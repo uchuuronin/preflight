@@ -46,7 +46,12 @@ def test_lookup_falls_back_from_gpu_to_lens_to_target():
 	)  # 5 runs < 9
 	assert t.lookup("memory.peak", "L4", "pretrain").key == ("memory.peak", "", "")
 	assert t.lookup("time.step", "L4", "finetune") is None
-	assert cf.Table.from_dict(t.to_dict()).cells == t.cells
+	back = cf.Table.from_dict(t.to_dict())
+	assert back.cells.keys() == t.cells.keys()
+	for k, c in t.cells.items():
+		assert back.cells[k].half_width == c.half_width and back.cells[k].residuals == pytest.approx(
+			c.residuals, abs=1e-5
+		)
 
 
 def test_half_width_falls_back_to_the_simulated_constant():

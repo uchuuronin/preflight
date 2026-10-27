@@ -69,6 +69,9 @@ class Cell:
 	groups: int
 	source: str  # "held_out" or "simulated"
 	key: tuple[str, ...]
+	residuals: tuple[
+		float, ...
+	] = ()  # signed log(actual / predicted), sorted: P(OOM) reads these (engine.oom)
 
 
 @dataclass(frozen=True)
@@ -78,6 +81,7 @@ class Table:
 	cells: dict[tuple[str, ...], Cell] = field(default_factory=dict)
 	built_from: str = ""
 	version: str = "0"
+	oom_reliable: bool = False  # P(OOM) passed its reliability diagram on real outcomes (engine.oom)
 
 	def lookup(self, target: str, gpu: str | None, lens: str | None) -> Cell | None:
 		"""The most specific cell with enough runs: (target, gpu, lens), then (target, lens), then (target,)."""
@@ -91,6 +95,7 @@ class Table:
 		return {
 			"version": self.version,
 			"built_from": self.built_from,
+			"oom_reliable": self.oom_reliable,
 			"cells": [
 				{
 					"key": list(c.key),
@@ -98,6 +103,7 @@ class Table:
 					"n": c.n,
 					"groups": c.groups,
 					"source": c.source,
+					"residuals": [round(r, 5) for r in c.residuals],
 				}
 				for c in self.cells.values()
 			],
@@ -106,10 +112,17 @@ class Table:
 	@classmethod
 	def from_dict(cls, d: dict) -> Table:
 		cells = {
-			tuple(c["key"]): Cell(c["half_width"], c["n"], c["groups"], c["source"], tuple(c["key"]))
+			tuple(c["key"]): Cell(
+				c["half_width"],
+				c["n"],
+				c["groups"],
+				c["source"],
+				tuple(c["key"]),
+				tuple(c.get("residuals", ())),
+			)
 			for c in d.get("cells", [])
 		}
-		return cls(cells, d.get("built_from", ""), d.get("version", "0"))
+		return cls(cells, d.get("built_from", ""), d.get("version", "0"), bool(d.get("oom_reliable", False)))
 
 
 def calibrate(scores: Iterable[Score], level: float = LEVEL, built_from: str = "") -> Table:
@@ -123,7 +136,8 @@ def calibrate(scores: Iterable[Score], level: float = LEVEL, built_from: str = "
 	for key, rows in by.items():
 		h = conformal_half_width([r.value for r in rows], level) if len(rows) >= MIN_CELL else None
 		if h is not None:
-			cells[key] = Cell(h, len(rows), len({r.group for r in rows}), "held_out", key)
+			res = tuple(sorted(r.log_ratio for r in rows))
+			cells[key] = Cell(h, len(rows), len({r.group for r in rows}), "held_out", key, res)
 	return Table(cells, built_from)
 
 

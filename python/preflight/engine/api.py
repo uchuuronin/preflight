@@ -23,6 +23,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from preflight.engine import agent_cost, conformal, gpus, knobs, memory, steptime
+from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
 	Estimate,
@@ -422,11 +423,20 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 	):
 		why = f"the peak comes at {est.breakdown.peak_moment}, which no probe ran; run a probe with {est.breakdown.peak_moment} in it"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
+	cell = conformal.TABLE.lookup("memory.peak", gpu, lens)
+	if est.status != "abstain" and est.point and cell is not None and cell.residuals:
+		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
+		alloc = est.point - memory.DEFAULT_CONTEXT_BYTES
+		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - memory.DEFAULT_CONTEXT_BYTES)
+		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
+		oom_source = f"from {cell.n} held-out runs"
+	else:
+		oom_source = "simulated band"
 	off = _off_probe(record, values)
 	if est.status in ("predicted", "measured") and off:
 		why = f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
-	res = _from_memory_estimate(est, mid)
+	res = _from_memory_estimate(est, mid, oom_source)
 	if est.status != "abstain" and est.breakdown is not None:
 		stack = dict(est.breakdown.stack)
 		if est.breakdown.peak_moment == "eval":
@@ -455,14 +465,17 @@ def _term_estimates(stack: dict, peak: Estimate) -> dict:
 	return out
 
 
-def _from_memory_estimate(est: memory.MemoryEstimate, mid: str) -> _MemoryResult:
+def _from_memory_estimate(
+	est: memory.MemoryEstimate, mid: str, oom_source: str = "simulated band"
+) -> _MemoryResult:
 	if est.status == "abstain":
 		return _MemoryResult(
 			_abstain("bytes", mid, est.reason), _abstain("probability", mid, est.reason), est
 		)
 	peak = _est(est.point, est.lo, est.hi, "bytes", est.status, mid, est.reason)
 	words = {"fits": "fits", "tight": "tight", "fails": "won't fit"}[est.oom_status]
-	why = f"{words}: P(out of memory) {est.p_oom:.0%}"
+	# Review, Oct 27: shown in bins until the reliability diagram on real outcomes passes (TABLE.oom_reliable)
+	why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
 	if est.breakdown is not None and est.breakdown.peak_moment != "train":
 		why += f"; the peak comes at {est.breakdown.peak_moment}, not during training steps"
 	# a probe that fitted measured the peak, not an OOM: P(OOM) is "measured" only from an OOM probe

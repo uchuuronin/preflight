@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from preflight.engine import conformal, knobs, memory, steptime
+from preflight.engine import conformal, knobs, memory, oom, steptime
 from preflight.engine.memory import TrainingSetup, TransformerArch
 
 LENS = {
@@ -133,6 +133,54 @@ def scores_from_rows(rows: Iterable[dict[str, Any]]) -> list[conformal.Score]:
 	return out
 
 
+def _capacity(row: dict[str, Any]) -> float | None:
+	env = row.get("env") or {}
+	mem = row.get("memory") or {}
+	return env.get("total_memory") or mem.get("total")
+
+
+def oom_pairs(rows: list[dict[str, Any]], scores: list[conformal.Score]) -> list[tuple[float, bool]]:
+	"""(predicted P(OOM), did it run out of memory) for every held-out query, fitted and OOM alike.
+
+	A query's P(OOM) uses only other architectures' residuals, so the check never grades a group on itself."""
+	resid = defaultdict(list)
+	for s in scores:
+		if s.target == "memory.peak":
+			resid[s.group].append(s.log_ratio)
+	groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+	for r in rows:
+		g = r.get("config", {}).get("params", {}).get("group")
+		if g:
+			groups[g].append(r)
+	out = []
+	for gid, rs in groups.items():
+		probes = [r for r in rs if r["config"]["params"].get("role") == "probe" and _ok(r)]
+		if len(probes) < 2:
+			continue
+		others = [x for g, v in resid.items() if g != gid for x in v]
+		if len(others) < conformal.MIN_CELL:
+			continue
+		cal = memory.Calibration.fit(
+			[
+				memory.MemoryProbe(
+					float(r["work_units"]), float(r["memory"]["peak_reserved"]), _analytical(r) or 0.0
+				)
+				for r in probes
+			]
+		)
+		for q in rs:
+			if q["config"]["params"].get("role") != "query" or q.get("status") not in ("ok", "oom"):
+				continue
+			cap = _capacity(q)
+			x = q.get("work_units") or q["config"]["params"].get("batch", 1) * q["config"]["params"].get(
+				"seq", 1
+			)
+			pred = cal.correct(float(x), _analytical(q) or 0.0)
+			if cap and pred > 0:
+				out.append((oom.empirical_p_oom(others, pred, float(cap)), q.get("status") == "oom"))
+	return out
+
+
 def _phases(row: dict[str, Any]) -> dict[str, float]:
 	t = row.get("timing") or {}
 	ph = {k: v for k, v in (t.get("phases") or {}).items() if v and v > 0}
@@ -167,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
 	ap.add_argument("--store", type=Path, required=True)
 	ap.add_argument("--out", type=Path, help="write the engine's _calibration_table.py here")
 	args = ap.parse_args(argv)
-	scores = scores_from_rows(load_rows(args.store))
+	scores = scores_from_rows(load_rows(args.store))  # grouped rows -> conformal scores
 	if not scores:
 		print("no grouped rows with probes and queries; nothing to calibrate")
 		return 1
@@ -176,7 +224,17 @@ def main(argv: list[str] | None = None) -> int:
 			f"{target}: leave-one-architecture-out coverage {cov.rate:.1%} "
 			f"(Wilson 95% {cov.lo:.1%}-{cov.hi:.1%}, n={cov.n}), median half-width {cov.median_half_width:.3f}"
 		)
+	rows = load_rows(args.store)
+	bins = oom.reliability(oom_pairs(rows, scores))
+	print("P(OOM) reliability (predicted vs observed, Wilson 95%):")
+	for b in bins:
+		print(
+			f"  [{b.lo:.2f}, {b.hi:.2f}) n={b.n} predicted {b.mean_predicted:.2f} observed {b.observed:.2f} ({b.wilson_lo:.2f}-{b.wilson_hi:.2f})"
+		)
+	ok = oom.reliable(bins)
+	print(f"  reliable enough to show as a probability: {ok}")
 	table = conformal.calibrate(scores, built_from=f"{args.store} ({len(scores)} scores)")
+	table = conformal.Table(table.cells, table.built_from, table.version, oom_reliable=ok)
 	if args.out:
 		write_table(table, args.out)
 		print(f"wrote {args.out} with {len(table.cells)} cells")

@@ -70,3 +70,22 @@ def test_a_real_cpu_group_runs_through_the_worker_and_calibrator():
 		rows.append({"key": c.key, "gpu": "cpu", "config": c.to_dict(), **res})
 	scores = calibrate.scores_from_rows(rows)
 	assert any(s.target == "time.step" and math.isfinite(s.value) for s in scores)
+
+
+def test_oom_pairs_use_other_architectures_and_real_outcomes():
+	from preflight.engine import conformal
+
+	rows, scores = [], []
+	for c in configs.grouped_configs(15, families=("gpt",)):
+		x = c.params["batch"] * c.params["seq"]
+		an = calibrate._analytical({"config": c.to_dict()})
+		row = _row(c, an * 1.05, x)
+		row["env"] = {"total_memory": an * 1.2}  # capacity just above the analytical peak
+		if c.params["role"] == "query" and c.params["batch"] > 8:
+			row["status"] = "oom"
+		rows.append(row)
+		if c.params["role"] == "query":
+			scores.append(conformal.Score("memory.peak", "L4", "pretrain", c.params["group"], an, an * 1.05))
+	pairs = calibrate.oom_pairs(rows, scores)
+	assert pairs and all(0 < p < 1 for p, _ in pairs)
+	assert any(y for _, y in pairs) and not all(y for _, y in pairs)  # both outcomes present
