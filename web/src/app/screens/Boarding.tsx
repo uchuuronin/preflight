@@ -9,7 +9,8 @@ import { t } from "../../lib/i18n";
 import type { JobEvent } from "../../workspace/record/types";
 import { go, href } from "../route";
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+/** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
+const API_BASE = "";
 
 const STAGES: Array<{ stage: JobEvent["stage"][]; key: string; model?: string }> = [
 	{ stage: ["queued", "admitted"], key: "boarding.stage.queue" },

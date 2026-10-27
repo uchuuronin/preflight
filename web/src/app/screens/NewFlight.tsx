@@ -11,7 +11,8 @@ import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+/** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
+const API_BASE = "";
 
 const GOALS: Array<{ kind: ObjectiveKind; key: string }> = [
 	{ kind: "min_cost", key: "goal.min_cost" },
@@ -54,7 +55,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		try {
 			const res = await fetch(`${API_BASE}/v1/jobs`, {
 				method: "POST",
-				credentials: "include",
+				credentials: "same-origin",
 				headers: { "Content-Type": "application/json", "Idempotency-Key": idem.current },
 				body: JSON.stringify(body),
 			});

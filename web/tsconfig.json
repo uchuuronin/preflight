@@ -14,5 +14,5 @@
 		"skipLibCheck": true,
 		"types": ["vite/client"]
 	},
-	"include": ["src", "vite.config.ts", "../schema/ts/contract.ts", "../schema/ts/encoding.ts"]
+	"include": ["src", "functions", "vite.config.ts", "../schema/ts/contract.ts", "../schema/ts/encoding.ts"]
 }

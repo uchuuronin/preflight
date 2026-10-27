@@ -7,7 +7,8 @@
  */
 import { buildTools, runTool, type ToolContext } from "./tools";
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+/** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
+const API_BASE = "";
 const MAX_ROUNDS = 6;
 
 export type InputItem = Record<string, unknown>;
@@ -32,7 +33,7 @@ export type Poster = (body: unknown) => Promise<Response>;
 const defaultPost: Poster = (body) =>
 	fetch(`${API_BASE}/v1/guide/turns`, {
 		method: "POST",
-		credentials: "include",
+		credentials: "same-origin",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(body),
 	});

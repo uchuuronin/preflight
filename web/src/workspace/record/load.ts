@@ -7,7 +7,8 @@ import { t } from "../../lib/i18n";
 import type { FlightRecord, Lens, LoadedRecord } from "./types";
 import { normaliseRecord } from "./types";
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+/** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
+const API_BASE = "";
 
 export interface Sample {
 	id: string;
@@ -58,7 +59,7 @@ export const DEFAULT_SAMPLE = "lora-7b";
 export async function loadRecord(ref: string): Promise<LoadedRecord> {
 	const sample = SAMPLES.find((s) => s.id === ref);
 	if (sample) return normaliseRecord(await sample.load());
-	const res = await fetch(`${API_BASE}/v1/records/${encodeURIComponent(ref)}`, { credentials: "include" });
+	const res = await fetch(`${API_BASE}/v1/records/${encodeURIComponent(ref)}`, { credentials: "same-origin" });
 	if (!res.ok) {
 		const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
 		throw new Error(body?.error?.message ?? t("app.record_unavailable"));
