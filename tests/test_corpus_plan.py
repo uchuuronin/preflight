@@ -282,3 +282,41 @@ def test_repeated_corpus_bugs_stop_the_sweep(tmp_path):
 def test_fp32_configs_sample_tf32_both_ways():
 	vals = {x.params.get("tf32") for x in c.kernel_configs(400, seed=0) if x.params.get("dtype") == "fp32"}
 	assert vals == {True, False}
+
+
+def test_uptime_ledger_bills_idle_time_and_stops_at_budget(tmp_path):
+	from datetime import UTC, datetime
+
+	from preflight.corpus import configs as C
+	from preflight.corpus.ledger import UptimeLedger
+	from preflight.corpus.store import ResultStore
+	from preflight.corpus.sweep import run_local
+
+	now = [1_000_000.0]
+	started = datetime.fromtimestamp(now[0] - 3600, UTC)  # the droplet has been up an hour already
+	ledger = UptimeLedger(tmp_path / "ledger.jsonl", started, usd_per_hour=2.0, clock=lambda: now[0])
+	assert ledger.spent() == pytest.approx(2.0)
+
+	def runner(cfg):
+		now[0] += 1800  # each config takes half an hour of droplet time
+		return {"status": "ok", "gpu_seconds": 60.0}
+
+	cfgs = C.kernel_configs(10)
+	n = run_local(
+		cfgs,
+		ResultStore(tmp_path / "out"),
+		"MI300X",
+		5.0,
+		2.0,
+		runner,
+		est_seconds=60,
+		ledger=ledger,
+		log=lambda m: None,
+	)
+	# $2 already spent by uptime; each config adds $1 of droplet time, not $0.03 of GPU seconds
+	assert n == 3
+	events = [r["event"] for r in ledger.rows()]
+	assert events[0] == "start" and events.count("config") == 3 and events[-1] == "stop"
+	assert ledger.rows()[-1]["spent_usd"] == pytest.approx(5.0)
+	with pytest.raises(ValueError):
+		UptimeLedger(tmp_path / "x.jsonl", datetime(2026, 10, 28), 2.0)  # no time zone

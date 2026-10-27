@@ -75,18 +75,22 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
   - Model cards say `calibration: simulated`, and engine and corpus constants carry source tags.
   - A Pyodide parity test (it needs the CDN, so CI runs it), an import allowlist, and an unlisted-GPU fallback from the probe's own memory.
 - **K1's band (S4c):** sized to cover 90% even if per-kernel drift is twice what S4 assumed. Cross-vendor drops from a hand-set 0.25 to 0.22, so AMD gets numbers with wide bands instead of always abstaining.
-- Tests live in root `tests/`; 701 pass across the repo (A's included), ruff clean with the repo config.
+- **Review, Oct 27 (the rest of B's list):**
+  - split-conformal intervals on log ratios, grouped by architecture, per GPU and lens, with a leave-one-architecture-out coverage check and Wilson intervals; the engine reads the table when one is built and stays `calibration: simulated` until then;
+  - P(OOM) from empirical residuals, shown in bins, with a reliability diagram that decides whether it may ever show as a number;
+  - corpus: grouped probe-like configs, 10 real HF LoRA and 4-bit jobs (pinned library versions, which are now part of each config's key), and `corpus.calibrate` to turn them into the table;
+  - memory refinements: optimizer-step moment, autocast weight cache, FSDP root unit, accumulated eval logits, LoRA frozen layers saving fewer activations, and flash attention no longer counted twice;
+  - the AMD droplet's uptime ledger: `--billing uptime` counts the droplet's whole bill, idle time included, and logs each config with the spend so far.
+- Tests live in root `tests/`; 773 pass across the repo (A's included), ruff clean with the repo config.
 
 ## Blocked
-- Modal access, for the NVIDIA corpus slice.
+- Modal access, for the L4 runs (grouped and HF jobs) that build the real calibration table, and one real call to confirm L4 capacity.
+- Chiya: who adds `cost_basis` and `job_cost` to the shared schema (gap 21).
 
 ## Next (Wed Oct 28)
-- Split-conformal layer on log ratios, grouped by architecture, calibrated per GPU and lens (simulated calibration until real held-out runs exist).
-- P(OOM) from empirical residuals, with a reliability diagram, shown in bins.
-- Corpus: grouped probe-like configs, about 10 real HF LoRA and 4-bit jobs on an L4, and code and library versions in the key.
-- Memory model refinements from the review; the AMD droplet's uptime ledger.
-- Run-cost breakdown (gap 21): the price table is started in `engine/prices/`; the `cost_basis` and `job_cost` schema fields wait on Chiya.
-- Agent cost from tokens when tasks lack `cost_usd`, once D's API price table lands.
+- Run-cost breakdown (gap 21): the price table is started in `engine/prices/`; the schema fields wait on Chiya.
+- Real held-out calibration on the L4 once Modal access lands; model cards switch to `held_out` per target as the table covers it.
+- Agent cost from tokens when tasks lack `cost_usd`, once D's price table lands.
 
 ## Contract requests
 In `docs/requests.md`.

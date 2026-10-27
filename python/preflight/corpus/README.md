@@ -83,3 +83,5 @@ PYTHONPATH=python python -m preflight.corpus.sweep run --kind kernels --configs 
 ```
 
 Stop and start it freely; it resumes. It refuses to start if `--gpu` doesn't match the GPU it finds, so rows can't be mislabelled. Then copy `~/corpus/kernels/MI300X` back for B.
+
+The droplet bills for uptime, not per config, so add `--billing uptime --droplet-started <when it was created, ISO 8601 with a time zone>` to the command above. The budget then counts the droplet's whole bill since it started, idle time and restarts included, and every start, config and stop goes into `~/corpus/ledger-MI300X.jsonl` with the spend at that moment. Destroy the droplet when the sweep stops: the bill keeps running until you do.
