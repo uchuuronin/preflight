@@ -7,9 +7,10 @@
  * Barley, Naples, Sky, Neptune, Light olive, Coral). Two sets: "dusk" (dark, the default)
  * and "day" (light). D may add or override sets with registerTokenSet from an add-on.
  *
- * Reserved meanings: `accent` is only "what the guide is talking about"; ok / tight / fail
- * are only fit status and always ship with an icon and a word. Memory-term colours
- * (term-1..5) never reuse either; they were checked with the dataviz validator on both skies.
+ * Reserved meanings: `fail` is the only red in the app (red at dusk, maroon by day, with a
+ * maroon tint behind failing parts at dusk), so anything red-toned means something will
+ * break; it always ships with an icon and a word. ok / tight are fit status, also with icon
+ * and word. Memory-term colours (term-1..5) follow D's mockup.
  */
 
 const shared = {
@@ -67,19 +68,19 @@ export const duskTokens = {
 	"accent-glow": "rgba(250, 213, 99, 0.42)",
 	ok: "#8EBD9D",
 	tight: "#F2B45A",
-	fail: "#F08A73",
-	"fail-soft": "rgba(240, 138, 115, 0.28)",
+	fail: "#FF6B6B",
+	"fail-soft": "rgba(139, 30, 45, 0.45)",
 	track: "rgba(255, 245, 209, 0.16)",
 	shadow: "0 20px 50px rgba(4, 18, 26, 0.40)",
 	"cloud-a": "rgba(158, 186, 224, 0.30)",
 	"cloud-b": "rgba(250, 213, 99, 0.22)",
 	"pill-bg": "#FAD563",
 	"pill-fg": "#173E50",
-	"term-1": "#4A8FE0",
-	"term-2": "#8E9730",
-	"term-3": "#9085E9",
-	"term-4": "#C98500",
-	"term-5": "#2FA79A",
+	"term-1": "#9EBAE0",
+	"term-2": "#B4BD62",
+	"term-3": "#8EBD9D",
+	"term-4": "#E8DCB0",
+	"term-5": "#FAD563",
 	focus: "#FAD563",
 } as const;
 
@@ -100,19 +101,19 @@ export const dayTokens = {
 	"accent-glow": "rgba(250, 213, 99, 0.75)",
 	ok: "#2E7652",
 	tight: "#9A5A00",
-	fail: "#B23D27",
-	"fail-soft": "rgba(178, 61, 39, 0.18)",
+	fail: "#8B1E2D",
+	"fail-soft": "rgba(139, 30, 45, 0.16)",
 	track: "rgba(23, 62, 80, 0.13)",
 	shadow: "0 20px 50px rgba(40, 70, 100, 0.18)",
 	"cloud-a": "rgba(255, 255, 255, 0.85)",
 	"cloud-b": "rgba(255, 224, 196, 0.75)",
 	"pill-bg": "#FAD563",
 	"pill-fg": "#173E50",
-	"term-1": "#4A8FE0",
-	"term-2": "#9AA33A",
-	"term-3": "#9085E9",
-	"term-4": "#C98500",
-	"term-5": "#2FA79A",
+	"term-1": "#70772E",
+	"term-2": "#B4BD62",
+	"term-3": "#8EBD9D",
+	"term-4": "#4E6A7D",
+	"term-5": "#D49810",
 	focus: "#173E50",
 } as const;
 
