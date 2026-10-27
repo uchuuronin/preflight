@@ -225,12 +225,14 @@
 					"type": "integer"
 				},
 				"output_tokens": {
+					"description": "All generated tokens, reasoning included (as OpenAI and Anthropic bill them)",
 					"minimum": 0,
 					"title": "Output Tokens",
 					"type": "integer"
 				},
 				"reasoning_tokens": {
 					"default": 0,
+					"description": "The part of output_tokens spent reasoning; not added again",
 					"minimum": 0,
 					"title": "Reasoning Tokens",
 					"type": "integer"
@@ -1310,6 +1312,29 @@
 					"default": null,
 					"description": "True when eval ran with autograd on (no no_grad)",
 					"title": "Grad Enabled"
+				},
+				"loader_batches": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Batches the full eval loader would run, so the pass can be extrapolated",
+					"title": "Loader Batches"
+				},
+				"memory_by_batch": {
+					"description": "Allocated bytes after each measured eval batch: growth across batches (outputs kept for metrics) is what makes an eval OOM late in the pass",
+					"items": {
+						"type": "integer"
+					},
+					"maxItems": 64,
+					"title": "Memory By Batch",
+					"type": "array"
 				}
 			},
 			"required": [
@@ -2221,6 +2246,19 @@
 					],
 					"default": null,
 					"title": "Record Id"
+				},
+				"share_token": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Where the record is read (GET /v1/records/{share_token}) once a skeleton exists",
+					"title": "Share Token"
 				},
 				"seq": {
 					"minimum": 0,
@@ -3923,6 +3961,15 @@
 					"title": "Extras",
 					"type": "object"
 				},
+				"step_log": {
+					"description": "Every optimizer step the probe ran, in order",
+					"items": {
+						"$ref": "#/$defs/StepSample"
+					},
+					"maxItems": 256,
+					"title": "Step Log",
+					"type": "array"
+				},
 				"kernels": {
 					"anyOf": [
 						{
@@ -4622,6 +4669,149 @@
 				}
 			},
 			"title": "Stability",
+			"type": "object"
+		},
+		"StepSample": {
+			"additionalProperties": false,
+			"description": "One optimizer step as the probe saw it, so B fits on every step, not a few summary points.",
+			"properties": {
+				"index": {
+					"minimum": 1,
+					"title": "Index",
+					"type": "integer"
+				},
+				"kind": {
+					"description": "warmup (discarded), timed (no recorder sync points, CUDA events at the step boundary only), phase (synchronised, for the phase split), profiled (profiler attached)",
+					"enum": [
+						"warmup",
+						"timed",
+						"phase",
+						"profiled"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"wall_s": {
+					"description": "Step boundary to step boundary, minus eval and checkpoint time",
+					"minimum": 0,
+					"title": "Wall S",
+					"type": "number"
+				},
+				"tokens": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Tokens in the step's batches, padding included",
+					"title": "Tokens"
+				},
+				"real_tokens": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Tokens the attention mask keeps",
+					"title": "Real Tokens"
+				},
+				"samples": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Samples"
+				},
+				"padded_len": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Padded sequence length of the step's batches",
+					"title": "Padded Len"
+				},
+				"micro_steps": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Micro Steps"
+				},
+				"peak_allocated_bytes": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Peak Allocated Bytes"
+				},
+				"peak_reserved_bytes": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Peak Reserved Bytes"
+				},
+				"device_used_bytes": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else",
+					"title": "Device Used Bytes"
+				}
+			},
+			"required": [
+				"index",
+				"kind",
+				"wall_s"
+			],
+			"title": "StepSample",
 			"type": "object"
 		},
 		"StepTime": {

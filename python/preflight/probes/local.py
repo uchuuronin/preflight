@@ -267,8 +267,14 @@ def _kill_descendants(root: int, keep: set[int]) -> None:
 
 
 def _probe_uid() -> int | None:
+	"""A fresh unprivileged uid per probe when running as root. PREFLIGHT_PROBE_UID pins one uid for
+	every probe in this process: in a per-job sandbox the sandbox is the isolation boundary, and
+	one uid lets a job's probes share the Hugging Face cache (locks, downloads) between points."""
 	if os.geteuid() != 0:
 		return None
+	pinned = os.environ.get("PREFLIGHT_PROBE_UID")
+	if pinned and pinned.isdigit() and int(pinned) >= 1000:
+		return int(pinned)
 	return 61_000 + (os.getpid() * 7 + next(_UIDS)) % 4_000
 
 
@@ -462,6 +468,7 @@ def _probe_model(
 		checkpoint=_opt(CheckpointStats, s.get("checkpoint")),
 		generation=_opt(GenerationStats, s.get("generation")),
 		extras={k: float(s[k]) for k in EXTRAS_KEYS if s.get(k) is not None},
+		step_log=untrusted.step_log(s.get("step_log")),
 		cost=ProbeCost(gpu_seconds=round(duration, 3), usd=round(duration * spec.gpu_usd_per_hour / 3600, 6)),
 	)
 
@@ -530,7 +537,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 			start_new_session=True,
 			**popen_kw,
 		)
-		log = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
+		plog = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
 	except BaseException:
 		_PROBE_LOCK.release()
 		raise
@@ -562,7 +569,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	finally:
 		_PROBE_LOCK.release()
 	duration = time.monotonic() - t0
-	log_tail = log.text()
+	log_tail = plog.text()
 
 	prog = {"stage": "starting", "steps": 0}
 	with contextlib.suppress(OSError, ValueError):

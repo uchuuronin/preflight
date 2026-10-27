@@ -599,6 +599,12 @@ export interface Probe {
 		[k: string]: number | undefined;
 	};
 	/**
+	 * Every optimizer step the probe ran, in order
+	 *
+	 * @maxItems 256
+	 */
+	step_log?: StepSample[];
+	/**
 	 * Per-kernel table, current-settings probe only (profiled window)
 	 */
 	kernels?: KernelTable | null;
@@ -740,6 +746,16 @@ export interface EvalStats {
 	 * True when eval ran with autograd on (no no_grad)
 	 */
 	grad_enabled?: boolean | null;
+	/**
+	 * Batches the full eval loader would run, so the pass can be extrapolated
+	 */
+	loader_batches?: number | null;
+	/**
+	 * Allocated bytes after each measured eval batch: growth across batches (outputs kept for metrics) is what makes an eval OOM late in the pass
+	 *
+	 * @maxItems 64
+	 */
+	memory_by_batch?: number[];
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -772,6 +788,43 @@ export interface GenerationStats {
 	 */
 	truncation_rate?: number | null;
 	backend?: ("hf" | "vllm" | "api" | "other") | null;
+}
+/**
+ * One optimizer step as the probe saw it, so B fits on every step, not a few summary points.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "StepSample".
+ */
+export interface StepSample {
+	index: number;
+	/**
+	 * warmup (discarded), timed (no recorder sync points, CUDA events at the step boundary only), phase (synchronised, for the phase split), profiled (profiler attached)
+	 */
+	kind: "warmup" | "timed" | "phase" | "profiled";
+	/**
+	 * Step boundary to step boundary, minus eval and checkpoint time
+	 */
+	wall_s: number;
+	/**
+	 * Tokens in the step's batches, padding included
+	 */
+	tokens?: number | null;
+	/**
+	 * Tokens the attention mask keeps
+	 */
+	real_tokens?: number | null;
+	samples?: number | null;
+	/**
+	 * Padded sequence length of the step's batches
+	 */
+	padded_len?: number | null;
+	micro_steps?: number | null;
+	peak_allocated_bytes?: number | null;
+	peak_reserved_bytes?: number | null;
+	/**
+	 * Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else
+	 */
+	device_used_bytes?: number | null;
 }
 /**
  * Top KERNEL_ROWS ops by device time, then the tail per class (probe-plan K: 100% within 20%).
@@ -868,7 +921,13 @@ export interface AgentTask {
 	model?: string | null;
 	turns: number;
 	input_tokens: number;
+	/**
+	 * All generated tokens, reasoning included (as OpenAI and Anthropic bill them)
+	 */
 	output_tokens: number;
+	/**
+	 * The part of output_tokens spent reasoning; not added again
+	 */
 	reasoning_tokens?: number;
 	cached_input_tokens?: number;
 	cache_creation_tokens?: number;
@@ -1170,6 +1229,10 @@ export interface Costs {
 export interface JobEvent {
 	job_id: string;
 	record_id?: string | null;
+	/**
+	 * Where the record is read (GET /v1/records/{share_token}) once a skeleton exists
+	 */
+	share_token?: string | null;
 	seq: number;
 	at: string;
 	stage:

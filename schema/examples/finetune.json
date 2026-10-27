@@ -439,6 +439,31 @@
 			"group": "speed"
 		},
 		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"T4",
+					"L4",
+					"A10",
+					"L40S",
+					"A100-SXM-40GB",
+					"A100-SXM-80GB",
+					"RTX-PRO-6000-96GB",
+					"H100-SXM-80GB",
+					"H200-SXM-141GB",
+					"B200-SXM-180GB",
+					"B300-SXM-288GB"
+				],
+				"log": false
+			},
+			"current": "L4",
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster"
+		},
+		{
 			"id": "packing",
 			"label_key": "knob.packing",
 			"kind": "bool",
@@ -475,7 +500,7 @@
 				"seq_len": 1024
 			},
 			"status": "ok",
-			"steps": 5,
+			"steps": 7,
 			"started_at": "2026-10-27T14:01:00Z",
 			"duration_s": 71.0,
 			"memory": {
@@ -519,21 +544,27 @@
 						2.37,
 						2.3,
 						2.26,
-						2.21
+						2.21,
+						2.18,
+						2.16
 					],
 					"grad_norm": [
 						0.81,
 						0.77,
 						0.74,
 						0.79,
-						0.72
+						0.72,
+						0.71,
+						0.7
 					],
 					"lr": [
 						2e-05,
 						4e-05,
 						6e-05,
 						8e-05,
-						0.0001
+						0.0001,
+						0.00012,
+						0.00014
 					]
 				},
 				"nan_count": 0,
@@ -561,6 +592,92 @@
 				"micro_steps_per_step": 4.0,
 				"host_rss_peak_bytes": 6442450944.0
 			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 3.108,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.7474,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.7326,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.7548,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.7252,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 6,
+					"kind": "phase",
+					"wall_s": 0.7622,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 7,
+					"kind": "phase",
+					"wall_s": 0.7698,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				}
+			],
 			"kernels": {
 				"rows": [
 					{
@@ -674,7 +791,7 @@
 				"seq_len": 1024
 			},
 			"status": "ok",
-			"steps": 5,
+			"steps": 7,
 			"started_at": "2026-10-27T14:03:00Z",
 			"duration_s": 80.0,
 			"memory": {
@@ -718,21 +835,27 @@
 						2.37,
 						2.3,
 						2.26,
-						2.21
+						2.21,
+						2.18,
+						2.16
 					],
 					"grad_norm": [
 						0.81,
 						0.77,
 						0.74,
 						0.79,
-						0.72
+						0.72,
+						0.71,
+						0.7
 					],
 					"lr": [
 						2e-05,
 						4e-05,
 						6e-05,
 						8e-05,
-						0.0001
+						0.0001,
+						0.00012,
+						0.00014
 					]
 				},
 				"nan_count": 0,
@@ -760,6 +883,92 @@
 				"micro_steps_per_step": 4.0,
 				"host_rss_peak_bytes": 6442450944.0
 			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 5.712,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 1.3736,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 1.3464,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 1.3872,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 1.3328,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 6,
+					"kind": "phase",
+					"wall_s": 1.4008,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 7,
+					"kind": "phase",
+					"wall_s": 1.4148,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				}
+			],
 			"cost": {
 				"gpu_seconds": 80.0,
 				"usd": 0.0178

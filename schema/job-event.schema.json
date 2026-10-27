@@ -220,6 +220,19 @@
 			"default": null,
 			"title": "Record Id"
 		},
+		"share_token": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Where the record is read (GET /v1/records/{share_token}) once a skeleton exists",
+			"title": "Share Token"
+		},
 		"seq": {
 			"minimum": 0,
 			"title": "Seq",

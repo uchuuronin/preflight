@@ -277,6 +277,7 @@
 				"tasks_sampled": 6.0,
 				"otel_spans": 84.0
 			},
+			"step_log": [],
 			"cost": {
 				"gpu_seconds": 0.0,
 				"usd": 1.0041

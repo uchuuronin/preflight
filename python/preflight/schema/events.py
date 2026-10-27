@@ -31,6 +31,10 @@ Stage = Literal[
 class JobEvent(Strict):
 	job_id: str
 	record_id: str | None = None
+	share_token: str | None = Field(
+		default=None,
+		description="Where the record is read (GET /v1/records/{share_token}) once a skeleton exists",
+	)
 	seq: int = Field(ge=0)
 	at: datetime
 	stage: Stage

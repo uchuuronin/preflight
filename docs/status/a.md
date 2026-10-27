@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Oct 27, 3 a.m. ET.
+Updated Tue Oct 27, evening ET.
 
 ## Done
 
@@ -40,30 +40,48 @@ Updated Tue Oct 27, 3 a.m. ET.
 - Independent code review: all Critical and High findings fixed with tests; Medium and Low fixed
   except the two noted below.
 
+- Execution plane, as code: the pipeline job function (fetch, map, skeleton before Muse Spark,
+  plan, probes, merge; a point that can't be set is skipped, eval OOM re-runs with eval off, a
+  per-job time and dollar budget, the content-hash probe cache), the Modal app (job-store
+  service, workers, one GPU sandbox per job with no secrets, an egress allowlist and read-only
+  weights), and a working `preflight map|run` CLI. One script runs end to end through the queue
+  on CPU in the tests.
+- Review fixes (Oct 27): `.eval()` before training no longer cuts the data loader; overrides
+  handle annotated fields, config classes and argparse flags (default and command line); timed
+  steps have no recorder sync points; every step is logged; eval memory per batch; chunked
+  attention-logit check; grad norms read after the step; visitor code runs under rlimits.
+- Second review pass (Oct 27): uploads live on a volume and the job state keeps a reference; a
+  retried job keeps its record id and share token; events are fenced by the lease token; each
+  sandbox runs as one pinned uid with its own HF cache; the store's owner is claimed before it
+  restores; workers stop leasing before their own timeout; probe time and cost are measured by
+  the worker, not reported by the sandbox; flags follow the script's own spelling and argparse
+  abbreviations; repos are read from git's object store with no checkout, big blobs never
+  downloaded and the clone deleted; malformed sources are visitor errors, not crashes.
+
 ## Blocked
 
-- No GPU and no Modal token in this environment, so probes are tested on CPU only. Modal wiring
-  (`runner/modal_app.py`) waits on Modal access (fallback decision due Wed Oct 28).
+- No GPU and no Modal token in this environment, so probes are tested on CPU only. The Modal app
+  (`runner/modal_app.py`) builds with Modal 1.6.3 but needs someone with Modal access to deploy it
+  and run `prefetch` and `smoke` for the first real zoo run.
 - Hugging Face is not reachable from this sandbox, so the zoo scripts run only on Modal.
 
 ## Next
 
-- Pipeline job function: fold `ProbeResult.arch` into the script map's model with
-  `untrusted.with_shape()` when the record is assembled.
-- Modal app: probe function with no secrets mounted and an egress allowlist, one container per
-  job, the queue store in one container saving to a Modal Dict, the reaper on a schedule.
-- Pipeline job function: fetch source, map, skeleton event within 60 s, plan, probes, merge into
-  the record, read-time plus measured findings, costs.
+- First real run: deploy the Modal app, `prefetch` the zoo weights, `smoke` one zoo script end to
+  end (needs someone with Modal access; commands in the hand-off).
+- Ground truth: both zoo scripts on a GPU, step time with and without the recorder's sync points,
+  to replace the simulated probe-plan figures.
 - Measured-rule findings (loader wait, padding, MFU, eval OOM, truncation, retry loops).
 - Agent recorder: OTel GenAI proxy around OpenAI-compatible clients; RL phase timer.
-- Remaining zoo scripts; ground-truth runs once Modal lands.
+- Remaining zoo scripts.
 
 ## Known limits, on purpose
 
-- Step timings synchronise at phase boundaries, so CPU/GPU overlap is lost and small models read
-  slightly slow. B's calibration absorbs it; we keep honest phase splits.
+- Timed steps carry no recorder sync points, but `by_phase` comes from two synchronised phase
+  steps after them, so phase splits lose CPU/GPU overlap. B scales the fractions to `p50_s`.
 - The queue saves under its lock. At 8 GPUs and a few visitors that is tens of saves a minute;
   revisit if the store moves off a single container.
+- Repos need a full 40-character commit: GitHub only serves a fetch by the whole hash.
 
 ## Contract requests
 

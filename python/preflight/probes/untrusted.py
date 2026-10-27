@@ -13,7 +13,7 @@ from preflight.recorder.kernels import KERNEL_ROWS
 from preflight.recorder.shape_keys import BOOL_KEYS as _BOOL_ARCH
 from preflight.recorder.shape_keys import INT_KEYS as _INT_ARCH
 from preflight.recorder.shape_keys import TEXT_KEYS as _TEXT_ARCH
-from preflight.schema import KernelTable
+from preflight.schema import KernelTable, StepSample
 from preflight.schema.record import KERNEL_NAME_LEN, KERNEL_TABLE_ROWS
 from preflight.schema.script_map import ModelInfo
 
@@ -96,3 +96,16 @@ def with_shape(model: ModelInfo | None, shape: dict | None) -> ModelInfo | None:
 		return ModelInfo.model_validate(merged)
 	except ValidationError:  # the base itself didn't validate (no model and an odd model_type)
 		return model
+
+
+def step_log(raw) -> list[StepSample]:
+	"""Each step the child reported that checks out; a malformed step is dropped, not the probe."""
+	if not isinstance(raw, list):
+		return []
+	out = []
+	for item in raw[:256]:
+		try:
+			out.append(StepSample.model_validate(item))
+		except ValidationError:
+			continue
+	return out

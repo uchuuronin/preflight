@@ -27,8 +27,42 @@ def _write(out_path: str, result: dict) -> None:
 	os.replace(tmp, out_path)
 
 
+# Limits on the visitor's code, set in this process before it runs (inherited by all it starts).
+# derived: no core files (they would hold the process's memory); a file-size cap well above a
+# 70B fp32 checkpoint shard so a runaway writer can't fill the disk; enough processes and threads
+# for DataLoader workers times BLAS threads; descriptors for big datasets.
+RLIMITS = {
+	"RLIMIT_CORE": 0,
+	"RLIMIT_FSIZE": 64 * 2**30,
+	"RLIMIT_NPROC": 8192,
+	"RLIMIT_NOFILE": 65536,
+}
+
+
+def set_limits() -> dict:
+	"""Lower each limit to ours (never raise one); returns what was applied, for the log."""
+	import resource
+
+	applied = {}
+	for name, want in RLIMITS.items():
+		lim = getattr(resource, name, None)
+		if lim is None:
+			continue
+		try:
+			soft, hard = resource.getrlimit(lim)
+			new_hard = want if hard == resource.RLIM_INFINITY else min(hard, want)
+			resource.setrlimit(
+				lim, (min(new_hard, soft if soft != resource.RLIM_INFINITY else new_hard), new_hard)
+			)
+			applied[name] = new_hard
+		except (ValueError, OSError):
+			continue
+	return applied
+
+
 def main(spec_path: str) -> int:
 	spec = json.loads(Path(spec_path).read_text())
+	set_limits()
 	workdir = os.path.abspath(spec["workdir"])
 	out_path = spec["out"]
 	try:

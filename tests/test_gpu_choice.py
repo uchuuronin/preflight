@@ -122,11 +122,9 @@ def test_one_step_up_after_a_gpu_oom_only():
 	assert tried == ["L4", "L40S"] and res.probe.status == "ok" and err is None
 	# host memory: a bigger GPU won't help
 	assert probe_on_ladder(lambda g: _R("oom", "oom.host"), "L4").tried == ["L4"]
-	# eval-time GPU OOM does step up
-	assert probe_on_ladder(lambda g: _R("oom", "oom.eval") if g == "L4" else _R("ok"), "L4").tried == [
-		"L4",
-		"L40S",
-	]
+	# an eval OOM is about the eval batch: no bigger GPU; the pipeline re-runs with eval off instead
+	out = probe_on_ladder(lambda g: _R("oom", "oom.eval") if g == "L4" else _R("ok"), "L4")
+	assert out.tried == ["L4"]
 	# still OOM after one step: stop there, the record says so
 	assert probe_on_ladder(lambda g: _R("oom", "oom"), "L4").tried == ["L4", "L40S"]
 	assert probe_on_ladder(lambda g: _R("oom", "oom"), "H200-SXM-141GB").tried == ["H200-SXM-141GB"]

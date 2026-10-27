@@ -1,6 +1,9 @@
 """Which probes to run for a record, and how long each runs.
 
-Defaults come from the Oct 27 Monte Carlo (docs/decisions/probe-plan.md):
+Defaults come from the Oct 27 Monte Carlo (docs/decisions/probe-plan.md). Those
+figures are simulated, a calibration of the procedure against data generated
+by the same kind of model; they are not accuracy claims and stay labelled so
+until the zoo's real runs replace them:
   - warmup 2, timed 5, median step time: 99.3% of trials within 15% of the
     long-run mean, against 89% for 3 timed steps averaged;
   - three memory probes (current, half batch, half sequence) so the fit can
@@ -17,10 +20,14 @@ from dataclasses import dataclass, field
 
 from preflight.schema import FlightRecord
 
-WARMUP_STEPS = 2
-TIMED_STEPS = 5
-EVAL_BATCHES = 2
-AGENT_TASKS = 30
+WARMUP_STEPS = 2  # simulated: probe-plan D1; checked against the zoo's real step-time series (Oct 28-29)
+TIMED_STEPS = 5  # simulated: probe-plan D1
+EVAL_BATCHES = (
+	2  # guess: enough to time an eval batch; replaced when eval memory growth is fitted on zoo runs
+)
+AGENT_TASKS = (
+	30  # simulated: probe-plan D3, pending Chiya's 30-or-50 call and the validation table's real run
+)
 MEMORY_LENSES = ("finetune", "pretrain", "rl", "vision", "gnn", "retrieval")
 
 

@@ -2,6 +2,7 @@
 trainer logs, divergence and classified failures. CPU, through the real subprocess path."""
 
 import importlib.util
+import itertools
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ pytest.importorskip("torch")
 from preflight.harness.static import map_static
 from preflight.probes.local import ProbeSpec, run_probe
 from preflight.recorder.overrides import apply_overrides
+from preflight.recorder.runtime import PHASE_STEPS
 
 FIX = Path(__file__).resolve().parent / "fixtures"
 # scripts that import transformers; CI's torch job installs it with accelerate
@@ -36,6 +38,7 @@ def test_eval_is_pulled_in_capped_and_shows_grads_were_kept():
 	assert p.eval.batch_size == 16
 	assert p.eval.grad_enabled is True
 	assert p.eval.seconds_per_batch > 0
+	assert p.eval.loader_batches == 100_000 // 16  # the full pass, so its time and memory can be extrapolated
 
 
 def test_checkpoint_saves_are_timed_and_kept_out_of_step_time():
@@ -50,8 +53,13 @@ def test_loss_scale_and_max_attention_logit_series():
 	p = probe("amp_attn.py", warmup=1, timed=3)
 	assert p.status == "ok", p.error
 	s = p.stability.series
-	assert len(s["loss_scale"]) == 4 and s["loss_scale"][0] == 1024.0
-	assert all(v is not None and v > 0 for v in s["max_attn_logit"])
+	assert len(s["loss_scale"]) == 4 + PHASE_STEPS and s["loss_scale"][0] == 1024.0
+	assert all(v == 1024.0 for v in s["loss_scale"])  # timed steps read the scale after the probe
+	# the attention check is skipped on timed steps (it would add GPU work to the timing), kept elsewhere
+	kinds = [x.kind for x in p.step_log]
+	assert all(
+		v is not None and v > 0 for v, k in zip(s["max_attn_logit"], kinds, strict=True) if k != "timed"
+	)
 
 
 @needs_transformers
@@ -59,7 +67,7 @@ def test_generation_stats_catch_truncated_rollouts():
 	p = probe("rollout_hf.py", warmup=1, timed=2)
 	assert p.status == "ok", p.error
 	g = p.generation
-	assert g.calls == 3 and g.backend == "hf"
+	assert g.calls == 3 + PHASE_STEPS and g.backend == "hf"
 	assert g.max_new_tokens == 8
 	assert g.new_tokens_max <= 8
 	assert g.truncation_rate > 0.5  # a random model rarely emits EOS within 8 tokens
@@ -72,7 +80,7 @@ def test_trainer_logs_become_rl_signals_and_logging_is_forced_every_step():
 	assert p.status == "ok", p.error
 	assert p.rl.truncation_rate == pytest.approx(0.9)
 	assert p.rl.zero_spread_fraction == pytest.approx(0.4)
-	assert len(p.rl.kl) == 3 and len(p.rl.entropy) == 3
+	assert len(p.rl.kl) == 3 + PHASE_STEPS and len(p.rl.entropy) == 3 + PHASE_STEPS
 
 
 def test_nan_loss_is_counted():
@@ -90,3 +98,40 @@ def test_failures_carry_codes():
 def test_host_memory_is_sampled():
 	p = probe("tiny_loop.py", warmup=1, timed=2)
 	assert p.extras["host_rss_peak_bytes"] > 50_000_000
+
+
+def test_a_model_left_in_eval_mode_is_not_an_eval_pass():
+	# from_pretrained calls .eval(); a loop that never calls .train() must keep its whole data loader
+	p = probe("eval_mode_loop.py", warmup=2, timed=4)
+	assert p.status == "ok", p.error
+	assert p.steps >= 6 and p.eval is None
+
+
+@needs_transformers
+def test_from_pretrained_eval_mode_does_not_cut_the_training_loader():
+	p = probe("eval_mode_hf.py", warmup=2, timed=4)
+	assert p.status == "ok", p.error
+	assert p.steps >= 6 and p.eval is None
+
+
+def test_a_validation_pass_before_training_is_cut_like_an_eval():
+	from preflight.probes.local import ProbeSpec, run_probe
+	from preflight.recorder.runtime import PRETRAIN_EVAL_CAP
+
+	files = {"sanity_eval_first.py": (FIX / "sanity_eval_first.py").read_text()}
+	r = run_probe(
+		ProbeSpec(
+			probe_id="p1", files=files, entrypoint="sanity_eval_first.py", warmup=1, timed=2, timeout_s=120
+		)
+	)
+	assert r.probe.status == "ok", r.probe.error
+	assert f"VAL BATCHES {PRETRAIN_EVAL_CAP}" in r.log_tail  # not 12,500
+	assert r.probe.steps == 3 + PHASE_STEPS
+
+
+def test_timed_steps_keep_each_steps_own_loss_scale():
+	p = probe("growing_scale.py", warmup=1, timed=3)
+	assert p.status == "ok", p.error
+	s = p.stability.series["loss_scale"]
+	assert all(b > a for a, b in itertools.pairwise(s)), s  # doubling every step, timed ones included
+	assert all(v is not None and v > 0 for v in p.stability.series["loss"])

@@ -79,3 +79,19 @@ def test_matmul_bytes_count_the_right_operands():
 	assert _bytes("aten::_scaled_mm", [[16, 64], [64, 32], [], [], [32]], 1) == (
 		16 * 64 + 64 * 32 + 32 + 16 * 32
 	)
+
+
+def test_matmul_flops_for_ops_the_counter_skips():
+	from preflight.recorder.kernels import _matmul_flops
+
+	assert _matmul_flops("aten::addmm_", [[16, 32], [16, 64], [64, 32]]) == 2 * 16 * 64 * 32
+	assert _matmul_flops("aten::baddbmm_", [[4, 16, 32], [4, 16, 64], [4, 64, 32]]) == 2 * 4 * 16 * 64 * 32
+	assert _matmul_flops("aten::addbmm", [[16, 32], [4, 16, 64], [4, 64, 32]]) == 2 * 4 * 16 * 64 * 32
+	assert _matmul_flops("aten::mv", [[16, 64], [64]]) == 2 * 16 * 64
+	assert _matmul_flops("aten::addmv", [[16], [16, 64], [64]]) == 2 * 16 * 64
+	assert _matmul_flops("aten::dot", [[64], [64]]) == 2 * 64
+	assert _matmul_flops("aten::_int_mm", [[16, 64], [64, 32]]) == 2 * 16 * 64 * 32
+	# composites: their child mm/addmm rows carry the FLOPs, so they would count twice
+	assert _matmul_flops("aten::linear", [[8, 32, 64], [128, 64], [128]]) is None
+	assert _matmul_flops("aten::matmul", [[8, 32, 64], [64, 128]]) is None
+	assert _matmul_flops("aten::relu", [[8, 8]]) is None

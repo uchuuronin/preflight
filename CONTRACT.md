@@ -145,3 +145,6 @@ an `Idempotency-Key` on every write that spends money. UI strings through
   `tokens_per_step`, `samples_per_step`, `micro_steps_per_step`; GPU names in
   `JobRequest.gpu` and `Constraints.gpu_types` are 1–64 characters; `JobRequest.constraints` is
   a typed `Constraints`.
+- 0.1.0, after the freeze (Oct 27 review, additive): `Probe.step_log` (`StepSample` per optimizer
+  step), `EvalStats.loader_batches` and `memory_by_batch`, `JobEvent.share_token`; descriptions
+  pin `AgentTask.output_tokens` as including reasoning tokens.

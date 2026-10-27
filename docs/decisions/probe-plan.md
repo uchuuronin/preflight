@@ -5,6 +5,14 @@ validation targets (step time within 15%, peak memory within 10%, no missed
 OOMs, agent cost inside its 90% interval). Each was chosen by simulating 3–5
 candidates (`scripts/mc_probe_plan.py`, `mc_agent_sample.py`, `mc_kernels_gpu.py`).
 
+> **Every figure in this file is simulated.** The simulations generate their own
+> truth from assumed distributions, so they show that each procedure behaves as
+> designed under those assumptions (calibration: simulated), not how accurate it
+> is on real jobs. None of these numbers goes in the README, the video or the UI.
+> They are replaced, setting by setting, by the zoo's ground-truth runs on Modal
+> (step time with and without the recorder's synchronisation points, memory at
+> every step, kernel tables) as those land, from Wed Oct 28.
+
 ## Assumptions the simulation makes
 
 - Step time: lognormal jitter with σ from 2% (compute-bound) to 10%
@@ -163,6 +171,15 @@ Chosen: walk the ladder when the size was unknown, one step when it was
 estimated (a second step for sized jobs adds nothing). Each failed rung costs
 about a minute, since an OOM fails at load or the first step. Reproduce K, G,
 L and U with `uv run python scripts/mc_kernels_gpu.py`.
+
+## Timing without the recorder in it (review, Oct 27)
+
+Timed steps run with no recorder synchronisation: losses, grad norms, logit norms and loss
+scales stay on the device and are read after the probe, the attention-logit check and the
+update-to-weight sample are skipped, and each step's time is the CUDA event at its boundary
+minus eval and checkpoint time. The phase split (data, forward, backward, optimizer) comes from
+two synchronised steps after them. Whether this matters, and by how much, is the first thing the
+zoo's GPU runs measure: the same script with and without the recorder.
 
 ## Also decided with these
 

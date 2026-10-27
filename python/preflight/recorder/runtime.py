@@ -47,11 +47,20 @@ from .arch import model_shape
 from .gpuinfo import canonical_gpu_name, peak
 from .kernels import KERNEL_ROWS  # noqa: F401  (re-exported for callers and tests)
 
-PROFILE_ACTIVE = 3
+PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zoo traces (Oct 28-29)
+# guess: batches a loop may fetch in eval mode before any backward; a sanity check or eval_on_start
+# pass is cut there. A training loop does its first backward on its first batch.
+PRETRAIN_EVAL_CAP = 8
+# synchronised steps after the timed ones, for the phase split (data/forward/backward/optimizer):
+# timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
+PHASE_STEPS = (
+	2  # guess: two synchronised steps for the phase split; compare with the profiled window on zoo runs
+)
 PROFILE_STEPS = 2 + PROFILE_ACTIVE  # wait 1 + warmup 1 + active 3
-ATTN_CALLS_PER_STEP = 2
-ATTN_QUERY_SAMPLE = 128
-SAMPLE_EVERY_S = 0.25
+ATTN_CALLS_PER_STEP = 2  # guess: two attention layers sampled per step bound the check's cost
+ATTN_QUERY_SAMPLE = 128  # guess: query rows sampled for the max-logit check
+ATTN_KEY_CHUNK = 4096  # keys per matmul in the attention-logit check: bounds its extra memory
+SAMPLE_EVERY_S = 0.25  # guess: host RSS and GPU power sampling period
 
 # TRL / HF log keys -> what they mean for Preflight's RL lens
 TRL_KEYS = {
@@ -176,7 +185,8 @@ class Recorder:
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
 		self.warmup, self.timed, self.profile = warmup, timed, profile
-		self.target = warmup + timed
+		self.target = warmup + timed + PHASE_STEPS
+		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
 		self.trace_path = trace_path
 		self.progress_path = progress_path
 		self.eval_cap = max(1, eval_batches)
@@ -193,6 +203,7 @@ class Recorder:
 		self._prof_steps = 0
 		self._stop_pending = False
 		self._kernels: dict | None = None
+		self._resolved = False
 		self._sdpa_seen = False  # attn_impl for script-defined models: only what actually ran
 		self._roots: list[nn.Module] = []
 		self._head_out = {"bytes": None, "norm": None, "dtype": None}
@@ -207,6 +218,11 @@ class Recorder:
 		self.stage = "running script"
 		# eval
 		self.eval_active = False
+		# .eval() before any backward is loading, not evaluating: HF's from_pretrained calls it, and a
+		# loop that never calls .train() would otherwise have its data loader cut to the eval cap
+		self._trained = False
+		self._pretrain_eval = None  # a module put in eval mode before training started
+		self._pretrain_batches: dict[int, int] = {}
 		self._eval_module = None
 		self._eval_t0 = 0.0
 		self._eval_batches_now = 0
@@ -227,8 +243,42 @@ class Recorder:
 	# ------------------------------------------------------------- plumbing
 
 	def _sync(self):
+		if self._clean:
+			return  # timed steps: the only synchronisation is the event at the step boundary
 		if self.cuda and torch.cuda.is_initialized():
 			torch.cuda.synchronize()
+
+	def _hard_sync(self):
+		"""Synchronise even in a timed step: around eval and checkpoint saves, whose time is taken out
+		of the step, so it must not include training work still queued on the device."""
+		if self.cuda and torch.cuda.is_initialized():
+			torch.cuda.synchronize()
+
+	@property
+	def _clean(self) -> bool:
+		"""True during the timed steps: no recorder sync points, no scalar reads off the GPU."""
+		n = len(self.steps)
+		return self._prof is None and self.warmup <= n < self.warmup + self.timed and not self.eval_active
+
+	def _kind(self) -> str:
+		n = len(self.steps)
+		if self._prof is not None:
+			return "profiled"
+		if n < self.warmup:
+			return "warmup"
+		return "timed" if n < self.warmup + self.timed else "phase"
+
+	@staticmethod
+	def _scalar(v):
+		"""A deferred scalar (a 0-d tensor kept on device during timed steps) read as a float."""
+		if v is None:
+			return None
+		if torch.is_tensor(v):
+			try:
+				return float(v.float())
+			except Exception:
+				return None
+		return v
 
 	def _now(self):
 		return time.perf_counter()
@@ -267,6 +317,9 @@ class Recorder:
 			"eval": 0.0,
 			"generate": 0.0,
 			"attn_max": None,
+			"loss_t": [],  # timed steps: losses kept on device, read after the probe
+			"scales_t": [],
+			"padded_len": 0,
 		}
 		self._attn_calls = 0
 
@@ -298,21 +351,37 @@ class Recorder:
 
 		def backward(t, *args, **kwargs):
 			rec._maybe_stop()
+			rec._trained = True
+			if rec.eval_active:
+				# gradients flowing means training resumed without a .train() call: the eval pass is over
+				rec._end_eval()
 			rec._sync()
 			t0 = rec._now()
 			if rec._data_end is not None:
 				rec.acc["forward"] += t0 - rec._data_end
 				rec._data_end = None
 			if t.numel() == 1:
-				v = float(t.detach().float().item())
-				for s_ in list(rec._scalers):
-					with suppress(Exception):
-						v /= float(s_.get_scale())  # scaler.scale(loss).backward(): report the real loss
-				if v != v or v in (float("inf"), float("-inf")):
-					rec.acc["nonfinite"] += 1
+				if rec._clean:
+					# kept on device and read after the probe: .item() here would sync every micro-step
+					rec.acc["loss_t"].append(t.detach().float())
+					# the scale as it is now: GradScaler.update() changes the same tensor in place later
+					rec.acc["scales_t"].append(
+						[
+							sc.detach().clone()
+							for sc in (getattr(s_, "_scale", None) for s_ in rec._scalers)
+							if sc is not None
+						]
+					)
 				else:
-					rec.acc["loss"] += v
-					rec.acc["loss_n"] += 1
+					v = float(t.detach().float().item())
+					for s_ in list(rec._scalers):
+						with suppress(Exception):
+							v /= float(s_.get_scale())  # scaler.scale(loss).backward(): report the real loss
+					if v != v or v in (float("inf"), float("-inf")):
+						rec.acc["nonfinite"] += 1
+					else:
+						rec.acc["loss"] += v
+						rec.acc["loss_n"] += 1
 			if not rec.steps and rec.stage in ("running script", "first batch"):
 				rec.stage = "first backward"
 				rec._progress()
@@ -324,6 +393,20 @@ class Recorder:
 
 		def next_(it):
 			if rec.eval_active:
+				ev = rec.evals[-1] if rec.evals else None
+				if ev is not None:
+					if ev.get("loader_batches") is None:
+						with suppress(Exception):
+							ev["loader_batches"] = len(it)  # the whole pass, for extrapolating it
+					mem = ev.get("memory_by_batch", [])
+					if (
+						rec._eval_batches_now
+						and rec.cuda
+						and torch.cuda.is_initialized()
+						and len(mem) <= rec.eval_cap
+					):
+						# what the previous eval batch left allocated: outputs kept for metrics grow it
+						ev.setdefault("memory_by_batch", []).append(torch.cuda.memory_allocated())
 				if rec._eval_batches_now >= rec.eval_cap:
 					raise StopIteration  # an eval loop gets a few batches, enough to measure it
 				batch = o["next"](it)
@@ -331,6 +414,12 @@ class Recorder:
 				if rec.evals and rec.evals[-1].get("batch_size") is None:
 					rec.evals[-1]["batch_size"] = _batch_stats(batch)[2]
 				return batch
+			pending = rec._pretrain_eval
+			if pending is not None and not rec._trained and not pending.training:
+				n = rec._pretrain_batches.get(id(it), 0) + 1
+				rec._pretrain_batches[id(it)] = n
+				if n > PRETRAIN_EVAL_CAP:
+					raise StopIteration  # a validation pass before training, cut like any eval
 			rec._maybe_stop()
 			rec._sync()
 			t0 = rec._now()
@@ -344,6 +433,8 @@ class Recorder:
 			t1 = rec._now()
 			rec.acc["data"] += t1 - t0
 			tokens, real, samples = _batch_stats(batch)
+			if tokens and samples:
+				rec.acc["padded_len"] = max(rec.acc["padded_len"], tokens // samples)
 			rec.acc["overhead"] += rec._now() - t1
 			rec.acc["batches"] += 1
 			if tokens is not None:
@@ -370,7 +461,12 @@ class Recorder:
 		def sdpa(q, k, v, *args, **kwargs):
 			out = o["sdpa"](q, k, v, *args, **kwargs)
 			rec._sdpa_seen = True
-			if torch.is_grad_enabled() and not rec.eval_active and rec._attn_calls < ATTN_CALLS_PER_STEP:
+			if (
+				torch.is_grad_enabled()
+				and not rec.eval_active
+				and not rec._clean
+				and rec._attn_calls < ATTN_CALLS_PER_STEP
+			):
 				rec._attn_calls += 1
 				t0 = rec._now()
 				with suppress(Exception):
@@ -431,9 +527,10 @@ class Recorder:
 			return fn(*args, **kwargs)
 		self._io_depth += 1
 		try:
-			self._sync()
+			self._hard_sync()
 			t0 = self._now()
 			out = fn(*args, **kwargs)
+			self._hard_sync()
 			dt = self._now() - t0
 		finally:
 			self._io_depth -= 1
@@ -468,8 +565,17 @@ class Recorder:
 				return
 		elif not any(p.requires_grad for p in m.parameters()):
 			return  # a frozen reference or encoder switching modes is not an eval phase
+		if not mode and not self._trained:
+			# .eval() before any backward: from_pretrained, or a pre-training validation pass (HF
+			# eval_on_start, Lightning's sanity check). Not an eval phase yet; the data loader caps a
+			# loop that runs on in eval mode without a backward (see next_)
+			if m.training:
+				self._pretrain_eval = m
+			return
+		if mode and m is self._pretrain_eval:
+			self._pretrain_eval = None
 		if not mode and not self.eval_active and m.training:
-			self._sync()
+			self._hard_sync()
 			self.eval_active = True
 			self._eval_module = m
 			self._eval_t0 = self._now()
@@ -483,11 +589,13 @@ class Recorder:
 			self._end_eval()
 
 	def _end_eval(self):
-		self._sync()
+		self._hard_sync()
 		dt = self._now() - self._eval_t0
 		ev = self.evals[-1]
 		ev["seconds"] = dt
 		ev["batches"] = self._eval_batches_now
+		if self.cuda and torch.cuda.is_initialized() and len(ev.get("memory_by_batch", [])) < ev["batches"]:
+			ev.setdefault("memory_by_batch", []).append(torch.cuda.memory_allocated())
 		if self.cuda and torch.cuda.is_initialized():
 			ev["peak"] = torch.cuda.max_memory_allocated()
 			torch.cuda.reset_peak_memory_stats()
@@ -498,6 +606,8 @@ class Recorder:
 		self._progress()
 
 	def _attn_logit(self, q, k, scale):
+		"""Largest |q·k|·scale over a sample of queries, in the native dtype and in key chunks, so a
+		long context doesn't allocate a float32 [heads, queries, keys] block on top of the step."""
 		if q.dim() < 3 or k.dim() < 3:
 			return
 		q0, k0 = q[0].detach(), k[0].detach()
@@ -507,9 +617,16 @@ class Recorder:
 			k0 = k0.repeat_interleave(q0.shape[0] // k0.shape[0], dim=0)
 		n = q0.shape[-2]
 		idx = torch.linspace(0, n - 1, min(n, ATTN_QUERY_SAMPLE), device=q0.device).long()
+		qs = q0[..., idx, :]
 		s = scale if scale is not None else q0.shape[-1] ** -0.5
+		best = None
 		with torch.no_grad():
-			m = float((q0[..., idx, :].float() @ k0.float().transpose(-1, -2)).abs().amax() * s)
+			for start in range(0, k0.shape[-2], ATTN_KEY_CHUNK):
+				part = (qs @ k0[..., start : start + ATTN_KEY_CHUNK, :].transpose(-1, -2)).abs().amax()
+				best = part if best is None else torch.maximum(best, part)
+		if best is None:
+			return
+		m = float(best.float()) * s
 		self.acc["attn_max"] = m if self.acc["attn_max"] is None else max(self.acc["attn_max"], m)
 
 	def _hook_hf_generate(self, mod):
@@ -698,9 +815,8 @@ class Recorder:
 				self._head_out["bytes"] = max(self._head_out["bytes"] or 0, _bytes(out))
 				self._head_out["dtype"] = out.dtype
 				with torch.no_grad():
-					self._head_out["norm"] = float(
-						torch.linalg.vector_norm(out.detach(), dim=-1).float().mean()
-					)
+					norm = torch.linalg.vector_norm(out.detach(), dim=-1).float().mean()
+					self._head_out["norm"] = norm if self._clean else float(norm)
 				self.acc["overhead"] += self._now() - t0
 
 			self._head_handles.append(head.register_forward_hook(hook))
@@ -720,28 +836,39 @@ class Recorder:
 		self._sync()
 		self._t_pre = self._now()
 		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"], self.acc["generate"])
-		grads = [p.grad for g in opt.param_groups for p in g["params"] if p.grad is not None]
-		self._grad_bytes = _unique_bytes(grads)
-		self._grad_norm = None
-		if grads:
-			# per-tensor norms in each grad's own dtype, then one small fp32 reduction: no full-size copies
-			by_dev: dict = {}
-			for g in grads:
-				by_dev.setdefault((g.device, g.dtype), []).append(g.detach())
-			norms = [n.float() for group in by_dev.values() for n in torch._foreach_norm(group)]
-			self._grad_norm = float(
-				torch.linalg.vector_norm(torch.stack([n.to(norms[0].device) for n in norms]))
-			)
-		self._sample = [(p, p.detach().clone()) for p in self._sample_params]
+		# update-to-weight needs the weights before the step; a small sample, and not on timed steps
+		self._sample = [] if self._clean else [(p, p.detach().clone()) for p in self._sample_params]
 		self._sync()
 		self._overhead_pre = self._now() - self._t_pre
+
+	def _grad_norm_of(self, opt):
+		"""Global grad norm, as a 0-d tensor (no sync). Read after the step: with a closure (Lightning,
+		LBFGS) the gradients only exist once optimizer.step() has run the closure."""
+		grads = [p.grad for g in opt.param_groups for p in g["params"] if p.grad is not None]
+		if not grads:
+			return None, 0
+		by_dev: dict = {}
+		for g in grads:
+			by_dev.setdefault((g.device, g.dtype), []).append(g.detach())
+		# per-tensor norms in each grad's own dtype, then one small fp32 reduction: no full-size copies
+		norms = [n.float() for group in by_dev.values() for n in torch._foreach_norm(group)]
+		total = torch.linalg.vector_norm(torch.stack([n.to(norms[0].device) for n in norms]))
+		return total, _unique_bytes(grads)
 
 	def _post(self, opt, args, kwargs):
 		if opt is not self.opt:
 			return
+		clean, kind = self._clean, self._kind()
 		self._sync()
 		t_post = self._now()
+		event = None
+		if self.cuda and torch.cuda.is_initialized():
+			event = torch.cuda.Event(enable_timing=True)
+			event.record()  # the step boundary, timed on the device: no host sync needed
 		t0 = t_post
+		grad_norm, grad_bytes = self._grad_norm_of(opt)
+		if grad_norm is not None and not clean:
+			grad_norm = float(grad_norm)
 		utw = None
 		if self._sample:
 			ratios = []
@@ -754,16 +881,21 @@ class Recorder:
 		opt_state = _unique_bytes(
 			t for s in opt.state.values() for t in s.values() if isinstance(t, torch.Tensor)
 		)
-		peak = reserved = None
+		peak = reserved = used = None
 		if self.cuda and torch.cuda.is_initialized():
 			peak = max(torch.cuda.max_memory_allocated(), self._eval_peak_stash)
 			reserved = torch.cuda.max_memory_reserved()
+			with suppress(Exception):
+				free, total = torch.cuda.mem_get_info()
+				used = total - free  # the whole device: PyTorch, NCCL, cuBLAS workspaces, other processes
 			torch.cuda.reset_peak_memory_stats()
 			self._eval_peak_stash = 0
 		scale = None
 		for s in list(self._scalers):
 			with suppress(Exception):
-				scale = float(s.get_scale())
+				# timed steps keep the scale tensor and read it after the probe (get_scale() syncs)
+				sc = getattr(s, "_scale", None)
+				scale = (sc.detach().clone() if sc is not None else None) if clean else float(s.get_scale())
 		lr = opt.param_groups[0].get("lr")
 		overhead = self._overhead_pre + (self._now() - t0) + self.acc["overhead"]
 		f0, b0, d0, g0 = self._acc_at_pre
@@ -774,35 +906,47 @@ class Recorder:
 		wall = max(1e-9, t_post - start - overhead - a["io"] - a["eval"])
 		self.steps.append(
 			{
+				"kind": kind,
 				"wall": wall,
+				"event": event,
 				"data": a["data"],
 				"forward": max(0.0, a["forward"] - a["generate"]),
 				"rollout": a["generate"],
 				"backward": a["backward"],
 				"optimizer": opt_time,
 				"loss": a["loss"] if a["loss_n"] else None,
+				"loss_t": a["loss_t"],
+				"scales_t": a["scales_t"],
 				"micro": a["micro"],
 				"tokens": a["tokens"],
 				"real": a["real"],
 				"samples": a["samples"],
+				"padded_len": a["padded_len"] or None,
 				"nonfinite": a["nonfinite"],
-				"grad_norm": self._grad_norm,
+				"grad_norm": grad_norm,
 				"utw": utw,
-				"grad_bytes": self._grad_bytes,
+				"grad_bytes": grad_bytes,
 				"opt_bytes": opt_state,
 				"peak": peak,
 				"reserved": reserved,
-				"lr": float(lr) if isinstance(lr, int | float) or torch.is_tensor(lr) else None,
+				"device_used": used,
+				"lr": float(lr)
+				if isinstance(lr, int | float) or (torch.is_tensor(lr) and not clean)
+				else None,
 				"logit_norm": self._head_out["norm"],
 				"attn_max": a["attn_max"],
 				"loss_scale": scale,
 				"io": a["io"],
 				"io_bytes": a["io_bytes"],
+				"eval_s": a["eval"],
 				"profiled": self._prof is not None,
 			}
 		)
 		self._reset_acc()
 		n = len(self.steps)
+		if kind == "timed" and n == self.warmup + self.timed:
+			# drain what the timed steps queued, so the first phase step doesn't carry it as "other"
+			self._hard_sync()
 		self.stage = f"step {n}"
 		self._progress()
 		self._last_post = self._now()
@@ -817,6 +961,42 @@ class Recorder:
 				self._start_profiler()
 			else:
 				self._stop_pending = True
+
+	def _resolve_deferred(self):
+		"""After the probe: read what timed steps left on the device, and time them from their events."""
+		if self._resolved:
+			return
+		self._resolved = True
+		if self.cuda and torch.cuda.is_initialized():
+			with suppress(Exception):
+				torch.cuda.synchronize()
+		prev = None
+		for st in self.steps:
+			ev = st.pop("event", None)
+			if st["kind"] == "timed" and ev is not None and prev is not None:
+				with suppress(Exception):
+					# device time between boundaries includes host stalls (the GPU idles while the
+					# loader works), so it is the step's wall time without any sync inside the step
+					st["wall"] = max(1e-9, prev.elapsed_time(ev) / 1000.0 - st["io"] - st["eval_s"])
+			prev = ev
+			losses = st.pop("loss_t", [])
+			scales = st.pop("scales_t", [])
+			if losses:
+				vals = []
+				for lt, sc in zip(losses, scales, strict=False):
+					v = self._scalar(lt)
+					for x in sc:
+						xv = self._scalar(x)
+						if v is not None and xv:
+							v /= xv
+					vals.append(v)
+				good = [
+					v for v in vals if v is not None and v == v and v not in (float("inf"), float("-inf"))
+				]
+				st["nonfinite"] += len(vals) - len(good)
+				st["loss"] = sum(good) if good else None
+			for key in ("grad_norm", "logit_norm", "loss_scale"):
+				st[key] = self._scalar(st[key])
 
 	def _start_profiler(self):
 		from torch.profiler import ProfilerActivity, profile, schedule
@@ -861,8 +1041,14 @@ class Recorder:
 	def summary(self) -> dict:
 		if self.eval_active:
 			self._end_eval()
-		timed = [s for s in self.steps if not s["profiled"]][self.warmup :]
+		self._resolve_deferred()
+		timed = [s for s in self.steps if s["kind"] == "timed"]
 		steps = list(self.steps)
+		# the phase split: synchronised phase steps on a GPU; on CPU nothing runs asynchronously, so the
+		# timed steps' own phase timings are exact
+		phased = [s for s in steps if s["kind"] == "phase"] if self.cuda else timed
+		if self.cuda and not phased:
+			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["host_rss_peak_bytes"] = self._rss_peak or None
 		if self._kernels is not None:
@@ -894,18 +1080,22 @@ class Recorder:
 			walls = sorted(s["wall"] for s in timed)
 			mean = statistics.fmean(walls)
 			keys = ["data", "forward", "backward", "optimizer"] + (
-				["rollout"] if any(s["rollout"] for s in timed) else []
+				["rollout"] if any(s["rollout"] for s in phased) else []
 			)
-			phases = {k: statistics.fmean(s[k] for s in timed) for k in keys}
-			phases["other"] = max(0.0, mean - sum(phases.values()))
-			total = sum(phases.values()) or 1.0
+			by_phase = {}
+			if phased:
+				ref = statistics.fmean(s["wall"] for s in phased)
+				phases = {k: statistics.fmean(s[k] for s in phased) for k in keys}
+				phases["other"] = max(0.0, ref - sum(phases.values()))
+				total = sum(phases.values()) or 1.0
+				by_phase = {k: v / total for k, v in phases.items()}
 			out["step_time"] = {
 				"n_steps": len(timed),
 				"mean_s": mean,
 				"p50_s": statistics.median(walls),
 				"p95_s": _quantile(walls, 0.95),
 				"first_step_s": steps[0]["wall"],
-				"by_phase": {k: v / total for k, v in phases.items()},
+				"by_phase": by_phase,
 				"unprofiled": True,
 			}
 			tokens = statistics.fmean(s["tokens"] for s in timed)
@@ -916,7 +1106,8 @@ class Recorder:
 			}
 			out["tokens_per_step"] = tokens
 			out["samples_per_step"] = samples
-			out["loader_wait_fraction"] = min(1.0, phases["data"] / mean)
+			if by_phase:
+				out["loader_wait_fraction"] = min(1.0, by_phase.get("data", 0.0))
 		real = sum(s["real"] for s in steps)
 		tok = sum(s["tokens"] for s in steps)
 		samples_total = sum(s["samples"] for s in steps)
@@ -953,6 +1144,22 @@ class Recorder:
 			"reserved": max((s["reserved"] for s in steps if s["reserved"] is not None), default=None),
 			"peak_step": (1 + max(range(len(steps)), key=lambda i: steps[i]["peak"] or 0)) if peaks else None,
 		}
+		out["step_log"] = [
+			{
+				"index": i,
+				"kind": st["kind"],
+				"wall_s": st["wall"],
+				"tokens": st["tokens"] or None,
+				"real_tokens": st["real"] or None,
+				"samples": st["samples"] or None,
+				"padded_len": st["padded_len"],
+				"micro_steps": st["micro"],
+				"peak_allocated_bytes": st["peak"],
+				"peak_reserved_bytes": st["reserved"],
+				"device_used_bytes": st["device_used"],
+			}
+			for i, st in enumerate(steps, 1)
+		][:256]
 		out["params_total"] = self._params_total
 		out["params_trainable"] = self._params_trainable
 		out["micro_steps_per_step"] = round(statistics.fmean(s["micro"] for s in steps), 3)
@@ -977,6 +1184,8 @@ class Recorder:
 				"seconds_per_batch": statistics.fmean(x["seconds"] / x["batches"] for x in done),
 				"peak_allocated_bytes": max(peaks) if peaks else None,
 				"grad_enabled": e.get("grad_enabled"),
+				"loader_batches": e.get("loader_batches"),
+				"memory_by_batch": [int(x) for x in e.get("memory_by_batch", [])][:64],
 			}
 		}
 

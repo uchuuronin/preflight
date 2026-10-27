@@ -85,6 +85,36 @@ def kernel_table(rows, backend="cuda", steps=3, allow_tf32=False):
 	}
 
 
+def step_log(
+	n_warmup, n_timed, n_phase, wall, tokens, samples, padded_len, peak, reserved, micro=1, first=4.2
+):
+	"""Probe.step_log: every step; the first carries compile and allocator warm-up, timed steps jitter a little."""
+	kinds = ["warmup"] * n_warmup + ["timed"] * n_timed + ["phase"] * n_phase
+	jitter = [1.0, 1.01, 0.99, 1.02, 0.98, 1.0, 1.01, 0.99]
+	return [
+		{"index": i + 1, "kind": k, "wall_s": round(wall * (first if i == 0 else jitter[i % 8]) * (1.03 if k == "phase" else 1.0), 4),
+			"tokens": int(tokens), "real_tokens": int(tokens), "samples": int(samples), "padded_len": int(padded_len),
+			"micro_steps": micro, "peak_allocated_bytes": int(peak), "peak_reserved_bytes": int(reserved)}
+		for i, k in enumerate(kinds)
+	]  # fmt: skip
+
+
+# what skeleton_record offers as gpu_type values: Modal's list (engine/gpus.py MODAL_GPU)
+MODAL_GPUS = [
+	"T4",
+	"L4",
+	"A10",
+	"L40S",
+	"A100-SXM-40GB",
+	"A100-SXM-80GB",
+	"RTX-PRO-6000-96GB",
+	"H100-SXM-80GB",
+	"H200-SXM-141GB",
+	"B200-SXM-180GB",
+	"B300-SXM-288GB",
+]
+
+
 def targets():
 	return [
 		{"id": "memory.peak", "label_key": "target.memory.peak", "unit": "bytes", "readout": "memory"},
@@ -188,6 +218,14 @@ def finetune() -> dict:
 			"group": "speed",
 		},
 		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {"values": MODAL_GPUS},
+			"current": "L4",
+			"group": "cluster",
+		},
+		{
 			"id": "packing",
 			"label_key": "knob.packing",
 			"kind": "bool",
@@ -271,12 +309,12 @@ def finetune() -> dict:
 		pk = peak(bs, 1024)
 		step = ft_step(bs)
 		tokens = ACCUM * bs * 1024  # padded batches, all four micro-steps: what tokens_per_s counts
-		loss = [2.41, 2.37, 2.30, 2.26, 2.21]
+		loss = [2.41, 2.37, 2.30, 2.26, 2.21, 2.18, 2.16]
 		return {
 			"id": pid,
 			"knobs": {"batch_size": bs, "seq_len": 1024},
 			"status": "ok",
-			"steps": 5,
+			"steps": 7,
 			"started_at": iso(T0 + timedelta(minutes=1 + 2 * i)),
 			"duration_s": 71.0 + 9 * i,
 			"memory": {
@@ -317,8 +355,8 @@ def finetune() -> dict:
 			"stability": {
 				"series": {
 					"loss": loss,
-					"grad_norm": [0.81, 0.77, 0.74, 0.79, 0.72],
-					"lr": [2e-05, 4e-05, 6e-05, 8e-05, 1e-04],
+					"grad_norm": [0.81, 0.77, 0.74, 0.79, 0.72, 0.71, 0.70],
+					"lr": [2e-05, 4e-05, 6e-05, 8e-05, 1e-04, 1.2e-04, 1.4e-04],
 				},
 			},
 			"data": {
@@ -338,6 +376,7 @@ def finetune() -> dict:
 				"micro_steps_per_step": float(ACCUM),
 				"host_rss_peak_bytes": 6_442_450_944.0,
 			},
+			"step_log": step_log(2, 3, 2, step, tokens, ACCUM * bs, 1024, pk, pk * 1.07, micro=ACCUM),
 			**({"kernels": ft_kernels(step, tokens)} if i == 0 else {}),
 			"cost": {"gpu_seconds": 71.0 + 9 * i, "usd": round((71.0 + 9 * i) * 0.80 / 3600, 4)},
 			"cache_key": f"sha256:{'a' * 60}{i:04d}",
@@ -649,6 +688,14 @@ def pretrain() -> dict:
 			"group": "speed",
 		},
 		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {"values": MODAL_GPUS},
+			"current": "A100-SXM-40GB",
+			"group": "cluster",
+		},
+		{
 			"id": "lr",
 			"label_key": "knob.lr",
 			"kind": "float",
@@ -731,12 +778,12 @@ def pretrain() -> dict:
 
 	def probe(pid, bs, i, prec="fp32"):
 		s = step_s(bs, 1024, 0, prec)
-		gn = [1.9, 1.4, 1.2, 1.1, 1.05, 0.98, 0.95, 0.93]
+		gn = [1.9, 1.4, 1.2, 1.1, 1.05, 0.98, 0.95, 0.93, 0.92, 0.91]
 		return {
 			"id": pid,
 			"knobs": {"batch_size": bs, "seq_len": 1024, "num_workers": 0, "precision": prec},
 			"status": "ok",
-			"steps": 8,
+			"steps": 10,
 			"started_at": iso(T0 + timedelta(minutes=1 + 2 * i)),
 			"duration_s": 64.0 + 5 * i,
 			"memory": {
@@ -771,13 +818,25 @@ def pretrain() -> dict:
 			},
 			"stability": {
 				"series": {
-					"loss": [10.98, 10.21, 9.62, 9.11, 8.70, 8.33, 8.02, 7.79],
+					"loss": [10.98, 10.21, 9.62, 9.11, 8.70, 8.33, 8.02, 7.79, 7.60, 7.44],
 					"grad_norm": gn,
 					"grad_norm_ma": [round(sum(gn[: k + 1]) / (k + 1), 3) for k in range(len(gn))],
-					"update_to_weight": [0.0021, 0.0018, 0.0016, 0.0015, 0.0015, 0.0014, 0.0014, 0.0013],
-					"max_attn_logit": [11.2, 12.0, 12.6, 13.1, 13.5, 13.8, 14.0, 14.3],
-					"output_logit_norm": [41.0, 39.2, 38.7, 38.1, 37.9, 37.6, 37.4, 37.2],
-					"lr": [6e-6, 1.2e-5, 1.8e-5, 2.4e-5, 3e-5, 3.6e-5, 4.2e-5, 4.8e-5],
+					"update_to_weight": [
+						0.0021,
+						0.0018,
+						0.0016,
+						None,
+						None,
+						None,
+						None,
+						None,
+						0.0013,
+						0.0013,
+					],
+					# timed steps skip the attention check (it would add GPU work inside the timing)
+					"max_attn_logit": [11.2, 12.0, 12.6, None, None, None, None, None, 14.4, 14.6],
+					"output_logit_norm": [41.0, 39.2, 38.7, 38.1, 37.9, 37.6, 37.4, 37.2, 37.0, 36.9],
+					"lr": [6e-6, 1.2e-5, 1.8e-5, 2.4e-5, 3e-5, 3.6e-5, 4.2e-5, 4.8e-5, 5.4e-5, 6e-5],
 				},
 				"nan_count": 0,
 				"inf_count": 0,
@@ -794,6 +853,18 @@ def pretrain() -> dict:
 				"samples_per_step": float(bs),
 				"micro_steps_per_step": 1.0,
 			},
+			"step_log": step_log(
+				3,
+				5,
+				2,
+				s,
+				bs * 1024,
+				bs,
+				1024,
+				(1.99 + 0.84 * bs) * GIB,
+				(2.2 + 0.86 * bs) * GIB,
+				first=1 + 21.0 / s,
+			),
 			**({"kernels": pt_kernels(s, prec)} if i == 0 else {}),
 			"cost": {"gpu_seconds": 64.0 + 5 * i, "usd": round((64.0 + 5 * i) * 2.10 / 3600, 4)},
 			"trace": f"blob://traces/01JBGOLDENPT/{pid}.json.gz",
@@ -858,7 +929,7 @@ def pretrain() -> dict:
 			"backend": "cuda",
 			"provider": "modal",
 			"gpu": {
-				"name": "A100-SXM4-40GB",
+				"name": "A100-SXM-40GB",
 				"count": 1,
 				"memory_bytes": 42_298_834_944,
 				"vendor": "nvidia",

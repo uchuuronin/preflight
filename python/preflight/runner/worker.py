@@ -60,7 +60,7 @@ class JobContext:
 
 	def emit(self, stage: str, **fields) -> None:
 		self.check()
-		self._store.emit(self.lease.job_id, stage=stage, **fields)
+		self._store.emit(self.lease.job_id, stage=stage, token=self.lease.token, **fields)
 
 
 JobFn = Callable[[Lease, JobContext], str]

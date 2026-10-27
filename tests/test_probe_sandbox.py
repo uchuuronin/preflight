@@ -119,3 +119,26 @@ def test_probe_runs_as_an_unprivileged_user(tmp_path):
 	files = {"who.py": "import os\nprint('UID', os.getuid())\n"}
 	r = run_probe(ProbeSpec(probe_id="p1", files=files, entrypoint="who.py", timeout_s=30, out_dir=tmp_path))
 	assert "UID 0" not in r.log_tail and "UID " in r.log_tail
+
+
+@needs_torch
+def test_visitor_code_runs_under_resource_limits(tmp_path):
+	files = {
+		"lim.py": "import resource\nfor n in ('RLIMIT_CORE', 'RLIMIT_FSIZE', 'RLIMIT_NOFILE'):\n    print(n, resource.getrlimit(getattr(resource, n))[1])\n"
+	}
+	r = run_probe(ProbeSpec(probe_id="p1", files=files, entrypoint="lim.py", timeout_s=30, out_dir=tmp_path))
+	assert "RLIMIT_CORE 0" in r.log_tail
+	assert f"RLIMIT_FSIZE {64 * 2**30}" in r.log_tail
+	nofile = int(r.log_tail.split("RLIMIT_NOFILE ")[1].split()[0])
+	assert 0 < nofile <= 65536  # lowered to ours, or the host's if that is lower; never raised
+
+
+def test_a_pinned_probe_uid_is_used_for_every_probe(monkeypatch):
+	from preflight.probes.local import _probe_uid
+
+	monkeypatch.setenv("PREFLIGHT_PROBE_UID", "61000")
+	if os.geteuid() == 0:
+		assert _probe_uid() == _probe_uid() == 61000
+	monkeypatch.setenv("PREFLIGHT_PROBE_UID", "0")  # never root, never a system uid
+	if os.geteuid() == 0:
+		assert _probe_uid() != 0
