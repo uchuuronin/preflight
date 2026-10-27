@@ -1,0 +1,269 @@
+"""Budgeted, resumable sweep driver.
+
+Used directly on a plain GPU box (the AMD MI300X droplet), and by the Modal app
+for the NVIDIA slices. Spend is counted from what the store already holds, so a
+restarted sweep picks up where it stopped and never exceeds its budget (gap 13).
+
+Budget rule (docs/decisions/engine-settings.md, S5 chosen B5): the cost of the
+next config is estimated from the running p90 of real configs on that GPU once
+three have finished, times a billing overhead, and one wave is held in reserve,
+so a run of slow configs can't push the sweep past its budget.
+
+    python -m preflight.corpus.sweep export-amd --out amd_slice.jsonl
+    python -m preflight.corpus.sweep run --kind kernels --configs amd_slice.jsonl \\
+        --gpu MI300X --out /data/corpus --budget-usd 16
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import time
+import traceback
+from collections.abc import Callable
+from typing import Any
+
+from preflight.corpus import configs as cfgs
+from preflight.corpus.configs import SCHEMA, CorpusConfig
+from preflight.corpus.store import ResultStore
+
+DEFAULT_EST_SECONDS = {"kernels": 45.0, "divergence": 180.0}
+DEFAULT_OVERHEAD = 1.25  # container start, image pull and idle time Modal also bills
+ESTIMATE_QUANTILE = 0.9
+MIN_HISTORY = 3
+MAX_CONSECUTIVE_USER_ERRORS = 3
+_EPS = 1e-6
+
+Runner = Callable[[CorpusConfig], dict[str, Any]]
+
+
+def cost_usd(seconds: float, usd_per_hour: float, overhead: float = 1.0) -> float:
+	return seconds * overhead / 3600 * usd_per_hour
+
+
+def quantile(xs: list[float], q: float) -> float:
+	s = sorted(xs)
+	pos = q * (len(s) - 1)
+	lo = math.floor(pos)
+	hi = min(lo + 1, len(s) - 1)
+	return s[lo] + (s[hi] - s[lo]) * (pos - lo)
+
+
+def estimate_seconds(
+	kind: str, history: list[float] | None, est_seconds: float | None = None
+) -> tuple[float, bool]:
+	"""(seconds per config, learned). The running p90 once MIN_HISTORY configs have finished."""
+	if est_seconds is not None:
+		return est_seconds, False
+	if history and len(history) >= MIN_HISTORY:
+		return quantile(history, ESTIMATE_QUANTILE), True
+	return DEFAULT_EST_SECONDS[kind], False
+
+
+def plan_from(
+	configs: list[CorpusConfig],
+	done: set[str],
+	spent_usd: float,
+	budget_usd: float,
+	usd_per_hour: float,
+	est_seconds: float | None = None,
+	overhead: float = DEFAULT_OVERHEAD,
+	history: list[float] | None = None,
+	reserve_configs: int = 0,
+) -> list[CorpusConfig]:
+	"""Configs not yet done, cut to what the remaining budget allows after the reserve."""
+	if not configs:
+		return []
+	est, _ = estimate_seconds(configs[0].kind, history, est_seconds)
+	per = cost_usd(est, usd_per_hour, overhead)
+	reserve = reserve_configs * per if len(history or []) >= MIN_HISTORY else 0.0
+	room = max(0, math.floor((budget_usd - spent_usd - reserve) / per + _EPS)) if per > 0 else len(configs)
+	return [c for c in configs if c.key not in done][:room]
+
+
+def plan(
+	configs: list[CorpusConfig],
+	store: ResultStore,
+	gpu: str,
+	budget_usd: float,
+	usd_per_hour: float,
+	est_seconds: float | None = None,
+	overhead: float = DEFAULT_OVERHEAD,
+	retry_errors: bool = False,
+) -> list[CorpusConfig]:
+	"""Configs still to run on this GPU, cut to what the remaining budget allows."""
+	if not configs:
+		return []
+	kind = configs[0].kind
+	done = store.done_keys(kind, gpu, retry_errors=retry_errors)
+	spent = store.spent_usd({gpu: usd_per_hour}, kind=kind, gpu=gpu)
+	history = store.gpu_seconds(kind, gpu)
+	return plan_from(configs, done, spent, budget_usd, usd_per_hour, est_seconds, overhead, history)
+
+
+def modal_gpu(gpu: str) -> str:
+	"""Modal's GPU string for a table name; H100 is pinned so Modal can't upgrade it to H200."""
+	from preflight.engine import gpus
+
+	key = gpus.resolve(gpu)
+	if key not in gpus.MODAL_GPU:
+		raise ValueError(f"{key} is not offered on Modal")
+	return gpus.MODAL_GPU[key]
+
+
+def parse_budget_plan(spec: str) -> dict[str, float]:
+	"""'L4=25,A100-80GB=45,H100=70' -> {table name: dollars}; Modal strings and table names both work."""
+	from preflight.engine import gpus
+
+	out: dict[str, float] = {}
+	for part in spec.split(","):
+		name, _, dollars = part.strip().partition("=")
+		out[gpus.resolve(name.strip())] = float(dollars)
+	return out
+
+
+def batches(configs: list[CorpusConfig], size: int) -> list[list[CorpusConfig]]:
+	return [configs[i : i + size] for i in range(0, len(configs), size)]
+
+
+def make_record(cfg: CorpusConfig, gpu: str, result: dict[str, Any]) -> dict[str, Any]:
+	return {"schema": SCHEMA, "key": cfg.key, "gpu": gpu, "config": cfg.to_dict(), **result}
+
+
+def run_local(
+	configs: list[CorpusConfig],
+	store: ResultStore,
+	gpu: str,
+	budget_usd: float,
+	usd_per_hour: float,
+	runner: Runner,
+	est_seconds: float | None = None,
+	overhead: float = DEFAULT_OVERHEAD,
+	retry_errors: bool = False,
+	log: Callable[[str], None] = print,
+	max_user_errors: int = MAX_CONSECUTIVE_USER_ERRORS,
+) -> int:
+	"""Run configs one at a time, writing each result once; returns how many ran.
+
+	Spend counts the billing overhead (an hourly droplet bills idle and start-up time too). Several
+	user_error rows in a row mean a bug in corpus code, not bad configs: the sweep stops and says so.
+	"""
+	if not configs:
+		return 0
+	kind = configs[0].kind
+	done = store.done_keys(kind, gpu, retry_errors=retry_errors)
+	spent = store.spent_usd({gpu: usd_per_hour}, kind=kind, gpu=gpu) * overhead
+	history = store.gpu_seconds(kind, gpu)
+	n, user_errors = 0, 0
+	for cfg in configs:
+		if cfg.key in done:
+			continue
+		est, _ = estimate_seconds(kind, history, est_seconds)
+		per = cost_usd(est, usd_per_hour, overhead)
+		reserve = per if len(history) >= MIN_HISTORY else 0.0  # one config is this driver's wave
+		if spent + per + reserve > budget_usd + _EPS:
+			log(f"budget reached: ${spent:.2f} of ${budget_usd:.2f} spent on {gpu}; halting")
+			break
+		t0 = time.monotonic()
+		try:
+			result = runner(cfg)
+		except Exception as exc:  # recorded so the sweep keeps going; retried with --retry-errors
+			result = {
+				"status": "error",
+				"error_code": "user_error",
+				"error": f"{type(exc).__name__}: {exc}",
+				"traceback": traceback.format_exc(limit=5),
+				"gpu_seconds": time.monotonic() - t0,
+			}
+		store.write_once(kind, gpu, cfg.key, make_record(cfg, gpu, result), replace_errors=True)
+		secs = float(result.get("gpu_seconds", 0.0))
+		spent += cost_usd(secs, usd_per_hour, overhead)
+		history.append(secs)
+		n += 1
+		log(f"[{n}] {cfg.family} {cfg.key} {result.get('status')} ${spent:.2f}")
+		user_errors = user_errors + 1 if result.get("error_code") == "user_error" else 0
+		if user_errors >= max_user_errors:
+			log(
+				f"{user_errors} configs in a row failed inside corpus code (last: {result.get('error')}); stopping. Fix the bug, then rerun with --retry-errors."
+			)
+			break
+	return n
+
+
+def _main(argv: list[str] | None = None) -> None:
+	ap = argparse.ArgumentParser(prog="preflight.corpus.sweep")
+	sub = ap.add_subparsers(dest="cmd", required=True)
+
+	ex = sub.add_parser("export-amd", help="write the AMD slice config list")
+	ex.add_argument("--out", required=True)
+	ex.add_argument("--n-total", type=int, default=1500)
+	ex.add_argument("--n", type=int, default=500)
+	ex.add_argument("--seed", type=int, default=0)
+
+	run = sub.add_parser("run", help="run a sweep on this machine's GPU")
+	run.add_argument("--kind", choices=["kernels", "divergence"], required=True)
+	run.add_argument("--configs", help="jsonl list; default: generate")
+	run.add_argument("--n", type=int, default=1500)
+	run.add_argument("--seed", type=int, default=0)
+	run.add_argument("--gpu", required=True, help="table name, e.g. MI300X or L4")
+	run.add_argument("--out", required=True)
+	run.add_argument("--budget-usd", type=float, required=True)
+	run.add_argument("--usd-per-hour", type=float)
+	run.add_argument("--device", default="cuda")
+	run.add_argument("--data", help="text file for divergence runs; synthetic if absent")
+	run.add_argument("--retry-errors", action="store_true")
+	run.add_argument(
+		"--overhead", type=float, default=DEFAULT_OVERHEAD, help="billing overhead on measured seconds"
+	)
+	args = ap.parse_args(argv)
+
+	if args.cmd == "export-amd":
+		nv = cfgs.kernel_configs(args.n_total, seed=args.seed)
+		cfgs.write_jsonl(cfgs.amd_slice(nv, args.n), args.out)
+		print(f"wrote {args.n} configs to {args.out}")
+		return
+
+	from preflight.corpus.isolate import run_isolated
+	from preflight.engine import gpus
+
+	gpu = gpus.resolve(args.gpu)
+	if args.device.startswith("cuda"):
+		import torch
+
+		props = torch.cuda.get_device_properties(0)
+		name = props.name or getattr(props, "gcnArchName", "")  # some ROCm builds report an empty name
+		actual = gpus.resolve(name, props.total_memory, props.multi_processor_count)
+		if actual != gpu:
+			raise SystemExit(
+				f"--gpu says {gpu} but this machine has {actual} ({props.name}); rows would be mislabelled"
+			)
+	rate = args.usd_per_hour
+	if rate is None:
+		p = gpus.price(gpu, "modal") or gpus.price(gpu, "amd_devcloud")
+		if p is None:
+			raise SystemExit(f"no price for {gpu}; pass --usd-per-hour")
+		rate = p.usd_per_hour
+	if args.configs:
+		todo = cfgs.read_jsonl(args.configs)
+	elif args.kind == "kernels":
+		todo = cfgs.kernel_configs(args.n, seed=args.seed)
+	else:
+		todo = cfgs.divergence_configs(args.n, seed=args.seed)
+
+	def runner(cfg: CorpusConfig) -> dict[str, Any]:
+		return run_isolated(cfg, device=args.device, data_path=args.data)
+
+	run_local(
+		todo,
+		ResultStore(args.out),
+		gpu,
+		args.budget_usd,
+		rate,
+		runner,
+		overhead=args.overhead,
+		retry_errors=args.retry_errors,
+	)
+
+
+if __name__ == "__main__":
+	_main()
