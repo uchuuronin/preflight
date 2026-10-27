@@ -1,0 +1,340 @@
+{
+	"_meta": {
+		"addon": "expertise",
+		"version": "0.1.0",
+		"tiers": ["new", "practitioner", "expert"],
+		"note": "Hover glossary cards for the expertise dial (D1). Each term has one line per tier and an optional 'act' line saying what a person usually changes. Keys become t('addon.expertise.glossary.<id>.<field>') once C confirms the add-on string namespace (see docs/requests.md). British spelling, no em dashes."
+	},
+	"terms": {
+		"probe": {
+			"label": "Probe",
+			"new": "A few real training steps we run on a GPU to measure your job before predicting the rest.",
+			"practitioner": "A short real run (minutes) at one knob setting; every prediction is anchored to probes.",
+			"expert": "A short, seeded run of at least 2 optimiser steps; timings come from unprofiled steps, the profiler only supplies proportions."
+		},
+		"flight_record": {
+			"label": "Flight record",
+			"new": "A small file holding what we measured and what we predicted. Share it or open it later.",
+			"practitioner": "Measurements, fitted models and intervals for one job, under 1 MB. Every view reads from it.",
+			"expert": "Versioned JSON (gzipped) with probes, knob grids (float16 point, lo, hi, abstain mask) and pinned model ids."
+		},
+		"verify": {
+			"label": "Verify",
+			"new": "Runs your chosen plan for real, briefly, to check our prediction was right.",
+			"practitioner": "A real run of the chosen config; the result is added to the record and tightens later predictions.",
+			"expert": "Re-probe plus a fixed-seed loss check and an unchanged effective batch size; results feed adaptive conformal recalibration."
+		},
+		"interval": {
+			"label": "Range",
+			"new": "Our best guess plus a low and high value. The true number usually lands inside.",
+			"practitioner": "A 90% prediction interval: on held-out jobs, about 9 in 10 true values fall inside it.",
+			"expert": "Conformalised quantile regression on log-ratio scores; marginal 90% coverage, not conditional on your config."
+		},
+		"abstain": {
+			"label": "Not enough data",
+			"new": "We would be guessing here, so we don't. Run a quick probe to get a real answer.",
+			"practitioner": "The setting is outside what we measured, or the range is too wide to trust. A probe fixes it.",
+			"expert": "Abstains outside the probed feature range, on kNN distance, interval width over ±50%, or analytical vs learned disagreement.",
+			"act": "Press \"Run a probe here\"."
+		},
+		"measured_predicted": {
+			"label": "Measured, predicted, extrapolated",
+			"new": "Solid means we saw it happen. Dashed means we worked it out. Grey means we're unsure.",
+			"practitioner": "Measured comes from a probe; predicted is inside the probed range; extrapolated is beyond it.",
+			"expert": "Status per estimate: measured, predicted (in range), extrapolated (beyond 2× the largest probed batch × sequence), abstain."
+		},
+		"oom": {
+			"label": "Out of memory (OOM)",
+			"new": "The job needs more GPU memory than the GPU has, so it crashes.",
+			"practitioner": "Peak allocation exceeds GPU capacity; often hits at the first eval or a long batch, not step 1.",
+			"expert": "P(OOM) from predicted peak against capacity minus a safety margin; reported in bins because allocation grows in steps.",
+			"act": "Lower the batch or sequence length, or turn on gradient checkpointing."
+		},
+		"peak_memory": {
+			"label": "Peak memory",
+			"new": "The most GPU memory your job uses at any moment. If it passes the GPU's limit, it crashes.",
+			"practitioner": "Max reserved memory over a step, including the eval spike and the CUDA or ROCm context.",
+			"expert": "Weights + grads + optimiser state + activations + logits + allocator reserve (+0.5 to 1 GB context), calibrated on two probe peaks."
+		},
+		"memory_terms": {
+			"label": "What fills the GPU",
+			"new": "Memory goes to the model itself, its learning notes and the in-progress maths for each batch.",
+			"practitioner": "Weights, gradients, optimiser state, activations, logits and the eval spike, stacked against capacity.",
+			"expert": "Activations ≈ sbh(34 + 5as/h) bytes per layer (Korthikanti et al.); logits = batch × seq × vocab × bytes."
+		},
+		"activations": {
+			"label": "Activations",
+			"new": "In-progress results kept from the forward pass so the model can learn from them. Grows with batch and length.",
+			"practitioner": "Saved intermediate tensors for backward; scale with batch × sequence length and usually dominate long-context jobs.",
+			"expert": "Per layer ≈ sbh(34 + 5as/h) bytes without recomputation; FlashAttention avoids storing the attention scores behind the 5as/h term."
+		},
+		"optimiser_state": {
+			"label": "Optimiser state",
+			"new": "Extra numbers the optimiser keeps for each trainable weight. For Adam it can be bigger than the model.",
+			"practitioner": "Adam keeps two moments per trainable parameter: 8 to 12 bytes each with fp32 master weights.",
+			"expert": "AdamW: m and v in fp32 (8 B) plus optional fp32 master copy (4 B) per trainable param; appears at the first step."
+		},
+		"logits_memory": {
+			"label": "Logits",
+			"new": "The model's score for every possible next word. With long text and big vocabularies it takes lots of memory.",
+			"practitioner": "batch × sequence × vocabulary × bytes; a hidden OOM cause at long sequence lengths.",
+			"expert": "Often materialised in fp32 for the loss; chunked or fused cross-entropy avoids the full tensor."
+		},
+		"gradient_checkpointing": {
+			"label": "Gradient checkpointing",
+			"new": "Saves memory by redoing some maths instead of storing it. Slower, but fits bigger jobs.",
+			"practitioner": "Recomputes activations in backward: a large memory saving for about one extra forward pass per step.",
+			"expert": "Stores layer inputs only and recomputes the forward in backward; selective recomputation targets the attention block.",
+			"act": "Turn it on when you are close to the OOM line."
+		},
+		"lora": {
+			"label": "LoRA",
+			"new": "Teaches a model by training a small add-on instead of every weight. Much cheaper on memory.",
+			"practitioner": "Freezes the base model and trains low-rank adapters; gradients and optimiser state only for the adapters.",
+			"expert": "W + BA with rank r; trainable params ≈ r(d_in + d_out) per adapted matrix; no optimiser state for frozen weights."
+		},
+		"qlora": {
+			"label": "QLoRA",
+			"new": "LoRA on a squeezed copy of the model, so big models fit on smaller GPUs.",
+			"practitioner": "4-bit base weights with LoRA adapters on top; trades some speed for a large memory cut.",
+			"expert": "NF4 base (≈0.5 B/param plus quantisation constants), bf16 compute, paged optimiser; dequantisation adds step time."
+		},
+		"lora_rank": {
+			"label": "LoRA rank",
+			"new": "How big the add-on is. Bigger can learn more but costs more memory.",
+			"practitioner": "Adapter rank r; memory and compute grow linearly with r, quality gains flatten quickly.",
+			"expert": "Trainable params scale with r; effective update scale also depends on alpha / r."
+		},
+		"precision": {
+			"label": "Precision",
+			"new": "How many digits each number keeps. Fewer digits means faster and smaller, usually with no loss in quality.",
+			"practitioner": "bf16 mixed precision halves activation memory and uses tensor cores; fp32 is rarely needed.",
+			"expert": "bf16 avoids fp16 loss scaling; fp8 needs per-tensor scaling and hardware support (H100, MI300X)."
+		},
+		"quantisation": {
+			"label": "Quantisation",
+			"new": "Storing the model with fewer bits so it takes less memory and often runs faster.",
+			"practitioner": "8-bit or 4-bit weights for serving or QLoRA; check quality on your own eval.",
+			"expert": "Weight-only (AWQ, GPTQ, NF4) vs weight and activation (fp8, int8); decode speed tracks bytes read per token."
+		},
+		"sequence_length": {
+			"label": "Sequence length",
+			"new": "The longest text, in tokens, one example can have. Longer uses more memory and time.",
+			"practitioner": "Max tokens per example; activation and logits memory grow with it, attention cost grows faster.",
+			"expert": "Memory roughly linear with FlashAttention, quadratic without; truncation rate tells you what you lose by capping it."
+		},
+		"batch_size": {
+			"label": "Batch size",
+			"new": "How many examples the GPU works on at once. Bigger is faster per example until memory runs out.",
+			"practitioner": "Per-device micro-batch; effective batch = micro-batch × accumulation steps × GPUs.",
+			"expert": "Throughput saturates once kernels fill the GPU; changing it changes the effective batch, so check the learning rate."
+		},
+		"eval_batch": {
+			"label": "Eval batch",
+			"new": "How many examples are checked at once during evaluation. Too big can crash a run that trained fine.",
+			"practitioner": "Eval often skips no_grad or keeps logits for metrics, so its peak can exceed training's.",
+			"expert": "Eval peak = weights + activations without recompute + accumulated logits; the usual first-eval OOM.",
+			"act": "Lower it, or wrap eval in no_grad."
+		},
+		"packing": {
+			"label": "Sequence packing",
+			"new": "Joining short examples into one long row so the GPU doesn't waste time on blank padding.",
+			"practitioner": "Concatenates examples to fill the sequence length; removes padding waste on short, variable data.",
+			"expert": "Needs attention masking or position resets per example to avoid cross-contamination."
+		},
+		"padding_waste": {
+			"label": "Padding waste",
+			"new": "Share of GPU work spent on filler tokens that carry no data.",
+			"practitioner": "Padded tokens over total tokens per batch; when it is high, packing usually pays off.",
+			"expert": "1 − Σ real lengths / (batch × max length), measured on probe batches."
+		},
+		"step_time": {
+			"label": "Step time",
+			"new": "How long one training step takes. Multiply by the number of steps for the whole run.",
+			"practitioner": "Wall time per optimiser step, split into data, forward, backward, optimiser and communication.",
+			"expert": "Measured on unprofiled steps; phase proportions from torch.profiler; scaled across GPUs by roofline plus a learned residual."
+		},
+		"throughput": {
+			"label": "Throughput",
+			"new": "How much work gets done per second, such as tokens or images.",
+			"practitioner": "Tokens/sec (or samples/sec); on the map, edge speed shows it.",
+			"expert": "Tokens/sec per GPU at steady state, excluding warm-up and compile steps."
+		},
+		"mfu": {
+			"label": "MFU",
+			"new": "How much of the GPU's top speed your job is actually using. Higher is better.",
+			"practitioner": "Model FLOPs utilisation: useful maths per second over the GPU's peak. 30 to 50% is typical for well-tuned training.",
+			"expert": "Achieved model FLOP/s over peak (PaLM); ≈ 6 × params × tokens/sec for dense transformers, ignoring attention."
+		},
+		"dataloader_workers": {
+			"label": "Data-loader workers",
+			"new": "Helpers that prepare data while the GPU trains. Too few and the GPU sits waiting.",
+			"practitioner": "num_workers in the DataLoader; 0 means loading blocks the training loop.",
+			"expert": "GPU idle share between kernels in the trace is the signal; also check pin_memory and prefetch."
+		},
+		"torch_compile": {
+			"label": "torch.compile",
+			"new": "A switch that makes PyTorch code run faster after a short warm-up.",
+			"practitioner": "Fuses operations into faster kernels; first steps are slow while it compiles.",
+			"expert": "Graph breaks and dynamic shapes cut the gain; exclude compile steps from timings."
+		},
+		"gpu_idle": {
+			"label": "GPU idle share",
+			"new": "Time the GPU spends waiting for something else, usually data.",
+			"practitioner": "Share of step time with no kernel running; a large share points at data loading or the CPU.",
+			"expert": "From the trace's temporal breakdown (Holistic Trace Analysis): idle vs compute vs communication."
+		},
+		"kv_cache": {
+			"label": "KV cache",
+			"new": "Memory a model uses to remember the conversation so far while it writes. Grows with length and users.",
+			"practitioner": "Stored keys and values per token; caps how many requests and how long a context fit at once.",
+			"expert": "2 × layers × kv_heads × head_dim × bytes per token; concurrency ≈ free memory / (bytes per token × average context)."
+		},
+		"prefill_decode": {
+			"label": "Prefill and decode",
+			"new": "Reading the prompt (fast, all at once) and then writing the answer (one token at a time).",
+			"practitioner": "Prefill is compute-bound, decode is memory-bandwidth-bound; they scale differently with batch.",
+			"expert": "Prefill time from a FLOPs roofline on prompt tokens; decode step from weights plus KV bytes read per step."
+		},
+		"concurrency": {
+			"label": "Concurrency",
+			"new": "How many requests or tasks run at the same time.",
+			"practitioner": "Parallel requests in flight; limited by KV memory on your GPU or by rate limits on an API.",
+			"expert": "Wall time ≈ max(token limit, request limit, latency × tasks / concurrency)."
+		},
+		"group_size": {
+			"label": "Group size",
+			"new": "How many answers the model writes for each prompt so they can be compared.",
+			"practitioner": "GRPO samples G completions per prompt and learns from how their rewards differ.",
+			"expert": "Advantages are rewards normalised within the group; larger G cuts zero-spread groups but raises rollout cost."
+		},
+		"reward_spread": {
+			"label": "Reward spread",
+			"new": "Whether a prompt's answers got different scores. If they all score the same, the model learns nothing from it.",
+			"practitioner": "Groups where every completion scores the same have zero advantage and give no learning signal.",
+			"expert": "P(zero spread) = p^G + (1 − p)^G for per-prompt pass rate p; DAPO's dynamic sampling filters them.",
+			"act": "Raise group size, or drop prompts the model always gets right or wrong."
+		},
+		"truncation": {
+			"label": "Truncation",
+			"new": "Answers cut off because they hit the length limit. A cut-off answer often scores zero.",
+			"practitioner": "Share of outputs that reach max new tokens; above about 10% hurts RL and eval results.",
+			"expert": "Measured on probe rollouts; in synchronous RL the longest response also sets batch generation time.",
+			"act": "Raise the completion length cap, or cap thinking separately."
+		},
+		"rollout_share": {
+			"label": "Time spent generating",
+			"new": "In RL training, how much of each step goes to the model writing answers.",
+			"practitioner": "Rollout share of step time; often the biggest cost, which is why fast generation engines help.",
+			"expert": "Phase timer over rollout, reference and reward, update and weight sync; set by max length in synchronous GRPO."
+		},
+		"kl": {
+			"label": "KL drift",
+			"new": "How far the model has moved from where it started. Moving too fast can break it.",
+			"practitioner": "KL divergence to the reference model; rising KL without rising reward is a warning.",
+			"expert": "Per-token KL estimate vs the reference policy; watch its slope against reward."
+		},
+		"entropy": {
+			"label": "Entropy",
+			"new": "How varied the model's answers are. If it collapses, the model stops exploring.",
+			"practitioner": "Per-token entropy of the policy; a fast fall signals entropy collapse in RL.",
+			"expert": "DAPO's clip-higher (decoupled ε_low, ε_high) counters collapse."
+		},
+		"grad_norm": {
+			"label": "Gradient norm",
+			"new": "How big each learning update is. Sudden jumps can mean training is about to break.",
+			"practitioner": "Total gradient size per step; a spike well above its recent average is an early warning.",
+			"expert": "Rule fires at above 5× its moving average; compared alongside update-to-weight ratio per layer."
+		},
+		"update_ratio": {
+			"label": "Update-to-weight ratio",
+			"new": "How much each step changes the weights, compared with their size.",
+			"practitioner": "Around 1e-3 is a common healthy value; above 1e-2 suggests the learning rate is too high.",
+			"expert": "‖ΔW‖ / ‖W‖ per layer per step, from probe steps."
+		},
+		"divergence_risk": {
+			"label": "Divergence risk",
+			"new": "The chance the run's loss blows up and training stops making progress.",
+			"practitioner": "From early signals in the probes: gradient spikes, attention logits, update ratios.",
+			"expert": "Classifier on early-step features plus threshold rules; it can only say \"no early warning signs\", never \"stable\"."
+		},
+		"lr_range_test": {
+			"label": "Learning-rate margin",
+			"new": "How far your learning rate is from the point where training breaks.",
+			"practitioner": "A short sweep raises the learning rate until loss explodes; your margin is the gap to that point.",
+			"expert": "Smith's LR range test over 100 to 200 steps at your config; reported as \"N× below where the probe diverged\"."
+		},
+		"checkpoint_interval": {
+			"label": "Checkpoint interval",
+			"new": "How often the run saves its progress. Save often if the GPU can be taken away.",
+			"practitioner": "Steps between saves; trade save time against work lost on a preemption or crash.",
+			"expert": "Young/Daly: τ ≈ √(2δM), with δ the save time and M the mean time to interrupt."
+		},
+		"preemption": {
+			"label": "Preemption",
+			"new": "The cluster pauses or stops your job to give the GPU to someone else.",
+			"practitioner": "Common on shared and cheap queues; your job needs to resume from a checkpoint.",
+			"expert": "Modelled from your cluster's rule rather than assumed random; feeds the Monte Carlo completion dates."
+		},
+		"wall_time_cap": {
+			"label": "Job time limit",
+			"new": "The longest one job may run on your cluster before it's stopped.",
+			"practitioner": "Slurm wall-time cap; long runs are split into segments that each fit under it.",
+			"expert": "Segments sized from the step-time upper bound so each lands under the cap with a resume in between."
+		},
+		"context_window": {
+			"label": "Context window",
+			"new": "How much text a model can read at once. Agents fill it up a little more every step.",
+			"practitioner": "Model's token limit; agent context grows with each turn's output and tool results.",
+			"expert": "Input tokens at turn k ≈ system + Σ previous outputs and tool results; overflow step predicted per task."
+		},
+		"prompt_caching": {
+			"label": "Prompt caching",
+			"new": "Reusing the unchanged start of a prompt so you pay less for it each time.",
+			"practitioner": "Cached input tokens are billed at a discount; works only if the stable prefix comes first.",
+			"expert": "Cost uses cache-read and cache-creation token counts from OTel GenAI spans per call."
+		},
+		"reasoning_effort": {
+			"label": "Reasoning effort",
+			"new": "How long the model thinks before answering. More thinking costs more and takes longer.",
+			"practitioner": "Low, medium, high or extra-high; reasoning tokens are billed even though you don't see them.",
+			"expert": "Muse Spark Open always reasons; effort sets the reasoning-token budget, which dominates triage cost."
+		},
+		"rate_limit": {
+			"label": "Rate limit",
+			"new": "The provider's cap on how much you can send per minute. Past it, requests wait.",
+			"practitioner": "Requests and tokens per minute; above it, more concurrency adds no speed.",
+			"expert": "Wall time bound by RPM and TPM; retries on 429 add latency tails."
+		},
+		"cost_frontier": {
+			"label": "Cost frontier",
+			"new": "The options where you can't get faster without paying more. Pick one on the line.",
+			"practitioner": "Pareto line of time against dollars across GPUs or models; points off it are dominated.",
+			"expert": "Non-dominated set over (time upper bound, cost upper bound), with a deadline rule."
+		},
+		"fan_out": {
+			"label": "Fan-out",
+			"new": "How many neighbours of each node a graph model looks at. More means more memory.",
+			"practitioner": "Neighbours sampled per hop; memory grows with hops × fan-out.",
+			"expert": "Sampled subgraph size grows as the product of per-hop fan-outs; CPU-side sampling can starve the GPU."
+		},
+		"in_batch_negatives": {
+			"label": "In-batch negatives",
+			"new": "Retrieval models learn by telling right matches from wrong ones in the same batch. Bigger batches give more wrong ones.",
+			"practitioner": "Contrastive batch size sets the number of negatives; too small weakens training.",
+			"expert": "Cached-gradient contrastive training decouples negatives from memory."
+		},
+		"repetition_exposure": {
+			"label": "Repetition exposure",
+			"new": "How many times the model sees each low-quality document when data is reused over several passes.",
+			"practitioner": "Same total tokens, different concentration: 4 passes over 5 GB repeats bad documents more than 1 pass over 20 GB.",
+			"expert": "Per-document exposure histogram by quality bin; the data-constrained scaling prior treats tokens as equal quality, so rankings across quality abstain."
+		},
+		"seeds_needed": {
+			"label": "Seeds needed",
+			"new": "How many repeat runs you need to be sure a difference is real and not luck.",
+			"practitioner": "From seed-to-seed loss noise in short probes, the runs per arm to detect a given gap.",
+			"expert": "Two-sample power analysis on matched-step loss variance at your chosen significance level."
+		}
+	}
+}
