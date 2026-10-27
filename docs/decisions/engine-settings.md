@@ -1,6 +1,6 @@
 # Engine settings: memory fit, bands, OOM words, divergence labels, cross-GPU time, corpus budget (Oct 27)
 
-Seven settings decide whether B's numbers can meet the plan's validation targets (peak memory within 10%, no missed OOMs, 90% intervals covering at least 88%, step time within 20% on an unmeasured GPU) and whether the corpus stays inside its budget. Each was chosen by simulating 3 to 9 candidates over 3,000 to 20,000 trials (20,000 for memory, 4,000 for divergence and cross-GPU, 3,000 sweeps for the budget) (`uv run python scripts/mc_engine_settings.py`).
+Seven settings decide whether B's numbers can meet the plan's validation targets (peak memory within 10%, no missed OOMs, 90% intervals covering at least 88%, step time within 20% on an unmeasured GPU) and whether the corpus stays inside its budget. Each was chosen by simulating 3 to 9 candidates over 3,000 to 20,000 trials (20,000 for memory, 4,000 for divergence and cross-GPU, 3,000 sweeps for the budget) (`uv run python scripts/mc_engine_settings.py`). S6 re-checks A's agent-total rule with B's code.
 
 ## Assumptions
 
@@ -98,7 +98,7 @@ Curves: stable decay 32%, spike that recovers 14%, plateau that never learns 9% 
 | K4 each phase by arithmetic intensity | 97.7% | 99.9% | 4.4% |
 | K5 assume the same MFU | 8.1% | 22.7% | 50.6% |
 
-**Chosen: K1, with K4 as the fallback** when a kernel has no FLOP count. A's profiler window doesn't record FLOPs today, so kernels are classed by name in that case. The whole-step FLOPs ratio and "same MFU", the most common rules of thumb, are off by half because most steps are not compute-bound throughout.
+**Chosen: K1, with K4 as the fallback** when a kernel has no FLOP or byte count. A's kernel table (`Probe.kernels`, top 64 ops plus a roll-up row per class) counts FLOPs for matmuls and attention and estimates bytes for the rest; rows with neither are scaled by their class, which the classifier reads from the op name (CUDA, HIP, Triton and aten; on a real profiled step no op is left unclassed). Replay scales each row by the ratio of its rooflines on the two GPUs. That equals "keep the measured efficiency" whenever the counts are consistent, and stays exact on the probed GPU when an estimated byte count overshoots what the GPU could move. A kernel table from a CPU probe isn't scaled to a GPU: the engine abstains. The whole-step FLOPs ratio and "same MFU", the most common rules of thumb, are off by half because most steps are not compute-bound throughout.
 
 ## S5. Keeping the corpus sweep inside its budget
 
@@ -111,3 +111,21 @@ Curves: stable decay 32%, spike that recovers 14%, plateau that never learns 9% 
 | **B5 overhead 1.25, running p90, one wave held in reserve** | **0.0%** | **$0.00** | **8.1%** | **769** |
 
 **Chosen: B5.** A fixed per-config estimate overspends in 83 to 92% of sweeps because real configs run longer than 45 s, even though each overspend is small since the sweep re-plans every wave. Learning the per-config time from finished configs, plus holding one wave in reserve, never overspends and still uses 92% of the budget.
+
+## S6. Agent and API run totals from a sample of tasks (re-check of A's D3)
+
+A's D3 rerun chose the rule; B implemented it in `engine/agent_cost.py` and re-scored it on A's generator (same seed and laws, 10,000 simulated runs of 500 tasks): a bootstrap of the sample mean, with the upper end raised by (one-sided Clopper-Pearson bound on the runaway rate minus the observed rate) times the runaway cost, whether or not a runaway was sampled.
+
+| Sample | Runaway bound | 90% interval covers (95% CI) | Width / total | Runaway-rate interval covers |
+| --- | --- | --- | --- | --- |
+| 30 tasks | 75% | 88.7% (88.1-89.3) | 1.07 | 98.3% |
+| **30 tasks** | **80%** | **90.3% (89.8-90.9)** | **1.16** | 98.3% |
+| 30 tasks | 85% | 92.3% (91.7-92.8) | 1.26 | 98.3% |
+| 30 tasks | 90% | 94.0% (93.6-94.5) | 1.42 | 98.3% |
+| 50 tasks | 75% | 87.9% (87.3-88.5) | 0.91 | 97.9% |
+| **50 tasks** | **80%** | **89.5% (88.8-90.1)** | **0.96** | 97.9% |
+| 50 tasks | 85% | 91.0% (90.5-91.6) | 1.03 | 97.9% |
+| 50 tasks | 90% | 92.7% (92.2-93.2) | 1.12 | 97.9% |
+
+**Chosen: an 80% bound, for either sample size.** It reproduces A's 89.1% at 50 tasks, and with this rule 30 tasks also clears the 88% target, at an interval 21% wider than 50 tasks gives. The sample size stays Chiya's call (A's D3). The runaway-rate readout (`risk.runaway`, a two-sided Clopper-Pearson interval on the share of tasks above 8x the median) covers the run's true share 98% of the time: conservative, as exact binomial intervals are. When most tasks cost nothing (cached), the median is 0 and A's rule would call every paid task a runaway; B takes 8x the median of the paid tasks instead. A's generator has no free tasks, so this case is covered by a unit test, not by S6. Reproduce with `uv run python scripts/mc_engine_settings.py s6`.
+

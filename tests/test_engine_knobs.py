@@ -221,3 +221,58 @@ def test_distributed_strategy(dist, fsdp_mode, ds, expect):
 def test_hsdp_shards_within_its_group():
 	par = m.Parallel("hsdp", world_size=32, shard_group=8)
 	assert par.shards() == (8, 8, 8)
+
+
+# ---------------------------------------------------------------- A's measured shape and new knobs (Oct 27)
+
+
+def _info(**kw):
+	from preflight.schema.script_map import ModelInfo
+
+	base = dict(name="x", family="decoder", n_layers=4, d_model=512, n_heads=8, vocab_size=32000, d_ff=1376)
+	return ModelInfo(**{**base, **kw})
+
+
+def test_group_by_length_is_declared_but_not_claimed_as_modelled():
+	spec = K.knob_spec("group_by_length")
+	assert spec.affects == {"time", "cost"} and not spec.modelled
+	assert not K.knob_spec("packing").modelled
+
+
+def test_measured_shape_beats_the_name_hint():
+	a = K.arch_from_model_info(
+		_info(name="meta-llama/Llama-3-8B", gated_mlp=False, tie_embeddings=True, norm="layernorm")
+	)
+	assert (a.gated_mlp, a.tie_embeddings, a.norm) == (False, True, "layernorm")
+
+
+def test_measured_dense_beats_a_moe_looking_name():
+	a = K.arch_from_model_info(_info(name="deepseek-v3-tiny", n_experts=0))
+	assert a.n_experts == 1 and a.experts_per_token == 1
+
+
+def test_measured_moe_is_used_as_given():
+	a = K.arch_from_model_info(_info(name="my-model", n_experts=16, experts_per_token=2))
+	assert (a.n_experts, a.experts_per_token) == (16, 2)
+
+
+def test_head_dim_override_only_when_it_differs():
+	assert K.arch_from_model_info(_info(head_dim=64)).head_dim_override is None
+	assert K.arch_from_model_info(_info(head_dim=128)).head_dim_override == 128
+
+
+def test_measured_head_dim_feeds_the_d_ff_solve():
+	from preflight.schema.script_map import ModelInfo
+
+	gemma = ModelInfo(
+		name="google/gemma-7b", family="decoder", n_layers=28, d_model=3072, n_heads=16, n_kv_heads=16,
+		vocab_size=256000, head_dim=256, param_count=8_537_680_896, gated_mlp=True, tie_embeddings=True,
+	)  # fmt: skip
+	a = K.arch_from_model_info(gemma)
+	assert a.d_ff == 24576 and a.param_count() == 8_537_680_896
+
+
+def test_moe_routing_falls_back_to_the_hint_and_is_capped():
+	mix = _info(name="mistralai/Mixtral-8x7B-v0.1", n_experts=8)
+	assert K.arch_from_model_info(mix).experts_per_token == 2
+	assert K.arch_from_model_info(_info(n_experts=8, experts_per_token=20)).experts_per_token == 8

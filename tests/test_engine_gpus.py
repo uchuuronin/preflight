@@ -205,3 +205,57 @@ def test_normalise_dtype_accepts_torch_spellings():
 	assert gpus.normalise_dtype("float8_e4m3fnuz") == "fp8"
 	with pytest.raises(ValueError):
 		gpus.normalise_dtype("int2")
+
+
+# ---------------------------------------------------------------- A's Oct 27 requests: MIG and bounded names
+
+
+def test_mig_slice_memory_does_not_pick_the_smaller_card():
+	assert gpus.resolve("NVIDIA A100-SXM4-80GB MIG 3g.40gb", int(40e9), 42) == "A100-SXM-80GB"
+	assert gpus.resolve("NVIDIA A100-SXM4-40GB MIG 3g.20gb", int(20e9), 42) == "A100-SXM-40GB"
+
+
+def test_mig_card_from_the_profile_when_the_name_has_no_size():
+	assert gpus.resolve("NVIDIA A100 MIG 3g.40gb") == "A100-SXM-80GB"
+	assert gpus.resolve("NVIDIA A100 MIG 7g.40gb") == "A100-SXM-40GB"
+	assert gpus.resolve("NVIDIA A100 MIG 1g.5gb") == "A100-SXM-40GB"
+
+
+def test_scaled_mig_name_round_trips():
+	slice_ = gpus.get_gpu("NVIDIA A100-SXM4-80GB MIG 3g.40gb", int(40e9), 42)
+	again = gpus.get_gpu(slice_.name)
+	assert again.name == slice_.name and again.bf16 == pytest.approx(slice_.bf16)
+	assert gpus.peak_flops(slice_.name, "bf16") == pytest.approx(312e12 * 3 / 7)
+
+
+@pytest.mark.parametrize("name", ["1" * 40_000, "a100 " + "9" * 40_000 + "gb", "mig 3g." + "1" * 5_000])
+def test_long_names_fail_fast(name):
+	import time
+
+	t = time.perf_counter()
+	with pytest.raises(KeyError):
+		gpus.resolve(name)
+	assert gpus.peak_flops(name, "bf16") is None
+	assert gpus.mig_profile(name) is None
+	assert time.perf_counter() - t < 0.1
+
+
+def test_sizes_in_names_still_resolve():
+	assert gpus.resolve("a100-80gb") == "A100-SXM-80GB"
+	assert gpus.resolve("NVIDIA A100-SXM4-40GB") == "A100-SXM-40GB"
+	assert gpus.resolve("NVIDIA GH200 480GB") == "GH200-96GB"
+
+
+@pytest.mark.parametrize(
+	"name,card",
+	[
+		("NVIDIA GH200 MIG 1g.24gb", "GH200-96GB"),
+		("NVIDIA GH200 MIG 1g.12gb", "GH200-96GB"),
+		("NVIDIA A100 MIG 1g.10gb", "A100-SXM-80GB"),  # tie: the 80 GB card's smallest profile
+		("NVIDIA A100 MIG 1g.20gb", "A100-SXM-80GB"),
+		("NVIDIA H200 MIG 1g.18gb", "H200-SXM-141GB"),
+		("NVIDIA A100-PCIE-40GB MIG 2g.10gb", "A100-PCIe-40GB"),
+	],
+)
+def test_mig_profiles_pick_their_card(name, card):
+	assert gpus.resolve(name, int(5e9)) == card
