@@ -16,6 +16,7 @@ Close a request by moving it to Done with the commit that settled it.
 - TODO(contract) [A -> B] `recorder/gpus.py` carries a minimal peak-FLOPs table (bf16, fp16, fp32, tf32) for MFU. Once your GPU spec table lands, expose it as a pure function and the recorder will import it instead. (Oct 27)
 - TODO(contract) [A -> C] Probe failures now carry `Probe.error_code` (families listed in schema/record.py, e.g. oom.eval, missing_package, download_blocked, gated_model). Please key UI copy as t('error.<code>') and t('error.<code>.hint'). (Oct 27)
 - TODO(contract) [A -> C] `QueueFull` from the job store should map to 429 with Retry-After = its `retry_after_s`; `StoreUnavailable` to 503 retryable. (Oct 27)
-- TODO(contract) [A -> Chiya] Agent sample size, 30 or 50 tasks: see D3 in docs/decisions/probe-plan.md. Default is 30 until decided. (Oct 27)
+- TODO(contract) [A -> Chiya] Agent sample size: 30 tasks (default) or 50 tasks with an 80% runaway bound, which clears 88% coverage with a narrower interval; see D3 in docs/decisions/probe-plan.md. (Oct 27)
+- TODO(contract) [A -> B] Agent cost upper bound: add (Clopper-Pearson upper bound on the runaway rate minus the observed rate) x the observed runaway cost to the bootstrap's upper end, whether or not a runaway was sampled. The plain bootstrap covers 71% at 50 tasks; this covers 89% at an 80% bound (D3 rerun). (Oct 27)
 
 ## Done
