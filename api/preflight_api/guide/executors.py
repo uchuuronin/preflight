@@ -72,7 +72,7 @@ def _unavailable(reason: str) -> dict:
 
 
 def job_request(name: str, args: dict, ctx: ExecContext) -> dict:
-	"""The JobRequest the guide submits for a server tool (shape agreed with A, docs/requests.md)."""
+	"""The JobRequest the guide submits for a server tool (fields requested of A, docs/requests.md, Oct 27)."""
 	base = {"source": {"kind": "record", "record_ref": ctx.record_ref}, "purpose": f"guide.{name}"}
 	if name == "run_probe":
 		knobs = {
