@@ -64,8 +64,35 @@ _TARGETS = {
 # ---------------------------------------------------------------- small helpers
 
 
+MEMORY_TERMS = (
+	"weights",
+	"master_weights",
+	"frozen_models",
+	"context",
+	"gradients",
+	"optimizer",
+	"comm_buffers",
+	"activations",
+	"logits",
+	"kv_cache",
+	"generation_engine",
+	"eval_spike",
+)  # fmt: skip  (the twelve memory.<term> ids C's ring groups)
+
+
+def _meta(tid: str) -> tuple[str, str | None]:
+	"""(unit, readout) for a target id, including the per-term and per-phase families."""
+	if tid in _TARGETS:
+		return _TARGETS[tid]
+	if tid.startswith("memory.") and tid[7:] in MEMORY_TERMS:
+		return "bytes", None
+	if tid.startswith("time.phase."):
+		return "s", None
+	raise KeyError(f"unknown target {tid!r}")
+
+
 def _target(tid: str) -> Target:
-	unit, readout = _TARGETS[tid]
+	unit, readout = _meta(tid)
 	return Target(id=tid, label_key=f"target.{tid}", unit=unit, readout=readout)
 
 
@@ -110,12 +137,35 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		ids = ["cost.total", "time.total", "memory.context_fill", "risk.runaway", "tokens.total"]
 	else:
 		ids = ["memory.peak", "time.total", "cost.total", "risk.oom", "time.step"]
+		if _has_shape(record):  # the per-term split needs the analytical model
+			ids += [f"memory.{t}" for t in MEMORY_TERMS]
+		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
 		c = record.job.constraints
 		if c.wall_time_cap_s:
 			ids.append("risk.wall_cap")
 		if c.preemption.kind != "none":
 			ids.append("risk.preemption_loss")
 	return [_target(t) for t in ids]
+
+
+def _has_shape(record: FlightRecord) -> bool:
+	try:
+		knobs.setup_from(record.job.script_map, _current(record))
+	except (ValueError, AttributeError):
+		return False
+	return True
+
+
+def _probe_phases(record: FlightRecord) -> list[str]:
+	names = {
+		ph
+		for p in record.probes
+		if p.status in OK_PROBE and p.step_time
+		for ph, v in p.step_time.by_phase.items()
+		if v
+	}
+	order = list(steptime.PHASES)
+	return sorted(names, key=lambda n: (order.index(n) if n in order else len(order), n))
 
 
 def _current(record: FlightRecord) -> dict:
@@ -234,6 +284,7 @@ class _MemoryResult:
 	peak: Estimate
 	oom: Estimate
 	detail: memory.MemoryEstimate | None = None
+	terms: dict | None = None  # memory.<term> estimates at the peak moment
 
 
 def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
@@ -298,7 +349,33 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 	):
 		why = f"the peak comes at {est.breakdown.peak_moment}, which no probe ran; run a probe with {est.breakdown.peak_moment} in it"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
-	return _from_memory_estimate(est, mid)
+	res = _from_memory_estimate(est, mid)
+	if est.status != "abstain" and est.breakdown is not None:
+		stack = dict(est.breakdown.stack)
+		if est.breakdown.peak_moment == "eval":
+			# C's ring shows eval as its own wedge: the training moment's terms plus the eval spike
+			train = memory.breakdown(
+				arch, replace(setup, eval_batch=None), shape.batch, shape.seq, capacity_bytes=capacity
+			)
+			stack = {**train.stack, "eval_spike": est.breakdown.allocator_peak - train.allocator_peak}
+		res = replace(res, terms=_term_estimates(stack, res.peak))
+	return res
+
+
+def _term_estimates(stack: dict, peak: Estimate) -> dict:
+	"""memory.<term> at the peak, scaled so the terms add up to the calibrated peak, with its relative band."""
+	total = sum(max(0.0, v) for v in stack.values())
+	if not total or peak.status == "abstain":
+		return {}
+	scale = peak.point / total
+	lo_f, hi_f = peak.lo / peak.point, peak.hi / peak.point
+	status = "predicted" if peak.status == "measured" else peak.status  # the split is modelled, not measured
+	why = "split by the analytical model, scaled to the calibrated peak"
+	out = {}
+	for t in MEMORY_TERMS:
+		v = max(0.0, stack.get(t, 0.0)) * scale
+		out[f"memory.{t}"] = _est(v, v * lo_f, v * hi_f, "bytes", status, memory.MODEL_ID, why)
+	return out
 
 
 def _from_memory_estimate(est: memory.MemoryEstimate, mid: str) -> _MemoryResult:
@@ -371,6 +448,7 @@ class _StepResult:
 	est: Estimate
 	sigma: float  # log sigma of the step time, for totals and tail probabilities
 	first_extra_s: float = 0.0  # compile and warm-up, paid once
+	phases: dict | None = None  # seconds per phase, scaled to the step's point
 
 
 def _step_x(lens: str, values: dict) -> float:
@@ -531,10 +609,14 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	for p in record.probes:
 		if p.status in OK_PROBE and p.step_time and p.step_time.first_step_s and p.step_time.p50_s:
 			first = max(first, p.step_time.first_step_s - p.step_time.p50_s)
+	bd = {k: v for k, v in (est.breakdown or {}).items() if v > 0}
+	total = sum(bd.values())
+	phases = {k: v * point / total for k, v in bd.items()} if total else None
 	return _StepResult(
 		_est(point, point * math.exp(-h), point * math.exp(h), "s", status, mid, "; ".join(reasons) or None),
 		sigma,
 		first,
+		phases,
 	)
 
 
@@ -613,6 +695,7 @@ class _TimeResult:
 	total: Estimate
 	step: Estimate
 	sigma: float
+	phases: dict | None = None
 
 
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
@@ -636,7 +719,7 @@ def _time(record: FlightRecord, values: dict) -> _TimeResult:
 		MODEL_ID_TOTAL,
 		reason,
 	)
-	return _TimeResult(total, step.est, step.sigma)
+	return _TimeResult(total, step.est, step.sigma, step.phases)
 
 
 def _total_status(step: Estimate) -> str:
@@ -785,13 +868,13 @@ def _agent(record: FlightRecord, values: dict) -> dict[str, Estimate]:
 	ids = ["cost.total", "time.total", "memory.context_fill", "risk.runaway", "tokens.total"]
 	if s is None:
 		return {
-			t: _abstain(_TARGETS[t][0], agent_cost.MODEL_ID, "no task sample yet; run the agent probe")
+			t: _abstain(_meta(t)[0], agent_cost.MODEL_ID, "no task sample yet; run the agent probe")
 			for t in ids
 		}
 	model = values.get("model")
 	if model is not None and not tasks:
 		why = f"no sampled task ran on {model}; sample it first"
-		return {t: _abstain(_TARGETS[t][0], agent_cost.MODEL_ID, why) for t in ids}
+		return {t: _abstain(_meta(t)[0], agent_cost.MODEL_ID, why) for t in ids}
 	pop = int(values.get("n_tasks") or s.population or 0) or None
 	tasks, cut, hit = _cap_turns(tasks, values.get("max_turns"))
 	sub = s.model_copy(update={"tasks": tasks})
@@ -917,6 +1000,13 @@ def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction
 		"time.total": tm.total,
 		"cost.total": _cost(record, values, tm.total),
 	}
+	out.update(mem.terms or {})
+	if tm.phases and tm.step.status != "abstain":
+		h = memory.Z90 * tm.sigma
+		for ph, v in tm.phases.items():
+			out[f"time.phase.{ph}"] = _est(
+				v, v * math.exp(-h), v * math.exp(h), "s", tm.step.status, tm.step.model_id
+			)
 	c = record.job.constraints
 	if c.wall_time_cap_s:
 		out["risk.wall_cap"] = _wall_cap(record, tm)
@@ -1009,7 +1099,7 @@ def build_grids(record: FlightRecord, knob_ids: list[str], targets: list[str] | 
 			Grid(
 				id=f"g.{t}.{'_'.join(knob_ids)}",
 				target_id=t,
-				unit=_TARGETS[t][0],
+				unit=_meta(t)[0],
 				axes=grid_axes,
 				point=encode_f16(pt, scale),
 				lo=encode_f16(lo, scale),
@@ -1095,15 +1185,22 @@ def _noise(pred: Prediction, tid: str) -> float:
 	return (e.hi - e.lo) / (2 * abs(e.point))
 
 
-def sensitivity(record: FlightRecord, objective: Objective) -> list[KnobImpact]:
+def sensitivity(
+	record: FlightRecord,
+	objective: Objective,
+	pinned: list[str] | set[str] | None = None,
+	knobs: dict | None = None,
+) -> list[KnobImpact]:
 	"""Which knobs move the objective most across their range (one at a time, others at current values).
 
 	Impact is the change across the range relative to the current value, capped at 1 (a probability
 	objective uses the change itself). Knobs that move it less than its own band are left out.
 	"""
 	f, tid = _objective_fn(record, objective)
-	base_values = _values(record, None)
-	base_pred = predict(record)
+	start = dict(knobs or {})  # rank from this setting (C's provider passes the live one)
+	pinned = set(pinned or ())
+	base_values = _values(record, start)
+	base_pred = predict(record, start)
 	base = f(base_pred, base_values)
 	prob = _TARGETS.get(tid, ("", None))[0] == "probability"
 	noise = _noise(base_pred, "time.step" if tid.startswith("time.step") else tid)
@@ -1111,15 +1208,16 @@ def sensitivity(record: FlightRecord, objective: Objective) -> list[KnobImpact]:
 	check = _feasible(record, base_pred)
 	out = []
 	for k in record.knobs:
-		if k.id in WORKLOAD_KNOBS:
+		if k.id in WORKLOAD_KNOBS or k.id in pinned:
 			continue
 		stops = axis_values(k, 6)
 		if len(stops) < 2:
 			continue
 		scored = []
 		for v in stops:
-			pred = predict(record, {k.id: v})
-			y = f(pred, _values(record, {k.id: v}))
+			q = {**start, k.id: v}
+			pred = predict(record, q)
+			y = f(pred, _values(record, q))
 			if y is not None and (not check or _feasible(record, pred)):
 				scored.append((v, y))
 		if len(scored) < 2:

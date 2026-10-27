@@ -63,6 +63,11 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
   - more GPUs add the all-reduce, with its own error;
   - the agent path honours turn caps, the sampled model and unmodelled knobs;
   - the context limit below the sample abstains, and the top-up is offered once.
+- **C's requests:**
+  - `memory.<term>` for all twelve terms, adding up to the peak, with eval as its own wedge;
+  - `time.phase.<name>` adding up to the step;
+  - `sensitivity(..., pinned=, knobs=)`;
+  - eval settings held in every grid's `fixed`.
 - **K1's band (S4c):** sized to cover 90% even if per-kernel drift is twice what S4 assumed. Cross-vendor drops from a hand-set 0.25 to 0.22, so AMD gets numbers with wide bands instead of always abstaining.
 - Tests live in root `tests/`; 701 pass across the repo (A's included), ruff clean with the repo config.
 

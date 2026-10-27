@@ -51,7 +51,7 @@ def test_every_lens_target_comes_back_valid(name):
 	pred = api.predict(rec).root
 	assert {t.id for t in api.targets_for(rec)} <= set(pred)
 	for tid, e in pred.items():
-		assert e.unit == api._TARGETS[tid][0]
+		assert e.unit == api._meta(tid)[0]
 		if e.status == "abstain":
 			assert e.reason
 		else:
@@ -334,3 +334,36 @@ def test_agent_turn_cap_and_untagged_tasks(ag):
 def test_context_limit_below_the_sample_abstains(ag):
 	e = api.predict(_agent_with(ag, 30), {"context_limit": 4096}).root["memory.context_fill"]
 	assert e.status == "abstain" and "would overflow" in e.reason
+
+
+# ---------------------------------------------------------------- C's requests (Oct 27)
+
+
+def test_memory_terms_add_up_to_the_peak_with_eval_as_its_own_wedge(ft):
+	p = api.predict(ft).root
+	terms = {k: v for k, v in p.items() if k.startswith("memory.") and k != "memory.peak"}
+	assert set(terms) == {f"memory.{t}" for t in api.MEMORY_TERMS}
+	assert sum(v.point for v in terms.values()) == pytest.approx(p["memory.peak"].point)
+	assert terms["memory.eval_spike"].point > terms["memory.activations"].point  # the planted eval OOM
+	calm = api.predict(ft, {"eval_batch_size": 1, "eval_no_grad": True}).root
+	assert calm["memory.eval_spike"].point == 0
+
+
+def test_phase_times_add_up_to_the_step(ft):
+	p = api.predict(ft).root
+	phases = {k: v for k, v in p.items() if k.startswith("time.phase.")}
+	assert {"time.phase.forward", "time.phase.backward"} <= set(phases)
+	assert sum(v.point for v in phases.values()) == pytest.approx(p["time.step"].point)
+	h100 = api.predict(ft, {"gpu_type": "H100-SXM-80GB"}).root
+	assert h100["time.phase.backward"].point < phases["time.phase.backward"].point
+
+
+def test_sensitivity_skips_pinned_knobs_and_starts_from_the_given_setting(ft):
+	rows = api.sensitivity(ft, Objective(kind="min_cost"), pinned=["precision"], knobs={"batch_size": 2})
+	assert "precision" not in {r.knob_id for r in rows}
+	assert {r.knob_id for r in rows} <= {k.id for k in ft.knobs}
+
+
+def test_eval_batch_is_held_in_every_grid(ft):
+	for g in api.build_grids(ft, ["batch_size", "seq_len"]):
+		assert g.fixed["eval_batch_size"] == 32 and g.fixed["eval_no_grad"] is False
