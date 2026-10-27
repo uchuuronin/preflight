@@ -128,6 +128,19 @@ The same decision for the same-GPU step-time model. Small batches under-use the 
 
 **Chosen: T4.** It holds 88.9% or better until the band passes +-50%, about 2.7 halvings (6.5x) below the smallest probe, and abstains from there. Memory's rule is too narrow for time. A one-sided band does worse because the fitted line can overshoot as well as undershoot below the probes. Reproduce with `uv run python scripts/mc_engine_settings.py s2d` and `s4b`.
 
+## S4c. How wide K1's band is, by vendor
+
+S4 scored K1's point error. The band needs the error's 90th percentile, and S4's per-kernel efficiency drift (0.12 same vendor, 0.25 cross vendor) is an assumption no AMD data backs yet. So the q90 from S4 (0.101 same vendor, 0.179 cross vendor, in log units) was re-scored with the true drift at 1x, 1.5x and 2x that assumption. Coverage of the 90% band:
+
+| Margin on S4's q90 | Same vendor (drift x1 / x1.5 / x2) | Cross vendor (drift x1 / x1.5 / x2) |
+| --- | --- | --- |
+| x1 | 90.3% / 76.5% / 65.1% | 89.7% / 74.6% / 61.5% |
+| x1.25 | 95.4% / 84.7% / 74.4% | 94.3% / 83.7% / 70.0% |
+| x1.5 | 97.3% / 90.5% / 81.9% | 96.8% / 88.8% / 78.0% |
+| **x2** | **99.4% / 96.2% / 91.2%** | **99.1% / 94.9% / 89.9%** |
+
+**Chosen: margin x2.** `SIGMA_SAME_VENDOR` stays 0.12, now backed by S4c rather than set by hand, and `SIGMA_CROSS_VENDOR` drops from a hand-set 0.25 to 0.22. Combined with the same-GPU sigma, 0.25 put every NVIDIA-to-AMD band past the +-50% abstain line, so the engine never gave AMD a number. At 0.22 it gives one, with the wider range the plan promises until AMD is measured. The conformal layer recalibrates both from the corpus. Reproduce with `uv run python scripts/mc_engine_settings.py s4c`.
+
 ## S5. Keeping the corpus sweep inside its budget
 
 | Candidate | P(overspend) | Mean overspend | Budget left unused | Configs run |

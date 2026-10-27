@@ -1,6 +1,6 @@
 # Status · B (prediction engine and corpus)
 
-Updated Tue Oct 27, afternoon ET, on `ws-b` rebased onto A's `ws-a` (b59334b).
+Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; from now on merges, not rebases).
 
 ## Done
 - **Settings chosen by Monte Carlo** (`docs/decisions/engine-settings.md`, `scripts/mc_engine_settings.py`): memory calibration on A's three-probe plan, the 90% band (including one or two probes) and the fits/tight/fails cut-offs, the divergence label (D9 catches early collapses, a case a CPU smoke run turned up), cross-GPU step time and the corpus budget rule.
@@ -48,15 +48,35 @@ Updated Tue Oct 27, afternoon ET, on `ws-b` rebased onto A's `ws-a` (b59334b).
   - GH200 MIG slices pick the right card;
   - dict tables are validated;
   - the agent bootstrap runs in bounded memory (17 MB at 10,000 tasks).
+- **Chiya's decisions applied:**
+  - **Below the smallest probe:** an "extrapolated" estimate with a growing band and a probe offer. Memory widens 25% per halving (S2d); step time widens 0.1 per halving and abstains about 2.7 halvings down (S4b).
+  - **Agent sample:** 30 tasks, plus a 20-task top-up offered when the cost range straddles the budget (S6b: 88.2% final coverage).
+  - **Flags:** B's four flags are in `flags.json`, off.
+- **`engine/api.py`:** `predict`, `build_grids`, `sensitivity`, plus `targets_for` and `fill_predictions` (the call `make_golden.py` makes).
+  - Every lens gets its readouts: GPU lenses get memory, OOM risk, step and total time, cost, the wall-cap risk and preemption loss; API lenses get cost, tokens, wall clock under concurrency and rate limits, context fill and runaway rate.
+  - Knob moves the models don't capture widen the band or abstain, and "measured" means a probe really saw the peak.
+  - About 0.4 ms per `predict`; a 7x7 grid of four targets takes 20 ms.
+- **K1's band (S4c):** sized to cover 90% even if per-kernel drift is twice what S4 assumed. Cross-vendor drops from a hand-set 0.25 to 0.22, so AMD gets numbers with wide bands instead of always abstaining.
 - Tests live in root `tests/`; 701 pass across the repo (A's included), ruff clean with the repo config.
 
 ## Blocked
 - Modal access, for the NVIDIA corpus slice.
 
 ## Next (Wed Oct 28)
-- `engine/api.py`: `predict`, `build_grids`, `sensitivity` against the v0.1 schema, then the `make_golden.py` call for A.
+- Run-cost breakdown (gap 21).
 - Conformal layer (CQR, log-ratio scores) replacing the simulated band constants.
-- `engine/api.py` wires `agent_totals` into `predict` for agent and API lenses, with D's API price table as `price`.
+- Agent cost from tokens when tasks lack `cost_usd`, once D's API price table lands.
 
 ## Contract requests
-In `docs/requests.md`. Open from B to A: one golden-record GPU name, FLOP counts for in-place matmuls, and the reasoning-token convention; four flags to Chiya, target ids and cut-offs to C (now with `tokens.total` and `risk.runaway`), the price table to D. Every A -> B request is closed except the golden predictions, which wait for `engine/api.py`. A reply to Chiya on the agent sample size: 30 and 50 tasks both clear 88% (S6).
+In `docs/requests.md`.
+- **Open from B to A:**
+  - one golden-record GPU name;
+  - FLOP counts for in-place matmuls;
+  - the reasoning-token convention;
+  - the agent top-up in the probe;
+  - the `make_golden.py` call, which needs 30 agent tasks in the golden record.
+- **Open from B to the others:**
+  - Chiya: one more flag, `engine.agent_totals`;
+  - C: every target id per lens, the extrapolated label, and the top-up offer;
+  - D: the price table.
+- **A to B:** every request is closed except the golden predictions, which now have a reply with the exact call.

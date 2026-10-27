@@ -4,7 +4,8 @@ S1: memory estimator on A's three probes (current, half batch, half seq).
 S2: the 90% band rule (S2a), the fits / tight / fails cut-offs (S2b), the band with one or two probes (S2c),
     and how the band grows below the smallest probe (S2d).
 S3: the rule that labels a short run diverged.
-S4: carrying step time from the probed GPU to another GPU; S4b: step time below the smallest probe.
+S4: carrying step time from the probed GPU to another GPU; S4b: step time below the smallest probe;
+    S4c: K1's band when the per-kernel drift is larger than assumed.
 S5: the corpus sweep's cost overhead factor and per-config time estimate.
 S6: B's agent-total code (engine/agent_cost.py) re-checked on A's D3 generator; S6b: 30 tasks plus a
     20-task top-up when the cost range straddles the budget.
@@ -491,6 +492,7 @@ def s4():
 			"K5 same MFU",
 		)
 	}
+	k1_log = []
 	for _ in range(4000):
 		P_t, B_t = targets[rng.integers(len(targets))]
 		cross_vendor = P_t == 1307.4e12
@@ -516,9 +518,61 @@ def s4():
 		k5 = f.sum() / (mfu * P_t)
 		for n, v in zip(errs, (k1, k2, k3, k4, k5), strict=True):
 			errs[n].append(v / true_t - 1)
+		k1_log.append((cross_vendor, abs(np.log(k1 / true_t))))
 	for n, e in errs.items():
 		e = np.abs(np.array(e))
 		print(f"  {n:<40} {pct(e <= 0.2)}      {pct(e <= 0.35)}      {np.median(e) * 100:4.1f}%")
+	# the step-level band K1 needs: 90th percentile of |log error|, by vendor (sets SIGMA_SAME/CROSS_VENDOR)
+	for name, cv in (("same vendor", False), ("cross vendor", True)):
+		e = np.array([x for c, x in k1_log if c == cv])
+		q90 = np.quantile(e, 0.9)
+		print(
+			f"  K1 {name:<13} q90 |log error| {q90:.3f} -> sigma {q90 / 1.6448536269514722:.3f} ({len(e)} trials)"
+		)
+
+
+def s4c(trials=4000):
+	"""K1's step-level band, robust to the per-kernel drift being larger than S4 assumes.
+
+	S4 draws per-kernel efficiency drift at 0.12 (same vendor) and 0.25 (cross vendor). Nothing
+	measured backs those yet, so the true drift is scaled by 1x, 1.5x and 2x and each candidate band
+	(S4's q90 times a margin) is scored for 90% coverage. Source A100-80GB, as in S4.
+	"""
+	g = np.random.default_rng(20261028)
+	src = (312e12, 2039e9)
+	targets = [
+		(989.4e12, 3350e9, False),
+		(121e12, 300e9, False),
+		(362e12, 864e9, False),
+		(1307.4e12, 5300e9, True),
+	]
+	base = {False: 0.101, True: 0.179}  # S4's q90 |log error| by vendor
+	k = 40
+	res = {}
+	for scale in (1.0, 1.5, 2.0):
+		errs = {False: [], True: []}
+		for _ in range(trials):
+			P_t, B_t, cv = targets[g.integers(len(targets))]
+			f = g.lognormal(np.log(1e10), 2.0, k)
+			by = f / g.lognormal(np.log(60), 1.5, k)
+			eff_s = g.uniform(0.3, 0.85, k)
+			eff_t = np.clip(eff_s * np.exp(g.normal(0, (0.25 if cv else 0.12) * scale, k)), 0.05, 0.95)
+			lat = 5e-6
+			roof_s, roof_t = np.maximum(f / src[0], by / src[1]), np.maximum(f / P_t, by / B_t)
+			t_s = roof_s / eff_s + lat
+			host = g.uniform(0, 0.15) * t_s.sum()
+			true_t = (roof_t / eff_t + lat).sum() + host
+			k1 = (t_s * roof_t / roof_s).sum() + host
+			errs[cv].append(abs(np.log(k1 / true_t)))
+		res[scale] = {cv: np.array(v) for cv, v in errs.items()}
+	print("\nS4c K1 band vs drift larger than assumed     coverage at drift x1 / x1.5 / x2")
+	for m in (1.0, 1.25, 1.5, 2.0):
+		row = []
+		for cv in (False, True):
+			h = base[cv] * m
+			cov = " / ".join(f"{100 * np.mean(res[sc][cv] <= h):5.1f}%" for sc in (1.0, 1.5, 2.0))
+			row.append(f"{'cross' if cv else 'same'} h={h:.3f}: {cov}")
+		print(f"  margin x{m:<5g}" + "    ".join(row))
 
 
 def s4b(trials=20_000):
@@ -736,6 +790,9 @@ if __name__ == "__main__":
 		w = memory_world()
 		s2c(w, probes(w))
 		raise SystemExit
+	if sys.argv[1:] == ["s4c"]:
+		s4c()
+		raise SystemExit
 	if sys.argv[1:] == ["s4b"]:
 		s4b()
 		raise SystemExit
@@ -751,6 +808,7 @@ if __name__ == "__main__":
 	s3()
 	s4()
 	s4b()
+	s4c()
 	s5()
 	s6()
 	s6b()

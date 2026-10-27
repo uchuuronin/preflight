@@ -234,14 +234,14 @@ def runaway_rate(
 	s, dropped = _clean(values)
 	n = int(s.size)
 	if n < min_sample:
-		return _abstain("fraction", f"only {n} tasks measured; run at least {min_sample}", n=n)
+		return _abstain("probability", f"only {n} tasks measured; run at least {min_sample}", n=n)
 	x = int((s > runaway_threshold(s, runaway_factor)).sum())
 	side = (1 + level) / 2
 	return TotalEstimate(
 		x / n,
 		cp_lower(x, n, side),
 		cp_upper(x, n, side),
-		"fraction",
+		"probability",
 		"predicted",
 		reason=None
 		if x
