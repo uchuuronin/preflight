@@ -451,6 +451,10 @@ def run_config(cfg: CorpusConfig, device: str = "cuda", data_path: str | None = 
 			result = _run_kernels(cfg, dev)
 		elif cfg.kind == "divergence":
 			result = _run_divergence(cfg, dev, data_path)
+		elif cfg.kind == "hf":
+			from preflight.corpus.hf_worker import run_hf
+
+			result = run_hf(cfg, dev)
 		else:
 			raise ValueError(f"unknown kind {cfg.kind!r}")
 	except Exception as exc:

@@ -30,6 +30,7 @@ from preflight.corpus.store import ResultStore
 DEFAULT_EST_SECONDS = {
 	"kernels": 45.0,
 	"divergence": 180.0,
+	"hf": 120.0,
 }  # guess: per-config seconds before any finish; replaced by the running p90 after 3 configs (measured)
 DEFAULT_OVERHEAD = 1.25  # guess: container start and idle Modal bills; replaced by Modal's billed/elapsed ratio after the first wave
 ESTIMATE_QUANTILE = 0.9  # simulated: S5 B5
@@ -204,7 +205,7 @@ def _main(argv: list[str] | None = None) -> None:
 	ex.add_argument("--seed", type=int, default=0)
 
 	run = sub.add_parser("run", help="run a sweep on this machine's GPU")
-	run.add_argument("--kind", choices=["kernels", "divergence"], required=True)
+	run.add_argument("--kind", choices=list(cfgs.KINDS), required=True)
 	run.add_argument("--configs", help="jsonl list; default: generate")
 	run.add_argument("--n", type=int, default=1500)
 	run.add_argument("--seed", type=int, default=0)
@@ -246,12 +247,9 @@ def _main(argv: list[str] | None = None) -> None:
 		if p is None:
 			raise SystemExit(f"no price for {gpu}; pass --usd-per-hour")
 		rate = p.usd_per_hour
-	if args.configs:
-		todo = cfgs.read_jsonl(args.configs)
-	elif args.kind == "kernels":
-		todo = cfgs.kernel_configs(args.n, seed=args.seed)
-	else:
-		todo = cfgs.divergence_configs(args.n, seed=args.seed)
+	todo = cfgs.read_jsonl(args.configs) if args.configs else cfgs.configs_for(args.kind, args.n, args.seed)
+	versions = cfgs.local_versions(args.kind)
+	todo = [c.with_versions(versions) for c in todo]  # code and library versions in every key
 
 	def runner(cfg: CorpusConfig) -> dict[str, Any]:
 		return run_isolated(cfg, device=args.device, data_path=args.data)

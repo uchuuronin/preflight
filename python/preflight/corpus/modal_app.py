@@ -30,13 +30,22 @@ VOLUME = "preflight-corpus"
 MOUNT = "/corpus"
 TEXT = "/assets/tinyshakespeare.txt"
 
+# exact pins, at least two weeks old on Oct 27 2026; they also go into every corpus key
+PINS = {
+	"torch": "torch==2.8.0",
+	"transformers": "transformers==5.19.0",
+	"peft": "peft==0.21.2",
+	"bitsandbytes": "bitsandbytes==0.50.2",
+	"accelerate": "accelerate==1.15.0",
+}
+
 app = modal.App(APP_NAME)
 vol = modal.Volume.from_name(VOLUME, create_if_missing=True)
 
 image = (
 	modal.Image.debian_slim(python_version="3.11")
 	.apt_install("curl")
-	.pip_install("torch==2.8.0", "numpy")
+	.pip_install(*PINS.values(), "numpy")
 	.run_commands(
 		"mkdir -p /assets",
 		f"curl -fsSL -o {TEXT} https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
@@ -130,7 +139,11 @@ def main(
 	from preflight.engine import gpus
 
 	plan = sweep.parse_budget_plan(budgets)
-	all_cfgs = cfgs.kernel_configs(n, seed) if kind == "kernels" else cfgs.divergence_configs(n, seed)
+	pinned = {"corpus": cfgs.CODE_VERSION, **{k: v.split("==")[1] for k, v in PINS.items()}}
+	if kind != "hf":
+		pinned = {k: v for k, v in pinned.items() if k in ("corpus", "torch")}
+	all_cfgs = [c.with_versions(pinned) for c in cfgs.configs_for(kind, n, seed)]
+	store_kind = all_cfgs[0].kind  # grouped configs are kernels rows; the ledger reads that directory
 	rates = {}
 	for g in plan:
 		p = gpus.price(g, "modal")
@@ -143,7 +156,7 @@ def main(
 		wave_size = batch_size * max_containers
 		wave, last_done = 0, -1
 		while True:
-			led = ledger.remote(kind, gpu, retry_errors and wave == 0)
+			led = ledger.remote(store_kind, gpu, retry_errors and wave == 0)
 			spent = led["gpu_seconds"] * overhead / 3600 * rates[gpu]
 			todo = sweep.plan_from(
 				all_cfgs, set(led["done"]), spent, plan[gpu], rates[gpu], overhead=overhead,

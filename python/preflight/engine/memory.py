@@ -713,9 +713,14 @@ class Calibration:
 	def halvings_below(self, tokens: float) -> float:
 		return math.log2(self.min_tokens / tokens) if self.is_below(tokens) else 0.0
 
-	def half_width(self, tokens: float | None = None) -> float:
-		"""90% half-width in log space (S2a R5; S2c for one or two probes; S2d below the smallest probe)."""
-		if self.n_probes >= 3 and self.loo_log_error is not None:
+	def half_width(self, tokens: float | None = None, base: float | None = None) -> float:
+		"""90% half-width in log space (S2a R5; S2c for one or two probes; S2d below the smallest probe).
+
+		`base` is a held-out conformal half-width (engine.conformal); without one the simulated constants apply.
+		"""
+		if base is not None:
+			h = base
+		elif self.n_probes >= 3 and self.loo_log_error is not None:
 			h = max(HALF_WIDTH_CALIBRATED, LOO_WIDEN * self.loo_log_error)
 		else:
 			h = HALF_WIDTH_CALIBRATED if self.n_probes == 2 else HALF_WIDTH_ONE_PROBE
@@ -779,6 +784,7 @@ def predict_peak(
 	margin_bytes: float = 0.0,
 	work_units: float | None = None,
 	measured: bool = False,
+	base_half_width: float | None = None,
 ) -> MemoryEstimate:
 	"""Peak per-GPU memory with a 90% band and P(OOM) against the GPU's capacity.
 
@@ -797,7 +803,7 @@ def predict_peak(
 	if probes:
 		cal = Calibration.fit(probes)
 		alloc = cal.correct(tokens, bd.allocator_peak)
-		h = cal.half_width(tokens)
+		h = cal.half_width(tokens, base=base_half_width)
 		if measured:
 			status = "measured"
 			h = min(h, HALF_WIDTH_CALIBRATED)

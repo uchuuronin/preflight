@@ -22,7 +22,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from preflight.engine import agent_cost, gpus, knobs, memory, steptime
+from preflight.engine import agent_cost, conformal, gpus, knobs, memory, steptime
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
 	Estimate,
@@ -410,6 +410,9 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		capacity_bytes=capacity,
 		work_units=knobs.work_units(lens, values),
 		measured=measured,
+		base_half_width=conformal.TABLE.lookup("memory.peak", gpu, lens).half_width
+		if conformal.TABLE.lookup("memory.peak", gpu, lens)
+		else None,
 	)
 	if (
 		est.status == "predicted"
@@ -499,7 +502,12 @@ def _empirical_memory(
 	cal = memory.Calibration.fit(pts)
 	x = knobs.work_units(lens, values)
 	measured = _matching_probe(record, values) is not None
-	h = memory.HALF_WIDTH_CALIBRATED if measured else cal.half_width(x)
+	cell = conformal.TABLE.lookup("memory.peak", _target_gpu(record, values), lens)
+	h = (
+		memory.HALF_WIDTH_CALIBRATED
+		if measured
+		else cal.half_width(x, base=cell.half_width if cell else None)
+	)
 	status = "measured" if measured else ("extrapolated" if cal.is_below(x) else "predicted")
 	if not measured and (x > cal.range()[1] or h > memory.ABSTAIN_HALF_WIDTH):
 		why = f"{x:.0f} work units is too far from the probes for a line fit; run a probe here"
@@ -577,6 +585,9 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	if not sprobes:
 		return _StepResult(_abstain("s", mid, "no probe timed a step yet"), 0.0)
 	model = steptime.SameGpuModel.fit(sprobes, constant_phases=steptime.CONSTANT_PHASES)
+	cell = conformal.TABLE.lookup("time.step", _env_gpu(record), lens)
+	if cell is not None:  # held-out conformal half-width replaces the simulated same-GPU sigma
+		model = replace(model, sigma=cell.half_width / steptime.Z90)
 	probe_gc = {bool(_probe_values(record, p).get("gradient_checkpointing", False)) for p in record.probes}
 	recompute = bool(values.get("gradient_checkpointing")) and probe_gc == {False}
 	match = _matching_probe(record, values)
@@ -1384,18 +1395,33 @@ _CARDS = {
 CALIBRATION = "simulated"  # Review, Oct 27: until real held-out runs replace the simulated constants
 
 
+_CARD_TARGET = {
+	memory.MODEL_ID: "memory.peak",
+	steptime.MODEL_ID_SAME: "time.step",
+	steptime.MODEL_ID_CROSS: "time.step",
+}
+
+
+def _calibration(mid: str) -> tuple[str, float | None]:
+	"""("held_out", None) when the conformal table has a cell for this model's target, else ("simulated", None)."""
+	target = _CARD_TARGET.get(mid)
+	cells = [c for k, c in conformal.TABLE.cells.items() if target and k[0] == target]
+	return ("held_out", None) if cells else (CALIBRATION, None)
+
+
 def _cards(ids: set[str]) -> list[ModelCard]:
-	"""Model cards; every band so far was sized on simulated data, so each says calibration: simulated."""
+	"""Model cards; until held-out real runs fill the conformal table, each says calibration: simulated."""
 	out = []
 	for mid in sorted(ids):
 		kind, notes = _CARDS.get(mid, ("analytical", None))
+		calib, _ = _calibration(mid)
 		out.append(
 			ModelCard(
 				id=mid,
 				kind=kind,
 				version=mid.split("@")[-1],
 				training_data="none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
-				notes=f"calibration: {CALIBRATION}. {notes or ''}".strip(),
+				notes=f"calibration: {calib}. {notes or ''}".strip(),
 			)
 		)
 	return out

@@ -44,6 +44,32 @@ PYTHONPATH=python modal run --detach python/preflight/corpus/modal_app.py --kind
 modal volume get preflight-corpus /kernels ./corpus/kernels
 ```
 
+### Calibration data: grouped configs and real HF jobs (Review, Oct 27)
+
+The engine's conformal intervals need data shaped like a user's job, so two more kinds run on an L4:
+- `grouped`: one architecture at five batch × sequence points. Three are probes laid out like A's probe plan; two are held-out queries, one inside the queried range and one a halving below the smallest probe.
+- `hf`: about ten real Hugging Face fine-tunes, five ungated models each as bf16 LoRA and 4-bit QLoRA, at the same five points.
+
+Every key carries the corpus code version and the library versions it ran with, so a torch or transformers upgrade never mixes with older rows.
+
+```
+PYTHONPATH=python modal run --detach python/preflight/corpus/modal_app.py --kind grouped --n 250 --budgets "L4=10"
+```
+
+```
+PYTHONPATH=python modal run --detach python/preflight/corpus/modal_app.py --kind hf --budgets "L4=5"
+```
+
+```
+modal volume get preflight-corpus / ./corpus
+```
+
+```
+PYTHONPATH=python python -m preflight.corpus.calibrate --store ./corpus --out python/preflight/engine/_calibration_table.py
+```
+
+The last step prints leave-one-architecture-out coverage with Wilson intervals and writes the table the engine reads. Model cards switch from `calibration: simulated` to `held_out` for the targets the table covers.
+
 ### Run the AMD slice on the MI300X (for A)
 
 On the droplet, with the repo cloned and ROCm PyTorch installed:
