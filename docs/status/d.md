@@ -25,7 +25,7 @@ Mon Oct 26, evening. Repo is empty (no skeleton pushed yet), so nothing is commi
 |---|---|---|---|---|---|
 | D1 | Expertise dial | `t()`, registry slots (rail filter, header control, hover card), flags; knob ids; `sensitivity()` | C, A, B | Tue, after C's first commits | Content and tier rules (done) |
 | D2 | Share cards and badge | Share token and read-only record fetch, R2 record store, `workers/` in the deploy pipeline, headline numbers in the record | C, B | Thu (C's gap 1 and 5) | Card and badge design on a mock record |
-| D3 | Local currency, regional prices | `fmt()` with a currency argument, B's GPU price table | C, B | Tue | Regional and spot price table, FX source choice |
+| D3 | Local currency, regional prices | `fmt()` with a currency argument, B's USD price table (as-of date and source per row) | C, B | Tue | Regional rows on top of B's table; display-time conversion with a dated exchange rate (decided Oct 26, D-10) |
 | D4 | Free-tier presets | Free-tier GPUs (T4, P100, L4) in B's spec table; wall-time cap in `job.constraints` | B, A | Tue | Preset data: GPU, memory, session cap per platform, with sources |
 | D5 | Notebook intake | The exact input A's harness takes for an upload | A | Tue, once A defines it | Converter core in `python/preflight/addons/` (nbformat, magics, Colab drive mounts) |
 | D6 | "Jobs like yours" prior | Corpus records readable from the store; map skeleton from A | B, A | Thu (G1) | Feature design for the neighbour search |
