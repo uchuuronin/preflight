@@ -28,7 +28,14 @@
 				"d_model": 1536,
 				"n_heads": 12,
 				"n_kv_heads": 2,
+				"d_ff": 8960,
 				"vocab_size": 151936,
+				"head_dim": 128,
+				"max_positions": 131072,
+				"gated_mlp": true,
+				"tie_embeddings": true,
+				"norm": "rmsnorm",
+				"attn_impl": "sdpa",
 				"dtype": "bfloat16",
 				"lora": {
 					"r": 16,
@@ -501,9 +508,9 @@
 				"unprofiled": true
 			},
 			"throughput": {
-				"tokens_per_s": 2767.6,
-				"samples_per_s": 2.7,
-				"mfu": 0.38
+				"tokens_per_s": 11070.3,
+				"samples_per_s": 10.81,
+				"mfu": 0.575
 			},
 			"stability": {
 				"series": {
@@ -546,7 +553,112 @@
 				"max_w": 72.0,
 				"samples": 70
 			},
-			"extras": {},
+			"extras": {
+				"params_total": 1562179072.0,
+				"params_trainable": 18464768.0,
+				"tokens_per_step": 8192.0,
+				"samples_per_step": 8.0,
+				"micro_steps_per_step": 4.0,
+				"host_rss_peak_bytes": 6442450944.0
+			},
+			"kernels": {
+				"rows": [
+					{
+						"name": "aten::mm",
+						"kernel_class": "gemm",
+						"calls": 4704.0,
+						"device_s": 0.4588,
+						"flops": 43768209001676.8,
+						"bytes": 116000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "aten::_flash_attention_backward",
+						"kernel_class": "attention",
+						"calls": 112.0,
+						"device_s": 0.074,
+						"flops": 5149201059020.8,
+						"bytes": 4400000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "aten::_flash_attention_forward",
+						"kernel_class": "attention",
+						"calls": 112.0,
+						"device_s": 0.0296,
+						"flops": 2574600529510.4,
+						"bytes": 3000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "aten::mul",
+						"kernel_class": "elementwise",
+						"calls": 7648.0,
+						"device_s": 0.037,
+						"bytes": 88000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "aten::silu_backward",
+						"kernel_class": "elementwise",
+						"calls": 112.0,
+						"device_s": 0.011099999999999999,
+						"bytes": 19000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "aten::_log_softmax_backward_data",
+						"kernel_class": "softmax",
+						"calls": 8.0,
+						"device_s": 0.011099999999999999,
+						"bytes": 10000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "aten::_foreach_addcdiv_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.00296,
+						"bytes": 220000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "(tail) elementwise (41 ops)",
+						"kernel_class": "elementwise",
+						"calls": 12880.0,
+						"device_s": 0.0296,
+						"bytes": 76000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "(tail) copy (6 ops)",
+						"kernel_class": "copy",
+						"calls": 1640.0,
+						"device_s": 0.011099999999999999,
+						"bytes": 24000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "(tail) reduction (9 ops)",
+						"kernel_class": "reduction",
+						"calls": 932.0,
+						"device_s": 0.0074,
+						"bytes": 8000000000.0,
+						"dtype": "bf16"
+					},
+					{
+						"name": "(unattributed device time)",
+						"kernel_class": "other",
+						"calls": 0.0,
+						"device_s": 0.00592,
+						"dtype": "bf16"
+					}
+				],
+				"steps": 3,
+				"backend": "cuda",
+				"allow_tf32": false,
+				"classified_by": "engine.steptime"
+			},
 			"cost": {
 				"gpu_seconds": 71.0,
 				"usd": 0.0158
@@ -595,9 +707,9 @@
 				"unprofiled": true
 			},
 			"throughput": {
-				"tokens_per_s": 3011.8,
-				"samples_per_s": 2.94,
-				"mfu": 0.38
+				"tokens_per_s": 12047.1,
+				"samples_per_s": 11.76,
+				"mfu": 0.626
 			},
 			"stability": {
 				"series": {
@@ -640,7 +752,14 @@
 				"max_w": 72.0,
 				"samples": 70
 			},
-			"extras": {},
+			"extras": {
+				"params_total": 1562179072.0,
+				"params_trainable": 18464768.0,
+				"tokens_per_step": 16384.0,
+				"samples_per_step": 16.0,
+				"micro_steps_per_step": 4.0,
+				"host_rss_peak_bytes": 6442450944.0
+			},
 			"cost": {
 				"gpu_seconds": 80.0,
 				"usd": 0.0178

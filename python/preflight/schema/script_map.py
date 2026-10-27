@@ -55,8 +55,23 @@ class ModelInfo(Strict):
 	n_kv_heads: int | None = None
 	d_ff: int | None = None
 	vocab_size: int | None = None
+	head_dim: int | None = None
+	n_experts: int | None = Field(default=None, description="MoE experts per layer")
+	experts_per_token: int | None = Field(default=None, description="MoE experts routed per token")
+	max_positions: int | None = Field(default=None, description="Longest context the model was built for")
+	gated_mlp: bool | None = Field(default=None, description="SwiGLU/GeGLU-style MLP with a gate projection")
+	tie_embeddings: bool | None = Field(default=None, description="Output head shares the embedding matrix")
+	norm: Literal["rmsnorm", "layernorm"] | None = None
+	attn_impl: str | None = Field(default=None, description="eager, sdpa, flash_attention_2, ...")
 	dtype: str | None = None
-	quantization: str | None = Field(default=None, description="e.g. 4bit-nf4, 8bit, none")
+	quantization: str | None = Field(
+		default=None,
+		description="Weight format, as engine.memory keys it: nf4, nf4_dq, fp4, fp4_dq, int8, "
+		"gptq_4bit, gptq_8bit, awq_4bit; none or absent for unquantised",
+	)
+	shape_source: Literal["code", "hf_config", "modules"] | None = Field(
+		default=None, description="Where the shape fields came from: the code, or the running model"
+	)
 	lora: LoraInfo | None = None
 
 

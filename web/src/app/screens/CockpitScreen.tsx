@@ -8,7 +8,7 @@ import { GuidePanel } from "../../guide/GuidePanel";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { usePanels } from "../../registry";
-import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
+import { FlightPlanBand, MemoryBand, ProbesBand } from "../../workspace/cockpit/Bands";
 import { DetailSheet } from "../../workspace/cockpit/DetailSheet";
 import { Dials } from "../../workspace/cockpit/Dials";
 import { Dock } from "../../workspace/cockpit/Dock";
@@ -130,6 +130,7 @@ function Cockpit() {
 					<h2 className="pf-h2">{t("below.title")}</h2>
 					<FlightPlanBand />
 					<MemoryBand />
+					<ProbesBand />
 					{below.map((p) => (
 						<p.component key={p.id} record={record} knobs={state.knobs} estimates={estimates} />
 					))}

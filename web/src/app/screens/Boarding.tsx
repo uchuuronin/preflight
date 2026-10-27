@@ -4,6 +4,7 @@
  * the record is ready the cockpit opens on it.
  */
 import { useEffect, useState } from "react";
+import { eventText } from "../../lib/errors";
 import { t } from "../../lib/i18n";
 import type { JobEvent } from "../../workspace/record/types";
 import { go, href } from "../route";
@@ -73,7 +74,17 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 						</li>
 					))}
 				</ol>
-				{failed && last?.message ? <p className="pf-error">{last.message}</p> : null}
+				{failed && last?.message
+					? (() => {
+							const e = eventText(last.message);
+							return e ? (
+								<div className="pf-error" role="alert">
+									<p>{e.text}</p>
+									{e.hint ? <p className="pf-dim">{e.hint}</p> : null}
+								</div>
+							) : null;
+						})()
+					: null}
 				{!jobId ? <p className="pf-hint">{t("boarding.no_job")}</p> : null}
 				{lost && !done ? <p className="pf-hint">{t("boarding.lost")}</p> : null}
 				<div className="pf-cta">

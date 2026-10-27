@@ -21,18 +21,76 @@ const KNOB_NODES: Record<string, string[]> = {
 	gradient_checkpointing: ["model"],
 	gpu_type: ["model"],
 	gpu: ["model"],
-	lora_r: ["optimizer"],
+	gpus: ["model"],
+	fsdp_mode: ["model", "optimizer"],
+	lora_r: ["optimizer", "model"],
+	lora_alpha: ["model"],
+	lora_dropout: ["model"],
+	quantization: ["model"],
+	attn: ["model"],
 	precision: ["model"],
+	optimizer: ["optimizer"],
+	weight_decay: ["optimizer"],
+	lr: ["optimizer"],
+	grad_clip: ["optimizer"],
 	packing: ["data"],
+	group_by_length: ["data"],
 	num_workers: ["data"],
 	grad_accum: ["optimizer"],
+	checkpoint_every: ["checkpoint"],
+	eval_every: ["eval"],
+	max_new_tokens: ["rollout"],
+	group_size: ["rollout"],
+	use_vllm: ["rollout"],
+	gpu_memory_utilization: ["rollout"],
+	kv_cache_dtype: ["rollout"],
 };
 
 /**
  * Knobs that change what the model learns, not just how fast or how cheaply. The tour offers
  * them only to clear a failure. Requested as knobs[].changes_results.
  */
-const CHANGES_RESULTS = new Set(["seq_len", "lora_r", "precision", "max_new_tokens", "group_size", "packing"]);
+const CHANGES_RESULTS = new Set([
+	// what the model sees
+	"seq_len",
+	"packing",
+	"group_by_length",
+	"max_prompt_len",
+	"max_completion_len",
+	"max_new_tokens",
+	"context_limit",
+	"image_size",
+	// what it can learn
+	"lora_r",
+	"lora_alpha",
+	"lora_dropout",
+	"quantization",
+	"precision",
+	"n_layer",
+	"d_model",
+	"n_head",
+	"hidden_channels",
+	"gnn_layers",
+	"model",
+	// how it learns
+	"lr",
+	"lr_schedule",
+	"warmup_steps",
+	"weight_decay",
+	"optimizer",
+	"grad_clip",
+	"epochs",
+	"max_steps",
+	// RL and agents
+	"group_size",
+	"temperature",
+	"reasoning_effort",
+	"kl_beta",
+	"clip_low",
+	"clip_high",
+	"loss_type",
+	"max_turns",
+]);
 
 export function changesResults(knobId: string): boolean {
 	return CHANGES_RESULTS.has(knobId);

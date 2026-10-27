@@ -3,14 +3,17 @@
  * GPU at its peak. Both read the record and the provider; neither computes a prediction.
  */
 import { useRef } from "react";
+import { errorCopy } from "../../lib/errors";
 import { fmt, fmtRange } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useOrbitLayout } from "../map/Orbit";
 import { runPlan, targetFor } from "../record/model";
 import { memoryTermBytes, type MemorySegment } from "../record/terms";
-import type { LoadedRecord, Prediction } from "../record/types";
+import type { KnobValue, LoadedRecord, Prediction } from "../record/types";
 import { useWorkspace } from "../state";
-import { bounds, likelyFails, trusted } from "../status";
+import { valueText } from "../../guide/GuidePanel";
+import { FitMark } from "../components/StatusMark";
+import { bounds, type Fit, likelyFails, trusted } from "../status";
 
 const MAX_MARKS = 24;
 
@@ -32,7 +35,7 @@ function predictedStop(record: LoadedRecord, est: Prediction, evalEvery: number 
 export function FlightPlanBand() {
 	const { record, estimates, state, actions } = useWorkspace();
 	const track = useRef<HTMLDivElement>(null);
-	const plan = runPlan(record);
+	const plan = runPlan(record, state.knobs);
 	const total = plan.totalSteps;
 	const timeT = targetFor(record, "time");
 	const costT = targetFor(record, "cost");
@@ -136,6 +139,16 @@ export function FlightPlanBand() {
 					<span key={f}>{f === 0 ? t("plan.step0") : fmt(Math.round(total * f), "count")}</span>
 				))}
 			</div>
+			{plan.source === "epochs" ? (
+				<p className="pf-band__foot">
+					{t("plan.counted", {
+						epochs: fmt(plan.epochs ?? 0, "count"),
+						examples: fmt(plan.examples ?? 0, "count"),
+						per: fmt(plan.samplesPerStep ?? 0, "count"),
+						steps: fmt(total, "count"),
+					})}
+				</p>
+			) : null}
 			<p className="pf-band__foot">
 				{state.playhead > 0 && trusted(time)
 					? t("plan.at", { step: fmt(playStep, "count"), time: fmt(time.point * state.playhead, "s"), cost: trusted(cost) ? fmt(cost.point * state.playhead, "usd") : "" })
@@ -195,6 +208,86 @@ export function MemoryBand() {
 						{partsLabel(s) ? <small className="pf-dim">{partsLabel(s)}</small> : null}
 					</li>
 				))}
+			</ul>
+		</div>
+	);
+}
+
+const PROBE_FIT: Record<string, Fit> = {
+	ok: "fits",
+	cached: "fits",
+	oom: "fails",
+	error: "fails",
+	timeout: "fails",
+	cancelled: "unknown",
+	queued: "unknown",
+	running: "unknown",
+};
+
+/**
+ * "What was measured": every probe in the record with the settings it ran at, what it cost,
+ * its peak memory, and for a failed probe what went wrong and what to try (A's error codes).
+ * "Fly here" moves the knobs to that probe's settings, where the numbers are measured.
+ */
+export function ProbesBand() {
+	const { record, state, actions } = useWorkspace();
+	if (!record.probes.length) return null;
+	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
+	const total = record.probes.reduce((a, p) => a + (p.cost?.usd ?? 0), 0);
+	return (
+		<div className="glass pf-band" aria-label={t("probes.title")}>
+			<div className="pf-band__head">
+				<b>{t("probes.title")}</b>
+				<span>{t("probes.summary", { n: fmt(record.probes.length, "count"), cost: fmt(total, "usd") })}</span>
+			</div>
+			<ul className="pf-probes">
+				{record.probes.map((p) => {
+					const fit = PROBE_FIT[p.status] ?? "unknown";
+					const failed = fit === "fails";
+					const err = failed ? errorCopy(p.error_code ?? (p.status === "oom" ? "oom" : p.status === "timeout" ? "timeout" : null), p.error) : null;
+					const settings = Object.entries(p.knobs ?? {}).filter((e): e is [string, KnobValue] => e[1] !== undefined && e[1] !== null);
+					const here = settings.length > 0 && settings.every(([k, v]) => state.knobs[k] === v);
+					const peak = p.memory?.peak_allocated_bytes ?? p.memory?.peak_reserved_bytes ?? null;
+					return (
+						<li key={p.id} className={`pf-probe${here ? " is-here" : ""}`}>
+							<div className="pf-probe__head">
+								<FitMark fit={fit} label={t(`probes.status.${p.status}`)} />
+								<span className="pf-probe__knobs">
+									{settings.length
+										? settings.map(([k, v]) => `${t(knobs.get(k)?.label_key ?? k)} ${valueText(knobs.get(k), v)}`).join(" · ")
+										: t("probes.as_written")}
+								</span>
+							</div>
+							<div className="pf-probe__meta pf-dim">
+								{[
+									p.steps ? t("probes.steps", { n: fmt(p.steps, "count") }) : null,
+									peak ? t("probes.peak", { bytes: fmt(peak, "bytes") }) : null,
+									p.cost?.gpu_seconds ? t("probes.gpu_time", { s: fmt(p.cost.gpu_seconds, "s") }) : null,
+									p.cost?.usd ? fmt(p.cost.usd, "usd") : null,
+								]
+									.filter(Boolean)
+									.join(" · ")}
+							</div>
+							{err ? (
+								<div className="pf-probe__error">
+									<p>{err.message}</p>
+									{err.hint ? <p className="pf-dim">{err.hint}</p> : null}
+								</div>
+							) : null}
+							{settings.length && !here ? (
+								<button
+									type="button"
+									className="pf-link"
+									onClick={() => {
+										for (const [k, v] of settings) if (knobs.has(k)) actions.setKnob(k, v, "user");
+									}}
+								>
+									{t("probes.fly_here")}
+								</button>
+							) : null}
+						</li>
+					);
+				})}
 			</ul>
 		</div>
 	);

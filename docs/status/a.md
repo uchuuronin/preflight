@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Oct 27, early morning ET.
+Updated Tue Oct 27, 3 a.m. ET.
 
 ## Done
 
@@ -26,6 +26,16 @@ Updated Tue Oct 27, early morning ET.
   cancellation, untrusted child output parsed defensively.
 - Probe plan from a Monte Carlo (docs/decisions/probe-plan.md): warmup 2, timed 5, median; three
   memory probes; eval and checkpoint pulled into the current-settings probe.
+- B's requests: per-kernel table from the profiled probe (top 64 plus per-class tail), canonical
+  GPU names and peak FLOP/s from B's table, the five counts in `Probe.extras`, model shape from the
+  running model, a `gpu_type` knob, and the knobs B maps (LoRA alpha and dropout, quantization,
+  attention kernel, context limit). Checked on a scratch merge with ws-b: 561 tests pass and the
+  kernel table feeds `predict_cross_gpu`. The schema carries them (`Probe.kernels`, the
+  `ModelInfo` shape fields), added before the freeze with Chiya's approval.
+- Size-aware probe GPU (L4, L40S, A100-80GB, H200; after a GPU OOM one step up, or the whole
+  ladder when the size was unknown), from a Monte Carlo (K, G, L, U in docs/decisions/probe-plan.md).
+- Kernel tables and model shapes from the probe child are checked in the parent before use
+  (`probes/untrusted.py`); visitor-supplied names are bounded before any regex sees them.
 - Bug zoo: LoRA fine-tune (HF) and nanoGPT pretrain scripts.
 - Independent code review: all Critical and High findings fixed with tests; Medium and Low fixed
   except the two noted below.
@@ -38,6 +48,8 @@ Updated Tue Oct 27, early morning ET.
 
 ## Next
 
+- Pipeline job function: fold `ProbeResult.arch` into the script map's model with
+  `untrusted.with_shape()` when the record is assembled.
 - Modal app: probe function with no secrets mounted and an egress allowlist, one container per
   job, the queue store in one container saving to a Modal Dict, the reaper on a schedule.
 - Pipeline job function: fetch source, map, skeleton event within 60 s, plan, probes, merge into

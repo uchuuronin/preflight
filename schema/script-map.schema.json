@@ -570,6 +570,112 @@
 					"default": null,
 					"title": "Vocab Size"
 				},
+				"head_dim": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Head Dim"
+				},
+				"n_experts": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "MoE experts per layer",
+					"title": "N Experts"
+				},
+				"experts_per_token": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "MoE experts routed per token",
+					"title": "Experts Per Token"
+				},
+				"max_positions": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Longest context the model was built for",
+					"title": "Max Positions"
+				},
+				"gated_mlp": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "SwiGLU/GeGLU-style MLP with a gate projection",
+					"title": "Gated Mlp"
+				},
+				"tie_embeddings": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Output head shares the embedding matrix",
+					"title": "Tie Embeddings"
+				},
+				"norm": {
+					"anyOf": [
+						{
+							"enum": [
+								"rmsnorm",
+								"layernorm"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Norm"
+				},
+				"attn_impl": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "eager, sdpa, flash_attention_2, ...",
+					"title": "Attn Impl"
+				},
 				"dtype": {
 					"anyOf": [
 						{
@@ -592,8 +698,26 @@
 						}
 					],
 					"default": null,
-					"description": "e.g. 4bit-nf4, 8bit, none",
+					"description": "Weight format, as engine.memory keys it: nf4, nf4_dq, fp4, fp4_dq, int8, gptq_4bit, gptq_8bit, awq_4bit; none or absent for unquantised",
 					"title": "Quantization"
+				},
+				"shape_source": {
+					"anyOf": [
+						{
+							"enum": [
+								"code",
+								"hf_config",
+								"modules"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Where the shape fields came from: the code, or the running model",
+					"title": "Shape Source"
 				},
 				"lora": {
 					"anyOf": [

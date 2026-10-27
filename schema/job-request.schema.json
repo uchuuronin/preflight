@@ -1,4 +1,188 @@
 {
+	"$defs": {
+		"Constraints": {
+			"additionalProperties": false,
+			"properties": {
+				"budget_usd": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Budget Usd"
+				},
+				"deadline": {
+					"anyOf": [
+						{
+							"format": "date-time",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Deadline"
+				},
+				"gpu_types": {
+					"description": "Allowed GPU names; empty means any",
+					"items": {
+						"maxLength": 64,
+						"minLength": 1,
+						"type": "string"
+					},
+					"title": "Gpu Types",
+					"type": "array"
+				},
+				"max_gpus": {
+					"anyOf": [
+						{
+							"minimum": 1,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Gpus"
+				},
+				"quota": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Quota"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"wall_time_cap_s": {
+					"anyOf": [
+						{
+							"exclusiveMinimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Scheduler limit per job, e.g. Slurm",
+					"title": "Wall Time Cap S"
+				},
+				"preemption": {
+					"$ref": "#/$defs/PreemptionRule"
+				}
+			},
+			"title": "Constraints",
+			"type": "object"
+		},
+		"PreemptionRule": {
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"default": "none",
+					"enum": [
+						"none",
+						"poisson",
+						"policy"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"mtti_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Mean time to interrupt, for kind=poisson",
+					"title": "Mtti S"
+				},
+				"policy": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The cluster's rule in words, for kind=policy",
+					"title": "Policy"
+				},
+				"grace_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Grace S"
+				}
+			},
+			"title": "PreemptionRule",
+			"type": "object"
+		},
+		"Quota": {
+			"additionalProperties": false,
+			"properties": {
+				"disk_bytes": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Disk Bytes"
+				},
+				"gpu_hours": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Gpu Hours"
+				},
+				"api_usd": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Api Usd"
+				}
+			},
+			"title": "Quota",
+			"type": "object"
+		}
+	},
 	"additionalProperties": false,
 	"description": "Body of POST /v1/jobs (validated by C, executed by A).",
 	"properties": {
@@ -37,19 +221,19 @@
 		"constraints": {
 			"anyOf": [
 				{
-					"additionalProperties": true,
-					"type": "object"
+					"$ref": "#/$defs/Constraints"
 				},
 				{
 					"type": "null"
 				}
 			],
-			"default": null,
-			"title": "Constraints"
+			"default": null
 		},
 		"gpu": {
 			"anyOf": [
 				{
+					"maxLength": 64,
+					"minLength": 1,
 					"type": "string"
 				},
 				{

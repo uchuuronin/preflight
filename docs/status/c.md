@@ -1,5 +1,27 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Tue Oct 27, midday (merged A's b59334b)
+
+**Done** (branch `ws-c`, local merge of `ws-a`, not pushed yet)
+
+- A's contract update (kernel tables, model shape, typed constraints, bounded GPU names) passes
+  the web typecheck and tests unchanged.
+- Probe errors: copy for all 20 of A's error-code families with a hint each, falling back to the
+  family and then a generic line (`web/src/lib/errors.ts`); shown on boarding and in a new
+  "What was measured" panel listing every probe with its settings, peak memory, GPU time and
+  cost, and a "Fly at these settings" button.
+- Run plan counts steps when the script gives none: a `max_steps` knob first (it moves with the
+  knob), then the script, then epochs x examples / samples per step. The golden fine-tune now
+  shows 3,235 steps with its eval and save marks.
+- Labels for all 57 of A's knob ids and their values; the guide maps the new knobs (quantisation,
+  attention kernel, LoRA alpha and dropout, optimiser, RL knobs) to map nodes and knows which
+  change results.
+- Checks: 48 web tests, 12 API tests, 523 Python tests, typecheck, ruff, build.
+
+**Next**: `POST /v1/jobs` and the event stream on A's job store (QueueFull -> 429 with
+Retry-After, StoreUnavailable -> 503), once where the store runs is settled.
+
+
 ## Tue Oct 27, early (rebased on B)
 
 **Done** (branch `ws-c`, rebased on `ws-b`)

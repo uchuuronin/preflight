@@ -91,16 +91,50 @@ export interface RunPlan {
 	totalSteps: number | null;
 	evalEvery: number | null;
 	checkpointEvery: number | null;
+	/**
+	 * Where the step count came from: a knob the person can move, the script's max_steps, or
+	 * epochs x examples / samples per step. null when none of these is known.
+	 */
+	source: "knob" | "script" | "epochs" | null;
+	/** For "epochs": the inputs, so the plan can say how it counted. */
+	epochs?: number;
+	examples?: number;
+	samplesPerStep?: number;
 }
 
-/** The run's shape from the script map (A reads it from the code). */
-export function runPlan(record: LoadedRecord): RunPlan {
-	const t = record.job.script_map?.training;
-	return {
-		totalSteps: t?.max_steps ?? null,
-		evalEvery: t?.eval_every ?? null,
-		checkpointEvery: t?.checkpoint_every ?? null,
-	};
+function num(v: KnobValue | undefined): number | null {
+	return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/**
+ * The run's shape. Knobs win (pretraining declares max_steps, checkpoint_every and eval_every
+ * as knobs, so the plan moves with them); then the script map; then epochs over the dataset at
+ * the current samples per step (batch x gradient accumulation x GPUs; packing folds examples
+ * together by their mean length).
+ */
+export function runPlan(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>> = currentKnobs(record)): RunPlan {
+	const tr = record.job.script_map?.training;
+	const data = record.job.script_map?.data;
+	const evalEvery = num(knobs.eval_every) ?? tr?.eval_every ?? null;
+	const checkpointEvery = num(knobs.checkpoint_every) ?? tr?.checkpoint_every ?? null;
+	const fromKnob = num(knobs.max_steps);
+	if (fromKnob) return { totalSteps: fromKnob, evalEvery, checkpointEvery, source: "knob" };
+	if (tr?.max_steps) return { totalSteps: tr.max_steps, evalEvery, checkpointEvery, source: "script" };
+	const epochs = num(knobs.epochs) ?? tr?.epochs ?? null;
+	const examples = data?.n_examples ?? null;
+	const batch = num(knobs.batch_size) ?? data?.batch_size ?? null;
+	if (epochs && examples && batch) {
+		const accum = num(knobs.grad_accum) ?? 1;
+		const gpus = num(knobs.gpus) ?? record.env?.gpu?.count ?? 1;
+		const samplesPerStep = batch * accum * gpus;
+		const packing = knobs.packing === true;
+		const seq = num(knobs.seq_len) ?? data?.seq_len ?? null;
+		const meanTokens = record.probes.find((p) => p.data?.tokens_per_sample_mean)?.data?.tokens_per_sample_mean ?? null;
+		const samples = packing && seq && meanTokens ? Math.ceil((examples * meanTokens) / seq) : examples;
+		const totalSteps = Math.max(1, Math.ceil((epochs * samples) / samplesPerStep));
+		return { totalSteps, evalEvery, checkpointEvery, source: "epochs", epochs, examples, samplesPerStep };
+	}
+	return { totalSteps: null, evalEvery, checkpointEvery, source: null };
 }
 
 /**

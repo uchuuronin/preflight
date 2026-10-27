@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import goldenRaw from "../../../../schema/examples/finetune.json";
+import pretrainRaw from "../../../../schema/examples/pretrain.json";
 import devRaw from "../fixtures/dev-finetune.record.json";
 import { fitOf } from "../status";
-import { capacityBytes, currentKnobs } from "./model";
+import { capacityBytes, currentKnobs, runPlan } from "./model";
 import { FAILS_AT, FITS_BELOW, gpuSpec, memorySegments, memoryTermBytes, oomStatus, resolveGpu } from "./terms";
 import { type Estimate, type FlightRecord, normaliseRecord, type Prediction } from "./types";
 
@@ -90,5 +91,28 @@ describe("GPU names from B's table", () => {
 		expect(capacityBytes(dev, currentKnobs(dev))).toBe(dev.env?.gpu?.memory_bytes);
 		expect(capacityBytes(dev, { ...currentKnobs(dev), gpu_type: "L40S" })).toBe(48 * GIB);
 		expect(capacityBytes(golden, currentKnobs(golden))).toBeGreaterThan(0);
+	});
+});
+
+
+describe("the run plan", () => {
+	const pretrain = normaliseRecord(pretrainRaw as unknown as FlightRecord);
+	it("counts steps from epochs and the dataset when the script gives no max_steps", () => {
+		const plan = runPlan(golden);
+		expect(plan.source).toBe("epochs");
+		const k = currentKnobs(golden);
+		const per = (k.batch_size as number) * ((k.grad_accum as number) ?? 1);
+		expect(plan.totalSteps).toBe(Math.ceil(51760 / per));
+		expect(plan.evalEvery).toBe(200);
+	});
+
+	it("follows a max_steps knob as it moves", () => {
+		const k = currentKnobs(pretrain);
+		expect(runPlan(pretrain, { ...k, max_steps: 1234 }).totalSteps).toBe(1234);
+		expect(runPlan(pretrain).source).toBe("knob");
+	});
+
+	it("takes the script's max_steps otherwise", () => {
+		expect(runPlan(dev).source).toBe("script");
 	});
 });

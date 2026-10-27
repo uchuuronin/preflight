@@ -25,6 +25,7 @@ import contextlib
 import ctypes
 import itertools
 import json
+import logging
 import os
 import re
 import shutil
@@ -49,6 +50,7 @@ from preflight.schema import (
 	Env,
 	EvalStats,
 	GenerationStats,
+	KernelTable,
 	LengthStats,
 	Memory,
 	Power,
@@ -60,7 +62,10 @@ from preflight.schema import (
 	Throughput,
 )
 
+from . import untrusted
 from .plan import TIMED_STEPS, WARMUP_STEPS
+
+log = logging.getLogger(__name__)
 
 # variables a probe may see; everything else (keys, tokens, cloud creds) is dropped
 SAFE_ENV = (
@@ -93,6 +98,17 @@ _PROBE_LOCK = threading.Lock()
 VALID_STATUS = {"ok", "oom", "error", "timeout", "cancelled"}
 
 
+# Probe.extras keys B reads by name (docs/requests.md, B -> A); keep them stable
+EXTRAS_KEYS = (
+	"params_total",
+	"params_trainable",
+	"tokens_per_step",
+	"samples_per_step",
+	"micro_steps_per_step",
+	"host_rss_peak_bytes",
+)
+
+
 class InvalidSubmission(ValueError):
 	"""The submitted files can't be probed as given. Not retryable."""
 
@@ -119,9 +135,16 @@ class ProbeResult:
 	probe: Probe
 	env: Env
 	summary: dict
+	# Kernel table from the profiled window, checked; also set on probe.kernels
+	kernels: KernelTable | None
+	# Model shape read from the running model (recorder/arch.py), checked; untrusted.with_shape()
+	# folds it into the script map's ModelInfo when the record is assembled
+	arch: dict | None
 	trace_file: Path | None
 	log_tail: str
 	workdir: Path
+	kernels_error: str | None = None  # why a profiled probe has no table (shown, never fatal)
+	gpu_unresolved: str | None = None  # device name B's table didn't know, for B to add
 
 
 # ---------------------------------------------------------------- submission checks
@@ -340,6 +363,16 @@ def parse_result(raw: str) -> tuple[str, str | None, str | None, dict, dict]:
 		)
 
 
+def _safe_env(raw) -> Env:
+	"""The child's env report, or a bare CPU env when it is malformed (it shares a process with user code)."""
+	if raw:
+		try:
+			return _env_model(raw)
+		except (ValidationError, TypeError, ValueError, AttributeError):
+			log.warning("probe env report could not be read")
+	return Env(backend="cpu", provider="local")
+
+
 def _env_model(raw: dict) -> Env:
 	gpu = raw.get("gpu")
 	return Env(
@@ -428,11 +461,7 @@ def _probe_model(
 		eval=_opt(EvalStats, s.get("eval")),
 		checkpoint=_opt(CheckpointStats, s.get("checkpoint")),
 		generation=_opt(GenerationStats, s.get("generation")),
-		extras={
-			k: float(s[k])
-			for k in ("micro_steps_per_step", "tokens_per_step", "samples_per_step", "host_rss_peak_bytes")
-			if s.get(k) is not None
-		},
+		extras={k: float(s[k]) for k in EXTRAS_KEYS if s.get(k) is not None},
 		cost=ProbeCost(gpu_seconds=round(duration, 3), usd=round(duration * spec.gpu_usd_per_hour / 3600, 6)),
 	)
 
@@ -575,10 +604,20 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		shutil.move(str(trace), final)
 	# uploaded code is not kept on the box after the probe (24 h retention lives in the object store)
 	shutil.rmtree(sandbox, ignore_errors=True)
+	kernels, kernels_error = untrusted.kernel_table(summary.get("kernels"))
+	if kernels is not None and probe.error_code != "recorder":  # not on a probe whose numbers were unreadable
+		probe = probe.model_copy(update={"kernels": kernels})
+	unresolved = raw_env.get("gpu_unresolved") if isinstance(raw_env, dict) else None
+	if isinstance(unresolved, str):
+		log.warning("GPU %r is not in the spec table; kept as reported", unresolved[:80])
 	return ProbeResult(
 		probe=probe,
-		env=_env_model(raw_env) if raw_env else Env(backend="cpu", provider="local"),
+		env=_safe_env(raw_env),
 		summary=summary,
+		kernels=kernels,
+		kernels_error=kernels_error,
+		arch=untrusted.model_shape(summary.get("arch")),
+		gpu_unresolved=unresolved[:80] if isinstance(unresolved, str) else None,
 		trace_file=final,
 		log_tail=log_tail,
 		workdir=root,
