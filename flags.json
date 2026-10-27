@@ -4,5 +4,13 @@
 	"probes.pretrain": false,
 	"probes.agent": false,
 	"harness.spark_script_map": false,
-	"runner.queue": false
+	"runner.queue": false,
+	"c.guide.live": false,
+	"c.provider.pyodide": false,
+	"c.hops": false,
+	"c.fix_loop": false,
+	"c.exports": false,
+	"c.campaign_calendar": false,
+	"d.expertise": false,
+	"d.currency": false
 }

@@ -1,0 +1,116 @@
+/* D1 · Expertise dial. Theme tokens only (var(--pf-*)); no literal colours. */
+
+.pf-addon-expertise {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+}
+
+/* Three levels read as one scale, so keep them on one row in the narrow pilot card. */
+.pf-addon-expertise .pf-choice {
+	flex-wrap: nowrap;
+}
+
+.pf-addon-expertise .pf-choice button {
+	flex: 1 1 auto;
+	justify-content: center;
+	padding: 0 12px;
+	white-space: nowrap;
+}
+
+.pf-addon-expertise__hint {
+	margin: 0;
+	font-size: var(--pf-text-sm);
+	line-height: 1.45;
+	color: var(--pf-fg-dim);
+}
+
+.pf-addon-gloss {
+	border-top: 1px solid var(--pf-stroke);
+	padding-top: var(--pf-space-2);
+	font-size: var(--pf-text-sm);
+	line-height: 1.5;
+}
+
+.pf-addon-gloss > summary {
+	cursor: pointer;
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+	gap: var(--pf-space-2);
+	color: var(--pf-fg-dim);
+	list-style: none;
+	transition: color var(--pf-dur-quick) ease;
+}
+
+.pf-addon-gloss > summary::-webkit-details-marker {
+	display: none;
+}
+
+.pf-addon-gloss > summary::before {
+	content: "";
+	width: 7px;
+	height: 7px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform var(--pf-dur-quick) var(--pf-ease);
+}
+
+.pf-addon-gloss[open] > summary::before {
+	transform: rotate(45deg);
+}
+
+.pf-addon-gloss > summary:hover {
+	color: var(--pf-fg);
+}
+
+.pf-addon-gloss > summary:focus-visible {
+	outline: 2px solid var(--pf-focus);
+	outline-offset: 3px;
+	border-radius: var(--pf-radius-sm);
+}
+
+.pf-addon-gloss__body {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--pf-space-2);
+	padding-bottom: var(--pf-space-2);
+	max-width: 62ch;
+}
+
+.pf-addon-gloss__body p {
+	margin: 0;
+}
+
+.pf-addon-gloss__deeper {
+	padding-left: var(--pf-space-3);
+	border-left: 2px solid var(--pf-stroke-strong);
+	color: var(--pf-fg-dim);
+	animation: pf-addon-gloss-in var(--pf-dur-quick) var(--pf-ease);
+}
+
+.pf-addon-gloss__act b {
+	font-weight: 600;
+}
+
+@keyframes pf-addon-gloss-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pf-addon-gloss__deeper {
+		animation: none;
+	}
+	.pf-addon-gloss > summary::before {
+		transition: none;
+	}
+}
