@@ -9,6 +9,7 @@ import { useAppPanels } from "../../registry";
 import { clearLogbook, type LogEntry, readLogbook } from "../logbook";
 import { Plane } from "../Plane";
 import { href } from "../route";
+import { AddonBoundary } from "../../components/AddonBoundary";
 
 const WORD: Record<NonNullable<LogEntry["worst"]>, { cls: string; key: string }> = {
 	critical: { cls: "fails", key: "logbook.status.needs_fix" },
@@ -53,7 +54,9 @@ export function Logbook({ active }: { active: boolean }) {
 					{settings.map((s) => (
 						<div key={s.id} className="pf-setting">
 							<span>{t(s.titleKey)}</span>
-							<s.component />
+							<AddonBoundary id={s.id}>
+								<s.component />
+							</AddonBoundary>
 						</div>
 					))}
 					{entries.length ? (

@@ -554,5 +554,15 @@
 	"probes.status.cancelled": "Cancelled",
 	"probes.status.queued": "Queued",
 	"probes.status.running": "Running",
-	"plan.counted": "{steps} steps: {epochs} epoch of {examples} examples at {per} samples a step"
+	"plan.counted": "{steps} steps: {epochs} epoch of {examples} examples at {per} samples a step",
+	"dock.more": "{n} more knobs",
+	"dock.fewer": "Show fewer",
+	"guide.sample_offer": "The run could cost anywhere from {lo} to {hi}, and your budget of {budget} sits inside that range. Running {tasks} more of its tasks for real narrows it enough to say whether it fits.",
+	"guide.sample_offer.why": "The cost comes from a sample of the run's tasks, and a few long tasks can move the total a lot. More tasks shrink the range; the guide won't trade settings to save money until it knows whether you are over the budget. Sampling costs a little API money and waits for your go-ahead.",
+	"guide.sample_more": "Sample {tasks} more tasks",
+	"guide.approval.sample_more": "The guide wants to run 20 more of your agent's tasks to narrow the cost range around your budget. That costs a little API money, so it waits for you.",
+	"guide.approval.sample_more.go": "Sample 20 more tasks",
+	"target.tokens.total": "Tokens for the run",
+	"dial.tokens": "Tokens",
+	"dial.tokens.unit": "for the run"
 }

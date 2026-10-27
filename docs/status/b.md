@@ -1,6 +1,6 @@
 # Status · B (prediction engine and corpus)
 
-Updated Tue Oct 27, early morning ET, on `ws-b` rebased onto A's `ws-a`.
+Updated Tue Oct 27, afternoon ET, on `ws-b` rebased onto A's `ws-a` (b59334b).
 
 ## Done
 - **Settings chosen by Monte Carlo** (`docs/decisions/engine-settings.md`, `scripts/mc_engine_settings.py`): memory calibration on A's three-probe plan, the 90% band (including one or two probes) and the fits/tight/fails cut-offs, the divergence label (D9 catches early collapses, a case a CPU smoke run turned up), cross-GPU step time and the corpus budget rule.
@@ -31,16 +31,32 @@ Updated Tue Oct 27, early morning ET, on `ws-b` rebased onto A's `ws-a`.
   - TF32 is off by default.
 
   The review also asked for the band with one or two probes, now simulated (S2c).
-- Tests live in root `tests/`; 513 pass across the repo (A's included), ruff clean with the repo config.
+- **A's Oct 27 requests, all closed:**
+  - **Kernel classes:** the classifier covers every op A saw as "other", keeps the class of the roll-up rows, and adds a `host` class (views, allocations, host syncs) that doesn't scale with the GPU. A real profiled training step has no unclassed op.
+  - **Bounded GPU names:** names over 128 characters are refused, and the size pattern is bounded.
+  - **MIG:** slices resolve to the right card, and the scaled names round-trip.
+  - **`group_by_length`:** declared, honestly marked not yet modelled.
+- **A's new schema, read by the engine:**
+  - `Probe.kernels` goes straight into cross-GPU step time (`kernel_rows`, `predict_cross_gpu_from_probe`). It abstains on CPU tables, and replay is exact on the probed GPU even when an estimated byte count overshoots. K1 is unchanged at 98.2%.
+  - The measured model shape (gated MLP, tied embeddings, norm, head dim, experts) beats the name hints.
+  - `attn_impl` sets the attention kernel when no knob does.
+- **Agent and API totals** (`engine/agent_cost.py`): `cost.total`, `tokens.total` and `risk.runaway` from A's task sample. It uses A's bootstrap plus a Clopper-Pearson runaway margin, re-checked on A's generator (S6): 89.5% at 50 tasks, 90.3% at 30.
+- **Independent review of this round:** no critical issues. All six important and six minor findings are fixed, each with a test:
+  - many tiny launches count as latency per launch;
+  - in-place and quantised matmuls and NCCL's `record_param_comms` get the right class;
+  - Gemma's head dim feeds the `d_ff` solve (exact parameter count);
+  - GH200 MIG slices pick the right card;
+  - dict tables are validated;
+  - the agent bootstrap runs in bounded memory (17 MB at 10,000 tasks).
+- Tests live in root `tests/`; 701 pass across the repo (A's included), ruff clean with the repo config.
 
 ## Blocked
 - Modal access, for the NVIDIA corpus slice.
-- Cross-GPU K1 needs a per-kernel table on probes; until A's recorder writes one, cross-GPU uses the phase-level fallback with a wider band.
 
 ## Next (Wed Oct 28)
 - `engine/api.py`: `predict`, `build_grids`, `sensitivity` against the v0.1 schema, then the `make_golden.py` call for A.
 - Conformal layer (CQR, log-ratio scores) replacing the simulated band constants.
-- Agent cost model (bootstrap with the rule-of-three tail from A's D3).
+- `engine/api.py` wires `agent_totals` into `predict` for agent and API lenses, with D's API price table as `price`.
 
 ## Contract requests
-In `docs/requests.md`, B -> A: kernel table on probes, parameter counts in `Probe.extras`, a `gpu_type` knob, canonical `env.gpu.name`, optional `ModelInfo` shape fields. (`accelerate` in the CI torch job is done.) B -> Chiya: four flags. B -> C: target ids and the fits/tight/fails cut-offs. B -> D: the price table. Plus replies to A's five requests.
+In `docs/requests.md`. Open from B to A: one golden-record GPU name, FLOP counts for in-place matmuls, and the reasoning-token convention; four flags to Chiya, target ids and cut-offs to C (now with `tokens.total` and `risk.runaway`), the price table to D. Every A -> B request is closed except the golden predictions, which wait for `engine/api.py`. A reply to Chiya on the agent sample size: 30 and 50 tasks both clear 88% (S6).

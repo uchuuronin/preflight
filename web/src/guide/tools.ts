@@ -13,6 +13,7 @@
  * lands in the trace with its real arguments and result.
  */
 import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
+import { costStraddlesBudget, SAMPLE_MORE_TASKS, samplesTasks } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, ObjectiveKind, Prediction } from "../workspace/record/types";
 import type { WorkspaceActions } from "../workspace/state";
 
@@ -24,7 +25,7 @@ export interface ToolDef {
 	strict?: boolean;
 }
 
-export const SERVER_TOOLS = new Set(["run_probe", "propose_patch", "run_verify"]);
+export const SERVER_TOOLS = new Set(["run_probe", "propose_patch", "run_verify", "sample_more"]);
 const OBJECTIVE_KINDS: ObjectiveKind[] = ["min_cost", "min_time", "fit_memory", "min_risk", "max_throughput"];
 
 export function buildTools(record: LoadedRecord, pinned: ReadonlySet<string>): ToolDef[] {
@@ -124,6 +125,19 @@ export function buildTools(record: LoadedRecord, pinned: ReadonlySet<string>): T
 			parameters: { type: "object", properties: {}, additionalProperties: false },
 		},
 	];
+	if (samplesTasks(record)) {
+		tools.push({
+			type: "function",
+			name: "sample_more",
+			description: `Run ${SAMPLE_MORE_TASKS} more of the run's tasks for real to narrow the run cost range. Use it only when that range straddles the budget (low end under it, high end over), because then more tasks change the answer. Costs API or model money; the person must approve it.`,
+			parameters: {
+				type: "object",
+				properties: { reason: { type: "string" } },
+				required: ["reason"],
+				additionalProperties: false,
+			},
+		});
+	}
 	if (movable.length) {
 		tools.unshift({
 			type: "function",
@@ -207,6 +221,17 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 			return { ok: true, result: { id: actions.snapshot(String(args.name ?? "")).id } };
 		case "compare":
 			return { ok: true, result: actions.compare(String(args.a), String(args.b)) };
+		case "sample_more": {
+			const straddle = costStraddlesBudget(ctx.record, ctx.provider.predict(ctx.record, ctx.knobs));
+			if (!straddle) {
+				return {
+					ok: false,
+					error: "the run cost range does not straddle the budget, so more tasks would not change whether it fits",
+				};
+			}
+			ctx.requestApproval(name, { ...args, tasks: SAMPLE_MORE_TASKS, budget: straddle.budget, lo: straddle.lo, hi: straddle.hi });
+			return { ok: true, result: { status: "awaiting_person_approval", tasks: SAMPLE_MORE_TASKS } };
+		}
 		default:
 			if (SERVER_TOOLS.has(name)) {
 				ctx.requestApproval(name, args);

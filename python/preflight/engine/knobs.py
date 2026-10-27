@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from preflight.engine.memory import Generation, GenericArch, Parallel, TrainingSetup, TransformerArch
@@ -58,7 +58,11 @@ _SPECS = [
 	# data loading
 	_k("num_workers", "data.num_workers", "time"),
 	_k("prefetch_factor", "data.prefetch", "time"),
-	_k("packing", "data.packing", "time cost", note="Removes padding: effective tokens per step rise."),
+	_k("packing", "data.packing", "time cost", "",
+		"Removes padding, so real tokens per step rise; the probe's padding_fraction bounds the gain."),
+	_k("group_by_length", "data.group_by_length", "time cost", "",
+		"Batches similar lengths, so less padding; the peak is unchanged because one batch of the "
+		"longest examples still happens. The probe's padding_fraction bounds the gain."),
 	# model shape
 	_k("n_layer", "arch.n_layers", "memory time cost quality", "memory time cost"),
 	_k("d_model", "arch.d_model", "memory time cost quality", "memory time cost"),
@@ -259,9 +263,10 @@ def arch_from_model_info(info) -> TransformerArch | GenericArch:
 	if family in ("decoder", "encoder", "encoder_decoder", "vit") and all(
 		getattr(info, k, None) for k in need
 	):
-		hint = arch_hint(getattr(info, "hf_id", None) or getattr(info, "name", None))
+		hint = _measured(info, arch_hint(getattr(info, "hf_id", None) or getattr(info, "name", None)))
 		pc = getattr(info, "param_count", None)
-		if hint.n_experts > 1 and pc and _hint_params(info, hint) > 2 * pc:
+		measured_moe = getattr(info, "n_experts", None) is not None
+		if not measured_moe and hint.n_experts > 1 and pc and _hint_params(info, hint) > 2 * pc:
 			# the name looked MoE but the stated size says dense: trust the size
 			hint = ArchHint(hint.gated_mlp, hint.norm, hint.bias, hint.tie_embeddings, hint.learned_positions)
 		tie = hint.tie_embeddings if hint.tie_embeddings is not None else (pc is None or pc < 4e9)
@@ -280,6 +285,7 @@ def arch_from_model_info(info) -> TransformerArch | GenericArch:
 			learned_positions=hint.learned_positions,
 			n_experts=hint.n_experts,
 			experts_per_token=hint.experts_per_token,
+			head_dim_override=_head_dim(info),
 		)
 		if family == "encoder_decoder":
 			# decoder layers add cross-attention: roughly 1.33x an encoder layer; n_layers counts both stacks
@@ -295,12 +301,42 @@ def arch_from_model_info(info) -> TransformerArch | GenericArch:
 	)
 
 
+def _measured(info, hint: ArchHint) -> ArchHint:
+	"""Shape fields A read from the running model (or the code) beat what the name suggests."""
+	n_exp = getattr(info, "n_experts", None)
+	per_tok = getattr(info, "experts_per_token", None)
+	return replace(
+		hint,
+		gated_mlp=hint.gated_mlp if getattr(info, "gated_mlp", None) is None else info.gated_mlp,
+		norm=getattr(info, "norm", None) or hint.norm,
+		tie_embeddings=hint.tie_embeddings
+		if getattr(info, "tie_embeddings", None) is None
+		else info.tie_embeddings,
+		n_experts=hint.n_experts if n_exp is None else max(1, n_exp),
+		experts_per_token=_per_token(n_exp, per_tok, hint),
+	)
+
+
+def _per_token(n_exp: int | None, per_tok: int | None, hint: ArchHint) -> int:
+	"""Experts routed per token: measured, else the name's hint, never more than the experts there are."""
+	if n_exp is None:
+		return hint.experts_per_token
+	if n_exp <= 1:
+		return 1
+	return max(1, min(n_exp, per_tok or hint.experts_per_token or 1))
+
+
+def _head_dim(info) -> int | None:
+	hd = getattr(info, "head_dim", None)
+	return hd if hd and hd != info.d_model // info.n_heads else None
+
+
 def _hint_params(info, hint: ArchHint) -> int:
 	return TransformerArch(
 		n_layers=info.n_layers, d_model=info.d_model, n_heads=info.n_heads,
 		n_kv_heads=getattr(info, "n_kv_heads", None), vocab_size=info.vocab_size,
 		d_ff=getattr(info, "d_ff", None) or 4 * info.d_model, gated_mlp=hint.gated_mlp,
-		n_experts=hint.n_experts, experts_per_token=hint.experts_per_token,
+		n_experts=hint.n_experts, experts_per_token=hint.experts_per_token, head_dim_override=_head_dim(info),
 	).param_count()  # fmt: skip
 
 
@@ -321,6 +357,7 @@ def _solve_d_ff(info, hint: ArchHint, tie: bool, pc: int | None) -> int | None:
 		tie_embeddings=tie,
 		learned_positions=hint.learned_positions,
 		n_experts=hint.n_experts,
+		head_dim_override=_head_dim(info),
 	)
 	fixed = probe.param_count()
 	mats = (3 if hint.gated_mlp else 2) * hint.n_experts
@@ -362,6 +399,13 @@ _ATTN_FLASH = {
 	"flash_attention_2": True,
 	"flash_attention_3": True,
 	"flex_attention": True,
+	"flash": True,
+	"flash_attention": True,
+	"mem_efficient": True,
+	"efficient": True,
+	"xformers": True,
+	"paged_attention": True,
+	"sdpa_math": False,
 }
 
 
@@ -402,7 +446,7 @@ def setup_from(script_map, values: dict) -> tuple[TransformerArch | GenericArch,
 	targets = tuple(_lora_target(t) for t in (lora.target_modules if lora else [])) or ("q", "v")
 
 	gc = values.get("gradient_checkpointing", training.grad_checkpointing if training else False)
-	attn = values.get("attn")
+	attn = values.get("attn", getattr(model, "attn_impl", None))
 	dist = (training.distributed if training else "none") or "none"
 	strategy = _strategy(dist, values.get("fsdp_mode"), values.get("deepspeed_config"))
 	world = int(values.get("gpus", 1) or 1)

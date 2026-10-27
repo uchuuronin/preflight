@@ -5,6 +5,7 @@ S2: the 90% band rule (S2a), the fits / tight / fails cut-offs (S2b), the band w
 S3: the rule that labels a short run diverged.
 S4: carrying step time from the probed GPU to another GPU.
 S5: the corpus sweep's cost overhead factor and per-config time estimate.
+S6: B's agent-total code (engine/agent_cost.py) re-checked on A's D3 generator.
 
 Assumptions follow A's docs/decisions/probe-plan.md where they overlap (allocator
 overhead 2-12% plus 2 MiB rounding, eager attention's bs*s^2 term, queries within
@@ -508,8 +509,58 @@ def s5():
 		)
 
 
+# ------------------------------------------------------------------ S6 agent totals
+def s6(trials=10_000, pop=500):
+	"""A's D3 generator (seed and laws from scripts/mc_agent_sample.py), scored with B's estimator."""
+	from preflight.engine.agent_cost import estimate_total, runaway_rate
+
+	g = np.random.default_rng(20261027)
+	sig = g.uniform(0.5, 1.2, trials)
+	p_run = g.uniform(0.0, 0.05, trials)
+	mult = g.uniform(10, 40, trials)
+	pops = []
+	for i in range(trials):
+		c = g.lognormal(np.log(0.05), sig[i], pop)
+		run = g.random(pop) < p_run[i]
+		full = np.where(run, c * mult[i], c)
+		pops.append((full, (full > 8 * np.median(full)).mean()))  # the share risk.runaway estimates
+	print(
+		"\nS6  agent total: 90% interval covers the run total   (95% CI)       median width/total   runaway rate covered"
+	)
+	for n, bound in [
+		(30, 0.75),
+		(30, 0.80),
+		(30, 0.85),
+		(30, 0.90),
+		(50, 0.75),
+		(50, 0.80),
+		(50, 0.85),
+		(50, 0.90),
+	]:
+		r = np.random.default_rng(7)
+		cov, width, rate_cov = np.zeros(trials, bool), np.zeros(trials), np.zeros(trials, bool)
+		for i, (popc, true_rate) in enumerate(pops):
+			smp = r.choice(popc, n, replace=False)
+			e = estimate_total(smp, pop, runaway_bound=bound)
+			total = popc.sum()
+			cov[i] = e.lo <= total <= e.hi
+			width[i] = (e.hi - e.lo) / total
+			rr = runaway_rate(smp)
+			rate_cov[i] = rr.lo <= true_rate <= rr.hi
+		p = cov.mean()
+		se = np.sqrt(p * (1 - p) / trials)
+		print(
+			f"  {n} tasks, {int(bound * 100)}% runaway bound{'':<22}{p * 100:5.1f}% ({(p - 1.96 * se) * 100:4.1f}-{(p + 1.96 * se) * 100:4.1f})"
+			f"        {np.median(width):5.2f}              {pct(rate_cov)}"
+		)
+
+
 if __name__ == "__main__":
 	import sys
+
+	if sys.argv[1:] == ["s6"]:
+		s6()
+		raise SystemExit
 
 	if sys.argv[1:] == ["s3"]:
 		s3()
@@ -525,3 +576,4 @@ if __name__ == "__main__":
 	s3()
 	s4()
 	s5()
+	s6()

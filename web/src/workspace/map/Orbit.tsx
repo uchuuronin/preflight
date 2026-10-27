@@ -10,6 +10,7 @@ import { memoryTermBytes } from "../record/terms";
 import { fitOf, likelyFails, trusted, type Fit } from "../status";
 import { FitMark } from "../components/StatusMark";
 import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbit";
+import { AddonBoundary } from "../../components/AddonBoundary";
 
 interface BgData extends Record<string, unknown> {
 	layout: OrbitLayout;
@@ -263,7 +264,9 @@ function OrbitInner() {
 				{layout.tokensPerSecond ? t("map.tps", { tps: fmt(layout.tokensPerSecond, "tokens/s") }) : null}
 			</span>
 			{overlays.map((o) => (
-				<o.component key={o.id} record={record} knobs={state.knobs} estimates={estimates} />
+				<AddonBoundary key={o.id} id={o.id}>
+					<o.component record={record} knobs={state.knobs} estimates={estimates} />
+				</AddonBoundary>
 			))}
 		</div>
 	);

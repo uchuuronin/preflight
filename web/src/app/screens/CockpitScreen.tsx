@@ -20,6 +20,7 @@ import type { LoadedRecord } from "../../workspace/record/types";
 import { useWorkspace, WorkspaceProvider } from "../../workspace/state";
 import { logFlight } from "../logbook";
 import { href } from "../route";
+import { AddonBoundary } from "../../components/AddonBoundary";
 
 type Load = { kind: "loading" } | { kind: "ready"; record: LoadedRecord } | { kind: "error"; message: string };
 
@@ -89,7 +90,9 @@ function Cockpit() {
 						{isFixture(record) ? <span className="pf-tag">{t("cockpit.illustrative")}</span> : null}
 						{spent > 0 ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
 						{headPanels.map((p) => (
-							<p.component key={p.id} record={record} knobs={state.knobs} estimates={estimates} />
+							<AddonBoundary key={p.id} id={p.id}>
+								<p.component record={record} knobs={state.knobs} estimates={estimates} />
+							</AddonBoundary>
 						))}
 					</header>
 					<div className="pf-deck">
@@ -132,7 +135,9 @@ function Cockpit() {
 					<MemoryBand />
 					<ProbesBand />
 					{below.map((p) => (
-						<p.component key={p.id} record={record} knobs={state.knobs} estimates={estimates} />
+						<AddonBoundary key={p.id} id={p.id}>
+							<p.component record={record} knobs={state.knobs} estimates={estimates} />
+						</AddonBoundary>
 					))}
 				</section>
 			</div>

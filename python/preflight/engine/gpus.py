@@ -273,7 +273,12 @@ def list_gpus(vendor: Vendor | None = None) -> list[str]:
 
 # ---------------------------------------------------------------- name resolution
 
-_MIG = re.compile(r"\bmig\s+(\d+)g\.(\d+)gb\b")
+# "A100-SXM4-80GB MIG 3g.40gb" from PyTorch, "A100-SXM-80GB-MIG-3g.40gb" from get_gpu
+_MIG = re.compile(r"\bmig[\s-]{1,3}(\d{1,2})g\.(\d{1,4})gb\b")
+_SIZE = re.compile(r"(?<!\d)(\d{1,4})\s?gb?\b")  # bounded and anchored: linear on any input
+MAX_NAME_LEN = 128  # longer than any device or Modal name; visitor text never reaches a regex unbounded
+# memory share of a MIG profile: 8 memory slices per card; a 1g profile holds 1 or 2 of them
+_MIG_MEM_EIGHTHS = {1: (1, 2), 2: (2,), 3: (4,), 4: (4,), 7: (8,)}
 
 
 def _by_memory(small: str, large: str, cut_gib: float):
@@ -352,26 +357,57 @@ def resolve(name: str, memory_bytes: int | None = None, compute_units: int | Non
 	"""
 	if name in GPUS:
 		return name
-	s = _MIG.sub("", _clean(name)).strip()
+	if len(name) > MAX_NAME_LEN:
+		raise KeyError(f"unknown GPU (name longer than {MAX_NAME_LEN} characters)")
+	cleaned = _clean(name)
+	mig = _MIG.search(cleaned)
+	s = _MIG.sub("", cleaned).strip(" -_")
 	for spec in _SPECS:
 		if s == spec.name.lower():
 			return spec.name
-	mem_gib = memory_bytes / GIB if memory_bytes else None
-	if mem_gib is None:
-		# a size in the name ("a100-80gb", "A100-SXM4-80GB"); ignore GH200's 480GB, which counts CPU memory
-		sizes = [int(m) for m in re.findall(r"(\d+)\s*gb?\b", s) if int(m) <= 300]
-		mem_gib = float(sizes[0]) if sizes else None
-	for pat, target in _PATTERNS:
-		if pat.search(s):
-			return target(mem_gib, compute_units) if callable(target) else target
+	# a size in the name ("a100-80gb", "A100-SXM4-80GB"); ignore GH200's 480GB, which counts CPU memory
+	sizes = [int(m) for m in _SIZE.findall(s) if int(m) <= 300]
+	if mig and not sizes:
+		# torch reports the slice's memory, not the card's: try each card size the profile allows
+		g, slice_gb = int(mig.group(1)), int(mig.group(2))
+		best = None
+		for eighths in _MIG_MEM_EIGHTHS.get(g, (8 * g / 7,)):
+			card_gb = slice_gb * 8 / eighths
+			hit = _match(s, card_gb * GB / GIB, compute_units)
+			if hit is not None:
+				err = abs(GPUS[hit].memory_gib * GIB / GB - card_gb) / card_gb
+				if (
+					best is None or err < best[0]
+				):  # ties go to the first: 1g.10gb is the 80 GB card's smallest
+					best = (err, hit)
+		if best:
+			return best[1]
+	elif mig:
+		hit = _match(s, float(sizes[0]), compute_units)  # the card's size is in the name
+		if hit:
+			return hit
+	else:
+		mem_gib = memory_bytes / GIB if memory_bytes else (float(sizes[0]) if sizes else None)
+		hit = _match(s, mem_gib, compute_units)
+		if hit:
+			return hit
 	for spec in _SPECS:
 		if s in spec.aliases:
 			return spec.name
 	raise KeyError(f"unknown GPU {name!r}")
 
 
+def _match(s: str, mem_gib: float | None, compute_units: int | None) -> str | None:
+	for pat, target in _PATTERNS:
+		if pat.search(s):
+			return target(mem_gib, compute_units) if callable(target) else target
+	return None
+
+
 def mig_profile(name: str) -> tuple[int, int] | None:
 	"""(compute slices, memory GB) for a MIG device name such as '... MIG 3g.40gb'."""
+	if len(name) > MAX_NAME_LEN:
+		return None
 	m = _MIG.search(name.lower())
 	return (int(m.group(1)), int(m.group(2))) if m else None
 

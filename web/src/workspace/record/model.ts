@@ -4,7 +4,7 @@
  * No prediction happens here; numbers come from the PredictionProvider.
  */
 import { chosenGpu, gpuMemoryBytes } from "./terms";
-import type { Knob, KnobValue, LoadedRecord, ObjectiveKind, Readout, Target } from "./types";
+import type { Estimate, Knob, KnobValue, LoadedRecord, ObjectiveKind, Readout, Target } from "./types";
 
 export function currentKnobs(record: LoadedRecord): Record<string, KnobValue> {
 	const out: Record<string, KnobValue> = {};
@@ -152,4 +152,37 @@ export function isFixture(record: LoadedRecord): boolean {
 	for (const e of Object.values(record.predictions.estimates ?? {})) if (e) ids.add(e.model_id);
 	if (!ids.size) return false;
 	return [...ids].every((id) => /fixture/i.test(id));
+}
+
+/** Tasks `sample_more` adds to an agent run's sample (contract: 20). */
+export const SAMPLE_MORE_TASKS = 20;
+
+export interface BudgetStraddle {
+	budget: number;
+	lo: number;
+	hi: number;
+	/** Tasks sampled so far, when the record carries its agent sample. */
+	sampled: number | null;
+}
+
+/**
+ * The run cost's range straddles the budget: its low end is under it and its high end over,
+ * so the answer to "does it fit the budget?" depends on where in the range the real cost
+ * lands. That is when sampling more tasks (sample_more) is worth its cost.
+ */
+export function costStraddlesBudget(record: LoadedRecord, est: Readonly<Record<string, Estimate | undefined>>): BudgetStraddle | null {
+	const budget = record.job.constraints?.budget_usd;
+	const tg = targetFor(record, "cost");
+	const e = tg ? est[tg.id] : undefined;
+	if (!budget || !e || e.status === "abstain" || e.point === null) return null;
+	const lo = e.lo ?? e.point;
+	const hi = e.hi ?? e.point;
+	if (!(lo < budget && hi > budget)) return null;
+	const tasks = record.agent_sample?.tasks;
+	return { budget, lo, hi, sampled: Array.isArray(tasks) ? tasks.length : null };
+}
+
+/** Records whose totals come from a sample of tasks (agent and API runs). */
+export function samplesTasks(record: LoadedRecord): boolean {
+	return !!record.agent_sample || record.job.lens === "agent";
 }
