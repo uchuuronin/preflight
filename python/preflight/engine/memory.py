@@ -36,20 +36,30 @@ from preflight.engine import gpus
 
 MODEL_ID = "memory-analytical@0.2.0"
 DEFAULT_CONTEXT_BYTES = int(0.75 * 2**30)  # CUDA/ROCm context, typically 0.5-1 GB
-Z90 = 1.6448536269514722
-HALF_WIDTH_CALIBRATED = 0.107  # S2a R3: q90 |log error| with three probes
-HALF_WIDTH_ONE_PROBE = 0.160  # S2c: one usable probe (88.1% coverage); two probes keep 0.107 (91%)
-HALF_WIDTH_PRIOR = 0.241  # analytical only, no probe
-LOO_WIDEN = 1.5
-ABSTAIN_HALF_WIDTH = math.log(1.5)  # band wider than +-50%
-EXTRAPOLATE_FACTOR = 2.0  # past 2x the largest probed work units: abstain (A's D2 query range)
-BELOW_GROWTH = 0.25  # S2d G3: below the smallest probe the band grows 25% per halving; past +-50% it abstains
-FITS_BELOW = 0.01
-FAILS_AT = 0.80
+Z90 = 1.6448536269514722  # derived: the normal 95th percentile, so +-Z90 sigma is a two-sided 90% band
+HALF_WIDTH_CALIBRATED = (
+	0.107  # simulated: S2a R3, q90 |log error| with three probes; conformal on real runs replaces it
+)
+HALF_WIDTH_ONE_PROBE = 0.160  # simulated: S2c, one usable probe (88.1%); two probes keep 0.107 (91%)
+HALF_WIDTH_PRIOR = 0.241  # simulated: S2a, analytical only with no probe; conformal on real runs replaces it
+LOO_WIDEN = 1.5  # simulated: S2a R5, band = max(0.107, 1.5 x leave-one-out error)
+ABSTAIN_HALF_WIDTH = math.log(1.5)  # cited: Hackathon Project Goals, abstain when the band exceeds +-50%
+EXTRAPOLATE_FACTOR = (
+	2.0  # cited: A's probe-plan D2 query range (simulated there): abstain past 2x the largest probe
+)
+BELOW_GROWTH = 0.25  # simulated: S2d G3, the band grows 25% per halving below the smallest probe
+FITS_BELOW = 0.01  # simulated: S2b cut-off for the word fits; replaced by the reliability-checked bins (Review, Oct 27)
+FAILS_AT = 0.80  # simulated: S2b cut-off for the word fails; replaced by the reliability-checked bins (Review, Oct 27)
 
 # ---------------------------------------------------------------- dtypes and quantisation
 
-_BYTES = {"fp32": 4.0, "tf32": 4.0, "bf16": 2.0, "fp16": 2.0, "fp8": 1.0}
+_BYTES = {
+	"fp32": 4.0,
+	"tf32": 4.0,
+	"bf16": 2.0,
+	"fp16": 2.0,
+	"fp8": 1.0,
+}  # derived: IEEE and bfloat16 storage sizes
 # Quantised weight formats: bytes per weight, constants included.
 # NF4/FP4 (bitsandbytes, QLoRA): 4 bits + one fp32 absmax per 64 weights; double quant cuts that to 0.127 bits.
 # LLM.int8: 1 byte + one fp32 scale per row (negligible). GPTQ/AWQ 4-bit: 4 bits + fp16 scale and zero per 128-group.

@@ -367,3 +367,37 @@ def test_sensitivity_skips_pinned_knobs_and_starts_from_the_given_setting(ft):
 def test_eval_batch_is_held_in_every_grid(ft):
 	for g in api.build_grids(ft, ["batch_size", "seq_len"]):
 		assert g.fixed["eval_batch_size"] == 32 and g.fixed["eval_no_grad"] is False
+
+
+# ---------------------------------------------------------------- Review, Oct 27
+
+
+def test_oom_risk_is_measured_only_from_an_oom_probe(pt):
+	p = api.predict(pt).root
+	assert p["memory.peak"].status == "measured" and p["risk.oom"].status == "predicted"
+
+
+def test_knobs_off_the_probes_make_estimates_extrapolated(ft, pt):
+	p = api.predict(ft, {"lora_r": 64, "eval_batch_size": 1, "eval_no_grad": True}).root
+	assert p["memory.peak"].status == "extrapolated" and "lora_r" in p["memory.peak"].reason
+	assert p["time.step"].status == "extrapolated"
+	assert (
+		api.predict(pt, {"max_steps": 1000}).root["time.step"].status == "measured"
+	)  # run length isn't a step knob
+
+
+def test_one_dimensional_grids_for_every_knob_around_the_current_point(ft):
+	out = api.fill_predictions(ft)
+	one_d = {
+		g.axes[0].knob_id: g
+		for g in out.predictions.grids
+		if len(g.axes) == 1 and g.target_id == "memory.peak"
+	}
+	assert set(one_d) == {k.id for k in ft.knobs}
+	bs = one_d["batch_size"].axes[0].values
+	assert 4 in bs and min(bs) >= 1 and max(bs) <= 32  # 4 x 1/8 .. 4 x 8, inside the domain
+
+
+def test_model_cards_say_calibration_simulated(ft):
+	cards = api.fill_predictions(ft).models
+	assert cards and all(c.notes.startswith("calibration: simulated") and c.coverage is None for c in cards)

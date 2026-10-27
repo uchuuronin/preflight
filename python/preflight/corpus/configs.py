@@ -20,7 +20,14 @@ from dataclasses import dataclass
 from typing import Any
 
 FAMILIES = ("gpt", "encoder", "lora", "cnn", "mlp", "gnn")
-_FAMILY_WEIGHTS = {"gpt": 0.35, "encoder": 0.10, "lora": 0.15, "cnn": 0.15, "mlp": 0.10, "gnn": 0.15}
+_FAMILY_WEIGHTS = {
+	"gpt": 0.35,
+	"encoder": 0.10,
+	"lora": 0.15,
+	"cnn": 0.15,
+	"mlp": 0.10,
+	"gnn": 0.15,
+}  # guess: design weights; revisited Oct 31 against the GNN cost model's 3,000-sample need
 SCHEMA = "preflight-corpus/0.1"
 
 

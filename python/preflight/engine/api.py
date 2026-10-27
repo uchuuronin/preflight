@@ -36,10 +36,10 @@ from preflight.schema.prediction import (
 )
 from preflight.schema.record import FlightRecord, Knob, ModelCard, Range
 
-LEVEL = 0.9
+LEVEL = 0.9  # cited: contract, 90% intervals
 API_LENSES = frozenset({"agent"})
 TRAIN_LENSES = frozenset({"finetune", "pretrain", "rl", "retrieval", "gnn", "vision"})
-UNMODELLED_WIDEN = 1.5  # time sigma multiplier when a time knob the model doesn't capture has moved
+UNMODELLED_WIDEN = 1.5  # guess: band widening when a knob the model doesn't capture moves; replaced by corpus runs varying those knobs (target Oct 31)
 OK_PROBE = ("ok", "cached")
 MODEL_ID_TOTAL = "time-total@0.1.0"
 MODEL_ID_COST = "cost-gpu-hours@0.1.0"
@@ -227,12 +227,28 @@ def _same(a, b) -> bool:
 	return a == b
 
 
+# run length and learning rate don't change one step's memory or time; the GPU is checked separately
+_MATCH_IGNORES = frozenset(
+	{
+		"gpu_type",
+		"max_steps",
+		"epochs",
+		"n_examples",
+		"checkpoint_every",
+		"eval_every",
+		"lr",
+		"warmup",
+		"seed",
+	}
+)
+
+
 def _matching_probe(record: FlightRecord, values: dict, ok=OK_PROBE):
 	"""A probe whose every knob equals the query's: the number is a measurement, not a prediction."""
 	for p in record.probes:
 		if p.status in ok:
 			pv = _probe_values(record, p)
-			if all(_same(pv.get(k), v) for k, v in values.items() if k != "gpu_type"):
+			if all(_same(pv.get(k), v) for k, v in values.items() if k not in _MATCH_IGNORES):
 				return p
 	return None
 
@@ -248,6 +264,48 @@ def _unmodelled_moves(record: FlightRecord, values: dict, readout: str) -> list[
 		if probed and not any(_same(v, pv) for pv in probed):
 			out.append(kid)
 	return out
+
+
+# knobs the calibration axis covers, and run-length knobs that don't change a step's memory or time
+SHAPE_KNOBS = frozenset(
+	{
+		"batch_size",
+		"seq_len",
+		"encode_batch_size",
+		"image_size",
+		"max_model_len",
+		"max_prompt_len",
+		"max_completion_len",
+	}
+)
+RUN_KNOBS = frozenset(
+	{
+		"max_steps",
+		"epochs",
+		"n_examples",
+		"checkpoint_every",
+		"eval_every",
+		"lr",
+		"warmup",
+		"seed",
+		"gpu_type",
+		"gpus",
+	}
+)
+
+
+def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozenset()) -> list[str]:
+	"""Knobs other than batch and sequence whose value no probe ran (Review, Oct 27: such estimates are extrapolated)."""
+	runs = [_probe_values(record, p) for p in record.probes if p.status in OK_PROBE]
+	if not runs:
+		return []
+	out = []
+	for kid, v in values.items():
+		if kid in SHAPE_KNOBS or kid in RUN_KNOBS or kid in also_ok or kid.startswith("fanout."):
+			continue
+		if not any(_same(v, pv.get(kid)) for pv in runs):
+			out.append(kid)
+	return sorted(out)
 
 
 def _env_gpu(record: FlightRecord) -> str | None:
@@ -349,6 +407,10 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 	):
 		why = f"the peak comes at {est.breakdown.peak_moment}, which no probe ran; run a probe with {est.breakdown.peak_moment} in it"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
+	off = _off_probe(record, values)
+	if est.status in ("predicted", "measured") and off:
+		why = f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
+		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
 	res = _from_memory_estimate(est, mid)
 	if est.status != "abstain" and est.breakdown is not None:
 		stack = dict(est.breakdown.stack)
@@ -388,7 +450,9 @@ def _from_memory_estimate(est: memory.MemoryEstimate, mid: str) -> _MemoryResult
 	why = f"{words}: P(out of memory) {est.p_oom:.0%}"
 	if est.breakdown is not None and est.breakdown.peak_moment != "train":
 		why += f"; the peak comes at {est.breakdown.peak_moment}, not during training steps"
-	oom = _est(est.p_oom, est.p_oom, est.p_oom, "probability", est.status, mid, why)
+	# a probe that fitted measured the peak, not an OOM: P(OOM) is "measured" only from an OOM probe
+	oom_status = "predicted" if est.status == "measured" else est.status
+	oom = _est(est.p_oom, est.p_oom, est.p_oom, "probability", oom_status, mid, why)
 	return _MemoryResult(peak, oom, est)
 
 
@@ -596,6 +660,15 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		point, status, mid = multi.point, "extrapolated", steptime.MODEL_ID_COMM
 		reasons.append(f"{world} GPUs: the gradient all-reduce is estimated, not measured")
 
+	off = [
+		k for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"})) if k not in _PRECISION_KNOBS
+	]
+	if off and status in ("predicted", "measured"):
+		status = "extrapolated"
+		reasons.append(
+			f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
+		)
+
 	moves = [m for m in _unmodelled_moves(record, values, "time") if m != "gpus"]
 	if moves:
 		sigma *= UNMODELLED_WIDEN
@@ -778,7 +851,8 @@ def _preemption(record: FlightRecord, values: dict, time: _TimeResult) -> Estima
 	)
 	# no checkpoints (or fewer than one per run): an interruption loses everything so far
 	interval = min(float(every) * step, time.total.point) if every else time.total.point
-	restart = (rule.grace_s or 0.0) + 60.0  # requeue and reload, at least a minute
+	# guess: a requeue plus reload takes at least a minute; replaced by A's measured first-step time per job
+	restart = (rule.grace_s or 0.0) + 60.0
 	lost_each = interval / 2 + restart  # Young/Daly: on average half an interval is redone
 
 	def loss(t):
@@ -1046,19 +1120,40 @@ def axis_values(knob: Knob, n: int = 6) -> list:
 
 
 _GRID_TARGETS = ("memory.peak", "risk.oom", "time.total", "cost.total")
+_AGENT_GRID_TARGETS = ("cost.total", "time.total", "memory.context_fill", "risk.runaway", "tokens.total")
+# derived: three halvings and doublings around the current value, the span A's probes cover
+LOCAL_FACTORS = (0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0)  # fmt: skip
 
 
-def build_grids(record: FlightRecord, knob_ids: list[str], targets: list[str] | None = None) -> list[Grid]:
+def local_values(knob: Knob) -> list:
+	"""Slider stops around the current value: halvings and doublings inside the domain, current included."""
+	if knob.kind in ("bool", "categorical"):
+		return axis_values(knob)
+	cur = float(knob.current)
+	if cur <= 0:
+		return axis_values(knob)
+	lo = knob.domain.min if knob.domain.min is not None else -math.inf
+	hi = knob.domain.max if knob.domain.max is not None else math.inf
+	vals = {cur * f for f in LOCAL_FACTORS if lo <= cur * f <= hi}
+	if knob.kind == "int":
+		return sorted({round(v) for v in vals} | {int(knob.current)})
+	return sorted({float(f"{v:.4g}") for v in vals} | {float(knob.current)})
+
+
+def build_grids(
+	record: FlightRecord, knob_ids: list[str], targets: list[str] | None = None, local: bool = False
+) -> list[Grid]:
 	"""Predictions precomputed over the knobs' slider stops, one grid per target (row-major over the axes)."""
 	if not 1 <= len(knob_ids) <= 4:
 		raise ValueError("a grid takes one to four knobs")
 	axes_knobs = [record.knob(k) for k in knob_ids]
 	per = 8 if len(knob_ids) <= 2 else 5
-	axes = [axis_values(k, per) for k in axes_knobs]
+	axes = [local_values(k) if local else axis_values(k, per) for k in axes_knobs]
 	cells = math.prod(len(a) for a in axes)
 	if cells > MAX_GRID_CELLS:
 		raise ValueError(f"{cells} cells is over the inline limit of {MAX_GRID_CELLS}")
-	tids = targets or [t.id for t in targets_for(record) if t.id in _GRID_TARGETS or _api_lens(record)]
+	keep = _AGENT_GRID_TARGETS if _api_lens(record) else _GRID_TARGETS
+	tids = targets or [t.id for t in targets_for(record) if t.id in keep]
 	vals: dict[str, dict[str, list]] = {
 		t: {"point": [], "lo": [], "hi": [], "abstain": [], "model": []} for t in tids
 	}
@@ -1268,11 +1363,23 @@ _CARDS = {
 }
 
 
+CALIBRATION = "simulated"  # Review, Oct 27: until real held-out runs replace the simulated constants
+
+
 def _cards(ids: set[str]) -> list[ModelCard]:
+	"""Model cards; every band so far was sized on simulated data, so each says calibration: simulated."""
 	out = []
 	for mid in sorted(ids):
 		kind, notes = _CARDS.get(mid, ("analytical", None))
-		out.append(ModelCard(id=mid, kind=kind, version=mid.split("@")[-1], notes=notes))
+		out.append(
+			ModelCard(
+				id=mid,
+				kind=kind,
+				version=mid.split("@")[-1],
+				training_data="none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+				notes=f"calibration: {CALIBRATION}. {notes or ''}".strip(),
+			)
+		)
 	return out
 
 
@@ -1295,6 +1402,9 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	est = predict(record).root
 	gridded = [k.id for k in record.knobs if k.gridded]
 	grids = build_grids(record, gridded[:max_axes]) if gridded else []
+	# Review, Oct 27: a 1-D grid for every knob around the current point, so any single move reads instantly
+	for k in record.knobs:
+		grids += build_grids(record, [k.id], local=True)
 	return Predictions(
 		targets=targets, estimates={t.id: est[t.id] for t in targets if t.id in est}, grids=grids
 	)

@@ -27,13 +27,15 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 
 MODEL_ID = "agent-bootstrap-cp@0.1.0"
-LEVEL = 0.9
-RUNAWAY_FACTOR = 8.0  # a task above 8x the sample median is a runaway
-UNSEEN_RUNAWAY_MULT = 20.0  # price of a runaway nobody saw: 20x the median
-RUNAWAY_BOUND = 0.80  # one-sided Clopper-Pearson level (D3 rerun: 89.1% coverage at 50 tasks)
-N_BOOT = 2000
-MIN_SAMPLE = 10  # below this the bootstrap is noise; abstain and say how many more to run
-BOOT_CHUNK_CELLS = 1_000_000  # bootstrap draws held at once: about 8 MB, whatever the sample size
+LEVEL = 0.9  # cited: contract, 90% intervals
+RUNAWAY_FACTOR = 8.0  # simulated: A's D3, a task above 8x the sample median is a runaway
+UNSEEN_RUNAWAY_MULT = 20.0  # simulated: A's D3, a runaway nobody saw is priced at 20x the median
+RUNAWAY_BOUND = 0.80  # simulated: A's D3 rerun and S6; a full benchmark run against its sample replaces it
+N_BOOT = 2000  # derived: 2,000 resamples put the 5th and 95th percentiles within about 1% of their limit
+MIN_SAMPLE = (
+	10  # guess: below 10 tasks the bootstrap is noise; replaced by the agent validation run (target Oct 31)
+)
+BOOT_CHUNK_CELLS = 1_000_000  # derived: 1e6 float64 draws, about 8 MB held at once
 
 
 # ---------------------------------------------------------------- binomial bounds
@@ -294,10 +296,9 @@ def agent_totals(
 
 # ---------------------------------------------------------------- sample size and the top-up (Chiya, Oct 27)
 
-DEFAULT_SAMPLE = 30  # tasks run first, with the 80% runaway bound (S6: 90.3% coverage)
-TOP_UP_TASKS = (
-	20  # more tasks the guide offers, with the user's click, when the cost range straddles the budget
-)
+DEFAULT_SAMPLE = 30  # cited: Chiya's decision, Contracts tab (Oct 27)
+# cited: Chiya's decision, Contracts tab (Oct 27): 20 more tasks, offered on a click when the range straddles the budget
+TOP_UP_TASKS = 20
 MAX_SAMPLE = DEFAULT_SAMPLE + TOP_UP_TASKS
 
 

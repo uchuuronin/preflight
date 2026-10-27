@@ -28,7 +28,10 @@ from typing import Any
 
 from preflight.corpus.configs import CorpusConfig
 
-DEFAULT_TIMEOUT_S = {"kernels": 600.0, "divergence": 1500.0}
+DEFAULT_TIMEOUT_S = {
+	"kernels": 600.0,
+	"divergence": 1500.0,
+}  # guess: per-config deadline; replaced by 3x the measured p99 config time after the first wave
 
 
 def run_isolated(

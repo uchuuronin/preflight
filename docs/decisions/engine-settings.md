@@ -1,5 +1,7 @@
 # Engine settings: memory fit, bands, OOM words, divergence labels, cross-GPU time, corpus budget (Oct 27)
 
+> **Calibration: simulated. Don't quote these figures.** Every result below comes from a Monte Carlo, and in most of them the simulated truth has the same form as the fitted model. They show that each rule works on its own assumptions, not that the engine is accurate (Review, Oct 27). Model cards say `calibration: simulated` until split-conformal calibration on held-out real runs replaces them. None of these numbers goes in the README, the video or the UI.
+
 Seven settings decide whether B's numbers can meet the plan's validation targets (peak memory within 10%, no missed OOMs, 90% intervals covering at least 88%, step time within 20% on an unmeasured GPU) and whether the corpus stays inside its budget. Each was chosen by simulating 3 to 9 candidates over 3,000 to 20,000 trials (20,000 for memory, 4,000 for divergence and cross-GPU, 3,000 sweeps for the budget) (`uv run python scripts/mc_engine_settings.py`). S6 re-checks A's agent-total rule with B's code.
 
 ## Assumptions

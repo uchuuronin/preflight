@@ -27,11 +27,14 @@ from preflight.corpus import configs as cfgs
 from preflight.corpus.configs import SCHEMA, CorpusConfig
 from preflight.corpus.store import ResultStore
 
-DEFAULT_EST_SECONDS = {"kernels": 45.0, "divergence": 180.0}
-DEFAULT_OVERHEAD = 1.25  # container start, image pull and idle time Modal also bills
-ESTIMATE_QUANTILE = 0.9
-MIN_HISTORY = 3
-MAX_CONSECUTIVE_USER_ERRORS = 3
+DEFAULT_EST_SECONDS = {
+	"kernels": 45.0,
+	"divergence": 180.0,
+}  # guess: per-config seconds before any finish; replaced by the running p90 after 3 configs (measured)
+DEFAULT_OVERHEAD = 1.25  # guess: container start and idle Modal bills; replaced by Modal's billed/elapsed ratio after the first wave
+ESTIMATE_QUANTILE = 0.9  # simulated: S5 B5
+MIN_HISTORY = 3  # simulated: S5 B5
+MAX_CONSECUTIVE_USER_ERRORS = 3  # guess: three corpus-code errors in a row means a bug, not a config
 _EPS = 1e-6
 
 Runner = Callable[[CorpusConfig], dict[str, Any]]

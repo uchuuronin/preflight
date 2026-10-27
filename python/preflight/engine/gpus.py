@@ -34,9 +34,9 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
-TFLOP = 1e12
-GB = 1e9
-GIB = 2**30
+TFLOP = 1e12  # derived: unit
+GB = 1e9  # derived: unit
+GIB = 2**30  # derived: unit
 
 Confidence = Literal["datasheet", "derived", "secondary"]
 
@@ -104,7 +104,11 @@ class GpuSpec:
 		if self.usable_gib is not None:
 			return self.usable_gib
 		if self.hbm:
-			return self.memory_gib * 0.99
+			return (
+				self.memory_gib * 0.99
+			)  # cited: published torch total_memory for the A100 and H100 rows, ~99% of HBM
+		# cited: published torch total_memory for the T4 and L4 rows (ECC GDDR reserves ~8%); 0.985 is a guess for
+		# other GDDR cards, replaced by one get_device_properties call per card as each joins the corpus
 		return self.memory_gib * (0.92 if self.name in _ECC_GDDR else 0.985)
 
 	def capacity_bytes(self) -> int:
@@ -276,9 +280,17 @@ def list_gpus(vendor: Vendor | None = None) -> list[str]:
 # "A100-SXM4-80GB MIG 3g.40gb" from PyTorch, "A100-SXM-80GB-MIG-3g.40gb" from get_gpu
 _MIG = re.compile(r"\bmig[\s-]{1,3}(\d{1,2})g\.(\d{1,4})gb\b")
 _SIZE = re.compile(r"(?<!\d)(\d{1,4})\s?gb?\b")  # bounded and anchored: linear on any input
-MAX_NAME_LEN = 128  # longer than any device or Modal name; visitor text never reaches a regex unbounded
+MAX_NAME_LEN = (
+	128  # derived: longer than any device or Modal name; visitor text never reaches a regex unbounded
+)
 # memory share of a MIG profile: 8 memory slices per card; a 1g profile holds 1 or 2 of them
-_MIG_MEM_EIGHTHS = {1: (1, 2), 2: (2,), 3: (4,), 4: (4,), 7: (8,)}
+_MIG_MEM_EIGHTHS = {
+	1: (1, 2),
+	2: (2,),
+	3: (4,),
+	4: (4,),
+	7: (8,),
+}  # cited: NVIDIA MIG user guide, 8 memory slices per card, a 1g profile holds 1 or 2
 
 
 def _by_memory(small: str, large: str, cut_gib: float):
@@ -429,7 +441,10 @@ def get_gpu(name: str, memory_bytes: int | None = None, compute_units: int | Non
 		spec,
 		name=f"{spec.name}-MIG-{g}g.{mem_gb}gb",
 		memory_gib=mem_gb * GB / GIB,
-		usable_gib=mem_gb * GB / GIB * 0.97,
+		usable_gib=mem_gb
+		* GB
+		/ GIB
+		* 0.97,  # guess: MIG slice overhead; replaced by a MIG probe's total_memory
 		bandwidth_gbps=spec.bandwidth_gbps * mem_frac,
 		compute_units=round(spec.compute_units * frac),
 		fp32=spec.fp32 * frac,
