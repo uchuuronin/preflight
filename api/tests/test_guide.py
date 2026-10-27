@@ -295,3 +295,34 @@ def test_billing_settles_actual_usage():
 	expected = (1000 * 1.25 + 100 * 4.25) / 1e6
 	assert body["provenance"]["cost_usd"] == pytest.approx(expected, rel=1e-3)
 	assert core.spent_today() == pytest.approx(expected, rel=1e-3)
+
+
+def test_rule_tour_approvals_run_the_tool():
+	jobs = Jobs()
+	with client(Model(), jobs=jobs) as c:
+		res = c.post(
+			"/v1/guide/tools",
+			json={
+				"record": "lora-7b",
+				"tool": "run_probe",
+				"setting": SETTING["knobs"],
+				"knobs": {"eval_batch_size": 16},
+				"reason": "tight",
+			},
+			headers={"Idempotency-Key": "click-1"},
+		)
+		assert res.json() == {"status": "submitted", "job_id": "job-1", "queue_position": 2}
+		assert jobs.submitted[0][1].endswith("click-1")
+		bad = c.post("/v1/guide/tools", json={"record": "lora-7b", "tool": "shell", "setting": {}})
+		assert bad.status_code == 422
+		odd = c.post(
+			"/v1/guide/tools",
+			json={"record": "lora-7b", "tool": "run_probe", "setting": {"eval_batch_size": 999}},
+		)
+		assert odd.status_code == 422
+	with client(Model(), jobs=None) as c:
+		c.app.state.jobs = None
+		res = c.post(
+			"/v1/guide/tools", json={"record": "lora-7b", "tool": "run_verify", "setting": SETTING["knobs"]}
+		)
+		assert res.json()["status"] == "unavailable"

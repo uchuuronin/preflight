@@ -21,10 +21,10 @@ import json
 import logging
 import math
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Request
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .. import edge
 from ..errors import ApiError
@@ -39,6 +39,7 @@ from ..guide.types import (
 	InputError,
 	SetKnobOut,
 	TurnIn,
+	Value,
 	check_decision,
 	check_result,
 	check_setting,
@@ -373,3 +374,59 @@ async def guide_turn(request: Request) -> dict:
 			"at": dt.datetime.now(dt.UTC).isoformat(),
 		},
 	}
+
+
+class ToolIn(BaseModel):
+	"""A spending tool the visitor approved from the rule-based tour (no model involved)."""
+
+	model_config = ConfigDict(extra="forbid")
+	record: Annotated[str, Field(pattern=r"^[A-Za-z0-9_:-]{1,80}$")]
+	tool: Literal["run_probe", "run_verify", "sample_more", "propose_patch"]
+	setting: dict[Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.:-]{0,79}$")], Value] = Field(max_length=96)
+	knobs: dict[Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.:-]{0,79}$")], Value] = Field(
+		default_factory=dict, max_length=96
+	)
+	knob_id: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.:-]{0,79}$")] | None = None
+	reason: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.]{0,47}$")] | None = None
+
+
+@router.post("/guide/tools")
+async def guide_tool(request: Request) -> dict:
+	"""Run one approved spending tool. Each click is its own idempotency key (the request id)."""
+	try:
+		body = ToolIn.model_validate(await request.json())
+	except (ValidationError, ValueError) as e:
+		raise ApiError(422, "invalid_request", "The tool request isn't in the expected shape.") from e
+	app = request.app
+	rec_raw = resolve_record(body.record, app.state.samples, app.state.records)
+	if rec_raw is None:
+		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
+	rec = view_of(rec_raw)
+	for kid, v in {**body.setting, **body.knobs}.items():
+		k = rec.knobs.get(kid)
+		if k is None or (not k.allows(v) and v != k.current):
+			raise ApiError(422, "invalid_request", f"{kid} can't be {v!r}.")
+	# The job store caps jobs per visitor; the ledger's IP bucket stops a visitor minting sessions
+	# to get round that (a zero-dollar reservation spends a turn and an IP token).
+	sid = request.state.session
+	gate = await app.state.ledger.reserve(
+		visitor=sid, run=f"{rec.key}:{sid}", ip=edge.ip_key(edge.client_ip(request)), usd=0.0
+	)
+	if not gate.ok:
+		raise ApiError(
+			429,
+			"rate_limited",
+			"Too many requests from here; try again shortly.",
+			extra={"retry_after_s": gate.retry_after_s},
+		)
+	await app.state.ledger.settle(gate.reservation, 0.0)
+	key = request.headers.get("Idempotency-Key") or request.state.request_id
+	args = {"knobs": body.knobs, "knob_id": body.knob_id, "reason": body.reason}
+	ctx = ExecContext(
+		record=rec,
+		record_ref=body.record,
+		visitor=request.state.session,
+		call_id=key,
+		knobs=dict(body.setting),
+	)
+	return await execute(body.tool, args, ctx, app.state.jobs)

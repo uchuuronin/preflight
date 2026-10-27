@@ -61,7 +61,7 @@ export function CockpitScreen({ recordRef }: { recordRef: string }) {
 		);
 	}
 	return (
-		<WorkspaceProvider key={recordRef} record={load.record} provider={provider}>
+		<WorkspaceProvider key={recordRef} record={load.record} recordRef={recordRef} provider={provider}>
 			<Cockpit />
 		</WorkspaceProvider>
 	);

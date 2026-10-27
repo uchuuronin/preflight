@@ -184,6 +184,10 @@ function OrbitInner() {
 			selectable: false,
 			focusable: false,
 			zIndex: 0,
+			// A fixed size, so React Flow never hides it waiting for a measurement that may not
+			// come when its size hasn't changed (seen after quick guide moves, Oct 27).
+			width: FRAME.w,
+			height: FRAME.h,
 			style: { pointerEvents: "none" },
 		};
 		const findingsByNode = new Map<string, { title: string; severity: string }>();

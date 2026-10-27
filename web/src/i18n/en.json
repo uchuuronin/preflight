@@ -564,5 +564,21 @@
 	"guide.approval.sample_more.go": "Sample 20 more tasks",
 	"target.tokens.total": "Tokens for the run",
 	"dial.tokens": "Tokens",
-	"dial.tokens.unit": "for the run"
+	"dial.tokens.unit": "for the run",
+	"guide.live.intro": "Muse Spark will move the knobs that matter for your aim one at a time, on the map, and you decide each move.",
+	"guide.withheld": "The guide's last reply quoted a number no tool returned, so it isn't shown. It has been told to quote only what the tools say.",
+	"guide.run.submitted": "Queued: job {job}, position {position}. The result appears in this cockpit when it is measured.",
+	"guide.run.unavailable": "Measuring isn't open yet, so nothing ran and nothing was charged.",
+	"guide.run.queue_full": "The measuring queue is full right now. Try again in a little while.",
+	"guide.run.refused": "That can't run for this record.",
+	"guide.run.failed": "That didn't go through. Nothing was charged.",
+	"guide.run.running": "Starting…",
+	"guide.run.follow": "Follow it",
+	"guide.run.close": "Close",
+	"guide.live.status.ready": "Ready",
+	"guide.live.status.thinking": "Thinking",
+	"guide.live.status.results": "Working",
+	"guide.live.status.decision": "Your move",
+	"guide.live.status.approval": "Needs your go-ahead",
+	"guide.live.status.visitor": "Listening"
 }
