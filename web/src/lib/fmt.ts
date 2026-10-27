@@ -18,7 +18,11 @@ export type Unit =
 	| "requests/s"
 	| "ratio"
 	| "prob"
+	| "probability"
+	| "fraction"
 	| "percent"
+	| "samples"
+	| "samples/s"
 	| "count"
 	| "flops"
 	| "steps"
@@ -121,9 +125,15 @@ export function fmt(value: number | null | undefined, unit: Unit | string = "non
 			return t("unit.tokens", { n: compact(value) });
 		case "tokens/s":
 			return t("unit.tokens_per_s", { n: compact(value) });
+		case "samples":
+			return t("unit.samples", { n: num(value, 0) });
+		case "samples/s":
+			return t("unit.samples_per_s", { n: num(value, sig(value)) });
 		case "requests/s":
 			return t("unit.requests_per_s", { n: num(value, sig(value)) });
 		case "prob":
+		case "probability":
+		case "fraction":
 		case "ratio":
 		case "percent": {
 			const p = unit === "percent" ? value / 100 : value;

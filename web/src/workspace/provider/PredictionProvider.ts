@@ -3,10 +3,9 @@
  * Mirrors python/preflight/engine/api.py (predict, build_grids, sensitivity).
  *
  * GridProvider answers instantly from the record's precomputed grids. PyodideProvider
- * (wired in with B) answers exactly, including off-grid knob combinations, once loaded.
- * HybridProvider asks the grid first and upgrades to exact when available.
+ * (wired in with B) answers exactly, off-grid combinations included, once loaded.
  */
-import type { FlightRecord, KnobImpact, KnobValue, Objective, Prediction } from "../record/types";
+import type { KnobImpact, KnobValue, LoadedRecord, Objective, Prediction } from "../record/types";
 
 export interface SensitivityOptions {
 	/** Knob ids the guide must not move. */
@@ -15,23 +14,23 @@ export interface SensitivityOptions {
 	knobs?: Readonly<Record<string, KnobValue>>;
 }
 
+/** One candidate move with its effect, for the guide's wording. C-internal, richer than KnobImpact. */
+export interface Move {
+	knobId: string;
+	to: KnobValue;
+	/** Objective target and its change (in the target's unit; negative means lower). */
+	targetId: string;
+	delta: number;
+	/** The move clears a predicted failure (OOM). */
+	clearsFailure: boolean;
+}
+
 export interface PredictionProvider {
 	readonly name: "grid" | "pyodide" | "hybrid";
 	ready(): boolean;
-	predict(record: FlightRecord, knobs: Readonly<Record<string, KnobValue>>): Prediction;
-	sensitivity(record: FlightRecord, objective: Objective, opts?: SensitivityOptions): KnobImpact[];
-}
-
-/** Objective to the target it minimises (or maximises). */
-export const OBJECTIVE_TARGET: Record<Objective, string> = {
-	cost: "total_cost",
-	time: "time_to_finish",
-	headroom: "peak_memory",
-	quality: "divergence_risk",
-};
-
-export function currentKnobs(record: FlightRecord): Record<string, KnobValue> {
-	const out: Record<string, KnobValue> = {};
-	for (const k of record.knobs) out[k.id] = k.value;
-	return out;
+	predict(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): Prediction;
+	/** The contract's sensitivity: knobs ranked by impact on the objective. */
+	sensitivity(record: LoadedRecord, objective: Objective, opts?: SensitivityOptions): KnobImpact[];
+	/** The best single move per knob, ranked, with real deltas. */
+	moves(record: LoadedRecord, objective: Objective, opts?: SensitivityOptions): Move[];
 }

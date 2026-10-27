@@ -1,25 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import record from "../workspace/fixtures/handmade-finetune.record.json";
-import type { FlightRecord, KnobValue } from "../workspace/record/types";
+import devRaw from "../workspace/fixtures/dev-finetune.record.json";
 import { GridProvider } from "../workspace/provider/GridProvider";
-import { currentKnobs } from "../workspace/provider/PredictionProvider";
-import type { WorkspaceActions } from "../workspace/state";
+import { currentKnobs } from "../workspace/record/model";
+import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
+import { fakeActions } from "./testkit";
 import { GuideFallback, runLiveTurn } from "./liveGuide";
 import type { ToolContext } from "./tools";
 
-const rec = record as unknown as FlightRecord;
+const dev = normaliseRecord(devRaw as unknown as FlightRecord);
 
 function ctx(pinned: Set<string>, moves: Array<[string, KnobValue]>): () => ToolContext {
+	const f = fakeActions(pinned);
 	const actions = {
-		setKnob: (id: string, v: KnobValue) => {
-			moves.push([id, v]);
-			return true;
+		...f.actions,
+		setKnob: (id: string, v: KnobValue, by?: "user" | "guide") => {
+			const ok = f.actions.setKnob(id, v, by);
+			if (ok) moves.push([id, v]);
+			return ok;
 		},
-		pin: (id: string, on: boolean) => (on ? pinned.add(id) : pinned.delete(id)),
-		highlight: vi.fn(),
-		propose: vi.fn(),
-	} as unknown as WorkspaceActions;
-	return () => ({ record: rec, provider: new GridProvider(), actions, knobs: currentKnobs(rec), pinned, requestApproval: vi.fn() });
+	};
+	return () => ({ record: dev, provider: new GridProvider(), actions, knobs: currentKnobs(dev), pinned, requestApproval: vi.fn() });
 }
 
 function reply(body: unknown, status = 200): Response {
@@ -28,7 +28,7 @@ function reply(body: unknown, status = 200): Response {
 
 describe("live guide loop", () => {
 	it("runs tool calls in the browser and sends their results back", async () => {
-		const bodies: Array<{ input: Array<Record<string, unknown>>; tools: Array<{ name: string }> }> = [];
+		const bodies: Array<{ input: Array<Record<string, unknown>> }> = [];
 		const responses = [
 			{ text: "", calls: [{ call_id: "c1", name: "set_knob", arguments: { knob_id: "eval_batch_size", value: 8, why: "oom" } }], provenance: {} },
 			{ text: "Your eval pass was the risk; eval batch 8 fits.", calls: [], provenance: {} },
@@ -41,8 +41,7 @@ describe("live guide loop", () => {
 		const out = await runLiveTurn([], "cheapest by Friday", ctx(new Set(), moves), { post });
 		expect(moves).toEqual([["eval_batch_size", 8]]);
 		expect(out.text).toContain("eval batch 8");
-		const second = bodies[1]?.input ?? [];
-		const output = second.find((i) => i.type === "function_call_output");
+		const output = (bodies[1]?.input ?? []).find((i) => i.type === "function_call_output");
 		expect(output?.call_id).toBe("c1");
 		expect(JSON.parse(String(output?.output)).ok).toBe(true);
 	});
@@ -59,14 +58,12 @@ describe("live guide loop", () => {
 			return reply(responses.shift());
 		});
 		await runLiveTurn([], "keep sequence length", ctx(pinned, []), { post });
-		const enumAfter = bodies[1]?.tools.find((t) => t.name === "set_knob")?.parameters.properties?.knob_id?.enum ?? [];
-		expect(enumAfter).not.toContain("seq_len");
+		const after = bodies[1]?.tools.find((t) => t.name === "set_knob")?.parameters.properties?.knob_id?.enum ?? [];
+		expect(after).not.toContain("seq_len");
 	});
 
 	it("hands over to the rule-based tour on a fallback response", async () => {
-		const post = vi.fn(async () =>
-			reply({ error: { code: "guide_unavailable", message: "off", fallback: "rule_based", reason: "disabled" } }, 503),
-		);
+		const post = vi.fn(async () => reply({ error: { code: "guide_unavailable", message: "off", fallback: "rule_based", reason: "disabled" } }, 503));
 		await expect(runLiveTurn([], "hi", ctx(new Set(), []), { post })).rejects.toBeInstanceOf(GuideFallback);
 	});
 });

@@ -67,7 +67,9 @@ def install(app: FastAPI) -> None:
 	async def _api_error(request: Request, exc: ApiError) -> JSONResponse:
 		headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after is not None else None
 		return JSONResponse(
-			envelope(request, exc.code, exc.message, exc.retryable, exc.extra), status_code=exc.status, headers=headers
+			envelope(request, exc.code, exc.message, exc.retryable, exc.extra),
+			status_code=exc.status,
+			headers=headers,
 		)
 
 	@app.exception_handler(RequestValidationError)
@@ -81,7 +83,9 @@ def install(app: FastAPI) -> None:
 	async def _http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
 		code = _HTTP_CODES.get(exc.status_code, "error")
 		message = exc.detail if isinstance(exc.detail, str) else "Request failed."
-		return JSONResponse(envelope(request, code, message, exc.status_code >= 500), status_code=exc.status_code)
+		return JSONResponse(
+			envelope(request, code, message, exc.status_code >= 500), status_code=exc.status_code
+		)
 
 	@app.exception_handler(Exception)
 	async def _unhandled(request: Request, exc: Exception) -> JSONResponse:

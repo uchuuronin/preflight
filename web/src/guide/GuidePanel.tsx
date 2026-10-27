@@ -3,26 +3,27 @@ import { fmt, fmtDelta } from "../lib/fmt";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
 import { usePanels } from "../registry";
-import type { KnobSpec, KnobValue, Objective } from "../workspace/record/types";
+import { capacityBytes, failureTarget, objectiveTarget, target, targetFor } from "../workspace/record/model";
+import type { Knob, KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
-import { memoryFit, trusted, type Fit } from "../workspace/status";
-import { GuideFallback, runLiveTurn, type InputItem } from "./liveGuide";
-import { MAX_TOUR_STEPS, nextStep, remainingSteps, type TourStep } from "./ruleTour";
+import { fitOf, trusted, type Fit } from "../workspace/status";
+import { GuideFallback, type InputItem, runLiveTurn } from "./liveGuide";
+import { MAX_TOUR_STEPS, nextStep, plannedSteps, type TourStep } from "./ruleTour";
+import { runTool, type ToolContext } from "./tools";
 
-interface ActiveStep {
+interface Active {
 	step: TourStep;
 	from?: KnobValue;
 	n: number;
 	of: number;
 }
 
-const OBJECTIVES: Objective[] = ["cost", "time", "headroom", "quality"];
-
-export function valueText(spec: KnobSpec | undefined, v: KnobValue | undefined): string {
+export function valueText(knob: Knob | undefined, v: KnobValue | undefined): string {
 	if (v === undefined) return "";
 	if (typeof v === "boolean") return t(v ? "value.on" : "value.off");
 	if (typeof v === "string") return hasKey(`knobvalue.${v}`) ? t(`knobvalue.${v}`) : v;
-	if (spec?.unit === "tokens") return new Intl.NumberFormat().format(v);
+	if (knob?.unit === "tokens") return new Intl.NumberFormat("en-GB").format(v);
+	if (!Number.isInteger(v) && Math.abs(v) < 1) return new Intl.NumberFormat("en-GB", { maximumSignificantDigits: 2 }).format(v);
 	return fmt(v, "count");
 }
 
@@ -30,163 +31,192 @@ export function GuidePanel() {
 	const ws = useWorkspace();
 	const { record, provider, state, actions, estimates } = ws;
 	const footer = usePanels("guide-footer", record.job.lens);
-	const [objective, setObjective] = useState<Objective>(record.job.objective);
-	const [active, setActive] = useState<ActiveStep | null>(null);
+	const [active, setActive] = useState<Active | null>(null);
 	const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
 	const [taken, setTaken] = useState(0);
 	const [why, setWhy] = useState(false);
-	const [cliff, setCliff] = useState<{ knobId: string; from: KnobValue; fit: Fit } | null>(null);
 	const [fallback, setFallback] = useState<string | null>(null);
-	const live = flag("c.guide.live") && !fallback;
-	const [history, setHistory] = useState<InputItem[]>([]);
-	const [liveText, setLiveText] = useState("");
-	const [ask, setAsk] = useState("");
-	const [busy, setBusy] = useState(false);
 	const [approvals, setApprovals] = useState<Array<{ name: string; args: Record<string, unknown> }>>([]);
-	const specs = new Map(record.knobs.map((k) => [k.id, k]));
+	const [ask, setAsk] = useState("");
+	const [liveText, setLiveText] = useState("");
+	const [history, setHistory] = useState<InputItem[]>([]);
+	const [busy, setBusy] = useState(false);
+	const [cliff, setCliff] = useState<{ knobId: string; from: KnobValue } | null>(null);
+	const live = flag("c.guide.live") && !fallback;
+	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 
-	// Read fresh values inside handlers without re-binding them every render.
 	const latest = useRef(ws);
 	latest.current = ws;
 
-	const begin = (nextVisited: ReadonlySet<string>, nextTaken: number, obj = objective) => {
+	const ctx = (): ToolContext => {
 		const { state: s } = latest.current;
-		const ctx = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: obj, visited: nextVisited };
-		const step = nextStep(ctx);
-		const n = nextTaken + 1;
-		const of = Math.min(MAX_TOUR_STEPS, nextTaken + remainingSteps(ctx));
-		setWhy(false);
-		if (step.kind === "move" && step.knobId !== undefined && step.to !== undefined && n <= MAX_TOUR_STEPS) {
-			const from = s.knobs[step.knobId];
-			actions.highlight([...step.nodes, `knob:${step.knobId}`]);
-			actions.setKnob(step.knobId, step.to, "guide");
-			if (from !== undefined) actions.propose({ knobId: step.knobId, from, to: step.to, by: "guide" });
-			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.max(of, n) });
-			return;
-		}
-		actions.highlight(step.kind === "blocked_by_pin" ? [...step.nodes, `knob:${step.pinnedKnob}`] : []);
-		actions.propose(null);
-		setActive({ step: step.kind === "move" ? { ...step, kind: "done", textKey: "guide.done", whyKey: "guide.done.why" } : step, n, of: n });
+		return {
+			record,
+			provider,
+			actions,
+			knobs: s.knobs,
+			pinned: s.pinned,
+			requestApproval: (name, args) => setApprovals((a) => [...a, { name, args }]),
+		};
 	};
 
-	const finishStep = (outcome: "apply" | "revert" | "pin") => {
-		if (!active) return;
-		const { step, from } = active;
-		if (step.kind === "move" && step.knobId) {
-			if (outcome !== "apply" && from !== undefined) actions.setKnob(step.knobId, from, "guide");
-			if (outcome === "pin") actions.pin(step.knobId, true);
+	const begin = (nextVisited: ReadonlySet<string>, nextTaken: number) => {
+		const { state: s } = latest.current;
+		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited };
+		const step = nextStep(tc);
+		const n = nextTaken + 1;
+		setWhy(false);
+		if (step.nodes.length) runTool("highlight", { nodes: step.nodes }, ctx());
+		else actions.highlight([]);
+		if (step.kind === "move" && step.move && n <= MAX_TOUR_STEPS) {
+			const from = s.knobs[step.move.knobId];
+			runTool("predict", { knobs: { [step.move.knobId]: step.move.to } }, ctx());
+			runTool("set_knob", { knob_id: step.move.knobId, value: step.move.to, why: step.textKey }, ctx());
+			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + plannedSteps(tc))) });
+			return;
 		}
 		actions.propose(null);
+		const shown = step.kind === "move" ? { ...step, kind: "done" as const, textKey: "guide.done", whyKey: "guide.done.why" } : step;
+		setActive({ step: shown, n, of: n });
+	};
+
+	const finish = (outcome: "apply" | "revert" | "pin") => {
+		if (!active?.step.move) return;
+		const { move } = active.step;
+		const from = active.from;
+		if (outcome !== "apply" && from !== undefined) actions.setKnob(move.knobId, from, "user");
+		if (outcome === "pin") actions.pin(move.knobId, true);
+		actions.propose(null);
 		const v = new Set(visited);
-		if (step.knobId) v.add(step.knobId);
+		v.add(move.knobId);
 		setVisited(v);
 		setTaken(taken + 1);
-		// Let the knob change land before ranking the next step.
 		requestAnimationFrame(() => begin(v, taken + 1));
 	};
+
+	const restart = () => {
+		const v = new Set<string>();
+		setVisited(v);
+		setTaken(0);
+		begin(v, 0);
+	};
+
+	// Restart the tour when the aim changes (a dial pressed, or the person's choice).
+	const objectiveKind = state.objective.kind;
+	const firstRun = useRef(true);
+	useEffect(() => {
+		if (firstRun.current) {
+			firstRun.current = false;
+			return;
+		}
+		if (active) restart();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [objectiveKind]);
+
+	// Hand over the controls: when the person crosses the memory cliff themselves, speak up once.
+	const prevFit = useRef<Fit>(fitOf(record, estimates, state.knobs));
+	const prevKnobs = useRef(state.knobs);
+	useEffect(() => {
+		const fit = fitOf(record, estimates, state.knobs);
+		const change = state.lastChange;
+		if (change?.by === "user" && fit === "fails" && prevFit.current !== "fails") {
+			const from = prevKnobs.current[change.knobId];
+			if (from !== undefined) setCliff({ knobId: change.knobId, from });
+		} else if (fit !== "fails") setCliff(null);
+		prevFit.current = fit;
+		prevKnobs.current = state.knobs;
+	}, [estimates, record, state.knobs, state.lastChange]);
 
 	const sendLive = async (text: string) => {
 		setBusy(true);
 		try {
-			const out = await runLiveTurn(
-				history,
-				text,
-				() => {
-					const { state: s } = latest.current;
-					return {
-						record,
-						provider,
-						actions,
-						knobs: s.knobs,
-						pinned: s.pinned,
-						requestApproval: (name, args) => setApprovals((a) => [...a, { name, args }]),
-					};
-				},
-				{ recordRef: record.record_id, onText: setLiveText },
-			);
+			const out = await runLiveTurn(history, text, ctx, { recordRef: record.share_token, onText: setLiveText });
 			setHistory(out.history);
 		} catch (e) {
-			if (e instanceof GuideFallback) setFallback(e.message || t("guide.fallback"));
-			else setFallback(t("guide.fallback"));
+			setFallback(e instanceof GuideFallback && e.message ? e.message : t("guide.fallback"));
 		} finally {
 			setBusy(false);
 		}
 	};
 
-	const restart = (obj = objective) => {
-		const v = new Set<string>();
-		setVisited(v);
-		setTaken(0);
-		begin(v, 0, obj);
-	};
+	const vars = stepVars(active);
 
-	// Hand over the controls: when the person crosses a cliff themselves, speak up once.
-	const prevFit = useRef<Fit>(memoryFit(estimates, record));
-	const prevKnobs = useRef(state.knobs);
-	useEffect(() => {
-		const fit = memoryFit(estimates, record);
-		const change = state.lastChange;
-		if (change?.by === "user" && fit === "fails" && prevFit.current !== "fails") {
-			const from = prevKnobs.current[change.knobId];
-			if (from !== undefined) setCliff({ knobId: change.knobId, from, fit });
-		} else if (fit !== "fails") {
-			setCliff(null);
-		}
-		prevFit.current = fit;
-		prevKnobs.current = state.knobs;
-	}, [estimates, record, state.knobs, state.lastChange]);
-
-	const objTarget = active?.step.impact?.target_id;
-	const target = record.predictions.targets.find((x) => x.id === objTarget);
-	const vars = (() => {
-		const step = active?.step;
-		const knobId = step?.knobId ?? step?.pinnedKnob;
-		const spec = knobId ? specs.get(knobId) : undefined;
-		const peak = estimates.peak_memory;
+	function stepVars(a: Active | null): Record<string, string> {
+		const step = a?.step;
+		const knobId = step?.move?.knobId ?? step?.pinnedKnob;
+		const knob = knobId ? knobs.get(knobId) : undefined;
+		const goal = objectiveTarget(record, state.objective.kind ?? "min_time", state.objective.target_id);
+		const goalTarget = step?.move ? target(record, step.move.targetId) : goal ? target(record, goal.id) : undefined;
+		const peakT = targetFor(record, "memory");
+		const peak = peakT ? estimates[peakT.id] : undefined;
+		const cap = capacityBytes(record, state.knobs);
+		const fail = failureTarget(record);
+		const risk = fail ? estimates[fail] : undefined;
 		return {
-			knob: spec ? t(spec.label_key) : "",
-			from: valueText(spec, active?.from),
-			to: valueText(spec, step?.to),
-			delta: step?.impact && target ? fmtDelta(step.impact.delta, target.unit) : "",
-			target: target ? t(target.label_key).toLowerCase() : "",
-			peak: trusted(peak) ? fmt(peak.point, "bytes") : "",
+			knob: knob ? t(knob.label_key) : "",
+			from: valueText(knob, a?.from),
+			to: valueText(knob, step?.move?.to),
+			delta: step?.move && goalTarget ? fmtDelta(step.move.delta, goalTarget.unit) : "",
+			target: goalTarget ? t(goalTarget.label_key).toLowerCase() : "",
+			peak: trusted(peak) ? fmt(peak.point, "bytes") : t("value.none"),
+			cap: cap ? fmt(cap, "bytes") : "",
+			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 		};
+	}
+
+	const primary = (() => {
+		if (!active) return { label: t("guide.start"), run: restart };
+		const s = active.step;
+		if (s.kind === "move") return { label: t("guide.apply_value", { knob: vars.knob, to: vars.to }), run: () => finish("apply") };
+		if (s.kind === "blocked_by_pin" && s.pinnedKnob)
+			return {
+				label: t("guide.unpin_and_continue", { knob: vars.knob }),
+				run: () => {
+					if (s.pinnedKnob) actions.pin(s.pinnedKnob, false);
+					requestAnimationFrame(restart);
+				},
+			};
+		if (s.kind === "nothing_safe") {
+			const f = record.findings.find((x) => x.knob_id && x.severity !== "info");
+			return {
+				label: t("guide.measure_fix"),
+				run: () =>
+					runTool(
+						"run_probe",
+						{ knobs: f?.knob_id ? { [f.knob_id]: knobs.get(f.knob_id)?.current ?? null } : {}, reason: f?.code ?? "unmeasured" },
+						ctx(),
+					),
+			};
+		}
+		return { label: t("guide.restart"), run: restart };
 	})();
 
 	return (
-		<aside className="pf-guide" aria-label={t("guide.label")}>
-			<header className="pf-guide__head">
-				<h2 className="pf-guide__title">{t("guide.title")}</h2>
-				<span className="pf-guide__model">{live ? t("guide.model.muse_spark") : t("guide.model.rule_based")}</span>
-			</header>
-
-			<div className="pf-guide__objective">
-				<label htmlFor="pf-objective">{t("guide.objective")}</label>
-				<select
-					id="pf-objective"
-					value={objective}
-					onChange={(e) => {
-						const o = e.currentTarget.value as Objective;
-						setObjective(o);
-						if (active) restart(o);
-					}}
-				>
-					{OBJECTIVES.map((o) => (
-						<option key={o} value={o}>
-							{t(`objective.${o}`)}
-						</option>
-					))}
-				</select>
-				{state.pinned.size ? (
-					<p className="pf-muted">
-						{t("guide.keeping", {
-							knobs: [...state.pinned].map((id) => t(specs.get(id)?.label_key ?? id).toLowerCase()).join(", "),
-						})}
-					</p>
-				) : null}
+		<section className="glass pf-guide" aria-label={t("guide.label")}>
+			<div className="pf-guide__head">
+				<span className={live ? "pf-model" : "pf-model pf-model--quiet"}>{live ? t("guide.model.muse_spark") : t("guide.model.rule_based")}</span>
+				<span className="pf-guide__step">
+					{active?.step.kind === "move" ? t("guide.step_of", { n: active.n, of: active.of }) : active ? t("guide.waiting") : t("guide.ready")}
+				</span>
 			</div>
 
 			{fallback ? <p className="pf-guide__notice" role="status">{fallback}</p> : null}
+
+			{cliff ? (
+				<div className="pf-guide__cliff" role="status">
+					<p>
+						{t("guide.cliff", {
+							knob: t(knobs.get(cliff.knobId)?.label_key ?? cliff.knobId),
+							value: valueText(knobs.get(cliff.knobId), state.knobs[cliff.knobId]),
+							peak: vars.peak,
+							cap: vars.cap,
+						})}
+					</p>
+					<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.setKnob(cliff.knobId, cliff.from, "user")}>
+						{t("guide.cliff.undo", { value: valueText(knobs.get(cliff.knobId), cliff.from) })}
+					</button>
+				</div>
+			) : null}
 
 			{live ? (
 				<form
@@ -200,102 +230,70 @@ export function GuidePanel() {
 					}}
 				>
 					<label htmlFor="pf-guide-ask">{t("guide.ask.label")}</label>
-					<textarea
-						id="pf-guide-ask"
-						rows={3}
-						value={ask}
-						placeholder={t("guide.ask.placeholder")}
-						onChange={(e) => setAsk(e.currentTarget.value)}
-					/>
-					<button type="submit" className="pf-btn pf-btn--primary" disabled={busy || !ask.trim()}>
+					<textarea id="pf-guide-ask" rows={2} value={ask} placeholder={t("guide.ask.placeholder")} onChange={(e) => setAsk(e.currentTarget.value)} />
+					<button type="submit" className="pf-btn pf-btn--primary pf-btn--small" disabled={busy || !ask.trim()}>
 						{busy ? t("guide.ask.thinking") : t("guide.ask.send")}
 					</button>
-					{liveText ? <p className="pf-guide__line">{liveText}</p> : null}
+					{liveText ? <p className="pf-guide__say">{liveText}</p> : null}
 				</form>
-			) : null}
+			) : (
+				<>
+					<p className="pf-guide__say">{active ? t(active.step.textKey, vars) : t("guide.intro", { aim: t(`objective.${state.objective.kind ?? "min_time"}`).toLowerCase() })}</p>
+					{active?.step.move && knobs.get(active.step.move.knobId)?.needs_code ? <p className="pf-guide__code">{t("guide.needs_code")}</p> : null}
+					<div className="pf-guide__actions">
+						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
+							{primary.label}
+						</button>
+						{active?.step.kind === "move" ? (
+							<>
+								<button type="button" className="pf-btn pf-btn--small" onClick={() => finish("revert")}>
+									{t("guide.revert")}
+								</button>
+								<button type="button" className="pf-btn pf-btn--small" onClick={() => finish("pin")} title={t("guide.pin.help")}>
+									{t("guide.pin")}
+								</button>
+							</>
+						) : null}
+						{active ? (
+							<button type="button" className="pf-btn pf-btn--small pf-btn--quiet" aria-expanded={why} onClick={() => setWhy(!why)}>
+								{t("guide.why")}
+							</button>
+						) : null}
+					</div>
+					{why && active ? <p className="pf-guide__why">{t(active.step.whyKey, vars)}</p> : null}
+				</>
+			)}
 
 			{approvals.map((a, i) => (
 				<div key={`${a.name}-${i}`} className="pf-guide__approval">
 					<p>{t(`guide.approval.${a.name}`)}</p>
-					<button type="button" className="pf-btn" onClick={() => setApprovals((all) => all.filter((_, j) => j !== i))}>
-						{t("guide.approval.dismiss")}
-					</button>
-				</div>
-			))}
-
-			{cliff ? (
-				<div className="pf-guide__cliff" role="status">
-					<p>
-						{t("guide.cliff", {
-							knob: t(specs.get(cliff.knobId)?.label_key ?? cliff.knobId),
-							value: valueText(specs.get(cliff.knobId), state.knobs[cliff.knobId]),
-							peak: vars.peak,
-						})}
-					</p>
-					<button type="button" className="pf-btn" onClick={() => actions.setKnob(cliff.knobId, cliff.from, "user")}>
-						{t("guide.cliff.undo", { value: valueText(specs.get(cliff.knobId), cliff.from) })}
-					</button>
-				</div>
-			) : null}
-
-			{live ? null : !active ? (
-				<div className="pf-guide__intro">
-					<p>{t("guide.intro")}</p>
-					<button type="button" className="pf-btn pf-btn--primary" onClick={() => restart()}>
-						{t("guide.start")}
-					</button>
-				</div>
-			) : (
-				<div className="pf-guide__step">
-					{active.step.kind === "move" ? (
-						<p className="pf-guide__count">{t("guide.step_of", { n: active.n, of: active.of })}</p>
-					) : null}
-					<p className="pf-guide__line">{t(active.step.textKey, vars)}</p>
-					{active.step.kind === "move" && active.step.knobId && specs.get(active.step.knobId)?.needs_code ? (
-						<p className="pf-guide__code">{t("guide.needs_code")}</p>
-					) : null}
-					{why ? <p className="pf-guide__why">{t(active.step.whyKey, vars)}</p> : null}
 					<div className="pf-guide__actions">
-						{active.step.kind === "move" ? (
-							<>
-								<button type="button" className="pf-btn pf-btn--primary" onClick={() => finishStep("apply")}>
-									{t("guide.apply")}
-								</button>
-								<button type="button" className="pf-btn" onClick={() => finishStep("revert")}>
-									{t("guide.revert")}
-								</button>
-								<button type="button" className="pf-btn" onClick={() => finishStep("pin")} title={t("guide.pin.help")}>
-									{t("guide.pin")}
-								</button>
-							</>
-						) : active.step.kind === "blocked_by_pin" && active.step.pinnedKnob ? (
-							<button
-								type="button"
-								className="pf-btn pf-btn--primary"
-								onClick={() => {
-									if (active.step.pinnedKnob) actions.pin(active.step.pinnedKnob, false);
-									restart();
-								}}
-							>
-								{t("guide.unpin_and_continue", { knob: vars.knob })}
-							</button>
-						) : (
-							<button type="button" className="pf-btn" onClick={() => restart()}>
-								{t("guide.restart")}
-							</button>
-						)}
-						<button type="button" className="pf-btn pf-btn--quiet" aria-expanded={why} onClick={() => setWhy(!why)}>
-							{t("guide.why")}
+						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" disabled title={t("guide.approval.unavailable")}>
+							{t(`guide.approval.${a.name}.go`)}
+						</button>
+						<button type="button" className="pf-btn pf-btn--small" onClick={() => setApprovals((all) => all.filter((_, j) => j !== i))}>
+							{t("guide.approval.dismiss")}
 						</button>
 					</div>
 				</div>
-			)}
+			))}
 
-			<footer className="pf-guide__foot">
-				{footer.map((p) => (
-					<p.component key={p.id} record={record} knobs={state.knobs} estimates={estimates} />
-				))}
-			</footer>
-		</aside>
+			{state.trace.length ? (
+				<ol className="pf-trace" aria-label={t("guide.trace")}>
+					{state.trace.slice(-4).map((e) => (
+						<li key={e.id} className={e.ok ? "" : "is-error"}>
+							<span className="pf-trace__call">
+								{e.tool}({e.args})
+							</span>
+							<span className="pf-trace__result">→ {e.result}</span>
+						</li>
+					))}
+				</ol>
+			) : null}
+
+			{footer.map((p) => (
+				<p.component key={p.id} record={record} knobs={state.knobs} estimates={estimates} />
+			))}
+		</section>
 	);
 }

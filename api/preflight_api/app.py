@@ -78,7 +78,11 @@ def create_app(
 			await app.state.http.aclose()
 
 	app = FastAPI(
-		title="Preflight API", version="0.1.0", lifespan=lifespan, docs_url="/v1/docs", openapi_url="/v1/openapi.json"
+		title="Preflight API",
+		version="0.1.0",
+		lifespan=lifespan,
+		docs_url="/v1/docs",
+		openapi_url="/v1/openapi.json",
 	)
 	app.state.records = records or LocalRecordStore(Path(os.environ.get("PREFLIGHT_RECORDS_DIR", "records")))
 	app.state.ledger = ledger or MemoryLedger()
@@ -89,7 +93,9 @@ def create_app(
 
 	origins = [
 		o
-		for o in os.environ.get("PREFLIGHT_WEB_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+		for o in os.environ.get("PREFLIGHT_WEB_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(
+			","
+		)
 		if o
 	]
 	app.add_middleware(
@@ -112,7 +118,9 @@ def create_app(
 		except Exception:
 			log.exception("unhandled error", extra={"request_id": request.state.request_id})
 			response = JSONResponse(
-				envelope(request, "internal", "Something went wrong on our side. Try again in a minute.", True),
+				envelope(
+					request, "internal", "Something went wrong on our side. Try again in a minute.", True
+				),
 				status_code=500,
 			)
 		response.headers["X-Request-Id"] = request.state.request_id

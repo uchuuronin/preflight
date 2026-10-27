@@ -1,5 +1,45 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Mon Oct 26, late (session 2)
+
+**Done** (branch `ws-c`, rebased on `ws-a`, not pushed)
+
+- Web app rebuilt on D's "Preflight glass workspace" design: one sky that climbs through five
+  screens (Home scroll story, New flight check-in desk and departures board, Boarding, Cockpit,
+  Logbook), glass nav capsule, dusk and day token sets, hash routes, reduced motion.
+- Cockpit on A's real contract (generated `contract.ts`, `encoding.ts`, golden records):
+  dials with intervals (time and cost press to set the aim), the orbit job map inside React
+  Flow (phase arcs sized by step share, overlap-free nodes, eval diamond and save hexagon on
+  tethers, memory ring where a full circle is the GPU and the overflow runs on a dashed ring),
+  node detail with "measured at ..." provenance, knob dock with fits / tight / fails / not
+  trusted ticks under each slider, flight plan with the predicted stop flag and playhead, and
+  the memory stack.
+- GridProvider reads A's grids: held-at-current rule for off-axis knobs (abstains with
+  `off_grid`), log-axis interpolation, estimates win at the record's own settings.
+- Dev record `web/src/workspace/fixtures/dev-finetune.record.json`, built and validated by
+  `web/scripts/make_dev_record.py` against the Pydantic schema (labelled not measured).
+- Guide: real tool calls appear in a visible trace; tour steps are Apply / Revert / Pin with
+  "Why?"; "Measure it" queues an approval and never spends.
+- Registry gains app-level slots for D: `intake`, `logbook-settings`, `nav-end`, `home-beats`,
+  plus `cockpit-head` for the cockpit.
+- Checks: 28 web tests, 12 API tests, typecheck, ruff, production build, screenshots of every
+  screen in dusk and day at desktop and phone width. Knob change to painted frame: 116 ms p95
+  in headless Chromium during the guided tour (target 400 ms).
+
+**Blocked**
+
+- `POST /v1/jobs` and the job event stream need A's runner queue; the check-in desk shows an
+  honest "not open yet" message meanwhile.
+- gitleaks can't be installed in the build sandbox (GitHub and the Go proxy are refused); a
+  pattern scan found nothing. Chiya, please run gitleaks before the push.
+
+**Next**
+
+- Jobs endpoint and event relay, R2 record store, cached samples, nightly Playwright test.
+- Cost fields when A adds them: run cost breakdown, "+ $X at risk", Preflight's own cost.
+- Agent and pretrain tours and orbit tweaks (agent turns as the loop, context fill ring).
+
+
 ## Mon Oct 26, night
 
 **Done** (branch `ws-c`, not pushed)

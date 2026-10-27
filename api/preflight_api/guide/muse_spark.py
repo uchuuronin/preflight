@@ -70,7 +70,9 @@ def _parse(body: dict, request_id: str | None) -> TurnResult:
 				args = json.loads(item.get("arguments") or "{}")
 			except ValueError:
 				args = {"_malformed": item.get("arguments")}
-			out.calls.append(FunctionCall(item.get("call_id") or item.get("id", ""), item.get("name", ""), args))
+			out.calls.append(
+				FunctionCall(item.get("call_id") or item.get("id", ""), item.get("name", ""), args)
+			)
 	usage = body.get("usage") or {}
 	out.input_tokens = int(usage.get("input_tokens", 0))
 	out.output_tokens = int(usage.get("output_tokens", 0))

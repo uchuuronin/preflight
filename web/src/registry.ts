@@ -8,19 +8,35 @@
  */
 import type { ComponentType } from "react";
 import { useSyncExternalStore } from "react";
-import type { Lens, FlightRecord, KnobSpec, Estimate } from "./workspace/record/types";
+import type { Estimate, Knob, KnobValue, Lens, LoadedRecord } from "./workspace/record/types";
 import { flag } from "./lib/flags";
 
 export interface WorkspaceContextValue {
-	record: FlightRecord;
+	record: LoadedRecord;
 	knobs: Readonly<Record<string, KnobValue>>;
-	estimates: Readonly<Record<string, Estimate>>;
+	estimates: Readonly<Record<string, Estimate | undefined>>;
 }
 
-export type KnobValue = number | string | boolean;
+export type { KnobValue };
 
-/** Where a panel docks. "views" is the tab strip under the map; "drawer" opens on node click. */
-export type PanelSlot = "views" | "drawer" | "rail-top" | "guide-footer" | "header-end";
+/**
+ * Where a panel docks:
+ * - "below": a band under the cockpit's whole-run section
+ * - "drawer": inside a node's detail sheet
+ * - "guide-footer": under the guide
+ * - "cockpit-head": beside the cockpit title
+ */
+export type PanelSlot = "below" | "drawer" | "guide-footer" | "cockpit-head";
+
+/** Panels outside the cockpit: no record in hand. */
+export interface AppPanelEntry {
+	id: string;
+	slot: "intake" | "logbook-settings" | "nav-end" | "home-beats";
+	titleKey: string;
+	order?: number;
+	flag?: string;
+	component: ComponentType;
+}
 
 export interface PanelEntry {
 	id: string;
@@ -48,7 +64,7 @@ export interface KnobDecorationEntry {
 	/** Which knobs it decorates; omit for all. */
 	knobIds?: string[];
 	flag?: string;
-	component: ComponentType<{ knob: KnobSpec; value: KnobValue } & WorkspaceContextValue>;
+	component: ComponentType<{ knob: Knob; value: KnobValue } & WorkspaceContextValue>;
 }
 
 export interface MapOverlayEntry {
@@ -61,13 +77,14 @@ export interface MapOverlayEntry {
 }
 
 interface Registry {
+	appPanels: AppPanelEntry[];
 	panels: PanelEntry[];
 	readouts: ReadoutEntry[];
 	knobDecorations: KnobDecorationEntry[];
 	mapOverlays: MapOverlayEntry[];
 }
 
-let state: Registry = { panels: [], readouts: [], knobDecorations: [], mapOverlays: [] };
+let state: Registry = { appPanels: [], panels: [], readouts: [], knobDecorations: [], mapOverlays: [] };
 const listeners = new Set<() => void>();
 
 function emit(next: Registry): void {
@@ -78,6 +95,10 @@ function emit(next: Registry): void {
 function upsert<T extends { id: string }>(list: T[], entry: T): T[] {
 	const rest = list.filter((e) => e.id !== entry.id);
 	return [...rest, entry];
+}
+
+export function registerAppPanel(entry: AppPanelEntry): void {
+	emit({ ...state, appPanels: upsert(state.appPanels, entry) });
 }
 
 export function registerPanel(entry: PanelEntry): void {
@@ -112,6 +133,12 @@ function visible<T extends { flag?: string; lenses?: Lens[]; order?: number }>(
 
 export function useRegistry(): Registry {
 	return useSyncExternalStore(subscribe, () => state, () => state);
+}
+
+export function useAppPanels(slot: AppPanelEntry["slot"]): AppPanelEntry[] {
+	return useRegistry()
+		.appPanels.filter((p) => p.slot === slot && (p.flag ? flag(p.flag) : true))
+		.sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 }
 
 export function usePanels(slot: PanelSlot, lens: Lens): PanelEntry[] {

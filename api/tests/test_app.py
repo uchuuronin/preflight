@@ -17,13 +17,18 @@ TOOLS = [
 		"type": "function",
 		"name": "set_knob",
 		"description": "Move one unpinned knob.",
-		"parameters": {"type": "object", "properties": {"knob_id": {"type": "string", "enum": ["batch_size"]}}},
+		"parameters": {
+			"type": "object",
+			"properties": {"knob_id": {"type": "string", "enum": ["batch_size"]}},
+		},
 	}
 ]
 
 
 def model_response(calls=True):
-	output = [{"type": "message", "content": [{"type": "output_text", "text": "Your eval pass is the risk."}]}]
+	output = [
+		{"type": "message", "content": [{"type": "output_text", "text": "Your eval pass is the risk."}]}
+	]
 	if calls:
 		output.append(
 			{
@@ -141,7 +146,9 @@ def test_guide_turn_proxies_and_bills(live_guide):
 	# Instructions come from the server, never the browser.
 	assert "flight simulator for ML jobs" in seen["body"]["instructions"]
 	assert seen["body"]["max_output_tokens"] <= 1200
-	assert body["calls"] == [{"call_id": "c1", "name": "set_knob", "arguments": {"knob_id": "batch_size", "value": 8}}]
+	assert body["calls"] == [
+		{"call_id": "c1", "name": "set_knob", "arguments": {"knob_id": "batch_size", "value": 8}}
+	]
 	assert body["provenance"]["request_id"] == "meta-1"
 	expected = (600 * 1.25 + 400 * 0.15 + 100 * 4.25) / 1e6
 	assert body["provenance"]["cost_usd"] == pytest.approx(expected, rel=1e-3)

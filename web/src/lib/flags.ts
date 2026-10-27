@@ -1,17 +1,33 @@
 /**
- * Feature flags. Defaults come from the repo's flags.json (every feature off until its
- * validation row passes). Overrides, in order: VITE_FLAGS (JSON, per environment), then
- * ?flags=a,b,-c in the URL (preview and local only).
+ * Feature flags. Defaults come from the repo's flags.json (flat `name: bool`, every feature
+ * off until its validation row passes). Overrides, later wins:
+ *   1. flags.<mode>.json at the repo root, where <mode> is the Vite mode (development,
+ *      preview, production);
+ *   2. VITE_FLAGS, a JSON object, per deploy environment;
+ *   3. ?flags=a,b,-c in the URL, outside production builds only.
  */
 import defaults from "../../../flags.json";
 
 type FlagMap = Record<string, boolean>;
 
+function onlyFlags(raw: Record<string, unknown>): FlagMap {
+	const out: FlagMap = {};
+	for (const [k, v] of Object.entries(raw)) if (!k.startsWith("$") && typeof v === "boolean") out[k] = v;
+	return out;
+}
+
+const perMode = import.meta.glob<{ default: Record<string, unknown> }>("../../../flags.*.json", { eager: true });
+
+function fromMode(): FlagMap {
+	const entry = Object.entries(perMode).find(([path]) => path.endsWith(`/flags.${import.meta.env.MODE}.json`));
+	return entry ? onlyFlags(entry[1].default) : {};
+}
+
 function fromEnv(): FlagMap {
 	const raw = import.meta.env.VITE_FLAGS as string | undefined;
 	if (!raw) return {};
 	try {
-		return JSON.parse(raw) as FlagMap;
+		return onlyFlags(JSON.parse(raw) as Record<string, unknown>);
 	} catch {
 		return {};
 	}
@@ -31,7 +47,12 @@ function fromUrl(): FlagMap {
 	return out;
 }
 
-const resolved: FlagMap = { ...(defaults.flags as FlagMap), ...fromEnv(), ...fromUrl() };
+const resolved: FlagMap = {
+	...onlyFlags(defaults as Record<string, unknown>),
+	...fromMode(),
+	...fromEnv(),
+	...fromUrl(),
+};
 
 export function flag(name: string): boolean {
 	return resolved[name] === true;

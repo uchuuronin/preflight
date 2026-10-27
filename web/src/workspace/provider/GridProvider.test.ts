@@ -1,107 +1,126 @@
 import { describe, expect, it } from "vitest";
-import record from "../fixtures/handmade-finetune.record.json";
-import type { FlightRecord } from "../record/types";
-import { halfToFloat } from "./float16";
+import goldenRaw from "../../../../schema/examples/finetune.json";
+import devRaw from "../fixtures/dev-finetune.record.json";
+import { currentKnobs, isFixture } from "../record/model";
+import { type FlightRecord, normaliseRecord } from "../record/types";
 import { GridProvider } from "./GridProvider";
-import { currentKnobs } from "./PredictionProvider";
+import { resolveMetric } from "./metrics";
 
-const rec = record as unknown as FlightRecord;
+const dev = normaliseRecord(devRaw as unknown as FlightRecord);
+const golden = normaliseRecord(goldenRaw as unknown as FlightRecord);
 const provider = new GridProvider();
 const GIB = 1024 ** 3;
+const cost = { kind: "min_cost" as const };
 
-describe("float16", () => {
-	it("decodes normal, subnormal and special values", () => {
-		expect(halfToFloat(0x3c00)).toBe(1);
-		expect(halfToFloat(0xc000)).toBe(-2);
-		expect(halfToFloat(0x7bff)).toBe(65504);
-		expect(halfToFloat(0x0001)).toBeCloseTo(5.96e-8, 10);
-		expect(halfToFloat(0x7c00)).toBe(Number.POSITIVE_INFINITY);
-		expect(Number.isNaN(halfToFloat(0x7e00))).toBe(true);
+describe("GridProvider on the golden fine-tune", () => {
+	it("returns B's estimates at the record's own settings", () => {
+		const p = provider.predict(golden, currentKnobs(golden));
+		expect(p["risk.oom"]?.point).toBeCloseTo(0.97, 2);
+		expect(p["time.total"]?.point).toBeCloseTo(4399.6, 1);
+	});
+
+	it("reads memory from the grid with its power-of-two scale", () => {
+		const p = provider.predict(golden, { batch_size: 2 });
+		const peak = p["memory.peak"]?.point ?? 0;
+		expect(peak).toBeGreaterThan(5 * GIB);
+		expect(peak).toBeLessThan(9 * GIB);
+	});
+
+	it("abstains when a knob no grid covers moves, instead of keeping the old number", () => {
+		const p = provider.predict(golden, { eval_batch_size: 8 });
+		expect(p["risk.oom"]?.status).toBe("abstain");
+		expect(p["memory.peak"]?.status).toBe("abstain");
+		expect(p["risk.oom"]?.reason).toBe("off_grid");
+	});
+
+	it("abstains on time and cost away from the current settings (no grid for them)", () => {
+		const p = provider.predict(golden, { batch_size: 8 });
+		expect(p["time.total"]?.status).toBe("abstain");
+		expect(p["memory.peak"]?.status).not.toBe("abstain");
+	});
+
+	it("is labelled a fixture", () => {
+		expect(isFixture(golden)).toBe(true);
 	});
 });
 
-describe("GridProvider.predict", () => {
-	it("flags the planted eval OOM at the record's own settings", () => {
-		const p = provider.predict(rec, currentKnobs(rec));
-		expect(p.p_oom?.point).toBeGreaterThan(0.9);
-		expect(p.peak_memory?.point).toBeGreaterThan(80 * GIB);
+describe("GridProvider on the dev record", () => {
+	it("flags the planted eval OOM at the record's settings", () => {
+		const p = provider.predict(dev, currentKnobs(dev));
+		expect(p["risk.oom"]?.point).toBeGreaterThan(0.9);
+		expect(p["memory.peak"]?.point).toBeGreaterThan(80 * GIB);
 	});
 
-	it("applies the grid scale so bytes come back in bytes", () => {
-		const p = provider.predict(rec, { eval_batch_size: 8 });
-		const peak = p.peak_memory?.point ?? 0;
-		expect(peak).toBeGreaterThan(60 * GIB);
-		expect(peak).toBeLessThan(72 * GIB);
-		expect(p.peak_memory?.lo).toBeLessThanOrEqual(peak);
-		expect(p.peak_memory?.hi).toBeGreaterThanOrEqual(peak);
+	it("interpolates in log space along a log axis", () => {
+		const at = (b: number) => provider.predict(dev, { eval_batch_size: 8, batch_size: b })["memory.term.activations"]?.point ?? 0;
+		const a2 = at(2);
+		const a4 = at(4);
+		const a3 = at(3);
+		expect(a3).toBeGreaterThan(a2);
+		expect(a3).toBeLessThan(a4);
 	});
 
-	it("interpolates between grid points", () => {
-		const a = provider.predict(rec, { eval_batch_size: 8, seq_len: 1024 }).mem_activations?.point ?? 0;
-		const b = provider.predict(rec, { eval_batch_size: 8, seq_len: 1536 }).mem_activations?.point ?? 0;
-		const mid = provider.predict(rec, { eval_batch_size: 8, seq_len: 1280 }).mem_activations?.point ?? 0;
-		expect(mid).toBeGreaterThan(a);
-		expect(mid).toBeLessThan(b);
-		expect(mid).toBeCloseTo((a + b) / 2, -6);
+	it("switches grids when a fixed knob moves", () => {
+		const off = provider.predict(dev, { eval_batch_size: 8, batch_size: 8 })["memory.term.activations"]?.point ?? 0;
+		const on = provider.predict(dev, { eval_batch_size: 8, batch_size: 8, gradient_checkpointing: true })[
+			"memory.term.activations"
+		]?.point ?? 0;
+		expect(on).toBeLessThan(off / 3);
 	});
 
-	it("marks values outside the probed range as extrapolated", () => {
-		const inside = provider.predict(rec, { eval_batch_size: 8, gpu: "A100-80GB" });
-		const outside = provider.predict(rec, { eval_batch_size: 8, gpu: "H100" });
-		expect(["predicted", "measured"]).toContain(inside.time_to_finish?.status);
-		expect(outside.time_to_finish?.status).toBe("extrapolated");
+	it("marks an unprobed GPU as extrapolated and a probe point as measured", () => {
+		expect(provider.predict(dev, { eval_batch_size: 8, gpu: "H100-SXM-80GB" })["time.total"]?.status).toBe("extrapolated");
+		expect(provider.predict(dev, { eval_batch_size: 8 })["memory.peak"]?.status).toBe("measured");
 	});
 
-	it("abstains past 2x the largest probed batch x sequence length", () => {
-		const p = provider.predict(rec, { eval_batch_size: 8, batch_size: 16, seq_len: 4096 });
-		expect(p.peak_memory?.status).toBe("abstain");
-		expect(p.peak_memory?.reason).toBe("outside_trusted_range");
-	});
-
-	it("abstains off-grid instead of guessing", () => {
-		const p = provider.predict(rec, { lora_rank: 64 });
-		expect(p.peak_memory?.status).toBe("abstain");
-		expect(p.peak_memory?.reason).toBe("off_grid");
-	});
-
-	it("labels an exact probe point as measured", () => {
-		const p = provider.predict(rec, {
-			seq_len: 512,
-			batch_size: 4,
-			eval_batch_size: 8,
-			gpu: "A100-80GB",
-			grad_ckpt: false,
-		});
-		expect(p.peak_memory?.status).toBe("measured");
+	it("abstains past twice the probed batch x sequence length", () => {
+		const p = provider.predict(dev, { eval_batch_size: 8, batch_size: 32, seq_len: 4096 });
+		expect(p["memory.peak"]?.status).toBe("abstain");
+		expect(p["memory.peak"]?.reason).toBe("outside_trusted_range");
 	});
 });
 
-describe("GridProvider.sensitivity", () => {
-	it("puts the OOM fix first when the run is failing", () => {
-		const ranked = provider.sensitivity(rec, "cost");
-		expect(ranked[0]?.knob_id).toBe("eval_batch_size");
+describe("sensitivity and moves", () => {
+	it("fixes the failure first, with the cheapest move that clears it", () => {
+		const [top] = provider.moves(dev, cost);
+		expect(top?.knobId).toBe("eval_batch_size");
+		expect(top?.to).toBe(8);
+		expect(top?.clearsFailure).toBe(true);
+	});
+
+	it("returns the contract's KnobImpact shape", () => {
+		const [top] = provider.sensitivity(dev, cost);
+		expect(top).toMatchObject({ knob_id: "eval_batch_size", impact: 1, direction: "decrease", best_value: 8 });
 	});
 
 	it("never moves a pinned knob", () => {
-		const ranked = provider.sensitivity(rec, "cost", { pinned: new Set(["eval_batch_size"]) });
-		expect(ranked.map((r) => r.knob_id)).not.toContain("eval_batch_size");
+		const ids = provider.moves(dev, cost, { pinned: new Set(["eval_batch_size"]) }).map((m) => m.knobId);
+		expect(ids).not.toContain("eval_batch_size");
 	});
 
-	it("ranks cost levers once the run fits", () => {
-		const ranked = provider.sensitivity(rec, "cost", { knobs: { eval_batch_size: 8 } });
-		expect(ranked.length).toBeGreaterThan(0);
-		for (const r of ranked) expect(r.delta).toBeLessThan(0);
-		for (const r of ranked) {
-			const p = provider.predict(rec, { eval_batch_size: 8, [r.knob_id]: r.best_value });
-			expect(p.p_oom?.point ?? 0).toBeLessThanOrEqual(0.1);
+	it("once the run fits, only offers moves that save and stay safe", () => {
+		const knobs = { ...currentKnobs(dev), eval_batch_size: 8 };
+		const moves = provider.moves(dev, cost, { knobs });
+		expect(moves.length).toBeGreaterThan(0);
+		for (const m of moves) {
+			expect(m.delta).toBeLessThan(0);
+			expect(provider.predict(dev, { ...knobs, [m.knobId]: m.to })["risk.oom"]?.point ?? 0).toBeLessThanOrEqual(0.1);
 		}
+	});
+
+	it("has nothing honest to offer on the golden record's eval problem yet", () => {
+		const ids = provider.moves(golden, cost).map((m) => m.knobId);
+		expect(ids).not.toContain("eval_batch_size");
 	});
 });
 
-describe("GridProvider.sensitivity, failing runs", () => {
-	it("picks the cheapest of the moves that clear an OOM, not the one with the lowest residual risk", () => {
-		const top = provider.sensitivity(rec, "cost")[0];
-		expect(top?.knob_id).toBe("eval_batch_size");
-		expect(top?.best_value).toBe(8);
+describe("metric resolver", () => {
+	it("reads a probe metric and says where it was measured", () => {
+		const m = resolveMetric(golden, currentKnobs(golden), {}, "probe.data.padding_fraction");
+		expect(m?.value).toBeCloseTo(0.46, 2);
+		expect(m?.kind).toBe("measured_here");
+		const far = resolveMetric(golden, { ...currentKnobs(golden), batch_size: 16 }, {}, "memory.by_term.logits");
+		expect(far?.kind).toBe("measured_elsewhere");
+		expect(far?.unit).toBe("bytes");
 	});
 });

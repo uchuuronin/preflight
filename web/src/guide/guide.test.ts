@@ -1,38 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
-import record from "../workspace/fixtures/handmade-finetune.record.json";
-import type { FlightRecord, KnobValue } from "../workspace/record/types";
+import goldenRaw from "../../../schema/examples/finetune.json";
+import devRaw from "../workspace/fixtures/dev-finetune.record.json";
 import { GridProvider } from "../workspace/provider/GridProvider";
-import { currentKnobs } from "../workspace/provider/PredictionProvider";
-import type { WorkspaceActions } from "../workspace/state";
+import { currentKnobs } from "../workspace/record/model";
+import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
+import type { TraceEntry } from "../workspace/state";
 import { nextStep } from "./ruleTour";
-import { buildTools, executeTool } from "./tools";
+import { fakeActions } from "./testkit";
+import { buildTools, executeTool, runTool, type ToolContext } from "./tools";
 
-const rec = record as unknown as FlightRecord;
+const dev = normaliseRecord(devRaw as unknown as FlightRecord);
+const golden = normaliseRecord(goldenRaw as unknown as FlightRecord);
 const provider = new GridProvider();
+const cost = { kind: "min_cost" as const };
 
-function fakeActions(): WorkspaceActions & { moves: Array<[string, KnobValue]>; approvals: string[] } {
-	const moves: Array<[string, KnobValue]> = [];
-	return {
-		moves,
-		approvals: [],
-		setKnob: (id, v) => {
-			moves.push([id, v]);
-			return true;
-		},
-		pin: vi.fn(),
-		highlight: vi.fn(),
-		propose: vi.fn(),
-		snapshot: vi.fn(() => ({ id: "s1", name: "s1", knobs: {}, estimates: {} })),
-		compare: vi.fn(() => []),
-		showGhost: vi.fn(),
-		setPlayhead: vi.fn(),
-		reset: vi.fn(),
-	};
+function ctx(record = dev, pinned = new Set<string>()): ToolContext & { moves: Array<[string, KnobValue]>; trace: TraceEntry[]; approve: ReturnType<typeof vi.fn> } {
+	const f = fakeActions(pinned);
+	const approve = vi.fn();
+	return { record, provider, actions: f.actions, knobs: currentKnobs(record), pinned, requestApproval: approve, moves: f.moves, trace: f.trace, approve };
 }
 
 describe("guide tool schema", () => {
 	it("removes pinned knobs from set_knob's enum every turn", () => {
-		const tools = buildTools(rec, new Set(["eval_batch_size", "gpu"]));
+		const tools = buildTools(dev, new Set(["eval_batch_size", "gpu"]));
 		const setKnob = tools.find((x) => x.name === "set_knob");
 		const props = setKnob?.parameters.properties as { knob_id: { enum: string[] } };
 		expect(props.knob_id.enum).not.toContain("eval_batch_size");
@@ -41,57 +31,66 @@ describe("guide tool schema", () => {
 	});
 
 	it("drops set_knob entirely when everything is pinned", () => {
-		const tools = buildTools(rec, new Set(rec.knobs.map((k) => k.id)));
-		expect(tools.some((x) => x.name === "set_knob")).toBe(false);
+		expect(buildTools(dev, new Set(dev.knobs.map((k) => k.id))).some((x) => x.name === "set_knob")).toBe(false);
 	});
 
 	it("refuses a set_knob on a pinned knob even if the model sends one", () => {
-		const actions = fakeActions();
-		const res = executeTool(
-			"set_knob",
-			{ knob_id: "eval_batch_size", value: 8, why: "x" },
-			{ record: rec, provider, actions, knobs: currentKnobs(rec), pinned: new Set(["eval_batch_size"]), requestApproval: vi.fn() },
-		);
+		const c = ctx(dev, new Set(["eval_batch_size"]));
+		const res = executeTool("set_knob", { knob_id: "eval_batch_size", value: 8, why: "x" }, c);
 		expect(res.ok).toBe(false);
-		expect(actions.moves).toHaveLength(0);
+		expect(c.moves).toHaveLength(0);
 	});
 
 	it("never runs a money-spending tool, only asks for approval", () => {
-		const actions = fakeActions();
-		const requestApproval = vi.fn();
+		const c = ctx();
 		for (const name of ["run_probe", "propose_patch", "run_verify"]) {
-			const res = executeTool(name, {}, { record: rec, provider, actions, knobs: currentKnobs(rec), pinned: new Set(), requestApproval });
-			expect(res).toEqual({ ok: true, result: { status: "awaiting_person_approval" } });
+			expect(executeTool(name, {}, c)).toEqual({ ok: true, result: { status: "awaiting_person_approval" } });
 		}
-		expect(requestApproval).toHaveBeenCalledTimes(3);
+		expect(c.approve).toHaveBeenCalledTimes(3);
+	});
+
+	it("puts every call and its real result in the trace", () => {
+		const c = ctx();
+		runTool("predict", { knobs: { eval_batch_size: 8 } }, c);
+		runTool("set_knob", { knob_id: "nope", value: 1, why: "x" }, c);
+		expect(c.trace).toHaveLength(2);
+		expect(c.trace[0]?.tool).toBe("predict");
+		expect(c.trace[0]?.result).toContain("memory.peak");
+		expect(c.trace[1]?.ok).toBe(false);
 	});
 });
 
 describe("rule-based tour", () => {
-	const base = { record: rec, provider, knobs: currentKnobs(rec), objective: "cost" as const, visited: new Set<string>() };
+	const base = (record = dev) => ({ record, provider, knobs: currentKnobs(record), objective: cost, visited: new Set<string>() });
 
-	it("opens on the OOM fix", () => {
-		const step = nextStep({ ...base, pinned: new Set() });
+	it("opens on the OOM fix and lights the eval node", () => {
+		const step = nextStep({ ...base(), pinned: new Set() });
 		expect(step.kind).toBe("move");
-		expect(step.knobId).toBe("eval_batch_size");
+		expect(step.move?.knobId).toBe("eval_batch_size");
+		expect(step.move?.to).toBe(8);
 		expect(step.nodes).toContain("eval");
 	});
 
-	it("never offers a pinned knob, and names the pin when it blocks the fix", () => {
-		const pinned = new Set(rec.knobs.map((k) => k.id).filter((id) => id !== "lora_rank"));
-		const step = nextStep({ ...base, pinned });
+	it("names the pin in the way instead of moving it", () => {
+		const step = nextStep({ ...base(), pinned: new Set(["eval_batch_size", "gpu", "gradient_checkpointing", "batch_size", "seq_len"]) });
 		expect(step.kind).toBe("blocked_by_pin");
 		expect(step.pinnedKnob).toBe("eval_batch_size");
 	});
 
-	it("doesn't offer shorter sequences as a cost saving once the run fits", () => {
-		const knobs = { ...base.knobs, eval_batch_size: 8 };
+	it("doesn't offer shorter sequences as a saving once the run fits", () => {
+		const knobs = { ...currentKnobs(dev), eval_batch_size: 8 };
 		const visited = new Set<string>();
 		for (let i = 0; i < 6; i++) {
-			const step = nextStep({ ...base, knobs, pinned: new Set(), visited });
-			if (step.kind !== "move" || !step.knobId) break;
-			expect(step.knobId).not.toBe("seq_len");
-			visited.add(step.knobId);
+			const step = nextStep({ ...base(), knobs, pinned: new Set(), visited });
+			if (step.kind !== "move" || !step.move) break;
+			expect(step.move.knobId).not.toBe("seq_len");
+			visited.add(step.move.knobId);
 		}
+	});
+
+	it("says honestly that nothing safe can be moved when no grid covers the fix", () => {
+		const step = nextStep({ ...base(golden), pinned: new Set() });
+		expect(step.kind).toBe("nothing_safe");
+		expect(step.nodes).toContain("eval");
 	});
 });

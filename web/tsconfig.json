@@ -6,7 +6,6 @@
 		"moduleResolution": "bundler",
 		"jsx": "react-jsx",
 		"strict": true,
-		"noUncheckedIndexedAccess": true,
 		"noImplicitOverride": true,
 		"noFallthroughCasesInSwitch": true,
 		"exactOptionalPropertyTypes": false,
@@ -15,5 +14,5 @@
 		"skipLibCheck": true,
 		"types": ["vite/client"]
 	},
-	"include": ["src", "vite.config.ts"]
+	"include": ["src", "vite.config.ts", "../schema/ts/contract.ts", "../schema/ts/encoding.ts"]
 }

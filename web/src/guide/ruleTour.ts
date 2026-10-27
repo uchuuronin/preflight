@@ -1,121 +1,122 @@
 /**
- * Rule-based tour: the guide's fallback when Muse Spark is unavailable or the visitor's
- * guide budget is spent, labelled "rule-based tour" on screen. The next step is chosen
- * from sensitivity() after every action, so it never goes stale after an Apply.
+ * Rule-based tour: the guide when Muse Spark is unavailable or the visitor's live turns are
+ * spent, labelled "Rule-based tour" on screen. It plans from the provider's ranked moves and
+ * re-plans after every Apply, Revert or Pin, so a step never goes stale.
  */
-import type { FlightRecord, KnobImpact, KnobValue, Objective } from "../workspace/record/types";
-import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
-import { OOM_LIMIT } from "../workspace/provider/GridProvider";
 import { hasKey } from "../lib/i18n";
+import { OOM_LIMIT } from "../workspace/provider/GridProvider";
+import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
+import { failureTarget } from "../workspace/record/model";
+import type { KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
 
 /**
- * Which map nodes a knob acts on. Requested as knobs[].affects in the schema
- * (docs/requests.md); this table is the fallback until A's records carry it.
+ * Map nodes a knob acts on, by knob id. Requested as knobs[].affects (docs/requests.md);
+ * until A's records carry it, this table and the record's findings decide.
  */
 const KNOB_NODES: Record<string, string[]> = {
 	eval_batch_size: ["eval"],
-	batch_size: ["data", "blocks"],
-	seq_len: ["blocks", "head"],
-	grad_ckpt: ["blocks", "backward"],
-	gpu: ["blocks", "backward"],
-	lora_rank: ["optimizer"],
-	precision: ["blocks"],
+	eval_no_grad: ["eval"],
+	batch_size: ["data", "model"],
+	seq_len: ["model", "lm_head"],
+	gradient_checkpointing: ["model"],
+	gpu: ["model"],
+	lora_r: ["optimizer"],
+	precision: ["model"],
+	packing: ["data"],
 	num_workers: ["data"],
-	group_size: ["generate", "reward"],
-	max_new_tokens: ["generate"],
-	concurrency: ["llm"],
+	grad_accum: ["optimizer"],
 };
 
 /**
- * Knobs that change what the model learns, not just how fast or how cheaply. The tour only
- * offers them to clear a failure, never as a saving. Requested as knobs[].changes_results.
+ * Knobs that change what the model learns, not just how fast or how cheaply. The tour offers
+ * them only to clear a failure. Requested as knobs[].changes_results.
  */
-const CHANGES_RESULTS = new Set(["seq_len", "lora_rank", "precision", "max_new_tokens", "group_size"]);
+const CHANGES_RESULTS = new Set(["seq_len", "lora_r", "precision", "max_new_tokens", "group_size", "packing"]);
 
 export function changesResults(knobId: string): boolean {
 	return CHANGES_RESULTS.has(knobId);
 }
 
-export function nodesForKnob(knobId: string): string[] {
-	return KNOB_NODES[knobId] ?? [];
+export function nodesForKnob(record: LoadedRecord, knobId: string): string[] {
+	const fromFindings = record.findings.filter((f) => f.knob_id === knobId && f.node_id).map((f) => f.node_id as string);
+	const known = new Set(record.graph.nodes.map((n) => n.id));
+	return [...new Set([...fromFindings, ...(KNOB_NODES[knobId] ?? [])])].filter((n) => known.has(n));
 }
 
 export interface TourStep {
-	kind: "move" | "blocked_by_pin" | "done";
-	knobId?: string;
-	to?: KnobValue;
-	impact?: KnobImpact;
+	kind: "move" | "blocked_by_pin" | "nothing_safe" | "done";
+	move?: Move;
+	pinnedKnob?: string;
 	nodes: string[];
-	/** i18n key for the one-line explanation, and its "why?" expansion. */
 	textKey: string;
 	whyKey: string;
-	/** The pinned knob in the way, for blocked_by_pin. */
-	pinnedKnob?: string;
 }
 
 export interface TourContext {
-	record: FlightRecord;
+	record: LoadedRecord;
 	provider: PredictionProvider;
 	knobs: Readonly<Record<string, KnobValue>>;
 	pinned: ReadonlySet<string>;
 	objective: Objective;
-	/** Knobs already toured, so a reverted step isn't offered again. */
 	visited: ReadonlySet<string>;
 }
 
-function keyFor(knobId: string, kind: "line" | "why", failing: boolean): string {
-	const specific = `guide.rule.${knobId}.${failing ? "fix" : "save"}.${kind}`;
+function keyFor(knobId: string, kind: "line" | "why", fixing: boolean): string {
+	const specific = `guide.rule.${knobId}.${fixing ? "fix" : "save"}.${kind}`;
 	if (hasKey(specific)) return specific;
-	const any = `guide.rule.${knobId}.${kind}`;
-	return hasKey(any) ? any : `guide.rule.generic.${kind}`;
+	return `guide.rule.generic.${fixing ? "fix" : "save"}.${kind}`;
+}
+
+export function isFailing(ctx: Pick<TourContext, "record" | "provider" | "knobs">): boolean {
+	const fail = failureTarget(ctx.record);
+	if (!fail) return false;
+	return (ctx.provider.predict(ctx.record, ctx.knobs)[fail]?.point ?? 0) > OOM_LIMIT;
+}
+
+function candidates(ctx: TourContext, pinned: ReadonlySet<string>): Move[] {
+	const failing = isFailing(ctx);
+	return ctx.provider
+		.moves(ctx.record, ctx.objective, { pinned, knobs: ctx.knobs })
+		.filter((m) => !ctx.visited.has(m.knobId))
+		.filter((m) => failing || !changesResults(m.knobId));
 }
 
 export function nextStep(ctx: TourContext): TourStep {
-	const { record, provider, knobs, pinned, objective, visited } = ctx;
-	const now = provider.predict(record, knobs);
-	const failing = (now.p_oom?.point ?? 0) > OOM_LIMIT;
-	const ranked = provider
-		.sensitivity(record, objective, { pinned, knobs })
-		.filter((i) => !visited.has(i.knob_id))
-		.filter((i) => failing || objective === "quality" || !changesResults(i.knob_id));
-	const top = ranked[0];
+	const failing = isFailing(ctx);
+	const top = candidates(ctx, ctx.pinned)[0];
 	if (top) {
+		const fixing = top.clearsFailure || failing;
 		return {
 			kind: "move",
-			knobId: top.knob_id,
-			to: top.best_value,
-			impact: top,
-			nodes: nodesForKnob(top.knob_id),
-			textKey: keyFor(top.knob_id, "line", failing),
-			whyKey: keyFor(top.knob_id, "why", failing),
+			move: top,
+			nodes: nodesForKnob(ctx.record, top.knobId),
+			textKey: keyFor(top.knobId, "line", fixing),
+			whyKey: keyFor(top.knobId, "why", fixing),
 		};
 	}
 	// Nothing movable helps. If a pin is in the way, say which one and what releasing it buys.
-	if (pinned.size) {
-		const unpinned = provider.sensitivity(record, objective, { knobs }).filter((i) => pinned.has(i.knob_id));
-		const blocker = unpinned[0];
+	if (ctx.pinned.size) {
+		const blocker = candidates(ctx, new Set()).find((m) => ctx.pinned.has(m.knobId));
 		if (blocker) {
 			return {
 				kind: "blocked_by_pin",
-				pinnedKnob: blocker.knob_id,
-				to: blocker.best_value,
-				impact: blocker,
-				nodes: nodesForKnob(blocker.knob_id),
+				move: blocker,
+				pinnedKnob: blocker.knobId,
+				nodes: nodesForKnob(ctx.record, blocker.knobId),
 				textKey: failing ? "guide.pin_blocks_fix" : "guide.pin_blocks_saving",
 				whyKey: "guide.pin_blocks.why",
 			};
 		}
 	}
-	return { kind: "done", nodes: [], textKey: failing ? "guide.done.still_failing" : "guide.done", whyKey: "guide.done.why" };
+	if (failing) {
+		const nodes = ctx.record.findings.filter((f) => f.severity !== "info" && f.node_id).map((f) => f.node_id as string);
+		return { kind: "nothing_safe", nodes, textKey: "guide.nothing_safe", whyKey: "guide.nothing_safe.why" };
+	}
+	return { kind: "done", nodes: [], textKey: "guide.done", whyKey: "guide.done.why" };
 }
 
-/** How many more steps the tour expects, for "Step 2 of 4". */
-export function remainingSteps(ctx: TourContext): number {
-	const failing = (ctx.provider.predict(ctx.record, ctx.knobs).p_oom?.point ?? 0) > OOM_LIMIT;
-	return ctx.provider
-		.sensitivity(ctx.record, ctx.objective, { pinned: ctx.pinned, knobs: ctx.knobs })
-		.filter((i) => !ctx.visited.has(i.knob_id))
-		.filter((i) => failing || ctx.objective === "quality" || !changesResults(i.knob_id)).length;
+export function plannedSteps(ctx: TourContext): number {
+	return candidates(ctx, ctx.pinned).length;
 }
 
 export const MAX_TOUR_STEPS = 5;

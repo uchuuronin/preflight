@@ -62,7 +62,9 @@ def _fallback(reason: str, message: str) -> ApiError:
 @router.post("/guide/turns")
 async def guide_turn(body: TurnRequest, request: Request) -> dict:
 	if not flag("c.guide.live") or not muse_spark.configured():
-		raise _fallback("disabled", "The live guide is off right now, so the rule-based tour is running instead.")
+		raise _fallback(
+			"disabled", "The live guide is off right now, so the rule-based tour is running instead."
+		)
 
 	unknown = [t.name for t in body.tools if t.name not in GUIDE_TOOLS]
 	if unknown:
@@ -71,7 +73,8 @@ async def guide_turn(body: TurnRequest, request: Request) -> dict:
 	approx_tokens = len(json.dumps(body.input)) / CHARS_PER_TOKEN
 	if approx_tokens > MAX_INPUT_TOKENS_PER_TURN:
 		raise _fallback(
-			"turn_too_large", "This conversation is too long for the live guide; the rule-based tour takes over."
+			"turn_too_large",
+			"This conversation is too long for the live guide; the rule-based tour takes over.",
 		)
 
 	visitor = request.state.session
@@ -79,7 +82,8 @@ async def guide_turn(body: TurnRequest, request: Request) -> dict:
 	decision = ledger.check(visitor, body.record_ref)
 	if not decision.allowed:
 		raise _fallback(
-			decision.reason or "budget", "You've used today's live guide turns; the rule-based tour takes over."
+			decision.reason or "budget",
+			"You've used today's live guide turns; the rule-based tour takes over.",
 		)
 
 	try:

@@ -5,7 +5,7 @@
  * the model stops calling tools. A 503 with fallback=rule_based hands over to the
  * rule-based tour.
  */
-import { buildTools, executeTool, type ToolContext } from "./tools";
+import { buildTools, runTool, type ToolContext } from "./tools";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 const MAX_ROUNDS = 6;
@@ -72,7 +72,7 @@ export async function runLiveTurn(
 		}
 		if (!turn.calls.length) break;
 		for (const call of turn.calls) {
-			const result = executeTool(call.name, call.arguments, ctx());
+			const result = runTool(call.name, call.arguments, ctx());
 			items.push({ type: "function_call", call_id: call.call_id, name: call.name, arguments: JSON.stringify(call.arguments) });
 			items.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result) });
 		}

@@ -69,9 +69,13 @@ def replay_or_none(store: IdempotencyStore, scope: str, key: str, body: object) 
 	if stored is None:
 		return None
 	if stored.body_hash != body_hash(body):
-		raise ApiError(409, "idempotency_conflict", "This Idempotency-Key was already used with a different request.")
+		raise ApiError(
+			409, "idempotency_conflict", "This Idempotency-Key was already used with a different request."
+		)
 	return stored
 
 
-def remember(store: IdempotencyStore, scope: str, key: str, body: object, status: int, response: dict) -> None:
+def remember(
+	store: IdempotencyStore, scope: str, key: str, body: object, status: int, response: dict
+) -> None:
 	store.put(f"{scope}:{key}", Stored(body_hash(body), status, response, time.time()))
