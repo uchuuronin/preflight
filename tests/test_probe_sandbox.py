@@ -16,6 +16,8 @@ from preflight.probes.local import (
 )
 
 FIX = Path(__file__).resolve().parent / "fixtures"
+# tests that launch the recorder need torch in the probe process; path and parsing checks don't
+needs_torch = pytest.mark.torch
 
 
 def spec(script, **kw):
@@ -24,6 +26,7 @@ def spec(script, **kw):
 	)
 
 
+@needs_torch
 def test_secrets_in_the_worker_never_reach_user_code(monkeypatch, tmp_path):
 	monkeypatch.setenv("MODEL_API_KEY", "sk-demo-SECRET")
 	home = tmp_path / "home"
@@ -34,6 +37,7 @@ def test_secrets_in_the_worker_never_reach_user_code(monkeypatch, tmp_path):
 	assert "NOTHING" in r.log_tail, r.log_tail
 
 
+@needs_torch
 def test_processes_started_by_the_probe_do_not_survive_it(tmp_path):
 	marker = tmp_path / "marker"
 	r = run_probe(spec("orphan.py", args=[str(marker)], timeout_s=30, out_dir=tmp_path / "run"))
@@ -67,17 +71,20 @@ def test_entrypoint_must_be_submitted():
 		validate_files({"a.py": ""}, entrypoint="b.py")
 
 
+@needs_torch
 def test_stale_results_from_an_earlier_attempt_are_never_reused(tmp_path):
 	(tmp_path / "p1.result.json").write_text('{"status": "ok", "error": null, "summary": {"steps": 9}}')
 	r = run_probe(spec("hang.py", timeout_s=5, out_dir=tmp_path))
 	assert r.probe.status == "timeout"
 
 
+@needs_torch
 def test_output_is_capped(tmp_path):
 	run_probe(spec("chatty.py", timeout_s=60, out_dir=tmp_path))
 	assert (tmp_path / "p1.log").stat().st_size <= LOG_CAP_BYTES + 4096
 
 
+@needs_torch
 def test_cancellation_reaches_a_running_probe(tmp_path):
 	t0 = time.monotonic()
 	r = run_probe(spec("hang.py", timeout_s=120), should_stop=lambda: time.monotonic() - t0 > 1.5)
@@ -106,6 +113,7 @@ def test_valid_child_output_passes_through():
 	assert (status, code, summary["steps"]) == ("ok", None, 3)
 
 
+@needs_torch
 @pytest.mark.skipif(os.geteuid() != 0, reason="privilege drop only when the worker runs as root")
 def test_probe_runs_as_an_unprivileged_user(tmp_path):
 	files = {"who.py": "import os\nprint('UID', os.getuid())\n"}

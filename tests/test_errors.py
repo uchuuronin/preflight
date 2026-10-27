@@ -78,6 +78,15 @@ class OutOfMemoryError(RuntimeError):
 			"error",
 			False,
 		),
+		(
+			exc(
+				ImportError,
+				"Using the `Trainer` with `PyTorch` requires `accelerate>=0.26.0`: Please run `pip install transformers[torch]`",
+			),
+			"missing_package",
+			"error",
+			False,
+		),
 		(exc(SyntaxError, "invalid syntax"), "syntax_error", "error", False),
 		(exc(ValueError, "labels and logits have different lengths"), "user_error", "error", False),
 	],
@@ -121,3 +130,15 @@ def test_file_not_found_names_the_path():
 def test_classify_exit(returncode, timed_out, code, status, retryable):
 	c = classify_exit(returncode=returncode, timed_out=timed_out, steps=0, stage="first batch", timeout_s=60)
 	assert (c.code, c.status, c.retryable) == (code, status, retryable)
+
+
+def test_import_error_that_asks_for_a_package_names_it():
+	c = classify(
+		exc(
+			ImportError,
+			"Using the `Trainer` with `PyTorch` requires `accelerate>=0.26.0`: Please run `pip install x`",
+		),
+		steps=0,
+		in_eval=False,
+	)
+	assert "accelerate" in c.message

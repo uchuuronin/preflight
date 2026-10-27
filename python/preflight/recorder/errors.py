@@ -45,6 +45,17 @@ def classify(exc: BaseException, *, steps: int, in_eval: bool) -> Classified:
 			f"The script imports {pkg}, which is not installed in the probe image",
 			False,
 		)
+	if isinstance(exc, ImportError) or name == "ImportError":
+		# libraries that check optional dependencies themselves, e.g. Trainer asking for accelerate
+		m = re.search(r"requires `?([A-Za-z0-9_.\-\[\]]+?)`?(?:[<>=!~][^\s`:]*)?`?[\s:,]", msg)
+		if m or _has(msg, "pip install"):
+			pkg = m.group(1) if m else "a package"
+			return Classified(
+				"missing_package",
+				"error",
+				f"A library in the script needs {pkg}, which is not installed in the probe image",
+				False,
+			)
 	if _has(msg, "gated repo", "401 Client Error", "Access to model", "is restricted"):
 		return Classified(
 			"gated_model", "error", "The model is gated on Hugging Face; the probe has no access token", False

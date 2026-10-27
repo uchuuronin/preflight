@@ -89,6 +89,7 @@ LOG_CAP_BYTES = 5 * 1024 * 1024
 LOG_TAIL_BYTES = 16 * 1024
 _PATH_OK = re.compile(r"^[A-Za-z0-9._\-/ ]+$")
 _UIDS = itertools.count()
+_PROBE_LOCK = threading.Lock()
 VALID_STATUS = {"ok", "oom", "error", "timeout", "cancelled"}
 
 
@@ -186,6 +187,60 @@ def _no_dumps() -> None:
 	if sys.platform.startswith("linux"):
 		with contextlib.suppress(Exception):
 			ctypes.CDLL(None, use_errno=True).prctl(4, 0, 0, 0, 0)  # PR_SET_DUMPABLE = 4
+
+
+def _become_subreaper() -> bool:
+	"""Orphans of anything this process starts reparent to it, not to init, so they can be found and killed.
+
+	Without this, a probe that detaches a process with setsid escapes the process-group kill
+	when the worker isn't root (no per-probe uid to sweep).
+	"""
+	if not sys.platform.startswith("linux"):
+		return False
+	try:
+		return ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) == 0  # PR_SET_CHILD_SUBREAPER = 36
+	except Exception:
+		return False
+
+
+def _parent_map() -> dict[int, int]:
+	"""pid -> ppid for every visible process."""
+	out = {}
+	for d in os.listdir("/proc"):
+		if not d.isdigit():
+			continue
+		with contextlib.suppress(OSError, ValueError, IndexError), open(f"/proc/{d}/stat") as f:
+			# "pid (comm) state ppid ...": comm may hold spaces and parentheses, so split after the last ')'
+			out[int(d)] = int(f.read().rsplit(")", 1)[1].split()[1])
+	return out
+
+
+def _child_pids(parent: int) -> set[int]:
+	return {pid for pid, ppid in _parent_map().items() if ppid == parent}
+
+
+def _kill_descendants(root: int, keep: set[int]) -> None:
+	"""SIGKILL every descendant of root except the subtrees under keep, then reap our direct children."""
+	for _ in range(5):
+		parents = _parent_map()
+		victims, frontier = set(), [pid for pid, ppid in parents.items() if ppid == root and pid not in keep]
+		while frontier:
+			pid = frontier.pop()
+			if pid in victims:
+				continue
+			victims.add(pid)
+			frontier.extend(c for c, pp in parents.items() if pp == pid)
+		if not victims:
+			return
+		for pid in victims:
+			with contextlib.suppress(ProcessLookupError, PermissionError):
+				os.kill(pid, signal.SIGKILL)
+		time.sleep(0.05)
+		for pid in victims:
+			with contextlib.suppress(ChildProcessError, OSError):
+				os.waitpid(
+					pid, os.WNOHANG
+				)  # only our own (reparented) children; others raise and are skipped
 
 
 def _probe_uid() -> int | None:
@@ -426,23 +481,30 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		_chown_tree(work, uid)
 		_chown_tree(box, uid)
 	_no_dumps()
+	subreaper = _become_subreaper()
+	before = _child_pids(os.getpid()) if subreaper else set()
 	pkg_root = str(Path(__file__).resolve().parents[2])
 	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", "")})
 	popen_kw = {"user": uid, "group": uid, "extra_groups": _extra_groups()} if uid is not None else {}
 
 	started = datetime.now(UTC).replace(microsecond=0)
 	t0 = time.monotonic()
-	proc = subprocess.Popen(
-		[sys.executable, "-m", "preflight.recorder.run", str(spec_path)],
-		cwd=work,
-		env=env,
-		stdin=subprocess.DEVNULL,
-		stdout=subprocess.PIPE,
-		stderr=subprocess.STDOUT,
-		start_new_session=True,
-		**popen_kw,
-	)
-	log = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
+	_PROBE_LOCK.acquire()  # one probe at a time per process: the descendant sweep below must not touch another probe
+	try:
+		proc = subprocess.Popen(
+			[sys.executable, "-m", "preflight.recorder.run", str(spec_path)],
+			cwd=work,
+			env=env,
+			stdin=subprocess.DEVNULL,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.STDOUT,
+			start_new_session=True,
+			**popen_kw,
+		)
+		log = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
+	except BaseException:
+		_PROBE_LOCK.release()
+		raise
 	timed_out = cancelled = False
 	while True:
 		try:
@@ -459,11 +521,17 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				os.killpg(proc.pid, signal.SIGKILL)
 			proc.wait()
 			break
-	# nothing the probe started survives it: its process group, then anything else running as its uid
-	with contextlib.suppress(ProcessLookupError, PermissionError):
-		os.killpg(proc.pid, signal.SIGKILL)
-	if uid is not None:
-		_kill_uid(uid)
+	# nothing the probe started survives it: its process group, every descendant that detached
+	# (reparented to us as subreaper), then anything else running as its uid
+	try:
+		with contextlib.suppress(ProcessLookupError, PermissionError):
+			os.killpg(proc.pid, signal.SIGKILL)
+		if subreaper:
+			_kill_descendants(os.getpid(), keep=before)
+		if uid is not None:
+			_kill_uid(uid)
+	finally:
+		_PROBE_LOCK.release()
 	duration = time.monotonic() - t0
 	log_tail = log.text()
 
