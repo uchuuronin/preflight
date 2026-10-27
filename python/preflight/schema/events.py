@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import Field
 
 from .base import Strict
-from .record import Finding
+from .record import Constraints, Finding
 
 Stage = Literal[
 	"queued",
@@ -52,6 +52,11 @@ class JobRequest(Strict):
 	source: dict = Field(description="A Source: sample, repo, upload, notebook or template")
 	lens: str | None = Field(default=None, description="Optional hint; the script map decides")
 	objective: dict | None = None
-	constraints: dict | None = None
-	gpu: str | None = Field(default=None, description="Requested GPU class; admission control may change it")
+	constraints: Constraints | None = None
+	gpu: str | None = Field(
+		default=None,
+		min_length=1,
+		max_length=64,
+		description="Requested GPU class; admission control may change it",
+	)
 	description: str | None = Field(default=None, description="The visitor's use case, for the guide")

@@ -30,7 +30,8 @@ Updated Tue Oct 27, 3 a.m. ET.
   GPU names and peak FLOP/s from B's table, the five counts in `Probe.extras`, model shape from the
   running model, a `gpu_type` knob, and the knobs B maps (LoRA alpha and dropout, quantization,
   attention kernel, context limit). Checked on a scratch merge with ws-b: 561 tests pass and the
-  kernel table feeds `predict_cross_gpu`.
+  kernel table feeds `predict_cross_gpu`. The schema carries them (`Probe.kernels`, the
+  `ModelInfo` shape fields), added before the freeze with Chiya's approval.
 - Size-aware probe GPU (L4, L40S, A100-80GB, H200; after a GPU OOM one step up, or the whole
   ladder when the size was unknown), from a Monte Carlo (K, G, L, U in docs/decisions/probe-plan.md).
 - Kernel tables and model shapes from the probe child are checked in the parent before use
@@ -47,8 +48,8 @@ Updated Tue Oct 27, 3 a.m. ET.
 
 ## Next
 
-- Move the kernel table and model shape onto `Probe.kernels` and `ModelInfo` once the PM chat adds
-  the fields; until then they ride on `ProbeResult`.
+- Pipeline job function: fold `ProbeResult.arch` into the script map's model with
+  `untrusted.with_shape()` when the record is assembled.
 - Modal app: probe function with no secrets mounted and an egress allowlist, one container per
   job, the queue store in one container saving to a Modal Dict, the reaper on a schedule.
 - Pipeline job function: fetch source, map, skeleton event within 60 s, plan, probes, merge into

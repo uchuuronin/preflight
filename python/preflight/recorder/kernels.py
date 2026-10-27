@@ -193,7 +193,7 @@ def kernel_table(
 	def out_row(name, t_us, calls, flops, nbytes, cls):
 		return {
 			"name": name,
-			"class": cls,
+			"kernel_class": cls,
 			"calls": calls / steps,
 			"device_s": t_us / 1e6 / steps,
 			"flops": flops / steps if flops else None,

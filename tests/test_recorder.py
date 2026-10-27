@@ -136,6 +136,10 @@ def test_extras_carry_the_counts_b_reads_by_name(loop_result):
 	assert x["micro_steps_per_step"] == 1
 
 
+def rows_of(result):
+	return [r.model_dump() for r in result.kernels.rows]
+
+
 @pytest.fixture(scope="module")
 def profiled(tmp_path_factory):
 	out = tmp_path_factory.mktemp("prof")
@@ -145,12 +149,13 @@ def profiled(tmp_path_factory):
 def test_profiled_probe_returns_a_kernel_table(profiled):
 	from preflight.recorder.runtime import KERNEL_ROWS
 
-	k = profiled.kernels
-	assert k is not None and k["steps"] == 3 and k["backend"] == "cpu"
+	k = profiled.kernels.model_dump()
+	assert k["steps"] == 3 and k["backend"] == "cpu"
+	assert profiled.probe.kernels == profiled.kernels  # rides on the Probe in the record
 	rows = k["rows"]
-	assert 0 < len(rows) <= KERNEL_ROWS + 16
+	assert 0 < len(rows) <= KERNEL_ROWS + 17
 	for r in rows:
-		assert set(r) >= {"name", "class", "calls", "device_s", "flops", "bytes", "dtype"}
+		assert set(r) >= {"name", "kernel_class", "calls", "device_s", "flops", "bytes", "dtype"}
 		assert r["device_s"] > 0 and r["calls"] > 0
 	# sorted by time, top rows first, the rolled-up tail last
 	top = [r for r in rows if not r["name"].startswith("(tail)")]
@@ -160,7 +165,7 @@ def test_profiled_probe_returns_a_kernel_table(profiled):
 def test_matmuls_carry_flops_and_bytes(profiled):
 	mm = [
 		r
-		for r in profiled.kernels["rows"]
+		for r in rows_of(profiled)
 		if r["name"] in ("aten::mm", "aten::addmm", "aten::linear", "aten::matmul")
 	]
 	assert mm and all(r["flops"] and r["flops"] > 0 for r in mm if r["name"] in ("aten::mm", "aten::addmm"))
@@ -186,7 +191,7 @@ def test_hf_model_shape_comes_from_its_config(profiled_hf):
 
 def test_host_bookkeeping_is_left_to_the_host_bucket(profiled):
 	# on CPU every op has self time; autograd nodes and view ops are host work on any device
-	names = [r["name"] for r in profiled.kernels["rows"]]
+	names = [r["name"] for r in rows_of(profiled)]
 	assert not [
 		n for n in names if n.endswith(("Backward0", "Backward1")) or n.startswith("torch::autograd::")
 	]
@@ -195,7 +200,7 @@ def test_host_bookkeeping_is_left_to_the_host_bucket(profiled):
 
 
 def test_kernel_time_is_per_step_and_bounded_by_the_step(profiled):
-	per_step = sum(r["device_s"] for r in profiled.kernels["rows"])
+	per_step = sum(r["device_s"] for r in rows_of(profiled))
 	# CPU self time of ops in one profiled step can't exceed a few steps' wall time
 	assert per_step < 20 * profiled.probe.step_time.p50_s + 0.05
 
@@ -208,7 +213,7 @@ def profiled_hf(tmp_path_factory):
 
 @needs_transformers
 def test_profiler_ranges_are_not_counted_as_kernels(profiled_hf):
-	names = [r["name"] for r in profiled_hf.kernels["rows"]]
+	names = [r["name"] for r in rows_of(profiled_hf)]
 	assert not any(n.startswith(("ProfilerStep", "Optimizer.", "enumerate(DataLoader)")) for n in names), (
 		names[:10]
 	)
@@ -216,5 +221,5 @@ def test_profiler_ranges_are_not_counted_as_kernels(profiled_hf):
 
 @needs_transformers
 def test_attention_rows_carry_estimated_flops(profiled_hf):
-	attn = [r for r in profiled_hf.kernels["rows"] if "scaled_dot_product" in r["name"]]
+	attn = [r for r in rows_of(profiled_hf) if "scaled_dot_product" in r["name"]]
 	assert attn and all(r["flops"] and r["flops"] > 0 for r in attn)

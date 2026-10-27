@@ -50,6 +50,7 @@ from preflight.schema import (
 	Env,
 	EvalStats,
 	GenerationStats,
+	KernelTable,
 	LengthStats,
 	Memory,
 	Power,
@@ -134,10 +135,10 @@ class ProbeResult:
 	probe: Probe
 	env: Env
 	summary: dict
-	# Kernel table from the profiled window (rows, steps, backend); goes on Probe.kernels once the
-	# schema carries it (B's request, with the PM chat)
-	kernels: dict | None
-	# Model shape read from the running model (recorder/arch.py): B's optional ModelInfo fields
+	# Kernel table from the profiled window, checked; also set on probe.kernels
+	kernels: KernelTable | None
+	# Model shape read from the running model (recorder/arch.py), checked; untrusted.with_shape()
+	# folds it into the script map's ModelInfo when the record is assembled
 	arch: dict | None
 	trace_file: Path | None
 	log_tail: str
@@ -604,6 +605,8 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	# uploaded code is not kept on the box after the probe (24 h retention lives in the object store)
 	shutil.rmtree(sandbox, ignore_errors=True)
 	kernels, kernels_error = untrusted.kernel_table(summary.get("kernels"))
+	if kernels is not None and probe.error_code != "recorder":  # not on a probe whose numbers were unreadable
+		probe = probe.model_copy(update={"kernels": kernels})
 	unresolved = raw_env.get("gpu_unresolved") if isinstance(raw_env, dict) else None
 	if isinstance(unresolved, str):
 		log.warning("GPU %r is not in the spec table; kept as reported", unresolved[:80])

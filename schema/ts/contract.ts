@@ -152,11 +152,41 @@ export interface ModelInfo {
 	n_kv_heads?: number | null;
 	d_ff?: number | null;
 	vocab_size?: number | null;
+	head_dim?: number | null;
+	/**
+	 * MoE experts per layer
+	 */
+	n_experts?: number | null;
+	/**
+	 * MoE experts routed per token
+	 */
+	experts_per_token?: number | null;
+	/**
+	 * Longest context the model was built for
+	 */
+	max_positions?: number | null;
+	/**
+	 * SwiGLU/GeGLU-style MLP with a gate projection
+	 */
+	gated_mlp?: boolean | null;
+	/**
+	 * Output head shares the embedding matrix
+	 */
+	tie_embeddings?: boolean | null;
+	norm?: ("rmsnorm" | "layernorm") | null;
+	/**
+	 * eager, sdpa, flash_attention_2, ...
+	 */
+	attn_impl?: string | null;
 	dtype?: string | null;
 	/**
-	 * e.g. 4bit-nf4, 8bit, none
+	 * Weight format, as engine.memory keys it: nf4, nf4_dq, fp4, fp4_dq, int8, gptq_4bit, gptq_8bit, awq_4bit; none or absent for unquantised
 	 */
 	quantization?: string | null;
+	/**
+	 * Where the shape fields came from: the code, or the running model
+	 */
+	shape_source?: ("code" | "hf_config" | "modules") | null;
 	lora?: LoraInfo | null;
 }
 /**
@@ -568,6 +598,10 @@ export interface Probe {
 	extras?: {
 		[k: string]: number | undefined;
 	};
+	/**
+	 * Per-kernel table, current-settings probe only (profiled window)
+	 */
+	kernels?: KernelTable | null;
 	cost?: ProbeCost;
 	/**
 	 * sha256 of script, env and knob values
@@ -738,6 +772,67 @@ export interface GenerationStats {
 	 */
 	truncation_rate?: number | null;
 	backend?: ("hf" | "vllm" | "api" | "other") | null;
+}
+/**
+ * Top KERNEL_ROWS ops by device time, then the tail per class (probe-plan K: 100% within 20%).
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "KernelTable".
+ */
+export interface KernelTable {
+	/**
+	 * @maxItems 96
+	 */
+	rows: KernelStat[];
+	/**
+	 * Profiled steps the rows average over
+	 */
+	steps: number;
+	backend: "cuda" | "rocm" | "cpu";
+	/**
+	 * fp32 matmuls ran as TF32, so B picks the TF32 peak
+	 */
+	allow_tf32: boolean;
+	/**
+	 * Which classifier set kernel_class
+	 */
+	classified_by?: string | null;
+}
+/**
+ * One row of the profiled probe's kernel table, per optimizer step; B scales it to other GPUs.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "KernelStat".
+ */
+export interface KernelStat {
+	/**
+	 * aten op; '(tail) <class> (<n> ops)' rolls up the rest of a class; '(unattributed device time)' is GPU time no op claimed
+	 */
+	name: string;
+	/**
+	 * engine.steptime.classify_kernel class, e.g. gemm, attention
+	 */
+	kernel_class?: string | null;
+	/**
+	 * Calls per step
+	 */
+	calls: number;
+	/**
+	 * Self device time per step (self CPU time on CPU probes)
+	 */
+	device_s: number;
+	/**
+	 * Per step; counted by PyTorch or estimated
+	 */
+	flops?: number | null;
+	/**
+	 * Read plus write traffic per step, estimated
+	 */
+	bytes?: number | null;
+	/**
+	 * bf16, fp16, fp32, ...
+	 */
+	dtype: string;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1131,9 +1226,7 @@ export interface JobRequest {
 	objective?: {
 		[k: string]: unknown | undefined;
 	} | null;
-	constraints?: {
-		[k: string]: unknown | undefined;
-	} | null;
+	constraints?: Constraints | null;
 	/**
 	 * Requested GPU class; admission control may change it
 	 */
