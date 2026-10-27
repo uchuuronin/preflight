@@ -2,8 +2,9 @@
 
 ## Tue Oct 27, midday (rebased on `ws-c`)
 
-**Done** (branch `ws-d`, rebased on `ws-c`, not pushed)
+**Done** (branch `ws-d`, rebased on `ws-c`)
 
+- Flag keys `d.expertise` and `d.currency` added to `flags.json` with Chiya's approval, both off.
 - D1 expertise dial, behind flag `d.expertise` (off by default), through C's existing extension points only:
 	- Detail level (New to this, Practitioner, Expert) in the Logbook's pilot card (`logbook-settings` slot). A radio group with arrow keys and one tab stop, kept per browser in localStorage, guarded for blocked storage.
 	- Glossary card in every knob's control (knob decoration): a native disclosure worded for the level, a "What to change" line where there is a clear fix, and "More detail" one level deeper without changing the setting. 63 terms; every knob in A's golden records and C's dev record is covered (test).
@@ -15,7 +16,6 @@
 **Blocked**
 
 - Fewer knobs and plainer labels at "new" need C's knob-view hook (docs/requests.md).
-- `d.expertise` and `d.currency` need keys in `flags.json` (shared, through Chiya).
 - D2 share cards need C's share-token read route, R2 store and `workers/` in the deploy (C's Thu work).
 
 **Next**

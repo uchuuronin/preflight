@@ -10,5 +10,7 @@
 	"c.hops": false,
 	"c.fix_loop": false,
 	"c.exports": false,
-	"c.campaign_calendar": false
+	"c.campaign_calendar": false,
+	"d.expertise": false,
+	"d.currency": false
 }
