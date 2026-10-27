@@ -26,6 +26,8 @@ interface DialSpec {
 	goal?: ObjectiveKind;
 	format: (v: number) => string;
 	note?: string;
+	/** The engine's sentence about this number (e.g. the runaway margin in an agent run's cost). */
+	reason?: string;
 	/** fails: red note and needle; tight: amber note. */
 	noteRisk?: boolean;
 	noteTight?: boolean;
@@ -62,7 +64,7 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 		</>
 	);
 	return (
-		<div className="pf-dial-wrap">
+		<div className="pf-dial-wrap" title={spec.reason}>
 			{onGoal ? (
 				<button type="button" className={`glass pf-dial pf-dial--button${goalOn ? " is-goal" : ""}`} onClick={onGoal} aria-pressed={goalOn} aria-label={`${aria}. ${goalOn ? t("dial.is_goal") : t("dial.make_goal")}`}>
 					{face}
@@ -103,6 +105,8 @@ export function Dials() {
 	const costMax = c.budget_usd ?? remember("cost", costEst);
 	const tpsT = target(record, "throughput.tokens_per_s");
 	const tpsEst = tpsT ? estimates[tpsT.id] : undefined;
+	const tokensT = target(record, "tokens.total");
+	const tokensEst = tokensT ? estimates[tokensT.id] : undefined;
 	const fail = failureTarget(record);
 	const riskT = targetFor(record, "risk") ?? (fail ? target(record, fail) : undefined);
 	const riskEst = riskT ? estimates[riskT.id] : undefined;
@@ -126,15 +130,26 @@ export function Dials() {
 			scaleMax: costMax,
 			goal: "min_cost",
 			format: (v) => fmt(v, "usd"),
+			...(costEst?.reason && costEst.status !== "abstain" ? { reason: costEst.reason } : {}),
 		},
-		{
-			id: "tps",
-			label: t("dial.tps"),
-			unit: t("dial.tps.unit"),
-			est: tpsEst,
-			scaleMax: remember("tps", tpsEst),
-			format: (v) => fmt(v, "tokens/s").replace(/ tokens\/s$/, ""),
-		},
+		tpsEst || !tokensEst
+			? {
+					id: "tps",
+					label: t("dial.tps"),
+					unit: t("dial.tps.unit"),
+					est: tpsEst,
+					scaleMax: remember("tps", tpsEst),
+					format: (v) => fmt(v, "tokens/s").replace(/ tokens\/s$/, ""),
+				}
+			: {
+					// Agent and API runs: the run's tokens instead of a training speed.
+					id: "tokens",
+					label: t("dial.tokens"),
+					unit: t("dial.tokens.unit"),
+					est: tokensEst,
+					scaleMax: remember("tokens", tokensEst),
+					format: (v) => fmt(v, "tokens").replace(/ tokens$/, ""),
+				},
 		{
 			id: "risk",
 			label: riskT ? t(riskT.label_key) : t("dial.risk"),

@@ -3,13 +3,14 @@ import { fmt, fmtDelta } from "../lib/fmt";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
 import { usePanels } from "../registry";
-import { capacityBytes, failureTarget, objectiveTarget, target, targetFor } from "../workspace/record/model";
+import { capacityBytes, costStraddlesBudget, failureTarget, objectiveTarget, SAMPLE_MORE_TASKS, target, targetFor } from "../workspace/record/model";
 import type { Knob, KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
 import { GuideFallback, type InputItem, runLiveTurn } from "./liveGuide";
-import { MAX_TOUR_STEPS, nextStep, plannedSteps, type TourStep } from "./ruleTour";
+import { MAX_TOUR_STEPS, nextStep, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
+import { AddonBoundary } from "../components/AddonBoundary";
 
 interface Active {
 	step: TourStep;
@@ -89,11 +90,13 @@ export function GuidePanel() {
 		setActive({ step: shown, n, of: n });
 	};
 
-	/** Move past a "measure it first" offer without measuring. */
+	/** Move past a "measure it first" or "sample more" offer without spending. */
 	const skipOffer = () => {
-		if (!active?.step.move) return;
+		if (!active) return;
 		const v = new Set(visited);
-		v.add(`probe:${active.step.move.knobId}`);
+		if (active.step.kind === "sample_offer") v.add(SAMPLE_VISIT);
+		else if (active.step.move) v.add(`probe:${active.step.move.knobId}`);
+		else return;
 		setVisited(v);
 		requestAnimationFrame(() => begin(v, taken));
 	};
@@ -183,6 +186,18 @@ export function GuidePanel() {
 			cap: cap ? fmt(cap, "bytes") : "",
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
+			...((): Record<string, string> => {
+				const st = costStraddlesBudget(record, estimates);
+				return st
+					? {
+							budget: fmt(st.budget, "usd"),
+							lo: fmt(st.lo, "usd"),
+							hi: fmt(st.hi, "usd"),
+							tasks: String(SAMPLE_MORE_TASKS),
+							sampled: st.sampled !== null ? fmt(st.sampled, "count") : "",
+						}
+					: {};
+			})(),
 		};
 	}
 
@@ -199,6 +214,8 @@ export function GuidePanel() {
 				},
 			};
 		if (s.kind === "probe_offer") return { label: t("guide.measure_fix"), run: () => measure(s.move, "tight") };
+		if (s.kind === "sample_offer")
+			return { label: t("guide.sample_more", { tasks: SAMPLE_MORE_TASKS }), run: () => runTool("sample_more", { reason: "budget_straddle" }, ctx()) };
 		if (s.kind === "nothing_safe") {
 			const f = record.findings.find((x) => x.knob_id && x.severity !== "info");
 			const move = s.move ?? (f?.knob_id ? { knobId: f.knob_id, to: knobs.get(f.knob_id)?.current ?? null } : undefined);
@@ -212,7 +229,7 @@ export function GuidePanel() {
 			<div className="pf-guide__head">
 				<span className={live ? "pf-model" : "pf-model pf-model--quiet"}>{live ? t("guide.model.muse_spark") : t("guide.model.rule_based")}</span>
 				<span className="pf-guide__step">
-					{active?.step.kind === "move" || active?.step.kind === "probe_offer" ? t("guide.step_of", { n: active.n, of: active.of }) : active ? t("guide.waiting") : t("guide.ready")}
+					{active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" ? t("guide.step_of", { n: active.n, of: active.of }) : active ? t("guide.waiting") : t("guide.ready")}
 				</span>
 			</div>
 
@@ -260,7 +277,7 @@ export function GuidePanel() {
 						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
 							{primary.label}
 						</button>
-						{active?.step.kind === "probe_offer" ? (
+						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" ? (
 							<button type="button" className="pf-btn pf-btn--small" onClick={skipOffer}>
 								{t("guide.skip")}
 							</button>
@@ -313,7 +330,9 @@ export function GuidePanel() {
 			) : null}
 
 			{footer.map((p) => (
-				<p.component key={p.id} record={record} knobs={state.knobs} estimates={estimates} />
+				<AddonBoundary key={p.id} id={p.id}>
+					<p.component record={record} knobs={state.knobs} estimates={estimates} />
+				</AddonBoundary>
 			))}
 		</section>
 	);

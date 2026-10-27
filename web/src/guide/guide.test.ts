@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+import agentRaw from "../../../schema/examples/agent.json";
 import goldenRaw from "../../../schema/examples/finetune.json";
 import devRaw from "../workspace/fixtures/dev-finetune.record.json";
 import { GridProvider } from "../workspace/provider/GridProvider";
 import { currentKnobs } from "../workspace/record/model";
 import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
 import type { TraceEntry } from "../workspace/state";
-import { nextStep } from "./ruleTour";
+import { nextStep, SAMPLE_VISIT } from "./ruleTour";
 import { fakeActions } from "./testkit";
 import { buildTools, executeTool, runTool, type ToolContext } from "./tools";
 
@@ -133,5 +134,35 @@ describe("measure-first offers (tight settings)", () => {
 	it("uses the 'would stop' wording only when the run likely fails", () => {
 		const tight = nextStep({ ...ctxFor(0.3), provider: { ...stub(0.3), moves: () => [{ ...fitsMove, clearsFailure: true }] as never } });
 		expect(tight.textKey).toBe("guide.rule.generic.fix.line");
+	});
+});
+
+
+describe("sample_more (agent runs whose cost range straddles the budget)", () => {
+	const agent = normaliseRecord(agentRaw as unknown as FlightRecord);
+
+	it("is in the tool schema for agent runs only", () => {
+		expect(buildTools(agent, new Set()).some((x) => x.name === "sample_more")).toBe(true);
+		expect(buildTools(dev, new Set()).some((x) => x.name === "sample_more")).toBe(false);
+	});
+
+	it("asks for the person's click when the range straddles the budget, never runs on its own", () => {
+		const c = ctx(agent);
+		const res = executeTool("sample_more", { reason: "budget" }, c);
+		expect(res).toEqual({ ok: true, result: { status: "awaiting_person_approval", tasks: 20 } });
+		expect(c.approve).toHaveBeenCalledWith("sample_more", expect.objectContaining({ tasks: 20, budget: 150 }));
+	});
+
+	it("refuses when the range is entirely under or over the budget", () => {
+		const under = { ...agent, job: { ...agent.job, constraints: { ...agent.job.constraints, budget_usd: 1000 } } };
+		const c = ctx(under);
+		expect(executeTool("sample_more", { reason: "x" }, c).ok).toBe(false);
+		expect(c.approve).not.toHaveBeenCalled();
+	});
+
+	it("opens the tour with the sample offer, and moves on when it is skipped", () => {
+		const base = { record: agent, provider, knobs: currentKnobs(agent), pinned: new Set<string>(), objective: cost };
+		expect(nextStep({ ...base, visited: new Set() }).kind).toBe("sample_offer");
+		expect(nextStep({ ...base, visited: new Set([SAMPLE_VISIT]) }).kind).not.toBe("sample_offer");
 	});
 });

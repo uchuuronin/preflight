@@ -1156,6 +1156,7 @@ a {
 .pf-knob b { font-family: var(--pf-font-mono); font-size: 12.5px; font-weight: 500; color: var(--pf-fg); }
 .pf-knob[aria-pressed="true"] { background: var(--pf-glass-hi); color: var(--pf-fg); box-shadow: inset 0 0 0 1px var(--pf-stroke-strong); }
 .pf-knob.is-guide { box-shadow: inset 0 0 0 1.5px var(--pf-accent), 0 0 22px var(--pf-accent-glow); }
+.pf-knob--more { border: 1px dashed var(--pf-stroke-strong); color: var(--pf-fg-dim); }
 .pf-knob__pin { width: 7px; height: 7px; border-radius: 50%; background: var(--pf-accent); }
 .pf-knob__code { padding: 1px 6px; border-radius: 6px; border: 1px solid var(--pf-stroke-strong); font-family: var(--pf-font-mono); font-size: 9.5px; letter-spacing: 0.04em; color: var(--pf-fg-dim); }
 

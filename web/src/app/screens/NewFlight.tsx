@@ -9,6 +9,7 @@ import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
+import { AddonBoundary } from "../../components/AddonBoundary";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
@@ -118,7 +119,9 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									.filter((p) => p.id === intake)
 									.map((p) => (
 										<div key={p.id} className="pf-pane">
-											<p.component />
+											<AddonBoundary id={p.id}>
+												<p.component />
+											</AddonBoundary>
 										</div>
 									))
 							)}

@@ -1,5 +1,25 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Tue Oct 27, afternoon (D's requests, sample_more)
+
+**Done** (branch `ws-c`, merged `ws-b` 39a7904)
+
+- D's blank-page bug fixed at the root: add-ons load from `web/src/loadAddons.ts` after the
+  registry exists, each as its own import (one that throws is logged and skipped; the app renders
+  within 1.5 s regardless), and every add-on component renders inside an error boundary.
+  Checked in Chromium with add-ons that register while loading, throw while loading and throw
+  while rendering: the page stays up each time.
+- Knob-view hook to D's spec (`registerKnobView`, filter + labelKey), with the dock never hiding
+  pinned, guided, open or moved knobs and a "show all" capsule; the guide's moving knob stays in
+  `highlight`. Decorations get `provider` and `ranked`; `useCockpit()` gives add-ons a read-only
+  cockpit. D's expertise add-on and its 47 tests pass against it.
+- `sample_more` guide tool (contract): agent runs only, refuses unless the cost range straddles
+  the budget, waits for the click; the rule tour offers it first on the golden agent sample
+  ($46 to $159 against a $150 budget).
+- Agent runs: a tokens dial and B's runaway-margin sentence on the cost dial.
+- Checks: 62 web tests, typecheck, build; knob change 97 ms p95.
+
+
 ## Tue Oct 27, midday (merged A's b59334b)
 
 **Done** (branch `ws-c`, local merge of `ws-a`, not pushed yet)
