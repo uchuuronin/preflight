@@ -1,0 +1,99 @@
+/* D4 · Free-tier presets. Theme tokens only (var(--pf-*)); no literal colours. */
+
+.pf-addon-freetier {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-3);
+}
+
+.pf-addon-freetier__title {
+	margin: 0;
+	font-family: var(--pf-font-serif);
+	font-weight: 400;
+	font-size: var(--pf-text-2xl);
+}
+
+.pf-addon-freetier__lede {
+	margin: 0;
+	font-size: var(--pf-text-sm);
+	line-height: 1.5;
+	color: var(--pf-fg-dim);
+	max-width: 70ch;
+}
+
+.pf-addon-freetier__rows {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+	gap: var(--pf-space-3);
+}
+
+.pf-addon-freetier__row {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+	padding: var(--pf-space-4);
+	border: 1px solid var(--pf-stroke);
+	border-radius: var(--pf-radius-md);
+	min-width: 0;
+}
+
+.pf-addon-freetier__head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+}
+
+.pf-addon-freetier__head b {
+	font-size: var(--pf-text-md);
+	font-weight: 600;
+	flex-basis: 100%;
+}
+
+.pf-addon-freetier__meta {
+	font-family: var(--pf-font-mono);
+	font-size: var(--pf-text-xs);
+	color: var(--pf-fg-dim);
+}
+
+.pf-addon-freetier__head > .pf-status,
+.pf-addon-freetier__chip {
+	margin-left: auto;
+}
+
+.pf-addon-freetier__chip {
+	font-size: 12px;
+	font-weight: 600;
+	padding: 3px 10px;
+	border-radius: var(--pf-radius-pill);
+	border: 1px dashed var(--pf-stroke-strong);
+	color: var(--pf-fg-dim);
+	white-space: nowrap;
+}
+
+.pf-addon-freetier__say {
+	margin: 0;
+	font-size: var(--pf-text-sm);
+	line-height: 1.5;
+}
+
+.pf-addon-freetier__note {
+	margin: 0;
+	font-size: var(--pf-text-xs);
+	line-height: 1.5;
+	color: var(--pf-fg-dim);
+}
+
+.pf-addon-freetier__sources {
+	margin: 0;
+	font-size: var(--pf-text-xs);
+	line-height: 1.6;
+	color: var(--pf-fg-dim);
+}
+
+.pf-addon-freetier__sources a {
+	color: inherit;
+}
