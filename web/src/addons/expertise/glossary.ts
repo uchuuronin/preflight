@@ -78,6 +78,8 @@ export const KNOB_TERMS: Readonly<Record<string, string>> = {
 	// multi-GPU
 	gpus: "gpu_count",
 	fsdp_mode: "fsdp_mode",
+	zero_stage: "zero_fsdp",
+	deepspeed_stage: "zero_fsdp",
 	tensor_parallel: "tensor_parallel",
 	// serving and eval
 	max_model_len: "model_length_cap",

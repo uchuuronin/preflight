@@ -8,7 +8,6 @@
  */
 import { flag } from "../../lib/flags";
 import { registerAppPanel } from "../../registry";
-import { whenReady } from "../_shared/whenReady";
 import { CurrencySetting } from "./CurrencySetting";
 import { applyCurrency } from "./store";
 import { registerCurrencyStrings } from "./strings";
@@ -25,14 +24,11 @@ export function start(enabled: boolean = flag(FLAG)): void {
 
 start();
 
-// See _shared/whenReady.ts: the registry may not be ready while add-ons load.
-export const ready: Promise<void> = whenReady(() => {
-	registerAppPanel({
-		id: "currency.setting",
-		slot: "logbook-settings",
-		titleKey: "addon.currency.title",
-		order: 20,
-		flag: FLAG,
-		component: CurrencySetting,
-	});
+registerAppPanel({
+	id: "currency.setting",
+	slot: "logbook-settings",
+	titleKey: "addon.currency.title",
+	order: 20,
+	flag: FLAG,
+	component: CurrencySetting,
 });

@@ -3,10 +3,14 @@ import type { Estimate } from "../../workspace/record/types";
 import { checkPreset } from "./check";
 import { PRESETS, type Preset } from "./presets";
 
-// The decision behind the one-session rule (docs/decisions/freetier-one-session.md), run against
-// checkPreset itself. Predicted run times 2 to 20 h on a 12 h Colab session; true time spread
+// calibration: simulated. The truth below is drawn from the same interval form the rule reads, so
+// this shows the rule is consistent with its inputs, not that it is accurate; its numbers are never
+// quoted. It stays as a guard against a rule that ignores the interval (the point-estimate rule
+// fails it). Accuracy comes from the zoo's real runs (docs/decisions/freetier-one-session.md).
+// The decision behind the one-session rule, run against checkPreset itself. Predicted run times 2 to 20 h on a 12 h Colab session; true time spread
 // around the prediction as the records' 90% intervals say (hi/point 1.15, or 1.40 for one in
-// four), optionally 1.5x wider than claimed; 5 to 30 min of setup each session.
+// four) [measured from A's fixture records, not real runs], optionally 1.5x wider than claimed;
+// 5 to 30 min of setup each session [guess, as SETUP_S].
 
 function rng(seed: number) {
 	return () => {

@@ -4,6 +4,7 @@
  */
 import { perUsd } from "./rates";
 
+// Country to currency [cited: ISO 4217; euro area per the ECB, 20 members since Croatia, 2023].
 const EURO_AREA = ["AT", "BE", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK"];
 
 const BY_REGION: Record<string, string> = {

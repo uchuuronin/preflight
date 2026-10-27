@@ -64,7 +64,8 @@ function uniqueSources(): Source[] {
 export function FreeTierPanel({ record, knobs, estimates }: WorkspaceContextValue & { nodeId?: string }) {
 	const raw = typeof knobs.gpu_type === "string" ? knobs.gpu_type : (record.env?.gpu?.name ?? null);
 	const gpu = canonicalGpu(raw);
-	const input = { gpu, memory: estimates["memory.peak"], time: estimates["time.total"] };
+	const input = { gpu, memory: estimates["memory.peak"], time: estimates["time.total"], cost: estimates["cost.total"] };
+	const usesBf16 = typeof knobs.precision === "string" && knobs.precision.toLowerCase().includes("bf16");
 	return (
 		<section className="pf-addon-freetier" aria-labelledby="pf-addon-freetier-title">
 			<h3 id="pf-addon-freetier-title" className="pf-addon-freetier__title">
@@ -84,6 +85,16 @@ export function FreeTierPanel({ record, knobs, estimates }: WorkspaceContextValu
 								<span className={CHIP[v.kind]}>{chip(v, p)}</span>
 							</div>
 							<p className="pf-addon-freetier__say">{say(v, p, raw ? short(gpu ?? raw) : null, gpu)}</p>
+							{"overCredit" in v && v.overCredit && p.monthlyCreditUsd !== undefined ? (
+								<p className="pf-addon-freetier__say">{t("addon.freetier.over_credit", { credit: fmt(p.monthlyCreditUsd, "usd") })}</p>
+							) : null}
+							{p.fp16Only ? (
+								<p className="pf-addon-freetier__fp16">
+									{usesBf16
+										? t("addon.freetier.fp16_switch", { gpu: short(gpu && p.gpus.includes(gpu) ? gpu : (p.gpus[0] ?? "")) })
+										: t("addon.freetier.fp16")}
+								</p>
+							) : null}
 							<p className="pf-addon-freetier__note">{t(`addon.freetier.note.${p.id}`)}</p>
 						</li>
 					);

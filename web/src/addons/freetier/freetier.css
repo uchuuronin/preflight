@@ -97,3 +97,11 @@
 .pf-addon-freetier__sources a {
 	color: inherit;
 }
+
+.pf-addon-freetier__fp16 {
+	margin: 0;
+	font-size: var(--pf-text-sm);
+	line-height: 1.5;
+	padding-left: var(--pf-space-3);
+	border-left: 2px solid var(--pf-tight);
+}

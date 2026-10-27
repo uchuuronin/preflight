@@ -1,45 +1,45 @@
-# How many knobs the "New to this" level shows (D1)
+# What the "New to this" level shows (D1)
 
-Decided Tue Oct 27 by D. Kept honest by `web/src/addons/expertise/tiers.test.ts`.
+Revised Tue Oct 27 after the Oct 27 review. Kept honest by
+`web/src/addons/expertise/dial.zoo.test.ts`.
 
-## Question
+## Rule
 
-At the "New to this" detail level the dock should show few knobs, but never hide the one
-that matters. The rule is: the lens baseline (knobs a newcomer recognises), plus the top K
-knobs by `sensitivity()` at the current setting, plus anything pinned or under the guide.
-What should K be?
+At "New to this" the knob dock shows:
 
-## Research
+- the lens baseline (knobs a newcomer recognises) [guess: chosen by D from the Users and views
+  tab; replace with which knobs first-time visitors open, from session telemetry after Nov 4];
+- the top 2 knobs for the visitor's current goal (C's `ranked`, from `sensitivity()` on the
+  active objective) [guess: replace with the zoo coverage below once B's real grids land];
+- the knobs of every error or critical finding, on the grid or not (`eval_no_grad` included);
+- any knob the visitor has touched this visit, even if put back.
 
-- Working memory holds about four chunks (Cowan 2001, "The magical number 4"); Hick's law
-  makes choice time grow with the log of the number of options. Both argue for five or
-  fewer knobs on screen for a newcomer.
-- The failure Preflight exists to catch must never be hidden: the knob that clears a
-  predicted failure has to be visible every time.
+C's dock also keeps pinned, guide-highlighted, open and moved knobs, and offers "Show N more".
 
-## Monte Carlo
+## Test
 
-Four sample records (C's dev fine-tune, A's golden fine-tune, pretrain and agent), 300
-random settings each over the knobs the grids cover (others held at the record's value, as
-C's provider requires), three goals (cheapest, fastest, fits in memory), C's GridProvider.
-963 goal cases with a best move, 303 with a predicted failure to clear.
+Ground truth is A's zoo, not the dial: each zoo script's docstring lists its planted problems
+and which make the run fail. For each golden record built from a zoo script (matched by
+`job.source.entrypoint`), a newcomer arrives at the record's own setting with one of three goals
+(cheapest, fastest, fits in memory); the test runs C's `applyKnobViews` with D's view and checks
+which planted knobs are on screen.
 
-| New level shows | Best knob for any goal visible | Failure fix visible | Knobs shown, mean / max |
-| --- | --- | --- | --- |
-| Baseline only | 82.6% | 61.7% | 2.75 / 3 |
-| Baseline + top 1 | 95.1% | 99.0% | 2.79 / 4 |
-| **Baseline + top 2** | **95.4%** | **100%** | **2.81 / 5** |
-| Baseline + top 3 | 96.7% | 100% | 2.85 / 6 |
-| Baseline + top 4 | 97.9% | 100% | 2.89 / 7 |
+- Asserted: every knob behind a planted failure is shown for every goal. The test fails if the
+  failure rule is removed (checked: 0 of 6 on the fine-tune).
+- Reported, Wilson 95%, on A's fixture predictions (`golden-fixture@0`), Oct 27:
 
-## Decision
+| Record | Planted problems shown | Hidden |
+| --- | --- | --- |
+| finetune.json (zoo/finetune_lora_hf) | 6 of 9, 67% [35, 88] | packing, for all three goals |
+| pretrain.json (zoo/pretrain_nanogpt) | 3 of 9, 33% [12, 65] | precision and checkpoint interval, for all three goals |
 
-K = 2: the smallest K that always shows the failure fix, with at most five knobs on screen.
-K = 3 buys 1.3 points of coverage for a sixth knob, which matters more once B's engine
-grids more knobs.
+Both failure knobs on the fine-tune show every time; the hidden ones are warnings (padding,
+fp32, sparse checkpoints). Whether "New to this" should show warning knobs too is open with
+Chiya. Rerun on B's grids once `make_golden.py` replaces the fixtures.
 
-## Caveats
+## Superseded
 
-The grids are A's fixture predictions (`golden-fixture@0`), the agent record has none, and
-only two to four knobs per record are gridded. The test reruns the same simulation in CI;
-when B's engine replaces the fixtures, a failing threshold means revisit K.
+The Oct 27 morning Monte Carlo (random settings over gridded knobs, scored on three goals while
+ranking by cost) is withdrawn: its top-2 rule covered both movable knobs by construction, so it
+could not fail, and its 44 misses came from ranking by one goal while scoring others. Its
+figures were calibration: simulated and are not quoted anywhere.

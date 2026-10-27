@@ -13,10 +13,11 @@ function est(point: number, ratio = 1.15, unit = "s"): Estimate {
 const colab = PRESETS.find((p) => p.id === "colab") as Preset;
 const kaggle = PRESETS.find((p) => p.id === "kaggle") as Preset;
 const lightning = PRESETS.find((p) => p.id === "lightning") as Preset;
+const modal = PRESETS.find((p) => p.id === "modal") as Preset;
 
 describe("free-tier presets", () => {
-	it("cover Colab, Kaggle and Lightning, each dated and sourced", () => {
-		expect(PRESETS.map((p) => p.id)).toEqual(["colab", "kaggle", "lightning"]);
+	it("cover Colab, Kaggle, Modal's free credit and Lightning, each dated and sourced", () => {
+		expect(PRESETS.map((p) => p.id)).toEqual(["colab", "kaggle", "modal", "lightning"]);
 		for (const p of PRESETS) {
 			expect(p.sessionCapS, p.id).toBeGreaterThan(0);
 			expect(p.sources.length, p.id).toBeGreaterThan(0);
@@ -31,6 +32,19 @@ describe("free-tier presets", () => {
 		expect(colab.sessionCapS).toBe(12 * H);
 		expect(kaggle.sessionCapS).toBe(12 * H);
 		expect(lightning.sessionCapS).toBe(4 * H);
+		expect(modal.sessionCapS).toBe(24 * H);
+	});
+
+	it("include a free L4: Modal's Starter plan, $30 of credit a month", () => {
+		expect(modal.gpus).toContain("L4");
+		expect(modal.monthlyCreditUsd).toBe(30);
+	});
+
+	it("say which tiers need fp16 because their GPUs have no bf16", () => {
+		expect(colab.fp16Only).toBe(true);
+		expect(kaggle.fp16Only).toBe(true);
+		expect(modal.fp16Only).toBe(false);
+		expect(lightning.fp16Only).toBe(false);
 	});
 
 	it("name GPUs B's table knows", () => {
@@ -79,6 +93,13 @@ describe("checkPreset", () => {
 
 	it("accepts any GPU a platform offers", () => {
 		expect(checkPreset(kaggle, { gpu: "P100-16GB", memory: fitsMem, time: est(2 * H) }).kind).toBe("one_session");
+	});
+
+	it("checks one month's free credit against the slow end of the cost", () => {
+		const fits = checkPreset(modal, { gpu: "L4", memory: fitsMem, time: est(6 * H), cost: est(20, 1.15, "usd") });
+		expect(fits).toMatchObject({ kind: "one_session", overCredit: false });
+		const over = checkPreset(modal, { gpu: "L4", memory: fitsMem, time: est(6 * H), cost: est(28, 1.15, "usd") });
+		expect(over).toMatchObject({ kind: "one_session", overCredit: true });
 	});
 
 	it("abstains when a number it needs isn't trusted", () => {

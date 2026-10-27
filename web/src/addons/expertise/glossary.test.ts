@@ -78,7 +78,7 @@ describe("glossary", () => {
 		expect(t(entry!.titleKey)).toBe("Eval batch");
 		expect(t(entry!.bodyKey)).toMatch(/crash a run that trained fine/);
 		expect(entry!.actKey && t(entry!.actKey)).toMatch(/no_grad/);
-		expect(t(glossaryEntry("eval_batch_size", "expert")!.bodyKey)).toMatch(/first-eval OOM/);
+		expect(t(glossaryEntry("eval_batch_size", "expert")!.bodyKey)).toMatch(/grows with the eval set/);
 	});
 
 	it("returns nothing for a knob it does not know", () => {

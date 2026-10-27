@@ -16,6 +16,7 @@ from preflight.engine.gpus import GpuPrice, price, prices
 SOURCE_URL = "https://modal.com/docs/guide/region-selection"
 AS_OF = "2026-10"
 
+# [cited: Modal "Region selection" docs, read 2026-10-27]
 MULTIPLIER: dict[str, float] = {"broad": 1.15, "narrow": 1.75}
 
 MODAL_REGIONS: dict[str, str] = {

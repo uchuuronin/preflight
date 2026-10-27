@@ -11,15 +11,21 @@ never say it falsely, while still saying it for most runs that do fit.
 
 ## Facts used
 
-- Session caps: Colab "at most 12 hours, depending on availability" (Colab FAQ); Kaggle 12 hours
-  per GPU session (Kaggle docs, via GPU Per Hour, 21 Sep 2026); Lightning AI's free Studio
-  restarts every 4 hours (plan page captured 22 Oct 2026).
+- Session caps [cited]: Colab "at most 12 hours, depending on availability" (Colab FAQ); Kaggle
+  12 hours per GPU session (Kaggle docs, via GPU Per Hour, 21 Sep 2026); Modal's Starter plan, a
+  Function runs at most 24 hours, with $30 of free credit a month (Modal timeouts and pricing,
+  read 27 Oct 2026); Lightning AI's free Studio restarts every 4 hours (plan page, 22 Oct 2026).
 - The records' 90% time intervals put `hi` at 1.15x the point for training runs and 1.40x for the
   agent run.
 - Each session also spends time installing packages and downloading the model; not measured yet,
   taken as 5 to 30 minutes.
 
-## Monte Carlo
+## Monte Carlo (calibration: simulated)
+
+The simulated true times come from the same interval form the rule reads, so this shows which
+rule is consistent with the intervals, not how often it is right on real runs. These figures are
+not quoted in the README, the video or the UI.
+
 
 200,000 runs with predicted times from 2 to 20 hours on a 12-hour cap; true time drawn around
 the prediction as the intervals claim (and again 1.5x wider, in case they are too narrow).
@@ -34,9 +40,15 @@ the prediction as the intervals claim (and again 1.5x wider, in case they are to
 
 ## Decision
 
-`hi + 15 min <= cap`. Wrong about 1 time in 500, still under 1 in 100 if the intervals are too
-narrow, and it counts the setup that every session really spends. When it doesn't fit, the band
+`hi + 15 min <= cap`: in the simulation it is the cheapest rule that holds when the intervals are
+too narrow, and it counts the setup that every session really spends. When it doesn't fit, the band
 says how many sessions and to save a checkpoint at least every `cap - 15 min`.
+
+## Replacing the simulation
+
+Once A runs the zoo scripts to completion on a GPU, compare each one-session verdict with the
+measured wall-clock plus measured setup, and report the share right with a Wilson 95% interval.
+SETUP_S (15 minutes) is a guess until A's job events give fetch, install and model-load times.
 
 ## Caveats
 

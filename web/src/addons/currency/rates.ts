@@ -2,6 +2,7 @@
  * Exchange rates for D3. Preflight's prices are in US dollars (B's table); the ECB publishes
  * rates per euro, so a rate per dollar is (currency per euro) / (dollars per euro).
  * One dated snapshot, shown on screen with its date, never fetched live.
+ * [cited: ECB euro foreign exchange reference rates, 26 Oct 2026; rates.json carries the link]
  */
 import data from "./rates.json";
 

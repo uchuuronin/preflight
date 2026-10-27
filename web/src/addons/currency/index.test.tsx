@@ -1,14 +1,13 @@
 import { renderHook } from "@testing-library/react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { currencyCode, setCurrency } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useRegistry } from "../../registry";
 import { CurrencySetting } from "./CurrencySetting";
-import { FLAG, ready, start } from "./index";
+import { FLAG, start } from "./index";
 import { resetCurrencyForTests } from "./store";
 
 describe("currency add-on", () => {
-	beforeAll(() => ready);
 	beforeEach(() => {
 		localStorage.clear();
 		resetCurrencyForTests(["de-DE"]);

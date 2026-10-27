@@ -1,7 +1,7 @@
 {
 	"_meta": {
 		"addon": "expertise",
-		"version": "0.3.0",
+		"version": "0.4.0",
 		"tiers": [
 			"new",
 			"practitioner",
@@ -24,35 +24,35 @@
 		},
 		"verify": {
 			"label": "Verify",
-			"new": "Runs your chosen plan for real, briefly, to check our prediction was right.",
-			"practitioner": "A real run of the chosen config; the result is added to the record and tightens later predictions.",
-			"expert": "Re-probe plus a fixed-seed loss check and an unchanged effective batch size; results feed adaptive conformal recalibration."
+			"new": "Planned: runs your chosen plan for real, briefly, to check our prediction. Not live yet.",
+			"practitioner": "Planned: a short real run of the chosen settings, added to the record so later predictions tighten.",
+			"expert": "Planned: re-probe plus a fixed-seed loss check with an unchanged effective batch; results feed recalibration."
 		},
 		"interval": {
 			"label": "Range",
-			"new": "Our best guess plus a low and high value. The true number usually lands inside.",
-			"practitioner": "A 90% prediction interval: on held-out jobs, about 9 in 10 true values fall inside it.",
-			"expert": "Conformalised quantile regression on log-ratio scores; marginal 90% coverage, not conditional on your config."
+			"new": "Planned: a low and a high value checked against real runs. Until then, ranges around our best guess are rough.",
+			"practitioner": "Planned: 90% prediction intervals calibrated on held-out real runs. Today's ranges carry no coverage promise.",
+			"expert": "Planned: split conformal on log ratios, grouped by architecture, calibrated per GPU and lens. Not live; no coverage guarantee yet."
 		},
 		"abstain": {
 			"label": "Not enough data",
 			"new": "We would be guessing here, so we don't. Run a quick probe to get a real answer.",
 			"practitioner": "The setting is outside what we measured, or the range is too wide to trust. A probe fixes it.",
-			"expert": "Abstains outside the probed feature range, on kNN distance, interval width over ±50%, or analytical vs learned disagreement.",
-			"act": "Press \"Run a probe here\"."
+			"expert": "Abstains when the setting is outside what the probes and grids cover, or a knob moved that no grid holds; the estimate's reason says which.",
+			"act": "Run a probe at this setting."
 		},
 		"measured_predicted": {
 			"label": "Measured, predicted, extrapolated",
-			"new": "Solid means we saw it happen. Dashed means we worked it out. Grey means we're unsure.",
-			"practitioner": "Measured comes from a probe; predicted is inside the probed range; extrapolated is beyond it.",
-			"expert": "Status per estimate: measured, predicted (in range), extrapolated (beyond 2× the largest probed batch × sequence), abstain."
+			"new": "Measured means a probe saw this number. Predicted means we worked it out close to what we measured. Extrapolated means further away, so less sure.",
+			"practitioner": "Measured: a probe observed this target at these settings. Predicted: within the probed batch and sequence range. Extrapolated: outside it, or after any other knob moved.",
+			"expert": "measured (a probe observed this target here), predicted (within the probed batch × sequence range), extrapolated (beyond it, or another knob moved; see reason), abstain."
 		},
 		"oom": {
 			"label": "Out of memory (OOM)",
 			"new": "The job needs more GPU memory than the GPU has, so it crashes.",
 			"practitioner": "Peak allocation exceeds GPU capacity; often hits at the first eval or a long batch, not step 1.",
 			"expert": "P(OOM) from predicted peak against capacity minus a safety margin; reported in bins because allocation grows in steps.",
-			"act": "Lower the batch or sequence length, or turn on gradient checkpointing."
+			"act": "Lower the batch and raise gradient accumulation to match, shorten the sequence, or turn on gradient checkpointing."
 		},
 		"peak_memory": {
 			"label": "Peak memory",
@@ -112,8 +112,8 @@
 		"precision": {
 			"label": "Precision",
 			"new": "How many digits each number keeps. Fewer digits means faster and smaller, usually with no loss in quality.",
-			"practitioner": "bf16 mixed precision halves activation memory and uses tensor cores; fp32 is rarely needed.",
-			"expert": "bf16 avoids fp16 loss scaling; fp8 needs per-tensor scaling and hardware support (H100, MI300X)."
+			"practitioner": "bf16 mixed precision halves activation memory and uses tensor cores. T4 and P100 have no bf16: train in fp16 with loss scaling.",
+			"expert": "bf16 needs Ampere or newer (A100, L4, H100). On T4 and P100 use fp16 with dynamic loss scaling (GradScaler); P100 has no tensor cores."
 		},
 		"quantisation": {
 			"label": "Quantisation",
@@ -131,14 +131,15 @@
 			"label": "Batch size",
 			"new": "How many examples the GPU works on at once. Bigger is faster per example until memory runs out.",
 			"practitioner": "Per-device micro-batch; effective batch = micro-batch × accumulation steps × GPUs.",
-			"expert": "Throughput saturates once kernels fill the GPU; changing it changes the effective batch, so check the learning rate."
+			"expert": "Throughput saturates once kernels fill the GPU; changing it changes the effective batch, so check the learning rate.",
+			"act": "Lowering it to fit memory? Raise gradient accumulation by the same factor so training sees the same effective batch."
 		},
 		"eval_batch": {
 			"label": "Eval batch",
 			"new": "How many examples are checked at once during evaluation. Too big can crash a run that trained fine.",
-			"practitioner": "Eval often skips no_grad or keeps logits for metrics, so its peak can exceed training's.",
-			"expert": "Eval peak = weights + activations without recompute + accumulated logits; the usual first-eval OOM.",
-			"act": "Lower it, or wrap eval in no_grad."
+			"practitioner": "Eval often runs without no_grad, and Hugging Face's Trainer keeps every eval batch's logits on the GPU until the loop ends, so eval can peak above training.",
+			"expert": "Eval peak = weights + activations kept for backward + logits accumulated across the eval loop (no eval_accumulation_steps): it grows with the eval set.",
+			"act": "Lower it, wrap eval in no_grad, or set eval_accumulation_steps (or preprocess_logits_for_metrics) so logits leave the GPU."
 		},
 		"packing": {
 			"label": "Sequence packing",
@@ -167,8 +168,8 @@
 		"mfu": {
 			"label": "MFU",
 			"new": "How much of the GPU's top speed your job is actually using. Higher is better.",
-			"practitioner": "Model FLOPs utilisation: useful maths per second over the GPU's peak. 30 to 50% is typical for well-tuned training.",
-			"expert": "Achieved model FLOP/s over peak (PaLM); ≈ 6 × params × tokens/sec for dense transformers, ignoring attention."
+			"practitioner": "Model FLOPs utilisation: useful maths per second over the GPU's peak. Small fine-tunes often run far below large pretraining runs.",
+			"expert": "Achieved model FLOP/s over peak: about 6N FLOPs per token for full training of a dense model, 4N with LoRA (frozen weights skip their weight gradients)."
 		},
 		"dataloader_workers": {
 			"label": "Data-loader workers",
@@ -204,7 +205,7 @@
 			"label": "Concurrency",
 			"new": "How many requests or tasks run at the same time.",
 			"practitioner": "Parallel requests in flight; limited by KV memory on your GPU or by rate limits on an API.",
-			"expert": "Wall time ≈ max(token limit, request limit, latency × tasks / concurrency)."
+			"expert": "Wall time ≈ max(total tokens / tokens per minute, requests / requests per minute, summed task latency / concurrency)."
 		},
 		"group_size": {
 			"label": "Group size",
@@ -259,8 +260,8 @@
 		"divergence_risk": {
 			"label": "Divergence risk",
 			"new": "The chance the run's loss blows up and training stops making progress.",
-			"practitioner": "From early signals in the probes: gradient spikes, attention logits, update ratios.",
-			"expert": "Classifier on early-step features plus threshold rules; it can only say \"no early warning signs\", never \"stable\"."
+			"practitioner": "From early signals in the probes: gradient spikes and update ratios, read by rules. A learned model is planned.",
+			"expert": "Rules on early-step signals today; a classifier is planned. It can only say \"no early warning signs\", never \"stable\"."
 		},
 		"lr_range_test": {
 			"label": "Learning-rate margin",
@@ -308,18 +309,18 @@
 			"label": "Rate limit",
 			"new": "The provider's cap on how much you can send per minute. Past it, requests wait.",
 			"practitioner": "Requests and tokens per minute; above it, more concurrency adds no speed.",
-			"expert": "Wall time bound by RPM and TPM; retries on 429 add latency tails."
+			"expert": "Wall time ≥ max(total tokens / tokens per minute, requests / requests per minute); retries on 429 add to both and lengthen the tail."
 		},
 		"cost_frontier": {
 			"label": "Cost frontier",
-			"new": "The options where you can't get faster without paying more. Pick one on the line.",
-			"practitioner": "Pareto line of time against dollars across GPUs or models; points off it are dominated.",
-			"expert": "Non-dominated set over (time upper bound, cost upper bound), with a deadline rule."
+			"new": "Planned: the options where you can't go faster without paying more. Pick one on the line.",
+			"practitioner": "Planned: a Pareto line of time against dollars across GPUs or models; points off it are dominated.",
+			"expert": "Planned: the non-dominated set over (time upper bound, cost upper bound), with a deadline rule."
 		},
 		"fan_out": {
 			"label": "Fan-out",
 			"new": "How many neighbours of each node a graph model looks at. More means more memory.",
-			"practitioner": "Neighbours sampled per hop; memory grows with hops × fan-out.",
+			"practitioner": "Neighbours sampled per hop. The sampled subgraph, and memory with it, grows with the product of the fan-outs: 10, 10, 10 is 1,000 nodes per seed.",
 			"expert": "Sampled subgraph size grows as the product of per-hop fan-outs; CPU-side sampling can starve the GPU."
 		},
 		"in_batch_negatives": {
@@ -330,15 +331,15 @@
 		},
 		"repetition_exposure": {
 			"label": "Repetition exposure",
-			"new": "How many times the model sees each low-quality document when data is reused over several passes.",
-			"practitioner": "Same total tokens, different concentration: 4 passes over 5 GB repeats bad documents more than 1 pass over 20 GB.",
-			"expert": "Per-document exposure histogram by quality bin; the data-constrained scaling prior treats tokens as equal quality, so rankings across quality abstain."
+			"new": "Planned: how many times the model sees each low-quality document when data is reused over several passes.",
+			"practitioner": "Planned: same total tokens, different concentration. 4 passes over 5 GB repeat bad documents more than 1 pass over 20 GB.",
+			"expert": "Planned: per-document exposure by quality bin; Preflight will abstain on ranking splits that differ in quality."
 		},
 		"seeds_needed": {
 			"label": "Seeds needed",
-			"new": "How many repeat runs you need to be sure a difference is real and not luck.",
-			"practitioner": "From seed-to-seed loss noise in short probes, the runs per arm to detect a given gap.",
-			"expert": "Two-sample power analysis on matched-step loss variance at your chosen significance level."
+			"new": "Planned: how many repeat runs you need to be sure a difference is real and not luck.",
+			"practitioner": "Planned: from seed-to-seed loss noise in short probes, the runs per arm needed to detect a given gap.",
+			"expert": "Planned: two-sample power analysis on matched-step loss variance at your chosen significance level."
 		},
 		"gradient_accumulation": {
 			"label": "Gradient accumulation",
@@ -441,7 +442,7 @@
 			"label": "Epochs",
 			"new": "How many times the model reads the whole dataset.",
 			"practitioner": "Passes over the data; time and cost scale with it. Repeated data teaches less each pass.",
-			"expert": "Exposure per document = epochs; Preflight's repetition view weighs it by data quality rather than treating tokens as equal."
+			"expert": "Exposure per document = epochs. A planned repetition view will weigh it by data quality rather than treating tokens as equal."
 		},
 		"eval_every": {
 			"label": "Eval interval",
@@ -452,8 +453,8 @@
 		"fsdp_mode": {
 			"label": "FSDP mode",
 			"new": "How the model is split across several GPUs to fit it in memory.",
-			"practitioner": "full_shard splits weights, grads and optimiser state; shard_grad_op splits grads and optimiser only; hybrid shards within a node.",
-			"expert": "Per-GPU state ≈ 16·P / N for full_shard (mixed precision Adam); more sharding, more all-gather traffic per step."
+			"practitioner": "full_shard (ZeRO-3) splits weights, grads and optimiser state; shard_grad_op (ZeRO-2) splits grads and optimiser only; hybrid shards within a node.",
+			"expert": "Per-GPU model states with mixed-precision Adam ≈ 16·P / N for full_shard (ZeRO-3), 2P + 14·P / N for shard_grad_op (ZeRO-2); more sharding, more all-gather traffic."
 		},
 		"gnn_layers": {
 			"label": "GNN layers",
@@ -586,6 +587,12 @@
 			"new": "Lets the serving engine reuse the shared start of many requests, so it doesn't redo the same work.",
 			"practitioner": "vLLM automatic prefix caching: requests that share a prefix reuse its KV blocks, cutting prefill time.",
 			"expert": "Hit rate depends on how much prefix requests share; cached blocks stay in the KV pool and compete with live requests."
+		},
+		"zero_fsdp": {
+			"label": "ZeRO and FSDP",
+			"new": "Ways to split training memory across several GPUs, so each one holds only part of the model's state.",
+			"practitioner": "ZeRO stage 1 splits optimiser state, stage 2 also gradients, stage 3 also weights. FSDP full_shard matches stage 3, shard_grad_op stage 2.",
+			"expert": "Per-GPU bytes for mixed-precision Adam: 4P + 12P/N at stage 1, 2P + 14P/N at stage 2, 16P/N at stage 3 (Rajbhandari et al., ZeRO)."
 		}
 	}
 }

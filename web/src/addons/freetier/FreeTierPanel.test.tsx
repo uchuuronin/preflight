@@ -27,7 +27,7 @@ describe("FreeTierPanel", () => {
 
 	it("lists the three free tiers with their session caps", () => {
 		renderPanel("T4", 9, 6);
-		expect(screen.getAllByRole("listitem").map((li) => li.getAttribute("aria-label"))).toEqual(["Google Colab (free)", "Kaggle Notebooks", "Lightning AI (free plan)"]);
+		expect(screen.getAllByRole("listitem").map((li) => li.getAttribute("aria-label"))).toEqual(["Google Colab (free)", "Kaggle Notebooks", "Modal (Starter credit)", "Lightning AI (free plan)"]);
 		expect(row("Google Colab (free)").getByText("12 h sessions")).toBeTruthy();
 		expect(row("Lightning AI (free plan)").getByText("4 h sessions")).toBeTruthy();
 	});
@@ -62,7 +62,23 @@ describe("FreeTierPanel", () => {
 		renderPanel("T4", 9, 6);
 		const link = screen.getByRole("link", { name: "Colab FAQ" });
 		expect(link.getAttribute("href")).toBe("https://research.google.com/colaboratory/faq.html");
-		expect(screen.getAllByText(/read 27 Oct 2026/)).toHaveLength(3);
+		expect(screen.getAllByText(/read 27 Oct 2026/)).toHaveLength(5);
+	});
+
+	it("tells T4 and P100 tiers to train in fp16, firmly when the plan is set to bf16", () => {
+		renderPanel("T4", 9, 6);
+		expect(row("Kaggle Notebooks").getByText(/No bf16 on T4 or P100: train in fp16 with loss scaling/)).toBeTruthy();
+		cleanup();
+		const estimates = { "memory.peak": est(9e9, "bytes", 1.1), "time.total": est(6 * H, "s") };
+		render(<FreeTierPanel record={record} knobs={{ gpu_type: "T4", precision: "bf16" }} estimates={estimates} />);
+		expect(row("Google Colab (free)").getByText(/This plan uses bf16, which a T4 can't run/)).toBeTruthy();
+		expect(within(screen.getByRole("listitem", { name: "Modal (Starter credit)" })).queryByText(/fp16/)).toBeNull();
+	});
+
+	it("says when a run would use more than a month of Modal's free credit", () => {
+		const estimates = { "memory.peak": est(9e9, "bytes", 1.1), "time.total": est(6 * H, "s"), "cost.total": est(40, "usd") };
+		render(<FreeTierPanel record={record} knobs={{ gpu_type: "L4" }} estimates={estimates} />);
+		expect(row("Modal (Starter credit)").getByText(/more than one month's (US)?\$30 free credit/)).toBeTruthy();
 	});
 
 	it("says Colab's GPU is reported, not published", () => {

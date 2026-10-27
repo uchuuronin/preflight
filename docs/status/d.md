@@ -1,5 +1,28 @@
 # Status: D (usability add-ons)
 
+## Tue Oct 27, afternoon (after the Oct 27 review; merged `ws-c` at a2b21af)
+
+**Done** (branch `ws-d`, committed locally, not pushed)
+
+- Dial (D1), per the review: the detail level moved to the cockpit header; "New to this" now filters C's knob dock through the knob-view hook, ranking by the visitor's current goal (C's `ranked`), always showing the knobs of error and critical findings even off the grid (`eval_no_grad`), and keeping knobs the visitor touched. Checked in Chromium on the golden fine-tune: 9 knobs become 4 plus "Show 5 more settings", both failure knobs among them.
+- New dial test (`dial.zoo.test.ts`): ground truth from the zoo scripts' planted problems, matched to golden records by entrypoint, through C's `applyKnobViews`. Asserts every planted-failure knob shows for every goal (it fails if the failure rule is removed). Reports, Wilson 95%, on A's fixture predictions: finetune 6 of 9 (67% [35, 88], packing hidden); pretrain 3 of 9 (33% [12, 65], precision and checkpoint interval hidden). The earlier simulation is withdrawn.
+- Glossary fixes from the review: conformal intervals, verify, repetition exposure, seed power analysis and the cost frontier marked planned; measured, predicted and extrapolated per the contract; fp16 with loss scaling on T4 and P100; lower batch with more gradient accumulation; MFU 6N full, 4N with LoRA; fan-out product; the rate-limit formula; Hugging Face eval logit accumulation; ZeRO and FSDP added. 95 terms.
+- `whenReady` removed now that C fixed loading.
+- D4: Modal's Starter credit added as the free L4 ($30 a month, 24 h per run; Modal pricing and timeouts pages), a monthly-credit check, and fp16 notes on T4 and P100 tiers. The one-session simulation is relabelled calibration: simulated, with the real check named.
+- Every D constant tagged cited, derived, simulated or guess; guesses name what replaces them.
+
+**Open with Chiya**
+
+- Should "New to this" also show the knobs of warning findings (packing, fp32, sparse checkpoints)?
+- Push: three earlier commits plus today's review work.
+- `d.freetier` flag key.
+
+**Blocked**
+
+- D5 notebook intake: A hasn't documented what an upload hands the harness.
+- D2 share cards: C's share route (Thu).
+- Dial coverage on real grids: B's `api.py` and `make_golden.py` (B, Wed).
+
 ## Tue Oct 27, midday (rebased on `ws-c`)
 
 **Done** (branch `ws-d`, rebased on `ws-c`)
@@ -36,10 +59,10 @@
 | D3 | Local currency, regional prices | `setCurrency` (done, C), B's dated USD table (done, B) | C, B | Done; regional rows wait on B reading them and `Constraints.region` |
 | D4 | Free-tier presets | T4, P100 in B's table (done); `d.freetier` key; T4/P100 on grids or an intake hook | B, C, Chiya | Done; time check widens when those land |
 | D5 | Notebook intake | The exact input A's harness takes for an upload | A | Waiting on A's answer |
-| D6 | "Jobs like yours" prior | Corpus records readable; map skeleton | B, A | After G1 |
-| D7 | Localisation | `registerStrings` and per-language files (done, C); `language` on guide turns | C | After G1 |
+| D6 | "Jobs like yours" prior | | | Dropped (review, Oct 27) |
+| D7 | Localisation | | C | Deferred beyond the guide's language field (review, Oct 27) |
 | D8 | Hugging Face quick start | `template` job source in A's harness | A | After G1 |
-| D9 | Energy and carbon | GPU power sampled in probes | A | After A's G2 |
-| D10 | Command palette | Browser `set_knob` and `pin` (done, C); `api/addons/` mount (done, C) | C | After G1 |
+| D9 | Energy and carbon | | | Dropped (review, Oct 27) |
+| D10 | Command palette | | C | Deferred (review, Oct 27) |
 | D11 | Phone view | Read-only share route | C | Dark set done by C; phone view waits on the route |
-| D12 | Alerts outside the app | In-flight mode and the "left its band" event | A, C | After G2 |
+| D12 | Alerts outside the app | | | Dropped (review, Oct 27) |

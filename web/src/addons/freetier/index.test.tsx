@@ -1,12 +1,11 @@
 import { renderHook } from "@testing-library/react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { t } from "../../lib/i18n";
 import { useRegistry } from "../../registry";
 import { FreeTierPanel } from "./FreeTierPanel";
-import { FLAG, LENSES, ready } from "./index";
+import { FLAG, LENSES } from "./index";
 
 describe("free-tier add-on registration", () => {
-	beforeAll(() => ready);
 
 	it("adds a band under the cockpit's whole run, behind its flag", () => {
 		const { result } = renderHook(() => useRegistry());
