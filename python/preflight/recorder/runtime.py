@@ -1,0 +1,1076 @@
+"""The recorder: process-wide hooks that measure whatever training loop a script runs.
+
+Installed before the user's script starts. What it hooks, and what for:
+
+  optimizer step (torch's global pre/post hooks)  step count, grad norm, update-to-weight ratio,
+                                                  optimizer time, peak memory per step, loss scale
+  Tensor.backward                                 backward time, the loss, micro-steps per step, NaN/Inf
+  DataLoader iterator                             time waiting on data, tokens, samples, padding;
+                                                  caps eval loaders at a few batches
+  nn.Module.train / eval (outermost call)         eval phases: time, peak memory, grads kept or not
+  output head (found at the first step)           logits size and norm
+  F.scaled_dot_product_attention                  max attention logit on two calls per step
+  torch.save, safetensors save                    checkpoint time and size, kept out of step time
+  GradScaler.scale                                which scaler to read the loss scale from
+  HF generate, vLLM LLM.generate                  rollout and generation time, lengths, truncation
+  HF TrainingArguments, Trainer.log               log every step, no external reporters; TRL/GRPO
+                                                  metrics (truncation, zero-spread groups, KL, entropy)
+  a sampler thread                                host RSS (with workers) and GPU power
+
+Timings are taken with a device synchronise at phase boundaries, on steps
+without the profiler attached; checkpoint, eval and instrumentation time are
+subtracted from step time and reported on their own. Profiling (wait 1,
+warmup 1, active 3) runs on extra steps after the timed ones. When the target
+is reached the recorder stops at the next batch fetch, backward or step,
+so the last step's logging, save and eval still run and get measured.
+StopProbe is a BaseException, so a script's `except Exception` can't swallow it.
+"""
+
+import gc
+import importlib.abc
+import importlib.machinery
+import itertools
+import json
+import os
+import statistics
+import sys
+import threading
+import time
+import weakref
+from contextlib import suppress
+from pathlib import Path
+
+import torch
+import torch.nn as nn
+
+from .gpus import peak_flops
+
+PROFILE_STEPS = 5  # wait 1 + warmup 1 + active 3
+ATTN_CALLS_PER_STEP = 2
+ATTN_QUERY_SAMPLE = 128
+SAMPLE_EVERY_S = 0.25
+
+# TRL / HF log keys -> what they mean for Preflight's RL lens
+TRL_KEYS = {
+	"truncation": ("completions/clipped_ratio", "completion_clipped_ratio"),
+	"zero_spread": ("frac_reward_zero_std",),
+	"kl": ("kl", "objective/kl"),
+	"entropy": ("entropy", "objective/entropy"),
+	"clip": ("clip_ratio/region_mean", "clip_ratio", "policy/clipfrac"),
+	"reward": ("reward", "rewards/mean", "objective/scores"),
+	"len_mean": ("completions/mean_length", "completion_length"),
+	"len_max": ("completions/max_length",),
+}
+
+
+class StopProbe(BaseException):
+	pass
+
+
+def _bytes(t: torch.Tensor) -> int:
+	return t.numel() * t.element_size()
+
+
+def _unique_bytes(tensors) -> int:
+	seen, total = set(), 0
+	for t in tensors:
+		if t is None or not isinstance(t, torch.Tensor) or t.device.type == "meta":
+			continue
+		key = (t.device, t.data_ptr()) if t.data_ptr() else id(t)
+		if key in seen:
+			continue
+		seen.add(key)
+		total += _bytes(t)
+	return total
+
+
+def _batch_stats(batch) -> tuple[int | None, int | None, int | None]:
+	"""(tokens, real tokens, samples) of a batch, when it looks like token ids."""
+	ids = mask = None
+	if hasattr(batch, "keys") and hasattr(batch, "get"):
+		ids, mask = batch.get("input_ids"), batch.get("attention_mask")
+		if ids is None:
+			first = next((v for v in batch.values() if isinstance(v, torch.Tensor)), None)
+			return None, None, int(first.shape[0]) if first is not None and first.dim() else None
+	elif isinstance(batch, list | tuple) and batch and isinstance(batch[0], torch.Tensor):
+		ids = batch[0]
+	elif isinstance(batch, torch.Tensor):
+		ids = batch
+	if not isinstance(ids, torch.Tensor) or ids.dim() == 0:
+		return None, None, None
+	samples = int(ids.shape[0])
+	if ids.dtype not in (torch.int64, torch.int32) or ids.dim() != 2:
+		return None, None, samples
+	tokens = int(ids.numel())
+	real = int(mask.sum().item()) if isinstance(mask, torch.Tensor) else tokens
+	return tokens, real, samples
+
+
+def _quantile(xs, q):
+	xs = sorted(xs)
+	return xs[min(len(xs) - 1, round(q * (len(xs) - 1)))]
+
+
+class _PostImport(importlib.abc.MetaPathFinder):
+	"""Run a callback right after a module finishes importing (or now, if it already has)."""
+
+	def __init__(self):
+		self.callbacks: dict[str, list] = {}
+		self._busy = threading.local()
+
+	def on(self, name, fn):
+		if name in sys.modules:
+			with suppress(Exception):
+				fn(sys.modules[name])
+			return
+		self.callbacks.setdefault(name, []).append(fn)
+
+	def find_spec(self, fullname, path, target=None):
+		if fullname not in self.callbacks or getattr(self._busy, "name", None) == fullname:
+			return None
+		self._busy.name = fullname
+		try:
+			spec = importlib.machinery.PathFinder.find_spec(fullname, path)
+			if spec is None:
+				for finder in sys.meta_path:
+					if finder is self or not hasattr(finder, "find_spec"):
+						continue
+					spec = finder.find_spec(fullname, path, target)
+					if spec is not None:
+						break
+		finally:
+			self._busy.name = None
+		if spec is None or spec.loader is None or not hasattr(spec.loader, "exec_module"):
+			return spec
+		loader, cbs = spec.loader, self.callbacks.pop(fullname)
+
+		class Wrapped(importlib.abc.Loader):
+			def create_module(self, s):
+				return loader.create_module(s)
+
+			def exec_module(self, module):
+				loader.exec_module(module)
+				for fn in cbs:
+					with suppress(Exception):
+						fn(module)
+
+		spec.loader = Wrapped()
+		return spec
+
+
+class Recorder:
+	def __init__(
+		self,
+		*,
+		warmup: int = 2,
+		timed: int = 5,
+		profile: bool = False,
+		trace_path: str | None = None,
+		progress_path: str | None = None,
+		eval_batches: int = 2,
+		hf_overrides: bool = True,
+	):
+		if warmup + timed < 2:
+			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
+		self.warmup, self.timed, self.profile = warmup, timed, profile
+		self.target = warmup + timed
+		self.trace_path = trace_path
+		self.progress_path = progress_path
+		self.eval_cap = max(1, eval_batches)
+		self.hf_overrides = hf_overrides
+		self.cuda = torch.cuda.is_available()
+		self.steps: list[dict] = []
+		self.opt = None
+		self._reset_acc()
+		self._last_post = None
+		self._data_end = None
+		self._t_start = time.perf_counter()
+		self._first_fetch = None
+		self._prof = None
+		self._prof_steps = 0
+		self._stop_pending = False
+		self._roots: list[nn.Module] = []
+		self._head_out = {"bytes": None, "norm": None, "dtype": None}
+		self._weights = self._params_total = self._params_trainable = None
+		self._sample: list = []
+		self._sample_params: list = []
+		self._handles = []
+		self._head_handles = []
+		self._orig: dict = {}
+		self._importer = _PostImport()
+		self.num_workers = None
+		self.stage = "running script"
+		# eval
+		self.eval_active = False
+		self._eval_module = None
+		self._eval_t0 = 0.0
+		self._eval_batches_now = 0
+		self.evals: list[dict] = []
+		self._eval_peak_stash = 0
+		# io, generation, logs, scalers, sampler
+		self._io_depth = 0
+		self.gens: list[dict] = []
+		self.trainer_logs: list[dict] = []
+		self._scalers: weakref.WeakSet = weakref.WeakSet()
+		self._attn_calls = 0
+		self._rss_peak = 0
+		self._power: list[float] = []
+		self._sampler_stop = threading.Event()
+		self._depth = threading.local()
+		self._progress()
+
+	# ------------------------------------------------------------- plumbing
+
+	def _sync(self):
+		if self.cuda and torch.cuda.is_initialized():
+			torch.cuda.synchronize()
+
+	def _now(self):
+		return time.perf_counter()
+
+	def _progress(self, **extra):
+		if not self.progress_path:
+			return
+		data = {
+			"stage": self.stage,
+			"steps": len(self.steps),
+			"t": round(self._now() - self._t_start, 3),
+			"in_eval": self.eval_active,
+			**extra,
+		}
+		tmp = self.progress_path + ".tmp"
+		with open(tmp, "w") as f:
+			json.dump(data, f)
+		os.replace(tmp, self.progress_path)
+
+	def _reset_acc(self):
+		self.acc = {
+			"data": 0.0,
+			"forward": 0.0,
+			"backward": 0.0,
+			"overhead": 0.0,
+			"loss": 0.0,
+			"loss_n": 0,
+			"micro": 0,
+			"tokens": 0,
+			"real": 0,
+			"samples": 0,
+			"batches": 0,
+			"nonfinite": 0,
+			"io": 0.0,
+			"io_bytes": 0,
+			"eval": 0.0,
+			"generate": 0.0,
+			"attn_max": None,
+		}
+		self._attn_calls = 0
+
+	def _maybe_stop(self):
+		if self._stop_pending:
+			self._stop_pending = False
+			raise StopProbe
+
+	# ------------------------------------------------------------- install
+
+	def install(self):
+		from torch.optim.optimizer import register_optimizer_step_post_hook, register_optimizer_step_pre_hook
+		from torch.utils.data.dataloader import _BaseDataLoaderIter
+
+		self._handles.append(register_optimizer_step_pre_hook(self._pre))
+		self._handles.append(register_optimizer_step_post_hook(self._post))
+		rec = self
+		F = torch.nn.functional
+		self._orig = {
+			"backward": torch.Tensor.backward,
+			"next": _BaseDataLoaderIter.__next__,
+			"iter_cls": _BaseDataLoaderIter,
+			"train": nn.Module.train,
+			"save": torch.save,
+			"sdpa": F.scaled_dot_product_attention,
+			"scaler_scale": torch.amp.GradScaler.scale,
+		}
+		o = self._orig
+
+		def backward(t, *args, **kwargs):
+			rec._maybe_stop()
+			rec._sync()
+			t0 = rec._now()
+			if rec._data_end is not None:
+				rec.acc["forward"] += t0 - rec._data_end
+				rec._data_end = None
+			if t.numel() == 1:
+				v = float(t.detach().float().item())
+				for s_ in list(rec._scalers):
+					with suppress(Exception):
+						v /= float(s_.get_scale())  # scaler.scale(loss).backward(): report the real loss
+				if v != v or v in (float("inf"), float("-inf")):
+					rec.acc["nonfinite"] += 1
+				else:
+					rec.acc["loss"] += v
+					rec.acc["loss_n"] += 1
+			if not rec.steps and rec.stage in ("running script", "first batch"):
+				rec.stage = "first backward"
+				rec._progress()
+			out = o["backward"](t, *args, **kwargs)
+			rec._sync()
+			rec.acc["backward"] += rec._now() - t0
+			rec.acc["micro"] += 1
+			return out
+
+		def next_(it):
+			if rec.eval_active:
+				if rec._eval_batches_now >= rec.eval_cap:
+					raise StopIteration  # an eval loop gets a few batches, enough to measure it
+				batch = o["next"](it)
+				rec._eval_batches_now += 1
+				if rec.evals and rec.evals[-1].get("batch_size") is None:
+					rec.evals[-1]["batch_size"] = _batch_stats(batch)[2]
+				return batch
+			rec._maybe_stop()
+			rec._sync()
+			t0 = rec._now()
+			if rec._first_fetch is None:
+				rec._first_fetch = t0
+				rec.num_workers = getattr(it, "_num_workers", None)
+				if rec.stage == "running script":
+					rec.stage = "first batch"
+					rec._progress()
+			batch = o["next"](it)
+			t1 = rec._now()
+			rec.acc["data"] += t1 - t0
+			tokens, real, samples = _batch_stats(batch)
+			rec.acc["overhead"] += rec._now() - t1
+			rec.acc["batches"] += 1
+			if tokens is not None:
+				rec.acc["tokens"] += tokens
+				rec.acc["real"] += real
+			if samples is not None:
+				rec.acc["samples"] += samples
+			rec._data_end = rec._now()
+			return batch
+
+		def train(m, mode=True):
+			depth = getattr(rec._depth, "n", 0)
+			rec._depth.n = depth + 1
+			try:
+				if depth == 0:
+					rec._mode_switch(m, mode)
+				return o["train"](m, mode)
+			finally:
+				rec._depth.n = depth
+
+		def save(obj, f, *args, **kwargs):
+			return rec._timed_io(o["save"], f, obj, f, *args, **kwargs)
+
+		def sdpa(q, k, v, *args, **kwargs):
+			out = o["sdpa"](q, k, v, *args, **kwargs)
+			if torch.is_grad_enabled() and not rec.eval_active and rec._attn_calls < ATTN_CALLS_PER_STEP:
+				rec._attn_calls += 1
+				t0 = rec._now()
+				with suppress(Exception):
+					rec._attn_logit(q, k, kwargs.get("scale"))
+				rec.acc["overhead"] += rec._now() - t0
+			return out
+
+		def scaler_scale(s, outputs):
+			rec._scalers.add(s)
+			return o["scaler_scale"](s, outputs)
+
+		torch.Tensor.backward = backward
+		_BaseDataLoaderIter.__next__ = next_
+		nn.Module.train = train
+		torch.save = save
+		F.scaled_dot_product_attention = sdpa
+		torch.amp.GradScaler.scale = scaler_scale
+
+		sys.meta_path.insert(0, self._importer)
+		self._importer.on("safetensors.torch", self._hook_safetensors)
+		self._importer.on("transformers.generation.utils", self._hook_hf_generate)
+		self._importer.on("transformers.trainer", self._hook_trainer)
+		if self.hf_overrides:
+			self._importer.on("transformers.training_args", self._hook_training_args)
+		self._importer.on("vllm.entrypoints.llm", self._hook_vllm)
+		threading.Thread(target=self._sample_loop, daemon=True).start()
+		return self
+
+	def uninstall(self):
+		for h in self._handles + self._head_handles:
+			h.remove()
+		self._handles.clear()
+		self._head_handles.clear()
+		if self._orig:
+			o = self._orig
+			torch.Tensor.backward = o["backward"]
+			o["iter_cls"].__next__ = o["next"]
+			nn.Module.train = o["train"]
+			torch.save = o["save"]
+			torch.nn.functional.scaled_dot_product_attention = o["sdpa"]
+			torch.amp.GradScaler.scale = o["scaler_scale"]
+		for undo in self._orig.get("undo", []):
+			with suppress(Exception):
+				undo()
+		with suppress(ValueError):
+			sys.meta_path.remove(self._importer)
+		self._sampler_stop.set()
+
+	def _patch(self, owner, name, wrapper_factory):
+		orig = getattr(owner, name)
+		setattr(owner, name, wrapper_factory(orig))
+		self._orig.setdefault("undo", []).append(lambda: setattr(owner, name, orig))
+
+	# ------------------------------------------------------------- instruments
+
+	def _timed_io(self, fn, target, *args, **kwargs):
+		if self._io_depth:
+			return fn(*args, **kwargs)
+		self._io_depth += 1
+		try:
+			self._sync()
+			t0 = self._now()
+			out = fn(*args, **kwargs)
+			dt = self._now() - t0
+		finally:
+			self._io_depth -= 1
+		size = 0
+		if isinstance(target, str | os.PathLike):
+			with suppress(OSError):
+				size = os.path.getsize(target)
+		elif hasattr(target, "tell"):
+			with suppress(Exception):
+				size = target.tell()
+		self.acc["io"] += dt
+		self.acc["io_bytes"] += size
+		return out
+
+	def _hook_safetensors(self, mod):
+		rec = self
+		for name in ("save_file", "save_model"):
+			if hasattr(mod, name):
+
+				def factory(orig, name=name):
+					def wrapped(*args, **kwargs):
+						target = kwargs.get("filename") or (args[1] if len(args) > 1 else None)
+						return rec._timed_io(orig, target, *args, **kwargs)
+
+					return wrapped
+
+				self._patch(mod, name, factory)
+
+	def _mode_switch(self, m: nn.Module, mode: bool):
+		if self._roots:
+			if not any(m is r for r in self._roots):
+				return
+		elif not any(p.requires_grad for p in m.parameters()):
+			return  # a frozen reference or encoder switching modes is not an eval phase
+		if not mode and not self.eval_active and m.training:
+			self._sync()
+			self.eval_active = True
+			self._eval_module = m
+			self._eval_t0 = self._now()
+			self._eval_batches_now = 0
+			if self.cuda and torch.cuda.is_initialized():
+				self._eval_peak_stash = max(self._eval_peak_stash, torch.cuda.max_memory_allocated())
+				torch.cuda.reset_peak_memory_stats()
+			self.evals.append({"batch_size": None, "grad_enabled": None, "peak": None})
+			self._progress()
+		elif mode and self.eval_active and m is self._eval_module:
+			self._end_eval()
+
+	def _end_eval(self):
+		self._sync()
+		dt = self._now() - self._eval_t0
+		ev = self.evals[-1]
+		ev["seconds"] = dt
+		ev["batches"] = self._eval_batches_now
+		if self.cuda and torch.cuda.is_initialized():
+			ev["peak"] = torch.cuda.max_memory_allocated()
+			torch.cuda.reset_peak_memory_stats()
+		self.acc["eval"] += dt
+		self.eval_active = False
+		self._eval_module = None
+		self._data_end = None
+		self._progress()
+
+	def _attn_logit(self, q, k, scale):
+		if q.dim() < 3 or k.dim() < 3:
+			return
+		q0, k0 = q[0].detach(), k[0].detach()
+		if q0.dim() == 2:
+			q0, k0 = q0[None], k0[None]
+		if k0.shape[0] != q0.shape[0] and q0.shape[0] % k0.shape[0] == 0:
+			k0 = k0.repeat_interleave(q0.shape[0] // k0.shape[0], dim=0)
+		n = q0.shape[-2]
+		idx = torch.linspace(0, n - 1, min(n, ATTN_QUERY_SAMPLE), device=q0.device).long()
+		s = scale if scale is not None else q0.shape[-1] ** -0.5
+		with torch.no_grad():
+			m = float((q0[..., idx, :].float() @ k0.float().transpose(-1, -2)).abs().amax() * s)
+		self.acc["attn_max"] = m if self.acc["attn_max"] is None else max(self.acc["attn_max"], m)
+
+	def _hook_hf_generate(self, mod):
+		rec = self
+		gm = getattr(mod, "GenerationMixin", None)
+		if gm is None:
+			return
+
+		def factory(orig):
+			def generate(model, *args, **kwargs):
+				rec._maybe_stop()
+				rec._sync()
+				t0 = rec._now()
+				out = orig(model, *args, **kwargs)
+				rec._sync()
+				dt = rec._now() - t0
+				with suppress(Exception):
+					rec._record_hf_generation(model, args, kwargs, out, dt)
+				rec.acc["generate"] += dt
+				return out
+
+			return generate
+
+		self._patch(gm, "generate", factory)
+
+	def _record_hf_generation(self, model, args, kwargs, out, dt):
+		seqs = getattr(out, "sequences", out)
+		inputs = kwargs.get("input_ids", kwargs.get("inputs", args[0] if args else None))
+		cfg = getattr(model, "generation_config", None)
+		cap = kwargs.get("max_new_tokens") or (cfg.max_new_tokens if cfg is not None else None)
+		eos = kwargs.get("eos_token_id", getattr(cfg, "eos_token_id", None))
+		eos = set(eos if isinstance(eos, list | tuple) else [eos] if eos is not None else [])
+		pad = kwargs.get("pad_token_id", getattr(cfg, "pad_token_id", None))
+		in_len = (
+			inputs.shape[-1] if isinstance(inputs, torch.Tensor) and seqs.shape[-1] >= inputs.shape[-1] else 0
+		)
+		gen = seqs[:, in_len:].tolist()
+		lengths, truncated = [], []
+		for row in gen:
+			end = next((i + 1 for i, t in enumerate(row) if t in eos), None)
+			n = end if end is not None else sum(1 for t in row if t != pad or pad in eos)
+			lengths.append(n)
+			truncated.append(end is None and cap is not None and n >= cap)
+		self.gens.append(
+			{"seconds": dt, "lengths": lengths, "truncated": truncated, "cap": cap, "backend": "hf"}
+		)
+
+	def _hook_vllm(self, mod):
+		rec = self
+		llm = getattr(mod, "LLM", None)
+		if llm is None:
+			return
+
+		def factory(orig):
+			def generate(self_, *args, **kwargs):
+				rec._maybe_stop()
+				rec._sync()
+				t0 = rec._now()
+				outs = orig(self_, *args, **kwargs)
+				dt = rec._now() - t0
+				with suppress(Exception):
+					sp = kwargs.get("sampling_params", args[1] if len(args) > 1 else None)
+					sp = sp[0] if isinstance(sp, list) and sp else sp
+					cap = getattr(sp, "max_tokens", None)
+					lengths, trunc = [], []
+					for o in outs:
+						for c in o.outputs:
+							lengths.append(len(c.token_ids))
+							trunc.append(getattr(c, "finish_reason", None) == "length")
+					rec.gens.append(
+						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
+					)
+				rec.acc["generate"] += dt
+				return outs
+
+			return generate
+
+		self._patch(llm, "generate", factory)
+
+	def _hook_trainer(self, mod):
+		rec = self
+		tr = getattr(mod, "Trainer", None)
+		if tr is None:
+			return
+
+		def factory(orig):
+			def log(self_, logs, *args, **kwargs):
+				with suppress(Exception):
+					rec.trainer_logs.append(
+						{k: float(v) for k, v in dict(logs).items() if isinstance(v, int | float)}
+					)
+				return orig(self_, logs, *args, **kwargs)
+
+			return log
+
+		self._patch(tr, "log", factory)
+
+	def _hook_training_args(self, mod):
+		ta = getattr(mod, "TrainingArguments", None)
+		if ta is None:
+			return
+
+		def factory(orig):
+			def post_init(self_, *args, **kwargs):
+				# probes log every step and never phone home (wandb, comet, hub)
+				self_.logging_steps = 1
+				with suppress(Exception):
+					self_.logging_strategy = "steps"
+				self_.report_to = "none"
+				self_.push_to_hub = False
+				self_.disable_tqdm = True
+				return orig(self_, *args, **kwargs)
+
+			return post_init
+
+		self._patch(ta, "__post_init__", factory)
+
+	def _sample_loop(self):
+		try:
+			import psutil
+
+			proc = psutil.Process()
+		except Exception:
+			proc = None
+		nvml = None
+		if self.cuda:
+			try:
+				import pynvml
+
+				pynvml.nvmlInit()
+				idx = int((os.environ.get("CUDA_VISIBLE_DEVICES") or "0").split(",")[0] or 0)
+				nvml = (pynvml, pynvml.nvmlDeviceGetHandleByIndex(idx if idx >= 0 else 0))
+			except Exception:
+				nvml = None
+		while not self._sampler_stop.wait(SAMPLE_EVERY_S):
+			if proc is not None:
+				with suppress(Exception):
+					rss = proc.memory_info().rss + sum(
+						c.memory_info().rss for c in proc.children(recursive=True)
+					)
+					self._rss_peak = max(self._rss_peak, rss)
+			if nvml is not None:
+				with suppress(Exception):
+					self._power.append(nvml[0].nvmlDeviceGetPowerUsage(nvml[1]) / 1000.0)
+
+	# ------------------------------------------------------------- model discovery (once)
+
+	def _discover(self, opt):
+		t0 = self._now()
+		opt_params = {id(p) for g in opt.param_groups for p in g["params"]}
+		mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]
+		owners = [m for m in mods if any(id(p) in opt_params for p in m.parameters(recurse=True))]
+		children = set()
+		for m in owners:
+			for c in m.modules():
+				if c is not m:
+					children.add(id(c))
+		self._roots = [m for m in owners if id(m) not in children]
+		params = [p for r in self._roots for p in r.parameters()]
+		buffers = [b for r in self._roots for b in r.buffers()]
+		self._weights = _unique_bytes(params + buffers)
+		uniq = {id(p): p for p in params}
+		self._params_total = sum(p.numel() for p in uniq.values())
+		self._params_trainable = sum(p.numel() for p in uniq.values() if p.requires_grad)
+		head, width = None, 0
+		for r in self._roots:
+			for m in r.modules():
+				w = getattr(m, "weight", None)
+				if (
+					isinstance(m, nn.Linear)
+					and isinstance(w, torch.Tensor)
+					and w.dim() == 2
+					and w.shape[0] > width
+				):
+					head, width = m, w.shape[0]
+		if head is not None and width >= 256:
+
+			def hook(_m, _inp, out):
+				if not isinstance(out, torch.Tensor):
+					return
+				if self.eval_active:
+					if self.evals and self.evals[-1]["grad_enabled"] is None:
+						self.evals[-1]["grad_enabled"] = bool(torch.is_grad_enabled() and out.requires_grad)
+					return
+				t0 = self._now()
+				self._head_out["bytes"] = max(self._head_out["bytes"] or 0, _bytes(out))
+				self._head_out["dtype"] = out.dtype
+				with torch.no_grad():
+					self._head_out["norm"] = float(
+						torch.linalg.vector_norm(out.detach(), dim=-1).float().mean()
+					)
+				self.acc["overhead"] += self._now() - t0
+
+			self._head_handles.append(head.register_forward_hook(hook))
+		trainable = [p for p in uniq.values() if p.requires_grad and p.numel() <= 4_000_000]
+		self._sample_params = sorted(trainable, key=lambda p: -p.numel())[:4]
+		self.acc["overhead"] += self._now() - t0
+
+	# ------------------------------------------------------------- optimizer hooks
+
+	def _pre(self, opt, args, kwargs):
+		if self.opt is None:
+			self.opt = opt
+			self._discover(opt)
+		if opt is not self.opt:
+			return
+		self._maybe_stop()
+		self._sync()
+		self._t_pre = self._now()
+		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"], self.acc["generate"])
+		grads = [p.grad for g in opt.param_groups for p in g["params"] if p.grad is not None]
+		self._grad_bytes = _unique_bytes(grads)
+		self._grad_norm = None
+		if grads:
+			# per-tensor norms in each grad's own dtype, then one small fp32 reduction: no full-size copies
+			by_dev: dict = {}
+			for g in grads:
+				by_dev.setdefault((g.device, g.dtype), []).append(g.detach())
+			norms = [n.float() for group in by_dev.values() for n in torch._foreach_norm(group)]
+			self._grad_norm = float(
+				torch.linalg.vector_norm(torch.stack([n.to(norms[0].device) for n in norms]))
+			)
+		self._sample = [(p, p.detach().clone()) for p in self._sample_params]
+		self._sync()
+		self._overhead_pre = self._now() - self._t_pre
+
+	def _post(self, opt, args, kwargs):
+		if opt is not self.opt:
+			return
+		self._sync()
+		t_post = self._now()
+		t0 = t_post
+		utw = None
+		if self._sample:
+			ratios = []
+			for p, before in self._sample:
+				w = torch.linalg.vector_norm(before.float())
+				if w > 0:
+					ratios.append(float(torch.linalg.vector_norm((p.detach() - before).float()) / w))
+			utw = statistics.fmean(ratios) if ratios else None
+			self._sample = []
+		opt_state = _unique_bytes(
+			t for s in opt.state.values() for t in s.values() if isinstance(t, torch.Tensor)
+		)
+		peak = reserved = None
+		if self.cuda and torch.cuda.is_initialized():
+			peak = max(torch.cuda.max_memory_allocated(), self._eval_peak_stash)
+			reserved = torch.cuda.max_memory_reserved()
+			torch.cuda.reset_peak_memory_stats()
+			self._eval_peak_stash = 0
+		scale = None
+		for s in list(self._scalers):
+			with suppress(Exception):
+				scale = float(s.get_scale())
+		lr = opt.param_groups[0].get("lr")
+		overhead = self._overhead_pre + (self._now() - t0) + self.acc["overhead"]
+		f0, b0, d0, g0 = self._acc_at_pre
+		a = self.acc
+		inner = (a["forward"] - f0) + (a["backward"] - b0) + (a["data"] - d0) + (a["generate"] - g0)
+		opt_time = max(0.0, (t_post - self._t_pre) - self._overhead_pre - inner)
+		start = self._last_post if self._last_post is not None else (self._first_fetch or self._t_start)
+		wall = max(1e-9, t_post - start - overhead - a["io"] - a["eval"])
+		self.steps.append(
+			{
+				"wall": wall,
+				"data": a["data"],
+				"forward": max(0.0, a["forward"] - a["generate"]),
+				"rollout": a["generate"],
+				"backward": a["backward"],
+				"optimizer": opt_time,
+				"loss": a["loss"] if a["loss_n"] else None,
+				"micro": a["micro"],
+				"tokens": a["tokens"],
+				"real": a["real"],
+				"samples": a["samples"],
+				"nonfinite": a["nonfinite"],
+				"grad_norm": self._grad_norm,
+				"utw": utw,
+				"grad_bytes": self._grad_bytes,
+				"opt_bytes": opt_state,
+				"peak": peak,
+				"reserved": reserved,
+				"lr": float(lr) if isinstance(lr, int | float) or torch.is_tensor(lr) else None,
+				"logit_norm": self._head_out["norm"],
+				"attn_max": a["attn_max"],
+				"loss_scale": scale,
+				"io": a["io"],
+				"io_bytes": a["io_bytes"],
+				"profiled": self._prof is not None,
+			}
+		)
+		self._reset_acc()
+		n = len(self.steps)
+		self.stage = f"step {n}"
+		self._progress()
+		self._last_post = self._now()
+		if self._prof is not None:
+			self._prof.step()
+			self._prof_steps += 1
+			if self._prof_steps >= PROFILE_STEPS:
+				self._prof.stop()
+				self._stop_pending = True
+		elif n >= self.target:
+			if self.profile and self.trace_path:
+				self._start_profiler()
+			else:
+				self._stop_pending = True
+
+	def _start_profiler(self):
+		from torch.profiler import ProfilerActivity, profile, schedule
+
+		acts = [ProfilerActivity.CPU] + ([ProfilerActivity.CUDA] if self.cuda else [])
+		path = self.trace_path
+
+		def ready(p):
+			p.export_chrome_trace(path)
+
+		self._prof = profile(
+			activities=acts,
+			schedule=schedule(wait=1, warmup=1, active=3),
+			on_trace_ready=ready,
+			record_shapes=False,
+			with_stack=False,
+		)
+		self._prof.start()
+
+	# ------------------------------------------------------------- results
+
+	def summary(self) -> dict:
+		if self.eval_active:
+			self._end_eval()
+		timed = [s for s in self.steps if not s["profiled"]][self.warmup :]
+		steps = list(self.steps)
+		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
+		out["host_rss_peak_bytes"] = self._rss_peak or None
+		if self._power:
+			out["power"] = {
+				"mean_w": statistics.fmean(self._power),
+				"max_w": max(self._power),
+				"samples": len(self._power),
+			}
+		out.update(self._eval_summary())
+		out.update(self._gen_summary())
+		out.update(self._rl_summary())
+		saves = [s for s in steps if s["io"] > 0]
+		if saves:
+			out["checkpoint"] = {
+				"saves": len(saves),
+				"seconds_mean": statistics.fmean(s["io"] for s in saves),
+				"bytes_mean": int(statistics.fmean(s["io_bytes"] for s in saves)),
+			}
+		if not steps:
+			return out
+		if timed:
+			walls = sorted(s["wall"] for s in timed)
+			mean = statistics.fmean(walls)
+			keys = ["data", "forward", "backward", "optimizer"] + (
+				["rollout"] if any(s["rollout"] for s in timed) else []
+			)
+			phases = {k: statistics.fmean(s[k] for s in timed) for k in keys}
+			phases["other"] = max(0.0, mean - sum(phases.values()))
+			total = sum(phases.values()) or 1.0
+			out["step_time"] = {
+				"n_steps": len(timed),
+				"mean_s": mean,
+				"p50_s": statistics.median(walls),
+				"p95_s": _quantile(walls, 0.95),
+				"first_step_s": steps[0]["wall"],
+				"by_phase": {k: v / total for k, v in phases.items()},
+				"unprofiled": True,
+			}
+			tokens = statistics.fmean(s["tokens"] for s in timed)
+			samples = statistics.fmean(s["samples"] for s in timed)
+			out["throughput"] = {
+				"tokens_per_s": tokens / mean if tokens else None,
+				"samples_per_s": samples / mean if samples else None,
+			}
+			out["tokens_per_step"] = tokens
+			out["samples_per_step"] = samples
+			out["loader_wait_fraction"] = min(1.0, phases["data"] / mean)
+		real = sum(s["real"] for s in steps)
+		tok = sum(s["tokens"] for s in steps)
+		samples_total = sum(s["samples"] for s in steps)
+		out["padding_fraction"] = 1 - real / tok if tok else None
+		out["tokens_per_sample_mean"] = real / samples_total if tok and samples_total else None
+		gn = [s["grad_norm"] for s in steps]
+		ma, run = [], []
+		for v in gn:
+			if v is not None and v == v:
+				run.append(v)
+			ma.append(statistics.fmean(run) if run else None)
+		series = {
+			"loss": [s["loss"] for s in steps],
+			"grad_norm": [v if v is None or v == v else None for v in gn],
+			"grad_norm_ma": ma,
+			"update_to_weight": [s["utw"] for s in steps],
+			"output_logit_norm": [s["logit_norm"] for s in steps],
+			"lr": [s["lr"] for s in steps],
+		}
+		for key, src in (("max_attn_logit", "attn_max"), ("loss_scale", "loss_scale")):
+			if any(s[src] is not None for s in steps):
+				series[key] = [s[src] for s in steps]
+		out["series"] = series
+		out["nan_count"] = sum(s["nonfinite"] for s in steps) + sum(1 for v in gn if v is not None and v != v)
+		scales = [s["loss_scale"] for s in steps if s["loss_scale"] is not None]
+		out["loss_scale_events"] = sum(1 for a, b in itertools.pairwise(scales) if b < a)
+		peaks = [s["peak"] for s in steps if s["peak"] is not None]
+		out["memory"] = {
+			"weights": self._weights,
+			"gradients": max(s["grad_bytes"] for s in steps),
+			"optimizer": max(s["opt_bytes"] for s in steps),
+			"logits": self._head_out["bytes"],
+			"peak": max(peaks) if peaks else None,
+			"reserved": max((s["reserved"] for s in steps if s["reserved"] is not None), default=None),
+			"peak_step": (1 + max(range(len(steps)), key=lambda i: steps[i]["peak"] or 0)) if peaks else None,
+		}
+		out["params_total"] = self._params_total
+		out["params_trainable"] = self._params_trainable
+		out["micro_steps_per_step"] = round(statistics.fmean(s["micro"] for s in steps), 3)
+		out["head_dtype"] = (
+			str(self._head_out["dtype"]).replace("torch.", "") if self._head_out["dtype"] else None
+		)
+		out["tf32"] = bool(
+			torch.get_float32_matmul_precision() != "highest" or torch.backends.cuda.matmul.allow_tf32
+		)
+		return out
+
+	def _eval_summary(self) -> dict:
+		done = [e for e in self.evals if e.get("batches")]
+		if not done:
+			return {}
+		e = done[0]
+		peaks = [x["peak"] for x in done if x.get("peak") is not None]
+		return {
+			"eval": {
+				"batches": e["batches"],
+				"batch_size": e.get("batch_size"),
+				"seconds_per_batch": statistics.fmean(x["seconds"] / x["batches"] for x in done),
+				"peak_allocated_bytes": max(peaks) if peaks else None,
+				"grad_enabled": e.get("grad_enabled"),
+			}
+		}
+
+	def _gen_summary(self) -> dict:
+		if not self.gens:
+			return {}
+		lengths = [n for g in self.gens for n in g["lengths"]]
+		trunc = [t for g in self.gens for t in g["truncated"]]
+		caps = [g["cap"] for g in self.gens if g["cap"]]
+		return {
+			"generation": {
+				"calls": len(self.gens),
+				"seconds_total": sum(g["seconds"] for g in self.gens),
+				"sequences": len(lengths),
+				"new_tokens_mean": statistics.fmean(lengths) if lengths else None,
+				"new_tokens_p95": _quantile(lengths, 0.95) if lengths else None,
+				"new_tokens_max": max(lengths) if lengths else None,
+				"max_new_tokens": int(max(caps)) if caps else None,
+				"truncation_rate": sum(trunc) / len(trunc) if trunc else None,
+				"backend": self.gens[-1]["backend"],
+			}
+		}
+
+	def _rl_summary(self) -> dict:
+		logs = self.trainer_logs
+		gen = self._gen_summary().get("generation")
+
+		def col(kind):
+			for key in TRL_KEYS[kind]:
+				vals = [entry[key] for entry in logs if key in entry]
+				if vals:
+					return vals
+			return []
+
+		rl = {}
+		if col("truncation"):
+			rl["truncation_rate"] = statistics.fmean(col("truncation"))
+		elif gen and gen["truncation_rate"] is not None:
+			rl["truncation_rate"] = gen["truncation_rate"]
+		if col("zero_spread"):
+			rl["zero_spread_fraction"] = statistics.fmean(col("zero_spread"))
+		for name, kind in (
+			("kl", "kl"),
+			("entropy", "entropy"),
+			("clip_fraction", "clip"),
+			("reward_mean", "reward"),
+		):
+			if col(kind):
+				rl[name] = col(kind)
+		if gen and gen["sequences"]:
+			rl["response_length"] = {
+				"mean": gen["new_tokens_mean"],
+				"p95": gen["new_tokens_p95"],
+				"max": gen["new_tokens_max"],
+				"n": gen["sequences"],
+			}
+		elif col("len_mean"):
+			m = col("len_mean")
+			mx = col("len_max") or m
+			rl["response_length"] = {"mean": statistics.fmean(m), "p95": max(mx), "max": max(mx), "n": len(m)}
+		return {"rl": rl} if rl else {}
+
+
+def detect_env() -> dict:
+	import platform
+	from importlib import metadata
+
+	libs = {}
+	for name in (
+		"torch",
+		"transformers",
+		"peft",
+		"trl",
+		"accelerate",
+		"lightning",
+		"vllm",
+		"datasets",
+		"sentence-transformers",
+		"torch-geometric",
+		"timm",
+		"deepspeed",
+		"bitsandbytes",
+		"flash-attn",
+	):
+		with suppress(metadata.PackageNotFoundError):
+			libs[name] = metadata.version(name)
+	env = {"libraries": libs, "python": platform.python_version()}
+	if torch.cuda.is_available():
+		props = torch.cuda.get_device_properties(0)
+		hip = getattr(torch.version, "hip", None)
+		env.update(
+			backend="rocm" if hip else "cuda",
+			gpu={
+				"name": props.name,
+				"count": torch.cuda.device_count(),
+				"memory_bytes": props.total_memory,
+				"vendor": "amd" if hip else "nvidia",
+				"compute_capability": None if hip else f"{props.major}.{props.minor}",
+			},
+		)
+	elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+		env.update(backend="mps", gpu={"name": "Apple MPS", "count": 1, "vendor": "apple"})
+	else:
+		env.update(backend="cpu", gpu=None)
+	return env
+
+
+def mfu(summary: dict, env: dict) -> tuple[float | None, float | None]:
+	"""(flops per step, MFU). Transformer rule: forward 2N + activation-grad 2N + weight-grad 2N_trainable per token."""
+	tokens = summary.get("tokens_per_step")
+	n, nt = summary.get("params_total"), summary.get("params_trainable")
+	st = summary.get("step_time")
+	if not tokens or not n or not st:
+		return None, None
+	flops = tokens * (4 * n + 2 * (nt or 0))
+	dtype = summary.get("head_dtype") or "float32"
+	prec = {"bfloat16": "bf16", "float16": "fp16"}.get(dtype, "fp32")
+	if prec == "fp32" and summary.get("tf32"):
+		prec = "tf32"
+	gpu = (env.get("gpu") or {}).get("name")
+	peak = peak_flops(gpu, prec)
+	if not peak:
+		return flops, None
+	util = flops / st["mean_s"] / peak
+	# above 1 means the precision guess was wrong (mixed kernels); say nothing rather than something false
+	return flops, util if util <= 1.0 else None
+
+
+def write_json(path: str | Path, data: dict) -> None:
+	Path(path).write_text(json.dumps(data, default=str))
