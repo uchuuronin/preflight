@@ -419,7 +419,7 @@ def test_ppo_value_model_adds_weights_and_optimizer():
 def test_grad_accum_keeps_grads_alive_in_forward():
 	one = m.breakdown(LLAMA2_7B, m.TrainingSetup(), 1, 512)
 	acc = m.breakdown(LLAMA2_7B, m.TrainingSetup(grad_accum=8), 1, 512)
-	assert acc.allocator_peak > one.allocator_peak
+	assert acc.moments["train"] > one.moments["train"]  # the peak itself is the optimizer step at batch 1
 
 
 def test_moe_counts_all_experts_but_activates_k():
@@ -457,3 +457,80 @@ def test_capacity_defaults_to_usable_memory():
 	a = m.predict_peak(GPT2_SMALL, setup, 4, 1024, gpu="L4")
 	b = m.predict_peak(GPT2_SMALL, setup, 4, 1024, capacity_bytes=24 * 2**30)
 	assert a.p_oom >= b.p_oom
+
+
+# ---------------------------------------------------------------- Review, Oct 27: memory model refinements
+
+
+def test_optimizer_step_moment_can_be_the_peak():
+	bd = m.breakdown(LLAMA2_7B, m.TrainingSetup(), 1, 512)
+	assert bd.peak_moment == "optimizer_step"
+	st = m.static_terms(LLAMA2_7B, m.TrainingSetup())
+	scratch = st["optimizer"] / 2  # foreach AdamW: one temporary the size of exp_avg_sq
+	expected = st["weights"] + st["optimizer"] + st["gradients"] + scratch
+	assert bd.moments["optimizer_step"] == pytest.approx(expected)
+	fused = m.breakdown(LLAMA2_7B, m.TrainingSetup(optimizer_impl="fused"), 1, 512)
+	assert fused.moments["optimizer_step"] == pytest.approx(expected - scratch)
+	assert "optimizer_step" not in m.breakdown(LLAMA2_7B, m.TrainingSetup(method="frozen"), 1, 512).moments
+
+
+def test_lora_frozen_linears_save_fewer_activations():
+	full = m.activation_bytes_per_layer(LLAMA2_7B, m.TrainingSetup(), 4, 1024)
+	qv = m.activation_bytes_per_layer(
+		LLAMA2_7B, m.TrainingSetup(method="lora", lora_rank=16, lora_targets=("q", "v")), 4, 1024
+	)
+	every = m.activation_bytes_per_layer(
+		LLAMA2_7B, m.TrainingSetup(method="lora", lora_rank=16, lora_targets=("all-linear",)), 4, 1024
+	)
+	assert qv < every and every < full * 1.05  # all-linear saves what full does, plus rank-16 intermediates
+	h, ff, sb = LLAMA2_7B.d_model, LLAMA2_7B.ff, 4 * 1024
+	# q,v-only skips the MLP input and the down input
+	assert full - qv == pytest.approx(2 * (sb * h + sb * ff) - 2 * 2 * sb * 16, rel=1e-6)
+
+
+def test_flash_attention_output_is_counted_once():
+	flash = m.activation_bytes_per_layer(LLAMA2_7B, m.TrainingSetup(flash_attention=True), 1, 1024)
+	sbh = 1024 * LLAMA2_7B.d_model
+	ffr = LLAMA2_7B.ff / LLAMA2_7B.d_model
+	norms, qkv_in, qkv, out_in, mlp_in, mlp = (
+		2 * 2 * sbh,
+		2 * sbh,
+		2 * sbh * 3,
+		2 * sbh,
+		2 * sbh,
+		2 * sbh * 4 * ffr,
+	)
+	lse = 4 * LLAMA2_7B.n_heads * 1024
+	assert flash == pytest.approx(norms + qkv_in + qkv + out_in + lse + mlp_in + mlp)
+
+
+def test_autocast_keeps_half_precision_weight_copies():
+	amp = m.TrainingSetup(param_dtype="fp32", compute_dtype="bf16")
+	cache = m.autocast_cache_bytes(LLAMA2_7B, amp)
+	assert cache == pytest.approx(LLAMA2_7B.param_breakdown()["linear"] * 2)
+	assert m.autocast_cache_bytes(LLAMA2_7B, m.TrainingSetup()) == 0  # bf16 weights: nothing to cast
+	assert (
+		m.autocast_cache_bytes(
+			LLAMA2_7B, m.TrainingSetup(param_dtype="fp32", compute_dtype="bf16", method="lora")
+		)
+		== 0
+	)
+	bd = m.breakdown(GPT2_SMALL, amp, 8, 1024)
+	assert bd.stack["weights"] > m.static_terms(GPT2_SMALL, amp)["weights"]
+
+
+def test_fsdp_root_unit_stays_gathered():
+	par = m.Parallel(strategy="fsdp", world_size=8)
+	st = m.static_terms(LLAMA2_7B, m.TrainingSetup(parallel=par))
+	pb = LLAMA2_7B.param_breakdown()
+	layer = 2 * LLAMA2_7B.largest_layer_params() * 2
+	root = (pb["embedding"] + pb["head"] + LLAMA2_7B.d_model) * 2 * (1 - 1 / 8)
+	assert st["comm_buffers"] == pytest.approx(layer + root)
+
+
+def test_hf_eval_logit_accumulation_grows_the_eval_peak():
+	base = m.TrainingSetup(eval_batch=8, eval_no_grad=True)
+	acc = m.TrainingSetup(eval_batch=8, eval_no_grad=True, eval_logits_accumulated=500)
+	a = m.breakdown(LLAMA2_7B, base, 1, 512).moments["eval"]
+	b = m.breakdown(LLAMA2_7B, acc, 1, 512).moments["eval"]
+	assert b - a == pytest.approx(500 * 512 * LLAMA2_7B.vocab_size * 2)

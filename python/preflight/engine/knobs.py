@@ -499,6 +499,8 @@ def setup_from(script_map, values: dict) -> tuple[TransformerArch | GenericArch,
 		),
 		generation=generation,
 		reference_model=bool(rl and rl.reference_model),
+		optimizer_impl=_optimizer_impl(values.get("optimizer", training.optimizer if training else None)),
+		eval_logits_accumulated=_eval_logits(values),
 	)
 	shape = Shape(
 		batch=int(values.get("batch_size") or values.get("encode_batch_size") or 1),
@@ -509,6 +511,27 @@ def setup_from(script_map, values: dict) -> tuple[TransformerArch | GenericArch,
 		values=dict(values),
 	)
 	return arch, setup, shape
+
+
+def _optimizer_impl(name) -> str:
+	"""HF's adamw_torch_fused and torch's fused=True update in place; plain AdamW on CUDA uses foreach."""
+	n = str(name or "").lower()
+	if "fused" in n:
+		return "fused"
+	if "for_loop" in n or "forloop" in n:
+		return "for_loop"
+	return "foreach"
+
+
+def _eval_logits(values: dict) -> int:
+	"""Eval samples whose logits the HF Trainer keeps on the GPU: eval_accumulation_steps batches when set.
+
+	Unset with compute_metrics means the whole eval set; the script map can't say that yet (request to A),
+	so it counts nothing rather than guess."""
+	steps = values.get("eval_accumulation_steps")
+	if isinstance(steps, int | float) and not isinstance(steps, bool) and steps > 0:
+		return int(steps) * int(values.get("eval_batch_size") or 1)
+	return 0
 
 
 _FSDP_MODES = {

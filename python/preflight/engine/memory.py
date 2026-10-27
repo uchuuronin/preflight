@@ -328,6 +328,10 @@ class TrainingSetup:
 	reference_model: bool = False  # RL: a frozen reference policy
 	value_model: bool = False  # PPO: a value head model with its own optimizer
 	logits_fp32_upcast: bool = True  # HF losses upcast logits to fp32
+	optimizer_impl: Literal["foreach", "fused", "for_loop"] = "foreach"  # torch's default on CUDA is foreach
+	eval_logits_accumulated: int = (
+		0  # HF Trainer with compute_metrics: eval samples whose logits stay on the GPU
+	)
 
 
 def adapter_params(arch: Arch, setup: TrainingSetup) -> int:
@@ -420,6 +424,11 @@ def static_terms(arch: Arch, setup: TrainingSetup, after_optimizer_step: bool = 
 	if p_shard > 1:
 		# FSDP/ZeRO-3 gather one unit's full params, with one more in flight from prefetch
 		comm += 2 * arch.largest_layer_params() * dtype_bytes(setup.param_dtype) / mp
+		# the root unit (embedding, head, final norm when blocks are auto-wrapped) is gathered at the start of
+		# forward and not resharded until backward ends: its full size, less the shard already counted
+		pb = arch.param_breakdown()
+		root = pb["embedding"] + pb["head"] + pb["norm"] // max(2 * getattr(arch, "n_layers", 1) + 1, 1)
+		comm += root * dtype_bytes(setup.param_dtype) * (1 - 1 / p_shard) / mp
 
 	frozen = 0.0
 	if setup.reference_model and not lora_like:
@@ -458,10 +467,21 @@ def activation_bytes_per_layer(arch: Arch, setup: TrainingSetup, batch: int, seq
 	mask = 1.0 if setup.dropout else 0.0
 
 	norms = 2 * e * sbh  # not split by tensor parallel
-	# qkv input stays whole under TP (Korthikanti); q, k, v and the out-proj input split
-	attn_linear = e * sbh + (e * sbh * (1 + 2 * kv_frac + 1) + mask * sbh) / t
+	lora = setup.method in ("lora", "qlora")
+	targets = set(setup.lora_targets)
+	if "all-linear" in targets or "all_linear" in targets:
+		targets = set(arch.linear_shapes())
+
+	def saved(*names: str) -> float:
+		"""A frozen linear doesn't save its input (no weight gradient); a LoRA target does, for its A matrix."""
+		return 1.0 if not lora or targets & set(names) else 0.0
+
+	# qkv input stays whole under TP (Korthikanti); q, k and v are saved by attention itself; the out-proj
+	# input is the attention output, which flash attention saves anyway (count it once)
+	o_saved = 1.0 if setup.flash_attention else saved("o")
+	attn_linear = saved("q", "k", "v") * e * sbh + (e * sbh * (1 + 2 * kv_frac + o_saved) + mask * sbh) / t
 	if setup.flash_attention:
-		core = (e * sbh + 4.0 * b * a * s) / t  # attention output and fp32 logsumexp
+		core = 4.0 * b * a * s / t  # fp32 logsumexp; the output is the out-proj input above
 	elif setup.grad_checkpointing == "selective":
 		core = 0.0  # selective recompute drops the s^2 terms
 	else:
@@ -469,9 +489,14 @@ def activation_bytes_per_layer(arch: Arch, setup: TrainingSetup, batch: int, seq
 		if setup.dropout:
 			core += (1 + e) * a * s * s * b / t  # dropout mask and dropout output
 	ffr = arch.ff / h * max(1, arch.experts_per_token)
-	mlp_in = e * sbh
-	mlp = (e * sbh * (4 * ffr if arch.gated_mlp else 2 * ffr) + mask * sbh) / t
-	return norms + attn_linear + core + mlp_in + mlp
+	mlp_in = saved("gate", "up") * e * sbh
+	# gated: gate out, up out and act(gate) let the gradient flow; the down input is only for down's weight
+	flow = 3 * ffr if arch.gated_mlp else ffr
+	mlp = (e * sbh * (flow + saved("down") * ffr) + mask * sbh) / t
+	# each adapter also saves its rank-r intermediate x @ A for B's gradient
+	n_adapters = sum(1 for name in arch.linear_shapes() if name in targets) if lora else 0
+	adapters = e * s * b * setup.lora_rank * n_adapters / t
+	return norms + attn_linear + core + mlp_in + mlp + adapters
 
 
 def activation_bytes(arch: Arch, setup: TrainingSetup, batch: int, seq: int) -> float:
@@ -531,8 +556,40 @@ class MemoryBreakdown:
 	peak_moment: str = "train"
 
 
+# derived: torch.optim's _multi_tensor_adam takes one _foreach_sqrt of exp_avg_sq, a temporary the size of
+# that state; the fused kernel works in place; the for-loop version holds one parameter's worth at a time
+OPT_STEP_TEMP = {"foreach": 1.0, "fused": 0.0, "for_loop": 0.0}
+
+
+def _optimizer_step_moment(arch, setup, st) -> tuple[float, dict[str, float]]:
+	"""During optimizer.step(): activations are gone, gradients are still there, and the update needs scratch."""
+	key, _ = optimizer_key(setup.optimizer)
+	n_states, _ = OPTIMIZERS[key]
+	per_state = st["optimizer"] / n_states if n_states else 0.0
+	temp = OPT_STEP_TEMP.get(setup.optimizer_impl, 1.0) * per_state
+	if setup.optimizer_impl == "for_loop" and n_states:
+		temp = per_state * arch.largest_layer_params() / max(arch.param_count(), 1)
+	resident = (
+		st["weights"] + st["master_weights"] + st["optimizer"] + st["frozen_models"] + st["comm_buffers"]
+	)
+	stack = {"activations": 0.0, "logits": 0.0, "gradients": st["gradients"], "optimizer_temp": temp}
+	return resident + st["gradients"] + temp, stack
+
+
+def autocast_cache_bytes(arch: Arch, setup: TrainingSetup) -> float:
+	"""Under AMP with fp32 weights, autocast caches a half-precision copy of every trainable weight a matmul
+	uses (torch caches casts of leaf tensors that require grad), and backward keeps those copies alive."""
+	e = _act_bytes(setup)
+	if dtype_bytes(setup.param_dtype) < 4 or e >= 4 or setup.method in ("lora", "qlora", "frozen"):
+		return 0.0
+	pb = arch.param_breakdown()
+	mp = max(setup.parallel.tensor, 1) * max(setup.parallel.pipeline, 1)
+	return pb["linear"] * e / mp
+
+
 def _train_moment(arch, setup, batch, seq, st) -> tuple[float, dict[str, float]]:
 	act = activation_bytes(arch, setup, batch, seq)
+	cache = autocast_cache_bytes(arch, setup)
 	logits = logits_bytes(arch, setup, batch, seq)
 	lgrad = logits_grad_bytes(arch, setup, batch, seq)
 	n_layers = max(getattr(arch, "n_layers", 1), 1)
@@ -541,12 +598,22 @@ def _train_moment(arch, setup, batch, seq, st) -> tuple[float, dict[str, float]]
 	)
 	# micro-batches after the first keep the accumulated grads alive through the forward pass
 	grads_in_fwd = st["gradients"] if setup.grad_accum > 1 else 0.0
-	at_loss = act + logits + lgrad + grads_in_fwd
-	at_backward_end = st["gradients"] + act / n_layers
+	at_loss = act + logits + lgrad + grads_in_fwd + cache
+	at_backward_end = st["gradients"] + (act + cache) / n_layers
 	if at_loss >= at_backward_end:
-		stack = {"activations": act, "logits": logits + lgrad, "gradients": grads_in_fwd}
+		stack = {
+			"activations": act,
+			"logits": logits + lgrad,
+			"gradients": grads_in_fwd,
+			"weights_cache": cache,
+		}
 	else:
-		stack = {"activations": act / n_layers, "logits": 0.0, "gradients": st["gradients"]}
+		stack = {
+			"activations": act / n_layers,
+			"logits": 0.0,
+			"gradients": st["gradients"],
+			"weights_cache": cache / n_layers,
+		}
 	return resident + max(at_loss, at_backward_end), stack
 
 
@@ -558,10 +625,13 @@ def _eval_moment(arch, setup, seq, st) -> tuple[float, dict[str, float]]:
 		else activation_bytes(arch, setup, b, seq)
 	)
 	logits = logits_bytes(arch, setup, b, seq)
+	# guess: the Trainer keeps preds in the model's output dtype; replaced by A's eval-memory-per-batch record
+	accumulated = setup.eval_logits_accumulated * seq * getattr(arch, "vocab_size", 0) * _act_bytes(setup)
 	resident = (
 		st["weights"] + st["master_weights"] + st["optimizer"] + st["frozen_models"] + st["comm_buffers"]
 	)
-	return resident + act + logits, {"activations": act, "logits": logits, "gradients": 0.0}
+	stack = {"activations": act, "logits": logits + accumulated, "gradients": 0.0}
+	return resident + act + logits + accumulated, stack
 
 
 def _generation_moment(arch, setup, st, capacity_bytes) -> tuple[float, dict[str, float]]:
@@ -598,6 +668,8 @@ def breakdown(
 	"""Per-GPU memory at each moment of a step (train, eval, generate) and at the worst one."""
 	st = static_terms(arch, setup, after_optimizer_step)
 	moments: dict[str, tuple[float, dict[str, float]]] = {"train": _train_moment(arch, setup, batch, seq, st)}
+	if setup.method != "frozen" and st["gradients"] > 0:
+		moments["optimizer_step"] = _optimizer_step_moment(arch, setup, st)
 	if setup.eval_batch:
 		moments["eval"] = _eval_moment(arch, setup, seq, st)
 	if setup.generation is not None:
@@ -605,6 +677,9 @@ def breakdown(
 	peak_name = max(moments, key=lambda k: moments[k][0])
 	peak, dyn = moments[peak_name]
 	resident = {k: st[k] for k in ("weights", "master_weights", "optimizer", "frozen_models", "comm_buffers")}
+	dyn = dict(dyn)
+	resident["weights"] += dyn.pop("weights_cache", 0.0)  # autocast's cast copies are weights on the ring
+	resident["optimizer"] += dyn.pop("optimizer_temp", 0.0)  # the update's scratch belongs with the optimizer
 	stack = {**resident, **dyn, "context": float(context_bytes)}
 	terms = {
 		**st,
