@@ -1,0 +1,41 @@
+# Bug zoo on real GPUs: nightly and on manual trigger, not every merge (each run costs
+# Modal GPU and Actions minutes). Revisit when the repo goes public.
+name: zoo
+
+on:
+  schedule:
+    - cron: "30 8 * * *"
+  workflow_dispatch:
+    inputs:
+      scripts:
+        description: Comma-separated zoo script ids, or "all"
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  zoo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: has
+        run: test -f python/preflight/runner/zoo.py && echo "zoo=true" >> "$GITHUB_OUTPUT" || echo "zoo=false" >> "$GITHUB_OUTPUT"
+      - if: steps.has.outputs.zoo == 'true'
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.11.x"
+          python-version: "3.11"
+      - if: steps.has.outputs.zoo == 'true'
+        run: uv sync --locked --extra modal
+      - if: steps.has.outputs.zoo == 'true'
+        name: Probe every zoo script and check planted problems are caught
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          # passed through the environment, never spliced into the script
+          SCRIPTS: ${{ github.event.inputs.scripts || 'all' }}
+        run: |
+          case "$SCRIPTS" in *[!A-Za-z0-9_,-]*) echo "bad script list"; exit 1;; esac
+          uv run python -m preflight.runner.zoo --scripts "$SCRIPTS" --check

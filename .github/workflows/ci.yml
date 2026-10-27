@@ -1,0 +1,91 @@
+# Runs on every push to an agent branch and every PR into main.
+# Owned by A until handover; C owns it after the Tue Oct 27 handover.
+# Third-party actions are pinned to commit SHAs (tag in the comment).
+name: ci
+
+on:
+  push:
+    branches: [main, ws-a, ws-b, ws-c, ws-d]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.11.x"
+          python-version: "3.11"
+          enable-cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: uv sync --locked
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Generated schema and TS types are current
+        run: uv run python -m preflight.schema.generate --check
+      - name: Tests (no torch)
+        run: uv run pytest -m "not torch and not gpu and not network" -q
+      - name: TS encoding parity
+        run: node --test schema/ts/*.test.ts
+
+  torch:
+    # Probes and the recorder on CPU torch: no GPU in CI, but the code paths are the same.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.11.x"
+          python-version: "3.11"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv pip install "torch>=2.4" psutil transformers --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
+      - run: uv run pytest -m "torch and not gpu and not network" -q
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: has
+        run: test -f web/package.json && echo "web=true" >> "$GITHUB_OUTPUT" || echo "web=false" >> "$GITHUB_OUTPUT"
+      - if: steps.has.outputs.web == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - if: steps.has.outputs.web == 'true'
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck --if-present
+          npm test --if-present
+          npm run build
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

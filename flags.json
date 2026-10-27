@@ -1,0 +1,8 @@
+{
+	"$comment": "Every feature ships behind a flag, off by default; it turns on when its validation row or check passes. Override per environment with flags.<env>.json.",
+	"probes.finetune": false,
+	"probes.pretrain": false,
+	"probes.agent": false,
+	"harness.spark_script_map": false,
+	"runner.queue": false
+}

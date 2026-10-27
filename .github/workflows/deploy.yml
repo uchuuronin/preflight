@@ -1,0 +1,80 @@
+# Nightly build on the public URL, plus on every merge to main.
+# Web -> Cloudflare Pages; API -> Modal. Each half skips itself until its code exists.
+# Secrets (per GitHub environment): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, MODAL_TOKEN_ID, MODAL_TOKEN_SECRET.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *" # 03:00 ET, after Chiya's nightly merge
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        type: choice
+        options: [preview, production]
+        default: preview
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+env:
+  TARGET: ${{ github.event.inputs.environment || 'production' }}
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: has
+        run: test -f web/package.json && echo "web=true" >> "$GITHUB_OUTPUT" || echo "web=false" >> "$GITHUB_OUTPUT"
+      - if: steps.has.outputs.web == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - if: steps.has.outputs.web == 'true'
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - if: steps.has.outputs.web == 'true'
+        id: branch
+        run: |
+          if [ "$TARGET" = "production" ]; then echo "name=main" >> "$GITHUB_OUTPUT"; else echo "name=preview" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.has.outputs.web == 'true'
+        name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@9681c2997648301493e78cacbfb790a9f19c833f # v3.9.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/dist --project-name=preflight --branch=${{ steps.branch.outputs.name }}
+
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: has
+        run: test -f api/app.py && echo "api=true" >> "$GITHUB_OUTPUT" || echo "api=false" >> "$GITHUB_OUTPUT"
+      - if: steps.has.outputs.api == 'true'
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.11.x"
+          python-version: "3.11"
+      - if: steps.has.outputs.api == 'true'
+        run: uv sync --locked --extra modal
+      - if: steps.has.outputs.api == 'true'
+        name: Deploy API and execution plane to Modal (environment = target)
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          uv run modal deploy --env "$TARGET" api/app.py
+          if [ -f python/preflight/runner/modal_app.py ]; then uv run modal deploy --env "$TARGET" python/preflight/runner/modal_app.py; fi

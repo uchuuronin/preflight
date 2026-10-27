@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+node_modules/
+web/dist/
+.env
+.env.*
+*.pem
+*.key
+.modal.toml
+# probe outputs and traces never go in git; they live in the object store
+runs/
+traces/
+*.pt.trace.json
+*.safetensors
+*.bin

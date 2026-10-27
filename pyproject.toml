@@ -1,0 +1,66 @@
+[project]
+name = "preflight"
+version = "0.1.0"
+description = "A flight simulator for ML jobs: measure a few minutes of a real job, then fly the whole run before spending GPU hours."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = { text = "Apache-2.0" }
+dependencies = [
+	"pydantic>=2.8,<3",
+	"numpy>=1.26",
+	"httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# Probes run on GPUs (Modal, AMD Developer Cloud, a local box). CI installs the CPU wheel.
+probe = [
+	"torch>=2.4",
+	"psutil>=5.9",
+]
+modal = [
+	"modal>=0.66",
+]
+
+[project.scripts]
+preflight = "preflight.cli.main:main"
+
+[dependency-groups]
+dev = [
+	"pytest>=8",
+	"pytest-timeout>=2.3",
+	"ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/preflight"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["python", "tests"]
+
+[tool.ruff.format]
+indent-style = "tab"
+quote-style = "double"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# W191: tabs are the house style. E501: the formatter owns line length.
+ignore = ["W191", "E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["python"]
+timeout = 120
+markers = [
+	"torch: needs PyTorch (CPU is enough)",
+	"gpu: needs a real GPU; skipped in CI",
+	"network: calls a remote service; skipped in CI",
+]
