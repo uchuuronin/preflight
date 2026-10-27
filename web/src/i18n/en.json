@@ -399,7 +399,7 @@
 	"term.logits": "Logits",
 	"term.generation": "Generation (KV cache)",
 	"term.eval": "Eval spike",
-	"term.other": "Not broken down",
+	"term.untrusted": "Not broken down",
 	"term.total": "Peak memory",
 	"target.memory.weights": "Weights",
 	"target.memory.master_weights": "Master weights",
@@ -580,5 +580,17 @@
 	"guide.live.status.results": "Working",
 	"guide.live.status.decision": "Your move",
 	"guide.live.status.approval": "Needs your go-ahead",
-	"guide.live.status.visitor": "Listening"
+	"guide.live.status.visitor": "Listening",
+	"dial.risk.fits": "Fits",
+	"dial.off_scale": "Past the end of this dial's scale",
+	"dial.off_scale_short": "past the scale",
+	"dial.scale.limit": "Scale runs to your limit, {hi}",
+	"dial.scale.log": "Scale runs from {lo} to {hi}; each step along the arc multiplies, so small and large runs both read",
+	"membar.untrusted.gap": "Not broken down",
+	"membar.untrusted.gap.help": "The peak is {gap} more than the predicted parts add up to. That share isn't attributed, so treat it as unknown.",
+	"membar.untrusted.overshoot": "Parts exceed the peak",
+	"membar.untrusted.overshoot.help": "The predicted parts add up to {over} more than the predicted peak. They're shown at their own sizes, not squeezed to fit, so trust the peak line over the parts.",
+	"membar.untrusted.abstain": "Not trusted here: {terms}",
+	"membar.peak": "Peak {total}",
+	"membar.off_scale": "Peak runs past this bar's scale"
 }

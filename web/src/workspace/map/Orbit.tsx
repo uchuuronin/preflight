@@ -53,6 +53,18 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 		acc += deg;
 		return [{ ...s, dash: `${len.toFixed(1)} ${cMem.toFixed(1)}`, rot }];
 	});
+	// Parts that add up past the peak: hatched past the peak's angle, never squeezed to fit.
+	const untrustedArc = (() => {
+		const u = memory.untrusted;
+		if (u?.kind !== "overshoot" || !memory.total) return null;
+		const start = -90 + Math.min(1, memory.total / scale) * 360;
+		const sweep = Math.min((u.bytes / scale) * 360, 270 - start);
+		if (sweep <= 0) return null;
+		const len = (sweep / 360) * cMem;
+		const dashes: string[] = [];
+		for (let d = 0; d + 2 <= len; d += 5) dashes.push(d + 5 <= len ? "2 3" : `2 ${(len - d - 2).toFixed(1)}`);
+		return { rot: start, dash: `${dashes.join(" ")} 0 ${cMem.toFixed(1)}` };
+	})();
 	const over = memory.total && memory.capacity && memory.total > memory.capacity ? Math.min(1, (memory.total - memory.capacity) / memory.capacity) : 0;
 	const cOver = 2 * Math.PI * R_OVER;
 	// One lap of dots takes less time when the job moves more tokens per second.
@@ -94,6 +106,16 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 						style={{ transform: `rotate(${s.rot.toFixed(2)}deg)` }}
 					/>
 				))}
+				{untrustedArc ? (
+					<circle
+						className="pf-mring-untrusted"
+						cx={FRAME.cx}
+						cy={FRAME.cy}
+						r={R_MEM}
+						strokeDasharray={untrustedArc.dash}
+						style={{ transform: `rotate(${untrustedArc.rot.toFixed(2)}deg)` }}
+					/>
+				) : null}
 				{over > 0 ? (
 					<circle
 						className="pf-mem-over"

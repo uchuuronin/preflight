@@ -1,5 +1,6 @@
 import { decodeF16, decodeMask } from "../../../../schema/ts/encoding";
 import { currentKnobs, failureTarget, knobChoices, objectiveTarget } from "../record/model";
+import { observedAt } from "../record/observed";
 import { FAILS_AT, FITS_BELOW } from "../record/terms";
 import type {
 	Estimate,
@@ -51,6 +52,27 @@ function decode(grid: Grid): Decoded {
 	};
 	cache.set(grid, d);
 	return d;
+}
+
+/**
+ * Smallest positive lo and largest hi over every trusted cell of every grid for a target: the
+ * full range this record can show, used for the dials' fixed scale (record/scale.ts).
+ */
+export function gridRange(record: LoadedRecord, targetId: string): { lo: number; hi: number } | null {
+	let lo = Number.POSITIVE_INFINITY;
+	let hi = 0;
+	for (const g of record.predictions.grids) {
+		if (g.target_id !== targetId) continue;
+		const d = decode(g);
+		for (let i = 0; i < d.hi.length; i++) {
+			if (d.abstain[i]) continue;
+			const h = d.hi[i] as number;
+			const l = d.lo[i] as number;
+			if (Number.isFinite(h) && h > hi) hi = h;
+			if (Number.isFinite(l) && l > 0 && l < lo) lo = l;
+		}
+	}
+	return hi > 0 ? { lo: Number.isFinite(lo) ? lo : hi, hi } : null;
 }
 
 function same(a: KnobValue | undefined, b: KnobValue | undefined): boolean {
@@ -179,14 +201,6 @@ export function interpolate(
 	};
 }
 
-function matchesProbe(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
-	return record.probes.some(
-		(p) =>
-			(p.status === "ok" || p.status === "cached") &&
-			record.knobs.every((k) => same(knobs[k.id], p.knobs[k.id] ?? k.current)),
-	);
-}
-
 function atCurrent(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
 	return record.knobs.every((k) => same(knobs[k.id], k.current));
 }
@@ -200,22 +214,25 @@ export class GridProvider implements PredictionProvider {
 
 	predict(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): Prediction {
 		const full = { ...currentKnobs(record), ...knobs };
-		const measured = matchesProbe(record, full);
 		const here = atCurrent(record, full);
 		const out: Prediction = {};
 		for (const target of record.predictions.targets) {
+			// "Measured" only when a probe at exactly these settings observed this target itself;
+			// totals and risks are always computed (record/observed.ts).
+			const seen = observedAt(record, full, target.id);
 			// At the record's own settings, B's estimates are authoritative (they may come from
-			// an exact model that sees more than any grid does, like the eval pass).
+			// an exact model that sees more than any grid does, like the eval pass), except that
+			// a "measured" label needs an observing probe here too.
 			const atHere = record.predictions.estimates?.[target.id];
 			if (here && atHere) {
-				out[target.id] = atHere;
+				out[target.id] = atHere.status === "measured" && !seen ? { ...atHere, status: "predicted" } : atHere;
 				continue;
 			}
 			const grids = record.predictions.grids.filter((g) => g.target_id === target.id);
 			const grid = grids.find((g) => applies(g, record, full));
 			if (grid) {
 				const est = interpolate(grid, target, record, full);
-				out[target.id] = measured && est.status === "predicted" ? { ...est, status: "measured" } : est;
+				out[target.id] = seen && est.status === "predicted" ? { ...est, status: "measured" } : est;
 				continue;
 			}
 			out[target.id] = abstained(target, grids[0]?.model_id ?? atHere?.model_id ?? "none", "off_grid");

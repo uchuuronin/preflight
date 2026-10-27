@@ -13,7 +13,7 @@
  */
 import { nearestProbe } from "../provider/metrics";
 import { capacityBytes, targetFor } from "../record/model";
-import { type MemorySegment, memorySegments } from "../record/terms";
+import { type MemorySegment, type MemoryStack, memorySegments } from "../record/terms";
 import type { GraphNode, KnobValue, LoadedRecord, Prediction } from "../record/types";
 import { trusted } from "../status";
 
@@ -59,7 +59,7 @@ export interface OrbitLayout {
 	shareSource: { kind: "prediction" | "probe" | "none"; probeId?: string; probeKnobs?: Record<string, KnobValue | undefined> };
 	nodes: OrbitNode[];
 	tethers: Array<{ from: { x: number; y: number }; to: { x: number; y: number }; nodeId: string }>;
-	memory: { segments: MemorySegment[]; total: number | null; capacity: number | null; breakdown: boolean };
+	memory: Pick<MemoryStack, "segments" | "breakdown" | "untrusted" | "abstaining" | "partsBytes"> & { total: number | null; capacity: number | null };
 	tokensPerSecond: number | null;
 }
 
@@ -298,7 +298,7 @@ export function layoutOrbit(record: LoadedRecord, knobs: Readonly<Record<string,
 	// Memory ring.
 	const memT = targetFor(record, "memory");
 	const peak = memT ? est[memT.id] : undefined;
-	const { segments, breakdown } = memorySegments(est, trusted(peak) ? peak.point : null);
+	const stack = memorySegments(est, trusted(peak) ? peak.point : null);
 	const tps = est["throughput.tokens_per_s"];
 	return {
 		arcs,
@@ -306,11 +306,14 @@ export function layoutOrbit(record: LoadedRecord, knobs: Readonly<Record<string,
 		nodes,
 		tethers,
 		memory: {
-			segments,
+			segments: stack.segments,
+			untrusted: stack.untrusted,
+			abstaining: stack.abstaining,
+			partsBytes: stack.partsBytes,
 			total: trusted(peak) ? peak.point : null,
 			// A fraction (an agent's context fill) has its own full circle: 100%.
 			capacity: memT?.unit === "fraction" ? 1 : capacityBytes(record, knobs),
-			breakdown,
+			breakdown: stack.breakdown,
 		},
 		tokensPerSecond: trusted(tps) ? tps.point : null,
 	};
