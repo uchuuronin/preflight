@@ -1,0 +1,363 @@
+{
+	"$defs": {
+		"Citation": {
+			"additionalProperties": false,
+			"properties": {
+				"title": {
+					"title": "Title",
+					"type": "string"
+				},
+				"url": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Url"
+				}
+			},
+			"required": [
+				"title"
+			],
+			"title": "Citation",
+			"type": "object"
+		},
+		"Evidence": {
+			"additionalProperties": false,
+			"properties": {
+				"metric": {
+					"title": "Metric",
+					"type": "string"
+				},
+				"value": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Value"
+				},
+				"threshold": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Threshold"
+				},
+				"probe_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Probe Id"
+				},
+				"step": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Step"
+				}
+			},
+			"required": [
+				"metric"
+			],
+			"title": "Evidence",
+			"type": "object"
+		},
+		"Finding": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"severity": {
+					"enum": [
+						"info",
+						"warn",
+						"error",
+						"critical"
+					],
+					"title": "Severity",
+					"type": "string"
+				},
+				"code": {
+					"description": "Stable rule id, e.g. eval.no_grad, data.num_workers_zero",
+					"title": "Code",
+					"type": "string"
+				},
+				"title": {
+					"title": "Title",
+					"type": "string"
+				},
+				"detail": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Detail"
+				},
+				"node_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Job-map node it attaches to",
+					"title": "Node Id"
+				},
+				"evidence": {
+					"items": {
+						"$ref": "#/$defs/Evidence"
+					},
+					"title": "Evidence",
+					"type": "array"
+				},
+				"source": {
+					"enum": [
+						"rule",
+						"spark_open_triage",
+						"spark_diagnosis",
+						"model"
+					],
+					"title": "Source",
+					"type": "string"
+				},
+				"fix_template": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Fix Template"
+				},
+				"knob_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Knob Id"
+				},
+				"citations": {
+					"items": {
+						"$ref": "#/$defs/Citation"
+					},
+					"title": "Citations",
+					"type": "array"
+				}
+			},
+			"required": [
+				"id",
+				"severity",
+				"code",
+				"title",
+				"source"
+			],
+			"title": "Finding",
+			"type": "object"
+		}
+	},
+	"additionalProperties": false,
+	"properties": {
+		"job_id": {
+			"title": "Job Id",
+			"type": "string"
+		},
+		"record_id": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"title": "Record Id"
+		},
+		"seq": {
+			"minimum": 0,
+			"title": "Seq",
+			"type": "integer"
+		},
+		"at": {
+			"format": "date-time",
+			"title": "At",
+			"type": "string"
+		},
+		"stage": {
+			"enum": [
+				"queued",
+				"admitted",
+				"fetching",
+				"mapping",
+				"skeleton",
+				"harnessing",
+				"probing",
+				"triage",
+				"predicting",
+				"done",
+				"failed",
+				"cancelled"
+			],
+			"title": "Stage",
+			"type": "string"
+		},
+		"progress": {
+			"anyOf": [
+				{
+					"maximum": 1,
+					"minimum": 0,
+					"type": "number"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Within the current stage",
+			"title": "Progress"
+		},
+		"queue_position": {
+			"anyOf": [
+				{
+					"minimum": 0,
+					"type": "integer"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"title": "Queue Position"
+		},
+		"message": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "i18n key or plain log line",
+			"title": "Message"
+		},
+		"level": {
+			"default": "info",
+			"enum": [
+				"debug",
+				"info",
+				"warn",
+				"error"
+			],
+			"title": "Level",
+			"type": "string"
+		},
+		"probe_id": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"title": "Probe Id"
+		},
+		"finding": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/Finding"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null
+		},
+		"record_rev": {
+			"anyOf": [
+				{
+					"type": "integer"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Bumped when the stored record changed; refetch it",
+			"title": "Record Rev"
+		},
+		"retryable": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "On failed: whether resubmitting may succeed",
+			"title": "Retryable"
+		}
+	},
+	"required": [
+		"job_id",
+		"seq",
+		"at",
+		"stage"
+	],
+	"title": "JobEvent",
+	"type": "object",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://preflight.dev/schema/0.1.0/JobEvent"
+}

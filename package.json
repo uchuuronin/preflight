@@ -1,0 +1,9 @@
+{
+	"name": "preflight-root",
+	"private": true,
+	"type": "module",
+	"description": "Root tooling only (schema codegen). The web app lives in web/ and owns its own package.json.",
+	"devDependencies": {
+		"json-schema-to-typescript": "15.0.4"
+	}
+}

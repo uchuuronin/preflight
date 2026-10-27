@@ -1,0 +1,859 @@
+{
+	"schema_version": "0.1.0",
+	"record_id": "01JBGOLDENPT0000000000000B",
+	"share_token": "golden-pretrain-share-tok",
+	"created_at": "2026-10-27T14:00:00Z",
+	"job": {
+		"lens": "pretrain",
+		"source": {
+			"kind": "sample",
+			"uri": "sample://zoo/nanogpt-pretrain",
+			"content_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+			"entrypoint": "zoo/pretrain_nanogpt/train.py",
+			"args": []
+		},
+		"framework": "plain_pytorch",
+		"title": "GPT-2 124M pretrain on OpenWebText",
+		"objective": {
+			"kind": "min_cost",
+			"weights": {},
+			"description": "Small LM baseline for a class project, cheapest finish"
+		},
+		"constraints": {
+			"budget_usd": 60.0,
+			"gpu_types": [],
+			"max_gpus": 1,
+			"wall_time_cap_s": 172800.0,
+			"preemption": {
+				"kind": "policy",
+				"policy": "Unity preempt partition: jobs may be requeued after 2 h",
+				"grace_s": 120.0
+			}
+		}
+	},
+	"env": {
+		"backend": "cuda",
+		"provider": "modal",
+		"gpu": {
+			"name": "A100-SXM4-40GB",
+			"count": 1,
+			"memory_bytes": 42298834944,
+			"vendor": "nvidia",
+			"compute_capability": "8.0"
+		},
+		"nodes": 1,
+		"libraries": {
+			"torch": "2.5.1"
+		},
+		"python": "3.11.10",
+		"seed": 1337
+	},
+	"graph": {
+		"nodes": [
+			{
+				"id": "data",
+				"label": "OpenWebText shards · num_workers=0",
+				"kind": "data",
+				"repeat": 1,
+				"metrics": [
+					"probe.data.loader_wait_fraction"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "model",
+				"label": "GPT-2 124M",
+				"kind": "group",
+				"repeat": 1,
+				"params": 124439808,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "wte",
+				"label": "Token + position embedding",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "block",
+				"label": "Transformer block",
+				"kind": "group",
+				"parent": "model",
+				"repeat": 12,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "attn",
+				"label": "Causal self-attention",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.max_attn_logit"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "mlp",
+				"label": "MLP",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "lm_head",
+				"label": "LM head",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "loss",
+				"label": "Cross-entropy",
+				"kind": "loss",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.loss"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "optimizer",
+				"label": "AdamW",
+				"kind": "optimizer",
+				"repeat": 1,
+				"params": 124439808,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "ckpt",
+				"label": "Checkpoint every 20k steps",
+				"kind": "io",
+				"repeat": 1,
+				"metrics": [
+					"risk.preemption_loss"
+				],
+				"attrs": {}
+			}
+		],
+		"edges": [
+			{
+				"source": "data",
+				"target": "wte",
+				"kind": "tokens",
+				"metric": "probe.throughput.tokens_per_s"
+			},
+			{
+				"source": "wte",
+				"target": "attn",
+				"kind": "data"
+			},
+			{
+				"source": "attn",
+				"target": "mlp",
+				"kind": "data"
+			},
+			{
+				"source": "mlp",
+				"target": "lm_head",
+				"kind": "data"
+			},
+			{
+				"source": "lm_head",
+				"target": "loss",
+				"kind": "data"
+			},
+			{
+				"source": "loss",
+				"target": "optimizer",
+				"kind": "grad"
+			},
+			{
+				"source": "optimizer",
+				"target": "wte",
+				"kind": "weights"
+			},
+			{
+				"source": "optimizer",
+				"target": "ckpt",
+				"kind": "control"
+			}
+		],
+		"skeleton": false
+	},
+	"knobs": [
+		{
+			"id": "batch_size",
+			"label_key": "knob.batch_size",
+			"unit": "samples",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 128.0,
+				"values": [],
+				"log": true
+			},
+			"current": 12,
+			"probed_range": {
+				"min": 8.0,
+				"max": 12.0
+			},
+			"gridded": true,
+			"needs_code": false,
+			"group": "memory"
+		},
+		{
+			"id": "seq_len",
+			"label_key": "knob.seq_len",
+			"unit": "tokens",
+			"kind": "int",
+			"domain": {
+				"min": 128.0,
+				"max": 4096.0,
+				"values": [],
+				"log": true
+			},
+			"current": 1024,
+			"probed_range": {
+				"min": 1024.0,
+				"max": 1024.0
+			},
+			"gridded": true,
+			"needs_code": false,
+			"group": "memory"
+		},
+		{
+			"id": "num_workers",
+			"label_key": "knob.num_workers",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 16.0,
+				"values": [],
+				"log": false
+			},
+			"current": 0,
+			"gridded": false,
+			"needs_code": false,
+			"group": "data"
+		},
+		{
+			"id": "precision",
+			"label_key": "knob.precision",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"bf16",
+					"fp32"
+				],
+				"log": false
+			},
+			"current": "fp32",
+			"gridded": false,
+			"needs_code": false,
+			"group": "speed"
+		},
+		{
+			"id": "lr",
+			"label_key": "knob.lr",
+			"kind": "float",
+			"domain": {
+				"min": 1e-05,
+				"max": 0.01,
+				"values": [],
+				"log": true
+			},
+			"current": 0.0006,
+			"gridded": false,
+			"needs_code": false,
+			"group": "model"
+		},
+		{
+			"id": "checkpoint_every",
+			"label_key": "knob.checkpoint_every",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 50.0,
+				"max": 100000.0,
+				"values": [],
+				"log": true
+			},
+			"current": 20000,
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster"
+		},
+		{
+			"id": "max_steps",
+			"label_key": "knob.max_steps",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 100.0,
+				"max": 1000000.0,
+				"values": [],
+				"log": true
+			},
+			"current": 60000,
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster"
+		}
+	],
+	"probes": [
+		{
+			"id": "p1",
+			"knobs": {
+				"batch_size": 8,
+				"seq_len": 1024,
+				"num_workers": 0,
+				"precision": "fp32"
+			},
+			"status": "ok",
+			"steps": 8,
+			"started_at": "2026-10-27T14:01:00Z",
+			"duration_s": 64.0,
+			"memory": {
+				"peak_allocated_bytes": 9352291287,
+				"peak_reserved_bytes": 9749575761,
+				"device_total_bytes": 42298834944,
+				"by_term": {
+					"weights": 497759232,
+					"gradients": 497759232,
+					"optimizer": 995518464,
+					"activations": 5669356830,
+					"logits": 1648361472,
+					"context": 644245094
+				},
+				"peak_step": 2
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.179,
+				"p50_s": 0.179,
+				"p95_s": 0.187,
+				"first_step_s": 21.179,
+				"by_phase": {
+					"data": 0.37,
+					"forward": 0.2,
+					"backward": 0.36,
+					"optimizer": 0.05,
+					"idle": 0.02
+				},
+				"unprofiled": true
+			},
+			"throughput": {
+				"tokens_per_s": 45665.6,
+				"samples_per_s": 44.6,
+				"flops_per_step": 6094848000000.0,
+				"mfu": 0.07
+			},
+			"stability": {
+				"series": {
+					"loss": [
+						10.98,
+						10.21,
+						9.62,
+						9.11,
+						8.7,
+						8.33,
+						8.02,
+						7.79
+					],
+					"grad_norm": [
+						1.9,
+						1.4,
+						1.2,
+						1.1,
+						1.05,
+						0.98,
+						0.95,
+						0.93
+					],
+					"grad_norm_ma": [
+						1.9,
+						1.65,
+						1.5,
+						1.4,
+						1.33,
+						1.272,
+						1.226,
+						1.189
+					],
+					"update_to_weight": [
+						0.0021,
+						0.0018,
+						0.0016,
+						0.0015,
+						0.0015,
+						0.0014,
+						0.0014,
+						0.0013
+					],
+					"max_attn_logit": [
+						11.2,
+						12.0,
+						12.6,
+						13.1,
+						13.5,
+						13.8,
+						14.0,
+						14.3
+					],
+					"output_logit_norm": [
+						41.0,
+						39.2,
+						38.7,
+						38.1,
+						37.9,
+						37.6,
+						37.4,
+						37.2
+					],
+					"lr": [
+						6e-06,
+						1.2e-05,
+						1.8e-05,
+						2.4e-05,
+						3e-05,
+						3.6e-05,
+						4.2e-05,
+						4.8e-05
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"tokens_per_sample_mean": 1024.0,
+				"loader_wait_fraction": 0.37,
+				"num_workers": 0
+			},
+			"power": {
+				"mean_w": 248.0,
+				"max_w": 301.0,
+				"samples": 64
+			},
+			"extras": {
+				"lr_range_divergence_lr": 0.0048,
+				"resume_exact_match": 1.0
+			},
+			"cost": {
+				"gpu_seconds": 64.0,
+				"usd": 0.0373
+			},
+			"trace": "blob://traces/01JBGOLDENPT/p1.json.gz"
+		},
+		{
+			"id": "p2",
+			"knobs": {
+				"batch_size": 12,
+				"seq_len": 1024,
+				"num_workers": 0,
+				"precision": "fp32"
+			},
+			"status": "ok",
+			"steps": 8,
+			"started_at": "2026-10-27T14:03:00Z",
+			"duration_s": 69.0,
+			"memory": {
+				"peak_allocated_bytes": 12960063815,
+				"peak_reserved_bytes": 13443247636,
+				"device_total_bytes": 42298834944,
+				"by_term": {
+					"weights": 497759232,
+					"gradients": 497759232,
+					"optimizer": 995518464,
+					"activations": 8504035246,
+					"logits": 2472542208,
+					"context": 644245094
+				},
+				"peak_step": 2
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.269,
+				"p50_s": 0.269,
+				"p95_s": 0.28,
+				"first_step_s": 21.269,
+				"by_phase": {
+					"data": 0.37,
+					"forward": 0.2,
+					"backward": 0.36,
+					"optimizer": 0.05,
+					"idle": 0.02
+				},
+				"unprofiled": true
+			},
+			"throughput": {
+				"tokens_per_s": 45665.6,
+				"samples_per_s": 44.6,
+				"flops_per_step": 9142272000000.0,
+				"mfu": 0.07
+			},
+			"stability": {
+				"series": {
+					"loss": [
+						10.98,
+						10.21,
+						9.62,
+						9.11,
+						8.7,
+						8.33,
+						8.02,
+						7.79
+					],
+					"grad_norm": [
+						1.9,
+						1.4,
+						1.2,
+						1.1,
+						1.05,
+						0.98,
+						0.95,
+						0.93
+					],
+					"grad_norm_ma": [
+						1.9,
+						1.65,
+						1.5,
+						1.4,
+						1.33,
+						1.272,
+						1.226,
+						1.189
+					],
+					"update_to_weight": [
+						0.0021,
+						0.0018,
+						0.0016,
+						0.0015,
+						0.0015,
+						0.0014,
+						0.0014,
+						0.0013
+					],
+					"max_attn_logit": [
+						11.2,
+						12.0,
+						12.6,
+						13.1,
+						13.5,
+						13.8,
+						14.0,
+						14.3
+					],
+					"output_logit_norm": [
+						41.0,
+						39.2,
+						38.7,
+						38.1,
+						37.9,
+						37.6,
+						37.4,
+						37.2
+					],
+					"lr": [
+						6e-06,
+						1.2e-05,
+						1.8e-05,
+						2.4e-05,
+						3e-05,
+						3.6e-05,
+						4.2e-05,
+						4.8e-05
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"tokens_per_sample_mean": 1024.0,
+				"loader_wait_fraction": 0.37,
+				"num_workers": 0
+			},
+			"power": {
+				"mean_w": 248.0,
+				"max_w": 301.0,
+				"samples": 64
+			},
+			"extras": {
+				"lr_range_divergence_lr": 0.0048,
+				"resume_exact_match": 1.0
+			},
+			"cost": {
+				"gpu_seconds": 69.0,
+				"usd": 0.0403
+			},
+			"trace": "blob://traces/01JBGOLDENPT/p2.json.gz"
+		}
+	],
+	"predictions": {
+		"targets": [
+			{
+				"id": "memory.peak",
+				"label_key": "target.memory.peak",
+				"unit": "bytes",
+				"readout": "memory"
+			},
+			{
+				"id": "time.total",
+				"label_key": "target.time.total",
+				"unit": "s",
+				"readout": "time"
+			},
+			{
+				"id": "cost.total",
+				"label_key": "target.cost.total",
+				"unit": "usd",
+				"readout": "cost"
+			},
+			{
+				"id": "risk.oom",
+				"label_key": "target.risk.oom",
+				"unit": "probability",
+				"readout": "risk"
+			},
+			{
+				"id": "risk.preemption_loss",
+				"label_key": "target.risk.preemption_loss",
+				"unit": "s",
+				"readout": "risk"
+			}
+		],
+		"estimates": {
+			"memory.peak": {
+				"point": 12960063815.68,
+				"lo": 12700862539.3664,
+				"hi": 13219265091.9936,
+				"unit": "bytes",
+				"status": "measured",
+				"model_id": "golden-fixture@0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.total": {
+				"point": 16145.194606993007,
+				"lo": 13723.415415944055,
+				"hi": 18566.973798041956,
+				"unit": "s",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "grid",
+				"level": 0.9
+			},
+			"cost.total": {
+				"point": 9.418030187412587,
+				"lo": 8.005325659300699,
+				"hi": 10.830734715524473,
+				"unit": "usd",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "grid",
+				"level": 0.9
+			},
+			"risk.oom": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.01,
+				"unit": "probability",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"risk.preemption_loss": {
+				"point": 3600.0,
+				"lo": 1800.0,
+				"hi": 5400.0,
+				"unit": "s",
+				"status": "predicted",
+				"model_id": "golden-fixture@0",
+				"source": "exact",
+				"level": 0.9
+			}
+		},
+		"grids": [
+			{
+				"id": "g.time.bs_prec",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							4,
+							8,
+							12,
+							16,
+							24,
+							32,
+							48
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "4mM/XOJjP1ziYz9c4mM/XOJjP1ziYz9c4mM/XA==",
+				"lo": "s2I4W7NiOFuzYjhbs2I4W7NiOFuzYjhbs2I4Ww==",
+				"hi": "iGTiXIhk4lyIZOJciGTiXIhk4lyIZOJciGTiXA==",
+				"abstain": "ADw=",
+				"model_id": "golden-fixture@0",
+				"scale": 16.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0
+				}
+			},
+			{
+				"id": "g.memory.bs_prec",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							4,
+							8,
+							12,
+							16,
+							24,
+							32,
+							48
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "precision",
+						"values": [
+							"fp32",
+							"bf16"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "WlmtV1tcsFkJXolbt1+xXIphil44YzJgSmULYg==",
+				"lo": "0VjpVtdbHlluXcha8l45XPxg411/Yoxfw2RwYQ==",
+				"hi": "41k5WMpcQVqjXiVcPmApXRdiMV/wY51g0WWlYg==",
+				"abstain": "ADw=",
+				"model_id": "golden-fixture@0",
+				"scale": 33554432.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0
+				}
+			}
+		]
+	},
+	"models": [
+		{
+			"id": "golden-fixture@0",
+			"kind": "rule",
+			"version": "0",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "Hand-made fixture for UI work; not a real model"
+		}
+	],
+	"findings": [
+		{
+			"id": "f1",
+			"severity": "error",
+			"code": "data.num_workers_zero",
+			"title": "GPU waits on the data loader 37% of each step",
+			"node_id": "data",
+			"evidence": [
+				{
+					"metric": "probe.data.loader_wait_fraction",
+					"value": 0.37,
+					"threshold": 0.1,
+					"probe_id": "p2"
+				}
+			],
+			"source": "rule",
+			"fix_template": "data.num_workers",
+			"knob_id": "num_workers",
+			"citations": []
+		},
+		{
+			"id": "f2",
+			"severity": "warn",
+			"code": "precision.fp32",
+			"title": "Training in fp32 on a GPU with bf16 tensor cores",
+			"node_id": "model",
+			"evidence": [
+				{
+					"metric": "probe.throughput.mfu",
+					"value": 0.07,
+					"threshold": 0.3
+				}
+			],
+			"source": "rule",
+			"fix_template": "precision.bf16_autocast",
+			"knob_id": "precision",
+			"citations": []
+		},
+		{
+			"id": "f3",
+			"severity": "warn",
+			"code": "ckpt.sparse",
+			"title": "Checkpoints every 20k steps; a requeue loses up to 7 h",
+			"node_id": "ckpt",
+			"evidence": [
+				{
+					"metric": "checkpoint_every",
+					"value": 20000.0
+				}
+			],
+			"source": "rule",
+			"fix_template": "ckpt.interval",
+			"knob_id": "checkpoint_every",
+			"citations": []
+		},
+		{
+			"id": "f4",
+			"severity": "info",
+			"code": "lr.headroom",
+			"title": "Learning rate is 8x below where the probe diverged",
+			"node_id": "optimizer",
+			"evidence": [
+				{
+					"metric": "probe.extras.lr_range_divergence_lr",
+					"value": 0.0048
+				}
+			],
+			"source": "rule",
+			"knob_id": "lr",
+			"citations": []
+		}
+	],
+	"patches": [],
+	"provenance": [],
+	"costs": {
+		"gpu_usd": 0.0782,
+		"llm_usd": 0.0,
+		"breakdown": {
+			"probes": 0.0782
+		}
+	}
+}

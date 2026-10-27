@@ -1,0 +1,84 @@
+{
+	"additionalProperties": false,
+	"description": "Body of POST /v1/jobs (validated by C, executed by A).",
+	"properties": {
+		"source": {
+			"additionalProperties": true,
+			"description": "A Source: sample, repo, upload, notebook or template",
+			"title": "Source",
+			"type": "object"
+		},
+		"lens": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Optional hint; the script map decides",
+			"title": "Lens"
+		},
+		"objective": {
+			"anyOf": [
+				{
+					"additionalProperties": true,
+					"type": "object"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"title": "Objective"
+		},
+		"constraints": {
+			"anyOf": [
+				{
+					"additionalProperties": true,
+					"type": "object"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"title": "Constraints"
+		},
+		"gpu": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Requested GPU class; admission control may change it",
+			"title": "Gpu"
+		},
+		"description": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "The visitor's use case, for the guide",
+			"title": "Description"
+		}
+	},
+	"required": [
+		"source"
+	],
+	"title": "JobRequest",
+	"type": "object",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://preflight.dev/schema/0.1.0/JobRequest"
+}

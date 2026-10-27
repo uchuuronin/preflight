@@ -1,0 +1,1115 @@
+{
+	"$defs": {
+		"AgentInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"client": {
+					"description": "openai, anthropic, meta, litellm, ...",
+					"title": "Client",
+					"type": "string"
+				},
+				"base_url_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Base Url Var"
+				},
+				"model": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Model"
+				},
+				"tools": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Tools",
+					"type": "array"
+				},
+				"max_turns": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Turns"
+				},
+				"task_source": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Task Source"
+				},
+				"n_tasks": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Tasks"
+				},
+				"prompt_caching": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Prompt Caching"
+				}
+			},
+			"required": [
+				"client"
+			],
+			"title": "AgentInfo",
+			"type": "object"
+		},
+		"Block": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"label": {
+					"title": "Label",
+					"type": "string"
+				},
+				"kind": {
+					"default": "module",
+					"enum": [
+						"module",
+						"data",
+						"loss",
+						"optimizer",
+						"io",
+						"phase",
+						"model_call",
+						"tool",
+						"other"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"parent": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Parent"
+				},
+				"repeat": {
+					"default": 1,
+					"title": "Repeat",
+					"type": "integer"
+				},
+				"params": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Params"
+				}
+			},
+			"required": [
+				"id",
+				"label"
+			],
+			"title": "Block",
+			"type": "object"
+		},
+		"CodeLocation": {
+			"additionalProperties": false,
+			"properties": {
+				"file": {
+					"title": "File",
+					"type": "string"
+				},
+				"line": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Line"
+				},
+				"expr": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The literal expression that sets the value, if any",
+					"title": "Expr"
+				}
+			},
+			"required": [
+				"file"
+			],
+			"title": "CodeLocation",
+			"type": "object"
+		},
+		"DataInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"dataset": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dataset"
+				},
+				"batch_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Batch Size"
+				},
+				"eval_batch_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Eval Batch Size"
+				},
+				"seq_len": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Seq Len"
+				},
+				"num_workers": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Num Workers"
+				},
+				"packing": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Packing"
+				},
+				"padding": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "longest, max_length, none",
+					"title": "Padding"
+				},
+				"n_examples": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Examples"
+				},
+				"quality_scores": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Column or file holding per-document quality",
+					"title": "Quality Scores"
+				},
+				"languages": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Languages",
+					"type": "array"
+				}
+			},
+			"title": "DataInfo",
+			"type": "object"
+		},
+		"LoopInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"enum": [
+						"hf_trainer",
+						"trl_trainer",
+						"lightning",
+						"torchtitan",
+						"plain",
+						"vllm",
+						"agent_loop",
+						"eval_loop",
+						"other"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"location": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CodeLocation"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"step_call": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The call that advances one step, e.g. optimizer.step()",
+					"title": "Step Call"
+				},
+				"model_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Model Var"
+				},
+				"optimizer_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Optimizer Var"
+				},
+				"dataloader_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dataloader Var"
+				}
+			},
+			"required": [
+				"kind"
+			],
+			"title": "LoopInfo",
+			"type": "object"
+		},
+		"LoraInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"r": {
+					"title": "R",
+					"type": "integer"
+				},
+				"alpha": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Alpha"
+				},
+				"target_modules": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Target Modules",
+					"type": "array"
+				},
+				"dropout": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dropout"
+				}
+			},
+			"required": [
+				"r"
+			],
+			"title": "LoraInfo",
+			"type": "object"
+		},
+		"ModelInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"name": {
+					"title": "Name",
+					"type": "string"
+				},
+				"hf_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Hf Id"
+				},
+				"family": {
+					"default": "other",
+					"enum": [
+						"decoder",
+						"encoder",
+						"encoder_decoder",
+						"cnn",
+						"vit",
+						"gnn",
+						"mlp",
+						"api",
+						"other"
+					],
+					"title": "Family",
+					"type": "string"
+				},
+				"param_count": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Param Count"
+				},
+				"n_layers": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Layers"
+				},
+				"d_model": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "D Model"
+				},
+				"n_heads": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Heads"
+				},
+				"n_kv_heads": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Kv Heads"
+				},
+				"d_ff": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "D Ff"
+				},
+				"vocab_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Vocab Size"
+				},
+				"dtype": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dtype"
+				},
+				"quantization": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "e.g. 4bit-nf4, 8bit, none",
+					"title": "Quantization"
+				},
+				"lora": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/LoraInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				}
+			},
+			"required": [
+				"name"
+			],
+			"title": "ModelInfo",
+			"type": "object"
+		},
+		"RLInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"algorithm": {
+					"description": "grpo, ppo, dpo, rloo, ...",
+					"title": "Algorithm",
+					"type": "string"
+				},
+				"group_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Group Size"
+				},
+				"max_completion_len": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Completion Len"
+				},
+				"reward_functions": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Reward Functions",
+					"type": "array"
+				},
+				"reference_model": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Reference Model"
+				},
+				"generation_backend": {
+					"anyOf": [
+						{
+							"enum": [
+								"hf",
+								"vllm",
+								"sglang",
+								"other"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Generation Backend"
+				}
+			},
+			"required": [
+				"algorithm"
+			],
+			"title": "RLInfo",
+			"type": "object"
+		},
+		"ScriptKnob": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"pattern": "^[a-z][a-z0-9_.]*$",
+					"title": "Id",
+					"type": "string"
+				},
+				"label": {
+					"title": "Label",
+					"type": "string"
+				},
+				"kind": {
+					"enum": [
+						"int",
+						"float",
+						"categorical",
+						"bool"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"current": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "integer"
+						},
+						{
+							"type": "number"
+						},
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Current"
+				},
+				"unit": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Unit"
+				},
+				"choices": {
+					"items": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"title": "Choices",
+					"type": "array"
+				},
+				"location": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CodeLocation"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"needs_code": {
+					"default": false,
+					"description": "True when changing it means editing code, not a flag",
+					"title": "Needs Code",
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"id",
+				"label",
+				"kind"
+			],
+			"title": "ScriptKnob",
+			"type": "object"
+		},
+		"TrainInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"optimizer": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Optimizer"
+				},
+				"lr": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Lr"
+				},
+				"warmup_steps": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Warmup Steps"
+				},
+				"grad_accum": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Grad Accum"
+				},
+				"precision": {
+					"default": "unknown",
+					"enum": [
+						"fp32",
+						"fp16",
+						"bf16",
+						"fp8",
+						"mixed",
+						"unknown"
+					],
+					"title": "Precision",
+					"type": "string"
+				},
+				"max_steps": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Steps"
+				},
+				"epochs": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Epochs"
+				},
+				"checkpoint_every": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Checkpoint Every"
+				},
+				"eval_every": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Eval Every"
+				},
+				"grad_checkpointing": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Grad Checkpointing"
+				},
+				"eval_under_no_grad": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Eval Under No Grad"
+				},
+				"distributed": {
+					"default": "none",
+					"enum": [
+						"none",
+						"ddp",
+						"fsdp",
+						"deepspeed",
+						"tp",
+						"other"
+					],
+					"title": "Distributed",
+					"type": "string"
+				}
+			},
+			"title": "TrainInfo",
+			"type": "object"
+		}
+	},
+	"additionalProperties": false,
+	"properties": {
+		"lens": {
+			"enum": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"agent",
+				"eval",
+				"serving",
+				"retrieval",
+				"gnn",
+				"vision"
+			],
+			"title": "Lens",
+			"type": "string"
+		},
+		"framework": {
+			"enum": [
+				"hf_trainer",
+				"trl",
+				"lightning",
+				"torchtitan",
+				"plain_pytorch",
+				"vllm",
+				"hf_generate",
+				"sentence_transformers",
+				"pyg",
+				"dgl",
+				"timm",
+				"openai_client",
+				"other"
+			],
+			"title": "Framework",
+			"type": "string"
+		},
+		"entrypoint": {
+			"title": "Entrypoint",
+			"type": "string"
+		},
+		"launch": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Command line that runs the script",
+			"title": "Launch"
+		},
+		"model": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/ModelInfo"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null
+		},
+		"data": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/DataInfo"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null
+		},
+		"training": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/TrainInfo"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null
+		},
+		"loop": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/LoopInfo"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null
+		},
+		"knobs": {
+			"items": {
+				"$ref": "#/$defs/ScriptKnob"
+			},
+			"title": "Knobs",
+			"type": "array"
+		},
+		"blocks": {
+			"items": {
+				"$ref": "#/$defs/Block"
+			},
+			"title": "Blocks",
+			"type": "array"
+		},
+		"agent": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/AgentInfo"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null
+		},
+		"rl": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/RLInfo"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null
+		},
+		"risks": {
+			"description": "Problems noticed while reading, in plain words",
+			"items": {
+				"type": "string"
+			},
+			"title": "Risks",
+			"type": "array"
+		},
+		"produced_by": {
+			"default": "adapter",
+			"enum": [
+				"muse_spark",
+				"adapter",
+				"manual"
+			],
+			"title": "Produced By",
+			"type": "string"
+		},
+		"confidence": {
+			"default": 1.0,
+			"maximum": 1,
+			"minimum": 0,
+			"title": "Confidence",
+			"type": "number"
+		}
+	},
+	"required": [
+		"lens",
+		"framework",
+		"entrypoint"
+	],
+	"title": "ScriptMap",
+	"type": "object",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://preflight.dev/schema/0.1.0/ScriptMap"
+}

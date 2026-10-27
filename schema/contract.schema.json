@@ -1,0 +1,4773 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://preflight.dev/schema/0.1.0/contract",
+	"title": "PreflightContract",
+	"description": "Preflight contract v0.1.0. Generated; do not edit.",
+	"type": "object",
+	"properties": {
+		"FlightRecord": {
+			"$ref": "#/$defs/FlightRecord"
+		},
+		"JobEvent": {
+			"$ref": "#/$defs/JobEvent"
+		},
+		"JobRequest": {
+			"$ref": "#/$defs/JobRequest"
+		},
+		"ScriptMap": {
+			"$ref": "#/$defs/ScriptMap"
+		},
+		"Prediction": {
+			"$ref": "#/$defs/Prediction"
+		},
+		"Estimate": {
+			"$ref": "#/$defs/Estimate"
+		},
+		"Grid": {
+			"$ref": "#/$defs/Grid"
+		},
+		"Target": {
+			"$ref": "#/$defs/Target"
+		},
+		"Objective": {
+			"$ref": "#/$defs/Objective"
+		},
+		"KnobImpact": {
+			"$ref": "#/$defs/KnobImpact"
+		}
+	},
+	"$defs": {
+		"AgentInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"client": {
+					"description": "openai, anthropic, meta, litellm, ...",
+					"title": "Client",
+					"type": "string"
+				},
+				"base_url_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Base Url Var"
+				},
+				"model": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Model"
+				},
+				"tools": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Tools",
+					"type": "array"
+				},
+				"max_turns": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Turns"
+				},
+				"task_source": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Task Source"
+				},
+				"n_tasks": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Tasks"
+				},
+				"prompt_caching": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Prompt Caching"
+				}
+			},
+			"required": [
+				"client"
+			],
+			"title": "AgentInfo",
+			"type": "object"
+		},
+		"AgentSample": {
+			"additionalProperties": false,
+			"properties": {
+				"tasks": {
+					"items": {
+						"$ref": "#/$defs/AgentTask"
+					},
+					"title": "Tasks",
+					"type": "array"
+				},
+				"population": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Tasks in the full run",
+					"title": "Population"
+				},
+				"selection": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "How the sample was chosen, e.g. 30–70% pass-rate band",
+					"title": "Selection"
+				},
+				"rate_limit_rpm": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Rate Limit Rpm"
+				},
+				"rate_limit_tpm": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Rate Limit Tpm"
+				}
+			},
+			"title": "AgentSample",
+			"type": "object"
+		},
+		"AgentTask": {
+			"additionalProperties": false,
+			"properties": {
+				"task_id": {
+					"title": "Task Id",
+					"type": "string"
+				},
+				"model": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Model"
+				},
+				"turns": {
+					"minimum": 0,
+					"title": "Turns",
+					"type": "integer"
+				},
+				"input_tokens": {
+					"minimum": 0,
+					"title": "Input Tokens",
+					"type": "integer"
+				},
+				"output_tokens": {
+					"minimum": 0,
+					"title": "Output Tokens",
+					"type": "integer"
+				},
+				"reasoning_tokens": {
+					"default": 0,
+					"minimum": 0,
+					"title": "Reasoning Tokens",
+					"type": "integer"
+				},
+				"cached_input_tokens": {
+					"default": 0,
+					"minimum": 0,
+					"title": "Cached Input Tokens",
+					"type": "integer"
+				},
+				"cache_creation_tokens": {
+					"default": 0,
+					"minimum": 0,
+					"title": "Cache Creation Tokens",
+					"type": "integer"
+				},
+				"tool_calls": {
+					"default": 0,
+					"minimum": 0,
+					"title": "Tool Calls",
+					"type": "integer"
+				},
+				"errors": {
+					"default": 0,
+					"minimum": 0,
+					"title": "Errors",
+					"type": "integer"
+				},
+				"latency_s": {
+					"minimum": 0,
+					"title": "Latency S",
+					"type": "number"
+				},
+				"success": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Success"
+				},
+				"context_tokens_by_turn": {
+					"items": {
+						"type": "integer"
+					},
+					"title": "Context Tokens By Turn",
+					"type": "array"
+				},
+				"cost_usd": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Cost Usd"
+				},
+				"stop_reason": {
+					"anyOf": [
+						{
+							"enum": [
+								"done",
+								"max_turns",
+								"context_overflow",
+								"error",
+								"timeout",
+								"loop"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Stop Reason"
+				},
+				"trace": {
+					"anyOf": [
+						{
+							"pattern": "^blob://[A-Za-z0-9._\\-/]+$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Trace"
+				}
+			},
+			"required": [
+				"task_id",
+				"turns",
+				"input_tokens",
+				"output_tokens",
+				"latency_s"
+			],
+			"title": "AgentTask",
+			"type": "object"
+		},
+		"Block": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"label": {
+					"title": "Label",
+					"type": "string"
+				},
+				"kind": {
+					"default": "module",
+					"enum": [
+						"module",
+						"data",
+						"loss",
+						"optimizer",
+						"io",
+						"phase",
+						"model_call",
+						"tool",
+						"other"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"parent": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Parent"
+				},
+				"repeat": {
+					"default": 1,
+					"title": "Repeat",
+					"type": "integer"
+				},
+				"params": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Params"
+				}
+			},
+			"required": [
+				"id",
+				"label"
+			],
+			"title": "Block",
+			"type": "object"
+		},
+		"Campaign": {
+			"additionalProperties": false,
+			"properties": {
+				"cells": {
+					"items": {
+						"$ref": "#/$defs/CampaignCell"
+					},
+					"title": "Cells",
+					"type": "array"
+				},
+				"lanes": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Lanes",
+					"type": "array"
+				},
+				"calendar": {
+					"anyOf": [
+						{
+							"pattern": "^blob://[A-Za-z0-9._\\-/]+$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Calendar"
+				},
+				"cut_list": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Cut List",
+					"type": "array"
+				},
+				"completion_quantiles": {
+					"additionalProperties": {
+						"format": "date-time",
+						"type": "string"
+					},
+					"description": "p10, p50, p90 ...",
+					"title": "Completion Quantiles",
+					"type": "object"
+				},
+				"checkpoint_interval_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Checkpoint Interval S"
+				}
+			},
+			"title": "Campaign",
+			"type": "object"
+		},
+		"CampaignCell": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"knobs": {
+					"additionalProperties": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"title": "Knobs",
+					"type": "object"
+				},
+				"gpu_hours": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Gpu Hours"
+				},
+				"usd": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Usd"
+				},
+				"wall_time_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Wall Time S"
+				},
+				"segments": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Wall-time-capped segments the run splits into",
+					"title": "Segments"
+				},
+				"lane": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Lane"
+				},
+				"cut": {
+					"default": false,
+					"title": "Cut",
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"id",
+				"knobs"
+			],
+			"title": "CampaignCell",
+			"type": "object"
+		},
+		"CheckpointStats": {
+			"additionalProperties": false,
+			"properties": {
+				"saves": {
+					"minimum": 0,
+					"title": "Saves",
+					"type": "integer"
+				},
+				"seconds_mean": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Seconds Mean"
+				},
+				"bytes_mean": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Bytes Mean"
+				}
+			},
+			"required": [
+				"saves"
+			],
+			"title": "CheckpointStats",
+			"type": "object"
+		},
+		"Citation": {
+			"additionalProperties": false,
+			"properties": {
+				"title": {
+					"title": "Title",
+					"type": "string"
+				},
+				"url": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Url"
+				}
+			},
+			"required": [
+				"title"
+			],
+			"title": "Citation",
+			"type": "object"
+		},
+		"CodeLocation": {
+			"additionalProperties": false,
+			"properties": {
+				"file": {
+					"title": "File",
+					"type": "string"
+				},
+				"line": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Line"
+				},
+				"expr": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The literal expression that sets the value, if any",
+					"title": "Expr"
+				}
+			},
+			"required": [
+				"file"
+			],
+			"title": "CodeLocation",
+			"type": "object"
+		},
+		"Constraints": {
+			"additionalProperties": false,
+			"properties": {
+				"budget_usd": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Budget Usd"
+				},
+				"deadline": {
+					"anyOf": [
+						{
+							"format": "date-time",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Deadline"
+				},
+				"gpu_types": {
+					"description": "Allowed GPU names; empty means any",
+					"items": {
+						"type": "string"
+					},
+					"title": "Gpu Types",
+					"type": "array"
+				},
+				"max_gpus": {
+					"anyOf": [
+						{
+							"minimum": 1,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Gpus"
+				},
+				"quota": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Quota"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"wall_time_cap_s": {
+					"anyOf": [
+						{
+							"exclusiveMinimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Scheduler limit per job, e.g. Slurm",
+					"title": "Wall Time Cap S"
+				},
+				"preemption": {
+					"$ref": "#/$defs/PreemptionRule"
+				}
+			},
+			"title": "Constraints",
+			"type": "object"
+		},
+		"Costs": {
+			"additionalProperties": false,
+			"properties": {
+				"gpu_usd": {
+					"default": 0,
+					"title": "Gpu Usd",
+					"type": "number"
+				},
+				"llm_usd": {
+					"default": 0,
+					"title": "Llm Usd",
+					"type": "number"
+				},
+				"breakdown": {
+					"additionalProperties": {
+						"type": "number"
+					},
+					"title": "Breakdown",
+					"type": "object"
+				}
+			},
+			"title": "Costs",
+			"type": "object"
+		},
+		"DataInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"dataset": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dataset"
+				},
+				"batch_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Batch Size"
+				},
+				"eval_batch_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Eval Batch Size"
+				},
+				"seq_len": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Seq Len"
+				},
+				"num_workers": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Num Workers"
+				},
+				"packing": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Packing"
+				},
+				"padding": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "longest, max_length, none",
+					"title": "Padding"
+				},
+				"n_examples": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Examples"
+				},
+				"quality_scores": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Column or file holding per-document quality",
+					"title": "Quality Scores"
+				},
+				"languages": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Languages",
+					"type": "array"
+				}
+			},
+			"title": "DataInfo",
+			"type": "object"
+		},
+		"DataStats": {
+			"additionalProperties": false,
+			"properties": {
+				"padding_fraction": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Padding Fraction"
+				},
+				"packing": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Packing"
+				},
+				"tokens_per_sample_mean": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Tokens Per Sample Mean"
+				},
+				"tokens_per_sample_p95": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Tokens Per Sample P95"
+				},
+				"loader_wait_fraction": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Loader Wait Fraction"
+				},
+				"num_workers": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Num Workers"
+				}
+			},
+			"title": "DataStats",
+			"type": "object"
+		},
+		"Domain": {
+			"additionalProperties": false,
+			"properties": {
+				"min": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Min"
+				},
+				"max": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max"
+				},
+				"values": {
+					"description": "Allowed values for categorical knobs",
+					"items": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"title": "Values",
+					"type": "array"
+				},
+				"step": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Step"
+				},
+				"log": {
+					"default": false,
+					"title": "Log",
+					"type": "boolean"
+				}
+			},
+			"title": "Domain",
+			"type": "object"
+		},
+		"Env": {
+			"additionalProperties": false,
+			"description": "Written by A.",
+			"properties": {
+				"backend": {
+					"enum": [
+						"cuda",
+						"rocm",
+						"api",
+						"cpu",
+						"mps"
+					],
+					"title": "Backend",
+					"type": "string"
+				},
+				"provider": {
+					"description": "modal, amd_devcloud, local, colab, kaggle, api",
+					"title": "Provider",
+					"type": "string"
+				},
+				"gpu": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/GPU"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"nodes": {
+					"default": 1,
+					"minimum": 1,
+					"title": "Nodes",
+					"type": "integer"
+				},
+				"libraries": {
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "package -> version",
+					"title": "Libraries",
+					"type": "object"
+				},
+				"python": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Python"
+				},
+				"seed": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Seed"
+				},
+				"region": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Region"
+				},
+				"image": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Container image digest the probe ran in",
+					"title": "Image"
+				}
+			},
+			"required": [
+				"backend",
+				"provider"
+			],
+			"title": "Env",
+			"type": "object"
+		},
+		"Estimate": {
+			"additionalProperties": false,
+			"description": "One number on screen: a point with an interval, or an honest abstention.",
+			"properties": {
+				"point": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"title": "Point"
+				},
+				"lo": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"title": "Lo"
+				},
+				"hi": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"title": "Hi"
+				},
+				"unit": {
+					"title": "Unit",
+					"type": "string"
+				},
+				"status": {
+					"enum": [
+						"measured",
+						"predicted",
+						"extrapolated",
+						"abstain"
+					],
+					"title": "Status",
+					"type": "string"
+				},
+				"model_id": {
+					"title": "Model Id",
+					"type": "string"
+				},
+				"source": {
+					"enum": [
+						"grid",
+						"exact"
+					],
+					"title": "Source",
+					"type": "string"
+				},
+				"reason": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Why the engine abstained or extrapolated",
+					"title": "Reason"
+				},
+				"level": {
+					"default": 0.9,
+					"description": "Nominal coverage of [lo, hi]",
+					"exclusiveMaximum": 1,
+					"exclusiveMinimum": 0,
+					"title": "Level",
+					"type": "number"
+				}
+			},
+			"required": [
+				"point",
+				"lo",
+				"hi",
+				"unit",
+				"status",
+				"model_id",
+				"source"
+			],
+			"title": "Estimate",
+			"type": "object"
+		},
+		"EvalStats": {
+			"additionalProperties": false,
+			"description": "One eval pass, pulled inside the probe window and capped at a few batches.",
+			"properties": {
+				"batches": {
+					"minimum": 0,
+					"title": "Batches",
+					"type": "integer"
+				},
+				"batch_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Batch Size"
+				},
+				"seconds_per_batch": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Seconds Per Batch"
+				},
+				"peak_allocated_bytes": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Peak Allocated Bytes"
+				},
+				"grad_enabled": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "True when eval ran with autograd on (no no_grad)",
+					"title": "Grad Enabled"
+				}
+			},
+			"required": [
+				"batches"
+			],
+			"title": "EvalStats",
+			"type": "object"
+		},
+		"Evidence": {
+			"additionalProperties": false,
+			"properties": {
+				"metric": {
+					"title": "Metric",
+					"type": "string"
+				},
+				"value": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Value"
+				},
+				"threshold": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Threshold"
+				},
+				"probe_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Probe Id"
+				},
+				"step": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Step"
+				}
+			},
+			"required": [
+				"metric"
+			],
+			"title": "Evidence",
+			"type": "object"
+		},
+		"Finding": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"severity": {
+					"enum": [
+						"info",
+						"warn",
+						"error",
+						"critical"
+					],
+					"title": "Severity",
+					"type": "string"
+				},
+				"code": {
+					"description": "Stable rule id, e.g. eval.no_grad, data.num_workers_zero",
+					"title": "Code",
+					"type": "string"
+				},
+				"title": {
+					"title": "Title",
+					"type": "string"
+				},
+				"detail": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Detail"
+				},
+				"node_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Job-map node it attaches to",
+					"title": "Node Id"
+				},
+				"evidence": {
+					"items": {
+						"$ref": "#/$defs/Evidence"
+					},
+					"title": "Evidence",
+					"type": "array"
+				},
+				"source": {
+					"enum": [
+						"rule",
+						"spark_open_triage",
+						"spark_diagnosis",
+						"model"
+					],
+					"title": "Source",
+					"type": "string"
+				},
+				"fix_template": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Fix Template"
+				},
+				"knob_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Knob Id"
+				},
+				"citations": {
+					"items": {
+						"$ref": "#/$defs/Citation"
+					},
+					"title": "Citations",
+					"type": "array"
+				}
+			},
+			"required": [
+				"id",
+				"severity",
+				"code",
+				"title",
+				"source"
+			],
+			"title": "Finding",
+			"type": "object"
+		},
+		"FlightRecord": {
+			"additionalProperties": false,
+			"properties": {
+				"schema_version": {
+					"default": "0.1.0",
+					"pattern": "^\\d+\\.\\d+\\.\\d+$",
+					"title": "Schema Version",
+					"type": "string"
+				},
+				"record_id": {
+					"description": "ULID, internal only",
+					"title": "Record Id",
+					"type": "string"
+				},
+				"share_token": {
+					"description": "Random token for read-only links",
+					"title": "Share Token",
+					"type": "string"
+				},
+				"parent_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Record this one derives from (verify, what-if)",
+					"title": "Parent Id"
+				},
+				"created_at": {
+					"format": "date-time",
+					"title": "Created At",
+					"type": "string"
+				},
+				"job": {
+					"$ref": "#/$defs/Job"
+				},
+				"env": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Env"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"graph": {
+					"$ref": "#/$defs/Graph"
+				},
+				"knobs": {
+					"items": {
+						"$ref": "#/$defs/Knob"
+					},
+					"title": "Knobs",
+					"type": "array"
+				},
+				"probes": {
+					"items": {
+						"$ref": "#/$defs/Probe"
+					},
+					"title": "Probes",
+					"type": "array"
+				},
+				"agent_sample": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/AgentSample"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"predictions": {
+					"$ref": "#/$defs/Predictions"
+				},
+				"models": {
+					"items": {
+						"$ref": "#/$defs/ModelCard"
+					},
+					"title": "Models",
+					"type": "array"
+				},
+				"findings": {
+					"items": {
+						"$ref": "#/$defs/Finding"
+					},
+					"title": "Findings",
+					"type": "array"
+				},
+				"patches": {
+					"items": {
+						"$ref": "#/$defs/Patch"
+					},
+					"title": "Patches",
+					"type": "array"
+				},
+				"campaign": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Campaign"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"provenance": {
+					"items": {
+						"$ref": "#/$defs/ModelCall"
+					},
+					"title": "Provenance",
+					"type": "array"
+				},
+				"costs": {
+					"$ref": "#/$defs/Costs"
+				}
+			},
+			"required": [
+				"job"
+			],
+			"title": "FlightRecord",
+			"type": "object"
+		},
+		"GPU": {
+			"additionalProperties": false,
+			"properties": {
+				"name": {
+					"description": "Canonical name from the spec table, e.g. H100-SXM-80GB, MI300X, L4",
+					"title": "Name",
+					"type": "string"
+				},
+				"count": {
+					"default": 1,
+					"minimum": 0,
+					"title": "Count",
+					"type": "integer"
+				},
+				"memory_bytes": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Memory Bytes"
+				},
+				"vendor": {
+					"default": "nvidia",
+					"enum": [
+						"nvidia",
+						"amd",
+						"apple",
+						"none"
+					],
+					"title": "Vendor",
+					"type": "string"
+				},
+				"compute_capability": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Compute Capability"
+				},
+				"driver": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Driver"
+				}
+			},
+			"required": [
+				"name"
+			],
+			"title": "GPU",
+			"type": "object"
+		},
+		"GenerationStats": {
+			"additionalProperties": false,
+			"description": "Generation inside the job: RL rollouts, eval sweeps, serving probes.",
+			"properties": {
+				"calls": {
+					"minimum": 0,
+					"title": "Calls",
+					"type": "integer"
+				},
+				"seconds_total": {
+					"default": 0,
+					"title": "Seconds Total",
+					"type": "number"
+				},
+				"sequences": {
+					"default": 0,
+					"title": "Sequences",
+					"type": "integer"
+				},
+				"new_tokens_mean": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "New Tokens Mean"
+				},
+				"new_tokens_p95": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "New Tokens P95"
+				},
+				"new_tokens_max": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "New Tokens Max"
+				},
+				"max_new_tokens": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The cap the script set, if seen",
+					"title": "Max New Tokens"
+				},
+				"truncation_rate": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Share of sequences that hit the cap",
+					"title": "Truncation Rate"
+				},
+				"backend": {
+					"anyOf": [
+						{
+							"enum": [
+								"hf",
+								"vllm",
+								"api",
+								"other"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Backend"
+				}
+			},
+			"required": [
+				"calls"
+			],
+			"title": "GenerationStats",
+			"type": "object"
+		},
+		"Graph": {
+			"additionalProperties": false,
+			"properties": {
+				"nodes": {
+					"items": {
+						"$ref": "#/$defs/GraphNode"
+					},
+					"title": "Nodes",
+					"type": "array"
+				},
+				"edges": {
+					"items": {
+						"$ref": "#/$defs/GraphEdge"
+					},
+					"title": "Edges",
+					"type": "array"
+				},
+				"skeleton": {
+					"default": true,
+					"description": "True until probes have measured it",
+					"title": "Skeleton",
+					"type": "boolean"
+				}
+			},
+			"title": "Graph",
+			"type": "object"
+		},
+		"GraphEdge": {
+			"additionalProperties": false,
+			"properties": {
+				"source": {
+					"title": "Source",
+					"type": "string"
+				},
+				"target": {
+					"title": "Target",
+					"type": "string"
+				},
+				"kind": {
+					"default": "data",
+					"enum": [
+						"data",
+						"grad",
+						"control",
+						"tokens",
+						"weights"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"metric": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "target id or metric key whose rate animates the edge",
+					"title": "Metric"
+				}
+			},
+			"required": [
+				"source",
+				"target"
+			],
+			"title": "GraphEdge",
+			"type": "object"
+		},
+		"GraphNode": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"label": {
+					"title": "Label",
+					"type": "string"
+				},
+				"kind": {
+					"default": "module",
+					"enum": [
+						"module",
+						"data",
+						"loss",
+						"optimizer",
+						"io",
+						"phase",
+						"model_call",
+						"tool",
+						"store",
+						"queue",
+						"group",
+						"other"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"parent": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Enclosing group, for collapsed hierarchy",
+					"title": "Parent"
+				},
+				"repeat": {
+					"default": 1,
+					"description": "Shown once with ×N when > 1",
+					"minimum": 1,
+					"title": "Repeat",
+					"type": "integer"
+				},
+				"params": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Params"
+				},
+				"metrics": {
+					"description": "target ids or probe metric keys this node animates",
+					"items": {
+						"type": "string"
+					},
+					"title": "Metrics",
+					"type": "array"
+				},
+				"attrs": {
+					"additionalProperties": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"title": "Attrs",
+					"type": "object"
+				}
+			},
+			"required": [
+				"id",
+				"label"
+			],
+			"title": "GraphNode",
+			"type": "object"
+		},
+		"Grid": {
+			"additionalProperties": false,
+			"description": "Predictions precomputed over a knob grid, row-major over `axes`.\n\npoint, lo and hi are base64 little-endian float16 holding real / scale;\nabstain is a base64 LSB-first bit mask. Grids over MAX_GRID_CELLS cells go\nto a sidecar blob. Use encoding.choose_scale() when writing one.",
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"target_id": {
+					"title": "Target Id",
+					"type": "string"
+				},
+				"unit": {
+					"title": "Unit",
+					"type": "string"
+				},
+				"axes": {
+					"items": {
+						"$ref": "#/$defs/GridAxis"
+					},
+					"maxItems": 4,
+					"minItems": 1,
+					"title": "Axes",
+					"type": "array"
+				},
+				"point": {
+					"default": "",
+					"title": "Point",
+					"type": "string"
+				},
+				"lo": {
+					"default": "",
+					"title": "Lo",
+					"type": "string"
+				},
+				"hi": {
+					"default": "",
+					"title": "Hi",
+					"type": "string"
+				},
+				"abstain": {
+					"default": "",
+					"title": "Abstain",
+					"type": "string"
+				},
+				"model_id": {
+					"title": "Model Id",
+					"type": "string"
+				},
+				"scale": {
+					"default": 1.0,
+					"description": "Power of two; real value = decoded float16 x scale",
+					"exclusiveMinimum": 0,
+					"title": "Scale",
+					"type": "number"
+				},
+				"fixed": {
+					"additionalProperties": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"description": "Values every knob not on an axis is held at",
+					"title": "Fixed",
+					"type": "object"
+				},
+				"sidecar": {
+					"anyOf": [
+						{
+							"pattern": "^blob://",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Set when the grid is too large to inline",
+					"title": "Sidecar"
+				}
+			},
+			"required": [
+				"id",
+				"target_id",
+				"unit",
+				"axes",
+				"model_id"
+			],
+			"title": "Grid",
+			"type": "object"
+		},
+		"GridAxis": {
+			"additionalProperties": false,
+			"properties": {
+				"knob_id": {
+					"title": "Knob Id",
+					"type": "string"
+				},
+				"values": {
+					"items": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"minItems": 1,
+					"title": "Values",
+					"type": "array"
+				},
+				"scale": {
+					"default": "linear",
+					"enum": [
+						"linear",
+						"log",
+						"categorical"
+					],
+					"title": "Scale",
+					"type": "string"
+				}
+			},
+			"required": [
+				"knob_id",
+				"values"
+			],
+			"title": "GridAxis",
+			"type": "object"
+		},
+		"Job": {
+			"additionalProperties": false,
+			"description": "Written by A.",
+			"properties": {
+				"lens": {
+					"enum": [
+						"finetune",
+						"pretrain",
+						"rl",
+						"agent",
+						"eval",
+						"serving",
+						"retrieval",
+						"gnn",
+						"vision"
+					],
+					"title": "Lens",
+					"type": "string"
+				},
+				"source": {
+					"$ref": "#/$defs/Source"
+				},
+				"framework": {
+					"anyOf": [
+						{
+							"enum": [
+								"hf_trainer",
+								"trl",
+								"lightning",
+								"torchtitan",
+								"plain_pytorch",
+								"vllm",
+								"hf_generate",
+								"sentence_transformers",
+								"pyg",
+								"dgl",
+								"timm",
+								"openai_client",
+								"other"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Framework"
+				},
+				"title": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Title"
+				},
+				"script_map": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/ScriptMap"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"objective": {
+					"$ref": "#/$defs/Objective"
+				},
+				"constraints": {
+					"$ref": "#/$defs/Constraints"
+				}
+			},
+			"required": [
+				"lens",
+				"source"
+			],
+			"title": "Job",
+			"type": "object"
+		},
+		"JobEvent": {
+			"additionalProperties": false,
+			"properties": {
+				"job_id": {
+					"title": "Job Id",
+					"type": "string"
+				},
+				"record_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Record Id"
+				},
+				"seq": {
+					"minimum": 0,
+					"title": "Seq",
+					"type": "integer"
+				},
+				"at": {
+					"format": "date-time",
+					"title": "At",
+					"type": "string"
+				},
+				"stage": {
+					"enum": [
+						"queued",
+						"admitted",
+						"fetching",
+						"mapping",
+						"skeleton",
+						"harnessing",
+						"probing",
+						"triage",
+						"predicting",
+						"done",
+						"failed",
+						"cancelled"
+					],
+					"title": "Stage",
+					"type": "string"
+				},
+				"progress": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Within the current stage",
+					"title": "Progress"
+				},
+				"queue_position": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Queue Position"
+				},
+				"message": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "i18n key or plain log line",
+					"title": "Message"
+				},
+				"level": {
+					"default": "info",
+					"enum": [
+						"debug",
+						"info",
+						"warn",
+						"error"
+					],
+					"title": "Level",
+					"type": "string"
+				},
+				"probe_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Probe Id"
+				},
+				"finding": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Finding"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"record_rev": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Bumped when the stored record changed; refetch it",
+					"title": "Record Rev"
+				},
+				"retryable": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "On failed: whether resubmitting may succeed",
+					"title": "Retryable"
+				}
+			},
+			"required": [
+				"job_id",
+				"seq",
+				"at",
+				"stage"
+			],
+			"title": "JobEvent",
+			"type": "object"
+		},
+		"JobRequest": {
+			"additionalProperties": false,
+			"description": "Body of POST /v1/jobs (validated by C, executed by A).",
+			"properties": {
+				"source": {
+					"additionalProperties": true,
+					"description": "A Source: sample, repo, upload, notebook or template",
+					"title": "Source",
+					"type": "object"
+				},
+				"lens": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Optional hint; the script map decides",
+					"title": "Lens"
+				},
+				"objective": {
+					"anyOf": [
+						{
+							"additionalProperties": true,
+							"type": "object"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Objective"
+				},
+				"constraints": {
+					"anyOf": [
+						{
+							"additionalProperties": true,
+							"type": "object"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Constraints"
+				},
+				"gpu": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Requested GPU class; admission control may change it",
+					"title": "Gpu"
+				},
+				"description": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The visitor's use case, for the guide",
+					"title": "Description"
+				}
+			},
+			"required": [
+				"source"
+			],
+			"title": "JobRequest",
+			"type": "object"
+		},
+		"Knob": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"pattern": "^[a-z][a-z0-9_.]*$",
+					"title": "Id",
+					"type": "string"
+				},
+				"label_key": {
+					"description": "i18n key, e.g. knob.batch_size",
+					"title": "Label Key",
+					"type": "string"
+				},
+				"unit": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Unit"
+				},
+				"kind": {
+					"enum": [
+						"int",
+						"float",
+						"categorical",
+						"bool"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"domain": {
+					"$ref": "#/$defs/Domain"
+				},
+				"current": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "integer"
+						},
+						{
+							"type": "number"
+						},
+						{
+							"type": "string"
+						}
+					],
+					"title": "Current"
+				},
+				"probed_range": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Range"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Filled by B from the probes"
+				},
+				"gridded": {
+					"default": false,
+					"title": "Gridded",
+					"type": "boolean"
+				},
+				"needs_code": {
+					"default": false,
+					"title": "Needs Code",
+					"type": "boolean"
+				},
+				"patch_template": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Patch template id for code knobs",
+					"title": "Patch Template"
+				},
+				"group": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "memory, speed, data, model, rl, agent, cluster",
+					"title": "Group"
+				}
+			},
+			"required": [
+				"id",
+				"label_key",
+				"kind",
+				"current"
+			],
+			"title": "Knob",
+			"type": "object"
+		},
+		"KnobImpact": {
+			"additionalProperties": false,
+			"properties": {
+				"knob_id": {
+					"title": "Knob Id",
+					"type": "string"
+				},
+				"impact": {
+					"description": "Change in the objective across the knob's range, normalised to [0, 1]",
+					"title": "Impact",
+					"type": "number"
+				},
+				"direction": {
+					"enum": [
+						"increase",
+						"decrease",
+						"either"
+					],
+					"title": "Direction",
+					"type": "string"
+				},
+				"best_value": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "integer"
+						},
+						{
+							"type": "number"
+						},
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Best Value"
+				},
+				"reason": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Reason"
+				}
+			},
+			"required": [
+				"knob_id",
+				"impact",
+				"direction"
+			],
+			"title": "KnobImpact",
+			"type": "object"
+		},
+		"LengthStats": {
+			"additionalProperties": false,
+			"properties": {
+				"mean": {
+					"title": "Mean",
+					"type": "number"
+				},
+				"p95": {
+					"title": "P95",
+					"type": "number"
+				},
+				"max": {
+					"title": "Max",
+					"type": "number"
+				},
+				"n": {
+					"title": "N",
+					"type": "integer"
+				}
+			},
+			"required": [
+				"mean",
+				"p95",
+				"max",
+				"n"
+			],
+			"title": "LengthStats",
+			"type": "object"
+		},
+		"LoopInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"enum": [
+						"hf_trainer",
+						"trl_trainer",
+						"lightning",
+						"torchtitan",
+						"plain",
+						"vllm",
+						"agent_loop",
+						"eval_loop",
+						"other"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"location": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CodeLocation"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"step_call": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The call that advances one step, e.g. optimizer.step()",
+					"title": "Step Call"
+				},
+				"model_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Model Var"
+				},
+				"optimizer_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Optimizer Var"
+				},
+				"dataloader_var": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dataloader Var"
+				}
+			},
+			"required": [
+				"kind"
+			],
+			"title": "LoopInfo",
+			"type": "object"
+		},
+		"LoraInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"r": {
+					"title": "R",
+					"type": "integer"
+				},
+				"alpha": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Alpha"
+				},
+				"target_modules": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Target Modules",
+					"type": "array"
+				},
+				"dropout": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dropout"
+				}
+			},
+			"required": [
+				"r"
+			],
+			"title": "LoraInfo",
+			"type": "object"
+		},
+		"Memory": {
+			"additionalProperties": false,
+			"properties": {
+				"peak_allocated_bytes": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Peak Allocated Bytes"
+				},
+				"peak_reserved_bytes": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Peak Reserved Bytes"
+				},
+				"device_total_bytes": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Device Total Bytes"
+				},
+				"by_term": {
+					"additionalProperties": {
+						"type": "integer"
+					},
+					"description": "weights, gradients, optimizer, activations, logits, context, kv_cache, other",
+					"title": "By Term",
+					"type": "object"
+				},
+				"peak_step": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Step where the peak occurred",
+					"title": "Peak Step"
+				},
+				"timeline": {
+					"anyOf": [
+						{
+							"pattern": "^blob://[A-Za-z0-9._\\-/]+$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Timeline"
+				}
+			},
+			"title": "Memory",
+			"type": "object"
+		},
+		"ModelCall": {
+			"additionalProperties": false,
+			"properties": {
+				"provider": {
+					"description": "meta, baseten, fireworks, local",
+					"title": "Provider",
+					"type": "string"
+				},
+				"model": {
+					"title": "Model",
+					"type": "string"
+				},
+				"purpose": {
+					"description": "script_map, triage, diagnosis, guide, patch, label, command",
+					"title": "Purpose",
+					"type": "string"
+				},
+				"input_tokens": {
+					"default": 0,
+					"title": "Input Tokens",
+					"type": "integer"
+				},
+				"output_tokens": {
+					"default": 0,
+					"title": "Output Tokens",
+					"type": "integer"
+				},
+				"cached_input_tokens": {
+					"default": 0,
+					"title": "Cached Input Tokens",
+					"type": "integer"
+				},
+				"cost_usd": {
+					"default": 0,
+					"title": "Cost Usd",
+					"type": "number"
+				},
+				"request_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Request Id"
+				},
+				"at": {
+					"format": "date-time",
+					"title": "At",
+					"type": "string"
+				},
+				"latency_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Latency S"
+				},
+				"ok": {
+					"default": true,
+					"title": "Ok",
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"provider",
+				"model",
+				"purpose",
+				"at"
+			],
+			"title": "ModelCall",
+			"type": "object"
+		},
+		"ModelCard": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"description": "name@version, pinned by every grid and estimate that used it",
+					"title": "Id",
+					"type": "string"
+				},
+				"kind": {
+					"enum": [
+						"analytical",
+						"gbdt",
+						"gnn",
+						"classifier",
+						"conformal",
+						"bootstrap",
+						"simulation",
+						"ensemble",
+						"rule"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"version": {
+					"title": "Version",
+					"type": "string"
+				},
+				"training_data": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Training Data"
+				},
+				"heldout_error": {
+					"additionalProperties": {
+						"type": "number"
+					},
+					"description": "metric -> value, e.g. mape, auroc",
+					"title": "Heldout Error",
+					"type": "object"
+				},
+				"coverage": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Coverage"
+				},
+				"per_gpu_coverage": {
+					"additionalProperties": {
+						"type": "number"
+					},
+					"title": "Per Gpu Coverage",
+					"type": "object"
+				},
+				"notes": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Notes"
+				}
+			},
+			"required": [
+				"id",
+				"kind",
+				"version"
+			],
+			"title": "ModelCard",
+			"type": "object"
+		},
+		"ModelInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"name": {
+					"title": "Name",
+					"type": "string"
+				},
+				"hf_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Hf Id"
+				},
+				"family": {
+					"default": "other",
+					"enum": [
+						"decoder",
+						"encoder",
+						"encoder_decoder",
+						"cnn",
+						"vit",
+						"gnn",
+						"mlp",
+						"api",
+						"other"
+					],
+					"title": "Family",
+					"type": "string"
+				},
+				"param_count": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Param Count"
+				},
+				"n_layers": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Layers"
+				},
+				"d_model": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "D Model"
+				},
+				"n_heads": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Heads"
+				},
+				"n_kv_heads": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "N Kv Heads"
+				},
+				"d_ff": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "D Ff"
+				},
+				"vocab_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Vocab Size"
+				},
+				"dtype": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Dtype"
+				},
+				"quantization": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "e.g. 4bit-nf4, 8bit, none",
+					"title": "Quantization"
+				},
+				"lora": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/LoraInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				}
+			},
+			"required": [
+				"name"
+			],
+			"title": "ModelInfo",
+			"type": "object"
+		},
+		"Objective": {
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"default": "min_time",
+					"enum": [
+						"min_time",
+						"min_cost",
+						"max_throughput",
+						"fit_memory",
+						"min_risk",
+						"max_quality_per_usd",
+						"custom"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"target_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "For custom objectives: the target to optimise",
+					"title": "Target Id"
+				},
+				"weights": {
+					"additionalProperties": {
+						"type": "number"
+					},
+					"description": "target_id -> weight, for blends",
+					"title": "Weights",
+					"type": "object"
+				},
+				"description": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The user's use case in their own words",
+					"title": "Description"
+				}
+			},
+			"title": "Objective",
+			"type": "object"
+		},
+		"Patch": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"kind": {
+					"enum": [
+						"template",
+						"open_ended"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"template_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Template Id"
+				},
+				"title": {
+					"title": "Title",
+					"type": "string"
+				},
+				"diff": {
+					"pattern": "^blob://[A-Za-z0-9._\\-/]+$",
+					"title": "Diff",
+					"type": "string"
+				},
+				"verify": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/VerifyResult"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"session_log": {
+					"anyOf": [
+						{
+							"pattern": "^blob://[A-Za-z0-9._\\-/]+$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Session Log"
+				},
+				"finding_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Finding Id"
+				}
+			},
+			"required": [
+				"id",
+				"kind",
+				"title",
+				"diff"
+			],
+			"title": "Patch",
+			"type": "object"
+		},
+		"Power": {
+			"additionalProperties": false,
+			"properties": {
+				"mean_w": {
+					"title": "Mean W",
+					"type": "number"
+				},
+				"max_w": {
+					"title": "Max W",
+					"type": "number"
+				},
+				"samples": {
+					"title": "Samples",
+					"type": "integer"
+				}
+			},
+			"required": [
+				"mean_w",
+				"max_w",
+				"samples"
+			],
+			"title": "Power",
+			"type": "object"
+		},
+		"Prediction": {
+			"additionalProperties": {
+				"$ref": "#/$defs/Estimate"
+			},
+			"description": "target_id -> Estimate, for one knob setting.",
+			"title": "Prediction",
+			"type": "object"
+		},
+		"Predictions": {
+			"additionalProperties": false,
+			"description": "Written by B.",
+			"properties": {
+				"targets": {
+					"items": {
+						"$ref": "#/$defs/Target"
+					},
+					"title": "Targets",
+					"type": "array"
+				},
+				"estimates": {
+					"additionalProperties": {
+						"$ref": "#/$defs/Estimate"
+					},
+					"description": "Estimates at the record's current knob values",
+					"title": "Estimates",
+					"type": "object"
+				},
+				"grids": {
+					"items": {
+						"$ref": "#/$defs/Grid"
+					},
+					"title": "Grids",
+					"type": "array"
+				}
+			},
+			"title": "Predictions",
+			"type": "object"
+		},
+		"PreemptionRule": {
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"default": "none",
+					"enum": [
+						"none",
+						"poisson",
+						"policy"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"mtti_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Mean time to interrupt, for kind=poisson",
+					"title": "Mtti S"
+				},
+				"policy": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The cluster's rule in words, for kind=policy",
+					"title": "Policy"
+				},
+				"grace_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Grace S"
+				}
+			},
+			"title": "PreemptionRule",
+			"type": "object"
+		},
+		"Probe": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"title": "Id",
+					"type": "string"
+				},
+				"knobs": {
+					"additionalProperties": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"description": "Knob values this probe ran at (only those it changed or read)",
+					"title": "Knobs",
+					"type": "object"
+				},
+				"status": {
+					"enum": [
+						"queued",
+						"running",
+						"ok",
+						"oom",
+						"error",
+						"timeout",
+						"cancelled",
+						"cached"
+					],
+					"title": "Status",
+					"type": "string"
+				},
+				"steps": {
+					"description": "Optimizer steps completed; at least 2 for a valid memory peak",
+					"minimum": 0,
+					"title": "Steps",
+					"type": "integer"
+				},
+				"started_at": {
+					"anyOf": [
+						{
+							"format": "date-time",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Started At"
+				},
+				"duration_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Duration S"
+				},
+				"error": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Error"
+				},
+				"error_code": {
+					"anyOf": [
+						{
+							"pattern": "^[a-z_]+(\\.[a-z_]+)?$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Stable code for the failure; the UI shows t('error.<code>') and its hint",
+					"title": "Error Code"
+				},
+				"memory": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Memory"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"step_time": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/StepTime"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"throughput": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Throughput"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"stability": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Stability"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"data": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/DataStats"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"rl": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/RLSignals"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"power": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Power"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"eval": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/EvalStats"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"checkpoint": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CheckpointStats"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"generation": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/GenerationStats"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"extras": {
+					"additionalProperties": {
+						"type": "number"
+					},
+					"description": "Lens-specific measurements",
+					"title": "Extras",
+					"type": "object"
+				},
+				"cost": {
+					"$ref": "#/$defs/ProbeCost"
+				},
+				"cache_key": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "sha256 of script, env and knob values",
+					"title": "Cache Key"
+				},
+				"trace": {
+					"anyOf": [
+						{
+							"pattern": "^blob://[A-Za-z0-9._\\-/]+$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Trace"
+				},
+				"log": {
+					"anyOf": [
+						{
+							"pattern": "^blob://[A-Za-z0-9._\\-/]+$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Log"
+				}
+			},
+			"required": [
+				"id",
+				"knobs",
+				"status",
+				"steps"
+			],
+			"title": "Probe",
+			"type": "object"
+		},
+		"ProbeCost": {
+			"additionalProperties": false,
+			"properties": {
+				"gpu_seconds": {
+					"default": 0,
+					"title": "Gpu Seconds",
+					"type": "number"
+				},
+				"usd": {
+					"default": 0,
+					"title": "Usd",
+					"type": "number"
+				}
+			},
+			"title": "ProbeCost",
+			"type": "object"
+		},
+		"Quota": {
+			"additionalProperties": false,
+			"properties": {
+				"disk_bytes": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Disk Bytes"
+				},
+				"gpu_hours": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Gpu Hours"
+				},
+				"api_usd": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Api Usd"
+				}
+			},
+			"title": "Quota",
+			"type": "object"
+		},
+		"RLInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"algorithm": {
+					"description": "grpo, ppo, dpo, rloo, ...",
+					"title": "Algorithm",
+					"type": "string"
+				},
+				"group_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Group Size"
+				},
+				"max_completion_len": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Completion Len"
+				},
+				"reward_functions": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Reward Functions",
+					"type": "array"
+				},
+				"reference_model": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Reference Model"
+				},
+				"generation_backend": {
+					"anyOf": [
+						{
+							"enum": [
+								"hf",
+								"vllm",
+								"sglang",
+								"other"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Generation Backend"
+				}
+			},
+			"required": [
+				"algorithm"
+			],
+			"title": "RLInfo",
+			"type": "object"
+		},
+		"RLSignals": {
+			"additionalProperties": false,
+			"properties": {
+				"response_length": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/LengthStats"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"truncation_rate": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Truncation Rate"
+				},
+				"zero_spread_fraction": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Zero Spread Fraction"
+				},
+				"pass_rate_per_prompt": {
+					"items": {
+						"type": "number"
+					},
+					"title": "Pass Rate Per Prompt",
+					"type": "array"
+				},
+				"group_size": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Group Size"
+				},
+				"entropy": {
+					"items": {
+						"type": "number"
+					},
+					"title": "Entropy",
+					"type": "array"
+				},
+				"kl": {
+					"items": {
+						"type": "number"
+					},
+					"title": "Kl",
+					"type": "array"
+				},
+				"clip_fraction": {
+					"items": {
+						"type": "number"
+					},
+					"title": "Clip Fraction",
+					"type": "array"
+				},
+				"reward_mean": {
+					"items": {
+						"type": "number"
+					},
+					"title": "Reward Mean",
+					"type": "array"
+				}
+			},
+			"title": "RLSignals",
+			"type": "object"
+		},
+		"Range": {
+			"additionalProperties": false,
+			"properties": {
+				"min": {
+					"title": "Min",
+					"type": "number"
+				},
+				"max": {
+					"title": "Max",
+					"type": "number"
+				}
+			},
+			"required": [
+				"min",
+				"max"
+			],
+			"title": "Range",
+			"type": "object"
+		},
+		"ScriptKnob": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"pattern": "^[a-z][a-z0-9_.]*$",
+					"title": "Id",
+					"type": "string"
+				},
+				"label": {
+					"title": "Label",
+					"type": "string"
+				},
+				"kind": {
+					"enum": [
+						"int",
+						"float",
+						"categorical",
+						"bool"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"current": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "integer"
+						},
+						{
+							"type": "number"
+						},
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Current"
+				},
+				"unit": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Unit"
+				},
+				"choices": {
+					"items": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"title": "Choices",
+					"type": "array"
+				},
+				"location": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CodeLocation"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"needs_code": {
+					"default": false,
+					"description": "True when changing it means editing code, not a flag",
+					"title": "Needs Code",
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"id",
+				"label",
+				"kind"
+			],
+			"title": "ScriptKnob",
+			"type": "object"
+		},
+		"ScriptMap": {
+			"additionalProperties": false,
+			"properties": {
+				"lens": {
+					"enum": [
+						"finetune",
+						"pretrain",
+						"rl",
+						"agent",
+						"eval",
+						"serving",
+						"retrieval",
+						"gnn",
+						"vision"
+					],
+					"title": "Lens",
+					"type": "string"
+				},
+				"framework": {
+					"enum": [
+						"hf_trainer",
+						"trl",
+						"lightning",
+						"torchtitan",
+						"plain_pytorch",
+						"vllm",
+						"hf_generate",
+						"sentence_transformers",
+						"pyg",
+						"dgl",
+						"timm",
+						"openai_client",
+						"other"
+					],
+					"title": "Framework",
+					"type": "string"
+				},
+				"entrypoint": {
+					"title": "Entrypoint",
+					"type": "string"
+				},
+				"launch": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Command line that runs the script",
+					"title": "Launch"
+				},
+				"model": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/ModelInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"data": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/DataInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"training": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/TrainInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"loop": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/LoopInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"knobs": {
+					"items": {
+						"$ref": "#/$defs/ScriptKnob"
+					},
+					"title": "Knobs",
+					"type": "array"
+				},
+				"blocks": {
+					"items": {
+						"$ref": "#/$defs/Block"
+					},
+					"title": "Blocks",
+					"type": "array"
+				},
+				"agent": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/AgentInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"rl": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/RLInfo"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"risks": {
+					"description": "Problems noticed while reading, in plain words",
+					"items": {
+						"type": "string"
+					},
+					"title": "Risks",
+					"type": "array"
+				},
+				"produced_by": {
+					"default": "adapter",
+					"enum": [
+						"muse_spark",
+						"adapter",
+						"manual"
+					],
+					"title": "Produced By",
+					"type": "string"
+				},
+				"confidence": {
+					"default": 1.0,
+					"maximum": 1,
+					"minimum": 0,
+					"title": "Confidence",
+					"type": "number"
+				}
+			},
+			"required": [
+				"lens",
+				"framework",
+				"entrypoint"
+			],
+			"title": "ScriptMap",
+			"type": "object"
+		},
+		"Source": {
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"enum": [
+						"sample",
+						"repo",
+						"upload",
+						"notebook",
+						"template",
+						"cli",
+						"inflight"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"uri": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "sample://name, https://github.com/..., upload://<hash>",
+					"title": "Uri"
+				},
+				"commit": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Commit"
+				},
+				"content_hash": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "sha256 of the submitted code",
+					"title": "Content Hash"
+				},
+				"entrypoint": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Entrypoint"
+				},
+				"args": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Args",
+					"type": "array"
+				}
+			},
+			"required": [
+				"kind"
+			],
+			"title": "Source",
+			"type": "object"
+		},
+		"Stability": {
+			"additionalProperties": false,
+			"properties": {
+				"series": {
+					"additionalProperties": {
+						"items": {
+							"anyOf": [
+								{
+									"type": "number"
+								},
+								{
+									"type": "null"
+								}
+							]
+						},
+						"type": "array"
+					},
+					"description": "Per step: loss, grad_norm, grad_norm_ma, update_to_weight, max_attn_logit, output_logit_norm, loss_scale, lr",
+					"title": "Series",
+					"type": "object"
+				},
+				"nan_count": {
+					"default": 0,
+					"title": "Nan Count",
+					"type": "integer"
+				},
+				"inf_count": {
+					"default": 0,
+					"title": "Inf Count",
+					"type": "integer"
+				},
+				"loss_scale_events": {
+					"default": 0,
+					"title": "Loss Scale Events",
+					"type": "integer"
+				}
+			},
+			"title": "Stability",
+			"type": "object"
+		},
+		"StepTime": {
+			"additionalProperties": false,
+			"properties": {
+				"n_steps": {
+					"minimum": 0,
+					"title": "N Steps",
+					"type": "integer"
+				},
+				"mean_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Mean S"
+				},
+				"p50_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "P50 S"
+				},
+				"p95_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "P95 S"
+				},
+				"first_step_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Includes compile and warm-up",
+					"title": "First Step S"
+				},
+				"by_phase": {
+					"additionalProperties": {
+						"type": "number"
+					},
+					"description": "Fractions of a step: data, forward, backward, optimizer, eval, rollout, reference, reward, update, weight_sync, idle",
+					"title": "By Phase",
+					"type": "object"
+				},
+				"unprofiled": {
+					"default": true,
+					"description": "Timings come from steps without the profiler attached",
+					"title": "Unprofiled",
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"n_steps"
+			],
+			"title": "StepTime",
+			"type": "object"
+		},
+		"Target": {
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"description": "Dotted id, e.g. memory.peak, time.total, cost.total, risk.oom",
+					"title": "Id",
+					"type": "string"
+				},
+				"label_key": {
+					"title": "Label Key",
+					"type": "string"
+				},
+				"unit": {
+					"title": "Unit",
+					"type": "string"
+				},
+				"readout": {
+					"anyOf": [
+						{
+							"enum": [
+								"memory",
+								"time",
+								"cost",
+								"risk"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Which of the four readouts shows it, if any",
+					"title": "Readout"
+				}
+			},
+			"required": [
+				"id",
+				"label_key",
+				"unit"
+			],
+			"title": "Target",
+			"type": "object"
+		},
+		"Throughput": {
+			"additionalProperties": false,
+			"properties": {
+				"tokens_per_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Tokens Per S"
+				},
+				"samples_per_s": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Samples Per S"
+				},
+				"flops_per_step": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Flops Per Step"
+				},
+				"mfu": {
+					"anyOf": [
+						{
+							"maximum": 1.5,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Mfu"
+				}
+			},
+			"title": "Throughput",
+			"type": "object"
+		},
+		"TrainInfo": {
+			"additionalProperties": false,
+			"properties": {
+				"optimizer": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Optimizer"
+				},
+				"lr": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Lr"
+				},
+				"warmup_steps": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Warmup Steps"
+				},
+				"grad_accum": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Grad Accum"
+				},
+				"precision": {
+					"default": "unknown",
+					"enum": [
+						"fp32",
+						"fp16",
+						"bf16",
+						"fp8",
+						"mixed",
+						"unknown"
+					],
+					"title": "Precision",
+					"type": "string"
+				},
+				"max_steps": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Max Steps"
+				},
+				"epochs": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Epochs"
+				},
+				"checkpoint_every": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Checkpoint Every"
+				},
+				"eval_every": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Eval Every"
+				},
+				"grad_checkpointing": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Grad Checkpointing"
+				},
+				"eval_under_no_grad": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Eval Under No Grad"
+				},
+				"distributed": {
+					"default": "none",
+					"enum": [
+						"none",
+						"ddp",
+						"fsdp",
+						"deepspeed",
+						"tp",
+						"other"
+					],
+					"title": "Distributed",
+					"type": "string"
+				}
+			},
+			"title": "TrainInfo",
+			"type": "object"
+		},
+		"VerifyResult": {
+			"additionalProperties": false,
+			"properties": {
+				"status": {
+					"enum": [
+						"pending",
+						"passed",
+						"failed",
+						"error"
+					],
+					"title": "Status",
+					"type": "string"
+				},
+				"metric": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Metric"
+				},
+				"before": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Before"
+				},
+				"after": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "After"
+				},
+				"fixed_seed_loss_delta": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Fixed Seed Loss Delta"
+				},
+				"effective_batch_unchanged": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Effective Batch Unchanged"
+				},
+				"probe_id": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Probe Id"
+				}
+			},
+			"required": [
+				"status"
+			],
+			"title": "VerifyResult",
+			"type": "object"
+		}
+	}
+}
