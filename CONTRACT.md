@@ -7,7 +7,7 @@ agent rereads this file and the Contracts tab at the start of every session.
 Frozen at v0.1 on **Tue Oct 27, noon ET**. After that, changes are additive
 only (new optional fields, new endpoints, new tools) and bump the minor
 version. A breaking change needs Chiya's sign-off and a note in every agent's
-chat. Ask for changes in `docs/requests.md` with a `TODO(contract)` line.
+chat. Ask for changes in your own `docs/requests/from-<you>.md` with a `TODO(contract)` line.
 
 ## Generated files
 
@@ -124,10 +124,11 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 - One branch per agent (`ws-a` to `ws-d`); only Chiya merges into main, nightly.
 - No push without Chiya's explicit consent in that chat, every time. Run gitleaks first.
-- Touch only the paths you own. Need something else? `TODO(contract)` in `docs/requests.md`.
+- Touch only the paths you own. Need something else? `TODO(contract)` in your own `docs/requests/from-<you>.md`; never edit another agent's file.
 - Every feature behind a flag in `flags.json`, off by default.
 - Nightly: update `docs/status/<agent>.md` with done, blocked, next.
-- Secrets only in Modal secrets, Cloudflare env and GitHub Actions secrets.
+- Secrets only in Modal secrets, Cloudflare env and GitHub Actions secrets. Agents never hold keys: cloud runs go through `remote-run.yml` and `amd-run.yml` (docs/setup/cloud.md). Canonical names: `META_API_KEY`, `META_API_BASE`, `BASETEN_API_KEY`, `BASETEN_BASE_URL`, `BASETEN_MODEL`; Modal secrets `preflight-meta` and `preflight-baseten`, never mounted in probe containers.
+- Start every session with `git merge origin/main` (merge, never rebase once pushed).
 - Python 3.11, uv, ruff; TypeScript strict; tabs in both; British spelling and no em dashes in user-facing copy.
 
 ## Changelog

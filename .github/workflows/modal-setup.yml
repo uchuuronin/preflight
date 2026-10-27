@@ -1,0 +1,42 @@
+# One-time (and after any key rotation): create the Modal environments the deploy uses and copy the
+# model API keys from GitHub secrets into Modal secrets, so code running on Modal can read them.
+# Probe containers never mount these secrets (gap 6); only the API and pipeline functions do.
+name: modal-setup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.11.x"
+          python-version: "3.11"
+      - run: uv sync --locked --extra modal
+      - name: Environments and secrets
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          META_API_KEY: ${{ secrets.META_API_KEY }}
+          META_API_BASE: ${{ secrets.META_API_BASE }}
+          BASETEN_API_KEY: ${{ secrets.BASETEN_API_KEY }}
+        run: |
+          set -euo pipefail
+          uv run modal environment create production || true
+          uv run modal environment create preview || true
+          for env in main production preview; do
+            if [ -n "$META_API_KEY" ]; then
+              uv run modal secret create preflight-meta META_API_KEY="$META_API_KEY" META_API_BASE="$META_API_BASE" --env "$env" --force > /dev/null
+            fi
+            if [ -n "$BASETEN_API_KEY" ]; then
+              uv run modal secret create preflight-baseten BASETEN_API_KEY="$BASETEN_API_KEY" BASETEN_BASE_URL="https://inference.baseten.co/v1" --env "$env" --force > /dev/null
+            fi
+            echo "secrets set in Modal environment $env"
+          done
