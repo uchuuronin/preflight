@@ -41,7 +41,7 @@ export interface TraceEntry {
 	pending?: boolean;
 }
 
-interface State {
+export interface State {
 	knobs: Record<string, KnobValue>;
 	pinned: ReadonlySet<string>;
 	objective: Objective;
@@ -92,10 +92,16 @@ function reducer(state: State, action: Action): State {
 		}
 		case "objective":
 			return { ...state, objective: { ...state.objective, kind: action.kind } };
-		case "highlight":
-			return { ...state, highlight: action.nodes };
-		case "propose":
-			return { ...state, proposal: action.proposal };
+		case "highlight": {
+			// The knob the guide is moving stays highlighted while it moves (D's request).
+			const moving = state.proposal ? [`knob:${state.proposal.knobId}`] : [];
+			return { ...state, highlight: [...new Set([...action.nodes, ...moving])] };
+		}
+		case "propose": {
+			const rest = state.highlight.filter((h) => !h.startsWith("knob:"));
+			const moving = action.proposal ? [`knob:${action.proposal.knobId}`] : [];
+			return { ...state, proposal: action.proposal, highlight: [...rest, ...moving] };
+		}
 		case "focus":
 			return { ...state, focus: action.node };
 		case "activeKnob":
@@ -248,4 +254,28 @@ export function useWorkspace(): Workspace {
 
 export function useOptionalWorkspace(): Workspace | null {
 	return useContext(Ctx);
+}
+
+/** Knob ids the guide is on: the one it is moving and any it points at (`knob:<id>` in highlight). */
+export function guidedKnobs(state: Pick<State, "highlight" | "proposal">): Set<string> {
+	const ids = state.highlight.filter((h) => h.startsWith("knob:")).map((h) => h.slice(5));
+	if (state.proposal) ids.push(state.proposal.knobId);
+	return new Set(ids);
+}
+
+/**
+ * Knob ids by impact on the current objective at the current setting, most first, from the
+ * provider's sensitivity(). Computed only by the components that ask (the dock when a knob
+ * view is registered, and add-ons), and memoised on the setting and the objective.
+ */
+export function useRanked(enabled = true): readonly string[] {
+	const ws = useOptionalWorkspace();
+	const record = ws?.record;
+	const provider = ws?.provider;
+	const knobs = ws?.state.knobs;
+	const objective = ws?.state.objective;
+	return useMemo(() => {
+		if (!enabled || !record || !provider || !knobs || !objective) return [];
+		return provider.sensitivity(record, objective, { knobs }).map((k) => k.knob_id);
+	}, [enabled, record, provider, knobs, objective]);
 }

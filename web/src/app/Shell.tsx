@@ -14,6 +14,7 @@ import { Home } from "./screens/Home";
 import { Logbook } from "./screens/Logbook";
 import { NewFlight } from "./screens/NewFlight";
 import { go, href, SCREEN_ORDER, type Screen, useRoute } from "./route";
+import { AddonBoundary } from "../components/AddonBoundary";
 
 const SKY_Y: Record<Screen, number> = { home: -47, new: -38, boarding: -26, cockpit: -12, logbook: 0 };
 const THEME_KEY = "pf.theme";
@@ -90,7 +91,9 @@ export function Shell() {
 				})}
 				<span className="pf-nav__sep" aria-hidden="true" />
 				{navEnd.map((p) => (
-					<p.component key={p.id} />
+					<AddonBoundary key={p.id} id={p.id}>
+						<p.component />
+					</AddonBoundary>
 				))}
 				<button type="button" className="pf-nav__sky" onClick={toggleSky} aria-label={theme === "dusk" ? t("nav.to_day") : t("nav.to_dusk")}>
 					{theme === "dusk" ? (

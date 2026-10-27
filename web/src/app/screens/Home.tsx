@@ -9,6 +9,7 @@ import { useAppPanels } from "../../registry";
 import { DEFAULT_SAMPLE } from "../../workspace/record/load";
 import { href } from "../route";
 import { Plane } from "../Plane";
+import { AddonBoundary } from "../../components/AddonBoundary";
 
 export function Home() {
 	const [p, setP] = useState(0);
@@ -71,7 +72,9 @@ export function Home() {
 						<p>{t("home.verify.body")}</p>
 					</div>
 					{extraBeats.map((b) => (
-						<b.component key={b.id} />
+						<AddonBoundary key={b.id} id={b.id}>
+							<b.component />
+						</AddonBoundary>
 					))}
 				</section>
 				<section className="pf-closing">

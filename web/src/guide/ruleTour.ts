@@ -5,7 +5,7 @@
  */
 import { hasKey } from "../lib/i18n";
 import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
-import { failureTarget } from "../workspace/record/model";
+import { costStraddlesBudget, failureTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
 import type { KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
 
@@ -107,7 +107,7 @@ export interface TourStep {
 	 * move: apply a "fits" move. probe_offer: a "tight" setting would save enough to be worth
 	 * measuring first (the person's click). blocked_by_pin, nothing_safe, done: as named.
 	 */
-	kind: "move" | "probe_offer" | "blocked_by_pin" | "nothing_safe" | "done";
+	kind: "move" | "probe_offer" | "sample_offer" | "blocked_by_pin" | "nothing_safe" | "done";
 	move?: Move;
 	pinnedKnob?: string;
 	nodes: string[];
@@ -171,7 +171,15 @@ function probeOffer(ctx: TourContext, bestFits: Move | undefined): Move | undefi
 	return offers.find((m) => Math.abs(m.relative ?? 0) - base >= PROBE_WORTH);
 }
 
+/** Visited marker for the sample offer, so Skip moves on. */
+export const SAMPLE_VISIT = "sample:more";
+
 export function nextStep(ctx: TourContext): TourStep {
+	// An agent run whose cost range straddles the budget: whether it fits depends on where the
+	// real cost lands, so measuring more tasks comes before any saving (sample_more, a click).
+	if (!ctx.visited.has(SAMPLE_VISIT) && costStraddlesBudget(ctx.record, ctx.provider.predict(ctx.record, ctx.knobs))) {
+		return { kind: "sample_offer", nodes: [], textKey: "guide.sample_offer", whyKey: "guide.sample_offer.why" };
+	}
 	const failing = isFailing(ctx);
 	const top = candidates(ctx, ctx.pinned)[0];
 	const offer = probeOffer(ctx, top);

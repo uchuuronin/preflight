@@ -13,6 +13,7 @@ import { target } from "../record/model";
 import { useWorkspace } from "../state";
 import { bounds, trusted } from "../status";
 import { Provenance } from "../components/StatusMark";
+import { AddonBoundary } from "../../components/AddonBoundary";
 
 export function DetailSheet() {
 	const { record, estimates, state, actions } = useWorkspace();
@@ -104,7 +105,9 @@ export function DetailSheet() {
 				</div>
 			))}
 			{drawer.map((p) => (
-				<p.component key={p.id} nodeId={node.id} record={record} knobs={state.knobs} estimates={estimates} />
+				<AddonBoundary key={p.id} id={p.id}>
+					<p.component nodeId={node.id} record={record} knobs={state.knobs} estimates={estimates} />
+				</AddonBoundary>
 			))}
 			<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.focus(null)}>
 				{t("detail.back")}
