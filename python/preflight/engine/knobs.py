@@ -117,11 +117,11 @@ _SPECS = [
 	_k("index_nlist", "retrieval.index_nlist", "time quality", "time"),
 	# agents
 	_k("model", "agent.model", "time cost risk quality", "time cost risk"),
-	_k("prompt_caching", "agent.prompt_caching", "cost time"),
+	_k("prompt_caching", "agent.prompt_caching", "cost time", "", "Cache pricing comes from the API price table."),
 	_k("concurrency", "agent.concurrency", "time risk", "time risk", "Rate limits cap the gain."),
 	_k("max_turns", "agent.max_turns", "cost time risk quality", "cost time risk"),
 	_k("n_tasks", "agent.n_tasks", "cost time"),
-	_k("tool_retry_cap", "agent.tool_retry_cap", "cost time risk"),
+	_k("tool_retry_cap", "agent.tool_retry_cap", "cost time risk", "", "Retry loops are counted, not yet simulated."),
 	_k("reasoning_effort", "agent.reasoning_effort", "cost time quality", "cost time"),
 	# distributed and kernels
 	_k("fsdp_mode", "parallel.strategy", "memory time cost", note="full_shard, shard_grad_op, hybrid_shard."),

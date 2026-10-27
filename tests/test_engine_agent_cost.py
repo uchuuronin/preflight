@@ -203,3 +203,10 @@ def test_combine_samples_dedupes_and_keeps_the_population():
 	assert len(both.tasks) == 50 and both.population == 500
 	assert both.selection == "30-70% pass band + top-up of 20"
 	assert ac.agent_totals(both)["cost.total"].detail["n"] == 50
+
+
+def test_top_up_is_not_offered_again_after_dedup():
+	e = ac.TotalEstimate(
+		25, 20, 30, "usd", "predicted", detail={"n": 45, "population": 500, "topped_up": True}
+	)
+	assert not ac.budget_check(e, 25).offer_top_up

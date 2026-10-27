@@ -227,3 +227,110 @@ def test_grid_values_stay_finite_after_scaling(ft):
 	for g in api.build_grids(ft, ["batch_size", "seq_len"]):
 		for name in ("point", "lo", "hi"):
 			assert np.isfinite(g.values(name)).all()
+
+
+# ---------------------------------------------------------------- review fixes (Oct 27)
+
+
+def test_unknown_gpu_never_reads_as_measured(ft):
+	e = api.predict(ft, {"gpu_type": "TPU-v5"}).root["time.step"]
+	assert e.status == "abstain" and "TPU-v5" in e.reason
+	no_gpu = ft.model_copy(update={"env": ft.env.model_copy(update={"gpu": None, "backend": "cpu"})})
+	e = api.predict(no_gpu, {"gpu_type": "H100-SXM-80GB"}).root["time.step"]
+	assert e.status == "abstain" and "without a known GPU" in e.reason
+
+
+def test_an_oom_probe_only_counts_on_its_own_gpu(ft):
+	oom = ft.probes[0].model_copy(
+		update={"id": "p9", "status": "oom", "knobs": {"batch_size": 16, "seq_len": 1024}}
+	)
+	rec = ft.model_copy(update={"probes": [*ft.probes, oom]})
+	assert api.predict(rec, {"batch_size": 16}).root["risk.oom"].status == "measured"
+	h100 = api.predict(rec, {"batch_size": 16, "gpu_type": "H100-SXM-80GB"}).root["risk.oom"]
+	assert h100.status != "measured"
+
+
+def test_unknown_precision_abstains_instead_of_crashing(ft):
+	pc = ft.knob("precision")
+	knob = pc.model_copy(
+		update={"domain": pc.domain.model_copy(update={"values": [*pc.domain.values, "int8"]})}
+	)
+	rec = ft.model_copy(update={"knobs": [knob if k.id == "precision" else k for k in ft.knobs]})
+	p = api.predict(rec, {"precision": "int8"}).root
+	assert all(e.status == "abstain" for e in p.values()) and "int8" in p["time.step"].reason
+	assert api.build_grids(rec, ["precision"]) and api.sensitivity(rec, Objective(kind="min_cost"))
+
+
+def test_bad_inputs(ft):
+	assert api.predict(ft, {"batch_size": 0}).root["memory.peak"].reason == "batch_size must be at least 1"
+	with pytest.raises(ValueError, match="takes a number"):
+		api.predict(ft, {"batch_size": "abc"})
+	with pytest.raises(ValueError, match="true or false"):
+		api.predict(ft, {"packing": "yes"})
+
+
+def test_max_throughput_prefers_bigger_batches(ft):
+	rows = {r.knob_id: r for r in api.sensitivity(ft, Objective(kind="max_throughput"))}
+	assert rows["batch_size"].direction == "increase" and rows["batch_size"].best_value > 1
+
+
+def test_sensitivity_drops_knobs_inside_the_band(ft):
+	ids = {r.knob_id for r in api.sensitivity(ft, Objective(kind="min_cost"))}
+	assert not ids & {"packing", "eval_no_grad", "lora_r"}
+
+
+def test_more_gpus_add_communication(ft):
+	# compare at a batch no probe ran, so both sides come from the same fit
+	one = api.predict(ft, {"batch_size": 3}).root
+	eight = api.predict(ft, {"batch_size": 3, "gpus": 8}).root
+	assert eight["time.step"].status == "extrapolated" and "all-reduce" in eight["time.step"].reason
+	assert eight["time.step"].point > one["time.step"].point  # the all-reduce costs something
+	assert eight["time.total"].point > one["time.total"].point / 8  # not a perfect 8x speed-up
+	# the all-reduce's own error adds to the step's (LoRA gradients are small, so only just)
+	assert (eight["time.step"].hi - eight["time.step"].lo) >= (one["time.step"].hi - one["time.step"].lo)
+
+
+def test_preemption_never_loses_more_than_the_run(pt):
+	c = pt.job.constraints
+	c = c.model_copy(
+		update={"preemption": c.preemption.model_copy(update={"kind": "poisson", "mtti_s": 4 * 3600.0})}
+	)
+	rec = pt.model_copy(update={"job": pt.job.model_copy(update={"constraints": c})})
+	p = api.predict(rec, {"checkpoint_every": 100000}).root
+	per_interrupt = p["risk.preemption_loss"].point / (p["time.total"].point / (4 * 3600.0))
+	assert per_interrupt <= p["time.total"].point / 2 + 60 + (c.preemption.grace_s or 0) + 1e-6
+
+
+def test_log_axis_from_zero():
+	from preflight.schema.record import Domain, Knob
+
+	k = Knob(
+		id="wd", label_key="knob.wd", kind="float", current=0.1, domain=Domain(min=0.0, max=1.0, log=True)
+	)
+	v = api.axis_values(k)
+	assert v[0] > 0 and 0.1 in v
+
+
+def test_agent_turn_cap_and_untagged_tasks(ag):
+	rec = _agent_with(ag, 30)
+	base = api.predict(rec).root["cost.total"]
+	capped = api.predict(rec, {"max_turns": 2}).root["cost.total"]
+	assert (
+		capped.point < base.point and capped.status == "extrapolated" and "stop at 2 turns" in capped.reason
+	)
+	retry = api.predict(rec, {"tool_retry_cap": 0}).root["cost.total"]
+	assert retry.status == "extrapolated" and "tool_retry_cap" in retry.reason
+	untagged = rec.model_copy(
+		update={
+			"agent_sample": rec.agent_sample.model_copy(
+				update={"tasks": [t.model_copy(update={"model": None}) for t in rec.agent_sample.tasks]}
+			)
+		}
+	)
+	assert api.predict(untagged, {"model": "muse-glimmer"}).root["cost.total"].status == "abstain"
+	assert api.predict(untagged).root["cost.total"].status == "predicted"
+
+
+def test_context_limit_below_the_sample_abstains(ag):
+	e = api.predict(_agent_with(ag, 30), {"context_limit": 4096}).root["memory.context_fill"]
+	assert e.status == "abstain" and "would overflow" in e.reason

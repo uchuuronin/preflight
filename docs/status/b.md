@@ -56,6 +56,13 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
   - Every lens gets its readouts: GPU lenses get memory, OOM risk, step and total time, cost, the wall-cap risk and preemption loss; API lenses get cost, tokens, wall clock under concurrency and rate limits, context fill and runaway rate.
   - Knob moves the models don't capture widen the band or abstain, and "measured" means a probe really saw the peak.
   - About 0.4 ms per `predict`; a 7x7 grid of four targets takes 20 ms.
+- **Independent review of `api.py`:** one critical, seven important and seven minor findings, all fixed with tests:
+  - an unknown GPU no longer reads as the probe's GPU, and an OOM probe only counts on its own GPU;
+  - bad precision values and sizes abstain instead of crashing;
+  - throughput sensitivity is per unit of work;
+  - more GPUs add the all-reduce, with its own error;
+  - the agent path honours turn caps, the sampled model and unmodelled knobs;
+  - the context limit below the sample abstains, and the top-up is offered once.
 - **K1's band (S4c):** sized to cover 90% even if per-kernel drift is twice what S4 assumed. Cross-vendor drops from a hand-set 0.25 to 0.22, so AMD gets numbers with wide bands instead of always abstaining.
 - Tests live in root `tests/`; 701 pass across the repo (A's included), ruff clean with the repo config.
 
@@ -63,7 +70,7 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
 - Modal access, for the NVIDIA corpus slice.
 
 ## Next (Wed Oct 28)
-- Run-cost breakdown (gap 21).
+- Run-cost breakdown (gap 21): the price table is started in `engine/prices/`; the `cost_basis` and `job_cost` schema fields wait on Chiya.
 - Conformal layer (CQR, log-ratio scores) replacing the simulated band constants.
 - Agent cost from tokens when tasks lack `cost_usd`, once D's API price table lands.
 

@@ -129,13 +129,41 @@ TRUNCATING_KNOBS = frozenset(
 )
 
 
+_SIZES = "batch_size seq_len grad_accum gpus eval_batch_size encode_batch_size image_size max_steps n_tasks concurrency max_turns context_limit"
+SIZE_KNOBS = frozenset(_SIZES.split())
+
+
 def _values(record: FlightRecord, overrides: dict | None) -> dict:
+	"""Current knob values with the overrides applied; a value of the wrong kind is the caller's bug."""
 	vals = _current(record)
+	kinds = {k.id: k.kind for k in record.knobs}
 	for kid, v in (overrides or {}).items():
 		if kid not in vals and kid not in ENGINE_WHAT_IFS:
 			raise ValueError(f"unknown knob {kid!r}: the record declares {sorted(vals)}")
+		kind = kinds.get(kid)
+		if kind in ("int", "float") and (
+			isinstance(v, bool) or not isinstance(v, int | float) or not math.isfinite(v)
+		):
+			raise ValueError(f"knob {kid!r} takes a number, got {v!r}")
+		if kind == "bool" and not isinstance(v, bool):
+			raise ValueError(f"knob {kid!r} takes true or false, got {v!r}")
 		vals[kid] = v
 	return vals
+
+
+def _invalid(values: dict) -> str | None:
+	"""Values the engine can't predict at, as a reason every target abstains with."""
+	for kid in sorted(SIZE_KNOBS & set(values)):
+		v = values[kid]
+		if v is not None and not isinstance(v, bool) and isinstance(v, int | float) and v <= 0:
+			return f"{kid} must be at least 1"
+	for kid in _PRECISION_KNOBS:
+		v = values.get(kid)
+		if isinstance(v, str) and v not in ("mixed", "unknown") and _precision({kid: v}) is None:
+			return (
+				f"precision {v!r} isn't one the engine models (quantised weights use the quantization knob)"
+			)
+	return None
 
 
 def _probe_values(record: FlightRecord, probe) -> dict:
@@ -216,7 +244,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	capacity = gpus.get_gpu(gpu).capacity_bytes()
 	oom_probe = _matching_probe(record, values, ok=("oom",))
-	if oom_probe is not None:
+	if oom_probe is not None and gpu == _env_gpu(record):  # an OOM on one GPU says nothing about a bigger one
 		why = f"probe {oom_probe.id} ran out of memory at these settings"
 		est = memory.MemoryEstimate(None, None, None, "bytes", "abstain", mid, 1.0, "fails", 0.0, None, why)  # type: ignore[arg-type]
 		oom = _est(1.0, 1.0, 1.0, "probability", "measured", mid, why)
@@ -350,10 +378,18 @@ def _step_x(lens: str, values: dict) -> float:
 	return knobs.work_units(lens, values) * max(1, int(values.get("grad_accum", 1) or 1))
 
 
+_PRECISION_KNOBS = ("precision", "dtype", "torch_dtype", "ptdtype")
+
+
 def _precision(values: dict) -> str | None:
-	for k in ("precision", "dtype", "torch_dtype", "ptdtype"):
-		if k in values and isinstance(values[k], str):
-			return gpus.normalise_dtype(values[k]) if values[k] not in ("mixed", "unknown") else None
+	"""The compute dtype a precision knob names; None when it says mixed, unknown or nothing usable."""
+	for k in _PRECISION_KNOBS:
+		v = values.get(k)
+		if isinstance(v, str) and v not in ("mixed", "unknown"):
+			try:
+				return gpus.normalise_dtype(v)
+			except ValueError:
+				return None
 	return None
 
 
@@ -391,7 +427,13 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	recompute = bool(values.get("gradient_checkpointing")) and probe_gc == {False}
 	match = _matching_probe(record, values)
 	src_gpu, tgt_gpu = _env_gpu(record), _target_gpu(record, values)
-	same_gpu = src_gpu is None or tgt_gpu is None or src_gpu == tgt_gpu
+	requested = values.get("gpu_type")
+	if requested and tgt_gpu is None:
+		return _StepResult(_abstain("s", mid, f"{requested!r} isn't a GPU the table knows"), 0.0)
+	if requested and src_gpu is None and tgt_gpu is not None:
+		why = f"the probes ran without a known GPU (CPU, MPS or an unlisted card), so their times don't carry to {tgt_gpu}"
+		return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), 0.0)
+	same_gpu = tgt_gpu == src_gpu
 	est = model.predict(
 		_step_x(lens, values), recompute=recompute, measured_probe=match.id if match and same_gpu else None
 	)
@@ -401,9 +443,14 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 
 	# precision moved away from what the probes ran
 	q_prec = _precision(values)
-	p_precs = {_precision(_probe_values(record, p)) for p in record.probes if p.status in OK_PROBE}
+	x_q = _step_x(lens, values)
+	by_dist = sorted(
+		(abs(math.log(max(_step_x(lens, pv), 1e-9) / max(x_q, 1e-9))), i, _precision(pv))
+		for i, pv in enumerate(_probe_values(record, p) for p in record.probes if p.status in OK_PROBE)
+	)
+	p_precs = {pr for _, _, pr in by_dist}
 	if q_prec and p_precs and q_prec not in p_precs and src_gpu:
-		src_prec = next(iter(p_precs - {None}), None)
+		src_prec = next((pr for _, _, pr in by_dist if pr), None)  # the nearest probe's, deterministically
 		tf32 = (
 			bool(current_probe.kernels.allow_tf32)
 			if current_probe is not None and current_probe.kernels
@@ -449,7 +496,29 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		if status == "measured":
 			status = "predicted"
 
-	moves = _unmodelled_moves(record, values, "time")
+	# a different GPU count than the probes: data parallel adds the gradient all-reduce
+	world = _n_gpus(values, record)
+	probed_world = _probed_world(record)
+	if world != probed_world:
+		if probed_world != 1:
+			why = f"the probes ran on {probed_world} GPUs; another count isn't modelled from there"
+			return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, why), sigma)
+		grad_bytes = _grad_bytes(record, values)
+		if grad_bytes is None:
+			why = "the trainable parameter count isn't known, so the gradient all-reduce can't be sized"
+			return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, why), sigma)
+		multi = steptime.multi_gpu_step(
+			point, grad_bytes, world, tgt_gpu or src_gpu, _strategy(record, values)
+		)
+		if multi.status == "abstain":
+			return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, multi.reason), sigma)
+		# each part keeps its own error: the measured step its sigma, the estimated all-reduce SIGMA_COMM
+		comm = multi.breakdown.get("comm_exposed", 0.0)
+		sigma = math.hypot(point * sigma, comm * steptime.SIGMA_COMM) / multi.point
+		point, status, mid = multi.point, "extrapolated", steptime.MODEL_ID_COMM
+		reasons.append(f"{world} GPUs: the gradient all-reduce is estimated, not measured")
+
+	moves = [m for m in _unmodelled_moves(record, values, "time") if m != "gpus"]
 	if moves:
 		sigma *= UNMODELLED_WIDEN
 		status = "extrapolated" if status != "abstain" else status
@@ -467,6 +536,33 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		sigma,
 		first,
 	)
+
+
+def _probed_world(record: FlightRecord) -> int:
+	counts = {_n_gpus(_probe_values(record, p), record) for p in record.probes if p.status in OK_PROBE}
+	return min(counts) if counts else 1
+
+
+def _grad_bytes(record: FlightRecord, values: dict) -> float | None:
+	"""Gradient bytes one step all-reduces: trainable parameters in the compute dtype."""
+	n = None
+	for p in record.probes:
+		if p.status in OK_PROBE and p.extras.get("params_trainable"):
+			n = p.extras["params_trainable"]
+			break
+	if n is None:
+		try:
+			arch, setup, _ = knobs.setup_from(record.job.script_map, values)
+			n = memory.static_terms(arch, setup)["gradients"] / memory.dtype_bytes(setup.compute_dtype)
+		except (ValueError, AttributeError, KeyError):
+			return None
+	return float(n) * memory.dtype_bytes(_precision(values) or "bf16")
+
+
+def _strategy(record: FlightRecord, values: dict) -> str:
+	sm = record.job.script_map
+	dist = (sm.training.distributed if sm and sm.training else "none") or "none"
+	return {"fsdp": "fsdp", "deepspeed": "zero3", "ddp": "ddp"}.get(dist, "ddp")
 
 
 # ---------------------------------------------------------------- run totals
@@ -597,7 +693,8 @@ def _preemption(record: FlightRecord, values: dict, time: _TimeResult) -> Estima
 		if record.job.script_map and record.job.script_map.training
 		else None
 	)
-	interval = float(every) * step if every else time.total.point  # no checkpoints: lose everything so far
+	# no checkpoints (or fewer than one per run): an interruption loses everything so far
+	interval = min(float(every) * step, time.total.point) if every else time.total.point
 	restart = (rule.grace_s or 0.0) + 60.0  # requeue and reload, at least a minute
 	lost_each = interval / 2 + restart  # Young/Daly: on average half an interval is redone
 
@@ -619,13 +716,68 @@ def _preemption(record: FlightRecord, values: dict, time: _TimeResult) -> Estima
 # ---------------------------------------------------------------- API lenses (agents)
 
 
+def _sampled_model(record: FlightRecord) -> str | None:
+	"""The model the agent probe ran: an untagged task belongs to it, not to whatever is chosen now."""
+	for p in record.probes:
+		if p.status in OK_PROBE and isinstance(p.knobs.get("model"), str):
+			return p.knobs["model"]
+	cur = _current(record).get("model")
+	return cur if isinstance(cur, str) else None
+
+
 def _tasks_for(record: FlightRecord, values: dict):
 	s = record.agent_sample
 	if s is None:
 		return None, []
 	model = values.get("model")
-	tasks = [t for t in s.tasks if model is None or t.model in (None, model)]
+	default = _sampled_model(record)
+	tasks = [t for t in s.tasks if model is None or (t.model or default) == model]
 	return s, tasks
+
+
+def _cap_turns(tasks, max_turns: int | None):
+	"""Tasks as they'd run under a turn cap: cut at the cap (input by the recorded context, the rest pro rata).
+
+	Returns the tasks, how many the cap cuts, and how many hit a lower cap in the sample (so their real
+	cost past it is unknown when the cap is raised)."""
+	if not max_turns:
+		return tasks, 0, 0
+	out, cut, hit = [], 0, 0
+	for t in tasks:
+		if t.turns > max_turns:
+			cut += 1
+			share = max_turns / t.turns
+			ctx = t.context_tokens_by_turn
+			in_share = sum(ctx[:max_turns]) / sum(ctx) if ctx and sum(ctx) > 0 else share
+			out.append(
+				t.model_copy(
+					update={
+						"turns": max_turns,
+						"input_tokens": int(t.input_tokens * in_share),
+						"cached_input_tokens": int(t.cached_input_tokens * in_share),
+						"output_tokens": int(t.output_tokens * share),
+						"reasoning_tokens": int(t.reasoning_tokens * share),
+						"latency_s": t.latency_s * share,
+						"cost_usd": None if t.cost_usd is None else t.cost_usd * in_share,
+						"context_tokens_by_turn": list(ctx[:max_turns]),
+						"stop_reason": "max_turns",
+					}
+				)
+			)
+		else:
+			hit += t.stop_reason == "max_turns" and t.turns < max_turns
+			out.append(t)
+	return out, cut, hit
+
+
+def _mark(e: Estimate, why: str) -> Estimate:
+	"""An estimate the knobs pushed past what the sample shows: extrapolated, with the reason."""
+	if e.status == "abstain":
+		return e
+	reason = "; ".join(x for x in (e.reason, why) if x)
+	return e.model_copy(
+		update={"status": "extrapolated" if e.status != "abstain" else e.status, "reason": reason}
+	)
 
 
 def _agent(record: FlightRecord, values: dict) -> dict[str, Estimate]:
@@ -641,6 +793,7 @@ def _agent(record: FlightRecord, values: dict) -> dict[str, Estimate]:
 		why = f"no sampled task ran on {model}; sample it first"
 		return {t: _abstain(_TARGETS[t][0], agent_cost.MODEL_ID, why) for t in ids}
 	pop = int(values.get("n_tasks") or s.population or 0) or None
+	tasks, cut, hit = _cap_turns(tasks, values.get("max_turns"))
 	sub = s.model_copy(update={"tasks": tasks})
 	tot = agent_cost.agent_totals(sub, population=pop)
 	out = {}
@@ -662,6 +815,23 @@ def _agent(record: FlightRecord, values: dict) -> dict[str, Estimate]:
 	)
 	out["time.total"] = _agent_time(s, tasks, pop, values)
 	out["memory.context_fill"] = _context_fill(tasks, values)
+	notes = []
+	if cut:
+		notes.append(
+			f"{cut} of {len(tasks)} sampled tasks would stop at {values['max_turns']} turns, unfinished"
+		)
+	if hit:
+		notes.append(f"{hit} sampled tasks hit a lower turn cap, so what they'd spend past it is unknown")
+	moves = [
+		m
+		for m in _unmodelled_moves(record, values, "cost")
+		if m not in ("prompt_caching", "max_turns", "n_tasks")
+	]
+	if moves:
+		notes.append(f"{', '.join(moves)} isn't modelled for agents yet; held at its sampled effect")
+	for why in notes:
+		for tid in ("cost.total", "tokens.total", "time.total", "risk.runaway"):
+			out[tid] = _mark(out[tid], why)
 	return out
 
 
@@ -712,6 +882,9 @@ def _context_fill(tasks, values) -> Estimate:
 		why = "no context limit set" if not limit else "too few tasks recorded their context by turn"
 		return _abstain("fraction", mid, why)
 	arr = np.asarray(peaks, dtype=float) / float(limit)
+	if arr.max() > 1.0:
+		why = f"at {limit:,} tokens, {np.mean(arr > 1.0):.0%} of sampled tasks would overflow the context"
+		return _abstain("fraction", mid, why)
 	rng = np.random.default_rng(0)
 	boots = np.quantile(arr[rng.integers(0, arr.size, (2000, arr.size))], 0.95, axis=1)
 	lo, hi = (float(v) for v in np.quantile(boots, [0.05, 0.95]))
@@ -730,6 +903,9 @@ def _context_fill(tasks, values) -> Estimate:
 def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction:
 	"""Every target for this lens at these knob values (others at their current values)."""
 	values = _values(record, knob_values)
+	why = _invalid(values)
+	if why:
+		return Prediction({t.id: _abstain(t.unit, "input-check@0.1.0", why) for t in targets_for(record)})
 	if _api_lens(record):
 		return Prediction(_agent(record, values))
 	mem = _memory(record, values)
@@ -771,11 +947,10 @@ def axis_values(knob: Knob, n: int = 6) -> list:
 			pts = list(np.unique(np.round(np.linspace(lo, hi, n))))
 		vals = sorted({int(v) for v in pts} | {int(knob.current)})
 	else:
-		pts = (
-			np.geomspace(lo, hi, n)
-			if (knob.domain.log or (lo > 0 and hi / lo >= 100))
-			else np.linspace(lo, hi, n)
-		)
+		if knob.domain.log and lo <= 0:
+			lo = hi / 1000 if hi > 0 else lo  # a log axis can't start at zero
+		log = lo > 0 and (knob.domain.log or hi / lo >= 100)
+		pts = np.geomspace(lo, hi, n) if log else np.linspace(lo, hi, n)
 		vals = sorted({float(f"{v:.4g}") for v in pts} | {float(knob.current)})
 	return vals
 
@@ -856,13 +1031,15 @@ def _is_log(values: list) -> bool:
 # ---------------------------------------------------------------- sensitivity
 
 
-def _objective_fn(
-	record: FlightRecord, objective: Objective
-) -> tuple[Callable[[Prediction], float | None], str]:
+Metric = Callable[[Prediction, dict], float | None]
+
+
+def _objective_fn(record: FlightRecord, objective: Objective) -> tuple[Metric, str]:
+	"""The number to minimise for this objective, from a prediction and the knob values behind it."""
 	api = _api_lens(record)
 
-	def pick(tid):
-		def f(pred):
+	def pick(tid) -> Metric:
+		def f(pred, _values):
 			e = pred.root.get(tid)
 			return None if e is None or e.status == "abstain" else e.point
 
@@ -873,16 +1050,27 @@ def _objective_fn(
 		return pick(objective.target_id), objective.target_id
 	if objective.weights:
 
-		def blend(pred):
+		def blend(pred, values):
 			total = 0.0
 			for tid, w in objective.weights.items():
-				v = pick(tid)(pred)
+				v = pick(tid)(pred, values)
 				if v is None:
 					return None
 				total += w * v
 			return total
 
 		return blend, "weighted blend"
+	if kind == "max_throughput":
+		if api:
+			return pick("time.total"), "time.total"
+
+		def seconds_per_unit(pred, values):  # minimising this maximises throughput
+			e = pred.root.get("time.step")
+			if e is None or e.status == "abstain" or not e.point:
+				return None
+			return e.point / max(_step_x(record.job.lens, values), 1e-12)
+
+		return seconds_per_unit, "time.step per unit of work"
 	table = {
 		"min_time": "time.total",
 		"min_cost": "cost.total",
@@ -890,15 +1078,6 @@ def _objective_fn(
 		"min_risk": "risk.runaway" if api else "risk.oom",
 		"max_quality_per_usd": "cost.total",
 	}
-	if kind == "max_throughput":
-		if api:
-			return pick("time.total"), "time.total"
-
-		def neg_tput(pred):
-			e = pred.root.get("time.step")
-			return None if e is None or e.status == "abstain" or not e.point else e.point
-
-		return neg_tput, "time.step"
 	tid = table.get(kind, "time.total")
 	return pick(tid), tid
 
@@ -908,14 +1087,29 @@ def _feasible(record: FlightRecord, pred: Prediction) -> bool:
 	return not (oom is not None and oom.status != "abstain" and oom.point >= memory.FAILS_AT)
 
 
+def _noise(pred: Prediction, tid: str) -> float:
+	"""Relative half-width of the objective's own band: moves smaller than this are not a signal."""
+	e = pred.root.get(tid)
+	if e is None or e.status == "abstain" or not e.point or e.unit == "probability":
+		return 0.0
+	return (e.hi - e.lo) / (2 * abs(e.point))
+
+
 def sensitivity(record: FlightRecord, objective: Objective) -> list[KnobImpact]:
-	"""Which knobs move the objective most across their range (one at a time, others at current values)."""
+	"""Which knobs move the objective most across their range (one at a time, others at current values).
+
+	Impact is the change across the range relative to the current value, capped at 1 (a probability
+	objective uses the change itself). Knobs that move it less than its own band are left out.
+	"""
 	f, tid = _objective_fn(record, objective)
+	base_values = _values(record, None)
 	base_pred = predict(record)
-	base = f(base_pred)
+	base = f(base_pred, base_values)
+	prob = _TARGETS.get(tid, ("", None))[0] == "probability"
+	noise = _noise(base_pred, "time.step" if tid.startswith("time.step") else tid)
 	# when the current settings already fail, every neighbour may too; rank by the objective anyway
 	check = _feasible(record, base_pred)
-	rows = []
+	out = []
 	for k in record.knobs:
 		if k.id in WORKLOAD_KNOBS:
 			continue
@@ -925,7 +1119,7 @@ def sensitivity(record: FlightRecord, objective: Objective) -> list[KnobImpact]:
 		scored = []
 		for v in stops:
 			pred = predict(record, {k.id: v})
-			y = f(pred)
+			y = f(pred, _values(record, {k.id: v}))
 			if y is not None and (not check or _feasible(record, pred)):
 				scored.append((v, y))
 		if len(scored) < 2:
@@ -933,6 +1127,9 @@ def sensitivity(record: FlightRecord, objective: Objective) -> list[KnobImpact]:
 		ys = [y for _, y in scored]
 		spread = max(ys) - min(ys)
 		ref = abs(base) if base else max(abs(y) for y in ys) or 1.0
+		impact = min(1.0, spread) if prob else min(1.0, spread / ref)
+		if impact <= noise or impact == 0:
+			continue
 		best_v, _ = min(scored, key=lambda s: s[1])
 		direction = "either"
 		if k.kind in ("int", "float"):
@@ -945,12 +1142,9 @@ def sensitivity(record: FlightRecord, objective: Objective) -> list[KnobImpact]:
 		why = f"{tid} from {min(ys):.3g} to {max(ys):.3g} across the range; best at {best_v}"
 		if k.id in TRUNCATING_KNOBS:
 			why += "; shorter cuts what the model sees, so check quality before taking it"
-		rows.append((k.id, spread / ref, direction, best_v, why))
-	top = max((r[1] for r in rows), default=0.0) or 1.0
-	out = [
-		KnobImpact(knob_id=kid, impact=min(1.0, imp / top), direction=d, best_value=bv, reason=why)
-		for kid, imp, d, bv, why in rows
-	]
+		out.append(
+			KnobImpact(knob_id=k.id, impact=impact, direction=direction, best_value=best_v, reason=why)
+		)
 	return sorted(out, key=lambda r: -r.impact)
 
 

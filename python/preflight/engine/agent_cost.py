@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -259,6 +259,10 @@ def _tokens(t) -> int:
 	return int(t.input_tokens + t.output_tokens)
 
 
+def _flag(e: TotalEstimate, topped_up: bool) -> TotalEstimate:
+	return replace(e, detail={**e.detail, "topped_up": topped_up})
+
+
 def agent_totals(
 	sample,
 	price: Callable[[object], float | None] | None = None,
@@ -274,9 +278,10 @@ def agent_totals(
 	pop = population if population is not None else getattr(sample, "population", None)
 	costs = [t.cost_usd if t.cost_usd is not None else (price(t) if price else None) for t in tasks]
 	tokens = [_tokens(t) for t in tasks]
+	topped = "top-up" in (getattr(sample, "selection", None) or "")
 	out = {
-		"cost.total": estimate_total(costs, pop, "usd", **kw),
-		"tokens.total": estimate_total(tokens, pop, "tokens", **kw),
+		"cost.total": _flag(estimate_total(costs, pop, "usd", **kw), topped),
+		"tokens.total": _flag(estimate_total(tokens, pop, "tokens", **kw), topped),
 		"risk.runaway": runaway_rate(
 			costs if any(c is not None for c in costs) else tokens,
 			level=kw.get("level", LEVEL),
@@ -320,7 +325,8 @@ def budget_check(estimate: TotalEstimate, budget_usd: float | None) -> BudgetChe
 		return BudgetCheck("over", False, 0, f"the whole cost range is over the ${budget_usd:,.2f} budget")
 	n = int(estimate.detail.get("n", 0))
 	pop = int(estimate.detail.get("population", 0))
-	more = max(0, min(TOP_UP_TASKS, pop - n)) if n < MAX_SAMPLE else 0
+	done = bool(estimate.detail.get("topped_up")) or n >= MAX_SAMPLE  # offered once, whatever dedup left
+	more = 0 if done else max(0, min(TOP_UP_TASKS, pop - n))
 	why = f"the cost range straddles the ${budget_usd:,.2f} budget"
 	if more:
 		why += f"; running {more} more tasks narrows it"
