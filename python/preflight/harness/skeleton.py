@@ -8,7 +8,9 @@ alone. Probes later fill measured numbers in; B fills probed ranges.
 
 import itertools
 
+from preflight.probes.gpu_choice import canonical, choose_probe_gpu, estimate_need_gb, offered_gpus
 from preflight.schema import (
+	Constraints,
 	Domain,
 	Env,
 	Evidence,
@@ -23,7 +25,7 @@ from preflight.schema import (
 )
 from preflight.schema.script_map import ScriptKnob, ScriptMap
 
-from .static import PRECISION
+from .static import PRECISION, PREQUANTISED, QUANT_FORMATS
 
 TRAINING_LENSES = ("finetune", "pretrain", "rl", "vision", "gnn", "retrieval")
 
@@ -44,6 +46,7 @@ GROUPS = {
 			"kv_cache_dtype",
 			"dump_hidden_states",
 			"dump_attentions",
+			"quantization",
 		],
 		"memory",
 	),
@@ -59,6 +62,8 @@ GROUPS = {
 			"d_model",
 			"n_head",
 			"lora_r",
+			"lora_alpha",
+			"lora_dropout",
 			"weight_decay",
 			"optimizer",
 			"lr_schedule",
@@ -81,10 +86,11 @@ GROUPS = {
 			"fsdp_mode",
 			"deepspeed_config",
 			"gpus",
+			"attn",
 		],
 		"speed",
 	),
-	**dict.fromkeys(["max_steps", "checkpoint_every", "eval_every", "log_every"], "cluster"),
+	**dict.fromkeys(["max_steps", "checkpoint_every", "eval_every", "log_every", "gpu_type"], "cluster"),
 	**dict.fromkeys(
 		[
 			"max_turns",
@@ -94,6 +100,7 @@ GROUPS = {
 			"n_tasks",
 			"tool_retry_cap",
 			"reasoning_effort",
+			"context_limit",
 		],
 		"agent",
 	),
@@ -146,6 +153,8 @@ INT_DOMAINS: dict[str, tuple[float, float, bool, float]] = {
 	"pipeline_parallel": (1, 8, True, 1),
 	"rl_iterations": (1, 8, False, 1),
 	"lora_r": (1, 512, True, 16),
+	"lora_alpha": (1, 1024, True, 16),
+	"context_limit": (1_024, 2_097_152, True, 4),
 	"index_m": (4, 128, True, 4),
 	"index_nlist": (16, 1_048_576, True, 16),
 	"hidden_channels": (8, 4_096, True, 4),
@@ -162,6 +171,8 @@ FLOAT_DOMAINS: dict[str, tuple[float, float, bool]] = {
 	"clip_high": (0.0, 1.0, False),
 	"weight_decay": (0.0, 1.0, False),
 	"epochs": (0.1, 100.0, True),
+	"lora_dropout": (0.0, 0.5, False),
+	"lora_alpha": (1.0, 1024.0, True),
 }
 CATEGORIES: dict[str, list] = {
 	"precision": ["fp32", "bf16", "fp16"],
@@ -170,6 +181,8 @@ CATEGORIES: dict[str, list] = {
 	"kv_cache_dtype": ["auto", "fp8", "fp8_e4m3", "fp8_e5m2"],
 	"optimizer": ["adamw_torch", "adamw_torch_fused", "adamw_8bit", "adafactor", "sgd", "lion_32bit"],
 	"lr_schedule": ["linear", "cosine", "constant", "constant_with_warmup", "cosine_with_restarts"],
+	"attn": ["eager", "sdpa", "flash_attention_2", "flash_attention_3", "flex_attention"],
+	"quantization": list(QUANT_FORMATS),
 }
 AGENT_MODELS = ["muse-spark-1.3", "muse-spark-open", "muse-glimmer"]
 
@@ -208,6 +221,9 @@ def _domain(sk: ScriptKnob) -> Domain:
 
 def _knob(sk: ScriptKnob) -> Knob:
 	current = sk.current
+	if sk.id == "quantization":
+		# read from a BitsAndBytesConfig: same knob, same patch as the one declared when the code has none
+		return _choice_knob("quantization", current, list(QUANT_FORMATS), "model.quantize_weights")
 	if sk.id == "precision" and isinstance(current, str):
 		current = PRECISION.get(current.lower(), current)
 		order = CATEGORIES["precision"]
@@ -244,6 +260,19 @@ def _code_knob(kid: str, current: bool, template: str, *, needs_code: bool = Tru
 	)
 
 
+def _choice_knob(kid: str, current: str, values: list[str], template: str) -> Knob:
+	return Knob(
+		id=kid,
+		label_key=f"knob.{kid}",
+		kind="categorical",
+		domain=Domain(values=values if current in values else [current, *values]),
+		current=current,
+		needs_code=True,
+		patch_template=template,
+		group=_group(kid),
+	)
+
+
 def declared_knobs(sm: ScriptMap) -> list[Knob]:
 	knobs = [_knob(sk) for sk in sm.knobs if sk.current is not None]
 	have = {k.id for k in knobs}
@@ -262,6 +291,22 @@ def declared_knobs(sm: ScriptMap) -> list[Knob]:
 					needs_code=sm.framework not in ("hf_trainer", "trl"),
 				)
 			)
+		m = sm.model
+		hf_decoder = m is not None and m.hf_id is not None and m.family == "decoder"
+		prequantised = m is not None and m.quantization in PREQUANTISED  # GPTQ/AWQ: fixed by the checkpoint
+		if (
+			hf_decoder
+			and m.lora is not None
+			and "quantization" not in have
+			and sm.lens == "finetune"
+			and not prequantised
+		):
+			# QLoRA: the largest memory lever a LoRA fine-tune has; B models it, a patch adds the config
+			knobs.append(_choice_knob("quantization", m.quantization or "none", list(QUANT_FORMATS),
+				"model.quantize_weights"))  # fmt: skip
+		if hf_decoder and "attn" not in have:
+			# transformers loads with SDPA unless told otherwise
+			knobs.append(_choice_knob("attn", "sdpa", CATEGORIES["attn"], "model.attn_implementation"))
 		if sm.lens == "vision" and "channels_last" not in have:
 			knobs.append(_code_knob("channels_last", False, "vision.channels_last"))
 	if sm.lens == "agent":
@@ -757,13 +802,53 @@ def read_time_findings(sm: ScriptMap, graph: Graph) -> list[Finding]:
 	return out
 
 
-def skeleton_record(sm: ScriptMap, source: Source, **job_fields) -> FlightRecord:
+def gpu_type_knob(
+	sm: ScriptMap, *, gpu: str | None = None, constraints: Constraints | None = None
+) -> Knob | None:
+	"""B's gpu_type knob: the GPU the probe runs on, and the ones the visitor may move to.
+
+	Values are the visitor's allowed GPUs when they set any, else Modal's list.
+	Current is the GPU they asked for, else the size-aware choice the probe
+	will make (probes/gpu_choice.py); the probe overwrites it with env.gpu.name.
+	"""
+	if sm.lens == "agent":
+		return None
+	allowed = [canonical(g) for g in constraints.gpu_types] if constraints and constraints.gpu_types else None
+	values = list(dict.fromkeys(allowed or offered_gpus()))
+	current = canonical(gpu) if gpu else choose_probe_gpu(estimate_need_gb(sm), allowed)
+	if current not in values:
+		values.append(current)
+	return Knob(
+		id="gpu_type",
+		label_key="knob.gpu_type",
+		kind="categorical",
+		domain=Domain(values=values),
+		current=current,
+		group="cluster",
+	)
+
+
+def skeleton_record(
+	sm: ScriptMap,
+	source: Source,
+	*,
+	gpu: str | None = None,
+	constraints: Constraints | None = None,
+	**job_fields,
+) -> FlightRecord:
+	"""gpu: the GPU the visitor asked for (JobRequest.gpu); constraints: their limits, kept on the job."""
 	graph = skeleton_graph(sm)
 	env = Env(backend="api", provider="api") if sm.lens == "agent" else None
+	knobs = declared_knobs(sm)
+	gk = gpu_type_knob(sm, gpu=gpu, constraints=constraints)
+	if gk is not None and all(k.id != "gpu_type" for k in knobs):
+		knobs = sorted([*knobs, gk], key=lambda k: (k.group or "z", k.id))
+	if constraints is not None:
+		job_fields["constraints"] = constraints
 	return FlightRecord(
 		job=Job(lens=sm.lens, source=source, framework=sm.framework, script_map=sm, **job_fields),
 		env=env,
 		graph=graph,
-		knobs=declared_knobs(sm),
+		knobs=knobs,
 		findings=read_time_findings(sm, graph),
 	)

@@ -1,6 +1,7 @@
 """Recorder signals beyond the basics: eval pass, checkpoints, AMP, attention logits, generation,
 trainer logs, divergence and classified failures. CPU, through the real subprocess path."""
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,10 @@ from preflight.probes.local import ProbeSpec, run_probe
 from preflight.recorder.overrides import apply_overrides
 
 FIX = Path(__file__).resolve().parent / "fixtures"
+# scripts that import transformers; CI's torch job installs it with accelerate
+needs_transformers = pytest.mark.skipif(
+	importlib.util.find_spec("transformers") is None, reason="transformers not installed"
+)
 pytestmark = pytest.mark.torch
 
 
@@ -49,6 +54,7 @@ def test_loss_scale_and_max_attention_logit_series():
 	assert all(v is not None and v > 0 for v in s["max_attn_logit"])
 
 
+@needs_transformers
 def test_generation_stats_catch_truncated_rollouts():
 	p = probe("rollout_hf.py", warmup=1, timed=2)
 	assert p.status == "ok", p.error
@@ -60,6 +66,7 @@ def test_generation_stats_catch_truncated_rollouts():
 	assert "rollout" in p.step_time.by_phase
 
 
+@needs_transformers
 def test_trainer_logs_become_rl_signals_and_logging_is_forced_every_step():
 	p = probe("trl_logs.py", warmup=1, timed=2)
 	assert p.status == "ok", p.error

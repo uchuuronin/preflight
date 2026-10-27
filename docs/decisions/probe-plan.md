@@ -1,9 +1,9 @@
 # Probe plan: how long, where, how many (Oct 27)
 
-Three probe-plan settings decide whether A's measurements can meet the plan's
+These probe-plan settings decide whether A's measurements can meet the plan's
 validation targets (step time within 15%, peak memory within 10%, no missed
 OOMs, agent cost inside its 90% interval). Each was chosen by simulating 3–5
-candidates over 20,000 trials (`uv run python scripts/mc_probe_plan.py`).
+candidates (`scripts/mc_probe_plan.py`, `mc_agent_sample.py`, `mc_kernels_gpu.py`).
 
 ## Assumptions the simulation makes
 
@@ -88,6 +88,81 @@ against the validation table's real comparison (a full benchmark run against
 its 20–50-task sample) once Modal and the Meta API are live. The estimator is
 B's; the request is in docs/requests.md. Reproduce with
 `uv run python scripts/mc_agent_sample.py`.
+
+## K. Kernel rows kept for B's cross-GPU model (Oct 27, 20,000 trials)
+
+B scales each recorded kernel by its roofline on the target GPU and keeps its
+measured efficiency; device time not in the table lands in B's host bucket,
+which does not scale. Share of cross-GPU step-time estimates within 20%:
+
+| Rows kept | Within 20% | Median error | Rows |
+|---|---|---|---|
+| top 32 | 80.1% | 9.6% | 32 |
+| top 64 | 89.3% | 6.3% | 64 |
+| top 128 | 96.6% | 3.2% | 128 |
+| **top 64 + tail rolled up per class** | **100%** | **0.2%** | **78** |
+| every kernel | 100% | 0.0% | 392 |
+
+Chosen: top 64 by time, then one `(tail) <class>` row per kernel class, then
+`(unattributed device time)` when kernels outside aten hold over 1% of device
+time (`recorder/kernels.py`). On CPU probes, autograd nodes, view ops and host
+syncs are left to the host bucket: they launch nothing on a GPU.
+
+## G. Which GPU a probe runs on (Oct 27, 40,000 simulated jobs)
+
+Jobs drawn from LoRA, full fine-tune, pretraining, inference and agent runs,
+median 1.2B parameters with a heavy tail, a 30% error on the memory estimate
+made before any probe, and 20% of jobs whose size nothing in the code gives
+away (a model built in the script), which start on the cheapest GPU. Usable
+memory is B's `usable_capacity_gib()` in GB, as the code uses it.
+
+| Policy | Measured on first try | Measured at all | Mean GPU $ a job |
+|---|---|---|---|
+| always L4 | 72.8% | 72.8% | $0.030 |
+| always A100-80GB | 94.2% | 94.2% | $0.099 |
+| always H100 | 94.2% | 94.2% | $0.149 |
+| **size-aware, 1.3× margin, one step up** | **89.1%** | **93.0%** | **$0.059** |
+| size-aware, 1.15× margin, one step up | 88.1% | 93.0% | $0.057 |
+
+Chosen: the cheapest GPU with 1.3× the estimated need, a step up after a GPU
+OOM (not a host OOM). 1.15× saves $0.002 a job for a further point of
+first-try failures, each a wasted container start the visitor waits through.
+
+### L. The top of that ladder
+
+H100 holds no more memory than A100-80GB (0.03 GiB), so it never wins a
+memory choice and a step from one to the other can't clear an OOM; steps need
+5% more memory. The question is what sits above 80 GB. Same policy, same jobs:
+
+| Top | Measured | Mean GPU $ a job |
+|---|---|---|
+| A100-80GB | 93.2% | $0.055 |
+| A100-80GB + H100 | 93.2% | $0.058 |
+| + RTX PRO 6000 96 GB | 93.8% | $0.057 |
+| **+ H200 141 GB** | **95.7%** | **$0.063** |
+| + H200 + B200 180 GB | 96.4% | $0.067 |
+
+Provisional: L4, L40S, A100-80GB, H200 (`probes/gpu_choice.py`), pending
+Chiya's call on B200. T4 is cheaper than L4 but has no bf16 tensor cores, so
+a bf16 probe there times an emulated path.
+
+### U. Steps up when the size was unknown
+
+On that ladder, after a GPU OOM:
+
+| Policy | Measured, all jobs | Measured, unknown size | Mean GPU $ a job |
+|---|---|---|---|
+| one step up | 95.7% | 88.2% | $0.064 |
+| up to two steps | 97.0% | 94.5% | $0.066 |
+| straight to the largest | 97.6% | 97.8% | $0.071 |
+| start unknown sizes on L40S, one step | 97.0% | 94.5% | $0.071 |
+| **walk the whole ladder** | **97.6%** | **97.8%** | **$0.068** |
+| whole ladder, and two steps when sized | 97.6% | 97.8% | $0.068 |
+
+Chosen: walk the ladder when the size was unknown, one step when it was
+estimated (a second step for sized jobs adds nothing). Each failed rung costs
+about a minute, since an OOM fails at load or the first step. Reproduce K, G,
+L and U with `uv run python scripts/mc_kernels_gpu.py`.
 
 ## Also decided with these
 
