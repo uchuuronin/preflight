@@ -43,9 +43,12 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from .gpus import peak_flops
+from .arch import model_shape
+from .gpuinfo import canonical_gpu_name, peak
+from .kernels import KERNEL_ROWS  # noqa: F401  (re-exported for callers and tests)
 
-PROFILE_STEPS = 5  # wait 1 + warmup 1 + active 3
+PROFILE_ACTIVE = 3
+PROFILE_STEPS = 2 + PROFILE_ACTIVE  # wait 1 + warmup 1 + active 3
 ATTN_CALLS_PER_STEP = 2
 ATTN_QUERY_SAMPLE = 128
 SAMPLE_EVERY_S = 0.25
@@ -189,6 +192,8 @@ class Recorder:
 		self._prof = None
 		self._prof_steps = 0
 		self._stop_pending = False
+		self._kernels: dict | None = None
+		self._sdpa_seen = False  # attn_impl for script-defined models: only what actually ran
 		self._roots: list[nn.Module] = []
 		self._head_out = {"bytes": None, "norm": None, "dtype": None}
 		self._weights = self._params_total = self._params_trainable = None
@@ -364,6 +369,7 @@ class Recorder:
 
 		def sdpa(q, k, v, *args, **kwargs):
 			out = o["sdpa"](q, k, v, *args, **kwargs)
+			rec._sdpa_seen = True
 			if torch.is_grad_enabled() and not rec.eval_active and rec._attn_calls < ATTN_CALLS_PER_STEP:
 				rec._attn_calls += 1
 				t0 = rec._now()
@@ -818,17 +824,37 @@ class Recorder:
 		acts = [ProfilerActivity.CPU] + ([ProfilerActivity.CUDA] if self.cuda else [])
 		path = self.trace_path
 
+		rec = self
+
 		def ready(p):
 			p.export_chrome_trace(path)
+			try:
+				rec._kernels = rec._kernel_summary(p)
+			except Exception as exc:  # the table is a bonus; never fail a probe over it
+				rec._kernels = {"error": f"{type(exc).__name__}: {exc}"[:300]}
 
+		# shapes and FLOPs feed B's per-kernel table; this window is never timed, so the overhead is free
 		self._prof = profile(
 			activities=acts,
-			schedule=schedule(wait=1, warmup=1, active=3),
+			schedule=schedule(wait=1, warmup=1, active=PROFILE_ACTIVE),
 			on_trace_ready=ready,
-			record_shapes=False,
+			record_shapes=True,
+			with_flops=True,
 			with_stack=False,
 		)
 		self._prof.start()
+
+	def _kernel_summary(self, prof) -> dict:
+		from .kernels import kernel_table
+
+		dtype = {"bfloat16": "bf16", "float16": "fp16"}.get(
+			str(self._head_out["dtype"]).replace("torch.", ""), "fp32"
+		)
+		device = ("rocm" if getattr(torch.version, "hip", None) else "cuda") if self.cuda else "cpu"
+		tf32 = bool(
+			torch.get_float32_matmul_precision() != "highest" or torch.backends.cuda.matmul.allow_tf32
+		)
+		return kernel_table(prof, steps=PROFILE_ACTIVE, device=device, dtype=dtype, allow_tf32=tf32)
 
 	# ------------------------------------------------------------- results
 
@@ -839,6 +865,13 @@ class Recorder:
 		steps = list(self.steps)
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["host_rss_peak_bytes"] = self._rss_peak or None
+		if self._kernels is not None:
+			out["kernels"] = self._kernels
+		if self._roots:
+			try:
+				out["arch"] = model_shape(self._roots, sdpa_seen=self._sdpa_seen)
+			except Exception as exc:  # shape is a nice-to-have; never fail the probe over it
+				out["arch"] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
 		if self._power:
 			out["power"] = {
 				"mean_w": statistics.fmean(self._power),
@@ -1034,10 +1067,19 @@ def detect_env() -> dict:
 	if torch.cuda.is_available():
 		props = torch.cuda.get_device_properties(0)
 		hip = getattr(torch.version, "hip", None)
+		name, unknown = canonical_gpu_name(
+			props.name,
+			props.total_memory,
+			getattr(props, "multi_processor_count", None),
+			arch=getattr(props, "gcnArchName", None),
+		)
+		env["gpu_device_name"] = props.name  # as torch reports it: MIG slices are looked up by it
+		if unknown:
+			env["gpu_unresolved"] = unknown  # not in B's table: kept as reported, filed for B
 		env.update(
 			backend="rocm" if hip else "cuda",
 			gpu={
-				"name": props.name,
+				"name": name,
 				"count": torch.cuda.device_count(),
 				"memory_bytes": props.total_memory,
 				"vendor": "amd" if hip else "nvidia",
@@ -1063,11 +1105,12 @@ def mfu(summary: dict, env: dict) -> tuple[float | None, float | None]:
 	prec = {"bfloat16": "bf16", "float16": "fp16"}.get(dtype, "fp32")
 	if prec == "fp32" and summary.get("tf32"):
 		prec = "tf32"
-	gpu = (env.get("gpu") or {}).get("name")
-	peak = peak_flops(gpu, prec)
-	if not peak:
+	gpu = env.get("gpu") or {}
+	top = peak(gpu.get("name"), prec, gpu.get("memory_bytes"), device_name=env.get("gpu_device_name"))
+	if not top:
 		return flops, None
-	util = flops / st["mean_s"] / peak
+	# the median step, as B projects run time from p50_s (probe-plan D1)
+	util = flops / (st.get("p50_s") or st["mean_s"]) / top
 	# above 1 means the precision guess was wrong (mixed kernels); say nothing rather than something false
 	return flops, util if util <= 1.0 else None
 

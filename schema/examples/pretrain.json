@@ -357,7 +357,7 @@
 				"tokens_per_s": 45665.6,
 				"samples_per_s": 44.6,
 				"flops_per_step": 6094848000000.0,
-				"mfu": 0.07
+				"mfu": 0.218
 			},
 			"stability": {
 				"series": {
@@ -448,7 +448,87 @@
 			},
 			"extras": {
 				"lr_range_divergence_lr": 0.0048,
-				"resume_exact_match": 1.0
+				"resume_exact_match": 1.0,
+				"params_total": 124475904.0,
+				"params_trainable": 124475904.0,
+				"tokens_per_step": 8192.0,
+				"samples_per_step": 8.0,
+				"micro_steps_per_step": 1.0
+			},
+			"kernels": {
+				"rows": [
+					{
+						"name": "aten::mm",
+						"kernel_class": "gemm",
+						"calls": 444.0,
+						"device_s": 0.053817315356643365,
+						"flops": 6100000000000.0,
+						"bytes": 9800000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_efficient_attention_backward",
+						"kernel_class": "attention",
+						"calls": 12.0,
+						"device_s": 0.014351284095104897,
+						"flops": 770000000000.0,
+						"bytes": 1200000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_efficient_attention_forward",
+						"kernel_class": "attention",
+						"calls": 12.0,
+						"device_s": 0.007175642047552448,
+						"flops": 310000000000.0,
+						"bytes": 600000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::native_layer_norm_backward",
+						"kernel_class": "norm",
+						"calls": 25.0,
+						"device_s": 0.00448477627972028,
+						"bytes": 3100000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::gelu_backward",
+						"kernel_class": "elementwise",
+						"calls": 12.0,
+						"device_s": 0.003587821023776224,
+						"bytes": 2400000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_lerp_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 0.0021526926142657345,
+						"bytes": 1500000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "(tail) elementwise (28 ops)",
+						"kernel_class": "elementwise",
+						"calls": 980.0,
+						"device_s": 0.00896955255944056,
+						"bytes": 7000000000.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "(tail) copy (5 ops)",
+						"kernel_class": "copy",
+						"calls": 120.0,
+						"device_s": 0.0021526926142657345,
+						"bytes": 1400000000.0,
+						"dtype": "fp32"
+					}
+				],
+				"steps": 3,
+				"backend": "cuda",
+				"allow_tf32": true,
+				"classified_by": "engine.steptime"
 			},
 			"cost": {
 				"gpu_seconds": 64.0,
@@ -501,7 +581,7 @@
 				"tokens_per_s": 45665.6,
 				"samples_per_s": 44.6,
 				"flops_per_step": 9142272000000.0,
-				"mfu": 0.07
+				"mfu": 0.218
 			},
 			"stability": {
 				"series": {
@@ -592,7 +672,12 @@
 			},
 			"extras": {
 				"lr_range_divergence_lr": 0.0048,
-				"resume_exact_match": 1.0
+				"resume_exact_match": 1.0,
+				"params_total": 124475904.0,
+				"params_trainable": 124475904.0,
+				"tokens_per_step": 12288.0,
+				"samples_per_step": 12.0,
+				"micro_steps_per_step": 1.0
 			},
 			"cost": {
 				"gpu_seconds": 69.0,

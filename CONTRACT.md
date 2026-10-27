@@ -46,7 +46,7 @@ fail loudly. Read stored records with `load_record()`, which runs `upgrade()`.
 | `env` | backend (cuda, rocm, api, cpu, mps), provider, GPU, libraries, seed, image | A |
 | `graph` | job-map nodes and edges; `parent` for hierarchy, `repeat` for ×N, `metrics` for what animates; `skeleton` until measured | A builds, C reads |
 | `knobs` | id, `label_key`, unit, kind, domain, current, `probed_range`, gridded, `needs_code`, `patch_template` | A declares, B fills `probed_range` |
-| `probes` | per probe: knob values, steps, status, memory by term, step time by phase, throughput and MFU, stability series, data stats, RL signals, power, cost, cache key | A |
+| `probes` | per probe: knob values, steps, status, memory by term, step time by phase, throughput and MFU, stability series, data stats, RL signals, power, counts in `extras`, the kernel table (current-settings probe), cost, cache key | A |
 | `agent_sample` | per task: turns, tokens (input, output, reasoning, cached, cache creation), tool calls, errors, latency, success, context by turn | A |
 | `predictions` | `targets`, `estimates` at current knobs, `grids` | B |
 | `models` | model cards, pinned by id from every estimate and grid | B |
@@ -137,3 +137,11 @@ an `Idempotency-Key` on every write that spends money. UI strings through
   Also: `Probe.error_code` (stable failure codes), `Probe.eval` (`EvalStats`), `Probe.checkpoint`
   (`CheckpointStats`), `Probe.generation` (`GenerationStats`); `Grid.scale` may be below 1 for very
   small values; `load_record` refuses records over 20 MB once decompressed.
+  For B's engine (Oct 27, Chiya approved A adding them): `Probe.kernels` (`KernelTable` of
+  `KernelStat` rows: name, `kernel_class`, calls, device_s, flops, bytes, dtype, per step);
+  `ModelInfo` gains `head_dim`, `n_experts`, `experts_per_token`, `max_positions`, `gated_mlp`,
+  `tie_embeddings`, `norm`, `attn_impl` and `shape_source`, and `quantization` uses
+  `engine.memory`'s format keys; `Probe.extras` carries `params_total`, `params_trainable`,
+  `tokens_per_step`, `samples_per_step`, `micro_steps_per_step`; GPU names in
+  `JobRequest.gpu` and `Constraints.gpu_types` are 1–64 characters; `JobRequest.constraints` is
+  a typed `Constraints`.

@@ -1,5 +1,6 @@
 """The probe recorder, end to end through a subprocess (the path Modal uses), on CPU."""
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,10 @@ pytest.importorskip("torch")
 from preflight.probes.local import ProbeSpec, run_probe
 
 FIX = Path(__file__).resolve().parent / "fixtures"
+# scripts that import transformers; CI's torch job installs it with accelerate
+needs_transformers = pytest.mark.skipif(
+	importlib.util.find_spec("transformers") is None, reason="transformers not installed"
+)
 pytestmark = pytest.mark.torch
 
 
@@ -80,6 +85,7 @@ def test_profiled_steps_export_a_trace(tmp_path):
 	assert r.probe.step_time.n_steps == 2  # profiled steps are never timed
 
 
+@needs_transformers
 def test_hf_trainer_probe_measures_padding(tmp_path):
 	r = run_probe(spec("tiny_hf.py", warmup=2, timed=2, out_dir=tmp_path, timeout_s=180))
 	p = r.probe
@@ -118,3 +124,102 @@ def test_hard_wall_clock_cap_names_the_last_stage():
 	p = r.probe
 	assert p.status == "timeout"
 	assert "before the first optimizer step" in p.error
+
+
+def test_extras_carry_the_counts_b_reads_by_name(loop_result):
+	n_params = 512 * 64 + (64 * 128 + 128) + (128 * 64 + 64) + 64 * 512
+	x = loop_result.probe.extras
+	assert x["params_total"] == n_params
+	assert x["params_trainable"] == n_params
+	assert x["tokens_per_step"] == 4 * 32
+	assert x["samples_per_step"] == 4
+	assert x["micro_steps_per_step"] == 1
+
+
+def rows_of(result):
+	return [r.model_dump() for r in result.kernels.rows]
+
+
+@pytest.fixture(scope="module")
+def profiled(tmp_path_factory):
+	out = tmp_path_factory.mktemp("prof")
+	return run_probe(spec("tiny_loop.py", warmup=2, timed=2, profile=True, out_dir=out, timeout_s=180))
+
+
+def test_profiled_probe_returns_a_kernel_table(profiled):
+	from preflight.recorder.runtime import KERNEL_ROWS
+
+	k = profiled.kernels.model_dump()
+	assert k["steps"] == 3 and k["backend"] == "cpu"
+	assert profiled.probe.kernels == profiled.kernels  # rides on the Probe in the record
+	rows = k["rows"]
+	assert 0 < len(rows) <= KERNEL_ROWS + 17
+	for r in rows:
+		assert set(r) >= {"name", "kernel_class", "calls", "device_s", "flops", "bytes", "dtype"}
+		assert r["device_s"] > 0 and r["calls"] > 0
+	# sorted by time, top rows first, the rolled-up tail last
+	top = [r for r in rows if not r["name"].startswith("(tail)")]
+	assert [r["device_s"] for r in top] == sorted((r["device_s"] for r in top), reverse=True)
+
+
+def test_matmuls_carry_flops_and_bytes(profiled):
+	mm = [
+		r
+		for r in rows_of(profiled)
+		if r["name"] in ("aten::mm", "aten::addmm", "aten::linear", "aten::matmul")
+	]
+	assert mm and all(r["flops"] and r["flops"] > 0 for r in mm if r["name"] in ("aten::mm", "aten::addmm"))
+	assert all(r["bytes"] and r["bytes"] > 0 for r in mm)
+
+
+def test_model_shape_rides_with_the_probe(loop_result):
+	# script-defined model, no blocks: what can be read and nothing more
+	assert loop_result.arch == {
+		"d_model": 64,
+		"vocab_size": 512,
+		"tie_embeddings": False,
+		"source": "modules",
+	}
+
+
+@needs_transformers
+def test_hf_model_shape_comes_from_its_config(profiled_hf):
+	a = profiled_hf.arch
+	assert a["source"] == "hf_config" and a["model_type"] == "llama" and a["norm"] == "rmsnorm"
+	assert a["gated_mlp"] is True and a["n_layers"] >= 1 and a["head_dim"] >= 1
+
+
+def test_host_bookkeeping_is_left_to_the_host_bucket(profiled):
+	# on CPU every op has self time; autograd nodes and view ops are host work on any device
+	names = [r["name"] for r in rows_of(profiled)]
+	assert not [
+		n for n in names if n.endswith(("Backward0", "Backward1")) or n.startswith("torch::autograd::")
+	]
+	assert not {"aten::view", "aten::t", "aten::as_strided", "aten::reshape", "aten::item"} & set(names)
+	assert any(n in ("aten::mm", "aten::addmm") for n in names)  # real compute stays
+
+
+def test_kernel_time_is_per_step_and_bounded_by_the_step(profiled):
+	per_step = sum(r["device_s"] for r in rows_of(profiled))
+	# CPU self time of ops in one profiled step can't exceed a few steps' wall time
+	assert per_step < 20 * profiled.probe.step_time.p50_s + 0.05
+
+
+@pytest.fixture(scope="module")
+def profiled_hf(tmp_path_factory):
+	out = tmp_path_factory.mktemp("prof_hf")
+	return run_probe(spec("tiny_hf.py", warmup=2, timed=2, profile=True, out_dir=out, timeout_s=240))
+
+
+@needs_transformers
+def test_profiler_ranges_are_not_counted_as_kernels(profiled_hf):
+	names = [r["name"] for r in rows_of(profiled_hf)]
+	assert not any(n.startswith(("ProfilerStep", "Optimizer.", "enumerate(DataLoader)")) for n in names), (
+		names[:10]
+	)
+
+
+@needs_transformers
+def test_attention_rows_carry_estimated_flops(profiled_hf):
+	attn = [r for r in rows_of(profiled_hf) if "scaled_dot_product" in r["name"]]
+	assert attn and all(r["flops"] and r["flops"] > 0 for r in attn)

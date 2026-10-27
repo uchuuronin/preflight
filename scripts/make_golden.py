@@ -70,6 +70,21 @@ def est(point, unit, status="predicted", rel=0.1, source="grid", reason=None):
 	return e
 
 
+def kernel_table(rows, backend="cuda", steps=3, allow_tf32=False):
+	"""Probe.kernels: (name, class, calls, device_s, flops, bytes) per step; dtype bf16 unless given."""
+	out = []
+	for name, cls, calls, sec, flops, nbytes, *dt in rows:
+		out.append({"name": name, "kernel_class": cls, "calls": calls, "device_s": sec, "flops": flops,
+			"bytes": nbytes, "dtype": dt[0] if dt else "bf16"})  # fmt: skip
+	return {
+		"rows": out,
+		"steps": steps,
+		"backend": backend,
+		"allow_tf32": allow_tf32,
+		"classified_by": "engine.steptime",
+	}
+
+
 def targets():
 	return [
 		{"id": "memory.peak", "label_key": "target.memory.peak", "unit": "bytes", "readout": "memory"},
@@ -80,6 +95,18 @@ def targets():
 
 
 # ------------------------------------------------------------------ fine-tune
+
+
+ACCUM = 4  # the fine-tune's grad_accum
+FT_PARAMS = 1_562_179_072  # Qwen2.5-1.5B with r=16 LoRA on all seven projections
+FT_TRAINABLE = 18_464_768
+L4_BF16 = 121e12
+
+
+def ft_step(bs):
+	"""Seconds per optimizer step (four micro-steps) on the L4. The fixture's time.total (C's tests
+	read it) is built on this, so it stays as first written: an optimistic 58-63% MFU."""
+	return round(0.31 * bs + 0.12, 3)
 
 
 def finetune() -> dict:
@@ -221,9 +248,29 @@ def finetune() -> dict:
 		{"source": "optimizer", "target": "ckpt", "kind": "control"},
 	]
 
+	def ft_kernels(step, tokens):
+		# Qwen2.5-1.5B LoRA on an L4, four micro-steps a step: GEMMs (about 80% of peak) and flash
+		# attention dominate; RMSNorm and SiLU run as elementwise ops; the rest rolls up per class.
+		# FLOPs add up to the recorder's 6N-style count for the step, and no row beats the peak.
+		f = tokens * (4 * FT_PARAMS + 2 * FT_TRAINABLE)
+		return kernel_table([
+			("aten::mm", "gemm", 4704.0, 0.62 * step, 0.85 * f, 1.16e11),
+			("aten::_flash_attention_backward", "attention", 112.0, 0.10 * step, 0.10 * f, 4.4e9),
+			("aten::_flash_attention_forward", "attention", 112.0, 0.04 * step, 0.05 * f, 3.0e9),
+			("aten::mul", "elementwise", 7648.0, 0.05 * step, None, 8.8e10),
+			("aten::silu_backward", "elementwise", 112.0, 0.015 * step, None, 1.9e10),
+			("aten::_log_softmax_backward_data", "softmax", 8.0, 0.015 * step, None, 1.0e10),
+			("aten::_foreach_addcdiv_", "optimizer", 1.0, 0.004 * step, None, 2.2e8),
+			("(tail) elementwise (41 ops)", "elementwise", 12880.0, 0.04 * step, None, 7.6e10),
+			("(tail) copy (6 ops)", "copy", 1640.0, 0.015 * step, None, 2.4e10),
+			("(tail) reduction (9 ops)", "reduction", 932.0, 0.01 * step, None, 8.0e9),
+			("(unattributed device time)", "other", 0.0, 0.008 * step, None, None),
+		])  # fmt: skip
+
 	def probe(pid, bs, i):
 		pk = peak(bs, 1024)
-		step = 0.31 * bs + 0.12
+		step = ft_step(bs)
+		tokens = ACCUM * bs * 1024  # padded batches, all four micro-steps: what tokens_per_s counts
 		loss = [2.41, 2.37, 2.30, 2.26, 2.21]
 		return {
 			"id": pid,
@@ -262,9 +309,10 @@ def finetune() -> dict:
 				"unprofiled": True,
 			},
 			"throughput": {
-				"tokens_per_s": round(bs * 1024 / step, 1),
-				"samples_per_s": round(bs / step, 2),
-				"mfu": 0.38,
+				"tokens_per_s": round(tokens / step, 1),
+				"samples_per_s": round(ACCUM * bs / step, 2),
+				# the recorder's rule: forward 2N + activation grads 2N + weight grads 2N_trainable per token
+				"mfu": round(tokens * (4 * FT_PARAMS + 2 * FT_TRAINABLE) / step / L4_BF16, 3),
 			},
 			"stability": {
 				"series": {
@@ -282,6 +330,15 @@ def finetune() -> dict:
 				"num_workers": 2,
 			},
 			"power": {"mean_w": 61.0, "max_w": 72.0, "samples": 70},
+			"extras": {
+				"params_total": float(FT_PARAMS),
+				"params_trainable": float(FT_TRAINABLE),
+				"tokens_per_step": float(tokens),
+				"samples_per_step": float(ACCUM * bs),
+				"micro_steps_per_step": float(ACCUM),
+				"host_rss_peak_bytes": 6_442_450_944.0,
+			},
+			**({"kernels": ft_kernels(step, tokens)} if i == 0 else {}),
 			"cost": {"gpu_seconds": 71.0 + 9 * i, "usd": round((71.0 + 9 * i) * 0.80 / 3600, 4)},
 			"cache_key": f"sha256:{'a' * 60}{i:04d}",
 			"trace": f"blob://traces/01JBGOLDENFT/{pid}.json.gz",
@@ -340,7 +397,14 @@ def finetune() -> dict:
 					"d_model": d,
 					"n_heads": 12,
 					"n_kv_heads": 2,
+					"d_ff": 8960,
 					"vocab_size": vocab,
+					"head_dim": 128,
+					"max_positions": 131_072,
+					"gated_mlp": True,
+					"tie_embeddings": True,
+					"norm": "rmsnorm",
+					"attn_impl": "sdpa",
 					"dtype": "bfloat16",
 					"lora": {
 						"r": 16,
@@ -448,8 +512,8 @@ def finetune() -> dict:
 			"targets": targets(),
 			"estimates": {
 				"memory.peak": est(peak(4, 1024), "bytes"),
-				"time.total": est(51_760 / 16 * 1.36, "s", rel=0.15),
-				"cost.total": est(51_760 / 16 * 1.36 * 0.80 / 3600, "usd", rel=0.15),
+				"time.total": est(51_760 / (4 * ACCUM) * ft_step(4), "s", rel=0.15),  # 3,235 steps at bs 4
+				"cost.total": est(51_760 / (4 * ACCUM) * ft_step(4) * 0.80 / 3600, "usd", rel=0.15),
 				"risk.oom": {
 					"point": 0.97,
 					"lo": 0.9,
@@ -650,6 +714,21 @@ def pretrain() -> dict:
 		{"source": "optimizer", "target": "ckpt", "kind": "control"},
 	]
 
+	def pt_kernels(s, prec):
+		# GPT-2 124M in fp32 with TF32 matmuls (nanoGPT turns it on) on an A100: the data loader leaves
+		# the GPU idle 37% of the step, so the kernels sum to well under it; the rest is B's host bucket
+		dt = "fp32" if prec == "fp32" else "bf16"
+		return kernel_table([
+			("aten::mm", "gemm", 444.0, 0.30 * s, 6.1e12, 9.8e9, dt),
+			("aten::_efficient_attention_backward", "attention", 12.0, 0.08 * s, 7.7e11, 1.2e9, dt),
+			("aten::_efficient_attention_forward", "attention", 12.0, 0.04 * s, 3.1e11, 6.0e8, dt),
+			("aten::native_layer_norm_backward", "norm", 25.0, 0.025 * s, None, 3.1e9, dt),
+			("aten::gelu_backward", "elementwise", 12.0, 0.02 * s, None, 2.4e9, dt),
+			("aten::_foreach_lerp_", "optimizer", 1.0, 0.012 * s, None, 1.5e9, dt),
+			("(tail) elementwise (28 ops)", "elementwise", 980.0, 0.05 * s, None, 7.0e9, dt),
+			("(tail) copy (5 ops)", "copy", 120.0, 0.012 * s, None, 1.4e9, dt),
+		], allow_tf32=prec == "fp32")  # fmt: skip
+
 	def probe(pid, bs, i, prec="fp32"):
 		s = step_s(bs, 1024, 0, prec)
 		gn = [1.9, 1.4, 1.2, 1.1, 1.05, 0.98, 0.95, 0.93]
@@ -687,7 +766,8 @@ def pretrain() -> dict:
 				"tokens_per_s": round(bs * 1024 / s, 1),
 				"samples_per_s": round(bs / s, 2),
 				"flops_per_step": bs * 1024 * 124e6 * 6,
-				"mfu": 0.07,
+				# against the TF32 peak (156 TFLOP/s) in fp32, bf16's (312) otherwise
+				"mfu": round(bs * 1024 * 124e6 * 6 / s / (156e12 if prec == "fp32" else 312e12), 3),
 			},
 			"stability": {
 				"series": {
@@ -705,7 +785,16 @@ def pretrain() -> dict:
 			},
 			"data": {"loader_wait_fraction": 0.37, "num_workers": 0, "tokens_per_sample_mean": 1024.0},
 			"power": {"mean_w": 248.0, "max_w": 301.0, "samples": 64},
-			"extras": {"lr_range_divergence_lr": 4.8e-3, "resume_exact_match": 1.0},
+			"extras": {
+				"lr_range_divergence_lr": 4.8e-3,
+				"resume_exact_match": 1.0,
+				"params_total": 124_475_904.0,
+				"params_trainable": 124_475_904.0,
+				"tokens_per_step": float(bs * 1024),
+				"samples_per_step": float(bs),
+				"micro_steps_per_step": 1.0,
+			},
+			**({"kernels": pt_kernels(s, prec)} if i == 0 else {}),
 			"cost": {"gpu_seconds": 64.0 + 5 * i, "usd": round((64.0 + 5 * i) * 2.10 / 3600, 4)},
 			"trace": f"blob://traces/01JBGOLDENPT/{pid}.json.gz",
 		}

@@ -119,11 +119,21 @@ CONST_KNOBS: dict[str, str] = {
 	**_ids(["image_size", "img_size", "resolution", "crop_size", "input_size"], "image_size"),
 	**_ids(["kl_coef", "beta", "kl_beta", "init_kl_coef"], "kl_beta"),
 	"lora_r": "lora_r",
+	"lora_alpha": "lora_alpha",
+	"lora_dropout": "lora_dropout",
 	"weight_decay": "weight_decay",
+	**_ids(
+		["context_limit", "max_context_tokens", "context_window", "max_context", "max_input_tokens"],
+		"context_limit",
+	),
+	**_ids(["attn_implementation", "attn_impl"], "attn"),
 }
 
 # kwargs of *Arguments / *Config calls (TrainingArguments, SFTConfig, GRPOConfig, DPOConfig, ...)
 ARGS_KNOBS: dict[str, str] = {
+	"lora_alpha": "lora_alpha",
+	"lora_dropout": "lora_dropout",
+	"attn_implementation": "attn",
 	"per_device_train_batch_size": "batch_size",
 	"per_device_eval_batch_size": "eval_batch_size",
 	"gradient_accumulation_steps": "grad_accum",
@@ -189,6 +199,10 @@ CALL_KNOBS: dict[str, str] = {
 	"prefetch_factor": "prefetch_factor",
 	"hidden_channels": "hidden_channels",
 	"max_turns": "max_turns",
+	"attn_implementation": "attn",
+	"max_context_tokens": "context_limit",
+	"context_limit": "context_limit",
+	"max_input_tokens": "context_limit",
 }
 
 # call-specific kwargs: (call name suffix, kwarg) -> knob id; these win over CALL_KNOBS
@@ -267,6 +281,12 @@ LABELS = {
 	"gpus": "GPUs",
 	"log_every": "Log interval",
 	"weight_decay": "Weight decay",
+	"lora_alpha": "LoRA alpha",
+	"lora_dropout": "LoRA dropout",
+	"attn": "Attention kernel",
+	"quantization": "Weight quantization",
+	"context_limit": "Context limit",
+	"gpu_type": "GPU type",
 }
 
 UNITS = {
@@ -287,6 +307,7 @@ UNITS = {
 	"image_size": "px",
 	"gpus": "GPUs",
 	"concurrency": "requests",
+	"context_limit": "tokens",
 }
 
 PRECISION = {
@@ -539,6 +560,10 @@ def _collect_knobs(f: Facts) -> None:
 				if r:
 					seg = src.segment(next(k for k in call.keywords if k.arg == "r"))
 					f.candidates.append(Candidate("lora_r", r[0], r[1], r[2], r[3] or seg or "r", 3))
+		if short in ("BitsAndBytesConfig", "from_pretrained"):
+			q = _quant_candidate(f, call, path, src)
+			if q is not None:
+				f.candidates.append(q)
 		if short in FAISS_POSITIONAL:
 			idx, kid = FAISS_POSITIONAL[short]
 			if len(call.args) > idx:
@@ -553,6 +578,52 @@ def _collect_knobs(f: Facts) -> None:
 				mt = pat.search(line)
 				if mt:
 					f.candidates.append(Candidate("gpus", int(mt.group(1)), path, i, mt.group(0), 3))
+
+
+# weight formats, named as B's memory model keys them (engine/memory.py QUANT_BYTES)
+QUANT_FORMATS = ("none", "int8", "nf4", "nf4_dq", "fp4", "fp4_dq")
+FOUR_BIT = frozenset({"nf4", "nf4_dq", "fp4", "fp4_dq", "gptq_4bit", "awq_4bit", "hqq_4bit"})
+PREQUANTISED = frozenset({"gptq_4bit", "gptq_8bit", "awq_4bit"})
+
+
+def _prequantised(hf_id: str) -> str | None:
+	"""Checkpoints quantised before loading, named in the model id (Llama-2-7B-GPTQ, Qwen2.5-7B-Instruct-GPTQ-Int8)."""
+	low = hf_id.lower()
+	if "gptq" in low:
+		return "gptq_8bit" if re.search(r"int8|8bit|8-bit|w8a", low) else "gptq_4bit"
+	if "awq" in low:
+		return "awq_4bit"
+	return None
+
+
+def _quant_label(kws: dict, f: Facts, path: str) -> str | None:
+	"""nf4, nf4_dq, fp4, fp4_dq or int8 from BitsAndBytesConfig / from_pretrained flags."""
+
+	def val(k):
+		r = _resolve(f, kws[k], path) if k in kws else None
+		return r[0] if r else None
+
+	if val("load_in_4bit") is True:
+		qt = val("bnb_4bit_quant_type")
+		base = qt if qt in ("nf4", "fp4") else "fp4"  # bitsandbytes' default is fp4
+		return f"{base}_dq" if val("bnb_4bit_use_double_quant") is True else base
+	if val("load_in_8bit") is True:
+		return "int8"
+	return None
+
+
+def _quant_candidate(f: Facts, call: ast.Call, path: str, src) -> Candidate | None:
+	kws = _kwargs(call)
+	label = _quant_label(kws, f, path)
+	if label is None:
+		return None
+	flag = "load_in_8bit" if label == "int8" else "load_in_4bit"
+	kw = next(k for k in call.keywords if k.arg == flag)
+	return Candidate("quantization", label, path, kw.value.lineno, src.segment(kw) or flag, 3)
+
+
+# changing these rewrites more than one value (quantization swaps a config object's flags)
+NEEDS_CODE = frozenset({"quantization"})
 
 
 def _knobs(f: Facts) -> list[ScriptKnob]:
@@ -581,7 +652,7 @@ def _knobs(f: Facts) -> list[ScriptKnob]:
 				current=v,
 				unit=UNITS.get(kid) or ("nodes" if kid.startswith("fanout.") else None),
 				location=CodeLocation(file=c.file, line=c.line, expr=c.expr),
-				needs_code=False,
+				needs_code=kid in NEEDS_CODE,
 			)
 		)
 	return sorted(out, key=lambda k: k.id)
@@ -693,17 +764,17 @@ def _model(f: Facts, hf_id, call, path) -> ModelInfo | None:
 					target_modules=list(tm) if isinstance(tm, list | tuple) else [],
 					dropout=vals.get("lora_dropout"),
 				)
-		if short == "BitsAndBytesConfig":
-			kws = _kwargs(c)
-			for k, label in (("load_in_4bit", "4bit"), ("load_in_8bit", "8bit")):
-				if k in kws and (_resolve(f, kws[k], p) or (None,))[0] is True:
-					quant = label
+		if short in ("BitsAndBytesConfig", "from_pretrained"):
+			# first one wins, as for the knob: a reward or reference model loaded later doesn't override it
+			quant = quant or _quant_label(_kwargs(c), f, p)
 		if short == "create_model" and "timm" in fn:
 			name = _first_arg(f, c, p, "model_name")
 			if isinstance(name, str):
 				fam = "vit" if re.search(r"vit|deit|swin|eva", name) else "cnn"
 				return ModelInfo(name=name, family=fam)
 	if hf_id:
+		if quant is None:
+			quant = _prequantised(hf_id[:200])
 		dtype = None
 		if call is not None:
 			for k in ("torch_dtype", "dtype"):

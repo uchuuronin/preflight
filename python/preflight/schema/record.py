@@ -8,7 +8,7 @@ referenced by blob:// keys, never inlined.
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from .base import BlobRef, KnobValue, Lens, Strict, Unit
 from .ids import new_share_token, new_ulid
@@ -49,10 +49,14 @@ class Quota(Strict):
 	api_usd: float | None = None
 
 
+# visitor-supplied GPU names reach regex-based resolution (engine.gpus.resolve): keep them short
+GpuName = Annotated[str, Field(min_length=1, max_length=64)]
+
+
 class Constraints(Strict):
 	budget_usd: float | None = Field(default=None, ge=0)
 	deadline: datetime | None = None
-	gpu_types: list[str] = Field(default_factory=list, description="Allowed GPU names; empty means any")
+	gpu_types: list[GpuName] = Field(default_factory=list, description="Allowed GPU names; empty means any")
 	max_gpus: int | None = Field(default=None, ge=1)
 	quota: Quota | None = None
 	wall_time_cap_s: float | None = Field(
@@ -336,6 +340,49 @@ class ProbeCost(Strict):
 	usd: float = 0
 
 
+KERNEL_TABLE_ROWS = 96  # top 64, one tail row per kernel class (16), the unattributed row, and room
+KERNEL_NAME_LEN = 200  # a visitor's record_function label can be any length; the recorder cuts it
+
+
+class KernelStat(Strict):
+	"""One row of the profiled probe's kernel table, per optimizer step; B scales it to other GPUs."""
+
+	model_config = ConfigDict(allow_inf_nan=False)
+
+	name: str = Field(
+		max_length=KERNEL_NAME_LEN,
+		description="aten op; '(tail) <class> (<n> ops)' rolls up the rest of a class; "
+		"'(unattributed device time)' is GPU time no op claimed",
+	)
+	kernel_class: str | None = Field(
+		default=None, max_length=64, description="engine.steptime.classify_kernel class, e.g. gemm, attention"
+	)
+	# strict: numbers only (no "3", no true); bounded well past anything a real step reaches
+	calls: float = Field(ge=0, le=1e9, strict=True, description="Calls per step")
+	device_s: float = Field(
+		ge=0, le=86_400, strict=True, description="Self device time per step (self CPU time on CPU probes)"
+	)
+	flops: float | None = Field(
+		default=None, ge=0, le=1e20, strict=True, description="Per step; counted by PyTorch or estimated"
+	)
+	bytes: float | None = Field(
+		default=None, ge=0, le=1e18, strict=True, description="Read plus write traffic per step, estimated"
+	)
+	dtype: str = Field(max_length=8, description="bf16, fp16, fp32, ...")
+
+
+class KernelTable(Strict):
+	"""Top KERNEL_ROWS ops by device time, then the tail per class (probe-plan K: 100% within 20%)."""
+
+	rows: list[KernelStat] = Field(max_length=KERNEL_TABLE_ROWS)
+	steps: int = Field(ge=1, le=1_000, strict=True, description="Profiled steps the rows average over")
+	backend: Literal["cuda", "rocm", "cpu"]
+	allow_tf32: bool = Field(description="fp32 matmuls ran as TF32, so B picks the TF32 peak")
+	classified_by: str | None = Field(
+		default=None, max_length=64, description="Which classifier set kernel_class"
+	)
+
+
 class Probe(Strict):
 	id: str
 	knobs: dict[str, KnobValue] = Field(
@@ -360,6 +407,9 @@ class Probe(Strict):
 	checkpoint: CheckpointStats | None = None
 	generation: GenerationStats | None = None
 	extras: dict[str, float] = Field(default_factory=dict, description="Lens-specific measurements")
+	kernels: KernelTable | None = Field(
+		default=None, description="Per-kernel table, current-settings probe only (profiled window)"
+	)
 	cost: ProbeCost = Field(default_factory=ProbeCost)
 	cache_key: str | None = Field(default=None, description="sha256 of script, env and knob values")
 	trace: BlobRef | None = None

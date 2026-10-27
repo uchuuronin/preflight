@@ -702,6 +702,8 @@
 				"gpu_types": {
 					"description": "Allowed GPU names; empty means any",
 					"items": {
+						"maxLength": 64,
+						"minLength": 1,
 						"type": "string"
 					},
 					"title": "Gpu Types",
@@ -2398,19 +2400,19 @@
 				"constraints": {
 					"anyOf": [
 						{
-							"additionalProperties": true,
-							"type": "object"
+							"$ref": "#/$defs/Constraints"
 						},
 						{
 							"type": "null"
 						}
 					],
-					"default": null,
-					"title": "Constraints"
+					"default": null
 				},
 				"gpu": {
 					"anyOf": [
 						{
+							"maxLength": 64,
+							"minLength": 1,
 							"type": "string"
 						},
 						{
@@ -2439,6 +2441,147 @@
 				"source"
 			],
 			"title": "JobRequest",
+			"type": "object"
+		},
+		"KernelStat": {
+			"additionalProperties": false,
+			"description": "One row of the profiled probe's kernel table, per optimizer step; B scales it to other GPUs.",
+			"properties": {
+				"name": {
+					"description": "aten op; '(tail) <class> (<n> ops)' rolls up the rest of a class; '(unattributed device time)' is GPU time no op claimed",
+					"maxLength": 200,
+					"title": "Name",
+					"type": "string"
+				},
+				"kernel_class": {
+					"anyOf": [
+						{
+							"maxLength": 64,
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "engine.steptime.classify_kernel class, e.g. gemm, attention",
+					"title": "Kernel Class"
+				},
+				"calls": {
+					"description": "Calls per step",
+					"maximum": 1000000000.0,
+					"minimum": 0,
+					"title": "Calls",
+					"type": "number"
+				},
+				"device_s": {
+					"description": "Self device time per step (self CPU time on CPU probes)",
+					"maximum": 86400,
+					"minimum": 0,
+					"title": "Device S",
+					"type": "number"
+				},
+				"flops": {
+					"anyOf": [
+						{
+							"maximum": 1e+20,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Per step; counted by PyTorch or estimated",
+					"title": "Flops"
+				},
+				"bytes": {
+					"anyOf": [
+						{
+							"maximum": 1e+18,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Read plus write traffic per step, estimated",
+					"title": "Bytes"
+				},
+				"dtype": {
+					"description": "bf16, fp16, fp32, ...",
+					"maxLength": 8,
+					"title": "Dtype",
+					"type": "string"
+				}
+			},
+			"required": [
+				"name",
+				"calls",
+				"device_s",
+				"dtype"
+			],
+			"title": "KernelStat",
+			"type": "object"
+		},
+		"KernelTable": {
+			"additionalProperties": false,
+			"description": "Top KERNEL_ROWS ops by device time, then the tail per class (probe-plan K: 100% within 20%).",
+			"properties": {
+				"rows": {
+					"items": {
+						"$ref": "#/$defs/KernelStat"
+					},
+					"maxItems": 96,
+					"title": "Rows",
+					"type": "array"
+				},
+				"steps": {
+					"description": "Profiled steps the rows average over",
+					"maximum": 1000,
+					"minimum": 1,
+					"title": "Steps",
+					"type": "integer"
+				},
+				"backend": {
+					"enum": [
+						"cuda",
+						"rocm",
+						"cpu"
+					],
+					"title": "Backend",
+					"type": "string"
+				},
+				"allow_tf32": {
+					"description": "fp32 matmuls ran as TF32, so B picks the TF32 peak",
+					"title": "Allow Tf32",
+					"type": "boolean"
+				},
+				"classified_by": {
+					"anyOf": [
+						{
+							"maxLength": 64,
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Which classifier set kernel_class",
+					"title": "Classified By"
+				}
+			},
+			"required": [
+				"rows",
+				"steps",
+				"backend",
+				"allow_tf32"
+			],
+			"title": "KernelTable",
 			"type": "object"
 		},
 		"Knob": {
@@ -3142,6 +3285,112 @@
 					"default": null,
 					"title": "Vocab Size"
 				},
+				"head_dim": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Head Dim"
+				},
+				"n_experts": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "MoE experts per layer",
+					"title": "N Experts"
+				},
+				"experts_per_token": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "MoE experts routed per token",
+					"title": "Experts Per Token"
+				},
+				"max_positions": {
+					"anyOf": [
+						{
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Longest context the model was built for",
+					"title": "Max Positions"
+				},
+				"gated_mlp": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "SwiGLU/GeGLU-style MLP with a gate projection",
+					"title": "Gated Mlp"
+				},
+				"tie_embeddings": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Output head shares the embedding matrix",
+					"title": "Tie Embeddings"
+				},
+				"norm": {
+					"anyOf": [
+						{
+							"enum": [
+								"rmsnorm",
+								"layernorm"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Norm"
+				},
+				"attn_impl": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "eager, sdpa, flash_attention_2, ...",
+					"title": "Attn Impl"
+				},
 				"dtype": {
 					"anyOf": [
 						{
@@ -3164,8 +3413,26 @@
 						}
 					],
 					"default": null,
-					"description": "e.g. 4bit-nf4, 8bit, none",
+					"description": "Weight format, as engine.memory keys it: nf4, nf4_dq, fp4, fp4_dq, int8, gptq_4bit, gptq_8bit, awq_4bit; none or absent for unquantised",
 					"title": "Quantization"
+				},
+				"shape_source": {
+					"anyOf": [
+						{
+							"enum": [
+								"code",
+								"hf_config",
+								"modules"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Where the shape fields came from: the code, or the running model",
+					"title": "Shape Source"
 				},
 				"lora": {
 					"anyOf": [
@@ -3655,6 +3922,18 @@
 					"description": "Lens-specific measurements",
 					"title": "Extras",
 					"type": "object"
+				},
+				"kernels": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/KernelTable"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Per-kernel table, current-settings probe only (profiled window)"
 				},
 				"cost": {
 					"$ref": "#/$defs/ProbeCost"
