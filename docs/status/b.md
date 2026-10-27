@@ -68,6 +68,12 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
   - `time.phase.<name>` adding up to the step;
   - `sensitivity(..., pinned=, knobs=)`;
   - eval settings held in every grid's `fixed`.
+- **Review, Oct 27 (top priority):**
+  - `api.py` runs on the three golden records, with a 1-D grid for every knob around its current value.
+  - "Measured" only where a probe observed the target: P(OOM) never, unless a probe ran out of memory there.
+  - "Extrapolated" whenever a knob other than batch or sequence sits off every probe.
+  - Model cards say `calibration: simulated`, and engine and corpus constants carry source tags.
+  - A Pyodide parity test (it needs the CDN, so CI runs it), an import allowlist, and an unlisted-GPU fallback from the probe's own memory.
 - **K1's band (S4c):** sized to cover 90% even if per-kernel drift is twice what S4 assumed. Cross-vendor drops from a hand-set 0.25 to 0.22, so AMD gets numbers with wide bands instead of always abstaining.
 - Tests live in root `tests/`; 701 pass across the repo (A's included), ruff clean with the repo config.
 
@@ -75,8 +81,11 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
 - Modal access, for the NVIDIA corpus slice.
 
 ## Next (Wed Oct 28)
+- Split-conformal layer on log ratios, grouped by architecture, calibrated per GPU and lens (simulated calibration until real held-out runs exist).
+- P(OOM) from empirical residuals, with a reliability diagram, shown in bins.
+- Corpus: grouped probe-like configs, about 10 real HF LoRA and 4-bit jobs on an L4, and code and library versions in the key.
+- Memory model refinements from the review; the AMD droplet's uptime ledger.
 - Run-cost breakdown (gap 21): the price table is started in `engine/prices/`; the `cost_basis` and `job_cost` schema fields wait on Chiya.
-- Conformal layer (CQR, log-ratio scores) replacing the simulated band constants.
 - Agent cost from tokens when tasks lack `cost_usd`, once D's API price table lands.
 
 ## Contract requests

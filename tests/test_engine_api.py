@@ -401,3 +401,18 @@ def test_one_dimensional_grids_for_every_knob_around_the_current_point(ft):
 def test_model_cards_say_calibration_simulated(ft):
 	cards = api.fill_predictions(ft).models
 	assert cards and all(c.notes.startswith("calibration: simulated") and c.coverage is None for c in cards)
+
+
+def test_unknown_probe_gpu_uses_its_reported_memory(ft):
+	env = ft.env.model_copy(
+		update={
+			"gpu": ft.env.gpu.model_copy(update={"name": "NVIDIA Weird 9000", "memory_bytes": 24 * 10**9})
+		}
+	)
+	rec = ft.model_copy(update={"env": env})
+	p = api.predict(rec, {"eval_batch_size": 1, "eval_no_grad": True}).root
+	assert p["memory.peak"].status != "abstain" and p["risk.oom"].status != "abstain"
+	assert p["time.step"].status in ("measured", "predicted", "extrapolated")
+	assert p["cost.total"].status == "abstain" and "no price" in p["cost.total"].reason
+	moved = api.predict(rec, {"gpu_type": "H100-SXM-80GB"}).root["time.step"]
+	assert moved.status == "abstain" and "isn't in the GPU table" in moved.reason

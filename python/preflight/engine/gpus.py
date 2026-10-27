@@ -38,7 +38,7 @@ TFLOP = 1e12  # derived: unit
 GB = 1e9  # derived: unit
 GIB = 2**30  # derived: unit
 
-Confidence = Literal["datasheet", "derived", "secondary"]
+Confidence = Literal["datasheet", "derived", "secondary", "guess"]
 
 _HBM_PREFIXES = ("P100", "V100", "TITAN-V", "A100", "H100", "H200", "GH200", "B200", "B300")
 # Data-centre GDDR cards ship with ECC on, which reserves part of the memory (L4: 21.45 of 24 GiB)
@@ -361,13 +361,44 @@ def _clean(name: str) -> str:
 	return s.strip()
 
 
+# ---------------------------------------------------------------- GPUs the table doesn't list
+
+UNLISTED = "unlisted:"
+
+
+def unlisted_name(raw: str, memory_bytes: int, compute_units: int | None = None) -> str:
+	"""A name that carries what the probe measured about a GPU the table lacks (Review, Oct 27)."""
+	clean = re.sub(r"[^A-Za-z0-9 ._()-]", "", raw)[:48].strip() or "gpu"
+	return f"{UNLISTED}{clean}@{int(memory_bytes)}:{int(compute_units or 0)}"
+
+
+def is_unlisted(name: str | None) -> bool:
+	return bool(name) and name.startswith(UNLISTED)
+
+
+def _unlisted_spec(name: str) -> GpuSpec:
+	"""Capacity from the probe's own report; no peaks, bandwidth or link, so nothing is scaled from it."""
+	m = re.fullmatch(r"unlisted:(.{1,48})@(\d{1,16}):(\d{1,6})", name)
+	if not m:
+		raise KeyError(f"malformed unlisted GPU name {name!r}")
+	raw, mem, cu = m.group(1), int(m.group(2)), int(m.group(3))
+	vendor = "amd" if re.search(r"amd|instinct|radeon|gfx", raw, re.I) else "nvidia"
+	gib = mem / GIB
+	return GpuSpec(
+		name, vendor, "unknown", gib, 0.0, cu, 0, 0.0, None, None, None, None, 0.0, "unknown",  # type: ignore[arg-type]
+		confidence="guess",
+		notes="Not in the table: capacity is what the probe's PyTorch reported; peaks, bandwidth and link unknown.",
+		usable_gib=gib,
+	)  # fmt: skip
+
+
 def resolve(name: str, memory_bytes: int | None = None, compute_units: int | None = None) -> str:
 	"""Table name for a PyTorch device name, ROCm arch, MIG slice or Modal string.
 
 	memory_bytes and compute_units (torch's total_memory and multi_processor_count)
 	split names PyTorch reports the same way, e.g. "AMD Instinct MI250X / MI250".
 	"""
-	if name in GPUS:
+	if name in GPUS or is_unlisted(name):
 		return name
 	if len(name) > MAX_NAME_LEN:
 		raise KeyError(f"unknown GPU (name longer than {MAX_NAME_LEN} characters)")
@@ -425,7 +456,9 @@ def mig_profile(name: str) -> tuple[int, int] | None:
 
 
 def get_gpu(name: str, memory_bytes: int | None = None, compute_units: int | None = None) -> GpuSpec:
-	"""The spec for a device; a MIG slice comes back scaled to its share of the GPU."""
+	"""The spec for a device; a MIG slice comes back scaled to its share of the GPU; an unlisted one, a fallback."""
+	if is_unlisted(name):
+		return _unlisted_spec(name)
 	spec = GPUS[resolve(name, memory_bytes, compute_units)]
 	mig = mig_profile(name)
 	if mig is None or not spec.mig_slices:

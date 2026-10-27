@@ -259,3 +259,14 @@ def test_sizes_in_names_still_resolve():
 )
 def test_mig_profiles_pick_their_card(name, card):
 	assert gpus.resolve(name, int(5e9)) == card
+
+
+def test_unlisted_gpu_falls_back_to_what_the_probe_reported():
+	name = gpus.unlisted_name("NVIDIA Weird 9000", 24 * 10**9, 60)
+	spec = gpus.get_gpu(name)
+	assert gpus.is_unlisted(name) and gpus.resolve(name) == name
+	assert spec.capacity_bytes() == pytest.approx(24e9, rel=1e-6) and spec.compute_units == 60
+	assert spec.confidence == "guess" and not spec.supports("bf16")
+	assert gpus.price(name) is None and gpus.on_demand_reference(name) is None
+	with pytest.raises(KeyError):
+		gpus.get_gpu("unlisted:bad")

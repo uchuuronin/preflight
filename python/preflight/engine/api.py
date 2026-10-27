@@ -309,10 +309,22 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 
 
 def _env_gpu(record: FlightRecord) -> str | None:
+	"""The probe's GPU: a table name, or an unlisted fallback built from the probe's own memory and SM count."""
 	if record.env and record.env.gpu and record.env.gpu.name:
+		g = record.env.gpu
 		try:
-			return gpus.resolve(record.env.gpu.name, record.env.gpu.memory_bytes)
+			return gpus.resolve(g.name, g.memory_bytes)
 		except KeyError:
+			if g.memory_bytes:
+				cu = next(
+					(
+						p.extras.get("gpu_compute_units")
+						for p in record.probes
+						if p.extras.get("gpu_compute_units")
+					),
+					None,
+				)
+				return gpus.unlisted_name(g.name, g.memory_bytes, int(cu) if cu else None)
 			return None
 	return None
 
@@ -576,6 +588,9 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		why = f"the probes ran without a known GPU (CPU, MPS or an unlisted card), so their times don't carry to {tgt_gpu}"
 		return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), 0.0)
 	same_gpu = tgt_gpu == src_gpu
+	if not same_gpu and (gpus.is_unlisted(src_gpu) or gpus.is_unlisted(tgt_gpu)):
+		why = f"{src_gpu if gpus.is_unlisted(src_gpu) else tgt_gpu} isn't in the GPU table, so time can't be carried across GPUs"
+		return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), 0.0)
 	est = model.predict(
 		_step_x(lens, values), recompute=recompute, measured_probe=match.id if match and same_gpu else None
 	)
@@ -591,6 +606,9 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		for i, pv in enumerate(_probe_values(record, p) for p in record.probes if p.status in OK_PROBE)
 	)
 	p_precs = {pr for _, _, pr in by_dist}
+	if q_prec and p_precs and q_prec not in p_precs and gpus.is_unlisted(src_gpu):
+		why = f"{src_gpu} isn't in the GPU table, so a precision change can't be scaled"
+		return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), sigma)
 	if q_prec and p_precs and q_prec not in p_precs and src_gpu:
 		src_prec = next((pr for _, _, pr in by_dist if pr), None)  # the nearest probe's, deterministically
 		tf32 = (
