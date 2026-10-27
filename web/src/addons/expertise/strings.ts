@@ -39,6 +39,52 @@ export const EXPERTISE_EN: Record<string, string> = {
 		concurrency: ["Running at once", "concurrency"],
 		n_tasks: ["Number of tasks", "n_tasks"],
 		tool_retry_cap: ["Tool retries", "tool_retry_cap"],
+		reasoning_effort: ["Thinking time", "reasoning_effort"],
+		// RL
+		group_size: ["Answers per question", "num_generations"],
+		max_completion_len: ["Longest answer", "max_completion_length"],
+		max_prompt_len: ["Longest question", "max_prompt_length"],
+		clip_high: ["Step limit (up)", "epsilon_high"],
+		clip_low: ["Step limit (down)", "epsilon"],
+		kl_beta: ["Stay close to the start", "beta"],
+		loss_type: ["Learning rule", "loss_type"],
+		temperature: ["Answer variety", "temperature"],
+		use_vllm: ["Fast answer writing", "use_vllm"],
+		// fine-tune and pretrain, wider set
+		lora_alpha: ["Add-on strength", "lora_alpha"],
+		lora_dropout: ["Add-on dropout", "lora_dropout"],
+		attn: ["Attention code", "attn_implementation"],
+		quantization: ["Model squeeze", "quantization_config"],
+		epochs: ["Passes over the data", "num_train_epochs"],
+		eval_every: ["Check progress every", "eval_steps"],
+		log_every: ["Log every", "logging_steps"],
+		grad_clip: ["Step size cap", "max_grad_norm"],
+		warmup_steps: ["Gentle start", "warmup_steps"],
+		weight_decay: ["Keep weights small", "weight_decay"],
+		d_model: ["Model width", "d_model"],
+		n_head: ["Attention heads", "n_head"],
+		n_layer: ["Layers", "n_layer"],
+		// multi-GPU
+		gpus: ["Number of GPUs", "nproc_per_node"],
+		fsdp_mode: ["Split the model across GPUs", "fsdp sharding_strategy"],
+		tensor_parallel: ["GPUs per model copy", "tensor_parallel_size"],
+		// serving and eval
+		max_model_len: ["Longest conversation", "max_model_len"],
+		max_num_seqs: ["Requests at once", "max_num_seqs"],
+		gpu_memory_utilization: ["GPU memory share", "gpu_memory_utilization"],
+		kv_cache_dtype: ["Memory precision", "kv_cache_dtype"],
+		prefix_caching: ["Reuse shared starts", "enable_prefix_caching"],
+		max_new_tokens: ["Longest answer", "max_new_tokens"],
+		dump_hidden_states: ["Save model internals", "output_hidden_states"],
+		// retrieval
+		encode_batch_size: ["Texts encoded at once", "encode batch_size"],
+		index_m: ["Index links", "HNSW M"],
+		index_nlist: ["Index buckets", "IVF nlist"],
+		// GNN
+		gnn_layers: ["How far to look", "num_layers"],
+		hidden_channels: ["Detail per node", "hidden_channels"],
+		// vision
+		image_size: ["Image size", "image_size"],
 	}),
 };
 
