@@ -1,9 +1,13 @@
 {
 	"_meta": {
 		"addon": "expertise",
-		"version": "0.1.0",
-		"tiers": ["new", "practitioner", "expert"],
-		"note": "Hover glossary cards for the expertise dial (D1). Each term has one line per tier and an optional 'act' line saying what a person usually changes. Keys become t('addon.expertise.glossary.<id>.<field>') once C confirms the add-on string namespace (see docs/requests.md). British spelling, no em dashes."
+		"version": "0.2.0",
+		"tiers": [
+			"new",
+			"practitioner",
+			"expert"
+		],
+		"note": "Hover glossary cards for the expertise dial (D1). Each term has one line per level and an optional 'act' line saying what a person usually changes. glossary.ts maps knob ids to terms and registers the text as addon.expertise.term.<id>.<field>. British spelling, no em dashes."
 	},
 	"terms": {
 		"probe": {
@@ -335,6 +339,61 @@
 			"new": "How many repeat runs you need to be sure a difference is real and not luck.",
 			"practitioner": "From seed-to-seed loss noise in short probes, the runs per arm to detect a given gap.",
 			"expert": "Two-sample power analysis on matched-step loss variance at your chosen significance level."
+		},
+		"gradient_accumulation": {
+			"label": "Gradient accumulation",
+			"new": "Adds up several small batches before each learning step, so you get the effect of a big batch without the memory.",
+			"practitioner": "Micro-batches summed per optimiser step; effective batch = micro-batch × accumulation × GPUs. Same memory, more time per step.",
+			"expert": "Grads accumulate over k micro-steps before one update; optimiser cost is amortised, activation memory stays at one micro-batch."
+		},
+		"eval_no_grad": {
+			"label": "Eval without gradients",
+			"new": "Tells the checks not to keep the extra notes needed for learning, which saves a lot of memory.",
+			"practitioner": "Wraps evaluation in no_grad (or inference_mode) so activations are freed layer by layer instead of kept for backward.",
+			"expert": "Without it, eval holds the autograd graph: activation memory as in training, with no recompute. Usually the cheapest OOM fix.",
+			"act": "Turn it on; it changes no results."
+		},
+		"gpu_type": {
+			"label": "GPU",
+			"new": "Which graphics card runs the job. Bigger ones fit larger jobs and run faster, but cost more per hour.",
+			"practitioner": "GPU model: sets memory capacity, speed and hourly price. A cheaper GPU that fits can still cost less overall.",
+			"expert": "Cross-GPU step time keeps each kernel's measured efficiency, scaled by peak FLOPs and bandwidth; intervals widen off the probed GPU."
+		},
+		"learning_rate": {
+			"label": "Learning rate",
+			"new": "How big a step the model takes each time it learns. Too big and training breaks; too small and it barely moves.",
+			"practitioner": "Peak step size for the optimiser; it does not change memory or time, but it decides whether the run is stable.",
+			"expert": "Shown against the LR range test: the margin to the rate where the probe's loss diverged, together with warm-up and decay."
+		},
+		"max_steps": {
+			"label": "Training steps",
+			"new": "How many learning steps the whole run takes. More steps means a longer, costlier run.",
+			"practitioner": "Total optimiser steps; time and cost scale with it, memory does not.",
+			"expert": "Total tokens = steps × effective batch × sequence length; drives the run's wall-clock, checkpoint count and segment split."
+		},
+		"agent_model": {
+			"label": "Model",
+			"new": "Which AI model does the work in each task. Stronger models cost more per word but may need fewer tries.",
+			"practitioner": "The model behind the agent: sets price per token, speed and success rate, measured on your sampled tasks.",
+			"expert": "Per-task token and turn counts are bootstrapped from the sample for this model; another model's figures come from its own sample."
+		},
+		"max_turns": {
+			"label": "Max turns",
+			"new": "The most back-and-forth steps an agent may take on one task before it stops.",
+			"practitioner": "Turn cap per task: limits runaway tasks and their cost, but cuts off tasks that needed more turns.",
+			"expert": "Context grows with every turn, so cost per task rises faster than linearly near the cap; the success curve is read from the sample."
+		},
+		"n_tasks": {
+			"label": "Tasks",
+			"new": "How many tasks the full run will do. We measured a small sample and scale it up.",
+			"practitioner": "Size of the full run; cost and time scale from the 20 to 50 tasks sampled.",
+			"expert": "Totals come from a bootstrap over the sampled tasks; the interval reflects the sample size."
+		},
+		"tool_retry_cap": {
+			"label": "Tool retry cap",
+			"new": "How many times the agent may retry a tool that failed before giving up on it.",
+			"practitioner": "Retries per failing tool call; higher saves some tasks but adds turns, tokens and time.",
+			"expert": "Retry loops are the usual runaway pattern; the cap bounds the tail of tokens per task seen in the sample."
 		}
 	}
 }

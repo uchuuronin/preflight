@@ -1,41 +1,40 @@
-# Status · D (usability add-ons)
+# Status: D (usability add-ons)
 
-Mon Oct 26, evening. Repo is empty (no skeleton pushed yet), so nothing is committed; D's files sit in D-owned paths, uncommitted, and go onto `ws-d` once `main` has its first commit.
+## Tue Oct 27, midday (rebased on `ws-c`)
 
-## Done
+**Done** (branch `ws-d`, rebased on `ws-c`, not pushed)
 
-- D1 content layer, no code dependencies:
-	- `web/src/addons/expertise/glossary.en.json`: 54 hover-card terms across every lens, one line per tier (new, practitioner, expert), plus a "what to change" line where there is a clear fix.
-	- `web/src/addons/expertise/strings.en.json`: dial copy, and knob and readout labels per tier.
-	- `web/src/addons/expertise/tiers.ts`: which knobs show per lens and tier, and `visibleKnobs()`. Pinned knobs and knobs the guide highlights always show, so the tour never moves a knob the visitor can't see. The "new" tier also shows the top 3 knobs from `sensitivity()`.
+- D1 expertise dial, behind flag `d.expertise` (off by default), through C's existing extension points only:
+	- Detail level (New to this, Practitioner, Expert) in the Logbook's pilot card (`logbook-settings` slot). A radio group with arrow keys and one tab stop, kept per browser in localStorage, guarded for blocked storage.
+	- Glossary card in every knob's control (knob decoration): a native disclosure worded for the level, a "What to change" line where there is a clear fix, and "More detail" one level deeper without changing the setting. 63 terms; every knob in A's golden records and C's dev record is covered (test).
+	- Tier rules ready for C's knob-view hook: `tiers.ts` (`visibleKnobs`, `labelKeyFor`) with plain new-level labels and expert code names for every record knob. New level = lens baseline + top 2 knobs by `sensitivity()` + pinned + guide-highlighted, chosen by Monte Carlo on the sample records (docs/decisions/expertise-new-level.md): the failure fix is visible in 100% of 303 cases, the best knob for any goal in 95.4% of 963, at most five knobs on screen. The simulation runs in CI as a regression test.
+- Found and reproduced a bug in C's `registry.ts`: the eager add-on glob is hoisted above the registry's state, so an add-on that registers while loading blanks the page. D works around it (`addons/_shared/whenReady.ts`); fix requested from C.
+- Re-filed D's requests against what A, B and C built; five settled by their work.
+- Checks: 47 add-on tests (89 in web with C's 42), typecheck, production build; Chromium at 1440 and 390 px, dusk and day, no horizontal overflow, no console errors from D's code.
 
-## Blocked
+**Blocked**
 
-- D1 UI: needs C's `t()`, registry, flags (Tue), A's knob ids (schema freeze Tue noon) and a way for add-ons to ship their own strings (request 1).
-- D2 onward: the contract says no item starts before the ones above it are on a branch, so they wait for D1 to land on `ws-d`.
+- Fewer knobs and plainer labels at "new" need C's knob-view hook (docs/requests.md).
+- `d.expertise` and `d.currency` need keys in `flags.json` (shared, through Chiya).
+- D2 share cards need C's share-token read route, R2 store and `workers/` in the deploy (C's Thu work).
 
-## Next
+**Next**
 
-- Rename provisional knob ids in `tiers.ts` and `strings.en.json` to A's frozen ids.
-- Build the dial control, rail filter and hover cards against C's registry; flag `addon.expertise`.
+- D2 once C's share route lands; D3 local currency on C's `setCurrency` and B's dated price table; D4 free-tier presets on B's T4, P100 and L4 rows.
 
 ## Dependency map
 
-| # | Add-on | Needs | From | Earliest start | D can do before then |
-|---|---|---|---|---|---|
-| D1 | Expertise dial | `t()`, registry slots (rail filter, header control, hover card), flags; knob ids; `sensitivity()` | C, A, B | Tue, after C's first commits | Content and tier rules (done) |
-| D2 | Share cards and badge | Share token and read-only record fetch, R2 record store, `workers/` in the deploy pipeline, headline numbers in the record | C, B | Thu (C's gap 1 and 5) | Card and badge design on a mock record |
-| D3 | Local currency, regional prices | `fmt()` with a currency argument, B's USD price table (as-of date and source per row) | C, B | Tue | Regional rows on top of B's table; display-time conversion with a dated exchange rate (decided Oct 26, D-10) |
-| D4 | Free-tier presets | Free-tier GPUs (T4, P100, L4) in B's spec table; wall-time cap in `job.constraints` | B, A | Tue | Preset data: GPU, memory, session cap per platform, with sources |
-| D5 | Notebook intake | The exact input A's harness takes for an upload | A | Tue, once A defines it | Converter core in `python/preflight/addons/` (nbformat, magics, Colab drive mounts) |
-| D6 | "Jobs like yours" prior | Corpus records readable from the store; map skeleton from A | B, A | Thu (G1) | Feature design for the neighbour search |
-| D7 | Localisation | `en.json` filled by C; a language field on guide turns | C | After G1 | Language choice and a do-not-translate term list |
-| D8 | Hugging Face quick start | `template` job source accepted by A's harness | A | After G1 | Hub metadata reader (needs Hub access from the workspace) |
-| D9 | Energy and carbon | GPU power sampled in probes | A | Sun (A's G2) | Grid-intensity table by region |
-| D10 | Command palette | Browser-side `set_knob` and `pin`, `api/addons/` mount for the Spark Open call | C | After G1 | Command grammar and examples |
-| D11 | Phone view, dark theme | Light token set; read-only share route | C | Tue for tokens, Thu for the route | Dark palette drafted against the light set |
-| D12 | Alerts outside the app | In-flight mode and C's "left its band" event | A, C | Sun | Message copy per channel |
-
-## Contract requests
-
-See `docs/requests.md`, items D-1 to D-9.
+| # | Add-on | Needs | From | Status |
+|---|---|---|---|---|
+| D1 | Expertise dial | Knob-view hook for filtering and labels | C | Setting and glossary cards done; filter and labels wait on the hook |
+| D2 | Share cards and badge | Share-token read route, R2 store, `workers/` in the deploy, headline numbers | C, B | Waiting (C, Thu) |
+| D3 | Local currency, regional prices | `setCurrency` (done, C), B's dated USD table (done, B) | C, B | Unblocked |
+| D4 | Free-tier presets | T4, P100, L4 in B's table (done); wall-time cap in `job.constraints` | B, A | Unblocked |
+| D5 | Notebook intake | The exact input A's harness takes for an upload | A | Waiting on A's answer |
+| D6 | "Jobs like yours" prior | Corpus records readable; map skeleton | B, A | After G1 |
+| D7 | Localisation | `registerStrings` and per-language files (done, C); `language` on guide turns | C | After G1 |
+| D8 | Hugging Face quick start | `template` job source in A's harness | A | After G1 |
+| D9 | Energy and carbon | GPU power sampled in probes | A | After A's G2 |
+| D10 | Command palette | Browser `set_knob` and `pin` (done, C); `api/addons/` mount (done, C) | C | After G1 |
+| D11 | Phone view | Read-only share route | C | Dark set done by C; phone view waits on the route |
+| D12 | Alerts outside the app | In-flight mode and the "left its band" event | A, C | After G2 |
