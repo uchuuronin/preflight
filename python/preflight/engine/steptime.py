@@ -245,8 +245,9 @@ class SameGpuModel:
 
 KernelClass = Literal[
 	"gemm", "conv", "attention", "norm", "softmax", "elementwise", "reduction", "embedding",
-	"index", "loss", "optimizer", "copy", "memset", "comm", "sort", "other",
+	"index", "loss", "optimizer", "copy", "memset", "comm", "sort", "host", "other",
 ]  # fmt: skip
+KERNEL_CLASSES: frozenset[str] = frozenset(KernelClass.__args__)
 Bound = Literal["compute", "memory", "link", "latency"]
 
 # (regex, class), most specific first. Covers CUDA (cuBLAS/cuBLASLt/CUTLASS/nvjet, cuDNN, FlashAttention),
@@ -254,24 +255,33 @@ Bound = Literal["compute", "memory", "link", "latency"]
 _KERNEL_PATTERNS: list[tuple[re.Pattern[str], KernelClass]] = [
 	(re.compile(p, re.I), c)
 	for p, c in [
+		# launches nothing on a GPU: views, metadata and host syncs; their time is host overhead
+		(
+			r"aten::(view|_?reshape_alias|reshape|as_strided|expand|expand_as|t|permute|transpose|unsqueeze|squeeze"
+			r"|select|slice|narrow|detach|alias|unbind|split|split_with_sizes|chunk|unfold|view_as|_unsafe_view"
+			r"|broadcast_tensors|broadcast_to|numel|size|stride|is_nonzero|item|_local_scalar_dense"
+			r"|resolve_conj|resolve_neg|lift_fresh|empty|empty_like|empty_strided|new_empty|new_empty_strided"
+			r"|set_|result_type)_?\b",
+			"host",
+		),
 		# communication
 		(
-			r"nccl|rccl|c10d::|all_?reduce|all_?gather|reduce_?scatter|broadcast|sendrecv|ncclDevKernel",
+			r"nccl|rccl|c10d::|record_param_comms|all_?reduce|all_?gather|all_to_all|reduce_?scatter|broadcast|sendrecv|ncclDevKernel",
 			"comm",
 		),
 		# attention (before gemm: flash kernels contain "gemm" in some builds)
 		(
-			r"flash_?(fwd|bwd|attn)|fmha|FmhaFwd|FmhaBwd|cutlass.*attention|_scaled_dot_product|efficient_attention|aiter.*attn|mha_(fwd|bwd)|paged_attention|flex_attention",
+			r"flash_?(fwd|bwd|attn|attention)|fmha|FmhaFwd|FmhaBwd|cutlass.*attention|scaled_dot_product|efficient_attention|_cudnn_attention|aiter.*attn|mha_(fwd|bwd)|paged_attention|flex_attention",
 			"attention",
 		),
 		# conv
 		(
-			r"implicit_?convolve|cudnn.*conv|conv2d|convolution|miopen.*(conv|igemm)|naive_conv|igemm_|xmma_fprop|xmma_dgrad|xmma_wgrad|winograd|fft_conv",
+			r"implicit_?convolve|cudnn.*conv|conv_?transpose\dd|conv\dd|conv_tbc|convolution|miopen.*(conv|igemm)|naive_conv|igemm_|xmma_fprop|xmma_dgrad|xmma_wgrad|winograd|fft_conv",
 			"conv",
 		),
 		# gemm
 		(
-			r"gemm|Cijk_|hipblaslt|rocblas|cublas|cutlass|nvjet|sm\d+_xmma|ampere_.*(sgemm|hgemm|bf16)|volta_.*gemm|turing_.*gemm|ck::.*gemm|device_gemm|kernel_gemm|triton_tem|aten::(mm|addmm|bmm|baddbmm|matmul|linear|_scaled_mm)\b|splitK",
+			r"gemm|Cijk_|hipblaslt|rocblas|cublas|cutlass|nvjet|sm\d+_xmma|ampere_.*(sgemm|hgemm|bf16)|volta_.*gemm|turing_.*gemm|ck::.*gemm|device_gemm|kernel_gemm|triton_tem|aten::(mm|addmm|addbmm|addmv|mv|dot|vdot|bmm|baddbmm|matmul|linear|_scaled_mm|_int_mm|_weight_int4pack_mm|_weight_int8pack_mm|_convert_weight_to_int4pack|_cudnn_rnn|lstm|gru|rnn_tanh|rnn_relu)_?\b|splitK",
 			"gemm",
 		),
 		# normalisation
@@ -282,23 +292,41 @@ _KERNEL_PATTERNS: list[tuple[re.Pattern[str], KernelClass]] = [
 		(r"softmax|log_softmax", "softmax"),
 		(r"cross_?entropy|nll_?loss|aten::(nll_loss|cross_entropy|mse_loss|binary_cross)", "loss"),
 		(r"embedding|EmbeddingBag", "embedding"),
-		(r"index_(select|add|put)|gather|scatter|aten::(index|take)|indexing_backward", "index"),
+		(
+			r"index_(select|add|put)|gather|scatter|aten::(index|_unsafe_index|_index_put_impl|take|nonzero|nonzero_static|masked_select|masked_scatter"
+			r"|unique|_unique2|unique_consecutive|bincount|histc|searchsorted|one_hot)|indexing_backward",
+			"index",
+		),
 		(
 			r"multi_tensor_apply|_foreach_|fused_adam|_fused_adamw|adam_|lamb_|aten::_fused_sgd|lion",
 			"optimizer",
 		),
 		(r"sort|topk|radix|argsort|cub::", "sort"),
 		(
-			r"reduce_kernel|reduction|aten::(sum|mean|norm|amax|max|min|var|std)\b|triton_(red|per)_|block_reduce",
+			r"reduce_kernel|reduction|linalg_vector_norm|aten::(sum|mean|norm|amax|amin|max|min|var|std|var_mean|std_mean|prod|all|any|argmax|argmin|cumsum|cumprod|logsumexp|count_nonzero|max_pool\dd|max_pool\dd_with_indices|avg_pool\dd|adaptive_avg_pool\dd|adaptive_max_pool\dd|_adaptive_avg_pool\dd)\w*?_?\b"
+			r"|triton_(red|per)_|block_reduce|pool",
 			"reduction",
 		),
 		(
-			r"memcpy|copy_?buffer|__amd_rocclr_copy|aten::(copy_|_to_copy|to|contiguous|clone)\b|CatArrayBatchedCopy|transpose",
+			r"memcpy|copy_?buffer|__amd_rocclr_copy|aten::(copy_|_to_copy|to|contiguous|clone|cat|stack|hstack|vstack|constant_pad_nd|pad|reflection_pad\dd|replication_pad\dd|slice_backward|select_backward|narrow_copy|repeat|repeat_interleave|flip|roll|_copy_from|_copy_from_and_resize|[a-z_]+_copy|upsample_\w+|_upsample_\w+|pixel_shuffle|pixel_unshuffle)_?\b"
+			r"|CatArrayBatchedCopy|transpose|upsample",
 			"copy",
 		),
-		(r"memset|fill_|zero_|aten::(zero_|fill_|zeros|ones|empty)", "memset"),
+		# fills and generators: write-only, so bandwidth-bound
 		(
-			r"elementwise|vectorized|unrolled_elementwise|triton_poi_|aten::(add|mul|sub|div|gelu|silu|relu|sigmoid|tanh|exp|pow|where|dropout|_softmax_backward)|act_and_mul|rotary|rope",
+			r"memset|(?<!masked_)fill_|zero_|aten::(zero_|fill_|zeros|zeros_like|new_zeros|ones|ones_like|new_ones|full|full_like|new_full|scalar_tensor"
+			r"|arange|linspace|logspace|eye|rand|randn|randint|rand_like|randn_like|random_|normal_|uniform_|bernoulli_|bernoulli"
+			r"|exponential_|multinomial|randperm)_?\b|philox|curand",
+			"memset",
+		),
+		(
+			r"elementwise|vectorized|unrolled_elementwise|triton_poi_|aten::(add|mul|sub|div|gelu|silu|relu|sigmoid|tanh|exp|pow|where|dropout|glu|_fused_dropout|hardswish|hardsigmoid)(_backward)?_?\b|act_and_mul|rotary|rope"
+			r"|aten::(neg|abs|sqrt|rsqrt|reciprocal|cos|sin|log|log1p|log2|erf|erfinv|sign|sgn|square|floor|ceil|round|trunc|frac"
+			r"|clamp|clamp_min|clamp_max|clip|maximum|minimum|fmax|fmin|eq|ne|gt|ge|lt|le|isclose"
+			r"|bitwise_and|bitwise_or|bitwise_xor|bitwise_not|logical_and|logical_or|logical_xor|logical_not"
+			r"|masked_fill|masked_scale|_masked_scale|lerp|addcmul|addcdiv|rsub|threshold|threshold_backward|hardtanh|leaky_relu|elu|softplus|mish"
+			r"|native_dropout|native_dropout_backward|isfinite|isinf|isnan|isneginf|isposinf|signbit|nan_to_num"
+			r"|atan2|hypot|fmod|remainder|copysign|xlogy|tril|triu|type_as|_amp_update_scale)_?\b",
 			"elementwise",
 		),
 	]
@@ -318,12 +346,24 @@ CLASS_BOUND: dict[str, Bound] = {
 	"copy": "memory",
 	"memset": "memory",
 	"sort": "memory",
+	"host": "latency",  # launches nothing on the GPU, so it doesn't scale with it
 	"comm": "link",
 	"other": "memory",
 }
 
 
+_TAIL_ROW = re.compile(r"^\(tail\) ([a-z]+) \(\d+ ops?\)$")
+
+
+MAX_KERNEL_NAME = 200  # the schema's KERNEL_NAME_LEN; longer names are cut before any regex sees them
+
+
 def classify_kernel(name: str) -> KernelClass:
+	"""Kernel or aten op name -> class. A's roll-up rows, `(tail) <class> (<n> ops)`, keep their class."""
+	name = name[:MAX_KERNEL_NAME]
+	if name.startswith("("):
+		m = _TAIL_ROW.match(name)
+		return m.group(1) if m and m.group(1) in KERNEL_CLASSES else "other"  # type: ignore[return-value]
 	for pat, cls in _KERNEL_PATTERNS:
 		if pat.search(name):
 			return cls
@@ -342,6 +382,60 @@ class KernelRow:
 	dtype: str = "bf16"
 	klass: str | None = None  # set when the recorder already classified it
 	allow_tf32: bool = False  # fp32 kernels: was TF32 on for this run
+	calls: float | None = None  # launches per step; latency is judged per launch, not per row
+
+	def per_launch_s(self) -> float:
+		return self.seconds / self.calls if self.calls and self.calls > 0 else self.seconds
+
+
+def kernel_rows(table) -> list[KernelRow]:
+	"""A probe's `Probe.kernels` (schema KernelTable, or its dict) as engine rows, per optimizer step.
+
+	The recorder's class is kept when it is one this classifier knows, else the name is classified
+	again; zero FLOPs or bytes mean "not counted", so those rows fall back to their class (K4).
+	"""
+	if isinstance(table, dict):
+		from preflight.schema.record import KernelTable
+
+		table = KernelTable.model_validate(table)  # the same bounds as a record: finite, non-negative, capped
+	tf32 = bool(table.allow_tf32)
+	out = []
+	for r in table.rows:
+		cls = r.kernel_class
+		out.append(
+			KernelRow(
+				name=r.name,
+				seconds=r.device_s,
+				flops=r.flops or None,
+				bytes=r.bytes or None,
+				dtype=r.dtype or "bf16",
+				klass=cls if cls in KERNEL_CLASSES else None,
+				allow_tf32=tf32,
+				calls=r.calls or None,
+			)
+		)
+	return out
+
+
+def predict_cross_gpu_from_probe(table, measured_step_s: float, src: str, tgt: str) -> StepEstimate:
+	"""K1 from a recorded kernel table; abstains when the table can't be scaled to a GPU."""
+	sigma = cross_sigma(src, tgt)
+	if table is None:
+		return _abstain(MODEL_ID_CROSS, sigma, "no kernel table on the probe")
+	try:
+		rows = kernel_rows(table)
+	except ValueError as exc:  # pydantic's ValidationError is a ValueError
+		return _abstain(
+			MODEL_ID_CROSS, sigma, f"the probe's kernel table is malformed ({str(exc).splitlines()[0]})"
+		)
+	backend = table.get("backend") if isinstance(table, dict) else table.backend
+	if not rows:
+		return _abstain(MODEL_ID_CROSS, sigma, "no kernel table on the probe")
+	if backend == "cpu":
+		return _abstain(
+			MODEL_ID_CROSS, sigma, "the kernel table came from a CPU probe; its times don't scale to a GPU"
+		)
+	return predict_cross_gpu(rows, measured_step_s, src, tgt)
 
 
 def _peak(spec: gpus.GpuSpec, dtype: str, allow_tf32: bool = False) -> float:
@@ -354,7 +448,7 @@ def _peak(spec: gpus.GpuSpec, dtype: str, allow_tf32: bool = False) -> float:
 
 def _roofline_s(k: KernelRow, gpu: gpus.GpuSpec) -> tuple[float, float]:
 	"""(compute time, memory time) at peak on this GPU."""
-	tc = (k.flops or 0.0) / _peak(gpu, k.dtype, k.allow_tf32)
+	tc = k.flops / _peak(gpu, k.dtype, k.allow_tf32) if k.flops else 0.0
 	tm = (k.bytes or 0.0) / gpu.bandwidth_bytes()
 	return tc, tm
 
@@ -364,10 +458,14 @@ def bound(k: KernelRow, gpu: str) -> Bound | Literal["unknown"]:
 	cls = k.klass or classify_kernel(k.name)
 	if cls == "comm":
 		return "link"
-	if k.flops is None and k.bytes is None:
+	if cls == "host":
+		return "latency"
+	if not k.flops and not k.bytes:
+		if k.calls and k.per_launch_s() < LATENCY_KERNEL_S and CLASS_BOUND.get(cls) == "memory":
+			return "latency"  # many tiny launches: launch overhead, not bandwidth
 		return CLASS_BOUND.get(cls, "memory") if cls != "other" else "unknown"
 	tc, tm = _roofline_s(k, spec)
-	if k.seconds < LATENCY_KERNEL_S and max(tc, tm) < 0.1 * k.seconds:
+	if k.per_launch_s() < LATENCY_KERNEL_S and max(tc, tm) < 0.1 * k.seconds:
 		return "latency"
 	return "compute" if tc >= tm else "memory"
 
@@ -379,14 +477,17 @@ def scale_kernel(k: KernelRow, src: str, tgt: str) -> float:
 		return k.seconds
 	if kind == "link":
 		return k.seconds * s.link_gbps / t.link_gbps if t.link_gbps else k.seconds
-	if k.flops is None and k.bytes is None:
+	if not k.flops and not k.bytes:
 		# K4 fallback: no costs recorded, so the kernel's class decides what it scales with
 		if kind == "compute":
 			return k.seconds * _peak(s, k.dtype, k.allow_tf32) / _peak(t, k.dtype, k.allow_tf32)
 		return k.seconds * s.bandwidth_bytes() / t.bandwidth_bytes()
+	# keep the kernel's measured efficiency: scale by the ratio of rooflines. Same as roof_tgt / efficiency,
+	# but stays exact on the same GPU when an estimated byte count overshoots what the GPU could move
 	roof_src = max(_roofline_s(k, s))
-	efficiency = min(1.0, roof_src / k.seconds) if k.seconds > 0 else 1.0
-	return max(_roofline_s(k, t)) / max(efficiency, 1e-3)
+	if roof_src <= 0:
+		return k.seconds
+	return k.seconds * max(_roofline_s(k, t)) / roof_src
 
 
 def cross_sigma(src: str, tgt: str) -> float:
@@ -403,6 +504,14 @@ def unsupported_dtypes(dtypes: set[str], tgt: str) -> set[str]:
 
 
 def predict_cross_gpu(kernels: list[KernelRow], measured_step_s: float, src: str, tgt: str) -> StepEstimate:
+	if (
+		not math.isfinite(measured_step_s)
+		or measured_step_s <= 0
+		or any(not math.isfinite(k.seconds) or k.seconds < 0 for k in kernels)
+	):
+		return _abstain(
+			MODEL_ID_CROSS, cross_sigma(src, tgt), "the measured step or a kernel time isn't a usable number"
+		)
 	missing = unsupported_dtypes({k.dtype for k in kernels if k.flops or bound(k, src) == "compute"}, tgt)
 	if missing:
 		why = f"{gpus.resolve(tgt)} has no fast path for {', '.join(sorted(missing))}; the job would fail there or need another precision"

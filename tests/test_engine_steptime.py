@@ -315,3 +315,165 @@ def test_fp32_kernels_assume_tf32_off_unless_recorded():
 def test_mig_slice_cannot_join_a_data_parallel_group():
 	est = st.multi_gpu_step(1.0, 1e9, 2, "NVIDIA A100-SXM4-80GB MIG 3g.40gb")
 	assert est.status == "abstain"
+
+
+# ---------------------------------------------------------------- A's kernel tables (Oct 27 requests)
+
+A_REPORTED_OTHER = [
+	"aten::linalg_vector_norm", "aten::cat", "aten::stack", "aten::constant_pad_nd", "aten::slice_backward",
+	"aten::neg", "aten::abs", "aten::sqrt", "aten::rsqrt", "aten::cos", "aten::eq", "aten::ne", "aten::gt",
+	"aten::le", "aten::bitwise_and", "aten::masked_fill", "aten::lerp_", "aten::arange", "aten::linspace",
+	"aten::randint", "aten::random_", "aten::scaled_dot_product_attention",
+	"aten::_flash_attention_forward", "aten::_flash_attention_backward",
+	"aten::_efficient_attention_forward", "aten::_efficient_attention_backward",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("name", A_REPORTED_OTHER)
+def test_ops_a_saw_as_other_now_have_a_class(name):
+	assert st.classify_kernel(name) != "other"
+
+
+@pytest.mark.parametrize(
+	"name,cls",
+	[
+		("aten::_flash_attention_forward", "attention"),
+		("aten::scaled_dot_product_attention", "attention"),
+		("aten::masked_fill_", "elementwise"),  # not a memset: it reads its input
+		("aten::fill_", "memset"),
+		("aten::lerp_", "elementwise"),
+		("aten::ne", "elementwise"),
+		("aten::neg", "elementwise"),
+		("aten::empty", "host"),
+		("aten::view", "host"),
+		("aten::broadcast_tensors", "host"),  # a view, not a collective
+		("c10d::broadcast_", "comm"),
+		("aten::select_backward", "copy"),
+		("aten::item", "host"),
+	],
+)
+def test_classifier_edge_cases(name, cls):
+	assert st.classify_kernel(name) == cls
+
+
+def test_roll_up_rows_keep_their_class():
+	assert st.classify_kernel("(tail) copy (6 ops)") == "copy"
+	assert st.classify_kernel("(tail) attention (1 op)") == "attention"
+	assert st.classify_kernel("(tail) bogus (3 ops)") == "other"
+	assert st.classify_kernel("(unattributed device time)") == "other"
+
+
+def test_host_ops_do_not_scale_with_the_gpu():
+	k = st.KernelRow("aten::view", 2e-3, bytes=1e9)
+	assert st.bound(k, "L4") == "latency"
+	assert st.scale_kernel(k, "L4", "H100-SXM-80GB") == pytest.approx(2e-3)
+
+
+def test_bytes_only_row_in_a_dtype_without_peak_does_not_raise():
+	k = st.KernelRow("aten::arange", 1e-3, bytes=1e8, dtype="int64")
+	assert st.scale_kernel(k, "L4", "H100-SXM-80GB") > 0
+
+
+def test_same_gpu_replay_is_exact_even_when_bytes_overshoot():
+	# 1e12 bytes can't move in 1 ms on any GPU; replaying on the same GPU must still return 1 ms
+	k = st.KernelRow("vectorized_elementwise_kernel", 1e-3, bytes=1e12, dtype="bf16")
+	assert st.scale_kernel(k, "L4", "L4") == pytest.approx(1e-3)
+
+
+def _golden_tables():
+	from pathlib import Path
+
+	from preflight.schema import load_record
+
+	root = Path(__file__).resolve().parents[1] / "schema" / "examples"
+	for f in ("finetune.json", "pretrain.json"):
+		rec = load_record((root / f).read_text())
+		for p in rec.probes:
+			if p.kernels:
+				yield rec.env.gpu.name, p
+
+
+def test_golden_kernel_tables_read_and_replay_exactly_on_their_own_gpu():
+	seen = 0
+	for src, probe in _golden_tables():
+		rows = st.kernel_rows(probe.kernels)
+		assert rows and all(r.klass in st.KERNEL_CLASSES for r in rows)
+		assert all(r.flops is None or r.flops > 0 for r in rows)
+		e = st.predict_cross_gpu_from_probe(probe.kernels, probe.step_time.p50_s, src, src)
+		assert e.status == "predicted"
+		assert e.point == pytest.approx(probe.step_time.p50_s, rel=1e-9)
+		faster = st.predict_cross_gpu_from_probe(probe.kernels, probe.step_time.p50_s, src, "H100-SXM-80GB")
+		assert faster.point < probe.step_time.p50_s
+		seen += 1
+	assert seen >= 2
+
+
+def test_kernel_rows_reclassify_unknown_recorder_classes_and_take_tf32():
+	row = {"name": "aten::mm", "kernel_class": "matmulish", "calls": 1.0, "device_s": 1e-3}
+	row |= {"flops": 1e9, "bytes": 0, "dtype": "fp32"}
+	table = {"rows": [row], "steps": 3, "backend": "cuda", "allow_tf32": True, "classified_by": None}
+	(row,) = st.kernel_rows(table)
+	assert row.klass is None and row.bytes is None and row.allow_tf32
+	assert st.classify_kernel(row.name) == "gemm"
+
+
+def test_cross_gpu_from_probe_abstains_without_a_usable_table():
+	assert st.predict_cross_gpu_from_probe(None, 0.1, "L4", "H100-SXM-80GB").status == "abstain"
+	row = {"name": "aten::mm", "calls": 1.0, "device_s": 1e-3, "dtype": "fp32"}
+	cpu = {"rows": [row], "steps": 1, "backend": "cpu", "allow_tf32": False}
+	e = st.predict_cross_gpu_from_probe(cpu, 0.1, "L4", "H100-SXM-80GB")
+	assert e.status == "abstain" and "CPU" in e.reason
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+@pytest.mark.parametrize(
+	"name,cls",
+	[
+		("aten::addmm_", "gemm"),
+		("aten::addbmm", "gemm"),
+		("aten::addmv", "gemm"),
+		("aten::baddbmm_", "gemm"),
+		("aten::_int_mm", "gemm"),
+		("aten::_weight_int4pack_mm", "gemm"),
+		("aten::mv", "gemm"),
+		("aten::dot", "gemm"),
+		("record_param_comms", "comm"),
+		("aten::conv_transpose2d", "conv"),
+		("aten::expand_copy", "copy"),
+		("aten::max_pool2d_with_indices", "reduction"),
+		("aten::upsample_nearest2d", "copy"),
+		("aten::_unsafe_index", "index"),
+		("aten::glu", "elementwise"),
+		("aten::add_", "elementwise"),
+		("aten::silu_backward", "elementwise"),
+	],
+)
+def test_review_classifier_cases(name, cls):
+	assert st.classify_kernel(name) == cls
+
+
+def test_classifier_cuts_long_names_before_matching():
+	import time
+
+	t = time.perf_counter()
+	assert st.classify_kernel("ampere_" * 6000) in st.KERNEL_CLASSES
+	assert time.perf_counter() - t < 0.05
+
+
+def test_many_tiny_launches_are_latency_not_bandwidth():
+	many = st.KernelRow("aten::add_", 10e-3, calls=2000)  # 5 us a launch
+	assert st.bound(many, "L4") == "latency"
+	assert st.scale_kernel(many, "L4", "H100-SXM-80GB") == pytest.approx(10e-3)
+	big = st.KernelRow("aten::add_", 10e-3, calls=10)  # 1 ms a launch: bandwidth
+	assert st.bound(big, "L4") == "memory"
+
+
+def test_kernel_rows_validate_dict_tables():
+	bad = {"rows": [{"name": "x", "calls": 1.0, "device_s": float("nan"), "dtype": "bf16"}],
+		"steps": 1, "backend": "cuda", "allow_tf32": False}  # fmt: skip
+	e = st.predict_cross_gpu_from_probe(bad, 0.1, "L4", "H100-SXM-80GB")
+	assert e.status == "abstain" and "malformed" in e.reason
+	neg = st.predict_cross_gpu([st.KernelRow("x", -1.0)], 0.1, "L4", "H100-SXM-80GB")
+	assert neg.status == "abstain"
