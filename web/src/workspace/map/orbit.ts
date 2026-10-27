@@ -13,6 +13,7 @@
  */
 import { nearestProbe } from "../provider/metrics";
 import { capacityBytes, targetFor } from "../record/model";
+import { type MemorySegment, memorySegments } from "../record/terms";
 import type { GraphNode, KnobValue, LoadedRecord, Prediction } from "../record/types";
 import { trusted } from "../status";
 
@@ -21,6 +22,7 @@ export const R_ORBIT = 180;
 export const R_BAND = 216;
 export const R_MEM = 98;
 export const R_OVER = 116;
+export type { MemorySegment };
 export const R_BRANCH = 262;
 
 const LOOP_PHASES = ["data", "forward", "loss", "backward", "optimizer", "rollout", "reference", "reward", "update", "weight_sync"];
@@ -50,12 +52,6 @@ export interface Arc {
 	startDeg: number;
 	sweepDeg: number;
 	midDeg: number;
-}
-
-export interface MemorySegment {
-	key: "weights" | "training" | "activations" | "logits" | "eval" | "total";
-	bytes: number;
-	slot: 1 | 2 | 3 | 4 | 5;
 }
 
 export interface OrbitLayout {
@@ -302,23 +298,7 @@ export function layoutOrbit(record: LoadedRecord, knobs: Readonly<Record<string,
 	// Memory ring.
 	const memT = targetFor(record, "memory");
 	const peak = memT ? est[memT.id] : undefined;
-	const term = (k: string) => {
-		const e = est[`memory.term.${k}`];
-		return trusted(e) ? e.point : 0;
-	};
-	const hasTerms = ["weights", "activations"].some((k) => trusted(est[`memory.term.${k}`]));
-	const segments: MemorySegment[] = hasTerms
-		? ([
-				{ key: "weights", bytes: term("weights") + term("context"), slot: 1 },
-				{ key: "training", bytes: term("gradients") + term("optimizer"), slot: 2 },
-				{ key: "activations", bytes: term("activations"), slot: 3 },
-				{ key: "logits", bytes: term("logits"), slot: 4 },
-				{ key: "eval", bytes: term("eval"), slot: 5 },
-			] as MemorySegment[]).filter((s) => s.bytes > 0)
-		: trusted(peak)
-			? [{ key: "total", bytes: peak.point, slot: 1 }]
-			: [];
-
+	const { segments, breakdown } = memorySegments(est, trusted(peak) ? peak.point : null);
 	const tps = est["throughput.tokens_per_s"];
 	return {
 		arcs,
@@ -330,7 +310,7 @@ export function layoutOrbit(record: LoadedRecord, knobs: Readonly<Record<string,
 			total: trusted(peak) ? peak.point : null,
 			// A fraction (an agent's context fill) has its own full circle: 100%.
 			capacity: memT?.unit === "fraction" ? 1 : capacityBytes(record, knobs),
-			breakdown: hasTerms,
+			breakdown,
 		},
 		tokensPerSecond: trusted(tps) ? tps.point : null,
 	};

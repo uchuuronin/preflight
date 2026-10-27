@@ -6,10 +6,11 @@ import { useRef } from "react";
 import { fmt, fmtRange } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useOrbitLayout } from "../map/Orbit";
-import { failureTarget, runPlan, targetFor } from "../record/model";
+import { runPlan, targetFor } from "../record/model";
+import { memoryTermBytes, type MemorySegment } from "../record/terms";
 import type { LoadedRecord, Prediction } from "../record/types";
 import { useWorkspace } from "../state";
-import { bounds, trusted } from "../status";
+import { bounds, likelyFails, trusted } from "../status";
 
 const MAX_MARKS = 24;
 
@@ -21,11 +22,9 @@ interface PlanMark {
 
 /** Where the run is predicted to stop, if it is: the first eval when the eval spike drives it. */
 function predictedStop(record: LoadedRecord, est: Prediction, evalEvery: number | null): number | null {
-	const fail = failureTarget(record);
-	const risk = fail ? est[fail] : undefined;
-	if (!trusted(risk) || risk.point <= 0.5) return null;
+	if (!likelyFails(record, est)) return null;
 	const evalDriven =
-		(trusted(est["memory.term.eval"]) && (est["memory.term.eval"]?.point ?? 0) > 0) ||
+		memoryTermBytes(est, "eval_spike") > 0 ||
 		record.findings.some((f) => f.node_id === "eval" && (f.severity === "error" || f.severity === "critical"));
 	return evalDriven && evalEvery ? evalEvery : 1;
 }
@@ -146,14 +145,15 @@ export function FlightPlanBand() {
 	);
 }
 
-const TERM_KEYS: Record<string, string> = {
-	weights: "term.weights",
-	training: "term.training",
-	activations: "term.activations",
-	logits: "term.logits",
-	eval: "term.eval_spike",
-	total: "term.total",
-};
+function groupLabel(s: MemorySegment): string {
+	return t(`term.${s.key}`);
+}
+
+/** The terms inside a group, when it holds more than one ("Weights 13 GiB · CUDA context 1 GiB"). */
+function partsLabel(s: MemorySegment): string {
+	if (s.parts.length < 2) return "";
+	return s.parts.map((p) => `${t(`target.memory.${p.term}`)} ${fmt(p.bytes, "bytes")}`).join(" · ");
+}
 
 export function MemoryBand() {
 	const { record, estimates } = useWorkspace();
@@ -181,7 +181,7 @@ export function MemoryBand() {
 			</div>
 			<div className="pf-stack" role="img" aria-label={t("membar.aria", { total: fmt(total ?? 0, "bytes"), cap: fmt(capacity, "bytes") })}>
 				{segments.map((s) => (
-					<div key={s.key} className={`pf-mseg pf-mseg--${s.slot}`} style={{ width: `${((s.bytes / scaleMax) * 100).toFixed(2)}%` }} title={`${t(TERM_KEYS[s.key] ?? s.key)}: ${fmt(s.bytes, "bytes")}`} />
+					<div key={s.key} className={`pf-mseg pf-mseg--${s.slot}`} style={{ width: `${((s.bytes / scaleMax) * 100).toFixed(2)}%` }} title={`${groupLabel(s)}: ${fmt(s.bytes, "bytes")}${partsLabel(s) ? ` (${partsLabel(s)})` : ""}`} />
 				))}
 				<div className="pf-cap" style={{ left: `${((capacity / scaleMax) * 100).toFixed(2)}%` }}>
 					<span>{t("membar.capacity", { cap: fmt(capacity, "bytes") })}</span>
@@ -191,7 +191,8 @@ export function MemoryBand() {
 				{segments.map((s) => (
 					<li key={s.key}>
 						<i className={`pf-mseg--${s.slot}`} />
-						{t(TERM_KEYS[s.key] ?? s.key)} <span className="pf-dim">{fmt(s.bytes, "bytes")}</span>
+						{groupLabel(s)} <span className="pf-dim">{fmt(s.bytes, "bytes")}</span>
+						{partsLabel(s) ? <small className="pf-dim">{partsLabel(s)}</small> : null}
 					</li>
 				))}
 			</ul>

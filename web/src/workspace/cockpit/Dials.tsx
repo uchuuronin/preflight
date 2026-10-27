@@ -11,6 +11,7 @@ import { useReadouts } from "../../registry";
 import { failureTarget, target, targetFor } from "../record/model";
 import type { Estimate, ObjectiveKind, Readout } from "../record/types";
 import { useWorkspace } from "../state";
+import { FAILS_AT, FITS_BELOW } from "../record/terms";
 import { bounds, trusted } from "../status";
 
 const ARC = 188.5; // 270 degrees of a radius-40 circle
@@ -25,7 +26,9 @@ interface DialSpec {
 	goal?: ObjectiveKind;
 	format: (v: number) => string;
 	note?: string;
+	/** fails: red note and needle; tight: amber note. */
 	noteRisk?: boolean;
+	noteTight?: boolean;
 }
 
 function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean }) {
@@ -70,7 +73,7 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 				</div>
 			)}
 			<span className="pf-dial__label">{spec.label}</span>
-			{spec.note ? <span className={`pf-dial__note${spec.noteRisk ? " is-risk" : ""}`}>{spec.note}</span> : null}
+			{spec.note ? <span className={`pf-dial__note${spec.noteRisk ? " is-risk" : spec.noteTight ? " is-tight" : ""}`}>{spec.note}</span> : null}
 			{goalOn ? <span className="pf-dial__goal">{t("dial.your_goal")}</span> : null}
 		</div>
 	);
@@ -139,8 +142,13 @@ export function Dials() {
 			est: riskEst,
 			scaleMax: 1,
 			format: (v) => fmt(v, "probability"),
-			noteRisk: trusted(riskEst) && riskEst.point > 0.5,
-			...(trusted(riskEst) && riskEst.point > 0.5 ? { note: t("dial.risk.likely") } : {}),
+			noteRisk: trusted(riskEst) && riskEst.point >= FAILS_AT,
+			noteTight: trusted(riskEst) && riskEst.point >= FITS_BELOW && riskEst.point < FAILS_AT,
+			...(trusted(riskEst) && riskEst.point >= FAILS_AT
+				? { note: t("dial.risk.likely") }
+				: trusted(riskEst) && riskEst.point >= FITS_BELOW
+					? { note: t("dial.risk.some") }
+					: {}),
 		},
 	];
 

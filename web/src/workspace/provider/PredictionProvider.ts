@@ -12,6 +12,11 @@ export interface SensitivityOptions {
 	pinned?: ReadonlySet<string>;
 	/** Current knob values; defaults to the record's. */
 	knobs?: Readonly<Record<string, KnobValue>>;
+	/**
+	 * Also return moves that land in "tight" (FITS_BELOW <= P(OOM) < FAILS_AT), flagged
+	 * `fit: "tight"`. The guide never applies these; it offers to measure them first.
+	 */
+	includeTight?: boolean;
 }
 
 /** One candidate move with its effect, for the guide's wording. C-internal, richer than KnobImpact. */
@@ -21,8 +26,14 @@ export interface Move {
 	/** Objective target and its change (in the target's unit; negative means lower). */
 	targetId: string;
 	delta: number;
-	/** The move clears a predicted failure (OOM). */
+	/** The move clears a predicted failure (OOM): the run goes from any risk to "fits". */
 	clearsFailure: boolean;
+	/** Fit after the move: "fits" moves may be applied; "tight" ones need a probe first. */
+	fit: "fits" | "tight";
+	/** Failure probability after the move, when the record has a failure target. */
+	risk: number | null;
+	/** Change relative to the current value of the objective (delta / |current|), when known. */
+	relative: number | null;
 }
 
 export interface PredictionProvider {

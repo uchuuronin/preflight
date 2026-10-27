@@ -3,6 +3,7 @@
  * a control offers, the run's length, GPU capacity, and whether the numbers are a fixture.
  * No prediction happens here; numbers come from the PredictionProvider.
  */
+import { chosenGpu, gpuMemoryBytes } from "./terms";
 import type { Knob, KnobValue, LoadedRecord, ObjectiveKind, Readout, Target } from "./types";
 
 export function currentKnobs(record: LoadedRecord): Record<string, KnobValue> {
@@ -102,33 +103,12 @@ export function runPlan(record: LoadedRecord): RunPlan {
 	};
 }
 
-const GIB = 1024 ** 3;
-
 /**
- * Memory per GPU for the capacity line when the record carries no `memory.capacity`
- * target (requested from B). Display only: names follow the spec table's canonical names.
+ * Memory per GPU for the capacity ring and the fits line: the record's own GPU when the knobs
+ * keep it, else B's GPU table (generated into gpus.json, aliases and Modal names resolve).
  */
-const GPU_MEMORY: Record<string, number> = {
-	"A100-80GB": 80 * GIB,
-	"A100-40GB": 40 * GIB,
-	"H100-SXM-80GB": 80 * GIB,
-	"H100-PCIE-80GB": 80 * GIB,
-	H100: 80 * GIB,
-	H200: 141 * GIB,
-	L40S: 48 * GIB,
-	L4: 24 * GIB,
-	A10G: 24 * GIB,
-	T4: 16 * GIB,
-	MI300X: 192 * GIB,
-	MI250: 128 * GIB,
-	"RTX-4090": 24 * GIB,
-};
-
 export function capacityBytes(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): number | null {
-	const gpu = typeof knobs.gpu === "string" ? knobs.gpu : record.env?.gpu?.name;
-	if (!gpu) return null;
-	if (gpu === record.env?.gpu?.name && record.env.gpu.memory_bytes) return record.env.gpu.memory_bytes;
-	return GPU_MEMORY[gpu] ?? null;
+	return gpuMemoryBytes(record, chosenGpu(record, knobs));
 }
 
 /** True when every prediction comes from a fixture model, so the UI says "illustrative". */

@@ -4,9 +4,10 @@ import { memo, useEffect, useMemo } from "react";
 import { fmt } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { useMapOverlays } from "../../registry";
-import { failureTarget, targetFor } from "../record/model";
+import { targetFor } from "../record/model";
 import { useWorkspace } from "../state";
-import { fitOf, trusted, type Fit } from "../status";
+import { memoryTermBytes } from "../record/terms";
+import { fitOf, likelyFails, trusted, type Fit } from "../status";
 import { FitMark } from "../components/StatusMark";
 import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbit";
 
@@ -148,9 +149,7 @@ function OrbitInner() {
 	const flow = useReactFlow();
 	const layout = useMemo(() => layoutOrbit(record, state.knobs, estimates), [record, state.knobs, estimates]);
 	const fit = fitOf(record, estimates, state.knobs);
-	const fail = failureTarget(record);
-	const risk = fail ? estimates[fail] : undefined;
-	const failing = trusted(risk) && risk.point > 0.5;
+	const failing = likelyFails(record, estimates);
 
 	const nodes = useMemo<Node[]>(() => {
 		const memT = targetFor(record, "memory");
@@ -195,10 +194,10 @@ function OrbitInner() {
 		}
 		const pfNodes: Node<NodeData>[] = layout.nodes.map((n) => {
 			const share = n.share !== null ? t("map.node.share", { share: fmt(n.share, "fraction") }) : "";
-			const evalTerm = n.phase === "eval" ? estimates["memory.term.eval"] : undefined;
+			const evalSpike = n.phase === "eval" ? memoryTermBytes(estimates, "eval_spike") : 0;
 			const meta =
-				n.phase === "eval" && trusted(evalTerm) && evalTerm.point > 0
-					? t("map.node.adds", { bytes: fmt(evalTerm.point, "bytes") })
+				evalSpike > 0
+					? t("map.node.adds", { bytes: fmt(evalSpike, "bytes") })
 					: n.phase === "checkpoint"
 						? t("map.node.saves")
 						: share;

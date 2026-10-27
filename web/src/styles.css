@@ -834,6 +834,8 @@ a {
 .pf-dial__note { max-width: 116px; font-family: var(--pf-font-mono); font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
 .pf-dial__note.is-risk { color: var(--pf-fail); font-weight: 500; }
 .pf-dial__note.is-risk::before { content: "✕ "; }
+.pf-dial__note.is-tight { color: var(--pf-tight); }
+.pf-dial__note.is-tight::before { content: "▲ "; font-size: 0.85em; }
 .pf-dial__goal { padding: 1px 8px; border-radius: var(--pf-radius-pill); background: var(--pf-pill-bg); color: var(--pf-pill-fg); font-size: 10.5px; font-weight: 600; }
 
 /* The orbit map */
@@ -897,6 +899,8 @@ a {
 .pf-mring--3 { stroke: var(--pf-term-3); }
 .pf-mring--4 { stroke: var(--pf-term-4); }
 .pf-mring--5 { stroke: var(--pf-term-5); }
+.pf-mring--6 { stroke: var(--pf-term-6); }
+.pf-mring--0 { stroke: var(--pf-stroke-strong); }
 .pf-mem-over {
 	fill: none;
 	stroke: var(--pf-fail);
@@ -1320,10 +1324,22 @@ a {
 .pf-mseg--3 { background: var(--pf-term-3); }
 .pf-mseg--4 { background: var(--pf-term-4); }
 .pf-mseg--5 { background: var(--pf-term-5); }
+.pf-mseg--6 { background: var(--pf-term-6); }
+.pf-mseg--0 { background: repeating-linear-gradient(135deg, var(--pf-track) 0 4px, var(--pf-stroke-strong) 4px 6px); }
 .pf-cap { position: absolute; top: -14px; bottom: -6px; width: 2px; background: var(--pf-fg); transition: left var(--pf-dur-value) var(--pf-ease); }
 .pf-cap span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-family: var(--pf-font-mono); font-size: 10.5px; white-space: nowrap; }
-.pf-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--pf-fg); }
-.pf-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.pf-legend {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 8px 20px;
+	font-size: 12px;
+	color: var(--pf-fg);
+}
+.pf-legend li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
+.pf-legend small { flex-basis: 100%; padding-left: 16px; font-size: 11px; line-height: 1.4; }
 .pf-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 
 /* ---------- Logbook ---------- */

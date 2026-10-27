@@ -1,5 +1,6 @@
 import { decodeF16, decodeMask } from "../../../../schema/ts/encoding";
 import { currentKnobs, failureTarget, knobChoices, objectiveTarget } from "../record/model";
+import { FAILS_AT, FITS_BELOW } from "../record/terms";
 import type {
 	Estimate,
 	Grid,
@@ -13,8 +14,12 @@ import type {
 } from "../record/types";
 import type { Move, PredictionProvider, SensitivityOptions } from "./PredictionProvider";
 
-/** Above this predicted failure probability a configuration counts as failing. */
-export const OOM_LIMIT = 0.1;
+/**
+ * The guide applies a move only when it lands in "fits" (P(OOM) < FITS_BELOW); a move into
+ * "tight" is offered as "measure it first". Chosen by Monte Carlo over five thresholds
+ * (docs/decisions/guide-moves.md): same crash rate as fits-only, a tenth of its extra cost.
+ */
+export const SAFE_BELOW = FITS_BELOW;
 
 // Ranking offsets for a failing run: clearing the failure beats any objective change, and
 // reducing its probability beats any objective change short of clearing it.
@@ -226,7 +231,7 @@ export class GridProvider implements PredictionProvider {
 		const base = this.predict(record, knobs);
 		const baseValue = base[goal.id]?.point;
 		const baseRisk = fail ? (base[fail]?.point ?? 0) : 0;
-		const failing = baseRisk > OOM_LIMIT;
+		const failing = baseRisk >= SAFE_BELOW;
 		const sign = goal.better === "higher" ? -1 : 1;
 		const ranked: Array<Move & { score: number }> = [];
 		for (const knob of record.knobs) {
@@ -239,14 +244,18 @@ export class GridProvider implements PredictionProvider {
 				if (!est || est.status === "abstain" || est.point === null) continue;
 				const risk = fail ? (p[fail]?.point ?? 0) : 0;
 				if (fail && p[fail]?.status === "abstain") continue;
-				// A move that makes the run likely to fail is never an improvement.
-				if (risk > OOM_LIMIT && !(failing && risk < baseRisk)) continue;
+				// Never into "fails". Into "tight" only when asked, and only as an offer to measure.
+				if (risk >= FAILS_AT) continue;
+				const tight = risk >= SAFE_BELOW;
+				if (tight && !opts.includeTight && !(failing && risk < baseRisk)) continue;
 				const delta = baseValue === null || baseValue === undefined ? 0 : est.point - baseValue;
-				const clears = failing && risk <= OOM_LIMIT;
+				const clears = failing && !tight;
 				const score = !failing ? sign * delta : clears ? CLEARS + sign * delta : (risk - baseRisk) * REDUCES + sign * delta;
-				if (!best || score < best.score) {
-					best = { knobId: knob.id, to: v, targetId: goal.id, delta, clearsFailure: clears, score };
-				}
+				const relative = baseValue ? delta / Math.abs(baseValue) : null;
+				const fit = tight ? "tight" : "fits";
+				const cand = { knobId: knob.id, to: v, targetId: goal.id, delta, clearsFailure: clears, fit, risk: fail ? risk : null, relative, score } as const;
+				// Per knob: the best "fits" move wins over any "tight" one, then the best score.
+				if (!best || (best.fit === "tight" && fit === "fits") || (best.fit === fit && score < best.score)) best = { ...cand };
 			}
 			if (best && (failing ? best.score < 0 : sign * best.delta < 0)) ranked.push(best);
 		}

@@ -22,11 +22,11 @@ function ctx(record = dev, pinned = new Set<string>()): ToolContext & { moves: A
 
 describe("guide tool schema", () => {
 	it("removes pinned knobs from set_knob's enum every turn", () => {
-		const tools = buildTools(dev, new Set(["eval_batch_size", "gpu"]));
+		const tools = buildTools(dev, new Set(["eval_batch_size", "gpu_type"]));
 		const setKnob = tools.find((x) => x.name === "set_knob");
 		const props = setKnob?.parameters.properties as { knob_id: { enum: string[] } };
 		expect(props.knob_id.enum).not.toContain("eval_batch_size");
-		expect(props.knob_id.enum).not.toContain("gpu");
+		expect(props.knob_id.enum).not.toContain("gpu_type");
 		expect(props.knob_id.enum).toContain("batch_size");
 	});
 
@@ -72,7 +72,7 @@ describe("rule-based tour", () => {
 	});
 
 	it("names the pin in the way instead of moving it", () => {
-		const step = nextStep({ ...base(), pinned: new Set(["eval_batch_size", "gpu", "gradient_checkpointing", "batch_size", "seq_len"]) });
+		const step = nextStep({ ...base(), pinned: new Set(["eval_batch_size", "gpu_type", "gradient_checkpointing", "batch_size", "seq_len"]) });
 		expect(step.kind).toBe("blocked_by_pin");
 		expect(step.pinnedKnob).toBe("eval_batch_size");
 	});
@@ -92,5 +92,46 @@ describe("rule-based tour", () => {
 		const step = nextStep({ ...base(golden), pinned: new Set() });
 		expect(step.kind).toBe("nothing_safe");
 		expect(step.nodes).toContain("eval");
+	});
+});
+
+describe("measure-first offers (tight settings)", () => {
+	const fitsMove = { knobId: "batch_size", to: 8, targetId: "cost.total", delta: -0.5, clearsFailure: false, fit: "fits", risk: 0.002, relative: -0.05 } as const;
+	const tightMove = { knobId: "eval_batch_size", to: 16, targetId: "cost.total", delta: -3, clearsFailure: false, fit: "tight", risk: 0.2, relative: -0.3 } as const;
+	const stub = (risk: number) => ({
+		name: "grid" as const,
+		ready: () => true,
+		predict: () => ({ "risk.oom": { point: risk, lo: risk, hi: risk, unit: "fraction", status: "predicted", model_id: "t", source: "grid", reason: null } }) as never,
+		sensitivity: () => [],
+		moves: (_r: unknown, _o: unknown, opts?: { includeTight?: boolean }) => (opts?.includeTight ? [tightMove, fitsMove] : [fitsMove]) as never,
+	});
+	const ctxFor = (risk: number, visited = new Set<string>()) => ({
+		record: dev,
+		provider: stub(risk),
+		knobs: currentKnobs(dev),
+		pinned: new Set<string>(),
+		objective: cost,
+		visited,
+	});
+
+	it("offers to measure a tight setting that saves 10% more than the best fitting move", () => {
+		const step = nextStep(ctxFor(0.001));
+		expect(step.kind).toBe("probe_offer");
+		expect(step.move?.knobId).toBe("eval_batch_size");
+	});
+
+	it("moves on to the fitting move once the offer is skipped", () => {
+		const step = nextStep(ctxFor(0.001, new Set(["probe:eval_batch_size"])));
+		expect(step.kind).toBe("move");
+		expect(step.move?.fit).toBe("fits");
+	});
+
+	it("never offers a tight setting while the run itself is at risk", () => {
+		expect(nextStep(ctxFor(0.3)).kind).not.toBe("probe_offer");
+	});
+
+	it("uses the 'would stop' wording only when the run likely fails", () => {
+		const tight = nextStep({ ...ctxFor(0.3), provider: { ...stub(0.3), moves: () => [{ ...fitsMove, clearsFailure: true }] as never } });
+		expect(tight.textKey).toBe("guide.rule.generic.fix.line");
 	});
 });

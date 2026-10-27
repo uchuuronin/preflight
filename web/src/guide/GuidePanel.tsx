@@ -65,6 +65,15 @@ export function GuidePanel() {
 		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited };
 		const step = nextStep(tc);
 		const n = nextTaken + 1;
+		if (step.kind === "probe_offer" && step.move) {
+			if (step.nodes.length) runTool("highlight", { nodes: step.nodes }, ctx());
+			runTool("predict", { knobs: { [step.move.knobId]: step.move.to } }, ctx());
+			actions.propose(null);
+			actions.openKnob(step.move.knobId);
+			setWhy(false);
+			setActive({ step, n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + plannedSteps(tc))) });
+			return;
+		}
 		setWhy(false);
 		if (step.nodes.length) runTool("highlight", { nodes: step.nodes }, ctx());
 		else actions.highlight([]);
@@ -79,6 +88,18 @@ export function GuidePanel() {
 		const shown = step.kind === "move" ? { ...step, kind: "done" as const, textKey: "guide.done", whyKey: "guide.done.why" } : step;
 		setActive({ step: shown, n, of: n });
 	};
+
+	/** Move past a "measure it first" offer without measuring. */
+	const skipOffer = () => {
+		if (!active?.step.move) return;
+		const v = new Set(visited);
+		v.add(`probe:${active.step.move.knobId}`);
+		setVisited(v);
+		requestAnimationFrame(() => begin(v, taken));
+	};
+
+	const measure = (move: { knobId: string; to: KnobValue } | undefined, reason: string) =>
+		runTool("run_probe", { knobs: move ? { [move.knobId]: move.to } : {}, reason }, ctx());
 
 	const finish = (outcome: "apply" | "revert" | "pin") => {
 		if (!active?.step.move) return;
@@ -161,6 +182,7 @@ export function GuidePanel() {
 			peak: trusted(peak) ? fmt(peak.point, "bytes") : t("value.none"),
 			cap: cap ? fmt(cap, "bytes") : "",
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
+			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
 		};
 	}
 
@@ -176,17 +198,11 @@ export function GuidePanel() {
 					requestAnimationFrame(restart);
 				},
 			};
+		if (s.kind === "probe_offer") return { label: t("guide.measure_fix"), run: () => measure(s.move, "tight") };
 		if (s.kind === "nothing_safe") {
 			const f = record.findings.find((x) => x.knob_id && x.severity !== "info");
-			return {
-				label: t("guide.measure_fix"),
-				run: () =>
-					runTool(
-						"run_probe",
-						{ knobs: f?.knob_id ? { [f.knob_id]: knobs.get(f.knob_id)?.current ?? null } : {}, reason: f?.code ?? "unmeasured" },
-						ctx(),
-					),
-			};
+			const move = s.move ?? (f?.knob_id ? { knobId: f.knob_id, to: knobs.get(f.knob_id)?.current ?? null } : undefined);
+			return { label: t("guide.measure_fix"), run: () => measure(move as { knobId: string; to: KnobValue } | undefined, f?.code ?? "no_fits_setting") };
 		}
 		return { label: t("guide.restart"), run: restart };
 	})();
@@ -196,7 +212,7 @@ export function GuidePanel() {
 			<div className="pf-guide__head">
 				<span className={live ? "pf-model" : "pf-model pf-model--quiet"}>{live ? t("guide.model.muse_spark") : t("guide.model.rule_based")}</span>
 				<span className="pf-guide__step">
-					{active?.step.kind === "move" ? t("guide.step_of", { n: active.n, of: active.of }) : active ? t("guide.waiting") : t("guide.ready")}
+					{active?.step.kind === "move" || active?.step.kind === "probe_offer" ? t("guide.step_of", { n: active.n, of: active.of }) : active ? t("guide.waiting") : t("guide.ready")}
 				</span>
 			</div>
 
@@ -244,6 +260,11 @@ export function GuidePanel() {
 						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
 							{primary.label}
 						</button>
+						{active?.step.kind === "probe_offer" ? (
+							<button type="button" className="pf-btn pf-btn--small" onClick={skipOffer}>
+								{t("guide.skip")}
+							</button>
+						) : null}
 						{active?.step.kind === "move" ? (
 							<>
 								<button type="button" className="pf-btn pf-btn--small" onClick={() => finish("revert")}>

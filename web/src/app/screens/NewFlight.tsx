@@ -18,7 +18,8 @@ const GOALS: Array<{ kind: ObjectiveKind; key: string }> = [
 	{ kind: "fit_memory", key: "goal.fit_memory" },
 ];
 
-const GPUS = ["A100-80GB", "H100-SXM-80GB", "L40S", "L4", "MI300X"];
+/** Canonical names from B's GPU table (engine/gpus.py, generated into gpus.json). */
+const GPUS = ["A100-SXM-80GB", "H100-SXM-80GB", "L40S", "L4", "MI300X"];
 
 type Intake = "repo" | "upload" | string;
 
@@ -31,7 +32,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [intake, setIntake] = useState<Intake>("repo");
 	const [repo, setRepo] = useState("");
 	const [goal, setGoal] = useState<ObjectiveKind>("min_cost");
-	const [gpu, setGpu] = useState<string | null>("A100-80GB");
+	const [gpu, setGpu] = useState<string | null>("A100-SXM-80GB");
 	const [description, setDescription] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);

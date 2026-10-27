@@ -1,5 +1,23 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Tue Oct 27, early (rebased on B)
+
+**Done** (branch `ws-c`, rebased on `ws-b`)
+
+- Speaks B's vocabulary: all twelve `memory.<term>` targets grouped for the ring and the stack
+  (older `memory.term.<t>` ids still read), B's fits / tight / fails cut-offs (1% and 80%)
+  everywhere, the `gpu_type` knob, and GPU memory from `engine/gpus.py` through a generated
+  `gpus.json` (47 GPUs, aliases and Modal names; CI checks it is current).
+- Guide move rule chosen by Monte Carlo (docs/decisions/guide-moves.md): it applies only
+  settings that fit, and offers "measure it first" when a tight one would save 10% or more.
+  Same crash rate as fits-only (0.1%), about 5% extra cost instead of 42%.
+- Failure signals are red at dusk and maroon by day; memory colours follow D's mockup, plus
+  a lavender sixth slot for generation memory (KV cache) on the RL lens.
+- CI: an `api` job (FastAPI tests) and the GPU table check.
+- Checks: 42 web tests, 12 API tests, 468 Python tests, typecheck, ruff, build. Knob change to
+  painted frame 82 ms p95 during the tour.
+
+
 ## Mon Oct 26, late (session 2)
 
 **Done** (branch `ws-c`, rebased on `ws-a`, not pushed)

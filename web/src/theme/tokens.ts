@@ -10,7 +10,8 @@
  * Reserved meanings: `fail` is the only red in the app (red at dusk, maroon by day, with a
  * maroon tint behind failing parts at dusk), so anything red-toned means something will
  * break; it always ships with an icon and a word. ok / tight are fit status, also with icon
- * and word. Memory-term colours (term-1..5) follow D's mockup.
+ * and word. Memory-term colours (term-1..5) follow D's mockup; term-6 (generation memory:
+ * KV cache and the inference engine, RL lens) is a lavender outside the mockup.
  */
 
 const shared = {
@@ -81,6 +82,7 @@ export const duskTokens = {
 	"term-3": "#8EBD9D",
 	"term-4": "#E8DCB0",
 	"term-5": "#FAD563",
+	"term-6": "#C3B1E1",
 	focus: "#FAD563",
 } as const;
 
@@ -114,6 +116,7 @@ export const dayTokens = {
 	"term-3": "#8EBD9D",
 	"term-4": "#4E6A7D",
 	"term-5": "#D49810",
+	"term-6": "#6C5A9C",
 	focus: "#173E50",
 } as const;
 

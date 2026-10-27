@@ -5,6 +5,7 @@ import { currentKnobs, isFixture } from "../record/model";
 import { type FlightRecord, normaliseRecord } from "../record/types";
 import { GridProvider } from "./GridProvider";
 import { resolveMetric } from "./metrics";
+import { FAILS_AT, FITS_BELOW } from "../record/terms";
 
 const dev = normaliseRecord(devRaw as unknown as FlightRecord);
 const golden = normaliseRecord(goldenRaw as unknown as FlightRecord);
@@ -52,7 +53,7 @@ describe("GridProvider on the dev record", () => {
 	});
 
 	it("interpolates in log space along a log axis", () => {
-		const at = (b: number) => provider.predict(dev, { eval_batch_size: 8, batch_size: b })["memory.term.activations"]?.point ?? 0;
+		const at = (b: number) => provider.predict(dev, { eval_batch_size: 8, batch_size: b })["memory.activations"]?.point ?? 0;
 		const a2 = at(2);
 		const a4 = at(4);
 		const a3 = at(3);
@@ -61,15 +62,15 @@ describe("GridProvider on the dev record", () => {
 	});
 
 	it("switches grids when a fixed knob moves", () => {
-		const off = provider.predict(dev, { eval_batch_size: 8, batch_size: 8 })["memory.term.activations"]?.point ?? 0;
+		const off = provider.predict(dev, { eval_batch_size: 8, batch_size: 8 })["memory.activations"]?.point ?? 0;
 		const on = provider.predict(dev, { eval_batch_size: 8, batch_size: 8, gradient_checkpointing: true })[
-			"memory.term.activations"
+			"memory.activations"
 		]?.point ?? 0;
 		expect(on).toBeLessThan(off / 3);
 	});
 
 	it("marks an unprobed GPU as extrapolated and a probe point as measured", () => {
-		expect(provider.predict(dev, { eval_batch_size: 8, gpu: "H100-SXM-80GB" })["time.total"]?.status).toBe("extrapolated");
+		expect(provider.predict(dev, { eval_batch_size: 8, gpu_type: "H100-SXM-80GB" })["time.total"]?.status).toBe("extrapolated");
 		expect(provider.predict(dev, { eval_batch_size: 8 })["memory.peak"]?.status).toBe("measured");
 	});
 
@@ -104,7 +105,7 @@ describe("sensitivity and moves", () => {
 		expect(moves.length).toBeGreaterThan(0);
 		for (const m of moves) {
 			expect(m.delta).toBeLessThan(0);
-			expect(provider.predict(dev, { ...knobs, [m.knobId]: m.to })["risk.oom"]?.point ?? 0).toBeLessThanOrEqual(0.1);
+			expect(provider.predict(dev, { ...knobs, [m.knobId]: m.to })["risk.oom"]?.point ?? 0).toBeLessThan(FITS_BELOW);
 		}
 	});
 
@@ -122,5 +123,27 @@ describe("metric resolver", () => {
 		const far = resolveMetric(golden, { ...currentKnobs(golden), batch_size: 16 }, {}, "memory.by_term.logits");
 		expect(far?.kind).toBe("measured_elsewhere");
 		expect(far?.unit).toBe("bytes");
+	});
+});
+
+describe("moves follow B's cut-offs and the measure-first rule", () => {
+	const cost = { kind: "min_cost" as const };
+	it("never proposes a move into fails, and by default only into fits", () => {
+		const knobs = { ...currentKnobs(dev), eval_batch_size: 8 };
+		for (const m of provider.moves(dev, cost, { knobs })) {
+			expect(m.fit).toBe("fits");
+			expect(m.risk ?? 0).toBeLessThan(FITS_BELOW);
+		}
+		for (const m of provider.moves(dev, cost, { knobs, includeTight: true })) {
+			expect(m.risk ?? 0).toBeLessThan(FAILS_AT);
+			expect(m.fit === "tight").toBe((m.risk ?? 0) >= FITS_BELOW);
+		}
+	});
+
+	it("reports each move's change relative to the current aim", () => {
+		const knobs = { ...currentKnobs(dev), eval_batch_size: 8 };
+		const base = provider.predict(dev, knobs)["cost.total"]?.point ?? 0;
+		const m = provider.moves(dev, cost, { knobs })[0];
+		expect(m?.relative).toBeCloseTo((m?.delta ?? 0) / base, 6);
 	});
 });

@@ -24,6 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
+from preflight.engine import gpus
+from preflight.engine import memory as engine_memory
 from preflight.schema import FlightRecord, dump_record
 from preflight.schema.encoding import choose_scale, encode_f16, encode_mask
 
@@ -34,16 +36,22 @@ MODEL_ID = "dev-fixture@1"
 SEQ = [256, 512, 1024, 2048, 3072, 4096]
 BATCH = [1, 2, 4, 8, 16, 32]
 EVAL_BATCH = [1, 8, 16, 32]
-GPUS = ["A100-80GB", "L40S", "H100-SXM-80GB"]
+GPUS = ["A100-SXM-80GB", "L40S", "H100-SXM-80GB"]
 CKPT = [False, True]
 
-GPU_SPEC = {
-	# name: (memory bytes, bf16 dense TFLOPs, $ per hour on demand)
-	"A100-80GB": (80 * GIB, 312, 2.50),
-	"L40S": (48 * GIB, 362, 1.95),
-	"H100-SXM-80GB": (80 * GIB, 989, 3.95),
-}
-MFU_PEAK = {"A100-80GB": 0.46, "L40S": 0.34, "H100-SXM-80GB": 0.41}
+
+def _spec(name: str) -> tuple[float, float, float]:
+	"""Usable memory, bf16 dense TFLOPS and Modal $/h from B's GPU table (engine/gpus.py)."""
+	g = gpus.get_gpu(name)
+	price = gpus.price(name)
+	assert price is not None, name
+	return (g.usable_gib or g.memory_gib) * GIB, g.bf16 or g.fp32, price.usd_per_hour
+
+
+GPU_SPEC = {name: _spec(name) for name in GPUS}
+MFU_PEAK = {"A100-SXM-80GB": 0.46, "L40S": 0.34, "H100-SXM-80GB": 0.41}
+# B's calibrated 90% band with three probes, as a log-normal sigma (engine/memory.py)
+SIGMA_LOG = engine_memory.HALF_WIDTH_CALIBRATED / engine_memory.Z90
 
 PARAMS = 7.0e9
 LAYERS, HIDDEN, VOCAB = 32, 4096, 32000
@@ -58,7 +66,17 @@ EVAL_TOKENS = 2e6
 PROBED = {"seq_len": (512, 2048), "batch_size": (2, 8), "eval_batch_size": (1, 16)}
 
 PHASES = ["data", "forward", "backward", "optimizer", "eval"]
-TERMS = ["weights", "gradients", "optimizer", "activations", "logits", "context", "eval"]
+# B's term names, emitted as memory.<term> (docs/requests.md, B -> C)
+TERMS = [
+	"weights",
+	"master_weights",
+	"gradients",
+	"optimizer",
+	"activations",
+	"logits",
+	"context",
+	"eval_spike",
+]
 
 
 def model(seq, batch, eval_batch, gpu, ckpt):
@@ -66,16 +84,18 @@ def model(seq, batch, eval_batch, gpu, ckpt):
 	weights = PARAMS * 2
 	lora = LAYERS * 4 * 2 * HIDDEN * LORA_R
 	gradients = lora * 2
-	optimizer = lora * 12  # fp32 master plus Adam m and v
+	master_weights = lora * 4  # fp32 master copy of the bf16 adapters
+	optimizer = lora * 8  # Adam m and v in fp32
 	per_layer = seq * batch * HIDDEN * ACT_BYTES
 	activations = per_layer * LAYERS if not ckpt else seq * batch * HIDDEN * 2 * LAYERS + per_layer
 	logits = batch * seq * VOCAB * 4 * 2
 	eval_full = eval_batch * seq * HIDDEN * ACT_BYTES * LAYERS + eval_batch * seq * VOCAB * 4 * 2
-	train_peak = weights + gradients + optimizer + activations + logits + CONTEXT
-	eval_peak = weights + gradients + optimizer + eval_full + CONTEXT
+	resident = weights + master_weights + gradients + optimizer
+	train_peak = resident + activations + logits + CONTEXT
+	eval_peak = resident + eval_full + CONTEXT
 	peak = max(train_peak, eval_peak)
 	eval_extra = max(0.0, eval_peak - train_peak)
-	p_oom = 1 / (1 + math.exp(-(peak - 0.96 * mem_cap) / (0.025 * mem_cap)))
+	p_oom = engine_memory.p_oom(peak, SIGMA_LOG, mem_cap)
 
 	tokens = seq * batch
 	mfu = MFU_PEAK[gpu] * (1 - math.exp(-tokens / 3000))
@@ -98,13 +118,14 @@ def model(seq, batch, eval_batch, gpu, ckpt):
 		"risk.divergence": (min(0.6, 0.03 + 0.12 / batch), 0.5),
 		"probe.mfu": mfu,
 		"throughput.tokens_per_s": (tokens * (1 - PADDING_WASTE) / step, 0.12),
-		"memory.term.weights": (weights, 0.02),
-		"memory.term.gradients": (gradients, 0.05),
-		"memory.term.optimizer": (optimizer, 0.05),
-		"memory.term.activations": (activations, 0.12),
-		"memory.term.logits": (logits, 0.05),
-		"memory.term.context": (CONTEXT, 0.1),
-		"memory.term.eval": (eval_extra, 0.15),
+		"memory.weights": (weights, 0.02),
+		"memory.master_weights": (master_weights, 0.02),
+		"memory.gradients": (gradients, 0.05),
+		"memory.optimizer": (optimizer, 0.05),
+		"memory.activations": (activations, 0.12),
+		"memory.logits": (logits, 0.05),
+		"memory.context": (CONTEXT, 0.1),
+		"memory.eval_spike": (eval_extra, 0.15),
 		"time.phase.data": (t_data, 0.2),
 		"time.phase.forward": (t_forward, 0.15),
 		"time.phase.backward": (t_backward, 0.15),
@@ -117,10 +138,9 @@ TARGETS = [
 	("memory.peak", "bytes", "memory"),
 	("time.total", "s", "time"),
 	("cost.total", "usd", "cost"),
-	("risk.oom", "probability", "risk"),
-	("risk.divergence", "probability", None),
+	("risk.oom", "fraction", "risk"),
 	("throughput.tokens_per_s", "tokens/s", None),
-	*[(f"memory.term.{t}", "bytes", None) for t in TERMS],
+	*[(f"memory.{t}", "bytes", None) for t in TERMS],
 	*[(f"time.phase.{p}", "s", None) for p in PHASES],
 ]
 
@@ -139,7 +159,7 @@ def grids():
 		{"knob_id": "seq_len", "values": SEQ, "scale": "log"},
 		{"knob_id": "batch_size", "values": BATCH, "scale": "log"},
 		{"knob_id": "eval_batch_size", "values": EVAL_BATCH, "scale": "log"},
-		{"knob_id": "gpu", "values": GPUS, "scale": "categorical"},
+		{"knob_id": "gpu_type", "values": GPUS, "scale": "categorical"},
 	]
 	out = []
 	for ckpt in CKPT:
@@ -150,7 +170,7 @@ def grids():
 			pts = np.array([r[tid][0] for r in results])
 			rel = np.array([r[tid][1] for r in results])
 			lo, hi = pts * (1 - rel), pts * (1 + rel)
-			if unit == "probability":
+			if unit in ("probability", "fraction"):
 				lo, hi = np.clip(lo, 0, 1), np.clip(hi, 0, 1)
 			scale = choose_scale(pts, lo, hi)
 			out.append(
@@ -175,18 +195,18 @@ CURRENT = {
 	"seq_len": 2048,
 	"batch_size": 4,
 	"eval_batch_size": 32,
-	"gpu": "A100-80GB",
+	"gpu_type": "A100-SXM-80GB",
 	"gradient_checkpointing": False,
 }
 
 
 def estimates():
-	r = model(2048, 4, 32, "A100-80GB", False)
+	r = model(2048, 4, 32, "A100-SXM-80GB", False)
 	out = {}
 	for tid, unit, _ in TARGETS:
 		p, rel = r[tid]
 		lo, hi = p * (1 - rel), p * (1 + rel)
-		if unit == "probability":
+		if unit in ("probability", "fraction"):
 			lo, hi = max(0.0, lo), min(1.0, hi)
 		# eval batch 32 is outside the probed range (1 to 16)
 		out[tid] = {
@@ -204,8 +224,8 @@ def estimates():
 
 
 def probe(pid, seq, batch, eval_batch, ckpt):
-	r = model(seq, batch, eval_batch, "A100-80GB", ckpt)
-	terms = {t: round(r[f"memory.term.{t}"][0]) for t in TERMS if t != "eval"}
+	r = model(seq, batch, eval_batch, "A100-SXM-80GB", ckpt)
+	terms = {t: round(r[f"memory.{t}"][0]) for t in TERMS if t != "eval_spike"}
 	step = sum(r[f"time.phase.{p}"][0] for p in PHASES if p != "eval")
 	return {
 		"id": pid,
@@ -256,20 +276,20 @@ def graph():
 			"data",
 			metrics=["time.phase.data", "probe.data.padding_fraction"],
 		),
-		n("model", "Llama-style 7B", "group", metrics=["time.phase.forward", "memory.term.activations"]),
-		n("embed", "Embedding", "module", parent="model", metrics=["memory.term.weights"]),
+		n("model", "Llama-style 7B", "group", metrics=["time.phase.forward", "memory.activations"]),
+		n("embed", "Embedding", "module", parent="model", metrics=["memory.weights"]),
 		n("block", "Decoder block", "group", parent="model", repeat=32),
 		n("attn", "Self-attention + LoRA", "module", parent="block"),
 		n("mlp", "MLP + LoRA", "module", parent="block"),
-		n("lm_head", "LM head", "module", parent="model", metrics=["memory.term.logits"]),
+		n("lm_head", "LM head", "module", parent="model", metrics=["memory.logits"]),
 		n("loss", "Cross-entropy", "loss"),
 		n(
 			"optimizer",
 			"AdamW (LoRA params)",
 			"optimizer",
-			metrics=["time.phase.optimizer", "memory.term.optimizer"],
+			metrics=["time.phase.optimizer", "memory.optimizer"],
 		),
-		n("eval", "Eval loop", "phase", metrics=["risk.oom", "memory.term.eval", "time.phase.eval"]),
+		n("eval", "Eval loop", "phase", metrics=["risk.oom", "memory.eval_spike", "time.phase.eval"]),
 		n("ckpt", "Checkpoints", "io"),
 	]
 	edges = [
@@ -322,11 +342,11 @@ def knobs():
 			"group": "memory",
 		},
 		{
-			"id": "gpu",
-			"label_key": "knob.gpu",
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
 			"kind": "categorical",
 			"domain": {"values": GPUS},
-			"current": "A100-80GB",
+			"current": "A100-SXM-80GB",
 			"gridded": True,
 			"group": "cluster",
 		},
@@ -444,7 +464,12 @@ def main():
 		"env": {
 			"backend": "cuda",
 			"provider": "modal",
-			"gpu": {"name": "A100-80GB", "count": 1, "memory_bytes": 80 * GIB, "vendor": "nvidia"},
+			"gpu": {
+				"name": "A100-SXM-80GB",
+				"count": 1,
+				"memory_bytes": round(GPU_SPEC["A100-SXM-80GB"][0]),
+				"vendor": "nvidia",
+			},
 			"libraries": {"torch": "2.5.1", "transformers": "4.46.2", "peft": "0.13.2"},
 			"seed": 0,
 		},
@@ -494,7 +519,7 @@ def main():
 				"evidence": [
 					{
 						"metric": "memory.peak@eval_batch_size=32",
-						"value": model(2048, 4, 32, "A100-80GB", False)["memory.peak"][0],
+						"value": model(2048, 4, 32, "A100-SXM-80GB", False)["memory.peak"][0],
 						"threshold": 80 * GIB,
 					}
 				],

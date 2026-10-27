@@ -44,6 +44,24 @@ jobs:
         run: uv run pytest -m "not torch and not gpu and not network" -q
       - name: TS encoding parity
         run: node --test schema/ts/*.test.ts
+      - name: Web GPU table matches engine/gpus.py
+        run: uv run python web/scripts/make_gpu_table.py --check
+
+  api:
+    # The FastAPI control plane (api/), its own uv project on top of the preflight package.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.11.x"
+          python-version: "3.11"
+          enable-cache: true
+      - working-directory: api
+        run: |
+          uv sync --locked
+          uv run pytest -q
 
   torch:
     # Probes and the recorder on CPU torch: no GPU in CI, but the code paths are the same.
