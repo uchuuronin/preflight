@@ -70,6 +70,20 @@ Seven settings decide whether B's numbers can meet the plan's validation targets
 
 **Chosen: fits below 1%, fails at 80% or more, tight between.** It ties for the fewest missed OOMs and the fewest false alarms. The price is that one setting in eight reads "tight", which near the cliff is the honest answer, and the UI offers a probe there.
 
+## S2d. Memory below the smallest probe (Chiya's call, Oct 27)
+
+Chiya decided that sizes below the smallest probe get an estimate labelled "extrapolated", with a wider range and a "run a probe here" offer, and that far outside still abstains. Five ways to widen the band, scored on S1's 20,000 jobs, with queries 2^-k below the smallest probe (batch lowered first, then sequence). The engine's existing rule abstains once the band passes +-50%. Each cell gives coverage of the estimates given, then the share abstained:
+
+| Rule | 0.5 halvings | 1 | 2 | 4 | 6 | 8 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| G1 constant x1.5 | 100% / 6% | 99.9% / 6% | 96.8% / 6% | 89.8% / 7% | 88.2% / 7% | 87.4% / 8% | 87.6% / 8% |
+| G2 constant x2 | 100% / 9% | 100% / 9% | 98.9% / 9% | 93.8% / 9% | 92.0% / 10% | 91.6% / 10% | 91.5% / 10% |
+| **G3 x(1 + 0.25 per halving)** | **99.8% / 5%** | **99.5% / 5%** | **96.7% / 6%** | **93.8% / 9%** | **94.5% / 13%** | **95.8% / 18%** | **96.7% / 22%** |
+| G4 x(1 + 0.5 per halving) | 99.9% / 5% | 99.9% / 6% | 98.9% / 9% | 97.2% / 17% | all abstain | all abstain | all abstain |
+| G5 + 0.05 per halving | 99.9% / 4% | 99.8% / 5% | 97.8% / 5% | 95.9% / 9% | all abstain | all abstain | all abstain |
+
+**Chosen: G3.** It keeps at least 93.8% coverage at every depth with the fewest abstentions near the probes. Its abstentions then grow with distance and fall on the jobs whose probes fit worst, so "far outside abstains" happens where the estimate stops being trustworthy rather than at an arbitrary line. Memory at small sizes is mostly fixed terms the probes do measure, which is why it can go this far down. Above twice the largest probe still abstains, as before.
+
 ## S3. Labelling a corpus run as diverged
 
 Curves: stable decay 32%, spike that recovers 14%, plateau that never learns 9% (all not diverged); NaN 11%, exponential blow-up 16%, slow upward drift 9%, and spike then collapse to the trivial baseline 9% (all diverged). Half the collapses happen in the first 30 steps, before the run has learned anything; a corpus smoke test on CPU turned this case up (lr 3.0: loss 6.9, then 271, then flat at ln 256 = 5.55, uniform over bytes), and the first version of this study didn't model it.
@@ -100,6 +114,20 @@ Curves: stable decay 32%, spike that recovers 14%, plateau that never learns 9% 
 
 **Chosen: K1, with K4 as the fallback** when a kernel has no FLOP or byte count. A's kernel table (`Probe.kernels`, top 64 ops plus a roll-up row per class) counts FLOPs for matmuls and attention and estimates bytes for the rest; rows with neither are scaled by their class, which the classifier reads from the op name (CUDA, HIP, Triton and aten; on a real profiled step no op is left unclassed). Replay scales each row by the ratio of its rooflines on the two GPUs. That equals "keep the measured efficiency" whenever the counts are consistent, and stays exact on the probed GPU when an estimated byte count overshoots what the GPU could move. A kernel table from a CPU probe isn't scaled to a GPU: the engine abstains. The whole-step FLOPs ratio and "same MFU", the most common rules of thumb, are off by half because most steps are not compute-bound throughout.
 
+## S4b. Step time below the smallest probe
+
+The same decision for the same-GPU step-time model. Small batches under-use the GPU, so time stops falling linearly with the batch. Simulated over 20,000 jobs with a saturating utilisation curve, A's probes at x and x/2, 3% timing noise and the model's own fit:
+
+| Rule | 0.5 halvings | 1 | 2 | 2.5 | 3 | 4 |
+| --- | --- | --- | --- | --- | --- | --- |
+| T0 no widening | 98.6% | 90.1% | 63.4% | 56.0% | 51.5% | 46.7% |
+| T1 memory's rule, x(1 + 0.25 per halving) | 99.1% | 94.6% | 76.8% | 70.5% | 66.8% | 63.4% |
+| T3 x(1 + 1 per halving) | 99.8% | 98.6% | 95.8% | abstains | abstains | abstains |
+| **T4 + 0.1 (log) per halving** | **99.6%** | **97.8%** | **92.7%** | **88.9%** | abstains | abstains |
+| T5 upper end only, + 0.1 per halving | 99.6% | 94.3% | 74.1% | 68.4% | abstains | abstains |
+
+**Chosen: T4.** It holds 88.9% or better until the band passes +-50%, about 2.7 halvings (6.5x) below the smallest probe, and abstains from there. Memory's rule is too narrow for time. A one-sided band does worse because the fitted line can overshoot as well as undershoot below the probes. Reproduce with `uv run python scripts/mc_engine_settings.py s2d` and `s4b`.
+
 ## S5. Keeping the corpus sweep inside its budget
 
 | Candidate | P(overspend) | Mean overspend | Budget left unused | Configs run |
@@ -128,4 +156,19 @@ A's D3 rerun chose the rule; B implemented it in `engine/agent_cost.py` and re-s
 | 50 tasks | 90% | 92.7% (92.2-93.2) | 1.12 | 97.9% |
 
 **Chosen: an 80% bound, for either sample size.** It reproduces A's 89.1% at 50 tasks, and with this rule 30 tasks also clears the 88% target, at an interval 21% wider than 50 tasks gives. The sample size stays Chiya's call (A's D3). The runaway-rate readout (`risk.runaway`, a two-sided Clopper-Pearson interval on the share of tasks above 8x the median) covers the run's true share 98% of the time: conservative, as exact binomial intervals are. When most tasks cost nothing (cached), the median is 0 and A's rule would call every paid task a runaway; B takes 8x the median of the paid tasks instead. A's generator has no free tasks, so this case is covered by a unit test, not by S6. Reproduce with `uv run python scripts/mc_engine_settings.py s6`.
+
+## S6b. 30 tasks, then a 20-task top-up when the range straddles the budget (Chiya's call, Oct 27)
+
+Chiya chose 30 tasks with the 80% bound as the default. When the cost range straddles the budget, the guide offers 20 more tasks with the user's click (`agent_cost.budget_check`, `combine_samples`). Topping up only after seeing a straddling range is a data-driven choice, so the final coverage was checked over 10,000 runs from A's generator, with budgets at 0.5x to 2x the run's true total:
+
+| Quantity | Result |
+| --- | --- |
+| Coverage, 30 tasks alone | 89.8% |
+| Runs topped up | 71.6% |
+| Topped-up runs still straddling after 50 tasks | 83.0% |
+| Final coverage, all runs | 88.2% (+-0.6) |
+| Final coverage, topped-up runs | 92.4% |
+| Under/over calls that were right, among runs with a clear call | 93.9% |
+
+The rule meets the 88% target. A range that misses tends not to straddle the budget either, so runs that skip the top-up cover less (about 78%), and the topped-up ones make up for it. Under and over calls are right 94% of the time. The top-up settles only about one straddle in six when budgets sit this close to the true cost. So the guide should promise a narrower range, not a settled answer. Reproduce with `uv run python scripts/mc_engine_settings.py s6b`.
 

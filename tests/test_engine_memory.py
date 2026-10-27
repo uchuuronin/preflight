@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from preflight.engine import memory as m
@@ -137,10 +139,17 @@ def test_single_probe_calibration_is_constant_offset():
 	assert cal.correct(8192, 7.0e9) == pytest.approx(7.5e9)
 
 
-def test_probed_range_is_half_the_smallest_to_twice_the_largest():
+def test_predicted_range_is_the_smallest_to_twice_the_largest_probe():
 	cal = m.Calibration.fit([m.MemoryProbe(1024, 3e9, 2.5e9), m.MemoryProbe(4096, 6e9, 5e9)])
-	assert cal.range() == (512, 8192)
-	assert cal.in_range(8192) and not cal.in_range(8193) and not cal.in_range(511)
+	assert cal.range() == (1024, 8192)
+	assert cal.in_range(8192) and not cal.in_range(8193) and not cal.in_range(1023)
+	assert cal.is_below(512) and cal.halvings_below(512) == pytest.approx(1.0)
+
+
+def test_band_grows_a_quarter_per_halving_below_the_smallest_probe():
+	cal = m.Calibration.fit([m.MemoryProbe(1024, 3e9, 2.5e9), m.MemoryProbe(4096, 6e9, 5e9)])
+	assert cal.half_width(1024) == pytest.approx(m.HALF_WIDTH_CALIBRATED)
+	assert cal.half_width(256) == pytest.approx(m.HALF_WIDTH_CALIBRATED * 1.5)  # two halvings
 
 
 def test_band_by_probe_count_follows_s2c():
@@ -187,7 +196,20 @@ def test_predict_peak_end_to_end():
 	far = m.predict_peak(GPT2_SMALL, setup, batch=24, seq=1024, probes=probes, gpu="L4")
 	assert far.status == "abstain" and "outside the probed range" in far.reason
 	low = m.predict_peak(GPT2_SMALL, setup, batch=1, seq=512, probes=probes, gpu="L4")
-	assert low.status == "abstain"
+	assert low.status == "extrapolated" and "run a probe here" in low.reason
+	assert math.log(low.hi / low.point) == pytest.approx(m.HALF_WIDTH_CALIBRATED * 1.5)  # 2 halvings below
+	assert (low.hi - low.lo) / low.point > (est.hi - est.lo) / est.point
+
+
+def test_far_below_the_probes_still_abstains():
+	setup = m.TrainingSetup(param_dtype="bf16")
+	probes = []
+	for b in (4, 16):
+		an = m.breakdown(GPT2_SMALL, setup, batch=b, seq=1024).allocator_peak
+		probes.append(m.MemoryProbe(tokens=b * 1024, measured_bytes=an * 1.1 + 3e8, analytical_bytes=an))
+	# the band reaches +-50% after (ln 1.5 / 0.107 - 1) / 0.25, about 11 halvings; this query is 12 below
+	far = m.predict_peak(GPT2_SMALL, setup, batch=1, seq=1, probes=probes, gpu="L4")
+	assert far.status == "abstain" and "too far below" in far.reason
 
 
 def test_abstains_when_the_band_passes_fifty_percent():

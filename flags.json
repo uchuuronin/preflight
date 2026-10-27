@@ -4,5 +4,9 @@
 	"probes.pretrain": false,
 	"probes.agent": false,
 	"harness.spark_script_map": false,
-	"runner.queue": false
+	"runner.queue": false,
+	"engine.memory": false,
+	"engine.steptime_same_gpu": false,
+	"engine.steptime_cross_gpu": false,
+	"corpus.sweep": false
 }

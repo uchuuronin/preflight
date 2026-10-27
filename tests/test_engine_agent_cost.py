@@ -163,3 +163,43 @@ def test_runaway_settings_reach_the_rate_readout():
 	sample = AgentSample(tasks=tasks, population=300)
 	assert ac.agent_totals(sample)["risk.runaway"].point == 0
 	assert ac.agent_totals(sample, runaway_factor=4.0)["risk.runaway"].point == pytest.approx(5 / 30)
+
+
+# ---------------------------------------------------------------- the top-up (Chiya, Oct 27)
+
+
+def _est(lo, hi, n=30, pop=500):
+	return ac.TotalEstimate((lo + hi) / 2, lo, hi, "usd", "predicted", detail={"n": n, "population": pop})
+
+
+def test_budget_check_offers_the_top_up_only_when_the_range_straddles():
+	assert ac.budget_check(_est(10, 20), 25).verdict == "under"
+	assert ac.budget_check(_est(30, 40), 25).verdict == "over"
+	b = ac.budget_check(_est(20, 30), 25)
+	assert b.verdict == "straddles" and b.offer_top_up and b.top_up_tasks == ac.TOP_UP_TASKS
+	assert "20 more tasks" in b.reason
+
+
+def test_top_up_is_offered_once_and_never_past_the_run():
+	assert not ac.budget_check(_est(20, 30, n=50), 25).offer_top_up
+	near_end = ac.budget_check(_est(20, 30, n=40, pop=48), 25)
+	assert near_end.offer_top_up and near_end.top_up_tasks == 8
+	assert ac.budget_check(_est(20, 30), None).verdict == "unknown"
+	abst = ac.TotalEstimate(None, None, None, "usd", "abstain", reason="x")
+	assert not ac.budget_check(abst, 25).offer_top_up
+
+
+def test_combine_samples_dedupes_and_keeps_the_population():
+	from preflight.schema.record import AgentSample, AgentTask
+
+	def t(i):
+		return AgentTask(
+			task_id=f"t{i}", turns=1, input_tokens=1, output_tokens=1, latency_s=1.0, cost_usd=0.01
+		)
+
+	first = AgentSample(tasks=[t(i) for i in range(30)], population=500, selection="30-70% pass band")
+	extra = AgentSample(tasks=[t(i) for i in range(28, 50)])
+	both = ac.combine_samples(first, extra)
+	assert len(both.tasks) == 50 and both.population == 500
+	assert both.selection == "30-70% pass band + top-up of 20"
+	assert ac.agent_totals(both)["cost.total"].detail["n"] == 50

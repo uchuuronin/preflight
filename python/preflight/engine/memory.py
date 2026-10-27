@@ -42,7 +42,8 @@ HALF_WIDTH_ONE_PROBE = 0.160  # S2c: one usable probe (88.1% coverage); two prob
 HALF_WIDTH_PRIOR = 0.241  # analytical only, no probe
 LOO_WIDEN = 1.5
 ABSTAIN_HALF_WIDTH = math.log(1.5)  # band wider than +-50%
-EXTRAPOLATE_FACTOR = 2.0  # past 2x the largest probed work units
+EXTRAPOLATE_FACTOR = 2.0  # past 2x the largest probed work units: abstain (A's D2 query range)
+BELOW_GROWTH = 0.25  # S2d G3: below the smallest probe the band grows 25% per halving; past +-50% it abstains
 FITS_BELOW = 0.01
 FAILS_AT = 0.80
 
@@ -688,21 +689,29 @@ class Calibration:
 		return analytical_bytes + self.intercept + self.slope * tokens
 
 	def range(self) -> tuple[float, float]:
-		"""Work units the probes vouch for: half the smallest to twice the largest (A's D2 query range)."""
-		return self.min_tokens / EXTRAPOLATE_FACTOR, self.max_tokens * EXTRAPOLATE_FACTOR
+		"""Work units the probes vouch for: the smallest probe to twice the largest (A's D2 query range)."""
+		return self.min_tokens, self.max_tokens * EXTRAPOLATE_FACTOR
 
 	def in_range(self, tokens: float) -> bool:
 		lo, hi = self.range()
 		return lo <= tokens <= hi
 
-	def is_extrapolated(self, tokens: float) -> bool:
-		return not self.in_range(tokens)
+	def is_below(self, tokens: float) -> bool:
+		"""Below the smallest probe: an extrapolated estimate with a wider band (Chiya, Oct 27; S2d)."""
+		return 0 < tokens < self.min_tokens
+
+	def halvings_below(self, tokens: float) -> float:
+		return math.log2(self.min_tokens / tokens) if self.is_below(tokens) else 0.0
 
 	def half_width(self, tokens: float | None = None) -> float:
-		"""90% half-width in log space (S2a R5; S2c for one or two probes). Out-of-range queries abstain instead."""
+		"""90% half-width in log space (S2a R5; S2c for one or two probes; S2d below the smallest probe)."""
 		if self.n_probes >= 3 and self.loo_log_error is not None:
-			return max(HALF_WIDTH_CALIBRATED, LOO_WIDEN * self.loo_log_error)
-		return HALF_WIDTH_CALIBRATED if self.n_probes == 2 else HALF_WIDTH_ONE_PROBE
+			h = max(HALF_WIDTH_CALIBRATED, LOO_WIDEN * self.loo_log_error)
+		else:
+			h = HALF_WIDTH_CALIBRATED if self.n_probes == 2 else HALF_WIDTH_ONE_PROBE
+		if tokens is not None:
+			h *= 1 + BELOW_GROWTH * self.halvings_below(tokens)
+		return h
 
 	def sigma_log(self, tokens: float) -> float:
 		return self.half_width(tokens) / Z90
@@ -765,7 +774,8 @@ def predict_peak(
 
 	`measured` is the caller's claim that every knob equals a probe's; work units alone can't
 	say so (another optimizer or precision at the same batch x seq is not a measurement).
-	Calibrated queries outside the probed range abstain, as the contract requires.
+	Below the smallest probe the estimate is "extrapolated" with a band that grows per halving (S2d);
+	above twice the largest probe, or once the band passes +-50%, it abstains.
 	"""
 	if capacity_bytes is None:
 		if gpu is None:
@@ -781,6 +791,12 @@ def predict_peak(
 		if measured:
 			status = "measured"
 			h = min(h, HALF_WIDTH_CALIBRATED)
+		elif cal.is_below(tokens):
+			status = "extrapolated"
+			reason = (
+				f"below the smallest probed size ({cal.min_tokens:.0f} work units), so the range is wider; "
+				"run a probe here for a measured number"
+			)
 		elif not cal.in_range(tokens):
 			lo_r, hi_r = cal.range()
 			why = f"{tokens:.0f} work units is outside the probed range ({lo_r:.0f} to {hi_r:.0f}); run a probe here"
@@ -794,7 +810,7 @@ def predict_peak(
 		reason = "analytical only, not calibrated by a probe yet"
 	sigma = h / Z90
 	if h > ABSTAIN_HALF_WIDTH or alloc <= 0:
-		why = f"the band would be wider than +-50% ({reason or 'too far from the probes'}); run a probe here"
+		why = f"the range would be wider than +-50% ({'too far below the probes' if status == 'extrapolated' else reason or 'too far from the probes'}); run a probe here"
 		return MemoryEstimate(None, None, None, "bytes", "abstain", MODEL_ID, None, None, sigma, bd, why)
 	point = alloc + context_bytes
 	p = p_oom(point, sigma, capacity_bytes, margin_bytes)

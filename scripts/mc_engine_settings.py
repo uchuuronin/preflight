@@ -1,11 +1,13 @@
 """Monte Carlo for B's engine settings, fixed seed: 20k trials for memory, 4k for divergence and cross-GPU, 3k budget sweeps.
 
 S1: memory estimator on A's three probes (current, half batch, half seq).
-S2: the 90% band rule (S2a), the fits / tight / fails cut-offs (S2b), the band with one or two probes (S2c).
+S2: the 90% band rule (S2a), the fits / tight / fails cut-offs (S2b), the band with one or two probes (S2c),
+    and how the band grows below the smallest probe (S2d).
 S3: the rule that labels a short run diverged.
-S4: carrying step time from the probed GPU to another GPU.
+S4: carrying step time from the probed GPU to another GPU; S4b: step time below the smallest probe.
 S5: the corpus sweep's cost overhead factor and per-config time estimate.
-S6: B's agent-total code (engine/agent_cost.py) re-checked on A's D3 generator.
+S6: B's agent-total code (engine/agent_cost.py) re-checked on A's D3 generator; S6b: 30 tasks plus a
+    20-task top-up when the cost range straddles the budget.
 
 Assumptions follow A's docs/decisions/probe-plan.md where they overlap (allocator
 overhead 2-12% plus 2 MiB rounding, eager attention's bs*s^2 term, queries within
@@ -268,6 +270,58 @@ def s2c(w, pr):
 		print(f"  {cname:<20} " + "   ".join(row))
 
 
+def s2d(w, pr):
+	"""Below the smallest probe: an extrapolated estimate whose band grows per halving (Chiya, Oct 27).
+
+	Queries sit 2^-k below the smallest probed work units, batch lowered first (to 1), then sequence.
+	The band starts from S2a's R5 (max(0.107, 1.5 x leave-one-out)) and the estimate abstains once
+	it passes +-50%, the engine's existing rule, so "far outside" falls out of the growth rule.
+	"""
+	b, s, m = pr
+	x = b * s
+	ok = ~np.isnan(m).any(1)
+	A = analytical(w, b, s)
+	c = fit([np.ones_like(x), x], m - A)
+	# leave-one-probe-out error, as Calibration.fit computes it
+	loo = np.zeros(N)
+	for i in range(3):
+		keep = [j for j in range(3) if j != i]
+		ci = fit([np.ones_like(x[:, keep]), x[:, keep]], (m - A)[:, keep])
+		pred = A[:, i] + ci[:, 0] + ci[:, 1] * x[:, i]
+		loo = np.maximum(
+			loo, np.abs(np.log(np.where(pred > 0, m[:, i] / np.where(pred > 0, pred, 1), np.inf)))
+		)
+	h0 = np.maximum(0.107, 1.5 * loo)
+	xmin = np.nanmin(np.where(np.isnan(m), np.nan, x), 1)
+	bmin = b[np.arange(N), np.nanargmin(np.where(np.isnan(m), np.inf, x), 1)]
+	cands = {
+		"G1 constant x1.5": lambda h, k: h * 1.5,
+		"G2 constant x2": lambda h, k: h * 2.0,
+		"G3 x(1 + 0.25 per halving)": lambda h, k: h * (1 + 0.25 * k),
+		"G4 x(1 + 0.5 per halving)": lambda h, k: h * (1 + 0.5 * k),
+		"G5 + 0.05 per halving": lambda h, k: h + 0.05 * k,
+	}
+	ks = [0.5, 1, 2, 4, 6, 8, 10]
+	print(
+		"\nS2d band below the smallest probe   coverage of estimates given / share abstained, by halvings below"
+	)
+	print("  " + " " * 30 + "".join(f"{k:>5g} halvings   " for k in ks))
+	for name, grow in cands.items():
+		row = []
+		for k in ks:
+			qx = xmin * 2.0**-k
+			qb = np.maximum(1.0, np.floor(bmin * 2.0**-k))
+			qs = np.maximum(1.0, qx / qb)
+			truth = reserved(w, qb, qs) + w["ctx"]
+			p = analytical(w, qb, qs) + c[:, 0] + c[:, 1] * qb * qs + 0.75 * GB
+			h = grow(h0, k)
+			given = ok & (p > 0) & (h <= np.log(1.5))
+			e = np.abs(np.log(truth / np.where(p > 0, p, 1.0)))
+			cov = (e <= h)[given].mean() if given.any() else np.nan
+			row.append(f"{100 * cov:5.1f}% / {100 * (1 - given[ok].mean()):4.1f}%")
+		print(f"  {name:<30}" + "  ".join(row))
+
+
 # ------------------------------------------------------------------ S3 divergence labels
 def curves(n_steps=600):
 	"""Simulated loss curves with known outcomes."""
@@ -467,6 +521,66 @@ def s4():
 		print(f"  {n:<40} {pct(e <= 0.2)}      {pct(e <= 0.35)}      {np.median(e) * 100:4.1f}%")
 
 
+def s4b(trials=20_000):
+	"""Same-GPU step time below the smallest probe. Small batches leave the GPU under-used, so time
+	falls slower than linearly: work(x) = c1 x / util(x), util = min(1, (x / x_sat)^alpha).
+	Probes at x0 and x0/2 (A's half batch and half sequence share bs*s), 3% timing noise; the fit is
+	SameGpuModel's (non-negative intercept and slope). The band starts from SIGMA_SAME_GPU (0.08)."""
+	g = np.random.default_rng(20261027)
+	x0 = 2.0 ** g.integers(9, 17, trials)
+	over = g.uniform(0.002, 0.05, trials)  # fixed per-step host and launch time, s
+	c1 = g.uniform(2e-7, 2e-5, trials)  # s per work unit at full utilisation
+	x_sat = x0 * np.exp(g.uniform(np.log(0.05), np.log(4.0), trials))
+	alpha = g.uniform(0.2, 0.8, trials)
+
+	def t(x):
+		col = (lambda v: v[:, None]) if np.ndim(x) == 2 else (lambda v: v)
+		util = np.minimum(1.0, (x / col(x_sat)) ** col(alpha))
+		return col(over) + col(c1) * x / util
+
+	xs = np.stack([x0, x0 / 2, x0 / 2], 1)
+	ys = t(xs) * g.lognormal(0, 0.03, xs.shape)
+	mx, my = xs.mean(1), ys.mean(1)
+	slope = ((xs - mx[:, None]) * (ys - my[:, None])).sum(1) / ((xs - mx[:, None]) ** 2).sum(1)
+	icpt = my - slope * mx
+	prop = (xs * ys).sum(1) / (xs * xs).sum(1)
+	slope, icpt = (
+		np.where(slope < 0, 0.0, np.where(icpt < 0, prop, slope)),
+		np.where(slope < 0, my, np.where(icpt < 0, 0.0, icpt)),
+	)
+	h0 = 1.6448536269514722 * 0.08
+	cands = {
+		"T0 no widening": lambda h, k: h,
+		"T1 x(1 + 0.25 per halving), memory's rule": lambda h, k: h * (1 + 0.25 * k),
+		"T2 x(1 + 0.5 per halving)": lambda h, k: h * (1 + 0.5 * k),
+		"T3 x(1 + 1.0 per halving)": lambda h, k: h * (1 + 1.0 * k),
+		"T4 + 0.1 per halving": lambda h, k: h + 0.1 * k,
+	}
+	# one-sided: the fit runs low at small batches, so only the upper end grows
+	upper = {
+		"T5 upper end + 0.1 per halving": lambda h, k: h + 0.1 * k,
+		"T6 upper end + 0.15 per halving": lambda h, k: h + 0.15 * k,
+		"T7 upper end + 0.2 per halving": lambda h, k: h + 0.2 * k,
+	}
+	ks = [0.5, 1, 2, 2.5, 3, 4, 6]
+	print(
+		"\nS4b step time below the smallest probe   coverage / abstained (band past +-50%), by halvings below"
+	)
+	print("  " + " " * 44 + "".join(f"{k:>6g} halvings   " for k in ks))
+	for name, grow in {**cands, **upper}.items():
+		row = []
+		for k in ks:
+			q = (x0 / 2) * 2.0**-k
+			pred = np.maximum(icpt + slope * q, 1e-12)
+			err = np.log(t(q) / pred)  # > 0: the fit ran low
+			hi = grow(h0, k)
+			lo = h0 if name in upper else hi
+			given = np.full(trials, hi <= np.log(1.5))
+			cov = ((err <= hi) & (err >= -lo))[given].mean() if given.any() else np.nan
+			row.append(f"{100 * cov:5.1f}% / {100 * (1 - given.mean()):5.1f}%")
+		print(f"  {name:<44}" + "  ".join(row))
+
+
 # ------------------------------------------------------------------ S5 corpus budget
 def s5():
 	print(
@@ -555,9 +669,62 @@ def s6(trials=10_000, pop=500):
 		)
 
 
+def s6b(trials=10_000, pop=500):
+	"""Chiya's rule: 30 tasks, then 20 more (distinct tasks) only when the range straddles the budget.
+
+	Topping up only when the first range straddles the budget is a choice made after seeing the data,
+	so the final interval's coverage is checked here rather than assumed from S6. Budgets are drawn at
+	0.5x to 2x the true total, log-uniform, so straddling cases are common.
+	"""
+	from preflight.engine.agent_cost import budget_check, estimate_total
+
+	g = np.random.default_rng(20261027)
+	sig = g.uniform(0.5, 1.2, trials)
+	p_run = g.uniform(0.0, 0.05, trials)
+	mult = g.uniform(10, 40, trials)
+	r = np.random.default_rng(11)
+	cov = np.zeros(trials, bool)
+	topped = np.zeros(trials, bool)
+	still = np.zeros(trials, bool)
+	call_right = []
+	cov30 = np.zeros(trials, bool)
+	for i in range(trials):
+		c = g.lognormal(np.log(0.05), sig[i], pop)
+		full = np.where(g.random(pop) < p_run[i], c * mult[i], c)
+		total = full.sum()
+		budget = total * np.exp(r.uniform(np.log(0.5), np.log(2.0)))
+		order = r.permutation(pop)
+		e = estimate_total(full[order[:30]], pop)
+		cov30[i] = e.lo <= total <= e.hi
+		chk = budget_check(e, budget)
+		if chk.offer_top_up:
+			topped[i] = True
+			e = estimate_total(full[order[: 30 + chk.top_up_tasks]], pop)
+			chk = budget_check(e, budget)
+			still[i] = chk.verdict == "straddles"
+		cov[i] = e.lo <= total <= e.hi
+		if chk.verdict in ("under", "over"):
+			call_right.append((chk.verdict == "under") == (total <= budget))
+	ci = lambda p: 1.96 * np.sqrt(p * (1 - p) / trials)  # noqa: E731
+	print("\nS6b 30 tasks + top-up of 20 when the range straddles the budget (budget 0.5-2x the run total)")
+	print(f"  30 tasks alone: coverage {pct(cov30)}")
+	print(
+		f"  topped up: {pct(topped)} of runs; still straddling after the top-up: {pct(still[topped])} of those"
+	)
+	print(
+		f"  final coverage, all runs: {pct(cov)} (+-{100 * ci(cov.mean()):.1f}); topped-up runs: {pct(cov[topped])}"
+	)
+	print(
+		f"  under/over calls that were right: {pct(np.array(call_right))} of {len(call_right)} runs with a clear call"
+	)
+
+
 if __name__ == "__main__":
 	import sys
 
+	if sys.argv[1:] == ["s6b"]:
+		s6b()
+		raise SystemExit
 	if sys.argv[1:] == ["s6"]:
 		s6()
 		raise SystemExit
@@ -569,11 +736,21 @@ if __name__ == "__main__":
 		w = memory_world()
 		s2c(w, probes(w))
 		raise SystemExit
+	if sys.argv[1:] == ["s4b"]:
+		s4b()
+		raise SystemExit
+	if sys.argv[1:] == ["s2d"]:
+		w = memory_world()
+		s2d(w, probes(w))
+		raise SystemExit
 	w, truth, est, usable, pr = s1()
 	p, u, q90, disagree, loo = s2(w, truth, est, usable, pr)
 	s2b(w, truth, p, u, np.maximum(q90, 1.5 * loo))
 	s2c(w, pr)
+	s2d(w, pr)
 	s3()
 	s4()
+	s4b()
 	s5()
 	s6()
+	s6b()

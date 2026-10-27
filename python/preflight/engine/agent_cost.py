@@ -285,3 +285,60 @@ def agent_totals(
 		),
 	}
 	return out
+
+
+# ---------------------------------------------------------------- sample size and the top-up (Chiya, Oct 27)
+
+DEFAULT_SAMPLE = 30  # tasks run first, with the 80% runaway bound (S6: 90.3% coverage)
+TOP_UP_TASKS = (
+	20  # more tasks the guide offers, with the user's click, when the cost range straddles the budget
+)
+MAX_SAMPLE = DEFAULT_SAMPLE + TOP_UP_TASKS
+
+
+@dataclass(frozen=True)
+class BudgetCheck:
+	verdict: str  # "under" | "over" | "straddles" | "unknown"
+	offer_top_up: bool
+	top_up_tasks: int
+	reason: str
+
+
+def budget_check(estimate: TotalEstimate, budget_usd: float | None) -> BudgetCheck:
+	"""Where the run's cost range sits against the budget, and whether to offer the 20-task top-up.
+
+	The top-up is offered once: only while the sample is still below 50 tasks and the run has
+	tasks left to sample. The guide asks the user before running it.
+	"""
+	if budget_usd is None or budget_usd <= 0:
+		return BudgetCheck("unknown", False, 0, "no budget set")
+	if estimate.status == "abstain" or estimate.lo is None or estimate.hi is None:
+		return BudgetCheck("unknown", False, 0, estimate.reason or "no cost estimate yet")
+	if estimate.hi <= budget_usd:
+		return BudgetCheck("under", False, 0, f"the whole cost range is under the ${budget_usd:,.2f} budget")
+	if estimate.lo > budget_usd:
+		return BudgetCheck("over", False, 0, f"the whole cost range is over the ${budget_usd:,.2f} budget")
+	n = int(estimate.detail.get("n", 0))
+	pop = int(estimate.detail.get("population", 0))
+	more = max(0, min(TOP_UP_TASKS, pop - n)) if n < MAX_SAMPLE else 0
+	why = f"the cost range straddles the ${budget_usd:,.2f} budget"
+	if more:
+		why += f"; running {more} more tasks narrows it"
+	return BudgetCheck("straddles", more > 0, more, why)
+
+
+def combine_samples(first, extra):
+	"""The first sample plus a top-up, as one `AgentSample` (a task id seen twice counts once)."""
+	from preflight.schema.record import AgentSample
+
+	seen: set[str] = set()
+	tasks = []
+	for t in [*first.tasks, *extra.tasks]:
+		if t.task_id not in seen:
+			seen.add(t.task_id)
+			tasks.append(t)
+	pop = first.population if first.population is not None else extra.population
+	added = len(tasks) - len(first.tasks)
+	selection = f"{first.selection or 'sample'} + top-up of {added}"
+	data = {**first.model_dump(), "tasks": [t.model_dump() for t in tasks], "population": pop}
+	return AgentSample.model_validate({**data, "selection": selection[:200]})  # validated, unlike model_copy

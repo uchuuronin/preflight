@@ -145,7 +145,9 @@ def _abstain(model_id: str, sigma: float, reason: str) -> StepEstimate:
 	return StepEstimate(None, None, None, "s", "abstain", model_id, sigma, {}, reason)
 
 
-RANGE_FACTOR = 2.0  # same rule as memory: half the smallest to twice the largest probe
+RANGE_FACTOR = 2.0  # past twice the largest probe: abstain, as memory does
+BELOW_GROWTH_LOG = 0.1  # S4b T4: below the smallest probe the 90% log half-width grows 0.1 per halving
+ABSTAIN_HALF_WIDTH = math.log(1.5)  # wider than +-50%: abstain, as memory does
 
 
 # ---------------------------------------------------------------- same GPU
@@ -217,7 +219,8 @@ class SameGpuModel:
 		return cls(fits, tuple(p.tokens for p in probes), sigma, measured)
 
 	def range(self) -> tuple[float, float]:
-		return min(self.probe_tokens) / RANGE_FACTOR, max(self.probe_tokens) * RANGE_FACTOR
+		"""Predicted between the smallest probe and twice the largest; below it, extrapolated (S4b)."""
+		return min(self.probe_tokens), max(self.probe_tokens) * RANGE_FACTOR
 
 	def predict(
 		self, tokens: float, recompute: bool = False, measured_probe: str | None = None
@@ -229,13 +232,21 @@ class SameGpuModel:
 			status, sigma = "measured", self.sigma / 2
 		else:
 			lo_r, hi_r = self.range()
-			if not lo_r <= tokens <= hi_r:
+			sigma, status = self.sigma, "predicted"
+			if 0 < tokens < lo_r:
+				# S4b T4: small batches under-use the GPU, so the line drifts; the band grows per halving
+				h = Z90 * self.sigma + BELOW_GROWTH_LOG * math.log2(lo_r / tokens)
+				if h > ABSTAIN_HALF_WIDTH:
+					why = f"{tokens:.0f} work units per step is too far below the smallest probe ({lo_r:.0f}); run a probe here"
+					return _abstain(MODEL_ID_SAME, h / Z90, why)
+				sigma, status = h / Z90, "extrapolated"
+				reason = f"below the smallest probed size ({lo_r:.0f} work units), so the range is wider; run a probe here for a measured number"
+			elif not lo_r <= tokens <= hi_r:
 				why = f"{tokens:.0f} work units per step is outside the probed range ({lo_r:.0f} to {hi_r:.0f}); run a probe here"
 				return _abstain(MODEL_ID_SAME, self.sigma, why)
 			bd = {n: f.predict(tokens) for n, f in self.fits.items()}
 			if recompute:
 				bd = with_recompute(bd)
-			sigma, status = self.sigma, "predicted"
 		point = sum(bd.values())
 		lo, hi = _band(point, sigma)
 		return StepEstimate(point, lo, hi, "s", status, MODEL_ID_SAME, sigma, bd, reason)
