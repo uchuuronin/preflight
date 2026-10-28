@@ -92,6 +92,8 @@ class Sweeper:
 			out.append(
 				{
 					"key": cfg.key,
+					"family": cfg.family,
+					"role": cfg.params.get("role"),
 					"gpu": actual,
 					"status": res["status"],
 					"error_code": res.get("error_code"),
@@ -225,6 +227,12 @@ def main(
 					print(f"[{gpu}] a batch failed: {type(res).__name__}: {res}")
 					continue
 				rows.extend(res)
+				for r in res:  # measured seconds per config, in the log, so pricing needs no export run
+					if r.get("status") != "skipped":
+						print(
+							f"[{gpu}] config {r.get('key', '?')[:12]} {r.get('family', '')} {r.get('role') or ''} {r.get('status')}: "
+							f"{float(r.get('gpu_seconds') or 0.0):.1f} s"
+						)
 				bad = [r for r in res if r["gpu"] != gpu]
 				if bad:
 					print(f"[{gpu}] warning: ran on {bad[0]['gpu']}; rows filed under the actual GPU")

@@ -106,7 +106,7 @@
 		"L4": {
 			"vendor": "nvidia",
 			"arch": "ada",
-			"memory_bytes": 23031762125,
+			"memory_bytes": 23689363456,
 			"confidence": "derived"
 		},
 		"L40": {
