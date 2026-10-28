@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -320,3 +321,59 @@ def test_uptime_ledger_bills_idle_time_and_stops_at_budget(tmp_path):
 	assert ledger.rows()[-1]["spent_usd"] == pytest.approx(5.0)
 	with pytest.raises(ValueError):
 		UptimeLedger(tmp_path / "x.jsonl", datetime(2026, 10, 28), 2.0)  # no time zone
+
+
+def test_amd_grouped_export_matches_the_nvidia_groups(tmp_path):
+	from preflight.corpus import configs as C
+	from preflight.corpus.sweep import _main
+
+	out = tmp_path / "amd.jsonl"
+	_main(["export-amd", "--kind", "grouped", "--n", "300", "--out", str(out)])
+	amd = C.read_jsonl(str(out))
+	nv = C.configs_for("grouped", 300, 0)
+	assert [c.key for c in amd] == [c.key for c in nv]
+	# the A100 holdout's 100 configs are the first 20 of the same groups
+	assert {c.key for c in C.configs_for("grouped", 100, 0)} <= {c.key for c in nv}
+	shipped = C.read_jsonl(str(Path(C.__file__).parent / "data" / "amd_grouped.jsonl"))
+	assert [c.key for c in shipped] == [c.key for c in nv]
+
+
+def test_copy_results_keeps_the_layout(tmp_path):
+	from preflight.corpus.sweep import copy_results
+
+	src = tmp_path / "store"
+	(src / "kernels" / "MI300X").mkdir(parents=True)
+	(src / "kernels" / "MI300X" / "a.json").write_text("{}")
+	(src / "ledger-MI300X.jsonl").write_text("{}\n")
+	assert copy_results(src, tmp_path / "out") == 2
+	assert (tmp_path / "out" / "kernels" / "MI300X" / "a.json").exists()
+
+
+def test_bf16_configs_skip_gpus_without_bf16():
+	pytest.importorskip("modal")
+	from preflight.corpus import configs as C
+	from preflight.corpus.modal_app import runs_on
+
+	cfgs = C.configs_for("grouped", 300, 0)
+	t4 = [c for c in cfgs if runs_on(c, "T4")]
+	assert 0 < len(t4) < len(cfgs) and all(c.params.get("dtype") != "bf16" for c in t4)
+	assert all(runs_on(c, "L4") for c in cfgs)
+	assert not any(runs_on(c, "T4") for c in C.hf_configs())  # HF jobs are bf16 LoRA or bf16-compute QLoRA
+
+
+def test_calibrate_reads_exported_gzip(tmp_path):
+	import gzip
+	import json
+
+	from preflight.corpus.calibrate import load_rows
+
+	p = tmp_path / "kernels" / "L4.jsonl.gz"
+	p.parent.mkdir(parents=True)
+	with gzip.open(p, "wt") as f:
+		f.write(
+			json.dumps({"status": "ok", "gpu": "L4"})
+			+ "\n"
+			+ json.dumps({"status": "oom", "gpu": "L4"})
+			+ "\n"
+		)
+	assert [r["status"] for r in load_rows(tmp_path)] == ["ok", "oom"]

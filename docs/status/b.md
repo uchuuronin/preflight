@@ -88,13 +88,16 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
   - Money at risk sits beside the total, never in it; its range spans the P(OOM) bin's edges (S7).
   - `engine/gpus.py` now reads its prices from `engine/prices`, so there is one table.
   - Storage isn't billed yet: no paid storage rows.
-- Tests live in root `tests/`; 792 pass across the repo (all agents' tests included), ruff clean with the repo config.
+  - On an own cluster, money at risk leads with GPU-hours and keeps dollars as the grey market figure (Chiya, Oct 27), until the contract has an at-risk GPU-hours field.
+- **Measured L4 (PM's Modal smoke run):** usable memory is 23,689,363,456 bytes (22.06 GiB, was 21.45), and the engine prefers a probe's reported total over the table for the probe's own GPU.
+- Tests live in root `tests/`; 797 pass across the repo (all agents' tests included), ruff clean with the repo config.
 
 ## Blocked
-- The L4 runs that build the real calibration table (grouped and HF jobs), and one real call to confirm L4 capacity, wait on Chiya's one-time Modal setup in docs/setup/cloud.md; after that B starts them through `remote-run.yml`.
+- The L4 runs that build the real calibration table (grouped and HF jobs) wait on Chiya's yes to the $45 corpus plan (ask before spending, Oct 27).
 
 ## Next (Wed Oct 28)
-- NVIDIA corpus slice re-planned to $45 of Modal: grouped and HF jobs on T4 and L4 first, then A10 and L40S, a few A100 rows for the cross-GPU holdout.
+- NVIDIA corpus slice re-planned to $45 of Modal (corpus/README.md): about $24 estimated, $35.20 in hard caps, $9.80 reserve; waiting on Chiya's yes before phase 0.
+- AMD: `data/amd_grouped.jsonl` (the same 300 grouped configs as the NVIDIA GPUs) and its `amd-run` command are ready for Thursday's droplet session.
 - Real held-out calibration on the L4 once Modal access lands; model cards switch to `held_out` per target as the table covers it.
 - Agent cost from tokens when tasks lack `cost_usd`, once D's price table lands.
 

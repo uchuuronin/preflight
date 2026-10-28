@@ -191,6 +191,9 @@ def _phases(row: dict[str, Any]) -> dict[str, float]:
 
 
 def load_rows(store: Path) -> list[dict[str, Any]]:
+	"""Rows from a result store (one .json per config) or from modal_app's export (.jsonl.gz per GPU)."""
+	import gzip
+
 	rows = []
 	for f in sorted(store.rglob("*.json")):
 		if f.name.endswith(".meta.json"):
@@ -198,6 +201,12 @@ def load_rows(store: Path) -> list[dict[str, Any]]:
 		try:
 			rows.append(json.loads(f.read_text()))
 		except (json.JSONDecodeError, OSError):
+			continue
+	for f in sorted(store.rglob("*.jsonl.gz")):
+		try:
+			with gzip.open(f, "rt") as fh:
+				rows += [json.loads(line) for line in fh if line.strip()]
+		except (json.JSONDecodeError, OSError, EOFError):
 			continue
 	return rows
 

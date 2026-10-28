@@ -214,6 +214,12 @@ def _main(argv: list[str] | None = None) -> None:
 
 	ex = sub.add_parser("export-amd", help="write the AMD slice config list")
 	ex.add_argument("--out", required=True)
+	ex.add_argument(
+		"--kind",
+		choices=["kernels", "grouped"],
+		default="kernels",
+		help="grouped: the same probe-like groups the NVIDIA GPUs run, so every MI300X row has NVIDIA pairs",
+	)
 	ex.add_argument("--n-total", type=int, default=1500)
 	ex.add_argument("--n", type=int, default=500)
 	ex.add_argument("--seed", type=int, default=0)
@@ -240,12 +246,21 @@ def _main(argv: list[str] | None = None) -> None:
 		help="uptime: the machine bills from start to destroy (the AMD droplet); needs --droplet-started",
 	)
 	run.add_argument("--droplet-started", help="when the droplet was created, ISO 8601 with a time zone")
+	run.add_argument(
+		"--copy-to",
+		help="also copy the results and ledger here when the sweep stops, even on a timeout (amd-run brings back ./out)",
+	)
 	args = ap.parse_args(argv)
 
 	if args.cmd == "export-amd":
-		nv = cfgs.kernel_configs(args.n_total, seed=args.seed)
-		cfgs.write_jsonl(cfgs.amd_slice(nv, args.n), args.out)
-		print(f"wrote {args.n} configs to {args.out}")
+		if args.kind == "grouped":
+			out = cfgs.configs_for(
+				"grouped", args.n, args.seed
+			)  # the first n // 5 groups, as on every NVIDIA GPU
+		else:
+			out = cfgs.amd_slice(cfgs.kernel_configs(args.n_total, seed=args.seed), args.n)
+		cfgs.write_jsonl(out, args.out)
+		print(f"wrote {len(out)} configs to {args.out}")
 		return
 
 	from preflight.corpus.isolate import run_isolated
@@ -286,17 +301,42 @@ def _main(argv: list[str] | None = None) -> None:
 		ledger = UptimeLedger(
 			Path(args.out) / f"ledger-{gpu}.jsonl", datetime.fromisoformat(args.droplet_started), rate
 		)
-	run_local(
-		todo,
-		ResultStore(args.out),
-		gpu,
-		args.budget_usd,
-		rate,
-		runner,
-		overhead=args.overhead,
-		retry_errors=args.retry_errors,
-		ledger=ledger,
-	)
+	import signal
+
+	def _stop(signum, frame):  # `timeout` sends SIGTERM; turn it into an exit so the copy below still runs
+		raise SystemExit(f"stopped by signal {signum}")
+
+	signal.signal(signal.SIGTERM, _stop)
+	try:
+		run_local(
+			todo,
+			ResultStore(args.out),
+			gpu,
+			args.budget_usd,
+			rate,
+			runner,
+			overhead=args.overhead,
+			retry_errors=args.retry_errors,
+			ledger=ledger,
+		)
+	finally:
+		if args.copy_to:
+			copy_results(args.out, args.copy_to)
+
+
+def copy_results(src: str | Path, dst: str | Path) -> int:
+	"""Copy a result store (rows, meta, ledgers) into dst, keeping its layout; returns the files copied."""
+	import shutil
+
+	src, dst = Path(src), Path(dst)
+	n = 0
+	for f in src.rglob("*"):
+		if f.is_file():
+			t = dst / f.relative_to(src)
+			t.parent.mkdir(parents=True, exist_ok=True)
+			shutil.copy2(f, t)
+			n += 1
+	return n
 
 
 if __name__ == "__main__":
