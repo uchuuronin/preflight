@@ -374,3 +374,36 @@ def test_a_stalled_guide_is_reminded_once_of_the_move_its_ranking_offered():
 	assert [x["name"] for x in r2["calls"]] == ["set_knob"]
 	nudge = [i for i in model.requests[2]["input"] if "[check] Your ranking" in str(i.get("content", ""))]
 	assert len(nudge) == 1 and "eval_batch_size" in nudge[0]["content"]
+
+
+def test_while_a_move_waits_only_spending_tools_are_offered_and_repeats_are_refused():
+	model = Model(
+		reply(calls=[("highlight", {"nodes": ["eval"]})]),
+		reply(calls=[("highlight", {"nodes": ["eval"]})]),
+		reply("Eval is where it runs out of memory."),
+	)
+	c = client(model)
+	r1 = turn(c, start=True).json()
+	r2 = turn(
+		c,
+		state=r1["state"],
+		results=[{"tool": "highlight", "call_id": r1["calls"][0]["call_id"], "nodes": ["eval"]}],
+	).json()
+	# The second identical highlight was refused on the server and the model answered instead.
+	assert r2["calls"] == [] and r2["text"] == "Eval is where it runs out of memory."
+	outs = [
+		json.loads(i["output"]) for i in model.requests[2]["input"] if i.get("type") == "function_call_output"
+	]
+	assert any(o.get("refused") == "already_done" for o in outs)
+
+
+def test_no_browser_tools_while_a_move_is_pending():
+	from preflight_api.guide.record_view import RecordView
+	from preflight_api.guide.tools import SERVER_TOOLS, build_tools
+	from preflight_api.stores import SampleStore
+
+	rec = RecordView.from_record(
+		SampleStore(__import__("pathlib").Path(__file__).resolve().parents[2]).get("lora-7b")
+	)
+	names = {t["name"] for t in build_tools(rec, set(), move_pending=True)}
+	assert names and names <= set(SERVER_TOOLS)

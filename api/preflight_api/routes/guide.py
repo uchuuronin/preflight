@@ -245,6 +245,7 @@ async def guide_turn(request: Request) -> dict:
 		state.turn_start = len(state.items)
 		state.evidence = []
 		state.ranked = None
+		state.seen = []
 		state.add(_event(f"The person {d.action} the move of {d.knob_id}{value}. Plan the next round."))
 	if body.message:
 		new_turn = True
@@ -252,6 +253,7 @@ async def guide_turn(request: Request) -> dict:
 			state.turn_start = len(state.items)
 			state.evidence = []
 			state.ranked = None
+			state.seen = []
 		state.add({"role": "user", "content": body.message})
 	if body.start and not state.items:
 		new_turn = True
@@ -353,6 +355,14 @@ async def guide_turn(request: Request) -> dict:
 					refusal = "already_ranked"
 				else:
 					state.ranked = fp
+			elif c.name in ("highlight", "predict"):
+				fp = (
+					c.name + json.dumps(c.arguments, sort_keys=True, default=str) + _fingerprint(body.setting)
+				)
+				if fp in state.seen:
+					refusal = "already_done"
+				else:
+					state.seen = [*state.seen, fp][-64:]
 			if refusal:
 				refused_any = True
 				out = {"refused": refusal}
@@ -360,6 +370,11 @@ async def guide_turn(request: Request) -> dict:
 					out["hint"] = (
 						"This setting is already ranked above. If nothing there fits and improves the aim, "
 						"tell the person so in one sentence and stop."
+					)
+				elif refusal == "already_done":
+					out["hint"] = (
+						"You already did exactly this this round. Act on what you have: call set_knob, or "
+						"say what you found in one or two sentences and stop."
 					)
 				state.add({"type": "function_call_output", "call_id": c.call_id, "output": json.dumps(out)})
 				continue
