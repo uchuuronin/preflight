@@ -1,0 +1,39 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-vYb05V4bY7SN33XEm00ZdR
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function startup_check_worker.
+└── ✓ Created Function startup_check_sandbox.
+submitted {'job_id': '01M60H0MARZPRT0Q0WFPJWEGPM', 'created': True, 'position': 0}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "seq": 0, "at": "2026-10-28T05:51:32.696448Z", "stage": "queued", "queue_position": 0, "level": "info"}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "seq": 1, "at": "2026-10-28T05:51:36.391725Z", "stage": "admitted", "message": "attempt 1", "level": "info"}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "seq": 2, "at": "2026-10-28T05:51:36.473894Z", "stage": "fetching", "level": "info"}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "seq": 3, "at": "2026-10-28T05:51:36.498397Z", "stage": "mapping", "level": "info"}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "share_token": "ICDYrfHQ2nBNbv3mlRHHMg", "seq": 4, "at": "2026-10-28T05:51:37.310500Z", "stage": "skeleton", "message": "skeleton from the static reader", "level": "info", "record_rev": 1}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "share_token": "ICDYrfHQ2nBNbv3mlRHHMg", "seq": 5, "at": "2026-10-28T05:51:48.441805Z", "stage": "skeleton", "message": "map refined by Muse Spark", "level": "info", "record_rev": 2}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "share_token": "ICDYrfHQ2nBNbv3mlRHHMg", "seq": 6, "at": "2026-10-28T05:51:48.527938Z", "stage": "harnessing", "level": "info", "record_rev": 2}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "share_token": "ICDYrfHQ2nBNbv3mlRHHMg", "seq": 7, "at": "2026-10-28T05:51:48.554736Z", "stage": "probing", "progress": 0.0, "level": "info", "probe_id": "p1", "record_rev": 2}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "share_token": "ICDYrfHQ2nBNbv3mlRHHMg", "seq": 8, "at": "2026-10-28T05:57:00.001191Z", "stage": "probing", "progress": 0.333, "level": "info", "probe_id": "p2", "record_rev": 2}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "share_token": "ICDYrfHQ2nBNbv3mlRHHMg", "seq": 9, "at": "2026-10-28T05:57:22.247630Z", "stage": "probing", "progress": 0.667, "level": "info", "probe_id": "p3", "record_rev": 2}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "share_token": "ICDYrfHQ2nBNbv3mlRHHMg", "seq": 10, "at": "2026-10-28T05:58:17.843399Z", "stage": "predicting", "message": "measured; predictions are B's next", "level": "info", "record_rev": 3}
+{"job_id": "01M60H0MARZPRT0Q0WFPJWEGPM", "record_id": "01M60H0R28WQS4R3XM0G38BAJP", "seq": 11, "at": "2026-10-28T05:58:17.932221Z", "stage": "done", "progress": 1.0, "level": "info"}
+{
+  "job_id": "01M60H0MARZPRT0Q0WFPJWEGPM",
+  "status": "done",
+  "position": null,
+  "record_id": "01M60H0R28WQS4R3XM0G38BAJP",
+  "share_token": "ICDYrfHQ2nBNbv3mlRHHMg",
+  "error": null,
+  "retryable": null,
+  "error_code": null,
+  "last_seq": 11
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-vYb05V4bY7SN33XEm00ZdR
