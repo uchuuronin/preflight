@@ -169,3 +169,16 @@ def test_probes_import_a_copy_of_the_package_when_its_home_is_closed(tmp_path, m
 		assert L._package_for_probe(open_pkg) == open_pkg
 	finally:
 		shutil.rmtree(top)
+
+
+@needs_torch
+def test_forced_seeds_override_the_scripts_own(tmp_path):
+	files = {
+		"s.py": "import random, torch\ntorch.manual_seed(42); random.seed(42)\nprint('DRAW', torch.rand(1).item(), random.random())\n"
+	}
+	draws = []
+	for seed in (1, 2, 2):
+		r = run_probe(ProbeSpec(probe_id="p1", files=files, entrypoint="s.py", timeout_s=60, seed=seed,
+			seed_force=True, out_dir=tmp_path / str(len(draws))))  # fmt: skip
+		draws.append(next(ln for ln in r.log_tail.splitlines() if ln.startswith("DRAW")))
+	assert draws[0] != draws[1] and draws[1] == draws[2]

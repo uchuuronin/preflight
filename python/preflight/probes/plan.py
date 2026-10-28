@@ -43,6 +43,7 @@ class PlannedProbe:
 	agent_tasks: int = 0
 	profile: bool = False
 	seed: int | None = None  # fixed for verify runs, so two settings draw the same data and init
+	seed_force: bool = False  # verify: the script's own seeding is overridden, so seeds really differ
 
 
 def _int_knob(rec: FlightRecord, kid: str) -> int | None:

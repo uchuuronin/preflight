@@ -39,9 +39,15 @@ class LossRunner:
 
 	def __call__(self, spec, gpu, *, should_stop):
 		self.calls.append({"id": spec.probe_id, "gpu": gpu, "knobs": dict(spec.knobs), "seed": spec.seed,
+			"force": spec.seed_force,
 			"timed": spec.timed, "files": dict(spec.files)})  # fmt: skip
 		status, code = self.outcomes.get(spec.probe_id, ("ok", None))
-		series = {"loss": [self.loss(spec.knobs, s) for s in range(spec.timed)]} if status == "ok" else {}
+		loss = self.loss
+		try:
+			series = {"loss": [loss(spec.knobs, s, spec.seed) for s in range(spec.timed)]}
+		except TypeError:
+			series = {"loss": [loss(spec.knobs, s) for s in range(spec.timed)]}
+		series = series if status == "ok" else {}
 		probe = Probe(id=spec.probe_id, knobs=spec.knobs, status=status, error_code=code,
 			steps=spec.warmup + spec.timed, duration_s=30.0, stability={"series": series},
 			cost={"gpu_seconds": 30.0, "usd": 30.0 * spec.gpu_usd_per_hour / 3600})  # fmt: skip
@@ -205,9 +211,32 @@ def test_verify_keeps_the_loss_when_the_effective_batch_holds(tmp_path):
 	rec = run_pipeline(
 		_on(parent, "verify", knobs={"batch_size": 4, "grad_accum": 2}), _Ctx(), _deps(tmp_path, runner)
 	)
-	assert [c["id"] for c in runner.calls] == ["v1", "v1-base"]
-	assert len({c["seed"] for c in runner.calls}) == 1
+	assert [c["id"] for c in runner.calls] == ["v1", "v1-base", "v1-seed"]
+	seeds = {c["id"]: c["seed"] for c in runner.calls}
+	assert seeds["v1"] == seeds["v1-base"] != seeds["v1-seed"] and all(c["force"] for c in runner.calls)
 	assert rec.findings[-1].code == "verify.passed"
+
+
+def test_verify_passes_a_change_inside_the_measured_seed_spread_and_fails_one_outside_it(tmp_path):
+	parent, _ = _parent(tmp_path)
+
+	def loss(knobs, step, seed, bump):
+		wiggle = 0.02 if seed % 2 else 0.0  # the second seed lands 2% off
+		change = bump if knobs.get("batch_size") == 4 else 0.0
+		return 2.0 / (1 + step) * (1 + wiggle + change)
+
+	inside = run_pipeline(_on(parent, "verify", knobs={"batch_size": 4}), _Ctx(),
+		_deps(tmp_path, LossRunner(loss=lambda k, s, seed: loss(k, s, seed, 0.01))))  # fmt: skip
+	f = inside.findings[-1]
+	assert f.code == "verify.passed"
+	ev = {e.metric: e for e in f.evidence}
+	assert ev["verify.loss_delta"].value == pytest.approx(0.01) and ev[
+		"verify.seed_spread"
+	].value == pytest.approx(0.02)
+	assert ev["verify.loss_delta"].threshold == ev["verify.seed_spread"].value  # measured, not a fixed %
+	outside = run_pipeline(_on(parent, "verify", knobs={"batch_size": 4}), _Ctx(),
+		_deps(tmp_path, LossRunner(loss=lambda k, s, seed: loss(k, s, seed, 0.05))))  # fmt: skip
+	assert outside.findings[-1].code == "verify.loss_changed"
 
 
 def test_verify_flags_a_change_that_alters_the_loss_and_says_why(tmp_path):

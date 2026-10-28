@@ -60,13 +60,17 @@ def set_limits() -> dict:
 	return applied
 
 
-def _seed(seed: int) -> None:
+def _seed(seed: int, *, force: bool = False) -> None:
 	"""Seed every generator a training script draws from by default, for fixed-seed comparisons.
 
-	Scripts that seed themselves (HF Trainer's args.seed, set_seed) keep their own seed; the verify
-	run compares two settings of the same script, so either way both runs draw the same numbers.
+	force: also make the script's own seeding (random.seed, numpy's, torch.manual_seed, so HF's
+	set_seed too) use this seed, so two verify runs at two seeds really differ and their spread is
+	the seed's. Explicit torch.Generator objects the script seeds itself keep their own seed.
 	"""
 	import random
+
+	if force:
+		_force_seed(seed)
 
 	random.seed(seed)
 	os.environ.setdefault("PYTHONHASHSEED", str(seed))  # for subprocesses (data loader workers)
@@ -79,6 +83,31 @@ def _seed(seed: int) -> None:
 	import torch
 
 	torch.manual_seed(seed)  # all devices, CUDA included
+
+
+def _force_seed(seed: int) -> None:
+	import random
+
+	import torch
+
+	def pinned(fn):
+		def call(*_args, **_kw):
+			return fn(seed % 2**32)
+
+		return call
+
+	random.seed = pinned(random.seed)
+	torch.manual_seed = pinned(torch.manual_seed)
+	torch.random.manual_seed = torch.manual_seed
+	if hasattr(torch, "cuda"):
+		torch.cuda.manual_seed = pinned(torch.cuda.manual_seed)
+		torch.cuda.manual_seed_all = pinned(torch.cuda.manual_seed_all)
+	try:
+		import numpy as np
+
+		np.random.seed = pinned(np.random.seed)
+	except ImportError:
+		pass
 
 
 def main(spec_path: str) -> int:
@@ -121,7 +150,7 @@ def main(spec_path: str) -> int:
 		os.environ["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
 	sys.argv = [spec["entrypoint"], *spec.get("args", [])]
 	if spec.get("seed") is not None:
-		_seed(int(spec["seed"]))
+		_seed(int(spec["seed"]), force=bool(spec.get("seed_force")))
 	rec = Recorder(
 		warmup=spec["warmup"],
 		timed=spec["timed"],

@@ -136,6 +136,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"eval_batches": spec.eval_batches,
 		"profile": spec.profile,
 		"seed": spec.seed,
+		"seed_force": spec.seed_force,
 		"install_requirements": spec.install_requirements,
 		"gpu": gpu,
 		"image": image,
@@ -237,6 +238,7 @@ def _spec(
 		profile=p.profile,
 		timeout_s=deps.probe_timeout_s,
 		seed=p.seed,
+		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
 	)
 
@@ -401,7 +403,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
 		finding = record_jobs.verify_finding(by_id[vid], by_id.get(f"{vid}-base"), plan_knobs, base_knobs,
-			{n.id for n in out.graph.nodes})  # fmt: skip
+			{n.id for n in out.graph.nodes}, other_seed=by_id.get(f"{vid}-seed"))  # fmt: skip
 		out = out.model_copy(update={"findings": [*out.findings, finding]})
 	return out
 
@@ -418,8 +420,10 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	if differs:
 		base = {k: base_knobs[k] for k in knobs if k in base_knobs}
 		plan.append(point_probe(rec, f"{vid}-base", base, role="verify_base", **steps))
+		plan.append(point_probe(rec, f"{vid}-seed", base, role="verify_seed", **steps))
 	for p in plan:
-		p.seed = record_jobs.VERIFY_SEED
+		p.seed = record_jobs.VERIFY_SEED_2 if p.role == "verify_seed" else record_jobs.VERIFY_SEED
+		p.seed_force = True
 	return plan
 
 

@@ -32,10 +32,12 @@ SAMPLE_REFS = {
 }
 VERIFY_WARMUP = 2  # simulated: probe-plan D1 (same warmup as every probe)
 VERIFY_STEPS = 20  # guess: long enough to see the loss move past warmup; set from the zoo verify runs
-VERIFY_SEED = 20261104  # derived: any fixed value; what matters is both runs share it
-# guess: 2% mean relative loss difference at a fixed seed; replaced by the spread of two identical
-# zoo runs on one GPU (bf16 kernels aren't bitwise deterministic), measured with the first GPU work
-VERIFY_LOSS_TOL = 0.02
+VERIFY_SEED = 20261104  # derived: any fixed value; what matters is the plan and the base share it
+VERIFY_SEED_2 = 20261105  # derived: the base again at another seed, to measure seed-to-seed spread
+# The pass line is measured per job, never a fixed percentage (Chiya, Oct 27): the current setting
+# runs at two seeds, and the plan passes only if its loss stays as close to the current setting at
+# the same seed as the two seeds stay to each other. Seeds are forced for these runs (a script's
+# own set_seed is overridden), so the spread is the seed's, not zero.
 UPLOAD_KINDS = ("upload", "cli", "inflight", "notebook")
 
 
@@ -162,9 +164,18 @@ def loss_delta(plan: Probe, base: Probe) -> float | None:
 
 
 def verify_finding(
-	plan: Probe, base: Probe | None, plan_knobs: dict, base_knobs: dict, node_ids: set[str]
+	plan: Probe,
+	base: Probe | None,
+	plan_knobs: dict,
+	base_knobs: dict,
+	node_ids: set[str],
+	other_seed: Probe | None = None,
 ) -> Finding:
-	"""What the verify run says: did the planned setting run, and does it learn what the current one does."""
+	"""Did the planned setting run, and does it learn what the current one does?
+
+	plan and base share a seed; other_seed is the base at a second seed. The plan's loss "holds"
+	when its mean step-by-step distance from the base is within the base's own seed-to-seed spread
+	(the mean distance between base and other_seed), both measured in this job."""
 	node = "loss" if "loss" in node_ids else None
 	fid = f"verify.{plan.id}"
 	steps = len(_losses(plan))
@@ -185,21 +196,36 @@ def verify_finding(
 	if base is None:
 		return finding("info", "verify.passed", f"The plan ran {steps} steps at a fixed seed with a finite loss",
 			evidence=[Evidence(metric="probe.stability.loss", value=_losses(plan)[-1], probe_id=plan.id)])  # fmt: skip
-	if base.status not in ("ok", "cached") or not _losses(base) or _diverged(base):
-		return finding("warn", "verify.no_baseline", "The plan ran, but the current settings didn't, so "
-			"the loss couldn't be compared", detail=base.error or base.status)  # fmt: skip
+
+	def usable(p):
+		return p is not None and p.status in ("ok", "cached") and _losses(p) and not _diverged(p)
+
+	if not usable(base) or not usable(other_seed):
+		bad = base if not usable(base) else other_seed
+		why = (bad.error or bad.status) if bad is not None else "not run"
+		return finding("warn", "verify.no_baseline", "The plan ran, but the current settings didn't run "
+			"cleanly at both seeds, so there's nothing to compare its loss with", detail=why)  # fmt: skip
 	delta = loss_delta(plan, base)
-	ev = [Evidence(metric="verify.loss_delta", value=None if delta is None or math.isinf(delta) else
-		round(delta, 6), threshold=VERIFY_LOSS_TOL, probe_id=plan.id)]  # fmt: skip
-	if delta is not None and delta <= VERIFY_LOSS_TOL:
-		return finding("info", "verify.passed", "Same loss as the current settings at a fixed seed",
-			detail=f"mean difference {delta:.1%} over {steps} steps (within {VERIFY_LOSS_TOL:.0%})", evidence=ev)  # fmt: skip
+	noise = loss_delta(other_seed, base)
+
+	def num(x):
+		return None if x is None or math.isinf(x) else round(x, 6)
+
+	ev = [
+		Evidence(metric="verify.loss_delta", value=num(delta), threshold=num(noise), probe_id=plan.id),
+		Evidence(metric="verify.seed_spread", value=num(noise), probe_id=other_seed.id),
+	]
+	pct = "an unbounded amount" if delta is None or math.isinf(delta) else f"{delta:.2%}"
+	spread = "none" if noise is None else f"{noise:.2%}"
+	if delta is not None and noise is not None and delta <= noise:
+		return finding("info", "verify.passed", "The loss holds: it stays within the current setting's "
+			"own seed-to-seed spread", detail=f"mean step-by-step difference {pct} over {steps} steps; two seeds "
+			f"of the current setting differ by {spread} (measured in this job)", evidence=ev)  # fmt: skip
 	eb_plan, eb_base = _effective_batch(plan_knobs), _effective_batch(base_knobs)
-	pct = "an unbounded amount" if delta is None or math.isinf(delta) else f"{delta:.1%}"
 	if eb_plan is not None and eb_base is not None and eb_plan != eb_base:
-		detail = (f"The effective batch changed from {eb_base:g} to {eb_plan:g}, so some change is expected; "
+		why = (f"The effective batch changed from {eb_base:g} to {eb_plan:g}, so some change is expected; "
 			"keep it the same (more accumulation for a smaller batch) to learn the same thing.")  # fmt: skip
 	else:
-		detail = "With the same data, seed and effective batch, the change alters what the model learns."
-	return finding("warn", "verify.loss_changed", f"Loss moved {pct} from the current settings at a fixed seed",
-		detail=detail, evidence=ev)  # fmt: skip
+		why = "With the same data, seed and effective batch, the change alters what the model learns."
+	return finding("warn", "verify.loss_changed", f"Loss moved {pct} from the current settings at the same "
+		f"seed, more than the {spread} two seeds differ by", detail=why, evidence=ev)  # fmt: skip
