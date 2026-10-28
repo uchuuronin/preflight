@@ -33,6 +33,8 @@ export const EXPERTISE_EN: Record<string, string> = {
 		gpu: ["GPU", "gpu_type"],
 		num_workers: ["Data helpers", "DataLoader(num_workers)"],
 		lr: ["Learning speed", "learning_rate"],
+		lr_schedule: ["How learning speed changes", "lr_scheduler_type"],
+		optimizer: ["Update method", "optim"],
 		checkpoint_every: ["Save progress every", "save_steps"],
 		max_steps: ["Training steps", "max_steps"],
 		model: ["AI model", "model"],

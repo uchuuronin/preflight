@@ -8,9 +8,44 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Tue Oct 27, late (Chiya's four conditions for turning `d.expertise` on)
+
+**Done** (committed on `ws-d`, push requested below). No tokens or GPU spent: the census reads
+public GitHub checkouts only.
+
+1. Warnings stay in the dock at "New to this", never dropped, until C's dock lists them and sets `findingsShown` on the knob-view context; only then do they leave the five and come back when opened. Today nothing sets it, so a newcomer sees every warning's knob.
+2. The 9-of-9 is labelled for what it is: on screen today, in-sample, 2 records (9 of 9 in the dock on both); and a design check with the list, in-sample, 2 records, counting a list not yet on screen. The held-out run on the unseen scripts (Nov 2) is the result, per record with Wilson intervals, policy frozen beforehand.
+3. The order of the five and the top count are a parameter (`POLICY`); `dial.zoo.test.ts` compares three orders with top 1, 2 and 3 and fails unless the configured one shows the planted knobs most often. On A's fixtures all nine tie at 9 of 18, so it decides when B's grids land.
+4. Newcomer basics measured: a census of 55 examples (bug zoo 2, TRL 22, transformers 20, PEFT 8, nanoGPT 3) at pinned commits, built by `python -m preflight.addons.knob_census`, reproducible byte for byte. Fine-tuning: batch size 28 of 34, epochs 20, learning rate 20, sequence length 18. Counts and sources in `docs/decisions/expertise-new-level.md`. Pretrain and vision have 3 examples each.
+- Fixed on the way: the rl baseline named `max_completion_length`, which isn't a knob id (`max_completion_len`); a test now checks every baseline id has a label.
+
+**Basis for every decision in this commit**
+
+| Decision | Basis | Test that fails if it's wrong |
+| --- | --- | --- |
+| At most 5 knobs picked at "New to this" | cited: Cowan 2001 (4 ± 1 chunks) | `tiers.test.ts` "picks at most five"; `dial.zoo.test.ts` "at most five" (both dock states) |
+| Failure knobs first, never dropped | Chiya and the Oct 27 review | `tiers.test.ts` "never drops a failure's knob"; `dial.zoo.test.ts` failure knobs in the dock for every goal |
+| Warning knobs stay until C's list is on screen | Chiya, Oct 27 | `tiers.test.ts` and `knobView.test.ts` gate tests; `dial.zoo.test.ts` on-screen 9 of 9; checked failing with the gate removed |
+| A warning's knob shows once opened, and stays | Chiya, Oct 27 | `knobView.test.ts` reveal; `dial.zoo.test.ts` reveal (checked failing with the reveal removed) |
+| Goal's top before baseline; top count 2 | guess; replaced by the comparison on B's grids, Wed Oct 28 | `dial.zoo.test.ts` "keeps the configured policy among those that show the planted knobs most often" (ties on fixtures, so it can only fail on real grids) |
+| Baseline for finetune, pretrain, rl, vision | measured: census, 55 examples, pinned commits | `tiers.test.ts` "takes each training lens's baseline from the census ranking" (checked failing when unwired); `test_d_knob_census.py` consistency and engine ids |
+| What counts in the census (unit = example; A's vocabulary; full configs excluded) | derived: a full config lists every field, so it can't show a choice; A's vocabulary keeps ids the same as the harness | `test_d_knob_census.py` parser, mapping, override-config and ranking tests |
+| Baseline for agent, eval, serving | guess; replaced by first-opened knobs from session telemetry after Nov 4 | `tiers.test.ts` "names only knob ids the app knows" (ids only) |
+| "Things worth checking" = `warn` findings only | derived: the contract's severities are info, warn, error, critical; errors and critical already hold knob places, info is not a problem | `worthChecking.test.ts` on all three golden records |
+| Plain labels for `optimizer` and `lr_schedule` | derived from what the setting does; ux-writing rules (plain, short, no jargon) | `tiers.test.ts` "names only knob ids the app knows" |
+| Dial claim on the golden fine-tune (failures, packing, batch size, sequence length) | measured on A's fixture | `knobView.test.ts` "on the golden fine-tune today ..." |
+
+Checks: 220 web tests, typecheck, build; 25 D Python tests, ruff; no em dashes; gitleaks clean. Python suite: 657 passed; 4 of A's `test_probe_sandbox.py` fail here because this container runs as root (same on clean `main`).
+
+**Push request:** `ws-d`, this commit on top of `3e5ba2d` and the merge of `main` at `ceb166a`. Normal push.
+
+**Open with Chiya**
+
+- Whether the unseen scripts join the census after Nov 2 (counting them before would tune on the held-out check).
+
 ## Tue Oct 27, night (after Chiya's decision on warnings)
 
-**Done** (committed on `ws-d`, not pushed)
+**Done** (pushed at 3e5ba2d)
 
 - "New to this" picks at most 5 knobs by itself: failures first (never dropped), then the goal's top two, then the lens baseline. Warnings no longer take a place; their knob shows once the visitor opens it and stays for the visit. Checked in Chromium on the golden fine-tune: 4 knobs plus "Show 5 more settings"; opening "Pack short examples together" and closing it leaves it in the dock.
 - "Things worth checking": `worthChecking.ts` lists the record's warnings with "1 thing / {n} things worth checking". It renders once C offers a spot under the dock in C's findings display (request in `docs/requests/from-d.md`); D doesn't build it in C's code.

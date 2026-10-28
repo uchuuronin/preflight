@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { hasKey } from "../../lib/i18n";
+import census from "./census.json";
+import { registerExpertiseStrings } from "./strings";
 import { BASELINE, MAX_NEW_KNOBS, NEW_TOP_SENSITIVE, labelKeyFor, visibleKnobs } from "./tiers";
 
 const FT_KNOBS = ["batch_size", "seq_len", "grad_accum", "eval_batch_size", "lora_r", "gradient_checkpointing", "precision", "packing", "eval_no_grad", "gpu_type"];
@@ -11,6 +14,8 @@ const base = {
 	touched: new Set<string>(),
 	opened: new Set<string>(),
 	failing: new Set<string>(),
+	warnings: new Set<string>(),
+	warningsListed: true,
 	ranked: [] as string[],
 };
 
@@ -20,14 +25,14 @@ describe("visibleKnobs", () => {
 		expect(visibleKnobs({ ...base, tier: "expert" })).toEqual(FT_KNOBS);
 	});
 
-	it("shows the lens baseline at the new level", () => {
-		expect(visibleKnobs({ ...base, tier: "new" })).toEqual(["batch_size", "seq_len", "gpu_type"]);
+	it("fills the new level from the lens baseline, most common first, up to five", () => {
+		expect(visibleKnobs({ ...base, tier: "new" })).toEqual(["batch_size", "seq_len", "grad_accum", "eval_batch_size", "lora_r"]);
 	});
 
 	it("adds the top two knobs by impact at the new level", () => {
 		expect(NEW_TOP_SENSITIVE).toBe(2);
 		const shown = visibleKnobs({ ...base, tier: "new", ranked: ["eval_batch_size", "packing", "lora_r"] });
-		expect(shown).toEqual(["batch_size", "seq_len", "eval_batch_size", "packing", "gpu_type"]);
+		expect(shown).toEqual(["batch_size", "seq_len", "grad_accum", "eval_batch_size", "packing"]);
 	});
 
 	it("always shows pinned knobs and knobs the guide is on", () => {
@@ -56,12 +61,30 @@ describe("visibleKnobs", () => {
 			ranked: ["lora_r", "precision", "packing"],
 		});
 		expect(shown).toHaveLength(5);
-		expect(shown).toEqual(["eval_batch_size", "lora_r", "precision", "eval_no_grad", "gpu_type"]);
+		expect(shown).toEqual(["batch_size", "eval_batch_size", "lora_r", "precision", "eval_no_grad"]);
 	});
 
 	it("shows warnings' knobs only once the visitor opens them", () => {
 		expect(visibleKnobs({ ...base, tier: "new" })).not.toContain("packing");
 		expect(visibleKnobs({ ...base, tier: "new", opened: new Set(["packing"]) })).toContain("packing");
+	});
+
+	it("keeps warnings' knobs in the dock, never dropped, while no list shows the warnings", () => {
+		const shown = visibleKnobs({
+			...base,
+			tier: "new",
+			failing: new Set(["eval_no_grad", "eval_batch_size"]),
+			warnings: new Set(["packing"]),
+			warningsListed: false,
+			ranked: ["lora_r", "precision", "grad_accum"],
+		});
+		expect(shown).toContain("packing");
+		expect(shown).toEqual(["eval_batch_size", "lora_r", "precision", "packing", "eval_no_grad"]);
+	});
+
+	it("hides warnings' knobs once a list shows the warnings", () => {
+		const shown = visibleKnobs({ ...base, tier: "new", warnings: new Set(["packing"]), warningsListed: true });
+		expect(shown).not.toContain("packing");
 	});
 
 	it("never drops a failure's knob to stay under the cap", () => {
@@ -95,7 +118,7 @@ describe("visibleKnobs", () => {
 	});
 
 	it("skips baseline ids the record does not declare", () => {
-		expect(visibleKnobs({ ...base, tier: "new", knobIds: ["seq_len", "lora_r"] })).toEqual(["seq_len"]);
+		expect(visibleKnobs({ ...base, tier: "new", knobIds: ["seq_len", "eval_no_grad"] })).toEqual(["seq_len"]);
 	});
 
 	it("falls back to the top knobs by impact for a lens with no baseline", () => {
@@ -104,7 +127,18 @@ describe("visibleKnobs", () => {
 	});
 
 	it("has a baseline for every lens A has sample records for", () => {
-		for (const lens of ["finetune", "pretrain", "agent"] as const) expect(BASELINE[lens]?.length).toBe(3);
+		for (const lens of ["finetune", "pretrain", "agent"] as const) expect(BASELINE[lens]?.length).toBeGreaterThanOrEqual(3);
+	});
+
+	it("takes each training lens's baseline from the census ranking", () => {
+		for (const [lens, row] of Object.entries(census.lenses)) expect(BASELINE[lens as keyof typeof BASELINE]).toEqual(row.ranking);
+		expect(Object.keys(census.lenses).sort()).toEqual(["finetune", "pretrain", "rl", "vision"]);
+	});
+
+	it("names only knob ids the app knows, in every baseline", () => {
+		registerExpertiseStrings();
+		const named = (id: string) => hasKey(`knob.${id}`) || hasKey(`addon.expertise.label.${id}.new`);
+		for (const ids of Object.values(BASELINE)) for (const id of ids ?? []) expect(named(id), id).toBe(true);
 	});
 });
 

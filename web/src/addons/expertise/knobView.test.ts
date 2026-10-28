@@ -4,6 +4,7 @@ import type { KnobViewContext } from "../../registry";
 import { currentKnobs } from "../../workspace/record/model";
 import { type FlightRecord, normaliseRecord } from "../../workspace/record/types";
 import { createKnobView, failingKnobs } from "./knobView";
+import { worthChecking } from "./worthChecking";
 import { resetTierForTests, setTier } from "./store";
 import { registerExpertiseStrings } from "./strings";
 
@@ -20,6 +21,11 @@ function ctx(over: Partial<KnobViewContext> = {}): KnobViewContext {
 		active: null,
 		...over,
 	};
+}
+
+/** As C's dock would pass it once it lists the view's findings under the row. */
+function listed(over: Partial<KnobViewContext> = {}): KnobViewContext {
+	return { ...ctx(over), findingsShown: true } as KnobViewContext;
 }
 
 function shownIds(view: ReturnType<typeof createKnobView>, c: KnobViewContext): string[] {
@@ -48,16 +54,33 @@ describe("expertise knob view", () => {
 
 	it("at the new level shows the failure's knobs and the goal's top two, filled from the baseline to five", () => {
 		setTier("new");
-		const shown = shownIds(createKnobView(), ctx({ ranked: ["lora_r", "precision", "packing"] }));
+		const shown = shownIds(createKnobView(), listed({ ranked: ["lora_r", "precision", "grad_accum"] }));
 		expect(shown.sort()).toEqual(["batch_size", "eval_batch_size", "eval_no_grad", "lora_r", "precision"]);
 	});
 
-	it("reveals a warning's knob when the visitor opens it, and keeps it after they close it", () => {
+	it("on the golden fine-tune today shows the failures, the warning, then batch size and sequence length", () => {
+		setTier("new");
+		expect(shownIds(createKnobView(), ctx()).sort()).toEqual(["batch_size", "eval_batch_size", "eval_no_grad", "packing", "seq_len"]);
+	});
+
+	it("keeps a warning's knob in the dock while C's list isn't showing the warnings", () => {
+		setTier("new");
+		expect(shownIds(createKnobView(), ctx())).toContain("packing");
+		expect(shownIds(createKnobView(), { ...ctx(), findingsShown: false } as KnobViewContext)).toContain("packing");
+	});
+
+	it("once C's list shows the warnings, reveals a warning's knob when opened and keeps it after closing", () => {
 		setTier("new");
 		const view = createKnobView();
-		expect(shownIds(view, ctx())).not.toContain("packing");
-		expect(shownIds(view, ctx({ active: "packing" }))).toContain("packing");
-		expect(shownIds(view, ctx({ active: null }))).toContain("packing");
+		expect(shownIds(view, listed())).not.toContain("packing");
+		expect(shownIds(view, listed({ active: "packing" }))).toContain("packing");
+		expect(shownIds(view, listed({ active: null }))).toContain("packing");
+	});
+
+	it("hands C the warnings to list and the list's heading", () => {
+		const view = createKnobView();
+		expect(view.findings(ctx())).toEqual(worthChecking(record));
+		expect(view.findingsKey(3)).toBe("addon.expertise.worth_checking.other");
 	});
 
 	it("keeps a knob the visitor moved and then put back", () => {
@@ -71,10 +94,13 @@ describe("expertise knob view", () => {
 	it("remembers touched knobs per record, not across records", () => {
 		setTier("new");
 		const view = createKnobView();
-		shownIds(view, ctx({ knobs: { ...currentKnobs(record), grad_accum: 8 } }));
 		const other = { ...record, record_id: "another" };
-		expect(view.filter!(other.knobs, ctx({ record: other })).map((k) => k.id)).not.toContain("grad_accum");
+		const fresh = createKnobView().filter!(other.knobs, ctx({ record: other })).map((k) => k.id);
+		shownIds(view, ctx({ knobs: { ...currentKnobs(record), grad_accum: 8 } }));
+		expect(shownIds(view, ctx())).toContain("grad_accum");
+		expect(view.filter!(other.knobs, ctx({ record: other })).map((k) => k.id)).toEqual(fresh);
 	});
+
 
 	it("names knobs plainly at the new level and by code name at expert", () => {
 		const view = createKnobView();

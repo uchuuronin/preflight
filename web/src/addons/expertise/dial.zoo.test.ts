@@ -3,23 +3,26 @@ import { hasKey } from "../../lib/i18n";
 import { applyKnobViews, type KnobViewContext } from "../../registry";
 import { GridProvider } from "../../workspace/provider/GridProvider";
 import { currentKnobs } from "../../workspace/record/model";
-import { type FlightRecord, type ObjectiveKind, normaliseRecord } from "../../workspace/record/types";
+import { type FlightRecord, type LoadedRecord, type ObjectiveKind, normaliseRecord } from "../../workspace/record/types";
 import { type Proportion, wilson } from "../_stats/wilson";
 import { createKnobView } from "./knobView";
 import { resetTierForTests, setTier } from "./store";
 import { registerExpertiseStrings } from "./strings";
+import { type Claim, MAX_NEW_KNOBS, POLICY, type Policy } from "./tiers";
 import { worthChecking } from "./worthChecking";
 
 /**
  * Does "New to this" show what the zoo planted? Ground truth comes from A's zoo scripts, written
  * independently of the dial: each docstring lists its planted problems, and which make the run
  * fail. Records are matched to a script by `job.source.entrypoint`, so this reruns on whatever
- * predictions the records carry: A's fixtures today, B's engine output once make_golden.py runs.
+ * predictions the records carry: A's fixtures today, B's engine output once make_golden.py runs,
+ * and the unseen scripts on Nov 2 (held out: the policy is frozen before then and not retuned).
  *
  * A newcomer arrives at the record's own setting with one goal; for each goal, the dock shows
- * what C's applyKnobViews returns for D's view, ranked by that same goal. A planted problem is
- * visible when its knob is in the dock or its finding is in the "things worth checking" list
- * (worthChecking.ts), which C's findings display renders under the dock once that spot exists.
+ * what C's applyKnobViews returns for D's view, ranked by that same goal. Two dock states:
+ * - on screen today: C's dock doesn't list the warnings yet, so their knobs stay in the dock;
+ * - with the list: C lists the warnings under the dock ("things worth checking"). That list is
+ *   not on screen yet, so this is a design check of the rule, not a result.
  */
 const ZOO: Record<string, { failure: string[]; waste: string[] }> = {
 	// zoo/finetune_lora_hf/train.py: 1 eval batch 32, 2 eval without no_grad -> OOM at the first eval; 3 no packing
@@ -32,53 +35,74 @@ const GOALS: ObjectiveKind[] = ["min_cost", "min_time", "fit_memory"];
 
 const RECORDS = import.meta.glob<FlightRecord>("../../../../schema/examples/*.json", { eager: true, import: "default" });
 
+interface Count {
+	k: number;
+	n: number;
+}
+
 interface Row {
 	record: string;
-	failure: { k: number; n: number };
-	/** Knob in the dock. */
-	dock: { k: number; n: number };
-	/** Knob in the dock, or its warning in the list. */
-	visible: { k: number; n: number };
+	/** Where the predictions came from, e.g. golden-fixture@0. */
+	models: string;
+	failure: Count;
+	/** Planted knob in the dock. */
+	dock: Count;
+	/** Planted knob in the dock, or its warning in the list (list state only). */
+	visible: Count;
 	missed: string[];
 	/** Most knobs the view picked by itself, over the goals. */
 	most: number;
+	/** Most knobs that must stay (failures, and warnings no list shows). */
+	must: number;
 	/** Listed warnings whose knob stayed in the dock after the visitor opened and closed it. */
-	revealed: { k: number; n: number };
+	revealed: Count;
 }
 
-function evaluate(): Row[] {
+const zero = (): Count => ({ k: 0, n: 0 });
+
+function zooRecords(): { name: string; record: LoadedRecord; truth: (typeof ZOO)[string] }[] {
+	return Object.entries(RECORDS).flatMap(([path, raw]) => {
+		const record = normaliseRecord(raw);
+		const truth = ZOO[record.job.source?.entrypoint ?? ""];
+		return truth ? [{ name: path.split("/").pop() ?? path, record, truth }] : [];
+	});
+}
+
+function evaluate(listShown: boolean, policy: Policy = POLICY): Row[] {
 	resetTierForTests();
 	registerExpertiseStrings();
 	setTier("new");
 	const provider = new GridProvider();
-	const rows: Row[] = [];
-	for (const [path, raw] of Object.entries(RECORDS)) {
-		const record = normaliseRecord(raw);
-		const truth = ZOO[record.job.source?.entrypoint ?? ""];
-		if (!truth) continue;
+	return zooRecords().map(({ name, record, truth }) => {
 		const row: Row = {
-			record: path.split("/").pop() ?? path,
-			failure: { k: 0, n: 0 },
-			dock: { k: 0, n: 0 },
-			visible: { k: 0, n: 0 },
+			record: name,
+			models: [...new Set(record.models.map((m) => m.id))].join(", ") || "none",
+			failure: zero(),
+			dock: zero(),
+			visible: zero(),
 			missed: [],
 			most: 0,
-			revealed: { k: 0, n: 0 },
+			must: 0,
+			revealed: zero(),
 		};
-		const listed = worthChecking(record);
+		const listed = listShown ? worthChecking(record) : [];
 		const listedKnobs = new Set(listed.flatMap((f) => (f.knob_id ? [f.knob_id] : [])));
+		const failing = record.findings.filter((f) => f.severity === "error" || f.severity === "critical").map((f) => f.knob_id);
+		const warned = worthChecking(record).map((f) => f.knob_id);
+		row.must = new Set([...failing, ...(listShown ? [] : warned)].filter(Boolean)).size;
 		for (const goal of GOALS) {
 			const knobs = currentKnobs(record);
-			const ctx: KnobViewContext = {
+			const ctx = {
 				record,
 				lens: record.job.lens,
 				knobs,
-				pinned: new Set(),
-				highlight: new Set(),
+				pinned: new Set<string>(),
+				highlight: new Set<string>(),
 				ranked: provider.sensitivity(record, { kind: goal }, { knobs }).map((x) => x.knob_id),
 				active: null,
-			};
-			const view = createKnobView();
+				findingsShown: listShown,
+			} as KnobViewContext;
+			const view = createKnobView(policy);
 			const shown = new Set(applyKnobViews(record.knobs, ctx, [view], hasKey).shown.map((k) => k.id));
 			row.most = Math.max(row.most, shown.size);
 			for (const id of [...truth.failure, ...truth.waste]) {
@@ -94,7 +118,6 @@ function evaluate(): Row[] {
 					if (inDock) row.failure.k++;
 				}
 			}
-			// The visitor opens each listed warning's knob, then closes it.
 			for (const id of listedKnobs) {
 				applyKnobViews(record.knobs, { ...ctx, active: id }, [view], hasKey);
 				const after = applyKnobViews(record.knobs, ctx, [view], hasKey).shown.map((k) => k.id);
@@ -102,29 +125,51 @@ function evaluate(): Row[] {
 				if (after.includes(id)) row.revealed.k++;
 			}
 		}
-		rows.push(row);
-	}
-	return rows;
+		return row;
+	});
 }
 
-function pct(w: Proportion): string {
-	return `${(w.p * 100).toFixed(0)}% [${(w.lo * 100).toFixed(0)}, ${(w.hi * 100).toFixed(0)}]`;
+function pct(c: Count): string {
+	const w: Proportion = wilson(c.k, c.n);
+	return `${c.k}/${c.n} = ${(w.p * 100).toFixed(0)}% [${(w.lo * 100).toFixed(0)}, ${(w.hi * 100).toFixed(0)}]`;
 }
 
-describe("New to this on the zoo's planted problems", () => {
-	const rows = evaluate();
+function sum(rows: Row[], pick: (r: Row) => Count): Count {
+	return rows.reduce((acc, r) => ({ k: acc.k + pick(r).k, n: acc.n + pick(r).n }), zero());
+}
+
+describe("New to this on the zoo, as on screen today (C's list not shown)", () => {
+	const rows = evaluate(false);
 
 	it("finds the zoo's records", () => {
 		expect(rows.map((r) => r.record).sort()).toEqual(["finetune.json", "pretrain.json"]);
-		expect(rows.reduce((s, r) => s + r.failure.n, 0)).toBeGreaterThan(0);
+		expect(sum(rows, (r) => r.failure).n).toBeGreaterThan(0);
 	});
+
+	it("shows every planted problem's knob in the dock, warnings included, for every goal", () => {
+		for (const r of rows) expect(r.dock.k, `${r.record}: hidden ${r.missed.join(", ")}`).toBe(r.dock.n);
+	});
+
+	it("picks at most five knobs, unless more must stay", () => {
+		for (const r of rows) expect(r.most, r.record).toBeLessThanOrEqual(Math.max(MAX_NEW_KNOBS, r.must));
+	});
+
+	it("reports per record: in-sample, 2 records, on screen (Wilson 95%)", () => {
+		const report = rows.map((r) => `${r.record} [${r.models}]: in the dock ${pct(r.dock)}; at most ${r.most} knobs`);
+		console.info(`[dial vs zoo: on screen today; in-sample, 2 records]\n${report.join("\n")}`);
+		expect(report).toHaveLength(2);
+	});
+});
+
+describe("New to this on the zoo, design check with C's list (list not yet on screen)", () => {
+	const rows = evaluate(true);
 
 	it("always shows the knobs behind a planted failure in the dock, for every goal", () => {
 		for (const r of rows) expect(r.failure.k, `${r.record}: ${r.missed.join(", ")}`).toBe(r.failure.n);
 	});
 
 	it("picks at most five knobs when the visitor has done nothing", () => {
-		for (const r of rows) expect(r.most, r.record).toBeLessThanOrEqual(5);
+		for (const r of rows) expect(r.most, r.record).toBeLessThanOrEqual(Math.max(MAX_NEW_KNOBS, r.must));
 	});
 
 	it("keeps every planted problem visible, in the dock or listed as worth checking", () => {
@@ -135,13 +180,40 @@ describe("New to this on the zoo's planted problems", () => {
 		for (const r of rows) expect(r.revealed.k, r.record).toBe(r.revealed.n);
 	});
 
-	it("reports, per record, planted problems visible and in the dock (Wilson 95%)", () => {
-		const report = rows.map(
-			(r) =>
-				`${r.record}: visible ${r.visible.k}/${r.visible.n} = ${pct(wilson(r.visible.k, r.visible.n))}; ` +
-				`in the dock ${r.dock.k}/${r.dock.n} = ${pct(wilson(r.dock.k, r.dock.n))}; at most ${r.most} knobs`,
+	it("reports per record: design check, 2 records, in-sample, counts a list not yet on screen (Wilson 95%)", () => {
+		const report = rows.map((r) => `${r.record} [${r.models}]: visible ${pct(r.visible)}; in the dock ${pct(r.dock)}; at most ${r.most} knobs`);
+		console.info(`[dial vs zoo: design check, 2 records, in-sample, counts a list not yet on screen]\n${report.join("\n")}`);
+		expect(report).toHaveLength(2);
+	});
+});
+
+/**
+ * Which order and how many of the goal's top knobs? With the list on screen, the policy that
+ * puts the planted problems' knobs in the dock most often (pooled over records and goals) wins.
+ * POLICY must be among the best; this fails when B's grids make another policy strictly better,
+ * and the decision record says why its `top` beat the others.
+ */
+const ORDERS: Record<string, readonly Claim[]> = {
+	"failures, top, baseline": ["must", "top", "baseline", "rest"],
+	"failures, baseline, top": ["must", "baseline", "top", "rest"],
+	"failures, top only": ["must", "top", "rest"],
+};
+
+describe("New to this: order of the five and the top count, compared on the zoo", () => {
+	const results = Object.entries(ORDERS).flatMap(([name, order]) =>
+		[1, 2, 3].map((top) => {
+			const rows = evaluate(true, { top, order });
+			return { name, top, dock: sum(rows, (r) => r.dock), models: rows[0]?.models ?? "none" };
+		}),
+	);
+
+	it("keeps the configured policy among those that show the planted knobs most often", () => {
+		const best = Math.max(...results.map((r) => r.dock.k));
+		const mine = results.find((r) => r.top === POLICY.top && r.name === "failures, top, baseline");
+		console.info(
+			`[dial order vs zoo, list on screen; predictions ${results[0]?.models}]\n` +
+				results.map((r) => `${r.name}, top ${r.top}: in the dock ${pct(r.dock)}`).join("\n"),
 		);
-		console.info(`[dial vs zoo, A's fixture predictions]\n${report.join("\n")}`);
-		expect(report).toHaveLength(rows.length);
+		expect(mine?.dock.k).toBe(best);
 	});
 });
