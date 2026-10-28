@@ -71,6 +71,14 @@ def test_text_that_is_not_valid_unicode_is_a_visitor_error_not_a_crash(text, say
 	assert "run.py" in str(got.value) and says in str(got.value)
 
 
+def test_a_script_argument_with_an_unpaired_surrogate_is_refused_clearly():
+	from preflight.runner.sources import fetch
+
+	with pytest.raises(InvalidSubmission) as got:
+		fetch({"kind": "upload", "files": {"run.py": "x = 1\n"}, "args": ["--name", "\ud800"]})
+	assert got.value.code == "submission.invalid" and "argument" in str(got.value)
+
+
 def test_a_notebook_with_an_unpaired_surrogate_is_refused_clearly():
 	import json
 

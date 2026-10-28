@@ -455,42 +455,33 @@ def test_a_record_whose_estimates_all_abstain_is_not_called_predicted(tmp_path, 
 	assert events[-1]["message"] == "measured; no predictions yet"
 
 
-def test_a_cancel_during_the_fill_stores_nothing(tmp_path, monkeypatch):
+def test_a_cancel_during_the_fill_stores_nothing_more(tmp_path, monkeypatch):
+	"""The store is asked before the filled record is stored, not the heartbeat's last word."""
+	import preflight.engine.api as engine
 	from preflight.engine.api import fill_predictions as real
-	from preflight.runner.worker import Cancelled
-
-	stop = {"now": False}
-
-	def fill(rec):
-		stop["now"] = True
-		return real(rec)
-
-	class Ctx(_Ctx):
-		def check(self):
-			if stop["now"]:
-				raise Cancelled("j1")
-
-	with pytest.raises(Cancelled):
-		_job(tmp_path, monkeypatch, flag_on=True, fill=fill, ctx=Ctx())
-	# the pipeline's own live saves are there; the filled record never was
-	for f in (tmp_path / "records").glob("*.json"):
-		assert not load_record(f.read_text()).predictions.estimates
-
-
-def test_runner_flags_read_like_the_apis(tmp_path, monkeypatch):
 	from preflight.runner import flags
 
-	(tmp_path / "flags.json").write_text('{"$comment": "x", "a": false, "b": true, "c": "yes"}')
-	(tmp_path / "flags.prod.json").write_text('{"a": true}')
-	monkeypatch.setenv("PREFLIGHT_ROOT", str(tmp_path))
-	monkeypatch.setenv("PREFLIGHT_ENV", "prod")
-	monkeypatch.setenv("PREFLIGHT_FLAGS", '{"b": false}')
+	store = InMemoryJobStore()
+	sub = store.submit({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, visitor="v1",
+		idempotency_key="k1")  # fmt: skip
+
+	def fill(rec):
+		store.cancel(sub.job_id)  # the visitor cancels while the engine works
+		return real(rec)
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"engine.memory": True}))
+	monkeypatch.setattr(engine, "fill_predictions", fill)
+	d = deps(tmp_path, FakeRunner())
 	flags.reload()
 	try:
-		assert flags.flag("a") is True and flags.flag("b") is False and flags.flag("c") is False
-		assert flags.flag("missing") is False
+		run_one(store, "w1", lambda lease, ctx: run_job(lease, ctx, deps=d), heartbeat_s=3600)
 	finally:
 		flags.reload()
+	assert store.status(sub.job_id) == "cancelled"
+	saved = list((tmp_path / "records").glob("*.json"))
+	assert saved  # the pipeline's own live saves
+	for f in saved:
+		assert not load_record(f.read_text()).predictions.estimates
 
 
 def test_runner_flags_find_the_repos_flags_json_without_help(monkeypatch):
@@ -531,8 +522,16 @@ def test_an_estimate_keeps_its_nulls_only_where_storage_would_drop_them():
 
 
 def test_the_worker_reads_the_same_flag_files_as_the_api():
-	"""Flags are baked into both images; the runner's env override must be the API's."""
+	"""Flags are baked into both images: the runner must ship the API's flag files and env."""
+	import re
+
+	def shipped(text):
+		return sorted(re.findall(r"add_local_file\([^\n]*?(flags[\w.{}]*\.json)", text)), re.findall(
+			r"glob\([^)]*flags", text
+		)
+
 	runner = (ROOT / "python" / "preflight" / "runner" / "modal_app.py").read_text()
 	api = (ROOT / "api" / "app.py").read_text()
+	assert shipped(runner) == shipped(api) == (["flags.json"], [])
 	assert 'FLAG_ENV = "production"' in runner and '"PREFLIGHT_ENV": FLAG_ENV' in runner
 	assert '"PREFLIGHT_ENV": "production"' in api

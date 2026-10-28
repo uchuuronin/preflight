@@ -179,6 +179,9 @@ class _Ctx:
 	def should_stop(self) -> bool:
 		return False
 
+	def confirm(self) -> None:
+		pass
+
 	def emit(self, stage: str, **fields) -> None:
 		self.events.append({"stage": stage, **fields})
 
@@ -688,7 +691,7 @@ def with_predictions(
 			# will (nulls dropped, then parsed), and fail here rather than in the reader;
 			# dump_record also enforces the 1 MB gzipped budget
 			box["rec"] = load_record(dump_record(fill_predictions(rec)))
-		except Exception as exc:
+		except BaseException as exc:  # SystemExit from a library too: reported, never a fake timeout
 			box["exc"] = exc
 
 	t0 = time.monotonic()
@@ -700,7 +703,7 @@ def with_predictions(
 	if "rec" in box:
 		log.info("job %s: predictions filled in %.2f s", rec.record_id, took)
 		return box["rec"], False
-	exc = box.get("exc") or TimeoutError(f"no predictions after {timeout_s:.0f} s")
+	exc = box.get("exc") or TimeoutError(f"no predictions after {timeout_s:g} s")
 	log.error("job %s: the engine couldn't fill predictions after %.2f s; keeping the measured record",
 		rec.record_id, took, exc_info=exc)  # fmt: skip
 	_emit(ctx, "predicting", rec, None, level="warn",
@@ -718,7 +721,7 @@ def run_job(lease, ctx: JobContext, *, deps: Deps) -> str:
 	rec = run_pipeline(lease.request, ctx, deps, ids=(lease.record_id, lease.share_token))
 	_emit(ctx, "predicting", rec, None, message="measured; predicting")
 	rec, failed = with_predictions(rec, ctx)
-	ctx.check()  # a cancel during the fill stops here, before the record is stored
+	ctx.confirm()  # asks the store: a job cancelled or reaped during the fill stores nothing more
 	rev = deps.records.put(rec)
 	if failed:
 		done = "measured; predictions unavailable"

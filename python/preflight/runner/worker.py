@@ -89,6 +89,17 @@ class JobContext:
 		self.check()
 		self._store.emit(self.lease.job_id, stage=stage, token=self.lease.token, **fields)
 
+	def confirm(self) -> None:
+		"""Ask the store, now, whether this attempt still holds the job (check() only sees what the
+		heartbeat last saw, up to HEARTBEAT_S ago). Raises LeaseLost after a cancel or a reap."""
+		self.check()
+		try:
+			self._store.heartbeat(self.lease)
+		except LeaseLost:
+			self.lost.set()
+			raise
+		self.renewed_at = time.monotonic()
+
 
 JobFn = Callable[[Lease, JobContext], str]
 
