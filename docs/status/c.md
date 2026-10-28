@@ -1,5 +1,30 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Wed Oct 28, early (critical path: upload to map)
+
+**Done** (branch `ws-c`; `main` unchanged since last night)
+
+- Records come from A's `preflight-records` volume: mounted read-only in api/app.py, read with
+  the volume's reload under one lock per container, at most one reload a second; record
+  responses are `private, no-cache` because a running job revises them. Guide and record reads
+  run off the event loop.
+- api/app.py no longer computes repo paths at import, and has a startup check
+  (`modal run --env main api/app.py::startup_check`) that deploy.yml runs before deploying;
+  every Modal step there now names environment `main`.
+- Check-in takes uploads (scripts with requirements and configs, or one notebook) under A's
+  upload rules, opening with `runner.queue`; boarding opens the cockpit by share token and
+  words every one of A's new error codes.
+- End-to-end check, waiting for a yes: api/scripts/e2e_upload.py checks a zoo script in through
+  the real API to A's deployed job store and reads the record back from the volume;
+  web/e2e/record_map.mjs then opens it in the cockpit in both themes. The same flow passes
+  against a stand-in store (api/tests/test_e2e_flow.py), and A's newer golden record opens to a
+  map in both themes with no errors.
+- Bug found that way and fixed: the status line said "Runs out of memory: peaks at 9.22 GiB of
+  22.1 GiB" when the failure came from the eval loop; the peak form is now used only when the
+  peak is over the card.
+- Stranger test 18 of 18; knob to readout p95 115 ms at 4x CPU slowdown (measured, this
+  container, after the UI changes).
+
 ## Tue Oct 27, late (decisions applied, cockpit as a dashboard)
 
 **Done** (branch `ws-c`, merged `origin/main` first)
