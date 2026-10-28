@@ -104,10 +104,15 @@ def test_own_cluster_shows_gpu_hours_first_and_a_grey_market_figure(ft):
 	assert jc.gpu_hours.point == pytest.approx(od.gpu_hours.point)
 	assert jc.market_equivalent_usd.point == pytest.approx(od.total_usd.point)
 	assert "GPU-hours" in jc.market_equivalent_usd.reason
-	assert (
-		"GPU-hours at risk" in jc.at_risk_usd.reason.split(";")[0]
-	)  # hours lead; dollars are the grey figure
-	assert jc.at_risk_usd.point == pytest.approx(od.at_risk_usd.point)  # same money, shown as hours first
+	# contract 0.3.0: the hours have their own field, and the dollars are the grey market figure
+	hrs = jc.at_risk_gpu_hours
+	assert hrs.unit == "gpu_hours"
+	assert hrs.point == pytest.approx(jc.at_risk_usd.point / 0.80)  # the L4's market rate
+	assert hrs.lo == pytest.approx(jc.at_risk_usd.lo / 0.80) and hrs.hi == pytest.approx(
+		jc.at_risk_usd.hi / 0.80
+	)
+	assert jc.at_risk_usd.point == pytest.approx(od.at_risk_usd.point)
+	assert od.at_risk_gpu_hours.point == pytest.approx(hrs.point)  # filled on every billing mode
 
 
 def test_spot_adds_redone_work_when_the_interruption_rate_is_known(pt):
@@ -135,6 +140,9 @@ def test_unpriced_gpu_abstains_with_the_reason(ft):
 	_, jc = api.run_cost(ft, {"gpu_type": "V100-SXM2-32GB"})
 	assert jc.total_usd.status == "abstain"
 	assert jc.at_risk_usd.status == "abstain"
+	# hours need no price: an unpriced GPU the engine can still time keeps its at-risk GPU-hours
+	_, rtx = api.run_cost(ft, {"gpu_type": "RTX-4090"})
+	assert rtx.at_risk_usd.status == "abstain" and rtx.at_risk_gpu_hours.status != "abstain"
 	# the line says it can't be priced, rather than looking unbilled like an own-cluster line
 	assert all(x.usd is not None and x.usd.status == "abstain" for x in jc.lines)
 

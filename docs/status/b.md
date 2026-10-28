@@ -88,9 +88,9 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
   - Money at risk sits beside the total, never in it; its range spans the P(OOM) bin's edges (S7).
   - `engine/gpus.py` now reads its prices from `engine/prices`, so there is one table.
   - Storage isn't billed yet: no paid storage rows.
-  - On an own cluster, money at risk leads with GPU-hours and keeps dollars as the grey market figure (Chiya, Oct 27), until the contract has an at-risk GPU-hours field.
+  - Money at risk also comes as GPU-hours (`at_risk_gpu_hours`, contract 0.3.0), shown first on an own cluster with dollars as the grey market figure (Chiya, Oct 27); it needs no price, so an unpriced GPU still gets it.
 - **Measured L4 (PM's Modal smoke run):** usable memory is 23,689,363,456 bytes (22.06 GiB, was 21.45), and the engine prefers a probe's reported total over the table for the probe's own GPU.
-- Tests live in root `tests/`; 797 pass across the repo (all agents' tests included), ruff clean with the repo config.
+- Tests live in root `tests/`; 798 pass across the repo (all agents' tests included), ruff clean with the repo config.
 
 ## Blocked
 - The L4 runs that build the real calibration table (grouped and HF jobs) wait on Chiya's yes to the $45 corpus plan (ask before spending, Oct 27).

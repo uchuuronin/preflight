@@ -1197,16 +1197,18 @@ def _at_risk(
 	tm: _TimeResult,
 	usd_per_s: float | None,
 	why_rate: str,
+	unit: str = "usd",
 ) -> Estimate:
-	"""P(OOM) x the cost up to the crash. Its range spans the P(OOM) bin's edges (S7), since the bin is all the
-	screen claims about the probability until the reliability check passes."""
+	"""P(OOM) x the cost up to the crash, in dollars or (with usd_per_s = GPUs / 3600) GPU-hours. Its range
+	spans the P(OOM) bin's edges (S7), since the bin is all the screen claims about the probability until the
+	reliability check passes."""
 	oom = mem.oom
 	if oom.status == "abstain":
-		return _abstain("usd", MODEL_ID_RUN_COST, oom.reason or "no out-of-memory estimate")
+		return _abstain(unit, MODEL_ID_RUN_COST, oom.reason or "no out-of-memory estimate")
 	if tm.step.status == "abstain" or tm.steps is None:
-		return _abstain("usd", MODEL_ID_RUN_COST, tm.total.reason or "no step time, so no cost up to a crash")
+		return _abstain(unit, MODEL_ID_RUN_COST, tm.total.reason or "no step time, so no cost up to a crash")
 	if usd_per_s is None:
-		return _abstain("usd", MODEL_ID_RUN_COST, why_rate)
+		return _abstain(unit, MODEL_ID_RUN_COST, why_rate)
 	moment = _peak_moment(record, values, mem)
 	n, where = _crash_point(record, values, moment, tm.steps)
 	h = memory.Z90 * tm.sigma
@@ -1230,7 +1232,7 @@ def _at_risk(
 	status = max(
 		("predicted" if oom.status == "measured" else oom.status, _total_status(tm.step)), key=order.index
 	)
-	return _est(p * c_pt, p_lo * c_lo, p_hi * c_hi, "usd", status, MODEL_ID_RUN_COST, why)
+	return _est(p * c_pt, p_lo * c_lo, p_hi * c_hi, unit, status, MODEL_ID_RUN_COST, why)
 
 
 def _basis(record: FlightRecord, provider: str | None, billing: str | None, region: str | None) -> CostBasis:
@@ -1352,16 +1354,16 @@ def run_cost(
 			else total
 		)
 	at_risk = _at_risk(record, values, mem, tm, per_s, why_rate)
-	if own and row is not None and at_risk.status != "abstain":
-		# Chiya, Oct 27: GPU-hours first on an own cluster, dollars only as the grey market figure. The contract
-		# has only at_risk_usd, so the hours lead its reason until an at-risk GPU-hours field exists.
-		k = 1.0 / row.usd_per_hour
-		lead = f"{at_risk.point * k:.2g} GPU-hours at risk ({at_risk.lo * k:.2g} to {at_risk.hi * k:.2g})"
-		at_risk = at_risk.model_copy(
-			update={"reason": f"{lead}; the dollars are the grey market figure. {at_risk.reason}"}
-		)
+	# contract 0.3.0: the same risk in GPU-hours, shown first on an own cluster (Chiya, Oct 27); it needs no price
+	hours_why = f"{n} x {gpu}" if gpu else "GPU-hours"
+	at_risk_hours = _at_risk(record, values, mem, tm, n / 3600.0, hours_why, unit="gpu_hours")
 	return basis, JobCost(
-		lines=lines, total_usd=total, gpu_hours=hours, market_equivalent_usd=market, at_risk_usd=at_risk
+		lines=lines,
+		total_usd=total,
+		gpu_hours=hours,
+		market_equivalent_usd=market,
+		at_risk_gpu_hours=at_risk_hours,
+		at_risk_usd=at_risk,
 	)
 
 
