@@ -717,6 +717,147 @@
 			"title": "Constraints",
 			"type": "object"
 		},
+		"CostBasis": {
+			"additionalProperties": false,
+			"description": "Where the run cost's rates come from, so every cost readout can say what it is based on.",
+			"properties": {
+				"price_table": {
+					"description": "Version of B's price table, e.g. 'prices@2026-10-27'",
+					"title": "Price Table",
+					"type": "string"
+				},
+				"as_of": {
+					"description": "Date the rates were checked",
+					"format": "date",
+					"title": "As Of",
+					"type": "string"
+				},
+				"provider": {
+					"description": "Provider the user picked, e.g. 'modal', 'unity', 'amd-devcloud'",
+					"title": "Provider",
+					"type": "string"
+				},
+				"region": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Region"
+				},
+				"billing": {
+					"default": "on_demand",
+					"enum": [
+						"on_demand",
+						"spot",
+						"own_cluster"
+					],
+					"title": "Billing",
+					"type": "string"
+				},
+				"currency": {
+					"const": "USD",
+					"default": "USD",
+					"description": "Rates are USD; fmt() converts for display",
+					"title": "Currency",
+					"type": "string"
+				},
+				"includes": {
+					"description": "Line kinds counted in the total",
+					"items": {
+						"enum": [
+							"gpu",
+							"tokens",
+							"storage"
+						],
+						"type": "string"
+					},
+					"title": "Includes",
+					"type": "array"
+				}
+			},
+			"required": [
+				"price_table",
+				"as_of",
+				"provider"
+			],
+			"title": "CostBasis",
+			"type": "object"
+		},
+		"CostLine": {
+			"additionalProperties": false,
+			"description": "One line of the run cost: a predicted quantity times a rate from the price table.",
+			"properties": {
+				"kind": {
+					"enum": [
+						"gpu",
+						"tokens",
+						"storage"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"label_key": {
+					"description": "t() key for the line's label",
+					"title": "Label Key",
+					"type": "string"
+				},
+				"quantity": {
+					"$ref": "#/$defs/Estimate",
+					"description": "GPU-hours, tokens or GB, with its interval"
+				},
+				"rate_usd": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "USD per unit; None when not billed",
+					"title": "Rate Usd"
+				},
+				"usd": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "quantity x rate; None when not billed in dollars"
+				},
+				"price_row": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Id of the price-table row the rate came from",
+					"title": "Price Row"
+				}
+			},
+			"required": [
+				"kind",
+				"label_key",
+				"quantity"
+			],
+			"title": "CostLine",
+			"type": "object"
+		},
 		"Costs": {
 			"additionalProperties": false,
 			"properties": {
@@ -2033,6 +2174,69 @@
 				"source"
 			],
 			"title": "Job",
+			"type": "object"
+		},
+		"JobCost": {
+			"additionalProperties": false,
+			"description": "What the job itself would cost to run in full. Preflight's own spend is `costs`, never here.",
+			"properties": {
+				"lines": {
+					"items": {
+						"$ref": "#/$defs/CostLine"
+					},
+					"title": "Lines",
+					"type": "array"
+				},
+				"total_usd": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Sum of billed lines, lows and highs added line by line; None on own cluster"
+				},
+				"gpu_hours": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Shown first on the user's own cluster"
+				},
+				"market_equivalent_usd": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "On-demand price of the same GPU-hours, shown grey on an own cluster"
+				},
+				"at_risk_usd": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Chance of failure x cost up to the failure point; shown beside the total, never in it"
+				}
+			},
+			"title": "JobCost",
 			"type": "object"
 		},
 		"KernelStat": {
@@ -4573,7 +4777,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.1.0",
+			"default": "0.2.0",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -4691,7 +4895,32 @@
 			"type": "array"
 		},
 		"costs": {
-			"$ref": "#/$defs/Costs"
+			"$ref": "#/$defs/Costs",
+			"description": "What Preflight itself spent making this record (probes, verify, model calls); never part of the run cost"
+		},
+		"cost_basis": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/CostBasis"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Where the run cost's rates come from (B)"
+		},
+		"job_cost": {
+			"anyOf": [
+				{
+					"$ref": "#/$defs/JobCost"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "The run cost breakdown, written by B"
 		}
 	},
 	"required": [
@@ -4700,5 +4929,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.1.0/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.2.0/FlightRecord"
 }

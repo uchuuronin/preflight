@@ -84,16 +84,25 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
 - Tests live in root `tests/`; 773 pass across the repo (A's included), ruff clean with the repo config.
 
 ## Blocked
-- Modal access, for the L4 runs (grouped and HF jobs) that build the real calibration table, and one real call to confirm L4 capacity.
-- Chiya: who adds `cost_basis` and `job_cost` to the shared schema (gap 21).
+- The L4 runs that build the real calibration table (grouped and HF jobs), and one real call to confirm L4 capacity, wait on Chiya's one-time Modal setup in docs/setup/cloud.md; after that B starts them through `remote-run.yml`.
 
 ## Next (Wed Oct 28)
-- Run-cost breakdown (gap 21): the price table is started in `engine/prices/`; the schema fields wait on Chiya.
+- Run-cost breakdown (gap 21): fill contract 0.2.0's `cost_basis` and `job_cost` from the price table started in `engine/prices/`.
+- NVIDIA corpus slice re-planned to $45 of Modal: grouped and HF jobs on T4 and L4 first, then A10 and L40S, a few A100 rows for the cross-GPU holdout.
 - Real held-out calibration on the L4 once Modal access lands; model cards switch to `held_out` per target as the table covers it.
 - Agent cost from tokens when tasks lack `cost_usd`, once D's price table lands.
 
+## Cloud runs and spend
+Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and dollars.
+
+| Date | Run | GPU | Minutes | Dollars |
+| --- | --- | --- | --- | --- |
+| none yet | | | | |
+
+Total so far: $0 of the $45 corpus budget.
+
 ## Contract requests
-In `docs/requests.md`.
+In `docs/requests/from-b.md`.
 - **Open from B to A:**
   - one golden-record GPU name;
   - FLOP counts for in-place matmuls;
