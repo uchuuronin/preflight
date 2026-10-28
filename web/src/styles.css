@@ -601,6 +601,7 @@ a {
 .pf-field { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .pf-field label { font-size: var(--pf-text-sm); color: var(--pf-fg-dim); }
 .pf-field input,
+.pf-field select,
 .pf-field textarea {
 	width: 100%;
 	min-height: 48px;
@@ -634,6 +635,9 @@ a {
 .pf-drop small { font-size: 12px; color: var(--pf-fg-dim); }
 .pf-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .pf-drop:focus-within { outline: 2px solid var(--pf-focus); outline-offset: 3px; }
+.pf-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; min-width: 0; }
+.pf-upload__files { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.pf-upload__files .pf-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pf-choice { display: flex; flex-wrap: wrap; gap: 6px; }
 .pf-choice button {

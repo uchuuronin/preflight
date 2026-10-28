@@ -52,7 +52,10 @@ export function statusLine(record: LoadedRecord, est: Prediction, knobs: Readonl
 
 	if (fit === "fails") {
 		const head =
-			trusted(mem) && cap && memT?.unit === "bytes"
+			// The peak form only when the peak itself is over the card: a run can fail on a part the
+			// training peak doesn't cover (an eval loop that keeps gradients), and "peaks at 9 GiB
+			// of 22 GiB" would read as a contradiction.
+			trusted(mem) && cap && memT?.unit === "bytes" && mem.point > cap
 				? t("status.fails_peak", { gpu, peak: fmt(mem.point, "bytes"), cap: fmt(cap, "bytes") })
 				: t("status.fails", { gpu, risk: trusted(risk) ? fmt(risk.point, "probability") : "" });
 		return { tone: "fails", text: head };

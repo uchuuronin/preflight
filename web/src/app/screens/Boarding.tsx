@@ -1,12 +1,12 @@
 /**
  * Boarding: probes running. Follows the job's server-sent events (A emits, C relays) and
- * moves along the route as stages complete. The map skeleton arrives within a minute; when
- * the record is ready the cockpit opens on it.
+ * moves along the route as stages complete. The record's share token arrives with the map
+ * skeleton; when the job is done the cockpit opens on it (boarding.ts).
  */
 import { useEffect, useState } from "react";
-import { eventText } from "../../lib/errors";
 import { t } from "../../lib/i18n";
 import type { JobEvent } from "../../workspace/record/types";
+import { type BoardingEvent, boardingState } from "../boarding";
 import { go, href } from "../route";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
@@ -21,7 +21,7 @@ const STAGES: Array<{ stage: JobEvent["stage"][]; key: string; model?: string }>
 ];
 
 export function Boarding({ jobId }: { jobId: string | null }) {
-	const [events, setEvents] = useState<JobEvent[]>([]);
+	const [events, setEvents] = useState<BoardingEvent[]>([]);
 	const [lost, setLost] = useState(false);
 
 	useEffect(() => {
@@ -31,7 +31,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		const es = new EventSource(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/events`, { withCredentials: true });
 		es.onmessage = (m) => {
 			try {
-				const ev = JSON.parse(m.data as string) as JobEvent;
+				const ev = JSON.parse(m.data as string) as BoardingEvent;
 				setEvents((all) => [...all, ev]);
 				// The server ends the stream after these; closing here stops EventSource reconnecting.
 				if (ev.stage === "done" || ev.stage === "failed" || ev.stage === "cancelled") es.close();
@@ -43,10 +43,8 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		return () => es.close();
 	}, [jobId]);
 
-	const last = events[events.length - 1];
+	const { last, done, failed, open, error } = boardingState(events);
 	const idx = last ? STAGES.findIndex((s) => s.stage.includes(last.stage)) : -1;
-	const failed = last?.stage === "failed" || last?.stage === "cancelled";
-	const done = last?.stage === "done";
 	const progress = done ? 100 : Math.max(0, idx) * 25;
 
 	return (
@@ -76,21 +74,16 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 						</li>
 					))}
 				</ol>
-				{failed && last?.message
-					? (() => {
-							const e = eventText(last.message);
-							return e ? (
-								<div className="pf-error" role="alert">
-									<p>{e.text}</p>
-									{e.hint ? <p className="pf-dim">{e.hint}</p> : null}
-								</div>
-							) : null;
-						})()
-					: null}
+				{error ? (
+					<div className="pf-error" role="alert">
+						<p>{error.message}</p>
+						{error.hint ? <p className="pf-dim">{error.hint}</p> : null}
+					</div>
+				) : null}
 				{!jobId ? <p className="pf-hint">{t("boarding.no_job")}</p> : null}
 				{lost && !done ? <p className="pf-hint">{t("boarding.lost")}</p> : null}
 				<div className="pf-cta">
-					<button type="button" className="pf-btn pf-btn--primary" disabled={!done || !last?.record_id} onClick={() => last?.record_id && go("cockpit", last.record_id)}>
+					<button type="button" className="pf-btn pf-btn--primary" disabled={!done || !open} onClick={() => open && go("cockpit", open)}>
 						{t("boarding.open")}
 					</button>
 					<a className="pf-btn" href={href("new")}>

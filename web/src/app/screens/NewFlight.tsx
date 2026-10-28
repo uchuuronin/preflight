@@ -4,6 +4,8 @@
  * never pays twice. Samples on the departures board open straight in the cockpit for free.
  */
 import { useId, useRef, useState } from "react";
+import { flag } from "../../lib/flags";
+import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
@@ -11,6 +13,7 @@ import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { DataUseNotice, dataUseAccepted } from "../DataUse";
+import { ACCEPT, type PickedFile, uploadSource } from "../upload";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
@@ -40,17 +43,41 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [accepted, setAccepted] = useState(dataUseAccepted);
+	const [picked, setPicked] = useState<PickedFile[]>([]);
+	const [entry, setEntry] = useState<string | undefined>();
+	const [reading, setReading] = useState(false);
 	const idem = useRef(newKey());
-	const ids = { repo: useId(), describe: useId(), upload: useId() };
+	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId() };
+	// Uploads open with live probes (the same flag the API checks before taking a job).
+	const uploadsOpen = flag("runner.queue");
+	const check = uploadSource(picked, entry);
 
 	// GitHub only: A's runner fetches from GitHub, and the API pins the link to a commit there.
-	const canSubmit = intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : false;
+	const canSubmit =
+		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : false;
+
+	const pick = async (list: FileList | null) => {
+		if (!list?.length) return;
+		setReading(true);
+		setError(null);
+		try {
+			const files = await Promise.all(Array.from(list, async (f) => ({ name: f.name, size: f.size, text: await f.text() })));
+			setPicked(files);
+			setEntry(undefined);
+			idem.current = newKey(); // different files are a different check-in
+		} catch {
+			setError(t("newflight.upload.binary"));
+		} finally {
+			setReading(false);
+		}
+	};
 
 	const submit = async () => {
 		setError(null);
+		if (intake === "upload" && !check.ok) return;
 		setBusy(true);
 		const body: JobRequest = {
-			source: { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` },
+			source: intake === "upload" && check.ok ? check.source : { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` },
 			objective: { kind: goal, description: description.trim() || null },
 			gpu,
 			description: description.trim() || null,
@@ -112,11 +139,66 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								</div>
 							) : intake === "upload" ? (
 								<div className="pf-pane">
-									<label className="pf-drop" htmlFor={ids.upload}>
+									<label
+										className="pf-drop"
+										htmlFor={ids.upload}
+										onDragOver={(e) => uploadsOpen && e.preventDefault()}
+										onDrop={(e) => {
+											if (!uploadsOpen) return;
+											e.preventDefault();
+											void pick(e.dataTransfer.files);
+										}}
+									>
 										{t("newflight.upload.label")}
 										<small>{t("newflight.upload.limits")}</small>
-										<input id={ids.upload} type="file" accept=".py,.ipynb" onChange={() => setError(t("newflight.upload.not_open"))} />
+										<input
+											id={ids.upload}
+											type="file"
+											multiple
+											accept={ACCEPT}
+											onChange={(e) => (uploadsOpen ? void pick(e.currentTarget.files) : setError(t("newflight.upload.not_open")))}
+										/>
 									</label>
+									{reading ? <p className="pf-hint">{t("newflight.upload.reading")}</p> : null}
+									{picked.length ? (
+										<div className="pf-upload">
+											<ul className="pf-upload__files">
+												{picked.map((p) => (
+													<li key={p.name} className="pf-tag">
+														{p.name}
+													</li>
+												))}
+											</ul>
+											<span className="pf-dim">{t("newflight.upload.files", { n: fmt(picked.length, "count"), size: fmt(picked.reduce((a, p) => a + p.size, 0), "bytes") })}</span>
+											<button
+												type="button"
+												className="pf-btn pf-btn--small"
+												onClick={() => {
+													setPicked([]);
+													setEntry(undefined);
+												}}
+											>
+												{t("newflight.upload.clear")}
+											</button>
+										</div>
+									) : null}
+									{!check.ok && check.candidates ? (
+										<div className="pf-field">
+											<label htmlFor={ids.entry}>{t("newflight.upload.which_label")}</label>
+											<select id={ids.entry} value={entry ?? ""} onChange={(e) => setEntry(e.currentTarget.value || undefined)}>
+												<option value="">{t("newflight.upload.which")}</option>
+												{check.candidates.map((c) => (
+													<option key={c} value={c}>
+														{c}
+													</option>
+												))}
+											</select>
+										</div>
+									) : picked.length && !check.ok ? (
+										<p className="pf-error" role="alert">
+											{t(`newflight.${check.reason}`)}
+										</p>
+									) : null}
 								</div>
 							) : (
 								extraIntake
