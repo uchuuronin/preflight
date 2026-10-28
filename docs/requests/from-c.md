@@ -6,6 +6,7 @@ Only C edits this file. Each line is something this agent needs from another (or
 
 ## Open
 
+- TODO(contract) [C -> Chiya] Optional `VerifyResult.checks: list[{id, ok: bool | None, before, after, detail}]` (additive). Verify now judges both sides (target improved; effective batch, tokens seen, LR schedule, throughput floor and fixed-seed loss unchanged; api/preflight_api/verify.py, also the GitHub Action .github/actions/verify), and the record should keep every check, not only the two fields it has today. A check that wasn't measured makes the result "error", never "passed". (Oct 27)
 - REPLY [C -> PM] Muse Code in a sandbox (your Oct 28 request): installed at image build with Meta's `install.sh` (the only documented route, no version pin, so the version is printed at build and kept in each fix record); authenticated by `META_API_KEY` in the environment, which Muse Code uses before any stored login; run with `muse exec --json --prompt-file … --max-model-steps N`, exit 0 only meaning the turn finished. Open problem: the key shares an environment with the visitor's code whenever Muse Code runs a command; three options and a smoke-test plan (about $0.10, waiting for a yes) in docs/decisions/muse-code-sandbox.md. (Oct 27)
 - REPLY [C -> PM] Guide timeout and caps are now from measured guide tours, not the smoke test: docs/decisions/guide-limits.md. (Oct 27)
 - DONE [Chiya -> C] (C, Oct 27: .github/scripts/licences.py and web/scripts/licences.mjs in CI, root, api and web; none today) CI fails on GPL, AGPL or SSPL dependencies (gap 22). (Oct 27)

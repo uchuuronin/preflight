@@ -1,0 +1,55 @@
+{
+	"knobs": [
+		{
+			"id": "batch_size",
+			"current": 4
+		},
+		{
+			"id": "eval_batch_size",
+			"current": 32
+		}
+	],
+	"job": {
+		"script_map": {
+			"training": {
+				"lr": 0.0002,
+				"warmup_steps": 100,
+				"max_steps": 6000
+			}
+		}
+	},
+	"probes": [
+		{
+			"id": "p1",
+			"status": "ok",
+			"knobs": {
+				"batch_size": 4,
+				"eval_batch_size": 32
+			},
+			"memory": {
+				"peak_allocated_bytes": 70866960384
+			},
+			"throughput": {
+				"tokens_per_s": 2600.0
+			},
+			"extras": {
+				"samples_per_step": 4,
+				"tokens_per_step": 8192
+			},
+			"stability": {
+				"series": {
+					"lr": [
+						1e-05,
+						2e-05,
+						3e-05
+					],
+					"loss": [
+						2.31,
+						2.25,
+						2.2
+					]
+				}
+			}
+		}
+	]
+}
