@@ -404,12 +404,7 @@ def test_model_cards_say_calibration_simulated(ft):
 
 
 def test_unknown_probe_gpu_uses_its_reported_memory(ft):
-	env = ft.env.model_copy(
-		update={
-			"gpu": ft.env.gpu.model_copy(update={"name": "NVIDIA Weird 9000", "memory_bytes": 24 * 10**9})
-		}
-	)
-	rec = ft.model_copy(update={"env": env})
+	rec = _as_harness_builds_it(ft, "NVIDIA Weird 9000", 24 * 10**9)  # knob current = env.gpu.name, as A's merge sets
 	p = api.predict(rec, {"eval_batch_size": 1, "eval_no_grad": True}).root
 	assert p["memory.peak"].status != "abstain" and p["risk.oom"].status != "abstain"
 	assert p["time.step"].status in ("measured", "predicted", "extrapolated")
@@ -422,3 +417,36 @@ def test_capacity_prefers_the_probes_reported_total(ft):
 	# the golden fine-tune's probe reported 23,034,920,960 bytes on its L4; other GPUs use the table
 	assert api._capacity(ft, "L4") == ft.env.gpu.memory_bytes
 	assert api._capacity(ft, "A100-SXM-80GB") == gpus.get_gpu("A100-SXM-80GB").capacity_bytes()
+
+
+def _as_harness_builds_it(rec, env_name, memory_bytes, knob_current=None):
+	"""The record the way A's pipeline leaves it: harness.skeleton.gpu_type_knob, then the merge's
+	`current = env.gpu.name` (runner/pipeline.py), unless knob_current pins a stale value."""
+	from preflight.harness.skeleton import gpu_type_knob
+
+	gk = gpu_type_knob(rec.job.script_map, gpu="L4")
+	seen = env_name if knob_current is None else knob_current
+	values = list(gk.domain.values) + ([seen] if seen not in gk.domain.values else [])
+	gk = gk.model_copy(update={"current": seen, "domain": gk.domain.model_copy(update={"values": values})})
+	knobs = [k for k in rec.knobs if k.id != "gpu_type"] + [gk]
+	env = rec.env.model_copy(
+		update={"gpu": rec.env.gpu.model_copy(update={"name": env_name, "memory_bytes": memory_bytes})}
+	)
+	return rec.model_copy(update={"env": env, "knobs": knobs})
+
+
+def test_the_records_own_gpu_is_never_a_move(ft):
+	weird = _as_harness_builds_it(ft, "NVIDIA Weird 9000", 24 * 10**9)
+	p = api.predict(weird).root
+	assert p["time.step"].status != "abstain"  # the probed, unlisted card keeps its measured step time
+	assert api.predict(weird, {"gpu_type": "H100-SXM-80GB"}).root["time.step"].status == "abstain"
+	# the same GPU under another name is no move either
+	l4 = _as_harness_builds_it(ft, "L4", ft.env.gpu.memory_bytes)
+	assert api.predict(l4, {"gpu_type": "NVIDIA L4"}).root["time.step"] == api.predict(l4).root["time.step"]
+
+
+def test_a_stale_knob_predicts_for_the_gpu_it_shows(ft):
+	# the probe stepped up to an L40S after an OOM but the knob still says L4: the dial shows L4, so predict for L4
+	rec = _as_harness_builds_it(ft, "L40S", 48 * 10**9, knob_current="L4")
+	assert api._target_gpu(rec, api._values(rec, None)) == "L4"
+	assert api._target_gpu(rec, api._values(rec, {"gpu_type": "L40S"})) == "L40S"

@@ -340,16 +340,26 @@ def _env_gpu(record: FlightRecord) -> str | None:
 
 
 def _gpu_move(record: FlightRecord, values: dict) -> str | None:
-	"""The GPU asked for, or None when gpu_type is still the record's own value (no move).
+	"""The GPU asked for, or None when gpu_type names the GPU the probes ran on (no move).
 
-	Records from A's harness carry a gpu_type knob whose current value names the probed GPU, so
-	the current value alone must never read as a move (an unlisted card would lose step time).
+	Records from A's harness carry a gpu_type knob whose current value is env.gpu.name (runner/pipeline.py),
+	so the probed GPU must never read as a move, whether named as the probe reported it (an unlisted card would
+	otherwise lose its step time) or by another name for the same card. Compared with the GPU the probes
+	measured, not the knob's current value, so a knob left stale after a step-up still predicts for the GPU
+	the dial shows.
 	"""
 	name = values.get("gpu_type")
 	if not (isinstance(name, str) and name):
 		return None
-	if name == _current(record).get("gpu_type"):
+	g = record.env.gpu if record.env else None
+	if g is not None and name == g.name:
 		return None
+	probed = _env_gpu(record)
+	try:
+		if probed is not None and gpus.resolve(name) == probed:
+			return None
+	except KeyError:
+		pass  # a name the table doesn't know is a move to an unknown GPU, and abstains downstream
 	return name
 
 
