@@ -7,14 +7,19 @@ What runs where:
   "preflight-records" volume mounted read-only, exactly as api/app.py mounts it.
 - POST /v1/jobs with the zoo script's files as a `kind: upload` source (what the check-in desk
   sends); A's job store runs it on its own workers and GPU sandboxes, under the job's own probe
-  budget (A's pipeline). The GPU is A's choice from the script's size, held at or below L4 here.
+  budget (A's pipeline: $0.60 and 15 minutes of probes). The job asks for an L4; A's runner picks
+  the cheapest card the script's size fits, so the record says which GPU actually ran.
 - It polls GET /v1/jobs/{id}, then reads GET /v1/jobs/{id}/events and
   GET /v1/records/{share_token}, timing each step.
 
-Every run ends in Modal before the workflow kills the job: the function has its own timeout and
-startup timeout, the runner cancels the call at a deadline under the workflow's `timeout`
-input, and the function cancels the job in A's store (POST /v1/jobs/{id}/cancel) before its own
-deadline, so no GPU keeps running for a job nobody is following.
+No GPU keeps running for a job nobody follows:
+- every API call is bounded (e2e_flow.CALL_TIMEOUT_S); past the job deadline the function asks
+  the API to cancel on every poll until the store says the job is over, and it cancels on any
+  early exit too;
+- the job id goes into an ephemeral Modal Dict the moment the job exists, so if the function
+  fails or times out, the runner here cancels the job in A's store directly;
+- the function has its own timeout and startup timeout, and the runner stops waiting at a
+  deadline under the workflow's `timeout` input.
 
 Through GitHub Actions (the API holds no keys here; A's workers hold their own):
 
@@ -102,7 +107,7 @@ def _read_only(vol):
 	retries=0,
 	cpu=1.0,
 )
-async def fly(sample: str, gpu: str, job_deadline_s: float) -> dict:
+async def fly(sample: str, gpu: str, job_deadline_s: float, handoff: modal.Dict) -> dict:
 	sys.path[:0] = ["/root/repo/api/scripts", "/root/repo/api", "/root/repo/python"]
 	import httpx
 	from e2e_flow import flow
@@ -128,6 +133,7 @@ async def fly(sample: str, gpu: str, job_deadline_s: float) -> dict:
 			job_deadline_s=job_deadline_s,
 			poll_s=POLL_S,
 			label=f"zoo/{sample}",
+			on_submit=lambda job_id: handoff.put.aio("job_id", job_id),
 		)
 	out["sample"] = sample
 	try:
@@ -141,8 +147,35 @@ async def fly(sample: str, gpu: str, job_deadline_s: float) -> dict:
 	return out
 
 
+def _cancel_in_store(job_id: str) -> str:
+	"""The backstop: cancel straight in A's job store, not through the in-process API."""
+	try:
+		svc = modal.Cls.from_name("preflight-runner", "JobStoreService")()
+		svc.cancel.remote(job_id)
+		return "cancelled"
+	except Exception as e:
+		return f"cancel failed: {type(e).__name__}: {str(e)[:200]}"
+
+
+def _write(res: dict) -> None:
+	Path("out").mkdir(exist_ok=True)
+	record = res.pop("record", None)
+	if record is not None:
+		Path("out/e2e_record.json").write_text(json.dumps(record, indent="\t") + "\n")
+	Path("out/e2e.json").write_text(json.dumps(res, indent="\t", default=str) + "\n")
+
+
+# Source: derived, the runs it's for: L4 is A's smallest probe GPU and T4 the CI default in A's
+# cloud runs; anything bigger needs its own yes.
+ALLOWED_GPUS = ("L4", "T4")
+
+
 @app.local_entrypoint()
 def main(sample: str = "finetune_lora_hf", gpu: str = "L4") -> None:
+	if gpu not in ALLOWED_GPUS:
+		raise SystemExit(
+			f"e2e: gpu must be one of {', '.join(ALLOWED_GPUS)}; a bigger card needs its own yes"
+		)
 	budget = int(os.environ.get("RUN_TIMEOUT") or 30) * 60  # the workflow's limit, in seconds
 	deadline = min(
 		FUNCTION_TIMEOUT_S + STARTUP_TIMEOUT_S, budget - PUBLISH_MARGIN_S - (time.monotonic() - _T0)
@@ -150,29 +183,41 @@ def main(sample: str = "finetune_lora_hf", gpu: str = "L4") -> None:
 	job_deadline = min(JOB_DEADLINE_S, deadline - STARTUP_TIMEOUT_S - 120)
 	if job_deadline < 5 * 60:
 		raise SystemExit(f"e2e: {budget // 60} min isn't enough for a probe job; ask for more")
-	call = fly.spawn(sample, gpu, job_deadline)
-	try:
-		res = call.get(timeout=deadline)
-	except (TimeoutError, modal.exception.TimeoutError):
-		call.cancel()
-		raise SystemExit(f"e2e: no result after {deadline:.0f} s; cancelled in Modal") from None
-	Path("out").mkdir(exist_ok=True)
-	record = res.pop("record", None)
-	if record is not None:
-		Path("out/e2e_record.json").write_text(json.dumps(record, indent="\t") + "\n")
-	Path("out/e2e.json").write_text(json.dumps(res, indent="\t", default=str) + "\n")
+	sys.path.insert(0, str(_HERE.parent))
+	from e2e_flow import passed
+
+	with modal.Dict.ephemeral() as handoff:
+		call = fly.spawn(sample, gpu, job_deadline, handoff)
+		try:
+			res = call.get(timeout=deadline)
+		except Exception as e:  # timed out or failed in Modal: stop the function, then the job
+			call.cancel()
+			job_id = handoff.get("job_id")
+			res = {
+				"error": f"{type(e).__name__}: {str(e)[:500]}",
+				"job_id": job_id,
+				"job_cancel": _cancel_in_store(job_id) if job_id else "no job was created",
+			}
+			_write(res)
+			print(json.dumps(res, indent=2), flush=True)
+			sys.exit(1)
+	_write(res)
 	print(
 		json.dumps(
 			{
 				k: res.get(k)
-				for k in ("submit", "marks", "checks", "record_read_s", "record_loads_on_this_branch")
+				for k in (
+					"submit",
+					"marks",
+					"checks",
+					"record_read_s",
+					"record_loads_on_this_branch",
+					"call_errors",
+				)
 			},
 			indent=2,
 			default=str,
 		)
 	)
-	sys.path.insert(0, str(_HERE.parent))
-	from e2e_flow import passed
-
 	if not passed(res.get("checks") or {}):
 		sys.exit(1)
