@@ -1,7 +1,9 @@
 """/v1/jobs over a stand-in for A's job store service."""
 
 import json
+from urllib.parse import unquote
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -82,7 +84,22 @@ def env(monkeypatch):
 	session.reset_keys()
 
 
+SHA = "a" * 40
+
+
+def github(req: httpx.Request) -> httpx.Response:
+	"""GitHub's commits API: main and v1 exist on karpathy/nanoGPT; nothing else does."""
+	refs = {"HEAD": SHA, "main": SHA, "v1": "b" * 40}
+	m = [unquote(x) for x in req.url.raw_path.decode().split("?")[0].split("/")]
+	if req.url.host == "api.github.com" and m[2:4] == ["karpathy", "nanoGPT"] and m[5] in refs:
+		return httpx.Response(200, text=refs[m[5]])
+	if m[5:6] == ["limited"]:
+		return httpx.Response(403, text="rate limited")
+	return httpx.Response(404, text="Not Found")
+
+
 def client(store, **kw):
+	kw.setdefault("http", httpx.AsyncClient(transport=httpx.MockTransport(github)))
 	return TestClient(create_app(jobstore=store, **kw), base_url="https://testserver")
 
 
@@ -103,8 +120,8 @@ def test_check_in_needs_a_key_a_known_source_and_https():
 	assert c.post("/v1/jobs", json=BODY).json()["error"]["code"] == "idempotency_key_required"
 	bad = {**BODY, "source": {"kind": "inflight"}}
 	assert c.post("/v1/jobs", json=bad, headers=KEY).status_code == 422
-	plain = {**BODY, "source": {"kind": "repo", "uri": "http://github.com/x/y"}}
-	assert c.post("/v1/jobs", json=plain, headers=KEY).status_code == 422
+	elsewhere = {**BODY, "source": {"kind": "repo", "uri": "https://gitlab.com/x/y"}}
+	assert c.post("/v1/jobs", json=elsewhere, headers=KEY).json()["error"]["code"] == "repo_not_usable"
 	extra = {**BODY, "surprise": 1}
 	assert c.post("/v1/jobs", json=extra, headers=KEY).status_code == 422
 
@@ -157,3 +174,33 @@ def test_the_ip_bucket_limits_check_ins_from_one_address():
 		for i in range(3)
 	]
 	assert codes == [202, 202, 429]
+
+
+def test_branch_links_become_the_bare_repo_and_a_full_commit():
+	store = Store()
+	c = client(store)
+	cases = [
+		("github.com/karpathy/nanoGPT", None, SHA, "HEAD"),
+		("https://github.com/karpathy/nanoGPT/tree/main/data", None, SHA, "main"),
+		("https://github.com/karpathy/nanoGPT.git", "v1", "b" * 40, "v1"),
+		("https://github.com/karpathy/nanoGPT", "c" * 40, "c" * 40, "c" * 40),
+	]
+	for i, (uri, commit, sha, ref) in enumerate(cases):
+		src = {"kind": "repo", "uri": uri, **({"commit": commit} if commit else {})}
+		r = c.post("/v1/jobs", json={**BODY, "source": src}, headers={"Idempotency-Key": f"k-case-{i:06d}"})
+		assert r.status_code == 202, r.text
+		assert r.json()["source"] == {"uri": "https://github.com/karpathy/nanoGPT", "commit": sha, "ref": ref}
+		sent = store.jobs[r.json()["job_id"]]["request"]["source"]
+		assert sent["uri"] == "https://github.com/karpathy/nanoGPT" and sent["commit"] == sha
+
+
+def test_unknown_branches_and_rate_limits_are_explained():
+	c = client(Store())
+	gone = {
+		**BODY,
+		"source": {"kind": "repo", "uri": "https://github.com/karpathy/nanoGPT", "commit": "nope"},
+	}
+	assert c.post("/v1/jobs", json=gone, headers=KEY).json()["error"]["code"] == "repo_not_usable"
+	busy = {**BODY, "source": {"kind": "repo", "uri": "https://github.com/x/y", "commit": "limited"}}
+	r = c.post("/v1/jobs", json=busy, headers={"Idempotency-Key": "k-limited-0001"})
+	assert r.status_code == 503 and r.json()["error"]["code"] == "repo_unavailable"

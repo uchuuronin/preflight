@@ -18,11 +18,12 @@ import re
 import time
 from collections.abc import AsyncIterator
 
+import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import ValidationError
 
-from .. import edge
+from .. import edge, repos
 from ..errors import ApiError
 from ..flags import flag
 from ..jobs import kind_of, retry_after, visitor_of
@@ -111,8 +112,24 @@ async def create_job(request: Request) -> dict:
 		raise ApiError(422, "invalid_request", "The check-in isn't in the expected shape.") from e
 	if source.kind not in SOURCE_KINDS:
 		raise ApiError(422, "invalid_request", f"Jobs can't come from {source.kind!r} here.")
-	if source.kind == "repo" and not (source.uri or "").startswith("https://"):
-		raise ApiError(422, "invalid_request", "Repo links must start with https://.")
+	request_body = body.model_dump(mode="json", exclude_none=True)
+	resolved = None
+	if source.kind == "repo":
+		# A's runner fetches GitHub only by a full commit hash: resolve the branch, tag or default
+		# branch now, so the job runs the code the visitor saw (preflight_api/repos.py).
+		http = request.app.state.http
+		own = http is None
+		client = http or httpx.AsyncClient()
+		try:
+			resolved = await repos.resolve(source.uri or "", source.commit, client)
+		except repos.RepoError as e:
+			if e.retryable:
+				raise ApiError(503, "repo_unavailable", str(e), retryable=True, retry_after=30) from e
+			raise ApiError(422, "repo_not_usable", str(e)) from e
+		finally:
+			if own:
+				await client.aclose()
+		request_body["source"] = {**request_body["source"], "uri": resolved.uri, "commit": resolved.commit}
 
 	sid: str = request.state.session
 	# The store caps jobs per visitor; the IP bucket stops a visitor minting sessions to get round it.
@@ -130,12 +147,13 @@ async def create_job(request: Request) -> dict:
 		)
 	await ledger.settle(gate.reservation, 0.0)
 	try:
-		out = await store.submit(
-			body.model_dump(mode="json", exclude_none=True), visitor=visitor_of(sid), idempotency_key=key
-		)
+		out = await store.submit(request_body, visitor=visitor_of(sid), idempotency_key=key)
 	except Exception as e:
 		raise _store_error(e) from e
-	return {"job_id": out["job_id"], "created": bool(out.get("created")), "position": out.get("position")}
+	reply = {"job_id": out["job_id"], "created": bool(out.get("created")), "position": out.get("position")}
+	if resolved:
+		reply["source"] = {"uri": resolved.uri, "commit": resolved.commit, "ref": resolved.ref}
+	return reply
 
 
 @router.get("/jobs/{job_id}")

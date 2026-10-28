@@ -43,7 +43,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const idem = useRef(newKey());
 	const ids = { repo: useId(), describe: useId(), upload: useId() };
 
-	const canSubmit = intake === "repo" ? /^(https?:\/\/)?(www\.)?(github\.com|huggingface\.co|colab\.research\.google\.com)\/.+/.test(repo.trim()) : false;
+	// GitHub only: A's runner fetches from GitHub, and the API pins the link to a commit there.
+	const canSubmit = intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : false;
 
 	const submit = async () => {
 		setError(null);

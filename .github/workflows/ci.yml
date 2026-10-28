@@ -46,6 +46,8 @@ jobs:
         run: node --test schema/ts/*.test.ts
       - name: Web GPU table matches engine/gpus.py
         run: uv run python web/scripts/make_gpu_table.py --check
+      - name: No GPL, AGPL or SSPL dependencies (gap 22)
+        run: uv run python .github/scripts/licences.py
 
   api:
     # The FastAPI control plane (api/), its own uv project on top of the preflight package.
@@ -62,6 +64,7 @@ jobs:
         run: |
           uv sync --locked
           uv run pytest -q
+          uv run python ../.github/scripts/licences.py
 
   torch:
     # Probes and the recorder on CPU torch: no GPU in CI, but the code paths are the same.
@@ -97,6 +100,7 @@ jobs:
           npm ci --no-audit --no-fund
           npm run typecheck --if-present
           npm test --if-present
+          node scripts/licences.mjs
           npm run build
       - if: steps.has.outputs.web == 'true'
         name: Stranger test on the built app (e2e/stranger.mjs)
