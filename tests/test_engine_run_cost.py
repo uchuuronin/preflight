@@ -104,6 +104,10 @@ def test_own_cluster_shows_gpu_hours_first_and_a_grey_market_figure(ft):
 	assert jc.gpu_hours.point == pytest.approx(od.gpu_hours.point)
 	assert jc.market_equivalent_usd.point == pytest.approx(od.total_usd.point)
 	assert "GPU-hours" in jc.market_equivalent_usd.reason
+	assert (
+		"GPU-hours at risk" in jc.at_risk_usd.reason.split(";")[0]
+	)  # hours lead; dollars are the grey figure
+	assert jc.at_risk_usd.point == pytest.approx(od.at_risk_usd.point)  # same money, shown as hours first
 
 
 def test_spot_adds_redone_work_when_the_interruption_rate_is_known(pt):

@@ -310,6 +310,14 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 	return sorted(out)
 
 
+def _capacity(record: FlightRecord, gpu: str) -> int:
+	"""Usable bytes on this GPU: the probe's reported total when the probe ran on it, else the table's."""
+	g = record.env.gpu if record.env else None
+	if g is not None and g.memory_bytes and gpu == _env_gpu(record):
+		return int(g.memory_bytes)
+	return gpus.get_gpu(gpu).capacity_bytes()
+
+
 def _env_gpu(record: FlightRecord) -> str | None:
 	"""The probe's GPU: a table name, or an unlisted fallback built from the probe's own memory and SM count."""
 	if record.env and record.env.gpu and record.env.gpu.name:
@@ -365,7 +373,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 	if gpu is None:
 		why = "the GPU isn't known, so there's no capacity to compare against; pick a GPU"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
-	capacity = gpus.get_gpu(gpu).capacity_bytes()
+	capacity = _capacity(record, gpu)
 	oom_probe = _matching_probe(record, values, ok=("oom",))
 	if oom_probe is not None and gpu == _env_gpu(record):  # an OOM on one GPU says nothing about a bigger one
 		why = f"probe {oom_probe.id} ran out of memory at these settings"
@@ -1160,7 +1168,7 @@ def _peak_moment(record: FlightRecord, values: dict, mem: _MemoryResult) -> str:
 	gpu = _target_gpu(record, values)
 	try:
 		arch, setup, shape = knobs.setup_from(record.job.script_map, values)
-		cap = gpus.get_gpu(gpu).capacity_bytes() if gpu else None
+		cap = _capacity(record, gpu) if gpu else None
 		return memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap).peak_moment
 	except (ValueError, AttributeError, KeyError):
 		return "train"
@@ -1344,6 +1352,14 @@ def run_cost(
 			else total
 		)
 	at_risk = _at_risk(record, values, mem, tm, per_s, why_rate)
+	if own and row is not None and at_risk.status != "abstain":
+		# Chiya, Oct 27: GPU-hours first on an own cluster, dollars only as the grey market figure. The contract
+		# has only at_risk_usd, so the hours lead its reason until an at-risk GPU-hours field exists.
+		k = 1.0 / row.usd_per_hour
+		lead = f"{at_risk.point * k:.2g} GPU-hours at risk ({at_risk.lo * k:.2g} to {at_risk.hi * k:.2g})"
+		at_risk = at_risk.model_copy(
+			update={"reason": f"{lead}; the dollars are the grey market figure. {at_risk.reason}"}
+		)
 	return basis, JobCost(
 		lines=lines, total_usd=total, gpu_hours=hours, market_equivalent_usd=market, at_risk_usd=at_risk
 	)

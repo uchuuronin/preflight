@@ -217,8 +217,10 @@ _SPECS: tuple[GpuSpec, ...] = (
 	_g("A100-SXM-80GB", "nvidia", "ampere", 80, 2039, 108, 400, 19.5, 156.0, 312.0, 312.0, None, 600, "nvlink",
 		mig_slices=7, aliases=("a100-sxm4-80gb", "a100-80gb"), usable_gib=79.15),
 	# --- Ada
+	# usable_gib measured: torch total_memory 23,689,363,456 bytes on Modal (Oct 27 smoke run); the same run reached
+	# 59.8 TFLOP/s on an 8192^2 bf16 matmul, 49% of the dense bf16 peak
 	_g("L4", "nvidia", "ada", 24, 300, 58, 72, 30.3, 60.0, 121.0, 121.0, 242.5, 64, "pcie4", confidence="derived",
-		aliases=("nvidia l4",), usable_gib=21.45),
+		aliases=("nvidia l4",), usable_gib=23_689_363_456 / 2**30),
 	_g("L40", "nvidia", "ada", 48, 864, 142, 300, 90.5, 90.5, 181.05, 181.05, 362.0, 64, "pcie4", aliases=("nvidia l40",)),
 	_g("L40S", "nvidia", "ada", 48, 864, 142, 350, 91.6, 183.0, 362.05, 362.05, 733.0, 64, "pcie4", aliases=("nvidia l40s",)),
 	_g("RTX-4090", "nvidia", "ada", 24, 1008, 128, 450, 82.6, 82.6, 165.2, 165.2, 330.3, 64, "pcie4",

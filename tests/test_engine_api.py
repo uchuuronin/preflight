@@ -416,3 +416,9 @@ def test_unknown_probe_gpu_uses_its_reported_memory(ft):
 	assert p["cost.total"].status == "abstain" and "no price" in p["cost.total"].reason
 	moved = api.predict(rec, {"gpu_type": "H100-SXM-80GB"}).root["time.step"]
 	assert moved.status == "abstain" and "isn't in the GPU table" in moved.reason
+
+
+def test_capacity_prefers_the_probes_reported_total(ft):
+	# the golden fine-tune's probe reported 23,034,920,960 bytes on its L4; other GPUs use the table
+	assert api._capacity(ft, "L4") == ft.env.gpu.memory_bytes
+	assert api._capacity(ft, "A100-SXM-80GB") == gpus.get_gpu("A100-SXM-80GB").capacity_bytes()
