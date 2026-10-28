@@ -11,10 +11,14 @@
   being down, not the API.
 - Notebook hand-off for D: intake panels get `setSource`; while D's Notebook tab is on, the
   Upload tab sends notebooks there.
-- Coverage page `#/checks` from A's real L4 run, held-out only, Wilson 95%: out of memory
-  caught 1 of 1 (21% to 100%, too few to tell); step time 0 of 3 within 15% and 0 of 3 inside
-  the 90% interval (0% to 56%, below target); peak memory not scored, because the probes re-ran
-  with eval off and nothing records that (asked A). Findings sent to B.
+- Coverage page `#/checks` from A's real L4 run, held-out only, Wilson 95%: out of memory none
+  missed yet (1 of 1, 21% to 100%); step time 0 of 3 within 15% and 0 of 3 inside the 90%
+  interval (0% to 56%, below target); peak memory not scored, because the probes ran no eval
+  pass and nothing records that (asked A). Findings sent to B: the likely cause is work units
+  (p1 and p3 measured the same tokens per step), with the caveat that three probes make a weak
+  held-out test. Independent review: no Critical; its 3 High and 7 Medium fixed (a stale
+  notebook source after a tab switch, memory scored on the engine's own quantity, siblings by
+  knobs and cache key, rate bars shown with their source, stable setSource).
 - Upload-to-map run: waits for A's `fill_predictions` in `main`, then runs from `main`.
 
 **Cloud runs**
