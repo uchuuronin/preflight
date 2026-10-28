@@ -1,0 +1,11 @@
+{
+	"name": "20261028-225112-40783074654-a-gt-lora-l4-2",
+	"exit_code": 124,
+	"workflow": "remote-run",
+	"run_id": "40783074654",
+	"ref": "ws-a",
+	"sha": "c542b86d6a0048798d6dcdb59b56f9890987d27e",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script finetune_lora_hf --bare-steps 120 --recorder-steps 40 --budget-min 30",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T23:31:28Z"
+}
