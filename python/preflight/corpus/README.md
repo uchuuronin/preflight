@@ -45,36 +45,42 @@ Every config has a content-addressed key and is written once. A restarted sweep 
 Cloud runs go through `remote-run.yml`; B holds no keys (docs/setup/cloud.md). Each phase is one workflow run of at most 120 minutes, and a sweep cut short resumes from the volume on its next run. Phase 0:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1 --max-minutes 45"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=0.4 --batch-size 2 --max-containers 1"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=90 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=0.4 --batch-size 2 --max-containers 1 --max-minutes 75"
 ```
 
-Phases 1 and 2, with the caps from the table (each GPU runs in parallel inside one run):
+Phases 1 and 2 at the doubled size Chiya approved (Oct 28), with their hard caps. Phase 1 resumes on the L4, passing Modal's figure for the first, timed-out run as `--prior-usd`:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l4 -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets L4=5.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l4-2 -f ref=ws-b -f timeout=120 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 600 --budgets L4=6 --prior-usd <Modal's figure> --max-minutes 105"
 ```
 
-```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=2.5,A10=3.5"
-```
+Phase 2, only after phase 1 comes back clean:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-gpus -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets T4=1,A10=7.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a10 -f ref=ws-b -f timeout=120 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 600 --budgets A10=7.5 --max-minutes 105"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l40s -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 200 --budgets L40S=9"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a10-hf -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind hf --budgets A10=0.7 --max-minutes 45"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a100 -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 100 --budgets A100-SXM-80GB=5.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-t4 -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets T4=1.2 --max-minutes 45"
 ```
 
-**Spend is container time (Oct 28).** Phase 1 showed that a config's own seconds can be a ninth of what Modal bills. Containers are also billed for start-up, volume reloads and commits, and the idle tail. So each wave's spend is its measured wall time × containers × rate, plus the 30 s idle window the app sets (`sweep.wave_billed_seconds`), an upper bound. It is kept on the volume in `_billing/`, so a rerun keeps counting. Configs are priced from the measured container-seconds per config, and a run stops launching waves before 100 minutes (`--max-minutes`). For a GPU that already spent money before this accounting existed, pass Modal's figure as `--prior-usd`. Before any paid sweep, start the app once in its real image:
+```
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l40s -f ref=ws-b -f timeout=120 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 200 --budgets L40S=3.7 --max-minutes 105"
+```
+
+```
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a100 -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 100 --budgets A100-SXM-80GB=2 --max-minutes 45"
+```
+
+**Spend is container time, bounded before each wave (Oct 28).** Phase 1 showed that a config's own seconds can be a ninth of what Modal bills. So before each wave the sweep bills the wave's worst case to `_billing/` on the volume: every container starting, running a full batch at the config deadline, and idling out. A wave launches only if that fits the money left and ends inside `--max-minutes`, which each command sets 15 minutes under its workflow timeout. After the wave, the bill settles to the measured container time, so a killed wave stays billed at its worst case. Deadlines follow the measured configs (3x the p99, at least 120 s). Retries are off, so a preempted batch never re-runs inside its wave. Rates carry a 1.10 guess for Modal's CPU and memory charges. For a GPU that spent money before this accounting existed, pass Modal's figure once as `--prior-usd`. Before any paid sweep, start the app once in its real image (one T4 container, one small config, about $0.03):
 
 ```
 gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-startup -f ref=ws-b -f timeout=15 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::startup_check"
@@ -83,11 +89,11 @@ gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-startup 
 Bring the rows back (a CPU container, about a cent), then read them from the `remote-runs` branch:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export -f ref=ws-b -f timeout=20 -f cmd="modal run python/preflight/corpus/modal_app.py::export --kind kernels"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export -f ref=ws-b -f timeout=20 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::export --kind kernels"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export-hf -f ref=ws-b -f timeout=20 -f cmd="modal run python/preflight/corpus/modal_app.py::export --kind hf"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export-hf -f ref=ws-b -f timeout=20 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::export --kind hf"
 ```
 
 Each run's GPU, minutes and dollars go in `docs/status/b.md`.

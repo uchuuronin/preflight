@@ -41,6 +41,15 @@ MAX_CONSECUTIVE_USER_ERRORS = 3  # guess: three corpus-code errors in a row mean
 _EPS = 1e-6
 # set, not a platform default: modal_app.Sweeper's scaledown_window, so each container's idle tail is known
 SCALEDOWN_S = 30.0
+STARTUP_S = (
+	180.0  # guess: cold start, image pull, imports and the volume reload; each batch now reports its own
+)
+RATE_OVERHEAD = (
+	1.10  # guess: Modal also bills a GPU container's CPU and memory; replaced by Modal's bill per run
+)
+MIN_DEADLINE_S = 120.0  # guess: floor for a config's deadline, so a slow-but-healthy config isn't cut short
+DEADLINE_FACTOR = 3.0  # cited: isolate.py, the deadline is 3x the measured p99 once configs have run
+MIN_DEADLINE_HISTORY = 10  # guess: configs measured before the deadline follows them
 
 Runner = Callable[[CorpusConfig], dict[str, Any]]
 
@@ -75,6 +84,51 @@ def wave_billed_seconds(wall_s: float, containers: int, scaledown_s: float = SCA
 	return max(0.0, wall_s + scaledown_s) * max(0, containers)
 
 
+def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
+	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
+	at its deadline, and idles out. Retries are off, so a preempted batch is not re-run inside the wave."""
+	return max(0, containers) * (max(0, batch) * deadline_s + STARTUP_S + SCALEDOWN_S)
+
+
+def plan_wave(
+	n_todo: int,
+	budget_left_usd: float,
+	minutes_left: float,
+	deadline_s: float,
+	usd_per_hour: float,
+	max_containers: int,
+	max_batch: int,
+) -> tuple[int, int]:
+	"""(containers, batch size) for the next wave: as many configs as possible such that the wave's worst case
+	fits the money left and ends before the time left. (0, 0) when not even one config fits."""
+	rate = usd_per_hour * RATE_OVERHEAD / 3600
+	room_s = minutes_left * 60 - STARTUP_S - SCALEDOWN_S
+	batch = min(max_batch, int(room_s // deadline_s) if deadline_s > 0 else max_batch, max(1, n_todo))
+	best = (0, 0)
+	for b in range(batch, 0, -1):
+		c = min(max_containers, math.ceil(n_todo / b))
+		while c > 0 and worst_wave_seconds(c, b, deadline_s) * rate > budget_left_usd + _EPS:
+			c -= 1
+		if c * b > best[0] * best[1]:
+			best = (c, b)
+	return best
+
+
+def adaptive_deadline(config_seconds: list[float], default_s: float) -> float:
+	"""A config's deadline: DEADLINE_FACTOR x the measured p99 once enough configs have run, never above the
+	default and never below MIN_DEADLINE_S."""
+	if len(config_seconds) < MIN_DEADLINE_HISTORY:
+		return default_s
+	return min(default_s, max(MIN_DEADLINE_S, DEADLINE_FACTOR * quantile(config_seconds, 0.99)))
+
+
+def prior_usd(path: str | Path) -> float:
+	"""Money spent before container billing was recorded (Modal's own figure), counted once however often passed."""
+	return max(
+		(float(r.get("prior_usd", 0.0)) for r in _billing_rows(path) if r.get("kind") == "prior"), default=0.0
+	)
+
+
 def add_billing(path: str | Path, row: dict[str, Any]) -> None:
 	path = Path(path)
 	path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,13 +144,20 @@ def _billing_rows(path: str | Path) -> list[dict[str, Any]]:
 
 
 def billed_seconds(path: str | Path) -> float:
-	"""Container-seconds billed so far on one GPU for one kind, across every run (the file lives on the volume)."""
+	"""Container-seconds billed so far on one GPU for one kind, across every run (the file lives on the volume).
+
+	A wave first writes a pending row at its worst case, then a settle row with (measured - worst), so a wave
+	killed before it settles stays on the bill at its worst case."""
 	return sum(float(r.get("billed_s", 0.0)) for r in _billing_rows(path))
 
 
 def container_history(path: str | Path) -> list[float]:
-	"""Billed container-seconds per config, one entry per wave that ran configs: what the next config will cost."""
-	return [float(r["billed_s"]) / r["configs"] for r in _billing_rows(path) if r.get("configs")]
+	"""Measured container-seconds per config, one entry per settled wave that ran configs."""
+	return [
+		float(r.get("measured_s", r.get("billed_s", 0.0))) / r["configs"]
+		for r in _billing_rows(path)
+		if r.get("configs")
+	]
 
 
 def plan_from(

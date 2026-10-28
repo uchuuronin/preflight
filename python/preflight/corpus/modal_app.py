@@ -1,10 +1,11 @@
 """Modal app for the NVIDIA corpus slices.
 
-Dispatches in waves: after each wave it re-reads the ledger on the volume and
-re-plans against the per-GPU budget, so the sweep halts at its budget even when
-real configs run longer than the estimate, and a restarted sweep resumes from
-what the volume already holds (gap 13). Each config is written once and the
-volume committed after every config, so a preempted container loses one config.
+Dispatches in waves. Before each wave it bills the wave's worst case (every container
+starting, running a full batch at the deadline and idling out) to a file on the volume,
+and launches only if that fits the money and the time left; after the wave it settles
+the bill to the measured container time (sweep.plan_wave, Oct 28). A restarted sweep
+resumes from what the volume holds and keeps counting what earlier runs cost (gap 13).
+Each config is written once; the volume is committed every COMMIT_EVERY configs.
 
 Run from the repo root (PYTHONPATH=python so the package is importable):
 
@@ -61,7 +62,8 @@ image = (
 	gpu="L4",
 	volumes={MOUNT: vol},
 	timeout=3 * 60 * 60,  # a batch of 8 configs, each capped by its own deadline in isolate.py
-	retries=modal.Retries(max_retries=1),  # preemption; finished configs are skipped on the retry
+	# no retries: a preempted batch is not re-run inside its wave (that would break the worst-case bound); its
+	# committed configs are kept and the rest go into a later, separately bounded wave
 	max_containers=4,
 	scaledown_window=30,  # set, so the idle tail is known: sweep.SCALEDOWN_S bills it (a test checks they match)
 )
@@ -70,6 +72,7 @@ class Sweeper:
 	def check(self) -> dict[str, Any]:
 		"""Start-up check in the real image: imports, the GPU, the volume. Runs no config."""
 		import importlib.metadata as md
+		import os
 
 		import torch
 
@@ -78,7 +81,13 @@ class Sweeper:
 
 		props = torch.cuda.get_device_properties(0)
 		vol.reload()
+		# one small config through the child process and its deadline, written nowhere
+		small = next(c for c in configs.kernel_configs(20) if c.family == "mlp")
+		child = isolate.run_isolated(small, device="cuda", timeout_s=120.0)
 		return {
+			"child_status": child.get("status"),
+			"child_seconds": round(float(child.get("gpu_seconds") or 0.0), 1),
+			"text_asset": os.path.exists(TEXT),
 			"gpu": gpus.resolve(props.name, props.total_memory, props.multi_processor_count),
 			"total_memory": props.total_memory,
 			"torch": torch.__version__,
@@ -87,7 +96,9 @@ class Sweeper:
 		}
 
 	@modal.method()
-	def run_batch(self, requested_gpu: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	def run_batch(
+		self, requested_gpu: str, items: list[dict[str, Any]], timeout_s: float | None = None
+	) -> list[dict[str, Any]]:
 		import time as _time
 
 		import torch
@@ -114,7 +125,9 @@ class Sweeper:
 				out.append({"key": cfg.key, "gpu": actual, "status": "skipped", "gpu_seconds": 0.0})
 				continue
 			# own process and deadline: a hang becomes a timeout row, a kernel fault can't poison the next config
-			res = run_isolated(cfg, device="cuda", data_path=TEXT if cfg.kind == "divergence" else None)
+			res = run_isolated(
+				cfg, device="cuda", data_path=TEXT if cfg.kind == "divergence" else None, timeout_s=timeout_s
+			)
 			res["requested_gpu"] = requested_gpu
 			store.write_once(cfg.kind, actual, cfg.key, make_record(cfg, actual, res), replace_errors=True)
 			uncommitted += 1
@@ -162,7 +175,11 @@ def billing(kind: str, gpu: str, row: dict[str, Any] | None = None) -> dict[str,
 	if row is not None:
 		sweep.add_billing(path, row)
 		vol.commit()
-	return {"billed_s": sweep.billed_seconds(path), "history": sweep.container_history(path)}
+	return {
+		"billed_s": sweep.billed_seconds(path),
+		"history": sweep.container_history(path),
+		"prior_usd": sweep.prior_usd(path),
+	}
 
 
 @app.function(image=image, volumes={MOUNT: vol}, timeout=15 * 60)
@@ -257,11 +274,10 @@ def main(
 	budgets: str = "L4=5",  # the $45 plan (corpus/README.md) passes its own per GPU; never more without Chiya's yes
 	batch_size: int = 8,
 	max_containers: int = 4,
-	overhead: float = 1.25,
 	retry_errors: bool = False,
 	dry_run: bool = False,
 	prior_usd: float = 0.0,  # money this GPU and kind already cost before container billing was recorded (Modal's bill)
-	max_minutes: float = 100.0,  # stop launching waves before remote-run's 120-minute limit
+	max_minutes: float = 100.0,  # every wave's worst case must end inside this; set it under the workflow's timeout
 ) -> None:
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
@@ -286,57 +302,64 @@ def main(
 		import time
 
 		sweeper = Sweeper.with_options(gpu=sweep.modal_gpu(gpu), max_containers=max_containers)()
-		wave_size = batch_size * max_containers
+		default_deadline = DEFAULT_TIMEOUT_S.get(store_kind, 900.0)
+		if prior_usd:
+			billing.remote(
+				store_kind, gpu, {"kind": "prior", "prior_usd": prior_usd}
+			)  # counted once, however often passed
 		wave, last_done = 0, -1
-		started, last_wall = time.monotonic(), 0.0
+		started = time.monotonic()
 		while True:
 			led = ledger.remote(store_kind, gpu, retry_errors and wave == 0)
 			bill = billing.remote(store_kind, gpu)
-			# spend is container time, an upper bound (sweep.wave_billed_seconds), plus what earlier runs cost
-			spent = prior_usd + bill["billed_s"] / 3600 * rates[gpu]
-			# hard cap: configs are priced at their deadline until three waves are measured, then at the p90
-			# container-seconds per config of the measured waves
-			todo = sweep.plan_from(
-				per_gpu[gpu], set(led["done"]), spent, plan[gpu], rates[gpu], overhead=1.0 if bill["history"] else overhead,
-				history=bill["history"], reserve_configs=wave_size,
-				worst_seconds=DEFAULT_TIMEOUT_S.get(store_kind, 900.0),
-			)  # fmt: skip
-			print(
-				f"[{gpu}] wave {wave}: ${spent:.2f} of ${plan[gpu]:.2f} spent (container time), {len(led['done'])} done, {len(todo)} fit in budget"
+			# spend: Modal's figure for earlier runs, plus container time, each wave first billed at its worst case
+			spent = bill["prior_usd"] + bill["billed_s"] / 3600 * rates[gpu] * sweep.RATE_OVERHEAD
+			deadline = sweep.adaptive_deadline(led["history"], default_deadline)
+			todo = [c for c in per_gpu[gpu] if c.key not in set(led["done"])]
+			minutes_left = max_minutes - (time.monotonic() - started) / 60
+			containers, batch = sweep.plan_wave(
+				len(todo), plan[gpu] - spent, minutes_left, deadline, rates[gpu], max_containers, batch_size
 			)
-			if not todo or dry_run:
-				return gpu
-			if (time.monotonic() - started + last_wall) / 60 > max_minutes:
-				print(
-					f"[{gpu}] another wave would pass {max_minutes:.0f} minutes; stopping here, a rerun resumes"
-				)
+			print(
+				f"[{gpu}] wave {wave}: ${spent:.2f} of ${plan[gpu]:.2f} spent (container time, worst case for unsettled "
+				f"waves), {len(led['done'])} done, {len(todo)} to do, deadline {deadline:.0f} s, "
+				f"next wave {containers} x {batch}"
+			)
+			if not todo or not containers or dry_run:
+				if todo and not containers:
+					print(
+						f"[{gpu}] the next wave's worst case doesn't fit the money or the {minutes_left:.0f} minutes left; stopping, a rerun resumes"
+					)
 				return gpu
 			if len(led["done"]) == last_done:
 				print(f"[{gpu}] no progress in the last wave (rows filed under another GPU?); stopping")
 				return gpu
 			last_done = len(led["done"])
-			chunk = sweep.batches(todo[:wave_size], batch_size)
-			args = [(gpu, [c.to_dict() for c in b]) for b in chunk]
-			rows: list[dict[str, Any]] = []
+			chunk = sweep.batches(todo[: containers * batch], batch)
+			args = [(gpu, [c.to_dict() for c in b], deadline) for b in chunk]
+			worst = sweep.worst_wave_seconds(len(args), batch, deadline)
+			billing.remote(store_kind, gpu, {"wave": wave, "kind": "pending", "billed_s": round(worst, 1)})
 			w0 = time.monotonic()
 			results = list(sweeper.run_batch.starmap(args, return_exceptions=True))
-			last_wall = time.monotonic() - w0
-			billed = sweep.wave_billed_seconds(last_wall, len(args))
+			wall = time.monotonic() - w0
+			measured = sweep.wave_billed_seconds(wall, len(args))
 			n_ran = sum(
 				1 for res in results if not isinstance(res, BaseException)
 				for r in res if r.get("status") not in ("skipped", "batch")
 			)  # fmt: skip
 			billing.remote(
 				store_kind, gpu,
-				{"wave": wave, "wall_s": round(last_wall, 1), "containers": len(args), "billed_s": round(billed, 1), "configs": n_ran},
+				{"wave": wave, "kind": "settle", "billed_s": round(measured - worst, 1), "measured_s": round(measured, 1),
+					"wall_s": round(wall, 1), "containers": len(args), "configs": n_ran},
 			)  # fmt: skip
 			print(
-				f"[{gpu}] wave {wave} took {last_wall:.0f} s on {len(args)} containers: {billed:.0f} container-s billed "
-				f"(${billed / 3600 * rates[gpu]:.2f}) for {n_ran} configs"
+				f"[{gpu}] wave {wave} took {wall:.0f} s on {len(args)} containers: {measured:.0f} container-s "
+				f"(${measured / 3600 * rates[gpu] * sweep.RATE_OVERHEAD:.2f}, worst case was ${worst / 3600 * rates[gpu] * sweep.RATE_OVERHEAD:.2f}) for {n_ran} configs"
 			)
+			rows: list[dict[str, Any]] = []
 			for res in results:
 				if isinstance(res, BaseException):
-					# a container died (preemption past its retry, infra); its finished configs are on the volume
+					# a container died (preemption, infra); its committed configs are on the volume, the rest rerun
 					print(f"[{gpu}] a batch failed: {type(res).__name__}: {res}")
 					continue
 				for r in res:

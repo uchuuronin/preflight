@@ -437,3 +437,100 @@ def test_modal_idle_window_matches_what_the_sweep_bills():
 	src = Path(modal_app.__file__).read_text()
 	assert float(re.search(r"scaledown_window=(\d+)", src).group(1)) == sweep.SCALEDOWN_S
 	assert modal_app.COMMIT_EVERY >= 1
+
+
+def test_a_wave_launches_only_if_its_worst_case_fits_money_and_time():
+	from preflight.corpus import sweep as sw
+
+	rate = 0.80 * sw.RATE_OVERHEAD
+	# $6 left, 100 minutes left, configs capped at 120 s: the worst case of whatever launches fits both
+	c, b = sw.plan_wave(
+		500,
+		budget_left_usd=6.0,
+		minutes_left=100.0,
+		deadline_s=120.0,
+		usd_per_hour=0.80,
+		max_containers=4,
+		max_batch=8,
+	)
+	assert c * b > 0
+	worst = sw.worst_wave_seconds(c, b, 120.0)
+	assert worst / 3600 * rate <= 6.0
+	assert (b * 120.0 + sw.STARTUP_S + sw.SCALEDOWN_S) / 60 <= 100.0
+	# 600 s deadlines and 30 minutes left: batches shrink so the slowest container still ends in time
+	c, b = sw.plan_wave(500, 6.0, 30.0, 600.0, 0.80, 4, 8)
+	assert b * 600.0 + sw.STARTUP_S + sw.SCALEDOWN_S <= 30 * 60
+	# not enough money for one worst-case config: nothing launches
+	assert sw.plan_wave(500, 0.05, 100.0, 600.0, 0.80, 4, 8) == (0, 0)
+	# fewer configs than slots: no idle containers are paid for
+	c, b = sw.plan_wave(3, 6.0, 100.0, 120.0, 0.80, 4, 8)
+	assert c * b >= 3 and c <= 3
+
+
+def test_deadline_follows_measured_configs():
+	from preflight.corpus import sweep as sw
+
+	assert sw.adaptive_deadline([], 600.0) == 600.0  # nothing measured: the default
+	measured = [10.0] * 30 + [36.0]
+	d = sw.adaptive_deadline(measured, 600.0)
+	assert sw.MIN_DEADLINE_S <= d < 600.0 and d >= 3 * 36.0 * 0.99
+
+
+def test_pending_rows_bill_a_killed_wave_at_its_worst(tmp_path):
+	from preflight.corpus import sweep as sw
+
+	p = tmp_path / "b.jsonl"
+	sw.add_billing(p, {"wave": 0, "kind": "pending", "billed_s": 4000.0})
+	assert sw.billed_seconds(p) == 4000.0  # killed here: the worst case stays on the bill
+	sw.add_billing(
+		p, {"wave": 0, "kind": "settle", "billed_s": 1200.0 - 4000.0, "configs": 32, "measured_s": 1200.0}
+	)
+	assert sw.billed_seconds(p) == pytest.approx(1200.0)
+	assert sw.container_history(p) == pytest.approx([1200.0 / 32])
+	sw.add_billing(p, {"kind": "prior", "prior_usd": 6.4})
+	sw.add_billing(p, {"kind": "prior", "prior_usd": 6.4})  # passed again on a rerun: counted once
+	assert sw.prior_usd(p) == 6.4
+
+
+@pytest.mark.parametrize("seed", range(40))
+def test_simulated_sweeps_never_pass_the_cap_or_the_clock(seed, tmp_path):
+	"""The wave loop of modal_app.main, with configs that sometimes hang to their deadline and containers whose
+	start-up varies, billed the way Modal bills: every container from start to idle-out."""
+	import random
+
+	from preflight.corpus import sweep as sw
+
+	r = random.Random(seed)
+	budget, max_minutes, rate, default_deadline = (
+		r.choice([0.3, 2.0, 6.0]),
+		r.choice([45.0, 100.0]),
+		0.80,
+		600.0,
+	)
+	n_todo, history, done, path = 600, [], 0, tmp_path / "bill.jsonl"
+	true_bill_s, clock = 0.0, 0.0
+	while n_todo - done > 0:
+		spent = sw.billed_seconds(path) / 3600 * rate * sw.RATE_OVERHEAD
+		deadline = sw.adaptive_deadline(history, default_deadline)
+		c, b = sw.plan_wave(n_todo - done, budget - spent, max_minutes - clock / 60, deadline, rate, 4, 8)
+		if not c:
+			break
+		worst = sw.worst_wave_seconds(c, b, deadline)
+		sw.add_billing(path, {"kind": "pending", "billed_s": worst})
+		walls = []
+		for _ in range(c):
+			start = r.uniform(20, sw.STARTUP_S)
+			# most configs take 5-40 s; one in 30 hangs to its deadline
+			runs = [deadline if r.random() < 1 / 30 else r.uniform(5, 40) for _ in range(b)]
+			history += [x for x in runs if x < deadline]
+			walls.append(start + sum(runs))
+		wall = max(walls)
+		billed = sum(w + sw.SCALEDOWN_S for w in walls)  # what Modal charges
+		true_bill_s += billed
+		clock += wall
+		sw.add_billing(
+			path, {"kind": "settle", "billed_s": sw.wave_billed_seconds(wall, c) - worst, "configs": c * b}
+		)
+		done += c * b
+	assert true_bill_s / 3600 * rate * sw.RATE_OVERHEAD <= budget + 1e-9
+	assert clock / 60 <= max_minutes + 1e-9
