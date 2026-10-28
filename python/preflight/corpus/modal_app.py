@@ -65,7 +65,8 @@ image = (
 	# no retries: a preempted batch is not re-run inside its wave (that would break the worst-case bound); its
 	# committed configs are kept and the rest go into a later, separately bounded wave
 	max_containers=4,
-	scaledown_window=30,  # set, so the idle tail is known: sweep.SCALEDOWN_S bills it (a test checks they match)
+	scaledown_window=30,
+	startup_timeout=180,  # matches sweep.STARTUP_S, so a slow start can't add to the per-wave timeout unbilled  # set, so the idle tail is known: sweep.SCALEDOWN_S bills it (a test checks they match)
 )
 class Sweeper:
 	@modal.method()
@@ -108,7 +109,7 @@ class Sweeper:
 		import torch
 
 		from preflight.corpus.configs import CorpusConfig
-		from preflight.corpus.isolate import run_isolated
+		from preflight.corpus.isolate import KILL_GRACE_S, run_isolated
 		from preflight.corpus.store import ResultStore
 		from preflight.corpus.sweep import make_record
 		from preflight.engine import gpus
@@ -124,7 +125,7 @@ class Sweeper:
 		out = []
 		for d in items:
 			# a restart after preemption sees the same end time, so the wave never runs past its bound
-			if end_at is not None and _time.time() + (timeout_s or 0.0) > end_at:
+			if end_at is not None and _time.time() + (timeout_s or 0.0) + KILL_GRACE_S + 60.0 > end_at:
 				break
 			cfg = CorpusConfig.from_dict(d)
 			prior = store.read(cfg.kind, actual, cfg.key)
@@ -182,16 +183,29 @@ def billing(kind: str, gpu: str, row: dict[str, Any] | None = None) -> dict[str,
 	if row is not None:
 		sweep.add_billing(path, row)
 		vol.commit()
-	import time as _time
-
 	return {
-		"others": sweep.other_leases(path, (row or {}).get("run", ""), _time.time())
-		if (row or {}).get("kind") == "lease"
-		else [],
 		"billed_s": sweep.billed_seconds(path),
 		"history": sweep.container_history(path),
 		"prior_usd": sweep.prior_usd(path),
 	}
+
+
+@app.function(image=image, volumes={MOUNT: vol}, timeout=5 * 60)
+def lease(kind: str, gpu: str, run_id: str, until: float | None = None) -> str | None:
+	"""Take (until given) or release this GPU's budget for a run; returns the run that owns it after a re-read."""
+	import time as _time
+
+	from preflight.corpus import sweep
+
+	d = f"{MOUNT}/_billing/{kind}-{gpu}.leases"
+	vol.reload()
+	if until is None:
+		sweep.release_lease(d, run_id)
+	else:
+		sweep.write_lease(d, run_id, until, _time.time())
+	vol.commit()
+	vol.reload()  # see leases other runs committed meanwhile; each run has its own file, so none is lost
+	return sweep.lease_winner(d, _time.time())
 
 
 @app.function(image=image, volumes={MOUNT: vol}, timeout=15 * 60)
@@ -316,14 +330,19 @@ def main(
 
 		default_deadline = DEFAULT_TIMEOUT_S.get(store_kind, 900.0)
 		run_id = uuid.uuid4().hex[:12]
-		lease = billing.remote(
-			store_kind, gpu, {"kind": "lease", "run": run_id, "until": time.time() + (max_minutes + 30) * 60}
-		)
-		if lease["others"]:
-			print(
-				f"[{gpu}] another run holds this GPU's budget until {lease['others'][0]['until']:.0f}; stopping"
-			)
+		owner = lease.remote(store_kind, gpu, run_id, time.time() + (max_minutes + 30) * 60)
+		if owner != run_id:
+			print(f"[{gpu}] run {owner} holds this GPU's budget; stopping")
+			lease.remote(store_kind, gpu, run_id)  # withdraw ours
 			return gpu
+		try:
+			return _sweep_gpu(gpu, default_deadline)
+		finally:
+			lease.remote(store_kind, gpu, run_id)  # release, so a quick rerun isn't refused
+
+	def _sweep_gpu(gpu: str, default_deadline: float) -> str:
+		import time
+
 		if prior_usd:
 			billing.remote(
 				store_kind, gpu, {"kind": "prior", "prior_usd": prior_usd}

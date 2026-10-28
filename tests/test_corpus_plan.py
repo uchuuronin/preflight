@@ -543,17 +543,20 @@ def test_simulated_sweeps_never_pass_the_cap_or_the_clock(seed, tmp_path):
 	assert clock / 60 <= max_minutes + 1e-9
 
 
-def test_a_second_run_on_the_same_budget_sees_the_first_runs_lease(tmp_path):
-	from preflight.corpus import sweep as sw
-
-	p = tmp_path / "b.jsonl"
-	sw.add_billing(p, {"kind": "lease", "run": "a", "until": 1000.0})
-	assert sw.other_leases(p, "a", 500.0) == []  # its own lease
-	assert [r["run"] for r in sw.other_leases(p, "b", 500.0)] == ["a"]  # another run, still live
-	assert sw.other_leases(p, "b", 1500.0) == []  # expired
-
-
 def test_a_killed_child_is_never_waited_on_forever():
 	from preflight.corpus import isolate
 
 	assert 0 < isolate.KILL_GRACE_S <= 60
+
+
+def test_lease_files_pick_one_winner_and_release(tmp_path):
+	from preflight.corpus import sweep as sw
+
+	d = tmp_path / "leases"
+	sw.write_lease(d, "b", until=1000.0, at=10.0)
+	sw.write_lease(d, "a", until=1000.0, at=10.0)  # same moment: the run id breaks the tie
+	sw.write_lease(d, "c", until=1000.0, at=5.0)
+	assert sw.lease_winner(d, now=100.0) == "c"  # the earliest live lease
+	sw.release_lease(d, "c")
+	assert sw.lease_winner(d, now=100.0) == "a"
+	assert sw.lease_winner(d, now=2000.0) is None  # all expired

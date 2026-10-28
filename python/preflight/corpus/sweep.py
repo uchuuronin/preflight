@@ -143,13 +143,29 @@ def prior_usd(path: str | Path) -> float:
 	)
 
 
-def other_leases(path: str | Path, run_id: str, now: float) -> list[dict[str, Any]]:
-	"""Unexpired leases of other runs on this billing file: two runs sharing one GPU's budget would each see only
-	their own pending waves, so a second run refuses to start."""
-	return [
-		r for r in _billing_rows(path)
-		if r.get("kind") == "lease" and r.get("run") != run_id and float(r.get("until", 0)) > now
-	]  # fmt: skip
+def write_lease(directory: str | Path, run_id: str, until: float, at: float) -> None:
+	"""One file per run, so two runs starting together never overwrite each other's lease."""
+	d = Path(directory)
+	d.mkdir(parents=True, exist_ok=True)
+	(d / f"{run_id}.json").write_text(json.dumps({"run": run_id, "until": until, "at": at}))
+
+
+def release_lease(directory: str | Path, run_id: str) -> None:
+	(Path(directory) / f"{run_id}.json").unlink(missing_ok=True)
+
+
+def lease_winner(directory: str | Path, now: float) -> str | None:
+	"""The run that owns this GPU's budget: the earliest live lease, the run id breaking ties."""
+	d = Path(directory)
+	live = []
+	for f in d.glob("*.json") if d.exists() else []:
+		try:
+			r = json.loads(f.read_text())
+		except (json.JSONDecodeError, OSError):
+			continue
+		if float(r.get("until", 0)) > now:
+			live.append((float(r.get("at", 0)), str(r.get("run")), r))
+	return min(live)[1] if live else None
 
 
 def add_billing(path: str | Path, row: dict[str, Any]) -> None:
