@@ -56,13 +56,31 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	// A notebook tab (D's intake panel) previews what will run, so notebooks go through it there.
 	const notebookTab = extraIntake.some((p) => p.id === NOTEBOOK_TAB);
 	const check = uploadSource(picked, entry, { notebooks: !notebookTab });
-	// Sources handed over by intake panels, by panel id.
+	// Sources handed over by intake panels, by panel id. A panel unmounts when its tab is left and
+	// forgets what it showed, so leaving a tab drops its source too (switchTab).
 	const [handed, setHanded] = useState<Record<string, JobRequest["source"] | null>>({});
 	const handedSource = intake !== "repo" && intake !== "upload" ? (handed[intake] ?? null) : null;
+	const handedTooBig = handedSource !== null && new TextEncoder().encode(JSON.stringify(handedSource)).length > MAX_TOTAL_BYTES;
+	// One stable setSource per panel, so a panel may call it from an effect without a render loop.
+	const setters = useRef(new Map<string, (src: JobRequest["source"] | null) => void>());
+	const setterFor = (id: string) => {
+		let fn = setters.current.get(id);
+		if (!fn) {
+			fn = (src) => setHanded((m) => (m[id] === src ? m : { ...m, [id]: src }));
+			setters.current.set(id, fn);
+		}
+		return fn;
+	};
+	const switchTab = (next: Intake) => {
+		if (next === intake) return;
+		setHanded((m) => (m[intake] == null ? m : { ...m, [intake]: null }));
+		setError(null);
+		setIntake(next);
+	};
 
 	// GitHub only: A's runner fetches from GitHub, and the API pins the link to a commit there.
 	const canSubmit =
-		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : uploadsOpen && handedSource !== null;
+		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : uploadsOpen && handedSource !== null && !handedTooBig;
 
 	const pick = async (list: FileList | null) => {
 		if (!list?.length) return;
@@ -90,10 +108,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const submit = async () => {
 		setError(null);
 		if (intake === "upload" && !check.ok) return;
-		if (handedSource && new TextEncoder().encode(JSON.stringify(handedSource)).length > MAX_TOTAL_BYTES) {
-			setError(t("newflight.upload.too_big"));
-			return;
-		}
+		if (handedTooBig) return;
 		setBusy(true);
 		const body: JobRequest = {
 			source:
@@ -150,7 +165,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								{ id: "upload", key: "newflight.tab.upload" },
 								...extraIntake.map((p) => ({ id: p.id, key: p.titleKey })),
 							].map((tab) => (
-								<button key={tab.id} type="button" role="tab" aria-selected={intake === tab.id} onClick={() => setIntake(tab.id)}>
+								<button key={tab.id} type="button" role="tab" aria-selected={intake === tab.id} onClick={() => switchTab(tab.id)}>
 									{t(tab.key)}
 								</button>
 							))}
@@ -177,7 +192,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 										}}
 									>
 										{t("newflight.upload.label")}
-										<small>{t("newflight.upload.limits")}</small>
+										<small>{t(notebookTab ? "newflight.upload.limits_scripts" : "newflight.upload.limits")}</small>
 										<input
 											id={ids.upload}
 											type="file"
@@ -241,8 +256,13 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									.map((p) => (
 										<div key={p.id} className="pf-pane">
 											<AddonBoundary id={p.id}>
-												<p.component setSource={uploadsOpen ? (src) => setHanded((m) => ({ ...m, [p.id]: src })) : undefined} />
+												<p.component setSource={uploadsOpen ? setterFor(p.id) : undefined} />
 											</AddonBoundary>
+											{handedTooBig ? (
+												<p className="pf-error" role="alert">
+													{t("newflight.handed.too_big")}
+												</p>
+											) : null}
 										</div>
 									))
 							)}
