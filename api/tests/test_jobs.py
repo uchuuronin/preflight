@@ -17,7 +17,8 @@ BODY = {
 	"objective": {"kind": "min_cost"},
 	"gpu": "L4",
 }
-KEY = {"Idempotency-Key": "k-0123456789"}
+# A check-in key the way the web app makes them (a request id, not a secret).
+KEY = {"Idempotency-Key": "checkin-aaaa-0001"}
 
 
 class QueueFull(RuntimeError):
