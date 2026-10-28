@@ -61,6 +61,8 @@ def _installed_package() -> Path:
 
 
 PKG = _REPO / "python" / "preflight" if _REPO is not None else _installed_package()
+# bytecode differs between the deploy machine and a container: keep it out so the mounts match
+_NOT_SOURCE = ["**/__pycache__", "**/__pycache__/**", "**/*.pyc"]
 ZOO_SRC = _REPO / "zoo" if _REPO is not None else Path(os.environ.get("PREFLIGHT_ZOO", "/root/zoo"))
 REMOTE_PKG = "/opt/preflight"  # not under /root (0700): probes import it as an unprivileged uid
 RECORDS_DIR = "/records"
@@ -112,8 +114,8 @@ _base = modal.Image.debian_slim(python_version="3.11").env(
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
-	.add_local_dir(ZOO_SRC, "/root/zoo")
-	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight")
+	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 probe_image = (
 	_base.apt_install("git")
@@ -127,7 +129,7 @@ probe_image = (
 			"PREFLIGHT_PROBE_UID": "61000",
 		}
 	)
-	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight")
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 
 jobs_dict = modal.Dict.from_name("preflight-jobs", create_if_missing=True)
