@@ -134,6 +134,19 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Oct 28 04:35 | `a-prefetch-main-2` (40633194148): Qwen2.5-1.5B and gpt2 in `preflight-weights` | none (CPU) | 1.4 | under $0.01 (estimate) |
 | Oct 28 04:37 | `a-smoke-l4-main-2` (40633354342): submit refused (`StoreUnavailable`), no job ran | none | 0.6 | $0 GPU |
 | Oct 28 04:38 | `a-stop-main-2` (40633463121): out/stop.json `stopped: true` | none | 0.3 | $0 |
+| Oct 28 05:09 | `a-startup-check-3` (40636359093): ok; container environment `main` seen; guard says "not deployed" from the ops app | none | 1 | under $0.01 (estimate) |
+| Oct 28 05:11 | `a-deploy-main-3` (40636474757): deployed 05:11:36, stopped 05:14 | none | 3 deployed | under $0.01 (estimate) |
+| Oct 28 05:11 | `a-smoke-l4-main-3` (40636560937): the job ran end to end (fetch, map, Muse Spark map, plan, 3 probes, record), but every probe failed at sandbox creation in 0.01 s | none (no sandbox started) | 1.2 | Muse Spark $0.020047 (measured, 4,937 in and 3,265 out tokens); $0 GPU |
+| Oct 28 05:13 | `a-stop-main-3` (40636720429): out/stop.json `stopped: true` | none | 0.4 | $0 |
+
+Third attempt, Oct 28 05:09 to 05:14 UTC: the deployed job store took its state (the guard works),
+and the job went from submit to a stored record (share token `oZKPJ2pUoLBf5itdEpXWSA`) through
+Muse Spark. All three probes failed as "The probe sandbox ended without a result" in 0.01 s:
+`modal.Sandbox.create` or its first `exec` raised server-side (local validation passes; the text
+is only in the worker's log). The startup check now also creates a real CPU sandbox with the
+worker's own factory and runs the probe entry through SandboxRunner, returning the exception text,
+so the next run names the cause before any GPU. Also found: the record's `costs.llm_usd` stayed 0
+although the call carried its cost; the merge now sums the record's model calls.
 
 Second attempt, Oct 28 04:33 to 04:39 UTC: the startup fix held, but every `modal run` of
 `modal_app.py` (the startup check, prefetch, smoke) started a temporary copy of the app, and that

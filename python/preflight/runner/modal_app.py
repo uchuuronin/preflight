@@ -341,14 +341,17 @@ class JobStoreService:
 # ---------------------------------------------------------------- workers
 
 
-def _sandbox_factory():
+def _sandbox_factory(owner=None):
+	"""The probe sandbox, created inside `owner` (this app by default; the startup check passes its
+	own running app). gpu "cpu" makes a GPU-less sandbox with every other setting the same."""
+
 	def create(gpu: str):
 		from preflight.probes.gpu_choice import modal_gpu
 
 		return modal.Sandbox.create(
-			app=app,
+			app=owner if owner is not None else app,
 			image=probe_image,
-			gpu=modal_gpu(gpu),
+			gpu=None if gpu == "cpu" else modal_gpu(gpu),
 			timeout=30 * 60,
 			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes
 			outbound_domain_allowlist=EGRESS,

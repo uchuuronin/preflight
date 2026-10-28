@@ -148,6 +148,47 @@ def startup_check_probe() -> dict:
 		"backend": r.env.backend if r.env else None, "log_tail": r.log_tail[-600:]}  # fmt: skip
 
 
+@ops.function(image=worker_image, timeout=600)
+def startup_check_sandbox() -> dict:
+	"""What run_worker does for every probe, on a CPU sandbox: the runner's own sandbox factory
+	(same image, allowlist, read-only weights, timeouts), then the probe entry run through
+	SandboxRunner with a tiny spec. Reports the exception text if any step fails."""
+	import traceback
+
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner.modal_app import _sandbox_factory
+	from preflight.runner.sandbox_runner import ENTRY, SandboxRunner
+
+	owner = modal.App._get_container_app()
+	out: dict = {"entry": list(ENTRY)}
+	create = _sandbox_factory(owner)
+	try:
+		sb = create("cpu")
+		out["created"] = True
+		p = sb.exec(
+			"python",
+			"-c",
+			"import preflight, torch; print('IMPORT', preflight.__file__, torch.__version__)",
+			timeout=120,
+		)
+		out["import_stdout"] = p.stdout.read()[-500:]
+		out["import_stderr"] = p.stderr.read()[-1500:]
+		p.wait()
+		out["import_exit"] = p.returncode
+		sb.terminate()
+	except Exception as exc:
+		out["created"] = out.get("created", False)
+		out["failed"] = f"{type(exc).__name__}: {exc}"[:2000]
+		out["traceback"] = traceback.format_exc()[-3000:]
+		return out
+	with SandboxRunner(create) as runner:
+		r = runner(ProbeSpec(probe_id="check", files={"train.py": _CHECK_LOOP}, entrypoint="train.py", timeout_s=240),
+			"cpu", should_stop=lambda: False)  # fmt: skip
+	out.update(probe_status=r.probe.status, probe_steps=r.probe.steps, probe_error=r.probe.error,
+		probe_error_code=r.probe.error_code)  # fmt: skip
+	return out
+
+
 @ops.local_entrypoint()
 def startup_check():
 	"""Before any deploy: import and start both images' code as Modal runs it, with no GPU.
@@ -158,16 +199,22 @@ def startup_check():
 	import sys
 
 	result: dict = {}
-	for name, fn in (("worker", startup_check_worker), ("probe", startup_check_probe)):
+	checks = (
+		("worker", startup_check_worker),
+		("probe", startup_check_probe),
+		("sandbox", startup_check_sandbox),
+	)
+	for name, fn in checks:
 		try:
 			result[name] = fn.remote()
 		except Exception as exc:  # the remote traceback is in the log above
 			result[name] = {"failed": f"{type(exc).__name__}: {exc}"[:2000]}
-	w, p = result["worker"], result["probe"]
+	w, p, sb = result["worker"], result["probe"], result["sandbox"]
 	result["ok"] = bool(
 		"failed" not in w and w.get("lens") == "finetune" and w.get("knobs", 0) > 0 and w.get("saves", 0) >= 1
 		and w.get("job_store_would_claim_here") is False and "runner_loaded_as" in w
 		and "failed" not in p and p.get("status") == "ok" and p.get("steps", 0) > 0 and p.get("reachable_by_probe_uid")
+		and "failed" not in sb and sb.get("import_exit") == 0 and sb.get("probe_status") == "ok"
 	)  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path("out/startup_check.json").write_text(json.dumps(result, indent=2))

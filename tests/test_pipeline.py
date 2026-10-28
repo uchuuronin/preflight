@@ -311,3 +311,25 @@ def test_cache_hits_carry_this_points_labels_not_the_cached_runs(tmp_path):
 	rec = run_pipeline(req, _Ctx(), deps(tmp_path, runner, cache=cache))
 	assert all(p.started_at is None and p.cost.usd == 0 for p in rec.probes)
 	assert rec.probes[1].knobs == {"batch_size": 4, "seq_len": 64}
+
+
+def test_the_records_model_calls_count_in_its_cost(tmp_path):
+	import preflight.runner.pipeline as pl
+	from preflight.schema import ModelCall
+
+	call = ModelCall(provider="meta", model="muse-spark-1.3", purpose="script_map", input_tokens=4937,
+		output_tokens=3265, cost_usd=0.020047, at="2026-10-28T05:12:00Z")  # fmt: skip
+
+	def fake_map(files, *, entrypoint, client):
+		return pl.map_static(files, entrypoint=entrypoint), [call]
+
+	pl_map = pl.map_script
+	pl.map_script = fake_map
+	try:
+		rec = run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(),
+			deps(tmp_path, FakeRunner(), spark=object()))  # fmt: skip
+	finally:
+		pl.map_script = pl_map
+	assert rec.costs.llm_usd == pytest.approx(0.020047)
+	assert rec.costs.breakdown["model_calls"] == pytest.approx(0.020047)
+	assert rec.costs.total_usd == pytest.approx(rec.costs.gpu_usd + 0.020047)

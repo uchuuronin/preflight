@@ -638,7 +638,11 @@ def _merge(
 		over = billed_usd - kept - discarded_usd
 		breakdown["sandbox_overhead"] = round(prior.get("sandbox_overhead", 0.0) + over, 6)
 	gpu_usd = round(rec.costs.gpu_usd + job_usd, 6)
-	costs = rec.costs.model_copy(update={"gpu_usd": gpu_usd, "breakdown": breakdown})
+	# every model call the record carries (a derived record keeps its parent's), priced per call
+	llm_usd = round(sum(c.cost_usd for c in rec.provenance), 6)
+	if llm_usd:
+		breakdown["model_calls"] = llm_usd
+	costs = rec.costs.model_copy(update={"gpu_usd": gpu_usd, "llm_usd": llm_usd, "breakdown": breakdown})
 	update["costs"] = costs
 	return FlightRecord.model_validate({**rec.model_dump(), **{k: v for k, v in update.items()}})
 
