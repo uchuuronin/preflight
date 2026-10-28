@@ -9,7 +9,7 @@ volume committed after every config, so a preempted container loses one config.
 Run from the repo root (PYTHONPATH=python so the package is importable):
 
     PYTHONPATH=python modal run python/preflight/corpus/modal_app.py --dry-run
-    modal run python/preflight/corpus/modal_app.py --kind grouped --n 300 --budgets "L4=5.5"
+    modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets "L4=5.5"
     modal run python/preflight/corpus/modal_app.py::export --kind kernels
 
 Agents start these through remote-run.yml, only after Chiya's yes; the plan and caps are in corpus/README.md.

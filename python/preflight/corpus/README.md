@@ -45,33 +45,33 @@ Every config has a content-addressed key and is written once. A restarted sweep 
 Cloud runs go through `remote-run.yml`; B holds no keys (docs/setup/cloud.md). Each phase is one workflow run of at most 120 minutes, and a sweep cut short resumes from the volume on its next run. Phase 0:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py --kind hf --budgets L4=0.4 --batch-size 2 --max-containers 1"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=0.4 --batch-size 2 --max-containers 1"
 ```
 
 Phases 1 and 2, with the caps from the table (each GPU runs in parallel inside one run):
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l4 -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py --kind grouped --n 300 --budgets L4=5.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l4 -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets L4=5.5"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py --kind hf --budgets L4=2.5,A10=3.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=2.5,A10=3.5"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-gpus -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py --kind grouped --n 300 --budgets T4=1,A10=7.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-gpus -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets T4=1,A10=7.5"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l40s -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py --kind grouped --n 200 --budgets L40S=9"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l40s -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 200 --budgets L40S=9"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a100 -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py --kind grouped --n 100 --budgets A100-SXM-80GB=5.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a100 -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 100 --budgets A100-SXM-80GB=5.5"
 ```
 
 Bring the rows back (a CPU container, about a cent), then read them from the `remote-runs` branch:
