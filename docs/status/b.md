@@ -81,13 +81,19 @@ Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; fr
   - corpus: grouped probe-like configs, 10 real HF LoRA and 4-bit jobs (pinned library versions, which are now part of each config's key), and `corpus.calibrate` to turn them into the table;
   - memory refinements: optimizer-step moment, autocast weight cache, FSDP root unit, accumulated eval logits, LoRA frozen layers saving fewer activations, and flash attention no longer counted twice;
   - the AMD droplet's uptime ledger: `--billing uptime` counts the droplet's whole bill, idle time included, and logs each config with the spend so far.
-- Tests live in root `tests/`; 773 pass across the repo (A's included), ruff clean with the repo config.
+- **Run cost (gap 21, contract 0.2.0):** `engine.api.run_cost(record, knob_values, provider=, billing=, region=)` returns `cost_basis` and `job_cost`, and `fill_predictions` writes both, replacing the golden fixture.
+  - GPU-hours x a dated price-table row, with redone work as its own line when the interruption rate is known.
+  - Own cluster: GPU-hours first, with a grey market equivalent.
+  - Agent and API runs: a tokens line.
+  - Money at risk sits beside the total, never in it; its range spans the P(OOM) bin's edges (S7).
+  - `engine/gpus.py` now reads its prices from `engine/prices`, so there is one table.
+  - Storage isn't billed yet: no paid storage rows.
+- Tests live in root `tests/`; 792 pass across the repo (all agents' tests included), ruff clean with the repo config.
 
 ## Blocked
 - The L4 runs that build the real calibration table (grouped and HF jobs), and one real call to confirm L4 capacity, wait on Chiya's one-time Modal setup in docs/setup/cloud.md; after that B starts them through `remote-run.yml`.
 
 ## Next (Wed Oct 28)
-- Run-cost breakdown (gap 21): fill contract 0.2.0's `cost_basis` and `job_cost` from the price table started in `engine/prices/`.
 - NVIDIA corpus slice re-planned to $45 of Modal: grouped and HF jobs on T4 and L4 first, then A10 and L40S, a few A100 rows for the cross-GPU holdout.
 - Real held-out calibration on the L4 once Modal access lands; model cards switch to `held_out` per target as the table covers it.
 - Agent cost from tokens when tasks lack `cost_usd`, once D's price table lands.

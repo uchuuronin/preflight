@@ -22,7 +22,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from preflight.engine import agent_cost, conformal, gpus, knobs, memory, steptime
+from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, steptime
 from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
@@ -35,7 +35,7 @@ from preflight.schema.prediction import (
 	Predictions,
 	Target,
 )
-from preflight.schema.record import FlightRecord, Knob, ModelCard, Range
+from preflight.schema.record import CostBasis, CostLine, FlightRecord, JobCost, Knob, ModelCard, Range
 
 LEVEL = 0.9  # cited: contract, 90% intervals
 API_LENSES = frozenset({"agent"})
@@ -47,6 +47,7 @@ MODEL_ID_COST = "cost-gpu-hours@0.1.0"
 MODEL_ID_AGENT_TIME = "agent-time-concurrency@0.1.0"
 MODEL_ID_CONTEXT = "agent-context-fill@0.1.0"
 MODEL_ID_PREEMPT = "preemption-poisson@0.1.0"
+MODEL_ID_RUN_COST = "run-cost@0.1.0"
 
 _TARGETS = {
 	"memory.peak": ("bytes", "memory"),
@@ -811,6 +812,8 @@ class _TimeResult:
 	step: Estimate
 	sigma: float
 	phases: dict | None = None
+	first_s: float = 0.0  # compile and warm-up, paid once before the first step
+	steps: float | None = None
 
 
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
@@ -834,7 +837,7 @@ def _time(record: FlightRecord, values: dict) -> _TimeResult:
 		MODEL_ID_TOTAL,
 		reason,
 	)
-	return _TimeResult(total, step.est, step.sigma, step.phases)
+	return _TimeResult(total, step.est, step.sigma, step.phases, step.first_extra_s, steps)
 
 
 def _total_status(step: Estimate) -> str:
@@ -1094,6 +1097,256 @@ def _context_fill(tasks, values) -> Estimate:
 		status = "extrapolated"
 		why = f"{overflowed} sampled task{'s' if overflowed != 1 else ''} hit the limit, so their real need is higher"
 	return _est(point, lo, max(hi, point), "fraction", status, mid, why)
+
+
+# ---------------------------------------------------------------- run cost (contract 0.2.0, gap 21)
+
+
+def _scale(
+	e: Estimate, k: float, unit: str, mid: str = MODEL_ID_RUN_COST, why: str | None = None
+) -> Estimate:
+	if e.status == "abstain":
+		return _abstain(unit, mid, e.reason or "nothing to price")
+	return _est(e.point * k, e.lo * k, e.hi * k, unit, _total_status(e), mid, why or e.reason)
+
+
+def _sum(parts: list[Estimate], unit: str, why: str | None = None) -> Estimate:
+	"""Lows and highs added line by line (contract 0.2.0): a deliberately cautious total."""
+	if not parts:
+		return _abstain(unit, MODEL_ID_RUN_COST, "nothing billed")
+	bad = next((e for e in parts if e.status == "abstain"), None)
+	if bad is not None:
+		return _abstain(unit, MODEL_ID_RUN_COST, bad.reason or "a line can't be priced")
+	order = ("measured", "predicted", "extrapolated")
+	status = max((_total_status(e) for e in parts), key=order.index)
+	return _est(
+		sum(e.point for e in parts),
+		sum(e.lo for e in parts),
+		sum(e.hi for e in parts),
+		unit,
+		status,
+		MODEL_ID_RUN_COST,
+		why,
+	)
+
+
+def _gpu_row(
+	gpu: str, provider: str, region: str | None, billing: str
+) -> tuple[prices.GpuRate | None, str | None]:
+	"""The price row for this GPU, and a note when it isn't the one asked for."""
+	kind = "spot" if billing == "spot" else "on_demand"
+	row = prices.gpu_rate(gpu, provider, region, kind)
+	if row is not None:
+		return row, None
+	if kind == "spot":
+		row = prices.gpu_rate(gpu, provider, region, "on_demand")
+		if row is not None:
+			return row, f"no spot rate listed for {gpu} on {provider}, so the on-demand rate is used"
+	row = prices.market_reference(gpu)
+	if row is not None:
+		where = f"{provider} ({region})" if region else provider
+		what = "spot or on-demand rate" if kind == "spot" else "rate"
+		return (
+			row,
+			f"no {where} {what} for {gpu}; the cheapest listed on-demand rate ({row.provider}, {row.region}) is used",
+		)
+	return None, None
+
+
+def _peak_moment(record: FlightRecord, values: dict, mem: _MemoryResult) -> str:
+	"""When the peak comes: from the memory estimate, else the analytical breakdown (an OOM probe carries none)."""
+	if mem.detail is not None and mem.detail.breakdown is not None:
+		return mem.detail.breakdown.peak_moment
+	gpu = _target_gpu(record, values)
+	try:
+		arch, setup, shape = knobs.setup_from(record.job.script_map, values)
+		cap = gpus.get_gpu(gpu).capacity_bytes() if gpu else None
+		return memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap).peak_moment
+	except (ValueError, AttributeError, KeyError):
+		return "train"
+
+
+def _crash_point(record: FlightRecord, values: dict, moment: str, steps: float) -> tuple[float, str]:
+	"""Steps run before an out-of-memory error stops the job, and where that is in words."""
+	if moment != "eval":
+		return 1.0, "the first step"
+	sm = record.job.script_map
+	tr = sm.training if sm else None
+	every = values.get("eval_every") or (tr.eval_every if tr else None)
+	if every and float(every) < steps:
+		return float(every), f"the first eval ({float(every):,.0f} steps in)"
+	if every:
+		return steps, f"the eval at the end of the run ({steps:,.0f} steps in)"
+	epochs = float(values.get("epochs") or (tr.epochs if tr else None) or 1.0)
+	n = max(1.0, math.ceil(steps / max(epochs, 1.0)))  # no step interval: eval at the end of each epoch
+	return n, f"the first eval, at the end of the first epoch ({n:,.0f} steps in)"
+
+
+def _at_risk(
+	record: FlightRecord,
+	values: dict,
+	mem: _MemoryResult,
+	tm: _TimeResult,
+	usd_per_s: float | None,
+	why_rate: str,
+) -> Estimate:
+	"""P(OOM) x the cost up to the crash. Its range spans the P(OOM) bin's edges (S7), since the bin is all the
+	screen claims about the probability until the reliability check passes."""
+	oom = mem.oom
+	if oom.status == "abstain":
+		return _abstain("usd", MODEL_ID_RUN_COST, oom.reason or "no out-of-memory estimate")
+	if tm.step.status == "abstain" or tm.steps is None:
+		return _abstain("usd", MODEL_ID_RUN_COST, tm.total.reason or "no step time, so no cost up to a crash")
+	if usd_per_s is None:
+		return _abstain("usd", MODEL_ID_RUN_COST, why_rate)
+	moment = _peak_moment(record, values, mem)
+	n, where = _crash_point(record, values, moment, tm.steps)
+	h = memory.Z90 * tm.sigma
+	step = tm.step.point
+	# checkpoint saves and eval passes up to the crash; the eval that crashes is counted whole, a cautious upper end
+	fixed = tm.first_s + _overheads(record, values, n)[0]
+	c_pt = (fixed + n * step) * usd_per_s
+	c_lo = (fixed + n * step * math.exp(-h)) * usd_per_s
+	c_hi = (fixed + n * step * math.exp(h)) * usd_per_s
+	p = oom.point
+	if oom.status == "measured":
+		p_lo = p_hi = p
+	else:
+		edges = next((lo, hi) for lo, hi, label in oom_model.BINS if label == oom_model.bin_label(p))
+		p_lo, p_hi = edges[0], min(edges[1], 1.0)
+	if oom.status == "measured":
+		why = f"a probe ran out of memory at these settings, so the run stops at {where}; {why_rate}"
+	else:
+		why = f"P(out of memory) {oom_model.bin_label(p)} x the cost up to {where}; {why_rate}"
+	order = ("predicted", "extrapolated")
+	status = max(
+		("predicted" if oom.status == "measured" else oom.status, _total_status(tm.step)), key=order.index
+	)
+	return _est(p * c_pt, p_lo * c_lo, p_hi * c_hi, "usd", status, MODEL_ID_RUN_COST, why)
+
+
+def _basis(record: FlightRecord, provider: str | None, billing: str | None, region: str | None) -> CostBasis:
+	prior = record.cost_basis
+	if provider is None:
+		provider = (
+			prior.provider
+			if prior
+			else (record.env.provider if record.env and record.env.provider else "modal")
+		)
+	return CostBasis(
+		price_table=f"prices@{prices.PRICE_TABLE_VERSION}",
+		as_of=prices.PRICE_TABLE_VERSION,
+		provider=provider,
+		region=region or (prior.region if prior else None),
+		billing=billing or (prior.billing if prior else "on_demand"),
+		includes=["gpu", "tokens"],
+	)
+
+
+def _api_cost(record: FlightRecord, values: dict, basis: CostBasis) -> JobCost:
+	est = _agent(record, values)
+	tokens, usd = est["tokens.total"], est["cost.total"]
+	model = values.get("model") or _sampled_model(record)
+	row = prices.token_rate(model) if model else None
+	rate = (
+		usd.point / tokens.point
+		if usd.status != "abstain" and tokens.status != "abstain" and tokens.point
+		else None
+	)
+	line = CostLine(
+		kind="tokens",
+		label_key="cost.line.tokens",
+		quantity=tokens,
+		rate_usd=rate,  # blended USD per token over the sampled tasks' input and output
+		usd=usd,
+		price_row=row.id if row else None,
+	)
+	return JobCost(lines=[line], total_usd=_sum([usd], "usd", usd.reason))
+
+
+def run_cost(
+	record: FlightRecord,
+	knob_values: dict | None = None,
+	provider: str | None = None,
+	billing: str | None = None,
+	region: str | None = None,
+) -> tuple[CostBasis, JobCost]:
+	"""The run's cost breakdown and where its rates come from (contract 0.2.0). Preflight's own spend is
+	`record.costs`, never here; money at risk sits beside the total, never in it."""
+	basis = _basis(record, provider, billing, region)
+	values = _values(record, knob_values)
+	why = _invalid(values)
+	if why:
+		return basis, JobCost(total_usd=_abstain("usd", "input-check@0.1.0", why))
+	if _api_lens(record):
+		return basis, _api_cost(record, values, basis)
+	mem, tm = _memory(record, values), _time(record, values)
+	gpu, n = _target_gpu(record, values), _n_gpus(values, record)
+	own = basis.billing == "own_cluster"
+	row, note = _gpu_row(gpu, basis.provider, basis.region, basis.billing) if gpu else (None, None)
+	if row is None:
+		why_rate = f"no price for {gpu or 'this GPU'} in the table"
+	else:
+		why_rate = f"{gpu} at ${row.usd_per_hour:.2f}/h ({row.provider}, {row.as_of})"
+		if note:
+			why_rate += f"; {note}"
+	if own and row is not None:
+		why_rate = f"at the {row.provider} on-demand rate, ${row.usd_per_hour:.2f}/h, since your cluster bills in GPU-hours"
+	per_s = row.usd_per_hour * n / 3600.0 if row else None
+
+	def line(label: str, seconds: Estimate) -> CostLine:
+		gpus_why = f"{n} x {gpu}" if gpu else None
+		hours = _scale(
+			seconds,
+			n / 3600.0,
+			"gpu_hours",
+			why="; ".join(x for x in (gpus_why, seconds.reason) if x) or None,
+		)
+		billed = not own and row is not None
+		if billed:
+			usd = _scale(hours, row.usd_per_hour, "usd", why=why_rate)
+		elif not own:  # billed in dollars, but this GPU has no price: say so on the line, not just the total
+			usd = _abstain("usd", MODEL_ID_RUN_COST, why_rate)
+		else:
+			usd = None
+		return CostLine(
+			kind="gpu",
+			label_key=label,
+			quantity=hours,
+			rate_usd=row.usd_per_hour if billed else None,
+			usd=usd,
+			price_row=row.id if row else None,
+		)
+
+	lines = [line("cost.line.gpu", tm.total)]
+	if record.job.constraints.preemption.kind != "none":
+		loss = _preemption(record, values, tm)
+		if loss.status != "abstain":
+			lines.append(line("cost.line.gpu_redo", loss))  # work redone after interruptions
+	hours = _sum([x.quantity for x in lines], "gpu_hours")
+	if own:
+		total = None
+		market = (
+			_scale(hours, row.usd_per_hour, "usd", why=why_rate)
+			if row
+			else _abstain("usd", MODEL_ID_RUN_COST, why_rate)
+		)
+	else:
+		total = _sum([x.usd for x in lines if x.usd is not None], "usd", why_rate)
+		market = None
+	if not own and basis.billing == "spot" and len(lines) == 1:
+		why_spot = (
+			"spot: the interruption rate isn't known, so redone work isn't counted; set it under constraints"
+		)
+		total = (
+			total.model_copy(update={"reason": "; ".join(x for x in (total.reason, why_spot) if x)})
+			if total
+			else total
+		)
+	at_risk = _at_risk(record, values, mem, tm, per_s, why_rate)
+	return basis, JobCost(
+		lines=lines, total_usd=total, gpu_hours=hours, market_equivalent_usd=market, at_risk_usd=at_risk
+	)
 
 
 # ---------------------------------------------------------------- the three calls
@@ -1394,7 +1647,12 @@ _CARDS = {
 	),
 	steptime.MODEL_ID_CROSS: ("analytical", "per-kernel roofline replay (K1), class fallback (K4); S4"),
 	MODEL_ID_TOTAL: ("analytical", "steps x step time plus measured checkpoint and eval overheads"),
-	MODEL_ID_COST: ("rule", "GPU-hours x the dated price in engine/gpus.py"),
+	MODEL_ID_COST: ("rule", "GPU-hours x the dated price in engine/prices"),
+	MODEL_ID_RUN_COST: (
+		"rule",
+		"run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is "
+		"P(OOM) over its bin's edges x the cost up to the crash (S7)",
+	),
 	MODEL_ID_PREEMPT: (
 		"simulation",
 		"Poisson interruptions, half a checkpoint interval redone each (Young/Daly)",
@@ -1475,7 +1733,15 @@ def fill_predictions(record: FlightRecord) -> FlightRecord:
 	preds = predictions_for(record)
 	used = {e.model_id for e in preds.estimates.values()} | {g.model_id for g in preds.grids}
 	used.discard("none")
+	used |= {MODEL_ID_RUN_COST}
 	others = [m for m in record.models if m.id not in used and not m.id.startswith("golden-fixture")]
+	basis, cost = run_cost(record)
 	return record.model_copy(
-		update={"predictions": preds, "models": [*others, *_cards(used)], "knobs": _probed_ranges(record)}
+		update={
+			"predictions": preds,
+			"models": [*others, *_cards(used)],
+			"knobs": _probed_ranges(record),
+			"cost_basis": basis,
+			"job_cost": cost,
+		}
 	)

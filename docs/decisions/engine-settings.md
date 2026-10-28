@@ -187,3 +187,16 @@ Chiya chose 30 tasks with the 80% bound as the default. When the cost range stra
 
 The rule meets the 88% target. A range that misses tends not to straddle the budget either, so runs that skip the top-up cover less (about 78%), and the topped-up ones make up for it. Under and over calls are right 94% of the time. The top-up settles only about one straddle in six when budgets sit this close to the true cost. So the guide should promise a narrower range, not a settled answer. Reproduce with `uv run python scripts/mc_engine_settings.py s6b`.
 
+
+## S7. The range on money at risk (gap 21)
+
+Money at risk is P(OOM) x the cost up to the crash: the first eval when the peak comes at eval, else the first step (Chiya, Oct 26). The cost up to the crash has its own band from the step-time error. The question is how wide the dollar range should be, given that P(OOM) is shown only as a bin until the reliability check on real outcomes passes. 200,000 simulated jobs: a memory band of log-sigma 0.05 to 0.2, a true residual spread off from the band by a log-normal factor (1.5x, 2x or 4x at 2 sd), probabilities from 0 to 1, and a correctly sized cost band. The target is 90% coverage of the true expected loss.
+
+| Range | Coverage (1.5x / 2x / 4x off) | Coverage, P(OOM) 5-70%, 2x off | Median width / point |
+| --- | --- | --- | --- |
+| A. Point P(OOM) x the cost band | 52.6% / 46.5% / 38.8% | 57.1% | 0.50 |
+| B. The bin's edges x the cost band | 96.1% / 92.8% / 84.4% | 90.5% | 1.68 |
+| C. P(OOM) at half and double the band's sigma x the cost band | 98.7% / 96.8% / 82.7% | 97.3% | 1.38 |
+| D. Point P(OOM) x the cost band widened 2x | 77.2% / 69.7% / 61.1% | 91.2% | 2.17 |
+
+**Chosen: B.** It meets 90% while the model's spread is off by up to 2x, it claims nothing about P(OOM) beyond the bin the screen shows, and it works the same whether P(OOM) comes from the simulated band or from held-out residuals. C is narrower and covers more in this world, but it needs a sigma, and empirical P(OOM) has none. It is also built on the same factor-of-two error the world assumes. When the reliability check passes and P(OOM) shows as a number, revisit with real residuals. A probe that ran out of memory at these settings gives P(OOM) = 1 exactly, so its range is the cost band alone. This is a simulation of the engine's own form: `calibration: simulated`, not for quoting. Reproduce with `uv run python scripts/mc_engine_settings.py s7`.

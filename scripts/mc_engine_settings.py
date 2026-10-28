@@ -773,9 +773,61 @@ def s6b(trials=10_000, pop=500):
 	)
 
 
+def s7(trials=200_000, seed=7, misspec=2.0):
+	"""Money at risk = P(OOM) x cost up to the crash. Which range covers the true expected loss?
+
+	The world: a memory band of log-sigma s_model; the true residual spread is s_model times a
+	misspecification factor (log-normal, 2x either way at 2 sd); the cost to the crash has its own
+	band, correctly sized. Options for the at-risk range:
+	- A point P x the cost band;
+	- B the P(OOM) bin's edges x the cost band (the bin is all the screen claims about P);
+	- C P recomputed at half and double the band's sigma x the cost band;
+	- D point P x the cost band widened 2x either way.
+	"""
+	from preflight.engine import oom
+
+	rng = np.random.default_rng(seed)
+	s_model = rng.uniform(0.05, 0.2, trials)
+	s_true = s_model * np.exp(rng.normal(0, np.log(misspec) / 2, trials))
+	margin = rng.uniform(-0.3, 0.5, trials)  # log(capacity / predicted peak)
+	z = 1.6449
+	s_c = rng.uniform(0.05, 0.25, trials)
+	c_hat = 1.0
+	c_true = c_hat * np.exp(rng.normal(0, s_c))
+	c_lo, c_hi = c_hat * np.exp(-z * s_c), c_hat * np.exp(z * s_c)
+	from scipy.stats import norm
+
+	p_model = norm.sf(margin / s_model)
+	p_true = norm.sf(margin / s_true)
+	loss = p_true * c_true
+	edges = np.array([b[0] for b in oom.BINS] + [1.0])
+	idx = np.clip(np.searchsorted(edges, p_model, side="right") - 1, 0, len(oom.BINS) - 1)
+	b_lo, b_hi = edges[idx], edges[idx + 1]
+	p_a, p_b = norm.sf(margin / (s_model / 2)), norm.sf(margin / (s_model * 2))
+	opts = {
+		"A point P x cost band": (p_model * c_lo, p_model * c_hi),
+		"B bin edges x cost band": (b_lo * c_lo, b_hi * c_hi),
+		"C P at sigma/2 and 2sigma x cost band": (np.minimum(p_a, p_b) * c_lo, np.maximum(p_a, p_b) * c_hi),
+		"D point P x cost band widened 2x": (p_model * c_lo / 2, p_model * c_hi * 2),
+	}
+	mid = (p_model >= 0.05) & (p_model < 0.7)
+	print(
+		f"\nS7 money-at-risk range, true spread off by {misspec:g}x at 2 sd (target: 90% coverage of the true expected loss)"
+	)
+	print("  option: coverage all / P(OOM) 5-70% ; median width (hi - lo) / point")
+	for name, (lo, hi) in opts.items():
+		cov = (loss >= lo) & (loss <= hi)
+		w = np.median((hi - lo)[mid] / (p_model * c_hat)[mid])
+		print(f"  {name}: {pct(cov)} / {pct(cov[mid])} ; {w:.2f}")
+
+
 if __name__ == "__main__":
 	import sys
 
+	if sys.argv[1:] == ["s7"]:
+		for m in (1.5, 2.0, 4.0):
+			s7(misspec=m)
+		raise SystemExit
 	if sys.argv[1:] == ["s6b"]:
 		s6b()
 		raise SystemExit

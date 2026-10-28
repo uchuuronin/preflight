@@ -33,6 +33,10 @@ def run(root: str) -> dict:
 		out[name] = {
 			"predictions": json.loads(filled.predictions.model_dump_json()),
 			"models": [m.model_dump(mode="json") for m in filled.models],
+			"run_cost": {
+				b: [x.model_dump(mode="json") for x in api.run_cost(rec, billing=b)]
+				for b in ("on_demand", "spot", "own_cluster")
+			},
 			"what_ifs": {
 				json.dumps(kv, sort_keys=True): json.loads(api.predict(rec, kv).model_dump_json())
 				for kv in cases

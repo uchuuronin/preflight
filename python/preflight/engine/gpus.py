@@ -34,6 +34,8 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
+from preflight.engine import prices as _prices
+
 TFLOP = 1e12  # derived: unit
 GB = 1e9  # derived: unit
 GIB = 2**30  # derived: unit
@@ -525,34 +527,11 @@ class GpuPrice:
 	preemptible: bool = False
 
 
-_MODAL = (
-	("T4", 0.59),
-	("L4", 0.80),
-	("A10", 1.10),
-	("L40S", 1.95),
-	("A100-SXM-80GB", 2.50),
-	("RTX-PRO-6000-96GB", 3.03),
-	("H100-SXM-80GB", 3.95),
-	("H200-SXM-141GB", 4.54),
-	("B200-SXM-180GB", 6.25),
-	("B300-SXM-288GB", 7.10),
-)
-_PRICES: tuple[GpuPrice, ...] = (
-	*(
-		GpuPrice(
-			g, "modal", p, "2026-07", "Modal list rate, per-second billing, base region", preemptible=True
-		)
-		for g, p in _MODAL
-	),
-	GpuPrice(
-		"A100-SXM-40GB",
-		"modal",
-		2.10,
-		"2026-10",
-		"computeprices.com, updated Oct 26 2026 (lists it as PCIe; single-GPU specs are the same)",
-		preemptible=True,
-	),
-	GpuPrice("MI300X", "amd_devcloud", 2.59, "2026-10", "Preflight contract, gap 8"),
+# One table (Chiya, Oct 26): the rows live in engine/prices; this is the GPU view the probes and corpus use.
+_PRICES: tuple[GpuPrice, ...] = tuple(
+	GpuPrice(r.gpu, r.provider, r.usd_per_hour, r.as_of, r.source, r.preemptible)
+	for r in _prices.GPU_RATES
+	if r.kind == "on_demand"
 )
 
 # Modal's GPU strings for the table names it offers. "!" stops Modal upgrading H100 to H200.
