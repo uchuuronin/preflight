@@ -8,7 +8,11 @@ const RECORDS = {
 	...import.meta.glob<RecordKnobs>("../../../../schema/examples/*.json", { eager: true, import: "default" }),
 	...import.meta.glob<RecordKnobs>("../../workspace/fixtures/*.record.json", { eager: true, import: "default" }),
 };
-const KNOB_IDS = [...new Set(Object.values(RECORDS).flatMap((r) => (r.knobs ?? []).map((k) => k.id)))];
+const NOT_KNOBS = new Set(["proposed", "pinned", "pinned_hint", "unpin_so_it_moves", "pin", "needs_code", "not_trusted_here"]);
+const LABELLED = Object.keys(en)
+	.map((k) => /^knob\.([a-z0-9_]+)$/.exec(k)?.[1])
+	.filter((id): id is string => !!id && !NOT_KNOBS.has(id));
+const KNOB_IDS = [...new Set([...Object.values(RECORDS).flatMap((r) => (r.knobs ?? []).map((k) => k.id)), ...LABELLED])];
 
 describe("expertise strings", () => {
 	it("gives every record knob a plain label for the new level", () => {

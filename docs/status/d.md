@@ -1,5 +1,105 @@
 # Status: D (usability add-ons)
 
+## Cloud runs
+
+Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars.
+
+| Date | GPU | Minutes | Dollars | What |
+|---|---|---|---|---|
+| | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
+
+## Tue Oct 27, late night (Chiya's census and margin decisions)
+
+**Done** (committed on `ws-d`, push requested below; `aee591f` pushed; merged `main` at 6a3eca2)
+
+- Unseen scripts stay out of the census entirely (Chiya), recorded in the decision note.
+- Order of the five and the top count: today's version stays unless a challenger's Wilson 95% interval sits wholly above it (`beatsClearly` in `_stats/wilson.ts`). `dial.zoo.test.ts` reports all nine versions and fails only on a clear win. On A's fixtures all tie at 9 of 18, so today's version stays. The decision note keeps a table for each run.
+- Checks: 221 web tests, typecheck, build; 26 D Python tests, ruff; no em dashes; gitleaks. Python suite 658 passed; the 4 failures are A's `test_probe_sandbox.py` (root container), as before.
+
+**Basis for every decision in this commit**
+
+| Decision | Basis | Test that fails if it's wrong |
+| --- | --- | --- |
+| Keep the incumbent order unless beaten by a clear margin | Chiya, Oct 27 (tuning and testing on the same two records) | `dial.zoo.test.ts` "keeps the configured policy unless another beats it by a clear margin" |
+| Clear margin = challenger's Wilson 95% lower bound above the incumbent's upper bound | Chiya, Oct 27; Wilson interval derived (Wilson 1927, z = 1.959964) | `wilson.test.ts` margin cases (equal, close, far apart, reversed) |
+| Unseen scripts out of the census | Chiya, Oct 27 (held-out score must describe the judged version) | `tiers.test.ts` "takes each training lens's baseline from the census ranking" and `test_d_knob_census.py` source checks: the census names only its 5 pinned sources |
+| Top count stays 2 | guess; replaced by B's grids only on a clear margin, else tested by the held-out run on Nov 2 | same `dial.zoo.test.ts` test |
+
+**Push request:** `ws-d`, this commit and the merge of `main` at 6a3eca2, on top of `aee591f`. Normal push.
+
+## Tue Oct 27, late (Chiya's four conditions for turning `d.expertise` on)
+
+**Done** (committed on `ws-d`, push requested below). No tokens or GPU spent: the census reads
+public GitHub checkouts only.
+
+1. Warnings stay in the dock at "New to this", never dropped, until C's dock lists them and sets `findingsShown` on the knob-view context; only then do they leave the five and come back when opened. Today nothing sets it, so a newcomer sees every warning's knob.
+2. The 9-of-9 is labelled for what it is: on screen today, in-sample, 2 records (9 of 9 in the dock on both); and a design check with the list, in-sample, 2 records, counting a list not yet on screen. The held-out run on the unseen scripts (Nov 2) is the result, per record with Wilson intervals, policy frozen beforehand.
+3. The order of the five and the top count are a parameter (`POLICY`); `dial.zoo.test.ts` compares three orders with top 1, 2 and 3 and fails unless the configured one shows the planted knobs most often. On A's fixtures all nine tie at 9 of 18, so it decides when B's grids land.
+4. Newcomer basics measured: a census of 55 examples (bug zoo 2, TRL 22, transformers 20, PEFT 8, nanoGPT 3) at pinned commits, built by `python -m preflight.addons.knob_census`, reproducible byte for byte. Fine-tuning: batch size 28 of 34, epochs 20, learning rate 20, sequence length 18. Counts and sources in `docs/decisions/expertise-new-level.md`. Pretrain and vision have 3 examples each.
+- Fixed on the way: the rl baseline named `max_completion_length`, which isn't a knob id (`max_completion_len`); a test now checks every baseline id has a label.
+
+**Basis for every decision in this commit**
+
+| Decision | Basis | Test that fails if it's wrong |
+| --- | --- | --- |
+| At most 5 knobs picked at "New to this" | cited: Cowan 2001 (4 ± 1 chunks) | `tiers.test.ts` "picks at most five"; `dial.zoo.test.ts` "at most five" (both dock states) |
+| Failure knobs first, never dropped | Chiya and the Oct 27 review | `tiers.test.ts` "never drops a failure's knob"; `dial.zoo.test.ts` failure knobs in the dock for every goal |
+| Warning knobs stay until C's list is on screen | Chiya, Oct 27 | `tiers.test.ts` and `knobView.test.ts` gate tests; `dial.zoo.test.ts` on-screen 9 of 9; checked failing with the gate removed |
+| A warning's knob shows once opened, and stays | Chiya, Oct 27 | `knobView.test.ts` reveal; `dial.zoo.test.ts` reveal (checked failing with the reveal removed) |
+| Goal's top before baseline; top count 2 | guess; replaced by the comparison on B's grids, Wed Oct 28 | `dial.zoo.test.ts` "keeps the configured policy among those that show the planted knobs most often" (ties on fixtures, so it can only fail on real grids) |
+| Baseline for finetune, pretrain, rl, vision | measured: census, 55 examples, pinned commits | `tiers.test.ts` "takes each training lens's baseline from the census ranking" (checked failing when unwired); `test_d_knob_census.py` consistency and engine ids |
+| What counts in the census (unit = example; A's vocabulary; full configs excluded) | derived: a full config lists every field, so it can't show a choice; A's vocabulary keeps ids the same as the harness | `test_d_knob_census.py` parser, mapping, override-config and ranking tests |
+| Baseline for agent, eval, serving | guess; replaced by first-opened knobs from session telemetry after Nov 4 | `tiers.test.ts` "names only knob ids the app knows" (ids only) |
+| "Things worth checking" = `warn` findings only | derived: the contract's severities are info, warn, error, critical; errors and critical already hold knob places, info is not a problem | `worthChecking.test.ts` on all three golden records |
+| Plain labels for `optimizer` and `lr_schedule` | derived from what the setting does; ux-writing rules (plain, short, no jargon) | `tiers.test.ts` "names only knob ids the app knows" |
+| Dial claim on the golden fine-tune (failures, packing, batch size, sequence length) | measured on A's fixture | `knobView.test.ts` "on the golden fine-tune today ..." |
+
+Checks: 220 web tests, typecheck, build; 25 D Python tests, ruff; no em dashes; gitleaks clean. Python suite: 657 passed; 4 of A's `test_probe_sandbox.py` fail here because this container runs as root (same on clean `main`).
+
+**Pushed** at `aee591f` (Chiya's yes, Oct 27).
+
+## Tue Oct 27, night (after Chiya's decision on warnings)
+
+**Done** (pushed at 3e5ba2d)
+
+- "New to this" picks at most 5 knobs by itself: failures first (never dropped), then the goal's top two, then the lens baseline. Warnings no longer take a place; their knob shows once the visitor opens it and stays for the visit. Checked in Chromium on the golden fine-tune: 4 knobs plus "Show 5 more settings"; opening "Pack short examples together" and closing it leaves it in the dock.
+- "Things worth checking": `worthChecking.ts` lists the record's warnings with "1 thing / {n} things worth checking". It renders once C offers a spot under the dock in C's findings display (request in `docs/requests/from-d.md`); D doesn't build it in C's code.
+- `dial.zoo.test.ts` now asserts, for every goal: failure knobs in the dock, at most 5 knobs, every planted problem visible (dock or list), and a listed warning's knob kept after opening. Fails when the list is emptied or the reveal removed (checked). On A's fixtures: finetune and pretrain each 9 of 9 visible, 100% [70, 100]; in the dock 6 of 9 and 3 of 9.
+- Order of the five compared on the fixtures: four failures-first orders tie (the goal ranking is empty for most goals there), so the order is tagged a guess to settle on B's grids.
+- `d.freetier` added to `flags.json`, off (approved by Chiya).
+- Checks: 209 web tests, typecheck, build, no em dashes.
+
+**Next**
+
+- Rerun the zoo test on B's grids (Wed) and settle the order and `NEW_TOP_SENSITIVE`; score once on the unseen scripts (Mon Nov 2) as a held-out check.
+- Wire the worth-checking list to C's spot when it lands. D5 once A documents uploads; D2 once C's share route lands (Thu).
+
+## Tue Oct 27, evening (merged `main` at 7faf676)
+
+- Merged `main`. Requests moved to `docs/requests/from-d.md`, brought up to date: C's three replies (loading fix, knob-view hook, provider and ranking) moved to Done; the dial rerun on B's real grids added as a request to B.
+- Checks on the merged tree: 197 web tests, typecheck, build, ruff, no em dashes. Python 647 passed; 4 of A's `test_probe_sandbox.py` tests fail here and 6 fail on a clean `main`, because the sandbox expects to run as a non-root user and this container runs as root. Not D's code.
+
+## Tue Oct 27, afternoon (after the Oct 27 review; merged `ws-c` at a2b21af)
+
+**Done** (branch `ws-d`, committed locally, not pushed)
+
+- Dial (D1), per the review: the detail level moved to the cockpit header; "New to this" now filters C's knob dock through the knob-view hook, ranking by the visitor's current goal (C's `ranked`), always showing the knobs of error and critical findings even off the grid (`eval_no_grad`), and keeping knobs the visitor touched. Checked in Chromium on the golden fine-tune: 9 knobs become 4 plus "Show 5 more settings", both failure knobs among them.
+- New dial test (`dial.zoo.test.ts`): ground truth from the zoo scripts' planted problems, matched to golden records by entrypoint, through C's `applyKnobViews`. Asserts every planted-failure knob shows for every goal (it fails if the failure rule is removed). Reports, Wilson 95%, on A's fixture predictions: finetune 6 of 9 (67% [35, 88], packing hidden); pretrain 3 of 9 (33% [12, 65], precision and checkpoint interval hidden). The earlier simulation is withdrawn.
+- Glossary fixes from the review: conformal intervals, verify, repetition exposure, seed power analysis and the cost frontier marked planned; measured, predicted and extrapolated per the contract; fp16 with loss scaling on T4 and P100; lower batch with more gradient accumulation; MFU 6N full, 4N with LoRA; fan-out product; the rate-limit formula; Hugging Face eval logit accumulation; ZeRO and FSDP added. 95 terms.
+- `whenReady` removed now that C fixed loading.
+- D4: Modal's Starter credit added as the free L4 ($30 a month, 24 h per run; Modal pricing and timeouts pages), a monthly-credit check, and fp16 notes on T4 and P100 tiers. The one-session simulation is relabelled calibration: simulated, with the real check named.
+- Every D constant tagged cited, derived, simulated or guess; guesses name what replaces them.
+
+**Open with Chiya**
+
+- Settled Oct 27 night: warnings are listed, not shown as knobs; `d.freetier` approved.
+
+**Blocked**
+
+- D5 notebook intake: A hasn't documented what an upload hands the harness.
+- D2 share cards: C's share route (Thu).
+- Dial coverage on real grids: B's `api.py` and `make_golden.py` (B, Wed).
+
 ## Tue Oct 27, midday (rebased on `ws-c`)
 
 **Done** (branch `ws-d`, rebased on `ws-c`)
@@ -13,14 +113,19 @@
 - Re-filed D's requests against what A, B and C built; five settled by their work.
 - Checks: 47 add-on tests (89 in web with C's 42), typecheck, production build; Chromium at 1440 and 390 px, dusk and day, no horizontal overflow, no console errors from D's code.
 
+- D1 finished: every knob A declares (61 labels) now has a glossary card and plain and expert labels; the test covers C's full knob label list, not only the samples.
+- D3 local currency, behind `d.currency`: costs in the visitor's currency from the browser region, or picked in the Logbook; converted at the ECB rates of 26 Oct 2026 (30 currencies), dated and linked on screen. Checked in Chromium: rupees from an en-IN browser, euros after switching, kept across reloads. Regional rows for B's table in `python/preflight/addons/regional_prices.py` (Modal 1.15x broad, 1.75x narrow; 15 tests).
+- D4 free-tier presets, behind `d.freetier` (key requested): a band under the cockpit's whole run for Colab, Kaggle and Lightning AI's free plan saying one session, N sessions with how often to save, won't fit, or measure on the free GPU. Rule "slow end + 15 min fits the cap" chosen by Monte Carlo (docs/decisions/freetier-one-session.md), kept as a regression test.
+
 **Blocked**
 
 - Fewer knobs and plainer labels at "new" need C's knob-view hook (docs/requests.md).
-- D2 share cards need C's share-token read route, R2 store and `workers/` in the deploy (C's Thu work).
+- D2 share cards need C's share-token read route, R2 store and `workers/` in the deploy (C's Thu work); picked back up when it lands.
+- `d.freetier` flag key (Chiya). D4's time check for most records needs T4 or P100 on the `gpu_type` grid (B) or an intake hook (C).
 
 **Next**
 
-- D2 once C's share route lands; D3 local currency on C's `setCurrency` and B's dated price table; D4 free-tier presets on B's T4, P100 and L4 rows.
+- D2 once C's share route lands (Thu). Then D5 notebook intake once A answers what an upload hands the harness.
 
 ## Dependency map
 
@@ -28,13 +133,13 @@
 |---|---|---|---|---|
 | D1 | Expertise dial | Knob-view hook for filtering and labels | C | Setting and glossary cards done; filter and labels wait on the hook |
 | D2 | Share cards and badge | Share-token read route, R2 store, `workers/` in the deploy, headline numbers | C, B | Waiting (C, Thu) |
-| D3 | Local currency, regional prices | `setCurrency` (done, C), B's dated USD table (done, B) | C, B | Unblocked |
-| D4 | Free-tier presets | T4, P100, L4 in B's table (done); wall-time cap in `job.constraints` | B, A | Unblocked |
+| D3 | Local currency, regional prices | `setCurrency` (done, C), B's dated USD table (done, B) | C, B | Done; regional rows wait on B reading them and `Constraints.region` |
+| D4 | Free-tier presets | T4, P100 in B's table (done); `d.freetier` key; T4/P100 on grids or an intake hook | B, C, Chiya | Done; time check widens when those land |
 | D5 | Notebook intake | The exact input A's harness takes for an upload | A | Waiting on A's answer |
-| D6 | "Jobs like yours" prior | Corpus records readable; map skeleton | B, A | After G1 |
-| D7 | Localisation | `registerStrings` and per-language files (done, C); `language` on guide turns | C | After G1 |
+| D6 | "Jobs like yours" prior | | | Dropped (review, Oct 27) |
+| D7 | Localisation | | C | Deferred beyond the guide's language field (review, Oct 27) |
 | D8 | Hugging Face quick start | `template` job source in A's harness | A | After G1 |
-| D9 | Energy and carbon | GPU power sampled in probes | A | After A's G2 |
-| D10 | Command palette | Browser `set_knob` and `pin` (done, C); `api/addons/` mount (done, C) | C | After G1 |
+| D9 | Energy and carbon | | | Dropped (review, Oct 27) |
+| D10 | Command palette | | C | Deferred (review, Oct 27) |
 | D11 | Phone view | Read-only share route | C | Dark set done by C; phone view waits on the route |
-| D12 | Alerts outside the app | In-flight mode and the "left its band" event | A, C | After G2 |
+| D12 | Alerts outside the app | | | Dropped (review, Oct 27) |
