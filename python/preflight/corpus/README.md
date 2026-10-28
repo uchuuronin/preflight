@@ -17,7 +17,7 @@ The NVIDIA slice is re-planned to $45 of Modal (PM, Oct 27): grouped probe-like 
 | | | | **1,095** | **$23.90** | **$35.20**, $9.80 reserve |
 
 - **Estimates:** 45 s per grouped config and 120 s per HF job (guesses until the smoke run measures them), times the 1.25 billing overhead.
-- **Caps:** each is the `--budgets` value for that GPU. The sweep halts there even if configs run long, and after three configs it prices the rest at the running p90 (S5).
+- **Caps:** each is the `--budgets` value for that GPU, and it is hard. Until three configs have finished, each config is priced at its deadline (600 s grouped, 900 s HF), so even a wave that hangs to its deadlines stays inside the cap. After that, the sweep prices the rest at the running p90 with one wave in reserve (S5).
 - **Phase 0** measures real per-config seconds. Phases 1 and 2 are re-priced from those numbers before they are put to Chiya.
 - **T4** has no bf16 path, so it runs only the fp32 and fp16 groups and no HF jobs (`modal_app.runs_on`).
 - **Shared groups:** every GPU runs the same groups (the first n / 5 of seed 0). The MI300X runs the same 300, so every row has pairs across GPUs and vendors.
@@ -45,11 +45,11 @@ Every config has a content-addressed key and is written once. A restarted sweep 
 Cloud runs go through `remote-run.yml`; B holds no keys (docs/setup/cloud.md). Each phase is one workflow run of at most 120 minutes, and a sweep cut short resumes from the volume on its next run. Phase 0:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=30 -f cmd="modal run python/preflight/corpus/modal_app.py --kind grouped --n 10 --budgets L4=0.3"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=45 -f cmd="modal run python/preflight/corpus/modal_app.py --kind hf --budgets L4=0.4"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py --kind hf --budgets L4=0.4 --batch-size 2 --max-containers 1"
 ```
 
 Phases 1 and 2, with the caps from the table (each GPU runs in parallel inside one run):

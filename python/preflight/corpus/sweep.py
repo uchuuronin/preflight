@@ -75,10 +75,17 @@ def plan_from(
 	overhead: float = DEFAULT_OVERHEAD,
 	history: list[float] | None = None,
 	reserve_configs: int = 0,
+	worst_seconds: float | None = None,
 ) -> list[CorpusConfig]:
-	"""Configs not yet done, cut to what the remaining budget allows after the reserve."""
+	"""Configs not yet done, cut to what the remaining budget allows after the reserve.
+
+	With worst_seconds (a config's deadline), configs are priced at it until MIN_HISTORY have finished,
+	so even a first wave that runs every config to its deadline stays inside the budget: a hard cap.
+	"""
 	if not configs:
 		return []
+	if est_seconds is None and worst_seconds is not None and len(history or []) < MIN_HISTORY:
+		est_seconds = worst_seconds
 	est, _ = estimate_seconds(configs[0].kind, history, est_seconds)
 	per = cost_usd(est, usd_per_hour, overhead)
 	reserve = reserve_configs * per if len(history or []) >= MIN_HISTORY else 0.0

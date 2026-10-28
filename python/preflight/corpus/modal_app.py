@@ -182,6 +182,7 @@ def main(
 ) -> None:
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
+	from preflight.corpus.isolate import DEFAULT_TIMEOUT_S
 	from preflight.engine import gpus
 
 	plan = sweep.parse_budget_plan(budgets)
@@ -205,9 +206,11 @@ def main(
 		while True:
 			led = ledger.remote(store_kind, gpu, retry_errors and wave == 0)
 			spent = led["gpu_seconds"] * overhead / 3600 * rates[gpu]
+			# hard cap: configs are priced at their deadline until three have finished (isolate.py)
 			todo = sweep.plan_from(
 				per_gpu[gpu], set(led["done"]), spent, plan[gpu], rates[gpu], overhead=overhead,
 				history=led["history"], reserve_configs=wave_size,
+				worst_seconds=DEFAULT_TIMEOUT_S.get(store_kind, 900.0),
 			)  # fmt: skip
 			print(
 				f"[{gpu}] wave {wave}: ${spent:.2f} of ${plan[gpu]:.2f} spent, {len(led['done'])} done, {len(todo)} fit in budget"

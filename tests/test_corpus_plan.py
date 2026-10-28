@@ -377,3 +377,17 @@ def test_calibrate_reads_exported_gzip(tmp_path):
 			+ "\n"
 		)
 	assert [r["status"] for r in load_rows(tmp_path)] == ["ok", "oom"]
+
+
+def test_deadline_pricing_makes_the_cap_hard_before_any_history():
+	from preflight.corpus import configs as C
+	from preflight.corpus import sweep as sw
+
+	cfgs = C.configs_for("grouped", 10, 0)
+	# $0.30 on an L4 at a 600 s deadline x 1.25 overhead: one config fits, even if it hangs to its deadline
+	todo = sw.plan_from(cfgs, set(), 0.0, 0.30, 0.80, worst_seconds=600.0)
+	assert len(todo) == 1
+	assert len(todo) * sw.cost_usd(600.0, 0.80, sw.DEFAULT_OVERHEAD) <= 0.30
+	# after three measured configs the running p90 takes over
+	todo = sw.plan_from(cfgs, set(), 0.05, 0.30, 0.80, history=[40.0, 45.0, 50.0], worst_seconds=600.0)
+	assert len(todo) > 1
