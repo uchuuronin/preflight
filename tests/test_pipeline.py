@@ -341,3 +341,97 @@ def test_gpu_cost_and_the_sandbox_overhead_estimate_are_kept_apart(tmp_path):
 	gpu = 3 * 36.0 * 0.80 / 3600  # three probes on the L4 at list price
 	assert rec.costs.gpu_usd == pytest.approx(gpu, rel=1e-3)
 	assert rec.costs.breakdown["sandbox_cpu_memory_estimate"] == pytest.approx(3 * 36.0 / 3600, rel=1e-3)
+
+
+# ---------------------------------------------------------------- B's predictions in run_job
+
+
+def _job(tmp_path, monkeypatch, *, flag_on, fill=None):
+	import preflight.engine.api as engine
+	from preflight.runner import flags
+	from preflight.runner.pipeline import run_job
+	from preflight.runner.queue import Lease
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"engine.memory": flag_on}))
+	flags.reload()
+	if fill is not None:
+		monkeypatch.setattr(engine, "fill_predictions", fill)
+	d = deps(tmp_path, FakeRunner())
+	lease = Lease(job_id="j1", token=1, worker="w", request={"source": {"kind": "upload", "files": {"train.py": SCRIPT}}},
+		attempt=1, record_id=None, share_token=None, expires_at=0.0)  # fmt: skip
+	ctx = _Ctx()
+	rid = run_job(lease, ctx, deps=d)
+	flags.reload()
+	stored = next((tmp_path / "records").glob("*.json"))
+	return rid, load_record(stored.read_text()), ctx.events
+
+
+def test_run_job_fills_bs_predictions_when_the_flag_is_on(tmp_path, monkeypatch):
+	from preflight.engine.api import fill_predictions as real
+
+	calls = []
+
+	def fill(rec):
+		calls.append(rec.record_id)
+		return real(rec)
+
+	_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=fill)
+	assert len(calls) == 1 and rec.predictions.estimates  # filled once, and stored
+	assert events[-1]["message"] == "predicted"
+
+
+def test_run_job_leaves_predictions_alone_when_the_flag_is_off(tmp_path, monkeypatch):
+	calls = []
+	_, rec, events = _job(tmp_path, monkeypatch, flag_on=False, fill=lambda r: calls.append(1) or r)
+	assert not calls and not rec.predictions.estimates
+	assert events[-1]["message"] == "measured; no predictions yet"
+
+
+def test_an_engine_failure_keeps_the_measured_record_and_says_so(tmp_path, monkeypatch):
+	def boom(rec):
+		raise ZeroDivisionError("bad fit")
+
+	_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=boom)
+	assert [p.id for p in rec.probes] == ["p1", "p2", "p3"] and not rec.predictions.estimates
+	warn = [e for e in events if e.get("level") == "warn"]
+	assert warn and "predictions unavailable (ZeroDivisionError)" in warn[0]["message"]
+	assert "bad fit" not in warn[0]["message"]  # internals stay in the log
+
+
+def test_an_engine_result_that_doesnt_validate_is_not_stored(tmp_path, monkeypatch):
+	def broken(rec):
+		return rec.model_copy(update={"knobs": [*rec.knobs, rec.knobs[0]]})  # duplicate knob ids
+
+	_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=broken)
+	assert len({k.id for k in rec.knobs}) == len(rec.knobs)
+	assert any(e.get("level") == "warn" for e in events)
+
+
+def test_runner_flags_read_like_the_apis(tmp_path, monkeypatch):
+	from preflight.runner import flags
+
+	(tmp_path / "flags.json").write_text('{"$comment": "x", "a": false, "b": true, "c": "yes"}')
+	(tmp_path / "flags.prod.json").write_text('{"a": true}')
+	monkeypatch.setenv("PREFLIGHT_ROOT", str(tmp_path))
+	monkeypatch.setenv("PREFLIGHT_ENV", "prod")
+	monkeypatch.setenv("PREFLIGHT_FLAGS", '{"b": false}')
+	flags.reload()
+	try:
+		assert flags.flag("a") is True and flags.flag("b") is False and flags.flag("c") is False
+		assert flags.flag("missing") is False
+	finally:
+		flags.reload()
+
+
+def test_a_record_with_abstentions_survives_storage():
+	"""Records are stored without nulls; an abstention (point None) must load back."""
+	from preflight.schema import Estimate, FlightRecord, dump_record
+
+	rec = load_record((ROOT / "schema" / "examples" / "finetune.json").read_text())
+	e = Estimate(point=None, lo=None, hi=None, unit="s", status="abstain", model_id="m@1", source="exact",
+		reason="the run's length isn't known")  # fmt: skip
+	rec = rec.model_copy(
+		update={"predictions": rec.predictions.model_copy(update={"estimates": {"time.total": e}})}
+	)
+	back = load_record(dump_record(FlightRecord.model_validate(rec.model_dump())))
+	assert back.predictions.estimates["time.total"].point is None

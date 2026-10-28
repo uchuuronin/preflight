@@ -66,6 +66,8 @@ from preflight.schema import (
 	Predictions,
 	Probe,
 	ProbeCost,
+	dump_record,
+	load_record,
 )
 from preflight.schema.script_map import ScriptMap
 
@@ -658,9 +660,40 @@ def _merge(
 	return FlightRecord.model_validate({**rec.model_dump(), **{k: v for k, v in update.items()}})
 
 
+def with_predictions(rec: FlightRecord, ctx, *, enabled: bool | None = None) -> FlightRecord:
+	"""The measured record with B's engine's predictions filled (engine.api.fill_predictions), when
+	the engine.memory flag is on. Any engine failure keeps the measured record as it was and says
+	so in a warn event: a prediction never costs the visitor their measurements."""
+	from .flags import flag
+
+	if not (flag("engine.memory") if enabled is None else enabled):
+		return rec
+	try:
+		from preflight.engine.api import fill_predictions
+
+		filled = fill_predictions(rec)
+		# the engine returns a copy without re-validating: store-and-load it exactly as C's API will
+		# (nulls dropped, then parsed), and fail here rather than in the reader; dump_record also
+		# enforces the 1 MB gzipped budget
+		return load_record(dump_record(filled))
+	except Exception as exc:
+		log.exception(
+			"job %s: the engine couldn't fill predictions; keeping the measured record", rec.record_id
+		)
+		_emit(ctx, "predicting", rec, None, level="warn",
+			message=f"predictions unavailable ({type(exc).__name__}); the measurements stand")  # fmt: skip
+		return rec
+
+
 def run_job(lease, ctx: JobContext, *, deps: Deps) -> str:
-	"""worker.JobFn: run the pipeline for a leased job, store the final record, return its id."""
+	"""worker.JobFn: run the pipeline for a leased job, fill B's predictions, store the final record,
+	return its id."""
 	rec = run_pipeline(lease.request, ctx, deps, ids=(lease.record_id, lease.share_token))
+	_emit(ctx, "predicting", rec, None, message="measured; predicting")
+	rec = with_predictions(rec, ctx)
 	rev = deps.records.put(rec)
-	_emit(ctx, "predicting", rec, rev, message="measured; predictions are B's next")
+	done = (
+		"predicted" if rec.predictions.estimates or rec.predictions.grids else "measured; no predictions yet"
+	)
+	_emit(ctx, "predicting", rec, rev, message=done)
 	return rec.record_id

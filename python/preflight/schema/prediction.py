@@ -8,7 +8,7 @@ import math
 from typing import Literal
 
 import numpy as np
-from pydantic import Field, RootModel, model_validator
+from pydantic import Field, RootModel, model_serializer, model_validator
 
 from .base import KnobValue, Strict, Unit
 from .encoding import MAX_GRID_CELLS, decode_f16, f16_len, mask_len_ok
@@ -29,6 +29,17 @@ class Estimate(Strict):
 	source: Literal["grid", "exact"]
 	reason: str | None = Field(default=None, description="Why the engine abstained or extrapolated")
 	level: float = Field(default=0.9, gt=0, lt=1, description="Nominal coverage of [lo, hi]")
+
+	@model_serializer(mode="wrap")
+	def _keep_nulls(self, handler):
+		# point, lo and hi are required and nullable (an abstention is null, never absent): records are
+		# stored with exclude_none, which would drop them, and then neither load_record nor C's
+		# types (`point: number | null`) could read the record back
+		out = handler(self)
+		if isinstance(out, dict):
+			for k in ("point", "lo", "hi"):
+				out.setdefault(k, None)
+		return out
 
 	@model_validator(mode="after")
 	def _check(self):

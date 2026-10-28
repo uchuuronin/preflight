@@ -84,6 +84,9 @@ def _load_standalone(src: Path | None = None) -> str:
 		spec.loader.exec_module(mod)
 		zoo = getattr(mod, "ZOO_SRC", mod.ROOT / "zoo")
 		missing = [str(d) for d in (mod.PKG, zoo) if not Path(d).is_dir()]
+		flags = getattr(mod, "FLAGS_SRC", None)
+		if flags is not None and not Path(flags).is_file():
+			missing.append(str(flags))
 		if missing:  # an image resolved here (a sandbox's) would fail to build: say so now
 			raise FileNotFoundError(f"image source folders missing in the container: {missing}")
 		return f"{dst} (module modal_app, tag {mod.image_tag()}, PKG {mod.PKG}, zoo {zoo})"
@@ -114,6 +117,9 @@ def startup_check_worker() -> dict:
 	# the job store's guard, seen from this ops container: it must find the deployed runner (or say
 	# it isn't deployed) and must answer "not the deployed app" here
 	guard_ok, guard_why = deployed_here()
+	from preflight.runner.flags import _root, flag
+
+	flags_seen = {"root": str(_root()), "engine.memory": flag("engine.memory")}
 	standalone = _load_standalone()
 	saved: list[dict] = []
 	store = InMemoryJobStore(on_change=saved.append)
@@ -125,7 +131,7 @@ def startup_check_worker() -> dict:
 	rec = skeleton_record(map_static(f.files, entrypoint=f.entrypoint), f.source)
 	return {"module": __name__, "file": __file__, "runner_loaded_as": standalone, "zoo": str(ZOO), "zoo_samples": sorted(p.name for p in ZOO.iterdir()),
 		"submitted": sub, "saves": len(saved), "lens": rec.job.lens, "knobs": len(rec.knobs),
-		"imported": imported, "container_environment": _container_environment(),
+		"imported": imported, "container_environment": _container_environment(), "flags": flags_seen,
 		"job_store_would_claim_here": guard_ok, "guard": guard_why,
 		"image_tag": image_tag()}  # fmt: skip
 
