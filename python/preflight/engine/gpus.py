@@ -34,11 +34,13 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
-TFLOP = 1e12
-GB = 1e9
-GIB = 2**30
+from preflight.engine import prices as _prices
 
-Confidence = Literal["datasheet", "derived", "secondary"]
+TFLOP = 1e12  # derived: unit
+GB = 1e9  # derived: unit
+GIB = 2**30  # derived: unit
+
+Confidence = Literal["datasheet", "derived", "secondary", "guess"]
 
 _HBM_PREFIXES = ("P100", "V100", "TITAN-V", "A100", "H100", "H200", "GH200", "B200", "B300")
 # Data-centre GDDR cards ship with ECC on, which reserves part of the memory (L4: 21.45 of 24 GiB)
@@ -104,7 +106,11 @@ class GpuSpec:
 		if self.usable_gib is not None:
 			return self.usable_gib
 		if self.hbm:
-			return self.memory_gib * 0.99
+			return (
+				self.memory_gib * 0.99
+			)  # cited: published torch total_memory for the A100 and H100 rows, ~99% of HBM
+		# cited: published torch total_memory for the T4 and L4 rows (ECC GDDR reserves ~8%); 0.985 is a guess for
+		# other GDDR cards, replaced by one get_device_properties call per card as each joins the corpus
 		return self.memory_gib * (0.92 if self.name in _ECC_GDDR else 0.985)
 
 	def capacity_bytes(self) -> int:
@@ -211,8 +217,10 @@ _SPECS: tuple[GpuSpec, ...] = (
 	_g("A100-SXM-80GB", "nvidia", "ampere", 80, 2039, 108, 400, 19.5, 156.0, 312.0, 312.0, None, 600, "nvlink",
 		mig_slices=7, aliases=("a100-sxm4-80gb", "a100-80gb"), usable_gib=79.15),
 	# --- Ada
+	# usable_gib measured: torch total_memory 23,689,363,456 bytes on Modal (Oct 27 smoke run); the same run reached
+	# 59.8 TFLOP/s on an 8192^2 bf16 matmul, 49% of the dense bf16 peak
 	_g("L4", "nvidia", "ada", 24, 300, 58, 72, 30.3, 60.0, 121.0, 121.0, 242.5, 64, "pcie4", confidence="derived",
-		aliases=("nvidia l4",), usable_gib=21.45),
+		aliases=("nvidia l4",), usable_gib=23_689_363_456 / 2**30),
 	_g("L40", "nvidia", "ada", 48, 864, 142, 300, 90.5, 90.5, 181.05, 181.05, 362.0, 64, "pcie4", aliases=("nvidia l40",)),
 	_g("L40S", "nvidia", "ada", 48, 864, 142, 350, 91.6, 183.0, 362.05, 362.05, 733.0, 64, "pcie4", aliases=("nvidia l40s",)),
 	_g("RTX-4090", "nvidia", "ada", 24, 1008, 128, 450, 82.6, 82.6, 165.2, 165.2, 330.3, 64, "pcie4",
@@ -276,9 +284,17 @@ def list_gpus(vendor: Vendor | None = None) -> list[str]:
 # "A100-SXM4-80GB MIG 3g.40gb" from PyTorch, "A100-SXM-80GB-MIG-3g.40gb" from get_gpu
 _MIG = re.compile(r"\bmig[\s-]{1,3}(\d{1,2})g\.(\d{1,4})gb\b")
 _SIZE = re.compile(r"(?<!\d)(\d{1,4})\s?gb?\b")  # bounded and anchored: linear on any input
-MAX_NAME_LEN = 128  # longer than any device or Modal name; visitor text never reaches a regex unbounded
+MAX_NAME_LEN = (
+	128  # derived: longer than any device or Modal name; visitor text never reaches a regex unbounded
+)
 # memory share of a MIG profile: 8 memory slices per card; a 1g profile holds 1 or 2 of them
-_MIG_MEM_EIGHTHS = {1: (1, 2), 2: (2,), 3: (4,), 4: (4,), 7: (8,)}
+_MIG_MEM_EIGHTHS = {
+	1: (1, 2),
+	2: (2,),
+	3: (4,),
+	4: (4,),
+	7: (8,),
+}  # cited: NVIDIA MIG user guide, 8 memory slices per card, a 1g profile holds 1 or 2
 
 
 def _by_memory(small: str, large: str, cut_gib: float):
@@ -349,13 +365,44 @@ def _clean(name: str) -> str:
 	return s.strip()
 
 
+# ---------------------------------------------------------------- GPUs the table doesn't list
+
+UNLISTED = "unlisted:"
+
+
+def unlisted_name(raw: str, memory_bytes: int, compute_units: int | None = None) -> str:
+	"""A name that carries what the probe measured about a GPU the table lacks (Review, Oct 27)."""
+	clean = re.sub(r"[^A-Za-z0-9 ._()-]", "", raw)[:48].strip() or "gpu"
+	return f"{UNLISTED}{clean}@{int(memory_bytes)}:{int(compute_units or 0)}"
+
+
+def is_unlisted(name: str | None) -> bool:
+	return bool(name) and name.startswith(UNLISTED)
+
+
+def _unlisted_spec(name: str) -> GpuSpec:
+	"""Capacity from the probe's own report; no peaks, bandwidth or link, so nothing is scaled from it."""
+	m = re.fullmatch(r"unlisted:(.{1,48})@(\d{1,16}):(\d{1,6})", name)
+	if not m:
+		raise KeyError(f"malformed unlisted GPU name {name!r}")
+	raw, mem, cu = m.group(1), int(m.group(2)), int(m.group(3))
+	vendor = "amd" if re.search(r"amd|instinct|radeon|gfx", raw, re.I) else "nvidia"
+	gib = mem / GIB
+	return GpuSpec(
+		name, vendor, "unknown", gib, 0.0, cu, 0, 0.0, None, None, None, None, 0.0, "unknown",  # type: ignore[arg-type]
+		confidence="guess",
+		notes="Not in the table: capacity is what the probe's PyTorch reported; peaks, bandwidth and link unknown.",
+		usable_gib=gib,
+	)  # fmt: skip
+
+
 def resolve(name: str, memory_bytes: int | None = None, compute_units: int | None = None) -> str:
 	"""Table name for a PyTorch device name, ROCm arch, MIG slice or Modal string.
 
 	memory_bytes and compute_units (torch's total_memory and multi_processor_count)
 	split names PyTorch reports the same way, e.g. "AMD Instinct MI250X / MI250".
 	"""
-	if name in GPUS:
+	if name in GPUS or is_unlisted(name):
 		return name
 	if len(name) > MAX_NAME_LEN:
 		raise KeyError(f"unknown GPU (name longer than {MAX_NAME_LEN} characters)")
@@ -413,7 +460,9 @@ def mig_profile(name: str) -> tuple[int, int] | None:
 
 
 def get_gpu(name: str, memory_bytes: int | None = None, compute_units: int | None = None) -> GpuSpec:
-	"""The spec for a device; a MIG slice comes back scaled to its share of the GPU."""
+	"""The spec for a device; a MIG slice comes back scaled to its share of the GPU; an unlisted one, a fallback."""
+	if is_unlisted(name):
+		return _unlisted_spec(name)
 	spec = GPUS[resolve(name, memory_bytes, compute_units)]
 	mig = mig_profile(name)
 	if mig is None or not spec.mig_slices:
@@ -429,7 +478,10 @@ def get_gpu(name: str, memory_bytes: int | None = None, compute_units: int | Non
 		spec,
 		name=f"{spec.name}-MIG-{g}g.{mem_gb}gb",
 		memory_gib=mem_gb * GB / GIB,
-		usable_gib=mem_gb * GB / GIB * 0.97,
+		usable_gib=mem_gb
+		* GB
+		/ GIB
+		* 0.97,  # guess: MIG slice overhead; replaced by a MIG probe's total_memory
 		bandwidth_gbps=spec.bandwidth_gbps * mem_frac,
 		compute_units=round(spec.compute_units * frac),
 		fp32=spec.fp32 * frac,
@@ -477,34 +529,11 @@ class GpuPrice:
 	preemptible: bool = False
 
 
-_MODAL = (
-	("T4", 0.59),
-	("L4", 0.80),
-	("A10", 1.10),
-	("L40S", 1.95),
-	("A100-SXM-80GB", 2.50),
-	("RTX-PRO-6000-96GB", 3.03),
-	("H100-SXM-80GB", 3.95),
-	("H200-SXM-141GB", 4.54),
-	("B200-SXM-180GB", 6.25),
-	("B300-SXM-288GB", 7.10),
-)
-_PRICES: tuple[GpuPrice, ...] = (
-	*(
-		GpuPrice(
-			g, "modal", p, "2026-07", "Modal list rate, per-second billing, base region", preemptible=True
-		)
-		for g, p in _MODAL
-	),
-	GpuPrice(
-		"A100-SXM-40GB",
-		"modal",
-		2.10,
-		"2026-10",
-		"computeprices.com, updated Oct 26 2026 (lists it as PCIe; single-GPU specs are the same)",
-		preemptible=True,
-	),
-	GpuPrice("MI300X", "amd_devcloud", 2.59, "2026-10", "Preflight contract, gap 8"),
+# One table (Chiya, Oct 26): the rows live in engine/prices; this is the GPU view the probes and corpus use.
+_PRICES: tuple[GpuPrice, ...] = tuple(
+	GpuPrice(r.gpu, r.provider, r.usd_per_hour, r.as_of, r.source, r.preemptible)
+	for r in _prices.GPU_RATES
+	if r.kind == "on_demand"
 )
 
 # Modal's GPU strings for the table names it offers. "!" stops Modal upgrading H100 to H200.

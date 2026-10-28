@@ -31,9 +31,9 @@ from preflight.corpus.configs import CorpusConfig
 from preflight.engine.steptime import classify_kernel
 from preflight.recorder.errors import classify
 
-WARMUP_STEPS = 2
-TIMED_STEPS = 5
-MAX_OP_ROWS = 200
+WARMUP_STEPS = 2  # cited: A's probe-plan D1 (warmup 2, timed 5)
+TIMED_STEPS = 5  # cited: A's probe-plan D1 (warmup 2, timed 5)
+MAX_OP_ROWS = 200  # derived: keeps a corpus row under about 100 KB
 _DTYPES = {"fp32": torch.float32, "bf16": torch.bfloat16, "fp16": torch.float16}
 
 
@@ -270,12 +270,12 @@ def _run_kernels(cfg: CorpusConfig, device: torch.device) -> dict[str, Any]:
 # ---------------------------------------------------------------- divergence
 
 
-LABEL_WINDOW = 25
-LABEL_TAIL = 50
-LABEL_RATIO = 1.25
-LABEL_FLOOR = 0.1
-COLLAPSE_SPIKE = 2.0
-COLLAPSE_NO_LEARNING = 0.9
+LABEL_WINDOW = 25  # simulated: S3 D9
+LABEL_TAIL = 50  # simulated: S3 D9
+LABEL_RATIO = 1.25  # simulated: S3 D9
+LABEL_FLOOR = 0.1  # simulated: S3 D9
+COLLAPSE_SPIKE = 2.0  # simulated: S3 D9
+COLLAPSE_NO_LEARNING = 0.9  # simulated: S3 D9
 
 
 def _rolling_median(xs: list[float], win: int) -> list[float]:
@@ -451,6 +451,10 @@ def run_config(cfg: CorpusConfig, device: str = "cuda", data_path: str | None = 
 			result = _run_kernels(cfg, dev)
 		elif cfg.kind == "divergence":
 			result = _run_divergence(cfg, dev, data_path)
+		elif cfg.kind == "hf":
+			from preflight.corpus.hf_worker import run_hf
+
+			result = run_hf(cfg, dev)
 		else:
 			raise ValueError(f"unknown kind {cfg.kind!r}")
 	except Exception as exc:

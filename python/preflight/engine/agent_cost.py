@@ -22,18 +22,20 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
 MODEL_ID = "agent-bootstrap-cp@0.1.0"
-LEVEL = 0.9
-RUNAWAY_FACTOR = 8.0  # a task above 8x the sample median is a runaway
-UNSEEN_RUNAWAY_MULT = 20.0  # price of a runaway nobody saw: 20x the median
-RUNAWAY_BOUND = 0.80  # one-sided Clopper-Pearson level (D3 rerun: 89.1% coverage at 50 tasks)
-N_BOOT = 2000
-MIN_SAMPLE = 10  # below this the bootstrap is noise; abstain and say how many more to run
-BOOT_CHUNK_CELLS = 1_000_000  # bootstrap draws held at once: about 8 MB, whatever the sample size
+LEVEL = 0.9  # cited: contract, 90% intervals
+RUNAWAY_FACTOR = 8.0  # simulated: A's D3, a task above 8x the sample median is a runaway
+UNSEEN_RUNAWAY_MULT = 20.0  # simulated: A's D3, a runaway nobody saw is priced at 20x the median
+RUNAWAY_BOUND = 0.80  # simulated: A's D3 rerun and S6; a full benchmark run against its sample replaces it
+N_BOOT = 2000  # derived: 2,000 resamples put the 5th and 95th percentiles within about 1% of their limit
+MIN_SAMPLE = (
+	10  # guess: below 10 tasks the bootstrap is noise; replaced by the agent validation run (target Oct 31)
+)
+BOOT_CHUNK_CELLS = 1_000_000  # derived: 1e6 float64 draws, about 8 MB held at once
 
 
 # ---------------------------------------------------------------- binomial bounds
@@ -234,14 +236,14 @@ def runaway_rate(
 	s, dropped = _clean(values)
 	n = int(s.size)
 	if n < min_sample:
-		return _abstain("fraction", f"only {n} tasks measured; run at least {min_sample}", n=n)
+		return _abstain("probability", f"only {n} tasks measured; run at least {min_sample}", n=n)
 	x = int((s > runaway_threshold(s, runaway_factor)).sum())
 	side = (1 + level) / 2
 	return TotalEstimate(
 		x / n,
 		cp_lower(x, n, side),
 		cp_upper(x, n, side),
-		"fraction",
+		"probability",
 		"predicted",
 		reason=None
 		if x
@@ -259,6 +261,10 @@ def _tokens(t) -> int:
 	return int(t.input_tokens + t.output_tokens)
 
 
+def _flag(e: TotalEstimate, topped_up: bool) -> TotalEstimate:
+	return replace(e, detail={**e.detail, "topped_up": topped_up})
+
+
 def agent_totals(
 	sample,
 	price: Callable[[object], float | None] | None = None,
@@ -274,9 +280,10 @@ def agent_totals(
 	pop = population if population is not None else getattr(sample, "population", None)
 	costs = [t.cost_usd if t.cost_usd is not None else (price(t) if price else None) for t in tasks]
 	tokens = [_tokens(t) for t in tasks]
+	topped = "top-up" in (getattr(sample, "selection", None) or "")
 	out = {
-		"cost.total": estimate_total(costs, pop, "usd", **kw),
-		"tokens.total": estimate_total(tokens, pop, "tokens", **kw),
+		"cost.total": _flag(estimate_total(costs, pop, "usd", **kw), topped),
+		"tokens.total": _flag(estimate_total(tokens, pop, "tokens", **kw), topped),
 		"risk.runaway": runaway_rate(
 			costs if any(c is not None for c in costs) else tokens,
 			level=kw.get("level", LEVEL),
@@ -285,3 +292,60 @@ def agent_totals(
 		),
 	}
 	return out
+
+
+# ---------------------------------------------------------------- sample size and the top-up (Chiya, Oct 27)
+
+DEFAULT_SAMPLE = 30  # cited: Chiya's decision, Contracts tab (Oct 27)
+# cited: Chiya's decision, Contracts tab (Oct 27): 20 more tasks, offered on a click when the range straddles the budget
+TOP_UP_TASKS = 20
+MAX_SAMPLE = DEFAULT_SAMPLE + TOP_UP_TASKS
+
+
+@dataclass(frozen=True)
+class BudgetCheck:
+	verdict: str  # "under" | "over" | "straddles" | "unknown"
+	offer_top_up: bool
+	top_up_tasks: int
+	reason: str
+
+
+def budget_check(estimate: TotalEstimate, budget_usd: float | None) -> BudgetCheck:
+	"""Where the run's cost range sits against the budget, and whether to offer the 20-task top-up.
+
+	The top-up is offered once: only while the sample is still below 50 tasks and the run has
+	tasks left to sample. The guide asks the user before running it.
+	"""
+	if budget_usd is None or budget_usd <= 0:
+		return BudgetCheck("unknown", False, 0, "no budget set")
+	if estimate.status == "abstain" or estimate.lo is None or estimate.hi is None:
+		return BudgetCheck("unknown", False, 0, estimate.reason or "no cost estimate yet")
+	if estimate.hi <= budget_usd:
+		return BudgetCheck("under", False, 0, f"the whole cost range is under the ${budget_usd:,.2f} budget")
+	if estimate.lo > budget_usd:
+		return BudgetCheck("over", False, 0, f"the whole cost range is over the ${budget_usd:,.2f} budget")
+	n = int(estimate.detail.get("n", 0))
+	pop = int(estimate.detail.get("population", 0))
+	done = bool(estimate.detail.get("topped_up")) or n >= MAX_SAMPLE  # offered once, whatever dedup left
+	more = 0 if done else max(0, min(TOP_UP_TASKS, pop - n))
+	why = f"the cost range straddles the ${budget_usd:,.2f} budget"
+	if more:
+		why += f"; running {more} more tasks narrows it"
+	return BudgetCheck("straddles", more > 0, more, why)
+
+
+def combine_samples(first, extra):
+	"""The first sample plus a top-up, as one `AgentSample` (a task id seen twice counts once)."""
+	from preflight.schema.record import AgentSample
+
+	seen: set[str] = set()
+	tasks = []
+	for t in [*first.tasks, *extra.tasks]:
+		if t.task_id not in seen:
+			seen.add(t.task_id)
+			tasks.append(t)
+	pop = first.population if first.population is not None else extra.population
+	added = len(tasks) - len(first.tasks)
+	selection = f"{first.selection or 'sample'} + top-up of {added}"
+	data = {**first.model_dump(), "tasks": [t.model_dump() for t in tasks], "population": pop}
+	return AgentSample.model_validate({**data, "selection": selection[:200]})  # validated, unlike model_copy

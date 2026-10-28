@@ -1,5 +1,7 @@
 # Engine settings: memory fit, bands, OOM words, divergence labels, cross-GPU time, corpus budget (Oct 27)
 
+> **Calibration: simulated. Don't quote these figures.** Every result below comes from a Monte Carlo, and in most of them the simulated truth has the same form as the fitted model. They show that each rule works on its own assumptions, not that the engine is accurate (Review, Oct 27). Model cards say `calibration: simulated` until split-conformal calibration on held-out real runs replaces them. None of these numbers goes in the README, the video or the UI.
+
 Seven settings decide whether B's numbers can meet the plan's validation targets (peak memory within 10%, no missed OOMs, 90% intervals covering at least 88%, step time within 20% on an unmeasured GPU) and whether the corpus stays inside its budget. Each was chosen by simulating 3 to 9 candidates over 3,000 to 20,000 trials (20,000 for memory, 4,000 for divergence and cross-GPU, 3,000 sweeps for the budget) (`uv run python scripts/mc_engine_settings.py`). S6 re-checks A's agent-total rule with B's code.
 
 ## Assumptions
@@ -70,6 +72,20 @@ Seven settings decide whether B's numbers can meet the plan's validation targets
 
 **Chosen: fits below 1%, fails at 80% or more, tight between.** It ties for the fewest missed OOMs and the fewest false alarms. The price is that one setting in eight reads "tight", which near the cliff is the honest answer, and the UI offers a probe there.
 
+## S2d. Memory below the smallest probe (Chiya's call, Oct 27)
+
+Chiya decided that sizes below the smallest probe get an estimate labelled "extrapolated", with a wider range and a "run a probe here" offer, and that far outside still abstains. Five ways to widen the band, scored on S1's 20,000 jobs, with queries 2^-k below the smallest probe (batch lowered first, then sequence). The engine's existing rule abstains once the band passes +-50%. Each cell gives coverage of the estimates given, then the share abstained:
+
+| Rule | 0.5 halvings | 1 | 2 | 4 | 6 | 8 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| G1 constant x1.5 | 100% / 6% | 99.9% / 6% | 96.8% / 6% | 89.8% / 7% | 88.2% / 7% | 87.4% / 8% | 87.6% / 8% |
+| G2 constant x2 | 100% / 9% | 100% / 9% | 98.9% / 9% | 93.8% / 9% | 92.0% / 10% | 91.6% / 10% | 91.5% / 10% |
+| **G3 x(1 + 0.25 per halving)** | **99.8% / 5%** | **99.5% / 5%** | **96.7% / 6%** | **93.8% / 9%** | **94.5% / 13%** | **95.8% / 18%** | **96.7% / 22%** |
+| G4 x(1 + 0.5 per halving) | 99.9% / 5% | 99.9% / 6% | 98.9% / 9% | 97.2% / 17% | all abstain | all abstain | all abstain |
+| G5 + 0.05 per halving | 99.9% / 4% | 99.8% / 5% | 97.8% / 5% | 95.9% / 9% | all abstain | all abstain | all abstain |
+
+**Chosen: G3.** It keeps at least 93.8% coverage at every depth with the fewest abstentions near the probes. Its abstentions then grow with distance and fall on the jobs whose probes fit worst, so "far outside abstains" happens where the estimate stops being trustworthy rather than at an arbitrary line. Memory at small sizes is mostly fixed terms the probes do measure, which is why it can go this far down. Above twice the largest probe still abstains, as before.
+
 ## S3. Labelling a corpus run as diverged
 
 Curves: stable decay 32%, spike that recovers 14%, plateau that never learns 9% (all not diverged); NaN 11%, exponential blow-up 16%, slow upward drift 9%, and spike then collapse to the trivial baseline 9% (all diverged). Half the collapses happen in the first 30 steps, before the run has learned anything; a corpus smoke test on CPU turned this case up (lr 3.0: loss 6.9, then 271, then flat at ln 256 = 5.55, uniform over bytes), and the first version of this study didn't model it.
@@ -100,6 +116,33 @@ Curves: stable decay 32%, spike that recovers 14%, plateau that never learns 9% 
 
 **Chosen: K1, with K4 as the fallback** when a kernel has no FLOP or byte count. A's kernel table (`Probe.kernels`, top 64 ops plus a roll-up row per class) counts FLOPs for matmuls and attention and estimates bytes for the rest; rows with neither are scaled by their class, which the classifier reads from the op name (CUDA, HIP, Triton and aten; on a real profiled step no op is left unclassed). Replay scales each row by the ratio of its rooflines on the two GPUs. That equals "keep the measured efficiency" whenever the counts are consistent, and stays exact on the probed GPU when an estimated byte count overshoots what the GPU could move. A kernel table from a CPU probe isn't scaled to a GPU: the engine abstains. The whole-step FLOPs ratio and "same MFU", the most common rules of thumb, are off by half because most steps are not compute-bound throughout.
 
+## S4b. Step time below the smallest probe
+
+The same decision for the same-GPU step-time model. Small batches under-use the GPU, so time stops falling linearly with the batch. Simulated over 20,000 jobs with a saturating utilisation curve, A's probes at x and x/2, 3% timing noise and the model's own fit:
+
+| Rule | 0.5 halvings | 1 | 2 | 2.5 | 3 | 4 |
+| --- | --- | --- | --- | --- | --- | --- |
+| T0 no widening | 98.6% | 90.1% | 63.4% | 56.0% | 51.5% | 46.7% |
+| T1 memory's rule, x(1 + 0.25 per halving) | 99.1% | 94.6% | 76.8% | 70.5% | 66.8% | 63.4% |
+| T3 x(1 + 1 per halving) | 99.8% | 98.6% | 95.8% | abstains | abstains | abstains |
+| **T4 + 0.1 (log) per halving** | **99.6%** | **97.8%** | **92.7%** | **88.9%** | abstains | abstains |
+| T5 upper end only, + 0.1 per halving | 99.6% | 94.3% | 74.1% | 68.4% | abstains | abstains |
+
+**Chosen: T4.** It holds 88.9% or better until the band passes +-50%, about 2.7 halvings (6.5x) below the smallest probe, and abstains from there. Memory's rule is too narrow for time. A one-sided band does worse because the fitted line can overshoot as well as undershoot below the probes. Reproduce with `uv run python scripts/mc_engine_settings.py s2d` and `s4b`.
+
+## S4c. How wide K1's band is, by vendor
+
+S4 scored K1's point error. The band needs the error's 90th percentile, and S4's per-kernel efficiency drift (0.12 same vendor, 0.25 cross vendor) is an assumption no AMD data backs yet. So the q90 from S4 (0.101 same vendor, 0.179 cross vendor, in log units) was re-scored with the true drift at 1x, 1.5x and 2x that assumption. Coverage of the 90% band:
+
+| Margin on S4's q90 | Same vendor (drift x1 / x1.5 / x2) | Cross vendor (drift x1 / x1.5 / x2) |
+| --- | --- | --- |
+| x1 | 90.3% / 76.5% / 65.1% | 89.7% / 74.6% / 61.5% |
+| x1.25 | 95.4% / 84.7% / 74.4% | 94.3% / 83.7% / 70.0% |
+| x1.5 | 97.3% / 90.5% / 81.9% | 96.8% / 88.8% / 78.0% |
+| **x2** | **99.4% / 96.2% / 91.2%** | **99.1% / 94.9% / 89.9%** |
+
+**Chosen: margin x2.** `SIGMA_SAME_VENDOR` stays 0.12, now backed by S4c rather than set by hand, and `SIGMA_CROSS_VENDOR` drops from a hand-set 0.25 to 0.22. Combined with the same-GPU sigma, 0.25 put every NVIDIA-to-AMD band past the +-50% abstain line, so the engine never gave AMD a number. At 0.22 it gives one, with the wider range the plan promises until AMD is measured. The conformal layer recalibrates both from the corpus. Reproduce with `uv run python scripts/mc_engine_settings.py s4c`.
+
 ## S5. Keeping the corpus sweep inside its budget
 
 | Candidate | P(overspend) | Mean overspend | Budget left unused | Configs run |
@@ -129,3 +172,31 @@ A's D3 rerun chose the rule; B implemented it in `engine/agent_cost.py` and re-s
 
 **Chosen: an 80% bound, for either sample size.** It reproduces A's 89.1% at 50 tasks, and with this rule 30 tasks also clears the 88% target, at an interval 21% wider than 50 tasks gives. The sample size stays Chiya's call (A's D3). The runaway-rate readout (`risk.runaway`, a two-sided Clopper-Pearson interval on the share of tasks above 8x the median) covers the run's true share 98% of the time: conservative, as exact binomial intervals are. When most tasks cost nothing (cached), the median is 0 and A's rule would call every paid task a runaway; B takes 8x the median of the paid tasks instead. A's generator has no free tasks, so this case is covered by a unit test, not by S6. Reproduce with `uv run python scripts/mc_engine_settings.py s6`.
 
+## S6b. 30 tasks, then a 20-task top-up when the range straddles the budget (Chiya's call, Oct 27)
+
+Chiya chose 30 tasks with the 80% bound as the default. When the cost range straddles the budget, the guide offers 20 more tasks with the user's click (`agent_cost.budget_check`, `combine_samples`). Topping up only after seeing a straddling range is a data-driven choice, so the final coverage was checked over 10,000 runs from A's generator, with budgets at 0.5x to 2x the run's true total:
+
+| Quantity | Result |
+| --- | --- |
+| Coverage, 30 tasks alone | 89.8% |
+| Runs topped up | 71.6% |
+| Topped-up runs still straddling after 50 tasks | 83.0% |
+| Final coverage, all runs | 88.2% (+-0.6) |
+| Final coverage, topped-up runs | 92.4% |
+| Under/over calls that were right, among runs with a clear call | 93.9% |
+
+The rule meets the 88% target. A range that misses tends not to straddle the budget either, so runs that skip the top-up cover less (about 78%), and the topped-up ones make up for it. Under and over calls are right 94% of the time. The top-up settles only about one straddle in six when budgets sit this close to the true cost. So the guide should promise a narrower range, not a settled answer. Reproduce with `uv run python scripts/mc_engine_settings.py s6b`.
+
+
+## S7. The range on money at risk (gap 21)
+
+Money at risk is P(OOM) x the cost up to the crash: the first eval when the peak comes at eval, else the first step (Chiya, Oct 26). The cost up to the crash has its own band from the step-time error. The question is how wide the dollar range should be, given that P(OOM) is shown only as a bin until the reliability check on real outcomes passes. 200,000 simulated jobs: a memory band of log-sigma 0.05 to 0.2, a true residual spread off from the band by a log-normal factor (1.5x, 2x or 4x at 2 sd), probabilities from 0 to 1, and a correctly sized cost band. The target is 90% coverage of the true expected loss.
+
+| Range | Coverage (1.5x / 2x / 4x off) | Coverage, P(OOM) 5-70%, 2x off | Median width / point |
+| --- | --- | --- | --- |
+| A. Point P(OOM) x the cost band | 52.6% / 46.5% / 38.8% | 57.1% | 0.50 |
+| B. The bin's edges x the cost band | 96.1% / 92.8% / 84.4% | 90.5% | 1.68 |
+| C. P(OOM) at half and double the band's sigma x the cost band | 98.7% / 96.8% / 82.7% | 97.3% | 1.38 |
+| D. Point P(OOM) x the cost band widened 2x | 77.2% / 69.7% / 61.1% | 91.2% | 2.17 |
+
+**Chosen: B.** It meets 90% while the model's spread is off by up to 2x, it claims nothing about P(OOM) beyond the bin the screen shows, and it works the same whether P(OOM) comes from the simulated band or from held-out residuals. C is narrower and covers more in this world, but it needs a sigma, and empirical P(OOM) has none. It is also built on the same factor-of-two error the world assumes. When the reliability check passes and P(OOM) shows as a number, revisit with real residuals. A probe that ran out of memory at these settings gives P(OOM) = 1 exactly, so its range is the cost band alone. This is a simulation of the engine's own form: `calibration: simulated`, not for quoting. Reproduce with `uv run python scripts/mc_engine_settings.py s7`.

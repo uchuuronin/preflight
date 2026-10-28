@@ -1,0 +1,9 @@
+{
+	"name": "preflight-pyodide-parity",
+	"private": true,
+	"type": "module",
+	"description": "Runs B's engine in Pyodide on the golden records and prints the results; tests/test_engine_pyodide.py compares them with CPython.",
+	"dependencies": {
+		"pyodide": "314.0.7"
+	}
+}
