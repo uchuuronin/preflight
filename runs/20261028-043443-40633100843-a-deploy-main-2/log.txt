@@ -1,0 +1,15 @@
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/modal_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function JobStoreService.*.
+├── ✓ Created Function run_worker.
+├── ✓ Created Function tick.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function prefetch.
+└── ✓ Created Function startup_check_probe.
+✓ App deployed in 7.061s! 🎉
+
+View Deployment: 
+https://modal.com/apps/shuureiyashi99/main/deployed/preflight-runner
