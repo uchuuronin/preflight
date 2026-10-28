@@ -35,6 +35,9 @@ image = (
 			"PREFLIGHT_ENV": "production",
 			"PREFLIGHT_REQUIRE_EDGE": "1",
 			"PREFLIGHT_LEDGER": "modal",
+			# A's job store (python/preflight/runner/modal_app.py), for /v1/jobs and approved guide jobs
+			"PREFLIGHT_JOBSTORE_APP": "preflight-runner",
+			"PREFLIGHT_JOBSTORE_CLS": "JobStoreService",
 		}
 	)
 	.add_local_file(ROOT / "flags.json", "/root/repo/flags.json")

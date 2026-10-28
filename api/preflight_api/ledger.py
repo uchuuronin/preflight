@@ -124,7 +124,8 @@ class LedgerCore:
 		tokens = min(float(cap), tokens + (now - at) * rate)
 		if tokens < 1.0:
 			self._bucket[ip] = (tokens, now)
-			return (1.0 - tokens) / rate
+			# a bucket that never refills (rate 0) reports a day's wait
+			return (1.0 - tokens) / rate if rate > 0 else 86_400.0
 		self._bucket[ip] = (tokens - 1.0, now)
 		return None
 

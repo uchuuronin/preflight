@@ -22,9 +22,11 @@ from .errors import envelope
 from .guide.executors import Executor, job_executor
 from .guide.muse_spark import TIMEOUT_S
 from .idempotency import IdempotencyStore, MemoryIdempotencyStore
+from .jobs import JobsClient, jobs_client
 from .ledger import Ledger, MemoryLedger, ModalLedger
 from .routes import guide as guide_routes
 from .routes import health as health_routes
+from .routes import jobs as jobs_routes
 from .routes import records as records_routes
 from .stores import LocalRecordStore, RecordStore, SampleStore
 
@@ -76,6 +78,7 @@ def create_app(
 	idempotency: IdempotencyStore | None = None,
 	http: httpx.AsyncClient | None = None,
 	jobs: Executor | None = None,
+	jobstore: JobsClient | None = None,
 	samples: SampleStore | None = None,
 	addons_dir: Path = ADDONS_DIR,
 ) -> FastAPI:
@@ -101,7 +104,9 @@ def create_app(
 	app.state.idempotency = idempotency or MemoryIdempotencyStore()
 	app.state.http = http
 	app.state.samples = samples or SampleStore(REPO_ROOT)
-	app.state.jobs = jobs if jobs is not None else job_executor()
+	# A's job store: /v1/jobs, and the guide's approved probes, verify runs and extra tasks.
+	app.state.jobstore = jobstore if jobstore is not None else jobs_client()
+	app.state.jobs = jobs if jobs is not None else job_executor(app.state.jobstore)
 
 	errors.install(app)
 
@@ -158,5 +163,6 @@ def create_app(
 	app.include_router(health_routes.router)
 	app.include_router(records_routes.router)
 	app.include_router(guide_routes.router)
+	app.include_router(jobs_routes.router)
 	app.state.addons = mount_addons(app, addons_dir)
 	return app

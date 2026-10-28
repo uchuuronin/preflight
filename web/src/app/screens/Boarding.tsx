@@ -33,7 +33,8 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 			try {
 				const ev = JSON.parse(m.data as string) as JobEvent;
 				setEvents((all) => [...all, ev]);
-				if (ev.stage === "done" && ev.record_id) es.close();
+				// The server ends the stream after these; closing here stops EventSource reconnecting.
+				if (ev.stage === "done" || ev.stage === "failed" || ev.stage === "cancelled") es.close();
 			} catch {
 				// a malformed event is skipped, not fatal
 			}
