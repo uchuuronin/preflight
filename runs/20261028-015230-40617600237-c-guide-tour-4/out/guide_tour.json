@@ -1,0 +1,1731 @@
+{
+	"model": "muse-spark-1.3",
+	"aim": "min_cost",
+	"tours": [
+		{
+			"sample": "lora-7b",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 2.199,
+					"in": 2116,
+					"out": 521,
+					"cached": 2033,
+					"usd": 0.002623,
+					"calls": [
+						"highlight",
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the cost tour and checking the best move."
+				},
+				{
+					"latency_s": 4.503,
+					"in": 2355,
+					"out": 1109,
+					"cached": 1905,
+					"usd": 0.005561,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Moving the top cost knob to its best fit value."
+				},
+				{
+					"latency_s": 4.276,
+					"in": 2578,
+					"out": 994,
+					"cached": 1777,
+					"usd": 0.005492,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking the next best cost move from here."
+				},
+				{
+					"latency_s": 4.069,
+					"in": 2782,
+					"out": 1190,
+					"cached": 2417,
+					"usd": 0.005876,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Touring cost knobs to cut spend without breaking the run."
+				},
+				{
+					"latency_s": 6.025,
+					"in": 3131,
+					"out": 1323,
+					"cached": 369,
+					"usd": 0.009131,
+					"calls": [
+						"highlight",
+						"sensitivity",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Next cost round, checking the top knob and moving it to save."
+				},
+				{
+					"latency_s": 3.307,
+					"in": 3552,
+					"out": 925,
+					"cached": 1777,
+					"usd": 0.006417,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Cost tour continuing from your applied setting."
+				},
+				{
+					"latency_s": 5.132,
+					"in": 3718,
+					"out": 1305,
+					"cached": 1777,
+					"usd": 0.008239,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking the next cost saving move from this setting."
+				},
+				{
+					"latency_s": 5.016,
+					"in": 3927,
+					"out": 1362,
+					"cached": 3441,
+					"usd": 0.006912,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Cost tour continuing, checking the top saving knob from here."
+				},
+				{
+					"latency_s": 3.157,
+					"in": 4128,
+					"out": 714,
+					"cached": 3825,
+					"usd": 0.003987,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Checking the top saving knob for this setting."
+				},
+				{
+					"latency_s": 2.785,
+					"in": 4477,
+					"out": 684,
+					"cached": 0,
+					"usd": 0.008503,
+					"calls": [
+						"highlight",
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Saving costs further from this setting."
+				},
+				{
+					"latency_s": 3.635,
+					"in": 4722,
+					"out": 866,
+					"cached": 2161,
+					"usd": 0.007206,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to cheaper faster hardware next."
+				},
+				{
+					"latency_s": 3.614,
+					"in": 4952,
+					"out": 1084,
+					"cached": 1777,
+					"usd": 0.008842,
+					"calls": [
+						"highlight",
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Saving costs further from the current $6 level setting."
+				},
+				{
+					"latency_s": 6.812,
+					"in": 5151,
+					"out": 2000,
+					"cached": 3953,
+					"usd": 0.01059,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": ""
+				},
+				{
+					"latency_s": 1.363,
+					"in": 5385,
+					"out": 350,
+					"cached": 2161,
+					"usd": 0.005842,
+					"calls": [
+						"highlight",
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Pushing cost lower from the applied hardware setting."
+				},
+				{
+					"latency_s": 2.091,
+					"in": 5583,
+					"out": 455,
+					"cached": 5233,
+					"usd": 0.003156,
+					"calls": [
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Pushing cost lower from here with the top saving knob."
+				},
+				{
+					"latency_s": 3.05,
+					"in": 5744,
+					"out": 862,
+					"cached": 4849,
+					"usd": 0.00551,
+					"calls": [
+						"sensitivity",
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking the next cost move from this setting."
+				},
+				{
+					"latency_s": 0.75,
+					"in": 5912,
+					"out": 171,
+					"cached": 1777,
+					"usd": 0.006162,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Nothing safe improves cost further from here."
+				},
+				{
+					"latency_s": 1.898,
+					"in": 6160,
+					"out": 466,
+					"cached": 2929,
+					"usd": 0.006459,
+					"calls": [
+						"highlight",
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Nothing further to cut without risk, verifying that cost is at its floor."
+				},
+				{
+					"latency_s": 0.634,
+					"in": 6334,
+					"out": 104,
+					"cached": 369,
+					"usd": 0.007954,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Nothing safe improves cost further from here."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "seq_len",
+					"from": 2048,
+					"to": 256.0
+				},
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 32.0
+				},
+				{
+					"knob_id": "gpu_type",
+					"from": "A100-SXM-80GB",
+					"to": "H100-SXM-80GB"
+				},
+				{
+					"knob_id": "seq_len",
+					"from": 256.0,
+					"to": 512.0
+				}
+			],
+			"decisions": 4,
+			"usd": 0.124462,
+			"tokens_in": 82707,
+			"tokens_out": 16485,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-7b",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 2.264,
+					"in": 2116,
+					"out": 598,
+					"cached": 369,
+					"usd": 0.004781,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Touring your cost dials now, starting with the biggest saver."
+				},
+				{
+					"latency_s": 1.941,
+					"in": 2274,
+					"out": 570,
+					"cached": 1905,
+					"usd": 0.00317,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Top saver is sequence length, highlighting the path and applying it."
+				},
+				{
+					"latency_s": 3.266,
+					"in": 2506,
+					"out": 968,
+					"cached": 1777,
+					"usd": 0.005292,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting this cost round with a fresh sensitivity check."
+				},
+				{
+					"latency_s": 3.355,
+					"in": 2711,
+					"out": 805,
+					"cached": 369,
+					"usd": 0.006404,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Highlighting batch path and applying the top saver now."
+				},
+				{
+					"latency_s": 5.713,
+					"in": 2808,
+					"out": 1590,
+					"cached": 0,
+					"usd": 0.010268,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Checking where the cheapest saving sits for this setting."
+				},
+				{
+					"latency_s": 4.886,
+					"in": 3154,
+					"out": 1090,
+					"cached": 2033,
+					"usd": 0.006339,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Applying the cheapest next saver for this setting."
+				},
+				{
+					"latency_s": 5.187,
+					"in": 3249,
+					"out": 1666,
+					"cached": 2929,
+					"usd": 0.00792,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the next cost round for this setting."
+				},
+				{
+					"latency_s": 2.076,
+					"in": 3453,
+					"out": 379,
+					"cached": 3057,
+					"usd": 0.002564,
+					"calls": [
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Applying the top saver now."
+				},
+				{
+					"latency_s": 5.398,
+					"in": 3597,
+					"out": 1293,
+					"cached": 369,
+					"usd": 0.009586,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Larger batches lift throughput and cut cost, now checking next saver."
+				},
+				{
+					"latency_s": 4.764,
+					"in": 3769,
+					"out": 1146,
+					"cached": 1777,
+					"usd": 0.007627,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to faster hardware for the next saving."
+				},
+				{
+					"latency_s": 1.726,
+					"in": 3860,
+					"out": 509,
+					"cached": 1777,
+					"usd": 0.005034,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Starting the next cost round with a fresh sensitivity check."
+				},
+				{
+					"latency_s": 1.82,
+					"in": 4211,
+					"out": 494,
+					"cached": 2033,
+					"usd": 0.005127,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the next cost round for the new setting."
+				},
+				{
+					"latency_s": 2.788,
+					"in": 4379,
+					"out": 706,
+					"cached": 625,
+					"usd": 0.007787,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to faster hardware to lower cost further."
+				},
+				{
+					"latency_s": 1.821,
+					"in": 4465,
+					"out": 498,
+					"cached": 3313,
+					"usd": 0.004053,
+					"calls": [
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to faster hardware to lower cost further."
+				},
+				{
+					"latency_s": 4.03,
+					"in": 4622,
+					"out": 909,
+					"cached": 2289,
+					"usd": 0.007123,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the next cost check for this setting."
+				},
+				{
+					"latency_s": 3.662,
+					"in": 4744,
+					"out": 1004,
+					"cached": 3697,
+					"usd": 0.00613,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Longer context helps ticket quality, so checking that stretch next."
+				},
+				{
+					"latency_s": 1.563,
+					"in": 4953,
+					"out": 262,
+					"cached": 369,
+					"usd": 0.006899,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Starting a fresh cost check on the current setting."
+				},
+				{
+					"latency_s": 1.005,
+					"in": 5311,
+					"out": 249,
+					"cached": 2161,
+					"usd": 0.00532,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking the next cheapest move for your setup."
+				},
+				{
+					"latency_s": 2.96,
+					"in": 5433,
+					"out": 711,
+					"cached": 1905,
+					"usd": 0.007718,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Longer context trims padding waste here, applying that stretch."
+				},
+				{
+					"latency_s": 3.268,
+					"in": 5677,
+					"out": 754,
+					"cached": 3569,
+					"usd": 0.006375,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Longer context applied, now hunting the next cost saver."
+				},
+				{
+					"latency_s": 1.206,
+					"in": 5768,
+					"out": 262,
+					"cached": 2289,
+					"usd": 0.005806,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Nothing safe improves cost further from this setting."
+				},
+				{
+					"latency_s": 0.837,
+					"in": 6017,
+					"out": 126,
+					"cached": 2033,
+					"usd": 0.00582,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the next cost round for the new setting."
+				},
+				{
+					"latency_s": 1.31,
+					"in": 6106,
+					"out": 260,
+					"cached": 5873,
+					"usd": 0.002277,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Nothing safe improves the aim any further from here."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "seq_len",
+					"from": 2048,
+					"to": 256.0
+				},
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 32.0
+				},
+				{
+					"knob_id": "gpu_type",
+					"from": "A100-SXM-80GB",
+					"to": "H100-SXM-80GB"
+				},
+				{
+					"knob_id": "seq_len",
+					"from": 256.0,
+					"to": 512.0
+				}
+			],
+			"decisions": 4,
+			"usd": 0.13942,
+			"tokens_in": 95183,
+			"tokens_out": 16849,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-7b",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 1.862,
+					"in": 2116,
+					"out": 424,
+					"cached": 625,
+					"usd": 0.003759,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting your low cost tour, checking which knob saves most first."
+				},
+				{
+					"latency_s": 2.748,
+					"in": 2273,
+					"out": 630,
+					"cached": 2033,
+					"usd": 0.003282,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Seq length trims cost most, moving it now."
+				},
+				{
+					"latency_s": 2.211,
+					"in": 2502,
+					"out": 618,
+					"cached": 1777,
+					"usd": 0.003799,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Moved sequence length down. Predicted cost is $57.25."
+				},
+				{
+					"latency_s": 1.692,
+					"in": 2743,
+					"out": 372,
+					"cached": 2161,
+					"usd": 0.002633,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Saving more next, checking the next best cost cut."
+				},
+				{
+					"latency_s": 1.607,
+					"in": 2949,
+					"out": 376,
+					"cached": 2545,
+					"usd": 0.002485,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Larger batches cut cost next, moving it now."
+				},
+				{
+					"latency_s": 1.488,
+					"in": 3041,
+					"out": 388,
+					"cached": 2033,
+					"usd": 0.003214,
+					"calls": [
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Batch size is top saver here, applying that move to finish the round."
+				},
+				{
+					"latency_s": 4.017,
+					"in": 3193,
+					"out": 1053,
+					"cached": 1777,
+					"usd": 0.006512,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking the next cheapest safe move for this setting."
+				},
+				{
+					"latency_s": 4.747,
+					"in": 3361,
+					"out": 1239,
+					"cached": 3057,
+					"usd": 0.006104,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to faster hardware to lower cost further."
+				},
+				{
+					"latency_s": 3.422,
+					"in": 3452,
+					"out": 873,
+					"cached": 369,
+					"usd": 0.007619,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Saving more where it is safe, checking costs again."
+				},
+				{
+					"latency_s": 3.489,
+					"in": 3803,
+					"out": 903,
+					"cached": 2033,
+					"usd": 0.006355,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to cheaper faster hardware next."
+				},
+				{
+					"latency_s": 1.19,
+					"in": 3892,
+					"out": 228,
+					"cached": 2801,
+					"usd": 0.002753,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching hardware should save most next, checking the map first."
+				},
+				{
+					"latency_s": 3.418,
+					"in": 4063,
+					"out": 965,
+					"cached": 0,
+					"usd": 0.00918,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Faster hardware should cut cost next, making that move now."
+				},
+				{
+					"latency_s": 1.076,
+					"in": 4297,
+					"out": 215,
+					"cached": 1777,
+					"usd": 0.00433,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching hardware should cut cost next, looking for the following saving."
+				},
+				{
+					"latency_s": 6.152,
+					"in": 4424,
+					"out": 1668,
+					"cached": 3313,
+					"usd": 0.008975,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Longer sequences look cheaper here, moving that next."
+				},
+				{
+					"latency_s": 2.963,
+					"in": 4523,
+					"out": 740,
+					"cached": 3185,
+					"usd": 0.005295,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Longer sequences look cheaper here, making that move."
+				},
+				{
+					"latency_s": 0.945,
+					"in": 4622,
+					"out": 252,
+					"cached": 2289,
+					"usd": 0.004331,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Longer sequences look cheaper here, making that move."
+				},
+				{
+					"latency_s": 1.301,
+					"in": 4940,
+					"out": 312,
+					"cached": 2033,
+					"usd": 0.005265,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Longer context may now save more, checking cheapest safe cuts."
+				},
+				{
+					"latency_s": 2.221,
+					"in": 5066,
+					"out": 611,
+					"cached": 2929,
+					"usd": 0.005707,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Longer sequences look cheapest next, making that move now."
+				},
+				{
+					"latency_s": 1.17,
+					"in": 5308,
+					"out": 323,
+					"cached": 4337,
+					"usd": 0.003237,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Moved sequence length up. Predicted cost is $5.38."
+				},
+				{
+					"latency_s": 0.587,
+					"in": 5561,
+					"out": 110,
+					"cached": 3953,
+					"usd": 0.00307,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking the next cheapest safe move."
+				},
+				{
+					"latency_s": 1.094,
+					"in": 5647,
+					"out": 162,
+					"cached": 369,
+					"usd": 0.007341,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Nothing safe lowers cost further now."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "seq_len",
+					"from": 2048,
+					"to": 256.0
+				},
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 32.0
+				},
+				{
+					"knob_id": "gpu_type",
+					"from": "A100-SXM-80GB",
+					"to": "H100-SXM-80GB"
+				},
+				{
+					"knob_id": "seq_len",
+					"from": 256.0,
+					"to": 512.0
+				}
+			],
+			"decisions": 4,
+			"usd": 0.105246,
+			"tokens_in": 81776,
+			"tokens_out": 12462,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-7b",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 2.082,
+					"in": 2116,
+					"out": 548,
+					"cached": 1905,
+					"usd": 0.002878,
+					"calls": [
+						"sensitivity",
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Touring your LoRA costs, starting with the biggest saver."
+				},
+				{
+					"latency_s": 3.411,
+					"in": 2358,
+					"out": 896,
+					"cached": 2033,
+					"usd": 0.004519,
+					"calls": [
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Top saver cuts sequence length to 256, setting that now."
+				},
+				{
+					"latency_s": 4.555,
+					"in": 2508,
+					"out": 1245,
+					"cached": 1777,
+					"usd": 0.006472,
+					"calls": [
+						"sensitivity",
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking cheapest safe saving for this setup."
+				},
+				{
+					"latency_s": 5.757,
+					"in": 2796,
+					"out": 1582,
+					"cached": 0,
+					"usd": 0.010219,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Top saver is larger batch. Moving it now."
+				},
+				{
+					"latency_s": 3.829,
+					"in": 2887,
+					"out": 1085,
+					"cached": 2289,
+					"usd": 0.005702,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Applying the top saver now."
+				},
+				{
+					"latency_s": 3.458,
+					"in": 2974,
+					"out": 970,
+					"cached": 1777,
+					"usd": 0.005885,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the cost tour from your current setup."
+				},
+				{
+					"latency_s": 2.411,
+					"in": 3182,
+					"out": 598,
+					"cached": 2673,
+					"usd": 0.003579,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the cost tour from your current setup."
+				},
+				{
+					"latency_s": 2.8,
+					"in": 3385,
+					"out": 804,
+					"cached": 369,
+					"usd": 0.007242,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the cost tour from your current setup."
+				}
+			],
+			"end": "http_503:too_many_rounds",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "seq_len",
+					"from": 2048,
+					"to": 256.0
+				}
+			],
+			"error": "The live guide went round in circles; the rule-based tour takes over.",
+			"decisions": 0,
+			"usd": 0.046496,
+			"tokens_in": 22206,
+			"tokens_out": 7728,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-7b",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 2.919,
+					"in": 2116,
+					"out": 707,
+					"cached": 1905,
+					"usd": 0.003554,
+					"calls": [
+						"sensitivity",
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting your low cost tour, checking the strongest saving first."
+				},
+				{
+					"latency_s": 4.886,
+					"in": 2352,
+					"out": 1456,
+					"cached": 2033,
+					"usd": 0.006892,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Trimming the costliest part of the plan now."
+				},
+				{
+					"latency_s": 5.212,
+					"in": 2582,
+					"out": 1372,
+					"cached": 1777,
+					"usd": 0.007104,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Checking the next best saving for you."
+				},
+				{
+					"latency_s": 3.888,
+					"in": 2785,
+					"out": 845,
+					"cached": 1905,
+					"usd": 0.004977,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Batch size looks your biggest saver, applying it now."
+				},
+				{
+					"latency_s": 5.179,
+					"in": 2882,
+					"out": 1526,
+					"cached": 1905,
+					"usd": 0.007992,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Touring for lowest cost, checking what saves most next."
+				},
+				{
+					"latency_s": 3.876,
+					"in": 3088,
+					"out": 1205,
+					"cached": 2673,
+					"usd": 0.006041,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Touring your low cost plan and checking the best saving first."
+				},
+				{
+					"latency_s": 2.306,
+					"in": 3295,
+					"out": 578,
+					"cached": 2673,
+					"usd": 0.003635,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Touring your low cost plan and checking the best saving first."
+				},
+				{
+					"latency_s": 4.67,
+					"in": 3644,
+					"out": 1314,
+					"cached": 2033,
+					"usd": 0.007903,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Applying your biggest saver next."
+				},
+				{
+					"latency_s": 5.277,
+					"in": 3868,
+					"out": 1545,
+					"cached": 1777,
+					"usd": 0.009447,
+					"calls": [
+						"sensitivity",
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Touring cost savings, checking the next move."
+				},
+				{
+					"latency_s": 3.024,
+					"in": 4116,
+					"out": 881,
+					"cached": 1905,
+					"usd": 0.006794,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Moving to cheaper hardware next."
+				},
+				{
+					"latency_s": 2.791,
+					"in": 4311,
+					"out": 788,
+					"cached": 1905,
+					"usd": 0.006642,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching GPU for lower cost."
+				},
+				{
+					"latency_s": 3.97,
+					"in": 4399,
+					"out": 831,
+					"cached": 2929,
+					"usd": 0.005809,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to cheaper hardware for you."
+				},
+				{
+					"latency_s": 3.928,
+					"in": 4488,
+					"out": 992,
+					"cached": 1905,
+					"usd": 0.007731,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to cheaper hardware next."
+				},
+				{
+					"latency_s": 2.139,
+					"in": 4576,
+					"out": 563,
+					"cached": 625,
+					"usd": 0.007425,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Switching to cheaper hardware for you."
+				},
+				{
+					"latency_s": 3.67,
+					"in": 4665,
+					"out": 971,
+					"cached": 4209,
+					"usd": 0.005328,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Touring costs, checking what saves most next."
+				}
+			],
+			"end": "http_503:too_many_rounds",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "seq_len",
+					"from": 2048,
+					"to": 256.0
+				},
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 32.0
+				}
+			],
+			"error": "The live guide went round in circles; the rule-based tour takes over.",
+			"decisions": 1,
+			"usd": 0.097274,
+			"tokens_in": 53167,
+			"tokens_out": 15574,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-qwen",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 2.539,
+					"in": 2120,
+					"out": 642,
+					"cached": 2033,
+					"usd": 0.003142,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the cost tour, checking which knob saves most."
+				},
+				{
+					"latency_s": 3.237,
+					"in": 2274,
+					"out": 816,
+					"cached": 2033,
+					"usd": 0.004074,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Touring for lowest cost from your current plan."
+				},
+				{
+					"latency_s": 3.4,
+					"in": 2478,
+					"out": 748,
+					"cached": 2161,
+					"usd": 0.003899,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Cost tour starting from your current plan."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"decisions": 0,
+			"usd": 0.011115,
+			"tokens_in": 6872,
+			"tokens_out": 2206,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-qwen",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 1.333,
+					"in": 2120,
+					"out": 359,
+					"cached": 2033,
+					"usd": 0.001939,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the cost tour, checking which knob saves most first."
+				},
+				{
+					"latency_s": 5.005,
+					"in": 2275,
+					"out": 1394,
+					"cached": 753,
+					"usd": 0.00794,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Batch size looks the strongest saver here, so I'll set that move."
+				},
+				{
+					"latency_s": 2.787,
+					"in": 2456,
+					"out": 722,
+					"cached": 881,
+					"usd": 0.005169,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Cost tour continuing from batch size 1. Checking next saver."
+				},
+				{
+					"latency_s": 2.967,
+					"in": 2548,
+					"out": 749,
+					"cached": 1905,
+					"usd": 0.004273,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Nothing safe improves cost further from this setting."
+				},
+				{
+					"latency_s": 1.672,
+					"in": 2786,
+					"out": 551,
+					"cached": 2161,
+					"usd": 0.003447,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Planning the next cost round from batch size 1."
+				},
+				{
+					"latency_s": 2.162,
+					"in": 2876,
+					"out": 520,
+					"cached": 2161,
+					"usd": 0.003428,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Nothing safe improves cost further from here."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 1.0
+				}
+			],
+			"decisions": 1,
+			"usd": 0.026196,
+			"tokens_in": 15061,
+			"tokens_out": 4295,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-qwen",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 2.595,
+					"in": 2120,
+					"out": 688,
+					"cached": 2033,
+					"usd": 0.003338,
+					"calls": [
+						"sensitivity",
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Tour starting for lowest cost. I'll check which knob saves most first."
+				},
+				{
+					"latency_s": 5.47,
+					"in": 2362,
+					"out": 1426,
+					"cached": 753,
+					"usd": 0.008185,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting cost tour on this setting. Checking biggest saver."
+				},
+				{
+					"latency_s": 2.592,
+					"in": 2572,
+					"out": 749,
+					"cached": 2033,
+					"usd": 0.004162,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Saving cost starts with batch size. I'll make that move now."
+				},
+				{
+					"latency_s": 3.85,
+					"in": 2671,
+					"out": 1072,
+					"cached": 2033,
+					"usd": 0.005658,
+					"calls": [
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting the cost tour from your current setting."
+				},
+				{
+					"latency_s": 3.22,
+					"in": 2879,
+					"out": 967,
+					"cached": 2033,
+					"usd": 0.005472,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Top saver is batch size, so I'll set that knob now."
+				},
+				{
+					"latency_s": 3.352,
+					"in": 3058,
+					"out": 1029,
+					"cached": 1777,
+					"usd": 0.006241,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting cost tour from your current setting, checking biggest saver."
+				},
+				{
+					"latency_s": 2.592,
+					"in": 3149,
+					"out": 643,
+					"cached": 0,
+					"usd": 0.006669,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Nothing safe left improves cost further from this setting."
+				},
+				{
+					"latency_s": 1.788,
+					"in": 3388,
+					"out": 499,
+					"cached": 2033,
+					"usd": 0.004119,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Nothing safe improves cost any more from this setting."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 1.0
+				}
+			],
+			"decisions": 1,
+			"usd": 0.043844,
+			"tokens_in": 22199,
+			"tokens_out": 7073,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-qwen",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 0.883,
+					"in": 2120,
+					"out": 242,
+					"cached": 0,
+					"usd": 0.003678,
+					"calls": [
+						"sensitivity",
+						"highlight"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Starting your low-cost tour, scanning the map for savings."
+				},
+				{
+					"latency_s": 4.447,
+					"in": 2360,
+					"out": 1208,
+					"cached": 1905,
+					"usd": 0.005988,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Moving to the cheapest safe batch size next."
+				},
+				{
+					"latency_s": 3.492,
+					"in": 2531,
+					"out": 857,
+					"cached": 369,
+					"usd": 0.0064,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Saving money is the mission, so I will check the next best saving."
+				},
+				{
+					"latency_s": 4.562,
+					"in": 2625,
+					"out": 1490,
+					"cached": 0,
+					"usd": 0.009614,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "No safe move cuts cost further, so the tour ends here."
+				},
+				{
+					"latency_s": 2.057,
+					"in": 2867,
+					"out": 511,
+					"cached": 2033,
+					"usd": 0.003519,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Nothing safe now lowers cost further so we stop here."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 1.0
+				}
+			],
+			"decisions": 1,
+			"usd": 0.029199,
+			"tokens_in": 12503,
+			"tokens_out": 4308,
+			"variant": "current"
+		},
+		{
+			"sample": "lora-qwen",
+			"aim": "min_cost",
+			"rounds": [
+				{
+					"latency_s": 3.19,
+					"in": 2120,
+					"out": 788,
+					"cached": 1905,
+					"usd": 0.003903,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Tour starting for lowest cost, checking the strongest saving move."
+				},
+				{
+					"latency_s": 4.83,
+					"in": 2275,
+					"out": 1361,
+					"cached": 2033,
+					"usd": 0.006392,
+					"calls": [
+						"highlight",
+						"set_knob"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Moving batch size to 1 for lower cost. This lightens load across data and model while trimming spend."
+				},
+				{
+					"latency_s": 2.948,
+					"in": 2463,
+					"out": 722,
+					"cached": 1777,
+					"usd": 0.004193,
+					"calls": [
+						"sensitivity"
+					],
+					"awaiting": "results",
+					"withheld": null,
+					"text": "Applied batch size cut, now checking the next best cost saver."
+				},
+				{
+					"latency_s": 3.115,
+					"in": 2555,
+					"out": 1064,
+					"cached": 369,
+					"usd": 0.00731,
+					"calls": [],
+					"awaiting": "decision",
+					"withheld": null,
+					"text": "Checking what still saves money from here."
+				},
+				{
+					"latency_s": 1.699,
+					"in": 2900,
+					"out": 353,
+					"cached": 369,
+					"usd": 0.004719,
+					"calls": [],
+					"awaiting": "visitor",
+					"withheld": null,
+					"text": "Nothing safe improves cost further from here."
+				}
+			],
+			"end": "done",
+			"offered_fitting_move": true,
+			"moves": [
+				{
+					"knob_id": "batch_size",
+					"from": 4,
+					"to": 1.0
+				}
+			],
+			"decisions": 1,
+			"usd": 0.026517,
+			"tokens_in": 12313,
+			"tokens_out": 4288,
+			"variant": "current"
+		}
+	],
+	"summary": {
+		"model": "muse-spark-1.3",
+		"tours": 10,
+		"rounds": 113,
+		"latency_s": {
+			"p50": 3.024,
+			"p90": 5.132,
+			"p95": 5.398,
+			"max": 6.812
+		},
+		"output_tokens": {
+			"p50": 754,
+			"p95": 1526,
+			"max": 2000
+		},
+		"input_tokens": {
+			"p50": 3193,
+			"max": 6334
+		},
+		"cached_share": 0.547,
+		"rounds_per_tour": {
+			"mean": 11.3,
+			"max": 23
+		},
+		"usd_per_tour": {
+			"mean": 0.065,
+			"max": 0.13942
+		},
+		"withheld_rounds": 0,
+		"ends": {
+			"http_503:too_many_rounds": 2,
+			"done": 8
+		}
+	}
+}
