@@ -1,0 +1,11 @@
+{
+	"name": "20261028-023753-40622057852-b-corpus-smoke-grouped",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "40622057852",
+	"ref": "ws-b",
+	"sha": "5457f49748121fcc700ef7ed61530d62c01a1538",
+	"cmd": "modal run python/preflight/corpus/modal_app.py --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T02:38:09Z"
+}

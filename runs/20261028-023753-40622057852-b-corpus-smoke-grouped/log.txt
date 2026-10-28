@@ -1,0 +1,9 @@
+Error: Specify a Modal Function or local entrypoint to run. E.g.
+> modal run python/preflight/corpus/modal_app.py::my_function [..args]
+
+'python/preflight/corpus/modal_app.py' has the following functions and local entrypoints:
+export / app.export
+main / app.main
+ledger / app.ledger
+read_rows / app.read_rows
+Sweeper.run_batch / app.Sweeper.run_batch
