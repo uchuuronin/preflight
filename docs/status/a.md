@@ -83,6 +83,15 @@ Updated Tue Oct 27, evening ET.
   revisit if the store moves off a single container.
 - Repos need a full 40-character commit: GitHub only serves a fetch by the whole hash.
 
+## Cloud runs
+
+Every run's GPU, minutes and dollars. Runs go through GitHub Actions (docs/setup/cloud.md) on T4
+or L4 unless Chiya approves bigger; `modal_app.py::smoke` holds its probes to L4.
+
+| Date | Run | GPU | Minutes | USD |
+| --- | --- | --- | --- | --- |
+| (none yet) | | | | |
+
 ## Contract requests
 
-See docs/requests.md.
+See docs/requests/from-a.md.

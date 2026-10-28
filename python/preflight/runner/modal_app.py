@@ -340,13 +340,21 @@ def prefetch(models: list[str] | None = None) -> list[str]:
 
 
 @app.local_entrypoint()
-def smoke(sample: str = "sample://zoo/finetune_lora_hf"):
-	"""Submit one zoo script and follow it to the record: the G1 critical path in one command."""
+def smoke(sample: str = "sample://zoo/finetune_lora_hf", gpus: str = "L4"):
+	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
+
+	Probes stay on `gpus` (comma-separated): L4 by default, since team runs use T4 or L4 unless
+	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder.
+	"""
 	import json
 	import time
 
 	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME)()
-	sub = svc.submit.remote({"source": {"kind": "sample", "uri": sample}}, "smoke", uuid.uuid4().hex)
+	request = {
+		"source": {"kind": "sample", "uri": sample},
+		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
+	}
+	sub = svc.submit.remote(request, "smoke", uuid.uuid4().hex)
 	print("submitted", sub)
 	seen = -1
 	while True:
