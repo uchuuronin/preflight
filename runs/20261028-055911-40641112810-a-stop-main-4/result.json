@@ -1,0 +1,11 @@
+{
+	"name": "20261028-055911-40641112810-a-stop-main-4",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "40641112810",
+	"ref": "ws-a",
+	"sha": "fc178bb9eaf0103132f428ff862463974a5c40b0",
+	"cmd": "python -m preflight.runner.stop_app --env main",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T05:59:35Z"
+}
