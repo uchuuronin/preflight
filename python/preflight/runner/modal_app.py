@@ -326,12 +326,14 @@ def tick() -> dict:
 
 
 @app.function(image=probe_image, volumes={WEIGHTS_DIR: weights_vol}, timeout=3600)
-def prefetch(models: list[str] | None = None) -> list[str]:
-	"""Download weights and tokenizers into the read-only weights volume (zoo models by default)."""
+def prefetch(models: str = "") -> list[str]:
+	"""Download weights and tokenizers into the read-only weights volume (zoo models by default).
+
+	models: comma-separated Hub ids (a plain string: `modal run` can't parse list arguments)."""
 	from huggingface_hub import snapshot_download
 
 	done = []
-	for repo in models or ZOO_MODELS:
+	for repo in [m.strip() for m in models.split(",") if m.strip()] or ZOO_MODELS:
 		snapshot_download(
 			repo,
 			cache_dir=f"{WEIGHTS_DIR}/hf/hub",
