@@ -22,8 +22,18 @@
 - Bug found that way and fixed: the status line said "Runs out of memory: peaks at 9.22 GiB of
   22.1 GiB" when the failure came from the eval loop; the peak form is now used only when the
   peak is over the card.
-- Stranger test 18 of 18; knob to readout p95 115 ms at 4x CPU slowdown (measured, this
-  container, after the UI changes).
+- Independent review (no Critical, 2 High, 8 Medium): all fixed. The end-to-end run can no
+  longer leave a GPU job running (every call bounded, cancel resent until it lands, a cancel on
+  any early exit, and a direct cancel in A's store as the backstop); a record committed just
+  after a reload is found; a stuck reload is a retryable 503, not a pile of threads; deploy.yml
+  no longer deploys or checks A's runner (its check could claim the live store); check-in reads
+  nothing before names and sizes pass, keys per distinct check-in, keeps the file-to-run
+  choice visible, and a plain cancel isn't shown as an error.
+- Stranger test 18 of 18; knob to readout p95 119 ms at 4x CPU slowdown (measured, this
+  container, after the UI changes). API 70 tests, web 156.
+
+**Cloud runs:** none (two runs wait for a yes: the API startup check, about $0.02, and the
+upload-to-map run, about $0.35 expected, $0.65 cap).
 
 ## Tue Oct 27, late (decisions applied, cockpit as a dashboard)
 
