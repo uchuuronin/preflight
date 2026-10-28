@@ -1,6 +1,8 @@
 # One-time (and after any key rotation): create the Modal environments the deploy uses and copy the
 # model API keys from GitHub secrets into Modal secrets, so code running on Modal can read them.
 # Probe containers never mount these secrets (gap 6); only the API and pipeline functions do.
+# Modal secrets made: preflight-meta (Meta key and base URL), preflight-baseten (Baseten key),
+# preflight-api (C's session-signing keys and the edge secret shared with Cloudflare Pages).
 name: modal-setup
 
 on:
@@ -27,6 +29,8 @@ jobs:
           META_API_KEY: ${{ secrets.META_API_KEY }}
           META_API_BASE: ${{ secrets.META_API_BASE }}
           BASETEN_API_KEY: ${{ secrets.BASETEN_API_KEY }}
+          PREFLIGHT_SESSION_KEYS: ${{ secrets.PREFLIGHT_SESSION_KEYS }}
+          PREFLIGHT_EDGE_SECRET: ${{ secrets.PREFLIGHT_EDGE_SECRET }}
         run: |
           set -euo pipefail
           uv run modal environment create production || true
@@ -37,6 +41,11 @@ jobs:
             fi
             if [ -n "$BASETEN_API_KEY" ]; then
               uv run modal secret create preflight-baseten BASETEN_API_KEY="$BASETEN_API_KEY" BASETEN_BASE_URL="https://inference.baseten.co/v1" --env "$env" --force > /dev/null
+            fi
+            if [ -n "$PREFLIGHT_SESSION_KEYS" ] && [ -n "$PREFLIGHT_EDGE_SECRET" ]; then
+              uv run modal secret create preflight-api PREFLIGHT_SESSION_KEYS="$PREFLIGHT_SESSION_KEYS" PREFLIGHT_EDGE_SECRET="$PREFLIGHT_EDGE_SECRET" --env "$env" --force > /dev/null
+            else
+              echo "preflight-api skipped: add PREFLIGHT_SESSION_KEYS and PREFLIGHT_EDGE_SECRET to GitHub secrets"
             fi
             echo "secrets set in Modal environment $env"
           done

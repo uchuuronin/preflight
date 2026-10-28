@@ -10,6 +10,7 @@ appear in a chat, a commit or a flight record.
 | Modal | Probes, zoo ground truth, the NVIDIA corpus slice, the API | GitHub secrets `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET` | $100 hackathon credits + $30 a month free |
 | Baseten | Muse Spark Open (triage, labelling) | GitHub secret `BASETEN_API_KEY`, copied into Modal secret `preflight-baseten` | $100 credits |
 | Meta Model API | Muse Spark (script map, guide), Muse Code, Muse Glimmer | GitHub secrets `META_API_KEY`, `META_API_BASE`, copied into Modal secret `preflight-meta` | $150 credits |
+| The API's own keys | Signing session cookies; proving traffic came through the Cloudflare site | GitHub secrets `PREFLIGHT_SESSION_KEYS`, `PREFLIGHT_EDGE_SECRET`, copied into Modal secret `preflight-api` | none |
 | AMD Developer Cloud | ROCm probes, the AMD corpus slice, the AMD holdout | GitHub secrets `AMD_SSH_KEY`, optional `DO_API_TOKEN` | $40, about 15 MI300X-hours at $2.59 |
 
 Probe containers never mount `preflight-meta` or `preflight-baseten` (gap 6). Only the API and the
@@ -41,7 +42,21 @@ gh secret set META_API_BASE -R uchuuronin/preflight
 
 `META_API_BASE` is `https://api.meta.ai/v1` (from the dashboard's cURL example; Meta uses the Responses API format).
 
-**3. Copy the keys into Modal, then check everything works**
+**3. Two random keys for the API's sessions**
+
+C's API signs visitors' session cookies, and only accepts traffic that comes through the Cloudflare
+site, checked with a shared secret. Make two random values in your conda env (run each, copy its output):
+
+```
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Save the first as `PREFLIGHT_SESSION_KEYS` and the second as `PREFLIGHT_EDGE_SECRET`, as repository
+secrets like the others. When the Cloudflare Pages project is created, set `PREFLIGHT_EDGE_SECRET`
+there too, with the same value.
+
+**4. Copy the keys into Modal, then check everything works**
 
 `main` must be the repo's default branch first (Settings > Branches), because GitHub only offers
 manual workflows that exist on the default branch.
@@ -57,7 +72,7 @@ requests (p50, p95, max). That grounds the guide's timeout and fixes the Muse Sp
 smoke test records the memory PyTorch actually reports on an L4, which B needs, and an achieved bf16
 matmul rate. Both cost cents.
 
-**4. AMD droplet (only when a ROCm run is planned; it bills every hour it exists)**
+**5. AMD droplet (only when a ROCm run is planned; it bills every hour it exists)**
 
 On Windows PowerShell, make a key with no passphrase (press Enter at both prompts):
 
