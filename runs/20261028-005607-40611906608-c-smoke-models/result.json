@@ -1,0 +1,11 @@
+{
+	"name": "20261028-005607-40611906608-c-smoke-models",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "40611906608",
+	"ref": "ws-c",
+	"sha": "62179a13e9de598f88669773fd1ddad59f6e1cf9",
+	"cmd": "python scripts/cloud/smoke_models.py --n 20",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T00:57:04Z"
+}
