@@ -1,0 +1,11 @@
+{
+	"name": "20261028-043726-40633354342-a-smoke-l4-main-2",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "40633354342",
+	"ref": "ws-a",
+	"sha": "ffdd1cf7b03c8d73e94a87cb54f08efac3ca2360",
+	"cmd": "modal run --env main python/preflight/runner/modal_app.py::smoke --gpus L4",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T04:37:51Z"
+}

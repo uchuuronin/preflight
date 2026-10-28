@@ -1,0 +1,80 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-q4WVd2kZuDfxyYYLY9uzd5
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/modal_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function JobStoreService.*.
+├── ✓ Created Function run_worker.
+├── ✓ Created Function tick.
+└── ✓ Created Function startup_check_worker.
+Stopping app - uncaught exception raised locally: StoreUnavailable('job state could not be saved: RuntimeError').
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/preflight/preflight/python/preflight/runner/modal_app.py:4 │
+│ 74 in smoke                                                                  │
+│                                                                              │
+│   473 │   }                                                                  │
+│ ❱ 474 │   sub = svc.submit.remote(request, "smoke", uuid.uuid4().hex)        │
+│   475 │   print("submitted", sub, flush=True)                                │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_object.py:49 in wrapped                                                  │
+│                                                                              │
+│    48 │   │   await self.hydrate()                                           │
+│ ❱  49 │   │   return await method(self, *args, **kwargs)                     │
+│    50                                                                        │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2081 in remote                                              │
+│                                                                              │
+│   2080 │   │                                                                 │
+│ ❱ 2081 │   │   return await self._call_function(args, kwargs)                │
+│   2082                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2018 in _call_function                                      │
+│                                                                              │
+│   2017 │   │                                                                 │
+│ ❱ 2018 │   │   return await invocation.run_function()                        │
+│   2019                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:517 in run_function                                         │
+│                                                                              │
+│    516 │   │   │   # No more retries left.                                   │
+│ ❱  517 │   │   │   return await _process_result(                             │
+│    518 │   │   │   │   await_response.output.result, await_response.output.d │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_utils/function_utils.py:572 in _process_result                           │
+│                                                                              │
+│   571 │   │   │                                                              │
+│ ❱ 572 │   │   │   raise exc_with_hints(exc)                                  │
+│   573                                                                        │
+│                                                                              │
+│     ...Remote call to Modal Function (ta-01M60CMQ8SA3JY8918KW7MTZ9R)...      │
+│                                                                              │
+│ /root/modal_app.py:212 in submit                                             │
+│                                                                              │
+│ ❱ 212 out = self.m.submit(request, visitor, idempotency_key)                 │
+│                                                                              │
+│                                                                              │
+│ /opt/preflight/preflight/runner/remote_store.py:112 in submit                │
+│                                                                              │
+│ ❱ 112 s = self.store.submit(request, visitor=visitor, idempotency_key=idempo │
+│                                                                              │
+│                                                                              │
+│ /opt/preflight/preflight/runner/queue.py:389 in submit                       │
+│                                                                              │
+│ ❱ 389 return self._txn(do)                                                   │
+│                                                                              │
+│                                                                              │
+│ /opt/preflight/preflight/runner/queue.py:198 in _txn                         │
+│                                                                              │
+│ ❱ 198 raise StoreUnavailable(f"job state could not be saved: {type(exc).__na │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+StoreUnavailable: job state could not be saved: RuntimeError
