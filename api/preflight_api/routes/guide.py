@@ -15,11 +15,13 @@ an error page.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import datetime as dt
 import json
 import logging
 import math
+import re
 from functools import lru_cache
 from typing import Annotated, Any, Literal
 
@@ -44,14 +46,30 @@ from ..guide.types import (
 	check_result,
 	check_setting,
 )
-from ..stores import resolve_record
+from ..stores import StoreBusy, resolve_record
 
 log = logging.getLogger("preflight.guide")
 router = APIRouter(prefix="/v1")
 
-MAX_OUTPUT_TOKENS = 900  # source: guess; 50 words of text plus a few tool calls. Measure (Oct 28).
+
+async def _record(ref: str, app) -> dict | None:
+	"""The record by sample id or share token, off the event loop (the store may wait on a reload)."""
+	try:
+		return await asyncio.to_thread(resolve_record, ref, app.state.samples, app.state.records)
+	except StoreBusy as e:
+		raise ApiError(
+			503, "record_store_busy", "Records are a moment behind; try again.", retryable=True, retry_after=2
+		) from e
+
+
+# Measured Oct 27 on muse-spark-1.3 (docs/decisions/guide-limits.md): reasoning counts as output;
+# in run 3 (264 rounds) output p95 was 1,327 and 5 rounds hit the 1,600 cap. Source: derived, about
+# 1.35x the highest measured p95 (1,485, with the act-now instruction now shipped).
+MAX_OUTPUT_TOKENS = 2000
 MAX_INPUT_TOKENS = 40_000  # source: derived, MAX_BYTES of state / about 3 characters per token
-MAX_ROUNDS_PER_TURN = 8  # source: guess, sensitivity + highlight + set_knob + slack
+# Source: measured, tours that finished never needed more than 4 rounds between visitor actions;
+# the only turns that reached 8 were the model re-ranking in a loop (now refused, see below).
+MAX_ROUNDS_PER_TURN = 8
 CHARS_PER_TOKEN_WORST = 3.0  # source: guess, conservative (English averages about 4)
 
 
@@ -92,6 +110,43 @@ def _turn_evidence(state: GuideState) -> list[Any]:
 	return outs
 
 
+def _fingerprint(setting: Any) -> str:
+	return json.dumps(
+		[setting.knobs, sorted(setting.pinned), setting.objective.model_dump(exclude_none=True)],
+		sort_keys=True,
+		default=str,
+	)
+
+
+_DASHES = re.compile(r"\s*[\u2014\u2013]\s*")
+
+
+def _plain(text: str) -> str:
+	"""House style: no em or en dashes in what visitors read (Muse Spark uses them anyway)."""
+	return _DASHES.sub(", ", text).strip()
+
+
+def _unmoved_offer(state: GuideState) -> tuple[str, Any] | None:
+	"""The top fitting move from this turn's last ranking, if the guide hasn't tried a move since."""
+	names: dict[str, str] = {}
+	offer: tuple[str, Any] | None = None
+	for item in state.items[state.turn_start :]:
+		if item.get("type") == "function_call":
+			names[item.get("call_id", "")] = item.get("name", "")
+			if item.get("name") == "set_knob":
+				offer = None
+		elif (
+			item.get("type") == "function_call_output" and names.get(item.get("call_id", "")) == "sensitivity"
+		):
+			try:
+				ranked = json.loads(item.get("output") or "{}").get("ranked") or []
+			except ValueError:
+				continue
+			top = next((r for r in ranked if r.get("fit") == "fits" and r.get("impact", 0) > 0), None)
+			offer = (top["knob_id"], top["best_value"]) if top else None
+	return offer
+
+
 def _guard_set_knob(
 	args: dict, rec: RecordView, pinned: set[str], state: GuideState, moved_now: bool
 ) -> str | None:
@@ -120,7 +175,7 @@ async def guide_turn(request: Request) -> dict:
 		raise ApiError(422, "invalid_request", "The guide request isn't in the expected shape.") from e
 
 	app = request.app
-	rec_raw = resolve_record(body.record, app.state.samples, app.state.records)
+	rec_raw = await _record(body.record, app)
 	if rec_raw is None:
 		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
 	rec = view_of(rec_raw)
@@ -201,12 +256,16 @@ async def guide_turn(request: Request) -> dict:
 		new_turn = True
 		state.turn_start = len(state.items)
 		state.evidence = []
+		state.ranked = None
+		state.seen = []
 		state.add(_event(f"The person {d.action} the move of {d.knob_id}{value}. Plan the next round."))
 	if body.message:
 		new_turn = True
 		if not body.decision:
 			state.turn_start = len(state.items)
 			state.evidence = []
+			state.ranked = None
+			state.seen = []
 		state.add({"role": "user", "content": body.message})
 	if body.start and not state.items:
 		new_turn = True
@@ -240,86 +299,135 @@ async def guide_turn(request: Request) -> dict:
 	tools = build_tools(rec, pinned, move_pending=state.move is not None)
 	offered = {t["name"] for t in tools}
 	instructions = INSTRUCTIONS + language_line(body.language)
-	items = [*state.items, setting_note]
-	worst, tokens_in = _worst_case_usd(instructions, items, tools)
-	if tokens_in > MAX_INPUT_TOKENS:
-		raise _fallback(
-			"turn_too_large",
-			"This conversation is too long for the live guide; the rule-based tour takes over.",
+	# The model gets another round, inside this same request, when everything it asked for was
+	# refused here and it said nothing: otherwise the tour would stop silently.
+	spent = {"in": 0, "out": 0, "cached": 0, "usd": 0.0}
+	nudged = False
+	while True:
+		items = [*state.items, setting_note]
+		worst, tokens_in = _worst_case_usd(instructions, items, tools)
+		if tokens_in > MAX_INPUT_TOKENS:
+			raise _fallback(
+				"turn_too_large",
+				"This conversation is too long for the live guide; the rule-based tour takes over.",
+			)
+		ledger = app.state.ledger
+		decision = await ledger.reserve(
+			visitor=sid, run=f"{rec.key}:{sid}", ip=edge.ip_key(edge.client_ip(request)), usd=worst
 		)
-	ledger = app.state.ledger
-	decision = await ledger.reserve(
-		visitor=sid, run=f"{rec.key}:{sid}", ip=edge.ip_key(edge.client_ip(request)), usd=worst
-	)
-	if not decision.ok:
-		raise _fallback(
-			decision.reason or "budget",
-			"You've used the live guide's allowance for now; the rule-based tour takes over.",
-			decision.retry_after_s,
-		)
-	try:
-		result = await muse_spark.create_turn(
-			instructions=instructions,
-			input_items=items,
-			tools=tools,
-			max_output_tokens=MAX_OUTPUT_TOKENS,
-			client=app.state.http,
-		)
-	except muse_spark.GuideModelError as e:
-		await ledger.release(decision.reservation)
-		raise _fallback("model_error", f"{e} The rule-based tour takes over for now.") from e
-	except Exception:
-		await ledger.settle(decision.reservation, worst)  # unknown outcome: keep the worst case
-		raise
-	await ledger.settle(decision.reservation, result.cost_usd)
-	state.rounds += 1
+		if not decision.ok:
+			raise _fallback(
+				decision.reason or "budget",
+				"You've used the live guide's allowance for now; the rule-based tour takes over.",
+				decision.retry_after_s,
+			)
+		try:
+			result = await muse_spark.create_turn(
+				instructions=instructions,
+				input_items=items,
+				tools=tools,
+				max_output_tokens=MAX_OUTPUT_TOKENS,
+				client=app.state.http,
+			)
+		except muse_spark.GuideModelError as e:
+			await ledger.release(decision.reservation)
+			raise _fallback("model_error", f"{e} The rule-based tour takes over for now.") from e
+		except Exception:
+			await ledger.settle(decision.reservation, worst)  # unknown outcome: keep the worst case
+			raise
+		await ledger.settle(decision.reservation, result.cost_usd)
+		state.rounds += 1
+		spent["in"] += result.input_tokens
+		spent["out"] += result.output_tokens
+		spent["cached"] += result.cached_tokens
+		spent["usd"] += result.cost_usd
 
-	# ---- guard what the model did
-	calls_out: list[dict] = []
-	moved_now = False
-	for c in result.calls:
-		state.add(
-			{
-				"type": "function_call",
-				"call_id": c.call_id,
-				"name": c.name,
-				"arguments": json.dumps(c.arguments),
-			}
-		)
-		refusal = None
-		if c.name not in offered:
-			refusal = "tool_not_offered"
-		elif c.name == "set_knob":
-			refusal = _guard_set_knob(c.arguments, rec, pinned, state, moved_now)
-			moved_now = moved_now or refusal is None
-		if refusal:
+		# ---- guard what the model did
+		calls_out: list[dict] = []
+		moved_now = False
+		refused_any = False
+		for c in result.calls:
 			state.add(
 				{
-					"type": "function_call_output",
+					"type": "function_call",
 					"call_id": c.call_id,
-					"output": json.dumps({"refused": refusal}),
+					"name": c.name,
+					"arguments": json.dumps(c.arguments),
 				}
 			)
-			continue
-		if c.name in SERVER_TOOLS:
-			state.pending.append(Pending(c.call_id, c.name, c.arguments, needs_approval=True))
-			state.add(
-				{
-					"type": "function_call_output",
-					"call_id": c.call_id,
-					"output": json.dumps({"status": "awaiting_person_approval"}),
-				}
-			)
-			calls_out.append(
-				{"call_id": c.call_id, "name": c.name, "arguments": c.arguments, "runs_in": "approval"}
-			)
-		elif c.name in BROWSER_TOOLS:
-			state.pending.append(Pending(c.call_id, c.name, c.arguments))
-			calls_out.append(
-				{"call_id": c.call_id, "name": c.name, "arguments": c.arguments, "runs_in": "browser"}
-			)
+			refusal = None
+			if c.name not in offered:
+				refusal = "tool_not_offered"
+			elif c.name == "set_knob":
+				refusal = _guard_set_knob(c.arguments, rec, pinned, state, moved_now)
+				moved_now = moved_now or refusal is None
+			elif c.name == "sensitivity":
+				fp = _fingerprint(body.setting)
+				if state.ranked == fp:
+					refusal = "already_ranked"
+				else:
+					state.ranked = fp
+			elif c.name in ("highlight", "predict"):
+				fp = (
+					c.name + json.dumps(c.arguments, sort_keys=True, default=str) + _fingerprint(body.setting)
+				)
+				if fp in state.seen:
+					refusal = "already_done"
+				else:
+					state.seen = [*state.seen, fp][-64:]
+			if refusal:
+				refused_any = True
+				out = {"refused": refusal}
+				if refusal == "already_ranked":
+					out["hint"] = (
+						"This setting is already ranked above. If nothing there fits and improves the aim, "
+						"tell the person so in one sentence and stop."
+					)
+				elif refusal == "already_done":
+					out["hint"] = (
+						"You already did exactly this this round. Act on what you have: call set_knob, or "
+						"say what you found in one or two sentences and stop."
+					)
+				state.add({"type": "function_call_output", "call_id": c.call_id, "output": json.dumps(out)})
+				continue
+			if c.name in SERVER_TOOLS:
+				state.pending.append(Pending(c.call_id, c.name, c.arguments, needs_approval=True))
+				state.add(
+					{
+						"type": "function_call_output",
+						"call_id": c.call_id,
+						"output": json.dumps({"status": "awaiting_person_approval"}),
+					}
+				)
+				calls_out.append(
+					{"call_id": c.call_id, "name": c.name, "arguments": c.arguments, "runs_in": "approval"}
+				)
+			elif c.name in BROWSER_TOOLS:
+				state.pending.append(Pending(c.call_id, c.name, c.arguments))
+				calls_out.append(
+					{"call_id": c.call_id, "name": c.name, "arguments": c.arguments, "runs_in": "browser"}
+				)
 
-	text, withheld = result.text.strip(), None
+		if state.rounds >= MAX_ROUNDS_PER_TURN:
+			break
+		if not calls_out and not moved_now and state.move is None and not nudged:
+			# A stall: the model announced a move and stopped, though its own ranking this turn
+			# offered one that fits (measured Oct 27: docs/decisions/guide-limits.md). Once per
+			# request, remind it and let it act or say why not.
+			offer = _unmoved_offer(state)
+			if offer is not None:
+				nudged = True
+				state.add(
+					_event(
+						f"[check] Your ranking this round offers {offer[0]} = {json.dumps(offer[1])}, "
+						"which fits. Call set_knob now, or say in one sentence why not."
+					)
+				)
+				continue
+		if calls_out or result.text.strip() or not refused_any:
+			break
+
+	text, withheld = _plain(result.text), None
 	if text:
 		evidence = numbers.evidence_from(
 			_turn_evidence(state),
@@ -366,10 +474,10 @@ async def guide_turn(request: Request) -> dict:
 			"provider": "meta",
 			"model": muse_spark.MODEL,
 			"purpose": "guide",
-			"input_tokens": result.input_tokens,
-			"output_tokens": result.output_tokens,
-			"cached_tokens": result.cached_tokens,
-			"cost_usd": round(result.cost_usd, 6),
+			"input_tokens": spent["in"],
+			"output_tokens": spent["out"],
+			"cached_tokens": spent["cached"],
+			"cost_usd": round(spent["usd"], 6),
 			"request_id": result.request_id,
 			"at": dt.datetime.now(dt.UTC).isoformat(),
 		},
@@ -398,7 +506,7 @@ async def guide_tool(request: Request) -> dict:
 	except (ValidationError, ValueError) as e:
 		raise ApiError(422, "invalid_request", "The tool request isn't in the expected shape.") from e
 	app = request.app
-	rec_raw = resolve_record(body.record, app.state.samples, app.state.records)
+	rec_raw = await _record(body.record, app)
 	if rec_raw is None:
 		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
 	rec = view_of(rec_raw)

@@ -1,5 +1,5 @@
 {
-	"schema_version": "0.3.0",
+	"schema_version": "0.4.0",
 	"record_id": "01JBGOLDENFT0000000000000A",
 	"share_token": "golden-finetune-share-tok",
 	"created_at": "2026-10-27T14:00:00Z",
@@ -7,7 +7,7 @@
 		"lens": "finetune",
 		"source": {
 			"kind": "sample",
-			"uri": "sample://zoo/lora-hf",
+			"uri": "sample://zoo/finetune_lora_hf",
 			"content_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			"entrypoint": "zoo/finetune_lora_hf/train.py",
 			"args": []
@@ -339,7 +339,11 @@
 			},
 			"gridded": true,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"data",
+				"model"
+			]
 		},
 		{
 			"id": "seq_len",
@@ -359,7 +363,13 @@
 			},
 			"gridded": true,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"data",
+				"attn",
+				"lm_head"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "grad_accum",
@@ -375,7 +385,11 @@
 			"current": 4,
 			"gridded": false,
 			"needs_code": false,
-			"group": "speed"
+			"group": "speed",
+			"affects": [
+				"data",
+				"optimizer"
+			]
 		},
 		{
 			"id": "eval_batch_size",
@@ -391,7 +405,11 @@
 			"current": 32,
 			"gridded": false,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"eval"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "lora_r",
@@ -406,7 +424,13 @@
 			"current": 16,
 			"gridded": false,
 			"needs_code": false,
-			"group": "model"
+			"group": "model",
+			"affects": [
+				"attn",
+				"mlp",
+				"optimizer"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "gradient_checkpointing",
@@ -419,7 +443,13 @@
 			"current": false,
 			"gridded": false,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"block",
+				"attn",
+				"mlp"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "precision",
@@ -436,7 +466,40 @@
 			"current": "bf16",
 			"gridded": false,
 			"needs_code": false,
-			"group": "speed"
+			"group": "speed",
+			"affects": [
+				"model"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"T4",
+					"L4",
+					"A10",
+					"L40S",
+					"A100-SXM-40GB",
+					"A100-SXM-80GB",
+					"RTX-PRO-6000-96GB",
+					"H100-SXM-80GB",
+					"H200-SXM-141GB",
+					"B200-SXM-180GB",
+					"B300-SXM-288GB"
+				],
+				"log": false
+			},
+			"current": "L4",
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"model"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "packing",
@@ -450,7 +513,11 @@
 			"gridded": false,
 			"needs_code": true,
 			"patch_template": "data.enable_packing",
-			"group": "data"
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "eval_no_grad",
@@ -464,7 +531,11 @@
 			"gridded": false,
 			"needs_code": true,
 			"patch_template": "eval.wrap_no_grad",
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"eval"
+			],
+			"changes_results": false
 		}
 	],
 	"probes": [
@@ -475,7 +546,7 @@
 				"seq_len": 1024
 			},
 			"status": "ok",
-			"steps": 5,
+			"steps": 7,
 			"started_at": "2026-10-27T14:01:00Z",
 			"duration_s": 71.0,
 			"memory": {
@@ -519,21 +590,27 @@
 						2.37,
 						2.3,
 						2.26,
-						2.21
+						2.21,
+						2.18,
+						2.16
 					],
 					"grad_norm": [
 						0.81,
 						0.77,
 						0.74,
 						0.79,
-						0.72
+						0.72,
+						0.71,
+						0.7
 					],
 					"lr": [
 						2e-05,
 						4e-05,
 						6e-05,
 						8e-05,
-						0.0001
+						0.0001,
+						0.00012,
+						0.00014
 					]
 				},
 				"nan_count": 0,
@@ -561,6 +638,92 @@
 				"micro_steps_per_step": 4.0,
 				"host_rss_peak_bytes": 6442450944.0
 			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 3.108,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.7474,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.7326,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.7548,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.7252,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 6,
+					"kind": "phase",
+					"wall_s": 0.7622,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				},
+				{
+					"index": 7,
+					"kind": "phase",
+					"wall_s": 0.7698,
+					"tokens": 8192,
+					"real_tokens": 8192,
+					"samples": 8,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 7155105136,
+					"peak_reserved_bytes": 7655962496
+				}
+			],
 			"kernels": {
 				"rows": [
 					{
@@ -674,7 +837,7 @@
 				"seq_len": 1024
 			},
 			"status": "ok",
-			"steps": 5,
+			"steps": 7,
 			"started_at": "2026-10-27T14:03:00Z",
 			"duration_s": 80.0,
 			"memory": {
@@ -718,21 +881,27 @@
 						2.37,
 						2.3,
 						2.26,
-						2.21
+						2.21,
+						2.18,
+						2.16
 					],
 					"grad_norm": [
 						0.81,
 						0.77,
 						0.74,
 						0.79,
-						0.72
+						0.72,
+						0.71,
+						0.7
 					],
 					"lr": [
 						2e-05,
 						4e-05,
 						6e-05,
 						8e-05,
-						0.0001
+						0.0001,
+						0.00012,
+						0.00014
 					]
 				},
 				"nan_count": 0,
@@ -760,6 +929,92 @@
 				"micro_steps_per_step": 4.0,
 				"host_rss_peak_bytes": 6442450944.0
 			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 5.712,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 1.3736,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 1.3464,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 1.3872,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 1.3328,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 6,
+					"kind": "phase",
+					"wall_s": 1.4008,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				},
+				{
+					"index": 7,
+					"kind": "phase",
+					"wall_s": 1.4148,
+					"tokens": 16384,
+					"real_tokens": 16384,
+					"samples": 16,
+					"padded_len": 1024,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 9897131376,
+					"peak_reserved_bytes": 10589930573
+				}
+			],
 			"cost": {
 				"gpu_seconds": 80.0,
 				"usd": 0.0178
@@ -933,7 +1188,8 @@
 			"version": "0",
 			"heldout_error": {},
 			"per_gpu_coverage": {},
-			"notes": "Hand-made fixture for UI work; not a real model"
+			"notes": "Hand-made fixture for UI work; not a real model",
+			"fixture": true
 		}
 	],
 	"findings": [

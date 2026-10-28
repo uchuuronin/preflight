@@ -149,6 +149,7 @@ export function LiveGuideSection({
 				>
 					<label htmlFor="pf-guide-ask">{t("guide.ask.label")}</label>
 					<textarea id="pf-guide-ask" rows={2} maxLength={500} value={ask} placeholder={t("guide.ask.placeholder")} onChange={(e) => setAsk(e.currentTarget.value)} />
+					<p className="pf-guide__fine">{t("guide.ask.datause")}</p>
 					<button type="submit" className="pf-btn pf-btn--small" disabled={busy || !ask.trim()}>
 						{busy ? t("guide.ask.thinking") : t("guide.ask.send")}
 					</button>

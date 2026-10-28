@@ -43,12 +43,12 @@ from preflight.schema.ids import new_ulid
 
 log = logging.getLogger("preflight.queue")
 
-LEASE_S = 60
-HEARTBEAT_S = 20
-MAX_RUNNING = 8  # concurrent GPU probe containers, public demo
-MAX_ATTEMPTS = 2
-MAX_QUEUED = 200
-MAX_QUEUED_PER_VISITOR = 3
+LEASE_S = 60  # cited: Contracts tab, gap 2 (60 s leases)
+HEARTBEAT_S = 20  # cited: Contracts tab, gap 2 (renewed every 20 s)
+MAX_RUNNING = 8  # cited: Contracts tab, public demo limits (8 GPU containers)
+MAX_ATTEMPTS = 2  # derived: one retry for our own failures; visitor failures are never retried
+MAX_QUEUED = 200  # guess: global queue cap; replaced by the load test before judging (Nov 4)
+MAX_QUEUED_PER_VISITOR = 3  # guess: per-visitor backlog; replaced by the load test before judging (Nov 4)
 MAX_EVENTS_PER_JOB = 300
 RECENT_DONE = 2_000  # finished jobs kept in memory for status and event reads
 
@@ -95,6 +95,9 @@ class Lease:
 	attempt: int
 	request: dict
 	expires_at: float
+	# the record an earlier attempt started: a retry continues it, so a viewer's link stays good
+	record_id: str | None = None
+	share_token: str | None = None
 
 
 @dataclass
@@ -111,8 +114,10 @@ class Job:
 	worker: str | None = None
 	lease_expires_at: float | None = None
 	record_id: str | None = None
+	share_token: str | None = None  # set by the first event that carries it (the skeleton)
 	error: str | None = None
 	retryable: bool | None = None
+	error_code: str | None = None  # Probe.error_code's families, for the boarding screen's copy
 	events: list[dict] = field(default_factory=list)
 	next_seq: int = 0
 
@@ -124,7 +129,7 @@ class JobStore(Protocol):
 	def lease(self, worker: str) -> Lease | None: ...
 	def heartbeat(self, lease: Lease) -> float: ...
 	def complete(self, lease: Lease, *, record_id: str) -> None: ...
-	def fail(self, lease: Lease, *, error: str, retryable: bool) -> None: ...
+	def fail(self, lease: Lease, *, error: str, retryable: bool, error_code: str | None = None) -> None: ...
 	def cancel(self, job_id: str) -> None: ...
 	def reap(self) -> list[str]: ...
 	def position(self, job_id: str) -> int | None: ...
@@ -247,8 +252,10 @@ class InMemoryJobStore:
 			submitted_at=info.get("submitted_at", 0.0),
 			status=info["status"],
 			record_id=info.get("record_id"),
+			share_token=info.get("share_token"),
 			error=info.get("error"),
 			retryable=info.get("retryable"),
+			error_code=info.get("error_code"),
 			events=[info["last_event"]] if info.get("last_event") else [],
 			next_seq=info.get("next_seq", 0),
 		)
@@ -259,6 +266,10 @@ class InMemoryJobStore:
 
 	def _emit(self, job: Job, stage: str, **fields) -> JobEvent:
 		ev = JobEvent(job_id=job.job_id, seq=job.next_seq, at=self._iso(), stage=stage, **fields)
+		if ev.share_token:  # the latest attempt's record: a retry writes a fresh one
+			job.share_token = ev.share_token
+		if ev.record_id:
+			job.record_id = ev.record_id
 		job.next_seq += 1
 		job.events.append(json.loads(ev.model_dump_json(exclude_none=True)))
 		if len(job.events) > self.max_events:
@@ -288,8 +299,10 @@ class InMemoryJobStore:
 			"body_hash": job.body_hash,
 			"status": job.status,
 			"record_id": job.record_id,
+			"share_token": job.share_token,
 			"error": job.error,
 			"retryable": job.retryable,
+			"error_code": job.error_code,
 			"submitted_at": job.submitted_at,
 			"last_event": job.events[-1] if job.events else None,
 			"next_seq": job.next_seq,
@@ -300,7 +313,7 @@ class InMemoryJobStore:
 			except Exception as exc:
 				log.warning("archive of %s failed: %s", job.job_id, exc)
 
-	def _requeue_or_fail(self, job: Job, error: str, retryable: bool) -> None:
+	def _requeue_or_fail(self, job: Job, error: str, retryable: bool, error_code: str | None = None) -> None:
 		job.worker = None
 		job.lease_expires_at = None
 		job.token += 1  # fence the old holder
@@ -314,7 +327,10 @@ class InMemoryJobStore:
 			job.status = "failed"
 			job.error = error
 			job.retryable = retryable
-			self._emit(job, "failed", message=error, level="error", retryable=retryable)
+			job.error_code = error_code
+			self._emit(
+				job, "failed", message=error, level="error", retryable=retryable, error_code=error_code
+			)
 			self._finish(job)
 
 	def _rank(self, job_id: str) -> tuple[int, int]:
@@ -400,7 +416,16 @@ class InMemoryJobStore:
 				job.worker = worker
 				job.lease_expires_at = self._clock() + self.lease_s
 				self._emit(job, "admitted", message=f"attempt {job.attempt}")
-				return Lease(job.job_id, job.token, worker, job.attempt, job.request, job.lease_expires_at)
+				return Lease(
+					job.job_id,
+					job.token,
+					worker,
+					job.attempt,
+					job.request,
+					job.lease_expires_at,
+					record_id=job.record_id,
+					share_token=job.share_token,
+				)
 
 			return self._txn(do)
 
@@ -430,10 +455,10 @@ class InMemoryJobStore:
 
 			self._txn(do)
 
-	def fail(self, lease: Lease, *, error: str, retryable: bool) -> None:
+	def fail(self, lease: Lease, *, error: str, retryable: bool, error_code: str | None = None) -> None:
 		with self._lock:
 			job = self._check(lease)
-			self._txn(lambda: self._requeue_or_fail(job, error, retryable))
+			self._txn(lambda: self._requeue_or_fail(job, error, retryable, error_code))
 
 	def cancel(self, job_id: str) -> None:
 		with self._lock:
@@ -465,14 +490,21 @@ class InMemoryJobStore:
 			def do():
 				for job in expired:
 					times = {1: "once", 2: "twice"}.get(job.attempt, f"{job.attempt} times")
-					self._requeue_or_fail(job, f"lease expired {times}; worker crashed or hung", True)
+					self._requeue_or_fail(
+						job, f"lease expired {times}; worker crashed or hung", True, "internal.worker_lost"
+					)
 				return [j.job_id for j in expired]
 
 			return self._txn(do)
 
-	def emit(self, job_id: str, *, stage: str, **fields) -> JobEvent:
+	def emit(self, job_id: str, *, stage: str, token: int | None = None, **fields) -> JobEvent:
+		"""Progress from a worker. With its lease token, it is fenced like heartbeat and complete: an
+		attempt that was reaped or cancelled can't add events or move the job's record."""
 		with self._lock:
-			ev = self._emit(self._job(job_id), stage, **fields)
+			job = self._job(job_id)
+			if token is not None and (job.status != "running" or job.token != token):
+				raise LeaseLost(job_id)
+			ev = self._emit(job, stage, **fields)
 			self._flush_events()
 			return ev
 
@@ -488,6 +520,22 @@ class InMemoryJobStore:
 	def status(self, job_id: str) -> JobStatus:
 		with self._lock:
 			return self._job(job_id).status
+
+	def info(self, job_id: str) -> dict:
+		"""What GET /v1/jobs/{id} shows: status, queue position, where the record is, and why it failed."""
+		with self._lock:
+			job = self._job(job_id)
+			return {
+				"job_id": job.job_id,
+				"status": job.status,
+				"position": self._position(job_id),
+				"record_id": job.record_id,
+				"share_token": job.share_token,
+				"error": job.error,
+				"retryable": job.retryable,
+				"error_code": job.error_code,
+				"last_seq": job.next_seq - 1,
+			}
 
 	def get(self, job_id: str) -> Job:
 		with self._lock:

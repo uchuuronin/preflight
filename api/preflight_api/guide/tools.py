@@ -112,8 +112,12 @@ def build_tools(rec: RecordView, pinned: set[str], *, move_pending: bool) -> lis
 				["reason"],
 			)
 		)
-	# One move per round: while a move waits for the person, set_knob isn't offered at all.
-	if movable and not move_pending:
+	# One move per round. While a move waits for the person, no browser tool is offered at all, so
+	# the guide explains the move and stops (Oct 27: with highlight still offered, Muse Spark kept
+	# highlighting instead of stopping; docs/decisions/guide-limits.md).
+	if move_pending:
+		return [t for t in tools if t["name"] in SERVER_TOOLS]
+	if movable:
 		tools.insert(
 			0,
 			_fn(

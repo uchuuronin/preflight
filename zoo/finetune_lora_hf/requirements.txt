@@ -1,0 +1,7 @@
+# What the script imports beyond torch. Probes install these when the image doesn't already
+# have them (the Modal probe image pins the same versions; the AMD droplet ships only ROCm torch).
+transformers==4.46.3
+peft==0.13.2
+accelerate==1.1.1
+datasets==3.1.0
+safetensors==0.4.5

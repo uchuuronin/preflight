@@ -81,6 +81,8 @@ SAFE_ENV = (
 	"NVIDIA_DRIVER_CAPABILITIES",
 	"LD_LIBRARY_PATH",
 	"HF_HOME",
+	"PREFLIGHT_PIP_CACHE",
+	"PREFLIGHT_DEPS_DIR",
 	"HF_HUB_OFFLINE",
 	"HF_DATASETS_OFFLINE",
 	"TRANSFORMERS_OFFLINE",
@@ -110,7 +112,14 @@ EXTRAS_KEYS = (
 
 
 class InvalidSubmission(ValueError):
-	"""The submitted files can't be probed as given. Not retryable."""
+	"""The submitted files can't be probed as given. Not retryable.
+
+	code: the job's error code (`submission.<why>`), shown with t('error.<code>') and its hint.
+	"""
+
+	def __init__(self, message: str = "", *, code: str = "submission"):
+		super().__init__(message)
+		self.code = code
 
 
 @dataclass
@@ -126,6 +135,9 @@ class ProbeSpec:
 	profile: bool = False
 	timeout_s: float = 600.0
 	seed: int | None = None
+	seed_force: bool = False  # override the script's own seeding (verify's seed-to-seed spread)
+	alternate_sync: bool = False  # ground truth only: alternate clean and synced steps (recorder/overhead.py)
+	install_requirements: bool = False  # pip-install requirements.txt in the probe (hosted probes only)
 	out_dir: Path | None = None
 	gpu_usd_per_hour: float = 0.0
 
@@ -267,8 +279,14 @@ def _kill_descendants(root: int, keep: set[int]) -> None:
 
 
 def _probe_uid() -> int | None:
+	"""A fresh unprivileged uid per probe when running as root. PREFLIGHT_PROBE_UID pins one uid for
+	every probe in this process: in a per-job sandbox the sandbox is the isolation boundary, and
+	one uid lets a job's probes share the Hugging Face cache (locks, downloads) between points."""
 	if os.geteuid() != 0:
 		return None
+	pinned = os.environ.get("PREFLIGHT_PROBE_UID")
+	if pinned and pinned.isdigit() and int(pinned) >= 1000:
+		return int(pinned)
 	return 61_000 + (os.getpid() * 7 + next(_UIDS)) % 4_000
 
 
@@ -281,6 +299,59 @@ def _extra_groups() -> list[int]:
 		with contextlib.suppress(KeyError):
 			out.append(grp.getgrnam(name).gr_gid)
 	return out
+
+
+def _others_can_reach(d: Path) -> bool:
+	"""Whether a uid with no special rights can get to directory d (search permission all the way)."""
+	for x in (d, *d.parents):
+		try:
+			if not x.stat().st_mode & 0o001:
+				return False
+		except OSError:
+			return False
+	return True
+
+
+_PKG_COPY: Path | None = None
+
+
+def _package_for_probe(pkg_root: Path) -> Path:
+	"""Our package where the probe uid can import it. Usually where it is; when it sits under a
+	directory others can't enter (/root is 0700 in Debian images, where the AMD checkout lives),
+	a read-only copy in a fresh world-readable temp dir, made once per process. Nothing on the host
+	has its permissions changed."""
+	global _PKG_COPY
+	if _others_can_reach(pkg_root):
+		return pkg_root
+	if _PKG_COPY is not None and (_PKG_COPY / "preflight").is_dir():
+		return _PKG_COPY
+	import atexit
+
+	dst = Path(tempfile.mkdtemp(prefix="preflight-pkg-"))
+	shutil.copytree(pkg_root / "preflight", dst / "preflight", symlinks=False,
+		ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))  # fmt: skip
+	for dirpath, _dirs, files in os.walk(dst):  # root made every entry just now: nothing to follow
+		os.chmod(dirpath, 0o755)
+		for f in files:
+			os.chmod(os.path.join(dirpath, f), 0o644)
+	atexit.register(shutil.rmtree, dst, True)
+	log.info("the probe user can't reach %s; probes import a copy from %s", pkg_root, dst)
+	_PKG_COPY = dst
+	return dst
+
+
+def _python_for_probe() -> str:
+	"""The interpreter the probe uid can run: this one, or the base it links to when this one
+	sits somewhere the probe can't enter (a venv under /root: its own packages drop out, the
+	system's, ROCm torch included, stay)."""
+	exe = sys.executable
+	if _others_can_reach(Path(exe).parent):
+		return exe
+	real = os.path.realpath(exe)
+	if _others_can_reach(Path(real).parent):
+		log.warning("the probe user can't reach %s; probes run %s instead", exe, real)
+		return real
+	return exe
 
 
 def _chown_tree(path: Path, uid: int) -> None:
@@ -462,6 +533,7 @@ def _probe_model(
 		checkpoint=_opt(CheckpointStats, s.get("checkpoint")),
 		generation=_opt(GenerationStats, s.get("generation")),
 		extras={k: float(s[k]) for k in EXTRAS_KEYS if s.get(k) is not None},
+		step_log=untrusted.step_log(s.get("step_log")),
 		cost=ProbeCost(gpu_seconds=round(duration, 3), usd=round(duration * spec.gpu_usd_per_hour / 3600, 6)),
 	)
 
@@ -501,6 +573,10 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"progress": str(progress),
 				"out": str(out),
 				"seed": spec.seed,
+				"seed_force": spec.seed_force,
+				"alternate_sync": spec.alternate_sync,
+				"install_requirements": spec.install_requirements,
+				"deps": str(box / "deps"),
 			}
 		)
 	)
@@ -513,6 +589,10 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	subreaper = _become_subreaper()
 	before = _child_pids(os.getpid()) if subreaper else set()
 	pkg_root = str(Path(__file__).resolve().parents[2])
+	python = sys.executable
+	if uid is not None:
+		pkg_root = str(_package_for_probe(Path(pkg_root)))
+		python = _python_for_probe()
 	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", "")})
 	popen_kw = {"user": uid, "group": uid, "extra_groups": _extra_groups()} if uid is not None else {}
 
@@ -521,7 +601,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	_PROBE_LOCK.acquire()  # one probe at a time per process: the descendant sweep below must not touch another probe
 	try:
 		proc = subprocess.Popen(
-			[sys.executable, "-m", "preflight.recorder.run", str(spec_path)],
+			[python, "-m", "preflight.recorder.run", str(spec_path)],
 			cwd=work,
 			env=env,
 			stdin=subprocess.DEVNULL,
@@ -530,7 +610,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 			start_new_session=True,
 			**popen_kw,
 		)
-		log = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
+		plog = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
 	except BaseException:
 		_PROBE_LOCK.release()
 		raise
@@ -562,7 +642,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	finally:
 		_PROBE_LOCK.release()
 	duration = time.monotonic() - t0
-	log_tail = log.text()
+	log_tail = plog.text()
 
 	prog = {"stage": "starting", "steps": 0}
 	with contextlib.suppress(OSError, ValueError):

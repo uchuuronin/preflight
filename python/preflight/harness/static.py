@@ -436,16 +436,32 @@ def _parse(files: dict[str, str]) -> Facts:
 	return f
 
 
+def _const_target(node: ast.AST) -> tuple[str, ast.AST] | None:
+	"""(name, value) for `x = 1` and `x: int = 1` with a plain name on the left."""
+	if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+		return node.targets[0].id, node.value
+	if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+		return node.target.id, node.value
+	return None
+
+
 def _scan(f: Facts, path: str, tree: ast.Module) -> None:
 	src = f.sources[path]
-	for node in tree.body:
-		if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-			try:
-				val = literal(node.value)
-			except (ValueError, SyntaxError, TypeError, RecursionError):
-				continue
-			name = node.targets[0].id
-			f.consts[name] = (val, path, node.lineno, src.segment(node) or name)
+	# module constants first; then fields of config classes (dataclasses, HfArgumentParser
+	# dataclasses, nanoGPT-style GPTConfig), which a module constant of the same name outranks
+	class_fields = [n for c in tree.body if isinstance(c, ast.ClassDef) for n in c.body]
+	for node, in_class in [(n, False) for n in tree.body] + [(n, True) for n in class_fields]:
+		target = _const_target(node)
+		if target is None:
+			continue
+		name, value = target
+		if in_class and name in f.consts:
+			continue
+		try:
+			val = literal(value)
+		except (ValueError, SyntaxError, TypeError, RecursionError):
+			continue
+		f.consts[name] = (val, path, node.lineno, src.segment(node) or name)
 	for node in ast.walk(tree):
 		if isinstance(node, ast.Import):
 			for a in node.names:
@@ -560,6 +576,10 @@ def _collect_knobs(f: Facts) -> None:
 				if r:
 					seg = src.segment(next(k for k in call.keywords if k.arg == "r"))
 					f.candidates.append(Candidate("lora_r", r[0], r[1], r[2], r[3] or seg or "r", 3))
+		if short == "add_argument":
+			a = _argparse_candidate(f, call, path, src)
+			if a is not None:
+				f.candidates.append(a)
 		if short in ("BitsAndBytesConfig", "from_pretrained"):
 			q = _quant_candidate(f, call, path, src)
 			if q is not None:
@@ -594,6 +614,34 @@ def _prequantised(hf_id: str) -> str | None:
 	if "awq" in low:
 		return "awq_4bit"
 	return None
+
+
+def argparse_flags(call: ast.Call) -> tuple[list[str], str | None]:
+	"""(option strings, dest) of a parser.add_argument call; dest as argparse would derive it."""
+	flags = [a.value for a in call.args if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+	opts = [x for x in flags if x.startswith("-")]
+	dest_kw = _kwargs(call).get("dest")
+	if isinstance(dest_kw, ast.Constant) and isinstance(dest_kw.value, str):
+		return opts, dest_kw.value
+	longs = [x for x in opts if x.startswith("--")]
+	name = (longs or opts or flags or [None])[0]
+	return opts, name.lstrip("-").replace("-", "_") if name else None
+
+
+def _argparse_candidate(f: Facts, call: ast.Call, path: str, src) -> Candidate | None:
+	"""parser.add_argument("--batch_size", type=int, default=16): a knob at its default."""
+	_opts, dest = argparse_flags(call)
+	kid = CONST_KNOBS.get((dest or "").lower())
+	default = next((k for k in call.keywords if k.arg == "default"), None)
+	if kid is None or default is None:
+		return None
+	try:
+		val = literal(default.value)
+	except (ValueError, SyntaxError, TypeError, RecursionError):
+		return None
+	if not isinstance(val, SCALAR) or val is None:
+		return None
+	return Candidate(kid, val, path, default.value.lineno, src.segment(default) or "default", 2)
 
 
 def _quant_label(kws: dict, f: Facts, path: str) -> str | None:

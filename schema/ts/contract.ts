@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.3.0. Generated; do not edit.
+ * Preflight contract v0.4.0. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -92,11 +92,18 @@ export interface Job {
  * via the `definition` "Source".
  */
 export interface Source {
-	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight";
+	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight" | "record";
 	/**
 	 * sample://name, https://github.com/..., upload://<hash>
 	 */
 	uri?: string | null;
+	/**
+	 * kind=record: a share token or sample:<id>; the job reuses that record's script, env and data, and writes a new record whose parent_id is it
+	 */
+	record_ref?: string | null;
+	/**
+	 * For repos: the full commit the code was read at
+	 */
 	commit?: string | null;
 	/**
 	 * sha256 of the submitted code
@@ -543,6 +550,81 @@ export interface Knob {
 	 * memory, speed, data, model, rl, agent, cluster
 	 */
 	group?: string | null;
+	/**
+	 * Job-map node ids the knob acts on
+	 *
+	 * @maxItems 16
+	 */
+	affects?:
+		| []
+		| [string]
+		| [string, string]
+		| [string, string, string]
+		| [string, string, string, string]
+		| [string, string, string, string, string]
+		| [string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string, string, string, string]
+		| [
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string
+		  ]
+		| [
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string
+		  ]
+		| [
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string
+		  ];
+	/**
+	 * True if moving it changes what the model learns (offered only to clear a failure, never as a saving); false if it changes only speed, memory or cost; null if unknown
+	 */
+	changes_results?: boolean | null;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -606,6 +688,12 @@ export interface Probe {
 	extras?: {
 		[k: string]: number | undefined;
 	};
+	/**
+	 * Every optimizer step the probe ran, in order
+	 *
+	 * @maxItems 256
+	 */
+	step_log?: StepSample[];
 	/**
 	 * Per-kernel table, current-settings probe only (profiled window)
 	 */
@@ -748,6 +836,16 @@ export interface EvalStats {
 	 * True when eval ran with autograd on (no no_grad)
 	 */
 	grad_enabled?: boolean | null;
+	/**
+	 * Batches the full eval loader would run, so the pass can be extrapolated
+	 */
+	loader_batches?: number | null;
+	/**
+	 * Allocated bytes after each measured eval batch: growth across batches (outputs kept for metrics) is what makes an eval OOM late in the pass
+	 *
+	 * @maxItems 64
+	 */
+	memory_by_batch?: number[];
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -780,6 +878,43 @@ export interface GenerationStats {
 	 */
 	truncation_rate?: number | null;
 	backend?: ("hf" | "vllm" | "api" | "other") | null;
+}
+/**
+ * One optimizer step as the probe saw it, so B fits on every step, not a few summary points.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "StepSample".
+ */
+export interface StepSample {
+	index: number;
+	/**
+	 * warmup (discarded), timed (no recorder sync points, CUDA events at the step boundary only), phase (synchronised, for the phase split), profiled (profiler attached)
+	 */
+	kind: "warmup" | "timed" | "phase" | "profiled";
+	/**
+	 * Step boundary to step boundary, minus eval and checkpoint time
+	 */
+	wall_s: number;
+	/**
+	 * Tokens in the step's batches, padding included
+	 */
+	tokens?: number | null;
+	/**
+	 * Tokens the attention mask keeps
+	 */
+	real_tokens?: number | null;
+	samples?: number | null;
+	/**
+	 * Padded sequence length of the step's batches
+	 */
+	padded_len?: number | null;
+	micro_steps?: number | null;
+	peak_allocated_bytes?: number | null;
+	peak_reserved_bytes?: number | null;
+	/**
+	 * Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else
+	 */
+	device_used_bytes?: number | null;
 }
 /**
  * Top KERNEL_ROWS ops by device time, then the tail per class (probe-plan K: 100% within 20%).
@@ -876,7 +1011,13 @@ export interface AgentTask {
 	model?: string | null;
 	turns: number;
 	input_tokens: number;
+	/**
+	 * All generated tokens, reasoning included (as OpenAI and Anthropic bill them)
+	 */
 	output_tokens: number;
+	/**
+	 * The part of output_tokens spent reasoning; not added again
+	 */
 	reasoning_tokens?: number;
 	cached_input_tokens?: number;
 	cache_creation_tokens?: number;
@@ -1031,6 +1172,10 @@ export interface ModelCard {
 		[k: string]: number | undefined;
 	};
 	notes?: string | null;
+	/**
+	 * Illustrative numbers from a fixture, not a fitted model; the UI says so
+	 */
+	fixture?: boolean;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1282,6 +1427,10 @@ export interface Estimate1 {
 export interface JobEvent {
 	job_id: string;
 	record_id?: string | null;
+	/**
+	 * Where the record is read (GET /v1/records/{share_token}) once a skeleton exists
+	 */
+	share_token?: string | null;
 	seq: number;
 	at: string;
 	stage:
@@ -1317,6 +1466,10 @@ export interface JobEvent {
 	 * On failed: whether resubmitting may succeed
 	 */
 	retryable?: boolean | null;
+	/**
+	 * On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')
+	 */
+	error_code?: string | null;
 }
 /**
  * Body of POST /v1/jobs (validated by C, executed by A).
@@ -1347,6 +1500,24 @@ export interface JobRequest {
 	 * The visitor's use case, for the guide
 	 */
 	description?: string | null;
+	/**
+	 * plan: map and probe a script (default). probe: one probe at `knobs`. verify: a short fixed-seed run of `knobs` against the record's current settings. sample_more: `tasks` more agent tasks. All but plan take a record source.
+	 */
+	mode?: "plan" | "probe" | "verify" | "sample_more";
+	/**
+	 * probe and verify: the full setting to run at
+	 */
+	knobs?: {
+		[k: string]: (boolean | number | string) | undefined;
+	} | null;
+	/**
+	 * sample_more: how many more tasks
+	 */
+	tasks?: number | null;
+	/**
+	 * Who asked, for the logbook, e.g. guide.run_probe
+	 */
+	purpose?: string | null;
 }
 /**
  * target_id -> Estimate, for one knob setting.
@@ -1383,4 +1554,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.3.0";
+export const SCHEMA_VERSION = "0.4.0";

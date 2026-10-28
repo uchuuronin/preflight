@@ -119,3 +119,66 @@ def test_probe_runs_as_an_unprivileged_user(tmp_path):
 	files = {"who.py": "import os\nprint('UID', os.getuid())\n"}
 	r = run_probe(ProbeSpec(probe_id="p1", files=files, entrypoint="who.py", timeout_s=30, out_dir=tmp_path))
 	assert "UID 0" not in r.log_tail and "UID " in r.log_tail
+
+
+@needs_torch
+def test_visitor_code_runs_under_resource_limits(tmp_path):
+	files = {
+		"lim.py": "import resource\nfor n in ('RLIMIT_CORE', 'RLIMIT_FSIZE', 'RLIMIT_NOFILE'):\n    print(n, resource.getrlimit(getattr(resource, n))[1])\n"
+	}
+	r = run_probe(ProbeSpec(probe_id="p1", files=files, entrypoint="lim.py", timeout_s=30, out_dir=tmp_path))
+	assert "RLIMIT_CORE 0" in r.log_tail
+	assert f"RLIMIT_FSIZE {64 * 2**30}" in r.log_tail
+	nofile = int(r.log_tail.split("RLIMIT_NOFILE ")[1].split()[0])
+	assert 0 < nofile <= 65536  # lowered to ours, or the host's if that is lower; never raised
+
+
+def test_a_pinned_probe_uid_is_used_for_every_probe(monkeypatch):
+	from preflight.probes.local import _probe_uid
+
+	monkeypatch.setenv("PREFLIGHT_PROBE_UID", "61000")
+	if os.geteuid() == 0:
+		assert _probe_uid() == _probe_uid() == 61000
+	monkeypatch.setenv("PREFLIGHT_PROBE_UID", "0")  # never root, never a system uid
+	if os.geteuid() == 0:
+		assert _probe_uid() != 0
+
+
+def test_probes_import_a_copy_of_the_package_when_its_home_is_closed(tmp_path, monkeypatch):
+	import preflight.probes.local as L
+
+	locked = tmp_path / "root"
+	pkg = locked / "pf" / "python"
+	(pkg / "preflight").mkdir(parents=True)
+	(pkg / "preflight" / "__init__.py").write_text("x = 1\n")
+	locked.chmod(0o700)
+	monkeypatch.setattr(L, "_PKG_COPY", None)
+	copy = L._package_for_probe(pkg)
+	assert copy != pkg and (copy / "preflight" / "__init__.py").read_text() == "x = 1\n"
+	assert L._others_can_reach(copy / "preflight")
+	assert locked.stat().st_mode & 0o777 == 0o700  # the host's permissions are left alone
+	assert L._package_for_probe(pkg) == copy  # one copy per process
+	import shutil
+	import tempfile
+
+	top = Path(tempfile.mkdtemp())  # pytest's own tmp dirs are 0700, so the open case lives in /tmp
+	try:
+		top.chmod(0o755)
+		open_pkg = top / "python"
+		open_pkg.mkdir(mode=0o755)
+		assert L._package_for_probe(open_pkg) == open_pkg
+	finally:
+		shutil.rmtree(top)
+
+
+@needs_torch
+def test_forced_seeds_override_the_scripts_own(tmp_path):
+	files = {
+		"s.py": "import random, torch\ntorch.manual_seed(42); random.seed(42)\nprint('DRAW', torch.rand(1).item(), random.random())\n"
+	}
+	draws = []
+	for seed in (1, 2, 2):
+		r = run_probe(ProbeSpec(probe_id="p1", files=files, entrypoint="s.py", timeout_s=60, seed=seed,
+			seed_force=True, out_dir=tmp_path / str(len(draws))))  # fmt: skip
+		draws.append(next(ln for ln in r.log_tail.splitlines() if ln.startswith("DRAW")))
+	assert draws[0] != draws[1] and draws[1] == draws[2]

@@ -26,7 +26,7 @@ describe("GlossaryCard", () => {
 		render(<GlossaryCard knob={knob("eval_batch_size")} />);
 		const summary = screen.getByText("What this setting does");
 		expect(summary.closest("details")).toBeTruthy();
-		expect(screen.getByText(/Eval often skips no_grad/)).toBeTruthy();
+		expect(screen.getByText(/keeps every eval batch's logits on the GPU/)).toBeTruthy();
 	});
 
 	it("follows the detail level as it changes", () => {
@@ -34,17 +34,17 @@ describe("GlossaryCard", () => {
 		act(() => setTier("new"));
 		expect(screen.getByText(/crash a run that trained fine/)).toBeTruthy();
 		act(() => setTier("expert"));
-		expect(screen.getByText(/the usual first-eval OOM/)).toBeTruthy();
+		expect(screen.getByText(/grows with the eval set/)).toBeTruthy();
 	});
 
 	it("says what to change when there is a clear fix", () => {
 		render(<GlossaryCard knob={knob("eval_batch_size")} />);
 		expect(screen.getByText("What to change")).toBeTruthy();
-		expect(screen.getByText(/Lower it, or wrap eval in no_grad/)).toBeTruthy();
+		expect(screen.getByText(/Lower it, wrap eval in no_grad, or set eval_accumulation_steps/)).toBeTruthy();
 	});
 
 	it("leaves out the fix line when there is none", () => {
-		render(<GlossaryCard knob={knob("batch_size")} />);
+		render(<GlossaryCard knob={knob("lora_r")} />);
 		expect(screen.queryByText("What to change")).toBeNull();
 	});
 

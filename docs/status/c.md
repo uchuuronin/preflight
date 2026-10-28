@@ -1,5 +1,145 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Wed Oct 28, early (critical path: upload to map)
+
+**Done** (branch `ws-c`; `main` unchanged since last night)
+
+- Records come from A's `preflight-records` volume: mounted read-only in api/app.py, read with
+  the volume's reload under one lock per container, at most one reload a second; record
+  responses are `private, no-cache` because a running job revises them. Guide and record reads
+  run off the event loop.
+- api/app.py no longer computes repo paths at import, and has a startup check
+  (`modal run --env main api/app.py::startup_check`) that deploy.yml runs before deploying;
+  every Modal step there now names environment `main`.
+- Check-in takes uploads (scripts with requirements and configs, or one notebook) under A's
+  upload rules, opening with `runner.queue`; boarding opens the cockpit by share token and
+  words every one of A's new error codes.
+- End-to-end check, waiting for a yes: api/scripts/e2e_upload.py checks a zoo script in through
+  the real API to A's deployed job store and reads the record back from the volume;
+  web/e2e/record_map.mjs then opens it in the cockpit in both themes. The same flow passes
+  against a stand-in store (api/tests/test_e2e_flow.py), and A's newer golden record opens to a
+  map in both themes with no errors.
+- Bug found that way and fixed: the status line said "Runs out of memory: peaks at 9.22 GiB of
+  22.1 GiB" when the failure came from the eval loop; the peak form is now used only when the
+  peak is over the card.
+- Independent review (no Critical, 2 High, 8 Medium): all fixed. The end-to-end run can no
+  longer leave a GPU job running (every call bounded, cancel resent until it lands, a cancel on
+  any early exit, and a direct cancel in A's store as the backstop); a record committed just
+  after a reload is found; a stuck reload is a retryable 503, not a pile of threads; deploy.yml
+  no longer deploys or checks A's runner (its check could claim the live store); check-in reads
+  nothing before names and sizes pass, keys per distinct check-in, keeps the file-to-run
+  choice visible, and a plain cancel isn't shown as an error.
+- Stranger test 18 of 18; knob to readout p95 87 to 119 ms at 4x CPU slowdown (measured, this
+  container, after the UI changes). API 72 tests, web 160. A second review pass closed the
+  rest: the job-id handoff can no longer skip the cancel, a stream of unknown links can't
+  reload back to back, and the cockpit retries a busy record read once.
+
+**Cloud runs:** none (two runs wait for a yes: the API startup check, about $0.02, and the
+upload-to-map run, about $0.35 expected, $0.65 cap).
+
+## Tue Oct 27, late (decisions applied, cockpit as a dashboard)
+
+**Done** (branch `ws-c`, merged `origin/main` first)
+
+- Cockpit reads as a work dashboard, after D's glass prototype: one status line above the
+  readouts from a template over the readouts and their intervals (review item 8); the stage
+  switches Map and Fit (with Fit the orbit steps aside into the side column and the fit map
+  follows every knob move); "Measured" is a capsule opening a drawer of probe chips; every
+  explanation sits behind an "i". Checked at 1440 px and 390 px, dusk and day, no sideways
+  scroll; the stranger test now has 18 checks, all passing.
+- `c.fit_map` in flags.json, off by default.
+- Verify checks both sides (review item 3): target improved; effective batch, tokens seen,
+  LR schedule, throughput floor and fixed-seed loss unchanged; one stdlib module used by the
+  API and by `.github/actions/verify`, which CI runs on example records.
+- `/v1/jobs` pins GitHub links to a full 40-character commit at check-in; check-in takes
+  GitHub links only.
+- CI fails on GPL, AGPL or SSPL dependencies in root, API and web (gap 22): none today.
+- Muse Code in a sandbox: install, auth and headless run written up with three options for
+  keeping the key from visitor code (docs/decisions/muse-code-sandbox.md); smoke test waits
+  for a yes.
+- CI green again on f1ac48d: the secrets job had failed since 3d03ec8 on a test
+  Idempotency-Key value gitleaks read as an API key. Renamed the value and listed the old
+  commit's fingerprint in `.gitleaksignore`; full-history and working-tree scans are clean.
+- Merged `main` (its `.gitleaksignore` kept). The secrets scan now reads only the history of
+  the commit under test (`--log-opts=HEAD`), so one branch's false alarm can't turn others red.
+- `guide_tour.py` ends in Modal before the workflow does: function timeout 20 min, startup
+  timeout 2 min, no retries, and the runner cancels the call at a deadline under the
+  workflow's `timeout` input. A crash on start now fails in 2 minutes, not 30.
+- Meta spend measured on the Usage page: $3.01 for 659 requests against $2.91 estimated (3%
+  low); recorded in `guide-limits.md`, caps unchanged.
+
+**Cloud runs:** none since the evening's table (new rule: ask before anything that spends).
+
+**Waiting**
+
+- First deploy and the ledger's hourly cost: after the Cloudflare Pages project exists. Modal
+  list prices put the ledger container (0.125 core, 128 MiB, always on) near $0.007 an hour.
+- Retention notice: when the 30-day expiry rule on the record bucket exists.
+- `/v1/jobs` live: A's job service in `main` and `runner.queue` on.
+- Muse Code: Chiya's pick of the three key options, then a yes for the smoke test.
+
+**Next**
+
+- Coverage page (review item 2) once real runs exist to fill it; autopilot scored over the bug
+  zoo with Wilson intervals (item 7, Nov 3); deploy for the Saturday builders (item 10).
+
+## Tue Oct 27, night (after the merge into main)
+
+**Done** (branch `ws-c`, merged `origin/main` 7faf676 first)
+
+- Muse Spark verified for real: `muse-spark-1.3` on `https://api.meta.ai/v1`, Responses format,
+  tool calls and usage fields as `muse_spark.py` expects. Five rounds of whole tours through the
+  real guide route (`api/scripts/guide_tour.py`, 76 tours, 595 rounds) set the timeout (12 s),
+  output cap (2,000 tokens), per-run and per-visitor caps, and found and fixed three failure
+  modes: re-ranking loops, highlight loops while a move waits, and announcing a move without
+  making it (a chosen instruction plus a one-time server reminder). Last run: the guide moved on
+  9 of 10 tours, no loops, $0.034 per tour. docs/decisions/guide-limits.md.
+- `deploy.yml` runs only by hand, and every deploy is gated on the stranger test.
+- Stranger test (`web/e2e/stranger.mjs`, 16 checks: sample to map, status word on every dial,
+  knob p95 under 400 ms at 4x CPU slowdown, the guide's first move, data-use notice before
+  check-in, phone width). Passes locally and in CI (16/16).
+- 4x CPU slowdown: knob to readout p95 135 to 175 ms (target 400). The slowest interactions fell
+  from about 1 s to 0.5 s at p98 once map nodes stopped being re-measured on every knob change
+  and the decorative loops pause while a hand is on a control. A transition-based variant was
+  tried and dropped (A/B, 5 runs each: no gain, knob latency 149 to 259 ms). The rest is
+  software compositing of the glass blur in headless Chromium, which a GPU does off the main
+  thread.
+- Data-use notice at check-in, every line switched by the flag for that behaviour; the old copy
+  promised deletion after 24 hours and a private mode, neither of which exists.
+- Fit map ("Where it fits", flag `c.fit_map`, key requested from Chiya): two knobs, status per
+  square as the dials show it, boundary placed from interpolated memory. Between grid points the
+  provider now derives P(OOM) from memory with B's formula.
+- `/v1/jobs` (POST, GET, events as SSE, cancel) on A's JobStoreService, off until `runner.queue`.
+
+**Cloud runs** (all through `remote-run.yml`; no GPU used)
+
+| Date | Run | Where | Minutes | USD |
+| --- | --- | --- | --- | --- |
+| Oct 28 00:56 UTC | c-smoke-models | GitHub runner; 43 Meta + 20 Baseten tiny calls | 1 | < 0.01 |
+| Oct 28 00:56 | c-guide-tour | Modal CPU, crashed on start until the timeout (path bug) | 30 | Modal CPU only, no model calls |
+| Oct 28 01:27 | c-guide-tour | Modal 1 CPU core + Meta, 91 rounds | 3 | 0.40 Meta |
+| Oct 28 01:34 | c-guide-tour-2 | Modal 1 CPU core + Meta, 48 rounds | 3 | 0.15 Meta |
+| Oct 28 01:38 | c-guide-prompts | Modal 1 CPU core + Meta, 264 rounds | 13 | 1.37 Meta |
+| Oct 28 01:52 | c-guide-tour-4 | Modal 1 CPU core + Meta, 113 rounds | 6 | 0.65 Meta |
+| Oct 28 01:59 | c-guide-tour-5 | Modal 1 CPU core + Meta, 79 rounds | 6 | 0.34 Meta |
+| Oct 28 01:34 | guide-smoke (push) | GitHub runner + Meta, 6 calls | 1 | 0.02 Meta |
+
+Meta dollars per run use the guide's price table ($1.25 / $4.25 / $0.15 per million in, out,
+cached). Measured total on Meta's Usage page: $3.01 for 659 requests, 3% above the table's sum. Modal CPU charges are on Modal's
+usage page; nothing here used a GPU.
+
+**Blocked**
+
+- The ledger container's hourly cost: measured on the first deploy, which waits for the
+  Cloudflare Pages project.
+- Retention: the data-use notice says nothing is deleted automatically, because nothing is.
+  Needs a decision (asked in chat) and then deletion built before the notice promises it.
+
+**Next**
+
+- Remaining review items: none of C's are open except the ledger's hourly cost (first deploy).
+- Watch: a guide reply leaked a line about its own tools once in 79 rounds.
+
 ## Tue Oct 27, evening (review: security, live tour, honest readouts)
 
 **Done** (branch `ws-c`, pushed a72a724, a138e3f, 96cce42)

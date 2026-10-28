@@ -1,0 +1,44 @@
+# Preflight verify as a GitHub Action: fails the job unless a fix improved its target AND left
+# the training run's meaning alone (effective batch, tokens seen, LR schedule, a throughput floor,
+# fixed-seed loss). The checks are the same code the API's verify uses
+# (api/preflight_api/verify.py), so the two can't disagree. Stdlib Python only; no keys.
+#
+#   - uses: uchuuronin/preflight/.github/actions/verify@main
+#     with:
+#       before: preflight/before.record.json   # the run before the fix
+#       after: preflight/after.record.json     # the verify run after it
+#       metric: memory.peak                    # what the fix was for
+name: Preflight verify
+description: Pass only when a fix helps and changes nothing else about the training run
+inputs:
+  before:
+    description: Flight record of the run before the fix (JSON)
+    required: true
+  after:
+    description: Flight record of the verify run after the fix (JSON)
+    required: true
+  metric:
+    description: Target the fix was for (memory.peak, time.step, throughput.tokens_per_s, ...)
+    default: memory.peak
+outputs:
+  status:
+    description: passed, failed, or error (a check couldn't be measured)
+    value: ${{ steps.verify.outputs.status }}
+runs:
+  using: composite
+  steps:
+    - id: verify
+      shell: bash
+      env:
+        BEFORE: ${{ inputs.before }}
+        AFTER: ${{ inputs.after }}
+        METRIC: ${{ inputs.metric }}
+        SCRIPT: ${{ github.action_path }}/../../../api/preflight_api/verify.py
+      run: |
+        set +e
+        python3 -I "$SCRIPT" "$BEFORE" "$AFTER" --metric "$METRIC" | tee verify.txt
+        code=${PIPESTATUS[0]}
+        case $code in 0) s=passed;; 1) s=failed;; *) s=error;; esac
+        echo "status=$s" >> "$GITHUB_OUTPUT"
+        { echo "### Preflight verify: $s"; echo '```'; cat verify.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        exit $code

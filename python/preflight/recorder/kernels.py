@@ -18,7 +18,7 @@ import math
 import re
 from collections.abc import Callable
 
-KERNEL_ROWS = 64
+KERNEL_ROWS = 64  # simulated: probe-plan K (plus the per-class tail); B's ask was 64
 _MATMUL = (
 	"aten::mm",
 	"aten::addmm",
@@ -27,6 +27,15 @@ _MATMUL = (
 	"aten::matmul",
 	"aten::linear",
 	"aten::_scaled_mm",
+	"aten::addmm_",
+	"aten::baddbmm_",
+	"aten::addbmm",
+	"aten::addbmm_",
+	"aten::addmv",
+	"aten::addmv_",
+	"aten::mv",
+	"aten::dot",
+	"aten::_int_mm",
 )
 DTYPE_BYTES = {"fp32": 4, "tf32": 4, "bf16": 2, "fp16": 2, "fp8": 1}
 # record_function ranges the profiler or frameworks add around real ops: their time belongs to the ops inside
@@ -96,6 +105,33 @@ def _bytes(name: str, shapes, elt: int) -> float | None:
 # the _scaled_dot_product_* wrappers and the CPU math path take [batch, heads, seq, dim]
 _BLHD = ("aten::_flash_attention", "aten::_efficient_attention")
 _ATTENTION = ("scaled_dot_product", "flash_attention", "efficient_attention", "cudnn_attention")
+
+
+def _matmul_flops(name: str, shapes) -> float | None:
+	"""2·M·N·K from the operand shapes, for matmul ops PyTorch's counter skips (in-place, mv, dot, int8).
+
+	derived: one multiply and one add per inner-product term.
+	"""
+	# linear and matmul are composites: their FLOPs are counted on the mm/addmm/bmm they call
+	if name not in _MATMUL or name in ("aten::linear", "aten::matmul") or not shapes:
+		return None
+	t = [s for s in shapes if isinstance(s, list | tuple) and s and all(isinstance(d, int) for d in s)]
+	if name in ("aten::dot",) and len(t) >= 2:
+		return 2.0 * t[0][0]
+	if name in ("aten::mv", "aten::addmv", "aten::addmv_") and len(t) >= 2:
+		m = t[-2]  # (bias?, mat[M, K], vec[K])
+		return 2.0 * m[0] * m[1] if len(m) == 2 else None
+	a, b = (
+		(t[0], t[1])
+		if name in ("aten::_scaled_mm", "aten::_int_mm")
+		else (t[-2], t[-1])
+		if len(t) >= 2
+		else (None, None)
+	)
+	if a is None or len(a) < 2 or len(b) < 2:
+		return None
+	batch = math.prod(a[:-2]) if len(a) > 2 else 1  # bmm/baddbmm/addbmm: [B, M, K] @ [B, K, N]
+	return 2.0 * batch * a[-2] * a[-1] * b[-1]
 
 
 def _attention_flops(name: str, shapes) -> float | None:
@@ -182,7 +218,8 @@ def kernel_table(
 		row["calls"] += int(e.count)
 		counted = float(_attr(e, "flops", default=0) or 0)
 		if not counted:
-			est = _attention_flops(e.key, getattr(e, "input_shapes", None))
+			shapes = getattr(e, "input_shapes", None)
+			est = _attention_flops(e.key, shapes) or _matmul_flops(e.key, shapes)
 			counted = est * e.count if est else 0.0
 		row["flops"] += counted
 		b = _bytes(e.key, getattr(e, "input_shapes", None), elt)

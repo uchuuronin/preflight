@@ -1,4 +1,4 @@
-# Preflight contract v0.3.0
+# Preflight contract v0.4.0
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,14 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.4.0 (Oct 28, additive; A's fields, asked for by C and approved through the PM): `JobRequest.mode` (plan, probe, verify, sample_more; default plan), `knobs`,
+  `tasks` and `purpose`, with `Source.kind` "record" and `Source.record_ref` (a share token or
+  `sample:<id>`); a job on a record writes a new record whose `parent_id` is it. `Knob.affects`
+  (map node ids, checked against the graph) and `Knob.changes_results`. `ModelCard.fixture`.
+  `JobEvent.error_code` (Probe.error_code's families plus `submission.*`, `internal`,
+  `internal.worker_lost`, `unsupported.agent_sampling`). `Source.commit` is the full hash the code
+  was read at. Golden records: knobs carry `affects` and `changes_results`, model cards
+  `fixture: true`, and sample URIs name the real zoo directories. 0.3.0 records load unchanged.
 - 0.3.0 (Oct 28, additive): `JobCost.at_risk_gpu_hours`, so an own cluster shows money at risk in GPU-hours
   first (B's request). Golden records use the L4 capacity PyTorch reports on Modal: 23,689,363,456 bytes
   (22.06 GiB), measured Oct 28 by the PM smoke test.
@@ -156,3 +164,6 @@ an `Idempotency-Key` on every write that spends money. UI strings through
   `tokens_per_step`, `samples_per_step`, `micro_steps_per_step`; GPU names in
   `JobRequest.gpu` and `Constraints.gpu_types` are 1–64 characters; `JobRequest.constraints` is
   a typed `Constraints`.
+- 0.1.0, after the freeze (Oct 27 review, additive): `Probe.step_log` (`StepSample` per optimizer
+  step), `EvalStats.loader_batches` and `memory_by_batch`, `JobEvent.share_token`; descriptions
+  pin `AgentTask.output_tokens` as including reasoning tokens.

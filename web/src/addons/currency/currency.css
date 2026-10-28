@@ -1,0 +1,57 @@
+/* D3 · Local currency. Theme tokens only (var(--pf-*)); no literal colours. */
+
+.pf-addon-currency {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+}
+
+.pf-addon-currency__select {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 100%;
+	min-height: 44px;
+	padding: 0 40px 0 16px;
+	border-radius: var(--pf-radius-pill);
+	border: 1px solid var(--pf-stroke-strong);
+	background-color: var(--pf-glass-hi);
+	color: var(--pf-fg);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+	/* chevron drawn with two gradients so it takes the text colour in both themes */
+	background-image:
+		linear-gradient(45deg, transparent 50%, currentColor 50%),
+		linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position:
+		calc(100% - 22px) 50%,
+		calc(100% - 17px) 50%;
+	background-size: 5px 5px;
+	background-repeat: no-repeat;
+	transition: border-color var(--pf-dur-quick) ease;
+}
+
+.pf-addon-currency__select:hover {
+	border-color: var(--pf-accent);
+}
+
+.pf-addon-currency__select:focus-visible {
+	outline: 2px solid var(--pf-focus);
+	outline-offset: 3px;
+}
+
+.pf-addon-currency__select option {
+	background: var(--pf-glass-solid);
+	color: var(--pf-fg);
+}
+
+.pf-addon-currency__note {
+	margin: 0;
+	font-size: var(--pf-text-sm);
+	line-height: 1.45;
+	color: var(--pf-fg-dim);
+}
+
+.pf-addon-currency__note a {
+	color: inherit;
+}

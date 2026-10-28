@@ -1,0 +1,464 @@
+"""A's execution plane on Modal: the job store, the workers, and a GPU sandbox per job.
+
+	modal run --env main python/preflight/runner/ops_app.py::startup_check   # first, every time
+	modal deploy --env main python/preflight/runner/modal_app.py            # app "preflight-runner"
+	modal run --env main python/preflight/runner/ops_app.py::prefetch        # zoo weights into the volume
+	modal run --env main python/preflight/runner/ops_app.py::smoke --gpus L4 # one zoo script to its record
+	python -m preflight.runner.stop_app --env main                          # stop it
+
+What runs where:
+  JobStoreService  one container, max 1, the serialised source of truth for jobs (gap 2);
+                   state saved to the Modal Dict "preflight-jobs" on every change.
+                   C's API calls submit/status/position/events/cancel with .remote().
+  run_worker       CPU containers, at most MAX_RUNNING: lease a job, run the pipeline,
+                   write the record to the "preflight-records" volume. Holds the Muse
+                   Spark key (secret "preflight-meta"); never runs visitor code.
+  probe sandbox    one modal.Sandbox per job (and per GPU if the job steps up): GPU,
+                   no secrets, egress only to Hugging Face, PyPI and GitHub, weights
+                   volume mounted read-only. Visitor code runs only here, under
+                   run_probe's own isolation (unprivileged uid, scrubbed env, limits).
+  tick             every minute: reap expired leases, start workers for queued jobs.
+
+C mounts "preflight-records" read-only and serves <share_token>.json until R2 lands.
+"""
+
+# Deploy-only. `modal run`, `modal serve` or `modal shell` of this file starts a temporary copy of
+# the app whose job store (min_containers=1) would claim the shared job state and lock the deployed
+# store out (Oct 28). JobStoreService.load therefore claims only in the deployed app's own
+# containers (deployed_here); a temporary copy refuses every call. Every `modal run` entry
+# (startup check, prefetch, smoke) lives in runner/ops_app.py.
+
+import contextlib
+import hashlib
+import os
+import uuid
+from pathlib import Path
+
+import modal
+
+from preflight.runner.ownership import decide_ownership
+from preflight.runner.queue import MAX_RUNNING
+
+APP_NAME = "preflight-runner"
+SERVICE_NAME = "JobStoreService"
+# Deployed or run from the repo, this file is <repo>/python/preflight/runner/modal_app.py and the
+# image definitions below read the repo through ROOT. Inside a container Modal loads this file on
+# its own, as /root/modal_app.py (module `modal_app`, not `preflight.runner.modal_app`), so no
+# lookup here may assume the repo layout. Images are also built inside a container: a sandbox's
+# image (probe_image) is resolved where Sandbox.create runs, in a worker, and every local path it
+# names must exist there (Oct 28: it pointed into the repo, and every probe failed in 0.01 s). So
+# each path comes from the repo when it is here and from where the image put it otherwise; the
+# contents are the same files, so the image and mount hashes don't change.
+_HERE = Path(__file__).resolve()
+_REPO = _HERE.parents[3] if len(_HERE.parents) > 3 and (_HERE.parents[3] / "zoo").is_dir() else None
+ROOT = _REPO if _REPO is not None else Path("/repo-not-here")
+
+
+def _installed_package() -> Path:
+	import preflight
+
+	return Path(preflight.__file__).resolve().parent
+
+
+PKG = _REPO / "python" / "preflight" if _REPO is not None else _installed_package()
+# bytecode differs between the deploy machine and a container: keep it out so the mounts match
+_NOT_SOURCE = ["**/__pycache__", "**/__pycache__/**", "**/*.pyc"]
+ZOO_SRC = _REPO / "zoo" if _REPO is not None else Path(os.environ.get("PREFLIGHT_ZOO", "/root/zoo"))
+REMOTE_PKG = "/opt/preflight"  # not under /root (0700): probes import it as an unprivileged uid
+RECORDS_DIR = "/records"
+UPLOADS_DIR = "/uploads"
+WEIGHTS_DIR = "/weights"
+HF_HOME = "/tmp/hf"
+
+# what a probe may reach: models and tokenizers, packages a script installs, code it clones
+EGRESS = [
+	"huggingface.co",
+	"*.huggingface.co",
+	"*.hf.co",
+	"pypi.org",
+	"files.pythonhosted.org",
+	"github.com",
+	"codeload.github.com",
+	"*.githubusercontent.com",
+]
+# pinned so a probe measures the same stack every time; part of the probe-cache key
+PROBE_PACKAGES = [
+	"torch==2.5.1",
+	"transformers==4.46.3",
+	"accelerate==1.1.1",
+	"peft==0.13.2",
+	"trl==0.12.1",
+	"datasets==3.1.0",
+	"safetensors==0.4.5",
+	"psutil==6.1.0",
+	"nvidia-ml-py==12.560.30",
+	"pydantic>=2.8,<3",
+	"numpy>=1.26,<2.2",
+	"httpx>=0.27",
+]
+ZOO_MODELS = ["Qwen/Qwen2.5-1.5B", "gpt2"]
+WORKER_TIMEOUT_S = 3600
+
+app = modal.App(APP_NAME)
+
+# The public demo probes on GPUs up to A100-80GB, never H200 (Chiya, Oct 27); a visitor's OOM may
+# still step up within the job's dollar budget (pipeline.JOB_BUDGET_USD).
+GPU_CEILING = "A100-SXM-80GB"
+# derived: Modal's sandbox rates (3x list: $0.0000394 per core-s, $0.00000667 per GiB-s, modal.com/pricing,
+# Oct 27) for ~4 cores and ~16 GiB while a 1.5B LoRA probe loads and trains = $0.95/h. guess on the
+# usage figures: the first smoke run's Modal bill replaces them
+SANDBOX_OVERHEAD_USD_PER_H = 0.95
+_base = modal.Image.debian_slim(python_version="3.11").env(
+	{"PYTHONPATH": REMOTE_PKG, "PREFLIGHT_ZOO": "/root/zoo", "PREFLIGHT_GPU_CEILING": GPU_CEILING}
+)
+worker_image = (
+	_base.apt_install("git")
+	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
+	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+)
+probe_image = (
+	_base.apt_install("git")
+	.pip_install(*PROBE_PACKAGES)
+	.env(
+		{
+			"HF_HOME": HF_HOME,
+			"PREFLIGHT_WEIGHTS_HUB": f"{WEIGHTS_DIR}/hf/hub",
+			"PREFLIGHT_SANDBOX_DIR": "/tmp",
+			# one unprivileged uid for all of a job's probes (the sandbox is per job): they share the HF cache
+			"PREFLIGHT_PROBE_UID": "61000",
+		}
+	)
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+)
+
+jobs_dict = modal.Dict.from_name("preflight-jobs", create_if_missing=True)
+cache_dict = modal.Dict.from_name("preflight-probe-cache", create_if_missing=True)
+records_vol = modal.Volume.from_name("preflight-records", create_if_missing=True)
+weights_vol = modal.Volume.from_name("preflight-weights", create_if_missing=True)
+# uploaded files, by content hash: kept out of the job state, which is saved on every change
+uploads_vol = modal.Volume.from_name("preflight-uploads", create_if_missing=True)
+
+
+def _read_only(vol):
+	try:
+		return vol.with_mount_options(read_only=True)
+	except AttributeError:  # older SDKs
+		return vol.read_only()
+
+
+def image_tag() -> str:
+	"""Pinned packages plus the recorder's own source: a change to either invalidates cached probes."""
+	import preflight
+
+	pkg = Path(preflight.__file__).resolve().parent  # the installed package, here or in the container
+	h = hashlib.sha256("\n".join(PROBE_PACKAGES).encode())
+	files = [p for sub in ("recorder", "probes") for p in sorted((pkg / sub).glob("*.py"))]
+	if not files:  # never key the cache on nothing: a wrong path would make every probe a hit
+		raise RuntimeError(f"no recorder or probe sources under {pkg}")
+	for p in files:
+		h.update(p.relative_to(pkg).as_posix().encode())
+		h.update(p.read_bytes())
+	return "probe-" + h.hexdigest()[:16]
+
+
+class DictCache:
+	"""Probe cache over a Modal Dict: content-hash key, probe JSON value."""
+
+	def __init__(self, d):
+		self._d = d
+
+	def get(self, key: str) -> dict | None:
+		try:
+			return self._d.get(key)
+		except Exception:
+			return None  # a cache outage costs a probe run, never a job
+
+	def put(self, key: str, probe: dict) -> None:
+		with contextlib.suppress(Exception):
+			self._d[key] = probe
+
+
+# ---------------------------------------------------------------- the job store
+
+
+def _container_environment() -> str | None:
+	"""The Modal environment this container runs in. Modal 1.6.3 has no public accessor; it keeps
+	it on the container IO manager (container_args.environment_name)."""
+	try:
+		from modal._runtime.container_io_manager import _ContainerIOManager
+
+		env = getattr(getattr(_ContainerIOManager, "_singleton", None), "_environment_name", None)
+	except Exception:
+		env = None
+	return env or os.environ.get("MODAL_ENVIRONMENT") or None
+
+
+def deployed_here(app_name: str = APP_NAME) -> tuple[bool | None, str]:
+	"""Whether this container belongs to the deployed `app_name` in its own environment, and why.
+
+	True: it does. False: the deployed app was found and this container is another app (a
+	temporary copy from modal run/serve/shell). None: it couldn't tell after retries (a lookup that
+	keeps failing); the job store then fails to start, so Modal restarts it, rather than serving
+	refusals for the container's whole life (decide_ownership has the rules)."""
+	import time
+
+	try:
+		mine = modal.App._get_container_app()
+		mine_id = mine.app_id if mine is not None else None
+	except Exception as exc:
+		return None, f"no container app ({type(exc).__name__})"
+	env = _container_environment()
+
+	def lookup():
+		return modal.App.lookup(app_name, environment_name=env).app_id
+
+	return decide_ownership(mine_id, lookup, where=f"{app_name} in {env or 'the default environment'}",
+		env_known=bool(env), sleep=time.sleep)  # fmt: skip
+
+
+class _Refusing:
+	"""The job store's methods in a container that isn't the deployed app's: every call refuses."""
+
+	def __init__(self, why: str):
+		self.why = why
+
+	def __getattr__(self, name):
+		from preflight.runner.queue import StoreUnavailable
+
+		def refuse(*_a, **_k):
+			raise StoreUnavailable(f"not the deployed job store: {self.why}")
+
+		return refuse
+
+
+@app.cls(
+	image=worker_image,
+	volumes={UPLOADS_DIR: uploads_vol},
+	max_containers=1,
+	min_containers=1,
+	timeout=24 * 3600,
+	scaledown_window=1200,
+)
+@modal.concurrent(max_inputs=64)
+class JobStoreService:
+	@modal.enter()
+	def load(self):
+		from preflight.runner.queue import InMemoryJobStore
+		from preflight.runner.remote_store import DirBlobs, StoreMethods
+
+		# fencing for the saved state: during a redeploy an old and a new container can overlap.
+		# The new one claims ownership before it reads, so the old one's saves fail from then on
+		# (StoreUnavailable, rolled back) and nothing it accepts after the read is lost silently.
+		# Modal Dicts have no compare-and-set, so a save already in flight can still land: deploys
+		# of this service happen with the queue drained.
+		self.generation = uuid.uuid4().hex
+		self._spawns: list[float] = []
+		ok, why = deployed_here()
+		env = _container_environment()
+		print(
+			f"job store (environment {env!r}): {'claiming' if ok else 'NOT claiming'} the job state: {why}",
+			flush=True,
+		)
+		if ok is None:
+			# couldn't tell: fail the start so Modal restarts the container and asks again
+			raise RuntimeError(f"job store can't confirm it is the deployed app: {why}")
+		if not ok:
+			# a temporary copy (modal run/serve/shell of this file): never touch the shared state
+			self.m = _Refusing(why)
+			return
+		jobs_dict["owner"] = self.generation
+		snap = jobs_dict.get("state")
+		kw = {"on_change": self._save}
+		self.store = InMemoryJobStore.restore(snap, **kw) if snap else InMemoryJobStore(**kw)
+		self.m = StoreMethods(self.store, blobs=DirBlobs(UPLOADS_DIR, commit=uploads_vol.commit))
+
+	def _save(self, snap: dict) -> None:
+		if jobs_dict.get("owner") != self.generation:
+			# only a newer deployed container can have claimed it (deployed_here): this one is
+			# being replaced, so stop taking calls and let Modal route them to the new one
+			with contextlib.suppress(Exception):
+				import modal.experimental
+
+				modal.experimental.stop_fetching_inputs()
+			raise RuntimeError("a newer job-store container owns the state")
+		jobs_dict["state"] = snap
+
+	def _kick(self) -> None:
+		"""Start a worker unless enough are running or starting: a burst of submits must not
+		queue hundreds of worker starts behind the GPU cap."""
+		import time
+
+		now = time.monotonic()
+		self._spawns = [t for t in self._spawns if now - t < 60]
+		if self.m.demand()["running"] + len(self._spawns) >= MAX_RUNNING:
+			return  # running workers loop until the queue is empty; tick covers the rest
+		self._spawns.append(now)
+		with contextlib.suppress(Exception):  # if it fails, tick starts a worker within a minute
+			run_worker.spawn()
+
+	@modal.method()
+	def submit(self, request: dict, visitor: str, idempotency_key: str) -> dict:
+		out = self.m.submit(request, visitor, idempotency_key)
+		if out["created"]:
+			self._kick()
+		return out
+
+	@modal.method()
+	def status(self, job_id: str) -> dict:
+		return self.m.status(job_id)
+
+	@modal.method()
+	def position(self, job_id: str) -> int | None:
+		return self.m.position(job_id)
+
+	@modal.method()
+	def events(self, job_id: str, after: int = -1) -> list[dict]:
+		return self.m.events(job_id, after)
+
+	@modal.method()
+	def cancel(self, job_id: str) -> None:
+		self.m.cancel(job_id)
+
+	@modal.method()
+	def lease(self, worker: str) -> dict | None:
+		return self.m.lease(worker)
+
+	@modal.method()
+	def heartbeat(self, lease: dict) -> float:
+		return self.m.heartbeat(lease)
+
+	@modal.method()
+	def complete(self, lease: dict, record_id: str) -> None:
+		self.m.complete(lease, record_id)
+
+	@modal.method()
+	def fail(self, lease: dict, error: str, retryable: bool, error_code: str | None = None) -> None:
+		self.m.fail(lease, error, retryable, error_code)
+
+	@modal.method()
+	def emit(self, job_id: str, stage: str, fields: dict, token: int | None = None) -> dict:
+		return self.m.emit(job_id, stage, fields, token)
+
+	@modal.method()
+	def reap(self) -> list[str]:
+		return self.m.reap()
+
+	@modal.method()
+	def demand(self) -> dict:
+		return self.m.demand()
+
+
+# ---------------------------------------------------------------- workers
+
+
+def _sandbox_factory(owner=None):
+	"""The probe sandbox, created inside `owner` (this app by default; the startup check passes its
+	own running app). gpu "cpu" makes a GPU-less sandbox with every other setting the same."""
+
+	def create(gpu: str):
+		from preflight.probes.gpu_choice import modal_gpu
+
+		return modal.Sandbox.create(
+			app=owner if owner is not None else app,
+			image=probe_image,
+			gpu=None if gpu == "cpu" else modal_gpu(gpu),
+			timeout=30 * 60,
+			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes
+			outbound_domain_allowlist=EGRESS,
+			volumes={WEIGHTS_DIR: _read_only(weights_vol)},
+			workdir="/tmp",
+		)
+
+	return create
+
+
+def _spark_client():
+	from preflight.harness.spark import ModelClient
+
+	return ModelClient.meta() if ModelClient.meta_configured() else None
+
+
+@app.function(
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-meta")],
+	volumes={RECORDS_DIR: records_vol, UPLOADS_DIR: _read_only(uploads_vol)},
+	timeout=WORKER_TIMEOUT_S,
+	max_containers=MAX_RUNNING,
+)
+def run_worker() -> int:
+	"""Run jobs until the queue is empty. Returns how many it ran."""
+	import time
+
+	from preflight.runner.pipeline import JOB_PROBE_WALL_S, Deps, run_job
+	from preflight.runner.records import LocalRecordWriter
+	from preflight.runner.remote_store import DirBlobs, RemoteJobStore
+	from preflight.runner.sandbox_runner import SandboxRunner
+	from preflight.runner.worker import run_one
+
+	svc = JobStoreService()
+	store = RemoteJobStore(lambda m, *a, **k: getattr(svc, m).remote(*a, **k))
+	writer = LocalRecordWriter(RECORDS_DIR, on_write=records_vol.commit, on_read=records_vol.reload)
+	blobs = DirBlobs(UPLOADS_DIR, reload=uploads_vol.reload)
+	name = f"worker-{uuid.uuid4().hex[:8]}"
+	tag = image_tag()
+	started = time.monotonic()
+	ran = 0
+	while True:
+		# never lease a job this container can't finish before its own timeout: a killed worker
+		# leaves the job to the reaper and a retry, and its sandbox billing until idle_timeout
+		if time.monotonic() - started > WORKER_TIMEOUT_S - (JOB_PROBE_WALL_S + 15 * 60):
+			return ran
+		with SandboxRunner(_sandbox_factory()) as runner:  # one sandbox per job, ended with the job
+			deps = Deps(records=writer, runner=runner, spark=_spark_client(), cache=DictCache(cache_dict),
+				image=tag, blobs=blobs, reader=writer, install_requirements=True,
+				overhead_usd_per_h=SANDBOX_OVERHEAD_USD_PER_H)  # fmt: skip
+			if not run_one(store, name, lambda lease, ctx, deps=deps: run_job(lease, ctx, deps=deps)):
+				return ran
+		ran += 1
+
+
+PRUNE_EVERY_S = 86_400  # PM decision (Oct 28): records go after 30 days, checked once a day
+
+
+def _prune_records_daily() -> list[str]:
+	"""Once a day (the last run's time is kept in the jobs Dict), delete records older than 30 days."""
+	import time
+
+	from preflight.runner.records import prune
+
+	last = jobs_dict.get("records_pruned_at") or 0
+	if time.time() - last < PRUNE_EVERY_S:
+		return []
+	jobs_dict["records_pruned_at"] = time.time()  # first, so a failure doesn't retry every minute
+	records_vol.reload()
+	removed = prune(RECORDS_DIR)
+	if removed:
+		records_vol.commit()
+		print(f"pruned {len(removed)} records older than 30 days", flush=True)
+	return removed
+
+
+@app.function(
+	image=worker_image, schedule=modal.Period(minutes=1), timeout=120, volumes={RECORDS_DIR: records_vol}
+)
+def tick() -> dict:
+	"""Free leases whose workers died; start workers for jobs waiting in the queue; once a day,
+	delete records older than 30 days."""
+	import time
+
+	pruned: list[str] = []
+	try:  # a failed cleanup never holds up the queue, but it says so
+		due = time.time() - (jobs_dict.get("records_pruned_at") or 0) >= PRUNE_EVERY_S
+		if due and deployed_here()[0] is True:  # a temporary copy's tick never deletes shared records
+			pruned = _prune_records_daily()
+	except Exception as exc:
+		print(f"record cleanup failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+	svc = JobStoreService()
+	reaped = svc.reap.remote()
+	d = svc.demand.remote()
+	for _ in range(min(d["queued"], max(0, MAX_RUNNING - d["running"]))):
+		run_worker.spawn()
+	if d["oldest_queued_s"] > 600:
+		print(f"ALERT backlog: oldest queued job has waited {d['oldest_queued_s']:.0f} s", flush=True)
+	return {"reaped": reaped, "pruned": len(pruned), **d}

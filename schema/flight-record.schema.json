@@ -188,12 +188,14 @@
 					"type": "integer"
 				},
 				"output_tokens": {
+					"description": "All generated tokens, reasoning included (as OpenAI and Anthropic bill them)",
 					"minimum": 0,
 					"title": "Output Tokens",
 					"type": "integer"
 				},
 				"reasoning_tokens": {
 					"default": 0,
+					"description": "The part of output_tokens spent reasoning; not added again",
 					"minimum": 0,
 					"title": "Reasoning Tokens",
 					"type": "integer"
@@ -1414,6 +1416,29 @@
 					"default": null,
 					"description": "True when eval ran with autograd on (no no_grad)",
 					"title": "Grad Enabled"
+				},
+				"loader_batches": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Batches the full eval loader would run, so the pass can be extrapolated",
+					"title": "Loader Batches"
+				},
+				"memory_by_batch": {
+					"description": "Allocated bytes after each measured eval batch: growth across batches (outputs kept for metrics) is what makes an eval OOM late in the pass",
+					"items": {
+						"type": "integer"
+					},
+					"maxItems": 64,
+					"title": "Memory By Batch",
+					"type": "array"
 				}
 			},
 			"required": [
@@ -2494,6 +2519,28 @@
 					"default": null,
 					"description": "memory, speed, data, model, rl, agent, cluster",
 					"title": "Group"
+				},
+				"affects": {
+					"description": "Job-map node ids the knob acts on",
+					"items": {
+						"type": "string"
+					},
+					"maxItems": 16,
+					"title": "Affects",
+					"type": "array"
+				},
+				"changes_results": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "True if moving it changes what the model learns (offered only to clear a failure, never as a saving); false if it changes only speed, memory or cost; null if unknown",
+					"title": "Changes Results"
 				}
 			},
 			"required": [
@@ -2901,6 +2948,12 @@
 					],
 					"default": null,
 					"title": "Notes"
+				},
+				"fixture": {
+					"default": false,
+					"description": "Illustrative numbers from a fixture, not a fitted model; the UI says so",
+					"title": "Fixture",
+					"type": "boolean"
 				}
 			},
 			"required": [
@@ -3660,6 +3713,15 @@
 					"title": "Extras",
 					"type": "object"
 				},
+				"step_log": {
+					"description": "Every optimizer step the probe ran, in order",
+					"items": {
+						"$ref": "#/$defs/StepSample"
+					},
+					"maxItems": 256,
+					"title": "Step Log",
+					"type": "array"
+				},
 				"kernels": {
 					"anyOf": [
 						{
@@ -4252,7 +4314,8 @@
 						"notebook",
 						"template",
 						"cli",
-						"inflight"
+						"inflight",
+						"record"
 					],
 					"title": "Kind",
 					"type": "string"
@@ -4270,6 +4333,20 @@
 					"description": "sample://name, https://github.com/..., upload://<hash>",
 					"title": "Uri"
 				},
+				"record_ref": {
+					"anyOf": [
+						{
+							"pattern": "^(sample:[a-z0-9][a-z0-9_-]{0,39}|[A-Za-z0-9_-]{16,64})$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "kind=record: a share token or sample:<id>; the job reuses that record's script, env and data, and writes a new record whose parent_id is it",
+					"title": "Record Ref"
+				},
 				"commit": {
 					"anyOf": [
 						{
@@ -4280,6 +4357,7 @@
 						}
 					],
 					"default": null,
+					"description": "For repos: the full commit the code was read at",
 					"title": "Commit"
 				},
 				"content_hash": {
@@ -4359,6 +4437,149 @@
 				}
 			},
 			"title": "Stability",
+			"type": "object"
+		},
+		"StepSample": {
+			"additionalProperties": false,
+			"description": "One optimizer step as the probe saw it, so B fits on every step, not a few summary points.",
+			"properties": {
+				"index": {
+					"minimum": 1,
+					"title": "Index",
+					"type": "integer"
+				},
+				"kind": {
+					"description": "warmup (discarded), timed (no recorder sync points, CUDA events at the step boundary only), phase (synchronised, for the phase split), profiled (profiler attached)",
+					"enum": [
+						"warmup",
+						"timed",
+						"phase",
+						"profiled"
+					],
+					"title": "Kind",
+					"type": "string"
+				},
+				"wall_s": {
+					"description": "Step boundary to step boundary, minus eval and checkpoint time",
+					"minimum": 0,
+					"title": "Wall S",
+					"type": "number"
+				},
+				"tokens": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Tokens in the step's batches, padding included",
+					"title": "Tokens"
+				},
+				"real_tokens": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Tokens the attention mask keeps",
+					"title": "Real Tokens"
+				},
+				"samples": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Samples"
+				},
+				"padded_len": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Padded sequence length of the step's batches",
+					"title": "Padded Len"
+				},
+				"micro_steps": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Micro Steps"
+				},
+				"peak_allocated_bytes": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Peak Allocated Bytes"
+				},
+				"peak_reserved_bytes": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Peak Reserved Bytes"
+				},
+				"device_used_bytes": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else",
+					"title": "Device Used Bytes"
+				}
+			},
+			"required": [
+				"index",
+				"kind",
+				"wall_s"
+			],
+			"title": "StepSample",
 			"type": "object"
 		},
 		"StepTime": {
@@ -4789,7 +5010,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.3.0",
+			"default": "0.4.0",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -4941,5 +5162,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.3.0/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.4.0/FlightRecord"
 }

@@ -339,9 +339,23 @@ def _env_gpu(record: FlightRecord) -> str | None:
 	return None
 
 
-def _target_gpu(record: FlightRecord, values: dict) -> str | None:
+def _gpu_move(record: FlightRecord, values: dict) -> str | None:
+	"""The GPU asked for, or None when gpu_type is still the record's own value (no move).
+
+	Records from A's harness carry a gpu_type knob whose current value names the probed GPU, so
+	the current value alone must never read as a move (an unlisted card would lose step time).
+	"""
 	name = values.get("gpu_type")
-	if isinstance(name, str) and name:
+	if not (isinstance(name, str) and name):
+		return None
+	if name == _current(record).get("gpu_type"):
+		return None
+	return name
+
+
+def _target_gpu(record: FlightRecord, values: dict) -> str | None:
+	name = _gpu_move(record, values)
+	if name:
 		try:
 			return gpus.resolve(name)
 		except KeyError:
@@ -629,7 +643,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	recompute = bool(values.get("gradient_checkpointing")) and probe_gc == {False}
 	match = _matching_probe(record, values)
 	src_gpu, tgt_gpu = _env_gpu(record), _target_gpu(record, values)
-	requested = values.get("gpu_type")
+	requested = _gpu_move(record, values)
 	if requested and tgt_gpu is None:
 		return _StepResult(_abstain("s", mid, f"{requested!r} isn't a GPU the table knows"), 0.0)
 	if requested and src_gpu is None and tgt_gpu is not None:

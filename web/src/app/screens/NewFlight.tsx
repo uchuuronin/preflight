@@ -4,12 +4,16 @@
  * never pays twice. Samples on the departures board open straight in the cockpit for free.
  */
 import { useId, useRef, useState } from "react";
+import { flag } from "../../lib/flags";
+import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
+import { DataUseNotice, dataUseAccepted } from "../DataUse";
+import { ACCEPT, type PickedFile, precheck, uploadSource } from "../upload";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
@@ -38,29 +42,67 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [description, setDescription] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
-	const idem = useRef(newKey());
-	const ids = { repo: useId(), describe: useId(), upload: useId() };
+	const [accepted, setAccepted] = useState(dataUseAccepted);
+	const [picked, setPicked] = useState<PickedFile[]>([]);
+	const [entry, setEntry] = useState<string | undefined>();
+	const [reading, setReading] = useState(false);
+	const idem = useRef<{ key: string; body: string | null }>({ key: newKey(), body: null });
+	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId() };
+	// Uploads open with live probes (the same flag the API checks before taking a job).
+	const uploadsOpen = flag("runner.queue");
+	const check = uploadSource(picked, entry);
 
-	const canSubmit = intake === "repo" ? /^(https?:\/\/)?(www\.)?(github\.com|huggingface\.co|colab\.research\.google\.com)\/.+/.test(repo.trim()) : false;
+	// GitHub only: A's runner fetches from GitHub, and the API pins the link to a commit there.
+	const canSubmit =
+		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : false;
+
+	const pick = async (list: FileList | null) => {
+		if (!list?.length) return;
+		setError(null);
+		const chosen = Array.from(list);
+		// Names and sizes first: a 4 GB checkpoint is refused without being read into the tab.
+		const early = precheck(chosen);
+		if (early) {
+			setPicked([]);
+			setError(t(`newflight.${early}`));
+			return;
+		}
+		setReading(true);
+		try {
+			setPicked(await Promise.all(chosen.map(async (f) => ({ name: f.name, size: f.size, text: await f.text() }))));
+			setEntry(undefined);
+		} catch {
+			setPicked([]);
+			setError(t("newflight.upload.unreadable"));
+		} finally {
+			setReading(false);
+		}
+	};
 
 	const submit = async () => {
 		setError(null);
+		if (intake === "upload" && !check.ok) return;
 		setBusy(true);
 		const body: JobRequest = {
-			source: { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` },
+			source: intake === "upload" && check.ok ? check.source : { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` },
 			objective: { kind: goal, description: description.trim() || null },
 			gpu,
 			description: description.trim() || null,
 		};
+		// One key per distinct check-in: a retry of the same body reuses it (the API returns the job
+		// it already made), and any change to the body is a new check-in with a new key.
+		const sent = JSON.stringify(body);
+		if (idem.current.body !== sent) idem.current = { key: newKey(), body: sent };
 		try {
 			const res = await fetch(`${API_BASE}/v1/jobs`, {
 				method: "POST",
 				credentials: "same-origin",
-				headers: { "Content-Type": "application/json", "Idempotency-Key": idem.current },
-				body: JSON.stringify(body),
+				headers: { "Content-Type": "application/json", "Idempotency-Key": idem.current.key },
+				body: sent,
 			});
 			const json = (await res.json().catch(() => null)) as { job_id?: string; error?: { code?: string; message?: string } } | null;
 			if (!res.ok || !json?.job_id) {
+				if (res.status === 409) idem.current = { key: newKey(), body: null }; // a key clash: start afresh
 				const retry = res.headers.get("Retry-After");
 				setError(
 					json?.error?.message ??
@@ -68,7 +110,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 				);
 				return;
 			}
-			idem.current = newKey();
+			idem.current = { key: newKey(), body: null };
 			go("boarding", json.job_id);
 		} catch {
 			setError(t("newflight.error.offline"));
@@ -109,11 +151,74 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								</div>
 							) : intake === "upload" ? (
 								<div className="pf-pane">
-									<label className="pf-drop" htmlFor={ids.upload}>
+									<label
+										className="pf-drop"
+										htmlFor={ids.upload}
+										onDragOver={(e) => uploadsOpen && e.preventDefault()}
+										onDrop={(e) => {
+											if (!uploadsOpen) return;
+											e.preventDefault();
+											void pick(e.dataTransfer.files);
+										}}
+									>
 										{t("newflight.upload.label")}
 										<small>{t("newflight.upload.limits")}</small>
-										<input id={ids.upload} type="file" accept=".py,.ipynb" onChange={() => setError(t("newflight.upload.not_open"))} />
+										<input
+											id={ids.upload}
+											type="file"
+											multiple
+											accept={ACCEPT}
+											onChange={(e) => {
+												const input = e.currentTarget;
+												if (!uploadsOpen) setError(t("newflight.upload.not_open"));
+												else void pick(input.files).finally(() => (input.value = "")); // the same files can be chosen again
+											}}
+										/>
 									</label>
+									{reading ? <p className="pf-hint">{t("newflight.upload.reading")}</p> : null}
+									{picked.length ? (
+										<div className="pf-upload">
+											<ul className="pf-upload__files">
+												{picked.map((p, i) => (
+													<li key={`${i}:${p.name}`} className="pf-tag">
+														{p.name}
+													</li>
+												))}
+											</ul>
+											<span className="pf-dim">{t("newflight.upload.files", { n: fmt(picked.length, "count"), size: fmt(picked.reduce((a, p) => a + p.size, 0), "bytes") })}</span>
+											<button
+												type="button"
+												className="pf-btn pf-btn--small"
+												onClick={() => {
+													setPicked([]);
+													setEntry(undefined);
+												}}
+											>
+												{t("newflight.upload.clear")}
+											</button>
+										</div>
+									) : null}
+									{(check.ok ? check.scripts : (check.candidates ?? [])).length > 1 ? (
+										<div className="pf-field">
+											<label htmlFor={ids.entry}>{t("newflight.upload.which_label")}</label>
+											<select
+												id={ids.entry}
+												value={check.ok && check.source.kind === "upload" ? check.source.entrypoint : (entry ?? "")}
+												onChange={(e) => setEntry(e.currentTarget.value || undefined)}
+											>
+												{check.ok ? null : <option value="">{t("newflight.upload.which")}</option>}
+												{(check.ok ? check.scripts : (check.candidates ?? [])).map((c) => (
+													<option key={c} value={c}>
+														{c}
+													</option>
+												))}
+											</select>
+										</div>
+									) : picked.length && !check.ok ? (
+										<p className="pf-error" role="alert">
+											{t(`newflight.${check.reason}`)}
+										</p>
+									) : null}
 								</div>
 							) : (
 								extraIntake
@@ -164,8 +269,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 							</p>
 						) : null}
 						<div className="pf-desk__foot">
-							<span className="pf-hint">{t("newflight.cost_hint")}</span>
-							<button type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy} onClick={() => void submit()}>
+							<span className="pf-hint">{accepted ? t("newflight.cost_hint") : t("datause.needed")}</span>
+							<button type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
 								{busy ? t("newflight.checking_in") : t("newflight.check_in")}
 							</button>
 						</div>
@@ -192,6 +297,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						<p className="pf-departures__foot">{t("newflight.departures.foot")}</p>
 					</section>
 				</div>
+				<DataUseNotice onChange={setAccepted} />
 				<p className="pf-notice">{t("newflight.notice")}</p>
 			</div>
 		</div>

@@ -8,6 +8,7 @@
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,
+	"c.fit_map": false,
 	"c.fix_loop": false,
 	"c.exports": false,
 	"c.campaign_calendar": false,
@@ -16,5 +17,6 @@
 	"engine.memory": false,
 	"engine.steptime_same_gpu": false,
 	"engine.steptime_cross_gpu": false,
-	"corpus.sweep": false
+	"corpus.sweep": false,
+	"d.freetier": false
 }

@@ -27,12 +27,96 @@ def _write(out_path: str, result: dict) -> None:
 	os.replace(tmp, out_path)
 
 
+# Limits on the visitor's code, set in this process before it runs (inherited by all it starts).
+# derived: no core files (they would hold the process's memory); a file-size cap well above a
+# 70B fp32 checkpoint shard so a runaway writer can't fill the disk; enough processes and threads
+# for DataLoader workers times BLAS threads; descriptors for big datasets.
+RLIMITS = {
+	"RLIMIT_CORE": 0,
+	"RLIMIT_FSIZE": 64 * 2**30,
+	"RLIMIT_NPROC": 8192,
+	"RLIMIT_NOFILE": 65536,
+}
+
+
+def set_limits() -> dict:
+	"""Lower each limit to ours (never raise one); returns what was applied, for the log."""
+	import resource
+
+	applied = {}
+	for name, want in RLIMITS.items():
+		lim = getattr(resource, name, None)
+		if lim is None:
+			continue
+		try:
+			soft, hard = resource.getrlimit(lim)
+			new_hard = want if hard == resource.RLIM_INFINITY else min(hard, want)
+			resource.setrlimit(
+				lim, (min(new_hard, soft if soft != resource.RLIM_INFINITY else new_hard), new_hard)
+			)
+			applied[name] = new_hard
+		except (ValueError, OSError):
+			continue
+	return applied
+
+
+def _seed(seed: int, *, force: bool = False) -> None:
+	"""Seed every generator a training script draws from by default, for fixed-seed comparisons.
+
+	force: also make the script's own seeding (random.seed, numpy's, torch.manual_seed, so HF's
+	set_seed too) use this seed, so two verify runs at two seeds really differ and their spread is
+	the seed's. Explicit torch.Generator objects the script seeds itself keep their own seed.
+	"""
+	import random
+
+	if force:
+		_force_seed(seed)
+
+	random.seed(seed)
+	os.environ.setdefault("PYTHONHASHSEED", str(seed))  # for subprocesses (data loader workers)
+	try:
+		import numpy as np
+
+		np.random.seed(seed % 2**32)
+	except ImportError:
+		pass
+	import torch
+
+	torch.manual_seed(seed)  # all devices, CUDA included
+
+
+def _force_seed(seed: int) -> None:
+	import random
+
+	import torch
+
+	def pinned(fn):
+		def call(*_args, **_kw):
+			return fn(seed % 2**32)
+
+		return call
+
+	random.seed = pinned(random.seed)
+	torch.manual_seed = pinned(torch.manual_seed)
+	torch.random.manual_seed = torch.manual_seed
+	if hasattr(torch, "cuda"):
+		torch.cuda.manual_seed = pinned(torch.cuda.manual_seed)
+		torch.cuda.manual_seed_all = pinned(torch.cuda.manual_seed_all)
+	try:
+		import numpy as np
+
+		np.random.seed = pinned(np.random.seed)
+	except ImportError:
+		pass
+
+
 def main(spec_path: str) -> int:
 	spec = json.loads(Path(spec_path).read_text())
+	set_limits()
 	workdir = os.path.abspath(spec["workdir"])
 	out_path = spec["out"]
 	try:
-		import torch
+		import torch  # noqa: F401  (fails here, inside the try, when torch is missing)
 
 		from .errors import classify
 		from .runtime import Recorder, StopProbe, detect_env, mfu
@@ -50,9 +134,23 @@ def main(spec_path: str) -> int:
 
 	os.chdir(workdir)
 	sys.path.insert(0, workdir)
+	if spec.get("install_requirements") and spec.get("deps"):
+		from .requirements import install
+
+		if spec.get("progress"):
+			_write(spec["progress"], {"stage": "installing requirements", "steps": 0})
+		err, dirs = install(Path(workdir), Path(spec["deps"]))
+		if err:
+			_write(out_path, {"status": "error", "error_code": "missing_package.install",
+				"error": f"requirements.txt didn't install: {err}", "summary": {}})  # fmt: skip
+			return 0
+		for i, d in enumerate(dirs, 1):
+			sys.path.insert(i, str(d))  # after the script's own files, before the image
+		parts = [*(str(d) for d in dirs), os.environ.get("PYTHONPATH") or ""]
+		os.environ["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
 	sys.argv = [spec["entrypoint"], *spec.get("args", [])]
 	if spec.get("seed") is not None:
-		torch.manual_seed(int(spec["seed"]))
+		_seed(int(spec["seed"]), force=bool(spec.get("seed_force")))
 	rec = Recorder(
 		warmup=spec["warmup"],
 		timed=spec["timed"],
@@ -60,6 +158,7 @@ def main(spec_path: str) -> int:
 		trace_path=spec.get("trace"),
 		progress_path=spec.get("progress"),
 		eval_batches=spec.get("eval_batches", 2),
+		alternate_sync=bool(spec.get("alternate_sync")),
 	).install()
 
 	status, code, error = "ok", None, None
