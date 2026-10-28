@@ -11,7 +11,7 @@ on:
         description: Short label for the run (letters, digits, dashes)
         required: true
       cmd:
-        description: Command, starting with `modal run ` or `python ` (scripts/ or -m preflight.)
+        description: Command, starting with `modal run `, `modal deploy ` or `python ` (scripts/ or -m preflight.)
         required: true
       ref:
         description: Branch or commit to run
@@ -46,7 +46,7 @@ jobs:
           [[ "$RUN_NAME" =~ ^[A-Za-z0-9-]{1,48}$ ]] || { echo "name: letters, digits and dashes, up to 48"; exit 2; }
           [[ "$RUN_TIMEOUT" =~ ^[0-9]{1,3}$ && "$RUN_TIMEOUT" -ge 1 && "$RUN_TIMEOUT" -le 120 ]] || { echo "timeout: 1 to 120 minutes"; exit 2; }
           # one command, no shell chaining; only our own entry points
-          [[ "$RUN_CMD" =~ ^(modal\ run\ |python\ (scripts/|-m\ preflight\.))[A-Za-z0-9_./:=,@\ -]*$ ]] || { echo "cmd must start with 'modal run ' or 'python scripts/' or 'python -m preflight.' and contain no shell operators"; exit 2; }
+          [[ "$RUN_CMD" =~ ^(modal\ (run|deploy)\ |python\ (scripts/|-m\ preflight\.))[A-Za-z0-9_./:=,@\ -]*$ ]] || { echo "cmd must start with 'modal run ', 'modal deploy ' or 'python scripts/' or 'python -m preflight.' and contain no shell operators"; exit 2; }
           echo "RUN_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "RUN_DIR=$(date -u +%Y%m%d-%H%M%S)-${GITHUB_RUN_ID}-${RUN_NAME}" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2

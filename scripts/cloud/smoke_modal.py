@@ -39,14 +39,14 @@ def props() -> dict:
 	torch.cuda.synchronize()
 	sec = start.elapsed_time(end) / 1000 / reps
 	return {
-		"name": p.name,
-		"total_memory_bytes": p.total_memory,
-		"mem_get_info_free_bytes": free,
-		"mem_get_info_total_bytes": total,
-		"multi_processor_count": p.multi_processor_count,
+		"name": str(p.name),
+		"total_memory_bytes": int(p.total_memory),
+		"mem_get_info_free_bytes": int(free),
+		"mem_get_info_total_bytes": int(total),
+		"multi_processor_count": int(p.multi_processor_count),
 		"capability": f"{p.major}.{p.minor}",
-		"torch": torch.__version__,
-		"cuda": torch.version.cuda,
+		"torch": str(torch.__version__),  # TorchVersion would need torch to unpickle locally
+		"cuda": str(torch.version.cuda),
 		"bf16_matmul_tflops": round(2 * n**3 / sec / 1e12, 1),
 		"measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
 	}
