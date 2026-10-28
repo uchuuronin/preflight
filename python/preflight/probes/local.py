@@ -108,6 +108,11 @@ EXTRAS_KEYS = (
 	"samples_per_step",
 	"micro_steps_per_step",
 	"host_rss_peak_bytes",
+	# the real run's length, for time.total (A -> B, Oct 28): batches per epoch of the training
+	# loader, and from an HF Trainer its epochs and planned optimizer steps
+	"train_loader_batches",
+	"epochs",
+	"planned_steps",
 )
 
 
