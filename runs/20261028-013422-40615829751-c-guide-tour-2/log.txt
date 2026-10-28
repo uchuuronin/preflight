@@ -1,0 +1,113 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-A84RVeQCnXUXReKC9UOd9e
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/scripts/guide_tour.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/schema/examples/agent.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/pretrain.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/web/src/workspace/fixtures/dev-finetun
+│   e.record.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/scripts/tour_play.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/finetune.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/preflight_api
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+└── ✓ Created Function play.
+{
+	"model": "muse-spark-1.3",
+	"tours": 12,
+	"rounds": 48,
+	"latency_s": {
+		"p50": 2.359,
+		"p90": 3.715,
+		"p95": 4.413,
+		"max": 5.104
+	},
+	"output_tokens": {
+		"p50": 372,
+		"p95": 977,
+		"max": 1037
+	},
+	"input_tokens": {
+		"p50": 2368,
+		"max": 4906
+	},
+	"cached_share": 0.726,
+	"rounds_per_tour": {
+		"mean": 4.0,
+		"max": 18
+	},
+	"usd_per_tour": {
+		"mean": 0.0122,
+		"max": 0.053527
+	},
+	"withheld_rounds": 0,
+	"ends": {
+		"done": 12
+	}
+}
+lora-7b    rounds=2   decisions=0 usd=0.0083 end=done 
+    2.801s in=2105 out=314 calls=['sensitivity'] -> results "I'll tour the cost-saving knobs for your LoRA run, starting with the most effective move."
+    2.179s in=2269 out=360 calls=[] -> visitor "I'll tour the cost-saving knobs for your LoRA run, starting with the biggest lever."
+lora-7b    rounds=2   decisions=0 usd=0.0065 end=done 
+    2.428s in=2105 out=362 calls=['sensitivity'] -> results "I'll rank every safe change by cost saving to start the tour."
+    2.798s in=2262 out=377 calls=[] -> visitor "I'll tour the knobs that control cost, starting with the top saver."
+lora-7b    rounds=18  decisions=4 usd=0.0535 end=done 
+    3.179s in=2105 out=439 calls=['sensitivity'] -> results "I'll chart the cheapest safe course for your LoRA run, starting with the strongest cost lever."
+    2.428s in=2268 out=459 calls=['highlight'] -> results "I'll highlight the sequence-length path and make that cost move."
+    2.926s in=2368 out=591 calls=['set_knob'] -> results 'Moving to the top cost knob next.'
+    4.413s in=2513 out=1037 calls=[] -> decision 'Moved sequence length to 256. Predicted cost is $57.25 with peak memory 40.1 GiB.'
+    1.584s in=2765 out=162 calls=['sensitivity'] -> results 'Planning the next cheapest move.'
+    1.717s in=2966 out=281 calls=['highlight'] -> results "Batch size looks like the next saving, so I'll line up that move."
+    1.28s in=3067 out=155 calls=['set_knob'] -> results 'Batch size 32 is top, moving there.'
+    2.76s in=3215 out=518 calls=[] -> decision 'Moved batch size to 32. Predicted cost is $10.54 with peak memory 40.1 GiB.'
+    1.134s in=3471 out=76 calls=['sensitivity'] -> results 'Next saving in sight, checking what still helps.'
+    2.382s in=3639 out=370 calls=['highlight'] -> results 'Switching to cheaper hardware path, applying the top-ranked move.'
+    1.115s in=3739 out=163 calls=['set_knob'] -> results "Switching GPU type looks cheapest, so I'll make that move."
+    4.591s in=3899 out=593 calls=[] -> decision 'Moved to H100 SXM 80GB. Predicted cost is $6.07 with peak memory 40.1 GiB.'
+    1.001s in=4166 out=80 calls=['sensitivity'] -> results "Switch applied, so I'll search for the next cost saving."
+    2.509s in=4291 out=431 calls=['highlight'] -> results 'I’ll lengthen the sequence window to trim cost further.'
+    1.617s in=4391 out=243 calls=['set_knob'] -> results "I'll lengthen the sequence window next to cut cost."
+    5.104s in=4551 out=816 calls=[] -> decision 'Sequence length is now 512. Predicted cost is $5.38 at 66.1 GiB peak.'
+    1.17s in=4814 out=82 calls=['sensitivity'] -> results "Saving is getting tighter, I'll scan for the next safe cut."
+    1.282s in=4906 out=182 calls=[] -> visitor 'Nothing safe improves cost further from here.'
+lora-qwen  rounds=6   decisions=1 usd=0.0231 end=done 
+    2.801s in=2109 out=452 calls=['sensitivity'] -> results "I'll rank the tweaks that trim your bill the most."
+    3.392s in=2264 out=654 calls=['highlight', 'set_knob'] -> results "I'll highlight the relevant nodes and apply your top cost-saving tweak."
+    3.715s in=2438 out=734 calls=['sensitivity'] -> results "I'll start the cost tour by ranking the knobs that most affect spend."
+    3.439s in=2532 out=624 calls=[] -> decision 'Nothing safe improves cost further from here.'
+    2.359s in=2769 out=353 calls=['sensitivity'] -> results "I'll rank the next moves that cut cost from your current setup."
+    2.859s in=2861 out=419 calls=[] -> visitor "I'll rank the cost trims that fit your current setup."
+lora-qwen  rounds=6   decisions=1 usd=0.0206 end=done 
+    1.58s in=2109 out=260 calls=['sensitivity'] -> results "I'll rank every safe tweak by cost saving to start the tour."
+    4.221s in=2265 out=1006 calls=['highlight', 'set_knob'] -> results 'Highlighting involved nodes and applying the top saving.'
+    2.743s in=2441 out=789 calls=['sensitivity'] -> results 'Starting the next round of the cost tour from the new setting.'
+    4.378s in=2533 out=977 calls=[] -> decision 'Nothing safe left now cuts cost further from here.'
+    1.753s in=2772 out=279 calls=['sensitivity'] -> results "I'll run a fresh check from this setting to find the next cost saver."
+    2.282s in=2866 out=285 calls=[] -> visitor 'No further safe move lowers cost from this setting.'
+lora-qwen  rounds=2   decisions=0 usd=0.0042 end=done 
+    1.984s in=2109 out=391 calls=['sensitivity'] -> results "Tour starting: I'll check which cost-saving move helps most."
+    1.96s in=2264 out=366 calls=[] -> visitor "I'll start the cost tour by checking the biggest safe saving."
+pretrain   rounds=2   decisions=0 usd=0.0062 end=done 
+    2.086s in=1953 out=372 calls=['sensitivity'] -> results "I'll start your cost-saving tour by checking which adjustment saves the most."
+    2.954s in=2046 out=558 calls=[] -> visitor 'Nothing safe improves cost from here.'
+pretrain   rounds=2   decisions=0 usd=0.0050 end=done 
+    2.271s in=1953 out=358 calls=['sensitivity'] -> results "I'll start your cost-saving tour by ranking the top memory-safe moves."
+    2.002s in=2046 out=341 calls=[] -> visitor 'No safe move improves cost from here.'
+pretrain   rounds=2   decisions=0 usd=0.0044 end=done 
+    1.725s in=1953 out=311 calls=['sensitivity'] -> results "I'll start your cost-saving tour by checking which adjustment saves the most."
+    2.209s in=2046 out=507 calls=[] -> visitor 'No safe move improves cost from here.'
+agent      rounds=2   decisions=0 usd=0.0049 end=done 
+    2.418s in=2129 out=279 calls=['sensitivity'] -> results "I'll rank the cheapest safe moves for your 500-task run."
+    1.989s in=2221 out=315 calls=[] -> visitor 'Nothing safe lowers cost further from here.'
+agent      rounds=2   decisions=0 usd=0.0050 end=done 
+    2.819s in=2129 out=470 calls=['sensitivity'] -> results 'Starting your cost tour, checking which knob saves most.'
+    2.163s in=2219 out=472 calls=[] -> visitor 'No safe move improves cost from here.'
+agent      rounds=2   decisions=0 usd=0.0043 end=done 
+    1.622s in=2129 out=267 calls=['sensitivity'] -> results "I'll rank the cost-saving moves for your 500-task eval to find the biggest win."
+    2.218s in=2226 out=523 calls=[] -> visitor 'No safe change cuts cost further on this setting.'
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-A84RVeQCnXUXReKC9UOd9e
