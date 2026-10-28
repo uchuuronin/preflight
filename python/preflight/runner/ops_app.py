@@ -12,6 +12,7 @@ reuses the runner's images, so what it checks is what the runner runs.
 """
 
 import contextlib
+import os
 import uuid
 from pathlib import Path
 
@@ -119,7 +120,11 @@ def startup_check_worker() -> dict:
 	guard_ok, guard_why = deployed_here()
 	from preflight.runner.flags import _root, flag
 
-	flags_seen = {"root": str(_root()), "engine.memory": flag("engine.memory")}
+	flags_seen = {
+		"root": str(_root()),
+		"env": os.environ.get("PREFLIGHT_ENV"),
+		"engine.memory": flag("engine.memory"),
+	}
 	standalone = _load_standalone()
 	saved: list[dict] = []
 	store = InMemoryJobStore(on_change=saved.append)

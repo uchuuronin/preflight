@@ -8,7 +8,7 @@ import math
 from typing import Literal
 
 import numpy as np
-from pydantic import Field, RootModel, model_serializer, model_validator
+from pydantic import Field, RootModel, SerializationInfo, model_serializer, model_validator
 
 from .base import KnobValue, Strict, Unit
 from .encoding import MAX_GRID_CELLS, decode_f16, f16_len, mask_len_ok
@@ -31,15 +31,21 @@ class Estimate(Strict):
 	level: float = Field(default=0.9, gt=0, lt=1, description="Nominal coverage of [lo, hi]")
 
 	@model_serializer(mode="wrap")
-	def _keep_nulls(self, handler):
+	def _keep_nulls(self, handler, info: SerializationInfo):
 		# point, lo and hi are required and nullable (an abstention is null, never absent): records are
 		# stored with exclude_none, which would drop them, and then neither load_record nor C's
-		# types (`point: number | null`) could read the record back
+		# types (`point: number | null`) could read the record back. Only exclude_none is undone; an
+		# explicit include or exclude is honoured, and the keys keep the fields' order.
 		out = handler(self)
-		if isinstance(out, dict):
-			for k in ("point", "lo", "hi"):
-				out.setdefault(k, None)
-		return out
+		if (
+			not isinstance(out, dict)
+			or not info.exclude_none
+			or info.include is not None
+			or info.exclude is not None
+		):
+			return out
+		# (no field has an alias, so the field names are the keys)
+		return {k: out.get(k) for k in type(self).model_fields if k in out or k in ("point", "lo", "hi")}
 
 	@model_validator(mode="after")
 	def _check(self):

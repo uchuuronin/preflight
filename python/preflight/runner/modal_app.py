@@ -113,13 +113,19 @@ SANDBOX_OVERHEAD_USD_PER_H = 0.95
 _base = modal.Image.debian_slim(python_version="3.11").env(
 	{"PYTHONPATH": REMOTE_PKG, "PREFLIGHT_ZOO": "/root/zoo", "PREFLIGHT_GPU_CEILING": GPU_CEILING}
 )
+# The worker reads flags as C's API does (runner/flags.py): flags.json, then flags.production.json,
+# then PREFLIGHT_FLAGS. They are baked into the image, so changing a flag takes a runner deploy.
+FLAG_ENV = "production"  # api/app.py's PREFLIGHT_ENV
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
+	.env({"PREFLIGHT_ENV": FLAG_ENV})
 	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 	.add_local_file(FLAGS_SRC, f"{REMOTE_PKG}/flags.json")
 )
+for _over in sorted(FLAGS_SRC.parent.glob(f"flags.{FLAG_ENV}.json")):
+	worker_image = worker_image.add_local_file(_over, f"{REMOTE_PKG}/{_over.name}")
 probe_image = (
 	_base.apt_install("git")
 	.pip_install(*PROBE_PACKAGES)

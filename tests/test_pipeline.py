@@ -346,24 +346,35 @@ def test_gpu_cost_and_the_sandbox_overhead_estimate_are_kept_apart(tmp_path):
 # ---------------------------------------------------------------- B's predictions in run_job
 
 
-def _job(tmp_path, monkeypatch, *, flag_on, fill=None):
+def _job(tmp_path, monkeypatch, *, flag_on, fill=None, timeout_s=None, ctx=None):
 	import preflight.engine.api as engine
 	from preflight.runner import flags
+	from preflight.runner import pipeline as pl
 	from preflight.runner.pipeline import run_job
 	from preflight.runner.queue import Lease
 
 	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"engine.memory": flag_on}))
-	flags.reload()
 	if fill is not None:
 		monkeypatch.setattr(engine, "fill_predictions", fill)
+	if timeout_s is not None:
+		monkeypatch.setattr(pl, "PREDICT_TIMEOUT_S", timeout_s)
+		real = pl.with_predictions
+		monkeypatch.setattr(pl, "with_predictions", lambda rec, ctx: real(rec, ctx, timeout_s=timeout_s))
 	d = deps(tmp_path, FakeRunner())
 	lease = Lease(job_id="j1", token=1, worker="w", request={"source": {"kind": "upload", "files": {"train.py": SCRIPT}}},
 		attempt=1, record_id=None, share_token=None, expires_at=0.0)  # fmt: skip
-	ctx = _Ctx()
-	rid = run_job(lease, ctx, deps=d)
+	ctx = ctx or _Ctx()
 	flags.reload()
+	try:
+		rid = run_job(lease, ctx, deps=d)
+	finally:
+		flags.reload()  # never leave the flag cached for later tests
 	stored = next((tmp_path / "records").glob("*.json"))
 	return rid, load_record(stored.read_text()), ctx.events
+
+
+def _predicting(events):
+	return [e for e in events if e["stage"] == "predicting"]
 
 
 def test_run_job_fills_bs_predictions_when_the_flag_is_on(tmp_path, monkeypatch):
@@ -377,7 +388,9 @@ def test_run_job_fills_bs_predictions_when_the_flag_is_on(tmp_path, monkeypatch)
 
 	_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=fill)
 	assert len(calls) == 1 and rec.predictions.estimates  # filled once, and stored
-	assert events[-1]["message"] == "predicted"
+	first, last = _predicting(events)
+	assert first["message"] == "measured; predicting" and "record_rev" not in first
+	assert last == events[-1] and last["message"] == "predicted" and last["record_rev"] >= 1
 
 
 def test_run_job_leaves_predictions_alone_when_the_flag_is_off(tmp_path, monkeypatch):
@@ -393,9 +406,10 @@ def test_an_engine_failure_keeps_the_measured_record_and_says_so(tmp_path, monke
 
 	_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=boom)
 	assert [p.id for p in rec.probes] == ["p1", "p2", "p3"] and not rec.predictions.estimates
-	warn = [e for e in events if e.get("level") == "warn"]
-	assert warn and "predictions unavailable (ZeroDivisionError)" in warn[0]["message"]
+	warn = [e for e in _predicting(events) if e.get("level") == "warn"]
+	assert len(warn) == 1 and "predictions unavailable (ZeroDivisionError)" in warn[0]["message"]
 	assert "bad fit" not in warn[0]["message"]  # internals stay in the log
+	assert events[-1]["message"] == "measured; predictions unavailable"  # the last word doesn't hide it
 
 
 def test_an_engine_result_that_doesnt_validate_is_not_stored(tmp_path, monkeypatch):
@@ -404,7 +418,63 @@ def test_an_engine_result_that_doesnt_validate_is_not_stored(tmp_path, monkeypat
 
 	_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=broken)
 	assert len({k.id for k in rec.knobs}) == len(rec.knobs)
-	assert any(e.get("level") == "warn" for e in events)
+	warn = [e for e in _predicting(events) if e.get("level") == "warn"]
+	assert len(warn) == 1 and "predictions unavailable (ValidationError)" in warn[0]["message"]
+
+
+def test_a_fill_that_hangs_is_given_up_on_and_the_measurements_are_stored(tmp_path, monkeypatch):
+	import threading
+
+	release = threading.Event()
+
+	def stuck(rec):
+		release.wait(5)
+		return rec
+
+	try:
+		_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=stuck, timeout_s=0.2)
+	finally:
+		release.set()
+	assert [p.id for p in rec.probes] == ["p1", "p2", "p3"]
+	warn = [e for e in _predicting(events) if e.get("level") == "warn"]
+	assert len(warn) == 1 and "predictions unavailable (TimeoutError)" in warn[0]["message"]
+	assert events[-1]["message"] == "measured; predictions unavailable"
+
+
+def test_a_record_whose_estimates_all_abstain_is_not_called_predicted(tmp_path, monkeypatch):
+	from preflight.schema import Estimate
+
+	def abstain(rec):
+		e = Estimate(point=None, lo=None, hi=None, unit="s", status="abstain", model_id="m@1", source="exact",
+			reason="the run's length isn't known")  # fmt: skip
+		preds = rec.predictions.model_copy(update={"estimates": {"time.total": e}, "grids": []})
+		return rec.model_copy(update={"predictions": preds})
+
+	_, rec, events = _job(tmp_path, monkeypatch, flag_on=True, fill=abstain)
+	assert rec.predictions.estimates["time.total"].point is None
+	assert events[-1]["message"] == "measured; no predictions yet"
+
+
+def test_a_cancel_during_the_fill_stores_nothing(tmp_path, monkeypatch):
+	from preflight.engine.api import fill_predictions as real
+	from preflight.runner.worker import Cancelled
+
+	stop = {"now": False}
+
+	def fill(rec):
+		stop["now"] = True
+		return real(rec)
+
+	class Ctx(_Ctx):
+		def check(self):
+			if stop["now"]:
+				raise Cancelled("j1")
+
+	with pytest.raises(Cancelled):
+		_job(tmp_path, monkeypatch, flag_on=True, fill=fill, ctx=Ctx())
+	# the pipeline's own live saves are there; the filled record never was
+	for f in (tmp_path / "records").glob("*.json"):
+		assert not load_record(f.read_text()).predictions.estimates
 
 
 def test_runner_flags_read_like_the_apis(tmp_path, monkeypatch):
@@ -423,6 +493,16 @@ def test_runner_flags_read_like_the_apis(tmp_path, monkeypatch):
 		flags.reload()
 
 
+def test_runner_flags_find_the_repos_flags_json_without_help(monkeypatch):
+	"""No PREFLIGHT_ROOT: the search from runner/ up finds <repo>/flags.json (in the worker image,
+	/opt/preflight/flags.json the same way)."""
+	from preflight.runner import flags
+
+	monkeypatch.delenv("PREFLIGHT_ROOT", raising=False)
+	assert flags._root() == ROOT
+	assert (ROOT / "flags.json").is_file()
+
+
 def test_a_record_with_abstentions_survives_storage():
 	"""Records are stored without nulls; an abstention (point None) must load back."""
 	from preflight.schema import Estimate, FlightRecord, dump_record
@@ -435,3 +515,24 @@ def test_a_record_with_abstentions_survives_storage():
 	)
 	back = load_record(dump_record(FlightRecord.model_validate(rec.model_dump())))
 	assert back.predictions.estimates["time.total"].point is None
+
+
+def test_an_estimate_keeps_its_nulls_only_where_storage_would_drop_them():
+	from preflight.schema import Estimate
+
+	e = Estimate(point=None, lo=None, hi=None, unit="s", status="abstain", model_id="m@1", source="exact",
+		reason="r")  # fmt: skip
+	stored = e.model_dump(exclude_none=True)
+	assert list(stored) == ["point", "lo", "hi", "unit", "status", "model_id", "source", "reason", "level"]
+	assert e.model_dump(include={"unit"}) == {"unit": "s"}  # an explicit include is honoured
+	assert "point" not in e.model_dump(exclude={"point"}, exclude_none=True)
+	f = Estimate(point=2.0, lo=None, hi=3.0, unit="s", status="predicted", model_id="m@1", source="grid")
+	assert f.model_dump(exclude_none=True)["lo"] is None and "reason" not in f.model_dump(exclude_none=True)
+
+
+def test_the_worker_reads_the_same_flag_files_as_the_api():
+	"""Flags are baked into both images; the runner's env override must be the API's."""
+	runner = (ROOT / "python" / "preflight" / "runner" / "modal_app.py").read_text()
+	api = (ROOT / "api" / "app.py").read_text()
+	assert 'FLAG_ENV = "production"' in runner and '"PREFLIGHT_ENV": FLAG_ENV' in runner
+	assert '"PREFLIGHT_ENV": "production"' in api

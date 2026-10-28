@@ -172,7 +172,17 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 		p = PurePosixPath(rel)
 		if not rel or not _PATH_OK.match(rel) or p.is_absolute() or ".." in p.parts or rel.startswith("."):
 			raise InvalidSubmission(f"file path {rel!r} is not a plain relative path")
-		size = len(text.encode("utf-8"))
+		if not isinstance(text, str):
+			raise InvalidSubmission(f"{rel} is not text", code="submission.invalid")
+		try:
+			size = len(text.encode("utf-8"))
+		except UnicodeEncodeError as exc:  # an unpaired surrogate ('\ud800'), which no file can hold
+			line = text.count("\n", 0, exc.start) + 1
+			raise InvalidSubmission(
+				f"{rel} has text that isn't valid Unicode (an unpaired surrogate, line {line}); "
+				"save it as UTF-8 and check in again",
+				code="submission.invalid",
+			) from None
 		if size > MAX_FILE_BYTES:
 			raise InvalidSubmission(
 				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB"

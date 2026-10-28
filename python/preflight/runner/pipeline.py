@@ -32,6 +32,7 @@ step up after an OOM only while the job's dollar budget holds it.
 import hashlib
 import json
 import logging
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -660,29 +661,55 @@ def _merge(
 	return FlightRecord.model_validate({**rec.model_dump(), **{k: v for k, v in update.items()}})
 
 
-def with_predictions(rec: FlightRecord, ctx, *, enabled: bool | None = None) -> FlightRecord:
+# derived: the fill took 0.09 s on the first L4 record (Oct 28, 5 estimates and 80 grids); 300x
+# that is a hang, and the measured record is stored without predictions instead of holding the
+# lease until WORKER_TIMEOUT_S and being retried into the same hang
+PREDICT_TIMEOUT_S = 30.0
+
+
+def with_predictions(
+	rec: FlightRecord, ctx, *, enabled: bool | None = None, timeout_s: float = PREDICT_TIMEOUT_S
+) -> tuple[FlightRecord, bool]:
 	"""The measured record with B's engine's predictions filled (engine.api.fill_predictions), when
-	the engine.memory flag is on. Any engine failure keeps the measured record as it was and says
-	so in a warn event: a prediction never costs the visitor their measurements."""
+	the engine.memory flag is on, and whether the engine failed. Any engine failure or a fill that
+	runs past timeout_s keeps the measured record as it was and says so in a warn event: a
+	prediction never costs the visitor their measurements."""
 	from .flags import flag
 
 	if not (flag("engine.memory") if enabled is None else enabled):
-		return rec
-	try:
-		from preflight.engine.api import fill_predictions
+		return rec, False
+	box: dict = {}
 
-		filled = fill_predictions(rec)
-		# the engine returns a copy without re-validating: store-and-load it exactly as C's API will
-		# (nulls dropped, then parsed), and fail here rather than in the reader; dump_record also
-		# enforces the 1 MB gzipped budget
-		return load_record(dump_record(filled))
-	except Exception as exc:
-		log.exception(
-			"job %s: the engine couldn't fill predictions; keeping the measured record", rec.record_id
-		)
-		_emit(ctx, "predicting", rec, None, level="warn",
-			message=f"predictions unavailable ({type(exc).__name__}); the measurements stand")  # fmt: skip
-		return rec
+	def fill() -> None:
+		try:
+			from preflight.engine.api import fill_predictions
+
+			# the engine returns a copy without re-validating: store-and-load it exactly as C's API
+			# will (nulls dropped, then parsed), and fail here rather than in the reader;
+			# dump_record also enforces the 1 MB gzipped budget
+			box["rec"] = load_record(dump_record(fill_predictions(rec)))
+		except Exception as exc:
+			box["exc"] = exc
+
+	t0 = time.monotonic()
+	# a daemon thread: a fill stuck in a loop can't be killed, but it can't hold the job either
+	th = threading.Thread(target=fill, name=f"predict-{rec.record_id}", daemon=True)
+	th.start()
+	th.join(timeout_s)
+	took = time.monotonic() - t0
+	if "rec" in box:
+		log.info("job %s: predictions filled in %.2f s", rec.record_id, took)
+		return box["rec"], False
+	exc = box.get("exc") or TimeoutError(f"no predictions after {timeout_s:.0f} s")
+	log.error("job %s: the engine couldn't fill predictions after %.2f s; keeping the measured record",
+		rec.record_id, took, exc_info=exc)  # fmt: skip
+	_emit(ctx, "predicting", rec, None, level="warn",
+		message=f"predictions unavailable ({type(exc).__name__}); the measurements stand")  # fmt: skip
+	return rec, True
+
+
+def _has_predictions(rec: FlightRecord) -> bool:
+	return bool(rec.predictions.grids) or any(e.point is not None for e in rec.predictions.estimates.values())
 
 
 def run_job(lease, ctx: JobContext, *, deps: Deps) -> str:
@@ -690,10 +717,14 @@ def run_job(lease, ctx: JobContext, *, deps: Deps) -> str:
 	return its id."""
 	rec = run_pipeline(lease.request, ctx, deps, ids=(lease.record_id, lease.share_token))
 	_emit(ctx, "predicting", rec, None, message="measured; predicting")
-	rec = with_predictions(rec, ctx)
+	rec, failed = with_predictions(rec, ctx)
+	ctx.check()  # a cancel during the fill stops here, before the record is stored
 	rev = deps.records.put(rec)
-	done = (
-		"predicted" if rec.predictions.estimates or rec.predictions.grids else "measured; no predictions yet"
-	)
+	if failed:
+		done = "measured; predictions unavailable"
+	elif _has_predictions(rec):
+		done = "predicted"
+	else:
+		done = "measured; no predictions yet"
 	_emit(ctx, "predicting", rec, rev, message=done)
 	return rec.record_id
