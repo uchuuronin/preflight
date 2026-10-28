@@ -306,49 +306,20 @@ def smoke(
 
 # ---------------------------------------------------------------- ground truth (L4, paid: ask first)
 
-GROUND_TRUTH_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt"}
-
 
 @ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=3600)
 def ground_truth_on_l4(script: str, bare_steps: int, recorder_steps: int, warmup: int) -> dict:
-	"""One zoo script on an L4: a bare run (a CUDA event per optimizer step, nothing else; it also
-	shows where the script really fails, the LoRA script's eval OOM included), then a recorder run
-	alternating clean and synced steps. Returns both and the paired overhead (recorder/overhead.py).
-	Our own zoo code on our own GPU, so a plain function, not a visitor sandbox."""
-	import json
-	import os
-	import subprocess
-	import sys
-	import tempfile
-
+	"""recorder/ground_truth.py on an L4: a bare run, then a recorder run alternating clean and
+	synced steps, and the paired overhead. The AMD droplet runs the same module."""
 	from preflight.probes import remote
-	from preflight.probes.local import ProbeSpec, run_probe
-	from preflight.recorder.overhead import report
-	from preflight.runner.sources import ZOO, _read_tree
+	from preflight.recorder.ground_truth import ZOO_SCRIPTS, measure
+	from preflight.runner.sources import ZOO
 
-	if script not in GROUND_TRUTH_SCRIPTS:
+	if script not in ZOO_SCRIPTS:
 		raise ValueError(f"unknown zoo script {script!r}")
 	remote.link_weights()
 	remote.deps_dir()
-	work = Path(tempfile.mkdtemp(prefix="gt-"))
-	files = _read_tree(ZOO / script)
-	for rel, text in files.items():
-		(work / rel).parent.mkdir(parents=True, exist_ok=True)
-		(work / rel).write_text(text)
-	out = work / "bare.json"
-	t = subprocess.run([sys.executable, "-m", "preflight.recorder.bare", str(work / "train.py"), str(out),
-		"--steps", str(bare_steps)], capture_output=True, text=True, timeout=2400, env={**os.environ})  # fmt: skip
-	bare = json.loads(out.read_text()) if out.exists() else {"failed": (t.stdout + t.stderr)[-3000:]}
-	r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint="train.py", warmup=warmup, timed=recorder_steps,
-		timeout_s=2400, alternate_sync=True))  # fmt: skip
-	log = [s.model_dump() for s in r.probe.step_log]
-	over = report(log, bare.get("walls_s") or [], warmup=warmup) if r.probe.status == "ok" else None
-	return {"script": script, "gpu": r.env.gpu.name if r.env and r.env.gpu else None, "bare": bare,
-		"recorder": {"status": r.probe.status, "error": r.probe.error, "error_code": r.probe.error_code,
-			"steps": r.probe.steps, "p50_s": r.probe.step_time.p50_s if r.probe.step_time else None,
-			"peak_allocated_bytes": r.probe.memory.peak_allocated_bytes if r.probe.memory else None,
-			"step_log": log, "log_tail": r.log_tail[-1500:]},
-		"overhead": over}  # fmt: skip
+	return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup)
 
 
 @ops.local_entrypoint()
@@ -357,10 +328,9 @@ def ground_truth(script: str, bare_steps: int, recorder_steps: int = 60, warmup:
 	Writes out/ground_truth_<script>.json (step walls, peak memory, how the bare run ended, overhead)."""
 	import json
 
+	from preflight.recorder.ground_truth import brief
+
 	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
-	brief = {k: v for k, v in res.items() if k not in ("bare", "recorder")}
-	brief["bare"] = {k: v for k, v in res["bare"].items() if k != "walls_s"}
-	brief["recorder"] = {k: v for k, v in res["recorder"].items() if k not in ("step_log", "log_tail")}
-	print(json.dumps(brief, indent=2), flush=True)
+	print(json.dumps(brief(res), indent=2), flush=True)
