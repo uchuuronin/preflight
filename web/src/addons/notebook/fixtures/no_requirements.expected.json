@@ -1,0 +1,8 @@
+{
+ "script": "print('hi')\n\n",
+ "requirements": [],
+ "files": {
+  "no_requirements.py": "print('hi')\n\n"
+ },
+ "entrypoint": "no_requirements.py"
+}

@@ -1,0 +1,86 @@
+/* D5 · Notebook intake. Theme tokens only (var(--pf-*)); no literal colours. C's .pf-drop sets the zone. */
+
+.pf-addon-notebook {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-3);
+}
+
+.pf-addon-notebook__drop {
+	transition: border-color var(--pf-dur-quick) var(--pf-ease), background-color var(--pf-dur-quick) var(--pf-ease);
+}
+
+.pf-addon-notebook__drop.is-dragging {
+	border-color: var(--pf-accent);
+	background: var(--pf-glass-hi);
+}
+
+.pf-addon-notebook__status:empty {
+	display: none;
+}
+
+.pf-addon-notebook__status {
+	margin: 0;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+
+.pf-addon-notebook__preview {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+}
+
+.pf-addon-notebook__facts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--pf-space-2) var(--pf-space-4);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-size: var(--pf-text-sm);
+	color: var(--pf-fg-dim);
+}
+
+.pf-addon-notebook__files summary {
+	cursor: pointer;
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+}
+
+.pf-addon-notebook__files figure {
+	margin: var(--pf-space-2) 0 0;
+}
+
+.pf-addon-notebook__files figcaption {
+	font-family: var(--pf-font-mono);
+	font-size: var(--pf-text-xs);
+	color: var(--pf-fg-dim);
+	overflow-wrap: anywhere;
+}
+
+.pf-addon-notebook__files pre {
+	margin: var(--pf-space-1) 0 0;
+	max-height: 18rem;
+	overflow: auto;
+	padding: var(--pf-space-3);
+	border-radius: var(--pf-radius-sm);
+	border: 1px solid var(--pf-stroke);
+	background: var(--pf-glass);
+	font-family: var(--pf-font-mono);
+	font-size: var(--pf-text-xs);
+	line-height: 1.5;
+	white-space: pre;
+}
+
+.pf-addon-notebook__files pre:focus-visible {
+	outline: 2px solid var(--pf-focus);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pf-addon-notebook__drop {
+		transition: none;
+	}
+}
