@@ -106,9 +106,10 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 
 | Date | Run | GPU | Minutes | Dollars |
 | --- | --- | --- | --- | --- |
-| none yet | | | | |
+| Oct 28 | `b-corpus-smoke-grouped` (GitHub run 40622057852): failed before start, the command needed `::main` | none | 0 | $0.00 |
+| Oct 28 | `b-corpus-smoke-grouped` (GitHub run 40622148184): 10 grouped configs, all ok, 16 to 34 s each | L4 | 3.5 GPU-min (7.3 min wall, image build included) | $0.06 (ledger: GPU-seconds x $0.80/h x 1.25) |
 
-Total so far: $0 of the $45 corpus budget.
+Total so far: $0.06 of the $45 corpus budget (phase 0 cap $0.70). The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
 
 ## Contract requests
 In `docs/requests/from-b.md`.
