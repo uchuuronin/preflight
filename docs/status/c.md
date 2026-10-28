@@ -20,6 +20,9 @@
 - Muse Code in a sandbox: install, auth and headless run written up with three options for
   keeping the key from visitor code (docs/decisions/muse-code-sandbox.md); smoke test waits
   for a yes.
+- CI green again on f1ac48d: the secrets job had failed since 3d03ec8 on a test
+  Idempotency-Key value gitleaks read as an API key. Renamed the value and listed the old
+  commit's fingerprint in `.gitleaksignore`; full-history and working-tree scans are clean.
 
 **Cloud runs:** none since the evening's table (new rule: ask before anything that spends).
 
