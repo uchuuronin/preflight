@@ -113,10 +113,25 @@ Updated Tue Oct 27, evening ET.
   need them to open /dev/kfd and /dev/dri.
 - Internet to Hugging Face and PyPI, and about 15 GB of disk (Qwen2.5-1.5B, Alpaca, wheels).
 
-The command, once Chiya approves the session:
-`python -m preflight.cli.main run zoo/finetune_lora_hf --out out/records --install-requirements --require-gpu`
-(as root the CLI pins one probe uid and shares one Hugging Face and pip cache across the probes;
-`--require-gpu` fails the run if the probes saw no GPU).
+Commands for A's part, in order, each one `amd-run.yml` call (`-f host=<ip> -f ref=ws-a`); only
+the last passes `destroy_droplet_id`, and only if B is done too. Times are guesses from the L4
+smoke run (Oct 28) and the MI300X being faster per step; downloads and installs dominate:
+
+| # | `cmd` | timeout | Expected | What it gives |
+| --- | --- | --- | --- | --- |
+| 1 | `python -m preflight.cli.main run zoo/finetune_lora_hf --out out/records --install-requirements --require-gpu` | 45 | 15 min | the LoRA zoo record on ROCm (memory, step time, kernels, power if `amdsmi` is there) |
+| 2 | `python -m preflight.recorder.ground_truth zoo/finetune_lora_hf out/gt_lora_mi300x.json --bare-steps 120 --recorder-steps 40 --install-requirements --budget-min 30` | 40 | 15 min | bare vs recorder step times, the recorder's overhead on ROCm |
+| 3 | `python -m preflight.cli.main run zoo/pretrain_nanogpt --out out/records --install-requirements --require-gpu` | 45 | 15 min | the nanoGPT record (TinyStories download, the planted slow loader) |
+| 4 | `python -m preflight.recorder.ground_truth zoo/pretrain_nanogpt out/gt_nanogpt_mi300x.json --bare-steps 300 --recorder-steps 100 --install-requirements --budget-min 30` | 40 | 20 min | the same for a from-scratch pretrain |
+
+About 65 minutes of runs plus 2 minutes of setup per call: **1.25 hours expected, 2 hours with one
+retry, so $3.25 to $5.20 of droplet time at $2.59/h** (B's corpus slice is B's own hours on the
+same droplet). Unlike `modal run`, the droplet's output reaches the workflow log as it comes, so
+a stall shows where it is. Things that could cost a retry: the venv is made without `--seed`, so
+installing requirements relies on the image's own pip being importable (step 1 shows it in its
+first minute); a version clash between the image's packages and the zoo's pins (`datasets` wants
+`fsspec<=2024.9.0`). The planted eval OOM may not fire on 192 GB, or may fire later: the eval keeps
+every batch's graph, so its memory grows with the batch count; either way the record says which.
 
 ## Cloud runs
 
@@ -149,6 +164,18 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Oct 28 22:49 | `a-startup-check-6` (40782894652): ok | none (CPU sandbox) | 1.5 | under $0.01 (estimate) |
 | Oct 28 22:51 | `a-gt-lora-l4-2` (40783074654): ground truth again, LoRA 120 bare + 40 recorder steps in a 30-minute budget. No result: nothing printed in 40 minutes and the workflow limit ended `modal run` (exit 124); not even the measurement's first stage line arrived, so the function may never have started. App `ap-smlQhBII0aKV0BnMwULRzO` | L4 (if it started) | at most 50 (Modal's own limit on the function) | at most $0.67 GPU at list (estimate); Modal's bill says whether it ran |
 | Oct 28 23:32 | `a-stop-ops-main-2` and `-3` (40788021207, 40788111609): never started. GitHub: "recent account payments have failed or your spending limit needs to be increased" | none | 0 | $0 |
+
+### First public number (one script)
+
+> **One script:** on our planted-bug LoRA fine-tune (Qwen2.5-1.5B on Alpaca, batch 4 x 4
+> accumulation, one L4), Preflight caught the evaluation pass running out of memory in **189 s of
+> probe time, $0.042 of GPU at list price** [measured], before any real run. Left alone, the run
+> would have crashed at its first evaluation, step 200: about 6 minutes of training at the measured
+> 1.68 s a step plus loading, about $0.09 of L4 [derived]. The saving is one failed run, not hours.
+
+Sources: record `ICDYrfHQ2nBNbv3mlRHHMg` (probe `p1-eval`: status oom, code oom.eval, eval batch 1
+of 33 at 21.9 GB; probe `p1`: p50 1.68 s); `EVAL_EVERY = 200` in `zoo/finetune_lora_hf/train.py`;
+L4 list price $0.80/h. One script and one run, so no interval: it is an example, not a rate.
 
 First end-to-end run on a real GPU, Oct 28 05:51 UTC (record `ICDYrfHQ2nBNbv3mlRHHMg` on
 `preflight-records`, env L4 with 23,689,363,456 bytes): the planted eval OOM was caught by the
