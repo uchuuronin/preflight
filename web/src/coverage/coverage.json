@@ -1,13 +1,22 @@
 {
-	"generated_at": "2026-10-28T18:41Z",
+	"generated_at": "2026-10-28T18:55Z",
 	"engine_commit": "206c3f3",
+	"inputs": [
+		"api/tests/fixtures/a-smoke-l4-main-3.record.json",
+		"api/tests/fixtures/a-smoke-l4-main-4.record.json"
+	],
 	"runs": [
-		"20261028-051157-40636560937-a-smoke-l4-main-3",
-		"20261028-055114-40640376141-a-smoke-l4-main-4"
+		"a-smoke-l4-main-3",
+		"a-smoke-l4-main-4"
+	],
+	"runs_measured": [
+		"a-smoke-l4-main-4"
 	],
 	"summary": {
 		"step_time": {
-			"target": "within 15%",
+			"tolerance": 0.15,
+			"rate_bar": 0.88,
+			"rate_bar_source": "guess",
 			"n": 3,
 			"hits": 0,
 			"rate": 0.0,
@@ -15,18 +24,24 @@
 				0.0,
 				0.5615
 			],
-			"abstained": 0
+			"abstained": 0,
+			"runs": 1
 		},
 		"peak_memory": {
-			"target": "within 10%",
+			"tolerance": 0.1,
+			"rate_bar": 0.88,
+			"rate_bar_source": "guess",
 			"n": 0,
 			"hits": 0,
 			"rate": null,
 			"wilson95": null,
-			"abstained": 0
+			"abstained": 0,
+			"runs": 0
 		},
 		"interval": {
-			"target": "at least 88% inside the 90% interval",
+			"tolerance": null,
+			"rate_bar": 0.88,
+			"rate_bar_source": "cited",
 			"n": 3,
 			"hits": 0,
 			"rate": 0.0,
@@ -34,10 +49,13 @@
 				0.0,
 				0.5615
 			],
-			"abstained": 0
+			"abstained": 0,
+			"runs": 1
 		},
 		"oom": {
-			"target": "no missed out-of-memory",
+			"tolerance": null,
+			"rate_bar": 1.0,
+			"rate_bar_source": "cited",
 			"n": 1,
 			"hits": 1,
 			"rate": 1.0,
@@ -45,12 +63,13 @@
 				0.2065,
 				1.0
 			],
-			"abstained": 0
+			"abstained": 0,
+			"runs": 1
 		}
 	},
 	"checks": [
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p1-eval",
 			"gpu": "L4",
 			"knobs": {
@@ -67,10 +86,18 @@
 				"model_id": "memory-analytical@0.2.0",
 				"reason": "won't fit: out of memory very likely (simulated band); the peak comes at eval, not during training steps"
 			},
+			"predicted_peak": {
+				"status": "extrapolated",
+				"point": 140064784384.0,
+				"lo": 125851804650.87563,
+				"hi": 155882896387.21454,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
 			"verdict": "caught"
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p1",
 			"gpu": "L4",
 			"knobs": {
@@ -90,7 +117,7 @@
 			"hit": false
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p1",
 			"gpu": "L4",
 			"knobs": {
@@ -110,7 +137,7 @@
 			"hit": false
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p2",
 			"gpu": "L4",
 			"knobs": {
@@ -130,7 +157,7 @@
 			"hit": false
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p2",
 			"gpu": "L4",
 			"knobs": {
@@ -150,7 +177,7 @@
 			"hit": false
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p3",
 			"gpu": "L4",
 			"knobs": {
@@ -170,7 +197,7 @@
 			"hit": false
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p3",
 			"gpu": "L4",
 			"knobs": {
@@ -192,11 +219,14 @@
 	],
 	"skipped": [
 		{
-			"run": "20261028-051157-40636560937-a-smoke-l4-main-3",
-			"why": "no probe measured anything (recorder)"
+			"run": "a-smoke-l4-main-3",
+			"why": "nothing_measured",
+			"codes": [
+				"recorder"
+			]
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p1",
 			"gpu": "L4",
 			"knobs": {
@@ -204,10 +234,10 @@
 				"seq_len": 1024
 			},
 			"metric": "peak_memory",
-			"why": "ran with eval off after the eval ran out of memory; no knob says so, so the engine predicts the job with eval"
+			"why": "no_eval_pass"
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p2",
 			"gpu": "L4",
 			"knobs": {
@@ -215,10 +245,10 @@
 				"seq_len": 1024
 			},
 			"metric": "peak_memory",
-			"why": "ran with eval off after the eval ran out of memory; no knob says so, so the engine predicts the job with eval"
+			"why": "no_eval_pass"
 		},
 		{
-			"run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+			"run": "a-smoke-l4-main-4",
 			"probe": "p3",
 			"gpu": "L4",
 			"knobs": {
@@ -226,7 +256,7 @@
 				"seq_len": 512
 			},
 			"metric": "peak_memory",
-			"why": "ran with eval off after the eval ran out of memory; no knob says so, so the engine predicts the job with eval"
+			"why": "no_eval_pass"
 		}
 	]
 }

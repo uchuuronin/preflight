@@ -13,7 +13,7 @@ import { FitMark } from "../../workspace/components/StatusMark";
 import type { Fit } from "../../workspace/status";
 
 const METRICS = ["oom", "step_time", "peak_memory", "interval"] as const;
-const TONE: Record<Verdict, Fit> = { meets: "fits", unsettled: "unknown", unchecked: "unknown", below: "fails", missed: "fails" };
+const TONE: Record<Verdict, Fit> = { meets: "fits", no_misses: "fits", unsettled: "unknown", unchecked: "unknown", below: "fails", missed: "fails" };
 
 interface Check {
 	run: string;
@@ -24,6 +24,7 @@ interface Check {
 	of?: string;
 	measured: number | string;
 	predicted: { status?: string; point?: number; lo?: number; hi?: number } | null;
+	predicted_peak?: { point?: number } | null;
 	error?: number;
 	hit?: boolean;
 	verdict?: string;
@@ -38,9 +39,21 @@ function settings(knobs: Record<string, unknown>): string {
 }
 
 function checkFit(c: Check): Fit {
-	if (c.metric === "oom") return c.verdict === "caught" ? "fits" : c.verdict === "missed" ? "fails" : "unknown";
+	if (c.metric === "oom") return c.verdict === "caught" || c.verdict === "warned" ? "fits" : c.verdict === "missed" ? "fails" : "unknown";
 	if (c.hit === undefined) return "unknown";
 	return c.hit ? "fits" : "fails";
+}
+
+function target(m: string, s: MetricSummary): string {
+	const bar = `${fmt(s.rate_bar, "probability")}${s.rate_bar_source === "cited" ? "" : ` ${t(`checks.source.${s.rate_bar_source}`)}`}`;
+	if (m === "oom") return t("checks.target.oom");
+	if (s.tolerance) return t("checks.target.tolerance", { tol: fmt(s.tolerance, "probability"), bar });
+	return t("checks.target.rate", { bar });
+}
+
+function skippedText(s: { run: string; probe?: string; metric?: string; why: string; codes?: string[] }): string {
+	if (s.why === "nothing_measured") return t("checks.why.nothing_measured", { run: s.run, codes: (s.codes ?? []).map((c) => t(`error.${c}`)).join(", ") });
+	return `${s.probe ?? ""} · ${t(`checks.metric.${s.metric ?? "peak_memory"}`)}: ${t(`checks.why.${s.why}`)}`;
 }
 
 export function Checks() {
@@ -59,7 +72,7 @@ export function Checks() {
 						</Info>
 					</h1>
 					<p className="pf-dim">
-						{t("checks.meta", { runs: fmt(data.runs.length, "count"), engine: data.engine_commit ?? "?", date })}
+						{t("checks.meta", { measured: fmt(data.runs_measured.length, "count"), runs: fmt(data.runs.length, "count"), engine: data.engine_commit ?? "?", date })}
 					</p>
 				</header>
 				<section className="glass pf-checks__table" aria-label={t("checks.summary")}>
@@ -77,12 +90,14 @@ export function Checks() {
 						return (
 							<div key={m} className="pf-checks__row">
 								<b>{t(`checks.metric.${m}`)}</b>
-								<span className="pf-dim">{s.target}</span>
-								<span>
+								<span className="pf-dim" data-label={t("checks.col.target")}>
+									{target(m, s)}
+								</span>
+								<span data-label={t("checks.col.result")}>
 									{s.n ? t("checks.result", { hits: fmt(s.hits, "count"), n: fmt(s.n, "count") }) : t("checks.none")}
 									{s.abstained ? <small className="pf-dim"> {t("checks.abstained", { n: fmt(s.abstained, "count") })}</small> : null}
 								</span>
-								<span>{s.wilson95 ? fmtRange(s.wilson95[0] ?? 0, s.wilson95[1] ?? 1, "probability") : t("value.none")}</span>
+								<span data-label={t("checks.col.interval")}>{s.wilson95 ? fmtRange(s.wilson95[0] ?? 0, s.wilson95[1] ?? 1, "probability") : t("value.none")}</span>
 								<FitMark fit={TONE[v]} label={t(`checks.verdict.${v}`)} />
 							</div>
 						);
@@ -96,11 +111,11 @@ export function Checks() {
 							const p = c.predicted;
 							const said =
 								c.metric === "oom"
-									? t(`checks.oom.${c.verdict ?? "abstained"}`)
+									? [t(`checks.oom.${c.verdict ?? "abstained"}`), c.predicted_peak?.point ? t("checks.oom.peak", { peak: fmt(c.predicted_peak.point, "bytes") }) : null].filter(Boolean).join(", ")
 									: p?.point !== undefined && unit
-										? `${fmt(p.point, unit)} (${fmtRange(p.lo ?? p.point, p.hi ?? p.point, unit)})`
+										? t("checks.predicted", { value: `${fmt(p.point, unit)} (${fmtRange(p.lo ?? p.point, p.hi ?? p.point, unit)})` })
 										: t("checks.abstain");
-							const got = typeof c.measured === "number" && unit ? fmt(c.measured, unit) : String(c.measured);
+							const got = c.metric === "oom" ? t(String(c.measured) === "oom.eval" ? "checks.measured.oom_eval" : "checks.measured.oom") : typeof c.measured === "number" && unit ? fmt(c.measured, unit) : String(c.measured);
 							return (
 								<li key={`${i}:${c.run}:${c.probe}:${c.metric}`} className={`pf-chip pf-chip--${checkFit(c)}`} title={c.run}>
 									<FitMark fit={checkFit(c)} label={t(`checks.metric.${c.of ? "interval" : c.metric}`)} />
@@ -118,8 +133,7 @@ export function Checks() {
 							<ul>
 								{data.skipped.map((s, i) => (
 									<li key={i} className="pf-dim">
-										{"probe" in s ? `${s.probe} · ${t(`checks.metric.${(s as { metric?: string }).metric ?? "peak_memory"}`)}: ` : ""}
-										{s.why}
+										{skippedText(s as never)}
 									</li>
 								))}
 							</ul>

@@ -1799,3 +1799,9 @@ a {
 	.pf-checks__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 	.pf-checks__row--head { display: none; }
 }
+@media (max-width: 720px) {
+	.pf-checks__row--head + .pf-checks__row { border-top: 0; }
+	.pf-checks__row [data-label]::before { content: attr(data-label); display: block; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-fg-dim); }
+	.pf-checks__list .pf-chip__where,
+	.pf-checks__list .pf-chip__nums { white-space: normal; overflow: visible; text-overflow: clip; }
+}

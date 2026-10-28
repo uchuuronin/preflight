@@ -20,17 +20,23 @@ def test_wilson_matches_the_textbook_values():
 	assert lo == 0.0 and abs(hi - 0.5615) < 1e-3
 	lo, hi = coverage.wilson(9, 10)
 	assert abs(lo - 0.5958) < 1e-3 and abs(hi - 0.9821) < 1e-3
+	# Rounded outwards: never narrower than the exact interval.
+	from preflight.engine import conformal
+
+	exact = conformal.wilson(9, 10)
+	assert lo <= exact[0] and hi >= exact[1]
 
 
 def test_a_real_run_is_scored_only_on_probes_held_out():
 	checks, skipped = coverage.check_record("a-smoke", REAL.read_text())
 	steps = [c for c in checks if c["metric"] == "step_time"]
 	assert {c["probe"] for c in steps} == {"p1", "p2", "p3"}
-	# The held-out probe's own number never reaches the prediction: p2 ran at half the batch and
-	# took half the time; the engine, without p2, could not have read 0.837 s off the record.
+	# The held-out probe's own number never reaches the prediction. On this plan p2 (batch 2,
+	# sequence 1024) and p3 (batch 4, sequence 512) do the same work per step, so without p2 the
+	# engine reads p3's time back: the test is weak here, and the page says so.
 	p2 = next(c for c in steps if c["probe"] == "p2")
 	assert abs(p2["measured"] - 0.837) < 0.001
-	assert p2["predicted"]["point"] != pytest.approx(p2["measured"], rel=0.01)
+	assert p2["predicted"]["point"] == pytest.approx(1.666, rel=0.01)
 	# Eval-off re-runs after the eval OOM aren't compared with a job-as-written memory prediction.
 	assert {s["probe"] for s in skipped if s.get("metric") == "peak_memory"} == {"p1", "p2", "p3"}
 	oom = [c for c in checks if c["metric"] == "oom"]
@@ -57,4 +63,22 @@ def test_a_run_whose_probes_all_errored_is_skipped_with_its_reason():
 		p["status"], p["error_code"] = "error", "recorder"
 	checks, skipped = coverage.check_record("broken", json.dumps(rec))
 	assert checks == []
-	assert skipped == [{"run": "broken", "why": "no probe measured anything (recorder)"}]
+	assert skipped == [{"run": "broken", "why": "nothing_measured", "codes": ["recorder"]}]
+
+
+def test_held_out_records_carry_nothing_derived_from_the_probe():
+	from preflight.schema import load_record
+
+	rec = load_record(REAL.read_text())
+	p1 = next(p for p in rec.probes if p.id == "p1")
+	held = coverage.held_out(rec, p1)
+	assert {p.id for p in held.probes} == {"p2", "p3"}  # p1-eval is the same point
+	assert held.models == [] and held.findings == [] and not held.predictions.estimates
+
+
+def test_a_probe_that_ran_no_eval_is_not_scored_for_memory_when_the_job_evaluates():
+	from preflight.schema import load_record
+
+	rec = load_record(REAL.read_text())
+	p2 = next(p for p in rec.probes if p.id == "p2")
+	assert coverage.memory_comparable(rec, p2) == "no_eval_pass"

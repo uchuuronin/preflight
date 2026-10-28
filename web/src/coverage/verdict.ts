@@ -1,33 +1,30 @@
 /**
- * The coverage page's status word for one metric, decided by its Wilson 95% interval against the
- * target rate, so a handful of checks can never read as a pass (or as a failure) by luck.
+ * The coverage page's status word for one metric. Step time, peak memory and the interval get a
+ * status only when the whole Wilson 95% interval is past the metric's rate bar, so a handful of
+ * checks can never read as a pass or a failure by luck. Out of memory follows the Project Goals'
+ * rule instead: one miss is the verdict, and none missed so far is said as just that.
  */
 
-export type Verdict = "unchecked" | "unsettled" | "meets" | "below" | "missed";
+export type Verdict = "unchecked" | "unsettled" | "meets" | "below" | "missed" | "no_misses";
 
 export interface MetricSummary {
-	target: string;
+	tolerance?: number | null;
+	/** The share of checks the metric is held to, and where that bar comes from (coverage.py). */
+	rate_bar: number;
+	rate_bar_source: string;
 	n: number;
 	hits: number;
 	rate: number | null;
-	wilson95: [number, number] | number[] | null;
+	wilson95: number[] | null;
 	abstained: number;
+	runs?: number;
 }
-
-/**
- * Source: cited, Project Goals: 90% intervals cover at least 88%. Step time and peak memory have
- * a tolerance per check and no stated rate; the page holds them to the same 88% (source: guess,
- * revisited with Chiya).
- */
-export const TARGET_RATE: Record<string, number> = { interval: 0.88, step_time: 0.88, peak_memory: 0.88, oom: 1 };
 
 export function verdict(metric: string, s: MetricSummary): Verdict {
 	if (!s.n || !s.wilson95) return "unchecked";
-	// Project Goals: no missed out-of-memory. One miss is the verdict, whatever the count.
-	if (metric === "oom") return s.hits < s.n ? "missed" : s.n >= 10 ? "meets" : "unsettled";
-	const target = TARGET_RATE[metric] ?? 0.88;
-	const [lo, hi] = s.wilson95;
-	if ((hi ?? 1) < target) return "below";
-	if ((lo ?? 0) >= target) return "meets";
+	if (metric === "oom") return s.hits < s.n ? "missed" : "no_misses";
+	const [lo = 0, hi = 1] = s.wilson95;
+	if (hi < s.rate_bar) return "below";
+	if (lo >= s.rate_bar) return "meets";
 	return "unsettled";
 }
