@@ -10,6 +10,8 @@ import { t } from "./i18n";
 export type Unit =
 	| "bytes"
 	| "s"
+	/** a duration for tight spaces: "10.3 h" instead of "10 h 19 min" */
+	| "s_short"
 	| "ms"
 	| "h"
 	| "usd"
@@ -109,6 +111,9 @@ export function fmt(value: number | null | undefined, unit: Unit | string = "non
 		}
 		case "s":
 			return duration(value);
+		case "s_short":
+			// For tight spaces (a dial face): past 10 hours the minutes are noise, "10.3 h".
+			return Math.abs(value) >= 36_000 && Math.abs(value) < 86_400 * 2 ? t("unit.h", { n: num(value / 3600, 1) }) : duration(value);
 		case "ms":
 			return duration(value / 1000);
 		case "h":

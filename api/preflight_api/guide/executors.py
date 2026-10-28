@@ -19,11 +19,11 @@ Each submission is idempotent on (visitor, call id): approving twice never pays 
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 from ..flags import flag
+from ..jobs import JobsClient, visitor_of
 from .record_view import RecordView
 from .tools import SAMPLE_MORE_TASKS
 
@@ -44,27 +44,18 @@ class Executor(Protocol):
 
 
 class JobStoreExecutor:
-	"""A's job store service, called from any API container."""
+	"""A's job store service (preflight_api/jobs.py), submitting the guide's approved jobs."""
 
-	def __init__(self, app_name: str, cls_name: str) -> None:
-		import modal
-
-		self._svc = modal.Cls.from_name(app_name, cls_name)()
+	def __init__(self, store: JobsClient) -> None:
+		self._store = store
 
 	async def submit(self, request: dict, *, visitor: str, idempotency_key: str) -> dict:
-		got = await self._svc.submit.remote.aio(request, visitor=visitor, idempotency_key=idempotency_key)
+		got = await self._store.submit(request, visitor=visitor, idempotency_key=idempotency_key)
 		return {"status": "submitted", "job_id": got["job_id"], "queue_position": got.get("position")}
 
 
-def job_executor() -> Executor | None:
-	app_name, cls_name = os.environ.get("PREFLIGHT_JOBSTORE_APP"), os.environ.get("PREFLIGHT_JOBSTORE_CLS")
-	if not app_name or not cls_name:
-		return None
-	try:
-		return JobStoreExecutor(app_name, cls_name)
-	except Exception:
-		log.exception("job store service not reachable")
-		return None
+def job_executor(store: JobsClient | None) -> Executor | None:
+	return JobStoreExecutor(store) if store is not None else None
 
 
 def _unavailable(reason: str) -> dict:
@@ -104,8 +95,8 @@ async def execute(name: str, args: dict, ctx: ExecContext, jobs: Executor | None
 		try:
 			return await jobs.submit(
 				job_request(name, args, ctx),
-				visitor=ctx.visitor,
-				idempotency_key=f"{ctx.visitor}:{ctx.call_id}",
+				visitor=visitor_of(ctx.visitor),
+				idempotency_key=f"guide.{ctx.call_id}",
 			)
 		except Exception as e:
 			code = type(e).__name__

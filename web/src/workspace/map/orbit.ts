@@ -119,6 +119,14 @@ const GAP_DEG = 4;
 const NODE_GAP_PX = 10;
 
 /**
+ * Every map node sits in a box this size (the largest a node gets), and draws itself at its
+ * own size inside it. The box never changes size, so moving a knob never makes React Flow
+ * re-measure its nodes (each re-measure forced a layout: about 40 ms per knob step at 4x CPU
+ * slowdown, measured Oct 27).
+ */
+export const NODE_BOX = 126;
+
+/**
  * Nudge nodes apart round the loop so none overlap, keeping loop order and staying as close
  * to their own arc as space allows. Small phases (data, loss, optimiser) often sit side by side.
  */
@@ -195,7 +203,7 @@ export function layoutOrbit(record: LoadedRecord, knobs: Readonly<Record<string,
 	const arcByPhase = new Map(arcs.map((a) => [a.phase, a]));
 
 	const nodes: OrbitNode[] = [];
-	const nodeSize = (share: number | null) => clamp(70 + (share ?? 0.15) * 120, 86, 126);
+	const nodeSize = (share: number | null) => clamp(70 + (share ?? 0.15) * 120, 86, NODE_BOX);
 	const usedPhases = new Set<string>();
 	for (const n of loopNodes) {
 		const phase = generic ? n.id : phaseOf(n);

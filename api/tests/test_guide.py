@@ -326,3 +326,84 @@ def test_rule_tour_approvals_run_the_tool():
 			"/v1/guide/tools", json={"record": "lora-7b", "tool": "run_verify", "setting": SETTING["knobs"]}
 		)
 		assert res.json()["status"] == "unavailable"
+
+
+def test_re_ranking_the_same_setting_is_refused_and_dashes_never_reach_the_visitor():
+	# Muse Spark looped on sensitivity for one record on Oct 27 until the round cap.
+	model = Model(
+		reply(calls=[("sensitivity", {"objective": "min_cost"})]),
+		reply(calls=[("sensitivity", {"objective": "min_cost"})]),
+		reply("Nothing safe improves cost — the tour ends here."),
+	)
+	c = client(model)
+	r1 = turn(c, start=True).json()
+	assert [x["name"] for x in r1["calls"]] == ["sensitivity"]
+	r2 = turn(
+		c,
+		state=r1["state"],
+		results=[{"tool": "sensitivity", "call_id": r1["calls"][0]["call_id"], "ranked": []}],
+	).json()
+	# The second ranking of the same setting never reaches the browser: the server refuses it.
+	assert r2["calls"] == []
+	refused = [
+		json.loads(i["output"])
+		for i in model.requests[2]["input"]
+		if i.get("type") == "function_call_output" and "refused" in i["output"]
+	]
+	assert refused and refused[0]["refused"] == "already_ranked"
+	assert r2["text"] == "Nothing safe improves cost, the tour ends here."
+
+
+def test_a_stalled_guide_is_reminded_once_of_the_move_its_ranking_offered():
+	# Oct 27: Muse Spark sometimes announced a move and stopped without calling set_knob.
+	model = Model(
+		reply(calls=[("sensitivity", {"objective": "min_cost"})]),
+		reply("I'll make the cheapest move next."),
+		reply(calls=[("set_knob", {"knob_id": "eval_batch_size", "value": 8, "why": "fits"})]),
+	)
+	c = client(model)
+	r1 = turn(c, start=True).json()
+	ranked = [
+		{"knob_id": "eval_batch_size", "impact": 1.0, "direction": "decrease", "best_value": 8, "fit": "fits"}
+	]
+	r2 = turn(
+		c,
+		state=r1["state"],
+		results=[{"tool": "sensitivity", "call_id": r1["calls"][0]["call_id"], "ranked": ranked}],
+	).json()
+	assert [x["name"] for x in r2["calls"]] == ["set_knob"]
+	nudge = [i for i in model.requests[2]["input"] if "[check] Your ranking" in str(i.get("content", ""))]
+	assert len(nudge) == 1 and "eval_batch_size" in nudge[0]["content"]
+
+
+def test_while_a_move_waits_only_spending_tools_are_offered_and_repeats_are_refused():
+	model = Model(
+		reply(calls=[("highlight", {"nodes": ["eval"]})]),
+		reply(calls=[("highlight", {"nodes": ["eval"]})]),
+		reply("Eval is where it runs out of memory."),
+	)
+	c = client(model)
+	r1 = turn(c, start=True).json()
+	r2 = turn(
+		c,
+		state=r1["state"],
+		results=[{"tool": "highlight", "call_id": r1["calls"][0]["call_id"], "nodes": ["eval"]}],
+	).json()
+	# The second identical highlight was refused on the server and the model answered instead.
+	assert r2["calls"] == [] and r2["text"] == "Eval is where it runs out of memory."
+	outs = [
+		json.loads(i["output"]) for i in model.requests[2]["input"] if i.get("type") == "function_call_output"
+	]
+	assert any(o.get("refused") == "already_done" for o in outs)
+
+
+def test_no_browser_tools_while_a_move_is_pending():
+	from preflight_api.guide.record_view import RecordView
+	from preflight_api.guide.tools import SERVER_TOOLS, build_tools
+	from preflight_api.stores import SampleStore
+
+	rec = RecordView.from_record(
+		SampleStore(__import__("pathlib").Path(__file__).resolve().parents[2]).get("lora-7b")
+	)
+	names = {t["name"] for t in build_tools(rec, set(), move_pending=True)}
+	assert names and names <= set(SERVER_TOOLS)

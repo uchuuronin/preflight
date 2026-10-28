@@ -46,6 +46,8 @@ jobs:
         run: node --test schema/ts/*.test.ts
       - name: Web GPU table matches engine/gpus.py
         run: uv run python web/scripts/make_gpu_table.py --check
+      - name: No GPL, AGPL or SSPL dependencies (gap 22)
+        run: uv run python .github/scripts/licences.py
 
   api:
     # The FastAPI control plane (api/), its own uv project on top of the preflight package.
@@ -62,6 +64,20 @@ jobs:
         run: |
           uv sync --locked
           uv run pytest -q
+          uv run python ../.github/scripts/licences.py
+
+  verify-action:
+    # The Action users add to their CI, run on its example records: a passing fix must pass.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: v
+        uses: ./.github/actions/verify
+        with:
+          before: .github/actions/verify/examples/before.json
+          after: .github/actions/verify/examples/after.json
+      - run: test "${{ steps.v.outputs.status }}" = passed
 
   torch:
     # Probes and the recorder on CPU torch: no GPU in CI, but the code paths are the same.
@@ -97,7 +113,16 @@ jobs:
           npm ci --no-audit --no-fund
           npm run typecheck --if-present
           npm test --if-present
+          node scripts/licences.mjs
           npm run build
+      - if: steps.has.outputs.web == 'true'
+        name: Stranger test on the built app (e2e/stranger.mjs)
+        working-directory: web
+        run: |
+          npx playwright install --with-deps chromium
+          npx vite preview --port 4173 --strictPort --host 127.0.0.1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          npm run stranger
 
   secrets:
     runs-on: ubuntu-latest
@@ -116,5 +141,8 @@ jobs:
           echo "$GITLEAKS_SHA256  gitleaks.tgz" | sha256sum -c -
           tar xzf gitleaks.tgz gitleaks
           rm gitleaks.tgz
-      - name: Scan the whole history
-        run: ./gitleaks git . --redact --no-banner --verbose --exit-code 1
+      # Only the history of the commit under test: by default gitleaks reads every fetched ref, so
+      # one branch's false alarm turned every branch red. Each branch is scanned by its own CI and
+      # again when it merges into main.
+      - name: Scan this branch's history
+        run: ./gitleaks git . --log-opts=HEAD --redact --no-banner --verbose --exit-code 1
