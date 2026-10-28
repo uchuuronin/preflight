@@ -1,0 +1,11 @@
+{
+	"name": "20261028-183428-40746362980-c-api-startup-check",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "40746362980",
+	"ref": "main",
+	"sha": "206c3f38dcd8d73e5f920c5f16885d6c0ca3011c",
+	"cmd": "modal run --env main api/app.py::startup_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T18:34:55Z"
+}

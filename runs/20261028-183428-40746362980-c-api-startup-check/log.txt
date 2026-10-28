@@ -1,0 +1,63 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Vk4C486EBf7DU5dJMPJZNi
+Building image im-g3SkLC0EWoNwTFVAGhb2MY
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PREFLIGHT_ROOT=/root/repo
+
+=> Step 2: ENV PREFLIGHT_ENV=production
+
+=> Step 3: ENV PREFLIGHT_REQUIRE_EDGE=1
+
+=> Step 4: ENV PREFLIGHT_LEDGER=modal
+
+=> Step 5: ENV PREFLIGHT_RECORDS_DIR=/records
+
+=> Step 6: ENV PREFLIGHT_JOBSTORE_APP=preflight-runner
+
+=> Step 7: ENV PREFLIGHT_JOBSTORE_CLS=JobStoreService
+Saving image...
+Image saved, took 402.36ms
+
+Built image im-g3SkLC0EWoNwTFVAGhb2MY in 761.36ms
+
+
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/schema/examples/agent.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/pretrain.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/finetune.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/web/src/workspace/fixtures/dev-finetun
+│   e.record.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/addons
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/preflight_api
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function SpendLedger.*.
+├── ✓ Created Function api
+│   └── https://shuureiyashi99--preflight-api-api-dev.us-east.modal.run 
+│       (unauthenticated)
+└── ✓ Created Function startup_check_api.
+/usr/local/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+{
+  "module": "app",
+  "file": "/root/app.py",
+  "reload_s": 0.105,
+  "records_seen": 2,
+  "ledger_restores": true,
+  "livez": 200,
+  "readyz": 200,
+  "unsigned_status": 403,
+  "signed_miss": [
+    404,
+    "record_not_found"
+  ],
+  "jobstore": "NotFoundError",
+  "ok": false
+}
+Stopping app - uncaught exception raised locally: SystemExit(1).
