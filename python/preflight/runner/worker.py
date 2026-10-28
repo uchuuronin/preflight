@@ -98,6 +98,12 @@ class JobContext:
 		except LeaseLost:
 			self.lost.set()
 			raise
+		except Exception as exc:
+			# a store hiccup (network, a redeploy) must not cost a finished job its record: fall back
+			# to what the heartbeat thread last saw, as it does; complete() is fenced either way
+			log.warning("confirming %s with the store failed: %s", self.lease.job_id, exc)
+			self.check()
+			return
 		self.renewed_at = time.monotonic()
 
 

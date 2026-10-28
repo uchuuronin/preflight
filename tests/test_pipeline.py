@@ -484,6 +484,25 @@ def test_a_cancel_during_the_fill_stores_nothing_more(tmp_path, monkeypatch):
 		assert not load_record(f.read_text()).predictions.estimates
 
 
+def test_a_store_hiccup_while_confirming_keeps_the_finished_job(tmp_path):
+	store = InMemoryJobStore()
+	sub = store.submit({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, visitor="v1",
+		idempotency_key="k1")  # fmt: skip
+	real = store.heartbeat
+	calls = []
+
+	def flaky(lease):
+		calls.append(1)
+		if len(calls) == 1:
+			raise ConnectionError("control plane hiccup")
+		return real(lease)
+
+	store.heartbeat = flaky
+	d = deps(tmp_path, FakeRunner())
+	assert run_one(store, "w1", lambda lease, ctx: run_job(lease, ctx, deps=d), heartbeat_s=3600)
+	assert calls and store.status(sub.job_id) == "done"
+
+
 def test_runner_flags_find_the_repos_flags_json_without_help(monkeypatch):
 	"""No PREFLIGHT_ROOT: the search from runner/ up finds <repo>/flags.json (in the worker image,
 	/opt/preflight/flags.json the same way)."""
@@ -533,5 +552,7 @@ def test_the_worker_reads_the_same_flag_files_as_the_api():
 	runner = (ROOT / "python" / "preflight" / "runner" / "modal_app.py").read_text()
 	api = (ROOT / "api" / "app.py").read_text()
 	assert shipped(runner) == shipped(api) == (["flags.json"], [])
+	# an override file is a deliberate change to both images and this test, never a silent one
+	assert sorted(p.name for p in ROOT.glob("flags*.json")) == ["flags.json"]
 	assert 'FLAG_ENV = "production"' in runner and '"PREFLIGHT_ENV": FLAG_ENV' in runner
 	assert '"PREFLIGHT_ENV": "production"' in api
