@@ -109,7 +109,9 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Oct 28 | `b-corpus-smoke-grouped` (GitHub run 40622057852): failed before start, the command needed `::main` | none | 0 | $0.00 |
 | Oct 28 | `b-corpus-smoke-grouped` (GitHub run 40622148184): 10 grouped configs, all ok, 16 to 34 s each | L4 | 3.5 GPU-min (7.3 min wall, image build included) | $0.06 (ledger: GPU-seconds x $0.80/h x 1.25) |
 
-Total so far: $0.06 of the $45 corpus budget (phase 0 cap $0.70). The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
+| Oct 28 | `b-corpus-smoke-hf` (GitHub run 40622922548): all 50 HF LoRA and QLoRA jobs, 49 ok and 1 out of memory (a query), 14 to 38 s each | L4 | 16.1 GPU-min (18.9 min wall) | $0.27 (ledger) |
+
+Total so far: $0.33 of the $45 corpus budget (phase 0 cap $0.70). Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
 
 ## Contract requests
 In `docs/requests/from-b.md`.
