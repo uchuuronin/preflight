@@ -1,4 +1,4 @@
-# Preflight contract v0.3.0
+# Preflight contract v0.4.0
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,8 +133,7 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
-- Unreleased (Oct 27-28, A on ws-a, after 0.3.0, additive, asked for by C and approved through the PM; version bump
-  is the PM's call): `JobRequest.mode` (plan, probe, verify, sample_more; default plan), `knobs`,
+- 0.4.0 (Oct 28, additive; A's fields, asked for by C and approved through the PM): `JobRequest.mode` (plan, probe, verify, sample_more; default plan), `knobs`,
   `tasks` and `purpose`, with `Source.kind` "record" and `Source.record_ref` (a share token or
   `sample:<id>`); a job on a record writes a new record whose `parent_id` is it. `Knob.affects`
   (map node ids, checked against the graph) and `Knob.changes_results`. `ModelCard.fixture`.

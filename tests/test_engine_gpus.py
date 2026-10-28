@@ -180,9 +180,7 @@ def test_on_demand_reference_picks_cheapest_listing():
 
 def test_capacity_is_what_pytorch_reports_not_the_box():
 	l4 = gpus.get_gpu("L4")
-	assert l4.capacity_bytes() == pytest.approx(
-		21.45 * GIB, rel=1e-3
-	)  # A's golden record: 23,034,920,960 bytes
+	assert l4.capacity_bytes() == 23_689_363_456  # torch total_memory on Modal's L4 (Oct 27 smoke run)
 	assert l4.nominal_bytes() == 24 * GIB
 	assert l4.usable_source == "reported"
 	assert gpus.get_gpu("T4").capacity_bytes() < 15 * GIB
@@ -259,3 +257,14 @@ def test_sizes_in_names_still_resolve():
 )
 def test_mig_profiles_pick_their_card(name, card):
 	assert gpus.resolve(name, int(5e9)) == card
+
+
+def test_unlisted_gpu_falls_back_to_what_the_probe_reported():
+	name = gpus.unlisted_name("NVIDIA Weird 9000", 24 * 10**9, 60)
+	spec = gpus.get_gpu(name)
+	assert gpus.is_unlisted(name) and gpus.resolve(name) == name
+	assert spec.capacity_bytes() == pytest.approx(24e9, rel=1e-6) and spec.compute_units == 60
+	assert spec.confidence == "guess" and not spec.supports("bf16")
+	assert gpus.price(name) is None and gpus.on_demand_reference(name) is None
+	with pytest.raises(KeyError):
+		gpus.get_gpu("unlisted:bad")

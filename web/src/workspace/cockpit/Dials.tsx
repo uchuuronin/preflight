@@ -71,7 +71,7 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 				) : null}
 			</svg>
 			<span className="pf-dial__text">
-				<b>{value}</b>
+				<b className={value.length > 10 ? "is-long" : undefined}>{value}</b>
 				<small>{spec.unit}</small>
 			</span>
 		</>
@@ -142,7 +142,7 @@ export function Dials() {
 			est: timeEst,
 			scale: timeScale,
 			goal: "min_time",
-			format: (v) => fmt(v, "s"),
+			format: (v) => fmt(v, "s_short"),
 		},
 		{
 			id: "cost",

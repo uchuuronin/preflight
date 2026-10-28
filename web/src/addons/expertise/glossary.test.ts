@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import en from "../../i18n/en.json";
 import { t } from "../../lib/i18n";
 import { GLOSSARY, KNOB_TERMS, glossaryEntry, termForKnob } from "./glossary";
 import { TIERS } from "./store";
@@ -11,6 +12,12 @@ const RECORDS = {
 	...import.meta.glob<RecordKnobs>("../../../../schema/examples/*.json", { eager: true, import: "default" }),
 	...import.meta.glob<RecordKnobs>("../../workspace/fixtures/*.record.json", { eager: true, import: "default" }),
 };
+
+// Every knob C has an English label for: A's full declared set, not only the samples.
+const NOT_KNOBS = new Set(["proposed", "pinned", "pinned_hint", "unpin_so_it_moves", "pin", "needs_code", "not_trusted_here"]);
+const LABELLED_KNOBS = Object.keys(en)
+	.map((k) => /^knob\.([a-z0-9_]+)$/.exec(k)?.[1])
+	.filter((id): id is string => !!id && !NOT_KNOBS.has(id));
 
 function recordKnobIds(): string[] {
 	const ids = new Set<string>();
@@ -32,6 +39,11 @@ describe("glossary", () => {
 	it("explains every knob the records declare", () => {
 		const missing = recordKnobIds().filter((id) => !termForKnob(id));
 		expect(missing).toEqual([]);
+	});
+
+	it("explains every knob C has a label for", () => {
+		expect(LABELLED_KNOBS.length).toBeGreaterThan(50);
+		expect(LABELLED_KNOBS.filter((id) => !termForKnob(id))).toEqual([]);
 	});
 
 	it("points every knob at a term that exists", () => {
@@ -66,7 +78,7 @@ describe("glossary", () => {
 		expect(t(entry!.titleKey)).toBe("Eval batch");
 		expect(t(entry!.bodyKey)).toMatch(/crash a run that trained fine/);
 		expect(entry!.actKey && t(entry!.actKey)).toMatch(/no_grad/);
-		expect(t(glossaryEntry("eval_batch_size", "expert")!.bodyKey)).toMatch(/first-eval OOM/);
+		expect(t(glossaryEntry("eval_batch_size", "expert")!.bodyKey)).toMatch(/grows with the eval set/);
 	});
 
 	it("returns nothing for a knob it does not know", () => {

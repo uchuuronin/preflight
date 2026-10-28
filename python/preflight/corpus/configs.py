@@ -20,27 +20,51 @@ from dataclasses import dataclass
 from typing import Any
 
 FAMILIES = ("gpt", "encoder", "lora", "cnn", "mlp", "gnn")
-_FAMILY_WEIGHTS = {"gpt": 0.35, "encoder": 0.10, "lora": 0.15, "cnn": 0.15, "mlp": 0.10, "gnn": 0.15}
+_FAMILY_WEIGHTS = {
+	"gpt": 0.35,
+	"encoder": 0.10,
+	"lora": 0.15,
+	"cnn": 0.15,
+	"mlp": 0.10,
+	"gnn": 0.15,
+}  # guess: design weights; revisited Oct 31 against the GNN cost model's 3,000-sample need
 SCHEMA = "preflight-corpus/0.1"
+# derived: bumped whenever the worker measures differently, so old and new rows never share a key
+CODE_VERSION = "corpus@0.3.0"
 
 
 @dataclass(frozen=True)
 class CorpusConfig:
-	kind: str  # "kernels" | "divergence"
+	kind: str  # "kernels" | "divergence" | "hf"
 	family: str
 	params: dict[str, Any]
+	versions: tuple[tuple[str, str], ...] = ()  # code and library versions the row was measured with
 
 	@property
 	def key(self) -> str:
-		blob = json.dumps({"kind": self.kind, "family": self.family, "params": self.params}, sort_keys=True)
+		"""Content hash of what was run and with what (Review, Oct 27: code and library versions in the key)."""
+		body = {"kind": self.kind, "family": self.family, "params": self.params}
+		if self.versions:
+			body["versions"] = dict(self.versions)
+		blob = json.dumps(body, sort_keys=True)
 		return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 	def to_dict(self) -> dict[str, Any]:
-		return {"kind": self.kind, "family": self.family, "params": self.params, "key": self.key}
+		d = {"kind": self.kind, "family": self.family, "params": self.params, "key": self.key}
+		if self.versions:
+			d["versions"] = dict(self.versions)
+		return d
 
 	@classmethod
 	def from_dict(cls, d: dict[str, Any]) -> CorpusConfig:
-		return cls(d["kind"], d["family"], dict(d["params"]))
+		return cls(
+			d["kind"], d["family"], dict(d["params"]), tuple(sorted((d.get("versions") or {}).items()))
+		)
+
+	def with_versions(self, versions: dict[str, str]) -> CorpusConfig:
+		return CorpusConfig(
+			self.kind, self.family, self.params, tuple(sorted({**dict(self.versions), **versions}.items()))
+		)
 
 
 def _dtype(r: random.Random) -> str:
@@ -201,3 +225,115 @@ def write_jsonl(configs: list[CorpusConfig], path: str) -> None:
 def read_jsonl(path: str) -> list[CorpusConfig]:
 	with open(path) as f:
 		return [CorpusConfig.from_dict(json.loads(line)) for line in f if line.strip()]
+
+
+# ---------------------------------------------------------------- grouped, probe-like configs (Review, Oct 27)
+
+ROLE_PROBE, ROLE_QUERY = "probe", "query"
+
+
+def _group_id(kind: str, family: str, params: dict[str, Any]) -> str:
+	shape_free = {k: v for k, v in params.items() if k not in ("batch", "seq", "group", "role")}
+	blob = json.dumps({"kind": kind, "family": family, "params": shape_free}, sort_keys=True)
+	return hashlib.sha256(blob.encode()).hexdigest()[:12]
+
+
+def _points(fam: str, b: int, s: int | None) -> list[tuple[str, int, int | None]]:
+	"""A's probe plan (current, half batch, half sequence) plus two held-out queries: one inside the
+	queried range (2x batch) and one a halving below the smallest probe."""
+	if s is None:  # vision and MLP: batch is the only work axis
+		return [(ROLE_PROBE, b, None), (ROLE_PROBE, max(1, b // 2), None), (ROLE_PROBE, max(1, b // 4), None),
+				(ROLE_QUERY, b * 2, None), (ROLE_QUERY, max(1, b // 8), None)]  # fmt: skip
+	return [(ROLE_PROBE, b, s), (ROLE_PROBE, max(1, b // 2), s), (ROLE_PROBE, b, max(16, s // 2)),
+			(ROLE_QUERY, b * 2, s), (ROLE_QUERY, max(1, b // 2), max(16, s // 2))]  # fmt: skip
+
+
+def grouped_configs(
+	n_groups: int, seed: int = 0, families: tuple[str, ...] = ("gpt", "lora", "encoder", "cnn", "mlp")
+) -> list[CorpusConfig]:
+	"""One architecture at five batch x sequence points each, so calibration data looks like a user's probes."""
+	r = random.Random(seed)
+	out: list[CorpusConfig] = []
+	for i in range(n_groups):
+		fam = families[i % len(families)]
+		base = _sample(fam, r)
+		seq = None
+		if fam in ("gpt", "lora", "encoder"):
+			base["batch"], base["seq"] = r.choice([4, 8, 16]), r.choice([256, 512, 1024])
+			seq = base["seq"]
+		else:
+			base["batch"] = r.choice([16, 32, 64, 128])
+		gid = _group_id("kernels", fam, base)
+		for role, b, s in _points(fam, base["batch"], seq):
+			p = {**base, "batch": b, "group": gid, "role": role}
+			if s is not None:
+				p["seq"] = s
+			out.append(CorpusConfig("kernels", fam, p))
+	return out
+
+
+# ---------------------------------------------------------------- real Hugging Face jobs (Review, Oct 27)
+
+# Ungated models that fit an L4 (24 GB) as LoRA in bf16 or QLoRA in 4-bit; weights download at run time.
+HF_MODELS = (
+	"Qwen/Qwen2.5-0.5B",
+	"HuggingFaceTB/SmolLM2-360M",
+	"TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+	"Qwen/Qwen2.5-1.5B",
+	"HuggingFaceTB/SmolLM2-1.7B",
+)
+
+
+def hf_configs(models: tuple[str, ...] = HF_MODELS, rank: int = 16) -> list[CorpusConfig]:
+	"""About ten real fine-tuning jobs (each model as bf16 LoRA and 4-bit QLoRA), each at the five probe-like points."""
+	out: list[CorpusConfig] = []
+	for model in models:
+		for quant in ("none", "nf4"):
+			base = {
+				"model_id": model,
+				"quantization": quant,
+				"lora_rank": rank,
+				"lora_alpha": 2 * rank,
+				"lora_targets": "all-linear",
+				"dtype": "bf16",
+				"grad_checkpointing": quant
+				== "nf4",  # what QLoRA recipes (prepare_model_for_kbit_training) turn on
+				"batch": 4,
+				"seq": 512,
+			}
+			gid = _group_id("hf", "hf_lora", base)
+			for role, b, s in _points("hf_lora", 4, 512):
+				out.append(
+					CorpusConfig("hf", "hf_lora", {**base, "batch": b, "seq": s, "group": gid, "role": role})
+				)
+	return out
+
+
+KINDS = ("kernels", "grouped", "hf", "divergence")
+
+
+def configs_for(kind: str, n: int, seed: int = 0) -> list[CorpusConfig]:
+	"""The config list for a sweep kind; grouped configs store under kernels, HF jobs under hf."""
+	if kind == "kernels":
+		return kernel_configs(n, seed)
+	if kind == "grouped":
+		return grouped_configs(max(1, n // 5), seed)
+	if kind == "hf":
+		return hf_configs()
+	if kind == "divergence":
+		return divergence_configs(n, seed)
+	raise ValueError(f"unknown kind {kind!r}; one of {KINDS}")
+
+
+def local_versions(kind: str) -> dict[str, str]:
+	"""Versions of what will measure, from this environment, for the key (Review, Oct 27)."""
+	import importlib.metadata as md
+
+	out = {"corpus": CODE_VERSION}
+	pkgs = ("torch", "transformers", "peft", "bitsandbytes", "accelerate") if kind == "hf" else ("torch",)
+	for pkg in pkgs:
+		try:
+			out[pkg] = md.version(pkg)
+		except md.PackageNotFoundError:
+			continue
+	return out

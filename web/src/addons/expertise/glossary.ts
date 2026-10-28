@@ -18,8 +18,8 @@ export interface Term {
 export const GLOSSARY: Readonly<Record<string, Term>> = content.terms;
 
 /**
- * Knob id (as declared in records) to glossary term. Ids follow A's golden records and B's
- * gpu_type request; RL, serving, retrieval, GNN and vision ids are added as A declares them.
+ * Knob id to glossary term, for every knob A declares (C's knob.<id> labels) plus aliases.
+ * glossary.test.ts fails when A declares a knob this table doesn't cover.
  */
 export const KNOB_TERMS: Readonly<Record<string, string>> = {
 	// fine-tune and pretrain
@@ -53,9 +53,53 @@ export const KNOB_TERMS: Readonly<Record<string, string>> = {
 	num_generations: "group_size",
 	max_completion_length: "truncation",
 	completion_len: "truncation",
-	// GNN, retrieval
+	max_completion_len: "truncation",
+	max_prompt_len: "prompt_length_cap",
+	clip_high: "clip_range",
+	clip_low: "clip_range",
+	kl_beta: "kl_beta",
+	loss_type: "rl_loss_type",
+	temperature: "temperature",
+	use_vllm: "vllm_rollouts",
+	// fine-tune and pretrain, wider set
+	lora_alpha: "lora_alpha",
+	lora_dropout: "lora_dropout",
+	attn: "attention_kernel",
+	quantization: "quantisation",
+	epochs: "epochs",
+	eval_every: "eval_every",
+	log_every: "log_every",
+	grad_clip: "grad_clip",
+	warmup_steps: "warmup_steps",
+	weight_decay: "weight_decay",
+	d_model: "model_width",
+	n_head: "attention_heads",
+	n_layer: "layers",
+	// multi-GPU
+	gpus: "gpu_count",
+	fsdp_mode: "fsdp_mode",
+	zero_stage: "zero_fsdp",
+	deepspeed_stage: "zero_fsdp",
+	tensor_parallel: "tensor_parallel",
+	// serving and eval
+	max_model_len: "model_length_cap",
+	max_num_seqs: "concurrency",
+	gpu_memory_utilization: "gpu_memory_share",
+	kv_cache_dtype: "kv_cache_dtype",
+	prefix_caching: "prefix_caching",
+	max_new_tokens: "truncation",
+	dump_hidden_states: "dump_hidden_states",
+	// retrieval
+	encode_batch_size: "encode_batch_size",
+	index_m: "hnsw_links",
+	index_nlist: "ivf_lists",
+	// GNN
 	fan_out: "fan_out",
 	num_neighbors: "fan_out",
+	gnn_layers: "gnn_layers",
+	hidden_channels: "hidden_channels",
+	// vision
+	image_size: "image_size",
 };
 
 export function termForKnob(knobId: string): string | null {

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ..errors import ApiError
+from ..stores import StoreBusy
 
 router = APIRouter(prefix="/v1")
 
@@ -11,9 +14,16 @@ router = APIRouter(prefix="/v1")
 @router.get("/records/{share_token}")
 async def get_record(share_token: str, request: Request) -> JSONResponse:
 	"""A record by its share token. The ULID never appears in a public link."""
-	record = request.app.state.records.by_share_token(share_token)
+	# Off the event loop: the store may wait for a volume reload.
+	try:
+		record = await asyncio.to_thread(request.app.state.records.by_share_token, share_token)
+	except StoreBusy as e:
+		raise ApiError(
+			503, "record_store_busy", "Records are a moment behind; try again.", retryable=True, retry_after=2
+		) from e
 	if record is None:
 		raise ApiError(
 			404, "record_not_found", "No flight record matches this link. Check the link or open a sample."
 		)
-	return JSONResponse(record, headers={"Cache-Control": "public, max-age=60"})
+	# A running job revises its record (skeleton, then each probe), so nothing may keep a copy.
+	return JSONResponse(record, headers={"Cache-Control": "private, no-cache"})
