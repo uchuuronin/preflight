@@ -1,0 +1,11 @@
+{
+	"name": "20261028-015955-40618299646-c-guide-tour-5",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "40618299646",
+	"ref": "ws-c",
+	"sha": "4c6171b457ac3d702ddcad2649d0a5d291326471",
+	"cmd": "modal run api/scripts/guide_tour.py --tours 5 --samples lora-7b,lora-qwen",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T02:05:46Z"
+}
