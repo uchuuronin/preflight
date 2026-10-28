@@ -16,8 +16,10 @@ probes do; nothing either writes is read by the other.
 """
 
 import argparse
+import collections
 import json
 import os
+import select
 import shutil
 import subprocess
 import sys
@@ -26,10 +28,44 @@ import time
 from pathlib import Path
 
 ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt"}
-BARE_TIMEOUT_S = 2400
+# derived: the whole measurement must end, and write its result, inside the run's own time limit
+# (remote-run.yml's timeout); Oct 28's first try ran into that limit with nothing written
+BUDGET_S = 40 * 60
+BARE_SHARE = 0.5  # of the budget, at most, for the bare run; the recorder run gets the rest
 
 
-def _bare(work: Path, bare_steps: int, *, install_requirements: bool, caches: Path, env: dict) -> dict:
+def _say(msg: str) -> None:
+	print(f"[ground truth {time.strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def _stream(cmd: list[str], *, env: dict, cwd: Path, timeout_s: float) -> tuple[int | None, str]:
+	"""Run cmd with its output passed through as it comes (so a run's log shows where it is), and
+	return (exit code, or None when it ran past timeout_s and was killed; the output's tail)."""
+	tail = collections.deque(maxlen=64)
+	deadline = time.monotonic() + timeout_s
+	with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=cwd) as proc:
+		fd = proc.stdout.fileno()
+		while True:
+			left = deadline - time.monotonic()
+			if left <= 0:
+				proc.kill()
+				proc.wait()
+				return None, b"".join(tail).decode("utf-8", "replace")
+			ready, _, _ = select.select([fd], [], [], min(left, 5.0))
+			if not ready:
+				continue
+			chunk = os.read(fd, 65536)  # whatever is there: a progress bar's \r line never blocks us
+			if not chunk:
+				break
+			tail.append(chunk)
+			sys.stdout.write(chunk.decode("utf-8", "replace"))
+			sys.stdout.flush()
+		return proc.wait(), b"".join(tail).decode("utf-8", "replace")
+
+
+def _bare(
+	work: Path, bare_steps: int, *, install_requirements: bool, caches: Path, env: dict, timeout_s: float
+) -> dict:
 	env = {**os.environ, **env}
 	if install_requirements:
 		from preflight.recorder.requirements import install
@@ -47,15 +83,22 @@ def _bare(work: Path, bare_steps: int, *, install_requirements: bool, caches: Pa
 			return {"failed": f"requirements: {err}"}
 		env["PYTHONPATH"] = os.pathsep.join([*map(str, dirs), env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
 	out = work / "bare.json"
-	try:
-		t = subprocess.run([sys.executable, "-m", "preflight.recorder.bare", str(work / "train.py"), str(out),
-			"--steps", str(bare_steps)], capture_output=True, text=True, timeout=BARE_TIMEOUT_S, env=env, cwd=work)  # fmt: skip
-	except subprocess.TimeoutExpired:
+	cmd = [
+		sys.executable,
+		"-m",
+		"preflight.recorder.bare",
+		str(work / "train.py"),
+		str(out),
+		"--steps",
+		str(bare_steps),
+	]
+	code, tail = _stream(cmd, env=env, cwd=work, timeout_s=timeout_s)
+	if code is None:
 		# keep going: the recorder run is still worth having from a paid session
-		return {"failed": f"the bare run took longer than {BARE_TIMEOUT_S} s"}
+		return {"failed": f"the bare run took longer than {timeout_s:.0f} s", "tail": tail[-3000:]}
 	if out.exists():
 		return json.loads(out.read_text())
-	return {"failed": (t.stdout + t.stderr)[-3000:]}
+	return {"failed": tail[-3000:]}
 
 
 def measure(
@@ -65,7 +108,7 @@ def measure(
 	recorder_steps: int = 60,
 	warmup: int = 5,
 	install_requirements: bool = False,
-	timeout_s: float = 2400,
+	budget_s: float = BUDGET_S,
 	bare_env: dict | None = None,
 ) -> dict:
 	"""Both runs and the paired overhead, as one dict (what out/ground_truth_<script>.json holds).
@@ -84,12 +127,21 @@ def measure(
 			(work / rel).parent.mkdir(parents=True, exist_ok=True)
 			(work / rel).write_text(text)
 		t0 = time.monotonic()
+		_say(
+			f"bare run of {script_dir.name}: {bare_steps} optimizer steps, at most {budget_s * BARE_SHARE:.0f} s"
+		)
 		bare = _bare(work, bare_steps, install_requirements=install_requirements, caches=caches,
-			env=bare_env or {})  # fmt: skip
+			env=bare_env or {}, timeout_s=budget_s * BARE_SHARE)  # fmt: skip
 		bare_wall = time.monotonic() - t0
+		_say(
+			f"bare run ended ({bare.get('ended') or 'failed'}) after {bare_wall:.0f} s, {bare.get('steps')} steps"
+		)
+		left = max(120.0, budget_s - bare_wall - 60)  # a minute kept for writing the result
+		_say(f"recorder run: {warmup} warmup + {recorder_steps} timed steps, at most {left:.0f} s")
 		r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint="train.py", warmup=warmup,
-			timed=recorder_steps, timeout_s=timeout_s, alternate_sync=True,
+			timed=recorder_steps, timeout_s=left, alternate_sync=True,
 			install_requirements=install_requirements))  # fmt: skip
+		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:
 		shutil.rmtree(work, ignore_errors=True)
 		shutil.rmtree(caches, ignore_errors=True)
@@ -121,6 +173,9 @@ def main(argv: list[str] | None = None) -> int:
 	ap.add_argument("--recorder-steps", type=int, default=60)
 	ap.add_argument("--warmup", type=int, default=5)
 	ap.add_argument("--install-requirements", action="store_true")
+	ap.add_argument(
+		"--budget-min", type=float, default=BUDGET_S / 60, help="the whole measurement's time limit"
+	)
 	ns = ap.parse_args(argv)
 	if ns.script_dir.name not in ZOO_SCRIPTS:
 		print(f"ground truth is for the zoo scripts {sorted(ZOO_SCRIPTS)}", file=sys.stderr)
@@ -135,7 +190,8 @@ def main(argv: list[str] | None = None) -> int:
 	run = _run_caches_when_root()
 	try:
 		res = measure(ns.script_dir, bare_steps=ns.bare_steps, recorder_steps=ns.recorder_steps,
-			warmup=ns.warmup, install_requirements=ns.install_requirements, bare_env=bare_env)  # fmt: skip
+			warmup=ns.warmup, install_requirements=ns.install_requirements, bare_env=bare_env,
+			budget_s=ns.budget_min * 60)  # fmt: skip
 	finally:
 		for d in (own, run):
 			if d is not None:

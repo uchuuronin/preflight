@@ -307,8 +307,16 @@ def smoke(
 # ---------------------------------------------------------------- ground truth (L4, paid: ask first)
 
 
-@ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=3600)
-def ground_truth_on_l4(script: str, bare_steps: int, recorder_steps: int, warmup: int) -> dict:
+# Modal's own limit, not just the workflow's: on Oct 28 remote-run.yml's timeout killed `modal run`
+# but the L4 function ran on until stop_app stopped it. The measurement ends inside its budget
+# (40 min by default); this ends the container even if that fails.
+GROUND_TRUTH_TIMEOUT_S = 50 * 60
+
+
+@ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=GROUND_TRUTH_TIMEOUT_S)
+def ground_truth_on_l4(
+	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float
+) -> dict:
 	"""recorder/ground_truth.py on an L4: a bare run, then a recorder run alternating clean and
 	synced steps, and the paired overhead. The AMD droplet runs the same module."""
 	from preflight.probes import remote
@@ -319,18 +327,22 @@ def ground_truth_on_l4(script: str, bare_steps: int, recorder_steps: int, warmup
 		raise ValueError(f"unknown zoo script {script!r}")
 	remote.link_weights()
 	remote.deps_dir()
-	return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup)
+	return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
+		budget_s=budget_s)  # fmt: skip
 
 
 @ops.local_entrypoint()
-def ground_truth(script: str, bare_steps: int, recorder_steps: int = 60, warmup: int = 5):
+def ground_truth(
+	script: str, bare_steps: int, recorder_steps: int = 60, warmup: int = 5, budget_min: float = 40
+):
 	"""modal run --env main python/preflight/runner/ops_app.py::ground_truth --script finetune_lora_hf --bare-steps 210
-	Writes out/ground_truth_<script>.json (step walls, peak memory, how the bare run ended, overhead)."""
+	Writes out/ground_truth_<script>.json (step walls, peak memory, how the bare run ended, overhead).
+	budget_min: the whole measurement ends inside it; keep it under the run's own time limit."""
 	import json
 
 	from preflight.recorder.ground_truth import brief
 
-	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup)
+	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(brief(res), indent=2), flush=True)

@@ -25,18 +25,15 @@ def test_the_bare_run_installs_into_its_own_prefix_not_the_probes(tmp_path, monk
 		seen["target"] = target
 		return None, [Path("/gt/site")]
 
-	def run(cmd, **kw):
+	def stream(cmd, **kw):
 		seen["cmd"], seen["kw"] = cmd, kw
 		Path(cmd[4]).write_text(json.dumps({"steps": 3, "walls_s": [None, 1.0, 1.0], "ended": "steps"}))
-
-		class Done:
-			stdout = stderr = ""
-
-		return Done()
+		return 0, ""
 
 	monkeypatch.setattr(req, "install", install)
-	monkeypatch.setattr(gt.subprocess, "run", run)
-	out = gt._bare(tmp_path, 3, install_requirements=True, caches=tmp_path / "c", env={"HF_HOME": "/gt/hf"})
+	monkeypatch.setattr(gt, "_stream", stream)
+	out = gt._bare(tmp_path, 3, install_requirements=True, caches=tmp_path / "c", env={"HF_HOME": "/gt/hf"},
+		timeout_s=60)  # fmt: skip
 	assert out["ended"] == "steps"
 	assert seen["env"] == {"PREFLIGHT_DEPS_DIR": None, "PREFLIGHT_PIP_CACHE": None}
 	assert seen["target"] == tmp_path / "c" / "deps"
@@ -48,21 +45,29 @@ def test_the_bare_run_installs_into_its_own_prefix_not_the_probes(tmp_path, monk
 
 
 def test_a_bare_run_that_writes_nothing_reports_its_output(tmp_path, monkeypatch):
-	class Done:
-		stdout, stderr = "", "ModuleNotFoundError: No module named 'peft'"
-
-	monkeypatch.setattr(gt.subprocess, "run", lambda cmd, **kw: Done())
-	out = gt._bare(tmp_path, 3, install_requirements=False, caches=tmp_path, env={})
+	monkeypatch.setattr(gt, "_stream", lambda cmd, **kw: (1, "ModuleNotFoundError: No module named 'peft'"))
+	out = gt._bare(tmp_path, 3, install_requirements=False, caches=tmp_path, env={}, timeout_s=60)
 	assert "peft" in out["failed"]
 
 
 def test_a_bare_run_that_times_out_still_lets_the_recorder_run(tmp_path, monkeypatch):
-	def slow(cmd, **kw):
-		raise gt.subprocess.TimeoutExpired(cmd, kw["timeout"])
+	monkeypatch.setattr(gt, "_stream", lambda cmd, **kw: (None, "step 50"))
+	out = gt._bare(tmp_path, 3, install_requirements=False, caches=tmp_path, env={}, timeout_s=60)
+	assert "longer than 60 s" in out["failed"] and out["tail"] == "step 50"
 
-	monkeypatch.setattr(gt.subprocess, "run", slow)
-	out = gt._bare(tmp_path, 3, install_requirements=False, caches=tmp_path, env={})
-	assert "longer than" in out["failed"]
+
+def test_streamed_output_passes_through_and_a_hang_is_killed_on_time(tmp_path, capsys):
+	import sys
+	import time
+
+	code, tail = gt._stream([sys.executable, "-c", "print('hello', flush=True)"], env=dict(os.environ),
+		cwd=tmp_path, timeout_s=30)  # fmt: skip
+	assert code == 0 and "hello" in tail and "hello" in capsys.readouterr().out
+	t0 = time.monotonic()
+	# a progress bar that never ends its line, then a hang: still killed at the deadline
+	hang = "import sys, time; sys.stdout.write('50%\\r'); sys.stdout.flush(); time.sleep(60)"
+	code, tail = gt._stream([sys.executable, "-c", hang], env=dict(os.environ), cwd=tmp_path, timeout_s=1.5)
+	assert code is None and "50%" in tail and time.monotonic() - t0 < 10
 
 
 def test_the_counts_b_reads_drop_anything_but_finite_non_negative_numbers():
