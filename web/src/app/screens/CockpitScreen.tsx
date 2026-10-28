@@ -9,6 +9,8 @@ import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { usePanels } from "../../registry";
 import { FlightPlanBand, MemoryBand, ProbesBand } from "../../workspace/cockpit/Bands";
+import { FitMap } from "../../workspace/cockpit/FitMap";
+import { flag } from "../../lib/flags";
 import { DetailSheet } from "../../workspace/cockpit/DetailSheet";
 import { Dials } from "../../workspace/cockpit/Dials";
 import { Dock } from "../../workspace/cockpit/Dock";
@@ -133,6 +135,7 @@ function Cockpit() {
 					<h2 className="pf-h2">{t("below.title")}</h2>
 					<FlightPlanBand />
 					<MemoryBand />
+					{flag("c.fit_map") ? <FitMap /> : null}
 					<ProbesBand />
 					{below.map((p) => (
 						<AddonBoundary key={p.id} id={p.id}>

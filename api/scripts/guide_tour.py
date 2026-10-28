@@ -61,18 +61,25 @@ app = modal.App("preflight-guide-tour", image=image)
 
 
 @app.function(secrets=[modal.Secret.from_name("preflight-meta")], timeout=1800, cpu=1.0)
-async def play(samples: list[str], tours: int, aim: str) -> dict:
+async def play(samples: list[str], tours: int, aim: str, variants: tuple[str, ...] = ("current",)) -> dict:
 	sys.path[:0] = ["/root/repo/api/scripts", "/root/repo/api", "/root/repo/python"]
 	from tour_play import run_tours
 
-	return await run_tours(Path("/root/repo"), samples, tours, aim)
+	return await run_tours(Path("/root/repo"), samples, tours, aim, variants)
 
 
 @app.local_entrypoint()
-def main(tours: int = 2, samples: str = "lora-7b,lora-qwen,pretrain,agent", aim: str = "min_cost") -> None:
+def main(
+	tours: int = 2,
+	samples: str = "lora-7b,lora-qwen,pretrain,agent",
+	aim: str = "min_cost",
+	variants: str = "current",
+) -> None:
 	from tour_play import report
 
-	res = play.remote([s for s in samples.split(",") if s], tours, aim)
+	res = play.remote(
+		[s for s in samples.split(",") if s], tours, aim, tuple(v for v in variants.split(",") if v)
+	)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/guide_tour.json").write_text(json.dumps(res, indent="\t") + "\n")
 	print(report(res))

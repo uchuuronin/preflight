@@ -336,6 +336,9 @@ async def one_tour(api, g: Grids, sample: str, aim: str, timing: list) -> dict:
 		if aw == "results":
 			results, knobs, move = browser_results(g, data["calls"], knobs, pinned)
 			body = {"results": results}
+			for res_ in results:
+				if res_["tool"] == "sensitivity" and any(x["fit"] == "fits" for x in res_["ranked"]):
+					tour["offered_fitting_move"] = True
 			if move:
 				tour.setdefault("moves", []).append(move)
 		elif aw == "decision":
@@ -367,8 +370,33 @@ async def one_tour(api, g: Grids, sample: str, aim: str, timing: list) -> dict:
 	return tour
 
 
-async def run_tours(root: Path, samples: list[str], tours: int, aim: str) -> dict:
-	"""Fly `tours` tours on each sample through the real route. Needs META_API_KEY/BASE set."""
+#: Lines of the guide's instructions that the prompt variants add or drop (prompt.py).
+_SPEAK_ONCE = (
+	"- While you are still calling tools, write nothing; speak once, when you stop for the person.\n"
+)
+_ACT_NOW = (
+	"- When sensitivity returns a move that fits, call set_knob in that same reply. Never end a\n"
+	"  reply with a plan you haven't carried out.\n"
+)
+
+
+def instructions_for(variant: str, current: str) -> str:
+	"""Prompt variants compared in docs/decisions/guide-limits.md. "current" is prompt.py as is."""
+	if variant == "current":
+		return current
+	if variant == "no_speak_once":
+		return current.replace(_SPEAK_ONCE, "")
+	if variant == "act_now":
+		return current.replace(_SPEAK_ONCE, _ACT_NOW)
+	if variant == "act_now_speak_once":
+		return current.replace(_SPEAK_ONCE, _SPEAK_ONCE + _ACT_NOW)
+	raise ValueError(variant)
+
+
+async def run_tours(
+	root: Path, samples: list[str], tours: int, aim: str, variants: tuple[str, ...] = ("current",)
+) -> dict:
+	"""Fly `tours` tours on each sample (per prompt variant) through the real route."""
 	import os
 	import secrets
 
@@ -399,17 +427,47 @@ async def run_tours(root: Path, samples: list[str], tours: int, aim: str) -> dic
 	)
 	api_app = create_app(ledger=MemoryLedger(LedgerCore(limits)), http=model_http)
 	out: dict = {"model": muse_spark.MODEL, "aim": aim, "tours": []}
+	from preflight_api.routes import guide as route
+
+	base_prompt = route.INSTRUCTIONS
 	try:
-		for sample in samples:
-			g = Grids(json.loads((root / SAMPLES[sample]).read_text()))
-			for _ in range(tours):
-				transport = httpx.ASGITransport(app=api_app)
-				async with httpx.AsyncClient(transport=transport, base_url="https://tour.local") as api:
-					out["tours"].append(await one_tour(api, g, sample, aim, timing))
+		for variant in variants:
+			route.INSTRUCTIONS = instructions_for(variant, base_prompt)
+			for sample in samples:
+				g = Grids(json.loads((root / SAMPLES[sample]).read_text()))
+				for _ in range(tours):
+					transport = httpx.ASGITransport(app=api_app)
+					async with httpx.AsyncClient(transport=transport, base_url="https://tour.local") as api:
+						t = await one_tour(api, g, sample, aim, timing)
+						t["variant"] = variant
+						out["tours"].append(t)
 	finally:
+		route.INSTRUCTIONS = base_prompt
 		await model_http.aclose()
 	out["summary"] = summarise(out)
+	if len(variants) > 1:
+		out["by_variant"] = {
+			v: compare({"tours": [t for t in out["tours"] if t["variant"] == v]}) for v in variants
+		}
 	return out
+
+
+def compare(res: dict) -> dict:
+	"""Per prompt variant: how tours ended, and how often the guide stalled with a move on offer."""
+	tours = res["tours"]
+	rounds = [r for t in tours for r in t["rounds"]]
+	offered = [t for t in tours if t.get("offered_fitting_move")]
+	return {
+		"tours": len(tours),
+		"moved_when_offered": sum(1 for t in offered if t["decisions"] > 0),
+		"offered": len(offered),
+		"stalled": sum(1 for t in offered if t["decisions"] == 0 and t["end"] == "done"),
+		"loops": sum(1 for t in tours if str(t["end"]).endswith("too_many_rounds")),
+		"text_while_calling": sum(1 for r in rounds if r["text"] and r["awaiting"] == "results"),
+		"rounds": len(rounds),
+		"usd": round(sum(t["usd"] for t in tours), 4),
+		"latency_p50": sorted(r["latency_s"] for r in rounds)[len(rounds) // 2] if rounds else None,
+	}
 
 
 def summarise(res: dict) -> dict:
@@ -458,6 +516,8 @@ def summarise(res: dict) -> dict:
 
 def report(res: dict) -> str:
 	lines = [json.dumps(res["summary"], indent="\t")]
+	if "by_variant" in res:
+		lines.append(json.dumps(res["by_variant"], indent="\t"))
 	for t in res["tours"]:
 		lines.append(
 			f"{t['sample']:<10} rounds={len(t['rounds']):<3} decisions={t['decisions']} usd={t['usd']:.4f} end={t['end']} {t.get('error', '')}"
@@ -481,5 +541,9 @@ if __name__ == "__main__":
 	ap.add_argument("--tours", type=int, default=1)
 	ap.add_argument("--samples", default="lora-7b,lora-qwen,pretrain,agent")
 	ap.add_argument("--aim", default="min_cost")
+	ap.add_argument("--variants", default="current")
 	a = ap.parse_args()
-	print(report(asyncio.run(run_tours(here.parents[2], a.samples.split(","), a.tours, a.aim))))
+	res = asyncio.run(
+		run_tours(here.parents[2], a.samples.split(","), a.tours, a.aim, tuple(a.variants.split(",")))
+	)
+	print(report(res))

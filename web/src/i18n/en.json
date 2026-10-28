@@ -592,5 +592,18 @@
 	"membar.untrusted.overshoot.help": "The predicted parts add up to {over} more than the predicted peak. They're shown at their own sizes, not squeezed to fit, so trust the peak line over the parts.",
 	"membar.untrusted.abstain": "Not trusted here: {terms}",
 	"membar.peak": "Peak {total}",
-	"membar.off_scale": "Peak runs past this bar's scale"
+	"membar.off_scale": "Peak runs past this bar's scale",
+	"fitmap.title": "Where it fits",
+	"fitmap.on_gpu": "On {gpu}, {cap} for the job",
+	"fitmap.across": "Across",
+	"fitmap.up": "Up",
+	"fitmap.y_up": "{knob} ↑",
+	"fitmap.help": "Each square is a setting you can fly to; press one to go there. The lines show where the run stops fitting, placed by predicted memory between the squares.",
+	"fitmap.cell": "{x} and {y}: {status}",
+	"fitmap.peak": "Peak {peak} of {cap}",
+	"fitmap.risk": "{risk} chance of running out of memory",
+	"fitmap.here": "You are here",
+	"fitmap.none": "Fewer than two knobs change memory in this record, so there is no map to draw.",
+	"fitmap.line.fits": "Fits up to this line",
+	"fitmap.line.fails": "Fails past this line"
 }
