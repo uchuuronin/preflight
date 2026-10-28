@@ -296,6 +296,10 @@ a {
 
 .pf-dim { color: var(--pf-fg-dim); }
 .pf-hint { margin: 0; font-size: var(--pf-text-sm); line-height: 1.5; color: var(--pf-fg-dim); }
+.pf-datause { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--pf-stroke); border-radius: 16px; font-size: 12.5px; line-height: 1.5; }
+.pf-datause ul { margin: 0; padding-left: 18px; color: var(--pf-fg-dim); }
+.pf-datause__ok { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.pf-guide__fine { margin: 0; font-size: 11px; color: var(--pf-fg-dim); }
 .pf-notice { margin: 0; max-width: 80ch; font-size: 12px; line-height: 1.5; color: var(--pf-fg-dim); }
 .pf-error p { margin: 0; }
 .pf-error p + p { margin-top: 4px; }

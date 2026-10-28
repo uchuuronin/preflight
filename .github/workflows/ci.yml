@@ -98,6 +98,14 @@ jobs:
           npm run typecheck --if-present
           npm test --if-present
           npm run build
+      - if: steps.has.outputs.web == 'true'
+        name: Stranger test on the built app (e2e/stranger.mjs)
+        working-directory: web
+        run: |
+          npx playwright install --with-deps chromium
+          npx vite preview --port 4173 --strictPort --host 127.0.0.1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          npm run stranger
 
   secrets:
     runs-on: ubuntu-latest

@@ -10,6 +10,7 @@ import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
+import { DataUseNotice, dataUseAccepted } from "../DataUse";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
@@ -38,6 +39,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [description, setDescription] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [accepted, setAccepted] = useState(dataUseAccepted);
 	const idem = useRef(newKey());
 	const ids = { repo: useId(), describe: useId(), upload: useId() };
 
@@ -163,9 +165,10 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								{error}
 							</p>
 						) : null}
+						<DataUseNotice onChange={setAccepted} />
 						<div className="pf-desk__foot">
-							<span className="pf-hint">{t("newflight.cost_hint")}</span>
-							<button type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy} onClick={() => void submit()}>
+							<span className="pf-hint">{accepted ? t("newflight.cost_hint") : t("datause.needed")}</span>
+							<button type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
 								{busy ? t("newflight.checking_in") : t("newflight.check_in")}
 							</button>
 						</div>

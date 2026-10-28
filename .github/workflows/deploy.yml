@@ -1,6 +1,8 @@
-# Deploys only when started by hand (Actions > deploy > Run workflow), until C's stranger test
-# gates it: the API's spend ledger is an always-on Modal container that bills every hour, so the
-# live app runs only while it is needed. Push and nightly triggers come back with the gate.
+# Deploys only when started by hand (Actions > deploy > Run workflow): the API's spend ledger is
+# an always-on Modal container that bills every hour, so the live app runs only while it is
+# needed. The stranger job (web/e2e/stranger.mjs) gates every deploy: web and API go out only when
+# a stranger's first minutes work on this exact build. Push and nightly triggers stay off until
+# Chiya turns them back on.
 # Web -> Cloudflare Pages; API -> Modal. Each half skips itself until its code exists.
 # Secrets (per GitHub environment): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, MODAL_TOKEN_ID, MODAL_TOKEN_SECRET.
 # Runtime secrets live in Modal ("preflight-meta", "preflight-api") and the Pages project, never here.
@@ -27,7 +29,32 @@ env:
   TARGET: ${{ github.event.inputs.environment || 'production' }}
 
 jobs:
+  # The gate: nothing deploys unless a stranger's first minutes work on this exact build.
+  stranger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: has
+        run: test -f web/package.json && echo "web=true" >> "$GITHUB_OUTPUT" || echo "web=false" >> "$GITHUB_OUTPUT"
+      - if: steps.has.outputs.web == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - if: steps.has.outputs.web == 'true'
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run build
+      - if: steps.has.outputs.web == 'true'
+        name: Stranger test on the built app (e2e/stranger.mjs)
+        working-directory: web
+        run: |
+          npx playwright install --with-deps chromium
+          npx vite preview --port 4173 --strictPort --host 127.0.0.1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          npm run stranger
+
   web:
+    needs: stranger
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: ${{ github.event.inputs.environment || 'production' }}
@@ -59,6 +86,7 @@ jobs:
           command: pages deploy dist --project-name=preflight --branch=${{ steps.branch.outputs.name }}
 
   api:
+    needs: stranger
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: ${{ github.event.inputs.environment || 'production' }}
