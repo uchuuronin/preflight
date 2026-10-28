@@ -1,5 +1,41 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Tue Oct 27, late (decisions applied, cockpit as a dashboard)
+
+**Done** (branch `ws-c`, merged `origin/main` first)
+
+- Cockpit reads as a work dashboard, after D's glass prototype: one status line above the
+  readouts from a template over the readouts and their intervals (review item 8); the stage
+  switches Map and Fit (with Fit the orbit steps aside into the side column and the fit map
+  follows every knob move); "Measured" is a capsule opening a drawer of probe chips; every
+  explanation sits behind an "i". Checked at 1440 px and 390 px, dusk and day, no sideways
+  scroll; the stranger test now has 18 checks, all passing.
+- `c.fit_map` in flags.json, off by default.
+- Verify checks both sides (review item 3): target improved; effective batch, tokens seen,
+  LR schedule, throughput floor and fixed-seed loss unchanged; one stdlib module used by the
+  API and by `.github/actions/verify`, which CI runs on example records.
+- `/v1/jobs` pins GitHub links to a full 40-character commit at check-in; check-in takes
+  GitHub links only.
+- CI fails on GPL, AGPL or SSPL dependencies in root, API and web (gap 22): none today.
+- Muse Code in a sandbox: install, auth and headless run written up with three options for
+  keeping the key from visitor code (docs/decisions/muse-code-sandbox.md); smoke test waits
+  for a yes.
+
+**Cloud runs:** none since the evening's table (new rule: ask before anything that spends).
+
+**Waiting**
+
+- First deploy and the ledger's hourly cost: after the Cloudflare Pages project exists. Modal
+  list prices put the ledger container (0.125 core, 128 MiB, always on) near $0.007 an hour.
+- Retention notice: when the 30-day expiry rule on the record bucket exists.
+- `/v1/jobs` live: A's job service in `main` and `runner.queue` on.
+- Muse Code: Chiya's pick of the three key options, then a yes for the smoke test.
+
+**Next**
+
+- Coverage page (review item 2) once real runs exist to fill it; autopilot scored over the bug
+  zoo with Wilson intervals (item 7, Nov 3); deploy for the Saturday builders (item 10).
+
 ## Tue Oct 27, night (after the merge into main)
 
 **Done** (branch `ws-c`, merged `origin/main` 7faf676 first)
