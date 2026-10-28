@@ -32,14 +32,24 @@ from preflight.engine.memory import TransformerArch
 MODEL_ID_SAME = "steptime-phases@0.2.0"
 MODEL_ID_CROSS = "steptime-roofline@0.2.0"
 MODEL_ID_COMM = "steptime-comm-analytical@0.1.0"
-Z90 = 1.6448536269514722
-SIGMA_SAME_GPU = 0.08  # A's D1: median of 5 timed steps lands within 15% in 99.3% of trials
-SIGMA_SAME_VENDOR = 0.12  # S4/K1 within 20% on an unmeasured GPU
-SIGMA_CROSS_VENDOR = 0.25  # hipBLASLt/CK kernels don't map 1:1 to cuBLAS
-SIGMA_SECONDARY_SPECS = 1.5  # multiplier when the target GPU's specs come from a spec database
-SIGMA_COMM = 0.35  # analytical-only multi-GPU extrapolation
-LATENCY_KERNEL_S = 20e-6
-EXPOSED_COMM_SHARE = 0.3  # share of DDP/FSDP gradient comm not overlapped with backward
+Z90 = 1.6448536269514722  # derived: the normal 95th percentile
+SIGMA_SAME_GPU = 0.08  # simulated: A's D1, median of 5 timed steps within 15% in 99.3% of trials
+SIGMA_SAME_VENDOR = (
+	0.12  # simulated: S4c, K1 q90 0.101 x margin 2; per-GPU conformal on the corpus replaces it
+)
+SIGMA_CROSS_VENDOR = 0.22  # simulated: S4c, K1 q90 0.179 x margin 2; the AMD corpus slice replaces it
+SIGMA_SECONDARY_SPECS = (
+	1.5  # guess: specs from a spec database; replaced by per-GPU conformal once that GPU is in the corpus
+)
+SIGMA_COMM = (
+	0.35  # guess: analytical all-reduce; replaced by a 2-GPU probe on Modal once access lands (target Oct 31)
+)
+LATENCY_KERNEL_S = (
+	20e-6  # guess: launch-bound below 20 us; replaced by the corpus kernel tables on L4 (target Oct 30)
+)
+EXPOSED_COMM_SHARE = (
+	0.3  # guess: share of gradient comm not hidden under backward; replaced by a 2-GPU probe (target Oct 31)
+)
 
 Mode = Literal["forward", "train", "train_frozen_base"]
 
@@ -145,7 +155,11 @@ def _abstain(model_id: str, sigma: float, reason: str) -> StepEstimate:
 	return StepEstimate(None, None, None, "s", "abstain", model_id, sigma, {}, reason)
 
 
-RANGE_FACTOR = 2.0  # same rule as memory: half the smallest to twice the largest probe
+RANGE_FACTOR = 2.0  # cited: A's probe-plan D2 query range: abstain past 2x the largest probe
+BELOW_GROWTH_LOG = (
+	0.1  # simulated: S4b T4, the 90% log half-width grows 0.1 per halving below the smallest probe
+)
+ABSTAIN_HALF_WIDTH = math.log(1.5)  # cited: Hackathon Project Goals, abstain when the band exceeds +-50%
 
 
 # ---------------------------------------------------------------- same GPU
@@ -217,7 +231,8 @@ class SameGpuModel:
 		return cls(fits, tuple(p.tokens for p in probes), sigma, measured)
 
 	def range(self) -> tuple[float, float]:
-		return min(self.probe_tokens) / RANGE_FACTOR, max(self.probe_tokens) * RANGE_FACTOR
+		"""Predicted between the smallest probe and twice the largest; below it, extrapolated (S4b)."""
+		return min(self.probe_tokens), max(self.probe_tokens) * RANGE_FACTOR
 
 	def predict(
 		self, tokens: float, recompute: bool = False, measured_probe: str | None = None
@@ -229,13 +244,21 @@ class SameGpuModel:
 			status, sigma = "measured", self.sigma / 2
 		else:
 			lo_r, hi_r = self.range()
-			if not lo_r <= tokens <= hi_r:
+			sigma, status = self.sigma, "predicted"
+			if 0 < tokens < lo_r:
+				# S4b T4: small batches under-use the GPU, so the line drifts; the band grows per halving
+				h = Z90 * self.sigma + BELOW_GROWTH_LOG * math.log2(lo_r / tokens)
+				if h > ABSTAIN_HALF_WIDTH:
+					why = f"{tokens:.0f} work units per step is too far below the smallest probe ({lo_r:.0f}); run a probe here"
+					return _abstain(MODEL_ID_SAME, h / Z90, why)
+				sigma, status = h / Z90, "extrapolated"
+				reason = f"below the smallest probed size ({lo_r:.0f} work units), so the range is wider; run a probe here for a measured number"
+			elif not lo_r <= tokens <= hi_r:
 				why = f"{tokens:.0f} work units per step is outside the probed range ({lo_r:.0f} to {hi_r:.0f}); run a probe here"
 				return _abstain(MODEL_ID_SAME, self.sigma, why)
 			bd = {n: f.predict(tokens) for n, f in self.fits.items()}
 			if recompute:
 				bd = with_recompute(bd)
-			sigma, status = self.sigma, "predicted"
 		point = sum(bd.values())
 		lo, hi = _band(point, sigma)
 		return StepEstimate(point, lo, hi, "s", status, MODEL_ID_SAME, sigma, bd, reason)
@@ -355,7 +378,7 @@ CLASS_BOUND: dict[str, Bound] = {
 _TAIL_ROW = re.compile(r"^\(tail\) ([a-z]+) \(\d+ ops?\)$")
 
 
-MAX_KERNEL_NAME = 200  # the schema's KERNEL_NAME_LEN; longer names are cut before any regex sees them
+MAX_KERNEL_NAME = 200  # cited: schema KERNEL_NAME_LEN
 
 
 def classify_kernel(name: str) -> KernelClass:

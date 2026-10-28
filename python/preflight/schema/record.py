@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.3.0"
+SCHEMA_VERSION = "0.4.0"
 
 
 def _now() -> datetime:
@@ -25,12 +25,21 @@ def _now() -> datetime:
 # ---------------------------------------------------------------- job (A)
 
 
+RECORD_REF = r"^(sample:[a-z0-9][a-z0-9_-]{0,39}|[A-Za-z0-9_-]{16,64})$"
+
+
 class Source(Strict):
-	kind: Literal["sample", "repo", "upload", "notebook", "template", "cli", "inflight"]
+	kind: Literal["sample", "repo", "upload", "notebook", "template", "cli", "inflight", "record"]
 	uri: str | None = Field(
 		default=None, description="sample://name, https://github.com/..., upload://<hash>"
 	)
-	commit: str | None = None
+	record_ref: str | None = Field(
+		default=None,
+		pattern=RECORD_REF,
+		description="kind=record: a share token or sample:<id>; the job reuses that record's script, "
+		"env and data, and writes a new record whose parent_id is it",
+	)
+	commit: str | None = Field(default=None, description="For repos: the full commit the code was read at")
 	content_hash: str | None = Field(default=None, description="sha256 of the submitted code")
 	entrypoint: str | None = None
 	args: list[str] = Field(default_factory=list)
@@ -191,6 +200,14 @@ class Knob(Strict):
 	needs_code: bool = False
 	patch_template: str | None = Field(default=None, description="Patch template id for code knobs")
 	group: str | None = Field(default=None, description="memory, speed, data, model, rl, agent, cluster")
+	affects: list[str] = Field(
+		default_factory=list, max_length=16, description="Job-map node ids the knob acts on"
+	)
+	changes_results: bool | None = Field(
+		default=None,
+		description="True if moving it changes what the model learns (offered only to clear a failure, "
+		"never as a saving); false if it changes only speed, memory or cost; null if unknown",
+	)
 
 	@model_validator(mode="after")
 	def _check(self):
@@ -241,6 +258,38 @@ class StepTime(Strict):
 	)
 	unprofiled: bool = Field(
 		default=True, description="Timings come from steps without the profiler attached"
+	)
+
+
+StepKind = Literal["warmup", "timed", "phase", "profiled"]
+
+
+class StepSample(Strict):
+	"""One optimizer step as the probe saw it, so B fits on every step, not a few summary points."""
+
+	model_config = ConfigDict(allow_inf_nan=False)
+
+	index: int = Field(ge=1)
+	kind: StepKind = Field(
+		description="warmup (discarded), timed (no recorder sync points, CUDA events at the step boundary "
+		"only), phase (synchronised, for the phase split), profiled (profiler attached)"
+	)
+	wall_s: float = Field(ge=0, description="Step boundary to step boundary, minus eval and checkpoint time")
+	tokens: int | None = Field(
+		default=None, ge=0, description="Tokens in the step's batches, padding included"
+	)
+	real_tokens: int | None = Field(default=None, ge=0, description="Tokens the attention mask keeps")
+	samples: int | None = Field(default=None, ge=0)
+	padded_len: int | None = Field(
+		default=None, ge=0, description="Padded sequence length of the step's batches"
+	)
+	micro_steps: int | None = Field(default=None, ge=0)
+	peak_allocated_bytes: int | None = Field(default=None, ge=0)
+	peak_reserved_bytes: int | None = Field(default=None, ge=0)
+	device_used_bytes: int | None = Field(
+		default=None,
+		ge=0,
+		description="Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else",
 	)
 
 
@@ -304,6 +353,17 @@ class EvalStats(Strict):
 	peak_allocated_bytes: int | None = None
 	grad_enabled: bool | None = Field(
 		default=None, description="True when eval ran with autograd on (no no_grad)"
+	)
+	loader_batches: int | None = Field(
+		default=None,
+		ge=0,
+		description="Batches the full eval loader would run, so the pass can be extrapolated",
+	)
+	memory_by_batch: list[int] = Field(
+		default_factory=list,
+		max_length=64,
+		description="Allocated bytes after each measured eval batch: growth across batches (outputs kept "
+		"for metrics) is what makes an eval OOM late in the pass",
 	)
 
 
@@ -407,6 +467,9 @@ class Probe(Strict):
 	checkpoint: CheckpointStats | None = None
 	generation: GenerationStats | None = None
 	extras: dict[str, float] = Field(default_factory=dict, description="Lens-specific measurements")
+	step_log: list[StepSample] = Field(
+		default_factory=list, max_length=256, description="Every optimizer step the probe ran, in order"
+	)
 	kernels: KernelTable | None = Field(
 		default=None, description="Per-kernel table, current-settings probe only (profiled window)"
 	)
@@ -424,8 +487,12 @@ class AgentTask(Strict):
 	model: str | None = None
 	turns: int = Field(ge=0)
 	input_tokens: int = Field(ge=0)
-	output_tokens: int = Field(ge=0)
-	reasoning_tokens: int = Field(default=0, ge=0)
+	output_tokens: int = Field(
+		ge=0, description="All generated tokens, reasoning included (as OpenAI and Anthropic bill them)"
+	)
+	reasoning_tokens: int = Field(
+		default=0, ge=0, description="The part of output_tokens spent reasoning; not added again"
+	)
 	cached_input_tokens: int = Field(default=0, ge=0)
 	cache_creation_tokens: int = Field(default=0, ge=0)
 	tool_calls: int = Field(default=0, ge=0)
@@ -464,6 +531,9 @@ class ModelCard(Strict):
 	coverage: float | None = Field(default=None, ge=0, le=1)
 	per_gpu_coverage: dict[str, float] = Field(default_factory=dict)
 	notes: str | None = None
+	fixture: bool = Field(
+		default=False, description="Illustrative numbers from a fixture, not a fitted model; the UI says so"
+	)
 
 
 # ---------------------------------------------------------------- findings (A and B write, C shows)
@@ -662,6 +732,10 @@ class FlightRecord(Strict):
 			if extra:
 				raise ValueError(f"probe {p.id} sets undeclared knobs {sorted(extra)}")
 		node_ids = {n.id for n in self.graph.nodes}
+		for k in self.knobs:
+			missing = [n for n in k.affects if node_ids and n not in node_ids]
+			if missing:
+				raise ValueError(f"knob {k.id} affects unknown nodes {missing}")
 		for f in self.findings:
 			if f.node_id is not None and node_ids and f.node_id not in node_ids:
 				raise ValueError(f"finding {f.id} points at unknown node {f.node_id}")

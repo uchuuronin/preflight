@@ -49,6 +49,11 @@ class GuideState:
 	rounds: int = 0
 	#: numbers the server injected this turn (decisions, server tool results), for the number check
 	evidence: list[float] = field(default_factory=list)
+	#: the setting the last sensitivity call this turn ranked (a fingerprint), so the guide can't
+	#: re-rank the same setting in a loop (seen with Muse Spark, Oct 27: docs/decisions/guide-limits.md)
+	ranked: str | None = None
+	#: highlight and predict calls already answered this turn (fingerprints), so repeats are refused
+	seen: list[str] = field(default_factory=list)
 
 	def add(self, *items: dict[str, Any]) -> None:
 		self.items.extend(items)
@@ -104,4 +109,6 @@ def open_state(token: str | None, *, sid: str, record_key: str) -> GuideState:
 		turn_start=int(raw.get("turn_start", 0)),
 		rounds=int(raw.get("rounds", 0)),
 		evidence=[float(x) for x in raw.get("evidence", [])],
+		ranked=raw.get("ranked"),
+		seen=[str(x) for x in raw.get("seen", [])][:64],
 	)

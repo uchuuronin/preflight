@@ -220,6 +220,19 @@
 			"default": null,
 			"title": "Record Id"
 		},
+		"share_token": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Where the record is read (GET /v1/records/{share_token}) once a skeleton exists",
+			"title": "Share Token"
+		},
 		"seq": {
 			"minimum": 0,
 			"title": "Seq",
@@ -348,6 +361,20 @@
 			"default": null,
 			"description": "On failed: whether resubmitting may succeed",
 			"title": "Retryable"
+		},
+		"error_code": {
+			"anyOf": [
+				{
+					"pattern": "^[a-z_]+(\\.[a-z_]+)?$",
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
+			"title": "Error Code"
 		}
 	},
 	"required": [
@@ -359,5 +386,5 @@
 	"title": "JobEvent",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.3.0/JobEvent"
+	"$id": "https://preflight.dev/schema/0.4.0/JobEvent"
 }

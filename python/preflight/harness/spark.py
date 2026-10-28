@@ -135,7 +135,19 @@ class ModelClient:
 
 	@classmethod
 	def meta(cls, **kw) -> "ModelClient":
-		return cls(base_url=os.environ.get("META_BASE_URL", META_BASE_URL), provider="meta", **kw)
+		"""Muse Spark on the Meta Model API, configured from the `preflight-meta` secret.
+
+		META_API_BASE and META_API_KEY are the canonical names (docs/setup/cloud.md);
+		META_BASE_URL and MODEL_API_KEY are read as fallbacks for one release.
+		"""
+		env = os.environ
+		kw.setdefault("base_url", env.get("META_API_BASE") or env.get("META_BASE_URL") or META_BASE_URL)
+		kw.setdefault("api_key", env.get("META_API_KEY") or env.get("MODEL_API_KEY") or "")
+		return cls(provider="meta", **kw)
+
+	@staticmethod
+	def meta_configured() -> bool:
+		return bool(os.environ.get("META_API_KEY") or os.environ.get("MODEL_API_KEY"))
 
 	@classmethod
 	def baseten_spark_open(cls, **kw) -> "ModelClient":

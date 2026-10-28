@@ -9,11 +9,10 @@ volume committed after every config, so a preempted container loses one config.
 Run from the repo root (PYTHONPATH=python so the package is importable):
 
     PYTHONPATH=python modal run python/preflight/corpus/modal_app.py --dry-run
-    PYTHONPATH=python modal run python/preflight/corpus/modal_app.py \\
-        --kind kernels --budgets "L4=25,A100-SXM-80GB=45,H100-SXM-80GB=70"
-    PYTHONPATH=python modal run python/preflight/corpus/modal_app.py \\
-        --kind divergence --n 800 --budgets "L4=35"
-    modal volume get preflight-corpus /kernels ./corpus/kernels
+    modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets "L4=5.5"
+    modal run python/preflight/corpus/modal_app.py::export --kind kernels
+
+Agents start these through remote-run.yml, only after Chiya's yes; the plan and caps are in corpus/README.md.
 
 Add --detach after `modal run` so a laptop disconnect doesn't cancel the sweep (it resumes either way).
 """
@@ -30,13 +29,22 @@ VOLUME = "preflight-corpus"
 MOUNT = "/corpus"
 TEXT = "/assets/tinyshakespeare.txt"
 
+# exact pins, at least two weeks old on Oct 27 2026; they also go into every corpus key
+PINS = {
+	"torch": "torch==2.8.0",
+	"transformers": "transformers==5.19.0",
+	"peft": "peft==0.21.2",
+	"bitsandbytes": "bitsandbytes==0.50.2",
+	"accelerate": "accelerate==1.15.0",
+}
+
 app = modal.App(APP_NAME)
 vol = modal.Volume.from_name(VOLUME, create_if_missing=True)
 
 image = (
 	modal.Image.debian_slim(python_version="3.11")
 	.apt_install("curl")
-	.pip_install("torch==2.8.0", "numpy")
+	.pip_install(*PINS.values(), "numpy")
 	.run_commands(
 		"mkdir -p /assets",
 		f"curl -fsSL -o {TEXT} https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
@@ -84,6 +92,8 @@ class Sweeper:
 			out.append(
 				{
 					"key": cfg.key,
+					"family": cfg.family,
+					"role": cfg.params.get("role"),
 					"gpu": actual,
 					"status": res["status"],
 					"error_code": res.get("error_code"),
@@ -113,12 +123,57 @@ def ledger(kind: str, gpu: str, retry_errors: bool = False) -> dict[str, Any]:
 	return out
 
 
+def runs_on(cfg, gpu: str) -> bool:
+	"""bf16 configs skip GPUs with no bf16 path (T4): emulated bf16 would time the emulation, not the job."""
+	from preflight.engine import gpus
+
+	dtype = cfg.params.get("dtype") or cfg.params.get("precision") or "fp32"
+	return not (dtype == "bf16" and gpus.get_gpu(gpu).bf16 is None)
+
+
+@app.function(image=image, volumes={MOUNT: vol}, timeout=15 * 60)
+def read_rows(kind: str) -> list[dict[str, Any]]:
+	"""Every finished row of one kind, for export (meta summaries left out)."""
+	import json
+	from pathlib import Path
+
+	vol.reload()
+	out = []
+	for f in sorted(Path(MOUNT, kind).rglob("*.json")):
+		if not f.name.endswith(".meta.json"):
+			out.append(json.loads(f.read_text()))
+	return out
+
+
+@app.local_entrypoint()
+def export(kind: str = "kernels", out: str = "out/corpus") -> None:
+	"""Bring the volume's rows back as one gzipped JSONL per kind and GPU (remote-run returns ./out):
+
+	modal run python/preflight/corpus/modal_app.py::export --kind kernels
+	"""
+	import gzip
+	import json
+	from collections import defaultdict
+	from pathlib import Path
+
+	by_gpu: dict[str, list[dict[str, Any]]] = defaultdict(list)
+	for row in read_rows.remote(kind):
+		by_gpu[row.get("gpu", "unknown")].append(row)
+	for gpu, rows in sorted(by_gpu.items()):
+		path = Path(out, kind, f"{gpu}.jsonl.gz")
+		path.parent.mkdir(parents=True, exist_ok=True)
+		with gzip.open(path, "wt") as f:
+			for r in rows:
+				f.write(json.dumps(r, sort_keys=True) + "\n")
+		print(f"{path}: {len(rows)} rows")
+
+
 @app.local_entrypoint()
 def main(
 	kind: str = "kernels",
 	n: int = 1500,
 	seed: int = 0,
-	budgets: str = "L4=25,A100-SXM-80GB=45,H100-SXM-80GB=70",
+	budgets: str = "L4=5",  # the $45 plan (corpus/README.md) passes its own per GPU; never more without Chiya's yes
 	batch_size: int = 8,
 	max_containers: int = 4,
 	overhead: float = 1.25,
@@ -127,10 +182,16 @@ def main(
 ) -> None:
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
+	from preflight.corpus.isolate import DEFAULT_TIMEOUT_S
 	from preflight.engine import gpus
 
 	plan = sweep.parse_budget_plan(budgets)
-	all_cfgs = cfgs.kernel_configs(n, seed) if kind == "kernels" else cfgs.divergence_configs(n, seed)
+	pinned = {"corpus": cfgs.CODE_VERSION, **{k: v.split("==")[1] for k, v in PINS.items()}}
+	if kind != "hf":
+		pinned = {k: v for k, v in pinned.items() if k in ("corpus", "torch")}
+	all_cfgs = [c.with_versions(pinned) for c in cfgs.configs_for(kind, n, seed)]
+	per_gpu = {g: [c for c in all_cfgs if runs_on(c, g)] for g in plan}
+	store_kind = all_cfgs[0].kind  # grouped configs are kernels rows; the ledger reads that directory
 	rates = {}
 	for g in plan:
 		p = gpus.price(g, "modal")
@@ -143,11 +204,13 @@ def main(
 		wave_size = batch_size * max_containers
 		wave, last_done = 0, -1
 		while True:
-			led = ledger.remote(kind, gpu, retry_errors and wave == 0)
+			led = ledger.remote(store_kind, gpu, retry_errors and wave == 0)
 			spent = led["gpu_seconds"] * overhead / 3600 * rates[gpu]
+			# hard cap: configs are priced at their deadline until three have finished (isolate.py)
 			todo = sweep.plan_from(
-				all_cfgs, set(led["done"]), spent, plan[gpu], rates[gpu], overhead=overhead,
+				per_gpu[gpu], set(led["done"]), spent, plan[gpu], rates[gpu], overhead=overhead,
 				history=led["history"], reserve_configs=wave_size,
+				worst_seconds=DEFAULT_TIMEOUT_S.get(store_kind, 900.0),
 			)  # fmt: skip
 			print(
 				f"[{gpu}] wave {wave}: ${spent:.2f} of ${plan[gpu]:.2f} spent, {len(led['done'])} done, {len(todo)} fit in budget"
@@ -167,6 +230,12 @@ def main(
 					print(f"[{gpu}] a batch failed: {type(res).__name__}: {res}")
 					continue
 				rows.extend(res)
+				for r in res:  # measured seconds per config, in the log, so pricing needs no export run
+					if r.get("status") != "skipped":
+						print(
+							f"[{gpu}] config {r.get('key', '?')[:12]} {r.get('family', '')} {r.get('role') or ''} {r.get('status')}: "
+							f"{float(r.get('gpu_seconds') or 0.0):.1f} s"
+						)
 				bad = [r for r in res if r["gpu"] != gpu]
 				if bad:
 					print(f"[{gpu}] warning: ran on {bad[0]['gpu']}; rows filed under the actual GPU")

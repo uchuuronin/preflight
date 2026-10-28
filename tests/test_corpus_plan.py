@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -282,3 +283,111 @@ def test_repeated_corpus_bugs_stop_the_sweep(tmp_path):
 def test_fp32_configs_sample_tf32_both_ways():
 	vals = {x.params.get("tf32") for x in c.kernel_configs(400, seed=0) if x.params.get("dtype") == "fp32"}
 	assert vals == {True, False}
+
+
+def test_uptime_ledger_bills_idle_time_and_stops_at_budget(tmp_path):
+	from datetime import UTC, datetime
+
+	from preflight.corpus import configs as C
+	from preflight.corpus.ledger import UptimeLedger
+	from preflight.corpus.store import ResultStore
+	from preflight.corpus.sweep import run_local
+
+	now = [1_000_000.0]
+	started = datetime.fromtimestamp(now[0] - 3600, UTC)  # the droplet has been up an hour already
+	ledger = UptimeLedger(tmp_path / "ledger.jsonl", started, usd_per_hour=2.0, clock=lambda: now[0])
+	assert ledger.spent() == pytest.approx(2.0)
+
+	def runner(cfg):
+		now[0] += 1800  # each config takes half an hour of droplet time
+		return {"status": "ok", "gpu_seconds": 60.0}
+
+	cfgs = C.kernel_configs(10)
+	n = run_local(
+		cfgs,
+		ResultStore(tmp_path / "out"),
+		"MI300X",
+		5.0,
+		2.0,
+		runner,
+		est_seconds=60,
+		ledger=ledger,
+		log=lambda m: None,
+	)
+	# $2 already spent by uptime; each config adds $1 of droplet time, not $0.03 of GPU seconds
+	assert n == 3
+	events = [r["event"] for r in ledger.rows()]
+	assert events[0] == "start" and events.count("config") == 3 and events[-1] == "stop"
+	assert ledger.rows()[-1]["spent_usd"] == pytest.approx(5.0)
+	with pytest.raises(ValueError):
+		UptimeLedger(tmp_path / "x.jsonl", datetime(2026, 10, 28), 2.0)  # no time zone
+
+
+def test_amd_grouped_export_matches_the_nvidia_groups(tmp_path):
+	from preflight.corpus import configs as C
+	from preflight.corpus.sweep import _main
+
+	out = tmp_path / "amd.jsonl"
+	_main(["export-amd", "--kind", "grouped", "--n", "300", "--out", str(out)])
+	amd = C.read_jsonl(str(out))
+	nv = C.configs_for("grouped", 300, 0)
+	assert [c.key for c in amd] == [c.key for c in nv]
+	# the A100 holdout's 100 configs are the first 20 of the same groups
+	assert {c.key for c in C.configs_for("grouped", 100, 0)} <= {c.key for c in nv}
+	shipped = C.read_jsonl(str(Path(C.__file__).parent / "data" / "amd_grouped.jsonl"))
+	assert [c.key for c in shipped] == [c.key for c in nv]
+
+
+def test_copy_results_keeps_the_layout(tmp_path):
+	from preflight.corpus.sweep import copy_results
+
+	src = tmp_path / "store"
+	(src / "kernels" / "MI300X").mkdir(parents=True)
+	(src / "kernels" / "MI300X" / "a.json").write_text("{}")
+	(src / "ledger-MI300X.jsonl").write_text("{}\n")
+	assert copy_results(src, tmp_path / "out") == 2
+	assert (tmp_path / "out" / "kernels" / "MI300X" / "a.json").exists()
+
+
+def test_bf16_configs_skip_gpus_without_bf16():
+	pytest.importorskip("modal")
+	from preflight.corpus import configs as C
+	from preflight.corpus.modal_app import runs_on
+
+	cfgs = C.configs_for("grouped", 300, 0)
+	t4 = [c for c in cfgs if runs_on(c, "T4")]
+	assert 0 < len(t4) < len(cfgs) and all(c.params.get("dtype") != "bf16" for c in t4)
+	assert all(runs_on(c, "L4") for c in cfgs)
+	assert not any(runs_on(c, "T4") for c in C.hf_configs())  # HF jobs are bf16 LoRA or bf16-compute QLoRA
+
+
+def test_calibrate_reads_exported_gzip(tmp_path):
+	import gzip
+	import json
+
+	from preflight.corpus.calibrate import load_rows
+
+	p = tmp_path / "kernels" / "L4.jsonl.gz"
+	p.parent.mkdir(parents=True)
+	with gzip.open(p, "wt") as f:
+		f.write(
+			json.dumps({"status": "ok", "gpu": "L4"})
+			+ "\n"
+			+ json.dumps({"status": "oom", "gpu": "L4"})
+			+ "\n"
+		)
+	assert [r["status"] for r in load_rows(tmp_path)] == ["ok", "oom"]
+
+
+def test_deadline_pricing_makes_the_cap_hard_before_any_history():
+	from preflight.corpus import configs as C
+	from preflight.corpus import sweep as sw
+
+	cfgs = C.configs_for("grouped", 10, 0)
+	# $0.30 on an L4 at a 600 s deadline x 1.25 overhead: one config fits, even if it hangs to its deadline
+	todo = sw.plan_from(cfgs, set(), 0.0, 0.30, 0.80, worst_seconds=600.0)
+	assert len(todo) == 1
+	assert len(todo) * sw.cost_usd(600.0, 0.80, sw.DEFAULT_OVERHEAD) <= 0.30
+	# after three measured configs the running p90 takes over
+	todo = sw.plan_from(cfgs, set(), 0.05, 0.30, 0.80, history=[40.0, 45.0, 50.0], worst_seconds=600.0)
+	assert len(todo) > 1

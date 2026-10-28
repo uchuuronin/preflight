@@ -293,3 +293,34 @@ def test_position_reflects_fair_dispatch_not_raw_order(clock):
 	mine = store.submit(REQ, visitor="polite", idempotency_key="p")
 	# greedy's first job goes first, then mine: one job ahead, not twenty
 	assert store.position(mine.job_id) == 1
+
+
+def test_info_points_at_the_latest_record_while_the_job_runs():
+	store = InMemoryJobStore()
+	sub = store.submit({"source": {"kind": "sample"}}, visitor="v", idempotency_key="k")
+	lease = store.lease("w")
+	store.emit(sub.job_id, stage="skeleton", record_id="R1", share_token="t" * 24, record_rev=1)
+	info = store.info(sub.job_id)
+	assert info["status"] == "running" and info["share_token"] == "t" * 24 and info["record_id"] == "R1"
+	store.complete(lease, record_id="R1")
+	assert store.info(sub.job_id)["status"] == "done"
+	# archived and restored: still answerable
+	again = InMemoryJobStore.restore(store.snapshot())
+	assert again.info(sub.job_id)["share_token"] == "t" * 24
+
+
+def test_a_reaped_attempt_cannot_emit_and_the_retry_keeps_the_record():
+	from preflight.runner.queue import LeaseLost
+
+	t = [1000.0]
+	store = InMemoryJobStore(clock=lambda: t[0])
+	sub = store.submit({"source": {}}, visitor="v", idempotency_key="k")
+	first = store.lease("w1")
+	store.emit(sub.job_id, stage="skeleton", token=first.token, record_id="R1", share_token="a" * 24)
+	t[0] += 1000  # the first worker went silent
+	store.reap()
+	with pytest.raises(LeaseLost):
+		store.emit(sub.job_id, stage="probing", token=first.token, share_token="b" * 24)
+	second = store.lease("w2")
+	assert (second.record_id, second.share_token) == ("R1", "a" * 24)  # the retry continues R1
+	assert store.info(sub.job_id)["share_token"] == "a" * 24

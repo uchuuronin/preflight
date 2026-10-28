@@ -8,6 +8,7 @@ import pytest
 pytest.importorskip("torch")
 
 from preflight.probes.local import ProbeSpec, run_probe
+from preflight.recorder.runtime import PHASE_STEPS
 
 FIX = Path(__file__).resolve().parent / "fixtures"
 # scripts that import transformers; CI's torch job installs it with accelerate
@@ -30,7 +31,7 @@ def loop_result():
 def test_plain_loop_probe_is_ok_and_stops_at_target(loop_result):
 	p = loop_result.probe
 	assert p.status == "ok", p.error
-	assert p.steps == 5
+	assert p.steps == 5 + PHASE_STEPS  # warmup, timed, then synchronised steps for the phase split
 	assert p.step_time.n_steps == 3
 	assert p.knobs == {"batch_size": 4}
 
@@ -57,7 +58,7 @@ def test_memory_terms_are_exact_for_weights_and_adam_state(loop_result):
 def test_stability_series_cover_every_step(loop_result):
 	s = loop_result.probe.stability
 	for key in ("loss", "grad_norm", "grad_norm_ma", "update_to_weight", "output_logit_norm", "lr"):
-		assert len(s.series[key]) == 5, key
+		assert len(s.series[key]) == 5 + PHASE_STEPS, key
 	assert all(v is not None and v > 0 for v in s.series["loss"])
 	assert s.nan_count == 0
 
@@ -90,11 +91,11 @@ def test_hf_trainer_probe_measures_padding(tmp_path):
 	r = run_probe(spec("tiny_hf.py", warmup=2, timed=2, out_dir=tmp_path, timeout_s=180))
 	p = r.probe
 	assert p.status == "ok", p.error
-	assert p.steps == 4
+	assert p.steps == 4 + PHASE_STEPS
 	assert 0.05 < p.data.padding_fraction < 0.8
 	# grad accumulation 2: two backward passes per optimizer step
 	assert p.extras["micro_steps_per_step"] == 2
-	assert len(p.stability.series["loss"]) == 4
+	assert len(p.stability.series["loss"]) == 4 + PHASE_STEPS
 
 
 def test_user_error_names_the_step_and_the_line():
@@ -116,7 +117,7 @@ def test_oom_is_its_own_status():
 def test_scripts_that_swallow_exceptions_still_stop():
 	r = run_probe(spec("swallow.py", warmup=1, timed=2, timeout_s=60))
 	assert r.probe.status == "ok"
-	assert r.probe.steps == 3
+	assert r.probe.steps == 3 + PHASE_STEPS
 
 
 def test_hard_wall_clock_cap_names_the_last_stage():
@@ -223,3 +224,27 @@ def test_profiler_ranges_are_not_counted_as_kernels(profiled_hf):
 def test_attention_rows_carry_estimated_flops(profiled_hf):
 	attn = [r for r in rows_of(profiled_hf) if "scaled_dot_product" in r["name"]]
 	assert attn and all(r["flops"] and r["flops"] > 0 for r in attn)
+
+
+def test_every_step_is_logged_with_its_shape_time_and_kind(loop_result):
+	log = loop_result.probe.step_log
+	assert [x.kind for x in log] == ["warmup"] * 2 + ["timed"] * 3 + ["phase"] * PHASE_STEPS
+	assert [x.index for x in log] == list(range(1, len(log) + 1))
+	for x in log:
+		assert (
+			x.wall_s > 0
+			and x.tokens == 4 * 32
+			and x.samples == 4
+			and x.padded_len == 32
+			and x.micro_steps == 1
+		)
+	# the summary's timed steps are exactly the logged timed ones
+	timed = sorted(x.wall_s for x in log if x.kind == "timed")
+	assert loop_result.probe.step_time.p50_s == pytest.approx(timed[1])
+
+
+def test_timed_steps_lose_no_signal_to_deferred_reads(loop_result):
+	# losses, grad norms and logit norms are read after the probe on timed steps, not dropped
+	s = loop_result.probe.stability.series
+	# (the output head is found at the first optimizer step, so its norm starts at step 2)
+	assert all(v is not None and v > 0 for v in s["loss"] + s["grad_norm"] + s["output_logit_norm"][1:])

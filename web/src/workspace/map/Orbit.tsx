@@ -9,7 +9,7 @@ import { useWorkspace } from "../state";
 import { memoryTermBytes } from "../record/terms";
 import { fitOf, likelyFails, trusted, type Fit } from "../status";
 import { FitMark } from "../components/StatusMark";
-import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbit";
+import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, NODE_BOX, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbit";
 import { AddonBoundary } from "../../components/AddonBoundary";
 
 interface BgData extends Record<string, unknown> {
@@ -148,25 +148,27 @@ const OrbitNodeView = memo(function OrbitNodeView({ data }: NodeProps<Node<NodeD
 	// Outline weight carries the share of a step.
 	const bw = node.share === null ? 1 : node.share > 0.4 ? 3 : node.share > 0.2 ? 2 : 1;
 	return (
-		<button
-			type="button"
-			className={cls}
-			style={{ width: node.size, height: node.size, borderWidth: node.shape === "hexagon" ? 0 : bw }}
-			aria-label={t("map.node.aria", { name: title, meta })}
-		>
-			<span className="pf-onode__inner">
-				<b>{title}</b>
-				{node.repeat > 1 ? <small>{t("map.repeat", { n: node.repeat })}</small> : null}
-				<small>{meta}</small>
-			</span>
-			{finding ? <span className={`pf-onode__chip${fails ? " is-fails" : ""}`}>{finding}</span> : null}
-		</button>
+		<div className="pf-onode-box">
+			<button
+				type="button"
+				className={cls}
+				style={{ width: node.size, height: node.size, borderWidth: node.shape === "hexagon" ? 0 : bw }}
+				aria-label={t("map.node.aria", { name: title, meta })}
+			>
+				<span className="pf-onode__inner">
+					<b>{title}</b>
+					{node.repeat > 1 ? <small>{t("map.repeat", { n: node.repeat })}</small> : null}
+					<small>{meta}</small>
+				</span>
+				{finding ? <span className={`pf-onode__chip${fails ? " is-fails" : ""}`}>{finding}</span> : null}
+			</button>
+		</div>
 	);
 });
 
 const NODE_TYPES = { bg: OrbitBackground, onode: OrbitNodeView };
 
-function OrbitInner() {
+function OrbitInner({ compact = false }: { compact?: boolean }) {
 	const { record, estimates, state, actions } = useWorkspace();
 	const overlays = useMapOverlays(record.job.lens);
 	const flow = useReactFlow();
@@ -210,6 +212,10 @@ function OrbitInner() {
 			// come when its size hasn't changed (seen after quick guide moves, Oct 27).
 			width: FRAME.w,
 			height: FRAME.h,
+			// Known size and no handles: React Flow keeps its measurement instead of re-measuring
+			// every node after each knob change (a forced layout per node, measured Oct 27).
+			measured: { width: FRAME.w, height: FRAME.h },
+			handles: [],
 			style: { pointerEvents: "none" },
 		};
 		const findingsByNode = new Map<string, { title: string; severity: string }>();
@@ -233,7 +239,7 @@ function OrbitInner() {
 			return {
 				id: n.id,
 				type: "onode",
-				position: { x: n.x - n.size / 2, y: n.y - n.size / 2 },
+				position: { x: n.x - NODE_BOX / 2, y: n.y - NODE_BOX / 2 },
 				data: {
 					node: n,
 					title,
@@ -245,8 +251,12 @@ function OrbitInner() {
 				},
 				draggable: false,
 				zIndex: 2,
-				width: n.size,
-				height: n.size,
+				// A fixed box (see NODE_BOX); only the button inside it takes clicks.
+				width: NODE_BOX,
+				height: NODE_BOX,
+				measured: { width: NODE_BOX, height: NODE_BOX },
+				handles: [],
+				style: { pointerEvents: "none" },
 			};
 		});
 		return [bg, ...pfNodes];
@@ -263,7 +273,7 @@ function OrbitInner() {
 	}, [state.focus]);
 
 	return (
-		<div className="pf-orbit" role="region" aria-label={t("map.label")}>
+		<div className={`pf-orbit${compact ? " pf-orbit--compact" : ""}`} role="region" aria-label={t("map.label")}>
 			<ReactFlow
 				nodes={nodes}
 				edges={[]}
@@ -286,10 +296,12 @@ function OrbitInner() {
 				onPaneClick={() => actions.focus(null)}
 				proOptions={{ hideAttribution: true }}
 			/>
+			{compact ? null : (
 			<span className="pf-orbit__tps">
 				{layout.tokensPerSecond ? t("map.tps", { tps: fmt(layout.tokensPerSecond, "tokens/s") }) : null}
 			</span>
-			{overlays.map((o) => (
+			)}
+			{compact ? null : overlays.map((o) => (
 				<AddonBoundary key={o.id} id={o.id}>
 					<o.component record={record} knobs={state.knobs} estimates={estimates} />
 				</AddonBoundary>
@@ -298,10 +310,11 @@ function OrbitInner() {
 	);
 }
 
-export function Orbit() {
+/** `compact`: the small orbit in the side column while the fit map has the stage. */
+export function Orbit({ compact = false }: { compact?: boolean } = {}) {
 	return (
 		<ReactFlowProvider>
-			<OrbitInner />
+			<OrbitInner compact={compact} />
 		</ReactFlowProvider>
 	);
 }

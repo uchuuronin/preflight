@@ -21,17 +21,22 @@ import math
 import time
 import traceback
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from preflight.corpus import configs as cfgs
 from preflight.corpus.configs import SCHEMA, CorpusConfig
 from preflight.corpus.store import ResultStore
 
-DEFAULT_EST_SECONDS = {"kernels": 45.0, "divergence": 180.0}
-DEFAULT_OVERHEAD = 1.25  # container start, image pull and idle time Modal also bills
-ESTIMATE_QUANTILE = 0.9
-MIN_HISTORY = 3
-MAX_CONSECUTIVE_USER_ERRORS = 3
+DEFAULT_EST_SECONDS = {
+	"kernels": 45.0,
+	"divergence": 180.0,
+	"hf": 120.0,
+}  # guess: per-config seconds before any finish; replaced by the running p90 after 3 configs (measured)
+DEFAULT_OVERHEAD = 1.25  # guess: container start and idle Modal bills; replaced by Modal's billed/elapsed ratio after the first wave
+ESTIMATE_QUANTILE = 0.9  # simulated: S5 B5
+MIN_HISTORY = 3  # simulated: S5 B5
+MAX_CONSECUTIVE_USER_ERRORS = 3  # guess: three corpus-code errors in a row means a bug, not a config
 _EPS = 1e-6
 
 Runner = Callable[[CorpusConfig], dict[str, Any]]
@@ -70,10 +75,17 @@ def plan_from(
 	overhead: float = DEFAULT_OVERHEAD,
 	history: list[float] | None = None,
 	reserve_configs: int = 0,
+	worst_seconds: float | None = None,
 ) -> list[CorpusConfig]:
-	"""Configs not yet done, cut to what the remaining budget allows after the reserve."""
+	"""Configs not yet done, cut to what the remaining budget allows after the reserve.
+
+	With worst_seconds (a config's deadline), configs are priced at it until MIN_HISTORY have finished,
+	so even a first wave that runs every config to its deadline stays inside the budget: a hard cap.
+	"""
 	if not configs:
 		return []
+	if est_seconds is None and worst_seconds is not None and len(history or []) < MIN_HISTORY:
+		est_seconds = worst_seconds
 	est, _ = estimate_seconds(configs[0].kind, history, est_seconds)
 	per = cost_usd(est, usd_per_hour, overhead)
 	reserve = reserve_configs * per if len(history or []) >= MIN_HISTORY else 0.0
@@ -142,27 +154,36 @@ def run_local(
 	retry_errors: bool = False,
 	log: Callable[[str], None] = print,
 	max_user_errors: int = MAX_CONSECUTIVE_USER_ERRORS,
+	ledger=None,
 ) -> int:
 	"""Run configs one at a time, writing each result once; returns how many ran.
 
-	Spend counts the billing overhead (an hourly droplet bills idle and start-up time too). Several
-	user_error rows in a row mean a bug in corpus code, not bad configs: the sweep stops and says so.
+	Spend counts the billing overhead. With an uptime ledger (ledger.UptimeLedger), spend is the droplet's
+	wall-clock bill instead, idle time included. Several user_error rows in a row mean a bug in corpus code,
+	not bad configs: the sweep stops and says so.
 	"""
 	if not configs:
 		return 0
 	kind = configs[0].kind
 	done = store.done_keys(kind, gpu, retry_errors=retry_errors)
 	spent = store.spent_usd({gpu: usd_per_hour}, kind=kind, gpu=gpu) * overhead
+	if ledger is not None:
+		spent = ledger.spent()
+		ledger.record("start", gpu=gpu, kind=kind, budget_usd=budget_usd)
 	history = store.gpu_seconds(kind, gpu)
 	n, user_errors = 0, 0
 	for cfg in configs:
 		if cfg.key in done:
 			continue
 		est, _ = estimate_seconds(kind, history, est_seconds)
-		per = cost_usd(est, usd_per_hour, overhead)
+		per = cost_usd(est, usd_per_hour, 1.0 if ledger is not None else overhead)
+		if ledger is not None:
+			spent = ledger.spent()  # idle time between configs is billed too
 		reserve = per if len(history) >= MIN_HISTORY else 0.0  # one config is this driver's wave
 		if spent + per + reserve > budget_usd + _EPS:
 			log(f"budget reached: ${spent:.2f} of ${budget_usd:.2f} spent on {gpu}; halting")
+			if ledger is not None:
+				ledger.record("stop", reason="budget")
 			break
 		t0 = time.monotonic()
 		try:
@@ -177,7 +198,11 @@ def run_local(
 			}
 		store.write_once(kind, gpu, cfg.key, make_record(cfg, gpu, result), replace_errors=True)
 		secs = float(result.get("gpu_seconds", 0.0))
-		spent += cost_usd(secs, usd_per_hour, overhead)
+		if ledger is not None:
+			spent = ledger.spent()
+			ledger.record("config", key=cfg.key, status=result.get("status"), config_s=round(secs, 1))
+		else:
+			spent += cost_usd(secs, usd_per_hour, overhead)
 		history.append(secs)
 		n += 1
 		log(f"[{n}] {cfg.family} {cfg.key} {result.get('status')} ${spent:.2f}")
@@ -196,12 +221,18 @@ def _main(argv: list[str] | None = None) -> None:
 
 	ex = sub.add_parser("export-amd", help="write the AMD slice config list")
 	ex.add_argument("--out", required=True)
+	ex.add_argument(
+		"--kind",
+		choices=["kernels", "grouped"],
+		default="kernels",
+		help="grouped: the same probe-like groups the NVIDIA GPUs run, so every MI300X row has NVIDIA pairs",
+	)
 	ex.add_argument("--n-total", type=int, default=1500)
 	ex.add_argument("--n", type=int, default=500)
 	ex.add_argument("--seed", type=int, default=0)
 
 	run = sub.add_parser("run", help="run a sweep on this machine's GPU")
-	run.add_argument("--kind", choices=["kernels", "divergence"], required=True)
+	run.add_argument("--kind", choices=list(cfgs.KINDS), required=True)
 	run.add_argument("--configs", help="jsonl list; default: generate")
 	run.add_argument("--n", type=int, default=1500)
 	run.add_argument("--seed", type=int, default=0)
@@ -215,12 +246,28 @@ def _main(argv: list[str] | None = None) -> None:
 	run.add_argument(
 		"--overhead", type=float, default=DEFAULT_OVERHEAD, help="billing overhead on measured seconds"
 	)
+	run.add_argument(
+		"--billing",
+		choices=["per-config", "uptime"],
+		default="per-config",
+		help="uptime: the machine bills from start to destroy (the AMD droplet); needs --droplet-started",
+	)
+	run.add_argument("--droplet-started", help="when the droplet was created, ISO 8601 with a time zone")
+	run.add_argument(
+		"--copy-to",
+		help="also copy the results and ledger here when the sweep stops, even on a timeout (amd-run brings back ./out)",
+	)
 	args = ap.parse_args(argv)
 
 	if args.cmd == "export-amd":
-		nv = cfgs.kernel_configs(args.n_total, seed=args.seed)
-		cfgs.write_jsonl(cfgs.amd_slice(nv, args.n), args.out)
-		print(f"wrote {args.n} configs to {args.out}")
+		if args.kind == "grouped":
+			out = cfgs.configs_for(
+				"grouped", args.n, args.seed
+			)  # the first n // 5 groups, as on every NVIDIA GPU
+		else:
+			out = cfgs.amd_slice(cfgs.kernel_configs(args.n_total, seed=args.seed), args.n)
+		cfgs.write_jsonl(out, args.out)
+		print(f"wrote {len(out)} configs to {args.out}")
 		return
 
 	from preflight.corpus.isolate import run_isolated
@@ -243,26 +290,60 @@ def _main(argv: list[str] | None = None) -> None:
 		if p is None:
 			raise SystemExit(f"no price for {gpu}; pass --usd-per-hour")
 		rate = p.usd_per_hour
-	if args.configs:
-		todo = cfgs.read_jsonl(args.configs)
-	elif args.kind == "kernels":
-		todo = cfgs.kernel_configs(args.n, seed=args.seed)
-	else:
-		todo = cfgs.divergence_configs(args.n, seed=args.seed)
+	todo = cfgs.read_jsonl(args.configs) if args.configs else cfgs.configs_for(args.kind, args.n, args.seed)
+	versions = cfgs.local_versions(args.kind)
+	todo = [c.with_versions(versions) for c in todo]  # code and library versions in every key
 
 	def runner(cfg: CorpusConfig) -> dict[str, Any]:
 		return run_isolated(cfg, device=args.device, data_path=args.data)
 
-	run_local(
-		todo,
-		ResultStore(args.out),
-		gpu,
-		args.budget_usd,
-		rate,
-		runner,
-		overhead=args.overhead,
-		retry_errors=args.retry_errors,
-	)
+	ledger = None
+	if args.billing == "uptime":
+		from datetime import datetime
+
+		from preflight.corpus.ledger import UptimeLedger
+
+		if not args.droplet_started:
+			raise SystemExit("--billing uptime needs --droplet-started (when the droplet was created)")
+		ledger = UptimeLedger(
+			Path(args.out) / f"ledger-{gpu}.jsonl", datetime.fromisoformat(args.droplet_started), rate
+		)
+	import signal
+
+	def _stop(signum, frame):  # `timeout` sends SIGTERM; turn it into an exit so the copy below still runs
+		raise SystemExit(f"stopped by signal {signum}")
+
+	signal.signal(signal.SIGTERM, _stop)
+	try:
+		run_local(
+			todo,
+			ResultStore(args.out),
+			gpu,
+			args.budget_usd,
+			rate,
+			runner,
+			overhead=args.overhead,
+			retry_errors=args.retry_errors,
+			ledger=ledger,
+		)
+	finally:
+		if args.copy_to:
+			copy_results(args.out, args.copy_to)
+
+
+def copy_results(src: str | Path, dst: str | Path) -> int:
+	"""Copy a result store (rows, meta, ledgers) into dst, keeping its layout; returns the files copied."""
+	import shutil
+
+	src, dst = Path(src), Path(dst)
+	n = 0
+	for f in src.rglob("*"):
+		if f.is_file():
+			t = dst / f.relative_to(src)
+			t.parent.mkdir(parents=True, exist_ok=True)
+			shutil.copy2(f, t)
+			n += 1
+	return n
 
 
 if __name__ == "__main__":

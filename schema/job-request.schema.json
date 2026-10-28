@@ -256,6 +256,78 @@
 			"default": null,
 			"description": "The visitor's use case, for the guide",
 			"title": "Description"
+		},
+		"mode": {
+			"default": "plan",
+			"description": "plan: map and probe a script (default). probe: one probe at `knobs`. verify: a short fixed-seed run of `knobs` against the record's current settings. sample_more: `tasks` more agent tasks. All but plan take a record source.",
+			"enum": [
+				"plan",
+				"probe",
+				"verify",
+				"sample_more"
+			],
+			"title": "Mode",
+			"type": "string"
+		},
+		"knobs": {
+			"anyOf": [
+				{
+					"additionalProperties": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "integer"
+							},
+							{
+								"type": "number"
+							},
+							{
+								"type": "string"
+							}
+						]
+					},
+					"maxProperties": 64,
+					"type": "object"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "probe and verify: the full setting to run at",
+			"title": "Knobs"
+		},
+		"tasks": {
+			"anyOf": [
+				{
+					"maximum": 50,
+					"minimum": 1,
+					"type": "integer"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "sample_more: how many more tasks",
+			"title": "Tasks"
+		},
+		"purpose": {
+			"anyOf": [
+				{
+					"maxLength": 64,
+					"pattern": "^[a-z][a-z0-9_.]*$",
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "Who asked, for the logbook, e.g. guide.run_probe",
+			"title": "Purpose"
 		}
 	},
 	"required": [
@@ -264,5 +336,5 @@
 	"title": "JobRequest",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.3.0/JobRequest"
+	"$id": "https://preflight.dev/schema/0.4.0/JobRequest"
 }

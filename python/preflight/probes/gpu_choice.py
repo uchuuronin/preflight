@@ -1,7 +1,9 @@
 """Which GPU a probe runs on when the visitor hasn't chosen, and what to try after an OOM.
 
 Policy from scripts/mc_kernels_gpu.py, 40,000 simulated jobs, 20% of them with
-no size the code gives away (docs/decisions/probe-plan.md G, L, U):
+no size the code gives away (docs/decisions/probe-plan.md G, L, U). Every figure
+below is simulated: the job mix, memory needs and estimate error are assumptions,
+so the numbers rank the policies and say nothing yet about real jobs:
 
   G  always L4                         72.8% measured   $0.030 a job
      always A100-80GB                  94.2%            $0.099
@@ -33,7 +35,7 @@ from preflight.schema.script_map import ScriptMap
 
 log = logging.getLogger(__name__)
 
-MARGIN = 1.3
+MARGIN = 1.3  # simulated: probe-plan G (scripts/mc_kernels_gpu.py); zoo runs on Modal replace it (Oct 28-29)
 # Top of the ladder (L): H100 holds no more than A100-80GB, so it never wins a memory choice;
 # H200 lifts measured jobs from 93.2% to 95.7% for $0.008 more a job.
 LADDER = ["L4", "L40S", "A100-SXM-80GB", "H200-SXM-141GB"]
@@ -81,9 +83,12 @@ _FALLBACK_USD_PER_HOUR = {
 	"B300-SXM-288GB": 7.10,
 }
 # an OOM only clears on a GPU with clearly more memory: A100-80GB and H100 differ by 0.03 GiB
-BIGGER = 1.05
-ACTIVATION_GB = 4.0  # median activation footprint of a probe in the simulation
-# bytes of GPU memory per parameter, by kind of job
+BIGGER = 1.05  # derived: A100-80GB and H100 differ by 0.03 GiB usable; any real step up is >40% more
+ACTIVATION_GB = (
+	4.0  # guess: median probe activations; replaced by the zoo runs' measured activations (Oct 28-29)
+)
+# bytes of GPU memory per parameter, by kind of job. derived: bf16 weights 2 B; full training adds
+# fp32 master 4, Adam moments 8 and grads 2; 4-bit weights 0.5 B plus quantisation constants
 BYTES_PER_PARAM = {
 	"lora": 2.3,  # bf16 weights plus adapter state
 	"qlora": 0.75,  # 4-bit weights plus adapter state (int8 LoRA counts as lora: a safe overestimate)
@@ -123,7 +128,30 @@ def offered_gpus() -> list[str]:
 		return list(_FALLBACK_MODAL)
 
 
-MAX_NAME = 64  # GPU names and model ids are visitor text: bound them before any regex sees them
+MAX_NAME = (
+	64  # derived: the longest canonical GPU name is 18 characters; visitor text, bounded before any regex
+)
+
+
+# Modal's GPU strings, for when B's table isn't importable (engine/gpus.py MODAL_GPU at 14ef490);
+# "H100!" pins a real H100 (plain "H100" may be upgraded to an H200)
+_FALLBACK_MODAL_STRINGS = {"T4": "T4", "L4": "L4", "A10": "A10", "L40S": "L40S", "A100-SXM-40GB": "A100-40GB",
+	"A100-SXM-80GB": "A100-80GB", "RTX-PRO-6000-96GB": "RTX-PRO-6000", "H100-SXM-80GB": "H100!",
+	"H200-SXM-141GB": "H200", "B200-SXM-180GB": "B200", "B300-SXM-288GB": "B300"}  # fmt: skip
+
+
+def modal_gpu(gpu: str) -> str:
+	"""The string Modal's gpu= takes for a canonical GPU name."""
+	try:
+		from preflight.engine.gpus import MODAL_GPU
+
+		table = MODAL_GPU
+	except ImportError:
+		table = _FALLBACK_MODAL_STRINGS
+	name = canonical(gpu)
+	if name not in table:
+		raise ValueError(f"{gpu!r} is not a GPU Modal offers")
+	return table[name]
 
 
 def canonical(gpu: str) -> str:
@@ -175,9 +203,43 @@ def estimate_need_gb(sm: ScriptMap) -> float:
 	return params * BYTES_PER_PARAM[_kind(sm)] / 1e9 + ACTIVATION_GB + 1.0  # + CUDA context
 
 
+CEILING_ENV = "PREFLIGHT_GPU_CEILING"  # set on the public demo: A100-SXM-80GB (Chiya, Oct 27: no H200)
+SAFE_CEILING = "A100-SXM-80GB"
+
+
+def ceiling() -> str | None:
+	"""The biggest GPU this deployment probes on, or None for no cap."""
+	import os
+
+	raw = os.environ.get(CEILING_ENV, "").strip()
+	if not raw:
+		return None
+	cap = canonical(raw)
+	if usable_gb(cap) <= 0:  # a mistyped cap still caps: the demo's own, never "no GPU at all"
+		log.error("%s=%r is not a known GPU; capping at %s", CEILING_ENV, raw[:64], SAFE_CEILING)
+		return SAFE_CEILING
+	return cap
+
+
+def under_ceiling(gpu: str, cap: str | None = None) -> bool:
+	cap = cap if cap is not None else ceiling()
+	return cap is None or usable_gb(canonical(gpu)) <= usable_gb(cap)
+
+
+def _pool(allowed: list[str] | None) -> list[str]:
+	pool = list(dict.fromkeys(canonical(g) for g in allowed)) if allowed else list(LADDER)
+	cap = ceiling()
+	capped = [g for g in pool if under_ceiling(g, cap)]
+	# allowed GPUs all above the cap (the visitor's run is H200-only): probe on the cap and let
+	# the cross-GPU model carry the numbers over
+	if cap is None:
+		return pool
+	return capped or [cap]
+
+
 def choose_probe_gpu(need_gb: float, allowed: list[str] | None = None, *, margin: float = MARGIN) -> str:
 	"""The cheapest GPU (allowed ones if the visitor set any) with need × margin usable; else the largest."""
-	pool = list(dict.fromkeys(canonical(g) for g in allowed)) if allowed else list(LADDER)
+	pool = _pool(allowed)
 	fits = [g for g in pool if usable_gb(g) >= need_gb * margin]
 	if fits:
 		return min(fits, key=lambda g: (usd_per_hour(g), usable_gb(g)))
@@ -189,7 +251,7 @@ def choose_probe_gpu(need_gb: float, allowed: list[str] | None = None, *, margin
 
 def next_gpu(current: str, allowed: list[str] | None = None) -> str | None:
 	"""After a GPU OOM: the cheapest GPU with more usable memory, or None when there is nothing bigger."""
-	pool = list(dict.fromkeys(canonical(g) for g in allowed)) if allowed else list(LADDER)
+	pool = _pool(allowed)
 	cur = canonical(current)
 	have = usable_gb(cur)
 	if have <= 0:  # a GPU the table doesn't know: nothing says which way is up, so don't guess
@@ -199,8 +261,13 @@ def next_gpu(current: str, allowed: list[str] | None = None) -> str | None:
 
 
 def escalates(status: str | None, error_code: str | None) -> bool:
-	"""Whether a failed probe is worth one more try on a bigger GPU: GPU memory only, not host memory."""
-	return status == "oom" and error_code != "oom.host"
+	"""Whether a failed probe is worth a try on a bigger GPU: a training-step GPU OOM only.
+
+	Not host memory (a bigger GPU doesn't help), and not an eval OOM: that one is about the eval
+	batch, which the visitor can change, so the probe re-runs with eval off on the same GPU and
+	the eval memory per batch says where it would have run out.
+	"""
+	return status == "oom" and error_code not in ("oom.host", "oom.eval")
 
 
 # shown on the record; the dispatcher's own error (app ids, URLs) stays in the server log

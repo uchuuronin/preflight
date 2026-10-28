@@ -22,6 +22,7 @@ traces/
 *.pt.trace.json
 *.safetensors
 *.bin
+/records/
 # local record store for API development
 api/records/
 

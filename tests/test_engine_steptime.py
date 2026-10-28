@@ -129,7 +129,10 @@ def test_same_gpu_step_prediction_flags_extrapolation():
 	assert mid.breakdown["optimizer"] == pytest.approx(0.01)
 	assert mid.point == pytest.approx(sum(mid.breakdown.values()))
 	assert model.predict(32768).status == "abstain"
-	assert model.predict(512).status == "abstain"
+	below = model.predict(512)  # two halvings below the smallest probe
+	assert below.status == "extrapolated" and "run a probe here" in below.reason
+	assert below.sigma_log == pytest.approx((st.Z90 * model.sigma + 0.2) / st.Z90)
+	assert model.predict(256).status == "abstain"  # three halvings: band past +-50%
 	assert model.predict(8192).status == "predicted"  # same work units is not a measurement by itself
 	assert model.predict(8192, measured_probe="probe1").status == "measured"
 

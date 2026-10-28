@@ -29,7 +29,34 @@ class Cancelled(Exception):
 
 
 class PermanentError(Exception):
-	"""A failure retrying cannot fix (bad script, unsupported framework). Not retried; message is visitor-safe."""
+	"""A failure retrying cannot fix (bad script, unsupported framework). Not retried; message is visitor-safe.
+
+	code: a stable error code (Probe.error_code's families) for the boarding screen's copy.
+	"""
+
+	def __init__(self, message: str = "", *, code: str = "unsupported"):
+		super().__init__(message)
+		self.code = code
+
+
+def error_code(exc: BaseException) -> str:
+	"""The stable code a failed job carries: the exception's own `code`, else one per type."""
+	code = getattr(exc, "code", None)
+	if isinstance(code, str) and code:
+		return code
+	from preflight.harness.static import ScriptParseError
+	from preflight.probes.local import InvalidSubmission
+	from preflight.recorder.overrides import OverrideError
+
+	if isinstance(exc, ScriptParseError):
+		return "syntax_error"
+	if isinstance(exc, OverrideError):
+		return "override.unsupported"
+	if isinstance(exc, InvalidSubmission):
+		return "submission"
+	if isinstance(exc, RecursionError):
+		return "submission.too_deep"
+	return "internal"
 
 
 def _permanent_types() -> tuple[type[BaseException], ...]:
@@ -60,7 +87,7 @@ class JobContext:
 
 	def emit(self, stage: str, **fields) -> None:
 		self.check()
-		self._store.emit(self.lease.job_id, stage=stage, **fields)
+		self._store.emit(self.lease.job_id, stage=stage, token=self.lease.token, **fields)
 
 
 JobFn = Callable[[Lease, JobContext], str]
@@ -96,7 +123,8 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 	except (Cancelled, LeaseLost):
 		pass
 	except _permanent_types() as exc:
-		_safe_fail(store, lease, str(exc)[:1000] or type(exc).__name__, retryable=False)
+		msg = str(exc)[:1000] or type(exc).__name__
+		_safe_fail(store, lease, msg, retryable=False, error_code=error_code(exc))
 	except Exception:
 		log.exception("job %s failed with an internal error", lease.job_id)
 		_safe_fail(
@@ -104,6 +132,7 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 			lease,
 			f"Internal error while running the job (ref {lease.job_id}); retrying once",
 			retryable=True,
+			error_code="internal",
 		)
 	finally:
 		stop.set()
@@ -111,6 +140,8 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 	return True
 
 
-def _safe_fail(store: JobStore, lease: Lease, error: str, *, retryable: bool) -> None:
+def _safe_fail(
+	store: JobStore, lease: Lease, error: str, *, retryable: bool, error_code: str | None = None
+) -> None:
 	with contextlib.suppress(LeaseLost):
-		store.fail(lease, error=error, retryable=retryable)
+		store.fail(lease, error=error, retryable=retryable, error_code=error_code)

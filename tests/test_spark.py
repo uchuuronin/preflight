@@ -307,3 +307,20 @@ def test_overall_deadline_bounds_retries():
 	with pytest.raises((httpx.HTTPStatusError, TimeoutError)):
 		c.structured([{"role": "user", "content": "x"}], ScriptMap, purpose="script_map")
 	assert _t.monotonic() - t0 < 2.5
+
+
+def test_meta_client_reads_the_canonical_env_names_with_fallbacks(monkeypatch):
+	for k in ("META_API_BASE", "META_BASE_URL", "META_API_KEY", "MODEL_API_KEY"):
+		monkeypatch.delenv(k, raising=False)
+	assert not ModelClient.meta_configured()
+	assert str(ModelClient.meta()._http.base_url).rstrip("/") == "https://api.meta.ai/v1"
+	monkeypatch.setenv("META_BASE_URL", "https://old.example/v1")
+	monkeypatch.setenv("MODEL_API_KEY", "old-key")
+	c = ModelClient.meta()
+	assert str(c._http.base_url).rstrip("/") == "https://old.example/v1"
+	assert c._http.headers["authorization"] == "Bearer old-key" and ModelClient.meta_configured()
+	monkeypatch.setenv("META_API_BASE", "https://new.example/v1")
+	monkeypatch.setenv("META_API_KEY", "new-key")
+	c = ModelClient.meta()
+	assert str(c._http.base_url).rstrip("/") == "https://new.example/v1"
+	assert c._http.headers["authorization"] == "Bearer new-key"
