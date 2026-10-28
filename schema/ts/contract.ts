@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.2.0. Generated; do not edit.
+ * Preflight contract v0.3.0. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -1366,6 +1366,10 @@ export interface JobCost {
 	 */
 	market_equivalent_usd?: Estimate | undefined | null;
 	/**
+	 * Money at risk as GPU-hours, shown first on an own cluster (at_risk_usd is then the grey market figure)
+	 */
+	at_risk_gpu_hours?: Estimate | undefined | null;
+	/**
 	 * Chance of failure x cost up to the failure point; shown beside the total, never in it
 	 */
 	at_risk_usd?: Estimate | undefined | null;
@@ -1550,4 +1554,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.2.0";
+export const SCHEMA_VERSION = "0.3.0";

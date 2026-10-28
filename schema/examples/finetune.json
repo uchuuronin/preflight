@@ -1,5 +1,5 @@
 {
-	"schema_version": "0.2.0",
+	"schema_version": "0.3.0",
 	"record_id": "01JBGOLDENFT0000000000000A",
 	"share_token": "golden-finetune-share-tok",
 	"created_at": "2026-10-27T14:00:00Z",
@@ -146,7 +146,7 @@
 		"gpu": {
 			"name": "L4",
 			"count": 1,
-			"memory_bytes": 23034920960,
+			"memory_bytes": 23689363456,
 			"vendor": "nvidia",
 			"compute_capability": "8.9",
 			"driver": "550.90.07"
@@ -552,7 +552,7 @@
 			"memory": {
 				"peak_allocated_bytes": 7155105136,
 				"peak_reserved_bytes": 7655962496,
-				"device_total_bytes": 23034920960,
+				"device_total_bytes": 23689363456,
 				"by_term": {
 					"weights": 3317862236,
 					"gradients": 75161927,
@@ -843,7 +843,7 @@
 			"memory": {
 				"peak_allocated_bytes": 9897131376,
 				"peak_reserved_bytes": 10589930573,
-				"device_total_bytes": 23034920960,
+				"device_total_bytes": 23689363456,
 				"by_term": {
 					"weights": 3317862236,
 					"gradients": 75161927,
@@ -1221,7 +1221,7 @@
 				{
 					"metric": "memory.peak@eval_batch_size=32",
 					"value": 38200000000.0,
-					"threshold": 23034920960.0
+					"threshold": 23689363456.0
 				}
 			],
 			"source": "rule",

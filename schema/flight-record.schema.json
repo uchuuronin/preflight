@@ -2248,6 +2248,18 @@
 					"default": null,
 					"description": "On-demand price of the same GPU-hours, shown grey on an own cluster"
 				},
+				"at_risk_gpu_hours": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Money at risk as GPU-hours, shown first on an own cluster (at_risk_usd is then the grey market figure)"
+				},
 				"at_risk_usd": {
 					"anyOf": [
 						{
@@ -4998,7 +5010,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.2.0",
+			"default": "0.3.0",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -5150,5 +5162,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.2.0/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.3.0/FlightRecord"
 }

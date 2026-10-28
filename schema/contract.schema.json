@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.2.0/contract",
+	"$id": "https://preflight.dev/schema/0.3.0/contract",
 	"title": "PreflightContract",
-	"description": "Preflight contract v0.2.0. Generated; do not edit.",
+	"description": "Preflight contract v0.3.0. Generated; do not edit.",
 	"type": "object",
 	"properties": {
 		"FlightRecord": {
@@ -1663,7 +1663,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"schema_version": {
-					"default": "0.2.0",
+					"default": "0.3.0",
 					"pattern": "^\\d+\\.\\d+\\.\\d+$",
 					"title": "Schema Version",
 					"type": "string"
@@ -2440,6 +2440,18 @@
 					],
 					"default": null,
 					"description": "On-demand price of the same GPU-hours, shown grey on an own cluster"
+				},
+				"at_risk_gpu_hours": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Money at risk as GPU-hours, shown first on an own cluster (at_risk_usd is then the grey market figure)"
 				},
 				"at_risk_usd": {
 					"anyOf": [

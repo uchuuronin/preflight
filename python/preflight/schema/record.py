@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.2.0"
+SCHEMA_VERSION = "0.3.0"
 
 
 def _now() -> datetime:
@@ -682,6 +682,10 @@ class JobCost(Strict):
 	gpu_hours: Estimate | None = Field(default=None, description="Shown first on the user's own cluster")
 	market_equivalent_usd: Estimate | None = Field(
 		default=None, description="On-demand price of the same GPU-hours, shown grey on an own cluster"
+	)
+	at_risk_gpu_hours: Estimate | None = Field(
+		default=None,
+		description="Money at risk as GPU-hours, shown first on an own cluster (at_risk_usd is then the grey market figure)",
 	)
 	at_risk_usd: Estimate | None = Field(
 		default=None,

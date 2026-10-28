@@ -321,7 +321,7 @@ def finetune() -> dict:
 			"memory": {
 				"peak_allocated_bytes": int(pk),
 				"peak_reserved_bytes": int(pk * 1.07),
-				"device_total_bytes": 23_034_920_960,
+				"device_total_bytes": 23_689_363_456,
 				"by_term": {
 					"weights": int(3.09 * GIB),
 					"gradients": int(0.07 * GIB),
@@ -528,7 +528,7 @@ def finetune() -> dict:
 			"gpu": {
 				"name": "L4",
 				"count": 1,
-				"memory_bytes": 23_034_920_960,
+				"memory_bytes": 23_689_363_456,
 				"vendor": "nvidia",
 				"compute_capability": "8.9",
 				"driver": "550.90.07",
@@ -597,7 +597,7 @@ def finetune() -> dict:
 				"title": "First eval will run out of memory",
 				"node_id": "eval",
 				"evidence": [
-					{"metric": "memory.peak@eval_batch_size=32", "value": 38.2e9, "threshold": 23_034_920_960}
+					{"metric": "memory.peak@eval_batch_size=32", "value": 38.2e9, "threshold": 23_689_363_456}
 				],
 				"source": "rule",
 				"fix_template": "eval.reduce_batch",

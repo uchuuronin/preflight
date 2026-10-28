@@ -1,0 +1,4 @@
+# Known false positives, one fingerprint per line (commit:file:rule:line). History is never rewritten
+# (merge-only rule), so a test value that looks like a key is allowed here after review.
+# C, api/tests/test_jobs.py: the test idempotency key "k-0123456789"; reviewed by the PM on Oct 27.
+3d03ec81c050a3f3ab889f884d7153cdf45112e5:api/tests/test_jobs.py:generic-api-key:18
