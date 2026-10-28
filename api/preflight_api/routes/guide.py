@@ -50,10 +50,10 @@ from ..stores import resolve_record
 log = logging.getLogger("preflight.guide")
 router = APIRouter(prefix="/v1")
 
-# Measured Oct 27 on muse-spark-1.3, 91 rounds of 12 tours (docs/decisions/guide-limits.md):
-# output p50 379, p95 863, and 4 rounds hit the old 900 cap (one came back empty), because
-# reasoning tokens count as output. Source: derived, about 1.85x the measured p95.
-MAX_OUTPUT_TOKENS = 1600
+# Measured Oct 27 on muse-spark-1.3 (docs/decisions/guide-limits.md): reasoning counts as output;
+# in run 3 (264 rounds) output p95 was 1,327 and 5 rounds hit the 1,600 cap. Source: derived, about
+# 1.35x the highest measured p95 (1,485, with the act-now instruction now shipped).
+MAX_OUTPUT_TOKENS = 2000
 MAX_INPUT_TOKENS = 40_000  # source: derived, MAX_BYTES of state / about 3 characters per token
 # Source: measured, tours that finished never needed more than 4 rounds between visitor actions;
 # the only turns that reached 8 were the model re-ranking in a loop (now refused, see below).
@@ -112,6 +112,27 @@ _DASHES = re.compile(r"\s*[\u2014\u2013]\s*")
 def _plain(text: str) -> str:
 	"""House style: no em or en dashes in what visitors read (Muse Spark uses them anyway)."""
 	return _DASHES.sub(", ", text).strip()
+
+
+def _unmoved_offer(state: GuideState) -> tuple[str, Any] | None:
+	"""The top fitting move from this turn's last ranking, if the guide hasn't tried a move since."""
+	names: dict[str, str] = {}
+	offer: tuple[str, Any] | None = None
+	for item in state.items[state.turn_start :]:
+		if item.get("type") == "function_call":
+			names[item.get("call_id", "")] = item.get("name", "")
+			if item.get("name") == "set_knob":
+				offer = None
+		elif (
+			item.get("type") == "function_call_output" and names.get(item.get("call_id", "")) == "sensitivity"
+		):
+			try:
+				ranked = json.loads(item.get("output") or "{}").get("ranked") or []
+			except ValueError:
+				continue
+			top = next((r for r in ranked if r.get("fit") == "fits" and r.get("impact", 0) > 0), None)
+			offer = (top["knob_id"], top["best_value"]) if top else None
+	return offer
 
 
 def _guard_set_knob(
@@ -267,6 +288,7 @@ async def guide_turn(request: Request) -> dict:
 	# The model gets another round, inside this same request, when everything it asked for was
 	# refused here and it said nothing: otherwise the tour would stop silently.
 	spent = {"in": 0, "out": 0, "cached": 0, "usd": 0.0}
+	nudged = False
 	while True:
 		items = [*state.items, setting_note]
 		worst, tokens_in = _worst_case_usd(instructions, items, tools)
@@ -359,7 +381,23 @@ async def guide_turn(request: Request) -> dict:
 					{"call_id": c.call_id, "name": c.name, "arguments": c.arguments, "runs_in": "browser"}
 				)
 
-		if calls_out or result.text.strip() or not refused_any or state.rounds >= MAX_ROUNDS_PER_TURN:
+		if state.rounds >= MAX_ROUNDS_PER_TURN:
+			break
+		if not calls_out and not moved_now and state.move is None and not nudged:
+			# A stall: the model announced a move and stopped, though its own ranking this turn
+			# offered one that fits (measured Oct 27: docs/decisions/guide-limits.md). Once per
+			# request, remind it and let it act or say why not.
+			offer = _unmoved_offer(state)
+			if offer is not None:
+				nudged = True
+				state.add(
+					_event(
+						f"[check] Your ranking this round offers {offer[0]} = {json.dumps(offer[1])}, "
+						"which fits. Call set_knob now, or say in one sentence why not."
+					)
+				)
+				continue
+		if calls_out or result.text.strip() or not refused_any:
 			break
 
 	text, withheld = _plain(result.text), None

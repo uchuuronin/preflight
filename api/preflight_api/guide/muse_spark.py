@@ -17,11 +17,11 @@ from dataclasses import dataclass, field
 import httpx
 
 MODEL = "muse-spark-1.3"
-# Measured Oct 27 from Modal, 91 tour rounds: p50 1.7 s, p95 3.3 s, max 4.0 s at up to 900 output
-# tokens. Latency grows with output, so at the 1,600-token cap the worst case is about 7 s.
-# Source: derived, that worst case plus 40% (docs/decisions/guide-limits.md). Past it the
-# rule-based tour takes over.
-TIMEOUT_S = 10.0
+# Measured Oct 27 from Modal over 264 tour rounds (run 3): latency is about 0.50 s + 3.4 ms per output
+# token, with the slowest round 1.8 s above that line. At the 2,000-token cap that predicts 9.1 s
+# at worst. Source: derived, that worst case plus about 30% (docs/decisions/guide-limits.md).
+# Past it the rule-based tour takes over.
+TIMEOUT_S = 12.0
 
 # Per million tokens. Source: cited from a third-party listing, unconfirmed: Chiya checks the
 # Meta Usage page against the Oct 27 tour runs (their dollar figures use these prices).

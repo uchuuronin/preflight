@@ -38,7 +38,7 @@ class Limits:
 	# Measured Oct 27 on muse-spark-1.3 (12 tours, docs/decisions/guide-limits.md): a tour costs
 	# $0.033 on average and $0.115 at most, at the guide's price table (muse_spark.PRICE_*, cited
 	# but unconfirmed). Source: derived, three of the costliest tours on one record plus one
-	# worst-case reservation (5.4k input + 1,600 output tokens, about $0.014).
+	# worst-case reservation (5.4k input + 2,000 output tokens, about $0.015).
 	usd_per_run: float = 0.40
 	# source: contract open question ($10 LLM per day for Nov 5-8), pending Chiya's answer
 	usd_per_day: float = 10.0
@@ -52,7 +52,7 @@ class Limits:
 	# the longest measured tour (21 rounds) through without a refusal.
 	ip_burst: int = 12
 	ip_refill_per_s: float = 0.5
-	# source: derived, well past the 10 s model timeout, so a reservation always outlives its call
+	# source: derived, well past the 12 s model timeout, so a reservation always outlives its call
 	reservation_ttl_s: float = 90.0
 
 

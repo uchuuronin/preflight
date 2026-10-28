@@ -381,15 +381,12 @@ _ACT_NOW = (
 
 
 def instructions_for(variant: str, current: str) -> str:
-	"""Prompt variants compared in docs/decisions/guide-limits.md. "current" is prompt.py as is."""
+	"""Prompt variants (docs/decisions/guide-limits.md, run 3 compared four). "current" is prompt.py
+	as shipped; "speak_once" is run 2's instructions, for a before and after."""
 	if variant == "current":
 		return current
-	if variant == "no_speak_once":
-		return current.replace(_SPEAK_ONCE, "")
-	if variant == "act_now":
-		return current.replace(_SPEAK_ONCE, _ACT_NOW)
-	if variant == "act_now_speak_once":
-		return current.replace(_SPEAK_ONCE, _SPEAK_ONCE + _ACT_NOW)
+	if variant == "speak_once":
+		return current.replace(_ACT_NOW, _SPEAK_ONCE)
 	raise ValueError(variant)
 
 

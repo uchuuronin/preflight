@@ -352,3 +352,25 @@ def test_re_ranking_the_same_setting_is_refused_and_dashes_never_reach_the_visit
 	]
 	assert refused and refused[0]["refused"] == "already_ranked"
 	assert r2["text"] == "Nothing safe improves cost, the tour ends here."
+
+
+def test_a_stalled_guide_is_reminded_once_of_the_move_its_ranking_offered():
+	# Oct 27: Muse Spark sometimes announced a move and stopped without calling set_knob.
+	model = Model(
+		reply(calls=[("sensitivity", {"objective": "min_cost"})]),
+		reply("I'll make the cheapest move next."),
+		reply(calls=[("set_knob", {"knob_id": "eval_batch_size", "value": 8, "why": "fits"})]),
+	)
+	c = client(model)
+	r1 = turn(c, start=True).json()
+	ranked = [
+		{"knob_id": "eval_batch_size", "impact": 1.0, "direction": "decrease", "best_value": 8, "fit": "fits"}
+	]
+	r2 = turn(
+		c,
+		state=r1["state"],
+		results=[{"tool": "sensitivity", "call_id": r1["calls"][0]["call_id"], "ranked": ranked}],
+	).json()
+	assert [x["name"] for x in r2["calls"]] == ["set_knob"]
+	nudge = [i for i in model.requests[2]["input"] if "[check] Your ranking" in str(i.get("content", ""))]
+	assert len(nudge) == 1 and "eval_batch_size" in nudge[0]["content"]
