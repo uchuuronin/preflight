@@ -1,0 +1,21 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-DW69CcpMwgFfMzU23eUPLu
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/scripts/cloud/smoke_modal.py
+└── ✓ Created Function props.
+{
+	"name": "NVIDIA L4",
+	"total_memory_bytes": 23689363456,
+	"mem_get_info_free_bytes": 23485808640,
+	"mem_get_info_total_bytes": 23689363456,
+	"multi_processor_count": 58,
+	"capability": "8.9",
+	"torch": "2.5.1+cu124",
+	"cuda": "12.4",
+	"bf16_matmul_tflops": 59.8,
+	"measured_at": "2026-10-28T01:27:37Z"
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-DW69CcpMwgFfMzU23eUPLu
