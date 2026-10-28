@@ -346,6 +346,10 @@ def run_local(
 				f"{user_errors} configs in a row failed inside corpus code (last: {result.get('error')}); stopping. Fix the bug, then rerun with --retry-errors."
 			)
 			break
+	if ledger is not None:
+		rows = ledger.rows()
+		if not rows or rows[-1].get("event") != "stop":  # every run ends with the spend at that moment
+			ledger.record("stop", reason="finished", configs=n)
 	return n
 
 

@@ -560,3 +560,30 @@ def test_lease_files_pick_one_winner_and_release(tmp_path):
 	sw.release_lease(d, "c")
 	assert sw.lease_winner(d, now=100.0) == "a"
 	assert sw.lease_winner(d, now=2000.0) is None  # all expired
+
+
+def test_uptime_ledger_records_a_stop_when_the_sweep_finishes(tmp_path):
+	from datetime import UTC, datetime
+
+	from preflight.corpus import configs as C
+	from preflight.corpus.ledger import UptimeLedger
+	from preflight.corpus.store import ResultStore
+	from preflight.corpus.sweep import run_local
+
+	now = [1_000_000.0]
+	ledger = UptimeLedger(
+		tmp_path / "l.jsonl", datetime.fromtimestamp(now[0], UTC), 2.0, clock=lambda: now[0]
+	)
+	run_local(
+		C.kernel_configs(2),
+		ResultStore(tmp_path / "o"),
+		"MI300X",
+		50.0,
+		2.0,
+		lambda c: {"status": "ok", "gpu_seconds": 1.0},
+		est_seconds=1,
+		ledger=ledger,
+		log=lambda m: None,
+	)
+	last = ledger.rows()[-1]
+	assert last["event"] == "stop" and last["reason"] == "finished" and last["configs"] == 2
