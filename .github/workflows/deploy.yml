@@ -6,6 +6,11 @@
 # Web -> Cloudflare Pages; API -> Modal. Each half skips itself until its code exists.
 # Secrets (per GitHub environment): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, MODAL_TOKEN_ID, MODAL_TOKEN_SECRET.
 # Runtime secrets live in Modal ("preflight-meta", "preflight-api") and the Pages project, never here.
+# Modal: everything runs in the Modal environment "main", where A's job store and the records
+# volume live (an API deployed elsewhere couldn't see them). Only a production deploy touches
+# Modal; a preview deploys the web app alone. Each app's startup check runs in its real image on
+# CPU before its deploy, and a failed check stops the deploy. The API stays up until stopped by
+# hand: `modal app stop --env main preflight-api`.
 name: deploy
 
 on:
@@ -87,6 +92,7 @@ jobs:
 
   api:
     needs: stranger
+    if: (github.event.inputs.environment || 'production') == 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: ${{ github.event.inputs.environment || 'production' }}
@@ -102,10 +108,16 @@ jobs:
       - if: steps.has.outputs.api == 'true'
         run: uv sync --locked --extra modal
       - if: steps.has.outputs.api == 'true'
-        name: Deploy API and execution plane to Modal (environment = target)
+        name: Check startup, then deploy the API and execution plane to Modal (environment main)
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
-          uv run modal deploy --env "$TARGET" api/app.py
-          if [ -f python/preflight/runner/modal_app.py ]; then uv run modal deploy --env "$TARGET" python/preflight/runner/modal_app.py; fi
+          set -euo pipefail
+          runner=python/preflight/runner/modal_app.py
+          if [ -f "$runner" ] && grep -q "def startup_check()" "$runner"; then
+            uv run modal run --env main "$runner::startup_check"
+          fi
+          uv run modal run --env main api/app.py::startup_check
+          if [ -f "$runner" ]; then uv run modal deploy --env main "$runner"; fi
+          uv run modal deploy --env main api/app.py

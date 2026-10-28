@@ -15,6 +15,7 @@ an error page.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import datetime as dt
 import json
@@ -163,7 +164,7 @@ async def guide_turn(request: Request) -> dict:
 		raise ApiError(422, "invalid_request", "The guide request isn't in the expected shape.") from e
 
 	app = request.app
-	rec_raw = resolve_record(body.record, app.state.samples, app.state.records)
+	rec_raw = await asyncio.to_thread(resolve_record, body.record, app.state.samples, app.state.records)
 	if rec_raw is None:
 		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
 	rec = view_of(rec_raw)
@@ -494,7 +495,7 @@ async def guide_tool(request: Request) -> dict:
 	except (ValidationError, ValueError) as e:
 		raise ApiError(422, "invalid_request", "The tool request isn't in the expected shape.") from e
 	app = request.app
-	rec_raw = resolve_record(body.record, app.state.samples, app.state.records)
+	rec_raw = await asyncio.to_thread(resolve_record, body.record, app.state.samples, app.state.records)
 	if rec_raw is None:
 		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
 	rec = view_of(rec_raw)
