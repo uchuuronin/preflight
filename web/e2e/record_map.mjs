@@ -13,7 +13,7 @@ import { chromium } from "playwright";
 
 const BASE = (process.env.BASE_URL ?? "http://127.0.0.1:4173").replace(/\/$/, "");
 const RECORD = process.env.RECORD ?? "out/e2e_record.json";
-/** Same bound as the stranger test's first map: 10 s covers a cold CDN. */
+/** Source: derived, the stranger test's first-map bound (Project Goals: immediate; 10 s covers a cold CDN). */
 const FIRST_MAP_MS = 10_000;
 
 const text = readFileSync(RECORD, "utf8");

@@ -43,7 +43,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		return () => es.close();
 	}, [jobId]);
 
-	const { last, done, failed, open, error } = boardingState(events);
+	const { last, done, failed, cancelled, open, error } = boardingState(events);
 	const idx = last ? STAGES.findIndex((s) => s.stage.includes(last.stage)) : -1;
 	const progress = done ? 100 : Math.max(0, idx) * 25;
 
@@ -51,7 +51,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		<div className="pf-scroll">
 			<div className="pf-inner pf-boarding">
 				<span className="pf-eyebrow">{t("boarding.eyebrow")}</span>
-				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t("boarding.ready") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
+				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t("boarding.ready") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
 				{last?.queue_position ? <p className="pf-lede pf-lede--sm">{t("boarding.queue", { n: last.queue_position })}</p> : null}
 				<div className="pf-route">
 					<svg viewBox="0 0 900 260" preserveAspectRatio="none" aria-hidden="true">

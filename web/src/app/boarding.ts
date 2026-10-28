@@ -16,6 +16,7 @@ export interface BoardingState {
 	last: BoardingEvent | undefined;
 	done: boolean;
 	failed: boolean;
+	cancelled: boolean;
 	/** The share token to open the cockpit on, once one has arrived. */
 	open: string | null;
 	error: ErrorCopy | null;
@@ -27,12 +28,15 @@ export function boardingState(events: readonly BoardingEvent[]): BoardingState {
 	for (const e of events) if (e.share_token) open = e.share_token;
 	const done = last?.stage === "done";
 	const failed = last?.stage === "failed" || last?.stage === "cancelled";
+	const cancelled = last?.stage === "cancelled";
 	let error: ErrorCopy | null = null;
-	if (failed && last) {
+	// A plain cancel (the visitor's own, or a deadline) has no code and no message: it isn't an
+	// error to explain, the heading says it.
+	if (failed && last && !(cancelled && !last.error_code && !last.message)) {
 		const said = eventText(last.message);
 		const copy = errorCopy(last.error_code, said?.text);
 		const hint = said && said.text !== copy.message && !last.message?.startsWith("error.") ? said.text : copy.hint;
 		error = { ...copy, hint };
 	}
-	return { last, done, failed, open, error };
+	return { last, done, failed, cancelled, open, error };
 }

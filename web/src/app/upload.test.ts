@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TOTAL_BYTES, uploadSource, type PickedFile } from "./upload";
+import { MAX_FILES, MAX_TOTAL_BYTES, precheck, uploadSource, type PickedFile } from "./upload";
 
 const f = (name: string, text = "print(1)\n", size?: number): PickedFile => ({ name, text, size: size ?? new TextEncoder().encode(text).length });
 
@@ -9,6 +9,7 @@ describe("uploadSource", () => {
 		expect(r.ok).toBe(true);
 		if (!r.ok) return;
 		expect(r.source).toEqual({ kind: "upload", files: { "requirements.txt": "peft\n", "train.py": "print(1)\n", "utils.py": "print(1)\n" }, entrypoint: "train.py" });
+		expect(r.scripts).toEqual(["train.py", "utils.py"]);
 	});
 
 	it("takes the only .py file as the entry point", () => {
@@ -37,8 +38,27 @@ describe("uploadSource", () => {
 		expect(uploadSource([f("model.safetensors", "x")])).toMatchObject({ ok: false, reason: "upload.type" });
 	});
 
-	it("keeps the whole check-in under the API's limit", () => {
+	it("keeps the whole check-in under the API's limit, counted as the JSON it is sent as", () => {
 		expect(uploadSource([f("train.py", "x", MAX_TOTAL_BYTES + 1)])).toMatchObject({ ok: false, reason: "upload.too_big" });
+		// Under the limit on disk, over it once quotes and newlines are escaped.
+		const nb = '"\n'.repeat(Math.ceil(MAX_TOTAL_BYTES / 2 / 2));
+		expect(uploadSource([f("train.ipynb", nb, MAX_TOTAL_BYTES - 1)])).toMatchObject({ ok: false, reason: "upload.too_big" });
+	});
+
+	it("says no from names and sizes before reading a huge file", () => {
+		expect(precheck([{ name: "model.safetensors", size: 4e9 }])).toBe("upload.type");
+		expect(precheck([{ name: "train.py", size: 4e9 }])).toBe("upload.too_big");
+		expect(precheck(Array.from({ length: MAX_FILES + 1 }, (_, i) => ({ name: `f${i}.py`, size: 1 })))).toBe("upload.too_many");
+		expect(precheck([{ name: "train.py", size: 10 }])).toBeNull();
+	});
+
+	it("takes small text data along, as A allows", () => {
+		expect(uploadSource([f("train.py"), f("tickets.csv", "a,b\n"), f("rows.jsonl", "{}\n")]).ok).toBe(true);
+	});
+
+	it("treats Train.PY as a script, whatever the case", () => {
+		const r = uploadSource([f("Train.PY")]);
+		expect(r.ok && r.source.kind === "upload" && r.source.entrypoint).toBe("Train.PY");
 	});
 
 	it("needs a file and something to run", () => {

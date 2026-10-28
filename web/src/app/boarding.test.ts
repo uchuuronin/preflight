@@ -48,7 +48,11 @@ describe("boardingState", () => {
 		expect(s.failed).toBe(false);
 	});
 
-	it("treats cancelled as failed", () => {
-		expect(boardingState([ev(0, "cancelled")]).failed).toBe(true);
+	it("treats cancelled as over, without an error alert for a plain cancel", () => {
+		const s = boardingState([ev(0, "cancelled")]);
+		expect(s.failed).toBe(true);
+		expect(s.cancelled).toBe(true);
+		expect(s.error).toBeNull();
+		expect(boardingState([ev(0, "cancelled", { error_code: "budget" })]).error?.code).toBe("budget");
 	});
 });
