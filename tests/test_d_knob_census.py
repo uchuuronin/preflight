@@ -115,3 +115,18 @@ def test_committed_census_is_consistent():
 		expect = sorted(counts, key=lambda k: (-counts[k], k))
 		assert row["ranking"] == expect, lens
 		assert len(row["units_list"]) == row["units"], lens
+
+
+def test_census_uses_only_its_pinned_sources_and_never_the_unseen_scripts():
+	census = json.loads(CENSUS.read_text())
+	repos = sorted(s["repo"] for s in census["sources"])
+	assert repos == [
+		"huggingface/peft",
+		"huggingface/transformers",
+		"huggingface/trl",
+		"karpathy/nanoGPT",
+		"uchuuronin/preflight",
+	]
+	units = [u for row in census["lenses"].values() for u in row["units_list"]]
+	assert not [u for u in units if "unseen" in u.lower()]
+	assert {u.split("/")[0] for u in units} == {"nanoGPT", "peft", "transformers", "trl", "zoo"}

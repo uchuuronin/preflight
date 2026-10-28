@@ -20,3 +20,12 @@ export function wilson(k: number, n: number, z = Z95): Proportion {
 	const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
 	return { k, n, p, lo: Math.max(0, centre - half), hi: Math.min(1, centre + half) };
 }
+
+/**
+ * Whether a challenger beats the incumbent by a clear margin: its Wilson interval sits wholly
+ * above the incumbent's (Chiya, Oct 27: when tuning and testing on the same records, keep the
+ * incumbent unless the intervals don't overlap).
+ */
+export function beatsClearly(challenger: { k: number; n: number }, incumbent: { k: number; n: number }, z = Z95): boolean {
+	return wilson(challenger.k, challenger.n, z).lo > wilson(incumbent.k, incumbent.n, z).hi;
+}

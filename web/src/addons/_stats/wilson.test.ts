@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { wilson } from "./wilson";
+import { beatsClearly, wilson } from "./wilson";
 
 // Reference values from the closed form with z = 1.959964 (Wilson 1927), checked by hand.
 describe("wilson", () => {
@@ -22,5 +22,12 @@ describe("wilson", () => {
 	it("refuses an empty or impossible count", () => {
 		expect(() => wilson(0, 0)).toThrow();
 		expect(() => wilson(5, 4)).toThrow();
+	});
+
+	it("calls a challenger clearly better only when its interval clears the incumbent's", () => {
+		expect(beatsClearly({ k: 9, n: 18 }, { k: 9, n: 18 })).toBe(false);
+		expect(beatsClearly({ k: 12, n: 18 }, { k: 9, n: 18 })).toBe(false);
+		expect(beatsClearly({ k: 18, n: 18 }, { k: 3, n: 18 })).toBe(true);
+		expect(beatsClearly({ k: 3, n: 18 }, { k: 18, n: 18 })).toBe(false);
 	});
 });

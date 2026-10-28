@@ -4,7 +4,7 @@ import { applyKnobViews, type KnobViewContext } from "../../registry";
 import { GridProvider } from "../../workspace/provider/GridProvider";
 import { currentKnobs } from "../../workspace/record/model";
 import { type FlightRecord, type LoadedRecord, type ObjectiveKind, normaliseRecord } from "../../workspace/record/types";
-import { type Proportion, wilson } from "../_stats/wilson";
+import { type Proportion, beatsClearly, wilson } from "../_stats/wilson";
 import { createKnobView } from "./knobView";
 import { resetTierForTests, setTier } from "./store";
 import { registerExpertiseStrings } from "./strings";
@@ -188,13 +188,16 @@ describe("New to this on the zoo, design check with C's list (list not yet on sc
 });
 
 /**
- * Which order and how many of the goal's top knobs? With the list on screen, the policy that
- * puts the planted problems' knobs in the dock most often (pooled over records and goals) wins.
- * POLICY must be among the best; this fails when B's grids make another policy strictly better,
- * and the decision record says why its `top` beat the others.
+ * Which order and how many of the goal's top knobs? With the list on screen, each version is
+ * scored by how often the planted problems' knobs are in the dock, pooled over records and goals.
+ * These are the records the rule is tuned on, so picking the best of nine would test on its own
+ * training data: the configured POLICY stays unless another version beats it by a clear margin,
+ * its Wilson 95% interval wholly above POLICY's (Chiya, Oct 27). The comparison is reported either
+ * way. Goals reuse the same records, so the counts are not independent and the intervals are
+ * narrower than they should be; the margin rule is lenient for that reason, not strict.
  */
 const ORDERS: Record<string, readonly Claim[]> = {
-	"failures, top, baseline": ["must", "top", "baseline", "rest"],
+	"failures, top, baseline": POLICY.order,
 	"failures, baseline, top": ["must", "baseline", "top", "rest"],
 	"failures, top only": ["must", "top", "rest"],
 };
@@ -203,17 +206,18 @@ describe("New to this: order of the five and the top count, compared on the zoo"
 	const results = Object.entries(ORDERS).flatMap(([name, order]) =>
 		[1, 2, 3].map((top) => {
 			const rows = evaluate(true, { top, order });
-			return { name, top, dock: sum(rows, (r) => r.dock), models: rows[0]?.models ?? "none" };
+			return { name, order, top, dock: sum(rows, (r) => r.dock), models: rows[0]?.models ?? "none" };
 		}),
 	);
 
-	it("keeps the configured policy among those that show the planted knobs most often", () => {
-		const best = Math.max(...results.map((r) => r.dock.k));
-		const mine = results.find((r) => r.top === POLICY.top && r.name === "failures, top, baseline");
+	it("keeps the configured policy unless another beats it by a clear margin", () => {
+		const mine = results.find((r) => r.top === POLICY.top && r.order === POLICY.order);
+		expect(mine, "POLICY is one of the compared versions").toBeDefined();
+		const clear = results.filter((r) => mine && beatsClearly(r.dock, mine.dock));
 		console.info(
-			`[dial order vs zoo, list on screen; predictions ${results[0]?.models}]\n` +
-				results.map((r) => `${r.name}, top ${r.top}: in the dock ${pct(r.dock)}`).join("\n"),
+			`[dial order vs zoo, list on screen; predictions ${results[0]?.models}; in-sample, so the incumbent stays without a clear margin]\n` +
+				results.map((r) => `${r.name}, top ${r.top}: in the dock ${pct(r.dock)}${r === mine ? " (configured)" : ""}`).join("\n"),
 		);
-		expect(mine?.dock.k).toBe(best);
+		expect(clear.map((r) => `${r.name}, top ${r.top}`)).toEqual([]);
 	});
 });

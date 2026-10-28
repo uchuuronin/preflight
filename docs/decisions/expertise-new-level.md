@@ -30,7 +30,7 @@ a warning's knob shows when the visitor opens it and stays for the visit. Reques
 | Failures first, never dropped | Chiya and the Oct 27 review | `tiers.test.ts` "never drops a failure's knob"; `dial.zoo.test.ts` failure knobs in the dock for every goal |
 | Warnings stay in the dock until the list is on screen | Chiya, Oct 27 night | `tiers.test.ts`, `knobView.test.ts` "keeps a warning's knob ... while C's list isn't showing"; `dial.zoo.test.ts` on-screen 9 of 9 |
 | A warning's knob shows once opened, and stays | Chiya, Oct 27 | `knobView.test.ts` reveal test; `dial.zoo.test.ts` "shows a listed warning's knob once the visitor opens it" |
-| Goal's top knobs before the baseline, and how many (2) | guess, to be settled by data when B's grids land (Wed Oct 28), see below | `dial.zoo.test.ts` "keeps the configured policy among those that show the planted knobs most often" |
+| Goal's top knobs before the baseline, and how many (2) | guess; kept unless B's grids show a version that beats it by a clear margin (Wilson intervals not overlapping), see below | `dial.zoo.test.ts` "keeps the configured policy unless another beats it by a clear margin"; `wilson.test.ts` for the margin rule |
 | Baseline for finetune, pretrain, rl, vision | measured: the census below | `tiers.test.ts` "takes each training lens's baseline from the census ranking"; `test_d_knob_census.py` consistency and engine-id checks |
 | Baseline for agent, eval, serving | guess: from the Users and views tab; replace with what first-time visitors open, from session telemetry after Nov 4 | `tiers.test.ts` "names only knob ids the app knows" (ids only) |
 
@@ -38,11 +38,23 @@ a warning's knob shows when the visitor opens it and stays for the visit. Reques
 
 `dial.zoo.test.ts` compares three orders (failures, top, baseline; failures, baseline, top;
 failures, top only) with the goal's top 1, 2 or 3, by how often the planted problems' knobs are
-in the dock with the list on screen, pooled over records and goals. On A's fixtures
-(`golden-fixture@0`) all nine tie at 9 of 18 (50%, Wilson 95% [29, 71]): the fixtures carry a goal
-ranking for few goals, so the comparison can't choose. When B's grids land, the version that
-shows the planted fixes most often wins; the test fails until the configured policy is that one,
-and this section will say why its count beat the other two.
+in the dock with the list on screen, pooled over records and goals.
+
+These are the two zoo records the rule is tuned on, so taking the best of nine would test on its
+own training data (Chiya, Oct 27). Today's version (failures, top, baseline; top 2) stays unless
+another beats it by a clear margin: its Wilson 95% interval wholly above today's. The comparison
+is recorded here either way. Goals reuse the same records, so the counts aren't independent and
+the intervals are narrower than they should be, which makes the margin rule more lenient, not
+stricter.
+
+| Predictions | Today's version | Best challenger | Clear margin? | Kept |
+| --- | --- | --- | --- | --- |
+| `golden-fixture@0`, Oct 27 | 9 of 18, 50% [29, 71] | all eight tie at 9 of 18 | no | failures, top, baseline; top 2 |
+| B's grids (Wed Oct 28) | to run | | | |
+
+Why 2 and not 1 or 3: not yet shown by data; on the fixtures all three counts tie. Two keeps
+room for at least one basic beside two failures within the five. If B's grids also tie or show
+no clear margin, 2 stays as a guess, and the held-out run on Nov 2 is its test.
 
 ## Census: the newcomer basics
 
@@ -125,8 +137,9 @@ reading. The dock shows each lens's ranking in order, skipping knobs the record 
 until the cap. On the golden fine-tune today that is the two failure knobs (eval batch size, eval
 without no_grad) and the packing warning, then batch size and sequence length from the baseline.
 
-The unseen scripts are not in the census: they are the held-out check (below), and counting their
-settings to choose the baseline would tune on them. Open with Chiya.
+The unseen scripts stay out of the census entirely (Chiya, Oct 27): they are the held-out check
+(below), and adding them after Nov 2 would change the basics after the held-out score was
+recorded, so that score would describe an older version than the one judged.
 
 ## How it is checked
 

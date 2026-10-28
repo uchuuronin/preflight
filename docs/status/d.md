@@ -8,6 +8,25 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Tue Oct 27, late night (Chiya's census and margin decisions)
+
+**Done** (committed on `ws-d`, push requested below; `aee591f` pushed; merged `main` at 6a3eca2)
+
+- Unseen scripts stay out of the census entirely (Chiya), recorded in the decision note.
+- Order of the five and the top count: today's version stays unless a challenger's Wilson 95% interval sits wholly above it (`beatsClearly` in `_stats/wilson.ts`). `dial.zoo.test.ts` reports all nine versions and fails only on a clear win. On A's fixtures all tie at 9 of 18, so today's version stays. The decision note keeps a table for each run.
+- Checks: 221 web tests, typecheck, build; 26 D Python tests, ruff; no em dashes; gitleaks. Python suite 658 passed; the 4 failures are A's `test_probe_sandbox.py` (root container), as before.
+
+**Basis for every decision in this commit**
+
+| Decision | Basis | Test that fails if it's wrong |
+| --- | --- | --- |
+| Keep the incumbent order unless beaten by a clear margin | Chiya, Oct 27 (tuning and testing on the same two records) | `dial.zoo.test.ts` "keeps the configured policy unless another beats it by a clear margin" |
+| Clear margin = challenger's Wilson 95% lower bound above the incumbent's upper bound | Chiya, Oct 27; Wilson interval derived (Wilson 1927, z = 1.959964) | `wilson.test.ts` margin cases (equal, close, far apart, reversed) |
+| Unseen scripts out of the census | Chiya, Oct 27 (held-out score must describe the judged version) | `tiers.test.ts` "takes each training lens's baseline from the census ranking" and `test_d_knob_census.py` source checks: the census names only its 5 pinned sources |
+| Top count stays 2 | guess; replaced by B's grids only on a clear margin, else tested by the held-out run on Nov 2 | same `dial.zoo.test.ts` test |
+
+**Push request:** `ws-d`, this commit and the merge of `main` at 6a3eca2, on top of `aee591f`. Normal push.
+
 ## Tue Oct 27, late (Chiya's four conditions for turning `d.expertise` on)
 
 **Done** (committed on `ws-d`, push requested below). No tokens or GPU spent: the census reads
@@ -37,11 +56,7 @@ public GitHub checkouts only.
 
 Checks: 220 web tests, typecheck, build; 25 D Python tests, ruff; no em dashes; gitleaks clean. Python suite: 657 passed; 4 of A's `test_probe_sandbox.py` fail here because this container runs as root (same on clean `main`).
 
-**Push request:** `ws-d`, this commit on top of `3e5ba2d` and the merge of `main` at `ceb166a`. Normal push.
-
-**Open with Chiya**
-
-- Whether the unseen scripts join the census after Nov 2 (counting them before would tune on the held-out check).
+**Pushed** at `aee591f` (Chiya's yes, Oct 27).
 
 ## Tue Oct 27, night (after Chiya's decision on warnings)
 
