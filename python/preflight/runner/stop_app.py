@@ -1,7 +1,7 @@
 """Stop the deployed Preflight runner, so it stops billing, and say whether it did.
 
-	python -m preflight.runner.stop_app                  # stops preflight-runner
-	python -m preflight.runner.stop_app --app other-app
+	python -m preflight.runner.stop_app --env main       # stops preflight-runner in Modal's main
+	python -m preflight.runner.stop_app --env main --app other-app
 
 Run through `remote-run.yml` (which only takes `modal run`, `modal deploy` and our own entry
 points, so `modal app stop` goes through here). A deployed app keeps its always-on job store
@@ -19,8 +19,10 @@ from pathlib import Path
 from .modal_app import APP_NAME
 
 
-def _apps() -> list[dict]:
-	r = subprocess.run(["modal", "app", "list", "--json"], capture_output=True, text=True, timeout=120)
+def _apps(env: str) -> list[dict]:
+	r = subprocess.run(
+		["modal", "app", "list", "--json", "--env", env], capture_output=True, text=True, timeout=120
+	)
 	if r.returncode != 0:
 		return []
 	try:
@@ -42,12 +44,15 @@ def _state(apps: list[dict], name: str) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
 	ap = argparse.ArgumentParser(prog="python -m preflight.runner.stop_app")
 	ap.add_argument("--app", default=APP_NAME)
+	# required: production is only ever touched by the manual deploy workflow, never by a default
+	ap.add_argument("--env", required=True, help="Modal environment, e.g. main")
 	ns = ap.parse_args(argv)
-	before = _state(_apps(), ns.app)
-	r = subprocess.run(["modal", "app", "stop", "--yes", ns.app], capture_output=True, text=True, timeout=180)
-	after = _state(_apps(), ns.app)
+	before = _state(_apps(ns.env), ns.app)
+	r = subprocess.run(["modal", "app", "stop", "--yes", "--env", ns.env, ns.app], capture_output=True, text=True,
+		timeout=180)  # fmt: skip
+	after = _state(_apps(ns.env), ns.app)
 	running = [s for s in after if s.lower() in ("deployed", "running", "ephemeral", "deploying")]
-	result = {"app": ns.app, "before": before, "after": after, "stop_exit": r.returncode,
+	result = {"app": ns.app, "env": ns.env, "before": before, "after": after, "stop_exit": r.returncode,
 		"stop_output": (r.stdout + r.stderr)[-2000:], "stopped": r.returncode == 0 and not running}  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path("out/stop.json").write_text(json.dumps(result, indent=2))

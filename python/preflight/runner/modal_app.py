@@ -343,7 +343,12 @@ def prefetch(models: list[str] | None = None) -> list[str]:
 
 
 @app.local_entrypoint()
-def smoke(sample: str = "sample://zoo/finetune_lora_hf", gpus: str = "L4", max_minutes: int = 25):
+def smoke(
+	sample: str = "sample://zoo/finetune_lora_hf",
+	gpus: str = "L4",
+	max_minutes: int = 25,
+	modal_env: str = "main",
+):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
 	Probes stay on `gpus` (comma-separated): L4 by default, since team runs use T4 or L4 unless
@@ -354,7 +359,7 @@ def smoke(sample: str = "sample://zoo/finetune_lora_hf", gpus: str = "L4", max_m
 	import json
 	import time
 
-	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME)()
+	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env)()
 	request = {
 		"source": {"kind": "sample", "uri": sample},
 		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
