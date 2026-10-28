@@ -168,7 +168,7 @@ const OrbitNodeView = memo(function OrbitNodeView({ data }: NodeProps<Node<NodeD
 
 const NODE_TYPES = { bg: OrbitBackground, onode: OrbitNodeView };
 
-function OrbitInner() {
+function OrbitInner({ compact = false }: { compact?: boolean }) {
 	const { record, estimates, state, actions } = useWorkspace();
 	const overlays = useMapOverlays(record.job.lens);
 	const flow = useReactFlow();
@@ -273,7 +273,7 @@ function OrbitInner() {
 	}, [state.focus]);
 
 	return (
-		<div className="pf-orbit" role="region" aria-label={t("map.label")}>
+		<div className={`pf-orbit${compact ? " pf-orbit--compact" : ""}`} role="region" aria-label={t("map.label")}>
 			<ReactFlow
 				nodes={nodes}
 				edges={[]}
@@ -296,10 +296,12 @@ function OrbitInner() {
 				onPaneClick={() => actions.focus(null)}
 				proOptions={{ hideAttribution: true }}
 			/>
+			{compact ? null : (
 			<span className="pf-orbit__tps">
 				{layout.tokensPerSecond ? t("map.tps", { tps: fmt(layout.tokensPerSecond, "tokens/s") }) : null}
 			</span>
-			{overlays.map((o) => (
+			)}
+			{compact ? null : overlays.map((o) => (
 				<AddonBoundary key={o.id} id={o.id}>
 					<o.component record={record} knobs={state.knobs} estimates={estimates} />
 				</AddonBoundary>
@@ -308,10 +310,11 @@ function OrbitInner() {
 	);
 }
 
-export function Orbit() {
+/** `compact`: the small orbit in the side column while the fit map has the stage. */
+export function Orbit({ compact = false }: { compact?: boolean } = {}) {
 	return (
 		<ReactFlowProvider>
-			<OrbitInner />
+			<OrbitInner compact={compact} />
 		</ReactFlowProvider>
 	);
 }

@@ -58,6 +58,20 @@ try {
 		{ dials },
 	);
 
+	// One plain status line above the readouts, from the readouts.
+	const status = (await page.locator(".pf-statusline").textContent())?.trim() ?? "";
+	check("a status line says where the run stands", /memory|Fits|finishes|Not trusted/.test(status), { status });
+
+	// What was measured: a capsule opens a drawer of probe chips, Escape closes it.
+	const measured = page.locator(".pf-tag--button");
+	if (await measured.count()) {
+		await measured.click();
+		const chips = await page.locator(".pf-drawer.is-open .pf-chip").count();
+		await page.keyboard.press("Escape");
+		const closed = (await page.locator(".pf-drawer.is-open").count()) === 0;
+		check("probes open as chips in a drawer", chips > 0 && closed, { chips });
+	}
+
 	// Every button has a name a screen reader can say.
 	const unnamed = await page.locator("button").evaluateAll((els) =>
 		els.filter((b) => !(b.getAttribute("aria-label") || b.textContent?.trim() || b.getAttribute("title"))).length,

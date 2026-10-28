@@ -12,6 +12,7 @@ import { knobChoices, targetFor } from "../record/model";
 import type { Knob, KnobValue } from "../record/types";
 import { guidedKnobs, useRanked, useWorkspace } from "../state";
 import { fitOf, type Fit } from "../status";
+import { Info } from "../components/Info";
 import { FitMark } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
 
@@ -199,7 +200,9 @@ export function Dock() {
 					</button>
 				) : null}
 			</div>
-			<p className="pf-dock__key">{t("dock.key")}</p>
+			<span className="pf-dock__key">
+				<Info label={t("rail.knobs")}>{t("dock.key")}</Info>
+			</span>
 		</div>
 	);
 }
