@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from preflight.schema import FlightRecord
+from preflight.schema import SCHEMA_VERSION, FlightRecord
 from preflight.schema.encoding import choose_scale, encode_f16, encode_mask
 
 OUT = Path(__file__).resolve().parents[1] / "schema" / "examples"
@@ -408,7 +408,7 @@ def finetune() -> dict:
 		abstain_fn=lambda bs, seq: bs * seq > 2 * 4 * 1024,
 	)
 	return {
-		"schema_version": "0.1.0",
+		"schema_version": SCHEMA_VERSION,
 		"record_id": "01JBGOLDENFT0000000000000A",
 		"share_token": "golden-finetune-share-tok",
 		"created_at": iso(T0),
@@ -635,6 +635,38 @@ def finetune() -> dict:
 			},
 		],
 		"costs": {"gpu_usd": 0.0336, "llm_usd": 0.0021, "breakdown": {"probes": 0.0336, "triage": 0.0021}},
+		"cost_basis": {
+			"price_table": "golden-fixture@0",
+			"as_of": "2026-10-27",
+			"provider": "modal",
+			"billing": "on_demand",
+			"includes": ["gpu"],
+		},
+		"job_cost": ft_job_cost(),
+	}
+
+
+def ft_job_cost() -> dict:
+	"""Fixture run cost for the fine-tune: one L4 at $0.80/h, and the planted first-eval OOM as money at risk.
+	B's engine replaces this with real numbers once engine/api.py lands."""
+	rate = 0.80
+	steps = 51_760 / (4 * ACCUM)
+	hours = steps * ft_step(4) / 3600
+	to_first_eval = 200 / steps  # eval_every 200: the run dies at the first eval
+	return {
+		"lines": [
+			{
+				"kind": "gpu",
+				"label_key": "cost.line.gpu",
+				"quantity": est(hours, "gpu_hours", rel=0.15),
+				"rate_usd": rate,
+				"usd": est(hours * rate, "usd", rel=0.15),
+				"price_row": "modal/L4/on_demand",
+			}
+		],
+		"total_usd": est(hours * rate, "usd", rel=0.15),
+		"gpu_hours": est(hours, "gpu_hours", rel=0.15),
+		"at_risk_usd": est(0.97 * hours * to_first_eval * rate, "usd", rel=0.15),
 	}
 
 
@@ -896,7 +928,7 @@ def pretrain() -> dict:
 	)
 	total = 60_000 * step_s(12, 1024, 0, "fp32")
 	return {
-		"schema_version": "0.1.0",
+		"schema_version": SCHEMA_VERSION,
 		"record_id": "01JBGOLDENPT0000000000000B",
 		"share_token": "golden-pretrain-share-tok",
 		"created_at": iso(T0),
@@ -1189,7 +1221,7 @@ def agent() -> dict:
 		)
 	per_task = sum(t["cost_usd"] for t in tasks) / len(tasks)
 	return {
-		"schema_version": "0.1.0",
+		"schema_version": SCHEMA_VERSION,
 		"record_id": "01JBGOLDENAG0000000000000C",
 		"share_token": "golden-agent-share-tokenn",
 		"created_at": iso(T0),

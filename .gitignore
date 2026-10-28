@@ -8,11 +8,14 @@ build/
 *.egg-info/
 node_modules/
 web/dist/
+.vite/
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 .modal.toml
+.DS_Store
 # probe outputs and traces never go in git; they live in the object store
 runs/
 traces/
@@ -20,3 +23,9 @@ traces/
 *.safetensors
 *.bin
 /records/
+# local record store for API development
+api/records/
+
+# outputs of cloud runs (published to the remote-runs branch instead)
+out/
+_results/

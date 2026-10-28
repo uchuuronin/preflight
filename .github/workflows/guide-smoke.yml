@@ -1,0 +1,48 @@
+# One real Muse Spark round trip (api/scripts/muse_spark_smoke.py): checks the wire format and
+# measures latency and token usage. About two cents a run. Runs when the guide's model client
+# or this smoke test changes on an agent branch, or by hand. Needs repository secrets
+# META_API_KEY and META_API_BASE; skips itself (successfully) without them.
+name: guide-smoke
+
+on:
+  push:
+    branches: [ws-c]
+    paths:
+      - "api/preflight_api/guide/muse_spark.py"
+      - "api/preflight_api/guide/prompt.py"
+      - "api/preflight_api/guide/tools.py"
+      - "api/scripts/muse_spark_smoke.py"
+      - ".github/workflows/guide-smoke.yml"
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: Guide rounds to time
+        default: "5"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guide-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.11.x"
+          python-version: "3.11"
+          enable-cache: true
+      - working-directory: api
+        run: uv sync --locked
+      - name: Call Muse Spark
+        working-directory: api
+        env:
+          META_API_KEY: ${{ secrets.META_API_KEY }}
+          META_API_BASE: ${{ secrets.META_API_BASE }}
+          ROUNDS: ${{ github.event.inputs.rounds || '5' }}
+        run: uv run python scripts/muse_spark_smoke.py --rounds "$ROUNDS"

@@ -1,0 +1,398 @@
+{
+	"_generated_by": "web/scripts/make_gpu_table.py from python/preflight/engine/gpus.py",
+	"gpus": {
+		"A10": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 25769803776,
+			"confidence": "datasheet"
+		},
+		"A100-PCIe-40GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 42294690447,
+			"confidence": "datasheet"
+		},
+		"A100-PCIe-80GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 84986665370,
+			"confidence": "datasheet"
+		},
+		"A100-SXM-40GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 42294690447,
+			"confidence": "datasheet"
+		},
+		"A100-SXM-80GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 84986665370,
+			"confidence": "datasheet"
+		},
+		"A16": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
+		"A40": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 51539607552,
+			"confidence": "datasheet"
+		},
+		"B200-SXM-180GB": {
+			"vendor": "nvidia",
+			"arch": "blackwell",
+			"memory_bytes": 193273528320,
+			"confidence": "datasheet"
+		},
+		"B300-SXM-288GB": {
+			"vendor": "nvidia",
+			"arch": "blackwell",
+			"memory_bytes": 309237645312,
+			"confidence": "derived"
+		},
+		"GH200-144GB": {
+			"vendor": "nvidia",
+			"arch": "hopper",
+			"memory_bytes": 154618822656,
+			"confidence": "datasheet"
+		},
+		"GH200-96GB": {
+			"vendor": "nvidia",
+			"arch": "hopper",
+			"memory_bytes": 103079215104,
+			"confidence": "datasheet"
+		},
+		"GTX-1080-Ti": {
+			"vendor": "nvidia",
+			"arch": "pascal",
+			"memory_bytes": 11811160064,
+			"confidence": "datasheet"
+		},
+		"H100-NVL-94GB": {
+			"vendor": "nvidia",
+			"arch": "hopper",
+			"memory_bytes": 100931731456,
+			"confidence": "derived"
+		},
+		"H100-PCIe-80GB": {
+			"vendor": "nvidia",
+			"arch": "hopper",
+			"memory_bytes": 85899345920,
+			"confidence": "datasheet"
+		},
+		"H100-SXM-80GB": {
+			"vendor": "nvidia",
+			"arch": "hopper",
+			"memory_bytes": 85018877624,
+			"confidence": "derived"
+		},
+		"H200-NVL-141GB": {
+			"vendor": "nvidia",
+			"arch": "hopper",
+			"memory_bytes": 151397597184,
+			"confidence": "derived"
+		},
+		"H200-SXM-141GB": {
+			"vendor": "nvidia",
+			"arch": "hopper",
+			"memory_bytes": 151397597184,
+			"confidence": "derived"
+		},
+		"L4": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 23031762125,
+			"confidence": "derived"
+		},
+		"L40": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 51539607552,
+			"confidence": "datasheet"
+		},
+		"L40S": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 51539607552,
+			"confidence": "datasheet"
+		},
+		"M40-24GB": {
+			"vendor": "nvidia",
+			"arch": "maxwell",
+			"memory_bytes": 25769803776,
+			"confidence": "datasheet"
+		},
+		"MI100": {
+			"vendor": "amd",
+			"arch": "cdna1",
+			"memory_bytes": 34359738368,
+			"confidence": "datasheet"
+		},
+		"MI210": {
+			"vendor": "amd",
+			"arch": "cdna2",
+			"memory_bytes": 68719476736,
+			"confidence": "datasheet"
+		},
+		"MI250-GCD": {
+			"vendor": "amd",
+			"arch": "cdna2",
+			"memory_bytes": 68719476736,
+			"confidence": "derived"
+		},
+		"MI250X-GCD": {
+			"vendor": "amd",
+			"arch": "cdna2",
+			"memory_bytes": 68719476736,
+			"confidence": "derived"
+		},
+		"MI300X": {
+			"vendor": "amd",
+			"arch": "cdna3",
+			"memory_bytes": 206158430208,
+			"confidence": "datasheet"
+		},
+		"MI325X": {
+			"vendor": "amd",
+			"arch": "cdna3",
+			"memory_bytes": 274877906944,
+			"confidence": "datasheet"
+		},
+		"MI355X": {
+			"vendor": "amd",
+			"arch": "cdna4",
+			"memory_bytes": 309237645312,
+			"confidence": "derived"
+		},
+		"P100-16GB": {
+			"vendor": "nvidia",
+			"arch": "pascal",
+			"memory_bytes": 17179869184,
+			"confidence": "datasheet"
+		},
+		"Quadro-RTX-8000": {
+			"vendor": "nvidia",
+			"arch": "turing",
+			"memory_bytes": 51539607552,
+			"confidence": "datasheet"
+		},
+		"RTX-2080": {
+			"vendor": "nvidia",
+			"arch": "turing",
+			"memory_bytes": 8589934592,
+			"confidence": "datasheet"
+		},
+		"RTX-2080-Ti": {
+			"vendor": "nvidia",
+			"arch": "turing",
+			"memory_bytes": 11811160064,
+			"confidence": "datasheet"
+		},
+		"RTX-3090": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 25769803776,
+			"confidence": "datasheet"
+		},
+		"RTX-4090": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 25393994138,
+			"confidence": "datasheet"
+		},
+		"RTX-5090": {
+			"vendor": "nvidia",
+			"arch": "blackwell",
+			"memory_bytes": 34359738368,
+			"confidence": "datasheet"
+		},
+		"RTX-A4000": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
+		"RTX-A5000": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 25769803776,
+			"confidence": "derived"
+		},
+		"RTX-A6000": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 51539607552,
+			"confidence": "datasheet"
+		},
+		"RTX-PRO-6000-96GB": {
+			"vendor": "nvidia",
+			"arch": "blackwell",
+			"memory_bytes": 103079215104,
+			"confidence": "secondary"
+		},
+		"T4": {
+			"vendor": "nvidia",
+			"arch": "turing",
+			"memory_bytes": 15826954486,
+			"confidence": "datasheet"
+		},
+		"TITAN-V": {
+			"vendor": "nvidia",
+			"arch": "volta",
+			"memory_bytes": 12884901888,
+			"confidence": "secondary"
+		},
+		"TITAN-X-Maxwell": {
+			"vendor": "nvidia",
+			"arch": "maxwell",
+			"memory_bytes": 12884901888,
+			"confidence": "secondary"
+		},
+		"TITAN-X-Pascal": {
+			"vendor": "nvidia",
+			"arch": "pascal",
+			"memory_bytes": 12884901888,
+			"confidence": "secondary"
+		},
+		"V100-PCIe-16GB": {
+			"vendor": "nvidia",
+			"arch": "volta",
+			"memory_bytes": 17179869184,
+			"confidence": "datasheet"
+		},
+		"V100-PCIe-32GB": {
+			"vendor": "nvidia",
+			"arch": "volta",
+			"memory_bytes": 34359738368,
+			"confidence": "datasheet"
+		},
+		"V100-SXM2-16GB": {
+			"vendor": "nvidia",
+			"arch": "volta",
+			"memory_bytes": 16932908564,
+			"confidence": "datasheet"
+		},
+		"V100-SXM2-32GB": {
+			"vendor": "nvidia",
+			"arch": "volta",
+			"memory_bytes": 34080565494,
+			"confidence": "datasheet"
+		}
+	},
+	"aliases": {
+		"a10": "A10",
+		"a100 80gb pcie": "A100-PCIe-80GB",
+		"a100-40gb": "A100-SXM-40GB",
+		"a100-80gb": "A100-SXM-80GB",
+		"a100-pcie-40gb": "A100-PCIe-40GB",
+		"a100-pcie-80gb": "A100-PCIe-80GB",
+		"a100-sxm-40gb": "A100-SXM-40GB",
+		"a100-sxm-80gb": "A100-SXM-80GB",
+		"a100-sxm4-40gb": "A100-SXM-40GB",
+		"a100-sxm4-80gb": "A100-SXM-80GB",
+		"a10g": "A10",
+		"a16": "A16",
+		"a40": "A40",
+		"b200": "B200-SXM-180GB",
+		"b200-sxm-180gb": "B200-SXM-180GB",
+		"b300": "B300-SXM-288GB",
+		"b300-sxm-288gb": "B300-SXM-288GB",
+		"geforce gtx 1080 ti": "GTX-1080-Ti",
+		"geforce gtx titan x": "TITAN-X-Maxwell",
+		"geforce rtx 2080": "RTX-2080",
+		"geforce rtx 2080 ti": "RTX-2080-Ti",
+		"geforce rtx 3090": "RTX-3090",
+		"geforce rtx 4090": "RTX-4090",
+		"geforce rtx 5090": "RTX-5090",
+		"gfx908": "MI100",
+		"gfx950": "MI355X",
+		"gh200": "GH200-96GB",
+		"gh200 144gb": "GH200-144GB",
+		"gh200-144gb": "GH200-144GB",
+		"gh200-96gb": "GH200-96GB",
+		"gtx 1080 ti": "GTX-1080-Ti",
+		"gtx-1080-ti": "GTX-1080-Ti",
+		"h100": "H100-SXM-80GB",
+		"h100 80gb hbm3": "H100-SXM-80GB",
+		"h100 nvl": "H100-NVL-94GB",
+		"h100 pcie": "H100-PCIe-80GB",
+		"h100-nvl-94gb": "H100-NVL-94GB",
+		"h100-pcie-80gb": "H100-PCIe-80GB",
+		"h100-sxm": "H100-SXM-80GB",
+		"h100-sxm-80gb": "H100-SXM-80GB",
+		"h200": "H200-SXM-141GB",
+		"h200 nvl": "H200-NVL-141GB",
+		"h200-nvl-141gb": "H200-NVL-141GB",
+		"h200-sxm-141gb": "H200-SXM-141GB",
+		"instinct mi100": "MI100",
+		"instinct mi210": "MI210",
+		"instinct mi250": "MI250-GCD",
+		"instinct mi250x": "MI250X-GCD",
+		"instinct mi300x": "MI300X",
+		"instinct mi325x": "MI325X",
+		"instinct mi355x": "MI355X",
+		"l4": "L4",
+		"l40": "L40",
+		"l40s": "L40S",
+		"m40-24gb": "M40-24GB",
+		"mi100": "MI100",
+		"mi210": "MI210",
+		"mi250": "MI250-GCD",
+		"mi250-gcd": "MI250-GCD",
+		"mi250x": "MI250X-GCD",
+		"mi250x-gcd": "MI250X-GCD",
+		"mi300x": "MI300X",
+		"mi325x": "MI325X",
+		"mi355x": "MI355X",
+		"nvidia a10": "A10",
+		"nvidia a16": "A16",
+		"nvidia a40": "A40",
+		"nvidia l4": "L4",
+		"nvidia l40": "L40",
+		"nvidia l40s": "L40S",
+		"p100": "P100-16GB",
+		"p100-16gb": "P100-16GB",
+		"quadro rtx 8000": "Quadro-RTX-8000",
+		"quadro-rtx-8000": "Quadro-RTX-8000",
+		"rtx a4000": "RTX-A4000",
+		"rtx a5000": "RTX-A5000",
+		"rtx a6000": "RTX-A6000",
+		"rtx pro 6000": "RTX-PRO-6000-96GB",
+		"rtx pro 6000 blackwell": "RTX-PRO-6000-96GB",
+		"rtx-2080": "RTX-2080",
+		"rtx-2080-ti": "RTX-2080-Ti",
+		"rtx-3090": "RTX-3090",
+		"rtx-4090": "RTX-4090",
+		"rtx-5090": "RTX-5090",
+		"rtx-a4000": "RTX-A4000",
+		"rtx-a5000": "RTX-A5000",
+		"rtx-a6000": "RTX-A6000",
+		"rtx-pro-6000": "RTX-PRO-6000-96GB",
+		"rtx-pro-6000-96gb": "RTX-PRO-6000-96GB",
+		"t4": "T4",
+		"tesla m40": "M40-24GB",
+		"tesla p100": "P100-16GB",
+		"tesla t4": "T4",
+		"tesla v100-pcie-16gb": "V100-PCIe-16GB",
+		"tesla v100-pcie-32gb": "V100-PCIe-32GB",
+		"tesla v100-sxm2-16gb": "V100-SXM2-16GB",
+		"tesla v100-sxm2-32gb": "V100-SXM2-32GB",
+		"titan v": "TITAN-V",
+		"titan x (pascal)": "TITAN-X-Pascal",
+		"titan xp": "TITAN-X-Pascal",
+		"titan-v": "TITAN-V",
+		"titan-x-maxwell": "TITAN-X-Maxwell",
+		"titan-x-pascal": "TITAN-X-Pascal",
+		"v100-pcie-16gb": "V100-PCIe-16GB",
+		"v100-pcie-32gb": "V100-PCIe-32GB",
+		"v100-sxm2": "V100-SXM2-32GB",
+		"v100-sxm2-16gb": "V100-SXM2-16GB",
+		"v100-sxm2-32gb": "V100-SXM2-32GB",
+		"v100s": "V100-PCIe-32GB"
+	}
+}

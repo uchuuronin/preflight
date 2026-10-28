@@ -29,8 +29,9 @@ EXAMPLES = ROOT / "schema" / "examples"
 GOLDEN = ["finetune", "pretrain", "agent"]
 
 
-def test_schema_version_is_semver_0_1():
-	assert SCHEMA_VERSION == "0.1.0"
+def test_schema_version_is_semver_0_x():
+	# 0.2.0 (Oct 27): run cost fields, additive over the 0.1.0 freeze
+	assert SCHEMA_VERSION == "0.2.0"
 
 
 def test_ulid_is_26_crockford_chars_and_sortable():

@@ -5,17 +5,17 @@ who in its docstring. Raw traces and logs go to the object store and are
 referenced by blob:// keys, never inlined.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
 from .base import BlobRef, KnobValue, Lens, Strict, Unit
 from .ids import new_share_token, new_ulid
-from .prediction import Objective, Predictions
+from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.1.0"
+SCHEMA_VERSION = "0.2.0"
 
 
 def _now() -> datetime:
@@ -620,6 +620,55 @@ class Costs(Strict):
 		return self.gpu_usd + self.llm_usd
 
 
+# ------------------------------------------------------------- run cost (0.2.0)
+
+CostLineKind = Literal["gpu", "tokens", "storage"]
+BillingMode = Literal["on_demand", "spot", "own_cluster"]
+
+
+class CostBasis(Strict):
+	"""Where the run cost's rates come from, so every cost readout can say what it is based on."""
+
+	price_table: str = Field(description="Version of B's price table, e.g. 'prices@2026-10-27'")
+	as_of: date = Field(description="Date the rates were checked")
+	provider: str = Field(description="Provider the user picked, e.g. 'modal', 'unity', 'amd-devcloud'")
+	region: str | None = None
+	billing: BillingMode = "on_demand"
+	currency: Literal["USD"] = Field(default="USD", description="Rates are USD; fmt() converts for display")
+	includes: list[CostLineKind] = Field(
+		default_factory=lambda: ["gpu", "tokens"], description="Line kinds counted in the total"
+	)
+
+
+class CostLine(Strict):
+	"""One line of the run cost: a predicted quantity times a rate from the price table."""
+
+	kind: CostLineKind
+	label_key: str = Field(description="t() key for the line's label")
+	quantity: Estimate = Field(description="GPU-hours, tokens or GB, with its interval")
+	rate_usd: float | None = Field(default=None, ge=0, description="USD per unit; None when not billed")
+	usd: Estimate | None = Field(default=None, description="quantity x rate; None when not billed in dollars")
+	price_row: str | None = Field(default=None, description="Id of the price-table row the rate came from")
+
+
+class JobCost(Strict):
+	"""What the job itself would cost to run in full. Preflight's own spend is `costs`, never here."""
+
+	lines: list[CostLine] = Field(default_factory=list)
+	total_usd: Estimate | None = Field(
+		default=None,
+		description="Sum of billed lines, lows and highs added line by line; None on own cluster",
+	)
+	gpu_hours: Estimate | None = Field(default=None, description="Shown first on the user's own cluster")
+	market_equivalent_usd: Estimate | None = Field(
+		default=None, description="On-demand price of the same GPU-hours, shown grey on an own cluster"
+	)
+	at_risk_usd: Estimate | None = Field(
+		default=None,
+		description="Chance of failure x cost up to the failure point; shown beside the total, never in it",
+	)
+
+
 # ---------------------------------------------------------------- the record
 
 
@@ -641,7 +690,12 @@ class FlightRecord(Strict):
 	patches: list[Patch] = Field(default_factory=list)
 	campaign: Campaign | None = None
 	provenance: list[ModelCall] = Field(default_factory=list)
-	costs: Costs = Field(default_factory=Costs)
+	costs: Costs = Field(
+		default_factory=Costs,
+		description="What Preflight itself spent making this record (probes, verify, model calls); never part of the run cost",
+	)
+	cost_basis: CostBasis | None = Field(default=None, description="Where the run cost's rates come from (B)")
+	job_cost: JobCost | None = Field(default=None, description="The run cost breakdown, written by B")
 
 	@model_validator(mode="after")
 	def _check(self):

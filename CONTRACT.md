@@ -1,4 +1,4 @@
-# Preflight contract v0.1.0
+# Preflight contract v0.2.0
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -7,7 +7,7 @@ agent rereads this file and the Contracts tab at the start of every session.
 Frozen at v0.1 on **Tue Oct 27, noon ET**. After that, changes are additive
 only (new optional fields, new endpoints, new tools) and bump the minor
 version. A breaking change needs Chiya's sign-off and a note in every agent's
-chat. Ask for changes in `docs/requests.md` with a `TODO(contract)` line.
+chat. Ask for changes in your own `docs/requests/from-<you>.md` with a `TODO(contract)` line.
 
 ## Generated files
 
@@ -54,7 +54,9 @@ fail loudly. Read stored records with `load_record()`, which runs `upgrade()`.
 | `patches` | template or open-ended, diff blob, verify result, session log | C |
 | `campaign` | cells, lanes, calendar, cut list, completion quantiles | B |
 | `provenance` | every model call: provider, model, purpose, tokens, cost, request id, time | whoever calls a model |
-| `costs` | GPU and LLM dollars | A and C |
+| `costs` | What Preflight itself spent making this record (probes, verify, model calls); never part of the run cost | A (GPU) and C (LLM) |
+| `cost_basis` | Where the run cost's rates come from: price-table version, as-of date, provider, region, billing (on demand, spot, own cluster), what the total includes; USD | B |
+| `job_cost` | The run cost: lines (GPU-hours, tokens, storage) as quantity × rate with intervals, the total (lows and highs added line by line), GPU-hours and market equivalent for an own cluster, and money at risk shown beside the total, never in it | B |
 
 The record write token is never stored in the record. Golden records for the
 fine-tune, pretrain and agent lenses live in `schema/examples/`; their
@@ -122,14 +124,19 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 - One branch per agent (`ws-a` to `ws-d`); only Chiya merges into main, nightly.
 - No push without Chiya's explicit consent in that chat, every time. Run gitleaks first.
-- Touch only the paths you own. Need something else? `TODO(contract)` in `docs/requests.md`.
+- Touch only the paths you own. Need something else? `TODO(contract)` in your own `docs/requests/from-<you>.md`; never edit another agent's file.
 - Every feature behind a flag in `flags.json`, off by default.
 - Nightly: update `docs/status/<agent>.md` with done, blocked, next.
-- Secrets only in Modal secrets, Cloudflare env and GitHub Actions secrets.
+- Secrets only in Modal secrets, Cloudflare env and GitHub Actions secrets. Agents never hold keys: cloud runs go through `remote-run.yml` and `amd-run.yml` (docs/setup/cloud.md). Canonical names: `META_API_KEY`, `META_API_BASE`, `BASETEN_API_KEY`, `BASETEN_BASE_URL`, `BASETEN_MODEL`; Modal secrets `preflight-meta` and `preflight-baseten`, never mounted in probe containers.
+- Start every session with `git merge origin/main` (merge, never rebase once pushed).
 - Python 3.11, uv, ruff; TypeScript strict; tabs in both; British spelling and no em dashes in user-facing copy.
 
 ## Changelog
 
+- 0.2.0 (Oct 27, after the freeze, additive): `cost_basis` and `job_cost` (the run cost agreed Oct 26,
+  gap 21); `costs` keeps its name and now says it holds Preflight's own spend only (renaming it would
+  break every plane). The golden fine-tune carries a fixture run cost with its first-eval OOM as money
+  at risk. 0.1.0 records load unchanged through `upgrade()`.
 - 0.1.0 (Oct 26–27): first contract. Pre-freeze additions over the Contracts tab, all A's:
   `Grid.scale` (float16 overflow), `Estimate.level`, `Target.readout`, `Finding.code` and
   `Finding.knob_id`, `Graph.skeleton`, `JobEvent` and `JobRequest`, `env.backend` gains `cpu`
