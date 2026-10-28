@@ -141,5 +141,8 @@ jobs:
           echo "$GITLEAKS_SHA256  gitleaks.tgz" | sha256sum -c -
           tar xzf gitleaks.tgz gitleaks
           rm gitleaks.tgz
-      - name: Scan the whole history
-        run: ./gitleaks git . --redact --no-banner --verbose --exit-code 1
+      # Only the history of the commit under test: by default gitleaks reads every fetched ref, so
+      # one branch's false alarm turned every branch red. Each branch is scanned by its own CI and
+      # again when it merges into main.
+      - name: Scan this branch's history
+        run: ./gitleaks git . --log-opts=HEAD --redact --no-banner --verbose --exit-code 1

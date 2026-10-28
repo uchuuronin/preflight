@@ -23,6 +23,13 @@
 - CI green again on f1ac48d: the secrets job had failed since 3d03ec8 on a test
   Idempotency-Key value gitleaks read as an API key. Renamed the value and listed the old
   commit's fingerprint in `.gitleaksignore`; full-history and working-tree scans are clean.
+- Merged `main` (its `.gitleaksignore` kept). The secrets scan now reads only the history of
+  the commit under test (`--log-opts=HEAD`), so one branch's false alarm can't turn others red.
+- `guide_tour.py` ends in Modal before the workflow does: function timeout 20 min, startup
+  timeout 2 min, no retries, and the runner cancels the call at a deadline under the
+  workflow's `timeout` input. A crash on start now fails in 2 minutes, not 30.
+- Meta spend measured on the Usage page: $3.01 for 659 requests against $2.91 estimated (3%
+  low); recorded in `guide-limits.md`, caps unchanged.
 
 **Cloud runs:** none since the evening's table (new rule: ask before anything that spends).
 
@@ -80,8 +87,8 @@
 | Oct 28 01:59 | c-guide-tour-5 | Modal 1 CPU core + Meta, 79 rounds | 6 | 0.34 Meta |
 | Oct 28 01:34 | guide-smoke (push) | GitHub runner + Meta, 6 calls | 1 | 0.02 Meta |
 
-Meta dollars use the guide's price table ($1.25 / $4.25 / $0.15 per million in, out, cached),
-which is cited but not confirmed against Meta's Usage page. Modal CPU charges are on Modal's
+Meta dollars per run use the guide's price table ($1.25 / $4.25 / $0.15 per million in, out,
+cached). Measured total on Meta's Usage page: $3.01 for 659 requests, 3% above the table's sum. Modal CPU charges are on Modal's
 usage page; nothing here used a GPU.
 
 **Blocked**

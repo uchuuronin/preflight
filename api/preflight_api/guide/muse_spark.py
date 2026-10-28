@@ -23,8 +23,8 @@ MODEL = "muse-spark-1.3"
 # Past it the rule-based tour takes over.
 TIMEOUT_S = 12.0
 
-# Per million tokens. Source: cited from a third-party listing, unconfirmed: Chiya checks the
-# Meta Usage page against the Oct 27 tour runs (their dollar figures use these prices).
+# Per million tokens. Source: cited from a third-party listing; checked against Meta's Usage page
+# on Oct 27, the tour runs came to $3.01 measured against $2.91 at these prices (3% low).
 PRICE_IN = 1.25
 PRICE_OUT = 4.25
 PRICE_CACHED = 0.15

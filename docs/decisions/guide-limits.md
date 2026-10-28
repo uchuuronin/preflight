@@ -105,11 +105,13 @@ tools ("I need to call sensitivity but..."), 1 of 79 rounds; watched, not fixed.
   it calls what) is what these runs measure.
 - 8 to 10 tours per comparison: enough to see a stall rate fall from 3/8 to 1/10, not to rank
   close versions finely. `api/scripts/guide_tour.py --variants` reruns any comparison.
-- Dollar figures depend on the unconfirmed price table.
+- Per-run dollar figures use the cited price table, which came out 3% under the measured total.
 - The slowest round (9.8 s) sits 2.2 s under the 12 s timeout; a timeout hands over to the
   rule-based tour, it doesn't lose the visitor's work.
 
 ## Spend on these runs
 
-Meta Model API at the cited prices: run 1 $0.40, run 2 $0.15, run 3 $1.37, run 4 $0.65, run 5
-$0.34; total about $2.91. Modal: one CPU core per run, no GPU.
+Measured: $3.01 for 659 requests on Meta's Usage page (checked by Chiya, Oct 27), covering these
+five runs plus the smoke checks. The estimate at the cited prices was $2.91 (run 1 $0.40, run 2
+$0.15, run 3 $1.37, run 4 $0.65, run 5 $0.34), 3% low, so the price table is close and the caps
+stay as set. Modal: one CPU core per run, no GPU.

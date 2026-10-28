@@ -21,6 +21,11 @@ Through GitHub Actions (the key never leaves Modal's "preflight-meta" secret):
 	gh workflow run remote-run.yml -f name=c-guide-tour -f ref=ws-c -f timeout=30 \\
 		-f cmd="modal run api/scripts/guide_tour.py --tours 2"
 
+Every run ends in Modal before the workflow kills the job: the function has its own timeout and
+startup timeout, and the runner waits for it only until a deadline under the workflow's
+`timeout` input, then cancels the call. A container that crashes on start (Oct 27, 8:56 PM: it
+crash-looped until the workflow timed out) now fails within STARTUP_TIMEOUT_S instead.
+
 Writes out/guide_tour.json (every round) and prints a summary. The tour itself lives in
 tour_play.py, which also runs locally against a stand-in model (see its docstring).
 """
@@ -28,12 +33,24 @@ tour_play.py, which also runs locally against a stand-in model (see its docstrin
 from __future__ import annotations
 
 import json
+import os
 import sys
+import time
 from pathlib import Path
 
 import modal
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # tour_play, next to this file
+
+_T0 = time.monotonic()  # on the runner: before the image build, which also eats the workflow's time
+# Source: measured, the longest batch so far (c-guide-prompts, 264 rounds) took 13 minutes end to
+# end on the workflow (docs/status/c.md); 20 minutes leaves room before Modal stops the function.
+FUNCTION_TIMEOUT_S = 1200
+# Source: guess, the image is prebuilt by the time a container starts, so a healthy start is
+# seconds; two minutes means a container that crashes on import fails here, not in a retry loop.
+STARTUP_TIMEOUT_S = 120
+# Source: guess, time the workflow needs after the run to publish out/ to the remote-runs branch.
+PUBLISH_MARGIN_S = 120
 
 # Locally (on the GitHub runner) the repo root; inside the container this file sits at /root and
 # the image's local files are already baked in, so the path is never read there.
@@ -60,7 +77,13 @@ for rel in SAMPLE_FILES:
 app = modal.App("preflight-guide-tour", image=image)
 
 
-@app.function(secrets=[modal.Secret.from_name("preflight-meta")], timeout=1800, cpu=1.0)
+@app.function(
+	secrets=[modal.Secret.from_name("preflight-meta")],
+	timeout=FUNCTION_TIMEOUT_S,
+	startup_timeout=STARTUP_TIMEOUT_S,
+	retries=0,
+	cpu=1.0,
+)
 async def play(samples: list[str], tours: int, aim: str, variants: tuple[str, ...] = ("current",)) -> dict:
 	sys.path[:0] = ["/root/repo/api/scripts", "/root/repo/api", "/root/repo/python"]
 	from tour_play import run_tours
@@ -77,9 +100,20 @@ def main(
 ) -> None:
 	from tour_play import report
 
-	res = play.remote(
+	budget = int(os.environ.get("RUN_TIMEOUT") or 30) * 60  # the workflow's limit, in seconds
+	deadline = min(
+		FUNCTION_TIMEOUT_S + STARTUP_TIMEOUT_S, budget - PUBLISH_MARGIN_S - (time.monotonic() - _T0)
+	)
+	if deadline < STARTUP_TIMEOUT_S:
+		raise SystemExit(f"guide tour: {budget // 60} min isn't enough to start and run; ask for more")
+	call = play.spawn(
 		[s for s in samples.split(",") if s], tours, aim, tuple(v for v in variants.split(",") if v)
 	)
+	try:
+		res = call.get(timeout=deadline)
+	except (TimeoutError, modal.exception.TimeoutError):
+		call.cancel()
+		raise SystemExit(f"guide tour: no result after {deadline:.0f} s; cancelled in Modal") from None
 	Path("out").mkdir(exist_ok=True)
 	Path("out/guide_tour.json").write_text(json.dumps(res, indent="\t") + "\n")
 	print(report(res))
