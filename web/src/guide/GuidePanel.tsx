@@ -7,7 +7,8 @@ import { capacityBytes, costStraddlesBudget, failureTarget, objectiveTarget, SAM
 import type { Knob, KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
-import { GuideFallback, type InputItem, runLiveTurn } from "./liveGuide";
+import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
+import { LiveGuideSection } from "./LiveGuideSection";
 import { MAX_TOUR_STEPS, nextStep, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
@@ -30,19 +31,16 @@ export function valueText(knob: Knob | undefined, v: KnobValue | undefined): str
 
 export function GuidePanel() {
 	const ws = useWorkspace();
-	const { record, provider, state, actions, estimates } = ws;
+	const { record, recordRef, provider, state, actions, estimates } = ws;
 	const footer = usePanels("guide-footer", record.job.lens);
 	const [active, setActive] = useState<Active | null>(null);
 	const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
 	const [taken, setTaken] = useState(0);
 	const [why, setWhy] = useState(false);
 	const [fallback, setFallback] = useState<string | null>(null);
-	const [approvals, setApprovals] = useState<Array<{ name: string; args: Record<string, unknown> }>>([]);
-	const [ask, setAsk] = useState("");
-	const [liveText, setLiveText] = useState("");
-	const [history, setHistory] = useState<InputItem[]>([]);
-	const [busy, setBusy] = useState(false);
+	const [approvals, setApprovals] = useState<Array<{ id: number; name: string; args: Record<string, unknown>; run?: ToolRun; running?: boolean }>>([]);
 	const [cliff, setCliff] = useState<{ knobId: string; from: KnobValue } | null>(null);
+	const [liveStatus, setLiveStatus] = useState("ready");
 	const live = flag("c.guide.live") && !fallback;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 
@@ -57,7 +55,7 @@ export function GuidePanel() {
 			actions,
 			knobs: s.knobs,
 			pinned: s.pinned,
-			requestApproval: (name, args) => setApprovals((a) => [...a, { name, args }]),
+			requestApproval: (name, args) => setApprovals((a) => [...a, { id: Date.now() + a.length, name, args }]),
 		};
 	};
 
@@ -151,16 +149,15 @@ export function GuidePanel() {
 		prevKnobs.current = state.knobs;
 	}, [estimates, record, state.knobs, state.lastChange]);
 
-	const sendLive = async (text: string) => {
-		setBusy(true);
-		try {
-			const out = await runLiveTurn(history, text, ctx, { recordRef: record.share_token, onText: setLiveText });
-			setHistory(out.history);
-		} catch (e) {
-			setFallback(e instanceof GuideFallback && e.message ? e.message : t("guide.fallback"));
-		} finally {
-			setBusy(false);
-		}
+	/** The visitor approved a spending tool from the rule-based tour: run it on the server. */
+	const approve = async (id: number) => {
+		const a = approvals.find((x) => x.id === id);
+		if (!a) return;
+		setApprovals((all) => all.map((x) => (x.id === id ? { ...x, running: true } : x)));
+		const args = a.args as { knobs?: Record<string, KnobValue>; knob_id?: string; reason?: string };
+		const reason = typeof args.reason === "string" && /^[a-z][a-z0-9_.]{0,47}$/.test(args.reason) ? args.reason : undefined;
+		const run = await runApprovedTool(recordRef, a.name as SpendTool, { ...(args.knobs ? { knobs: args.knobs } : {}), ...(args.knob_id ? { knob_id: args.knob_id } : {}), ...(reason ? { reason } : {}) }, latest.current.state.knobs);
+		setApprovals((all) => all.map((x) => (x.id === id ? { ...x, running: false, run } : x)));
 	};
 
 	const vars = stepVars(active);
@@ -229,7 +226,13 @@ export function GuidePanel() {
 			<div className="pf-guide__head">
 				<span className={live ? "pf-model" : "pf-model pf-model--quiet"}>{live ? t("guide.model.muse_spark") : t("guide.model.rule_based")}</span>
 				<span className="pf-guide__step">
-					{active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" ? t("guide.step_of", { n: active.n, of: active.of }) : active ? t("guide.waiting") : t("guide.ready")}
+					{live
+						? t(`guide.live.status.${liveStatus}`)
+						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer"
+							? t("guide.step_of", { n: active.n, of: active.of })
+							: active
+								? t("guide.waiting")
+								: t("guide.ready")}
 				</span>
 			</div>
 
@@ -252,23 +255,7 @@ export function GuidePanel() {
 			) : null}
 
 			{live ? (
-				<form
-					className="pf-guide__ask"
-					onSubmit={(e) => {
-						e.preventDefault();
-						if (ask.trim() && !busy) {
-							void sendLive(ask.trim());
-							setAsk("");
-						}
-					}}
-				>
-					<label htmlFor="pf-guide-ask">{t("guide.ask.label")}</label>
-					<textarea id="pf-guide-ask" rows={2} value={ask} placeholder={t("guide.ask.placeholder")} onChange={(e) => setAsk(e.currentTarget.value)} />
-					<button type="submit" className="pf-btn pf-btn--primary pf-btn--small" disabled={busy || !ask.trim()}>
-						{busy ? t("guide.ask.thinking") : t("guide.ask.send")}
-					</button>
-					{liveText ? <p className="pf-guide__say">{liveText}</p> : null}
-				</form>
+				<LiveGuideSection onFallback={setFallback} onStatus={setLiveStatus} />
 			) : (
 				<>
 					<p className="pf-guide__say">{active ? t(active.step.textKey, vars) : t("guide.intro", { aim: t(`objective.${state.objective.kind ?? "min_time"}`).toLowerCase() })}</p>
@@ -302,15 +289,22 @@ export function GuidePanel() {
 				</>
 			)}
 
-			{approvals.map((a, i) => (
-				<div key={`${a.name}-${i}`} className="pf-guide__approval">
-					<p>{t(`guide.approval.${a.name}`)}</p>
+			{approvals.map((a) => (
+				<div key={a.id} className="pf-guide__approval">
+					<p>{a.run ? t(`guide.run.${a.run.status}`, { job: a.run.job_id ?? "", position: a.run.queue_position ?? "" }) : t(`guide.approval.${a.name}`)}</p>
+					{a.run?.status === "submitted" && a.run.job_id ? (
+						<a className="pf-link" href={`#/boarding/${encodeURIComponent(a.run.job_id)}`}>
+							{t("guide.run.follow")}
+						</a>
+					) : null}
 					<div className="pf-guide__actions">
-						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" disabled title={t("guide.approval.unavailable")}>
-							{t(`guide.approval.${a.name}.go`)}
-						</button>
-						<button type="button" className="pf-btn pf-btn--small" onClick={() => setApprovals((all) => all.filter((_, j) => j !== i))}>
-							{t("guide.approval.dismiss")}
+						{!a.run ? (
+							<button type="button" className="pf-btn pf-btn--primary pf-btn--small" disabled={a.running} onClick={() => void approve(a.id)}>
+								{a.running ? t("guide.run.running") : t(`guide.approval.${a.name}.go`)}
+							</button>
+						) : null}
+						<button type="button" className="pf-btn pf-btn--small" onClick={() => setApprovals((all) => all.filter((x) => x.id !== a.id))}>
+							{a.run ? t("guide.run.close") : t("guide.approval.dismiss")}
 						</button>
 					</div>
 				</div>

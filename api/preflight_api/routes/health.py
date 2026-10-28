@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from ..flags import flag
 from ..guide import muse_spark
-from ..guide.budget import LLM_USD_PER_DAY
+from ..ledger import Limits
 
 router = APIRouter()
 
@@ -26,11 +26,14 @@ async def readyz(request: Request) -> JSONResponse:
 async def status(request: Request) -> dict:
 	"""Public service status: what works right now, in words the status page shows."""
 	guide_live = flag("c.guide.live") and muse_spark.configured()
-	spent = request.app.state.ledger.spent_today()
+	ledger = request.app.state.ledger
+	spent = await ledger.spent_today()
+	cap = getattr(getattr(ledger, "core", None), "limits", None)
+	cap_usd = cap.usd_per_day if cap else Limits().usd_per_day
 	return {
 		"status": "ok" if request.app.state.records.healthy() else "degraded",
 		"guide": "muse_spark" if guide_live else "rule_based",
 		"llm_spend_today_usd": round(spent, 2),
-		"llm_spend_cap_usd": LLM_USD_PER_DAY,
-		"samples_only": spent >= LLM_USD_PER_DAY,
+		"llm_spend_cap_usd": cap_usd,
+		"samples_only": spent >= cap_usd,
 	}

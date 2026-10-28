@@ -63,12 +63,23 @@ describe("memory terms", () => {
 		expect(segments.find((s) => s.key === "weights")?.parts.map((x) => x.term)).toEqual(["weights", "master_weights", "frozen_models", "context"]);
 	});
 
-	it("scales terms down to the peak when they overshoot it, and shows the rest as other when short", () => {
+	it("never rescales parts: a short sum leaves an untrusted gap, an overshoot is marked past the peak", () => {
 		const p: Prediction = { "memory.weights": est(30 * GIB), "memory.activations": est(30 * GIB) };
-		const over = memorySegments(p, 40 * GIB).segments;
-		expect(over.reduce((a, s) => a + s.bytes, 0)).toBeCloseTo(40 * GIB, 0);
-		const short = memorySegments(p, 80 * GIB).segments;
-		expect(short.find((s) => s.key === "other")?.bytes).toBeCloseTo(20 * GIB, 0);
+		const over = memorySegments(p, 40 * GIB);
+		expect(over.segments.map((s) => s.bytes / GIB)).toEqual([30, 30]);
+		expect(over.untrusted).toEqual({ kind: "overshoot", bytes: 20 * GIB });
+		const short = memorySegments(p, 80 * GIB);
+		expect(short.segments.find((s) => s.key === "untrusted")).toMatchObject({ bytes: 20 * GIB, slot: 0 });
+		expect(short.untrusted).toEqual({ kind: "gap", bytes: 20 * GIB });
+		expect(memorySegments(p, 60.5 * GIB).untrusted).toBeNull();
+	});
+
+	it("names the terms that abstain here", () => {
+		const p: Prediction = {
+			"memory.weights": est(30 * GIB),
+			"memory.activations": { point: null, lo: null, hi: null, unit: "bytes", status: "abstain", model_id: "m", source: "grid" },
+		};
+		expect(memorySegments(p, 50 * GIB).abstaining).toEqual(["activations"]);
 	});
 
 	it("falls back to one total segment without a breakdown", () => {

@@ -74,6 +74,26 @@ describe("GridProvider on the dev record", () => {
 		expect(provider.predict(dev, { eval_batch_size: 8 })["memory.peak"]?.status).toBe("measured");
 	});
 
+	it("calls only what the probe observed measured: never the run's cost, time or risk", () => {
+		const p = provider.predict(dev, { eval_batch_size: 8 });
+		expect(p["memory.peak"]?.status).toBe("measured");
+		expect(p["throughput.tokens_per_s"]?.status).toBe("measured");
+		for (const id of ["cost.total", "time.total", "risk.oom"]) expect(p[id]?.status).toBe("predicted");
+		// One knob away from the probe, nothing is measured.
+		expect(provider.predict(dev, { eval_batch_size: 16 })["memory.peak"]?.status).not.toBe("measured");
+	});
+
+	it("drops a 'measured' label from the record's own estimates when no probe here observed it", () => {
+		const rec = {
+			...dev,
+			predictions: {
+				...dev.predictions,
+				estimates: { ...dev.predictions.estimates, "cost.total": { ...dev.predictions.estimates!["cost.total"]!, status: "measured" as const } },
+			},
+		};
+		expect(provider.predict(rec, {})["cost.total"]?.status).toBe("predicted");
+	});
+
 	it("abstains past twice the probed batch x sequence length", () => {
 		const p = provider.predict(dev, { eval_batch_size: 8, batch_size: 32, seq_len: 4096 });
 		expect(p["memory.peak"]?.status).toBe("abstain");

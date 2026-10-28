@@ -1,5 +1,51 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Tue Oct 27, evening (review: security, live tour, honest readouts)
+
+**Done** (branch `ws-c`, pushed a72a724, a138e3f, 96cce42)
+
+- Same-site API: a Cloudflare Pages Function (`web/functions/v1/[[path]].ts`) forwards `/v1/*`
+  to Modal with a shared edge secret and the visitor's IP; with `PREFLIGHT_REQUIRE_EDGE=1` the
+  API refuses anything that didn't come through it. The web app calls `/v1` on its own origin.
+- Signed sessions: `__Host-pf_session=v1.<id>.<HMAC-SHA256>`, keys from
+  `PREFLIGHT_SESSION_KEYS` (first signs, all verify, rotation re-signs); production refuses to
+  start without a key.
+- Spend ledger: before every model call the API reserves the worst case (max output tokens x
+  Meta's price) atomically, against caps per day, per run, per visitor and per IP plus an IP
+  token bucket, then settles to the real usage or releases on failure. Production holds it in
+  one always-on Modal container (`SpendLedger`, snapshot in a Modal Dict), so four API
+  containers can't overspend between them.
+- `/v1/guide/turns` takes only typed input (record id, setting, signed conversation state, a
+  500-character message, a decision, typed tool results, approvals); tool definitions are built
+  on the server from the record, and `set_knob` disappears while a move waits for the visitor.
+  Any number in the guide's reply that this turn's tool results don't support withholds the
+  reply.
+- Autonomous live tour: the browser runs sensitivity, highlight, predict and a guarded
+  `set_knob` (refuses pinned knobs, values outside the knob, settings that don't fit or that
+  memory can't vouch for, and a second move in one round), then stops for the visitor's Apply,
+  Revert or Pin and re-plans. Approving a spending tool runs it on the server and the guide hears
+  the real result ("measuring isn't open yet" until A's job store service exists).
+- Honest readouts: every dial says measured, predicted, extrapolated or not trusted, and the
+  risk dial always says fits, tight or likely to fail. "Measured" needs a probe at exactly these
+  settings that observed that target itself (never time.total, cost or risk). Dials keep one
+  fixed scale per record (log over the grid's range; linear to a budget or cap), chosen by Monte
+  Carlo: docs/decisions/dial-scale.md. The memory stack and ring draw each part at its own size
+  and hatch any disagreement with the peak as untrusted, naming terms that abstain.
+- Muse Spark smoke test (`api/scripts/muse_spark_smoke.py`, workflow `guide-smoke`): one plain
+  call, a guide round trip and a fallback probe, reported as annotations.
+- Checks: 77 web tests, 33 API tests, ruff, typecheck, build; knob change 83 ms p95.
+
+**Blocked**
+
+- Real Muse Spark call: needs the repository secrets `META_API_KEY` and `META_API_BASE`.
+  Timeout and caps stay tagged guesses until it reports latency and tokens.
+- Guide-approved probes: A's job store service and the `JobRequest` fields in docs/requests.md.
+
+**Next**
+
+- Fit map with the OOM frontier, Playwright stranger test gating the nightly deploy, data-use
+  notice, `/v1/jobs` on A's job store, INP at 4x CPU throttle.
+
 ## Tue Oct 27, afternoon (D's requests, sample_more)
 
 **Done** (branch `ws-c`, merged `ws-b` 39a7904)

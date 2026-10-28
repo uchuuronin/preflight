@@ -8,11 +8,12 @@ import { fmt, fmtRange } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useOrbitLayout } from "../map/Orbit";
 import { runPlan, targetFor } from "../record/model";
+import { memoryStackScale } from "../record/scale";
 import { memoryTermBytes, type MemorySegment } from "../record/terms";
 import type { KnobValue, LoadedRecord, Prediction } from "../record/types";
 import { useWorkspace } from "../state";
 import { valueText } from "../../guide/GuidePanel";
-import { FitMark } from "../components/StatusMark";
+import { FitMark, Provenance } from "../components/StatusMark";
 import { bounds, type Fit, likelyFails, trusted } from "../status";
 
 const MAX_MARKS = 24;
@@ -168,13 +169,19 @@ function partsLabel(s: MemorySegment): string {
 	return s.parts.map((p) => `${t(`target.memory.${p.term}`)} ${fmt(p.bytes, "bytes")}`).join(" · ");
 }
 
+/**
+ * What fills the GPU at its peak: each predicted part at its own size on a scale fixed for the
+ * record (record/scale.ts). Where parts and peak disagree, the difference is hatched and named
+ * untrusted, never squeezed away; terms that abstain here are listed by name.
+ */
 export function MemoryBand() {
 	const { record, estimates } = useWorkspace();
 	const layout = useOrbitLayout();
-	const { segments, total, capacity, breakdown } = layout.memory;
+	const { segments, total, capacity, breakdown, untrusted, abstaining, partsBytes } = layout.memory;
 	const memT = targetFor(record, "memory");
 	const peak = memT ? estimates[memT.id] : undefined;
-	if (!segments.length || !capacity) {
+	const scaleMax = memoryStackScale(record) ?? (capacity ? capacity * 1.25 : null);
+	if (!segments.length || !capacity || !scaleMax) {
 		return (
 			<div className="glass pf-band">
 				<div className="pf-band__head">
@@ -184,30 +191,59 @@ export function MemoryBand() {
 			</div>
 		);
 	}
-	const scaleMax = Math.max(capacity * 1.25, total ?? 0);
+	const pct = (b: number) => `${Math.min(100, (b / scaleMax) * 100).toFixed(2)}%`;
+	const offScale = Math.max(total ?? 0, partsBytes) > scaleMax;
+	const status = peak?.status ?? "abstain";
+	const unit = memT?.unit === "fraction" ? "fraction" : "bytes";
 	return (
 		<div className="glass pf-band" aria-label={t("membar.title")}>
 			<div className="pf-band__head">
 				<b>{t("membar.title")}</b>
-				<span>{total ? t("membar.line", { total: fmt(total, "bytes"), cap: fmt(capacity, "bytes") }) : ""}</span>
+				<span>{total ? t("membar.line", { total: fmt(total, unit), cap: fmt(capacity, unit) }) : ""}</span>
+				<Provenance status={status} />
 				{!breakdown ? <span className="pf-dim">{t("membar.no_breakdown")}</span> : null}
 			</div>
-			<div className="pf-stack" role="img" aria-label={t("membar.aria", { total: fmt(total ?? 0, "bytes"), cap: fmt(capacity, "bytes") })}>
+			<div className="pf-stack" role="img" aria-label={`${t("membar.aria", { total: fmt(total ?? 0, unit), cap: fmt(capacity, unit) })}${offScale ? `. ${t("membar.off_scale")}` : ""}`}>
 				{segments.map((s) => (
-					<div key={s.key} className={`pf-mseg pf-mseg--${s.slot}`} style={{ width: `${((s.bytes / scaleMax) * 100).toFixed(2)}%` }} title={`${groupLabel(s)}: ${fmt(s.bytes, "bytes")}${partsLabel(s) ? ` (${partsLabel(s)})` : ""}`} />
+					<div
+						key={s.key}
+						className={`pf-mseg pf-mseg--${s.slot}`}
+						style={{ width: pct(s.bytes) }}
+						title={s.key === "untrusted" ? t("membar.untrusted.gap.help", { gap: fmt(s.bytes, unit) }) : `${groupLabel(s)}: ${fmt(s.bytes, unit)}${partsLabel(s) ? ` (${partsLabel(s)})` : ""}`}
+					/>
 				))}
-				<div className="pf-cap" style={{ left: `${((capacity / scaleMax) * 100).toFixed(2)}%` }}>
-					<span>{t("membar.capacity", { cap: fmt(capacity, "bytes") })}</span>
+				{untrusted?.kind === "overshoot" && total ? (
+					<div
+						className="pf-mseg-over"
+						style={{ left: pct(total), width: pct(untrusted.bytes) }}
+						title={t("membar.untrusted.overshoot.help", { over: fmt(untrusted.bytes, unit) })}
+					/>
+				) : null}
+				{total && breakdown ? (
+					<div className="pf-peak" style={{ left: pct(total) }} title={t("membar.peak", { total: fmt(total, unit) })} />
+				) : null}
+				<div className="pf-cap" style={{ left: pct(capacity) }}>
+					<span>{t("membar.capacity", { cap: fmt(capacity, unit) })}</span>
 				</div>
+				{offScale ? <span className="pf-stack__off" aria-hidden="true">›</span> : null}
 			</div>
 			<ul className="pf-legend">
 				{segments.map((s) => (
 					<li key={s.key}>
 						<i className={`pf-mseg--${s.slot}`} />
-						{groupLabel(s)} <span className="pf-dim">{fmt(s.bytes, "bytes")}</span>
+						{groupLabel(s)} <span className="pf-dim">{fmt(s.bytes, unit)}</span>
 						{partsLabel(s) ? <small className="pf-dim">{partsLabel(s)}</small> : null}
 					</li>
 				))}
+				{untrusted?.kind === "overshoot" ? (
+					<li>
+						<i className="pf-mseg-over" />
+						{t("membar.untrusted.overshoot")} <span className="pf-dim">{fmt(untrusted.bytes, unit)}</span>
+					</li>
+				) : null}
+				{abstaining.length ? (
+					<li className="pf-dim">{t("membar.untrusted.abstain", { terms: abstaining.map((x) => t(`target.memory.${x}`)).join(", ") })}</li>
+				) : null}
 			</ul>
 		</div>
 	);
