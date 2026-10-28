@@ -123,9 +123,22 @@ The command, once Chiya approves the session:
 Every run's GPU, minutes and dollars. Runs go through GitHub Actions (docs/setup/cloud.md) on T4
 or L4 unless Chiya approves bigger; `modal_app.py::smoke` holds its probes to L4.
 
-| Date | Run | GPU | Minutes | USD |
+| Date (UTC) | Run | GPU | Minutes | USD |
 | --- | --- | --- | --- | --- |
-| (none yet) | | | | |
+| Oct 28 02:39 | `a-deploy-main` (run 40622175703): `modal deploy --env main`, image builds | none | 2.4 (build); then 26 deployed | under $0.05 estimated, all CPU; Modal's bill for the window replaces it |
+| Oct 28 02:42 | `a-prefetch-main` (40622466016): failed before starting (`list[str]` argument) | none | 0.5 | $0 |
+| Oct 28 02:43 | `a-smoke-l4-main` (40622569222): submit failed, the job store never started | none (no sandbox) | 24 | $0 Modal GPU; the CPU is in the deploy row |
+| Oct 28 03:07 | `a-stop-main` (40624905511): Chiya had already stopped the app at 03:07:19; out/stop.json lists it stopped | none | 0.4 | $0 |
+
+Failed sitting, Oct 28 02:39 to 03:07 UTC: `JobStoreService` and `tick` crashed on every start
+(Modal crash-loop alerts) with `IndexError` at `ROOT = Path(__file__).resolve().parents[3]`.
+Modal loads a deployed file on its own as `/root/modal_app.py`, not from the repo, so the lookup
+had no fourth parent; moving the package to /opt/preflight that evening didn't cause it, and the
+app had never started on Modal before. The same assumption made `image_tag()` hash no files in
+the container. Fixed (the repo path is read only where the repo exists, the tag hashes the
+installed package and refuses to hash nothing), and `modal_app.py::startup_check` now runs both
+images' startup code with no GPU before any deploy. No GPU or sandbox ran, so the $0.95/h sandbox
+CPU and memory figure is still a guess until the smoke run's bill.
 
 ## Contract requests
 

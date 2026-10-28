@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .modal_app import APP_NAME
+APP_NAME = "preflight-runner"  # runner/modal_app.py's APP_NAME (not imported: that pulls in modal images)
 
 
 def _apps(env: str) -> list[dict]:
@@ -52,8 +52,10 @@ def main(argv: list[str] | None = None) -> int:
 		timeout=180)  # fmt: skip
 	after = _state(_apps(ns.env), ns.app)
 	running = [s for s in after if s.lower() in ("deployed", "running", "ephemeral", "deploying")]
+	# `modal app stop` exits 1 on an app that's already stopped: what counts is the list afterwards
+	already = "already stopped" in (r.stdout + r.stderr).lower()
 	result = {"app": ns.app, "env": ns.env, "before": before, "after": after, "stop_exit": r.returncode,
-		"stop_output": (r.stdout + r.stderr)[-2000:], "stopped": r.returncode == 0 and not running}  # fmt: skip
+		"stop_output": (r.stdout + r.stderr)[-2000:], "stopped": bool(after) and not running and (r.returncode == 0 or already)}  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path("out/stop.json").write_text(json.dumps(result, indent=2))
 	print(json.dumps(result, indent=2))

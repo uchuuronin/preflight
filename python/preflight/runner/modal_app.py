@@ -31,7 +31,17 @@ from preflight.runner.queue import MAX_RUNNING
 
 APP_NAME = "preflight-runner"
 SERVICE_NAME = "JobStoreService"
-ROOT = Path(__file__).resolve().parents[3]
+# Deployed or run from the repo, this file is <repo>/python/preflight/runner/modal_app.py and the
+# image definitions below read the repo through ROOT. Inside a container Modal loads this file on
+# its own, as /root/modal_app.py (module `modal_app`, not `preflight.runner.modal_app`), so no
+# lookup here may assume the repo layout: ROOT is only read while building images, which happens
+# on the machine that deploys. Package files at runtime come from the installed `preflight`.
+_HERE = Path(__file__).resolve()
+ROOT = (
+	_HERE.parents[3]
+	if len(_HERE.parents) > 3 and (_HERE.parents[3] / "zoo").is_dir()
+	else Path("/repo-not-here")
+)
 PKG = ROOT / "python" / "preflight"
 REMOTE_PKG = "/opt/preflight"  # not under /root (0700): probes import it as an unprivileged uid
 RECORDS_DIR = "/records"
@@ -118,10 +128,16 @@ def _read_only(vol):
 
 def image_tag() -> str:
 	"""Pinned packages plus the recorder's own source: a change to either invalidates cached probes."""
+	import preflight
+
+	pkg = Path(preflight.__file__).resolve().parent  # the installed package, here or in the container
 	h = hashlib.sha256("\n".join(PROBE_PACKAGES).encode())
-	for sub in ("recorder", "probes"):
-		for p in sorted((Path(__file__).resolve().parents[1] / sub).glob("*.py")):
-			h.update(p.read_bytes())
+	files = [p for sub in ("recorder", "probes") for p in sorted((pkg / sub).glob("*.py"))]
+	if not files:  # never key the cache on nothing: a wrong path would make every probe a hit
+		raise RuntimeError(f"no recorder or probe sources under {pkg}")
+	for p in files:
+		h.update(p.relative_to(pkg).as_posix().encode())
+		h.update(p.read_bytes())
 	return "probe-" + h.hexdigest()[:16]
 
 
@@ -342,6 +358,95 @@ def prefetch(models: str = "") -> list[str]:
 		done.append(repo)
 	weights_vol.commit()
 	return done
+
+
+# ---------------------------------------------------------------- startup check (no GPU)
+
+_CHECK_LOOP = """
+import torch
+m = torch.nn.Sequential(torch.nn.Linear(16, 32), torch.nn.GELU(), torch.nn.Linear(32, 1))
+opt = torch.optim.SGD(m.parameters(), lr=0.05)
+for _ in range(12):
+	loss = m(torch.randn(8, 16)).pow(2).mean()
+	opt.zero_grad()
+	loss.backward()
+	opt.step()
+"""
+
+
+@app.function(image=worker_image, timeout=300)
+def startup_check_worker() -> dict:
+	"""What a job-store or worker container does when it starts, without touching the shared state:
+	import this module as Modal loads it, build a job store and round-trip its snapshot, take a
+	job, and read, map and skeleton the LoRA zoo sample."""
+	import tempfile
+
+	from preflight.harness.skeleton import skeleton_record
+	from preflight.harness.static import map_static
+	from preflight.runner.queue import InMemoryJobStore
+	from preflight.runner.remote_store import DirBlobs, StoreMethods
+	from preflight.runner.sources import ZOO, fetch
+
+	saved: list[dict] = []
+	store = InMemoryJobStore(on_change=saved.append)
+	m = StoreMethods(store, blobs=DirBlobs(tempfile.mkdtemp()))
+	sub = m.submit({"source": {"kind": "sample", "uri": "sample://zoo/finetune_lora_hf"}}, "check", "check-1")
+	restored = InMemoryJobStore.restore(store.snapshot())
+	lease = restored.lease("check-worker")
+	f = fetch(lease.request["source"])
+	rec = skeleton_record(map_static(f.files, entrypoint=f.entrypoint), f.source)
+	return {"module": __name__, "file": __file__, "zoo": str(ZOO), "zoo_samples": sorted(p.name for p in ZOO.iterdir()),
+		"submitted": sub, "saves": len(saved), "lens": rec.job.lens, "knobs": len(rec.knobs),
+		"image_tag": image_tag()}  # fmt: skip
+
+
+@app.function(image=probe_image, timeout=600)  # CPU on purpose: proves the probe path without a GPU
+def startup_check_probe() -> dict:
+	"""What a probe sandbox does, on the CPU: set up the HF cache and the shared deps dir, then run
+	a tiny training loop through run_probe as the unprivileged probe uid."""
+	import os
+
+	import preflight
+	from preflight.probes import remote
+	from preflight.probes.local import ProbeSpec, _others_can_reach, run_probe
+
+	pkg = Path(preflight.__file__).resolve().parents[1]
+	remote.link_weights()
+	remote.deps_dir()
+	r = run_probe(
+		ProbeSpec(probe_id="check", files={"train.py": _CHECK_LOOP}, entrypoint="train.py", timeout_s=240)
+	)
+	return {"pkg_root": str(pkg), "reachable_by_probe_uid": _others_can_reach(pkg), "euid": os.geteuid(),
+		"probe_uid": os.environ.get("PREFLIGHT_PROBE_UID"), "status": r.probe.status, "error": r.probe.error,
+		"error_code": r.probe.error_code, "steps": r.probe.steps,
+		"backend": r.env.backend if r.env else None, "log_tail": r.log_tail[-600:]}  # fmt: skip
+
+
+@app.local_entrypoint()
+def startup_check():
+	"""Before any deploy: import and start both images' code as Modal runs it, with no GPU.
+
+	modal run --env main python/preflight/runner/modal_app.py::startup_check
+	Writes out/startup_check.json; exits non-zero if either side fails."""
+	import json
+	import sys
+
+	result: dict = {}
+	for name, fn in (("worker", startup_check_worker), ("probe", startup_check_probe)):
+		try:
+			result[name] = fn.remote()
+		except Exception as exc:  # the remote traceback is in the log above
+			result[name] = {"failed": f"{type(exc).__name__}: {exc}"[:2000]}
+	w, p = result["worker"], result["probe"]
+	result["ok"] = bool(
+		"failed" not in w and w.get("lens") == "finetune" and w.get("knobs", 0) > 0
+		and "failed" not in p and p.get("status") == "ok" and p.get("reachable_by_probe_uid")
+	)  # fmt: skip
+	Path("out").mkdir(exist_ok=True)
+	Path("out/startup_check.json").write_text(json.dumps(result, indent=2))
+	print(json.dumps(result, indent=2), flush=True)
+	if not result["ok"]:
+		sys.exit(1)
 
 
 @app.local_entrypoint()
