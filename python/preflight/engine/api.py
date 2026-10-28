@@ -446,7 +446,9 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		why = f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
 	res = _from_memory_estimate(est, mid, oom_source)
-	if cell is not None and res.peak.status not in ("abstain", "measured"):
+	if (
+		cell is not None and mprobes and res.peak.status not in ("abstain", "measured")
+	):  # no probes: the prior set it
 		res = replace(res, peak=_with_note(res.peak, _band_note(cell)))
 	if est.status != "abstain" and est.breakdown is not None:
 		stack = dict(est.breakdown.stack)
@@ -1402,12 +1404,10 @@ def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction
 	}
 	out.update(mem.terms or {})
 	tcell = conformal.TABLE.lookup("time.step", _env_gpu(record), record.job.lens)
-	if (
-		tcell is not None
-		and tm.step.status not in ("abstain", "measured")
-		and _target_gpu(record, values) == _env_gpu(record)
-	):
-		out["time.step"] = _with_note(tm.step, _band_note(tcell))
+	if tcell is not None:  # _step takes the probe GPU's held-out band, and cross-GPU time builds on it
+		for tid in ("time.step", "time.total"):
+			if out[tid].status not in ("abstain", "measured"):
+				out[tid] = _with_note(out[tid], _band_note(tcell))
 	if tm.phases and tm.step.status != "abstain":
 		h = memory.Z90 * tm.sigma
 		for ph, v in tm.phases.items():
@@ -1711,6 +1711,11 @@ _CARD_TARGET = {
 }
 
 
+# the models whose own predictions the corpus scores; the cross-GPU model's band starts from the same-GPU cell,
+# but no cross-GPU prediction has been scored yet, so its card carries no coverage
+_CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME})
+
+
 def _calibration(mid: str) -> tuple[str, float | None]:
 	"""("held_out", None) when the conformal table has a cell for this model's target, else ("simulated", None)."""
 	target = _CARD_TARGET.get(mid)
@@ -1726,15 +1731,13 @@ def _cards(ids: set[str]) -> list[ModelCard]:
 		calib, _ = _calibration(mid)
 		target = _CARD_TARGET.get(mid)
 		extra: dict = {}
-		if calib == "held_out" and target:
+		if calib == "held_out" and target and mid in _CARD_SCORED:
 			t = conformal.TABLE
 			extra["training_data"] = t.built_from
 			if target in t.coverage and t.coverage[target][1]:
 				h, n = t.coverage[target]
 				extra["coverage"] = h / n
-			extra["per_gpu_coverage"] = {
-				f"holdout:{g}": h / n for g, (h, n) in t.holdout.get(target, {}).items() if n
-			}
+			extra["per_gpu_coverage"] = {g: h / n for g, (h, n) in t.holdout.get(target, {}).items() if n}
 			notes = f"{notes or ''}. {t.describe(target)}".strip(". ")
 		out.append(
 			ModelCard(

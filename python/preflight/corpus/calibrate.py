@@ -94,20 +94,20 @@ def _ok(row: dict[str, Any]) -> bool:
 
 
 def scores_from_rows(rows: Iterable[dict[str, Any]]) -> list[conformal.Score]:
-	groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+	# one fit per architecture per GPU: a group id names the architecture, and the same groups run on every GPU
+	groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
 	for r in rows:
 		g = r.get("config", {}).get("params", {}).get("group")
 		if g and _ok(r):
-			groups[g].append(r)
+			groups[(g, r.get("gpu", ""))].append(r)
 	out: list[conformal.Score] = []
-	for gid, rs in sorted(groups.items()):
+	for (gid, gpu), rs in sorted(groups.items()):
 		probes = [r for r in rs if r["config"]["params"].get("role") == "probe"]
 		queries = [r for r in rs if r["config"]["params"].get("role") == "query"]
 		if len(probes) < 2 or not queries:
 			continue
 		fam = rs[0]["config"]["family"]
 		lens = LENS.get(fam, "pretrain")
-		gpu = rs[0]["gpu"]
 		an = {id(r): _analytical(r) for r in rs}
 		mp = [
 			memory.MemoryProbe(float(r["work_units"]), float(r["memory"]["peak_reserved"]), an[id(r)] or 0.0)
@@ -143,42 +143,43 @@ def _capacity(row: dict[str, Any]) -> float | None:
 def oom_pairs(rows: list[dict[str, Any]], scores: list[conformal.Score]) -> list[tuple[float, bool]]:
 	"""(predicted P(OOM), did it run out of memory) for every held-out query, fitted and OOM alike.
 
-	A query's P(OOM) uses only other architectures' residuals, so the check never grades a group on itself."""
-	resid = defaultdict(list)
-	for s in scores:
-		if s.target == "memory.peak":
-			resid[s.group].append(s.log_ratio)
-	groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+	Each query's P(OOM) comes the way the engine computes it: from the residuals of the table cell its GPU and job
+	type look up, in a table built without the query's own architecture, so the check never grades a group on itself.
+	"""
+	mem = [s for s in scores if s.target == "memory.peak"]
+	groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
 	for r in rows:
 		g = r.get("config", {}).get("params", {}).get("group")
 		if g:
-			groups[g].append(r)
+			groups[(g, r.get("gpu", ""))].append(r)
+	tables: dict[str, conformal.Table] = {}
 	out = []
-	for gid, rs in groups.items():
+	for (gid, gpu), rs in sorted(groups.items()):
 		probes = [r for r in rs if r["config"]["params"].get("role") == "probe" and _ok(r)]
 		if len(probes) < 2:
 			continue
-		others = [x for g, v in resid.items() if g != gid for x in v]
-		if len(others) < conformal.MIN_CELL:
+		if gid not in tables:
+			tables[gid] = conformal.calibrate([s for s in mem if s.group != gid])
+		lens = LENS.get(rs[0]["config"]["family"], "pretrain")
+		cell = tables[gid].lookup("memory.peak", gpu, lens)
+		if cell is None or not cell.residuals:
 			continue
-		cal = memory.Calibration.fit(
-			[
-				memory.MemoryProbe(
-					float(r["work_units"]), float(r["memory"]["peak_reserved"]), _analytical(r) or 0.0
-				)
-				for r in probes
-			]
-		)
+		mp = [
+			memory.MemoryProbe(
+				float(r["work_units"]), float(r["memory"]["peak_reserved"]), _analytical(r) or 0.0
+			)
+			for r in probes
+		]
+		cal = memory.Calibration.fit(mp)
 		for q in rs:
 			if q["config"]["params"].get("role") != "query" or q.get("status") not in ("ok", "oom"):
 				continue
 			cap = _capacity(q)
-			x = q.get("work_units") or q["config"]["params"].get("batch", 1) * q["config"]["params"].get(
-				"seq", 1
-			)
+			p = q["config"]["params"]
+			x = q.get("work_units") or p.get("batch", 1) * p.get("seq", 1)
 			pred = cal.correct(float(x), _analytical(q) or 0.0)
 			if cap and pred > 0:
-				out.append((oom.empirical_p_oom(others, pred, float(cap)), q.get("status") == "oom"))
+				out.append((oom.empirical_p_oom(cell.residuals, pred, float(cap)), q.get("status") == "oom"))
 	return out
 
 
@@ -240,10 +241,13 @@ def build(
 			f"Wilson 95% {cov.lo:.1%} to {cov.hi:.1%}), median half-width {cov.median_half_width:.3f}"
 		)
 	holdout: dict[str, dict[str, tuple[int, int]]] = {}
-	for s in (
-		held
-	):  # the holdout GPU has no cell of its own, so it is scored on the merged cells, as a user's GPU is
-		cell = table.lookup(s.target, s.gpu, s.lens)
+	# the holdout GPU has no cell of its own, so it is scored on the merged cells, as a user's GPU is, and on a table
+	# without its own architecture, as a user's new model is
+	by_group: dict[str, conformal.Table] = {}
+	for s in held:
+		if s.group not in by_group:
+			by_group[s.group] = conformal.calibrate([c for c in cal if c.group != s.group])
+		cell = by_group[s.group].lookup(s.target, s.gpu, s.lens)
 		if cell is None:
 			continue
 		h, n = holdout.setdefault(s.target, {}).get(s.gpu, (0, 0))
@@ -281,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
 	ap.add_argument("--out", type=Path, help="write the engine's _calibration_table.py here")
 	ap.add_argument("--holdout-gpus", default=",".join(HOLDOUT_GPUS), help="never calibrated on; scored once")
 	args = ap.parse_args(argv)
-	holdout = tuple(g for g in args.holdout_gpus.split(",") if g)
+	holdout = tuple(g.strip() for g in args.holdout_gpus.split(",") if g.strip())
 	rows = load_rows(args.store)
 	scores = scores_from_rows(rows)  # grouped rows -> conformal scores
 	if not scores:

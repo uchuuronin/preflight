@@ -110,11 +110,13 @@ class Table:
 			f"A GPU and job type with fewer than {MIN_CELL} held-out runs has no band of its own: it uses its job "
 			"type merged across GPUs, then all runs."
 		)
-		if target in self.coverage:
+		if self.coverage.get(target, (0, 0))[1]:
 			h, n = self.coverage[target]
 			lo, hi = wilson(h, n)
 			parts.append(f"Leave-one-architecture-out coverage {h} of {n} (Wilson 95% {lo:.0%} to {hi:.0%}).")
 		for gpu, (h, n) in sorted(self.holdout.get(target, {}).items()):
+			if not n:
+				continue
 			lo, hi = wilson(h, n)
 			parts.append(
 				f"Holdout, never tuned on: {gpu} {h} of {n} inside the band (Wilson 95% {lo:.0%} to {hi:.0%})."

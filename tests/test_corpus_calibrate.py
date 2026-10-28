@@ -123,3 +123,54 @@ def test_reliability_report_leaves_out_thin_bins():
 	text = "\n".join(lines)
 	assert "[0.00, 0.05) n=30" in text and "Wilson 95%" in text
 	assert "[0.30, 0.70): 3 points, too few to draw" in text
+
+
+def _two_gpu_rows(order=1):
+	cfgs = [c for c in configs.grouped_configs(50) if c.family == "gpt"]  # 10 gpt groups: 20 scores a GPU
+	rows = []
+	for gpu, f in (("A100-SXM-80GB", 1.3), ("L4", 1.0))[::order]:
+		for c in cfgs:
+			x = c.params["batch"] * c.params["seq"]
+			an = calibrate._analytical({"config": c.to_dict()})
+			rows.append(_row(c, an * f + 2e8, x, gpu=gpu))
+	return cfgs, rows
+
+
+@pytest.mark.parametrize("order", [1, -1])
+def test_each_gpu_is_fitted_and_labelled_on_its_own(order):
+	from collections import Counter
+
+	_, rows = _two_gpu_rows(order)
+	s = calibrate.scores_from_rows(rows)
+	per_gpu = Counter(x.gpu for x in s)
+	assert per_gpu["L4"] == per_gpu["A100-SXM-80GB"] > 0  # same groups on both GPUs, scored separately
+	# the group stays the architecture, so leave-one-architecture-out never splits one model across GPUs
+	assert {x.group for x in s if x.gpu == "L4"} == {x.group for x in s if x.gpu == "A100-SXM-80GB"}
+	table, _ = calibrate.build(s)
+	mem = Counter(x.gpu for x in s if x.target == "memory.peak")
+	assert table.lookup("memory.peak", "", "").n == mem["L4"]  # only L4 calibrates
+	assert sum(n for _, n in table.holdout["memory.peak"].values()) == mem["A100-SXM-80GB"]
+
+
+def test_oom_pairs_mirror_the_engines_cell_and_skip_the_holdout():
+	_, rows = _two_gpu_rows()
+	s = calibrate.scores_from_rows(rows)
+	pairs = calibrate.oom_pairs(
+		[r for r in rows if r["gpu"] != "A100-SXM-80GB"], [x for x in s if x.gpu != "A100-SXM-80GB"]
+	)
+	assert all(0 < p < 1 for p, _ in pairs)
+
+
+def test_reliability_needs_real_out_of_memory_runs():
+	from preflight.engine import oom
+
+	never = [(0.01, False)] * 60  # one bin, no OOM anywhere: consistent, but says nothing where it matters
+	assert not oom.reliable(oom.reliability(never))
+	mixed = (
+		[(0.01, False)] * 60
+		+ [(0.8, True)] * 16
+		+ [(0.8, False)] * 4
+		+ [(0.5, True)] * 6
+		+ [(0.5, False)] * 6
+	)
+	assert oom.reliable(oom.reliability(mixed))

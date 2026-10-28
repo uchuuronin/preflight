@@ -119,3 +119,28 @@ def test_engine_cards_and_reasons_name_the_cell(monkeypatch):
 	card = next(c for c in api.fill_predictions(rec).models if c.id.startswith("memory"))
 	assert card.training_data == "corpus test" and card.coverage == pytest.approx(0.9)
 	assert "merged across GPUs" in card.notes
+
+
+def test_notes_follow_the_band_that_was_used(monkeypatch):
+	from pathlib import Path
+
+	from preflight.engine import api
+	from preflight.schema import load_record
+
+	root = Path(__file__).resolve().parents[1] / "schema/examples"
+	ft = load_record((root / "finetune.json").read_text())
+	table = cf.calibrate(_scores(4, gpu="L4", lens="finetune") + [
+		cf.Score("time.step", "L4", "finetune", f"a{i}", 1.0, 1.0 + 0.01 * i) for i in range(12)
+	])  # fmt: skip
+	monkeypatch.setattr(cf, "TABLE", table)
+	no_probes = ft.model_copy(update={"probes": []})
+	peak = api.predict(no_probes).root["memory.peak"]
+	assert "band from held-out runs" not in (peak.reason or "")  # the prior set it, not the cell
+	cross = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root
+	if cross["time.step"].status != "abstain":
+		assert "band from held-out runs: L4, finetune" in cross["time.step"].reason
+		assert "band from held-out runs" in cross["time.total"].reason
+	cards = {c.id: c for c in api.fill_predictions(ft).models}
+	roof = next((c for i, c in cards.items() if i.startswith("steptime-roofline")), None)
+	if roof is not None:
+		assert roof.coverage is None and not roof.per_gpu_coverage
