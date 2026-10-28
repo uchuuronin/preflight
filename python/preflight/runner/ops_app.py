@@ -82,7 +82,11 @@ def _load_standalone(src: Path | None = None) -> str:
 		spec = importlib.util.spec_from_file_location("modal_app", dst)
 		mod = importlib.util.module_from_spec(spec)
 		spec.loader.exec_module(mod)
-		return f"{dst} (module modal_app, tag {mod.image_tag()})"
+		zoo = getattr(mod, "ZOO_SRC", mod.ROOT / "zoo")
+		missing = [str(d) for d in (mod.PKG, zoo) if not Path(d).is_dir()]
+		if missing:  # an image resolved here (a sandbox's) would fail to build: say so now
+			raise FileNotFoundError(f"image source folders missing in the container: {missing}")
+		return f"{dst} (module modal_app, tag {mod.image_tag()}, PKG {mod.PKG}, zoo {zoo})"
 	finally:
 		shutil.rmtree(shallow, ignore_errors=True)
 
@@ -162,25 +166,25 @@ def startup_check_sandbox() -> dict:
 	owner = modal.App._get_container_app()
 	out: dict = {"entry": list(ENTRY)}
 	create = _sandbox_factory(owner)
+	sb = None
 	try:
 		sb = create("cpu")
 		out["created"] = True
-		p = sb.exec(
-			"python",
-			"-c",
-			"import preflight, torch; print('IMPORT', preflight.__file__, torch.__version__)",
-			timeout=120,
-		)
+		cmd = "import preflight, torch; print('IMPORT', preflight.__file__, torch.__version__)"
+		p = sb.exec("python", "-c", cmd, timeout=120)
 		out["import_stdout"] = p.stdout.read()[-500:]
 		out["import_stderr"] = p.stderr.read()[-1500:]
 		p.wait()
 		out["import_exit"] = p.returncode
-		sb.terminate()
 	except Exception as exc:
 		out["created"] = out.get("created", False)
 		out["failed"] = f"{type(exc).__name__}: {exc}"[:2000]
 		out["traceback"] = traceback.format_exc()[-3000:]
 		return out
+	finally:
+		if sb is not None:  # never leave it billing until its idle timeout
+			with contextlib.suppress(Exception):
+				sb.terminate()
 	with SandboxRunner(create) as runner:
 		r = runner(ProbeSpec(probe_id="check", files={"train.py": _CHECK_LOOP}, entrypoint="train.py", timeout_s=240),
 			"cpu", should_stop=lambda: False)  # fmt: skip

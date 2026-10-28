@@ -145,7 +145,12 @@ Muse Spark. All three probes failed as "The probe sandbox ended without a result
 `modal.Sandbox.create` or its first `exec` raised server-side (local validation passes; the text
 is only in the worker's log). The startup check now also creates a real CPU sandbox with the
 worker's own factory and runs the probe entry through SandboxRunner, returning the exception text,
-so the next run names the cause before any GPU. Also found: the record's `costs.llm_usd` stayed 0
+so the next run names the cause before any GPU. Cause found by the independent review: the probe
+image is resolved where `Sandbox.create` runs, inside the worker, and its `add_local_dir` source
+still pointed into the repo (`/repo-not-here/python/preflight`), so the mount failed on the client
+in 0.01 s. Image source paths now fall back to the installed package and the image's zoo, and the
+startup check fails if any image source folder is missing in the container (it catches the
+previous commit). Also found: the record's `costs.llm_usd` stayed 0
 although the call carried its cost; the merge now sums the record's model calls.
 
 Second attempt, Oct 28 04:33 to 04:39 UTC: the startup fix held, but every `modal run` of

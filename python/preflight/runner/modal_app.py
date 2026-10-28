@@ -44,15 +44,24 @@ SERVICE_NAME = "JobStoreService"
 # Deployed or run from the repo, this file is <repo>/python/preflight/runner/modal_app.py and the
 # image definitions below read the repo through ROOT. Inside a container Modal loads this file on
 # its own, as /root/modal_app.py (module `modal_app`, not `preflight.runner.modal_app`), so no
-# lookup here may assume the repo layout: ROOT is only read while building images, which happens
-# on the machine that deploys. Package files at runtime come from the installed `preflight`.
+# lookup here may assume the repo layout. Images are also built inside a container: a sandbox's
+# image (probe_image) is resolved where Sandbox.create runs, in a worker, and every local path it
+# names must exist there (Oct 28: it pointed into the repo, and every probe failed in 0.01 s). So
+# each path comes from the repo when it is here and from where the image put it otherwise; the
+# contents are the same files, so the image and mount hashes don't change.
 _HERE = Path(__file__).resolve()
-ROOT = (
-	_HERE.parents[3]
-	if len(_HERE.parents) > 3 and (_HERE.parents[3] / "zoo").is_dir()
-	else Path("/repo-not-here")
-)
-PKG = ROOT / "python" / "preflight"
+_REPO = _HERE.parents[3] if len(_HERE.parents) > 3 and (_HERE.parents[3] / "zoo").is_dir() else None
+ROOT = _REPO if _REPO is not None else Path("/repo-not-here")
+
+
+def _installed_package() -> Path:
+	import preflight
+
+	return Path(preflight.__file__).resolve().parent
+
+
+PKG = _REPO / "python" / "preflight" if _REPO is not None else _installed_package()
+ZOO_SRC = _REPO / "zoo" if _REPO is not None else Path(os.environ.get("PREFLIGHT_ZOO", "/root/zoo"))
 REMOTE_PKG = "/opt/preflight"  # not under /root (0700): probes import it as an unprivileged uid
 RECORDS_DIR = "/records"
 UPLOADS_DIR = "/uploads"
@@ -103,7 +112,7 @@ _base = modal.Image.debian_slim(python_version="3.11").env(
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
-	.add_local_dir(ROOT / "zoo", "/root/zoo")
+	.add_local_dir(ZOO_SRC, "/root/zoo")
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight")
 )
 probe_image = (
