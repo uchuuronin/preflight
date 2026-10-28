@@ -33,9 +33,11 @@ from pathlib import Path
 
 import modal
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tour_play, next to this file
 
-ROOT = Path(__file__).resolve().parents[2]
+# Locally (on the GitHub runner) the repo root; inside the container this file sits at /root and
+# the image's local files are already baked in, so the path is never read there.
+ROOT = Path(__file__).resolve().parents[2] if modal.is_local() else Path("/root/repo")
 SAMPLE_FILES = [
 	"web/src/workspace/fixtures/dev-finetune.record.json",
 	"schema/examples/finetune.json",

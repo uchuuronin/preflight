@@ -9,7 +9,7 @@ import { useWorkspace } from "../state";
 import { memoryTermBytes } from "../record/terms";
 import { fitOf, likelyFails, trusted, type Fit } from "../status";
 import { FitMark } from "../components/StatusMark";
-import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbit";
+import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, NODE_BOX, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbit";
 import { AddonBoundary } from "../../components/AddonBoundary";
 
 interface BgData extends Record<string, unknown> {
@@ -148,19 +148,21 @@ const OrbitNodeView = memo(function OrbitNodeView({ data }: NodeProps<Node<NodeD
 	// Outline weight carries the share of a step.
 	const bw = node.share === null ? 1 : node.share > 0.4 ? 3 : node.share > 0.2 ? 2 : 1;
 	return (
-		<button
-			type="button"
-			className={cls}
-			style={{ width: node.size, height: node.size, borderWidth: node.shape === "hexagon" ? 0 : bw }}
-			aria-label={t("map.node.aria", { name: title, meta })}
-		>
-			<span className="pf-onode__inner">
-				<b>{title}</b>
-				{node.repeat > 1 ? <small>{t("map.repeat", { n: node.repeat })}</small> : null}
-				<small>{meta}</small>
-			</span>
-			{finding ? <span className={`pf-onode__chip${fails ? " is-fails" : ""}`}>{finding}</span> : null}
-		</button>
+		<div className="pf-onode-box">
+			<button
+				type="button"
+				className={cls}
+				style={{ width: node.size, height: node.size, borderWidth: node.shape === "hexagon" ? 0 : bw }}
+				aria-label={t("map.node.aria", { name: title, meta })}
+			>
+				<span className="pf-onode__inner">
+					<b>{title}</b>
+					{node.repeat > 1 ? <small>{t("map.repeat", { n: node.repeat })}</small> : null}
+					<small>{meta}</small>
+				</span>
+				{finding ? <span className={`pf-onode__chip${fails ? " is-fails" : ""}`}>{finding}</span> : null}
+			</button>
+		</div>
 	);
 });
 
@@ -210,6 +212,10 @@ function OrbitInner() {
 			// come when its size hasn't changed (seen after quick guide moves, Oct 27).
 			width: FRAME.w,
 			height: FRAME.h,
+			// Known size and no handles: React Flow keeps its measurement instead of re-measuring
+			// every node after each knob change (a forced layout per node, measured Oct 27).
+			measured: { width: FRAME.w, height: FRAME.h },
+			handles: [],
 			style: { pointerEvents: "none" },
 		};
 		const findingsByNode = new Map<string, { title: string; severity: string }>();
@@ -233,7 +239,7 @@ function OrbitInner() {
 			return {
 				id: n.id,
 				type: "onode",
-				position: { x: n.x - n.size / 2, y: n.y - n.size / 2 },
+				position: { x: n.x - NODE_BOX / 2, y: n.y - NODE_BOX / 2 },
 				data: {
 					node: n,
 					title,
@@ -245,8 +251,12 @@ function OrbitInner() {
 				},
 				draggable: false,
 				zIndex: 2,
-				width: n.size,
-				height: n.size,
+				// A fixed box (see NODE_BOX); only the button inside it takes clicks.
+				width: NODE_BOX,
+				height: NODE_BOX,
+				measured: { width: NODE_BOX, height: NODE_BOX },
+				handles: [],
+				style: { pointerEvents: "none" },
 			};
 		});
 		return [bg, ...pfNodes];
