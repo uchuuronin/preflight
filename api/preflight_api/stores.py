@@ -34,6 +34,10 @@ class RecordStore(Protocol):
 	def healthy(self) -> bool: ...
 
 
+class StoreBusy(RuntimeError):
+	"""The record store couldn't take the read in time (a volume reload is still running)."""
+
+
 class LocalRecordStore:
 	"""<root>/<share_token>.json: a directory in development and tests, A's "preflight-records"
 	Modal volume (mounted read-only) in production.
@@ -41,14 +45,20 @@ class LocalRecordStore:
 	On Modal, `reload` is the volume's reload(): without it this container never sees what A's
 	workers committed after it started. A container sees the volume empty while it reloads, and a
 	reload fails while a file on it is open, so one lock covers every reload and every read here
-	(reads are a single small file each). Reloads are at most one per RELOAD_MIN_S; a failed one
-	serves the view the container already has.
+	(reads are a single small file each). Reloads are at most one per RELOAD_MIN_S, except that a
+	miss always reloads once unless a reload already started after the request arrived (so a
+	record committed a moment ago is never a 404). A failed reload serves the view the container
+	already has; a reload that holds the lock past LOCK_WAIT_S turns other reads into StoreBusy,
+	which the API answers with a retryable 503 instead of piling up threads.
 	"""
 
-	# Source: guess, a record changes at most once per probe (tens of seconds apart) and boarding
-	# reads it after the job's done event, so a second-old view is current enough; replaced by the
-	# reload time measured in the end-to-end run if reloads turn out slow.
+	# Source: guess, a record changes at most once per probe (tens of seconds apart), so a
+	# second-old view of a record that exists is current enough; replaced by the reload time
+	# measured in the end-to-end run if reloads turn out slow.
 	RELOAD_MIN_S = 1.0
+	# Source: guess, a reload of a small volume is well under a second; five seconds of waiting
+	# means one is stuck, and the browser's retry is cheaper than a held thread.
+	LOCK_WAIT_S = 5.0
 	# Source: derived, A's reader cap (runner/records.py MAX_READ_BYTES); a stored record is under
 	# 1 MB gzipped (schema MAX_RECORD_GZIP_BYTES).
 	MAX_READ_BYTES = 20 * 2**20
@@ -64,32 +74,47 @@ class LocalRecordStore:
 		self._reload = reload
 		self._clock = clock
 		self._lock = threading.Lock()
-		self._last_reload: float | None = None
+		self._last_reload: float | None = None  # when the latest reload started
 
-	def _maybe_reload(self) -> None:
-		if self._reload is None:
-			return
-		now = self._clock()
-		if self._last_reload is not None and now - self._last_reload < self.RELOAD_MIN_S:
-			return
-		self._last_reload = now
+	def _reload_now(self) -> None:
+		self._last_reload = self._clock()
 		try:
-			self._reload()
+			self._reload()  # type: ignore[misc]
 		except Exception:
 			log.warning("record volume reload failed; serving the current view", exc_info=True)
+
+	def _read(self, path: Path) -> bytes | None:
+		try:
+			if path.stat().st_size > self.MAX_READ_BYTES:
+				return None
+			return path.read_bytes()
+		except OSError:
+			return None
 
 	def by_share_token(self, token: str) -> dict | None:
 		if not valid_token(token):
 			return None
 		path = self.root / f"{token}.json"
-		with self._lock:
-			self._maybe_reload()
-			try:
-				if path.stat().st_size > self.MAX_READ_BYTES:
-					return None
-				data = path.read_bytes()
-			except OSError:
-				return None
+		arrived = self._clock()
+		if not self._lock.acquire(timeout=self.LOCK_WAIT_S):
+			raise StoreBusy("the record store is reloading")
+		try:
+			if self._reload is not None and (
+				self._last_reload is None or arrived - self._last_reload >= self.RELOAD_MIN_S
+			):
+				self._reload_now()
+			data = self._read(path)
+			if (
+				data is None
+				and self._reload is not None
+				and (self._last_reload is None or self._last_reload < arrived)
+			):
+				self._reload_now()  # a miss: look again unless a reload already started after we arrived
+				data = self._read(path)
+		finally:
+			self._lock.release()
+		if data is None:
+			return None
 		try:
 			rec = json.loads(data)
 		except ValueError:

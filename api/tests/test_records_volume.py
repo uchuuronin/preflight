@@ -7,10 +7,11 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from preflight_api.app import create_app
-from preflight_api.stores import LocalRecordStore, new_share_token
+from preflight_api.stores import LocalRecordStore, StoreBusy, new_share_token
 
 
 class Clock:
@@ -123,3 +124,59 @@ def test_record_responses_are_not_cached_while_a_job_can_still_revise_them(tmp_p
 		assert res.status_code == 200
 		assert "no-cache" in res.headers["Cache-Control"]
 		assert "public" not in res.headers["Cache-Control"]
+
+
+def test_a_record_committed_just_after_a_reload_is_found_on_a_miss(tmp_path):
+	# Review finding: a reload at t, A commits, a read at t + 0.6 s must still find the record.
+	token = new_share_token()
+	clock = Clock()
+	committed = {"now": False}
+
+	def reload() -> None:
+		if committed["now"]:
+			write(tmp_path, token, 1)
+
+	store = LocalRecordStore(tmp_path, reload=reload, clock=clock)
+	assert store.by_share_token(new_share_token()) is None  # a reload at t
+	committed["now"] = True
+	clock.t += 0.6
+	assert store.by_share_token(token)["rev"] == 1
+
+
+def test_a_miss_reloads_at_most_once_per_request(tmp_path):
+	calls = []
+	store = LocalRecordStore(tmp_path, reload=lambda: calls.append(1), clock=Clock())
+	assert store.by_share_token(new_share_token()) is None
+	assert len(calls) == 1  # the first reload already started after the request arrived
+
+
+def test_a_stuck_reload_turns_other_reads_into_a_retryable_busy(tmp_path):
+	token = new_share_token()
+	write(tmp_path, token, 1)
+	release = threading.Event()
+	store = LocalRecordStore(tmp_path, reload=lambda: release.wait(5))
+	store.LOCK_WAIT_S = 0.05
+	stuck = threading.Thread(target=store.by_share_token, args=(token,))
+	stuck.start()
+	time.sleep(0.02)
+	try:
+		with pytest.raises(StoreBusy):
+			store.by_share_token(token)
+	finally:
+		release.set()
+		stuck.join()
+
+
+def test_busy_store_is_a_503_the_browser_may_retry(tmp_path):
+	class Busy:
+		def by_share_token(self, token):
+			raise StoreBusy("reloading")
+
+		def healthy(self):
+			return True
+
+	with TestClient(create_app(records=Busy()), base_url="https://testserver") as c:
+		res = c.get(f"/v1/records/{new_share_token()}")
+		assert res.status_code == 503
+		assert res.json()["error"]["code"] == "record_store_busy"
+		assert res.json()["error"]["retryable"] is True

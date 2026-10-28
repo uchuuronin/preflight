@@ -46,10 +46,21 @@ from ..guide.types import (
 	check_result,
 	check_setting,
 )
-from ..stores import resolve_record
+from ..stores import StoreBusy, resolve_record
 
 log = logging.getLogger("preflight.guide")
 router = APIRouter(prefix="/v1")
+
+
+async def _record(ref: str, app) -> dict | None:
+	"""The record by sample id or share token, off the event loop (the store may wait on a reload)."""
+	try:
+		return await asyncio.to_thread(resolve_record, ref, app.state.samples, app.state.records)
+	except StoreBusy as e:
+		raise ApiError(
+			503, "record_store_busy", "Records are a moment behind; try again.", retryable=True, retry_after=2
+		) from e
+
 
 # Measured Oct 27 on muse-spark-1.3 (docs/decisions/guide-limits.md): reasoning counts as output;
 # in run 3 (264 rounds) output p95 was 1,327 and 5 rounds hit the 1,600 cap. Source: derived, about
@@ -164,7 +175,7 @@ async def guide_turn(request: Request) -> dict:
 		raise ApiError(422, "invalid_request", "The guide request isn't in the expected shape.") from e
 
 	app = request.app
-	rec_raw = await asyncio.to_thread(resolve_record, body.record, app.state.samples, app.state.records)
+	rec_raw = await _record(body.record, app)
 	if rec_raw is None:
 		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
 	rec = view_of(rec_raw)
@@ -495,7 +506,7 @@ async def guide_tool(request: Request) -> dict:
 	except (ValidationError, ValueError) as e:
 		raise ApiError(422, "invalid_request", "The tool request isn't in the expected shape.") from e
 	app = request.app
-	rec_raw = await asyncio.to_thread(resolve_record, body.record, app.state.samples, app.state.records)
+	rec_raw = await _record(body.record, app)
 	if rec_raw is None:
 		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
 	rec = view_of(rec_raw)
