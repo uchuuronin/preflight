@@ -76,9 +76,15 @@ def test_held_out_records_carry_nothing_derived_from_the_probe():
 	assert held.models == [] and held.findings == [] and not held.predictions.estimates
 
 
-def test_a_probe_that_ran_no_eval_is_not_scored_for_memory_when_the_job_evaluates():
+def test_a_probe_without_an_eval_pass_is_skipped_only_when_the_engine_peak_includes_eval():
+	from preflight.engine.api import predict
 	from preflight.schema import load_record
 
 	rec = load_record(REAL.read_text())
 	p2 = next(p for p in rec.probes if p.id == "p2")
-	assert coverage.memory_comparable(rec, p2) == "no_eval_pass"
+	as_written = predict(coverage.held_out(rec, p2), dict(p2.knobs)).root
+	assert coverage.memory_comparable(p2, as_written) == "no_eval_pass"
+	# The same job with an eval that adds nothing to the peak: the training peak is comparable.
+	quiet = predict(coverage.held_out(rec, p2), {**p2.knobs, "eval_no_grad": True, "eval_batch_size": 2}).root
+	assert (quiet["memory.eval_spike"].point or 0) == 0
+	assert coverage.memory_comparable(p2, quiet) is None

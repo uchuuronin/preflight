@@ -9,9 +9,9 @@ Checks, matching the Project Goals' validation table:
   step_time       held-out step time within STEP_TOLERANCE of the probe's median step (the
                   engine fits on p50_s too)
   interval        the probe's measurement inside the estimate's 90% interval (target 88%)
-  peak_memory     held-out peak within MEMORY_TOLERANCE, against reserved bytes plus the CUDA
-                  context (what the engine predicts), only where the probe ran the job as the
-                  knobs describe it (see `memory_comparable`)
+  peak_memory     held-out peak within MEMORY_TOLERANCE of the probe's reserved peak (the engine
+                  predicts reserved bytes plus a CUDA-context constant, which is taken off the
+                  prediction), only where the probe ran the job as predicted (`memory_comparable`)
   oom             each measured out-of-memory: without that probe, did the engine say "fails"
                   or "at risk" (both warn the visitor), or "fits" (a miss)?
 
@@ -84,14 +84,14 @@ def siblings(rec, probe, other) -> bool:
 	return _point(rec, other) == _point(rec, probe)
 
 
-def memory_comparable(rec, probe) -> str | None:
-	"""Why a probe's peak can't be scored against a prediction for its knobs, or None if it can.
+def memory_comparable(probe, pred) -> str | None:
+	"""Why a probe's peak can't be scored against the held-out prediction, or None if it can.
 
 	A probe that ran no eval pass (A re-runs points with eval off after an eval OOM, and short
-	probes may never reach eval_every) measured a training-only peak, while the engine predicts
-	the job as written, eval included whenever the job evaluates."""
-	evaluates = any(k.id.startswith("eval") for k in rec.knobs)
-	if probe.eval is None and evaluates:
+	probes may never reach eval_every) measured a training-only peak. That only matters when the
+	engine's peak for the job includes an eval pass, i.e. its `memory.eval_spike` is above 0."""
+	spike = pred.get("memory.eval_spike")
+	if probe.eval is None and spike is not None and (spike.point or 0) > 0:
 		return "no_eval_pass"
 	return None
 
@@ -122,6 +122,105 @@ def check_record(name: str, raw: str) -> tuple[list[dict], list[dict]]:
 		codes = sorted({p.error_code or p.status for p in rec.probes})
 		skipped.append({"run": name, "why": "nothing_measured", "codes": codes})
 		return checks, skipped
+	for p in rec.probes:
+		if p.status not in OK and p.status != "oom":
+			continue
+		where = {"run": name, "probe": p.id, "gpu": gpu, "knobs": dict(p.knobs)}
+		pred = predict(held_out(rec, p), dict(p.knobs)).root
+		if p.status == "oom":
+			e = _est(pred.get("risk.oom"))
+			if not e or e["status"] == "abstain":
+				verdict = "abstained"
+			elif e["point"] >= FAILS_AT:
+				verdict = "caught"
+			elif e["point"] < FITS_BELOW:
+				verdict = "missed"
+			else:
+				verdict = "warned"
+			peak = _est(pred.get("memory.peak"))
+			checks.append(
+				{
+					**where,
+					"metric": "oom",
+					"measured": p.error_code or "oom",
+					"predicted": e,
+					"predicted_peak": peak,
+					"verdict": verdict,
+				}
+			)
+			continue
+		st = pred.get("time.step")
+		measured = p.step_time.p50_s if p.step_time else None
+		e = _est(st)
+		if measured and e and e["status"] != "abstain":
+			err = abs(e["point"] - measured) / measured
+			checks.append(
+				{
+					**where,
+					"metric": "step_time",
+					"measured": measured,
+					"predicted": e,
+					"error": round(err, 4),
+					"hit": err <= STEP_TOLERANCE,
+				}
+			)
+			checks.append(
+				{
+					**where,
+					"metric": "interval",
+					"of": "time.step",
+					"measured": measured,
+					"predicted": e,
+					"hit": e["lo"] <= measured <= e["hi"],
+				}
+			)
+		elif measured:
+			checks.append(
+				{**where, "metric": "step_time", "measured": measured, "predicted": e, "verdict": "abstained"}
+			)
+		reserved = p.memory.peak_reserved_bytes if p.memory else None
+		why = memory_comparable(p, pred)
+		if reserved and why:
+			skipped.append({**where, "metric": "peak_memory", "why": why})
+		elif reserved:
+			# The engine predicts the reserved peak plus its own CUDA-context constant; take the
+			# constant off the prediction, so the measurement stays what the probe measured.
+			m = _est(pred.get("memory.peak"))
+			if m and m["status"] != "abstain":
+				m = {**m, **{k: m[k] - DEFAULT_CONTEXT_BYTES for k in ("point", "lo", "hi") if k in m}}
+				m["less_context_bytes"] = DEFAULT_CONTEXT_BYTES
+				err = abs(m["point"] - reserved) / reserved
+				checks.append(
+					{
+						**where,
+						"metric": "peak_memory",
+						"measured": reserved,
+						"predicted": m,
+						"error": round(err, 4),
+						"hit": err <= MEMORY_TOLERANCE,
+					}
+				)
+				checks.append(
+					{
+						**where,
+						"metric": "interval",
+						"of": "memory.peak",
+						"measured": reserved,
+						"predicted": m,
+						"hit": m["lo"] <= reserved <= m["hi"],
+					}
+				)
+			else:
+				checks.append(
+					{
+						**where,
+						"metric": "peak_memory",
+						"measured": reserved,
+						"predicted": m,
+						"verdict": "abstained",
+					}
+				)
+	return checks, skipped
 	for p in rec.probes:
 		if p.status not in OK and p.status != "oom":
 			continue

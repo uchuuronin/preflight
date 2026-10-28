@@ -731,10 +731,10 @@
 	"checks.source.guess": "(guess)",
 	"checks.source.derived": "(derived)",
 	"checks.source.measured": "(measured)",
-	"checks.why.nothing_measured": "{run}: nothing measured ({codes})",
+	"checks.why.nothing_measured": "{run}: nothing measured. {codes}",
 	"checks.why.no_eval_pass": "the probe ran no eval pass, but the engine's peak includes eval",
 	"newflight.upload.limits_scripts": ".py with requirements, configs and small text data, up to 5 MB in all",
-	"newflight.handed.too_big": "That's more than 5 MB to check in. Trim the notebook's outputs, or link a GitHub repo instead.",
+	"newflight.handed.too_big": "That's more than 5 MB to check in, even without the notebook's outputs. Link a GitHub repo instead.",
 	"checks.predicted": "predicted {value}",
 	"checks.measured.oom": "out of memory",
 	"checks.measured.oom_eval": "out of memory in eval"

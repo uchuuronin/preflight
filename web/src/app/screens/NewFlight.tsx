@@ -3,7 +3,7 @@
  * POST /v1/jobs (validated by C, executed by A) with an Idempotency-Key, so a double click
  * never pays twice. Samples on the departures board open straight in the cockpit for free.
  */
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { flag } from "../../lib/flags";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
@@ -60,7 +60,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	// forgets what it showed, so leaving a tab drops its source too (switchTab).
 	const [handed, setHanded] = useState<Record<string, JobRequest["source"] | null>>({});
 	const handedSource = intake !== "repo" && intake !== "upload" ? (handed[intake] ?? null) : null;
-	const handedTooBig = handedSource !== null && new TextEncoder().encode(JSON.stringify(handedSource)).length > MAX_TOTAL_BYTES;
+	// Measured once per source, not on every keystroke elsewhere on the desk.
+	const handedTooBig = useMemo(() => handedSource !== null && new TextEncoder().encode(JSON.stringify(handedSource)).length > MAX_TOTAL_BYTES, [handedSource]);
 	// One stable setSource per panel, so a panel may call it from an effect without a render loop.
 	const setters = useRef(new Map<string, (src: JobRequest["source"] | null) => void>());
 	const setterFor = (id: string) => {

@@ -13,7 +13,7 @@ import { FitMark } from "../../workspace/components/StatusMark";
 import type { Fit } from "../../workspace/status";
 
 const METRICS = ["oom", "step_time", "peak_memory", "interval"] as const;
-const TONE: Record<Verdict, Fit> = { meets: "fits", no_misses: "fits", unsettled: "unknown", unchecked: "unknown", below: "fails", missed: "fails" };
+const TONE: Record<Verdict, Fit> = { meets: "fits", no_misses: "unknown", unsettled: "unknown", unchecked: "unknown", below: "fails", missed: "fails" };
 
 interface Check {
 	run: string;
