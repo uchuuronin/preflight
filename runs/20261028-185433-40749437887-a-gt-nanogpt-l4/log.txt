@@ -1,0 +1,13 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-948odHjhzUDCbwoCLISH8R
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function startup_check_worker.
+└── ✓ Created Function startup_check_sandbox.
