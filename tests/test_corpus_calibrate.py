@@ -89,3 +89,37 @@ def test_oom_pairs_use_other_architectures_and_real_outcomes():
 	pairs = calibrate.oom_pairs(rows, scores)
 	assert pairs and all(0 < p < 1 for p, _ in pairs)
 	assert any(y for _, y in pairs) and not all(y for _, y in pairs)  # both outcomes present
+
+
+def test_holdout_gpus_never_calibrate_and_are_reported_once():
+	import math
+
+	from preflight.corpus import calibrate as cal
+	from preflight.engine import conformal as cf
+
+	def scores(gpu, n, seed):
+		import random
+
+		r = random.Random(seed)
+		return [
+			cf.Score("memory.peak", gpu, "finetune", f"{gpu}{i}", 1e9, 1e9 * math.exp(r.gauss(0, 0.1)))
+			for i in range(n)
+		]
+
+	s = scores("L4", 40, 0) + scores("A100-SXM-80GB", 20, 1)
+	table, report = cal.build(s, holdout_gpus=("A100-SXM-80GB",), built_from="t")
+	assert all(k[1] != "A100-SXM-80GB" for k in table.cells)
+	assert table.lookup("memory.peak", "", "").n == 40  # the A100 rows never reached calibration
+	hits, n = table.holdout["memory.peak"]["A100-SXM-80GB"]
+	assert n == 20 and 0 <= hits <= 20
+	assert "A100-SXM-80GB" in report and "Wilson" in report
+
+
+def test_reliability_report_leaves_out_thin_bins():
+	from preflight.corpus.calibrate import reliability_lines
+
+	pairs = [(0.01, False)] * 30 + [(0.5, True)] * 3  # the 30-70% bin has only 3 points
+	lines = reliability_lines(pairs, min_per_bin=10)
+	text = "\n".join(lines)
+	assert "[0.00, 0.05) n=30" in text and "Wilson 95%" in text
+	assert "[0.30, 0.70): 3 points, too few to draw" in text

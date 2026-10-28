@@ -16,6 +16,7 @@ import argparse
 import json
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -219,31 +220,85 @@ def write_table(table: conformal.Table, out: Path) -> None:
 	)
 
 
+HOLDOUT_GPUS = ("A100-SXM-80GB",)  # PM, Oct 27: the cross-GPU holdout; never tuned on, reported once
+MIN_PER_BIN = 10  # guess: fewer points than this and a bin's Wilson interval is too wide to read; not drawn
+
+
+def build(
+	scores: list[conformal.Score], holdout_gpus: tuple[str, ...] = HOLDOUT_GPUS, built_from: str = ""
+) -> tuple[conformal.Table, str]:
+	"""The table from every GPU but the holdout, its leave-one-architecture-out coverage, and the holdout scored
+	once against it. Returns the table and a report to print."""
+	cal = [s for s in scores if s.gpu not in holdout_gpus]
+	held = [s for s in scores if s.gpu in holdout_gpus]
+	table = conformal.calibrate(cal, built_from=built_from)
+	lines, coverage = [], {}
+	for target, cov in conformal.evaluate(cal).items():
+		coverage[target] = (cov.hits, cov.n)
+		lines.append(
+			f"{target}: leave-one-architecture-out coverage {cov.hits} of {cov.n} ({cov.rate:.1%}, "
+			f"Wilson 95% {cov.lo:.1%} to {cov.hi:.1%}), median half-width {cov.median_half_width:.3f}"
+		)
+	holdout: dict[str, dict[str, tuple[int, int]]] = {}
+	for s in (
+		held
+	):  # the holdout GPU has no cell of its own, so it is scored on the merged cells, as a user's GPU is
+		cell = table.lookup(s.target, s.gpu, s.lens)
+		if cell is None:
+			continue
+		h, n = holdout.setdefault(s.target, {}).get(s.gpu, (0, 0))
+		holdout[s.target][s.gpu] = (h + (s.value <= cell.half_width), n + 1)
+	for target, gs in sorted(holdout.items()):
+		for gpu, (h, n) in sorted(gs.items()):
+			lo, hi = conformal.wilson(h, n)
+			lines.append(
+				f"{target}: holdout {gpu}, {h} of {n} inside the band (Wilson 95% {lo:.1%} to {hi:.1%}); reported once"
+			)
+	table = replace(table, coverage=coverage, holdout=holdout)
+	return table, "\n".join(lines)
+
+
+def reliability_lines(pairs: list[tuple[float, bool]], min_per_bin: int = MIN_PER_BIN) -> list[str]:
+	"""The reliability diagram as text: predicted against observed per bin, with Wilson intervals; thin bins
+	are named but not drawn."""
+	out = ["P(OOM) reliability (predicted vs observed, Wilson 95% on each bin):"]
+	for b in oom.reliability(pairs):
+		if b.n == 0:
+			continue
+		if b.n < min_per_bin:
+			out.append(f"  [{b.lo:.2f}, {b.hi:.2f}): {b.n} points, too few to draw")
+			continue
+		out.append(
+			f"  [{b.lo:.2f}, {b.hi:.2f}) n={b.n} predicted {b.mean_predicted:.2f} observed {b.observed:.2f} "
+			f"(Wilson 95% {b.wilson_lo:.2f} to {b.wilson_hi:.2f}){'' if b.consistent else ' INCONSISTENT'}"
+		)
+	return out
+
+
 def main(argv: list[str] | None = None) -> int:
 	ap = argparse.ArgumentParser(prog="preflight.corpus.calibrate")
 	ap.add_argument("--store", type=Path, required=True)
 	ap.add_argument("--out", type=Path, help="write the engine's _calibration_table.py here")
+	ap.add_argument("--holdout-gpus", default=",".join(HOLDOUT_GPUS), help="never calibrated on; scored once")
 	args = ap.parse_args(argv)
-	scores = scores_from_rows(load_rows(args.store))  # grouped rows -> conformal scores
+	holdout = tuple(g for g in args.holdout_gpus.split(",") if g)
+	rows = load_rows(args.store)
+	scores = scores_from_rows(rows)  # grouped rows -> conformal scores
 	if not scores:
 		print("no grouped rows with probes and queries; nothing to calibrate")
 		return 1
-	for target, cov in conformal.evaluate(scores).items():
-		print(
-			f"{target}: leave-one-architecture-out coverage {cov.rate:.1%} "
-			f"(Wilson 95% {cov.lo:.1%}-{cov.hi:.1%}, n={cov.n}), median half-width {cov.median_half_width:.3f}"
-		)
-	rows = load_rows(args.store)
-	bins = oom.reliability(oom_pairs(rows, scores))
-	print("P(OOM) reliability (predicted vs observed, Wilson 95%):")
-	for b in bins:
-		print(
-			f"  [{b.lo:.2f}, {b.hi:.2f}) n={b.n} predicted {b.mean_predicted:.2f} observed {b.observed:.2f} ({b.wilson_lo:.2f}-{b.wilson_hi:.2f})"
-		)
-	ok = oom.reliable(bins)
+	table, report = build(
+		scores,
+		holdout,
+		built_from=f"{args.store} ({len(scores)} scores, holdout {', '.join(holdout) or 'none'})",
+	)
+	print(report)
+	cal_rows = [r for r in rows if r.get("gpu") not in holdout]
+	pairs = oom_pairs(cal_rows, [s for s in scores if s.gpu not in holdout])
+	print("\n".join(reliability_lines(pairs)))
+	ok = oom.reliable(oom.reliability(pairs), min_per_bin=MIN_PER_BIN)
 	print(f"  reliable enough to show as a probability: {ok}")
-	table = conformal.calibrate(scores, built_from=f"{args.store} ({len(scores)} scores)")
-	table = conformal.Table(table.cells, table.built_from, table.version, oom_reliable=ok)
+	table = replace(table, oom_reliable=ok)
 	if args.out:
 		write_table(table, args.out)
 		print(f"wrote {args.out} with {len(table.cells)} cells")

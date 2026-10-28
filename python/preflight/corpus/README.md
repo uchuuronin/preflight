@@ -100,7 +100,13 @@ They run as phases 0 to 2 above. Once the exports are on the `remote-runs` branc
 PYTHONPATH=python python -m preflight.corpus.calibrate --store ./corpus --out python/preflight/engine/_calibration_table.py
 ```
 
-The last step prints leave-one-architecture-out coverage with Wilson intervals and writes the table the engine reads. Model cards switch from `calibration: simulated` to `held_out` for the targets the table covers.
+**Rules for building the table (Chiya, Oct 28):**
+- **Calibrate only on configs drawn the way probes are chosen.** That means the grouped and HF configs, whose three probes follow A's plan (current, half batch, half sequence) and whose two queries sit where users ask (twice the batch, and a halving below the probes). No groups are aimed at the out-of-memory boundary. Any added for the reliability diagram stay out of the table, or are reweighted.
+- **Small groups merge.** A GPU and job type needs at least 9 held-out runs for a 90% band; below that it has no band of its own. It uses its job type merged across GPUs, then all runs. Each estimate's reason and each model card name the cell they used.
+- **The A100 rows are a holdout.** `--holdout-gpus` (default `A100-SXM-80GB`) keeps them out of the table and its coverage check, and scores them once against the merged cells, as a user's unseen GPU would be. The result goes on the model card, never back into tuning.
+- **Reliability diagram:** each bin carries a Wilson interval, and bins with fewer than 10 points are named but not drawn.
+
+The last step prints leave-one-architecture-out coverage with Wilson intervals, then the holdout and the reliability bins, and writes the table the engine reads. Model cards switch from `calibration: simulated` to `held_out` for the targets the table covers.
 
 ### Run the AMD slice on the MI300X (Thursday's droplet session)
 

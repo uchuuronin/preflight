@@ -75,3 +75,47 @@ def test_the_engine_uses_a_held_out_cell_when_there_is_one(monkeypatch):
 	assert math.log(after.hi / after.point) > math.log(before.hi / before.point)
 	card = next(c for c in api.fill_predictions(rec).models if c.id.startswith("memory"))
 	assert card.notes.startswith("calibration: held_out")
+
+
+def test_cells_say_whether_they_were_merged():
+	t = cf.calibrate(_scores(4, gpu="L4") + _scores(1, gpu="H100-SXM-80GB", seed=1))
+	assert t.lookup("memory.peak", "L4", "finetune").label() == "L4, finetune (n = 20)"
+	merged = t.lookup("memory.peak", "H100-SXM-80GB", "finetune")
+	assert merged.label() == "finetune, merged across GPUs (n = 25)"
+	assert t.lookup("memory.peak", "L4", "pretrain").label() == "merged across GPUs and job types (n = 25)"
+	text = t.describe("memory.peak")
+	assert (
+		"L4, finetune (n = 20)" in text
+		and "fewer than 9" in text
+		and "H100" not in text.split("Own cells:")[1].split(".")[0]
+	)
+
+
+def test_holdout_and_coverage_round_trip():
+	t = cf.calibrate(_scores(12))
+	t = cf.Table(
+		t.cells, "x", coverage={"memory.peak": (54, 60)}, holdout={"memory.peak": {"A100-SXM-80GB": (17, 20)}}
+	)
+	back = cf.Table.from_dict(t.to_dict())
+	assert back.coverage == {"memory.peak": (54, 60)}
+	assert back.holdout == {"memory.peak": {"A100-SXM-80GB": (17, 20)}}
+	assert "A100-SXM-80GB 17 of 20" in back.describe("memory.peak")
+
+
+def test_engine_cards_and_reasons_name_the_cell(monkeypatch):
+	from pathlib import Path
+
+	from preflight.engine import api
+	from preflight.schema import load_record
+
+	rec = load_record((Path(__file__).resolve().parents[1] / "schema/examples/pretrain.json").read_text())
+	table = cf.calibrate(_scores(4, sigma=0.15, gpu="L4", lens="pretrain"))
+	table = cf.Table(table.cells, "corpus test", coverage={"memory.peak": (18, 20)})
+	monkeypatch.setattr(cf, "TABLE", table)
+	peak = api.predict(rec, {"batch_size": 10}).root["memory.peak"]
+	assert (
+		"band from held-out runs: pretrain, merged across GPUs (n = 20)" in peak.reason
+	)  # probe GPU is an A100
+	card = next(c for c in api.fill_predictions(rec).models if c.id.startswith("memory"))
+	assert card.training_data == "corpus test" and card.coverage == pytest.approx(0.9)
+	assert "merged across GPUs" in card.notes

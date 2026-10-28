@@ -446,6 +446,8 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		why = f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
 	res = _from_memory_estimate(est, mid, oom_source)
+	if cell is not None and res.peak.status not in ("abstain", "measured"):
+		res = replace(res, peak=_with_note(res.peak, _band_note(cell)))
 	if est.status != "abstain" and est.breakdown is not None:
 		stack = dict(est.breakdown.stack)
 		if est.breakdown.peak_moment == "eval":
@@ -541,9 +543,20 @@ def _empirical_memory(
 	p = memory.p_oom(point, h / memory.Z90, capacity)
 	est = memory.MemoryEstimate(
 		point, point * math.exp(-h), point * math.exp(h), "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
-		h / memory.Z90, None, "fitted to the probes alone: the script map has no model shape",
+		h / memory.Z90, None, "; ".join(x for x in (
+			"fitted to the probes alone: the script map has no model shape",
+			_band_note(cell) if cell is not None and not measured else None,
+		) if x),
 	)  # fmt: skip
 	return _from_memory_estimate(est, mid)
+
+
+def _band_note(cell: conformal.Cell) -> str:
+	return f"band from held-out runs: {cell.label()}"
+
+
+def _with_note(est: Estimate, note: str) -> Estimate:
+	return est.model_copy(update={"reason": "; ".join(x for x in (est.reason, note) if x)})
 
 
 # ---------------------------------------------------------------- step time
@@ -1388,6 +1401,13 @@ def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction
 		"cost.total": _cost(record, values, tm.total),
 	}
 	out.update(mem.terms or {})
+	tcell = conformal.TABLE.lookup("time.step", _env_gpu(record), record.job.lens)
+	if (
+		tcell is not None
+		and tm.step.status not in ("abstain", "measured")
+		and _target_gpu(record, values) == _env_gpu(record)
+	):
+		out["time.step"] = _with_note(tm.step, _band_note(tcell))
 	if tm.phases and tm.step.status != "abstain":
 		h = memory.Z90 * tm.sigma
 		for ph, v in tm.phases.items():
@@ -1704,13 +1724,29 @@ def _cards(ids: set[str]) -> list[ModelCard]:
 	for mid in sorted(ids):
 		kind, notes = _CARDS.get(mid, ("analytical", None))
 		calib, _ = _calibration(mid)
+		target = _CARD_TARGET.get(mid)
+		extra: dict = {}
+		if calib == "held_out" and target:
+			t = conformal.TABLE
+			extra["training_data"] = t.built_from
+			if target in t.coverage and t.coverage[target][1]:
+				h, n = t.coverage[target]
+				extra["coverage"] = h / n
+			extra["per_gpu_coverage"] = {
+				f"holdout:{g}": h / n for g, (h, n) in t.holdout.get(target, {}).items() if n
+			}
+			notes = f"{notes or ''}. {t.describe(target)}".strip(". ")
 		out.append(
 			ModelCard(
 				id=mid,
 				kind=kind,
 				version=mid.split("@")[-1],
-				training_data="none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+				training_data=extra.pop(
+					"training_data",
+					"none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+				),
 				notes=f"calibration: {calib}. {notes or ''}".strip(),
+				**extra,
 			)
 		)
 	return out
