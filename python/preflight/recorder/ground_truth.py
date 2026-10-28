@@ -17,10 +17,12 @@ probes do; nothing either writes is read by the other.
 
 import argparse
 import collections
+import contextlib
 import json
 import os
 import select
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -32,6 +34,7 @@ ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt"}
 # (remote-run.yml's timeout); Oct 28's first try ran into that limit with nothing written
 BUDGET_S = 40 * 60
 BARE_SHARE = 0.5  # of the budget, at most, for the bare run; the recorder run gets the rest
+DRAIN_S = 5.0  # guess: output still in the pipe when the command exits arrives within this
 
 
 def _say(msg: str) -> None:
@@ -40,27 +43,45 @@ def _say(msg: str) -> None:
 
 def _stream(cmd: list[str], *, env: dict, cwd: Path, timeout_s: float) -> tuple[int | None, str]:
 	"""Run cmd with its output passed through as it comes (so a run's log shows where it is), and
-	return (exit code, or None when it ran past timeout_s and was killed; the output's tail)."""
+	return (exit code, or None when it ran past timeout_s and was killed; the output's tail).
+	The command runs in its own process group: a dataloader or compile worker that inherited the
+	pipe neither keeps us reading after the command exits nor outlives the kill."""
 	tail = collections.deque(maxlen=64)
 	deadline = time.monotonic() + timeout_s
-	with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=cwd) as proc:
-		fd = proc.stdout.fileno()
+	proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=cwd,
+		start_new_session=True)  # fmt: skip
+	fd = proc.stdout.fileno()
+	exited_at = None
+	code: int | None = None
+	try:
 		while True:
-			left = deadline - time.monotonic()
-			if left <= 0:
-				proc.kill()
-				proc.wait()
-				return None, b"".join(tail).decode("utf-8", "replace")
-			ready, _, _ = select.select([fd], [], [], min(left, 5.0))
+			now = time.monotonic()
+			if proc.poll() is not None and exited_at is None:
+				exited_at = now
+			if exited_at is not None and now - exited_at > DRAIN_S:
+				break  # exited; whatever still holds the pipe is a leftover worker
+			if exited_at is None and now >= deadline:
+				break
+			ready, _, _ = select.select([fd], [], [], 1.0)
 			if not ready:
 				continue
 			chunk = os.read(fd, 65536)  # whatever is there: a progress bar's \r line never blocks us
 			if not chunk:
+				if exited_at is None:
+					proc.wait(timeout=max(0.1, deadline - time.monotonic()))
 				break
 			tail.append(chunk)
 			sys.stdout.write(chunk.decode("utf-8", "replace"))
 			sys.stdout.flush()
-		return proc.wait(), b"".join(tail).decode("utf-8", "replace")
+		code = proc.poll()
+	except subprocess.TimeoutExpired:
+		code = None
+	finally:
+		with contextlib.suppress(ProcessLookupError, PermissionError):
+			os.killpg(proc.pid, signal.SIGKILL)  # the command if still running, and any leftover worker
+		proc.wait()
+		proc.stdout.close()
+	return code, b"".join(tail).decode("utf-8", "replace")
 
 
 def _bare(
@@ -93,6 +114,8 @@ def _bare(
 		str(bare_steps),
 	]
 	code, tail = _stream(cmd, env=env, cwd=work, timeout_s=timeout_s)
+	if out.exists():  # bare.py writes its result last, so a file here is a whole result
+		return json.loads(out.read_text())
 	if code is None:
 		# keep going: the recorder run is still worth having from a paid session
 		return {"failed": f"the bare run took longer than {timeout_s:.0f} s", "tail": tail[-3000:]}

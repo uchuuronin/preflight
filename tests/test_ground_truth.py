@@ -77,3 +77,21 @@ def test_the_counts_b_reads_drop_anything_but_finite_non_negative_numbers():
 		"train_loader_batches": 2500, "tokens_per_step": "512", "samples_per_step": True,
 		"micro_steps_per_step": float("inf"), "host_rss_peak_bytes": 3.5e9})  # fmt: skip
 	assert got == {"train_loader_batches": 2500.0, "host_rss_peak_bytes": 3.5e9}
+
+
+def test_a_worker_left_holding_the_pipe_doesnt_hold_the_run(tmp_path):
+	"""The command exits but a child it started (a dataloader worker) keeps the output pipe open."""
+	import subprocess
+	import sys
+	import time
+
+	leave = (
+		"import subprocess, sys; "
+		"subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+		"print('done', flush=True)"
+	)
+	t0 = time.monotonic()
+	code, tail = gt._stream([sys.executable, "-c", leave], env=dict(os.environ), cwd=tmp_path, timeout_s=30)
+	assert code == 0 and "done" in tail
+	assert time.monotonic() - t0 < gt.DRAIN_S + 5  # not the 30 s deadline
+	assert subprocess.run(["pgrep", "-f", "time.sleep(60)"], capture_output=True).returncode != 0  # killed
