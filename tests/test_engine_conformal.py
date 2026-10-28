@@ -140,6 +140,8 @@ def test_notes_follow_the_band_that_was_used(monkeypatch):
 	if cross["time.step"].status != "abstain":
 		assert "band from held-out runs: L4, finetune" in cross["time.step"].reason
 		assert "band from held-out runs" in cross["time.total"].reason
+		phases = [v for k, v in cross.items() if k.startswith("time.phase.") and v.status != "abstain"]
+		assert phases and all("band from held-out runs" in v.reason for v in phases)
 	cards = {c.id: c for c in api.fill_predictions(ft).models}
 	roof = next((c for i, c in cards.items() if i.startswith("steptime-roofline")), None)
 	if roof is not None:

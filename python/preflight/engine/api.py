@@ -1403,17 +1403,17 @@ def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction
 		"cost.total": _cost(record, values, tm.total),
 	}
 	out.update(mem.terms or {})
-	tcell = conformal.TABLE.lookup("time.step", _env_gpu(record), record.job.lens)
-	if tcell is not None:  # _step takes the probe GPU's held-out band, and cross-GPU time builds on it
-		for tid in ("time.step", "time.total"):
-			if out[tid].status not in ("abstain", "measured"):
-				out[tid] = _with_note(out[tid], _band_note(tcell))
 	if tm.phases and tm.step.status != "abstain":
 		h = memory.Z90 * tm.sigma
 		for ph, v in tm.phases.items():
 			out[f"time.phase.{ph}"] = _est(
 				v, v * math.exp(-h), v * math.exp(h), "s", tm.step.status, tm.step.model_id
 			)
+	tcell = conformal.TABLE.lookup("time.step", _env_gpu(record), record.job.lens)
+	if tcell is not None:  # _step takes the probe GPU's held-out band, and cross-GPU time builds on it
+		for tid in [t for t in out if t in ("time.step", "time.total") or t.startswith("time.phase.")]:
+			if out[tid].status not in ("abstain", "measured"):
+				out[tid] = _with_note(out[tid], _band_note(tcell))
 	c = record.job.constraints
 	if c.wall_time_cap_s:
 		out["risk.wall_cap"] = _wall_cap(record, tm)

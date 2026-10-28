@@ -235,6 +235,11 @@ def build(
 	table = conformal.calibrate(cal, built_from=built_from)
 	lines, coverage = [], {}
 	for target, cov in conformal.evaluate(cal).items():
+		if not cov.n:
+			lines.append(
+				f"{target}: no held-out run found a cell with at least {conformal.MIN_CELL} runs; no coverage"
+			)
+			continue
 		coverage[target] = (cov.hits, cov.n)
 		lines.append(
 			f"{target}: leave-one-architecture-out coverage {cov.hits} of {cov.n} ({cov.rate:.1%}, "
