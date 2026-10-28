@@ -326,3 +326,29 @@ def test_rule_tour_approvals_run_the_tool():
 			"/v1/guide/tools", json={"record": "lora-7b", "tool": "run_verify", "setting": SETTING["knobs"]}
 		)
 		assert res.json()["status"] == "unavailable"
+
+
+def test_re_ranking_the_same_setting_is_refused_and_dashes_never_reach_the_visitor():
+	# Muse Spark looped on sensitivity for one record on Oct 27 until the round cap.
+	model = Model(
+		reply(calls=[("sensitivity", {"objective": "min_cost"})]),
+		reply(calls=[("sensitivity", {"objective": "min_cost"})]),
+		reply("Nothing safe improves cost — the tour ends here."),
+	)
+	c = client(model)
+	r1 = turn(c, start=True).json()
+	assert [x["name"] for x in r1["calls"]] == ["sensitivity"]
+	r2 = turn(
+		c,
+		state=r1["state"],
+		results=[{"tool": "sensitivity", "call_id": r1["calls"][0]["call_id"], "ranked": []}],
+	).json()
+	# The second ranking of the same setting never reaches the browser: the server refuses it.
+	assert r2["calls"] == []
+	refused = [
+		json.loads(i["output"])
+		for i in model.requests[2]["input"]
+		if i.get("type") == "function_call_output" and "refused" in i["output"]
+	]
+	assert refused and refused[0]["refused"] == "already_ranked"
+	assert r2["text"] == "Nothing safe improves cost, the tour ends here."

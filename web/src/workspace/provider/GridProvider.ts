@@ -1,5 +1,6 @@
 import { decodeF16, decodeMask } from "../../../../schema/ts/encoding";
-import { currentKnobs, failureTarget, knobChoices, objectiveTarget } from "../record/model";
+import { capacityBytes, currentKnobs, failureTarget, knobChoices, objectiveTarget, targetFor } from "../record/model";
+import { pOomFromMemory } from "../record/oom";
 import { observedAt } from "../record/observed";
 import { FAILS_AT, FITS_BELOW } from "../record/terms";
 import type {
@@ -73,6 +74,14 @@ export function gridRange(record: LoadedRecord, targetId: string): { lo: number;
 		}
 	}
 	return hi > 0 ? { lo: Number.isFinite(lo) ? lo : hi, hi } : null;
+}
+
+/** True when every axis value is one of the grid's own points (no interpolation needed). */
+function onGridPoints(grid: Grid, knobs: Readonly<Record<string, KnobValue>>): boolean {
+	return grid.axes.every((a) => {
+		const v = knobs[a.knob_id];
+		return v !== undefined && a.values.some((x) => same(x, v));
+	});
 }
 
 function same(a: KnobValue | undefined, b: KnobValue | undefined): boolean {
@@ -216,6 +225,8 @@ export class GridProvider implements PredictionProvider {
 		const full = { ...currentKnobs(record), ...knobs };
 		const here = atCurrent(record, full);
 		const out: Prediction = {};
+		const fail = failureTarget(record);
+		let deriveRisk = false;
 		for (const target of record.predictions.targets) {
 			// "Measured" only when a probe at exactly these settings observed this target itself;
 			// totals and risks are always computed (record/observed.ts).
@@ -233,11 +244,36 @@ export class GridProvider implements PredictionProvider {
 			if (grid) {
 				const est = interpolate(grid, target, record, full);
 				out[target.id] = seen && est.status === "predicted" ? { ...est, status: "measured" } : est;
+				if (target.id === fail && !onGridPoints(grid, full)) deriveRisk = true;
 				continue;
 			}
 			out[target.id] = abstained(target, grids[0]?.model_id ?? atHere?.model_id ?? "none", "off_grid");
 		}
+		// Between grid points, P(OOM) comes from interpolated memory, never from interpolating
+		// the probability itself (record/oom.ts).
+		if (deriveRisk && fail) this.riskFromMemory(record, full, out, fail);
 		return out;
+	}
+
+	private riskFromMemory(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>, out: Prediction, fail: string): void {
+		const memT = targetFor(record, "memory");
+		const risk = out[fail];
+		if (!memT || memT.unit !== "bytes" || !risk) return;
+		const mem = out[memT.id];
+		if (!mem || mem.status === "abstain" || mem.point === null) {
+			out[fail] = { ...risk, point: null, lo: null, hi: null, status: "abstain", reason: mem?.reason ?? "off_grid" };
+			return;
+		}
+		const p = pOomFromMemory(mem, capacityBytes(record, knobs));
+		if (p === null) return;
+		out[fail] = {
+			...risk,
+			point: p,
+			lo: p,
+			hi: p,
+			status: mem.status === "measured" ? "predicted" : mem.status,
+			reason: "from_memory",
+		};
 	}
 
 	moves(record: LoadedRecord, objective: Objective, opts: SensitivityOptions = {}): Move[] {

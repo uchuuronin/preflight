@@ -35,18 +35,24 @@ ET = ZoneInfo("America/New_York")
 
 @dataclass(frozen=True)
 class Limits:
-	# source: guess; replace with measured tokens per tour x Meta's price after the smoke run (Oct 28)
+	# Measured Oct 27 on muse-spark-1.3 (12 tours, docs/decisions/guide-limits.md): a tour costs
+	# $0.033 on average and $0.115 at most, at the guide's price table (muse_spark.PRICE_*, cited
+	# but unconfirmed). Source: derived, three of the costliest tours on one record plus one
+	# worst-case reservation (5.4k input + 1,600 output tokens, about $0.014).
 	usd_per_run: float = 0.40
 	# source: contract open question ($10 LLM per day for Nov 5-8), pending Chiya's answer
 	usd_per_day: float = 10.0
-	# source: guess; a full tour is about 6 rounds, so 40 allows six tours. Measure on Oct 28.
-	turns_per_visitor_day: int = 40
-	# source: guess; a shared campus or office address carries several visitors
-	turns_per_ip_day: int = 160
-	# source: guess; a round fires at most one call a second while a tour runs
+	# Measured Oct 27: 7.6 rounds per tour on average, 21 at most. Source: derived, three of the
+	# longest tours (63), rounded up.
+	turns_per_visitor_day: int = 64
+	# source: guess, four visitors behind one shared campus or office address
+	turns_per_ip_day: int = 256
+	# Measured Oct 27: rounds arrive about every 1.7 s (p50 model latency) and at most 4 come back
+	# to back before the visitor acts. Source: derived, a burst of 12 and one round per 2 s let
+	# the longest measured tour (21 rounds) through without a refusal.
 	ip_burst: int = 12
 	ip_refill_per_s: float = 0.5
-	# source: derived, the model timeout (30 s) times retries (2) plus margin
+	# source: derived, well past the 10 s model timeout, so a reservation always outlives its call
 	reservation_ttl_s: float = 90.0
 
 

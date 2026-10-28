@@ -1,8 +1,9 @@
 """Muse Spark client for the guide. The only file that knows the wire format.
 
 The Meta Model API is OpenAI-compatible; this sends an OpenAI-style Responses request.
-NOT YET VERIFIED against the live API (its docs weren't reachable from the build
-sandbox), which is why c.guide.live is off. If the shape differs, fix it here only.
+Verified Oct 27 against https://api.meta.ai/v1 with muse-spark-1.3: 91 guide rounds with
+tool calls, usage in `input_tokens`, `output_tokens` and `input_tokens_details.cached_tokens`
+(api/scripts/guide_tour.py, docs/decisions/guide-limits.md). If the shape changes, fix it here only.
 
 Config (Modal secret "preflight-meta"): META_API_KEY, META_API_BASE.
 """
@@ -16,9 +17,14 @@ from dataclasses import dataclass, field
 import httpx
 
 MODEL = "muse-spark-1.3"
-TIMEOUT_S = 30.0  # contract: 30 s per guide turn, then the rule-based tour
+# Measured Oct 27 from Modal, 91 tour rounds: p50 1.7 s, p95 3.3 s, max 4.0 s at up to 900 output
+# tokens. Latency grows with output, so at the 1,600-token cap the worst case is about 7 s.
+# Source: derived, that worst case plus 40% (docs/decisions/guide-limits.md). Past it the
+# rule-based tour takes over.
+TIMEOUT_S = 10.0
 
-# Per million tokens, from a third-party listing; confirm on the Meta Usage page.
+# Per million tokens. Source: cited from a third-party listing, unconfirmed: Chiya checks the
+# Meta Usage page against the Oct 27 tour runs (their dollar figures use these prices).
 PRICE_IN = 1.25
 PRICE_OUT = 4.25
 PRICE_CACHED = 0.15
