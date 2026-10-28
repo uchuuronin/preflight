@@ -138,6 +138,29 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Oct 28 05:11 | `a-deploy-main-3` (40636474757): deployed 05:11:36, stopped 05:14 | none | 3 deployed | under $0.01 (estimate) |
 | Oct 28 05:11 | `a-smoke-l4-main-3` (40636560937): the job ran end to end (fetch, map, Muse Spark map, plan, 3 probes, record), but every probe failed at sandbox creation in 0.01 s | none (no sandbox started) | 1.2 | Muse Spark $0.020047 (measured, 4,937 in and 3,265 out tokens); $0 GPU |
 | Oct 28 05:13 | `a-stop-main-3` (40636720429): out/stop.json `stopped: true` | none | 0.4 | $0 |
+| Oct 28 05:49 | `a-startup-check-4` (40640178518): ok, a real CPU sandbox from the worker's factory ran a 9-step probe | none (CPU sandbox) | 1.2 | under $0.01 (estimate) |
+| Oct 28 05:51 | `a-deploy-main-4` (40640317696): deployed 05:51:03, stopped about 05:59 | none | 8 deployed | under $0.01 (estimate) |
+| Oct 28 05:51 | `a-smoke-l4-main-4` (40640376141): LoRA zoo script, upload to record in 6 min 45 s (05:51:32 to 05:58:17) | L4 | 6.4 of probes (386 s measured) | GPU $0.0858 (measured probe time x L4 list $0.000222/s); Muse Spark $0.017833 (measured tokens); sandbox CPU and memory about $0.10 (guess rate, see below) |
+| Oct 28 05:59 | `a-stop-main-4` (40641112810): out/stop.json `stopped: true` | none | 0.4 | $0 |
+
+First end-to-end run on a real GPU, Oct 28 05:51 UTC (record `ICDYrfHQ2nBNbv3mlRHHMg` on
+`preflight-records`, env L4 with 23,689,363,456 bytes): the planted eval OOM was caught by the
+first probe (`p1-eval`, status oom, code oom.eval, eval batch 1 of 33 at 21.9 GB allocated) and the
+point re-ran with eval off. Measured on the L4 (step_time.p50 over the timed steps, peak allocated):
+
+| Probe | Setting | p50 step | Peak | Probe time | GPU at list |
+| --- | --- | --- | --- | --- | --- |
+| p1-eval | batch 4, seq 1024, eval on | 1.36 s | 21.9 GB in eval | 189 s | $0.0420 |
+| p1 | batch 4, seq 1024, eval off | 1.68 s | 15.7 GB | 122 s | $0.0272 |
+| p2 | batch 2, seq 1024 | 0.84 s | 9.6 GB | 22 s | $0.0049 |
+| p3 | batch 4, seq 512 | 1.67 s | 15.5 GB | 53 s | $0.0117 |
+
+p3 barely moved because Alpaca examples are mostly shorter than 512 tokens: the seq_len knob is a
+truncation cap, so halving it changes little on this data (for B's memory fit). The read-time
+findings also flagged eval.no_grad, eval.batch_large and data.no_packing. The record's gpu_usd
+had folded the sandbox CPU and memory guess into the GPU figure; they are now kept apart
+(breakdown `sandbox_cpu_memory_estimate`). The $0.95/h guess stays a guess until Chiya or the PM
+reads Modal's bill for 05:51 to 05:59 UTC.
 
 Third attempt, Oct 28 05:09 to 05:14 UTC: the deployed job store took its state (the guard works),
 and the job went from submit to a stored record (share token `oZKPJ2pUoLBf5itdEpXWSA`) through

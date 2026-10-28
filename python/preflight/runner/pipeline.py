@@ -89,7 +89,9 @@ PROBE_TIMEOUT_S = (
 class Budget:
 	usd: float = JOB_BUDGET_USD
 	wall_s: float = JOB_PROBE_WALL_S
-	spent_usd: float = 0.0
+	spent_usd: float = 0.0  # what the cap is checked against: GPU and the sandbox overhead estimate
+	gpu_usd: float = 0.0  # GPU at measured probe time, every attempt
+	overhead_usd: float = 0.0  # the sandbox CPU and memory estimate alone
 	started: float = field(default_factory=time.monotonic)
 
 	def left_s(self) -> float:
@@ -397,7 +399,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		dropped = {p.id for p in rec.probes}
 		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
 		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
-	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.spent_usd,
+	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.gpu_usd, overhead_usd=budget.overhead_usd,
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
@@ -493,6 +495,8 @@ def _probe_points(
 			if result is not None:
 				# every attempt counts, kept or not, with the sandbox's CPU and memory beside the GPU
 				budget.spent_usd += result.probe.cost.usd + (result.probe.duration_s or 0) * over / 3600
+				budget.gpu_usd += result.probe.cost.usd
+				budget.overhead_usd += (result.probe.duration_s or 0) * over / 3600
 			attempts.append(out)
 			return out
 
@@ -595,6 +599,7 @@ def _merge(
 	gpu: str,
 	*,
 	spent_usd: float | None = None,
+	overhead_usd: float = 0.0,
 	discarded_usd: float = 0.0,
 	billed_usd: float | None = None,
 	new_ids: set[str] | None = None,
@@ -638,6 +643,12 @@ def _merge(
 		over = billed_usd - kept - discarded_usd
 		breakdown["sandbox_overhead"] = round(prior.get("sandbox_overhead", 0.0) + over, 6)
 	gpu_usd = round(rec.costs.gpu_usd + job_usd, 6)
+	if overhead_usd:
+		# an estimate of the sandbox's CPU and memory (Deps.overhead_usd_per_h), kept apart from the
+		# GPU figure, which is measured probe time at list price; Modal's bill replaces both
+		breakdown["sandbox_cpu_memory_estimate"] = round(
+			prior.get("sandbox_cpu_memory_estimate", 0.0) + overhead_usd, 6
+		)
 	# every model call the record carries (a derived record keeps its parent's), priced per call
 	llm_usd = round(sum(c.cost_usd for c in rec.provenance), 6)
 	if llm_usd:

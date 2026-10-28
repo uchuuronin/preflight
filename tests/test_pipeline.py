@@ -333,3 +333,11 @@ def test_the_records_model_calls_count_in_its_cost(tmp_path):
 	assert rec.costs.llm_usd == pytest.approx(0.020047)
 	assert rec.costs.breakdown["model_calls"] == pytest.approx(0.020047)
 	assert rec.costs.total_usd == pytest.approx(rec.costs.gpu_usd + 0.020047)
+
+
+def test_gpu_cost_and_the_sandbox_overhead_estimate_are_kept_apart(tmp_path):
+	rec = run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(),
+		deps(tmp_path, FakeRunner(seconds=36.0), overhead_usd_per_h=1.0))  # fmt: skip
+	gpu = 3 * 36.0 * 0.80 / 3600  # three probes on the L4 at list price
+	assert rec.costs.gpu_usd == pytest.approx(gpu, rel=1e-3)
+	assert rec.costs.breakdown["sandbox_cpu_memory_estimate"] == pytest.approx(3 * 36.0 / 3600, rel=1e-3)
