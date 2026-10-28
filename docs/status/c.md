@@ -6,7 +6,7 @@
 
 - Muse Spark verified for real: `muse-spark-1.3` on `https://api.meta.ai/v1`, Responses format,
   tool calls and usage fields as `muse_spark.py` expects. Five rounds of whole tours through the
-  real guide route (`api/scripts/guide_tour.py`, 52 tours, 595 rounds) set the timeout (12 s),
+  real guide route (`api/scripts/guide_tour.py`, 76 tours, 595 rounds) set the timeout (12 s),
   output cap (2,000 tokens), per-run and per-visitor caps, and found and fixed three failure
   modes: re-ranking loops, highlight loops while a move waits, and announcing a move without
   making it (a chosen instruction plus a one-time server reminder). Last run: the guide moved on
