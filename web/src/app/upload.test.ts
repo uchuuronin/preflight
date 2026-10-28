@@ -60,6 +60,11 @@ describe("uploadSource", () => {
 		expect(uploadSource([f("Train.IPYNB", "{}")])).toMatchObject({ ok: false, reason: "upload.notebook_case" });
 	});
 
+	it("sends notebooks to the Notebook tab when there is one", () => {
+		expect(uploadSource([f("train.ipynb", "{}")], undefined, { notebooks: false })).toMatchObject({ ok: false, reason: "upload.notebook_tab" });
+		expect(uploadSource([f("train.py")], undefined, { notebooks: false }).ok).toBe(true);
+	});
+
 	it("treats Train.PY as a script, whatever the case", () => {
 		const r = uploadSource([f("Train.PY")]);
 		expect(r.ok && r.source.kind === "upload" && r.source.entrypoint).toBe("Train.PY");

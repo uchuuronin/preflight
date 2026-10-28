@@ -13,7 +13,10 @@ import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { DataUseNotice, dataUseAccepted } from "../DataUse";
-import { ACCEPT, type PickedFile, precheck, uploadSource } from "../upload";
+import { ACCEPT, ACCEPT_SCRIPTS, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";
+
+/** D's notebook intake panel (addons/notebook); while it is on, notebooks check in there. */
+const NOTEBOOK_TAB = "notebook.intake";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
@@ -50,18 +53,23 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId() };
 	// Uploads open with live probes (the same flag the API checks before taking a job).
 	const uploadsOpen = flag("runner.queue");
-	const check = uploadSource(picked, entry);
+	// A notebook tab (D's intake panel) previews what will run, so notebooks go through it there.
+	const notebookTab = extraIntake.some((p) => p.id === NOTEBOOK_TAB);
+	const check = uploadSource(picked, entry, { notebooks: !notebookTab });
+	// Sources handed over by intake panels, by panel id.
+	const [handed, setHanded] = useState<Record<string, JobRequest["source"] | null>>({});
+	const handedSource = intake !== "repo" && intake !== "upload" ? (handed[intake] ?? null) : null;
 
 	// GitHub only: A's runner fetches from GitHub, and the API pins the link to a commit there.
 	const canSubmit =
-		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : false;
+		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : uploadsOpen && handedSource !== null;
 
 	const pick = async (list: FileList | null) => {
 		if (!list?.length) return;
 		setError(null);
 		const chosen = Array.from(list);
 		// Names and sizes first: a 4 GB checkpoint is refused without being read into the tab.
-		const early = precheck(chosen);
+		const early = precheck(chosen, { notebooks: !notebookTab });
 		if (early) {
 			setPicked([]);
 			setError(t(`newflight.${early}`));
@@ -82,9 +90,16 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const submit = async () => {
 		setError(null);
 		if (intake === "upload" && !check.ok) return;
+		if (handedSource && new TextEncoder().encode(JSON.stringify(handedSource)).length > MAX_TOTAL_BYTES) {
+			setError(t("newflight.upload.too_big"));
+			return;
+		}
 		setBusy(true);
 		const body: JobRequest = {
-			source: intake === "upload" && check.ok ? check.source : { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` },
+			source:
+				intake === "upload" && check.ok
+					? check.source
+					: (handedSource ?? { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` }),
 			objective: { kind: goal, description: description.trim() || null },
 			gpu,
 			description: description.trim() || null,
@@ -167,7 +182,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 											id={ids.upload}
 											type="file"
 											multiple
-											accept={ACCEPT}
+											accept={notebookTab ? ACCEPT_SCRIPTS : ACCEPT}
 											onChange={(e) => {
 												const input = e.currentTarget;
 												if (!uploadsOpen) setError(t("newflight.upload.not_open"));
@@ -226,7 +241,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									.map((p) => (
 										<div key={p.id} className="pf-pane">
 											<AddonBoundary id={p.id}>
-												<p.component />
+												<p.component setSource={uploadsOpen ? (src) => setHanded((m) => ({ ...m, [p.id]: src })) : undefined} />
 											</AddonBoundary>
 										</div>
 									))
