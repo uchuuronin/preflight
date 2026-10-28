@@ -19,6 +19,14 @@ Failure policy, per probe point:
   - job budget (time or dollars)     stop probing, keep what was measured
   - the probe's own failure          recorded on the probe (status, error code)
 Nothing here retries a probe that failed for the visitor's reasons.
+
+Job modes (JobRequest.mode): plan is all of the above. probe, verify and
+sample_more start from an existing record (runner/record_jobs.py) and write a
+new record derived from it: probe runs one profiled point at the guide's
+setting; verify runs that setting and the current one for VERIFY_STEPS at one
+fixed seed and records whether the loss holds; sample_more is for agent runs.
+GPUs: never above PREFLIGHT_GPU_CEILING (the public demo: A100-80GB), and a
+step up after an OOM only while the job's dollar budget holds it.
 """
 
 import hashlib
@@ -29,26 +37,42 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Protocol
 
+from pydantic import ValidationError
+
 from preflight.harness.mapper import map_script
 from preflight.harness.skeleton import skeleton_record
 from preflight.harness.static import map_static
 from preflight.probes import untrusted
 from preflight.probes.gpu_choice import (
+	ceiling as gpu_ceiling,
+)
+from preflight.probes.gpu_choice import (
 	choose_probe_gpu,
 	estimate_need_gb,
 	max_steps_up,
 	probe_on_ladder,
+	under_ceiling,
 	usd_per_hour,
 )
 from preflight.probes.local import InvalidSubmission, ProbeResult, ProbeSpec, run_probe
-from preflight.probes.plan import PlannedProbe, plan_probes
+from preflight.probes.plan import PlannedProbe, next_probe_id, plan_probes, point_probe
 from preflight.recorder.overrides import OverrideError, apply_overrides, override_args, values_from_args
-from preflight.schema import Constraints, Env, FlightRecord, Objective, Probe, ProbeCost
+from preflight.schema import (
+	Constraints,
+	Env,
+	FlightRecord,
+	JobRequest,
+	Objective,
+	Predictions,
+	Probe,
+	ProbeCost,
+)
 from preflight.schema.script_map import ScriptMap
 
-from .records import RecordWriter
+from . import record_jobs
+from .records import RecordReader, RecordWriter
 from .sources import Fetched, fetch
-from .worker import JobContext
+from .worker import JobContext, PermanentError
 
 log = logging.getLogger("preflight.pipeline")
 
@@ -112,6 +136,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"eval_batches": spec.eval_batches,
 		"profile": spec.profile,
 		"seed": spec.seed,
+		"install_requirements": spec.install_requirements,
 		"gpu": gpu,
 		"image": image,
 	}  # fmt: skip
@@ -129,6 +154,11 @@ class Deps:
 	budget: Callable[[], Budget] = Budget
 	probe_timeout_s: float = PROBE_TIMEOUT_S
 	blobs: object | None = None  # remote_store.Blobs: uploaded files the job store moved out of its state
+	reader: RecordReader | None = None  # stored records, for jobs that start from one (record_jobs.py)
+	install_requirements: bool = False  # hosted probes pip-install requirements.txt; the CLI uses yours
+	# what a probe's sandbox costs beside its GPU (Modal bills sandbox CPU and memory at 3x list),
+	# counted against the job budget; 0 for local runs
+	overhead_usd_per_h: float = 0.0
 
 
 @dataclass
@@ -206,6 +236,8 @@ def _spec(
 		eval_batches=eval_batches if eval_batches else 0,
 		profile=p.profile,
 		timeout_s=deps.probe_timeout_s,
+		seed=p.seed,
+		install_requirements=deps.install_requirements,
 	)
 
 
@@ -232,56 +264,211 @@ def _run_point(spec: ProbeSpec, gpu: str, deps: Deps, ctx) -> tuple[ProbeResult 
 	return result, None
 
 
+def _validated(request: dict) -> JobRequest:
+	if not isinstance(request, dict):
+		raise InvalidSubmission("the job request is not an object", code="submission.invalid")
+	try:
+		return JobRequest.model_validate(request)
+	except ValidationError as exc:
+		first = exc.errors()[0] if exc.errors() else {}
+		where = ".".join(str(x) for x in first.get("loc", ()))
+		why = first.get("msg", "invalid")
+		raise InvalidSubmission(
+			f"the job request is invalid: {where + ': ' if where else ''}{why}"[:300],
+			code="submission.invalid",
+		) from exc
+
+
 def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None = None) -> FlightRecord:
 	"""request: a JobRequest body. ctx: a worker JobContext (or _Ctx). Returns the final record.
 
 	ids: (record_id, share_token) an earlier attempt of this job started; the retry continues
-	that record so a visitor already watching it keeps the same link."""
+	that record so a visitor already watching it keeps the same link.
+
+	mode plan maps and probes a script; probe, verify and sample_more start from an existing
+	record (runner/record_jobs.py) and write a new record derived from it."""
+	req = _validated(request)
+	source = request.get("source") or {}
+	origin = None
+	if source.get("kind") == "record":
+		origin = record_jobs.resolve(source, reader=deps.reader, blobs=deps.blobs)
+		source = origin.fetch_source
 	_emit(ctx, "fetching")
-	fetched = fetch(request.get("source") or {}, blobs=deps.blobs)
+	fetched = fetch(source, blobs=deps.blobs)
+	if origin is not None and origin.parent is not None:
+		was = origin.parent.job.source.content_hash
+		if was and fetched.source.content_hash != was:
+			raise InvalidSubmission("this record's code has changed since it was measured; check it in again",
+				code="submission.code_changed")  # fmt: skip
 	ctx.check()
 
 	_emit(ctx, "mapping")
-	sm = values_from_args(
-		fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
-	)
-	rec = _skeleton(fetched, sm, request)
-	if ids and all(ids):
-		rec = rec.model_copy(update={"record_id": ids[0], "share_token": ids[1]})
-	rev = deps.records.put(rec)
-	_emit(ctx, "skeleton", rec, rev, message="skeleton from the static reader")
-
-	if deps.spark is not None:
-		ctx.check()
-		spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
-		if calls:
-			sm = values_from_args(fetched.files, spark_sm, fetched.args)
-			rec = _skeleton(fetched, sm, request, base=rec)
-		rec = rec.model_copy(update={"provenance": [*rec.provenance, *calls]})
+	followup = req.mode != "plan"
+	if followup and origin.parent is not None:
+		# the parent's map and knobs carry over (no Muse Spark call): a new record, same script
+		rec = record_jobs.derive(origin.parent, ids)
+		sm = rec.job.script_map or values_from_args(
+			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+		)
 		rev = deps.records.put(rec)
-		_emit(ctx, "skeleton", rec, rev, message="map refined by Muse Spark")
+		_emit(ctx, "skeleton", rec, rev, message=f"continuing from record {origin.parent.share_token}")
+	else:
+		sm = values_from_args(
+			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+		)
+		rec = _skeleton(fetched, sm, request)
+		update = {"parent_id": origin.parent_id} if origin is not None else {}
+		if ids and all(ids):
+			update.update(record_id=ids[0], share_token=ids[1])
+		if update:
+			rec = rec.model_copy(update=update)
+		rev = deps.records.put(rec)
+		_emit(ctx, "skeleton", rec, rev, message="skeleton from the static reader")
+		if deps.spark is not None and not followup:  # a follow-up asks for a measurement, not a map
+			ctx.check()
+			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
+			if calls:
+				sm = values_from_args(fetched.files, spark_sm, fetched.args)
+				rec = _skeleton(fetched, sm, request, base=rec)
+				if origin is not None:
+					rec = rec.model_copy(update={"parent_id": origin.parent_id})
+			rec = rec.model_copy(update={"provenance": [*rec.provenance, *calls]})
+			rev = deps.records.put(rec)
+			_emit(ctx, "skeleton", rec, rev, message="map refined by Muse Spark")
 
+	if req.mode == "sample_more":
+		if rec.job.lens != "agent":
+			raise InvalidSubmission(
+				"sampling more tasks is for agent and API runs", code="submission.not_agent"
+			)
+		# the agent sampler (OTel proxy) isn't built yet: say so rather than pretend
+		raise PermanentError(
+			"sampling more agent tasks isn't available yet", code="unsupported.agent_sampling"
+		)
 	if rec.job.lens == "agent":
+		if followup:
+			raise InvalidSubmission(
+				"agent runs are measured by sampling tasks, not GPU probes", code="submission.not_gpu_job"
+			)
 		# agent runs are sampled by the agent recorder (OTel proxy), not by GPU probes
 		_emit(ctx, "harnessing", rec, rev, message="agent jobs run through the agent sampler")
 		return rec
 
 	ctx.check()
 	_emit(ctx, "harnessing", rec, rev)
-	plan = plan_probes(rec)
 	allowed = _allowed_gpus(rec)
 	need = estimate_need_gb(sm)
-	gpu = _requested_gpu(request, allowed) or choose_probe_gpu(need, allowed)
+	pinned = False  # a GPU the guide asked for: an OOM there is the answer, not a reason to move
+	plan_knobs: dict = {}
+	base_knobs: dict = {}
+	if req.mode == "plan":
+		plan = plan_probes(rec)
+	else:
+		knobs, unknown = record_jobs.setting(rec, req.knobs)
+		if unknown:
+			_emit(ctx, "harnessing", rec, rev, level="warn",
+				message=f"not knobs of this record, left as they are: {', '.join(sorted(unknown))}")  # fmt: skip
+		plan_knobs = record_jobs.full_setting(rec, knobs)
+		base_knobs = record_jobs.full_setting(rec, {})
+		plan = _followup_plan(rec, req.mode, knobs, plan_knobs, base_knobs)
+		if "gpu_type" in knobs:
+			request = {**request, "gpu": knobs["gpu_type"]}
+			pinned = True
+	gpu = _requested_gpu(request, allowed) or (
+		_parent_gpu(rec) if followup and origin.parent is not None else None
+	) or choose_probe_gpu(need, allowed)  # fmt: skip
+	cap = gpu_ceiling()
+	if not under_ceiling(gpu, cap):
+		_emit(ctx, "harnessing", rec, rev, level="warn",
+			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip
+		gpu = cap
 	budget = deps.budget()
+	probes, results, gpu, discarded_usd = _probe_points(
+		plan, rec, rev, fetched, sm, deps, ctx, budget, gpu=gpu, allowed=allowed, need=need, pinned=pinned
+	)
+	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
+	kept = rec.probes
+	if followup and origin.parent is not None and gpu != _parent_gpu(origin.parent):
+		# measured on another GPU: the record's env is this one, so the parent's probes don't
+		# belong, nor what was fitted or found from them; the script's own findings stay
+		kept = []
+		dropped = {p.id for p in rec.probes}
+		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
+		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
+	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.spent_usd,
+		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
+	if req.mode == "verify":
+		by_id = {p.id: p for p in probes}
+		vid = plan[0].probe_id
+		finding = record_jobs.verify_finding(by_id[vid], by_id.get(f"{vid}-base"), plan_knobs, base_knobs,
+			{n.id for n in out.graph.nodes})  # fmt: skip
+		out = out.model_copy(update={"findings": [*out.findings, finding]})
+	return out
 
+
+def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, base_knobs: dict):
+	"""probe: one profiled point at the setting. verify: the setting, and the current settings
+	beside it when they differ, both for VERIFY_STEPS at one fixed seed."""
+	if mode == "probe":
+		return [point_probe(rec, next_probe_id(rec), knobs, role="point")]
+	vid = next_probe_id(rec, "v")
+	steps = {"warmup": record_jobs.VERIFY_WARMUP, "timed": record_jobs.VERIFY_STEPS, "cadence": False}
+	plan = [point_probe(rec, vid, knobs, role="verify", **steps)]
+	differs = {k: v for k, v in plan_knobs.items() if k != "gpu_type" and base_knobs.get(k) != v}
+	if differs:
+		base = {k: base_knobs[k] for k in knobs if k in base_knobs}
+		plan.append(point_probe(rec, f"{vid}-base", base, role="verify_base", **steps))
+	for p in plan:
+		p.seed = record_jobs.VERIFY_SEED
+	return plan
+
+
+def _parent_gpu(rec: FlightRecord) -> str | None:
+	"""The GPU the parent measured on (or chose), so a follow-up probe compares like with like."""
+	from preflight.probes.gpu_choice import canonical
+
+	name = rec.env.gpu.name if rec.env is not None and rec.env.gpu is not None else None
+	if not name:
+		try:
+			name = rec.knob("gpu_type").current
+		except KeyError:
+			return None
+	name = canonical(str(name))
+	return name if name in _offered() else None
+
+
+def _probe_points(
+	plan: list[PlannedProbe],
+	rec: FlightRecord,
+	rev: int,
+	fetched: Fetched,
+	sm: ScriptMap,
+	deps: Deps,
+	ctx,
+	budget: Budget,
+	*,
+	gpu: str,
+	allowed: list[str] | None,
+	need: float,
+	pinned: bool = False,
+) -> tuple[list[Probe], list[ProbeResult], str, float]:
+	"""Run the planned points in order; returns their probes, fresh results, the GPU they settled on
+	and what discarded attempts cost."""
 	probes: list[Probe] = []
 	results: list[ProbeResult] = []
 	discarded_usd = 0.0
 	for i, p in enumerate(plan):
 		ctx.check()
 		_emit(ctx, "probing", rec, rev, probe_id=p.probe_id, progress=round(i / len(plan), 3))
+		if any(q.error_code == "missing_package.install" for q in probes):
+			# the same requirements fail the same way at every point: don't pay for it again
+			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
+				error="skipped: requirements.txt didn't install (see the first probe)",
+				error_code="missing_package.install"))  # fmt: skip
+			continue
 		est_s = max((r.probe.duration_s or 0.0 for r in results), default=60.0)
-		if probes and not budget.allows(_price(gpu) * est_s / 3600, est_s):
+		over = deps.overhead_usd_per_h
+		if probes and not budget.allows((_price(gpu) + over) * est_s / 3600, est_s):
 			why = (
 				f"skipped: the job's probe budget (${budget.usd:.2f}, {budget.wall_s / 60:.0f} min) is spent"
 			)
@@ -296,16 +483,23 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			continue
 		attempts: list = []
 
-		def run(g, spec=spec, attempts=attempts):
+		def run(g, spec=spec, attempts=attempts, over=over):
 			result, cached = _run_point(spec, g, deps, ctx)
 			out = result if result is not None else _CachedResult(cached)
 			if result is not None:
-				budget.spent_usd += result.probe.cost.usd  # every attempt counts, kept or not
+				# every attempt counts, kept or not, with the sandbox's CPU and memory beside the GPU
+				budget.spent_usd += result.probe.cost.usd + (result.probe.duration_s or 0) * over / 3600
 			attempts.append(out)
 			return out
 
-		def may_step_up(g, est_s=est_s):  # another GPU only while the job is live and the budget holds it
-			return not ctx.should_stop() and budget.allows(_price(g) * est_s / 3600, est_s)
+		def may_step_up(
+			g, est_s=est_s, over=over
+		):  # another GPU only while the job is live and the budget holds it
+			return (
+				not pinned
+				and not ctx.should_stop()
+				and budget.allows((_price(g) + over) * est_s / 3600, est_s)
+			)
 
 		steps = max_steps_up(need) if i == 0 else 1
 		ladder = probe_on_ladder(run, gpu, allowed, steps=steps, may_step_up=may_step_up)
@@ -336,10 +530,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		discarded_usd += sum(
 			a.probe.cost.usd for a in attempts if isinstance(a, ProbeResult) and id(a) not in kept_ids
 		)
-	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
-	return _merge(
-		rec, probes, results, gpu, spent_usd=budget.spent_usd, discarded_usd=discarded_usd, billed_usd=billed
-	)
+	return probes, results, gpu, discarded_usd
 
 
 def _price(gpu: str) -> float:
@@ -402,7 +593,11 @@ def _merge(
 	spent_usd: float | None = None,
 	discarded_usd: float = 0.0,
 	billed_usd: float | None = None,
+	new_ids: set[str] | None = None,
 ) -> FlightRecord:
+	"""probes: every probe the record will carry; new_ids: the ones this job ran (default all).
+	Costs add this job's spend to what the record had already cost (a derived record keeps its
+	parent's), so a record always says what making it cost in total."""
 	env = next((r.env for r in results if r.probe.status == "ok" and r.env is not None), None)
 	env = env or next((r.env for r in results if r.env is not None), None)
 	update: dict = {"probes": probes}
@@ -426,16 +621,20 @@ def _merge(
 			)
 		knobs.append(k)
 	update["knobs"] = knobs
-	kept = round(sum(p.cost.usd for p in probes if p.status != "cached"), 6)
+	ran = [p for p in probes if new_ids is None or p.id in new_ids]
+	kept = round(sum(p.cost.usd for p in ran if p.status != "cached"), 6)
 	# what the job really cost: every attempt (a probe that ran out and was re-run on a bigger GPU
 	# still ran), and the sandbox's whole lifetime when the runner knows it (start-up, idle)
-	gpu_usd = max(kept, spent_usd or 0.0, billed_usd or 0.0)
-	breakdown = {**rec.costs.breakdown, "probes": kept}
+	job_usd = max(kept, spent_usd or 0.0, billed_usd or 0.0)
+	prior = rec.costs.breakdown
+	breakdown = {**prior, "probes": round(prior.get("probes", 0.0) + kept, 6)}
 	if discarded_usd:
-		breakdown["discarded_attempts"] = round(discarded_usd, 6)
+		breakdown["discarded_attempts"] = round(prior.get("discarded_attempts", 0.0) + discarded_usd, 6)
 	if billed_usd and billed_usd > kept + discarded_usd:
-		breakdown["sandbox_overhead"] = round(billed_usd - kept - discarded_usd, 6)
-	costs = rec.costs.model_copy(update={"gpu_usd": round(gpu_usd, 6), "breakdown": breakdown})
+		over = billed_usd - kept - discarded_usd
+		breakdown["sandbox_overhead"] = round(prior.get("sandbox_overhead", 0.0) + over, 6)
+	gpu_usd = round(rec.costs.gpu_usd + job_usd, 6)
+	costs = rec.costs.model_copy(update={"gpu_usd": gpu_usd, "breakdown": breakdown})
 	update["costs"] = costs
 	return FlightRecord.model_validate({**rec.model_dump(), **{k: v for k, v in update.items()}})
 

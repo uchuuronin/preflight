@@ -33,6 +33,7 @@ ENTRYPOINT_GUESSES = ("train.py", "main.py", "run.py", "finetune.py", "pretrain.
 _GITHUB = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?(\.git)?/?")
 # a full hash: GitHub serves `git fetch origin <sha>` only for the whole 40 characters
 _COMMIT = re.compile(r"[0-9a-f]{40}")
+_FILES_REF = re.compile(r"sha256:[0-9a-f]{64}")
 MAX_ARGS = 64
 MAX_ARG_LEN = 4096
 CLONE_TIMEOUT_S = 60
@@ -107,6 +108,38 @@ def _notebook_to_script(text: str) -> str:
 			raise InvalidSubmission("a notebook cell's source is not text")
 		out.append("".join(("# " + ln) if ln.lstrip().startswith(("!", "%")) else ln for ln in lines))
 	return "\n\n".join(out) + "\n"
+
+
+_PIP = re.compile(r"\s*[!%]\s*(?:python3?\s+-m\s+)?pip3?\s+install\s+(?P<args>.*)")
+_PIP_TAKES_VALUE = {"-r", "--requirement", "-e", "--editable", "-c", "--constraint", "-i", "--index-url",
+	"--extra-index-url", "-f", "--find-links", "--target", "-t", "--prefix", "--root"}  # fmt: skip
+
+
+def notebook_requirements(script: str) -> list[str]:
+	"""The packages a notebook's `!pip install` / `%pip install` lines ask for, in order, deduplicated.
+
+	Options are dropped (and the values of those that take one); what's left is what pip would
+	install from PyPI. The probe installs them from requirements.txt like any upload's."""
+	reqs: list[str] = []
+	for line in script.splitlines():
+		m = _PIP.fullmatch(line.removeprefix("# "))
+		if m is None:
+			continue
+		words = re.split(r"[#;|&`$]", m["args"], maxsplit=1)[0].split()  # this command only
+		skip = False
+		for w in words:
+			if skip:
+				skip = False
+				continue
+			if w in _PIP_TAKES_VALUE:
+				skip = True
+				continue
+			w = w.strip("'\"")
+			if not w or w.startswith("-"):
+				continue
+			if w and w not in reqs:
+				reqs.append(w)
+	return reqs
 
 
 def _pick_entrypoint(files: dict[str, str], wanted) -> str:
@@ -199,8 +232,9 @@ def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict) -> dict[
 	return files
 
 
-def _clone(uri, commit) -> dict[str, str]:
-	"""The text files of a public GitHub repo at its default branch or a full commit hash."""
+def _clone(uri, commit) -> tuple[dict[str, str], str]:
+	"""The text files of a public GitHub repo at its default branch or a full commit hash, and the
+	commit they were read at, so a later probe of the same record reads the same code."""
 	if not isinstance(uri, str) or not _GITHUB.fullmatch(uri):
 		raise InvalidSubmission("repositories are read from https://github.com/<owner>/<repo>")
 	if commit is not None and (not isinstance(commit, str) or not _COMMIT.fullmatch(commit)):
@@ -209,38 +243,15 @@ def _clone(uri, commit) -> dict[str, str]:
 	dest = tmp / "repo"
 	env = {"GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "HOME": str(tmp), "PATH": "/usr/bin:/bin"}
 	base = ["git", "-c", "core.hooksPath=/dev/null", "-c", "protocol.file.allow=never"]
-	blob_cap = f"--filter=blob:limit={MAX_FILE_BYTES}"
+	shallow = ["--depth", "1", "--no-tags", f"--filter=blob:limit={MAX_FILE_BYTES}"]
 	try:
-		_git(
-			base,
-			"clone",
-			"--depth",
-			"1",
-			"--no-tags",
-			"--no-checkout",
-			blob_cap,
-			"--",
-			uri,
-			str(dest),
-			env=env,
-		)
+		_git(base, "clone", *shallow, "--no-checkout", "--", uri, str(dest), env=env)
 		treeish = "HEAD"
 		if commit:
-			_git(
-				base,
-				"-C",
-				str(dest),
-				"fetch",
-				"--depth",
-				"1",
-				"--no-tags",
-				blob_cap,
-				"origin",
-				commit,
-				env=env,
-			)
+			_git(base, "-C", str(dest), "fetch", *shallow, "origin", commit, env=env)
 			treeish = commit
-		return _git_files(dest, treeish, base=base, env=env)
+		sha = _git(base, "-C", str(dest), "rev-parse", f"{treeish}^{{commit}}", env=env).decode().strip()
+		return _git_files(dest, treeish, base=base, env=env), sha
 	except subprocess.TimeoutExpired as exc:
 		raise InvalidSubmission("the repository took too long to clone") from exc
 	except subprocess.CalledProcessError as exc:
@@ -266,10 +277,18 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 	`files_ref` once the job store has moved them to its blob store)."""
 	if not isinstance(source, dict):
 		raise InvalidSubmission("the job has no source")
+	upload_ref = None
 	if "files_ref" in source and "files" not in source:
-		if blobs is None:
-			raise InvalidSubmission("the uploaded files are no longer available; submit again")
-		source = {**source, "files": blobs.get(source["files_ref"])}
+		upload_ref = source["files_ref"]
+		if blobs is None or not isinstance(upload_ref, str) or not _FILES_REF.fullmatch(upload_ref):
+			raise InvalidSubmission("the uploaded files are no longer available; submit again",
+				code="submission.files_gone")  # fmt: skip
+		try:
+			files = blobs.get(upload_ref)
+		except (OSError, ValueError) as exc:
+			raise InvalidSubmission("the uploaded files are no longer available; submit again",
+				code="submission.files_gone") from exc  # fmt: skip
+		source = {**source, "files": files}
 	kind = source.get("kind")
 	uri = source.get("uri") or ""
 	if not isinstance(uri, str):
@@ -296,15 +315,23 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		stem = Path(name).with_suffix(".py").name
 		if stem in (".py", "..py") or not re.fullmatch(r"[^/\\\0]{1,200}", stem):
 			raise InvalidSubmission("the notebook's file name is not usable")
-		files = {stem: _notebook_to_script(text)}
+		script = _notebook_to_script(text)
+		files = {stem: script}
+		reqs = notebook_requirements(script)
+		if reqs:  # the notebook's !pip install lines, installed like any upload's requirements.txt
+			files["requirements.txt"] = "\n".join(reqs) + "\n"
 	elif kind == "repo":
-		files = _clone(uri, commit)
+		files, commit = _clone(uri, commit)
 	else:
 		raise InvalidSubmission(f"unknown source kind {kind!r}")
 	entry = _pick_entrypoint(
 		files, source.get("entrypoint") or (next(iter(files)) if kind == "notebook" else None)
 	)
 	validate_files(files, entrypoint=entry)
+	if kind in ("upload", "cli", "inflight", "notebook"):
+		# never the visitor's own uri: it says where the files are kept, so a later probe of this
+		# record reads exactly them (record_jobs.refetch), and only the job store sets that
+		uri = f"upload://{upload_ref}" if upload_ref is not None else ""
 	src = Source(
 		kind=kind,
 		uri=uri or None,

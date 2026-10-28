@@ -166,7 +166,9 @@
 			"current": "muse-spark",
 			"gridded": false,
 			"needs_code": false,
-			"group": "agent"
+			"group": "agent",
+			"affects": [],
+			"changes_results": true
 		},
 		{
 			"id": "prompt_caching",
@@ -179,7 +181,9 @@
 			"current": false,
 			"gridded": false,
 			"needs_code": false,
-			"group": "agent"
+			"group": "agent",
+			"affects": [],
+			"changes_results": false
 		},
 		{
 			"id": "max_turns",
@@ -195,7 +199,12 @@
 			"current": 40,
 			"gridded": false,
 			"needs_code": false,
-			"group": "agent"
+			"group": "agent",
+			"affects": [
+				"agent",
+				"context"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "context_limit",
@@ -211,7 +220,11 @@
 			"current": 32768,
 			"gridded": false,
 			"needs_code": false,
-			"group": "agent"
+			"group": "agent",
+			"affects": [
+				"context"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "concurrency",
@@ -227,7 +240,12 @@
 			"current": 4,
 			"gridded": false,
 			"needs_code": false,
-			"group": "agent"
+			"group": "agent",
+			"affects": [
+				"agent",
+				"llm"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "n_tasks",
@@ -243,7 +261,11 @@
 			"current": 500,
 			"gridded": false,
 			"needs_code": false,
-			"group": "agent"
+			"group": "agent",
+			"affects": [
+				"tasks"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "tool_retry_cap",
@@ -259,7 +281,9 @@
 			"gridded": false,
 			"needs_code": true,
 			"patch_template": "agent.cap_tool_retries",
-			"group": "agent"
+			"group": "agent",
+			"affects": [],
+			"changes_results": false
 		}
 	],
 	"probes": [
@@ -569,7 +593,8 @@
 			"version": "0",
 			"heldout_error": {},
 			"per_gpu_coverage": {},
-			"notes": "Hand-made fixture for UI work; not a real model"
+			"notes": "Hand-made fixture for UI work; not a real model",
+			"fixture": true
 		}
 	],
 	"findings": [

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
+from preflight.harness.knob_meta import annotate
 from preflight.schema import SCHEMA_VERSION, FlightRecord
 from preflight.schema.encoding import choose_scale, encode_f16, encode_mask
 
@@ -416,7 +417,7 @@ def finetune() -> dict:
 			"lens": "finetune",
 			"source": {
 				"kind": "sample",
-				"uri": "sample://zoo/lora-hf",
+				"uri": "sample://zoo/finetune_lora_hf",
 				"entrypoint": "zoo/finetune_lora_hf/train.py",
 				"content_hash": "sha256:" + "f" * 64,
 			},
@@ -573,6 +574,7 @@ def finetune() -> dict:
 				"kind": "rule",
 				"version": "0",
 				"notes": "Hand-made fixture for UI work; not a real model",
+				"fixture": True,
 			}
 		],
 		"findings": [
@@ -936,7 +938,7 @@ def pretrain() -> dict:
 			"lens": "pretrain",
 			"source": {
 				"kind": "sample",
-				"uri": "sample://zoo/nanogpt-pretrain",
+				"uri": "sample://zoo/pretrain_nanogpt",
 				"entrypoint": "zoo/pretrain_nanogpt/train.py",
 				"content_hash": "sha256:" + "e" * 64,
 			},
@@ -1009,6 +1011,7 @@ def pretrain() -> dict:
 				"kind": "rule",
 				"version": "0",
 				"notes": "Hand-made fixture for UI work; not a real model",
+				"fixture": True,
 			}
 		],
 		"findings": [
@@ -1313,6 +1316,7 @@ def agent() -> dict:
 				"kind": "rule",
 				"version": "0",
 				"notes": "Hand-made fixture for UI work; not a real model",
+				"fixture": True,
 			}
 		],
 		"findings": [
@@ -1381,6 +1385,9 @@ def main() -> None:
 	for name, fn in [("finetune", finetune), ("pretrain", pretrain), ("agent", agent)]:
 		raw = fn()
 		rec = FlightRecord.model_validate(raw)
+		# what each knob acts on and whether it changes results, as the skeleton writes them
+		rec = rec.model_copy(update={"knobs": annotate(rec.knobs, rec.graph)})
+		rec = FlightRecord.model_validate(rec.model_dump())
 		# write the canonical serialisation so the round-trip test is exact
 		canonical = json.loads(rec.model_dump_json(exclude_none=True))
 		(OUT / f"{name}.json").write_text(json.dumps(canonical, indent="\t", ensure_ascii=False) + "\n")

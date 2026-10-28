@@ -7,7 +7,7 @@
 		"lens": "pretrain",
 		"source": {
 			"kind": "sample",
-			"uri": "sample://zoo/nanogpt-pretrain",
+			"uri": "sample://zoo/pretrain_nanogpt",
 			"content_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 			"entrypoint": "zoo/pretrain_nanogpt/train.py",
 			"args": []
@@ -210,7 +210,11 @@
 			},
 			"gridded": true,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"data",
+				"model"
+			]
 		},
 		{
 			"id": "seq_len",
@@ -230,7 +234,13 @@
 			},
 			"gridded": true,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"data",
+				"attn",
+				"lm_head"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "num_workers",
@@ -245,7 +255,11 @@
 			"current": 0,
 			"gridded": false,
 			"needs_code": false,
-			"group": "data"
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "precision",
@@ -261,7 +275,11 @@
 			"current": "fp32",
 			"gridded": false,
 			"needs_code": false,
-			"group": "speed"
+			"group": "speed",
+			"affects": [
+				"model"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "gpu_type",
@@ -286,7 +304,11 @@
 			"current": "A100-SXM-40GB",
 			"gridded": false,
 			"needs_code": false,
-			"group": "cluster"
+			"group": "cluster",
+			"affects": [
+				"model"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "lr",
@@ -301,7 +323,11 @@
 			"current": 0.0006,
 			"gridded": false,
 			"needs_code": false,
-			"group": "model"
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "checkpoint_every",
@@ -317,7 +343,11 @@
 			"current": 20000,
 			"gridded": false,
 			"needs_code": false,
-			"group": "cluster"
+			"group": "cluster",
+			"affects": [
+				"ckpt"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "max_steps",
@@ -333,7 +363,12 @@
 			"current": 60000,
 			"gridded": false,
 			"needs_code": false,
-			"group": "cluster"
+			"group": "cluster",
+			"affects": [
+				"data",
+				"optimizer"
+			],
+			"changes_results": true
 		}
 	],
 	"probes": [
@@ -1154,7 +1189,8 @@
 			"version": "0",
 			"heldout_error": {},
 			"per_gpu_coverage": {},
-			"notes": "Hand-made fixture for UI work; not a real model"
+			"notes": "Hand-made fixture for UI work; not a real model",
+			"fixture": true
 		}
 	],
 	"findings": [

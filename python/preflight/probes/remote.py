@@ -28,15 +28,8 @@ def link_weights(src: Path = WEIGHTS_HUB) -> int:
 	if not home:
 		return 0
 	dst = Path(home) / "hub"
-	dst.mkdir(parents=True, exist_ok=True)
-	uid = os.environ.get("PREFLIGHT_PROBE_UID")
 	for d in (Path(home), dst):
-		if uid and uid.isdigit() and os.geteuid() == 0:
-			os.chown(
-				d, int(uid), int(uid)
-			)  # the job's one probe uid owns the cache: shared across its points
-		else:
-			d.chmod(0o1777)  # any probe uid may write; sticky, so one can't delete another's files
+		_own_dir(d)
 	if not src.is_dir():
 		return 0
 	n = 0
@@ -47,8 +40,29 @@ def link_weights(src: Path = WEIGHTS_HUB) -> int:
 	return n
 
 
+def _own_dir(d: Path) -> None:
+	"""Make d a real directory the job's probe uid owns. An earlier point's code (that uid) may have
+	swapped it for a link: root never follows one, it removes it and starts the directory again."""
+	if d.is_symlink():
+		d.unlink()
+	d.mkdir(parents=True, exist_ok=True)
+	uid = os.environ.get("PREFLIGHT_PROBE_UID")
+	if uid and uid.isdigit() and os.geteuid() == 0:
+		os.chown(d, int(uid), int(uid), follow_symlinks=False)  # one uid per job: shared across its points
+	else:
+		d.chmod(0o1777)  # any probe uid may write; sticky, so one can't delete another's files
+
+
+def deps_dir(root: Path = Path("/tmp/pf-deps")) -> Path:
+	"""Where the job's probes share one install of the submission's requirements."""
+	_own_dir(root)
+	os.environ["PREFLIGHT_DEPS_DIR"] = str(root)
+	return root
+
+
 def main() -> int:
 	link_weights()
+	deps_dir()
 	spec = spec_from_wire(sys.stdin.read())
 	result = run_probe(spec)
 	sys.stdout.write(result_to_wire(result) + "\n")

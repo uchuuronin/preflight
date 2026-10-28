@@ -60,13 +60,34 @@ def set_limits() -> dict:
 	return applied
 
 
+def _seed(seed: int) -> None:
+	"""Seed every generator a training script draws from by default, for fixed-seed comparisons.
+
+	Scripts that seed themselves (HF Trainer's args.seed, set_seed) keep their own seed; the verify
+	run compares two settings of the same script, so either way both runs draw the same numbers.
+	"""
+	import random
+
+	random.seed(seed)
+	os.environ.setdefault("PYTHONHASHSEED", str(seed))  # for subprocesses (data loader workers)
+	try:
+		import numpy as np
+
+		np.random.seed(seed % 2**32)
+	except ImportError:
+		pass
+	import torch
+
+	torch.manual_seed(seed)  # all devices, CUDA included
+
+
 def main(spec_path: str) -> int:
 	spec = json.loads(Path(spec_path).read_text())
 	set_limits()
 	workdir = os.path.abspath(spec["workdir"])
 	out_path = spec["out"]
 	try:
-		import torch
+		import torch  # noqa: F401  (fails here, inside the try, when torch is missing)
 
 		from .errors import classify
 		from .runtime import Recorder, StopProbe, detect_env, mfu
@@ -84,9 +105,23 @@ def main(spec_path: str) -> int:
 
 	os.chdir(workdir)
 	sys.path.insert(0, workdir)
+	if spec.get("install_requirements") and spec.get("deps"):
+		from .requirements import install
+
+		if spec.get("progress"):
+			_write(spec["progress"], {"stage": "installing requirements", "steps": 0})
+		err, dirs = install(Path(workdir), Path(spec["deps"]))
+		if err:
+			_write(out_path, {"status": "error", "error_code": "missing_package.install",
+				"error": f"requirements.txt didn't install: {err}", "summary": {}})  # fmt: skip
+			return 0
+		for i, d in enumerate(dirs, 1):
+			sys.path.insert(i, str(d))  # after the script's own files, before the image
+		parts = [*(str(d) for d in dirs), os.environ.get("PYTHONPATH") or ""]
+		os.environ["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
 	sys.argv = [spec["entrypoint"], *spec.get("args", [])]
 	if spec.get("seed") is not None:
-		torch.manual_seed(int(spec["seed"]))
+		_seed(int(spec["seed"]))
 	rec = Recorder(
 		warmup=spec["warmup"],
 		timed=spec["timed"],

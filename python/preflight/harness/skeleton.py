@@ -25,6 +25,7 @@ from preflight.schema import (
 )
 from preflight.schema.script_map import ScriptKnob, ScriptMap
 
+from .knob_meta import annotate
 from .static import PRECISION, PREQUANTISED, QUANT_FORMATS
 
 TRAINING_LENSES = ("finetune", "pretrain", "rl", "vision", "gnn", "retrieval")
@@ -843,6 +844,7 @@ def skeleton_record(
 	gk = gpu_type_knob(sm, gpu=gpu, constraints=constraints)
 	if gk is not None and all(k.id != "gpu_type" for k in knobs):
 		knobs = sorted([*knobs, gk], key=lambda k: (k.group or "z", k.id))
+	knobs = annotate(knobs, graph)
 	if constraints is not None:
 		job_fields["constraints"] = constraints
 	return FlightRecord(

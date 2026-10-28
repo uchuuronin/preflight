@@ -57,18 +57,35 @@ Updated Tue Oct 27, evening ET.
   the worker, not reported by the sandbox; flags follow the script's own spelling and argparse
   abbreviations; repos are read from git's object store with no checkout, big blobs never
   downloaded and the clone deleted; malformed sources are visitor errors, not crashes.
+- Oct 27 evening: guide jobs on a record (`run_probe`, `run_verify`, `sample_more`) write a new
+  record derived from it; `Knob.affects` and `changes_results`, `ModelCard.fixture` and
+  `JobEvent.error_code` for C; the Spark client reads `META_API_BASE`; the upload format for D
+  (docs/decisions/upload-format.md) with requirements.txt installed in probes and notebook pip
+  lines turned into one; probes never above A100-80GB on the demo, and the job budget counts the
+  sandbox's CPU and memory; `python -m preflight.runner.stop_app` stops the deployed app through
+  remote-run; the smoke run writes its events and record to out/; Apache-2.0 LICENSE.
+- Found and fixed before any GPU run: Debian images keep /root at 0700, so the probe's
+  unprivileged uid couldn't reach the package there. The Modal image now keeps it in
+  /opt/preflight; elsewhere (the AMD checkout) probes import a read-only copy, and nothing on the
+  host has its permissions changed.
+- Independent review of the evening's work, all fixed with tests: the CLI as root gave probes a
+  cache shared across runs that root then chowned recursively (a planted link would have handed
+  over /etc), now a fresh per-run directory root never walks; requirements used pip --target,
+  which reinstalls torch under anything that needs it, now --prefix with public-version pins and
+  one install per job; verify passed a run whose loss went NaN; a stale volume view could feed a
+  follow-up an old parent; a visitor's own upload uri and changed code are refused; moving GPU
+  drops the parent's fits along with its probes; a mistyped GPU ceiling still caps.
 
 ## Blocked
 
-- No GPU and no Modal token in this environment, so probes are tested on CPU only. The Modal app
-  (`runner/modal_app.py`) builds with Modal 1.6.3 but needs someone with Modal access to deploy it
-  and run `prefetch` and `smoke` for the first real zoo run.
-- Hugging Face is not reachable from this sandbox, so the zoo scripts run only on Modal.
+- The first GPU work (deploy, `prefetch`, `smoke` on L4) waits for Chiya's yes on the costed plan;
+  runs go through `remote-run.yml`, so nothing here holds a key.
+- Hugging Face is not reachable from this sandbox, so the zoo scripts run only on Modal or AMD.
 
 ## Next
 
-- First real run: deploy the Modal app, `prefetch` the zoo weights, `smoke` one zoo script end to
-  end (needs someone with Modal access; commands in the hand-off).
+- First real run, once approved: deploy the Modal app, `prefetch` the zoo weights, `smoke` the LoRA
+  zoo script end to end on L4, then `stop_app`; log GPU, minutes and dollars below.
 - Ground truth: both zoo scripts on a GPU, step time with and without the recorder's sync points,
   to replace the simulated probe-plan figures.
 - Measured-rule findings (loader wait, padding, MFU, eval OOM, truncation, retry loops).
@@ -82,6 +99,24 @@ Updated Tue Oct 27, evening ET.
 - The queue saves under its lock. At 8 GPUs and a few visitors that is tens of saves a minute;
   revisit if the store moves off a single container.
 - Repos need a full 40-character commit: GitHub only serves a fetch by the whole hash.
+
+## AMD session (Thu Oct 29): what the droplet needs
+
+`amd-run.yml` checks for ROCm PyTorch on the host and installs only this repo and psutil, so:
+
+- The ROCm PyTorch image (torch built for HIP: `torch.version.hip` set). Everything else the zoo
+  script imports comes from `zoo/finetune_lora_hf/requirements.txt`, installed in each probe by
+  `--install-requirements` (torch itself is never replaced).
+- Optional, for power readings: AMD's `amdsmi` Python package (on ROCm 6: `pip install
+  /opt/rocm/share/amd_smi`); without it probes record no power, nothing else changes.
+- The `video` and `render` groups (stock on ROCm images): probes run as an unprivileged uid and
+  need them to open /dev/kfd and /dev/dri.
+- Internet to Hugging Face and PyPI, and about 15 GB of disk (Qwen2.5-1.5B, Alpaca, wheels).
+
+The command, once Chiya approves the session:
+`python -m preflight.cli.main run zoo/finetune_lora_hf --out out/records --install-requirements --require-gpu`
+(as root the CLI pins one probe uid and shares one Hugging Face and pip cache across the probes;
+`--require-gpu` fails the run if the probes saw no GPU).
 
 ## Cloud runs
 

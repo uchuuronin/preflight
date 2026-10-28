@@ -133,6 +133,15 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- Unreleased (Oct 27, A on ws-a, additive, asked for by C and approved through the PM; version bump
+  is the PM's call): `JobRequest.mode` (plan, probe, verify, sample_more; default plan), `knobs`,
+  `tasks` and `purpose`, with `Source.kind` "record" and `Source.record_ref` (a share token or
+  `sample:<id>`); a job on a record writes a new record whose `parent_id` is it. `Knob.affects`
+  (map node ids, checked against the graph) and `Knob.changes_results`. `ModelCard.fixture`.
+  `JobEvent.error_code` (Probe.error_code's families plus `submission.*`, `internal`,
+  `internal.worker_lost`, `unsupported.agent_sampling`). `Source.commit` is the full hash the code
+  was read at. Golden records: knobs carry `affects` and `changes_results`, model cards
+  `fixture: true`, and sample URIs name the real zoo directories. 0.2.0 records load unchanged.
 - 0.2.0 (Oct 27, after the freeze, additive): `cost_basis` and `job_cost` (the run cost agreed Oct 26,
   gap 21); `costs` keeps its name and now says it holds Preflight's own spend only (renaming it would
   break every plane). The golden fine-tune carries a fixture run cost with its first-eval OOM as money

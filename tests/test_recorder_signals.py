@@ -135,3 +135,29 @@ def test_timed_steps_keep_each_steps_own_loss_scale():
 	s = p.stability.series["loss_scale"]
 	assert all(b > a for a, b in itertools.pairwise(s)), s  # doubling every step, timed ones included
 	assert all(v is not None and v > 0 for v in p.stability.series["loss"])
+
+
+def test_power_is_read_through_amdsmi_on_rocm(monkeypatch):
+	import sys
+	import types
+
+	import torch
+
+	from preflight.recorder import runtime
+
+	fake = types.ModuleType("amdsmi")
+	fake.amdsmi_init = lambda: None
+	fake.amdsmi_get_processor_handles = lambda: ["gpu0", "gpu1"]
+	fake.amdsmi_get_power_info = lambda h: {
+		"current_socket_power": "N/A",
+		"average_socket_power": 512 if h == "gpu1" else 0,
+	}
+	monkeypatch.setitem(sys.modules, "amdsmi", fake)
+	monkeypatch.setattr(torch.version, "hip", "6.2.0", raising=False)
+	monkeypatch.setenv("HIP_VISIBLE_DEVICES", "1")
+	read = runtime.gpu_power_reader()
+	assert read is not None and read() == 512.0
+	fake.amdsmi_get_power_info = lambda h: (_ for _ in ()).throw(RuntimeError("no smi"))
+	monkeypatch.setitem(sys.modules, "amdsmi", fake)
+	with pytest.raises(RuntimeError):
+		read()  # the sampler suppresses this; the reader itself doesn't hide it

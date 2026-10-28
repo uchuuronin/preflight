@@ -117,6 +117,7 @@ class Job:
 	share_token: str | None = None  # set by the first event that carries it (the skeleton)
 	error: str | None = None
 	retryable: bool | None = None
+	error_code: str | None = None  # Probe.error_code's families, for the boarding screen's copy
 	events: list[dict] = field(default_factory=list)
 	next_seq: int = 0
 
@@ -128,7 +129,7 @@ class JobStore(Protocol):
 	def lease(self, worker: str) -> Lease | None: ...
 	def heartbeat(self, lease: Lease) -> float: ...
 	def complete(self, lease: Lease, *, record_id: str) -> None: ...
-	def fail(self, lease: Lease, *, error: str, retryable: bool) -> None: ...
+	def fail(self, lease: Lease, *, error: str, retryable: bool, error_code: str | None = None) -> None: ...
 	def cancel(self, job_id: str) -> None: ...
 	def reap(self) -> list[str]: ...
 	def position(self, job_id: str) -> int | None: ...
@@ -254,6 +255,7 @@ class InMemoryJobStore:
 			share_token=info.get("share_token"),
 			error=info.get("error"),
 			retryable=info.get("retryable"),
+			error_code=info.get("error_code"),
 			events=[info["last_event"]] if info.get("last_event") else [],
 			next_seq=info.get("next_seq", 0),
 		)
@@ -300,6 +302,7 @@ class InMemoryJobStore:
 			"share_token": job.share_token,
 			"error": job.error,
 			"retryable": job.retryable,
+			"error_code": job.error_code,
 			"submitted_at": job.submitted_at,
 			"last_event": job.events[-1] if job.events else None,
 			"next_seq": job.next_seq,
@@ -310,7 +313,7 @@ class InMemoryJobStore:
 			except Exception as exc:
 				log.warning("archive of %s failed: %s", job.job_id, exc)
 
-	def _requeue_or_fail(self, job: Job, error: str, retryable: bool) -> None:
+	def _requeue_or_fail(self, job: Job, error: str, retryable: bool, error_code: str | None = None) -> None:
 		job.worker = None
 		job.lease_expires_at = None
 		job.token += 1  # fence the old holder
@@ -324,7 +327,10 @@ class InMemoryJobStore:
 			job.status = "failed"
 			job.error = error
 			job.retryable = retryable
-			self._emit(job, "failed", message=error, level="error", retryable=retryable)
+			job.error_code = error_code
+			self._emit(
+				job, "failed", message=error, level="error", retryable=retryable, error_code=error_code
+			)
 			self._finish(job)
 
 	def _rank(self, job_id: str) -> tuple[int, int]:
@@ -449,10 +455,10 @@ class InMemoryJobStore:
 
 			self._txn(do)
 
-	def fail(self, lease: Lease, *, error: str, retryable: bool) -> None:
+	def fail(self, lease: Lease, *, error: str, retryable: bool, error_code: str | None = None) -> None:
 		with self._lock:
 			job = self._check(lease)
-			self._txn(lambda: self._requeue_or_fail(job, error, retryable))
+			self._txn(lambda: self._requeue_or_fail(job, error, retryable, error_code))
 
 	def cancel(self, job_id: str) -> None:
 		with self._lock:
@@ -484,7 +490,9 @@ class InMemoryJobStore:
 			def do():
 				for job in expired:
 					times = {1: "once", 2: "twice"}.get(job.attempt, f"{job.attempt} times")
-					self._requeue_or_fail(job, f"lease expired {times}; worker crashed or hung", True)
+					self._requeue_or_fail(
+						job, f"lease expired {times}; worker crashed or hung", True, "internal.worker_lost"
+					)
 				return [j.job_id for j in expired]
 
 			return self._txn(do)
@@ -525,6 +533,7 @@ class InMemoryJobStore:
 				"share_token": job.share_token,
 				"error": job.error,
 				"retryable": job.retryable,
+				"error_code": job.error_code,
 				"last_seq": job.next_seq - 1,
 			}
 

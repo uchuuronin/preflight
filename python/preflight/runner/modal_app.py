@@ -22,7 +22,6 @@ C mounts "preflight-records" read-only and serves <share_token>.json until R2 la
 
 import contextlib
 import hashlib
-import os
 import uuid
 from pathlib import Path
 
@@ -34,7 +33,7 @@ APP_NAME = "preflight-runner"
 SERVICE_NAME = "JobStoreService"
 ROOT = Path(__file__).resolve().parents[3]
 PKG = ROOT / "python" / "preflight"
-REMOTE_PKG = "/root/pf"
+REMOTE_PKG = "/opt/preflight"  # not under /root (0700): probes import it as an unprivileged uid
 RECORDS_DIR = "/records"
 UPLOADS_DIR = "/uploads"
 WEIGHTS_DIR = "/weights"
@@ -71,8 +70,15 @@ WORKER_TIMEOUT_S = 3600
 
 app = modal.App(APP_NAME)
 
+# The public demo probes on GPUs up to A100-80GB, never H200 (Chiya, Oct 27); a visitor's OOM may
+# still step up within the job's dollar budget (pipeline.JOB_BUDGET_USD).
+GPU_CEILING = "A100-SXM-80GB"
+# derived: Modal's sandbox rates (3x list: $0.0000394 per core-s, $0.00000667 per GiB-s, modal.com/pricing,
+# Oct 27) for ~4 cores and ~16 GiB while a 1.5B LoRA probe loads and trains = $0.95/h. guess on the
+# usage figures: the first smoke run's Modal bill replaces them
+SANDBOX_OVERHEAD_USD_PER_H = 0.95
 _base = modal.Image.debian_slim(python_version="3.11").env(
-	{"PYTHONPATH": REMOTE_PKG, "PREFLIGHT_ZOO": "/root/zoo"}
+	{"PYTHONPATH": REMOTE_PKG, "PREFLIGHT_ZOO": "/root/zoo", "PREFLIGHT_GPU_CEILING": GPU_CEILING}
 )
 worker_image = (
 	_base.apt_install("git")
@@ -221,8 +227,8 @@ class JobStoreService:
 		self.m.complete(lease, record_id)
 
 	@modal.method()
-	def fail(self, lease: dict, error: str, retryable: bool) -> None:
-		self.m.fail(lease, error, retryable)
+	def fail(self, lease: dict, error: str, retryable: bool, error_code: str | None = None) -> None:
+		self.m.fail(lease, error, retryable, error_code)
 
 	@modal.method()
 	def emit(self, job_id: str, stage: str, fields: dict, token: int | None = None) -> dict:
@@ -261,11 +267,7 @@ def _sandbox_factory():
 def _spark_client():
 	from preflight.harness.spark import ModelClient
 
-	key = os.environ.get("META_API_KEY") or os.environ.get("MODEL_API_KEY")
-	if not key:
-		return None
-	base = os.environ.get("META_API_BASE") or os.environ.get("META_BASE_URL")
-	return ModelClient(api_key=key, **({"base_url": base} if base else {}))
+	return ModelClient.meta() if ModelClient.meta_configured() else None
 
 
 @app.function(
@@ -287,7 +289,7 @@ def run_worker() -> int:
 
 	svc = JobStoreService()
 	store = RemoteJobStore(lambda m, *a, **k: getattr(svc, m).remote(*a, **k))
-	writer = LocalRecordWriter(RECORDS_DIR, on_write=records_vol.commit)
+	writer = LocalRecordWriter(RECORDS_DIR, on_write=records_vol.commit, on_read=records_vol.reload)
 	blobs = DirBlobs(UPLOADS_DIR, reload=uploads_vol.reload)
 	name = f"worker-{uuid.uuid4().hex[:8]}"
 	tag = image_tag()
@@ -300,7 +302,8 @@ def run_worker() -> int:
 			return ran
 		with SandboxRunner(_sandbox_factory()) as runner:  # one sandbox per job, ended with the job
 			deps = Deps(records=writer, runner=runner, spark=_spark_client(), cache=DictCache(cache_dict),
-				image=tag, blobs=blobs)  # fmt: skip
+				image=tag, blobs=blobs, reader=writer, install_requirements=True,
+				overhead_usd_per_h=SANDBOX_OVERHEAD_USD_PER_H)  # fmt: skip
 			if not run_one(store, name, lambda lease, ctx, deps=deps: run_job(lease, ctx, deps=deps)):
 				return ran
 		ran += 1
@@ -340,11 +343,13 @@ def prefetch(models: list[str] | None = None) -> list[str]:
 
 
 @app.local_entrypoint()
-def smoke(sample: str = "sample://zoo/finetune_lora_hf", gpus: str = "L4"):
+def smoke(sample: str = "sample://zoo/finetune_lora_hf", gpus: str = "L4", max_minutes: int = 25):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
 	Probes stay on `gpus` (comma-separated): L4 by default, since team runs use T4 or L4 unless
-	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder.
+	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder. The job
+	is cancelled after `max_minutes`. Writes out/smoke.json (every event and the final status) and
+	out/record.json (the flight record), which remote-run.yml brings back with the log.
 	"""
 	import json
 	import time
@@ -355,14 +360,29 @@ def smoke(sample: str = "sample://zoo/finetune_lora_hf", gpus: str = "L4"):
 		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
 	}
 	sub = svc.submit.remote(request, "smoke", uuid.uuid4().hex)
-	print("submitted", sub)
-	seen = -1
+	print("submitted", sub, flush=True)
+	out = Path("out")
+	out.mkdir(exist_ok=True)
+	events: list[dict] = []
+	seen, deadline = -1, time.monotonic() + max_minutes * 60
 	while True:
 		for ev in svc.events.remote(sub["job_id"], seen):
 			seen = ev["seq"]
-			print(json.dumps(ev))
+			events.append(ev)
+			print(json.dumps(ev), flush=True)
 		info = svc.status.remote(sub["job_id"])
 		if info["status"] in ("done", "failed", "cancelled"):
-			print(json.dumps(info, indent=2))
-			return
+			break
+		if time.monotonic() > deadline:
+			print(f"cancelling: past {max_minutes} min", flush=True)
+			svc.cancel.remote(sub["job_id"])
+			deadline = float("inf")
 		time.sleep(5)
+	print(json.dumps(info, indent=2), flush=True)
+	(out / "smoke.json").write_text(json.dumps({"submitted": sub, "info": info, "events": events}, indent=2))
+	if info.get("share_token"):
+		try:
+			data = b"".join(records_vol.read_file(f"{info['share_token']}.json"))
+			(out / "record.json").write_bytes(data)
+		except Exception as exc:  # the record is on the volume either way; the log says why it's not here
+			print(f"could not copy the record: {exc}", flush=True)

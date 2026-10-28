@@ -25,12 +25,21 @@ def _now() -> datetime:
 # ---------------------------------------------------------------- job (A)
 
 
+RECORD_REF = r"^(sample:[a-z0-9][a-z0-9_-]{0,39}|[A-Za-z0-9_-]{16,64})$"
+
+
 class Source(Strict):
-	kind: Literal["sample", "repo", "upload", "notebook", "template", "cli", "inflight"]
+	kind: Literal["sample", "repo", "upload", "notebook", "template", "cli", "inflight", "record"]
 	uri: str | None = Field(
 		default=None, description="sample://name, https://github.com/..., upload://<hash>"
 	)
-	commit: str | None = None
+	record_ref: str | None = Field(
+		default=None,
+		pattern=RECORD_REF,
+		description="kind=record: a share token or sample:<id>; the job reuses that record's script, "
+		"env and data, and writes a new record whose parent_id is it",
+	)
+	commit: str | None = Field(default=None, description="For repos: the full commit the code was read at")
 	content_hash: str | None = Field(default=None, description="sha256 of the submitted code")
 	entrypoint: str | None = None
 	args: list[str] = Field(default_factory=list)
@@ -191,6 +200,14 @@ class Knob(Strict):
 	needs_code: bool = False
 	patch_template: str | None = Field(default=None, description="Patch template id for code knobs")
 	group: str | None = Field(default=None, description="memory, speed, data, model, rl, agent, cluster")
+	affects: list[str] = Field(
+		default_factory=list, max_length=16, description="Job-map node ids the knob acts on"
+	)
+	changes_results: bool | None = Field(
+		default=None,
+		description="True if moving it changes what the model learns (offered only to clear a failure, "
+		"never as a saving); false if it changes only speed, memory or cost; null if unknown",
+	)
 
 	@model_validator(mode="after")
 	def _check(self):
@@ -514,6 +531,9 @@ class ModelCard(Strict):
 	coverage: float | None = Field(default=None, ge=0, le=1)
 	per_gpu_coverage: dict[str, float] = Field(default_factory=dict)
 	notes: str | None = None
+	fixture: bool = Field(
+		default=False, description="Illustrative numbers from a fixture, not a fitted model; the UI says so"
+	)
 
 
 # ---------------------------------------------------------------- findings (A and B write, C shows)
@@ -708,6 +728,10 @@ class FlightRecord(Strict):
 			if extra:
 				raise ValueError(f"probe {p.id} sets undeclared knobs {sorted(extra)}")
 		node_ids = {n.id for n in self.graph.nodes}
+		for k in self.knobs:
+			missing = [n for n in k.affects if node_ids and n not in node_ids]
+			if missing:
+				raise ValueError(f"knob {k.id} affects unknown nodes {missing}")
 		for f in self.findings:
 			if f.node_id is not None and node_ids and f.node_id not in node_ids:
 				raise ValueError(f"finding {f.id} points at unknown node {f.node_id}")

@@ -142,3 +142,30 @@ def test_a_pinned_probe_uid_is_used_for_every_probe(monkeypatch):
 	monkeypatch.setenv("PREFLIGHT_PROBE_UID", "0")  # never root, never a system uid
 	if os.geteuid() == 0:
 		assert _probe_uid() != 0
+
+
+def test_probes_import_a_copy_of_the_package_when_its_home_is_closed(tmp_path, monkeypatch):
+	import preflight.probes.local as L
+
+	locked = tmp_path / "root"
+	pkg = locked / "pf" / "python"
+	(pkg / "preflight").mkdir(parents=True)
+	(pkg / "preflight" / "__init__.py").write_text("x = 1\n")
+	locked.chmod(0o700)
+	monkeypatch.setattr(L, "_PKG_COPY", None)
+	copy = L._package_for_probe(pkg)
+	assert copy != pkg and (copy / "preflight" / "__init__.py").read_text() == "x = 1\n"
+	assert L._others_can_reach(copy / "preflight")
+	assert locked.stat().st_mode & 0o777 == 0o700  # the host's permissions are left alone
+	assert L._package_for_probe(pkg) == copy  # one copy per process
+	import shutil
+	import tempfile
+
+	top = Path(tempfile.mkdtemp())  # pytest's own tmp dirs are 0700, so the open case lives in /tmp
+	try:
+		top.chmod(0o755)
+		open_pkg = top / "python"
+		open_pkg.mkdir(mode=0o755)
+		assert L._package_for_probe(open_pkg) == open_pkg
+	finally:
+		shutil.rmtree(top)

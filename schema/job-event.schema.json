@@ -361,6 +361,20 @@
 			"default": null,
 			"description": "On failed: whether resubmitting may succeed",
 			"title": "Retryable"
+		},
+		"error_code": {
+			"anyOf": [
+				{
+					"pattern": "^[a-z_]+(\\.[a-z_]+)?$",
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
+			"title": "Error Code"
 		}
 	},
 	"required": [

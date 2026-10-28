@@ -92,11 +92,18 @@ export interface Job {
  * via the `definition` "Source".
  */
 export interface Source {
-	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight";
+	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight" | "record";
 	/**
 	 * sample://name, https://github.com/..., upload://<hash>
 	 */
 	uri?: string | null;
+	/**
+	 * kind=record: a share token or sample:<id>; the job reuses that record's script, env and data, and writes a new record whose parent_id is it
+	 */
+	record_ref?: string | null;
+	/**
+	 * For repos: the full commit the code was read at
+	 */
 	commit?: string | null;
 	/**
 	 * sha256 of the submitted code
@@ -543,6 +550,81 @@ export interface Knob {
 	 * memory, speed, data, model, rl, agent, cluster
 	 */
 	group?: string | null;
+	/**
+	 * Job-map node ids the knob acts on
+	 *
+	 * @maxItems 16
+	 */
+	affects?:
+		| []
+		| [string]
+		| [string, string]
+		| [string, string, string]
+		| [string, string, string, string]
+		| [string, string, string, string, string]
+		| [string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string, string, string, string]
+		| [
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string
+		  ]
+		| [
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string
+		  ]
+		| [
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string,
+				string
+		  ];
+	/**
+	 * True if moving it changes what the model learns (offered only to clear a failure, never as a saving); false if it changes only speed, memory or cost; null if unknown
+	 */
+	changes_results?: boolean | null;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1090,6 +1172,10 @@ export interface ModelCard {
 		[k: string]: number | undefined;
 	};
 	notes?: string | null;
+	/**
+	 * Illustrative numbers from a fixture, not a fitted model; the UI says so
+	 */
+	fixture?: boolean;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1376,6 +1462,10 @@ export interface JobEvent {
 	 * On failed: whether resubmitting may succeed
 	 */
 	retryable?: boolean | null;
+	/**
+	 * On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')
+	 */
+	error_code?: string | null;
 }
 /**
  * Body of POST /v1/jobs (validated by C, executed by A).
@@ -1406,6 +1496,24 @@ export interface JobRequest {
 	 * The visitor's use case, for the guide
 	 */
 	description?: string | null;
+	/**
+	 * plan: map and probe a script (default). probe: one probe at `knobs`. verify: a short fixed-seed run of `knobs` against the record's current settings. sample_more: `tasks` more agent tasks. All but plan take a record source.
+	 */
+	mode?: "plan" | "probe" | "verify" | "sample_more";
+	/**
+	 * probe and verify: the full setting to run at
+	 */
+	knobs?: {
+		[k: string]: (boolean | number | string) | undefined;
+	} | null;
+	/**
+	 * sample_more: how many more tasks
+	 */
+	tasks?: number | null;
+	/**
+	 * Who asked, for the logbook, e.g. guide.run_probe
+	 */
+	purpose?: string | null;
 }
 /**
  * target_id -> Estimate, for one knob setting.

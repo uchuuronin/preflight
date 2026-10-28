@@ -7,7 +7,7 @@
 		"lens": "finetune",
 		"source": {
 			"kind": "sample",
-			"uri": "sample://zoo/lora-hf",
+			"uri": "sample://zoo/finetune_lora_hf",
 			"content_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			"entrypoint": "zoo/finetune_lora_hf/train.py",
 			"args": []
@@ -339,7 +339,11 @@
 			},
 			"gridded": true,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"data",
+				"model"
+			]
 		},
 		{
 			"id": "seq_len",
@@ -359,7 +363,13 @@
 			},
 			"gridded": true,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"data",
+				"attn",
+				"lm_head"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "grad_accum",
@@ -375,7 +385,11 @@
 			"current": 4,
 			"gridded": false,
 			"needs_code": false,
-			"group": "speed"
+			"group": "speed",
+			"affects": [
+				"data",
+				"optimizer"
+			]
 		},
 		{
 			"id": "eval_batch_size",
@@ -391,7 +405,11 @@
 			"current": 32,
 			"gridded": false,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"eval"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "lora_r",
@@ -406,7 +424,13 @@
 			"current": 16,
 			"gridded": false,
 			"needs_code": false,
-			"group": "model"
+			"group": "model",
+			"affects": [
+				"attn",
+				"mlp",
+				"optimizer"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "gradient_checkpointing",
@@ -419,7 +443,13 @@
 			"current": false,
 			"gridded": false,
 			"needs_code": false,
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"block",
+				"attn",
+				"mlp"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "precision",
@@ -436,7 +466,11 @@
 			"current": "bf16",
 			"gridded": false,
 			"needs_code": false,
-			"group": "speed"
+			"group": "speed",
+			"affects": [
+				"model"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "gpu_type",
@@ -461,7 +495,11 @@
 			"current": "L4",
 			"gridded": false,
 			"needs_code": false,
-			"group": "cluster"
+			"group": "cluster",
+			"affects": [
+				"model"
+			],
+			"changes_results": false
 		},
 		{
 			"id": "packing",
@@ -475,7 +513,11 @@
 			"gridded": false,
 			"needs_code": true,
 			"patch_template": "data.enable_packing",
-			"group": "data"
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": true
 		},
 		{
 			"id": "eval_no_grad",
@@ -489,7 +531,11 @@
 			"gridded": false,
 			"needs_code": true,
 			"patch_template": "eval.wrap_no_grad",
-			"group": "memory"
+			"group": "memory",
+			"affects": [
+				"eval"
+			],
+			"changes_results": false
 		}
 	],
 	"probes": [
@@ -1142,7 +1188,8 @@
 			"version": "0",
 			"heldout_error": {},
 			"per_gpu_coverage": {},
-			"notes": "Hand-made fixture for UI work; not a real model"
+			"notes": "Hand-made fixture for UI work; not a real model",
+			"fixture": true
 		}
 	],
 	"findings": [

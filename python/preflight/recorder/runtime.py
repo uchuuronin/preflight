@@ -31,6 +31,7 @@ import importlib.abc
 import importlib.machinery
 import itertools
 import json
+import math
 import os
 import statistics
 import sys
@@ -168,6 +169,62 @@ class _PostImport(importlib.abc.MetaPathFinder):
 
 		spec.loader = Wrapped()
 		return spec
+
+
+def _device_index(*names: str) -> int:
+	for n in names:
+		v = (os.environ.get(n) or "").split(",")[0].strip()
+		if v.isdigit():
+			return int(v)
+	return 0
+
+
+def gpu_power_reader():
+	"""A function returning the probe GPU's board power in watts, or None when nothing can read it.
+
+	NVIDIA through NVML (nvidia-ml-py); AMD through amdsmi, which ROCm ships for its Python
+	(on a ROCm box: pip install /opt/rocm/share/amd_smi). The visible-devices variables only pick the
+	first index; with a remapped mask the reading may be another GPU's, so it stays a side signal.
+	"""
+	try:
+		import torch
+
+		hip = getattr(torch.version, "hip", None)
+	except Exception:
+		hip = None
+	if hip:
+		try:
+			import amdsmi
+
+			amdsmi.amdsmi_init()
+			handles = amdsmi.amdsmi_get_processor_handles()
+			h = handles[
+				min(
+					_device_index("HIP_VISIBLE_DEVICES", "ROCR_VISIBLE_DEVICES", "CUDA_VISIBLE_DEVICES"),
+					len(handles) - 1,
+				)
+			]
+
+			def amd() -> float | None:
+				info = amdsmi.amdsmi_get_power_info(h)
+				# MI300 reports current_socket_power; older parts only the average (both in W)
+				for key in ("current_socket_power", "average_socket_power", "socket_power"):
+					v = info.get(key) if isinstance(info, dict) else None
+					if isinstance(v, int | float) and not isinstance(v, bool):
+						return float(v)
+				return None
+
+			return amd
+		except Exception:
+			return None
+	try:
+		import pynvml
+
+		pynvml.nvmlInit()
+		h = pynvml.nvmlDeviceGetHandleByIndex(_device_index("CUDA_VISIBLE_DEVICES"))
+		return lambda: pynvml.nvmlDeviceGetPowerUsage(h) / 1000.0
+	except Exception:
+		return None
 
 
 class Recorder:
@@ -751,16 +808,7 @@ class Recorder:
 			proc = psutil.Process()
 		except Exception:
 			proc = None
-		nvml = None
-		if self.cuda:
-			try:
-				import pynvml
-
-				pynvml.nvmlInit()
-				idx = int((os.environ.get("CUDA_VISIBLE_DEVICES") or "0").split(",")[0] or 0)
-				nvml = (pynvml, pynvml.nvmlDeviceGetHandleByIndex(idx if idx >= 0 else 0))
-			except Exception:
-				nvml = None
+		read_power = gpu_power_reader() if self.cuda else None
 		while not self._sampler_stop.wait(SAMPLE_EVERY_S):
 			if proc is not None:
 				with suppress(Exception):
@@ -768,9 +816,11 @@ class Recorder:
 						c.memory_info().rss for c in proc.children(recursive=True)
 					)
 					self._rss_peak = max(self._rss_peak, rss)
-			if nvml is not None:
+			if read_power is not None:
 				with suppress(Exception):
-					self._power.append(nvml[0].nvmlDeviceGetPowerUsage(nvml[1]) / 1000.0)
+					w = read_power()
+					if w is not None and math.isfinite(w) and 0 < w < 5_000:
+						self._power.append(w)
 
 	# ------------------------------------------------------------- model discovery (once)
 

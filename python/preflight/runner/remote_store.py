@@ -89,8 +89,8 @@ class RemoteJobStore:
 	def complete(self, lease: Lease, *, record_id: str) -> None:
 		self._call("complete", _thin(lease), record_id=record_id)
 
-	def fail(self, lease: Lease, *, error: str, retryable: bool) -> None:
-		self._call("fail", _thin(lease), error=error, retryable=retryable)
+	def fail(self, lease: Lease, *, error: str, retryable: bool, error_code: str | None = None) -> None:
+		self._call("fail", _thin(lease), error=error, retryable=retryable, error_code=error_code)
 
 	def emit(self, job_id: str, *, stage: str, token: int | None = None, **fields):
 		return self._call("emit", job_id, stage, fields, token)
@@ -135,8 +135,8 @@ class StoreMethods:
 	def complete(self, lease: dict, record_id: str) -> None:
 		self.store.complete(Lease(**lease), record_id=record_id)
 
-	def fail(self, lease: dict, error: str, retryable: bool) -> None:
-		self.store.fail(Lease(**lease), error=error, retryable=retryable)
+	def fail(self, lease: dict, error: str, retryable: bool, error_code: str | None = None) -> None:
+		self.store.fail(Lease(**lease), error=error, retryable=retryable, error_code=error_code)
 
 	def emit(self, job_id: str, stage: str, fields: dict, token: int | None = None) -> dict:
 		ev = self.store.emit(job_id, stage=stage, token=token, **fields)

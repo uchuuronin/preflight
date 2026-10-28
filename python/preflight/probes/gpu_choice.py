@@ -203,9 +203,43 @@ def estimate_need_gb(sm: ScriptMap) -> float:
 	return params * BYTES_PER_PARAM[_kind(sm)] / 1e9 + ACTIVATION_GB + 1.0  # + CUDA context
 
 
+CEILING_ENV = "PREFLIGHT_GPU_CEILING"  # set on the public demo: A100-SXM-80GB (Chiya, Oct 27: no H200)
+SAFE_CEILING = "A100-SXM-80GB"
+
+
+def ceiling() -> str | None:
+	"""The biggest GPU this deployment probes on, or None for no cap."""
+	import os
+
+	raw = os.environ.get(CEILING_ENV, "").strip()
+	if not raw:
+		return None
+	cap = canonical(raw)
+	if usable_gb(cap) <= 0:  # a mistyped cap still caps: the demo's own, never "no GPU at all"
+		log.error("%s=%r is not a known GPU; capping at %s", CEILING_ENV, raw[:64], SAFE_CEILING)
+		return SAFE_CEILING
+	return cap
+
+
+def under_ceiling(gpu: str, cap: str | None = None) -> bool:
+	cap = cap if cap is not None else ceiling()
+	return cap is None or usable_gb(canonical(gpu)) <= usable_gb(cap)
+
+
+def _pool(allowed: list[str] | None) -> list[str]:
+	pool = list(dict.fromkeys(canonical(g) for g in allowed)) if allowed else list(LADDER)
+	cap = ceiling()
+	capped = [g for g in pool if under_ceiling(g, cap)]
+	# allowed GPUs all above the cap (the visitor's run is H200-only): probe on the cap and let
+	# the cross-GPU model carry the numbers over
+	if cap is None:
+		return pool
+	return capped or [cap]
+
+
 def choose_probe_gpu(need_gb: float, allowed: list[str] | None = None, *, margin: float = MARGIN) -> str:
 	"""The cheapest GPU (allowed ones if the visitor set any) with need × margin usable; else the largest."""
-	pool = list(dict.fromkeys(canonical(g) for g in allowed)) if allowed else list(LADDER)
+	pool = _pool(allowed)
 	fits = [g for g in pool if usable_gb(g) >= need_gb * margin]
 	if fits:
 		return min(fits, key=lambda g: (usd_per_hour(g), usable_gb(g)))
@@ -217,7 +251,7 @@ def choose_probe_gpu(need_gb: float, allowed: list[str] | None = None, *, margin
 
 def next_gpu(current: str, allowed: list[str] | None = None) -> str | None:
 	"""After a GPU OOM: the cheapest GPU with more usable memory, or None when there is nothing bigger."""
-	pool = list(dict.fromkeys(canonical(g) for g in allowed)) if allowed else list(LADDER)
+	pool = _pool(allowed)
 	cur = canonical(current)
 	have = usable_gb(cur)
 	if have <= 0:  # a GPU the table doesn't know: nothing says which way is up, so don't guess

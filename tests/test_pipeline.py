@@ -232,6 +232,19 @@ def test_cli_run_writes_a_record(tmp_path, capsys):
 	assert out["probes"][0]["status"] == "ok"
 
 
+@pytest.mark.torch
+def test_cli_run_can_insist_on_a_gpu(tmp_path, capsys):
+	pytest.importorskip("torch")
+	import torch
+
+	from preflight.cli.main import main
+
+	if torch.cuda.is_available():
+		pytest.skip("this box has a GPU")
+	assert main(["run", str(FIX / "tiny_loop.py"), "--out", str(tmp_path), "--require-gpu"]) == 3
+	assert json.loads(capsys.readouterr().out)["backend"] == "cpu"
+
+
 def test_eval_oom_after_a_step_up_reruns_on_the_bigger_gpu(tmp_path):
 	state = {"L4": ("oom", "oom"), "L40S": ("oom", "oom.eval")}
 
