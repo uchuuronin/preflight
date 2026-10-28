@@ -14,9 +14,12 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 APP_NAME = "preflight-runner"  # runner/modal_app.py's APP_NAME (not imported: that pulls in modal images)
+STOP_WAIT_S = 5  # guess: Modal took under 10 s from "stopping..." to "stopped" on Oct 28
+STOP_WAIT_POLLS = 24  # two minutes, then report what the list says
 
 
 def _apps(env: str) -> list[dict]:
@@ -32,13 +35,28 @@ def _apps(env: str) -> list[dict]:
 	return data if isinstance(data, list) else []
 
 
-def _state(apps: list[dict], name: str) -> list[str]:
+def _entries(apps: list[dict], name: str) -> list[dict]:
 	out = []
 	for a in apps:
 		label = a.get("Description") or a.get("description") or a.get("Name") or a.get("name")
 		if label == name:
-			out.append(str(a.get("State") or a.get("state") or "?"))
+			out.append(
+				{
+					"id": str(a.get("App ID") or a.get("app_id") or ""),
+					"state": str(a.get("State") or a.get("state") or "?"),
+				}
+			)
 	return out
+
+
+def _state(apps: list[dict], name: str) -> list[str]:
+	return [e["state"] for e in _entries(apps, name)]
+
+
+def _live(state: str) -> bool:
+	"""Anything but stopped or disabled is still running somewhere (deployed, ephemeral,
+	"ephemeral (detached)", "initializing...", "stopping...")."""
+	return state.lower() not in ("stopped", "disabled")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -47,15 +65,30 @@ def main(argv: list[str] | None = None) -> int:
 	# required: production is only ever touched by the manual deploy workflow, never by a default
 	ap.add_argument("--env", required=True, help="Modal environment, e.g. main")
 	ns = ap.parse_args(argv)
-	before = _state(_apps(ns.env), ns.app)
-	r = subprocess.run(["modal", "app", "stop", "--yes", "--env", ns.env, ns.app], capture_output=True, text=True,
-		timeout=180)  # fmt: skip
+	listed = _entries(_apps(ns.env), ns.app)
+	before = [e["state"] for e in listed]
+	# the deployed app by name, then any temporary copy still live (a detached `modal run` of the
+	# runner is exactly the kind that holds the job state), each by its app id
+	targets = [ns.app] + [
+		e["id"] for e in listed if e["id"] and _live(e["state"]) and e["state"].lower() != "deployed"
+	]
+	outputs, codes = [], []
+	for t in targets:
+		r = subprocess.run(["modal", "app", "stop", "--yes", "--env", ns.env, t], capture_output=True, text=True,
+			timeout=180)  # fmt: skip
+		outputs.append(f"{t}: {(r.stdout + r.stderr).strip()}")
+		codes.append(r.returncode)
 	after = _state(_apps(ns.env), ns.app)
-	running = [s for s in after if s.lower() in ("deployed", "running", "ephemeral", "deploying")]
+	for _ in range(STOP_WAIT_POLLS):  # "stopping..." settles within seconds; wait for it to say so
+		if not any(x.lower().startswith("stopping") for x in after):
+			break
+		time.sleep(STOP_WAIT_S)
+		after = _state(_apps(ns.env), ns.app)
+	running = [s for s in after if _live(s)]
 	# `modal app stop` exits 1 on an app that's already stopped: what counts is the list afterwards
-	already = "already stopped" in (r.stdout + r.stderr).lower()
-	result = {"app": ns.app, "env": ns.env, "before": before, "after": after, "stop_exit": r.returncode,
-		"stop_output": (r.stdout + r.stderr)[-2000:], "stopped": bool(after) and not running and (r.returncode == 0 or already)}  # fmt: skip
+	text = "\n".join(outputs)
+	result = {"app": ns.app, "env": ns.env, "before": before, "after": after, "stop_exit": max(codes, default=0),
+		"stop_output": text[-2000:], "stopped": bool(after) and not running}  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path("out/stop.json").write_text(json.dumps(result, indent=2))
 	print(json.dumps(result, indent=2))

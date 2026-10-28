@@ -121,7 +121,7 @@ The command, once Chiya approves the session:
 ## Cloud runs
 
 Every run's GPU, minutes and dollars. Runs go through GitHub Actions (docs/setup/cloud.md) on T4
-or L4 unless Chiya approves bigger; `modal_app.py::smoke` holds its probes to L4.
+or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 
 | Date (UTC) | Run | GPU | Minutes | USD |
 | --- | --- | --- | --- | --- |
@@ -129,6 +129,24 @@ or L4 unless Chiya approves bigger; `modal_app.py::smoke` holds its probes to L4
 | Oct 28 02:42 | `a-prefetch-main` (40622466016): failed before starting (`list[str]` argument) | none | 0.5 | $0 |
 | Oct 28 02:43 | `a-smoke-l4-main` (40622569222): submit failed, the job store never started | none (no sandbox) | 24 | $0 Modal GPU; the CPU is in the deploy row |
 | Oct 28 03:07 | `a-stop-main` (40624905511): Chiya had already stopped the app at 03:07:19; out/stop.json lists it stopped | none | 0.4 | $0 |
+| Oct 28 04:33 | `a-startup-check-main` (40632951774): both images start; a tiny CPU probe ran 9 steps as uid 61000 | none | 1.2 | under $0.01 (estimate) |
+| Oct 28 04:35 | `a-deploy-main-2` (40633100843): deployed 04:35:12, stopped about 04:39 | none | 4 deployed | under $0.01 (estimate) |
+| Oct 28 04:35 | `a-prefetch-main-2` (40633194148): Qwen2.5-1.5B and gpt2 in `preflight-weights` | none (CPU) | 1.4 | under $0.01 (estimate) |
+| Oct 28 04:37 | `a-smoke-l4-main-2` (40633354342): submit refused (`StoreUnavailable`), no job ran | none | 0.6 | $0 GPU |
+| Oct 28 04:38 | `a-stop-main-2` (40633463121): out/stop.json `stopped: true` | none | 0.3 | $0 |
+
+Second attempt, Oct 28 04:33 to 04:39 UTC: the startup fix held, but every `modal run` of
+`modal_app.py` (the startup check, prefetch, smoke) started a temporary copy of the app, and that
+copy's job store (min_containers=1) claimed the shared job state, so the deployed store refused its
+own saves and the smoke submit failed. The app list showed six `preflight-runner` entries. All
+`modal run` entries now live in `runner/ops_app.py` ("preflight-runner-ops": no job store, no
+schedule), the startup check also loads `modal_app.py` standalone from a shallow path as Modal
+does (it fails on the Oct 27 file with IndexError: 3), and a test keeps `modal_app.py` free of
+`modal run` entries. An independent review found the runner could still be started as a copy
+(`modal run ...::tick`, `modal serve`, `modal shell`), so the job store now claims the shared
+state only in the deployed app's own containers (`deployed_here`, fails closed) and a copy refuses
+every call; `stop_app` also stops live temporary copies by id. The weights from prefetch are on
+the volume and stay.
 
 Failed sitting, Oct 28 02:39 to 03:07 UTC: `JobStoreService` and `tick` crashed on every start
 (Modal crash-loop alerts) with `IndexError` at `ROOT = Path(__file__).resolve().parents[3]`.
@@ -136,7 +154,7 @@ Modal loads a deployed file on its own as `/root/modal_app.py`, not from the rep
 had no fourth parent; moving the package to /opt/preflight that evening didn't cause it, and the
 app had never started on Modal before. The same assumption made `image_tag()` hash no files in
 the container. Fixed (the repo path is read only where the repo exists, the tag hashes the
-installed package and refuses to hash nothing), and `modal_app.py::startup_check` now runs both
+installed package and refuses to hash nothing), and `ops_app.py::startup_check` now runs both
 images' startup code with no GPU before any deploy. No GPU or sandbox ran, so the $0.95/h sandbox
 CPU and memory figure is still a guess until the smoke run's bill.
 

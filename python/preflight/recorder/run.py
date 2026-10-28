@@ -158,6 +158,7 @@ def main(spec_path: str) -> int:
 		trace_path=spec.get("trace"),
 		progress_path=spec.get("progress"),
 		eval_batches=spec.get("eval_batches", 2),
+		alternate_sync=bool(spec.get("alternate_sync")),
 	).install()
 
 	status, code, error = "ok", None, None

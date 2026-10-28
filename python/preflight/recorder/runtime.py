@@ -238,11 +238,15 @@ class Recorder:
 		progress_path: str | None = None,
 		eval_batches: int = 2,
 		hf_overrides: bool = True,
+		alternate_sync: bool = False,
 	):
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
 		self.warmup, self.timed, self.profile = warmup, timed, profile
-		self.target = warmup + timed + PHASE_STEPS
+		# ground truth only (recorder/overhead.py): after warmup, clean and synced steps alternate,
+		# and every step is timed from its boundary events, so the two kinds compare like with like
+		self.alternate_sync = alternate_sync
+		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
 		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
 		self.trace_path = trace_path
 		self.progress_path = progress_path
@@ -315,7 +319,9 @@ class Recorder:
 	def _clean(self) -> bool:
 		"""True during the timed steps: no recorder sync points, no scalar reads off the GPU."""
 		n = len(self.steps)
-		return self._prof is None and self.warmup <= n < self.warmup + self.timed and not self.eval_active
+		if self._prof is not None or self.eval_active or not self.warmup <= n < self.warmup + self.timed:
+			return False
+		return not self.alternate_sync or (n - self.warmup) % 2 == 0
 
 	def _kind(self) -> str:
 		n = len(self.steps)
@@ -323,6 +329,8 @@ class Recorder:
 			return "profiled"
 		if n < self.warmup:
 			return "warmup"
+		if self.alternate_sync:
+			return "timed" if (n - self.warmup) % 2 == 0 else "phase"
 		return "timed" if n < self.warmup + self.timed else "phase"
 
 	@staticmethod
@@ -994,7 +1002,7 @@ class Recorder:
 		)
 		self._reset_acc()
 		n = len(self.steps)
-		if kind == "timed" and n == self.warmup + self.timed:
+		if kind == "timed" and n == self.warmup + self.timed and not self.alternate_sync:
 			# drain what the timed steps queued, so the first phase step doesn't carry it as "other"
 			self._hard_sync()
 		self.stage = f"step {n}"
@@ -1023,7 +1031,8 @@ class Recorder:
 		prev = None
 		for st in self.steps:
 			ev = st.pop("event", None)
-			if st["kind"] == "timed" and ev is not None and prev is not None:
+			timed_by_events = st["kind"] == "timed" or (self.alternate_sync and st["kind"] == "phase")
+			if timed_by_events and ev is not None and prev is not None:
 				with suppress(Exception):
 					# device time between boundaries includes host stalls (the GPU idles while the
 					# loader works), so it is the step's wall time without any sync inside the step

@@ -136,6 +136,7 @@ class ProbeSpec:
 	timeout_s: float = 600.0
 	seed: int | None = None
 	seed_force: bool = False  # override the script's own seeding (verify's seed-to-seed spread)
+	alternate_sync: bool = False  # ground truth only: alternate clean and synced steps (recorder/overhead.py)
 	install_requirements: bool = False  # pip-install requirements.txt in the probe (hosted probes only)
 	out_dir: Path | None = None
 	gpu_usd_per_hour: float = 0.0
@@ -573,6 +574,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"out": str(out),
 				"seed": spec.seed,
 				"seed_force": spec.seed_force,
+				"alternate_sync": spec.alternate_sync,
 				"install_requirements": spec.install_requirements,
 				"deps": str(box / "deps"),
 			}

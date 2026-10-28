@@ -72,3 +72,69 @@ class LocalRecordWriter:
 		rev = self._revs.get(rec.record_id, 0) + 1
 		self._revs[rec.record_id] = rev
 		return rev
+
+
+RECORD_TTL_S = 30 * 86400  # PM decision (Oct 28): records live 30 days on the preflight-records volume
+
+
+PRUNE_MAX_SHARE = 0.25  # guess: a daily pass should remove one day's records; more means the dates are wrong
+PRUNE_MIN_GUARD = 20  # below this many records the share check is too noisy to trust either way
+
+
+_CREATED = re.compile(r'"created_at"\s*:\s*"([^"]{10,40})"')
+
+
+def _created_at(p: Path) -> float | None:
+	"""The record's own creation time (its `created_at`), not the file's: volume file times
+	aren't guaranteed to survive a reload, and a wrong one must never delete a record."""
+	import json
+	from datetime import datetime
+
+	try:
+		with p.open("rb") as f:
+			head = f.read(8192).decode("utf-8", "replace")
+		m = _CREATED.search(head)  # dumps put it near the top
+		at = m.group(1) if m else json.loads(p.read_text()).get("created_at")
+		return datetime.fromisoformat(str(at).replace("Z", "+00:00")).timestamp() if at else None
+	except (OSError, ValueError, AttributeError, TypeError):
+		return None
+
+
+def prune(root: Path | str, *, max_age_s: float = RECORD_TTL_S, now: float | None = None) -> list[str]:
+	"""Delete stored records older than max_age_s by their own `created_at`, and temp files left
+	over from interrupted writes (by file time, a day old); returns the names removed.
+
+	Only `<share_token>.json` and `.tmp-*.json` directly in root are considered. A record whose date
+	can't be read, or is in the future, is kept. One pass removes at most PRUNE_MAX_SHARE of the
+	records (at least PRUNE_MIN_GUARD), oldest first: a backlog drains over a few days, and dates
+	gone wrong can't empty the volume in one go."""
+	import time
+
+	root = Path(root)
+	now = time.time() if now is None else now
+	records, expired, temps = 0, [], []
+	for p in sorted(root.iterdir()) if root.is_dir() else []:
+		name = p.name
+		if p.is_symlink() or not p.is_file() or not name.endswith(".json"):
+			continue
+		if name.startswith(".tmp-"):
+			with contextlib.suppress(FileNotFoundError):
+				if now - p.stat().st_mtime > 86_400:
+					temps.append(p)
+			continue
+		if not _TOKEN.fullmatch(name[:-5]):
+			continue
+		records += 1
+		at = _created_at(p)
+		if at is not None and max_age_s < now - at and at <= now + 86_400:
+			expired.append((at, p))
+	cap = max(PRUNE_MIN_GUARD, int(PRUNE_MAX_SHARE * records))
+	doomed = [p for _, p in sorted(expired)[:cap]] + temps
+	removed = []
+	for p in doomed:
+		try:
+			p.unlink()
+			removed.append(p.name)
+		except FileNotFoundError:
+			continue  # another container removed it first
+	return sorted(removed)

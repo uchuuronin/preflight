@@ -229,3 +229,42 @@ def test_a_sandbox_that_cannot_start_is_a_probe_error_not_a_crash():
 	with SandboxRunner(create) as run:
 		r = run(spec(), "nope", should_stop=lambda: False)
 	assert r.probe.status == "error" and r.probe.error_code == "recorder"
+
+
+def test_records_older_than_30_days_are_pruned_by_their_own_dates(tmp_path):
+	import os
+	from datetime import UTC, datetime
+
+	from preflight.runner.records import RECORD_TTL_S, prune
+
+	now = 2_000_000_000.0
+
+	def rec(name, age_s, mtime_age=0):
+		at = datetime.fromtimestamp(now - age_s, UTC).isoformat()
+		(tmp_path / name).write_text(json.dumps({"schema_version": "0.3.0", "created_at": at}))
+		os.utime(tmp_path / name, (now - mtime_age, now - mtime_age))
+
+	old, fresh = "a" * 22 + ".json", "b" * 22 + ".json"
+	rec(old, RECORD_TTL_S + 60)  # file time says new: the record's own date decides
+	rec(fresh, 3600, mtime_age=10**9)  # file time says ancient (a reset volume time): kept
+	(tmp_path / "d").write_text("x")
+	(tmp_path / ("e" * 22 + ".json")).write_text("not json")  # unreadable date: kept
+	(tmp_path / ".tmp-x.json").write_text("{}")
+	os.utime(tmp_path / ".tmp-x.json", (now - 2 * 86400, now - 2 * 86400))
+	(tmp_path / ("c" * 22 + ".json")).symlink_to(tmp_path / fresh)
+	assert prune(tmp_path, now=now) == sorted([old, ".tmp-x.json"])
+	assert {p.name for p in tmp_path.iterdir()} == {fresh, "d", "e" * 22 + ".json", "c" * 22 + ".json"}
+
+
+def test_one_prune_pass_removes_at_most_its_share_oldest_first(tmp_path):
+	from preflight.runner.records import PRUNE_MIN_GUARD, prune
+
+	for i in range(100):  # all expired: a backlog, or dates gone wrong
+		(tmp_path / (f"{i:02d}" + "z" * 20 + ".json")).write_text(
+			f'{{"created_at": "2000-01-{1 + i % 28:02d}T00:00:00Z"}}'
+		)
+	(tmp_path / ("f" * 22 + ".json")).write_text('{"created_at": "2999-01-01T00:00:00Z"}')  # future: kept
+	removed = prune(tmp_path, now=2_000_000_000.0)
+	assert len(removed) == max(PRUNE_MIN_GUARD, 25)
+	left = {p.name for p in tmp_path.iterdir()}
+	assert "f" * 22 + ".json" in left and len(left) == 101 - len(removed)
