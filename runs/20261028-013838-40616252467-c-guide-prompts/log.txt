@@ -1,0 +1,396 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-CFnAmu6zgTsoVBMtpB1XWr
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/preflight/preflight/schema/examples/agent.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/scripts/guide_tour.py
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/pretrain.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/finetune.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/scripts/tour_play.py
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/web/src/workspace/fixtures/dev-finetun
+│   e.record.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/preflight_api
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+└── ✓ Created Function play.
+{
+	"model": "muse-spark-1.3",
+	"tours": 32,
+	"rounds": 264,
+	"latency_s": {
+		"p50": 2.35,
+		"p90": 4.464,
+		"p95": 4.925,
+		"max": 7.093
+	},
+	"output_tokens": {
+		"p50": 559,
+		"p95": 1327,
+		"max": 1600
+	},
+	"input_tokens": {
+		"p50": 2960,
+		"max": 6308
+	},
+	"cached_share": 0.438,
+	"rounds_per_tour": {
+		"mean": 8.25,
+		"max": 22
+	},
+	"usd_per_tour": {
+		"mean": 0.0428,
+		"max": 0.1609
+	},
+	"withheld_rounds": 0,
+	"ends": {
+		"done": 31,
+		"http_503:model_error": 1
+	}
+}
+{
+	"current": {
+		"tours": 8,
+		"moved_when_offered": 5,
+		"offered": 8,
+		"stalled": 3,
+		"loops": 0,
+		"text_while_calling": 50,
+		"rounds": 70,
+		"usd": 0.2954,
+		"latency_p50": 2.19
+	},
+	"no_speak_once": {
+		"tours": 8,
+		"moved_when_offered": 5,
+		"offered": 8,
+		"stalled": 3,
+		"loops": 0,
+		"text_while_calling": 53,
+		"rounds": 72,
+		"usd": 0.3343,
+		"latency_p50": 1.828
+	},
+	"act_now": {
+		"tours": 8,
+		"moved_when_offered": 7,
+		"offered": 8,
+		"stalled": 1,
+		"loops": 0,
+		"text_while_calling": 57,
+		"rounds": 79,
+		"usd": 0.4982,
+		"latency_p50": 3.251
+	},
+	"act_now_speak_once": {
+		"tours": 8,
+		"moved_when_offered": 3,
+		"offered": 8,
+		"stalled": 5,
+		"loops": 0,
+		"text_while_calling": 29,
+		"rounds": 43,
+		"usd": 0.2432,
+		"latency_p50": 2.693
+	}
+}
+lora-7b    rounds=20  decisions=4 usd=0.0917 end=done 
+    2.378s in=2105 out=290 calls=['sensitivity'] -> results "I'll start the cost-saving tour by checking which adjustment saves the most."
+    3.315s in=2263 out=513 calls=['highlight'] -> results 'Highlighting the sequence length path and applying the top cost saver.'
+    2.466s in=2364 out=355 calls=['set_knob'] -> results 'Applying the top cost-saving move.'
+    3.844s in=2508 out=722 calls=[] -> decision 'Shortened sequence for ticket length. Predicted cost is $57.25.'
+    1.15s in=2751 out=224 calls=['sensitivity'] -> results "I'll check the next best cost-saving move for this shorter sequence setup."
+    1.802s in=2960 out=281 calls=['highlight'] -> results "I'll highlight the batch throughput path while applying the top saver."
+    1.759s in=3058 out=145 calls=['set_knob'] -> results 'Applying the batch size increase.'
+    2.344s in=3202 out=511 calls=['sensitivity'] -> results "I'll rank the next cost-saving moves from this setting."
+    3.202s in=3371 out=698 calls=['highlight'] -> results 'Switching to faster hardware for the next saving.'
+    4.431s in=3467 out=739 calls=[] -> decision 'Switching to faster hardware for the next saving.'
+    2.7s in=3817 out=626 calls=['sensitivity'] -> results "I'll rank the cost-saving options from this new setting to plan the next move."
+    2.783s in=3991 out=559 calls=['highlight'] -> results 'Switching to faster hardware to cut cost further.'
+    2.19s in=4082 out=403 calls=['set_knob'] -> results 'Moving to the faster hardware pick next.'
+    4.305s in=4237 out=948 calls=[] -> decision 'Moved to faster hardware for cheaper training. Predicted cost is $6.07.'
+    0.881s in=4493 out=147 calls=['sensitivity'] -> results "I'll rank the cost options from this faster hardware setup to plan the next move."
+    2.325s in=4622 out=560 calls=['highlight'] -> results 'Switching to longer sequences to trim cost further.'
+    1.451s in=4720 out=269 calls=['set_knob'] -> results 'Switching to a longer sequence length to trim cost further.'
+    3.548s in=4881 out=912 calls=[] -> decision 'Longer sequences pack tickets better. Predicted cost is $5.38.'
+    1.188s in=5136 out=83 calls=['sensitivity'] -> results "I'll rank the remaining cost options from this packed longer sequence setup."
+    1.274s in=5228 out=260 calls=[] -> visitor 'Nothing safe lowers cost further from here.'
+lora-7b    rounds=12  decisions=2 usd=0.0423 end=done 
+    1.817s in=2105 out=449 calls=['sensitivity'] -> results "I'll start the cost-saving tour by checking which adjustment saves the most."
+    1.891s in=2263 out=476 calls=['highlight'] -> results 'Highlighting the sequence-length path and applying the top saving.'
+    1.507s in=2356 out=444 calls=['set_knob'] -> results "Top saving is shorter sequences. I'll move that knob now."
+    2.454s in=2505 out=627 calls=[] -> decision 'Shortened sequences to 256. Predicted cost is $57.25.'
+    1.035s in=2748 out=200 calls=['sensitivity'] -> results 'Applying the sequence-length cut and planning the next cheapest safe move.'
+    2.759s in=2956 out=675 calls=['highlight'] -> results "Batch size looks like the next cheapest safe move, so I'll highlight it and apply the increase."
+    1.278s in=3061 out=273 calls=['set_knob'] -> results "Batch size 32 fits and saves the most, so I'll set it."
+    3.304s in=3214 out=397 calls=['sensitivity'] -> results "I'll run sensitivity to find the next cost-saving move."
+    1.654s in=3383 out=392 calls=['highlight'] -> results 'Top knob is GPU type; highlighting and moving it.'
+    2.126s in=3470 out=460 calls=[] -> decision 'Moving to the cheaper GPU next.'
+    1.043s in=3817 out=155 calls=['sensitivity'] -> results 'Applied, now seeking the next cost saver.'
+    2.392s in=3984 out=546 calls=[] -> visitor 'Switching to the cheaper GPU to keep cutting cost.'
+lora-7b    rounds=2   decisions=0 usd=0.0036 end=done 
+    1.136s in=2105 out=259 calls=['sensitivity'] -> results "I'll tour the cost-saving knobs for your LoRA run, starting with the biggest win."
+    1.902s in=2268 out=347 calls=[] -> visitor "Your ticket tuner is set long; I'll check which cost cut fits best."
+lora-7b    rounds=19  decisions=4 usd=0.0786 end=done 
+    1.434s in=2105 out=292 calls=['sensitivity'] -> results "I'll start your cost-saving tour by checking which adjustment cuts spend most."
+    2.394s in=2263 out=634 calls=['highlight', 'set_knob'] -> results "Top cost knob is sequence length, so I'll highlight the map and apply that trim."
+    2.191s in=2498 out=603 calls=[] -> decision 'Trimmed sequence length to 256. Predicted cost is $57.25.'
+    1.184s in=2742 out=251 calls=['sensitivity'] -> results "I'll check the next best cost saving from here."
+    2.38s in=2947 out=506 calls=['highlight'] -> results "Top cost saver now is batch size, so I'll apply it next."
+    1.505s in=3047 out=376 calls=['set_knob'] -> results "Batch size 32 is the top saver, so I'll set that knob."
+    1.274s in=3199 out=344 calls=['sensitivity'] -> results "I'll check the next best cost saving now that batch size is 32."
+    2.347s in=3372 out=572 calls=['highlight'] -> results "Top saver is the faster GPU, so I'll highlight it and switch over."
+    1.878s in=3468 out=447 calls=[] -> decision 'Switching to the cheaper faster GPU next.'
+    2.37s in=3817 out=562 calls=['highlight'] -> results 'Switching to the cheaper faster GPU to cut cost further.'
+    3.008s in=3910 out=733 calls=['set_knob'] -> results 'Switching to the faster GPU type to lower total cost.'
+    1.741s in=4068 out=454 calls=['sensitivity'] -> results "I'll run sensitivity to find the next cost saver."
+    2.269s in=4191 out=633 calls=[] -> decision "I'll check sensitivity for the cheapest next move."
+    1.734s in=4548 out=440 calls=['sensitivity'] -> results "I'll run sensitivity to find the next cost saver."
+    1.584s in=4671 out=332 calls=['highlight'] -> results "Increasing sequence length is the cheapest next move, so I'll apply it."
+    1.051s in=4773 out=160 calls=['set_knob'] -> results "Increasing sequence length to 512 should lower cost further, so I'll set it."
+    3.561s in=4937 out=826 calls=[] -> decision 'Lengthened sequences to 512 for a predicted cost of $5.38.'
+    0.836s in=5193 out=106 calls=['sensitivity'] -> results "I'll run sensitivity to find the next cost saver."
+    0.931s in=5282 out=112 calls=[] -> visitor 'Nothing safe improves cost further from here.'
+lora-qwen  rounds=6   decisions=1 usd=0.0325 end=done 
+    2.135s in=2109 out=473 calls=['sensitivity'] -> results "I'll start your cost-saving tour by checking which adjustment saves the most."
+    1.679s in=2266 out=450 calls=['highlight'] -> results 'Moving to your top saver and lighting up its map area.'
+    2.277s in=2359 out=626 calls=['set_knob'] -> results 'Top saver is batch size, moving it now.'
+    2.951s in=2455 out=833 calls=['sensitivity'] -> results 'Starting the next round of the cost tour from the current setting.'
+    3.282s in=2547 out=869 calls=[] -> decision 'Nothing further to say yet, checking sensitivity to continue the tour.'
+    1.818s in=2897 out=356 calls=[] -> visitor 'Nothing safe left here improves cost further.'
+lora-qwen  rounds=5   decisions=1 usd=0.0271 end=done 
+    2.163s in=2109 out=506 calls=['sensitivity'] -> results "I'll start the cost-saving tour by checking which knob trims spend most."
+    2.985s in=2267 out=792 calls=['highlight', 'set_knob'] -> results "I'll highlight the batch controls and dial it down to the cheapest fit."
+    2.496s in=2442 out=764 calls=['sensitivity'] -> results "Saving spend needs care, so I'll map the next cheapest safe move."
+    2.78s in=2535 out=657 calls=[] -> decision "I'll map the cheapest safe move for this setup."
+    2.872s in=2882 out=737 calls=[] -> visitor 'Nothing safe left lowers cost further.'
+lora-qwen  rounds=3   decisions=0 usd=0.0094 end=done 
+    1.556s in=2109 out=322 calls=['sensitivity'] -> results "I'll start your cost-saving tour by checking which adjustment saves the most."
+    3.694s in=2266 out=901 calls=['highlight'] -> results "Your cheapest win looks like batch size, so I'll highlight it and dial it down."
+    0.902s in=2364 out=177 calls=[] -> visitor "I'll rank the cheapest safe moves for this setup."
+lora-qwen  rounds=3   decisions=0 usd=0.0102 end=done 
+    2.241s in=2109 out=446 calls=['sensitivity'] -> results "I'll rank the cost-saving knobs for your LoRA run to begin the tour."
+    2.252s in=2269 out=580 calls=['highlight'] -> results "Batch size looks the strongest lever for cost, so I'll set up that move on the map."
+    1.715s in=2369 out=386 calls=[] -> visitor 'Starting the cost tour from your current setting, ranking the cheapest safe moves.'
+lora-7b    rounds=2   decisions=0 usd=0.0072 end=done 
+    1.541s in=2084 out=263 calls=['sensitivity'] -> results "Starting your cost tour, I'll check which knob saves most first."
+    1.539s in=2241 out=343 calls=[] -> visitor "I'll rank cost-saving moves for this setup and light up the map."
+lora-7b    rounds=8   decisions=1 usd=0.0384 end=done 
+    2.587s in=2084 out=616 calls=['sensitivity'] -> results 'Touring your cost dials to find safe savings.'
+    3.191s in=2239 out=791 calls=['highlight'] -> results 'Seen your current plan, now lining up the cheapest safe move.'
+    1.828s in=2340 out=450 calls=['set_knob'] -> results 'Top saving is shorter sequences. Trying that move now.'
+    2.153s in=2487 out=471 calls=['sensitivity'] -> results 'Checking what still saves money from here.'
+    1.879s in=2690 out=427 calls=[] -> decision 'Starting the cost tour from your current plan.'
+    5.958s in=3035 out=1560 calls=['highlight'] -> results 'Larger batches look cheaper here. Trying that next.'
+    1.685s in=3132 out=400 calls=['sensitivity'] -> results 'Applied, thanks, scanning for your next cost saver.'
+    1.559s in=3338 out=327 calls=[] -> visitor 'Scanning for the next safe cost saver from the applied plan.'
+lora-7b    rounds=22  decisions=4 usd=0.1146 end=done 
+    1.798s in=2084 out=397 calls=['sensitivity'] -> results 'Tour starting, checking which cost knobs move most.'
+    2.15s in=2239 out=554 calls=['highlight', 'set_knob'] -> results "Seen. Shortening the sequence looks biggest for cost, so I'll light that path and move it."
+    1.94s in=2477 out=461 calls=['sensitivity'] -> results "Saving cost on this LoRA run, I'll check the next best move."
+    3.781s in=2687 out=1041 calls=['highlight'] -> results 'Cost tour continuing, batch size looks next.'
+    3.493s in=2782 out=888 calls=[] -> decision 'Top cost move is batch size, so I will apply it.'
+    1.187s in=3131 out=218 calls=['sensitivity'] -> results 'Applied, now looking for the next saving.'
+    1.508s in=3335 out=378 calls=['highlight'] -> results 'Batch size is the top saver, moving it now.'
+    1.657s in=3432 out=349 calls=['set_knob'] -> results "Batch size is top, I'll move it now."
+    1.83s in=3579 out=373 calls=['sensitivity'] -> results 'Cost is down, hunting the next safe saving.'
+    2.984s in=3747 out=714 calls=['highlight'] -> results 'GPU type leads on cost here, lighting it up and switching it.'
+    0.808s in=3847 out=124 calls=[] -> decision 'Switching to the cheaper faster GPU next.'
+    1.157s in=4196 out=185 calls=['sensitivity'] -> results 'Saving applied, now hunting the next cost cut.'
+    3.609s in=4364 out=847 calls=['highlight', 'set_knob'] -> results 'GPU hardware is next for cost, lighting the map and moving it.'
+    2.35s in=4604 out=505 calls=['sensitivity'] -> results 'Saving applied. Checking next cost move.'
+    2.548s in=4725 out=712 calls=['highlight'] -> results 'Longer context is cheapest next, lighting it and moving it.'
+    0.751s in=4826 out=114 calls=[] -> decision 'Longer context is cheapest next, moving it now.'
+    0.984s in=5185 out=105 calls=['sensitivity'] -> results 'Saving hardware applied, checking the next cost move.'
+    1.456s in=5308 out=347 calls=['highlight', 'set_knob'] -> results 'Longer context is cheapest next, lighting it and moving it.'
+    1.903s in=5551 out=396 calls=['sensitivity'] -> results 'Saving applied, checking what cuts cost next.'
+    1.264s in=5639 out=148 calls=[] -> decision 'Nothing safe improves cost any more.'
+    0.832s in=5886 out=153 calls=['sensitivity'] -> results 'Saving applied, checking the next cost cut.'
+    1.197s in=5974 out=219 calls=[] -> visitor 'Nothing safe improves cost any more.'
+lora-7b    rounds=16  decisions=4 usd=0.0756 end=done 
+    1.233s in=2084 out=258 calls=['sensitivity'] -> results "I'll tour the cost knobs, starting with the biggest saver."
+    2.41s in=2241 out=711 calls=['highlight', 'set_knob'] -> results 'Starting with the sequence length, the largest cost saver on the map.'
+    4.975s in=2474 out=1408 calls=[] -> decision 'This sets context to 256 and predicts cost of $57.25 with peak of 40.1 GiB.'
+    3.657s in=2726 out=749 calls=['sensitivity'] -> results 'Checking the next best cost saver.'
+    2.292s in=2928 out=448 calls=['highlight'] -> results 'Batch size looks biggest next, highlighting its path before moving it.'
+    1.127s in=3027 out=218 calls=['set_knob'] -> results "Batch size is top, so I'll move it now."
+    2.454s in=3176 out=612 calls=[] -> decision 'This lifts batch size to 32 and predicts cost of $10.54 with peak of 40.1 GiB.'
+    1.118s in=3433 out=95 calls=['sensitivity'] -> results "Larger batches are applied, so I'll scan for the next saver."
+    1.824s in=3605 out=408 calls=['highlight'] -> results 'GPU type is top, highlighting its path before moving it.'
+    0.979s in=3703 out=149 calls=['set_knob'] -> results "GPU path is lit. I'll switch to the cheaper GPU."
+    2.994s in=3862 out=761 calls=[] -> decision 'This switches compute to faster hardware and predicts cost of $6.07 with peak of 40.1 GiB.'
+    0.89s in=4126 out=108 calls=['sensitivity'] -> results 'Faster hardware applied, now looking for further savings.'
+    2.249s in=4250 out=568 calls=['highlight', 'set_knob'] -> results 'Longer context is top, lighting its path before lengthening it.'
+    1.96s in=4495 out=486 calls=[] -> decision 'This lengthens context to 512 and predicts cost of $5.38 with peak of 66.1 GiB.'
+    0.779s in=4760 out=80 calls=['sensitivity'] -> results "Applied, so I'll look for the next safe saving."
+    1.116s in=4850 out=123 calls=[] -> visitor 'Nothing safe lowers cost further from here.'
+lora-qwen  rounds=6   decisions=1 usd=0.0291 end=done 
+    1.786s in=2088 out=387 calls=['sensitivity'] -> results 'Tour starting for lowest cost. Checking which knob saves most.'
+    1.662s in=2243 out=497 calls=['highlight'] -> results 'Saving cost by shrinking batches. Highlighting the map and moving the top knob.'
+    1.563s in=2340 out=384 calls=['set_knob'] -> results 'Moving the top cost knob now.'
+    5.517s in=2433 out=1511 calls=[] -> decision 'Moved batch size down. It still fits but the saving is not trusted here so I can measure it if you like.'
+    1.088s in=2686 out=187 calls=['sensitivity'] -> results 'Applied. Planning the next saving move.'
+    1.776s in=2773 out=347 calls=[] -> visitor 'Nothing safe improves the aim any more.'
+lora-qwen  rounds=8   decisions=1 usd=0.0367 end=done 
+    2.695s in=2088 out=463 calls=['sensitivity'] -> results "Touring for lowest cost, I'll check which knob saves most."
+    2.309s in=2244 out=521 calls=['highlight'] -> results "Lowest cost is the aim, so I'll map the biggest savers."
+    3.475s in=2453 out=803 calls=['highlight'] -> results "Batch size looks like the biggest saver, so I'll set that move."
+    3.068s in=2548 out=831 calls=['set_knob'] -> results "Batch size is the top saver here, so I'll move it."
+    2.122s in=2647 out=609 calls=['sensitivity'] -> results "Saving cost is the aim, so I'll check the next best saver."
+    3.836s in=2740 out=1029 calls=[] -> decision "Saving cost is the aim, so I'm checking the next best saver."
+    1.246s in=3091 out=213 calls=['sensitivity'] -> results "Saving cost is the aim, so I'll map the next saver."
+    1.616s in=3183 out=402 calls=[] -> visitor 'Nothing safe lowers cost further from this setting.'
+lora-qwen  rounds=7   decisions=0 usd=0.0239 end=done 
+    1.748s in=2088 out=389 calls=['sensitivity', 'highlight'] -> results 'Touring your cost dials to find safe savings.'
+    2.624s in=2327 out=661 calls=['highlight'] -> results 'Checking which cost saving fits your current plan.'
+    1.805s in=2535 out=549 calls=['highlight'] -> results 'Cost tour starting from your current plan.'
+    1.492s in=2742 out=337 calls=['highlight'] -> results 'Cost tour starting with your biggest saver.'
+    2.021s in=2949 out=596 calls=['highlight'] -> results 'Starting the cost tour from your current plan.'
+    3.735s in=3157 out=781 calls=['highlight'] -> results 'Starting with your top cost saver.'
+    1.458s in=3245 out=326 calls=[] -> visitor 'Your cost map is live, ranking the biggest safe savings now.'
+lora-qwen  rounds=3   decisions=0 usd=0.0089 end=done 
+    1.514s in=2088 out=330 calls=['sensitivity'] -> results 'Tour starting, checking the cheapest safe move for your fine tune.'
+    1.989s in=2244 out=478 calls=['highlight'] -> results 'Noted your current plan, now highlighting the path and trying the cheapest safe move.'
+    1.975s in=2342 out=406 calls=[] -> visitor 'Your map is up, I will find the cheapest safe move next.'
+lora-7b    rounds=2   decisions=0 usd=0.0101 end=done 
+    2.921s in=2116 out=627 calls=['sensitivity', 'highlight'] -> results 'Starting your cost tour, checking the strongest savings first.'
+    2.628s in=2356 out=539 calls=[] -> visitor "On this setting, I'll rank the cost moves and light the map."
+lora-7b    rounds=22  decisions=4 usd=0.1609 end=http_503:model_error The guide model rejected the request (400). The rule-based tour takes over for now.
+    3.331s in=2116 out=897 calls=['sensitivity', 'highlight'] -> results 'Tour starting for lowest cost, checking the strongest saving first.'
+    3.496s in=2352 out=978 calls=['highlight'] -> results 'Seen the current plan, now ranking the cheapest safe move.'
+    3.557s in=2558 out=893 calls=['highlight', 'set_knob'] -> results 'Fixing the missed move now, applying the top saving.'
+    2.76s in=2787 out=696 calls=['sensitivity'] -> results 'Ranking the next cheapest safe move for this plan.'
+    3.908s in=2992 out=859 calls=['highlight'] -> results 'Highlighting the batch path, then applying the top saver.'
+    3.569s in=3090 out=857 calls=['highlight'] -> results 'Applying the top saver now.'
+    6.112s in=3182 out=1600 calls=[] -> decision ''
+    1.943s in=3404 out=394 calls=['sensitivity'] -> results 'Ranking the next cheapest safe move.'
+    4.925s in=3606 out=1272 calls=['highlight', 'set_knob'] -> results 'Highlighting the batch path and applying the top saver.'
+    4.533s in=3835 out=1237 calls=['sensitivity'] -> results 'Ranking the cheapest safe move for this plan.'
+    1.868s in=4002 out=405 calls=['highlight'] -> results 'Ranking the cheapest safe move and lighting the path it touches.'
+    4.849s in=4208 out=1352 calls=['highlight'] -> results 'Lighting the compute path and applying the top saver.'
+    2.017s in=4299 out=418 calls=[] -> decision 'Ranking the cheapest safe move for this plan.'
+    3.611s in=4648 out=655 calls=['sensitivity', 'highlight'] -> results 'Ranking the cheapest safe move for this plan.'
+    5.472s in=4895 out=1314 calls=['highlight', 'set_knob'] -> results 'Highlighting the compute path for the next saver.'
+    1.279s in=5127 out=251 calls=['sensitivity'] -> results 'Ranking the cheapest safe move for this plan.'
+    4.255s in=5249 out=894 calls=[] -> decision 'Ranking the cheapest safe move for this plan.'
+    3.515s in=5606 out=826 calls=['sensitivity'] -> results 'Ranking the cheapest safe move for this plan.'
+    3.075s in=5728 out=817 calls=['highlight', 'set_knob'] -> results 'Highlighting the sequence path and applying the ranked saver.'
+    2.266s in=5968 out=524 calls=['sensitivity'] -> results 'Ranking the cheapest safe move for this plan.'
+    1.493s in=6056 out=376 calls=[] -> decision 'Nothing safe improves cost any more so the tour ends here.'
+    1.204s in=6308 out=189 calls=['sensitivity'] -> results 'Ranking the cheapest safe move and lighting the path it touches.'
+lora-7b    rounds=14  decisions=4 usd=0.0784 end=done 
+    3.793s in=2116 out=1032 calls=['sensitivity', 'highlight'] -> results 'Starting your cost tour, checking the strongest saving move.'
+    3.208s in=2351 out=855 calls=['set_knob'] -> results "Shortening sequence length looks like the top saver, so I'll make that move."
+    3.249s in=2504 out=837 calls=[] -> decision 'Moved sequence length to 256. This trims padding on short tickets and lowers cost.'
+    3.677s in=2750 out=848 calls=['sensitivity', 'highlight'] -> results 'Checking the next best saver for cost.'
+    6.516s in=3033 out=1451 calls=['set_knob'] -> results "Larger batches look cheaper, so I'll apply that move."
+    3.447s in=3183 out=783 calls=[] -> decision 'Raised batch size to 32. Predicted cost is $10.54 with peak memory 40.1 GiB.'
+    2.217s in=3440 out=504 calls=['sensitivity', 'highlight'] -> results "Saving tour continues, I'll check the next cost move."
+    2.34s in=3689 out=514 calls=['set_knob'] -> results 'Switching to faster hardware for the next saving.'
+    1.889s in=3846 out=392 calls=[] -> decision 'Switched graphics card type. This speeds the run and should lower cost.'
+    2.163s in=4101 out=555 calls=['sensitivity', 'highlight'] -> results 'Saving tour continues, checking the next move.'
+    1.149s in=4303 out=236 calls=['set_knob'] -> results "Lengthening to 512 is the saver, so I'll make that move."
+    2.343s in=4467 out=544 calls=[] -> decision 'Raised sequence length to 512. Predicted cost is $5.38 with peak memory 66.1 GiB.'
+    3.16s in=4732 out=713 calls=['sensitivity', 'highlight'] -> results 'Checking for the next cost saving.'
+    0.914s in=4898 out=137 calls=[] -> visitor 'Nothing safe improves cost further from here.'
+lora-7b    rounds=19  decisions=3 usd=0.1270 end=done 
+    2.215s in=2116 out=570 calls=['sensitivity'] -> results 'Tour starting for lowest cost, checking which knob saves most first.'
+    4.836s in=2273 out=1389 calls=['highlight', 'set_knob'] -> results 'Starting with the biggest saver on the map.'
+    3.036s in=2606 out=993 calls=['sensitivity'] -> results 'Starting the cost tour from your current plan.'
+    6.343s in=2810 out=1600 calls=[] -> decision ''
+    4.393s in=3032 out=1209 calls=['highlight', 'set_knob'] -> results 'Batch size is the next saver, moving it up now.'
+    2.276s in=3261 out=560 calls=['sensitivity'] -> results 'Checking the next cheapest move for your current plan.'
+    3.251s in=3429 out=757 calls=['highlight'] -> results 'Switching to cheaper hardware next.'
+    6.527s in=3517 out=1245 calls=['highlight'] -> results 'Switching to cheaper hardware to cut cost.'
+    4.805s in=3602 out=1299 calls=['highlight'] -> results 'Moving to the cheapest hardware option next.'
+    3.601s in=3749 out=823 calls=['highlight'] -> results 'Switching to cheaper hardware to trim cost further.'
+    2.628s in=3835 out=572 calls=[] -> decision 'Checking what still saves cost from here.'
+    2.415s in=4187 out=536 calls=['sensitivity'] -> results 'Saving cost from your current plan, checking the best knob next.'
+    3.68s in=4358 out=945 calls=['highlight', 'set_knob'] -> results 'Moving to cheaper hardware to lower cost.'
+    2.663s in=4578 out=555 calls=['sensitivity'] -> results 'Cost tour continuing from your current plan.'
+    4.87s in=4699 out=1109 calls=['highlight'] -> results 'Longer context with cleaner throughput path next.'
+    4.844s in=4789 out=1195 calls=['highlight'] -> results 'Lengthening context to trim cost further.'
+    4.229s in=4878 out=903 calls=['highlight'] -> results 'Lengthening context to use the hardware better.'
+    2.472s in=5076 out=556 calls=[] -> decision 'Lengthening context looks cheapest here, checking the map first.'
+    7.093s in=5440 out=1600 calls=[] -> visitor ''
+lora-qwen  rounds=5   decisions=1 usd=0.0289 end=done 
+    3.067s in=2120 out=553 calls=['sensitivity', 'highlight'] -> results 'Touring for lowest cost, checking which knob saves most.'
+    1.747s in=2360 out=471 calls=['set_knob'] -> results 'Switching to the cheapest safe batch size.'
+    4.253s in=2455 out=1121 calls=['sensitivity', 'highlight'] -> results 'Checking next cheapest safe move for this setting.'
+    4.0s in=2628 out=1218 calls=[] -> decision 'No safe knob move lowers cost further from here.'
+    2.836s in=2867 out=551 calls=[] -> visitor 'Nothing safe lowers cost further from here.'
+lora-qwen  rounds=6   decisions=1 usd=0.0382 end=done 
+    2.847s in=2120 out=735 calls=['sensitivity'] -> results 'Tour starting for lowest cost, checking the strongest saving first.'
+    4.558s in=2275 out=1180 calls=['highlight', 'set_knob'] -> results 'Saving the most money first, looking at batch and sequence work.'
+    5.058s in=2556 out=1485 calls=['sensitivity'] -> results 'Checking the next cheapest saving that still fits.'
+    3.761s in=2644 out=1173 calls=[] -> decision 'Starting the cost tour and checking where savings sit.'
+    2.608s in=2991 out=618 calls=['sensitivity'] -> results 'Starting the next cost saving round.'
+    4.782s in=3077 out=1001 calls=[] -> visitor 'Checking the next saving that still fits.'
+lora-qwen  rounds=6   decisions=1 usd=0.0319 end=done 
+    3.026s in=2120 out=654 calls=['sensitivity', 'highlight'] -> results 'Touring your cost dials now, mapping the biggest savers.'
+    3.999s in=2362 out=835 calls=['set_knob'] -> results 'Moving the top saver into place.'
+    4.355s in=2455 out=1194 calls=['sensitivity', 'highlight'] -> results 'Starting the next round of your cost tour.'
+    5.264s in=2628 out=1600 calls=[] -> decision 'Starting your cost tour and checking the strongest saver.'
+    2.236s in=2867 out=602 calls=['sensitivity', 'highlight'] -> results 'Checking the next best cost saver from your current setup.'
+    2.27s in=3042 out=435 calls=[] -> visitor 'Nothing safe improves cost further from here.'
+lora-qwen  rounds=5   decisions=1 usd=0.0226 end=done 
+    1.805s in=2120 out=481 calls=['sensitivity'] -> results 'Starting the cost tour, checking which knob saves most first.'
+    4.464s in=2275 out=1222 calls=['highlight', 'set_knob'] -> results 'Batch size looks dearest, lighting the map and trimming it.'
+    4.25s in=2449 out=1119 calls=['sensitivity'] -> results 'On a cost tour now, checking the dearest knob next.'
+    2.679s in=2541 out=920 calls=[] -> decision 'Nothing safe lowers cost further from here.'
+    2.001s in=2778 out=505 calls=[] -> visitor 'Nothing safe lowers cost further from here.'
+lora-7b    rounds=3   decisions=0 usd=0.0198 end=done 
+    2.651s in=2137 out=692 calls=['sensitivity'] -> results "I'll start the cost-saving tour by checking which adjustment cuts the most."
+    4.914s in=2295 out=1180 calls=['highlight'] -> results "I'll examine how trimming context length affects cost and spotlight the data flow."
+    3.374s in=2505 out=931 calls=[] -> visitor 'I will check the cheapest safe cut for this setup.'
+lora-7b    rounds=2   decisions=0 usd=0.0069 end=done 
+    1.098s in=2137 out=196 calls=['sensitivity'] -> results "Tour started, I'll check which knob trims cost most."
+    2.479s in=2293 out=652 calls=[] -> visitor "I'll start the cost tour by checking the biggest saving move."
+lora-7b    rounds=2   decisions=0 usd=0.0079 end=done 
+    1.982s in=2137 out=470 calls=['sensitivity'] -> results 'Tour starting, checking cheapest safe move.'
+    2.399s in=2289 out=618 calls=[] -> visitor 'Starting your cheapest tour, checking the map for the biggest safe saving.'
+lora-7b    rounds=21  decisions=4 usd=0.1302 end=done 
+    1.856s in=2137 out=445 calls=['sensitivity'] -> results "First I'll check which cost saver fits in memory."
+    2.242s in=2291 out=623 calls=['highlight', 'set_knob'] -> results 'Moving to the top cost saver now.'
+    3.468s in=2518 out=870 calls=['sensitivity'] -> results "I'll examine the cost-saving options for this setting."
+    3.288s in=2723 out=740 calls=['highlight'] -> results "That shorten-the-sequence move is in, so I'll size the next cheapest fitting step."
+    5.193s in=2821 out=1600 calls=[] -> decision ''
+    3.747s in=3043 out=1105 calls=['highlight', 'set_knob'] -> results "I'll size the batch move that fits."
+    3.291s in=3269 out=721 calls=['sensitivity'] -> results "I'll rank the next cheapest fitting move."
+    3.95s in=3435 out=868 calls=['highlight'] -> results 'Moving to the cheaper GPU next.'
+    4.006s in=3518 out=903 calls=['highlight'] -> results "I'll shift to the cheaper fitting GPU."
+    3.28s in=3602 out=778 calls=['highlight'] -> results 'Switching to the cheaper fitting GPU.'
+    2.672s in=3686 out=801 calls=[] -> decision "I'll tour the cost knobs from your current setting."
+    4.568s in=4037 out=1215 calls=['highlight', 'set_knob'] -> results 'Switching to the cheaper fitting GPU.'
+    0.794s in=4262 out=94 calls=['sensitivity'] -> results "I'll rank the next cheapest fitting move."
+    3.582s in=4383 out=845 calls=['highlight'] -> results 'Switching to the longer fitting sequence that still lowers cost.'
+    3.72s in=4483 out=867 calls=['highlight'] -> results 'While tools are pending I will stay silent.'
+    2.651s in=4580 out=535 calls=['highlight'] -> results 'Switching to the longer fitting sequence that still lowers cost.'
+    2.693s in=4680 out=908 calls=[] -> decision 'I must not write while calling tools, so only tool call.'
+    1.966s in=5041 out=559 calls=['highlight', 'set_knob'] -> results 'Switching to the longer fitting sequence that still lowers cost.'
+    1.929s in=5284 out=384 calls=['sensitivity'] -> results "I'll rank the cheapest fitting moves from this new setting."
+    1.684s in=5374 out=222 calls=[] -> decision 'Nothing safe improves cost further from here.'
+    1.604s in=5622 out=259 calls=[] -> visitor 'Nothing safe improves cost further from here.'
+lora-qwen  rounds=6   decisions=1 usd=0.0303 end=done 
+    1.815s in=2141 out=425 calls=['sensitivity'] -> results "I'll start the cost tour by checking which knob saves the most."
+    2.161s in=2297 out=574 calls=['highlight', 'set_knob'] -> results "I'll highlight the batch cost path and dial batch size down to trim spend."
+    3.344s in=2473 out=747 calls=['sensitivity'] -> results "I'll pick up the cost tour from the current setting to find the next saving."
+    5.513s in=2568 out=1327 calls=[] -> decision 'Batch size is now 1. Peak memory is predicted at 5.4 GiB with no failure risk. Cost and time abstained so I do not trust'
+    2.101s in=2841 out=477 calls=['sensitivity'] -> results "I'll pick up the cost tour from the current setting to find the next saving."
+    2.021s in=2936 out=458 calls=[] -> visitor 'Nothing safe improves cost further from here.'
+lora-qwen  rounds=2   decisions=0 usd=0.0118 end=done 
+    2.124s in=2141 out=477 calls=['sensitivity'] -> results "I'll start the cost-saving tour by checking which adjustment saves the most."
+    4.605s in=2298 out=1193 calls=[] -> visitor 'I need to re-check the cost ranking for your current setup before moving any knobs.'
+lora-qwen  rounds=2   decisions=0 usd=0.0124 end=done 
+    3.653s in=2141 out=833 calls=['sensitivity', 'highlight'] -> results "I'll tour the cost-saving knobs for your LoRA run, starting with a sensitivity check."
+    4.919s in=2388 out=1373 calls=[] -> visitor 'No safe move cuts cost without changing what the model learns, so the tour stops here.'
+lora-qwen  rounds=5   decisions=1 usd=0.0239 end=done 
+    1.852s in=2141 out=433 calls=['sensitivity'] -> results "I'll start the cost-saving tour by checking which adjustment cuts the most."
+    3.229s in=2298 out=809 calls=['highlight', 'set_knob'] -> results "Starting the cost tour, I'll highlight the key map and make the top saving move."
+    3.97s in=2481 out=1085 calls=['sensitivity'] -> results "I'll run sensitivity to find the next cost saver."
+    3.695s in=2570 out=1128 calls=[] -> decision "I'll tour the cost knobs for this LoRA job, starting with sensitivity."
+    1.891s in=2923 out=354 calls=[] -> visitor 'Nothing safe improves cost further from here.'
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-CFnAmu6zgTsoVBMtpB1XWr

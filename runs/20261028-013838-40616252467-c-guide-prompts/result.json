@@ -1,0 +1,11 @@
+{
+	"name": "20261028-013838-40616252467-c-guide-prompts",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "40616252467",
+	"ref": "ws-c",
+	"sha": "2de0e3d79aca516b4469627d8917ea2f5e00bb36",
+	"cmd": "modal run api/scripts/guide_tour.py --tours 4 --samples lora-7b,lora-qwen --variants current,no_speak_once,act_now,act_now_speak_once",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-28T01:50:57Z"
+}
