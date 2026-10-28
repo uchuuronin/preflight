@@ -55,6 +55,61 @@ lora-qwen tour ended with a sentence announcing a move ("I'll tour the cost-savi
 and no tool call: a stall. The instruction "write nothing while you are still calling tools"
 was ignored 30 times out of 48 and may have caused the stalls.
 
-## Run 3: four versions of the instructions
+## Run 3: four versions of the instructions, 32 tours, 264 rounds
 
-See the table below (filled from `c-guide-prompts`).
+lora-7b and lora-qwen (the samples where the guide's ranking offers a move that fits), 4 tours
+each per version. "Moved" counts tours that applied at least one move when a fitting move was on
+offer; a stall is a tour that ended with a fitting move on offer and no move.
+
+| Instructions | Moved | Stalls | Loops | Rounds | $ per applied move | Output p95 | Latency p95 |
+|---|---|---|---|---|---|---|---|
+| run 2's (speak once) | 5/8 | 3 | 0 | 70 | 0.025 | 869 | 3.7 s |
+| without "speak once" | 5/8 | 3 | 0 | 72 | 0.030 | 1,029 | 3.8 s |
+| **"call set_knob in the same reply" (act now)** | **7/8** | **1** | 0 | 79 | 0.033 | 1,485 | 6.1 s |
+| act now and speak once | 3/8 | 5 | 0 | 43 | 0.041 | 1,327 | 4.9 s |
+
+With a flat prior, the probability that "act now" moves more often than run 2's instructions is
+0.85, and that it is the best of the four is 0.76. It ships. Its replies run longer (4 rounds hit
+the 1,600 cap), so the cap rises to 2,000 and, from a fit of latency against output over these
+264 rounds (0.50 s + 3.4 ms per output token, worst residual 1.8 s, predicting 9.1 s at the cap),
+the timeout to 12 s. The server also reminds the model once per request when it stops after
+announcing a move its own ranking offered.
+
+## Run 4 (act now, cap 2,000, timeout 12 s), 10 tours, 113 rounds
+
+8/10 moved; but 2 tours reached the round cap with the guide calling `highlight` again and again
+("applying it now") while its move waited for the visitor. Fix: while a move waits, the server
+offers no browser tools at all, and an identical `highlight` or `predict` twice in one turn is
+refused with a hint.
+
+## Run 5 (all of the above), 10 tours, 79 rounds
+
+| | Value |
+|---|---|
+| Moved when a fitting move was offered | 9/10 |
+| Loops to the round cap | 0 |
+| Latency p50 / p95 / max | 3.8 s / 7.1 s / 9.8 s |
+| Output p95 / max | 1,332 / 2,000 (2 rounds at the cap) |
+| $ per tour (mean / max) | 0.034 / 0.093 |
+| $ per applied move | 0.019 |
+| Replies with dashes | 0 |
+
+Three tours ended waiting for a second approval (the harness approves one spending tool per
+tour), which is the guide asking to measure, not a stall. One reply leaked a line about its own
+tools ("I need to call sensitivity but..."), 1 of 79 rounds; watched, not fixed.
+
+## Caveats
+
+- The browser side is a Python stand-in reading grid points only; the cockpit's own provider
+  interpolates and extrapolates, so its numbers can differ slightly. The guide's behaviour (when
+  it calls what) is what these runs measure.
+- 8 to 10 tours per comparison: enough to see a stall rate fall from 3/8 to 1/10, not to rank
+  close versions finely. `api/scripts/guide_tour.py --variants` reruns any comparison.
+- Dollar figures depend on the unconfirmed price table.
+- The slowest round (9.8 s) sits 2.2 s under the 12 s timeout; a timeout hands over to the
+  rule-based tour, it doesn't lose the visitor's work.
+
+## Spend on these runs
+
+Meta Model API at the cited prices: run 1 $0.40, run 2 $0.15, run 3 $1.37, run 4 $0.65, run 5
+$0.34; total about $2.91. Modal: one CPU core per run, no GPU.

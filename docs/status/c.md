@@ -1,5 +1,62 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Tue Oct 27, night (after the merge into main)
+
+**Done** (branch `ws-c`, merged `origin/main` 7faf676 first)
+
+- Muse Spark verified for real: `muse-spark-1.3` on `https://api.meta.ai/v1`, Responses format,
+  tool calls and usage fields as `muse_spark.py` expects. Five rounds of whole tours through the
+  real guide route (`api/scripts/guide_tour.py`, 52 tours, 595 rounds) set the timeout (12 s),
+  output cap (2,000 tokens), per-run and per-visitor caps, and found and fixed three failure
+  modes: re-ranking loops, highlight loops while a move waits, and announcing a move without
+  making it (a chosen instruction plus a one-time server reminder). Last run: the guide moved on
+  9 of 10 tours, no loops, $0.034 per tour. docs/decisions/guide-limits.md.
+- `deploy.yml` runs only by hand, and every deploy is gated on the stranger test.
+- Stranger test (`web/e2e/stranger.mjs`, 16 checks: sample to map, status word on every dial,
+  knob p95 under 400 ms at 4x CPU slowdown, the guide's first move, data-use notice before
+  check-in, phone width). Passes locally and in CI (16/16).
+- 4x CPU slowdown: knob to readout p95 135 to 175 ms (target 400). The slowest interactions fell
+  from about 1 s to 0.5 s at p98 once map nodes stopped being re-measured on every knob change
+  and the decorative loops pause while a hand is on a control. A transition-based variant was
+  tried and dropped (A/B, 5 runs each: no gain, knob latency 149 to 259 ms). The rest is
+  software compositing of the glass blur in headless Chromium, which a GPU does off the main
+  thread.
+- Data-use notice at check-in, every line switched by the flag for that behaviour; the old copy
+  promised deletion after 24 hours and a private mode, neither of which exists.
+- Fit map ("Where it fits", flag `c.fit_map`, key requested from Chiya): two knobs, status per
+  square as the dials show it, boundary placed from interpolated memory. Between grid points the
+  provider now derives P(OOM) from memory with B's formula.
+- `/v1/jobs` (POST, GET, events as SSE, cancel) on A's JobStoreService, off until `runner.queue`.
+
+**Cloud runs** (all through `remote-run.yml`; no GPU used)
+
+| Date | Run | Where | Minutes | USD |
+| --- | --- | --- | --- | --- |
+| Oct 28 00:56 UTC | c-smoke-models | GitHub runner; 43 Meta + 20 Baseten tiny calls | 1 | < 0.01 |
+| Oct 28 00:56 | c-guide-tour | Modal CPU, crashed on start until the timeout (path bug) | 30 | Modal CPU only, no model calls |
+| Oct 28 01:27 | c-guide-tour | Modal 1 CPU core + Meta, 91 rounds | 3 | 0.40 Meta |
+| Oct 28 01:34 | c-guide-tour-2 | Modal 1 CPU core + Meta, 48 rounds | 3 | 0.15 Meta |
+| Oct 28 01:38 | c-guide-prompts | Modal 1 CPU core + Meta, 264 rounds | 13 | 1.37 Meta |
+| Oct 28 01:52 | c-guide-tour-4 | Modal 1 CPU core + Meta, 113 rounds | 6 | 0.65 Meta |
+| Oct 28 01:59 | c-guide-tour-5 | Modal 1 CPU core + Meta, 79 rounds | 6 | 0.34 Meta |
+| Oct 28 01:34 | guide-smoke (push) | GitHub runner + Meta, 6 calls | 1 | 0.02 Meta |
+
+Meta dollars use the guide's price table ($1.25 / $4.25 / $0.15 per million in, out, cached),
+which is cited but not confirmed against Meta's Usage page. Modal CPU charges are on Modal's
+usage page; nothing here used a GPU.
+
+**Blocked**
+
+- The ledger container's hourly cost: measured on the first deploy, which waits for the
+  Cloudflare Pages project.
+- Retention: the data-use notice says nothing is deleted automatically, because nothing is.
+  Needs a decision (asked in chat) and then deletion built before the notice promises it.
+
+**Next**
+
+- Remaining review items: none of C's are open except the ledger's hourly cost (first deploy).
+- Watch: a guide reply leaked a line about its own tools once in 79 rounds.
+
 ## Tue Oct 27, evening (review: security, live tour, honest readouts)
 
 **Done** (branch `ws-c`, pushed a72a724, a138e3f, 96cce42)
