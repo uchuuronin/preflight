@@ -838,6 +838,11 @@ a {
 .pf-dial__note.is-risk::before { content: "✕ "; }
 .pf-dial__note.is-tight { color: var(--pf-tight); }
 .pf-dial__note.is-tight::before { content: "▲ "; font-size: 0.85em; }
+.pf-dial__status { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 6px; font-size: 10.5px; color: var(--pf-fg-dim); }
+.pf-dial__off { font-family: var(--pf-font-mono); color: var(--pf-tight); }
+.pf-dial__off::before { content: "› "; }
+.pf-dial__val.is-off { stroke-linecap: butt; }
+.pf-dial__note.is-fits::before { content: "● "; font-size: 0.8em; }
 .pf-dial__goal { padding: 1px 8px; border-radius: var(--pf-radius-pill); background: var(--pf-pill-bg); color: var(--pf-pill-fg); font-size: 10.5px; font-weight: 600; }
 
 /* The orbit map */
@@ -1329,6 +1334,11 @@ a {
 .pf-mseg--5 { background: var(--pf-term-5); }
 .pf-mseg--6 { background: var(--pf-term-6); }
 .pf-mseg--0 { background: repeating-linear-gradient(135deg, var(--pf-track) 0 4px, var(--pf-stroke-strong) 4px 6px); }
+.pf-mseg-over { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, transparent 0 4px, var(--pf-stroke-strong) 4px 6px); outline: 1px dashed var(--pf-stroke-strong); outline-offset: -1px; }
+.pf-legend .pf-mseg-over { position: static; display: inline-block; outline: 1px dashed var(--pf-stroke-strong); }
+.pf-peak { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px dashed var(--pf-fg); transition: left var(--pf-dur-value) var(--pf-ease); }
+.pf-stack__off { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--pf-fail); }
+.pf-mring-untrusted { fill: none; stroke: var(--pf-stroke-strong); stroke-width: 16; opacity: 0.9; transform-box: view-box; transform-origin: 300px 280px; }
 .pf-cap { position: absolute; top: -14px; bottom: -6px; width: 2px; background: var(--pf-fg); transition: left var(--pf-dur-value) var(--pf-ease); }
 .pf-cap span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-family: var(--pf-font-mono); font-size: 10.5px; white-space: nowrap; }
 .pf-legend {

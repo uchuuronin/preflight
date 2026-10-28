@@ -1,5 +1,6 @@
-"""App factory. Middleware: request id, anonymous session cookie. Every router in
-api/addons/ (owned by D) is mounted automatically, so add-on routes never touch this file.
+"""App factory. Middleware: request id, the edge check (the API is reached through the web
+app's own origin, edge.py) and the signed anonymous session cookie (session.py). Every router
+in api/addons/ (owned by D) is mounted automatically, so add-on routes never touch this file.
 """
 
 from __future__ import annotations
@@ -7,7 +8,6 @@ from __future__ import annotations
 import importlib.util
 import logging
 import os
-import secrets
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,20 +17,28 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from . import errors
+from . import edge, errors, session
 from .errors import envelope
-from .guide.budget import Ledger, MemoryLedger
+from .guide.executors import Executor, job_executor
 from .guide.muse_spark import TIMEOUT_S
 from .idempotency import IdempotencyStore, MemoryIdempotencyStore
+from .ledger import Ledger, MemoryLedger, ModalLedger
 from .routes import guide as guide_routes
 from .routes import health as health_routes
 from .routes import records as records_routes
-from .stores import LocalRecordStore, RecordStore
+from .stores import LocalRecordStore, RecordStore, SampleStore
 
 log = logging.getLogger("preflight.api")
 
 ADDONS_DIR = Path(__file__).resolve().parents[1] / "addons"
-SESSION_COOKIE = "pf_session"
+REPO_ROOT = Path(os.environ.get("PREFLIGHT_ROOT", Path(__file__).resolve().parents[2]))
+
+
+def default_ledger() -> Ledger:
+	"""The shared single-container ledger in production; in-process for development and tests."""
+	if os.environ.get("PREFLIGHT_LEDGER") == "modal":
+		return ModalLedger()
+	return MemoryLedger()
 
 
 def mount_addons(app: FastAPI, directory: Path = ADDONS_DIR) -> list[str]:
@@ -67,8 +75,12 @@ def create_app(
 	ledger: Ledger | None = None,
 	idempotency: IdempotencyStore | None = None,
 	http: httpx.AsyncClient | None = None,
+	jobs: Executor | None = None,
+	samples: SampleStore | None = None,
 	addons_dir: Path = ADDONS_DIR,
 ) -> FastAPI:
+	session._keys()  # fail at start-up, not on the first visitor, if production has no key
+
 	@asynccontextmanager
 	async def lifespan(app: FastAPI):
 		own = http is None
@@ -85,34 +97,39 @@ def create_app(
 		openapi_url="/v1/openapi.json",
 	)
 	app.state.records = records or LocalRecordStore(Path(os.environ.get("PREFLIGHT_RECORDS_DIR", "records")))
-	app.state.ledger = ledger or MemoryLedger()
+	app.state.ledger = ledger or default_ledger()
 	app.state.idempotency = idempotency or MemoryIdempotencyStore()
 	app.state.http = http
+	app.state.samples = samples or SampleStore(REPO_ROOT)
+	app.state.jobs = jobs if jobs is not None else job_executor()
 
 	errors.install(app)
 
-	origins = [
-		o
-		for o in os.environ.get("PREFLIGHT_WEB_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(
-			","
+	# Production serves the API from the web app's origin (same site), so there's no CORS at all.
+	# Development may list the Vite dev server here.
+	origins = [o for o in os.environ.get("PREFLIGHT_WEB_ORIGINS", "").split(",") if o]
+	if origins:
+		app.add_middleware(
+			CORSMiddleware,
+			allow_origins=origins,
+			allow_credentials=True,
+			allow_methods=["GET", "POST"],
+			allow_headers=["Content-Type", "Idempotency-Key"],
+			expose_headers=["X-Request-Id", "Retry-After"],
 		)
-		if o
-	]
-	app.add_middleware(
-		CORSMiddleware,
-		allow_origins=origins,
-		allow_credentials=True,
-		allow_methods=["GET", "POST"],
-		allow_headers=["Content-Type", "Idempotency-Key"],
-		expose_headers=["X-Request-Id", "Retry-After"],
-	)
 
 	@app.middleware("http")
 	async def request_context(request: Request, call_next):
 		request.state.request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
-		session = request.cookies.get(SESSION_COOKIE)
-		fresh = not session or len(session) > 64
-		request.state.session = secrets.token_urlsafe(18) if fresh else session
+		if not edge.allowed(request):
+			return JSONResponse(
+				envelope(request, "forbidden", "Use the Preflight app's own address.", False), status_code=403
+			)
+		raw = request.cookies.get(session.COOKIE)
+		sid = session.verify(raw)
+		fresh = sid is None
+		resign = not fresh and session.needs_resign(raw)
+		request.state.session = sid or session.new_session_id()
 		try:
 			response = await call_next(request)
 		except Exception:
@@ -124,15 +141,18 @@ def create_app(
 				status_code=500,
 			)
 		response.headers["X-Request-Id"] = request.state.request_id
-		if fresh:
+		if fresh or resign:
 			response.set_cookie(
-				SESSION_COOKIE,
-				request.state.session,
-				max_age=30 * 86400,
+				session.COOKIE,
+				session.sign(request.state.session),
+				max_age=session.MAX_AGE_S,
+				path="/",
 				httponly=True,
-				secure=os.environ.get("PREFLIGHT_INSECURE_COOKIES") != "1",
+				secure=True,  # required by the __Host- prefix; tests use an https base URL
 				samesite="lax",
 			)
+			if request.cookies.get(session.LEGACY_COOKIE):
+				response.delete_cookie(session.LEGACY_COOKIE)
 		return response
 
 	app.include_router(health_routes.router)

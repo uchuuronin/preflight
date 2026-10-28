@@ -44,3 +44,39 @@ class LocalRecordStore:
 
 	def healthy(self) -> bool:
 		return self.root.is_dir()
+
+
+#: Sample flights served from the repo, so every visitor can try the cockpit and the guide
+#: without running anything. Ids match web/src/workspace/record/load.ts SAMPLES.
+SAMPLES: dict[str, str] = {
+	"lora-7b": "web/src/workspace/fixtures/dev-finetune.record.json",
+	"lora-qwen": "schema/examples/finetune.json",
+	"pretrain": "schema/examples/pretrain.json",
+	"agent": "schema/examples/agent.json",
+}
+
+
+class SampleStore:
+	"""Bundled sample records by id. Read once and kept: they never change while running."""
+
+	def __init__(self, root: Path) -> None:
+		self.root = root
+		self._cache: dict[str, dict] = {}
+
+	def get(self, sample_id: str) -> dict | None:
+		if sample_id not in SAMPLES:
+			return None
+		if sample_id not in self._cache:
+			path = self.root / SAMPLES[sample_id]
+			if not path.is_file():
+				return None
+			rec = json.loads(path.read_text())
+			# A sample's key is its id, so each visitor's session on it is one run for the caps.
+			rec["record_id"] = f"sample:{sample_id}"
+			self._cache[sample_id] = rec
+		return self._cache[sample_id]
+
+
+def resolve_record(ref: str, samples: SampleStore, records: RecordStore) -> dict | None:
+	"""A record by sample id or share token. The run id comes from the record, never the request."""
+	return samples.get(ref) or records.by_share_token(ref)

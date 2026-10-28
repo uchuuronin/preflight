@@ -5,7 +5,7 @@ export default defineConfig({
 	plugins: [react()],
 	server: {
 		proxy: {
-			// Local API during development; production uses VITE_API_BASE.
+			// Local API during development; in production the Pages Function at functions/v1 forwards to Modal.
 			"/v1": "http://127.0.0.1:8000",
 		},
 	},

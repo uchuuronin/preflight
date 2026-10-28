@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.1.0. Generated; do not edit.
+ * Preflight contract v0.2.0. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -47,6 +47,14 @@ export interface FlightRecord {
 	campaign?: Campaign | null;
 	provenance?: ModelCall[];
 	costs?: Costs;
+	/**
+	 * Where the run cost's rates come from (B)
+	 */
+	cost_basis?: CostBasis | null;
+	/**
+	 * The run cost breakdown, written by B
+	 */
+	job_cost?: JobCost | null;
 }
 /**
  * Written by A.
@@ -1153,8 +1161,7 @@ export interface ModelCall {
 	ok?: boolean;
 }
 /**
- * This interface was referenced by `PreflightContract`'s JSON-Schema
- * via the `definition` "Costs".
+ * What Preflight itself spent making this record (probes, verify, model calls); never part of the run cost
  */
 export interface Costs {
 	gpu_usd?: number;
@@ -1162,6 +1169,107 @@ export interface Costs {
 	breakdown?: {
 		[k: string]: number | undefined;
 	};
+}
+/**
+ * Where the run cost's rates come from, so every cost readout can say what it is based on.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "CostBasis".
+ */
+export interface CostBasis {
+	/**
+	 * Version of B's price table, e.g. 'prices@2026-10-27'
+	 */
+	price_table: string;
+	/**
+	 * Date the rates were checked
+	 */
+	as_of: string;
+	/**
+	 * Provider the user picked, e.g. 'modal', 'unity', 'amd-devcloud'
+	 */
+	provider: string;
+	region?: string | null;
+	billing?: "on_demand" | "spot" | "own_cluster";
+	/**
+	 * Rates are USD; fmt() converts for display
+	 */
+	currency?: "USD";
+	/**
+	 * Line kinds counted in the total
+	 */
+	includes?: ("gpu" | "tokens" | "storage")[];
+}
+/**
+ * What the job itself would cost to run in full. Preflight's own spend is `costs`, never here.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "JobCost".
+ */
+export interface JobCost {
+	lines?: CostLine[];
+	/**
+	 * Sum of billed lines, lows and highs added line by line; None on own cluster
+	 */
+	total_usd?: Estimate | undefined | null;
+	/**
+	 * Shown first on the user's own cluster
+	 */
+	gpu_hours?: Estimate | undefined | null;
+	/**
+	 * On-demand price of the same GPU-hours, shown grey on an own cluster
+	 */
+	market_equivalent_usd?: Estimate | undefined | null;
+	/**
+	 * Chance of failure x cost up to the failure point; shown beside the total, never in it
+	 */
+	at_risk_usd?: Estimate | undefined | null;
+}
+/**
+ * One line of the run cost: a predicted quantity times a rate from the price table.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "CostLine".
+ */
+export interface CostLine {
+	kind: "gpu" | "tokens" | "storage";
+	/**
+	 * t() key for the line's label
+	 */
+	label_key: string;
+	quantity: Estimate1;
+	/**
+	 * USD per unit; None when not billed
+	 */
+	rate_usd?: number | null;
+	/**
+	 * quantity x rate; None when not billed in dollars
+	 */
+	usd?: Estimate | undefined | null;
+	/**
+	 * Id of the price-table row the rate came from
+	 */
+	price_row?: string | null;
+}
+/**
+ * One number on screen: a point with an interval, or an honest abstention.
+ */
+export interface Estimate1 {
+	point: number | null;
+	lo: number | null;
+	hi: number | null;
+	unit: string;
+	status: "measured" | "predicted" | "extrapolated" | "abstain";
+	model_id: string;
+	source: "grid" | "exact";
+	/**
+	 * Why the engine abstained or extrapolated
+	 */
+	reason?: string | null;
+	/**
+	 * Nominal coverage of [lo, hi]
+	 */
+	level?: number;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1259,5 +1367,16 @@ export interface KnobImpact {
 	best_value?: boolean | number | string | null;
 	reason?: string | null;
 }
+/**
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "Costs".
+ */
+export interface Costs1 {
+	gpu_usd?: number;
+	llm_usd?: number;
+	breakdown?: {
+		[k: string]: number | undefined;
+	};
+}
 
-export const SCHEMA_VERSION = "0.1.0";
+export const SCHEMA_VERSION = "0.2.0";

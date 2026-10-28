@@ -1,5 +1,18 @@
 # Status: D (usability add-ons)
 
+## Cloud runs
+
+Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars.
+
+| Date | GPU | Minutes | Dollars | What |
+|---|---|---|---|---|
+| | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
+
+## Tue Oct 27, evening (merged `main` at 7faf676)
+
+- Merged `main`. Requests moved to `docs/requests/from-d.md`, brought up to date: C's three replies (loading fix, knob-view hook, provider and ranking) moved to Done; the dial rerun on B's real grids added as a request to B.
+- Checks on the merged tree: 197 web tests, typecheck, build, ruff, no em dashes. Python 647 passed; 4 of A's `test_probe_sandbox.py` tests fail here and 6 fail on a clean `main`, because the sandbox expects to run as a non-root user and this container runs as root. Not D's code.
+
 ## Tue Oct 27, afternoon (after the Oct 27 review; merged `ws-c` at a2b21af)
 
 **Done** (branch `ws-d`, committed locally, not pushed)
@@ -14,7 +27,6 @@
 **Open with Chiya**
 
 - Should "New to this" also show the knobs of warning findings (packing, fp32, sparse checkpoints)?
-- Push: three earlier commits plus today's review work.
 - `d.freetier` flag key.
 
 **Blocked**

@@ -24,3 +24,7 @@ traces/
 *.bin
 # local record store for API development
 api/records/
+
+# outputs of cloud runs (published to the remote-runs branch instead)
+out/
+_results/

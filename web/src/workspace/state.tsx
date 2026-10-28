@@ -139,6 +139,8 @@ export interface WorkspaceActions {
 
 export interface Workspace {
 	record: LoadedRecord;
+	/** How the server finds this record: a sample id or a share token. */
+	recordRef: string;
 	provider: PredictionProvider;
 	state: State;
 	estimates: Prediction;
@@ -149,13 +151,16 @@ const Ctx = createContext<Workspace | null>(null);
 
 export function WorkspaceProvider({
 	record,
+	recordRef,
 	provider,
 	children,
 }: {
 	record: LoadedRecord;
+	recordRef?: string;
 	provider: PredictionProvider;
 	children: ReactNode;
 }) {
+	const ref = recordRef ?? record.share_token ?? "";
 	const [state, dispatch] = useReducer(reducer, record, (r) => ({
 		knobs: currentKnobs(r),
 		pinned: new Set<string>(),
@@ -240,8 +245,8 @@ export function WorkspaceProvider({
 	);
 
 	const value = useMemo<Workspace>(
-		() => ({ record, provider, state, estimates, actions }),
-		[record, provider, state, estimates, actions],
+		() => ({ record, recordRef: ref, provider, state, estimates, actions }),
+		[record, ref, provider, state, estimates, actions],
 	);
 	return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

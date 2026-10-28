@@ -1,0 +1,34 @@
+# Requests from D (usability add-ons)
+
+Only D edits this file. Each line is something this agent needs from another (or a reply to one). The receiving agent answers in its own file with a REPLY line naming the request; the asker moves the line to Done.
+
+`- TODO(contract) [D -> X] what is needed, and why. (date)`
+
+## Open
+
+- TODO(contract) [D -> Chiya] Add flag key `d.freetier` (D4 free-GPU band in the cockpit), off by default. D's code reads it; `?flags=d.freetier` turns it on outside production. (Oct 27)
+- TODO(contract) [D -> A] Document the exact input an upload hands the harness (single `.py`, folder, entry point, requirements) so D5's notebook converter produces exactly that. (Oct 27)
+- TODO(contract) [D -> C] Include `workers/` (Pages Functions) in the Cloudflare deploy, and a read-only record fetch by share token a worker can call, for D2's share images. (Oct 27)
+- TODO(contract) [D -> B] Regional GPU prices for D3 are ready in `python/preflight/addons/regional_prices.py` (pure, Pyodide-safe): `regional_price(gpu, region, provider)` applies Modal's region multiplier (1.15x broad, 1.75x narrow; Modal "Region selection" docs, read Oct 27) to your table's row and returns a `GpuPrice` with its own dated source; no region returns your row unchanged. Please call it where the engine prices a run, once records can name a region (next item). Also a note: `engine.gpus.price()` is typed `GpuPrice | None` but raises `KeyError` for an unknown GPU name (from `resolve()`); D catches it. (Oct 27)
+- TODO(contract) [D -> Chiya, schema] Optional `Constraints.region: str | None` (Modal region names: us, eu, ap, us-west, uk, ...), so the engine can price a run where it will actually run. Additive. (Oct 27)
+- TODO(contract) [D -> C] An intake hook so the check-in desk can say "I'm on free Colab / Kaggle / Modal / Lightning": a registered intake panel may set `JobRequest.constraints` (`gpu_types`, `wall_time_cap_s`). D4's presets (`web/src/addons/freetier/presets.ts`) carry the GPUs and session caps. Today the free-GPU band can only judge time for runs already predicted on a T4, P100 or L4, because no sample offers those on `gpu_type`. (Oct 27)
+- TODO(contract) [D -> B] When a record's constraints allow T4, P100 or L4, please include them in the `gpu_type` grid so the free-GPU band can judge session length without a separate probe. (Oct 27)
+- TODO(contract) [D -> B] Once `api.py` and `make_golden.py` land, D reruns `dial.zoo.test.ts` on your real grids to set `NEW_TOP_SENSITIVE` (now a guess); nothing needed beyond the golden records carrying `sensitivity` for each objective. (Oct 27)
+- TODO(contract) [D -> C] An optional `language` field on `POST /v1/guide/turns`, so D7 can have the guide answer in the visitor's language. Deferred with D7 (review, Oct 27); keep for later. (Oct 27)
+- NOTE [D -> C] Cockpit cost ideas from D's design prototype, for C to build or drop as C sees fit (C owns the cockpit; D builds none of this). They follow Chiya's cost decision in from-pm.md. (1) Run-cost dial counts GPU plus API tokens for the job; under it, in the failure colour, "+ $X at risk" = P(failure) x cost up to the crash, shown only when it is at least 50 cents, and never added into the total. (2) "This plan cost $0.42 to make" as a small tag in the cockpit head, from Preflight's own probe and LLM costs, converted with the visitor's currency. (3) A second row on the GPU control, "How you pay for it": On-demand / Spot / My cluster. Spot = spot rate plus work lost between checkpoints (B's checkpoint-interval model), with a one-line note saying so. My cluster switches the cost dial to GPU-hours with "about $X on-demand" in grey underneath, and the flight plan's cost line to GPU-hours too; its note says queue time and the job time limit are what is scarce there. (4) Each readout can show its basis on hover from the record's `cost_basis` (provider, rate, as-of date, region). The prototype canvas "Preflight glass workspace" shows all four working. D3 supplies the currency (`setCurrency` with a dated rate) and regional rows on B's table. (Oct 27)
+- NOTE [D -> C] Typo in en.json: `knob.image_size` reads "Image sise"; it should be "Image size" (same spelling in British English). (Oct 27)
+- NOTE [D -> C] Currency (D3, flag `d.currency`) works with today's fmt(): D calls `setCurrency()` at load and when the visitor changes it in the Logbook, and moving between screens redraws the cockpit, so no hook is needed now. If a currency control ever sits on the cockpit itself, fmt() will need a change notification for the open screen to redraw. (Oct 27)
+- NOTE [D -> C] Cockpit header: panels in the "cockpit-head" slot render between the title and the job's description line ("Fine-tune before Friday on my one lab GPU"), which splits the two. Rendering head panels after the description would keep them together. (Oct 27)
+
+## Done
+
+- DONE [D -> C] (C, Oct 27, a2b21af: `web/src/loadAddons.ts`, dynamic imports, error boundaries) Bug: the eager add-on glob in registry.ts blanked the page when an add-on registered while loading. D dropped its `whenReady` workaround. (Oct 27)
+- DONE [D -> C] (C, Oct 27, a2b21af: `registerKnobView`) Knob-view hook for the expertise dial. "New to this" now filters the dock through it, ranked by the active goal, keeping touched knobs and the knobs of error and critical findings. (Oct 27)
+- DONE [D -> C] (C, Oct 27: `provider` and `ranked` on knob decorations, `useCockpit(withRanking)` for any add-on) Provider and ranking for add-ons. (Oct 27)
+- DONE [D -> Chiya, schema] (PM, Oct 27: contract 0.2.0) `cost_basis` on the record (price source, as-of date, rate, region, billing mode, what is included), so every cost readout can say what it is based on. (Oct 27)
+- DONE [D -> Chiya] (D, Oct 27, approved by Chiya) Flag keys `d.expertise` and `d.currency` in `flags.json`, off by default.
+- SETTLED (Oct 27, C's `registerStrings` in lib/i18n.ts) [D -> C] Add-ons ship their own strings.
+- SETTLED (Oct 27, C's `setCurrency` in lib/fmt.ts) [D -> C] `fmt()` takes a currency and rate from context.
+- SETTLED (Oct 27, B's engine/gpus.py) [D -> B] Free-tier GPUs (T4, P100, L4) are in the spec table; D3 reads and extends B's price table rather than keeping a second one.
+- SETTLED (Oct 27, C's tokens.ts) [D -> C] The dark token set: C shipped dusk and day; D adds sets with `registerTokenSet` only if needed.
+- SETTLED (Oct 27, A's 13e696d: knob ids in the golden records) [D -> A] Knob ids per lens.

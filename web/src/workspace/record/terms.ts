@@ -68,10 +68,10 @@ export function memoryTermBytes(est: Prediction, term: MemoryTerm): number {
 	return usable(e) ? Math.max(0, e.point) : 0;
 }
 
-export type MemoryGroupKey = "weights" | "training" | "activations" | "logits" | "generation" | "eval" | "other" | "total";
+export type MemoryGroupKey = "weights" | "training" | "activations" | "logits" | "generation" | "eval" | "untrusted" | "total";
 
 /** Ring and stack groups: colour slot, terms, and the label key. Six slots, D's five plus generation. */
-export const MEMORY_GROUPS: Array<{ key: Exclude<MemoryGroupKey, "other" | "total">; slot: 1 | 2 | 3 | 4 | 5 | 6; terms: MemoryTerm[] }> = [
+export const MEMORY_GROUPS: Array<{ key: Exclude<MemoryGroupKey, "untrusted" | "total">; slot: 1 | 2 | 3 | 4 | 5 | 6; terms: MemoryTerm[] }> = [
 	{ key: "weights", slot: 1, terms: ["weights", "master_weights", "frozen_models", "context"] },
 	{ key: "training", slot: 2, terms: ["gradients", "optimizer", "comm_buffers"] },
 	{ key: "activations", slot: 3, terms: ["activations"] },
@@ -83,36 +83,71 @@ export const MEMORY_GROUPS: Array<{ key: Exclude<MemoryGroupKey, "other" | "tota
 export interface MemorySegment {
 	key: MemoryGroupKey;
 	bytes: number;
+	/** 0 is the hatched "untrusted" fill. */
 	slot: 0 | 1 | 2 | 3 | 4 | 5 | 6;
 	/** The terms inside this group with their own bytes, for the legend and the detail sheet. */
 	parts: Array<{ term: MemoryTerm; bytes: number }>;
 }
 
 /**
- * Memory at the peak, grouped for the ring. Terms are reported at their own moments (the eval
- * spike is extra on top of training), so the sum can drift from the peak: when it overshoots
- * the groups are scaled to the peak, and when it falls short the rest shows as "other".
+ * Parts and peak agree when they differ by at most this share of the peak. Source: guess, the
+ * float16 grid's rounding (about 0.1% per value) summed over up to 12 terms with headroom;
+ * replaced by B's measured residual between summed terms and probe peaks once B reports it.
  */
-export function memorySegments(est: Prediction, peakBytes: number | null): { segments: MemorySegment[]; breakdown: boolean } {
+export const PARTS_AGREE_WITHIN = 0.02;
+
+export interface MemoryStack {
+	segments: MemorySegment[];
+	breakdown: boolean;
+	/** Sum of the trusted parts, at their own sizes. */
+	partsBytes: number;
+	/** The predicted peak, when trusted. */
+	peakBytes: number | null;
+	/**
+	 * Where parts and peak disagree. "gap": the peak is bigger, the rest is a hatched segment.
+	 * "overshoot": the parts add up to more than the peak; nothing is rescaled, the excess past
+	 * the peak line is marked untrusted instead.
+	 */
+	untrusted: { kind: "gap" | "overshoot"; bytes: number } | null;
+	/** Terms the record predicts that abstain at these settings (their bytes are unknown). */
+	abstaining: MemoryTerm[];
+}
+
+/**
+ * Memory at the peak, grouped for the ring and the stack, each part at its own predicted size.
+ * Terms are reported at their own moments, so the sum can drift from the peak; that drift is
+ * shown as untrusted, never hidden by scaling the parts.
+ */
+export function memorySegments(est: Prediction, peakBytes: number | null): MemoryStack {
+	const abstaining: MemoryTerm[] = [];
+	for (const term of MEMORY_TERMS) {
+		const key = memoryTermKey(est, term);
+		if (key && !usable(est[key])) abstaining.push(term);
+	}
 	const groups: MemorySegment[] = MEMORY_GROUPS.map((g) => {
 		const parts = g.terms.map((term) => ({ term, bytes: memoryTermBytes(est, term) })).filter((p) => p.bytes > 0);
 		return { key: g.key, slot: g.slot, bytes: parts.reduce((a, p) => a + p.bytes, 0), parts };
 	}).filter((s) => s.bytes > 0);
 	const breakdown = groups.some((g) => g.key === "weights" || g.key === "activations");
 	if (!breakdown) {
-		return { segments: peakBytes ? [{ key: "total", bytes: peakBytes, slot: 1, parts: [] }] : [], breakdown: false };
+		return {
+			segments: peakBytes ? [{ key: "total", bytes: peakBytes, slot: 1, parts: [] }] : [],
+			breakdown: false,
+			partsBytes: 0,
+			peakBytes,
+			untrusted: null,
+			abstaining,
+		};
 	}
 	const sum = groups.reduce((a, g) => a + g.bytes, 0);
-	if (peakBytes && sum > peakBytes * 1.02) {
-		const k = peakBytes / sum;
-		for (const g of groups) {
-			g.bytes *= k;
-			for (const p of g.parts) p.bytes *= k;
-		}
-	} else if (peakBytes && peakBytes - sum > peakBytes * 0.02) {
-		groups.push({ key: "other", bytes: peakBytes - sum, slot: 0, parts: [] });
+	let untrusted: MemoryStack["untrusted"] = null;
+	if (peakBytes && sum - peakBytes > peakBytes * PARTS_AGREE_WITHIN) {
+		untrusted = { kind: "overshoot", bytes: sum - peakBytes };
+	} else if (peakBytes && peakBytes - sum > peakBytes * PARTS_AGREE_WITHIN) {
+		untrusted = { kind: "gap", bytes: peakBytes - sum };
+		groups.push({ key: "untrusted", bytes: peakBytes - sum, slot: 0, parts: [] });
 	}
-	return { segments: groups, breakdown: true };
+	return { segments: groups, breakdown: true, partsBytes: sum, peakBytes, untrusted, abstaining };
 }
 
 /* ---------- GPUs (generated from engine/gpus.py) ---------- */
