@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.3.0. Generated; do not edit.
+ * Preflight contract v0.4.0. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -1554,4 +1554,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.3.0";
+export const SCHEMA_VERSION = "0.4.0";

@@ -386,5 +386,5 @@
 	"title": "JobEvent",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.3.0/JobEvent"
+	"$id": "https://preflight.dev/schema/0.4.0/JobEvent"
 }
