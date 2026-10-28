@@ -97,7 +97,7 @@ def test_hf_trainer_probe_measures_padding(tmp_path):
 	assert p.extras["micro_steps_per_step"] == 2
 	# the real run's length: the Trainer plans args.max_steps optimizer steps; no epoch count then
 	assert p.extras["planned_steps"] == 500 and "epochs" not in p.extras
-	assert p.extras["train_loader_batches"] > 0
+	assert p.extras["train_loader_batches"] > 0  # the Varlen set over per-device batches
 	assert len(p.stability.series["loss"]) == 4 + PHASE_STEPS
 
 

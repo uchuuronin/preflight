@@ -489,11 +489,14 @@ class Recorder:
 				rec._pretrain_batches[id(it)] = n
 				if n > PRETRAIN_EVAL_CAP:
 					raise StopIteration  # a validation pass before training, cut like any eval
-			elif rec.train_loader_batches is None:
-				with suppress(Exception):  # an IterableDataset has no length: the run's length stays unknown
+			elif not rec._trained:
+				# the loader whose batch feeds the first training step: kept until the first backward
+				# (a batch drawn from another loader earlier, for a fixed sample or stats, is replaced),
+				# then frozen. An IterableDataset has no length: the run's length stays unknown
+				n = None
+				with suppress(Exception):
 					n = len(it)
-					if isinstance(n, int) and n > 0:
-						rec.train_loader_batches = n
+				rec.train_loader_batches = n if isinstance(n, int) and n > 0 else None
 			rec._maybe_stop()
 			rec._sync()
 			t0 = rec._now()

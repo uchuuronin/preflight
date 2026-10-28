@@ -47,8 +47,12 @@ def _bare(work: Path, bare_steps: int, *, install_requirements: bool, caches: Pa
 			return {"failed": f"requirements: {err}"}
 		env["PYTHONPATH"] = os.pathsep.join([*map(str, dirs), env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
 	out = work / "bare.json"
-	t = subprocess.run([sys.executable, "-m", "preflight.recorder.bare", str(work / "train.py"), str(out),
-		"--steps", str(bare_steps)], capture_output=True, text=True, timeout=BARE_TIMEOUT_S, env=env, cwd=work)  # fmt: skip
+	try:
+		t = subprocess.run([sys.executable, "-m", "preflight.recorder.bare", str(work / "train.py"), str(out),
+			"--steps", str(bare_steps)], capture_output=True, text=True, timeout=BARE_TIMEOUT_S, env=env, cwd=work)  # fmt: skip
+	except subprocess.TimeoutExpired:
+		# keep going: the recorder run is still worth having from a paid session
+		return {"failed": f"the bare run took longer than {BARE_TIMEOUT_S} s"}
 	if out.exists():
 		return json.loads(out.read_text())
 	return {"failed": (t.stdout + t.stderr)[-3000:]}
