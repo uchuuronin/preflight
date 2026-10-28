@@ -9,7 +9,8 @@
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"preview": "vite preview",
-		"stranger": "node e2e/stranger.mjs"
+		"stranger": "node e2e/stranger.mjs",
+		"record-map": "node e2e/record_map.mjs"
 	},
 	"dependencies": {
 		"@xyflow/react": "^12.12.0",
