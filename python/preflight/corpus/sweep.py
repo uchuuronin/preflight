@@ -84,10 +84,21 @@ def wave_billed_seconds(wall_s: float, containers: int, scaledown_s: float = SCA
 	return max(0.0, wall_s + scaledown_s) * max(0, containers)
 
 
+def container_timeout_s(batch: int, deadline_s: float) -> int:
+	"""Modal's timeout for one wave's containers: a full batch at the deadline plus start-up, the child's kill grace
+	and the volume work, so a hang anywhere in the container (not only in a config) ends where the bound assumed."""
+	from preflight.corpus.isolate import KILL_GRACE_S
+
+	return math.ceil(batch * (deadline_s + KILL_GRACE_S) + STARTUP_S)
+
+
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
 	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
 	at its deadline, and idles out. Retries are off, so a preempted batch is not re-run inside the wave."""
-	return max(0, containers) * (max(0, batch) * deadline_s + STARTUP_S + SCALEDOWN_S)
+	if containers <= 0 or batch <= 0:
+		return 0.0
+	# each container is cut off at container_timeout_s by Modal, then idles out
+	return containers * (container_timeout_s(batch, deadline_s) + SCALEDOWN_S)
 
 
 def plan_wave(
@@ -101,9 +112,12 @@ def plan_wave(
 ) -> tuple[int, int]:
 	"""(containers, batch size) for the next wave: as many configs as possible such that the wave's worst case
 	fits the money left and ends before the time left. (0, 0) when not even one config fits."""
+	from preflight.corpus.isolate import KILL_GRACE_S
+
 	rate = usd_per_hour * RATE_OVERHEAD / 3600
 	room_s = minutes_left * 60 - STARTUP_S - SCALEDOWN_S
-	batch = min(max_batch, int(room_s // deadline_s) if deadline_s > 0 else max_batch, max(1, n_todo))
+	per = deadline_s + KILL_GRACE_S
+	batch = min(max_batch, int(room_s // per) if per > 0 else max_batch, max(1, n_todo))
 	best = (0, 0)
 	for b in range(batch, 0, -1):
 		c = min(max_containers, math.ceil(n_todo / b))
@@ -127,6 +141,15 @@ def prior_usd(path: str | Path) -> float:
 	return max(
 		(float(r.get("prior_usd", 0.0)) for r in _billing_rows(path) if r.get("kind") == "prior"), default=0.0
 	)
+
+
+def other_leases(path: str | Path, run_id: str, now: float) -> list[dict[str, Any]]:
+	"""Unexpired leases of other runs on this billing file: two runs sharing one GPU's budget would each see only
+	their own pending waves, so a second run refuses to start."""
+	return [
+		r for r in _billing_rows(path)
+		if r.get("kind") == "lease" and r.get("run") != run_id and float(r.get("until", 0)) > now
+	]  # fmt: skip
 
 
 def add_billing(path: str | Path, row: dict[str, Any]) -> None:

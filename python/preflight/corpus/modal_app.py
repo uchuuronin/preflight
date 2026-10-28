@@ -97,7 +97,11 @@ class Sweeper:
 
 	@modal.method()
 	def run_batch(
-		self, requested_gpu: str, items: list[dict[str, Any]], timeout_s: float | None = None
+		self,
+		requested_gpu: str,
+		items: list[dict[str, Any]],
+		timeout_s: float | None = None,
+		end_at: float | None = None,
 	) -> list[dict[str, Any]]:
 		import time as _time
 
@@ -119,6 +123,9 @@ class Sweeper:
 		actual = gpus.resolve(name, props.total_memory, props.multi_processor_count)
 		out = []
 		for d in items:
+			# a restart after preemption sees the same end time, so the wave never runs past its bound
+			if end_at is not None and _time.time() + (timeout_s or 0.0) > end_at:
+				break
 			cfg = CorpusConfig.from_dict(d)
 			prior = store.read(cfg.kind, actual, cfg.key)
 			if prior is not None and prior.get("status") not in ("error", "timeout"):
@@ -175,7 +182,12 @@ def billing(kind: str, gpu: str, row: dict[str, Any] | None = None) -> dict[str,
 	if row is not None:
 		sweep.add_billing(path, row)
 		vol.commit()
+	import time as _time
+
 	return {
+		"others": sweep.other_leases(path, (row or {}).get("run", ""), _time.time())
+		if (row or {}).get("kind") == "lease"
+		else [],
 		"billed_s": sweep.billed_seconds(path),
 		"history": sweep.container_history(path),
 		"prior_usd": sweep.prior_usd(path),
@@ -300,9 +312,18 @@ def main(
 
 	def run_gpu(gpu: str) -> str:
 		import time
+		import uuid
 
-		sweeper = Sweeper.with_options(gpu=sweep.modal_gpu(gpu), max_containers=max_containers)()
 		default_deadline = DEFAULT_TIMEOUT_S.get(store_kind, 900.0)
+		run_id = uuid.uuid4().hex[:12]
+		lease = billing.remote(
+			store_kind, gpu, {"kind": "lease", "run": run_id, "until": time.time() + (max_minutes + 30) * 60}
+		)
+		if lease["others"]:
+			print(
+				f"[{gpu}] another run holds this GPU's budget until {lease['others'][0]['until']:.0f}; stopping"
+			)
+			return gpu
 		if prior_usd:
 			billing.remote(
 				store_kind, gpu, {"kind": "prior", "prior_usd": prior_usd}
@@ -336,8 +357,14 @@ def main(
 				return gpu
 			last_done = len(led["done"])
 			chunk = sweep.batches(todo[: containers * batch], batch)
-			args = [(gpu, [c.to_dict() for c in b], deadline) for b in chunk]
-			worst = sweep.worst_wave_seconds(len(args), batch, deadline)
+			worst = sweep.worst_wave_seconds(len(chunk), batch, deadline)
+			cap_s = sweep.container_timeout_s(batch, deadline)
+			# Modal cuts every container off at cap_s, so a hang anywhere (driver, volume) ends where the bound assumed
+			sweeper = Sweeper.with_options(
+				gpu=sweep.modal_gpu(gpu), max_containers=max_containers, timeout=cap_s
+			)()
+			end_at = time.time() + cap_s
+			args = [(gpu, [c.to_dict() for c in b], deadline, end_at) for b in chunk]
 			billing.remote(store_kind, gpu, {"wave": wave, "kind": "pending", "billed_s": round(worst, 1)})
 			w0 = time.monotonic()
 			results = list(sweeper.run_batch.starmap(args, return_exceptions=True))

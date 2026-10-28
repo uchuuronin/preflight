@@ -399,6 +399,8 @@ def test_wave_billing_is_an_upper_bound_on_container_time():
 
 	# 4 containers for a 10-minute wave, each with its 30 s idle tail: 4 x 630 s
 	assert sw.wave_billed_seconds(600.0, 4) == pytest.approx(4 * (600.0 + sw.SCALEDOWN_S))
+	# Modal cuts each container off at its timeout, so the worst case is bounded however a container hangs
+	assert sw.worst_wave_seconds(4, 8, 120.0) == 4 * (sw.container_timeout_s(8, 120.0) + sw.SCALEDOWN_S)
 	assert sw.wave_billed_seconds(600.0, 0) == 0.0
 	# phase 1's shape: 32 configs in an 11-minute wave cost far more than their 9 s each
 	per = sw.wave_billed_seconds(660.0, 4) / 32
@@ -456,10 +458,10 @@ def test_a_wave_launches_only_if_its_worst_case_fits_money_and_time():
 	assert c * b > 0
 	worst = sw.worst_wave_seconds(c, b, 120.0)
 	assert worst / 3600 * rate <= 6.0
-	assert (b * 120.0 + sw.STARTUP_S + sw.SCALEDOWN_S) / 60 <= 100.0
+	assert (sw.container_timeout_s(b, 120.0) + sw.SCALEDOWN_S) / 60 <= 100.0
 	# 600 s deadlines and 30 minutes left: batches shrink so the slowest container still ends in time
 	c, b = sw.plan_wave(500, 6.0, 30.0, 600.0, 0.80, 4, 8)
-	assert b * 600.0 + sw.STARTUP_S + sw.SCALEDOWN_S <= 30 * 60
+	assert sw.container_timeout_s(b, 600.0) + sw.SCALEDOWN_S <= 30 * 60
 	# not enough money for one worst-case config: nothing launches
 	assert sw.plan_wave(500, 0.05, 100.0, 600.0, 0.80, 4, 8) == (0, 0)
 	# fewer configs than slots: no idle containers are paid for
@@ -520,10 +522,15 @@ def test_simulated_sweeps_never_pass_the_cap_or_the_clock(seed, tmp_path):
 		walls = []
 		for _ in range(c):
 			start = r.uniform(20, sw.STARTUP_S)
-			# most configs take 5-40 s; one in 30 hangs to its deadline
-			runs = [deadline if r.random() < 1 / 30 else r.uniform(5, 40) for _ in range(b)]
+			# most configs take 5-40 s; one in 30 hangs to its deadline plus the kill grace
+			runs = [deadline + 30.0 if r.random() < 1 / 30 else r.uniform(5, 40) for _ in range(b)]
 			history += [x for x in runs if x < deadline]
-			walls.append(start + sum(runs))
+			wall_c = start + sum(runs)
+			if (
+				r.random() < 1 / 50
+			):  # the container hangs outside any config (volume, driver): Modal cuts it off
+				wall_c = 10 * 3600.0
+			walls.append(min(wall_c, sw.container_timeout_s(b, deadline)))
 		wall = max(walls)
 		billed = sum(w + sw.SCALEDOWN_S for w in walls)  # what Modal charges
 		true_bill_s += billed
@@ -534,3 +541,19 @@ def test_simulated_sweeps_never_pass_the_cap_or_the_clock(seed, tmp_path):
 		done += c * b
 	assert true_bill_s / 3600 * rate * sw.RATE_OVERHEAD <= budget + 1e-9
 	assert clock / 60 <= max_minutes + 1e-9
+
+
+def test_a_second_run_on_the_same_budget_sees_the_first_runs_lease(tmp_path):
+	from preflight.corpus import sweep as sw
+
+	p = tmp_path / "b.jsonl"
+	sw.add_billing(p, {"kind": "lease", "run": "a", "until": 1000.0})
+	assert sw.other_leases(p, "a", 500.0) == []  # its own lease
+	assert [r["run"] for r in sw.other_leases(p, "b", 500.0)] == ["a"]  # another run, still live
+	assert sw.other_leases(p, "b", 1500.0) == []  # expired
+
+
+def test_a_killed_child_is_never_waited_on_forever():
+	from preflight.corpus import isolate
+
+	assert 0 < isolate.KILL_GRACE_S <= 60
