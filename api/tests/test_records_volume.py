@@ -180,3 +180,14 @@ def test_busy_store_is_a_503_the_browser_may_retry(tmp_path):
 		assert res.status_code == 503
 		assert res.json()["error"]["code"] == "record_store_busy"
 		assert res.json()["error"]["retryable"] is True
+
+
+def test_a_stream_of_misses_does_not_reload_back_to_back(tmp_path):
+	calls = []
+	clock = Clock()
+	store = LocalRecordStore(tmp_path, reload=lambda: calls.append(1), clock=clock)
+	store.by_share_token(new_share_token())
+	for _ in range(20):
+		clock.t += 0.01
+		store.by_share_token(new_share_token())
+	assert len(calls) == 1

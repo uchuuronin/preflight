@@ -112,7 +112,7 @@ async def _run(tmp_path, a, deadline, on_submit=None):
 			job_deadline_s=deadline,
 			poll_s=3.0,
 			label="zoo/test",
-			on_submit=on_submit,
+			note=on_submit,
 			clock=clock,
 			sleep=clock.sleep,
 		)
@@ -178,12 +178,12 @@ def test_a_submit_whose_reply_was_lost_is_retried_under_the_same_key(tmp_path):
 	a.submit_fails = 1
 	seen = []
 
-	async def on_submit(job_id):
-		seen.append(job_id)
+	async def note(name, value):
+		seen.append((name, value))
 
-	out = run(tmp_path, a, on_submit=on_submit)
+	out = run(tmp_path, a, on_submit=note)
 	assert out["submit"]["attempt"] == 2
-	assert seen == ["01JOBE2E000000000000000000"]
+	assert seen[0][0] == "idempotency_key" and seen[1] == ("job_id", "01JOBE2E000000000000000000")
 	assert passed(out["checks"])
 
 
@@ -204,3 +204,14 @@ def test_a_run_whose_probes_all_failed_does_not_pass(tmp_path):
 
 	c = e2e_flow.checks_for({"status": "done"}, {**RECORD, "probes": [{"id": "p1", "status": "oom"}]}, [])
 	assert not passed(c)
+
+
+def test_a_failed_handoff_still_ends_in_a_cancel(tmp_path):
+	a = A(tmp_path, steps=("queued", "running"))
+
+	async def broken(name, value):
+		raise RuntimeError("Dict unavailable")
+
+	out = run(tmp_path, a, deadline=5.0, on_submit=broken)
+	assert any(e["call"] == "note job_id" for e in out["call_errors"])
+	assert a.cancelled

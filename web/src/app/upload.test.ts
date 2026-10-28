@@ -56,6 +56,10 @@ describe("uploadSource", () => {
 		expect(uploadSource([f("train.py"), f("tickets.csv", "a,b\n"), f("rows.jsonl", "{}\n")]).ok).toBe(true);
 	});
 
+	it("asks for a lower-case .ipynb, the only spelling A converts", () => {
+		expect(uploadSource([f("Train.IPYNB", "{}")])).toMatchObject({ ok: false, reason: "upload.notebook_case" });
+	});
+
 	it("treats Train.PY as a script, whatever the case", () => {
 		const r = uploadSource([f("Train.PY")]);
 		expect(r.ok && r.source.kind === "upload" && r.source.entrypoint).toBe("Train.PY");

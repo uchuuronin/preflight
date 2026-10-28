@@ -46,9 +46,9 @@ class LocalRecordStore:
 	workers committed after it started. A container sees the volume empty while it reloads, and a
 	reload fails while a file on it is open, so one lock covers every reload and every read here
 	(reads are a single small file each). Reloads are at most one per RELOAD_MIN_S, except that a
-	miss always reloads once unless a reload already started after the request arrived (so a
-	record committed a moment ago is never a 404). A failed reload serves the view the container
-	already has; a reload that holds the lock past LOCK_WAIT_S turns other reads into StoreBusy,
+	miss reloads once more if no reload started after the request arrived and the last is at
+	least MISS_RELOAD_MIN_S old: a record committed a moment ago is found, and a stream of misses
+	can't reload back to back. A failed reload serves the view the container already has; a reload that holds the lock past LOCK_WAIT_S turns other reads into StoreBusy,
 	which the API answers with a retryable 503 instead of piling up threads.
 	"""
 
@@ -56,8 +56,13 @@ class LocalRecordStore:
 	# second-old view of a record that exists is current enough; replaced by the reload time
 	# measured in the end-to-end run if reloads turn out slow.
 	RELOAD_MIN_S = 1.0
+	# Source: guess, boarding asks for a record seconds after its job's done event, so a miss only
+	# needs a reload when the last one is a quarter second old; the floor stops a stream of misses
+	# (expired links, scanners) from reloading back to back and starving real reads.
+	MISS_RELOAD_MIN_S = 0.25
 	# Source: guess, a reload of a small volume is well under a second; five seconds of waiting
-	# means one is stuck, and the browser's retry is cheaper than a held thread.
+	# means one is stuck; the cockpit retries a 503 once after Retry-After (record/load.ts), which is
+	# cheaper than a held thread.
 	LOCK_WAIT_S = 5.0
 	# Source: derived, A's reader cap (runner/records.py MAX_READ_BYTES); a stored record is under
 	# 1 MB gzipped (schema MAX_RECORD_GZIP_BYTES).
@@ -107,9 +112,17 @@ class LocalRecordStore:
 			if (
 				data is None
 				and self._reload is not None
-				and (self._last_reload is None or self._last_reload < arrived)
+				and (
+					self._last_reload is None
+					or (
+						self._last_reload < arrived
+						and self._clock() - self._last_reload >= self.MISS_RELOAD_MIN_S
+					)
+				)
 			):
-				self._reload_now()  # a miss: look again unless a reload already started after we arrived
+				# A miss: look again, unless a reload already started after we arrived or the last one
+				# is under MISS_RELOAD_MIN_S old.
+				self._reload_now()
 				data = self._read(path)
 		finally:
 			self._lock.release()

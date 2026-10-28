@@ -31,6 +31,7 @@ it), which web/e2e/record_map.mjs then opens in the cockpit.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -53,8 +54,9 @@ RECORDS_DIR = "/records"
 # Source: guess, A's check-in copy says about 4 minutes on one GPU; a cold start, the model
 # download and a queue wait can triple that. The job is cancelled past this.
 JOB_DEADLINE_S = 20 * 60
-# Source: derived, JOB_DEADLINE_S plus two minutes to cancel, read the events and the record.
-FUNCTION_TIMEOUT_S = JOB_DEADLINE_S + 120
+# Source: derived, JOB_DEADLINE_S plus four minutes: the worst case after the deadline with every
+# call hanging to e2e_flow.CALL_TIMEOUT_S is about 170 s (cancels, events, record, exit cancel).
+FUNCTION_TIMEOUT_S = JOB_DEADLINE_S + 240
 # Source: guess, a healthy container start is seconds; two minutes means a crash on import fails
 # here, not in a retry loop (the Oct 27 guide-tour lesson).
 STARTUP_TIMEOUT_S = 120
@@ -133,7 +135,7 @@ async def fly(sample: str, gpu: str, job_deadline_s: float, handoff: modal.Dict)
 			job_deadline_s=job_deadline_s,
 			poll_s=POLL_S,
 			label=f"zoo/{sample}",
-			on_submit=lambda job_id: handoff.put.aio("job_id", job_id),
+			note=lambda name, value: handoff.put.aio(name, value),
 		)
 	out["sample"] = sample
 	try:
@@ -190,17 +192,27 @@ def main(sample: str = "finetune_lora_hf", gpu: str = "L4") -> None:
 		call = fly.spawn(sample, gpu, job_deadline, handoff)
 		try:
 			res = call.get(timeout=deadline)
-		except Exception as e:  # timed out or failed in Modal: stop the function, then the job
-			call.cancel()
-			job_id = handoff.get("job_id")
+		except Exception as e:  # timed out or failed in Modal: stop the job first, then the function
+			job_id = None
+			with contextlib.suppress(Exception):
+				job_id = handoff.get("job_id")
 			res = {
 				"error": f"{type(e).__name__}: {str(e)[:500]}",
 				"job_id": job_id,
-				"job_cancel": _cancel_in_store(job_id) if job_id else "no job was created",
+				"job_cancel": _cancel_in_store(job_id) if job_id else "no job id was handed over",
 			}
+			with contextlib.suppress(Exception):
+				res["idempotency_key"] = handoff.get("idempotency_key")
+			try:
+				call.cancel()
+			except Exception as ce:
+				res["call_cancel"] = f"{type(ce).__name__}"
 			_write(res)
 			print(json.dumps(res, indent=2), flush=True)
 			sys.exit(1)
+	# The function came back, but if the job isn't over (its own cancel didn't land), stop it here.
+	if res.get("job_id") and (res.get("status") or {}).get("status") not in ("done", "failed", "cancelled"):
+		res["job_cancel"] = _cancel_in_store(res["job_id"])
 	_write(res)
 	print(
 		json.dumps(

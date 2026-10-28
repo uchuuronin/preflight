@@ -95,7 +95,7 @@ async def flow(
 	job_deadline_s: float,
 	poll_s: float,
 	label: str,
-	on_submit: Callable[[str], Awaitable[None]] | None = None,
+	note: Callable[[str, str], Awaitable[None]] | None = None,
 	clock: Callable[[], float] = time.monotonic,
 	sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> dict:
@@ -117,7 +117,19 @@ async def flow(
 		"description": f"Preflight end-to-end check: {label}",
 	}
 	key = f"e2e-{uuid.uuid4().hex}"
+
+	async def tell(name: str, value: str) -> None:
+		"""Hand a fact to the caller (the job id, the check-in key) without ever failing the run."""
+		if note is None:
+			return
+		try:
+			await _call(note(name, value))
+		except Exception as e:
+			out["call_errors"].append({"at": now(), "call": f"note {name}", "error": type(e).__name__})
+
 	await _call(c.get("/livez"))  # the session cookie, as a browser gets it on first load
+	# Before submitting: if every try hangs after A took the job, the key still finds it by hand.
+	await tell("idempotency_key", key)
 
 	job_id = None
 	for attempt in range(SUBMIT_TRIES):
@@ -137,11 +149,10 @@ async def flow(
 		return out
 	out["job_id"] = job_id
 	mark("submitted")
-	if on_submit is not None:
-		await on_submit(job_id)
 
 	status: dict = {}
 	try:
+		await tell("job_id", job_id)
 		last = None
 		cancel_from: float | None = None
 		while True:

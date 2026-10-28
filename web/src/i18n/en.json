@@ -61,6 +61,7 @@
 	"newflight.upload.too_many": "That's more than 2,000 files. Link the GitHub repo instead.",
 	"newflight.upload.unreadable": "A file couldn't be read. Folders can't be dropped; choose the files inside them.",
 	"newflight.upload.notebook_alone": "Check a notebook in on its own: its pip lines become its requirements.",
+	"newflight.upload.notebook_case": "Rename the notebook so it ends in .ipynb, in lower case.",
 	"newflight.upload.no_script": "Add the .py file to run.",
 	"newflight.upload.which": "Pick the file to run.",
 	"newflight.goal": "What matters most",

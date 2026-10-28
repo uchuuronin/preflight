@@ -9,6 +9,10 @@ import { normaliseRecord } from "./types";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
+/** Source: derived, the API asks for 2 s after a busy record store (routes/records.py); 5 s caps a larger ask. */
+const RETRY_CAP_MS = 5_000;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface Sample {
 	id: string;
@@ -59,7 +63,14 @@ export const DEFAULT_SAMPLE = "lora-7b";
 export async function loadRecord(ref: string): Promise<LoadedRecord> {
 	const sample = SAMPLES.find((s) => s.id === ref);
 	if (sample) return normaliseRecord(await sample.load());
-	const res = await fetch(`${API_BASE}/v1/records/${encodeURIComponent(ref)}`, { credentials: "same-origin" });
+	const url = `${API_BASE}/v1/records/${encodeURIComponent(ref)}`;
+	let res = await fetch(url, { credentials: "same-origin" });
+	if (res.status === 503) {
+		// The record store was mid-reload (a retryable 503): wait as told, at most RETRY_CAP_MS, once.
+		const after = Number(res.headers.get("Retry-After"));
+		await sleep(Math.min(RETRY_CAP_MS, Number.isFinite(after) && after > 0 ? after * 1000 : 1000));
+		res = await fetch(url, { credentials: "same-origin" });
+	}
 	if (!res.ok) {
 		const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
 		throw new Error(body?.error?.message ?? t("app.record_unavailable"));

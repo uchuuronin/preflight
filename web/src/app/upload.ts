@@ -42,6 +42,8 @@ export function precheck(picked: ReadonlyArray<{ name: string; size: number }>):
 	for (const p of picked) {
 		if (!NAME.test(p.name) || p.name.startsWith(".")) return "upload.name";
 		if (!TEXT_TYPES.some((ext) => lower(p.name).endsWith(ext))) return "upload.type";
+		// A's converter knows a notebook only by a lower-case ".ipynb" (runner/sources.py).
+		if (lower(p.name).endsWith(".ipynb") && !p.name.endsWith(".ipynb")) return "upload.notebook_case";
 	}
 	if (picked.reduce((a, p) => a + p.size, 0) > MAX_TOTAL_BYTES) return "upload.too_big";
 	return null;
@@ -59,7 +61,7 @@ export function uploadSource(picked: readonly PickedFile[], entrypoint?: string)
 	// What the API counts: the files as JSON, escapes included (notebooks grow when escaped).
 	if (new TextEncoder().encode(JSON.stringify(files)).length > MAX_TOTAL_BYTES) return { ok: false, reason: "upload.too_big" };
 	const names = Object.keys(files);
-	if (names.some((n) => lower(n).endsWith(".ipynb"))) {
+	if (names.some((n) => n.endsWith(".ipynb"))) {
 		if (names.length > 1) return { ok: false, reason: "upload.notebook_alone" };
 		return { ok: true, source: { kind: "notebook", files }, scripts: [] };
 	}

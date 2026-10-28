@@ -29,8 +29,10 @@
   no longer deploys or checks A's runner (its check could claim the live store); check-in reads
   nothing before names and sizes pass, keys per distinct check-in, keeps the file-to-run
   choice visible, and a plain cancel isn't shown as an error.
-- Stranger test 18 of 18; knob to readout p95 119 ms at 4x CPU slowdown (measured, this
-  container, after the UI changes). API 70 tests, web 156.
+- Stranger test 18 of 18; knob to readout p95 87 to 119 ms at 4x CPU slowdown (measured, this
+  container, after the UI changes). API 72 tests, web 160. A second review pass closed the
+  rest: the job-id handoff can no longer skip the cancel, a stream of unknown links can't
+  reload back to back, and the cockpit retries a busy record read once.
 
 **Cloud runs:** none (two runs wait for a yes: the API startup check, about $0.02, and the
 upload-to-map run, about $0.35 expected, $0.65 cap).
