@@ -1771,3 +1771,31 @@ a {
 	.pf-drawer, .pf-info__pop { transition: opacity 0.15s ease; }
 }
 .pf-fitcell .pf-status { padding: 0; border: 0; background: none; box-shadow: none; }
+
+/* Checks: held-out checks on real runs (documentation screen, not the cockpit) */
+.pf-checks { display: flex; flex-direction: column; gap: 22px; padding-block: 110px 80px; }
+.pf-checks__head { display: flex; flex-direction: column; gap: 6px; }
+.pf-checks__head .pf-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pf-checks__table { display: flex; flex-direction: column; padding: 8px 18px; border-radius: var(--pf-radius-md); }
+.pf-checks__row {
+	display: grid;
+	grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+	gap: 12px;
+	align-items: center;
+	padding: 12px 0;
+	border-top: 1px solid var(--pf-stroke);
+	font-size: 14px;
+	min-width: 0;
+}
+.pf-checks__row:first-child { border-top: 0; }
+.pf-checks__row--head { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-fg-dim); }
+.pf-checks__row > * { min-width: 0; overflow-wrap: anywhere; }
+.pf-checks__list .pf-chips { display: flex; flex-direction: column; gap: 8px; }
+.pf-checks__list .pf-chip { cursor: default; }
+.pf-checks__skipped { margin-top: 12px; font-size: 13px; }
+.pf-checks__skipped summary { cursor: pointer; color: var(--pf-fg-dim); }
+.pf-checks__skipped ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 720px) {
+	.pf-checks__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+	.pf-checks__row--head { display: none; }
+}
