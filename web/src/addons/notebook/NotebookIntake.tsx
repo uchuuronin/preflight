@@ -7,7 +7,7 @@
 import { type DragEvent, useEffect, useId, useRef, useState } from "react";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
-import { type NotebookError, type NotebookPreview, type NotebookSource, prepareNotebook } from "./convert";
+import { CHECKIN_BYTES, type NotebookError, type NotebookPreview, type NotebookSource, prepareNotebook } from "./convert";
 
 /**
  * Largest file the browser reads before converting.
@@ -133,7 +133,7 @@ export function NotebookIntake({ setSource }: { setSource?: (source: NotebookSou
 			</p>
 			{state.at === "failed" ? (
 				<p className="pf-error" role="alert">
-					{t(`addon.notebook.error.${state.error}`, { size: fmt(MAX_READ_BYTES, "bytes") })}
+					{t(`addon.notebook.error.${state.error}`, { size: fmt(MAX_READ_BYTES, "bytes"), limit: `${CHECKIN_BYTES / 1_000_000} MB` })}
 				</p>
 			) : null}
 			{state.at === "ready" ? <Preview preview={state.preview} canCheckIn={!!setSource} /> : null}

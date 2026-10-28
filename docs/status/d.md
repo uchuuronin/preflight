@@ -8,6 +8,33 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Wed Oct 28, afternoon (merged `main` at contract 0.4.0)
+
+**Done** (committed on `ws-d`; `ea2f578` pushed with Chiya's yes)
+
+- Merged `main` (206c3f3, contract 0.4.0): clean. All web tests pass (305 after the size fix), as do the typecheck and build. D's Python tests: 33 passed, now including the A-side notebook parity test, which runs because A's converter is in `main` (7 of 7). Python suite: 10 failures, the same 10 as on a clean `main` (A's sandbox, overhead and pip-install tests, which need a non-root, networked runner).
+- `d.notebook` added to `flags.json`, off (Chiya's yes).
+- Dial order frozen for Nov 2 (Chiya): the held-out run is its test.
+- C's Upload tab now sends a lone `.ipynb` as kind `notebook`, without D's preview, output stripping or name cleaning; note to C with two options in `docs/requests/from-d.md`.
+- Found while reading C's upload: the API refuses a check-in body over 6 MiB, and C holds files to 5 MB as JSON. D5 only checked A's 8 MB and 25 MB caps, so a notebook D5 accepted could be refused by the API. D5 now reads C's `MAX_TOTAL_BYTES` and checks what it sends the same way, with copy that names the limit.
+
+**Waiting**
+
+- Notebook tab check-in: C's source hand-off (not on `main` or `ws-c` yet).
+- D2 share cards: C's share route (not on `main` or `ws-c` yet).
+- A's surrogate crash stays with A (noted in `from-d.md`).
+
+**Basis for every decision in this commit**
+
+| Decision | Basis | Test that fails if it's wrong |
+| --- | --- | --- |
+| `d.notebook` off by default | Chiya, Oct 28; flags start off (contract) | `notebook/index.test.tsx` (flag name); flags.json is the shared list |
+| Dial order and top 2 frozen until Nov 2 | Chiya, Oct 28 | `dial.zoo.test.ts` keeps the configured policy |
+| One notebook path, (a) or (b), left to C and Chiya | measured: C's `precheck` refuses `train (1).ipynb` and A's `fetch` refuses `train (1).py`; outputs count against C's 5 MB | `test_d_notebook_parity.py::test_a_accepts_every_name_d_sends` |
+| D5 holds what it sends to C's 5 MB of files as JSON | cited: `app/upload.ts` MAX_TOTAL_BYTES, `routes/jobs.py` MAX_BODY_BYTES 6 MiB | `convert.test.ts` "won't fit a check-in" and "just under"; `NotebookIntake.test.tsx` "says the check-in limit" |
+
+**Push request:** `ws-d`, the merge of `main` and this commit, on top of `ea2f578`. Normal push.
+
 ## Wed Oct 28, early (D5 notebook intake; dial counted per record)
 
 **Done** (committed on `ws-d`, push requested below; `901332e` pushed). No tokens or GPU spent, no Modal app: D5 runs in the browser. Not on today's critical path (one zoo script from upload to map): zoo scripts are `.py` and come in as samples or repos; D5 lets notebooks in once C's desk takes an intake source.
@@ -37,12 +64,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 
 Checks: 266 web tests, typecheck, build; D Python tests 26 passed, 1 skipped (A-side parity, until A's converter is in `main`); ruff; no em dashes; gitleaks. Cloud runs: none.
 
-**Push request:** `ws-d`, this commit on top of `901332e`. Normal push.
-
-**Open with Chiya**
-
-- `d.notebook` flag key.
-- The dial comparison can't decide on 2 zoo records. Options in the chat.
+**Pushed** at `ea2f578` (Chiya's yes, Oct 28).
 
 ## Tue Oct 27, late night (Chiya's census and margin decisions)
 

@@ -67,6 +67,13 @@ describe("NotebookIntake", () => {
 		expect((await screen.findByRole("alert")).textContent).toMatch(/no code cells/);
 	});
 
+	it("says the check-in limit when the code is too big", async () => {
+		render(<NotebookIntake setSource={() => {}} />);
+		const code = "x = 1\n".repeat(1_000_000);
+		await choose(nb("big.ipynb", JSON.stringify({ cells: [{ cell_type: "code", source: code }] })));
+		expect((await screen.findByRole("alert")).textContent).toMatch(/over 5 MB, more than a check-in carries/);
+	});
+
 	it("turns away a file that isn't .ipynb", async () => {
 		render(<NotebookIntake setSource={() => {}} />);
 		await choose(new File(["print(1)"], "train.py"));

@@ -11,11 +11,17 @@
  * sent (A never reads them; they can be megabytes and can hold data), and the file name is
  * cleaned to what A accepts (a browser's "train (1).ipynb" otherwise fails A's path rule).
  */
+import { MAX_TOTAL_BYTES as CHECKIN_FILE_BYTES } from "../../app/upload";
 
 /** A's per-file cap, after conversion [cited: upload-format.md, probes/local.py MAX_FILE_BYTES]. */
 export const MAX_FILE_BYTES = 8 * 1024 * 1024;
 /** A's cap on all files together [cited: upload-format.md, probes/local.py MAX_TOTAL_BYTES]. */
 export const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+/**
+ * Most bytes a check-in carries as files, counted as JSON: C's limit at the desk, inside the API's
+ * 6 MiB body cap [cited: app/upload.ts MAX_TOTAL_BYTES, api routes/jobs.py MAX_BODY_BYTES].
+ */
+export const CHECKIN_BYTES = CHECKIN_FILE_BYTES;
 /** Longest stem D sends [derived: A accepts a converted name of up to 200 characters]. */
 const MAX_STEM = 120;
 
@@ -236,8 +242,8 @@ export function prepareNotebook(name: string, text: string): Prepared {
 			return { ok: false, error: "too_big" };
 		}
 		const sent = stripped(nb);
-		// [derived: what is sent holds the same code as the converted files plus JSON escaping]
-		if (utf8(sent) > MAX_TOTAL_BYTES) return { ok: false, error: "too_big" };
+		// What the API counts, as C's desk does: the files as JSON, escapes included.
+		if (utf8(JSON.stringify({ [safe]: sent })) > CHECKIN_BYTES) return { ok: false, error: "too_big" };
 		return {
 			ok: true,
 			source: { kind: "notebook", files: { [safe]: sent } },

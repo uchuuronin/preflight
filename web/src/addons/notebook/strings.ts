@@ -27,7 +27,7 @@ export const NOTEBOOK_EN: Record<string, string> = {
 	"addon.notebook.error.no_cells": "This file can't be read as a notebook: it has no cells. Download it again from Colab or Jupyter and choose the new copy.",
 	"addon.notebook.error.cell_not_text": "One of the cells can't be read as text. Open the notebook in Jupyter or Colab, save it, and choose it again.",
 	"addon.notebook.error.no_code": "This notebook has no code cells, so there's nothing to run. Add your training code and choose it again.",
-	"addon.notebook.error.too_big": "The code in this notebook is over 8 MB, more than Preflight reads. Load data from Hugging Face instead of pasting it into cells.",
+	"addon.notebook.error.too_big": "The code in this notebook is over {limit}, more than a check-in carries. Load data from Hugging Face instead of pasting it into cells.",
 	"addon.notebook.error.too_big_file": "This file is over {size}, mostly saved outputs. In Jupyter or Colab, clear all outputs, save, and choose it again.",
 	"addon.notebook.error.read_failed": "Your browser couldn't open that file. Try choosing it again.",
 	"addon.notebook.error.bad_text": "This notebook has characters that aren't valid text. Open it in Jupyter or Colab, save it, and choose it again.",

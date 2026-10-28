@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import names from "./fixtures/names.json";
 import random from "./fixtures/random.expected.json";
 import sent from "./fixtures/sent.expected.json";
-import { MAX_FILE_BYTES, notebookRequirements, notebookToScript, prepareNotebook, safeNotebookName } from "./convert";
+import { CHECKIN_BYTES, MAX_FILE_BYTES, notebookRequirements, notebookToScript, prepareNotebook, safeNotebookName } from "./convert";
 
 /**
  * Parity with A's converter (runner/sources.py `_notebook_to_script`, `notebook_requirements` and
  * `fetch` for kind "notebook"): each fixture's expected output was produced by A's code, and
  * tests/test_d_notebook_parity.py checks A's code still produces it, so drift on either side fails.
  */
+const utf8Length = (s: string) => new TextEncoder().encode(s).length;
+
 const NOTEBOOKS = import.meta.glob<string>("./fixtures/*.ipynb", { eager: true, query: "?raw", import: "default" });
 const EXPECTED = import.meta.glob<{ script: string; requirements: string[]; files: Record<string, string>; entrypoint: string }>(
 	"./fixtures/*.expected.json",
@@ -177,6 +179,18 @@ describe("what is sent stays small and valid", () => {
 		if (!out.ok) throw new Error(out.error);
 		expect(out.source.files["md.ipynb"].length).toBeLessThan(500);
 		expect(notebookToScript(out.source.files["md.ipynb"])).toBe(notebookToScript(nb));
+	});
+
+	it("stops a notebook whose code won't fit a check-in (C's 5 MB of files as JSON)", () => {
+		const code = "x = 1\n".repeat(Math.ceil(CHECKIN_BYTES / 6) + 10);
+		const nb = JSON.stringify({ cells: [{ cell_type: "code", source: code }] });
+		expect(utf8Length(code)).toBeLessThan(MAX_FILE_BYTES);
+		expect(prepareNotebook("big.ipynb", nb)).toEqual({ ok: false, error: "too_big" });
+	});
+
+	it("takes a notebook just under the check-in limit", () => {
+		const code = "x = 1\n".repeat(Math.floor(CHECKIN_BYTES / 6 / 2));
+		expect(prepareNotebook("ok.ipynb", JSON.stringify({ cells: [{ cell_type: "code", source: code }] })).ok).toBe(true);
 	});
 
 	it("stops text that isn't valid Unicode, which A can't store", () => {
