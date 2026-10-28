@@ -12,5 +12,6 @@
 	"c.exports": false,
 	"c.campaign_calendar": false,
 	"d.expertise": false,
-	"d.currency": false
+	"d.currency": false,
+	"d.freetier": false
 }

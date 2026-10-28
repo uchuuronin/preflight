@@ -46,11 +46,18 @@ describe("expertise knob view", () => {
 		expect(shownIds(view, ctx())).toHaveLength(record.knobs.length);
 	});
 
-	it("at the new level shows the baseline, the top two for the goal and the failure's knobs", () => {
+	it("at the new level shows the failure's knobs and the goal's top two, filled from the baseline to five", () => {
 		setTier("new");
 		const shown = shownIds(createKnobView(), ctx({ ranked: ["lora_r", "precision", "packing"] }));
-		expect(shown).toEqual(expect.arrayContaining(["batch_size", "seq_len", "lora_r", "precision", "eval_batch_size", "eval_no_grad"]));
-		expect(shown).not.toContain("packing");
+		expect(shown.sort()).toEqual(["batch_size", "eval_batch_size", "eval_no_grad", "lora_r", "precision"]);
+	});
+
+	it("reveals a warning's knob when the visitor opens it, and keeps it after they close it", () => {
+		setTier("new");
+		const view = createKnobView();
+		expect(shownIds(view, ctx())).not.toContain("packing");
+		expect(shownIds(view, ctx({ active: "packing" }))).toContain("packing");
+		expect(shownIds(view, ctx({ active: null }))).toContain("packing");
 	});
 
 	it("keeps a knob the visitor moved and then put back", () => {

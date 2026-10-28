@@ -8,6 +8,22 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Tue Oct 27, night (after Chiya's decision on warnings)
+
+**Done** (committed on `ws-d`, not pushed)
+
+- "New to this" picks at most 5 knobs by itself: failures first (never dropped), then the goal's top two, then the lens baseline. Warnings no longer take a place; their knob shows once the visitor opens it and stays for the visit. Checked in Chromium on the golden fine-tune: 4 knobs plus "Show 5 more settings"; opening "Pack short examples together" and closing it leaves it in the dock.
+- "Things worth checking": `worthChecking.ts` lists the record's warnings with "1 thing / {n} things worth checking". It renders once C offers a spot under the dock in C's findings display (request in `docs/requests/from-d.md`); D doesn't build it in C's code.
+- `dial.zoo.test.ts` now asserts, for every goal: failure knobs in the dock, at most 5 knobs, every planted problem visible (dock or list), and a listed warning's knob kept after opening. Fails when the list is emptied or the reveal removed (checked). On A's fixtures: finetune and pretrain each 9 of 9 visible, 100% [70, 100]; in the dock 6 of 9 and 3 of 9.
+- Order of the five compared on the fixtures: four failures-first orders tie (the goal ranking is empty for most goals there), so the order is tagged a guess to settle on B's grids.
+- `d.freetier` added to `flags.json`, off (approved by Chiya).
+- Checks: 209 web tests, typecheck, build, no em dashes.
+
+**Next**
+
+- Rerun the zoo test on B's grids (Wed) and settle the order and `NEW_TOP_SENSITIVE`; score once on the unseen scripts (Mon Nov 2) as a held-out check.
+- Wire the worth-checking list to C's spot when it lands. D5 once A documents uploads; D2 once C's share route lands (Thu).
+
 ## Tue Oct 27, evening (merged `main` at 7faf676)
 
 - Merged `main`. Requests moved to `docs/requests/from-d.md`, brought up to date: C's three replies (loading fix, knob-view hook, provider and ranking) moved to Done; the dial rerun on B's real grids added as a request to B.
@@ -26,8 +42,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 
 **Open with Chiya**
 
-- Should "New to this" also show the knobs of warning findings (packing, fp32, sparse checkpoints)?
-- `d.freetier` flag key.
+- Settled Oct 27 night: warnings are listed, not shown as knobs; `d.freetier` approved.
 
 **Blocked**
 

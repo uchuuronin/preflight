@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BASELINE, NEW_TOP_SENSITIVE, labelKeyFor, visibleKnobs } from "./tiers";
+import { BASELINE, MAX_NEW_KNOBS, NEW_TOP_SENSITIVE, labelKeyFor, visibleKnobs } from "./tiers";
 
 const FT_KNOBS = ["batch_size", "seq_len", "grad_accum", "eval_batch_size", "lora_r", "gradient_checkpointing", "precision", "packing", "eval_no_grad", "gpu_type"];
 
@@ -9,6 +9,7 @@ const base = {
 	pinned: new Set<string>(),
 	highlighted: new Set<string>(),
 	touched: new Set<string>(),
+	opened: new Set<string>(),
 	failing: new Set<string>(),
 	ranked: [] as string[],
 };
@@ -44,6 +45,42 @@ describe("visibleKnobs", () => {
 		const shown = visibleKnobs({ ...base, tier: "new", failing: new Set(["eval_no_grad", "eval_batch_size"]), ranked: ["packing", "lora_r"] });
 		expect(shown).toContain("eval_no_grad");
 		expect(shown).toContain("eval_batch_size");
+	});
+
+	it("picks at most five knobs by itself: failures, then the goal's top two, then the baseline", () => {
+		expect(MAX_NEW_KNOBS).toBe(5);
+		const shown = visibleKnobs({
+			...base,
+			tier: "new",
+			failing: new Set(["eval_no_grad", "eval_batch_size"]),
+			ranked: ["lora_r", "precision", "packing"],
+		});
+		expect(shown).toHaveLength(5);
+		expect(shown).toEqual(["eval_batch_size", "lora_r", "precision", "eval_no_grad", "gpu_type"]);
+	});
+
+	it("shows warnings' knobs only once the visitor opens them", () => {
+		expect(visibleKnobs({ ...base, tier: "new" })).not.toContain("packing");
+		expect(visibleKnobs({ ...base, tier: "new", opened: new Set(["packing"]) })).toContain("packing");
+	});
+
+	it("never drops a failure's knob to stay under the cap", () => {
+		const six = ["batch_size", "seq_len", "grad_accum", "eval_batch_size", "lora_r", "packing"];
+		const shown = visibleKnobs({ ...base, tier: "new", failing: new Set(six), ranked: ["precision"] });
+		expect(shown).toEqual(six);
+	});
+
+	it("adds what the visitor opened, moved or pinned on top of the five", () => {
+		const shown = visibleKnobs({
+			...base,
+			tier: "new",
+			failing: new Set(["eval_no_grad", "eval_batch_size"]),
+			ranked: ["lora_r", "precision"],
+			opened: new Set(["packing"]),
+			touched: new Set(["grad_accum"]),
+			pinned: new Set(["gradient_checkpointing"]),
+		});
+		expect(shown).toHaveLength(8);
 	});
 
 	it("keeps a knob the visitor touched, even after they put it back", () => {

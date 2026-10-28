@@ -1,9 +1,9 @@
 /**
- * The expertise dial's view over C's knob dock (registerKnobView). At "New to this" it shows
- * the lens baseline, the top knobs for the visitor's current goal (C's `ranked`, from
- * sensitivity() on the active objective), the knobs behind the current failure and anything the
- * visitor has touched; practitioners and experts see every knob. C's dock also keeps pinned,
- * guide-highlighted, open and moved knobs whatever a view returns.
+ * The expertise dial's view over C's knob dock (registerKnobView). At "New to this" it shows up
+ * to five knobs (the failure's, the top two for the visitor's current goal from C's `ranked`,
+ * then the lens baseline; tiers.ts) plus anything the visitor has opened or moved this visit, so a
+ * warning's knob stays once opened; practitioners and experts see every knob. C's dock also keeps
+ * pinned, guide-highlighted, open and moved knobs whatever a view returns.
  */
 import { hasKey } from "../../lib/i18n";
 import type { KnobViewContext, KnobViewEntry } from "../../registry";
@@ -28,19 +28,32 @@ function recordKey(record: LoadedRecord): string {
 }
 
 export function createKnobView(): KnobViewEntry {
-	// Knobs moved this visit, per record, so one put back stays where the visitor left it.
+	// Knobs moved this visit, per record, so one put back stays where the visitor left it; and
+	// knobs opened this visit (a warning's "open" button, say), so one revealed stays revealed.
 	const touched = new Map<string, Set<string>>();
+	const opened = new Map<string, Set<string>>();
 
-	function touchedFor(ctx: KnobViewContext): Set<string> {
+	function setFor(store: Map<string, Set<string>>, ctx: KnobViewContext): Set<string> {
 		const key = recordKey(ctx.record);
-		let set = touched.get(key);
+		let set = store.get(key);
 		if (!set) {
 			set = new Set();
-			touched.set(key, set);
+			store.set(key, set);
 		}
+		return set;
+	}
+
+	function touchedFor(ctx: KnobViewContext): Set<string> {
+		const set = setFor(touched, ctx);
 		for (const k of ctx.record.knobs) {
 			if (k.id in ctx.knobs && ctx.knobs[k.id] !== k.current) set.add(k.id);
 		}
+		return set;
+	}
+
+	function openedFor(ctx: KnobViewContext): Set<string> {
+		const set = setFor(opened, ctx);
+		if (ctx.active) set.add(ctx.active);
 		return set;
 	}
 
@@ -50,6 +63,7 @@ export function createKnobView(): KnobViewEntry {
 		moreKey: "addon.expertise.more",
 		filter(knobs: Knob[], ctx: KnobViewContext): Knob[] {
 			const moved = touchedFor(ctx);
+			const seen = openedFor(ctx);
 			const tier = getTier();
 			if (tier !== "new") return knobs;
 			const ids = new Set(
@@ -60,6 +74,7 @@ export function createKnobView(): KnobViewEntry {
 					pinned: ctx.pinned,
 					highlighted: ctx.highlight,
 					touched: moved,
+					opened: seen,
 					failing: failingKnobs(ctx.record),
 					ranked: ctx.ranked,
 				}),

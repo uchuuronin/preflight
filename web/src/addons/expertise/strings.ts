@@ -17,6 +17,8 @@ export const EXPERTISE_EN: Record<string, string> = {
 	"addon.expertise.card.act": "What to change",
 	"addon.expertise.card.more": "More detail",
 	"addon.expertise.more": "Show {n} more settings",
+	"addon.expertise.worth_checking.one": "1 thing worth checking",
+	"addon.expertise.worth_checking.other": "{n} things worth checking",
 	...levelLabels({
 		batch_size: ["Examples at once", "per_device_train_batch_size"],
 		seq_len: ["Longest example", "max_seq_length"],
