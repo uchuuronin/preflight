@@ -52,9 +52,11 @@ export function DataUseNotice({ onChange }: { onChange: (accepted: boolean) => v
 	const id = useId();
 	const [accepted, setAccepted] = useState(readSeen);
 	return (
-		<section className="pf-datause" aria-labelledby={`${id}-title`}>
-			<b id={`${id}-title`}>{t("datause.title")}</b>
-			<ul>
+		<section className="glass pf-datause" aria-labelledby={`${id}-title`}>
+			<b id={`${id}-title`} className="pf-datause__title">
+				{t("datause.title")}
+			</b>
+			<ul className="pf-datause__list">
 				{dataUseLines().map((line) => (
 					<li key={line}>{line}</li>
 				))}

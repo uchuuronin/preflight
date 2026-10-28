@@ -165,7 +165,6 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								{error}
 							</p>
 						) : null}
-						<DataUseNotice onChange={setAccepted} />
 						<div className="pf-desk__foot">
 							<span className="pf-hint">{accepted ? t("newflight.cost_hint") : t("datause.needed")}</span>
 							<button type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
@@ -195,6 +194,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						<p className="pf-departures__foot">{t("newflight.departures.foot")}</p>
 					</section>
 				</div>
+				<DataUseNotice onChange={setAccepted} />
 				<p className="pf-notice">{t("newflight.notice")}</p>
 			</div>
 		</div>

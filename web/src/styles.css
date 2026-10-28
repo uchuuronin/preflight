@@ -296,9 +296,14 @@ a {
 
 .pf-dim { color: var(--pf-fg-dim); }
 .pf-hint { margin: 0; font-size: var(--pf-text-sm); line-height: 1.5; color: var(--pf-fg-dim); }
-.pf-datause { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--pf-stroke); border-radius: 16px; font-size: 12.5px; line-height: 1.5; }
-.pf-datause ul { margin: 0; padding-left: 18px; color: var(--pf-fg-dim); }
-.pf-datause__ok { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+/* Data-use notice: its own glass strip under the desk and the departures board (app/DataUse.tsx). */
+.pf-datause { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 14px 22px; border-radius: 24px; font-size: 12.5px; line-height: 1.45; }
+.pf-datause__title { flex: none; font-size: 13px; }
+.pf-datause__list { display: flex; flex-wrap: wrap; gap: 4px 18px; flex: 1 1 520px; min-width: 0; margin: 0; padding: 0; list-style: none; color: var(--pf-fg-dim); }
+.pf-datause__list li { position: relative; padding-left: 12px; }
+.pf-datause__list li::before { content: ""; position: absolute; left: 0; top: 0.6em; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.pf-datause__ok { flex: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.pf-datause__ok input { width: 16px; height: 16px; accent-color: var(--pf-accent); }
 .pf-guide__fine { margin: 0; font-size: 11px; color: var(--pf-fg-dim); }
 .pf-notice { margin: 0; max-width: 80ch; font-size: 12px; line-height: 1.5; color: var(--pf-fg-dim); }
 .pf-error p { margin: 0; }

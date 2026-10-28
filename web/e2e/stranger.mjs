@@ -129,7 +129,7 @@ try {
 	const checkIn = page.getByRole("button", { name: "Check in" });
 	check("data-use notice is shown", await page.locator(".pf-datause").isVisible());
 	check("check-in waits for the notice", await checkIn.isDisabled());
-	await page.getByLabel("I've read this").check();
+	await page.getByLabel("Got it").check();
 	check("ticking the notice enables check-in", await checkIn.isEnabled());
 
 	check("no page errors", errors.length === 0, { errors: errors.slice(0, 5) });
