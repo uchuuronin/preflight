@@ -97,6 +97,11 @@ Destroy the droplet when a session ends; a powered-off droplet still bills.
 
 ## Agents: running something in the cloud
 
+**Ask first.** Don't use the keys recklessly. Before running anything that spends tokens or GPU
+time (Modal, Muse Spark, Muse Code, Baseten, the AMD droplet), run it by Chiya and the PM chat in
+your chat: what it runs, on which GPU or model, for how long, and the expected cost. Start it only
+after Chiya says yes. This holds for every run, smoke tests included.
+
 Name runs `<agent>-<what>` (for example `a-zoo-lora`, `b-corpus-t4`). Use the cheapest GPU that
 fits (T4 $0.59/h, L4 $0.80/h); anything above L40S needs Chiya's OK in chat first.
 
@@ -106,8 +111,9 @@ Start a run on Modal or a model API, from your own branch:
 gh workflow run remote-run.yml -R uchuuronin/preflight -f name=a-smoke-t4 -f ref=ws-a -f timeout=15 -f cmd="modal run scripts/cloud/smoke_modal.py --gpu T4"
 ```
 
-`cmd` must start with `modal run `, `python scripts/` or `python -m preflight.`, with no shell
-operators. Anything your command writes to `./out/` comes back with the log.
+`cmd` must start with `modal run `, `modal deploy `, `python scripts/` or `python -m preflight.`,
+with no shell operators. A `modal deploy` leaves the app running and billing until it is stopped, so it
+always needs Chiya's yes first, with how and when it will be stopped. Anything your command writes to `./out/` comes back with the log.
 
 Wait for it and read the results:
 
@@ -151,6 +157,7 @@ come from the cross-GPU model with wider intervals, labelled as such. If outputs
 
 ## Rules
 
+- Ask Chiya and the PM chat before any run that spends tokens or GPU time (see "Ask first" above).
 - Never paste a key into a chat, a commit, a test or a record. `.env.example` lists the names only.
 - `remote-runs` is written by workflows only; never push to it by hand.
 - Every run records its spend in your `docs/status/<agent>.md` (GPU, minutes, dollars), so the
