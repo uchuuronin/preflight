@@ -404,7 +404,9 @@ def test_model_cards_say_calibration_simulated(ft):
 
 
 def test_unknown_probe_gpu_uses_its_reported_memory(ft):
-	rec = _as_harness_builds_it(ft, "NVIDIA Weird 9000", 24 * 10**9)  # knob current = env.gpu.name, as A's merge sets
+	rec = _as_harness_builds_it(
+		ft, "NVIDIA Weird 9000", 24 * 10**9
+	)  # knob current = env.gpu.name, as A's merge sets
 	p = api.predict(rec, {"eval_batch_size": 1, "eval_no_grad": True}).root
 	assert p["memory.peak"].status != "abstain" and p["risk.oom"].status != "abstain"
 	assert p["time.step"].status in ("measured", "predicted", "extrapolated")
