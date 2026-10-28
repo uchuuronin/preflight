@@ -28,6 +28,9 @@ APP_NAME = "preflight-corpus"
 VOLUME = "preflight-corpus"
 MOUNT = "/corpus"
 TEXT = "/assets/tinyshakespeare.txt"
+COMMIT_EVERY = (
+	4  # guess: volume commits per batch traded against configs lost to a preemption; measured per batch
+)
 
 # exact pins, at least two weeks old on Oct 27 2026; they also go into every corpus key
 PINS = {
@@ -60,10 +63,33 @@ image = (
 	timeout=3 * 60 * 60,  # a batch of 8 configs, each capped by its own deadline in isolate.py
 	retries=modal.Retries(max_retries=1),  # preemption; finished configs are skipped on the retry
 	max_containers=4,
+	scaledown_window=30,  # set, so the idle tail is known: sweep.SCALEDOWN_S bills it (a test checks they match)
 )
 class Sweeper:
 	@modal.method()
+	def check(self) -> dict[str, Any]:
+		"""Start-up check in the real image: imports, the GPU, the volume. Runs no config."""
+		import importlib.metadata as md
+
+		import torch
+
+		from preflight.corpus import configs, isolate, store, sweep, worker  # noqa: F401
+		from preflight.engine import gpus
+
+		props = torch.cuda.get_device_properties(0)
+		vol.reload()
+		return {
+			"gpu": gpus.resolve(props.name, props.total_memory, props.multi_processor_count),
+			"total_memory": props.total_memory,
+			"torch": torch.__version__,
+			"transformers": md.version("transformers"),
+			"volume_ok": True,
+		}
+
+	@modal.method()
 	def run_batch(self, requested_gpu: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+		import time as _time
+
 		import torch
 
 		from preflight.corpus.configs import CorpusConfig
@@ -72,7 +98,10 @@ class Sweeper:
 		from preflight.corpus.sweep import make_record
 		from preflight.engine import gpus
 
+		t0 = _time.monotonic()
 		vol.reload()
+		reload_s = _time.monotonic() - t0
+		commit_s, uncommitted = 0.0, 0
 		store = ResultStore(MOUNT)
 		props = torch.cuda.get_device_properties(0)
 		name = props.name or getattr(props, "gcnArchName", "")
@@ -88,7 +117,12 @@ class Sweeper:
 			res = run_isolated(cfg, device="cuda", data_path=TEXT if cfg.kind == "divergence" else None)
 			res["requested_gpu"] = requested_gpu
 			store.write_once(cfg.kind, actual, cfg.key, make_record(cfg, actual, res), replace_errors=True)
-			vol.commit()
+			uncommitted += 1
+			if uncommitted >= COMMIT_EVERY:  # a preempted container loses at most COMMIT_EVERY - 1 configs
+				c0 = _time.monotonic()
+				vol.commit()
+				commit_s += _time.monotonic() - c0
+				uncommitted = 0
 			out.append(
 				{
 					"key": cfg.key,
@@ -101,7 +135,34 @@ class Sweeper:
 					"gpu_seconds": res.get("gpu_seconds", 0.0),
 				}
 			)
+		if uncommitted:
+			c0 = _time.monotonic()
+			vol.commit()
+			commit_s += _time.monotonic() - c0
+		# where the container's time went, so the overhead is measured rather than guessed
+		out.append(
+			{
+				"status": "batch",
+				"gpu": actual,
+				"wall_s": round(_time.monotonic() - t0, 1),
+				"reload_s": round(reload_s, 1),
+				"commit_s": round(commit_s, 1),
+			}
+		)
 		return out
+
+
+@app.function(image=image, volumes={MOUNT: vol}, timeout=5 * 60)
+def billing(kind: str, gpu: str, row: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""The container-seconds billed on one GPU for one kind across every run, kept on the volume; adds row if given."""
+	from preflight.corpus import sweep
+
+	path = f"{MOUNT}/_billing/{kind}-{gpu}.jsonl"
+	vol.reload()
+	if row is not None:
+		sweep.add_billing(path, row)
+		vol.commit()
+	return {"billed_s": sweep.billed_seconds(path), "history": sweep.container_history(path)}
 
 
 @app.function(image=image, volumes={MOUNT: vol}, timeout=15 * 60)
@@ -146,6 +207,26 @@ def read_rows(kind: str) -> list[dict[str, Any]]:
 
 
 @app.local_entrypoint()
+def startup_check(gpu: str = "T4", out: str = "out/startup_check.json") -> None:
+	"""Start the app in its real image once, on the cheapest GPU, before any paid sweep (Chiya, Oct 28):
+
+	modal run --env main python/preflight/corpus/modal_app.py::startup_check
+	"""
+	import json
+	from pathlib import Path
+
+	from preflight.corpus import sweep
+
+	result = {
+		"billing": billing.remote("kernels", gpu),
+		"sweeper": Sweeper.with_options(gpu=sweep.modal_gpu(gpu))().check.remote(),
+	}
+	Path(out).parent.mkdir(parents=True, exist_ok=True)
+	Path(out).write_text(json.dumps(result, indent=1))
+	print(json.dumps(result, indent=1))
+
+
+@app.local_entrypoint()
 def export(kind: str = "kernels", out: str = "out/corpus") -> None:
 	"""Bring the volume's rows back as one gzipped JSONL per kind and GPU (remote-run returns ./out):
 
@@ -179,6 +260,8 @@ def main(
 	overhead: float = 1.25,
 	retry_errors: bool = False,
 	dry_run: bool = False,
+	prior_usd: float = 0.0,  # money this GPU and kind already cost before container billing was recorded (Modal's bill)
+	max_minutes: float = 100.0,  # stop launching waves before remote-run's 120-minute limit
 ) -> None:
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
@@ -200,22 +283,33 @@ def main(
 		rates[g] = p.usd_per_hour
 
 	def run_gpu(gpu: str) -> str:
+		import time
+
 		sweeper = Sweeper.with_options(gpu=sweep.modal_gpu(gpu), max_containers=max_containers)()
 		wave_size = batch_size * max_containers
 		wave, last_done = 0, -1
+		started, last_wall = time.monotonic(), 0.0
 		while True:
 			led = ledger.remote(store_kind, gpu, retry_errors and wave == 0)
-			spent = led["gpu_seconds"] * overhead / 3600 * rates[gpu]
-			# hard cap: configs are priced at their deadline until three have finished (isolate.py)
+			bill = billing.remote(store_kind, gpu)
+			# spend is container time, an upper bound (sweep.wave_billed_seconds), plus what earlier runs cost
+			spent = prior_usd + bill["billed_s"] / 3600 * rates[gpu]
+			# hard cap: configs are priced at their deadline until three waves are measured, then at the p90
+			# container-seconds per config of the measured waves
 			todo = sweep.plan_from(
-				per_gpu[gpu], set(led["done"]), spent, plan[gpu], rates[gpu], overhead=overhead,
-				history=led["history"], reserve_configs=wave_size,
+				per_gpu[gpu], set(led["done"]), spent, plan[gpu], rates[gpu], overhead=1.0 if bill["history"] else overhead,
+				history=bill["history"], reserve_configs=wave_size,
 				worst_seconds=DEFAULT_TIMEOUT_S.get(store_kind, 900.0),
 			)  # fmt: skip
 			print(
-				f"[{gpu}] wave {wave}: ${spent:.2f} of ${plan[gpu]:.2f} spent, {len(led['done'])} done, {len(todo)} fit in budget"
+				f"[{gpu}] wave {wave}: ${spent:.2f} of ${plan[gpu]:.2f} spent (container time), {len(led['done'])} done, {len(todo)} fit in budget"
 			)
 			if not todo or dry_run:
+				return gpu
+			if (time.monotonic() - started + last_wall) / 60 > max_minutes:
+				print(
+					f"[{gpu}] another wave would pass {max_minutes:.0f} minutes; stopping here, a rerun resumes"
+				)
 				return gpu
 			if len(led["done"]) == last_done:
 				print(f"[{gpu}] no progress in the last wave (rows filed under another GPU?); stopping")
@@ -224,11 +318,33 @@ def main(
 			chunk = sweep.batches(todo[:wave_size], batch_size)
 			args = [(gpu, [c.to_dict() for c in b]) for b in chunk]
 			rows: list[dict[str, Any]] = []
-			for res in sweeper.run_batch.starmap(args, return_exceptions=True):
+			w0 = time.monotonic()
+			results = list(sweeper.run_batch.starmap(args, return_exceptions=True))
+			last_wall = time.monotonic() - w0
+			billed = sweep.wave_billed_seconds(last_wall, len(args))
+			n_ran = sum(
+				1 for res in results if not isinstance(res, BaseException)
+				for r in res if r.get("status") not in ("skipped", "batch")
+			)  # fmt: skip
+			billing.remote(
+				store_kind, gpu,
+				{"wave": wave, "wall_s": round(last_wall, 1), "containers": len(args), "billed_s": round(billed, 1), "configs": n_ran},
+			)  # fmt: skip
+			print(
+				f"[{gpu}] wave {wave} took {last_wall:.0f} s on {len(args)} containers: {billed:.0f} container-s billed "
+				f"(${billed / 3600 * rates[gpu]:.2f}) for {n_ran} configs"
+			)
+			for res in results:
 				if isinstance(res, BaseException):
 					# a container died (preemption past its retry, infra); its finished configs are on the volume
 					print(f"[{gpu}] a batch failed: {type(res).__name__}: {res}")
 					continue
+				for r in res:
+					if r.get("status") == "batch":
+						print(
+							f"[{gpu}] batch: {r['wall_s']} s in the container, reload {r['reload_s']} s, commits {r['commit_s']} s"
+						)
+				res = [r for r in res if r.get("status") != "batch"]
 				rows.extend(res)
 				for r in res:  # measured seconds per config, in the log, so pricing needs no export run
 					if r.get("status") != "skipped":

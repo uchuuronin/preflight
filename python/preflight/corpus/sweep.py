@@ -17,6 +17,7 @@ so a run of slow configs can't push the sweep past its budget.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import time
 import traceback
@@ -38,6 +39,8 @@ ESTIMATE_QUANTILE = 0.9  # simulated: S5 B5
 MIN_HISTORY = 3  # simulated: S5 B5
 MAX_CONSECUTIVE_USER_ERRORS = 3  # guess: three corpus-code errors in a row means a bug, not a config
 _EPS = 1e-6
+# set, not a platform default: modal_app.Sweeper's scaledown_window, so each container's idle tail is known
+SCALEDOWN_S = 30.0
 
 Runner = Callable[[CorpusConfig], dict[str, Any]]
 
@@ -63,6 +66,37 @@ def estimate_seconds(
 	if history and len(history) >= MIN_HISTORY:
 		return quantile(history, ESTIMATE_QUANTILE), True
 	return DEFAULT_EST_SECONDS[kind], False
+
+
+def wave_billed_seconds(wall_s: float, containers: int, scaledown_s: float = SCALEDOWN_S) -> float:
+	"""Upper bound on the container-seconds one wave is billed: every container up for the whole wave, start-up,
+	volume reloads and commits included, plus its idle tail. Phase 1 (Oct 28) showed config seconds alone can be
+	a ninth of this."""
+	return max(0.0, wall_s + scaledown_s) * max(0, containers)
+
+
+def add_billing(path: str | Path, row: dict[str, Any]) -> None:
+	path = Path(path)
+	path.parent.mkdir(parents=True, exist_ok=True)
+	with path.open("a") as f:
+		f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def _billing_rows(path: str | Path) -> list[dict[str, Any]]:
+	path = Path(path)
+	if not path.exists():
+		return []
+	return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def billed_seconds(path: str | Path) -> float:
+	"""Container-seconds billed so far on one GPU for one kind, across every run (the file lives on the volume)."""
+	return sum(float(r.get("billed_s", 0.0)) for r in _billing_rows(path))
+
+
+def container_history(path: str | Path) -> list[float]:
+	"""Billed container-seconds per config, one entry per wave that ran configs: what the next config will cost."""
+	return [float(r["billed_s"]) / r["configs"] for r in _billing_rows(path) if r.get("configs")]
 
 
 def plan_from(

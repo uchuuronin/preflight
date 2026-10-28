@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -391,3 +392,48 @@ def test_deadline_pricing_makes_the_cap_hard_before_any_history():
 	# after three measured configs the running p90 takes over
 	todo = sw.plan_from(cfgs, set(), 0.05, 0.30, 0.80, history=[40.0, 45.0, 50.0], worst_seconds=600.0)
 	assert len(todo) > 1
+
+
+def test_wave_billing_is_an_upper_bound_on_container_time():
+	from preflight.corpus import sweep as sw
+
+	# 4 containers for a 10-minute wave, each with its 30 s idle tail: 4 x 630 s
+	assert sw.wave_billed_seconds(600.0, 4) == pytest.approx(4 * (600.0 + sw.SCALEDOWN_S))
+	assert sw.wave_billed_seconds(600.0, 0) == 0.0
+	# phase 1's shape: 32 configs in an 11-minute wave cost far more than their 9 s each
+	per = sw.wave_billed_seconds(660.0, 4) / 32
+	assert per > 80
+
+
+def test_container_history_prices_the_next_wave():
+	from preflight.corpus import configs as C
+	from preflight.corpus import sweep as sw
+
+	cfgs = C.configs_for("grouped", 600, 0)
+	# three measured waves at ~85 container-seconds a config; $6 on an L4 with $5 already billed
+	todo = sw.plan_from(
+		cfgs, set(), 5.0, 6.0, 0.80, overhead=1.0, history=[85.0, 80.0, 90.0], reserve_configs=0
+	)
+	assert len(todo) == math.floor(1.0 / sw.cost_usd(sw.quantile([85.0, 80.0, 90.0], 0.9), 0.80, 1.0))
+
+
+def test_billing_file_round_trips(tmp_path):
+	from preflight.corpus import sweep as sw
+
+	p = tmp_path / "_billing" / "kernels-L4.jsonl"
+	assert sw.billed_seconds(p) == 0.0
+	sw.add_billing(p, {"wave": 0, "wall_s": 100.0, "containers": 2, "billed_s": 260.0, "configs": 16})
+	sw.add_billing(p, {"wave": 1, "wall_s": 50.0, "containers": 1, "billed_s": 80.0, "configs": 8})
+	assert sw.billed_seconds(p) == pytest.approx(340.0)
+	assert sw.container_history(p) == pytest.approx([260.0 / 16, 80.0 / 8])
+
+
+def test_modal_idle_window_matches_what_the_sweep_bills():
+	pytest.importorskip("modal")
+	import re
+
+	from preflight.corpus import modal_app, sweep
+
+	src = Path(modal_app.__file__).read_text()
+	assert float(re.search(r"scaledown_window=(\d+)", src).group(1)) == sweep.SCALEDOWN_S
+	assert modal_app.COMMIT_EVERY >= 1

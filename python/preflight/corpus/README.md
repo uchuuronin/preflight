@@ -74,6 +74,12 @@ gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l40s -f 
 gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a100 -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 100 --budgets A100-SXM-80GB=5.5"
 ```
 
+**Spend is container time (Oct 28).** Phase 1 showed that a config's own seconds can be a ninth of what Modal bills. Containers are also billed for start-up, volume reloads and commits, and the idle tail. So each wave's spend is its measured wall time × containers × rate, plus the 30 s idle window the app sets (`sweep.wave_billed_seconds`), an upper bound. It is kept on the volume in `_billing/`, so a rerun keeps counting. Configs are priced from the measured container-seconds per config, and a run stops launching waves before 100 minutes (`--max-minutes`). For a GPU that already spent money before this accounting existed, pass Modal's figure as `--prior-usd`. Before any paid sweep, start the app once in its real image:
+
+```
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-startup -f ref=ws-b -f timeout=15 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::startup_check"
+```
+
 Bring the rows back (a CPU container, about a cent), then read them from the `remote-runs` branch:
 
 ```
