@@ -147,7 +147,8 @@ def test_app_logs_reads_and_never_runs(monkeypatch, tmp_path):
 			raise app_logs.subprocess.TimeoutExpired(
 				cmd, kw["timeout"], output=b"[ground truth] bare run", stderr=b""
 			)
-		return Done(0, json.dumps([{"App ID": "ap-abcdef12", "State": "ephemeral"}]))
+		return Done(0, json.dumps([{"App ID": "ap-abcdef12", "Description": "preflight-runner-ops", "State": "ephemeral"},
+			{"App ID": "ap-runner99", "Description": "preflight-runner", "State": "deployed"}]))  # fmt: skip
 
 	monkeypatch.setattr(app_logs.subprocess, "run", run)
 	assert app_logs.main(["--env", "main", "ap-abcdef12", "--seconds", "5"]) == 0
@@ -156,3 +157,6 @@ def test_app_logs_reads_and_never_runs(monkeypatch, tmp_path):
 	assert got["state"] == "ephemeral" and "cut off" in got["read"]
 	assert all(c[:2] == ["modal", "app"] and c[2] in ("logs", "list") for c in calls)  # read-only commands
 	assert app_logs.main(["--env", "main", "ap-x; rm -rf /"]) == 2
+	n = len(calls)
+	assert app_logs.main(["--env", "main", "ap-runner99"]) == 2  # visitors' output is never published
+	assert not any(c[2] == "logs" for c in calls[n:])
