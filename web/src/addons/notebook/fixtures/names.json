@@ -1,0 +1,16 @@
+{
+	"about": "Notebook names as a browser hands them, and the name D sends; every sent name must pass A's fetch (tests/test_d_notebook_parity.py)",
+	"names": {
+		"Untitled1.ipynb": "Untitled1.ipynb",
+		"my notebook.ipynb": "my notebook.ipynb",
+		"train (1).ipynb": "train_1.ipynb",
+		"résumé.ipynb": "resume.ipynb",
+		".hidden.ipynb": "hidden.ipynb",
+		"C:\\Users\\me\\a b.ipynb": "a b.ipynb",
+		"(((.ipynb": "notebook.ipynb",
+		"Copy of LoRA – Qwen2.5 [Colab].ipynb": "Copy of LoRA_Qwen2.5_Colab.ipynb",
+		"模型训练.ipynb": "notebook.ipynb",
+		"a.IPYNB": "a.ipynb",
+		"notes - final (v2).ipynb": "notes - final_v2.ipynb"
+	}
+}

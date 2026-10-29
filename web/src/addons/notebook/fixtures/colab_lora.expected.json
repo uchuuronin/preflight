@@ -1,0 +1,14 @@
+{
+ "script": "# !pip install -q transformers peft==0.13.2 \"trl>=0.12\" --upgrade\n# %pip install accelerate  # for device_map\n\n\nimport torch\nfrom transformers import AutoModelForCausalLM\n\n# %time model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-0.5B')\nbatch_size = 8\n\n\nfor step in range(10):\n    loss = step\n#     !nvidia-smi\nprint(loss)\n",
+ "requirements": [
+  "transformers",
+  "peft==0.13.2",
+  "trl>=0.12",
+  "accelerate"
+ ],
+ "files": {
+  "colab_lora.py": "# !pip install -q transformers peft==0.13.2 \"trl>=0.12\" --upgrade\n# %pip install accelerate  # for device_map\n\n\nimport torch\nfrom transformers import AutoModelForCausalLM\n\n# %time model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-0.5B')\nbatch_size = 8\n\n\nfor step in range(10):\n    loss = step\n#     !nvidia-smi\nprint(loss)\n",
+  "requirements.txt": "transformers\npeft==0.13.2\ntrl>=0.12\naccelerate\n"
+ },
+ "entrypoint": "colab_lora.py"
+}

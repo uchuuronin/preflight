@@ -1,0 +1,15 @@
+{
+ "script": "# !python -m pip install --index-url https://example.com/simple foo bar==1.0; echo done\n# !pip3 install -r requirements.txt baz # comment\n# % pip install qux\n# !pip install foo 'quux[extra]>=2' -e ./local\n\n\n\n\nx = 1\n",
+ "requirements": [
+  "foo",
+  "bar==1.0",
+  "baz",
+  "qux",
+  "quux[extra]>=2"
+ ],
+ "files": {
+  "pip_edge_cases.py": "# !python -m pip install --index-url https://example.com/simple foo bar==1.0; echo done\n# !pip3 install -r requirements.txt baz # comment\n# % pip install qux\n# !pip install foo 'quux[extra]>=2' -e ./local\n\n\n\n\nx = 1\n",
+  "requirements.txt": "foo\nbar==1.0\nbaz\nqux\nquux[extra]>=2\n"
+ },
+ "entrypoint": "pip_edge_cases.py"
+}
