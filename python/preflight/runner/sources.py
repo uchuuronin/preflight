@@ -269,6 +269,14 @@ def _args(raw) -> list[str]:
 		raise InvalidSubmission("the script's arguments are a list of strings")
 	if len(raw) > MAX_ARGS or any(len(a) > MAX_ARG_LEN or "\0" in a for a in raw):
 		raise InvalidSubmission(f"up to {MAX_ARGS} arguments of up to {MAX_ARG_LEN} characters each")
+	for a in raw:
+		try:
+			a.encode("utf-8")
+		except UnicodeEncodeError:  # an unpaired surrogate: no record or command line can hold it
+			raise InvalidSubmission(
+				"a script argument has text that isn't valid Unicode (an unpaired surrogate)",
+				code="submission.invalid",
+			) from None
 	return list(raw)
 
 

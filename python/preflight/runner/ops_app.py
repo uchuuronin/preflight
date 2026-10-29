@@ -12,6 +12,7 @@ reuses the runner's images, so what it checks is what the runner runs.
 """
 
 import contextlib
+import os
 import uuid
 from pathlib import Path
 
@@ -84,6 +85,9 @@ def _load_standalone(src: Path | None = None) -> str:
 		spec.loader.exec_module(mod)
 		zoo = getattr(mod, "ZOO_SRC", mod.ROOT / "zoo")
 		missing = [str(d) for d in (mod.PKG, zoo) if not Path(d).is_dir()]
+		flags = getattr(mod, "FLAGS_SRC", None)
+		if flags is not None and not Path(flags).is_file():
+			missing.append(str(flags))
 		if missing:  # an image resolved here (a sandbox's) would fail to build: say so now
 			raise FileNotFoundError(f"image source folders missing in the container: {missing}")
 		return f"{dst} (module modal_app, tag {mod.image_tag()}, PKG {mod.PKG}, zoo {zoo})"
@@ -114,6 +118,13 @@ def startup_check_worker() -> dict:
 	# the job store's guard, seen from this ops container: it must find the deployed runner (or say
 	# it isn't deployed) and must answer "not the deployed app" here
 	guard_ok, guard_why = deployed_here()
+	from preflight.runner.flags import _root, flag
+
+	flags_seen = {
+		"root": str(_root()),
+		"env": os.environ.get("PREFLIGHT_ENV"),
+		"engine.memory": flag("engine.memory"),
+	}
 	standalone = _load_standalone()
 	saved: list[dict] = []
 	store = InMemoryJobStore(on_change=saved.append)
@@ -125,7 +136,7 @@ def startup_check_worker() -> dict:
 	rec = skeleton_record(map_static(f.files, entrypoint=f.entrypoint), f.source)
 	return {"module": __name__, "file": __file__, "runner_loaded_as": standalone, "zoo": str(ZOO), "zoo_samples": sorted(p.name for p in ZOO.iterdir()),
 		"submitted": sub, "saves": len(saved), "lens": rec.job.lens, "knobs": len(rec.knobs),
-		"imported": imported, "container_environment": _container_environment(),
+		"imported": imported, "container_environment": _container_environment(), "flags": flags_seen,
 		"job_store_would_claim_here": guard_ok, "guard": guard_why,
 		"image_tag": image_tag()}  # fmt: skip
 
@@ -295,61 +306,43 @@ def smoke(
 
 # ---------------------------------------------------------------- ground truth (L4, paid: ask first)
 
-GROUND_TRUTH_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt"}
+
+# Modal's own limit, not just the workflow's: on Oct 28 remote-run.yml's timeout killed `modal run`
+# but the L4 function ran on until stop_app stopped it. The measurement ends inside its budget
+# (40 min by default); this ends the container even if that fails.
+GROUND_TRUTH_TIMEOUT_S = 50 * 60
 
 
-@ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=3600)
-def ground_truth_on_l4(script: str, bare_steps: int, recorder_steps: int, warmup: int) -> dict:
-	"""One zoo script on an L4: a bare run (a CUDA event per optimizer step, nothing else; it also
-	shows where the script really fails, the LoRA script's eval OOM included), then a recorder run
-	alternating clean and synced steps. Returns both and the paired overhead (recorder/overhead.py).
-	Our own zoo code on our own GPU, so a plain function, not a visitor sandbox."""
-	import json
-	import os
-	import subprocess
-	import sys
-	import tempfile
-
+@ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=GROUND_TRUTH_TIMEOUT_S)
+def ground_truth_on_l4(
+	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float
+) -> dict:
+	"""recorder/ground_truth.py on an L4: a bare run, then a recorder run alternating clean and
+	synced steps, and the paired overhead. The AMD droplet runs the same module."""
 	from preflight.probes import remote
-	from preflight.probes.local import ProbeSpec, run_probe
-	from preflight.recorder.overhead import report
-	from preflight.runner.sources import ZOO, _read_tree
+	from preflight.recorder.ground_truth import ZOO_SCRIPTS, measure
+	from preflight.runner.sources import ZOO
 
-	if script not in GROUND_TRUTH_SCRIPTS:
+	if script not in ZOO_SCRIPTS:
 		raise ValueError(f"unknown zoo script {script!r}")
 	remote.link_weights()
 	remote.deps_dir()
-	work = Path(tempfile.mkdtemp(prefix="gt-"))
-	files = _read_tree(ZOO / script)
-	for rel, text in files.items():
-		(work / rel).parent.mkdir(parents=True, exist_ok=True)
-		(work / rel).write_text(text)
-	out = work / "bare.json"
-	t = subprocess.run([sys.executable, "-m", "preflight.recorder.bare", str(work / "train.py"), str(out),
-		"--steps", str(bare_steps)], capture_output=True, text=True, timeout=2400, env={**os.environ})  # fmt: skip
-	bare = json.loads(out.read_text()) if out.exists() else {"failed": (t.stdout + t.stderr)[-3000:]}
-	r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint="train.py", warmup=warmup, timed=recorder_steps,
-		timeout_s=2400, alternate_sync=True))  # fmt: skip
-	log = [s.model_dump() for s in r.probe.step_log]
-	over = report(log, bare.get("walls_s") or [], warmup=warmup) if r.probe.status == "ok" else None
-	return {"script": script, "gpu": r.env.gpu.name if r.env and r.env.gpu else None, "bare": bare,
-		"recorder": {"status": r.probe.status, "error": r.probe.error, "error_code": r.probe.error_code,
-			"steps": r.probe.steps, "p50_s": r.probe.step_time.p50_s if r.probe.step_time else None,
-			"peak_allocated_bytes": r.probe.memory.peak_allocated_bytes if r.probe.memory else None,
-			"step_log": log, "log_tail": r.log_tail[-1500:]},
-		"overhead": over}  # fmt: skip
+	return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
+		budget_s=budget_s)  # fmt: skip
 
 
 @ops.local_entrypoint()
-def ground_truth(script: str, bare_steps: int, recorder_steps: int = 60, warmup: int = 5):
+def ground_truth(
+	script: str, bare_steps: int, recorder_steps: int = 60, warmup: int = 5, budget_min: float = 40
+):
 	"""modal run --env main python/preflight/runner/ops_app.py::ground_truth --script finetune_lora_hf --bare-steps 210
-	Writes out/ground_truth_<script>.json (step walls, peak memory, how the bare run ended, overhead)."""
+	Writes out/ground_truth_<script>.json (step walls, peak memory, how the bare run ended, overhead).
+	budget_min: the whole measurement ends inside it; keep it under the run's own time limit."""
 	import json
 
-	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup)
+	from preflight.recorder.ground_truth import brief
+
+	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
-	brief = {k: v for k, v in res.items() if k not in ("bare", "recorder")}
-	brief["bare"] = {k: v for k, v in res["bare"].items() if k != "walls_s"}
-	brief["recorder"] = {k: v for k, v in res["recorder"].items() if k not in ("step_log", "log_tail")}
-	print(json.dumps(brief, indent=2), flush=True)
+	print(json.dumps(brief(res), indent=2), flush=True)
