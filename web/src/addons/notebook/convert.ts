@@ -43,10 +43,12 @@ export interface NotebookPreview {
 	renamedFrom: string | null;
 }
 
-export interface NotebookSource {
+// A type alias, not an interface: C's IntakePanelProps hands back JobRequest["source"], an index
+// signature object, and only an alias is assignable to it (PM, merge of ws-c and ws-d, Oct 28).
+export type NotebookSource = {
 	kind: "notebook";
 	files: Record<string, string>;
-}
+};
 
 export type Prepared = { ok: true; source: NotebookSource; preview: NotebookPreview } | { ok: false; error: NotebookError };
 

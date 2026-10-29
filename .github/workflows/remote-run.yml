@@ -71,6 +71,8 @@ jobs:
           # SIGINT, which `modal run` handles by stopping its app; SIGKILL follows 2 minutes later.
           # A plain SIGTERM killed the client and left its GPU functions running (A, Oct 28).
           source .venv/bin/activate
+          # unbuffered, so a run that is cut off still leaves its last lines in the log
+          export PYTHONUNBUFFERED=1
           timeout -s INT -k 2m "${RUN_TIMEOUT}m" "${argv[@]}" > run.log 2>&1
           code=$?
           echo "exit=$code" >> "$GITHUB_OUTPUT"
