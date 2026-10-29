@@ -340,16 +340,26 @@ def _env_gpu(record: FlightRecord) -> str | None:
 
 
 def _gpu_move(record: FlightRecord, values: dict) -> str | None:
-	"""The GPU asked for, or None when gpu_type is still the record's own value (no move).
+	"""The GPU asked for, or None when gpu_type names the GPU the probes ran on (no move).
 
-	Records from A's harness carry a gpu_type knob whose current value names the probed GPU, so
-	the current value alone must never read as a move (an unlisted card would lose step time).
+	Records from A's harness carry a gpu_type knob whose current value is env.gpu.name (runner/pipeline.py),
+	so the probed GPU must never read as a move, whether named as the probe reported it (an unlisted card would
+	otherwise lose its step time) or by another name for the same card. Compared with the GPU the probes
+	measured, not the knob's current value, so a knob left stale after a step-up still predicts for the GPU
+	the dial shows.
 	"""
 	name = values.get("gpu_type")
 	if not (isinstance(name, str) and name):
 		return None
-	if name == _current(record).get("gpu_type"):
+	g = record.env.gpu if record.env else None
+	if g is not None and name == g.name:
 		return None
+	probed = _env_gpu(record)
+	try:
+		if probed is not None and gpus.resolve(name) == probed:
+			return None
+	except KeyError:
+		pass  # a name the table doesn't know is a move to an unknown GPU, and abstains downstream
 	return name
 
 
@@ -460,6 +470,10 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		why = f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
 	res = _from_memory_estimate(est, mid, oom_source)
+	if (
+		cell is not None and mprobes and res.peak.status not in ("abstain", "measured")
+	):  # no probes: the prior set it
+		res = replace(res, peak=_with_note(res.peak, _band_note(cell)))
 	if est.status != "abstain" and est.breakdown is not None:
 		stack = dict(est.breakdown.stack)
 		if est.breakdown.peak_moment == "eval":
@@ -555,9 +569,20 @@ def _empirical_memory(
 	p = memory.p_oom(point, h / memory.Z90, capacity)
 	est = memory.MemoryEstimate(
 		point, point * math.exp(-h), point * math.exp(h), "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
-		h / memory.Z90, None, "fitted to the probes alone: the script map has no model shape",
+		h / memory.Z90, None, "; ".join(x for x in (
+			"fitted to the probes alone: the script map has no model shape",
+			_band_note(cell) if cell is not None and not measured else None,
+		) if x),
 	)  # fmt: skip
 	return _from_memory_estimate(est, mid)
+
+
+def _band_note(cell: conformal.Cell) -> str:
+	return f"band from held-out runs: {cell.label()}"
+
+
+def _with_note(est: Estimate, note: str) -> Estimate:
+	return est.model_copy(update={"reason": "; ".join(x for x in (est.reason, note) if x)})
 
 
 # ---------------------------------------------------------------- step time
@@ -1408,6 +1433,11 @@ def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction
 			out[f"time.phase.{ph}"] = _est(
 				v, v * math.exp(-h), v * math.exp(h), "s", tm.step.status, tm.step.model_id
 			)
+	tcell = conformal.TABLE.lookup("time.step", _env_gpu(record), record.job.lens)
+	if tcell is not None:  # _step takes the probe GPU's held-out band, and cross-GPU time builds on it
+		for tid in [t for t in out if t in ("time.step", "time.total") or t.startswith("time.phase.")]:
+			if out[tid].status not in ("abstain", "measured"):
+				out[tid] = _with_note(out[tid], _band_note(tcell))
 	c = record.job.constraints
 	if c.wall_time_cap_s:
 		out["risk.wall_cap"] = _wall_cap(record, tm)
@@ -1705,6 +1735,11 @@ _CARD_TARGET = {
 }
 
 
+# the models whose own predictions the corpus scores; the cross-GPU model's band starts from the same-GPU cell,
+# but no cross-GPU prediction has been scored yet, so its card carries no coverage
+_CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME})
+
+
 def _calibration(mid: str) -> tuple[str, float | None]:
 	"""("held_out", None) when the conformal table has a cell for this model's target, else ("simulated", None)."""
 	target = _CARD_TARGET.get(mid)
@@ -1718,13 +1753,27 @@ def _cards(ids: set[str]) -> list[ModelCard]:
 	for mid in sorted(ids):
 		kind, notes = _CARDS.get(mid, ("analytical", None))
 		calib, _ = _calibration(mid)
+		target = _CARD_TARGET.get(mid)
+		extra: dict = {}
+		if calib == "held_out" and target and mid in _CARD_SCORED:
+			t = conformal.TABLE
+			extra["training_data"] = t.built_from
+			if target in t.coverage and t.coverage[target][1]:
+				h, n = t.coverage[target]
+				extra["coverage"] = h / n
+			extra["per_gpu_coverage"] = {g: h / n for g, (h, n) in t.holdout.get(target, {}).items() if n}
+			notes = f"{notes or ''}. {t.describe(target)}".strip(". ")
 		out.append(
 			ModelCard(
 				id=mid,
 				kind=kind,
 				version=mid.split("@")[-1],
-				training_data="none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+				training_data=extra.pop(
+					"training_data",
+					"none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+				),
 				notes=f"calibration: {calib}. {notes or ''}".strip(),
+				**extra,
 			)
 		)
 	return out

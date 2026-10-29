@@ -73,6 +73,15 @@ class Cell:
 		float, ...
 	] = ()  # signed log(actual / predicted), sorted: P(OOM) reads these (engine.oom)
 
+	def label(self) -> str:
+		"""Which runs set this band, saying when a GPU and job type had too few and was merged."""
+		_, gpu, lens = (*self.key, "", "")[:3]
+		if gpu and lens:
+			return f"{gpu}, {lens} (n = {self.n})"
+		if lens:
+			return f"{lens}, merged across GPUs (n = {self.n})"
+		return f"merged across GPUs and job types (n = {self.n})"
+
 
 @dataclass(frozen=True)
 class Table:
@@ -82,6 +91,37 @@ class Table:
 	built_from: str = ""
 	version: str = "0"
 	oom_reliable: bool = False  # P(OOM) passed its reliability diagram on real outcomes (engine.oom)
+	coverage: dict[str, tuple[int, int]] = field(
+		default_factory=dict
+	)  # target -> leave-one-arch-out (hits, n)
+	holdout: dict[str, dict[str, tuple[int, int]]] = field(
+		default_factory=dict
+	)  # target -> gpu -> (hits, n), once
+
+	def describe(self, target: str) -> str:
+		"""For a model card: the cells this target has, how pairs below MIN_CELL merge, coverage and holdout."""
+		own = sorted(
+			(c for k, c in self.cells.items() if k[0] == target), key=lambda c: (-len(c.key[1]), c.key)
+		)
+		if not own:
+			return "no held-out cells"
+		parts = [f"Own cells: {'; '.join(c.label() for c in own)}."]
+		parts.append(
+			f"A GPU and job type with fewer than {MIN_CELL} held-out runs has no band of its own: it uses its job "
+			"type merged across GPUs, then all runs."
+		)
+		if self.coverage.get(target, (0, 0))[1]:
+			h, n = self.coverage[target]
+			lo, hi = wilson(h, n)
+			parts.append(f"Leave-one-architecture-out coverage {h} of {n} (Wilson 95% {lo:.0%} to {hi:.0%}).")
+		for gpu, (h, n) in sorted(self.holdout.get(target, {}).items()):
+			if not n:
+				continue
+			lo, hi = wilson(h, n)
+			parts.append(
+				f"Holdout, never tuned on: {gpu} {h} of {n} inside the band (Wilson 95% {lo:.0%} to {hi:.0%})."
+			)
+		return " ".join(parts)
 
 	def lookup(self, target: str, gpu: str | None, lens: str | None) -> Cell | None:
 		"""The most specific cell with enough runs: (target, gpu, lens), then (target, lens), then (target,)."""
@@ -96,6 +136,8 @@ class Table:
 			"version": self.version,
 			"built_from": self.built_from,
 			"oom_reliable": self.oom_reliable,
+			"coverage": {t: list(v) for t, v in self.coverage.items()},
+			"holdout": {t: {g: list(v) for g, v in d.items()} for t, d in self.holdout.items()},
 			"cells": [
 				{
 					"key": list(c.key),
@@ -122,7 +164,14 @@ class Table:
 			)
 			for c in d.get("cells", [])
 		}
-		return cls(cells, d.get("built_from", ""), d.get("version", "0"), bool(d.get("oom_reliable", False)))
+		return cls(
+			cells,
+			d.get("built_from", ""),
+			d.get("version", "0"),
+			bool(d.get("oom_reliable", False)),
+			{t: (int(v[0]), int(v[1])) for t, v in d.get("coverage", {}).items()},
+			{t: {g: (int(v[0]), int(v[1])) for g, v in gs.items()} for t, gs in d.get("holdout", {}).items()},
+		)
 
 
 def calibrate(scores: Iterable[Score], level: float = LEVEL, built_from: str = "") -> Table:

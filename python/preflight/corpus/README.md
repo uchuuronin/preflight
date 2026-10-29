@@ -45,43 +45,55 @@ Every config has a content-addressed key and is written once. A restarted sweep 
 Cloud runs go through `remote-run.yml`; B holds no keys (docs/setup/cloud.md). Each phase is one workflow run of at most 120 minutes, and a sweep cut short resumes from the volume on its next run. Phase 0:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-grouped -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 10 --budgets L4=0.3 --batch-size 2 --max-containers 1 --max-minutes 45"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=0.4 --batch-size 2 --max-containers 1"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-smoke-hf -f ref=ws-b -f timeout=90 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=0.4 --batch-size 2 --max-containers 1 --max-minutes 75"
 ```
 
-Phases 1 and 2, with the caps from the table (each GPU runs in parallel inside one run):
+Phases 1 and 2 at the doubled size Chiya approved (Oct 28), with their hard caps. Phase 1 resumes on the L4, passing Modal's figure for the first, timed-out run as `--prior-usd`:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l4 -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets L4=5.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l4-2 -f ref=ws-b -f timeout=120 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 600 --budgets L4=6 --prior-usd <Modal's figure> --max-minutes 105"
 ```
 
-```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-hf -f ref=ws-b -f timeout=90 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind hf --budgets L4=2.5,A10=3.5"
-```
+Phase 2, only after phase 1 comes back clean:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-gpus -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets T4=1,A10=7.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a10 -f ref=ws-b -f timeout=120 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 600 --budgets A10=7.5 --max-minutes 105"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l40s -f ref=ws-b -f timeout=120 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 200 --budgets L40S=9"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a10-hf -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind hf --budgets A10=0.7 --max-minutes 45"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a100 -f ref=ws-b -f timeout=60 -f cmd="modal run python/preflight/corpus/modal_app.py::main --kind grouped --n 100 --budgets A100-SXM-80GB=5.5"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-t4 -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --budgets T4=1.2 --max-minutes 45"
+```
+
+```
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-l40s -f ref=ws-b -f timeout=120 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 200 --budgets L40S=3.7 --max-minutes 105"
+```
+
+```
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-a100 -f ref=ws-b -f timeout=60 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 100 --budgets A100-SXM-80GB=2 --max-minutes 45"
+```
+
+**Spend is container time, bounded before each wave (Oct 28).** Phase 1 showed that a config's own seconds can be a ninth of what Modal bills. So before each wave the sweep bills the wave's worst case to `_billing/` on the volume: every container starting, running a full batch at the config deadline, and idling out. A wave launches only if that fits the money left and ends inside `--max-minutes`, which each command sets 15 minutes under its workflow timeout. After the wave, the bill settles to the measured container time, so a killed wave stays billed at its worst case. Deadlines follow the measured configs (3x the p99, at least 120 s). Each wave's containers get a Modal timeout equal to their worst case, so a hang anywhere in a container (the GPU driver, the volume) ends where the bound assumed. No config starts past the wave's end time, even in Modal's own restart after a preemption. Retries are off. A lease on the billing file stops a second run from sharing one GPU's budget. Rates carry a 1.10 guess for Modal's CPU and memory charges. For a GPU that spent money before this accounting existed, pass Modal's figure once as `--prior-usd`. Before any paid sweep, start the app once in its real image (one T4 container, one small config, about $0.03):
+
+```
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-startup -f ref=ws-b -f timeout=15 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::startup_check"
 ```
 
 Bring the rows back (a CPU container, about a cent), then read them from the `remote-runs` branch:
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export -f ref=ws-b -f timeout=20 -f cmd="modal run python/preflight/corpus/modal_app.py::export --kind kernels"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export -f ref=ws-b -f timeout=20 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::export --kind kernels"
 ```
 
 ```
-gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export-hf -f ref=ws-b -f timeout=20 -f cmd="modal run python/preflight/corpus/modal_app.py::export --kind hf"
+gh workflow run remote-run.yml -R uchuuronin/preflight -f name=b-corpus-export-hf -f ref=ws-b -f timeout=20 -f cmd="modal run --env main python/preflight/corpus/modal_app.py::export --kind hf"
 ```
 
 Each run's GPU, minutes and dollars go in `docs/status/b.md`.
@@ -100,7 +112,13 @@ They run as phases 0 to 2 above. Once the exports are on the `remote-runs` branc
 PYTHONPATH=python python -m preflight.corpus.calibrate --store ./corpus --out python/preflight/engine/_calibration_table.py
 ```
 
-The last step prints leave-one-architecture-out coverage with Wilson intervals and writes the table the engine reads. Model cards switch from `calibration: simulated` to `held_out` for the targets the table covers.
+**Rules for building the table (Chiya, Oct 28):**
+- **Calibrate only on configs drawn the way probes are chosen.** That means the grouped and HF configs, whose three probes follow A's plan (current, half batch, half sequence) and whose two queries sit where users ask (twice the batch, and a halving below the probes). No groups are aimed at the out-of-memory boundary. Any added for the reliability diagram stay out of the table, or are reweighted.
+- **Small groups merge.** A GPU and job type needs at least 9 held-out runs for a 90% band; below that it has no band of its own. It uses its job type merged across GPUs, then all runs. Each estimate's reason and each model card name the cell they used.
+- **The A100 rows are a holdout.** `--holdout-gpus` (default `A100-SXM-80GB`) keeps them out of the table and its coverage check, and scores them once against the merged cells, as a user's unseen GPU would be. The result goes on the model card, never back into tuning.
+- **Reliability diagram:** each bin carries a Wilson interval, and bins with fewer than 10 points are named but not drawn.
+
+The last step prints leave-one-architecture-out coverage with Wilson intervals, then the holdout and the reliability bins, and writes the table the engine reads. Model cards switch from `calibration: simulated` to `held_out` for the targets the table covers.
 
 ### Run the AMD slice on the MI300X (Thursday's droplet session)
 
