@@ -8,7 +8,7 @@
  */
 import type { ComponentType } from "react";
 import { useSyncExternalStore } from "react";
-import type { Estimate, Knob, KnobValue, Lens, LoadedRecord } from "./workspace/record/types";
+import type { Estimate, JobRequest, Knob, KnobValue, Lens, LoadedRecord } from "./workspace/record/types";
 import type { PredictionProvider } from "./workspace/provider/PredictionProvider";
 import { guidedKnobs, useOptionalWorkspace, useRanked } from "./workspace/state";
 import { flag } from "./lib/flags";
@@ -30,6 +30,16 @@ export type { KnobValue };
  */
 export type PanelSlot = "below" | "drawer" | "guide-footer" | "cockpit-head";
 
+/**
+ * What the check-in desk gives an "intake" panel. `setSource` hands the desk the panel's
+ * `JobRequest.source` (null clears it); while the active tab has one, "Check in" sends it with
+ * the goal, GPU and description. It is absent while check-in isn't open (the `runner.queue`
+ * flag), so a panel can say so. Other slots get no props.
+ */
+export interface IntakePanelProps {
+	setSource?: (source: JobRequest["source"] | null) => void;
+}
+
 /** Panels outside the cockpit: no record in hand. */
 export interface AppPanelEntry {
 	id: string;
@@ -37,7 +47,7 @@ export interface AppPanelEntry {
 	titleKey: string;
 	order?: number;
 	flag?: string;
-	component: ComponentType;
+	component: ComponentType<IntakePanelProps>;
 }
 
 export interface PanelEntry {

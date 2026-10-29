@@ -59,6 +59,9 @@ export function Logbook({ active }: { active: boolean }) {
 							</AddonBoundary>
 						</div>
 					))}
+					<a className="pf-link" href={href("checks")}>
+						{t("checks.link")}
+					</a>
 					{entries.length ? (
 						<button
 							type="button"

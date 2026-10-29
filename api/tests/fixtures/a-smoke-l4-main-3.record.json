@@ -1,0 +1,1043 @@
+{
+	"schema_version": "0.3.0",
+	"record_id": "01M60ES3GW28VAYPFZ4QM05EQP",
+	"share_token": "fixture-share-token-0001",
+	"created_at": "2026-10-28T05:12:28Z",
+	"job": {
+		"lens": "finetune",
+		"source": {
+			"kind": "sample",
+			"uri": "sample://zoo/finetune_lora_hf",
+			"content_hash": "sha256:84bbfce5bb70716f37298ba3cf2d06b0b98ce62e83913a831d038b44ebbe6f8d",
+			"entrypoint": "train.py",
+			"args": []
+		},
+		"framework": "hf_trainer",
+		"script_map": {
+			"lens": "finetune",
+			"framework": "hf_trainer",
+			"entrypoint": "train.py",
+			"launch": "python train.py",
+			"model": {
+				"name": "Qwen2.5-1.5B",
+				"hf_id": "Qwen/Qwen2.5-1.5B",
+				"family": "decoder",
+				"param_count": 1540000000,
+				"n_layers": 28,
+				"d_model": 1536,
+				"n_heads": 12,
+				"n_kv_heads": 2,
+				"d_ff": 8960,
+				"vocab_size": 151936,
+				"head_dim": 128,
+				"max_positions": 131072,
+				"gated_mlp": true,
+				"tie_embeddings": false,
+				"norm": "rmsnorm",
+				"dtype": "bfloat16",
+				"shape_source": "hf_config",
+				"lora": {
+					"r": 16,
+					"alpha": 32.0,
+					"target_modules": [
+						"q_proj",
+						"k_proj",
+						"v_proj",
+						"o_proj",
+						"gate_proj",
+						"up_proj",
+						"down_proj"
+					],
+					"dropout": 0.05
+				}
+			},
+			"data": {
+				"dataset": "yahma/alpaca-cleaned",
+				"batch_size": 4,
+				"eval_batch_size": 32,
+				"seq_len": 1024,
+				"packing": false,
+				"padding": "longest",
+				"languages": [
+					"en"
+				]
+			},
+			"training": {
+				"optimizer": "adamw_torch",
+				"lr": 0.0001,
+				"warmup_steps": 50,
+				"grad_accum": 4,
+				"precision": "bf16",
+				"epochs": 1.0,
+				"checkpoint_every": 500,
+				"eval_every": 200,
+				"grad_checkpointing": false,
+				"eval_under_no_grad": false,
+				"distributed": "none"
+			},
+			"loop": {
+				"kind": "hf_trainer",
+				"location": {
+					"file": "train.py",
+					"line": 109,
+					"expr": "trainer.train()"
+				},
+				"step_call": "trainer.train()",
+				"model_var": "model"
+			},
+			"knobs": [
+				{
+					"id": "batch_size",
+					"label": "Batch size",
+					"kind": "int",
+					"current": 4,
+					"unit": "samples",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 88,
+						"expr": "per_device_train_batch_size=4"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "checkpoint_every",
+					"label": "Checkpoint interval",
+					"kind": "int",
+					"current": 500,
+					"unit": "steps",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 96,
+						"expr": "save_steps=500"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "epochs",
+					"label": "Epochs",
+					"kind": "int",
+					"current": 1,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 93,
+						"expr": "num_train_epochs=1"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "eval_batch_size",
+					"label": "Eval batch size",
+					"kind": "int",
+					"current": 32,
+					"unit": "samples",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 89,
+						"expr": "per_device_eval_batch_size=32"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "eval_every",
+					"label": "Eval interval",
+					"kind": "int",
+					"current": 200,
+					"unit": "steps",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 33,
+						"expr": "EVAL_EVERY = 200"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "grad_accum",
+					"label": "Gradient accumulation",
+					"kind": "int",
+					"current": 4,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 90,
+						"expr": "gradient_accumulation_steps=4"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "log_every",
+					"label": "Log interval",
+					"kind": "int",
+					"current": 10,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 95,
+						"expr": "logging_steps=10"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "lora_alpha",
+					"label": "LoRA alpha",
+					"kind": "int",
+					"current": 32,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 42,
+						"expr": "lora_alpha=32"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "lora_dropout",
+					"label": "LoRA dropout",
+					"kind": "float",
+					"current": 0.05,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 43,
+						"expr": "lora_dropout=0.05"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "lora_r",
+					"label": "LoRA rank",
+					"kind": "int",
+					"current": 16,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 41,
+						"expr": "r=16"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "lr",
+					"label": "Learning rate",
+					"kind": "float",
+					"current": 0.0001,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 91,
+						"expr": "learning_rate=1e-4"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "precision",
+					"label": "Precision",
+					"kind": "categorical",
+					"current": "bf16",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 94,
+						"expr": "bf16=True"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "seq_len",
+					"label": "Sequence length",
+					"kind": "int",
+					"current": 1024,
+					"unit": "tokens",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 32,
+						"expr": "MAX_LEN = 1024"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "warmup_steps",
+					"label": "Warm-up steps",
+					"kind": "int",
+					"current": 50,
+					"unit": "steps",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 92,
+						"expr": "warmup_steps=50"
+					},
+					"needs_code": false
+				}
+			],
+			"blocks": [
+				{
+					"id": "qwen2_decoder_stack",
+					"label": "Qwen2.5 decoder layers",
+					"kind": "module",
+					"repeat": 28,
+					"params": 1540000000
+				},
+				{
+					"id": "perplexity_callback",
+					"label": "PerplexityCallback custom eval loop",
+					"kind": "other",
+					"repeat": 1
+				}
+			],
+			"risks": [
+				"Eval forward in PerplexityCallback.on_step_end (train.py:79) runs without torch.no_grad(); activations for backward are kept",
+				"Eval batch 32 is 8x the train batch",
+				"No sequence packing; batches are padded (longest)",
+				"Eval batch size 32 is 8x train batch size 4, will spike eval memory.",
+				"PerplexityCallback runs model forward without torch.no_grad and appends loss tensors with live graph, leaking memory through eval.",
+				"Data collator uses longest padding with no packing, wasting about 46% of tokens.",
+				"Custom eval runs at step 200 while Trainer eval_strategy is no, training can OOM at first eval on 24GB GPU."
+			],
+			"produced_by": "muse_spark",
+			"confidence": 0.92
+		},
+		"objective": {
+			"kind": "min_time",
+			"weights": {}
+		},
+		"constraints": {
+			"gpu_types": [
+				"L4"
+			],
+			"preemption": {
+				"kind": "none"
+			}
+		}
+	},
+	"env": {
+		"backend": "cpu",
+		"provider": "modal",
+		"nodes": 1,
+		"libraries": {}
+	},
+	"graph": {
+		"nodes": [
+			{
+				"id": "data",
+				"label": "alpaca-cleaned \u00b7 padded (longest)",
+				"kind": "data",
+				"repeat": 1,
+				"metrics": [
+					"probe.data.loader_wait_fraction",
+					"probe.data.padding_fraction"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "model",
+				"label": "Qwen2.5-1.5B",
+				"kind": "group",
+				"repeat": 1,
+				"params": 1540000000,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "embed",
+				"label": "Embedding",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "block",
+				"label": "Decoder block",
+				"kind": "group",
+				"parent": "model",
+				"repeat": 28,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "attn",
+				"label": "Self-attention + LoRA",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.max_attn_logit"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "mlp",
+				"label": "MLP + LoRA",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "lm_head",
+				"label": "LM head",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [
+					"memory.by_term.logits"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "loss",
+				"label": "Loss",
+				"kind": "loss",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.loss"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "optimizer",
+				"label": "adamw_torch (LoRA params)",
+				"kind": "optimizer",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.grad_norm"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "eval",
+				"label": "Eval loop \u00b7 batch 32",
+				"kind": "phase",
+				"repeat": 1,
+				"metrics": [
+					"risk.oom",
+					"probe.eval.peak_allocated_bytes"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "ckpt",
+				"label": "Checkpoint every 500 steps",
+				"kind": "io",
+				"repeat": 1,
+				"metrics": [
+					"risk.preemption_loss",
+					"probe.checkpoint.seconds_mean"
+				],
+				"attrs": {}
+			}
+		],
+		"edges": [
+			{
+				"source": "embed",
+				"target": "attn",
+				"kind": "data"
+			},
+			{
+				"source": "attn",
+				"target": "mlp",
+				"kind": "data"
+			},
+			{
+				"source": "mlp",
+				"target": "lm_head",
+				"kind": "data"
+			},
+			{
+				"source": "data",
+				"target": "embed",
+				"kind": "tokens",
+				"metric": "probe.throughput.tokens_per_s"
+			},
+			{
+				"source": "lm_head",
+				"target": "loss",
+				"kind": "data"
+			},
+			{
+				"source": "loss",
+				"target": "optimizer",
+				"kind": "grad"
+			},
+			{
+				"source": "optimizer",
+				"target": "embed",
+				"kind": "weights"
+			},
+			{
+				"source": "data",
+				"target": "eval",
+				"kind": "control"
+			},
+			{
+				"source": "optimizer",
+				"target": "ckpt",
+				"kind": "control"
+			}
+		],
+		"skeleton": true
+	},
+	"knobs": [
+		{
+			"id": "checkpoint_every",
+			"label_key": "knob.checkpoint_every",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1000000.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 500,
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"ckpt"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "eval_every",
+			"label_key": "knob.eval_every",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 100000.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 200,
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"eval"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"L4"
+				],
+				"log": false
+			},
+			"current": "L4",
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"model"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "log_every",
+			"label_key": "knob.log_every",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 10000.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 10,
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [],
+			"changes_results": false
+		},
+		{
+			"id": "epochs",
+			"label_key": "knob.epochs",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 10.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 1,
+			"gridded": false,
+			"needs_code": false,
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "packing",
+			"label_key": "knob.packing",
+			"kind": "bool",
+			"domain": {
+				"values": [],
+				"log": false
+			},
+			"current": false,
+			"gridded": false,
+			"needs_code": true,
+			"patch_template": "data.enable_packing",
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "batch_size",
+			"label_key": "knob.batch_size",
+			"unit": "samples",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1024.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 4,
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"data",
+				"model"
+			]
+		},
+		{
+			"id": "eval_batch_size",
+			"label_key": "knob.eval_batch_size",
+			"unit": "samples",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 512.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 32,
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"eval"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "eval_no_grad",
+			"label_key": "knob.eval_no_grad",
+			"kind": "bool",
+			"domain": {
+				"values": [],
+				"log": false
+			},
+			"current": false,
+			"gridded": false,
+			"needs_code": true,
+			"patch_template": "eval.wrap_no_grad",
+			"group": "memory",
+			"affects": [
+				"eval"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "gradient_checkpointing",
+			"label_key": "knob.gradient_checkpointing",
+			"kind": "bool",
+			"domain": {
+				"values": [],
+				"log": false
+			},
+			"current": false,
+			"gridded": false,
+			"needs_code": false,
+			"patch_template": "memory.gradient_checkpointing",
+			"group": "memory",
+			"affects": [
+				"block",
+				"attn",
+				"mlp"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "quantization",
+			"label_key": "knob.quantization",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"none",
+					"int8",
+					"nf4",
+					"nf4_dq",
+					"fp4",
+					"fp4_dq"
+				],
+				"log": false
+			},
+			"current": "none",
+			"gridded": false,
+			"needs_code": true,
+			"patch_template": "model.quantize_weights",
+			"group": "memory",
+			"affects": [
+				"model",
+				"attn",
+				"mlp"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "seq_len",
+			"label_key": "knob.seq_len",
+			"unit": "tokens",
+			"kind": "int",
+			"domain": {
+				"min": 64.0,
+				"max": 32768.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 1024,
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"data",
+				"attn",
+				"lm_head"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "lora_alpha",
+			"label_key": "knob.lora_alpha",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1024.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 32,
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"attn",
+				"mlp"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "lora_dropout",
+			"label_key": "knob.lora_dropout",
+			"kind": "float",
+			"domain": {
+				"min": 0.0,
+				"max": 0.5,
+				"values": [],
+				"log": false
+			},
+			"current": 0.05,
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"attn",
+				"mlp"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "lora_r",
+			"label_key": "knob.lora_r",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 512.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 16,
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"attn",
+				"mlp",
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "lr",
+			"label_key": "knob.lr",
+			"kind": "float",
+			"domain": {
+				"min": 1e-06,
+				"max": 0.01,
+				"values": [],
+				"log": true
+			},
+			"current": 0.0001,
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "warmup_steps",
+			"label_key": "knob.warmup_steps",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 100000.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 50,
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "attn",
+			"label_key": "knob.attn",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"eager",
+					"sdpa",
+					"flash_attention_2",
+					"flash_attention_3",
+					"flex_attention"
+				],
+				"log": false
+			},
+			"current": "sdpa",
+			"gridded": false,
+			"needs_code": true,
+			"patch_template": "model.attn_implementation",
+			"group": "speed",
+			"affects": [
+				"attn"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "grad_accum",
+			"label_key": "knob.grad_accum",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 256.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 4,
+			"gridded": false,
+			"needs_code": false,
+			"group": "speed",
+			"affects": [
+				"data",
+				"optimizer"
+			]
+		},
+		{
+			"id": "precision",
+			"label_key": "knob.precision",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"fp32",
+					"bf16",
+					"fp16"
+				],
+				"log": false
+			},
+			"current": "bf16",
+			"gridded": false,
+			"needs_code": false,
+			"group": "speed",
+			"affects": [
+				"model"
+			],
+			"changes_results": true
+		}
+	],
+	"probes": [
+		{
+			"id": "p1",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 1024
+			},
+			"status": "error",
+			"steps": 0,
+			"duration_s": 0.01,
+			"error": "The probe sandbox ended without a result",
+			"error_code": "recorder",
+			"extras": {},
+			"step_log": [],
+			"cost": {
+				"gpu_seconds": 0.01,
+				"usd": 2e-06
+			},
+			"cache_key": "sha256:77816dd62da669a0da65b18c15153350369845054661ac3b1b317f8affa4b103"
+		},
+		{
+			"id": "p2",
+			"knobs": {
+				"batch_size": 2,
+				"seq_len": 1024
+			},
+			"status": "error",
+			"steps": 0,
+			"duration_s": 0.007,
+			"error": "The probe sandbox ended without a result",
+			"error_code": "recorder",
+			"extras": {},
+			"step_log": [],
+			"cost": {
+				"gpu_seconds": 0.007,
+				"usd": 1e-06
+			},
+			"cache_key": "sha256:b4a4fe1b1d76e7ad981f18f3c05f5acc98e1f8e5d65d88d705eb700663a80c3d"
+		},
+		{
+			"id": "p3",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 512
+			},
+			"status": "error",
+			"steps": 0,
+			"duration_s": 0.006,
+			"error": "The probe sandbox ended without a result",
+			"error_code": "recorder",
+			"extras": {},
+			"step_log": [],
+			"cost": {
+				"gpu_seconds": 0.006,
+				"usd": 1e-06
+			},
+			"cache_key": "sha256:b716f8632c892da191b5e74a9e0cd0ecbbec3acf35c4d1ab72da7de58248322a"
+		}
+	],
+	"predictions": {
+		"targets": [],
+		"estimates": {},
+		"grids": []
+	},
+	"models": [],
+	"findings": [
+		{
+			"id": "read.eval.no_grad",
+			"severity": "error",
+			"code": "eval.no_grad",
+			"title": "Eval runs with gradients kept",
+			"detail": "Eval forward in PerplexityCallback.on_step_end (train.py:79) runs without torch.no_grad(); activations for backward are kept",
+			"node_id": "eval",
+			"evidence": [
+				{
+					"metric": "script.eval_under_no_grad",
+					"value": "false"
+				}
+			],
+			"source": "rule",
+			"fix_template": "eval.wrap_no_grad",
+			"knob_id": "eval_no_grad",
+			"citations": []
+		},
+		{
+			"id": "read.eval.batch_large",
+			"severity": "warn",
+			"code": "eval.batch_large",
+			"title": "Eval batch is 8x the train batch",
+			"node_id": "eval",
+			"evidence": [
+				{
+					"metric": "eval_batch_size",
+					"value": 32.0,
+					"threshold": 16.0
+				}
+			],
+			"source": "rule",
+			"fix_template": "eval.reduce_batch",
+			"knob_id": "eval_batch_size",
+			"citations": []
+		},
+		{
+			"id": "read.data.no_packing",
+			"severity": "warn",
+			"code": "data.no_packing",
+			"title": "No sequence packing; batches are padded",
+			"node_id": "data",
+			"evidence": [],
+			"source": "rule",
+			"fix_template": "data.enable_packing",
+			"knob_id": "packing",
+			"citations": []
+		}
+	],
+	"patches": [],
+	"provenance": [
+		{
+			"provider": "meta",
+			"model": "muse-spark-1.3",
+			"purpose": "script_map",
+			"input_tokens": 4937,
+			"output_tokens": 3265,
+			"cached_input_tokens": 0,
+			"cost_usd": 0.020047,
+			"request_id": "805b5bbe-1dec-4a5a-a875-3b4cfa5fdd8e",
+			"at": "2026-10-28T05:12:45Z",
+			"latency_s": 14.375,
+			"ok": true
+		}
+	],
+	"costs": {
+		"gpu_usd": 1e-05,
+		"llm_usd": 0.0,
+		"breakdown": {
+			"probes": 4e-06
+		}
+	}
+}

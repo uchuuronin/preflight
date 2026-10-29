@@ -5,17 +5,18 @@
  *   #/boarding/<id>  probes running for job <id>
  *   #/cockpit/<ref>  a record by sample id or share token
  *   #/logbook        flights this browser opened
+ *   #/checks         held-out checks of the engine on real runs (documentation, not in the nav)
  */
 import { useSyncExternalStore } from "react";
 
-export type Screen = "home" | "new" | "boarding" | "cockpit" | "logbook";
+export type Screen = "home" | "new" | "boarding" | "cockpit" | "logbook" | "checks";
 
 export interface Route {
 	screen: Screen;
 	param: string | null;
 }
 
-export const SCREEN_ORDER: Screen[] = ["home", "new", "boarding", "cockpit", "logbook"];
+export const SCREEN_ORDER: Screen[] = ["home", "new", "boarding", "cockpit", "logbook", "checks"];
 
 export function parseRoute(hash: string): Route {
 	const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -29,6 +30,8 @@ export function parseRoute(hash: string): Route {
 			return { screen: "cockpit", param: param ? decodeURIComponent(param) : null };
 		case "logbook":
 			return { screen: "logbook", param: null };
+		case "checks":
+			return { screen: "checks", param: null };
 		default:
 			return { screen: "home", param: null };
 	}

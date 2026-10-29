@@ -1,0 +1,262 @@
+{
+	"generated_at": "2026-10-28T19:02Z",
+	"engine_commit": "206c3f3",
+	"inputs": [
+		"api/tests/fixtures/a-smoke-l4-main-3.record.json",
+		"api/tests/fixtures/a-smoke-l4-main-4.record.json"
+	],
+	"runs": [
+		"a-smoke-l4-main-3",
+		"a-smoke-l4-main-4"
+	],
+	"runs_measured": [
+		"a-smoke-l4-main-4"
+	],
+	"summary": {
+		"step_time": {
+			"tolerance": 0.15,
+			"rate_bar": 0.88,
+			"rate_bar_source": "guess",
+			"n": 3,
+			"hits": 0,
+			"rate": 0.0,
+			"wilson95": [
+				0.0,
+				0.5615
+			],
+			"abstained": 0,
+			"runs": 1
+		},
+		"peak_memory": {
+			"tolerance": 0.1,
+			"rate_bar": 0.88,
+			"rate_bar_source": "guess",
+			"n": 0,
+			"hits": 0,
+			"rate": null,
+			"wilson95": null,
+			"abstained": 0,
+			"runs": 0
+		},
+		"interval": {
+			"tolerance": null,
+			"rate_bar": 0.88,
+			"rate_bar_source": "cited",
+			"n": 3,
+			"hits": 0,
+			"rate": 0.0,
+			"wilson95": [
+				0.0,
+				0.5615
+			],
+			"abstained": 0,
+			"runs": 1
+		},
+		"oom": {
+			"tolerance": null,
+			"rate_bar": 1.0,
+			"rate_bar_source": "cited",
+			"n": 1,
+			"hits": 1,
+			"rate": 1.0,
+			"wilson95": [
+				0.2065,
+				1.0
+			],
+			"abstained": 0,
+			"runs": 1
+		}
+	},
+	"checks": [
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p1-eval",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 1024
+			},
+			"metric": "oom",
+			"measured": "oom.eval",
+			"predicted": {
+				"status": "extrapolated",
+				"point": 1.0,
+				"lo": 1.0,
+				"hi": 1.0,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "won't fit: out of memory very likely (simulated band); the peak comes at eval, not during training steps"
+			},
+			"predicted_peak": {
+				"status": "extrapolated",
+				"point": 140064784384.0,
+				"lo": 125851804650.87563,
+				"hi": 155882896387.21454,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
+			"verdict": "caught"
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p1",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 1024
+			},
+			"metric": "step_time",
+			"measured": 1.680131103515625,
+			"predicted": {
+				"status": "predicted",
+				"point": 2.1097550484548937,
+				"lo": 1.7318486377725195,
+				"hi": 2.5701243557900146,
+				"model_id": "steptime-phases@0.2.0"
+			},
+			"error": 0.2557,
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p1",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 1024
+			},
+			"metric": "interval",
+			"of": "time.step",
+			"measured": 1.680131103515625,
+			"predicted": {
+				"status": "predicted",
+				"point": 2.1097550484548937,
+				"lo": 1.7318486377725195,
+				"hi": 2.5701243557900146,
+				"model_id": "steptime-phases@0.2.0"
+			},
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p2",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 2,
+				"seq_len": 1024
+			},
+			"metric": "step_time",
+			"measured": 0.8370115966796875,
+			"predicted": {
+				"status": "predicted",
+				"point": 1.666289105966178,
+				"lo": 1.4608387711219701,
+				"hi": 1.9006336904168488,
+				"model_id": "steptime-phases@0.2.0"
+			},
+			"error": 0.9908,
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p2",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 2,
+				"seq_len": 1024
+			},
+			"metric": "interval",
+			"of": "time.step",
+			"measured": 0.8370115966796875,
+			"predicted": {
+				"status": "predicted",
+				"point": 1.666289105966178,
+				"lo": 1.4608387711219701,
+				"hi": 1.9006336904168488,
+				"model_id": "steptime-phases@0.2.0"
+			},
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p3",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 512
+			},
+			"metric": "step_time",
+			"measured": 1.6661207275390626,
+			"predicted": {
+				"status": "predicted",
+				"point": 0.9871607558774371,
+				"lo": 0.8654456782754131,
+				"hi": 1.1259936728627349,
+				"model_id": "steptime-phases@0.2.0"
+			},
+			"error": 0.4075,
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p3",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 512
+			},
+			"metric": "interval",
+			"of": "time.step",
+			"measured": 1.6661207275390626,
+			"predicted": {
+				"status": "predicted",
+				"point": 0.9871607558774371,
+				"lo": 0.8654456782754131,
+				"hi": 1.1259936728627349,
+				"model_id": "steptime-phases@0.2.0"
+			},
+			"hit": false
+		}
+	],
+	"skipped": [
+		{
+			"run": "a-smoke-l4-main-3",
+			"why": "nothing_measured",
+			"codes": [
+				"recorder"
+			]
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p1",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 1024
+			},
+			"metric": "peak_memory",
+			"why": "no_eval_pass"
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p2",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 2,
+				"seq_len": 1024
+			},
+			"metric": "peak_memory",
+			"why": "no_eval_pass"
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p3",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 512
+			},
+			"metric": "peak_memory",
+			"why": "no_eval_pass"
+		}
+	]
+}
