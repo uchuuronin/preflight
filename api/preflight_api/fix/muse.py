@@ -87,11 +87,11 @@ def note(decision, reason=""):
 # Input keys each allowed tool may carry. Path keys hold a path (or a list of paths for "paths");
 # pattern keys hold a glob that must stay relative; text keys hold scalars only.
 PATH_KEYS = {"path", "file_path", "paths", "directory", "dir"}
-PATTERN_KEYS = {"glob", "include", "exclude", "pattern"}
+PATTERN_KEYS = {"glob", "include", "exclude"}
 TEXT_KEYS = {
 	"read_file": {"offset", "limit", "start_line", "end_line", "line"},
-	"search": {"query", "regex", "case_sensitive", "max_results", "literal"},
-	"edit_file": {"old_string", "new_string", "old_str", "new_str", "replace_all", "old_text", "new_text"},
+	"search": {"query", "pattern", "regex", "case_sensitive", "max_results", "literal"},
+	"edit_file": {"old_string", "new_string", "old_str", "new_str", "replace_all", "old_text", "new_text", "find", "replace"},
 	"write_file": {"content", "text"},
 }
 WRITES = {"edit_file", "write_file"}
@@ -211,11 +211,21 @@ REQUIRED_FLAGS = (
 )
 
 
+# Source: measured, the model id the guide runs on Meta's API (docs/status/c.md, Oct 27). Named on
+# every run: left to its default, Muse Code 1.4.14 ran muse-spark-1.3-contributor even with
+# --contributor-mode off (smoke run 41246585559), whose usage Meta may use to improve its products.
+MODEL = "muse-spark-1.3"
+
+
+def is_contributor(model: str | None) -> bool:
+	return bool(model) and "contributor" in str(model).lower()
+
+
 def command(
 	prompt_file: str,
 	*,
 	steps: int = MAX_MODEL_STEPS,
-	model: str | None = None,
+	model: str | None = MODEL,
 	extra_flags: tuple[str, ...] = (),
 	allow_shell: bool = False,
 	key_on_stdin: bool = True,
@@ -258,13 +268,15 @@ class Usage:
 	input_tokens: int = 0
 	cached_input_tokens: int = 0
 	output_tokens: int = 0
+	#: Muse Code 1.4.14 reports these beside output_tokens without saying whether they're inside it;
+	#: priced as output on top, so a cost reading can be high but never low.
+	reasoning_tokens: int = 0
 
 	def usd(self, price_in: float, price_cached: float, price_out: float) -> float:
 		"""Cached input is counted inside input_tokens, as the guide's Responses usage does."""
 		fresh = max(0, self.input_tokens - self.cached_input_tokens)
-		return (
-			fresh * price_in + self.cached_input_tokens * price_cached + self.output_tokens * price_out
-		) / 1e6
+		out = self.output_tokens + self.reasoning_tokens
+		return (fresh * price_in + self.cached_input_tokens * price_cached + out * price_out) / 1e6
 
 
 @dataclass
@@ -280,11 +292,14 @@ class Events:
 	tools: list[str] = field(default_factory=list)
 	final: str | None = None
 	session_id: str | None = None
+	#: The model Muse Code says it ran (run.model.configured).
+	model: str | None = None
 	unknown: int = 0
 
 
 _IN = re.compile(r"(^|_)(input|prompt)_tokens$")
 _CACHED = re.compile(r"cache(d|_read)(_input)?_tokens$")
+_REASON = re.compile(r"(^|_)reasoning_tokens$")
 _OUT = re.compile(r"(^|_)(output|completion)_tokens$")
 
 
@@ -306,10 +321,12 @@ def parse_events(lines) -> Events:
 	repeat running totals), tool names, the hook's deny text, the session id and the last agent
 	message. Lines that aren't JSON are counted and kept out."""
 	ev = Events()
-	best = {"in": 0, "cached": 0, "out": 0}
-	total = {"in": 0, "cached": 0, "out": 0}
-	last = {"in": 0, "cached": 0, "out": 0}
-	dropped = {"in": False, "cached": False, "out": False}
+	best = {"in": 0, "cached": 0, "out": 0, "reason": 0}
+	total = dict(best)
+	last = dict(best)
+	dropped = {k: False for k in best}
+	kinds: dict[str, str] = {}  # task id -> tool, from Muse Code 1.4.14's task events
+	said: list[str] = []
 	for raw in lines:
 		raw = raw.strip()
 		if not raw:
@@ -327,6 +344,8 @@ def parse_events(lines) -> Events:
 				kind = (
 					"cached"
 					if _CACHED.search(k)
+					else "reason"
+					if _REASON.search(k)
 					else "in"
 					if _IN.search(k)
 					else "out"
@@ -354,17 +373,31 @@ def parse_events(lines) -> Events:
 				ev.session_id = sid
 
 		_walk(obj, look)
+		# Muse Code 1.4.14 envelopes: {"payload_type": ..., "payload": {...}} (smoke run 41246585559).
+		pt = obj.get("payload_type") if isinstance(obj, dict) else None
+		pl = obj.get("payload") if isinstance(obj, dict) and isinstance(obj.get("payload"), dict) else {}
+		event = pl.get("event") if isinstance(pl.get("event"), dict) else {}
+		if pt == "run.output.delta" and isinstance(pl.get("text"), str):
+			said.append(pl["text"])
+		elif pt == "task.lifecycle.proposed" and isinstance(event.get("task_kind"), str):
+			kinds[str(event.get("task_id"))] = event["task_kind"].removeprefix("tool.")
+		elif pt == "task.lifecycle.rejected" and str(event.get("reason", "")).startswith("Preflight: "):
+			ev.blocked.append(kinds.get(str(event.get("task_id")), "?"))
+		elif pt == "run.model.configured" and isinstance(pl.get("model_id"), str):
+			ev.model = pl["model_id"]
 		if isinstance(obj, dict) and obj.get("role") == "assistant" and isinstance(obj.get("text"), str):
 			ev.final = obj["text"]
 		for k in ("final_message", "last_message", "final"):
 			if isinstance(obj, dict) and isinstance(obj.get(k), str):
 				ev.final = obj[k]
-	ev.usage = Usage(best["in"], best["cached"], best["out"])
-	ev.usage_sum = Usage(total["in"], total["cached"], total["out"])
+	if said:
+		ev.final = "".join(said)
+	ev.usage = Usage(best["in"], best["cached"], best["out"], best["reason"])
+	ev.usage_sum = Usage(total["in"], total["cached"], total["out"], total["reason"])
 	# For the cost cap: a counter that never goes down is a running total (its largest value is
 	# the spend); one that goes down is per turn (its sum is).
 	pick = {k: total[k] if dropped[k] else best[k] for k in best}
-	ev.usage_cap = Usage(pick["in"], pick["cached"], pick["out"])
+	ev.usage_cap = Usage(pick["in"], pick["cached"], pick["out"], pick["reason"])
 	return ev
 
 

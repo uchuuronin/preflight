@@ -265,6 +265,7 @@ def _echo_runner(box: ModalBox):
 			*muse.command(
 				"/fix/prompt-echo.txt",
 				steps=2,
+				model=None,  # "Model id for non-echo providers"
 				extra_flags=("--provider", "echo", *extra),
 				key_on_stdin=False,
 			),
@@ -308,9 +309,13 @@ def _observer_switch(echo, help_text: str) -> dict:
 
 
 SMOKE_EXTRA = (
-	"\nBefore editing, run `python train.py --help` to see the script's options. If you can't run "
-	"it, say so in your reply and carry on with the edit.\n"
+	"\nBefore editing, run `python train.py --help` with your shell tool to see the script's options. "
+	"If the tool is refused, say so in your reply and carry on with the edit.\n"
 )
+# The preamble tells real candidates not to try commands, so the first smoke run's model never
+# asked for one (run 41246585559). The smoke test drops that one sentence, so the model tries
+# and the gate is seen refusing it; everything else in the task is the real one.
+NO_COMMANDS = "You can't run commands, tests or the\n  script; don't try. "
 
 
 @app.function(secrets=[META], timeout=12 * 60, retries=0)
@@ -323,7 +328,9 @@ def smoke_fix(files: dict[str, str], observers: dict | None = None) -> dict:
 	key = os.environ["META_API_KEY"]
 	# The smoke test's own task text: the template plus the command request.
 	orig = templates.PREAMBLE
-	templates.PREAMBLE = orig + SMOKE_EXTRA
+	if NO_COMMANDS not in orig:
+		raise RuntimeError("the preamble changed; update the smoke test's prompt")
+	templates.PREAMBLE = orig.replace(NO_COMMANDS, "") + SMOKE_EXTRA
 	sb = _sandbox(app, network=True)
 	box = ModalBox(sb, stop_usd=SMOKE_STOP_USD)
 	t0 = time.monotonic()

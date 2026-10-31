@@ -445,8 +445,9 @@ def test_verify_honours_what_a_template_may_change_and_checks_eval_fixes():
 
 def test_search_patterns_cannot_spell_a_path_outside(tmp_path):
 	for bad in ("/proc/*/environ", "../../**/*", "{/proc,x}/*", "[/]proc/*", "\\/proc/*"):
-		assert denied(gate(tmp_path, "search", {"pattern": bad})), bad
-	assert gate(tmp_path, "search", {"pattern": "**/*.py", "query": "no_grad"}) is None
+		assert denied(gate(tmp_path, "search", {"glob": bad})), bad
+	# search's `pattern` is a content regex (Muse Code 1.4.14), checked as text; globs are path-like.
+	assert gate(tmp_path, "search", {"glob": "**/*.py", "pattern": "no_grad\\("}) is None
 	# Config that steers an agent is not writable anywhere in the tree.
 	for path in ("sub/AGENTS.md", "docs/.mcp.json", "x/.cursor/rules", "sub/.git/config"):
 		assert denied(gate(tmp_path, "write_file", {"path": path, "content": "x"})), path
@@ -512,3 +513,30 @@ def test_real_races_run_without_shell_or_web_tools_and_only_the_smoke_test_keeps
 	)
 	assert "--disable-shell" not in muse.command("/p", allow_shell=True)
 	assert set(muse.REQUIRED_FLAGS) <= set(argv)
+
+
+REAL_LOG = Path(__file__).parent / "fixtures" / "muse-1.4.14-smoke.jsonl"
+
+
+def test_muse_code_1_4_14_events_read_as_they_were_in_the_first_real_run():
+	# Smoke run 41246585559: 7 model calls; the gate denied two searches and one edit, Muse Code
+	# rejected each with the gate's reason, and the model was the contributor variant.
+	ev = muse.parse_events(REAL_LOG.read_text().splitlines())
+	assert ev.blocked == ["search", "search", "edit_file"]
+	assert ev.model == "muse-spark-1.3-contributor" and muse.is_contributor(ev.model)
+	assert (ev.usage.input_tokens, ev.usage.cached_input_tokens) == (186689, 133557)
+	assert (ev.usage.output_tokens, ev.usage.reasoning_tokens) == (5175, 3331)
+	assert ev.final.startswith("Wrapped the custom eval loop")
+	assert ev.usage_cap.usd(1.25, 0.15, 4.25) == pytest.approx(0.1226, abs=1e-4)
+
+
+def test_the_gate_takes_the_inputs_muse_code_1_4_14_really_sent(tmp_path):
+	assert gate(tmp_path, "search", {"pattern": "model\\(", "paths": ["train.py"]}) is None
+	assert gate(tmp_path, "edit_file", {"path": "train.py", "find": "a", "replace": "b"}) is None
+	assert gate(tmp_path, "read_file", {"path": "train.py", "offset": 70, "limit": 20}) is None
+	assert gate(tmp_path, "write_file", {"path": "train.py", "content": "x"}) is None
+
+
+def test_every_real_run_names_the_standard_model():
+	assert muse.command("/p")[muse.command("/p").index("--model") + 1] == muse.MODEL
+	assert not muse.is_contributor(muse.MODEL)

@@ -235,6 +235,10 @@ def _one(
 					continue
 	except Exception:  # the log is a report, never part of the decision
 		cand.tool_calls = [{"tool": None, "decision": "log_unreadable"}]
+	if muse.is_contributor(ev.model):
+		# Visitor code must never go to a contributor-tier model (data-use notice).
+		cand.status, cand.problem, cand.diff, cand.final = "refused", "contributor_model", "", None
+		return cand
 	if muse.leaks(out, secrets) or muse.leaks(ev.final or "", secrets):
 		cand.status, cand.problem, cand.log_tail, cand.final = "leaked", "secret_in_output", "", None
 		return cand
