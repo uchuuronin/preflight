@@ -1805,3 +1805,8 @@ a {
 	.pf-checks__list .pf-chip__where,
 	.pf-checks__list .pf-chip__nums { white-space: normal; overflow: visible; text-overflow: clip; }
 }
+
+/* Check-in: the hint that takes a phone visitor to "Got it" stays hint-coloured, and the box shows
+   where focus landed even after a tap (a programmatic focus isn't :focus-visible). */
+.pf-desk__foot .pf-link.pf-hint { color: var(--pf-fg-dim); min-height: 24px; text-align: left; }
+.pf-datause__ok:focus-within { outline: 2px solid var(--pf-focus); outline-offset: 3px; border-radius: 8px; }

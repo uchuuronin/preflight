@@ -8,9 +8,9 @@
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useReadouts } from "../../registry";
-import { failureTarget, target, targetFor } from "../record/model";
+import { failureTarget, isFixture, target, targetFor } from "../record/model";
 import type { Estimate, ObjectiveKind, Readout } from "../record/types";
-import { Provenance } from "../components/StatusMark";
+import { Provenance, provenanceKey } from "../components/StatusMark";
 import { useWorkspace } from "../state";
 import { type DialScale, dialScale, scaleFraction } from "../record/scale";
 import { FAILS_AT, FITS_BELOW, oomStatus } from "../record/terms";
@@ -37,12 +37,13 @@ interface DialSpec {
 }
 
 /** The one word under every dial: where this number comes from. */
-function statusWord(est: Estimate | undefined): string {
-	return t(`provenance.${est?.status ?? "abstain"}`);
+function statusWord(est: Estimate | undefined, illustrative: boolean): string {
+	return t(provenanceKey(est?.status ?? "abstain", illustrative));
 }
 
 function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean }) {
 	const est = spec.est;
+	const illustrative = isFixture(useWorkspace().record);
 	const ok = trusted(est) && !!spec.scale;
 	const scale = spec.scale;
 	const point = ok ? est.point : 0;
@@ -57,7 +58,7 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 	const title = [spec.reason, scaleNote].filter(Boolean).join("\n");
 	const value = ok ? spec.format(point) : t("readout.abstain_short");
 	const aria = ok
-		? `${t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
+		? `${t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est, illustrative)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
 		: t("dial.aria_abstain", { label: spec.label });
 	const face = (
 		<>

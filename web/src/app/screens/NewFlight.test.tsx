@@ -114,22 +114,32 @@ describe("the check-in desk and intake panels", () => {
 		expect(screen.queryByText(en["newflight.repo.invalid"])).toBeNull(); // nothing typed: no complaint
 		for (const bad of ["not a link", "https://gitlab.com/a/b", "github.com/owner"]) {
 			fireEvent.change(field, { target: { value: bad } });
-			expect(screen.getByText(en["newflight.repo.invalid"])).toBeTruthy();
+			expect(screen.queryByText(en["newflight.repo.invalid"])).toBeNull(); // still typing
+			fireEvent.blur(field);
+			const msg = screen.getByText(en["newflight.repo.invalid"]);
+			expect(msg.id).not.toBe("");
+			expect(field.getAttribute("aria-describedby")?.split(" ")).toContain(msg.id);
 			expect(field.getAttribute("aria-invalid")).toBe("true");
-			expect(field.getAttribute("aria-describedby")).toContain(screen.getByText(en["newflight.repo.invalid"]).id);
+			expect(msg.closest("[role=status]")).not.toBeNull(); // spoken when it appears
 		}
 		fireEvent.change(field, { target: { value: "github.com/karpathy/nanoGPT" } });
+		fireEvent.blur(field);
 		expect(screen.queryByText(en["newflight.repo.invalid"])).toBeNull();
 		expect(field.getAttribute("aria-invalid")).toBeNull();
 	});
 
-	it("takes the visitor to the Got it box when the hint is pressed", () => {
+	it("takes the visitor to the Got it box, then back to Check in once it's ticked", async () => {
 		render(<NewFlight onSample={() => {}} />);
+		Element.prototype.scrollIntoView = vi.fn();
+		fireEvent.change(screen.getByLabelText("GitHub repository"), { target: { value: "github.com/karpathy/nanoGPT" } });
 		const box = document.getElementById(DATA_USE_OK_ID) as HTMLInputElement;
-		box.scrollIntoView = vi.fn();
 		fireEvent.click(screen.getByRole("button", { name: en["datause.needed"] }));
-		expect(box.scrollIntoView).toHaveBeenCalled();
 		expect(document.activeElement).toBe(box);
+		fireEvent.click(box);
+		await act(async () => {
+			await new Promise((r) => requestAnimationFrame(() => r(null)));
+		});
+		expect(document.activeElement).toBe(screen.getByRole("button", { name: "Check in" }));
 	});
 
 	it("states the measured run, with no dollar promise, once the notice is ticked", () => {

@@ -96,7 +96,7 @@ function Cockpit() {
 			<span className="pf-map-key">
 				<span>
 					<i className="pf-key-band" />
-					{source.kind === "prediction" ? t("map.key.band") : source.kind === "probe" ? t("map.key.band_probe", { where }) : t("map.key.band_none")}
+					{source.kind === "prediction" ? t("map.key.band") : source.kind === "probe" ? t(isFixture(record) ? "map.key.band_probe_illustrative" : "map.key.band_probe", { where }) : t("map.key.band_none")}
 				</span>
 				<span>
 					<i className="pf-key-ring" />
