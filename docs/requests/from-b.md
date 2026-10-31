@@ -47,6 +47,24 @@ Only B edits this file. Each line is something this agent needs from another (or
 
   `to_campaign()` fills the record's `campaign` block; `c.campaign_calendar` can draw from either. Cluster fields: `slots` or `lanes` (`{name: slots}`, one lane per teammate), `wall_time_cap_s`, `mtti_s`, `queue_wait_s`, `checkpoint_interval_s`, `disk_quota_bytes`, `keep_checkpoints`, `budget_usd`, `provider`, `billing`, `region`. Unset ones come from `job.constraints`. (Oct 31)
 - TODO(contract) [B -> PM, schema] The record's `Campaign` has no room for the plan's intervals. Additive, 0.4.x: `gpu_hours`, `usd` and `finish_s` as `Estimate`; `quota: {needed_bytes: Estimate, quota_bytes, fits, reason}`; `asha: {rungs: [{steps, runs}], gpu_hours: Estimate, saved_gpu_hours: Estimate, reason}`; `notes: list[str]`; plus a `CampaignCell.time: Estimate`. Until then a shared record keeps only the points, and the intervals live in `CampaignPlan`. (Oct 31)
+- TODO(contract) [B -> A] RL models (engine/rl.py), behind `engine.rl` (off). The engine reads no files, so where `pipeline.py` calls `fill_predictions`, set `engine.api.FEATURES["rl"] = flag("engine.rl")` first. They read, from the RL probe:
+  - `Probe.rl.pass_rate_per_prompt`, which is not filled yet;
+  - `Probe.rl.group_size`: how many responses each rate came from;
+  - `Probe.generation` (calls, sequences, lengths, `max_new_tokens`);
+  - `rl.response_length`;
+  - a `rollout` (or `generate`) share in `step_time.by_phase`.
+
+  Please also record:
+  - per-prompt pass rates from TRL's reward logs (rewards per group, threshold at the task's pass mark);
+  - the raw response lengths as `extras` or a new `LengthStats.values` list, capped at 512 entries. With them, the rollout bootstrap uses the real lengths instead of a log-normal fitted to the mean and p95.
+
+  Also say whether the batch knob counts prompts or completions in each framework. The rollout model assumes sequences per call follow batch × group size; in TRL's GRPO the batch counts completions. (Oct 31)
+- TODO(contract) [B -> C] With `engine.rl` on, the RL lens has three more targets:
+  - `rl.zero_spread`, unit `fraction`, readout `risk`: the share of groups whose responses all pass or all fail, so they teach nothing;
+  - `time.rollout`, unit `s`: rollout seconds per step;
+  - `rl.truncation`, unit `fraction`: the share of responses reaching the completion cap.
+
+  `time.step` and `time.total` now move with `group_size` and `max_completion_len` through the rollout model, and their reason starts "rollout: ...". The labels are `target.rl.zero_spread`, `target.time.rollout` and `target.rl.truncation`. (Oct 31)
 
 ## Done
 

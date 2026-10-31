@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, steptime
+from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, rl, steptime
 from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
@@ -62,7 +62,16 @@ _TARGETS = {
 	"tokens.total": ("tokens", None),
 	"memory.context_fill": ("fraction", "memory"),
 	"risk.runaway": ("probability", "risk"),
+	"rl.zero_spread": ("fraction", "risk"),
+	"rl.truncation": ("fraction", None),
+	"time.rollout": ("s", None),
 }
+
+# Features the caller switches on from its flags (the engine reads no files). Off by default.
+FEATURES = {
+	"rl": False
+}  # flags.json engine.rl: zero-spread groups, rollout time and truncation on the RL lens
+RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 
 
 # ---------------------------------------------------------------- small helpers
@@ -144,6 +153,8 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		if _has_shape(record):  # the per-term split needs the analytical model
 			ids += [f"memory.{t}" for t in MEMORY_TERMS]
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
+		if FEATURES["rl"] and record.job.lens == "rl":
+			ids += list(RL_TARGETS)
 		c = record.job.constraints
 		if c.wall_time_cap_s:
 			ids.append("risk.wall_cap")
@@ -1041,6 +1052,8 @@ class _TimeResult:
 
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
 	step = _step(record, values)
+	if FEATURES["rl"] and record.job.lens == "rl" and step.est.status != "abstain":
+		step = _with_rollout(record, values, step)
 	if step.est.status == "abstain":
 		return _TimeResult(_abstain("s", MODEL_ID_TOTAL, step.est.reason), step.est, step.sigma)
 	steps, why = _total_steps(record, values)
@@ -1631,7 +1644,144 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.wall_cap"] = _wall_cap(record, tm)
 	if c.preemption.kind != "none":
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
+	if FEATURES["rl"] and record.job.lens == "rl":
+		out.update(_rl_targets(record, values))
 	return Prediction(out)
+
+
+# ---------------------------------------------------------------- RL post-training (engine/rl.py)
+
+
+def _rl_probe(record: FlightRecord):
+	"""The probe that measured a rollout: generation stats, and a rollout phase in its step."""
+	for p in record.probes:
+		if p.status in OK_PROBE and p.generation and p.generation.calls and p.generation.sequences:
+			return p
+	return None
+
+
+def _lengths(p) -> rl.LengthSample | None:
+	r = p.rl.response_length if p.rl else None
+	if r is not None and r.mean and r.p95:
+		return rl.LengthSample(r.mean, r.p95, r.max, r.n)
+	g = p.generation
+	if g and g.new_tokens_mean and g.new_tokens_p95:
+		return rl.LengthSample(
+			g.new_tokens_mean, g.new_tokens_p95, g.new_tokens_max or g.new_tokens_p95, g.sequences
+		)
+	return None
+
+
+def _rollout_query(record: FlightRecord, values: dict, p) -> tuple[int, int, float | None, float | None]:
+	"""(sequences per call at the probe, at the query, cap at the probe, cap at the query).
+
+	Sequences per call follow batch x group size (an assumption the reason states: in TRL's GRPO the batch counts
+	completions, so there a group-size change moves prompts, not sequences, and this overstates the change)."""
+	pv = _probe_values(record, p)
+	n_p = max(1, round(p.generation.sequences / p.generation.calls))
+	scale = 1.0
+	for k in ("batch_size", "group_size"):
+		a, b = pv.get(k), values.get(k)
+		if a and b:
+			scale *= float(b) / float(a)
+	n_q = max(1, round(n_p * scale))
+	cap_p = p.generation.max_new_tokens or pv.get("max_completion_len")
+	cap_q = values.get("max_completion_len") or cap_p
+	return n_p, n_q, (float(cap_p) if cap_p else None), (float(cap_q) if cap_q else None)
+
+
+def _measured_rollout_s(p) -> float | None:
+	st = p.step_time
+	if not st or not st.p50_s:
+		return None
+	ph = steptime.phases_seconds(st.by_phase, st.p50_s)
+	r = ph.get("rollout", 0.0) + ph.get("generate", 0.0)
+	return r or None
+
+
+def _rollout(record: FlightRecord, values: dict) -> Estimate:
+	mid = rl.MODEL_ID_ROLLOUT
+	p = _rl_probe(record)
+	if p is None:
+		return _abstain("s", mid, "no probe timed a rollout (generation stats missing)")
+	measured, sample = _measured_rollout_s(p), _lengths(p)
+	if measured is None:
+		return _abstain("s", mid, "the probe's step has no rollout phase to scale")
+	if sample is None:
+		return _abstain("s", mid, "the probe recorded no response lengths")
+	n_p, n_q, cap_p, cap_q = _rollout_query(record, values, p)
+	iv = rl.rollout_seconds(measured, sample, n_p, cap_p, n_q, cap_q)
+	same = n_q == n_p and cap_q == cap_p
+	return _est(iv.point, iv.lo, iv.hi, "s", "predicted" if same else "extrapolated", mid, iv.reason)
+
+
+def _with_rollout(record: FlightRecord, values: dict, step: _StepResult) -> _StepResult:
+	"""Swap the step's rollout phase, which the per-phase line scales by tokens, for the batch-maximum model, which
+	follows group size and the completion cap as well."""
+	ph = dict(step.phases or {})
+	linear = ph.get("rollout", 0.0) + ph.get("generate", 0.0)
+	ro = _rollout(record, values)
+	if not linear or ro.status == "abstain":
+		return step
+	rest = max(step.est.point - linear, 0.0)
+	h = memory.Z90 * step.sigma
+	point = rest + ro.point
+	lo, hi = rest * math.exp(-h) + ro.lo, rest * math.exp(h) + ro.hi
+	for k in ("rollout", "generate"):
+		if k in ph:
+			ph[k] = ro.point * ph[k] / linear
+	sigma = max(step.sigma, math.log(hi / point) / memory.Z90 if point > 0 else step.sigma)
+	note = f"rollout: {ro.reason}"
+	est = _est(
+		point,
+		lo,
+		hi,
+		"s",
+		step.est.status if ro.status == "predicted" else "extrapolated",
+		step.est.model_id,
+		"; ".join(x for x in (step.est.reason, note) if x),
+	)
+	return replace(step, est=est, sigma=sigma, phases=ph)
+
+
+def _rl_targets(record: FlightRecord, values: dict) -> dict:
+	out = {"time.rollout": _rollout(record, values)}
+	p = _rl_probe(record) or next((q for q in record.probes if q.status in OK_PROBE and q.rl), None)
+	g = values.get("group_size")
+	mid = rl.MODEL_ID_ZERO
+	if p is None or not p.rl or not p.rl.pass_rate_per_prompt:
+		out["rl.zero_spread"] = _abstain("fraction", mid, "the probe recorded no per-prompt pass rates")
+	elif not g:
+		out["rl.zero_spread"] = _abstain("fraction", mid, "no group size: set the group_size knob")
+	else:
+		k = p.rl.group_size or (_probe_values(record, p).get("group_size"))
+		iv = rl.zero_spread(p.rl.pass_rate_per_prompt, int(g), int(k) if k else None)
+		why = iv.reason
+		if p.rl.zero_spread_fraction is not None and k:
+			why += f"; the probe measured {p.rl.zero_spread_fraction:.0%} at its group size of {int(k)}"
+		status = "predicted" if k and int(g) == int(k) else "extrapolated"
+		out["rl.zero_spread"] = _est(iv.point, iv.lo, iv.hi, "fraction", status, mid, why)
+	sample = _lengths(p) if p is not None else None
+	cap = values.get("max_completion_len") or (
+		p.generation.max_new_tokens if p is not None and p.generation else None
+	)
+	if sample is None or not cap:
+		why = (
+			"no response lengths recorded" if sample is None else "no completion cap: set max_completion_len"
+		)
+		out["rl.truncation"] = _abstain("fraction", rl.MODEL_ID_ROLLOUT, why)
+	else:
+		share = rl.truncation_share(sample, float(cap))
+		why = (
+			f"share of responses reaching the {float(cap):g}-token cap, from the probe's length distribution"
+		)
+		measured = (p.rl.truncation_rate if p.rl else None) or (
+			p.generation.truncation_rate if p.generation else None
+		)
+		if measured is not None:
+			why += f"; the probe measured {measured:.0%}"
+		out["rl.truncation"] = _est(share, share, share, "fraction", "predicted", rl.MODEL_ID_ROLLOUT, why)
+	return out
 
 
 def axis_values(knob: Knob, n: int = 6) -> list:
@@ -1905,6 +2055,16 @@ def sensitivity(
 
 
 _CARDS = {
+	rl.MODEL_ID_ZERO: (
+		"bootstrap",
+		"p^G + (1-p)^G per prompt, each pass rate with a Jeffreys posterior, prompts resampled (DAPO, Dr. GRPO); "
+		"not yet checked against a full RL run (validation row: GRPO zoo script)",
+	),
+	rl.MODEL_ID_ROLLOUT: (
+		"bootstrap",
+		"the expected longest capped response in a batch, bootstrapped from the probe's lengths (HybridFlow); "
+		"not yet checked against a full RL run (validation row: rollout time within 20%)",
+	),
 	memory.MODEL_ID: ("analytical", "Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d"),
 	steptime.MODEL_ID_SAME: (
 		"analytical",

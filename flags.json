@@ -17,6 +17,7 @@
 	"engine.memory": false,
 	"engine.steptime_same_gpu": false,
 	"engine.steptime_cross_gpu": false,
+	"engine.rl": false,
 	"corpus.sweep": false,
 	"campaign.planner": false,
 	"d.freetier": false,
