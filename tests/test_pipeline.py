@@ -132,6 +132,35 @@ def test_eval_oom_reruns_with_eval_off_on_the_same_gpu(tmp_path):
 		and rec.probes[0].error_code == "oom.eval"
 		and rec.probes[1].status == "ok"
 	)
+	# the re-run says it ran no eval pass (C's checks page scores memory on that)
+	assert rec.probes[1].extras["eval_off"] == 1.0 and "eval_off" not in rec.probes[0].extras
+	assert "eval_batch_size" not in rec.probes[1].knobs  # this script has no eval batch knob
+	paid = sum(p.cost.usd for p in rec.probes)
+	assert rec.costs.gpu_usd == pytest.approx(paid, abs=2e-6)  # the re-run is a kept probe, not a discard
+
+
+def test_the_eval_off_rerun_sets_the_eval_batch_knob_to_zero_where_there_is_one(tmp_path):
+	runner = FakeRunner({("p1", "L4"): ("oom", "oom.eval")})
+
+	def flip(spec, gpu, *, should_stop):
+		if spec.probe_id == "p1" and spec.eval_batches == 0:
+			runner.outcomes[("p1", "L4")] = ("ok", None)
+		return FakeRunner.__call__(runner, spec, gpu, should_stop=should_stop)
+
+	script = SCRIPT.replace("eval_every = 100", "eval_every = 100\neval_batch_size = 32")
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": script}}}, _Ctx(), deps(tmp_path, flip)
+	)
+	assert any(k.id == "eval_batch_size" for k in rec.knobs)
+	rerun = next(p for p in rec.probes if p.id == "p1")
+	assert rerun.knobs["eval_batch_size"] == 0 and rerun.extras["eval_off"] == 1.0
+	from preflight.schema import dump_record
+
+	back = load_record(dump_record(rec))  # the record as stored still validates
+	assert next(p for p in back.probes if p.id == "p1").knobs["eval_batch_size"] == 0
+	from preflight.engine.api import fill_predictions
+
+	assert fill_predictions(back).predictions is not None  # B's engine takes it
 
 
 def test_budget_stops_probing_and_keeps_what_was_measured(tmp_path):

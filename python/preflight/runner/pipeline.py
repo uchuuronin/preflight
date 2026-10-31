@@ -529,7 +529,7 @@ def _probe_points(
 				probes.append(out.probe.model_copy(update={"id": f"{p.probe_id}-eval"}))
 				if isinstance(out, ProbeResult):
 					results.append(out)
-				out = again
+				out = _marked_eval_off(again, rec)
 			except OverrideError:
 				pass
 		probe = out.probe
@@ -545,6 +545,18 @@ def _probe_points(
 			a.probe.cost.usd for a in attempts if isinstance(a, ProbeResult) and id(a) not in kept_ids
 		)
 	return probes, results, gpu, discarded_usd
+
+
+def _marked_eval_off(out, rec: FlightRecord):
+	"""The eval-off re-run, saying so (C, Oct 28): its peak is training's alone, so a held-out check
+	compares it with the engine's training-only peak. extras.eval_off always; and where the record
+	has an eval batch knob, the probe's knobs set it to 0, which the engine reads as no eval pass.
+	Marked in place: the attempt's identity is how its cost is counted as kept, not discarded."""
+	knobs = dict(out.probe.knobs)
+	if any(k.id == "eval_batch_size" for k in rec.knobs):
+		knobs["eval_batch_size"] = 0
+	out.probe = out.probe.model_copy(update={"knobs": knobs, "extras": {**out.probe.extras, "eval_off": 1.0}})
+	return out
 
 
 def _price(gpu: str) -> float:
