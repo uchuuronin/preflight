@@ -190,6 +190,25 @@ def main(argv: list[str] | None = None) -> int:
 	ens_w = 0.5
 	report("mean of the two", ens_w * p_gb + (1 - ens_w) * p_gnn, y)
 	print("verdict:", "the GNN beats the GBDT" if gn[0] > gb[0] else "the GNN does not beat the GBDT: not used")
+	# Chiya, Oct 31: the mix is used only if its paired gain over the GBDT excludes zero, with architectures resampled
+	ens = ens_w * p_gb + (1 - ens_w) * p_gnn
+	hit_gb = np.abs(np.exp(p_gb - y) - 1) <= TOL
+	hit_ens = np.abs(np.exp(ens - y) - 1) <= TOL
+	arch = np.asarray([cal.arch_key(r["config"]) for r in rows])
+	groups = np.unique(arch)
+	idx = {g: np.where(arch == g)[0] for g in groups}
+	rng = np.random.default_rng(SEED)
+	gaps = []
+	for _ in range(5000):
+		pick = np.concatenate([idx[g] for g in rng.choice(groups, len(groups))])
+		gaps.append(hit_ens[pick].mean() - hit_gb[pick].mean())
+	lo, hi = np.quantile(gaps, [0.025, 0.975])
+	gap = hit_ens.mean() - hit_gb.mean()
+	print(
+		f"paired gain of the mix over the GBDT: {gap:+.1%} within 20% (95% interval {lo:+.1%} to {hi:+.1%}, "
+		f"bootstrap over {len(groups)} architectures)"
+	)
+	print("use:", "the mix" if lo > 0 else "the GBDT (the paired interval includes zero)")
 	return 0
 
 
