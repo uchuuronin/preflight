@@ -7,15 +7,19 @@ A sampler is called as sampler(fetched, script_map, k=, skip_keys=, offered_firs
 should_stop=) and returns
 an AgentSample; the pipeline puts it on the record and B's engine projects the whole run from it.
 The CLI's sampler runs the script here, with the user's own provider key held by the proxy (the
-script gets a dummy key). The hosted path (a sandbox that can reach only the proxy) is not built.
+script gets a dummy key). The hosted sampler runs the proxy in the worker with our key, behind a
+Modal tunnel, and the script in a sandbox with no secrets whose egress adds only the tunnel.
 """
 
+import contextlib
+import json
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from preflight.recorder.agent import AgentProxy
-from preflight.recorder.agent_sampler import run_sample
+from preflight.recorder.agent_sampler import TIMEOUT_S, run_sample
 
 
 def _write(files: dict[str, str], root: Path) -> None:
@@ -46,6 +50,79 @@ def local_sampler(upstream: str, api_key: str, *, rate=None, python: str = sys.e
 				return run_sample(cmd, cwd=root, proxy=proxy, population=population, k=k, skip_keys=skip_keys,
 					offered_first=tuple(offered_first), run_id=run_id, env=env, should_stop=should_stop, **kw)  # fmt: skip
 		finally:
+			proxy.stop()
+
+	return sample
+
+
+AGENT_ENTRY = ("python", "-m", "preflight.probes.agent_remote")
+
+
+class _SandboxProc:
+	"""The script running in a sandbox (probes/agent_remote.py), as run_sample's process."""
+
+	def __init__(self, sb, job: dict):
+		self.sb = sb
+		self.p = sb.exec(*AGENT_ENTRY, timeout=int(job["timeout_s"]) + 600)  # installs come first
+		self.p.stdin.write(json.dumps(job))
+		self.p.stdin.write_eof()
+		self.p.stdin.drain()
+		self.report: dict = {}
+
+	def poll(self):
+		return self.p.poll()
+
+	def wait(self, timeout):
+		time.sleep(timeout)
+
+	def kill(self):
+		with contextlib.suppress(Exception):
+			if self.p.poll() is not None:
+				lines = [x for x in self.p.stdout.read().splitlines() if x.startswith("{")]
+				self.report = json.loads(lines[-1]) if lines else {}
+		with contextlib.suppress(Exception):
+			self.sb.terminate()
+
+
+def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, forward=None, **proxy_kw):
+	"""A sampler for the hosted path: the proxy runs here, with the key, behind a tunnel; the script
+	runs in a sandbox created with create_sandbox(extra_egress=[tunnel host]) that holds no secrets.
+
+	forward: modal.forward (a context manager giving the tunnel for a local port); injected for tests."""
+	if rate is None:
+		from preflight.engine.prices import token_rate as rate
+	if forward is None:
+		import modal
+
+		forward = modal.forward
+
+	def sample(
+		fetched, sm, *, k, skip_keys=(), offered_first=(), run_id="s1", timeout_s=None, should_stop=None
+	):
+		from urllib.parse import urlparse
+
+		agent = getattr(sm, "agent", None)
+		proxy = AgentProxy(upstream, api_key, rate=rate, **proxy_kw)
+		_, port = proxy.start(bind="0.0.0.0")
+		sb = None
+		try:
+			with forward(port) as tunnel:
+				proxy.public_base = tunnel.url
+				sb = create_sandbox(extra_egress=[urlparse(tunnel.url).hostname])
+				limit = timeout_s or TIMEOUT_S
+
+				def launch(env):
+					return _SandboxProc(sb, {"files": fetched.files, "entrypoint": fetched.entrypoint,
+						"args": list(fetched.args or []), "env": env, "timeout_s": limit})  # fmt: skip
+
+				return run_sample(None, cwd=None, proxy=proxy, population=getattr(agent, "n_tasks", None), k=k,
+					skip_keys=skip_keys, offered_first=tuple(offered_first), run_id=run_id, timeout_s=limit,
+					env={}, should_stop=should_stop, launch=launch,
+					base_url_var=getattr(agent, "base_url_var", None))  # fmt: skip
+		finally:
+			if sb is not None:
+				with contextlib.suppress(Exception):
+					sb.terminate()
 			proxy.stop()
 
 	return sample

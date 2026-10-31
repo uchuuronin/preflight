@@ -72,48 +72,74 @@ def _scrubbed(env: dict, upstream_key: str | None) -> tuple[dict, list[str]]:
 	return out, sorted(gone)
 
 
-def run_sample(cmd: list[str], *, cwd: Path, proxy, population: int | None, k: int = DEFAULT_SAMPLE,
-	skip_keys=(), offered_first=(), run_id: str = "s1", timeout_s: float = TIMEOUT_S,
-	env: dict | None = None, should_stop=None) -> AgentSample:  # fmt: skip
+# where agent scripts read their base URL and key (OpenAI's SDK names, and the Meta Model API's
+# names the zoo's agent script and docs/setup/cloud.md use); all point at the proxy, all get the
+# dummy key
+BASE_URL_VARS = ("OPENAI_BASE_URL", "OPENAI_API_BASE", "META_API_BASE", "META_BASE_URL")
+KEY_VARS = ("OPENAI_API_KEY", "META_API_KEY")
+STALL_S = 300.0  # guess: no call through the proxy for 5 min with tasks open is a stuck run (a tool loop)
+
+
+class _LocalProc:
+	"""The script as a process here, in its own session (so its children die with it)."""
+
+	def __init__(self, cmd, cwd, env):
+		self.p = subprocess.Popen(cmd, cwd=cwd, env=env, start_new_session=True,
+			stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # fmt: skip
+
+	def poll(self):
+		return self.p.poll()
+
+	def wait(self, timeout):
+		with _quiet():
+			self.p.wait(timeout=timeout)
+
+	def kill(self):
+		with _quiet():
+			os.killpg(self.p.pid, signal.SIGKILL)  # the script, and anything it left running
+		self.wait(10)
+
+
+def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: int | None,
+	k: int = DEFAULT_SAMPLE, skip_keys=(), offered_first=(), run_id: str = "s1", timeout_s: float = TIMEOUT_S,
+	env: dict | None = None, should_stop=None, launch=None, base_url_var: str | None = None,
+	stall_s: float = STALL_S) -> AgentSample:  # fmt: skip
 	"""Run the script once through the proxy; the tasks it ran, as the record's agent_sample.
 
 	skip_keys: opening keys of tasks already sampled (agent.task_key of each first-sample task
 	id); the proxy refuses them at their first call. offered_first: the first sample's indices,
 	offered again ahead of the new ones, so a script that reads PREFLIGHT_TASK_INDICES starts with
 	the tasks that will be refused, as a script that can't be told where to start does.
-	should_stop: polled every second (the job was cancelled); the script is stopped."""
+	should_stop: polled every second (the job was cancelled); the script is stopped.
+	launch: (env) -> a process with poll(), wait(timeout) and kill(); the default runs cmd here.
+	A sandbox launch gets only the variables set here (pass env={}): never the caller's own.
+	base_url_var: the variable the script map says the client reads its base URL from.
+	stall_s: the script is stopped when no call has come through the proxy for this long."""
 	url = proxy.open_run(run_id, max_tasks=k, skip_keys=skip_keys)
 	new = draw_indices(population, k, exclude=offered_first)
 	indices = None if new is None else [*offered_first, *new]
 	kept, withheld = _scrubbed(env if env is not None else dict(os.environ), getattr(proxy, "_key", None))
-	child_env = {
-		**kept,
-		"OPENAI_BASE_URL": url,
-		"OPENAI_API_BASE": url,
-		"OPENAI_API_KEY": DUMMY_KEY,
-		"PREFLIGHT_SAMPLE_TASKS": str(k),
-	}
+	urls = {v: url for v in (*BASE_URL_VARS, *([base_url_var] if base_url_var else []))}
+	child_env = {**kept, **urls, **dict.fromkeys(KEY_VARS, DUMMY_KEY), "PREFLIGHT_SAMPLE_TASKS": str(k)}
 	if indices is not None:
 		child_env["PREFLIGHT_TASK_INDICES"] = ",".join(map(str, indices))
 	t0 = time.monotonic()
-	proc = subprocess.Popen(cmd, cwd=cwd, env=child_env, start_new_session=True,
-		stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # fmt: skip
+	proc = launch(child_env) if launch is not None else _LocalProc(cmd, cwd, child_env)
 	cut = None
 	while proc.poll() is None:
+		idle = proxy.run_stats(run_id).get("idle_s")
 		if time.monotonic() - t0 > timeout_s:
 			cut = "timeout"
 		elif should_stop is not None and should_stop():
 			cut = "cancelled"
+		elif idle is not None and idle > stall_s:
+			cut = "stalled"  # tasks open, nothing calling the model: a tool stuck in a loop
 		if cut:
 			break
-		with _quiet():
-			proc.wait(timeout=1.0)
+		proc.wait(1.0)
 	at_cut = proxy.run_stats(run_id) if cut else {}
 	in_flight = {*at_cut.get("in_flight", []), *at_cut.get("mid_tool", [])}
-	with _quiet():
-		os.killpg(proc.pid, signal.SIGKILL)  # the script, and anything it left running
-	with _quiet():
-		proc.wait(timeout=10)
+	proc.kill()
 	wall = time.monotonic() - t0
 	ids = proxy.run_tasks(run_id)
 	tasks = [proxy.task(t, timed_out=t in in_flight) for t in ids]
@@ -127,8 +153,9 @@ def run_sample(cmd: list[str], *, cwd: Path, proxy, population: int | None, k: i
 		parts.append(f"{len(withheld)} other provider keys withheld")
 	if st.get("single_call") and len(ids) and st["single_call"] * 2 > len(ids):
 		parts.append(f"{st['single_call']} one-call tasks (side calls may split tasks)")
-	parts.append(f"script wall {wall:.0f} s" + (f", {cut} at {timeout_s:.0f} s" if cut == "timeout" else
-		", cancelled" if cut else ""))  # fmt: skip
+	why = {"timeout": f", cut at {timeout_s:.0f} s", "cancelled": ", cancelled",
+		"stalled": f", stopped after {stall_s:.0f} s with no model calls"}.get(cut, "")  # fmt: skip
+	parts.append(f"script wall {wall:.0f} s{why}")
 	selection = "; ".join(parts)
 	if len(selection) > 200:
 		selection = selection[:197].rsplit(" ", 1)[0] + "..."

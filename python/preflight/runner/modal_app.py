@@ -377,7 +377,8 @@ def _sandbox_factory(owner=None):
 	"""The probe sandbox, created inside `owner` (this app by default; the startup check passes its
 	own running app). gpu "cpu" makes a GPU-less sandbox with every other setting the same."""
 
-	def create(gpu: str):
+	def create(gpu: str, extra_egress: list[str] | tuple = ()):
+		"""extra_egress: hosts beyond EGRESS, only the agent proxy's tunnel (runner/agent_jobs.py)."""
 		from preflight.probes.gpu_choice import modal_gpu
 
 		return modal.Sandbox.create(
@@ -386,7 +387,7 @@ def _sandbox_factory(owner=None):
 			gpu=None if gpu == "cpu" else modal_gpu(gpu),
 			timeout=30 * 60,
 			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes
-			outbound_domain_allowlist=EGRESS,
+			outbound_domain_allowlist=[*EGRESS, *(h for h in extra_egress if h)],
 			volumes={WEIGHTS_DIR: _read_only(weights_vol)},
 			workdir="/tmp",
 		)

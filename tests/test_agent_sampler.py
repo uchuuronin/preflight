@@ -229,3 +229,109 @@ def prov_and_capped():
 	yield prov, px
 	px.stop()
 	prov.server.shutdown()
+
+
+def test_a_system_prompt_rebuilt_every_call_still_groups_by_task(proxy, tmp_path):
+	"""D's agent script puts the time in its system prompt: every turn's prefix differs there."""
+	prov, px = proxy
+	env = {**os.environ, "FAKE_AGENT_TIMESTAMP_SYSTEM": "1"}
+	first = run_sample([sys.executable, str(FIX / "fake_agent.py")], cwd=tmp_path, proxy=px, population=100,
+		k=5, env=env)  # fmt: skip
+	assert len(first.tasks) == 5 and all(t.turns == 3 for t in first.tasks)
+	before = len(prov.seen)
+	more = _top_up(px, [sys.executable, str(FIX / "fake_agent.py")], tmp_path, first, env, k=3)
+	assert len(more.tasks) == 3 and "task 0" not in _first_users(prov.seen[before:])  # skipped by content
+
+
+def test_a_run_with_no_model_calls_for_a_while_is_stopped_as_stalled(proxy, tmp_path):
+	"""D's planted tool loop: a failing tool retried forever, so the model is never called again."""
+	import time
+
+	_, px = proxy
+	stuck = tmp_path / "stuck.py"
+	stuck.write_text(
+		"import json, os, time, urllib.request\n"
+		"b = json.dumps({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': 'x'}]}).encode()\n"
+		"urllib.request.urlopen(urllib.request.Request(os.environ['META_API_BASE'] + '/chat/completions', b,"
+		" {'Content-Type': 'application/json'})).read()\n"
+		"while True: time.sleep(1)\n"
+	)
+	t0 = time.monotonic()
+	out = run_sample([sys.executable, str(stuck)], cwd=tmp_path, proxy=px, population=None, k=3,
+		env=dict(os.environ), stall_s=2.0)  # fmt: skip
+	assert time.monotonic() - t0 < 15 and len(out.tasks) == 1 and "no model calls" in out.selection
+
+
+class _FakeExec:
+	"""A sandbox exec run as a local process: probes/agent_remote.py, fed on stdin."""
+
+	def __init__(self, cmd):
+		import subprocess
+
+		self.proc = subprocess.Popen(list(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+		self.buf = []
+		self.stdin = self
+		self.stdout = self
+
+	def write(self, s):
+		self.buf.append(s)
+
+	def write_eof(self):
+		self.proc.stdin.write("".join(self.buf))
+		self.proc.stdin.close()
+
+	def drain(self):
+		pass
+
+	def poll(self):
+		return self.proc.poll()
+
+	def read(self):
+		return self.proc.stdout.read()
+
+
+class _FakeSandbox:
+	def __init__(self, extra_egress):
+		self.extra_egress, self.execs, self.terminated = extra_egress, [], False
+
+	def exec(self, *cmd, timeout=None):
+		self.execs.append(_FakeExec([sys.executable, *cmd[1:]]))
+		return self.execs[-1]
+
+	def terminate(self):
+		self.terminated = True
+		for e in self.execs:
+			if e.proc.poll() is None:
+				e.proc.kill()
+
+
+def test_the_hosted_sampler_keeps_the_key_outside_and_routes_through_the_tunnel(tmp_path, monkeypatch):
+	import contextlib
+	import types
+
+	from preflight.runner.agent_jobs import sandbox_sampler
+	from preflight.runner.sources import Fetched
+	from preflight.schema.script_map import AgentInfo, ScriptMap
+
+	prov = Provider()
+	made = []
+
+	@contextlib.contextmanager
+	def forward(port):
+		yield types.SimpleNamespace(url=f"http://127.0.0.1:{port}")
+
+	def create(extra_egress):
+		made.append(_FakeSandbox(extra_egress))
+		return made[-1]
+
+	monkeypatch.setenv("META_API_KEY", "worker-secret")  # the worker's own env must not reach the script
+	try:
+		sample = sandbox_sampler(create, prov.url, "our-key", forward=forward)
+		fetched = Fetched(files={"run.py": (FIX / "fake_agent.py").read_text()}, entrypoint="run.py")
+		sm = ScriptMap.model_construct(agent=AgentInfo(client="openai", n_tasks=100))
+		out = sample(fetched, sm, k=4)
+	finally:
+		prov.server.shutdown()
+	assert len(out.tasks) == 4 and all(t.turns == 3 for t in out.tasks)
+	assert {s["auth"] for s in prov.seen} == {"Bearer our-key"}
+	assert made[0].extra_egress == ["127.0.0.1"] and made[0].terminated

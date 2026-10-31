@@ -92,11 +92,19 @@ class _Run:
 	by_response: dict[str, str] = field(default_factory=dict)  # response id -> task (responses API)
 	keys: dict[str, int] = field(default_factory=dict)  # opening key -> tasks opened with it
 	refused: int = 0  # calls refused because the sample was full
+	system: dict[str, str | None] = field(default_factory=dict)  # task -> its last system prompt hash
+	last_call_at: float | None = None  # monotonic: any call through the run, refused ones too
 
 
-def _conversation(req: dict) -> list[str]:
-	"""A call's conversation as hashes of its messages (chat `messages`, responses `input`,
-	legacy completions `prompt`)."""
+def _h(x) -> str:
+	return hashlib.sha256(json.dumps(x, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
+def _split(req: dict) -> tuple[str | None, list[str]]:
+	"""A call's system prompt (hashed) and the rest of its conversation as hashes of its messages
+	(chat `messages`, responses `input`, legacy completions `prompt`). The system prompt is kept
+	apart: agents often rebuild it every call (a timestamp, the tool list), which would make every
+	turn look like a new conversation."""
 	items = req.get("messages")
 	if items is None:
 		items = req.get("input")
@@ -105,10 +113,16 @@ def _conversation(req: dict) -> list[str]:
 	if isinstance(items, str):
 		items = [{"role": "user", "content": items}]
 	if not isinstance(items, list):
-		return []
-	return [
-		hashlib.sha256(json.dumps(x, sort_keys=True, default=str).encode()).hexdigest()[:16] for x in items
-	]
+		return None, []
+	system = [x for x in items if isinstance(x, dict) and x.get("role") in ("system", "developer")]
+	if isinstance(req.get("instructions"), str):
+		system.append({"instructions": req["instructions"]})
+	rest = [x for x in items if not (isinstance(x, dict) and x.get("role") in ("system", "developer"))]
+	return (_h(system) if system else None), [_h(x) for x in rest]
+
+
+def _conversation(req: dict) -> list[str]:
+	return _split(req)[1]
 
 
 def opening_key(msgs: list[str]) -> str:
@@ -130,6 +144,7 @@ class _Task:
 	repeats: int = 0
 	stopped: str | None = None  # why the proxy stopped it: max_turns, loop, budget
 	in_flight: int = 0
+	open: list = field(default_factory=list)  # calls in flight; their status is set once the provider answers
 	reserved_usd: float = 0.0
 	unpriced: bool = False
 	trace_id: str = field(default_factory=lambda: secrets.token_hex(16))
@@ -300,10 +315,19 @@ class AgentProxy:
 		self._tasks: dict[str, _Task] = {}
 		self._tokens: dict[str, str] = {}  # path token -> task id
 		self._server: ThreadingHTTPServer | None = None
+		self.public_base: str | None = None  # e.g. a Modal tunnel's https URL
 
 	# ------------------------------------------------------------- lifecycle
 
-	def start(self) -> tuple[str, int]:
+	def _url(self, token: str) -> str:
+		if self.public_base:  # reached through a tunnel (a sandbox on another machine)
+			return f"{self.public_base.rstrip('/')}/t/{token}/v1"
+		host, port = self._server.server_address[:2]
+		return f"http://{host}:{port}/t/{token}/v1"
+
+	def start(self, bind: str = "127.0.0.1") -> tuple[str, int]:
+		"""bind: 127.0.0.1 for a script on this machine; 0.0.0.0 behind a tunnel (the token in the
+		path is what admits a caller, and the proxy forwards only generation endpoints)."""
 		proxy = self
 
 		class Handler(BaseHTTPRequestHandler):
@@ -320,7 +344,7 @@ class AgentProxy:
 					self, 404, {"error": {"type": "not_found", "message": "preflight: POST only"}}, close=True
 				)
 
-		self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+		self._server = ThreadingHTTPServer((bind, 0), Handler)
 		self._server.daemon_threads = True
 		threading.Thread(target=self._server.serve_forever, name="agent-proxy", daemon=True).start()
 		return self._server.server_address[0], self._server.server_address[1]
@@ -335,8 +359,7 @@ class AgentProxy:
 		with self._lock:
 			self._tokens[token] = task_id
 			self._tasks.setdefault(task_id, _Task())
-		host, port = self._server.server_address[:2]
-		return f"http://{host}:{port}/t/{token}/v1"
+		return self._url(token)
 
 	def open_run(self, run_id: str, *, max_tasks: int, skip_keys=()) -> str:
 		"""The base URL for a script that runs many tasks in one process (the usual agent eval
@@ -361,8 +384,7 @@ class AgentProxy:
 			for k in skip_keys:  # a key twice: two sampled tasks opened the same way, both skipped
 				counts[k] = counts.get(k, 0) + 1
 			self._tokens[token] = _Run(run_id, max_tasks, skip_keys=counts)
-		host, port = self._server.server_address[:2]
-		return f"http://{host}:{port}/t/{token}/v1"
+		return self._url(token)
 
 	def _run(self, run_id: str):
 		return next((r for r in self._tokens.values() if isinstance(r, _Run) and r.run_id == run_id), None)
@@ -385,14 +407,16 @@ class AgentProxy:
 				"in_flight": [tid for tid, t in ts.items() if t.in_flight > 0],
 				# a task whose last answer asked for a tool was mid-task (running the tool) if cut now
 				"mid_tool": [tid for tid, t in ts.items() if t.calls and t.calls[-1].finish_reason == "tool_calls"],
-				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1)}  # fmt: skip
+				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1),
+				"idle_s": None if run.last_call_at is None else time.monotonic() - run.last_call_at}  # fmt: skip
 
 	def _task_for(self, run: "_Run", req: dict) -> str | None:
 		"""The task this call belongs to, opening one if it starts a conversation; None when the
 		run already has max_tasks tasks and this would be a new one."""
-		msgs = _conversation(req)
+		sys_h, msgs = _split(req)
 		prev = req.get("previous_response_id") if isinstance(req.get("previous_response_id"), str) else None
 		with self._lock:
+			run.last_call_at = time.monotonic()
 			if prev and prev in run.by_response:
 				return run.by_response[prev]
 			best, best_key = None, None
@@ -402,19 +426,24 @@ class AgentProxy:
 				t = self._tasks.get(tid, _Task())
 				if t.stopped and len(last) == len(msgs):
 					return tid  # a retry of the call that stopped it: refused again, not a fresh task
-				failed = bool(t.calls) and (
-					t.calls[-1].error or not t.calls[-1].status or t.calls[-1].status >= 400
+				# the last answer failed, logged or still being relayed (a client can retry on the status
+				# line, before the proxy has logged the call)
+				failed = any(c.status >= 400 or c.error for c in t.open if c.status) or (
+					bool(t.calls)
+					and bool(t.calls[-1].error or not t.calls[-1].status or t.calls[-1].status >= 400)
 				)
 				if len(last) == len(msgs) and not failed:
 					# the same call again, unless its last answer failed: a repeat (pass@k, or n samples
 					# sent at once), not a retry; a client's own retry after a timeout opens a task too
 					continue
-				# the longest match; among equals, a task with nothing in flight (its turn is next)
-				k = (len(last), t.in_flight == 0)
+				# the longest match; among equals, the same system prompt, then a task with nothing in
+				# flight (its turn is next)
+				k = (len(last), run.system.get(tid) == sys_h, t.in_flight == 0)
 				if best_key is None or k > best_key:
 					best, best_key = tid, k
 			if best is not None:
 				run.last[best] = msgs
+				run.system[best] = sys_h
 				return best
 			if any(len(k) <= len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
 				# a retry (a framework's own, past the SDK) or a later turn of a skipped task: still
@@ -434,6 +463,7 @@ class AgentProxy:
 			tid = f"{run.run_id}-{key}" + (f".{n}" if n > 1 else "")
 			run.order.append(tid)
 			run.last[tid] = msgs
+			run.system[tid] = sys_h
 			self._tasks.setdefault(tid, _Task())
 			return tid
 
@@ -507,6 +537,8 @@ class AgentProxy:
 		with self._lock:
 			t = self._tasks.setdefault(task_id, _Task())
 			t.in_flight -= 1
+			with contextlib.suppress(ValueError):
+				t.open.remove(call)
 			t.reserved_usd = max(0.0, t.reserved_usd - reserved)
 			t.unpriced = t.unpriced or uncosted
 			t.calls.append(call)
@@ -571,6 +603,8 @@ class AgentProxy:
 		model = req.get("model") if isinstance(req.get("model"), str) else None
 		stream = req.get("stream") is True
 		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
+		with self._lock:
+			self._tasks.setdefault(task_id, _Task()).open.append(call)
 		sent = [False]  # this request's reply has started: a failure now can only close the connection
 		last: list = []  # the reply's last bytes (or the headers' end), sent once the call is logged
 		broke, never_sent, upstream_status, fail_reply = False, False, 0, False

@@ -34,10 +34,19 @@ def chat(messages):
 		return json.loads(r.read())
 
 
+def system():
+	if os.environ.get("FAKE_AGENT_TIMESTAMP_SYSTEM"):  # rebuilt every call, as D's agent script does
+		import time
+
+		return {"role": "system", "content": f"Current time: {time.time_ns()}"}
+	return {"role": "system", "content": "you are a coder"}
+
+
 def run(t):
-	messages = [{"role": "system", "content": "you are a coder"}, {"role": "user", "content": f"task {t}"}]
+	messages = [system(), {"role": "user", "content": f"task {t}"}]
 	try:
 		for turn in range(3):
+			messages[0] = system()
 			reply = chat(messages)["choices"][0]["message"]
 			messages += [
 				{"role": "assistant", "content": reply.get("content") or ""},
