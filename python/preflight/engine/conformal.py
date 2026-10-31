@@ -98,7 +98,7 @@ class Table:
 		default_factory=dict
 	)  # target -> gpu -> (hits, n), once
 	# P(OOM)'s reliability diagram on oom.SHOWN_EDGES: (lo, hi, points, agrees with outcomes) per bin
-	oom_bins: tuple[tuple[float, float, int, bool], ...] = ()
+	oom_bins: tuple[tuple, ...] = ()  # (lo, hi, n, consistent, ooms); older tables have no ooms
 
 	def describe(self, target: str) -> str:
 		"""For a model card: the cells this target has, how pairs below MIN_CELL merge, coverage and holdout."""
@@ -179,7 +179,10 @@ class Table:
 			bool(d.get("oom_reliable", False)),
 			{t: (int(v[0]), int(v[1])) for t, v in d.get("coverage", {}).items()},
 			{t: {g: (int(v[0]), int(v[1])) for g, v in gs.items()} for t, gs in d.get("holdout", {}).items()},
-			tuple((float(b[0]), float(b[1]), int(b[2]), bool(b[3])) for b in d.get("oom_bins", ())),
+			tuple(
+				(float(b[0]), float(b[1]), int(b[2]), bool(b[3]), *((int(b[4]),) if len(b) > 4 else ()))
+				for b in d.get("oom_bins", ())
+			),
 		)
 
 

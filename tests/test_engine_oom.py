@@ -82,3 +82,36 @@ def test_the_installed_table_carries_the_bins_the_switch_reads():
 
 	edges = [(b[0], b[1]) for b in conformal.TABLE.oom_bins]
 	assert edges == [(lo, min(hi, 1.0)) for lo, hi in zip(oom.SHOWN_EDGES, oom.SHOWN_EDGES[1:], strict=False)]
+
+
+def test_an_unverified_top_bin_shows_its_own_counts_until_it_verifies(monkeypatch):
+	# Chiya, Oct 31: not a number, not "above 95%": "Likely to run out of memory: 9 of 10 similar runs did"
+	from dataclasses import replace
+
+	from preflight.engine import api, conformal, memory, oom
+
+	failing = ((0.0, 0.05, 587, True, 2), (0.95, 1.0, 10, False, 9))
+	assert oom.end_evidence(0.99, failing) == (9, 10) and not oom.shown_as_number(0.99, failing)
+	assert oom.end_evidence(0.01, failing) is None and oom.shown_as_number(
+		0.01, failing
+	)  # the bottom verifies
+	est = memory.MemoryEstimate(
+		3.0e10, 2.8e10, 3.2e10, "bytes", "predicted", memory.MODEL_ID, 0.99, "fails", 0.1, None
+	)
+	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=failing))
+	r = api._from_memory_estimate(est, memory.MODEL_ID, "from 19 held-out runs").oom
+	assert r.reason.startswith("Likely to run out of memory: 9 of 10 similar runs did")
+	lo, hi = conformal.wilson(9, 10)
+	assert r.lo == pytest.approx(lo) and r.hi == pytest.approx(max(hi, 0.99))  # the range holds the model's point
+	# the switch: once that bin holds 10 runs that agree with outcomes, a number again
+	passing = ((0.0, 0.05, 587, True, 2), (0.95, 1.0, 12, True, 12))
+	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=passing))
+	r = api._from_memory_estimate(est, memory.MODEL_ID, "from 19 held-out runs").oom
+	assert r.lo == r.hi == 0.99 and "similar runs did" not in r.reason
+
+
+def test_the_installed_table_shows_the_top_bin_as_evidence():
+	from preflight.engine import conformal, oom
+
+	top = next(b for b in conformal.TABLE.oom_bins if b[0] >= 0.95 - 1e-9)
+	assert len(top) == 5 and oom.end_evidence(0.99, conformal.TABLE.oom_bins) == (top[4], top[2])

@@ -97,6 +97,7 @@ Only B edits this file. Each line is something this agent needs from another (or
   - which lenses have held-out bands.
 
   It also includes P(OOM)'s reliability bins, each with `verified` (10 points that agree with outcomes) and `shown_as_number` (what the engine shows: always at the ends, in the middle only once every middle bin verifies). Today the top bin is shown but not verified: say so on the page. Today that's memory 439/487 and step time 404/449, the A100 holdout (step 26/28, memory 22/28), and 5 OOM bins. It's the corpus's numbers beside your real-probe ones. (Oct 31)
+- TODO(contract) [B -> C] The top P(OOM) bin shows its evidence, not a number (Chiya, Oct 31). Above 95%, while that bin doesn't verify, `risk.oom`'s reason starts with "Likely to run out of memory: 9 of 10 similar runs did", using the bin's own counts. Its `lo`/`hi` are the Wilson interval of those counts, widened to hold the model's point. Show that sentence in the readout, the status line and the fit-map hover wherever you would print the number. Below 5% the same applies with "Unlikely ...", but that bin verifies today, so it shows a number. When the top bin verifies (10 runs that agree with outcomes), the engine returns `lo == hi == point` with no such sentence: no change needed on your side. `calibration_summary()` gives each bin's `ooms`, `n`, `verified` and `shown_as_number`. (Oct 31)
 
 ## Done
 

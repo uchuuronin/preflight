@@ -428,7 +428,8 @@ def main(argv: list[str] | None = None) -> int:
 		table,
 		oom_reliable=ok,
 		oom_bins=tuple(
-			(b.lo, b.hi, b.n, b.consistent) for b in oom.reliability(pairs, edges=oom.SHOWN_EDGES)
+			(b.lo, b.hi, b.n, b.consistent, round(b.observed * b.n) if b.n else 0)
+			for b in oom.reliability(pairs, edges=oom.SHOWN_EDGES)
 		),
 		# a lens-limited target has no all-lens cell: an unlisted lens must not borrow the listed lenses' band
 		cells={k: c for k, c in table.cells.items() if k[0] in keep and not (k[0] in only and not k[2])},

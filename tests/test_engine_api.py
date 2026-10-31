@@ -570,11 +570,15 @@ def test_a_record_banded_with_an_older_table_is_reported(ft):
 def test_the_summary_says_what_the_engine_shows():
 	bins = api.calibration_summary()["oom_bins"]
 	ends = [b for b in bins if b["hi"] <= 0.05 + 1e-9 or b["lo"] >= 0.95 - 1e-9]
-	assert ends and all(b["shown_as_number"] for b in ends)  # the ends always show, verified or not
+	assert ends and all(
+		b["shown_as_number"] == b["verified"] for b in ends
+	)  # an end shows a number once verified
 	middle = [b for b in bins if b not in ends]
 	assert middle and not any(b["shown_as_number"] for b in middle)
 	top = next(b for b in bins if b["lo"] >= 0.95 - 1e-9)
-	assert top["verified"] is False  # shown, but not verified: the page can say so
+	assert (
+		top["verified"] is False and top["ooms"] == 9 and top["n"] == 10
+	)  # shown as "9 of 10 similar runs did"
 
 
 def test_one_threads_quiet_grid_doesnt_silence_another():

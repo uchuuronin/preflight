@@ -70,7 +70,9 @@ def forecast(
 	y = np.asarray([p[1] for p in pts], dtype=float)
 	if last_step <= t[-1]:
 		v = float(y[int(np.argmin(np.abs(t - last_step)))])
-		return Forecast(v, v, v, "extrapolated", f"the probe already reached step {last_step}: its loss there")
+		return Forecast(
+			v, v, v, "extrapolated", f"the probe already reached step {last_step}: its loss there"
+		)
 	try:
 		a, b, c, _ = _fit(t, y)
 	except ValueError as exc:

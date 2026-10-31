@@ -579,8 +579,16 @@ def _from_memory_estimate(
 	# Chiya, Oct 31: a number only where the reliability diagram verifies it; in between, the 5-95% range
 	# the bins verify the empirical P(OOM) from held-out residuals; a simulated band's P(OOM) is never verified
 	empirical = oom_source != "simulated band"
-	shown = oom_model.shown_as_number(est.p_oom, conformal.TABLE.oom_bins if empirical else ())
-	if shown:
+	bins = conformal.TABLE.oom_bins if empirical else ()
+	shown = oom_model.shown_as_number(est.p_oom, bins)
+	evidence = oom_model.end_evidence(est.p_oom, bins)
+	if evidence is not None:
+		# Chiya, Oct 31: an end bin that doesn't verify shows what happened to similar runs, not a probability
+		k, n = evidence
+		lead = "Likely" if est.p_oom > oom_model.UNCERTAIN[1] else "Unlikely"
+		why = f"{lead} to run out of memory: {k} of {n} similar runs did ({oom_source})"
+		lo, hi = conformal.wilson(k, n)
+	elif shown:
 		why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
 		lo = hi = est.p_oom
 	else:
@@ -2534,17 +2542,21 @@ def calibration_summary() -> dict:
 		},
 		"oom_bins": [
 			{
-				"lo": lo,
-				"hi": hi,
-				"n": n,
-				"agrees": ok,
-				"verified": n >= oom_model.MIN_SHOWN and ok,
-				# what the engine shows: always a number at the ends, in the middle only once every middle bin verifies
-				"shown_as_number": hi <= oom_model.UNCERTAIN[0] + 1e-9
-				or lo >= oom_model.UNCERTAIN[1] - 1e-9
-				or oom_model.middle_verified(t.oom_bins),
+				"lo": b[0],
+				"hi": b[1],
+				"n": b[2],
+				"ooms": b[4] if len(b) > 4 else None,
+				"agrees": b[3],
+				"verified": b[2] >= oom_model.MIN_SHOWN and b[3],
+				# what the engine shows: a number at an end only once that bin verifies (else its counts), and in the
+				# middle only once every middle bin does (else "uncertain (5-95%)")
+				"shown_as_number": (
+					(b[2] >= oom_model.MIN_SHOWN and b[3]) or len(b) <= 4
+					if b[1] <= oom_model.UNCERTAIN[0] + 1e-9 or b[0] >= oom_model.UNCERTAIN[1] - 1e-9
+					else oom_model.middle_verified(t.oom_bins)
+				),
 			}
-			for lo, hi, n, ok in t.oom_bins
+			for b in t.oom_bins
 		],
 		"oom_middle_verified": oom_model.middle_verified(t.oom_bins),
 	}

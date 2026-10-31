@@ -1636,10 +1636,10 @@ DATA = {'built_from': 'remote-runs b-corpus-export-3 and b-corpus-export-hf-2 (O
  'coverage': {'memory.peak': [439, 487], 'time.step': [404, 449], 'time.step.cross': [2130, 2286]},
  'holdout': {'memory.peak': {'A100-PCIe-80GB': [8, 12], 'A100-SXM-80GB': [14, 16]},
              'time.step': {'A100-PCIe-80GB': [11, 12], 'A100-SXM-80GB': [15, 16]}},
- 'oom_bins': [[0.0, 0.05, 587, True],
-              [0.05, 0.3, 5, True],
-              [0.3, 0.7, 6, True],
-              [0.7, 0.95, 4, True],
-              [0.95, 1.0, 10, False]],
+ 'oom_bins': [[0.0, 0.05, 587, True, 2],
+              [0.05, 0.3, 5, True, 1],
+              [0.3, 0.7, 6, True, 2],
+              [0.7, 0.95, 4, True, 4],
+              [0.95, 1.0, 10, False, 9]],
  'oom_reliable': True,
- 'version': '6c7bfd7b77'}
+ 'version': 'e92fbd0e7b'}
