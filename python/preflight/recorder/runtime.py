@@ -293,6 +293,10 @@ class Recorder:
 		self._io_depth = 0
 		self.gens: list[dict] = []
 		self.trainer_logs: list[dict] = []
+		# how long the real run is, for B's time.total: the training loader's batches per epoch,
+		# and from an HF Trainer its epochs and the optimizer steps it plans (state.max_steps)
+		self.train_loader_batches: int | None = None
+		self.run_length: dict = {}
 		self._scalers: weakref.WeakSet = weakref.WeakSet()
 		self._attn_calls = 0
 		self._rss_peak = 0
@@ -485,6 +489,14 @@ class Recorder:
 				rec._pretrain_batches[id(it)] = n
 				if n > PRETRAIN_EVAL_CAP:
 					raise StopIteration  # a validation pass before training, cut like any eval
+			elif not rec._trained:
+				# the loader whose batch feeds the first training step: kept until the first backward
+				# (a batch drawn from another loader earlier, for a fixed sample or stats, is replaced),
+				# then frozen. An IterableDataset has no length: the run's length stays unknown
+				n = None
+				with suppress(Exception):
+					n = len(it)
+				rec.train_loader_batches = n if isinstance(n, int) and n > 0 else None
 			rec._maybe_stop()
 			rec._sync()
 			t0 = rec._now()
@@ -788,6 +800,23 @@ class Recorder:
 			return log
 
 		self._patch(tr, "log", factory)
+
+		def plan_factory(orig):
+			# Trainer builds its LR schedule once with the run's total optimizer steps (epochs x loader
+			# batches / accumulation, or args.max_steps), before the first step: the real run's length.
+			# create_scheduler is on every path (create_optimizer_and_scheduler, DeepSpeed, FSDP)
+			def create(self_, num_training_steps, *args, **kwargs):
+				with suppress(Exception):
+					rec.run_length = {
+						"planned_steps": int(num_training_steps),
+						"epochs": float(self_.args.num_train_epochs) if self_.args.max_steps <= 0 else None,
+					}
+				return orig(self_, num_training_steps, *args, **kwargs)
+
+			return create
+
+		if hasattr(tr, "create_scheduler"):
+			self._patch(tr, "create_scheduler", plan_factory)
 
 	def _hook_training_args(self, mod):
 		ta = getattr(mod, "TrainingArguments", None)
@@ -1109,6 +1138,8 @@ class Recorder:
 		if self.cuda and not phased:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
+		out["train_loader_batches"] = self.train_loader_batches
+		out.update({k: v for k, v in self.run_length.items() if v is not None})
 		out["host_rss_peak_bytes"] = self._rss_peak or None
 		if self._kernels is not None:
 			out["kernels"] = self._kernels

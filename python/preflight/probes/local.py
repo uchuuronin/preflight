@@ -26,6 +26,7 @@ import ctypes
 import itertools
 import json
 import logging
+import math
 import os
 import re
 import shutil
@@ -108,6 +109,11 @@ EXTRAS_KEYS = (
 	"samples_per_step",
 	"micro_steps_per_step",
 	"host_rss_peak_bytes",
+	# the real run's length, for time.total (A -> B, Oct 28): batches per epoch of the training
+	# loader, and from an HF Trainer its epochs and planned optimizer steps
+	"train_loader_batches",
+	"epochs",
+	"planned_steps",
 )
 
 
@@ -172,7 +178,17 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 		p = PurePosixPath(rel)
 		if not rel or not _PATH_OK.match(rel) or p.is_absolute() or ".." in p.parts or rel.startswith("."):
 			raise InvalidSubmission(f"file path {rel!r} is not a plain relative path")
-		size = len(text.encode("utf-8"))
+		if not isinstance(text, str):
+			raise InvalidSubmission(f"{rel} is not text", code="submission.invalid")
+		try:
+			size = len(text.encode("utf-8"))
+		except UnicodeEncodeError as exc:  # an unpaired surrogate ('\ud800'), which no file can hold
+			line = text.count("\n", 0, exc.start) + 1
+			raise InvalidSubmission(
+				f"{rel} has text that isn't valid Unicode (an unpaired surrogate, line {line}); "
+				"save it as UTF-8 and check in again",
+				code="submission.invalid",
+			) from None
 		if size > MAX_FILE_BYTES:
 			raise InvalidSubmission(
 				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB"
@@ -424,7 +440,7 @@ def parse_result(raw: str) -> tuple[str, str | None, str | None, dict, dict]:
 		if summary.get("step_time"):
 			StepTime(**summary["step_time"])
 		return status, code, error, summary, env
-	except (ValueError, KeyError, TypeError, ValidationError) as exc:
+	except (ValueError, KeyError, TypeError, ArithmeticError, ValidationError) as exc:
 		return (
 			"error",
 			"recorder",
@@ -532,10 +548,27 @@ def _probe_model(
 		eval=_opt(EvalStats, s.get("eval")),
 		checkpoint=_opt(CheckpointStats, s.get("checkpoint")),
 		generation=_opt(GenerationStats, s.get("generation")),
-		extras={k: float(s[k]) for k in EXTRAS_KEYS if s.get(k) is not None},
+		extras=_extras(s),
 		step_log=untrusted.step_log(s.get("step_log")),
 		cost=ProbeCost(gpu_seconds=round(duration, 3), usd=round(duration * spec.gpu_usd_per_hour / 3600, 6)),
 	)
+
+
+def _extras(summary: dict) -> dict[str, float]:
+	"""The counts B reads by name, from the probe's own (untrusted) summary: a value that isn't a
+	finite, non-negative number is left out, never stored as NaN or allowed to crash the parent."""
+	out = {}
+	for k in EXTRAS_KEYS:
+		v = summary.get(k)
+		if isinstance(v, bool) or not isinstance(v, int | float):
+			continue
+		try:
+			f = float(v)
+		except (OverflowError, ValueError):
+			continue
+		if math.isfinite(f) and f >= 0:
+			out[k] = f
+	return out
 
 
 # ---------------------------------------------------------------- run
@@ -668,7 +701,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		status, code, error, summary, raw_env = parse_result(out.read_text(errors="replace")[:5_000_000])
 	try:
 		probe = _probe_model(spec, status, code, error, summary, started, duration)
-	except (ValidationError, TypeError, ValueError) as exc:
+	except (ValidationError, TypeError, ValueError, ArithmeticError) as exc:
 		probe = _probe_model(
 			spec,
 			"error",

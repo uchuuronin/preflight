@@ -28,6 +28,7 @@ from typing import Any
 
 from preflight.corpus.configs import CorpusConfig
 
+KILL_GRACE_S = 30.0  # guess: time for a killed child to exit before the parent stops waiting for it
 DEFAULT_TIMEOUT_S = {
 	"kernels": 600.0,
 	"divergence": 1500.0,
@@ -68,7 +69,10 @@ def run_isolated(
 		except subprocess.TimeoutExpired:
 			timed_out = True
 			_kill_group(proc)
-			_, err = proc.communicate()
+			try:  # a child stuck in the GPU driver can ignore SIGKILL for a while; never wait on it forever
+				_, err = proc.communicate(timeout=KILL_GRACE_S)
+			except subprocess.TimeoutExpired:
+				err = b"child did not exit after SIGKILL; abandoned"
 		elapsed = time.monotonic() - t0
 		result: dict[str, Any] | None = None
 		if not timed_out and cout.exists():

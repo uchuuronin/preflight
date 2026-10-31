@@ -32,6 +32,7 @@ step up after an OOM only while the job's dollar budget holds it.
 import hashlib
 import json
 import logging
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -66,6 +67,8 @@ from preflight.schema import (
 	Predictions,
 	Probe,
 	ProbeCost,
+	dump_record,
+	load_record,
 )
 from preflight.schema.script_map import ScriptMap
 
@@ -89,7 +92,9 @@ PROBE_TIMEOUT_S = (
 class Budget:
 	usd: float = JOB_BUDGET_USD
 	wall_s: float = JOB_PROBE_WALL_S
-	spent_usd: float = 0.0
+	spent_usd: float = 0.0  # what the cap is checked against: GPU and the sandbox overhead estimate
+	gpu_usd: float = 0.0  # GPU at measured probe time, every attempt
+	overhead_usd: float = 0.0  # the sandbox CPU and memory estimate alone
 	started: float = field(default_factory=time.monotonic)
 
 	def left_s(self) -> float:
@@ -173,6 +178,9 @@ class _Ctx:
 
 	def should_stop(self) -> bool:
 		return False
+
+	def confirm(self) -> None:
+		pass
 
 	def emit(self, stage: str, **fields) -> None:
 		self.events.append({"stage": stage, **fields})
@@ -397,7 +405,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		dropped = {p.id for p in rec.probes}
 		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
 		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
-	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.spent_usd,
+	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.gpu_usd, overhead_usd=budget.overhead_usd,
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
@@ -493,6 +501,8 @@ def _probe_points(
 			if result is not None:
 				# every attempt counts, kept or not, with the sandbox's CPU and memory beside the GPU
 				budget.spent_usd += result.probe.cost.usd + (result.probe.duration_s or 0) * over / 3600
+				budget.gpu_usd += result.probe.cost.usd
+				budget.overhead_usd += (result.probe.duration_s or 0) * over / 3600
 			attempts.append(out)
 			return out
 
@@ -595,6 +605,7 @@ def _merge(
 	gpu: str,
 	*,
 	spent_usd: float | None = None,
+	overhead_usd: float = 0.0,
 	discarded_usd: float = 0.0,
 	billed_usd: float | None = None,
 	new_ids: set[str] | None = None,
@@ -638,6 +649,12 @@ def _merge(
 		over = billed_usd - kept - discarded_usd
 		breakdown["sandbox_overhead"] = round(prior.get("sandbox_overhead", 0.0) + over, 6)
 	gpu_usd = round(rec.costs.gpu_usd + job_usd, 6)
+	if overhead_usd:
+		# an estimate of the sandbox's CPU and memory (Deps.overhead_usd_per_h), kept apart from the
+		# GPU figure, which is measured probe time at list price; Modal's bill replaces both
+		breakdown["sandbox_cpu_memory_estimate"] = round(
+			prior.get("sandbox_cpu_memory_estimate", 0.0) + overhead_usd, 6
+		)
 	# every model call the record carries (a derived record keeps its parent's), priced per call
 	llm_usd = round(sum(c.cost_usd for c in rec.provenance), 6)
 	if llm_usd:
@@ -647,9 +664,70 @@ def _merge(
 	return FlightRecord.model_validate({**rec.model_dump(), **{k: v for k, v in update.items()}})
 
 
+# derived: the fill took 0.09 s on the first L4 record (Oct 28, 5 estimates and 80 grids); 300x
+# that is a hang, and the measured record is stored without predictions instead of holding the
+# lease until WORKER_TIMEOUT_S and being retried into the same hang
+PREDICT_TIMEOUT_S = 30.0
+
+
+def with_predictions(
+	rec: FlightRecord, ctx, *, enabled: bool | None = None, timeout_s: float = PREDICT_TIMEOUT_S
+) -> tuple[FlightRecord, bool]:
+	"""The measured record with B's engine's predictions filled (engine.api.fill_predictions), when
+	the engine.memory flag is on, and whether the engine failed. Any engine failure or a fill that
+	runs past timeout_s keeps the measured record as it was and says so in a warn event: a
+	prediction never costs the visitor their measurements."""
+	from .flags import flag
+
+	if not (flag("engine.memory") if enabled is None else enabled):
+		return rec, False
+	box: dict = {}
+
+	def fill() -> None:
+		try:
+			from preflight.engine.api import fill_predictions
+
+			# the engine returns a copy without re-validating: store-and-load it exactly as C's API
+			# will (nulls dropped, then parsed), and fail here rather than in the reader;
+			# dump_record also enforces the 1 MB gzipped budget
+			box["rec"] = load_record(dump_record(fill_predictions(rec)))
+		except BaseException as exc:  # SystemExit from a library too: reported, never a fake timeout
+			box["exc"] = exc
+
+	t0 = time.monotonic()
+	# a daemon thread: a fill stuck in a loop can't be killed, but it can't hold the job either
+	th = threading.Thread(target=fill, name=f"predict-{rec.record_id}", daemon=True)
+	th.start()
+	th.join(timeout_s)
+	took = time.monotonic() - t0
+	if "rec" in box:
+		log.info("job %s: predictions filled in %.2f s", rec.record_id, took)
+		return box["rec"], False
+	exc = box.get("exc") or TimeoutError(f"no predictions after {timeout_s:g} s")
+	log.error("job %s: the engine couldn't fill predictions after %.2f s; keeping the measured record",
+		rec.record_id, took, exc_info=exc)  # fmt: skip
+	_emit(ctx, "predicting", rec, None, level="warn",
+		message=f"predictions unavailable ({type(exc).__name__}); the measurements stand")  # fmt: skip
+	return rec, True
+
+
+def _has_predictions(rec: FlightRecord) -> bool:
+	return bool(rec.predictions.grids) or any(e.point is not None for e in rec.predictions.estimates.values())
+
+
 def run_job(lease, ctx: JobContext, *, deps: Deps) -> str:
-	"""worker.JobFn: run the pipeline for a leased job, store the final record, return its id."""
+	"""worker.JobFn: run the pipeline for a leased job, fill B's predictions, store the final record,
+	return its id."""
 	rec = run_pipeline(lease.request, ctx, deps, ids=(lease.record_id, lease.share_token))
+	_emit(ctx, "predicting", rec, None, message="measured; predicting")
+	rec, failed = with_predictions(rec, ctx)
+	ctx.confirm()  # asks the store: a job cancelled or reaped during the fill stores nothing more
 	rev = deps.records.put(rec)
-	_emit(ctx, "predicting", rec, rev, message="measured; predictions are B's next")
+	if failed:
+		done = "measured; predictions unavailable"
+	elif _has_predictions(rec):
+		done = "predicted"
+	else:
+		done = "measured; no predictions yet"
+	_emit(ctx, "predicting", rec, rev, message=done)
 	return rec.record_id

@@ -11,12 +11,13 @@ import { applyTokenSet, currentTokenSet, DEFAULT_SET } from "../theme/tokens";
 import { Boarding } from "./screens/Boarding";
 import { CockpitScreen } from "./screens/CockpitScreen";
 import { Home } from "./screens/Home";
+import { Checks } from "./screens/Checks";
 import { Logbook } from "./screens/Logbook";
 import { NewFlight } from "./screens/NewFlight";
 import { go, href, SCREEN_ORDER, type Screen, useRoute } from "./route";
 import { AddonBoundary } from "../components/AddonBoundary";
 
-const SKY_Y: Record<Screen, number> = { home: -47, new: -38, boarding: -26, cockpit: -12, logbook: 0 };
+const SKY_Y: Record<Screen, number> = { home: -47, new: -38, boarding: -26, cockpit: -12, logbook: 0, checks: 0 };
 const THEME_KEY = "pf.theme";
 
 function savedTheme(): string {
@@ -123,6 +124,9 @@ export function Shell() {
 			</main>
 			<main className="pf-screen" data-pos={pos("logbook")} aria-hidden={pos("logbook") !== "active"} inert={pos("logbook") !== "active"}>
 				<Logbook active={route.screen === "logbook"} />
+			</main>
+			<main className="pf-screen" data-pos={pos("checks")} aria-hidden={pos("checks") !== "active"} inert={pos("checks") !== "active"}>
+				{route.screen === "checks" ? <Checks /> : null}
 			</main>
 		</div>
 	);

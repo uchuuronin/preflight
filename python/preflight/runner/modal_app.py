@@ -64,6 +64,8 @@ PKG = _REPO / "python" / "preflight" if _REPO is not None else _installed_packag
 # bytecode differs between the deploy machine and a container: keep it out so the mounts match
 _NOT_SOURCE = ["**/__pycache__", "**/__pycache__/**", "**/*.pyc"]
 ZOO_SRC = _REPO / "zoo" if _REPO is not None else Path(os.environ.get("PREFLIGHT_ZOO", "/root/zoo"))
+# the feature flags the worker reads (runner/flags.py looks beside the package)
+FLAGS_SRC = _REPO / "flags.json" if _REPO is not None else Path("/opt/preflight/flags.json")
 REMOTE_PKG = "/opt/preflight"  # not under /root (0700): probes import it as an unprivileged uid
 RECORDS_DIR = "/records"
 UPLOADS_DIR = "/uploads"
@@ -111,11 +113,17 @@ SANDBOX_OVERHEAD_USD_PER_H = 0.95
 _base = modal.Image.debian_slim(python_version="3.11").env(
 	{"PYTHONPATH": REMOTE_PKG, "PREFLIGHT_ZOO": "/root/zoo", "PREFLIGHT_GPU_CEILING": GPU_CEILING}
 )
+# The worker reads flags as C's API does (runner/flags.py) and ships the same flag files as the
+# API's image (api/app.py: flags.json only, with PREFLIGHT_ENV=production). Both are baked in, so
+# changing a flag takes a deploy of the runner as well as the API.
+FLAG_ENV = "production"  # api/app.py's PREFLIGHT_ENV
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
+	.env({"PREFLIGHT_ENV": FLAG_ENV})
 	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+	.add_local_file(FLAGS_SRC, f"{REMOTE_PKG}/flags.json")
 )
 probe_image = (
 	_base.apt_install("git")

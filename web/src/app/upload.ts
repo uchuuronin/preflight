@@ -32,16 +32,24 @@ const NAME = /^[A-Za-z0-9._ -]+$/;
 
 /** The file picker's filter: the same types the check accepts. */
 export const ACCEPT = TEXT_TYPES.join(",");
+/** The filter when notebooks have their own tab. */
+export const ACCEPT_SCRIPTS = TEXT_TYPES.filter((t) => t !== ".ipynb").join(",");
+
+export interface UploadOptions {
+	/** False when a Notebook tab takes notebooks (it shows what will run); default true. */
+	notebooks?: boolean;
+}
 
 const lower = (n: string) => n.toLowerCase();
 
 /** What can be said from names and sizes alone, before reading anything into memory. */
-export function precheck(picked: ReadonlyArray<{ name: string; size: number }>): string | null {
+export function precheck(picked: ReadonlyArray<{ name: string; size: number }>, opts: UploadOptions = {}): string | null {
 	if (!picked.length) return "upload.empty";
 	if (picked.length > MAX_FILES) return "upload.too_many";
 	for (const p of picked) {
 		if (!NAME.test(p.name) || p.name.startsWith(".")) return "upload.name";
 		if (!TEXT_TYPES.some((ext) => lower(p.name).endsWith(ext))) return "upload.type";
+		if (opts.notebooks === false && lower(p.name).endsWith(".ipynb")) return "upload.notebook_tab";
 		// A's converter knows a notebook only by a lower-case ".ipynb" (runner/sources.py).
 		if (lower(p.name).endsWith(".ipynb") && !p.name.endsWith(".ipynb")) return "upload.notebook_case";
 	}
@@ -49,8 +57,8 @@ export function precheck(picked: ReadonlyArray<{ name: string; size: number }>):
 	return null;
 }
 
-export function uploadSource(picked: readonly PickedFile[], entrypoint?: string): UploadCheck {
-	const early = precheck(picked);
+export function uploadSource(picked: readonly PickedFile[], entrypoint?: string, opts: UploadOptions = {}): UploadCheck {
+	const early = precheck(picked, opts);
 	if (early) return { ok: false, reason: early };
 	const files: Record<string, string> = {};
 	for (const p of picked) {

@@ -3,7 +3,7 @@
  * POST /v1/jobs (validated by C, executed by A) with an Idempotency-Key, so a double click
  * never pays twice. Samples on the departures board open straight in the cockpit for free.
  */
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { flag } from "../../lib/flags";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
@@ -13,7 +13,10 @@ import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { DataUseNotice, dataUseAccepted } from "../DataUse";
-import { ACCEPT, type PickedFile, precheck, uploadSource } from "../upload";
+import { ACCEPT, ACCEPT_SCRIPTS, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";
+
+/** D's notebook intake panel (addons/notebook); while it is on, notebooks check in there. */
+const NOTEBOOK_TAB = "notebook.intake";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
@@ -50,18 +53,42 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId() };
 	// Uploads open with live probes (the same flag the API checks before taking a job).
 	const uploadsOpen = flag("runner.queue");
-	const check = uploadSource(picked, entry);
+	// A notebook tab (D's intake panel) previews what will run, so notebooks go through it there.
+	const notebookTab = extraIntake.some((p) => p.id === NOTEBOOK_TAB);
+	const check = uploadSource(picked, entry, { notebooks: !notebookTab });
+	// Sources handed over by intake panels, by panel id. A panel unmounts when its tab is left and
+	// forgets what it showed, so leaving a tab drops its source too (switchTab).
+	const [handed, setHanded] = useState<Record<string, JobRequest["source"] | null>>({});
+	const handedSource = intake !== "repo" && intake !== "upload" ? (handed[intake] ?? null) : null;
+	// Measured once per source, not on every keystroke elsewhere on the desk.
+	const handedTooBig = useMemo(() => handedSource !== null && new TextEncoder().encode(JSON.stringify(handedSource)).length > MAX_TOTAL_BYTES, [handedSource]);
+	// One stable setSource per panel, so a panel may call it from an effect without a render loop.
+	const setters = useRef(new Map<string, (src: JobRequest["source"] | null) => void>());
+	const setterFor = (id: string) => {
+		let fn = setters.current.get(id);
+		if (!fn) {
+			fn = (src) => setHanded((m) => (m[id] === src ? m : { ...m, [id]: src }));
+			setters.current.set(id, fn);
+		}
+		return fn;
+	};
+	const switchTab = (next: Intake) => {
+		if (next === intake) return;
+		setHanded((m) => (m[intake] == null ? m : { ...m, [intake]: null }));
+		setError(null);
+		setIntake(next);
+	};
 
 	// GitHub only: A's runner fetches from GitHub, and the API pins the link to a commit there.
 	const canSubmit =
-		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : false;
+		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : uploadsOpen && handedSource !== null && !handedTooBig;
 
 	const pick = async (list: FileList | null) => {
 		if (!list?.length) return;
 		setError(null);
 		const chosen = Array.from(list);
 		// Names and sizes first: a 4 GB checkpoint is refused without being read into the tab.
-		const early = precheck(chosen);
+		const early = precheck(chosen, { notebooks: !notebookTab });
 		if (early) {
 			setPicked([]);
 			setError(t(`newflight.${early}`));
@@ -82,9 +109,13 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const submit = async () => {
 		setError(null);
 		if (intake === "upload" && !check.ok) return;
+		if (handedTooBig) return;
 		setBusy(true);
 		const body: JobRequest = {
-			source: intake === "upload" && check.ok ? check.source : { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` },
+			source:
+				intake === "upload" && check.ok
+					? check.source
+					: (handedSource ?? { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` }),
 			objective: { kind: goal, description: description.trim() || null },
 			gpu,
 			description: description.trim() || null,
@@ -135,7 +166,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								{ id: "upload", key: "newflight.tab.upload" },
 								...extraIntake.map((p) => ({ id: p.id, key: p.titleKey })),
 							].map((tab) => (
-								<button key={tab.id} type="button" role="tab" aria-selected={intake === tab.id} onClick={() => setIntake(tab.id)}>
+								<button key={tab.id} type="button" role="tab" aria-selected={intake === tab.id} onClick={() => switchTab(tab.id)}>
 									{t(tab.key)}
 								</button>
 							))}
@@ -162,12 +193,12 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 										}}
 									>
 										{t("newflight.upload.label")}
-										<small>{t("newflight.upload.limits")}</small>
+										<small>{t(notebookTab ? "newflight.upload.limits_scripts" : "newflight.upload.limits")}</small>
 										<input
 											id={ids.upload}
 											type="file"
 											multiple
-											accept={ACCEPT}
+											accept={notebookTab ? ACCEPT_SCRIPTS : ACCEPT}
 											onChange={(e) => {
 												const input = e.currentTarget;
 												if (!uploadsOpen) setError(t("newflight.upload.not_open"));
@@ -226,8 +257,13 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									.map((p) => (
 										<div key={p.id} className="pf-pane">
 											<AddonBoundary id={p.id}>
-												<p.component />
+												<p.component setSource={uploadsOpen ? setterFor(p.id) : undefined} />
 											</AddonBoundary>
+											{handedTooBig ? (
+												<p className="pf-error" role="alert">
+													{t("newflight.handed.too_big")}
+												</p>
+											) : null}
 										</div>
 									))
 							)}

@@ -43,7 +43,8 @@ export interface NotebookPreview {
 	renamedFrom: string | null;
 }
 
-/** A type alias, not an interface, so it fits C's `JobRequest["source"]` hand-off (Chiya, Oct 30). */
+// A type alias, not an interface: C's IntakePanelProps hands back JobRequest["source"], an index
+// signature object, and only an alias is assignable to it (PM, merge of ws-c and ws-d, Oct 28).
 export type NotebookSource = {
 	kind: "notebook";
 	files: Record<string, string>;
