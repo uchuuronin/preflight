@@ -161,5 +161,63 @@ def test_app_logs_reads_and_never_runs(monkeypatch, tmp_path):
 	assert app_logs.main(["--env", "main", "ap-runner99"]) == 2  # visitors' output is never published
 	assert app_logs.main(["--env", "main", "ap-unknown123"]) == 2  # unlisted and not one of ours
 	assert not any(c[2] == "logs" for c in calls[n:])
-	assert app_logs.main(["--env", "main", "ap-smlQhBII0aKV0BnMwULRzO"]) == 0  # ours, no longer listed
-	assert calls[-1][2] == "logs" and "--tail" in calls[-1] and calls[-1][-1] == "ap-smlQhBII0aKV0BnMwULRzO"
+
+
+def _remote_runs(tmp_path, runs):
+	"""A clone whose origin has a remote-runs branch holding these run records."""
+	import subprocess
+
+	def git(*a, cwd):
+		subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True)
+
+	src = tmp_path / "src"
+	src.mkdir()
+	git("init", "-q", "-b", "remote-runs", cwd=src)
+	for name, (cmd, log) in runs.items():
+		d = src / "runs" / name
+		d.mkdir(parents=True)
+		(d / "log.txt").write_text(log)
+		(d / "result.json").write_text(json.dumps({"cmd": cmd}))
+	git("add", "-A", cwd=src)
+	git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "runs", cwd=src)
+	clone = tmp_path / "clone"
+	git("clone", "-q", "--no-checkout", str(src), str(clone), cwd=tmp_path)
+	return clone
+
+
+def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monkeypatch, tmp_path):
+	from preflight.runner import app_logs
+
+	view = "\u2713 Initialized. View run at\nhttps://modal.com/apps/me/main/{}\n"
+	clone = _remote_runs(tmp_path, {
+		"r1-a-gt-lora-l4-2": ("modal run --env main python/preflight/runner/ops_app.py::ground_truth --script x",
+			view.format("ap-opsAAAAAA")),
+		"r2-a-stop-ops-main": ("python -m preflight.runner.stop_app --env main --app preflight-runner-ops",
+			"stopping ap-runrBBBBBB and ap-opsAAAAAA"),  # mentions apps, started none
+		"r3-a-smoke-l4-main": ("modal run --env main python/preflight/runner/modal_app.py::smoke",
+			view.format("ap-runrBBBBBB")),
+		"r4-a-ops-other-env": ("modal run --env dev python/preflight/runner/ops_app.py::startup_check",
+			view.format("ap-devCCCCCC")),
+	})  # fmt: skip
+	monkeypatch.chdir(clone)
+	real = app_logs.subprocess.run
+	logs = []
+
+	def run(cmd, **kw):
+		if cmd[0] == "git":
+			return real(cmd, **kw)
+		if cmd[:3] == ["modal", "app", "list"]:
+			return Done(0, "[]")  # nothing listed any more
+		logs.append(cmd)
+		return Done(0, "[ground truth 22:52:01] bare run of finetune_lora_hf")
+
+	monkeypatch.setattr(app_logs.subprocess, "run", run)
+	assert app_logs.ops_run_for("ap-opsAAAAAA", "main") == "runs/r1-a-gt-lora-l4-2"
+	assert app_logs.ops_run_for("ap-runrBBBBBB", "main") is None  # the job runner, never
+	assert app_logs.ops_run_for("ap-devCCCCCC", "main") is None  # another environment's run
+	assert app_logs.ops_run_for("ap-nowhere99", "main") is None
+	assert app_logs.main(["--env", "main", "ap-runrBBBBBB"]) == 2 and not logs
+	assert app_logs.main(["--env", "main", "ap-opsAAAAAA"]) == 0
+	assert logs[-1][-1] == "ap-opsAAAAAA" and "--tail" in logs[-1]
+	got = json.loads((clone / "out" / "app_logs.json").read_text())
+	assert got["app"] == "preflight-runner-ops" and "r1-a-gt-lora-l4-2" in got["state"]
