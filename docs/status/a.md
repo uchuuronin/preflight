@@ -133,6 +133,84 @@ first minute); a version clash between the image's packages and the zoo's pins (
 `fsspec<=2024.9.0`). The planted eval OOM may not fire on 192 GB, or may fire later: the eval keeps
 every batch's graph, so its memory grows with the batch count; either way the record says which.
 
+## Every plan item A owns (Oct 31, 08:00 ET)
+
+From the Contracts tab (Contract A, the gaps table, the Oct 27 review, the competitive review) and
+the main plan's feature set and validation targets. "main" = merged; "ws-a" = pushed to the
+branch, not yet merged (it carries round three: agent recorder, retention, longest-row extras,
+ground-truth module, log reader); hours are A's remaining work, honest guesses, GPU time not
+included. Hero lenses first.
+
+| # | Item (source) | Where | Left, h |
+| --- | --- | --- | --- |
+| **Fine-tuning (hero)** | | | |
+| 1 | Probes, recorder, memory terms by term, eval-OOM re-run, P(OOM) inputs (lens) | main; L4 run Oct 28 | 0 |
+| 2 | Packing and padding-waste measurement (lens, contract) | main (`padding_fraction`, `tokens_per_sample_mean`) | 0 |
+| 3 | Longest dataset row for B's memory rule (B, Oct 30) | ws-a | 0 |
+| 4 | FakeTensor cross-check of the analytical memory terms (contract) | not started | 3 |
+| 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | ws-a; running now (queued for an L4) | 1 |
+| **Agent and API runs (hero)** | | | |
+| 6 | OTel GenAI proxy around any OpenAI-compatible client (lens, contract) | ws-a (`recorder/agent.py`) | 0 |
+| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | not started | 6 |
+| 8 | Rate-limit wall-clock (lens) | not started | 2 |
+| 9 | Pareto model sweep across Muse Spark and Spark Open (lens, contract) | not started | 4 |
+| 10 | Agent zoo script and an agent record on the public app (G1) | not started (D writes the script) | 2 |
+| **RL post-training (hero)** | | | |
+| 11 | GRPO zoo script, public model and data, 512-token completion cap planted (competitive #1) | not started | 3 |
+| 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | partial on main (rollout via the generate hooks only) | 5 |
+| 13 | Pass rate per prompt for B's zero-variance fraction (lens) | not started | 3 |
+| 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals) | 2 |
+| **Campaign (hero; B owns the model)** | | | |
+| 15 | Probes for a grid's points (a campaign is many records from one script) | not started; needs B's campaign spec | 3 |
+| **Other lenses** | | | |
+| 16 | LM pretraining: throughput, MFU, loader probe, stability signals (lens) | main | 0 |
+| 17 | LR range test (lens, contract) | not started | 3 |
+| 18 | Checkpoint resume exact-match (lens, contract, hygiene) | not started | 3 |
+| 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
+| 20 | Serving probes on vLLM for B's model (contract) | hooks on main; probe not started | 5 |
+| 21 | Retrieval probes through an adapter (lens) | not started | 5 |
+| 22 | GNN probes through an adapter (lens) | not started | 5 |
+| 23 | Vision probes through an adapter (lens) | not started | 4 |
+| 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
+| 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | not started | 3 |
+| 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
+| 27 | In-flight collector (feature, contract) | not started | 5 |
+| 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | partial | 4 |
+| **Muse Spark** | | | |
+| 29 | Spark Open triage of every probe log on Baseten, every call logged (contract) | client on main, triage not wired | 3 |
+| 30 | Spark Open checks each claim against the raw probe numbers (competitive #5) | not started | 5 |
+| 31 | Spark diagnosis: traces and plots as images, search grounding, cited findings (contract) | not started | 5 |
+| 32 | Glimmer host proposal with B (competitive #6) | not started | 2 |
+| **AMD** | | | |
+| 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); session this morning | 2 + droplet |
+| 34 | Droplet idle watchdog (contract) | not started (B's sweep has an uptime ledger) | 2 |
+| **Platform and gaps** | | | |
+| 35 | Job store, queue, leases, reaper, probe cache, sandbox policy, migrations, token caps, AMD offline (gaps 1, 2, 3, 6, 8, 9, 11) | main | 0 |
+| 36 | Hostile-repo fixture and sandbox tests (gap 17) | main | 0 |
+| 37 | LICENSE (gap 22) | main | 0 |
+| 38 | 30-day retention of uploads, probe cache, job index (Chiya, Oct 30) | ws-a | 0 |
+| 39 | Runner deploy with `engine.memory` on (G1) | waits for round three on main | 1 |
+| 40 | Execution-plane logs and metrics (gap 14) | partial (backlog alarm, cleanup log) | 2 |
+| 41 | GPU power sampling (contract) | main | 0 |
+| 42 | pip-installable CLI, one-command install, 60-second quickstart (contract) | CLI on main, packaging not started | 3 |
+| 43 | 8 of 9 unseen scripts harnessed, failures name the step (contract; PM picks them) | not started | 6 |
+| 44 | Hash of the unseen-script list, published before Nov 2 (competitive #3) | not started (needs the PM's list) | 0.5 |
+| 45 | Prebuilt images and a warm pool for judging, Nov 5–8 (contract) | not started | 3 |
+| 46 | Chakra trace export (contract) | not started | 3 |
+| 47 | Any OpenAI-compatible endpoint in the CLI's model sweep (competitive #11, after G2) | not started | 2 |
+| 48 | First public number, "one script" (competitive #2) | ws-a (status file) | 0 |
+| **Validation rows A feeds** | | | |
+| 49 | Peak memory within 10%, no missed OOMs: full runs of the zoo and unseen scripts | 1 real run so far | 3 + paid runs |
+| 50 | Step time within 15%, same GPU: full runs | L4 ground truth pending | 2 + paid runs |
+| 51 | Rollout time within 20%: GRPO zoo script and an unseen TRL script | blocked on 11, 12 | 2 + paid runs |
+| 52 | Agent run total cost inside the 90% interval: a full benchmark vs the 30-task sample | blocked on 7 | 2 + API spend |
+| 53 | Planted problems caught (bug zoo) | LoRA eval OOM caught; nanoGPT not yet on a GPU | 1 + paid run |
+| 54 | Cost of one Preflight run under $1 and under 5 minutes | $0.10 GPU, but 6 min 45 s on Oct 28: over 5 min | 3 |
+
+**Total left: about 138 hours of A's work (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
+order the PM set (hero lenses, then the rest) is the order I work in; Chiya's cuts at noon Sunday
+can read the hours column. Paid runs are asked for one at a time.
+
 ## Cloud runs
 
 Every run's GPU, minutes and dollars. Runs go through GitHub Actions (docs/setup/cloud.md) on T4
