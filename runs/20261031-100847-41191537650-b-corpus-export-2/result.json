@@ -1,0 +1,11 @@
+{
+	"name": "20261031-100847-41191537650-b-corpus-export-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41191537650",
+	"ref": "ws-b",
+	"sha": "b6ef276690dafc2130467900ad5557d07209099e",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::export --kind kernels",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T10:13:13Z"
+}
