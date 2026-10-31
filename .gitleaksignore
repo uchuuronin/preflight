@@ -2,3 +2,5 @@
 # (merge-only rule), so a test value that looks like a key is allowed here after review.
 # C, api/tests/test_jobs.py: the test idempotency key "k-0123456789"; reviewed by the PM on Oct 27.
 3d03ec81c050a3f3ab889f884d7153cdf45112e5:api/tests/test_jobs.py:generic-api-key:18
+# A, tests/test_agent_recorder.py: `rate=token_rate, max_usd_total=...` (a price function's name, no key); flagged Oct 30, for the PM's review.
+5e9cade4b399f0acfb1075abdef3608701ee50cf:tests/test_agent_recorder.py:generic-api-key:176
