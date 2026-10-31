@@ -587,3 +587,19 @@ def test_uptime_ledger_records_a_stop_when_the_sweep_finishes(tmp_path):
 	)
 	last = ledger.rows()[-1]
 	assert last["event"] == "stop" and last["reason"] == "finished" and last["configs"] == 2
+
+
+def test_a_late_starting_container_still_runs_what_its_bill_covers():
+	"""Oct 30, A100: no history (600 s deadline), batch of 1, ~150 s cold start. The container quit before its first
+	config, so the wave billed three A100s for nothing."""
+	from preflight.corpus import sweep as sw
+
+	dispatched, deadline = 1_000.0, 600.0
+	end_at = sw.wave_end_at(dispatched, 1, deadline)
+	assert sw.may_start_config(dispatched + 150.0, deadline, end_at)  # a 150 s start-up still leaves room
+	assert sw.may_start_config(dispatched + sw.STARTUP_S, deadline, end_at)  # up to the start-up the bill assumed
+	assert not sw.may_start_config(dispatched + sw.STARTUP_S + 1.0, deadline, end_at)
+	# and Modal's own cut-off comes after the last config could end, with the margin, all inside the bill
+	cap = sw.container_timeout_s(1, deadline)
+	assert end_at - dispatched + sw.END_MARGIN_S == cap
+	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.SCALEDOWN_S)

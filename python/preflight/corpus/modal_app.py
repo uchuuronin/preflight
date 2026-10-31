@@ -108,8 +108,9 @@ class Sweeper:
 
 		import torch
 
+		from preflight.corpus import sweep
 		from preflight.corpus.configs import CorpusConfig
-		from preflight.corpus.isolate import KILL_GRACE_S, run_isolated
+		from preflight.corpus.isolate import run_isolated
 		from preflight.corpus.store import ResultStore
 		from preflight.corpus.sweep import make_record
 		from preflight.engine import gpus
@@ -125,7 +126,7 @@ class Sweeper:
 		out = []
 		for d in items:
 			# a restart after preemption sees the same end time, so the wave never runs past its bound
-			if end_at is not None and _time.time() + (timeout_s or 0.0) + KILL_GRACE_S + 60.0 > end_at:
+			if end_at is not None and not sweep.may_start_config(_time.time(), timeout_s or 0.0, end_at):
 				break
 			cfg = CorpusConfig.from_dict(d)
 			prior = store.read(cfg.kind, actual, cfg.key)
@@ -382,7 +383,7 @@ def main(
 			sweeper = Sweeper.with_options(
 				gpu=sweep.modal_gpu(gpu), max_containers=max_containers, timeout=cap_s
 			)()
-			end_at = time.time() + cap_s
+			end_at = sweep.wave_end_at(time.time(), batch, deadline)
 			args = [(gpu, [c.to_dict() for c in b], deadline, end_at) for b in chunk]
 			billing.remote(store_kind, gpu, {"wave": wave, "kind": "pending", "billed_s": round(worst, 1)})
 			w0 = time.monotonic()

@@ -44,6 +44,7 @@ SCALEDOWN_S = 30.0
 STARTUP_S = (
 	180.0  # guess: cold start, image pull, imports and the volume reload; each batch now reports its own
 )
+END_MARGIN_S = 60.0  # guess: the last commit and the reply after the final config, inside Modal's cut-off
 RATE_OVERHEAD = (
 	1.10  # guess: Modal also bills a GPU container's CPU and memory; replaced by Modal's bill per run
 )
@@ -89,7 +90,20 @@ def container_timeout_s(batch: int, deadline_s: float) -> int:
 	and the volume work, so a hang anywhere in the container (not only in a config) ends where the bound assumed."""
 	from preflight.corpus.isolate import KILL_GRACE_S
 
-	return math.ceil(batch * (deadline_s + KILL_GRACE_S) + STARTUP_S)
+	return math.ceil(batch * (deadline_s + KILL_GRACE_S) + STARTUP_S + END_MARGIN_S)
+
+
+def wave_end_at(dispatched_at: float, batch: int, deadline_s: float) -> float:
+	"""The latest moment a wave's last config may end: Modal's cut-off less the margin for the final commit. The
+	container's start-up counts against it, as it does against the bill (Oct 30: measured from dispatch)."""
+	return dispatched_at + container_timeout_s(batch, deadline_s) - END_MARGIN_S
+
+
+def may_start_config(now: float, deadline_s: float, end_at: float) -> bool:
+	"""A config starts only if, run to its deadline and killed, it still ends by end_at."""
+	from preflight.corpus.isolate import KILL_GRACE_S
+
+	return now + deadline_s + KILL_GRACE_S <= end_at
 
 
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
