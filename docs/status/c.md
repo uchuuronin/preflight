@@ -38,6 +38,16 @@
   one honest "illustrative" label for samples (no made-up costs on them), and the measured-run
   line in place of "About 4 minutes, under $1". Stranger test 18 of 18, knob p95 66 ms at 4x.
 
+**After round three** (planned, not built)
+
+- Checks page on B's `predict_as_run` and `probe_ran_eval` (one rule with calibration). Memory is
+  sized by `seq_len` until A records the dataset's longest row: where a probe's longest padded
+  row is under its `seq_len` (p1 and p2 on Oct 28's record: 517 of 1024), its memory check is
+  labelled "sized for seq_len; longest row not yet recorded" and kept out of the score, not
+  counted as a model miss. p3 (longest row 512 of 512) is scored.
+- Once A's longest-row field lands: a cockpit finding "longest row N tokens, `seq_len` reserves
+  X GiB you won't use".
+
 **Waiting**
 
 - Upload-to-map run (approved, about $0.35, $0.65 cap): from `main` once A says the runner is
