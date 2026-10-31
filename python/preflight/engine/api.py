@@ -1777,12 +1777,31 @@ def _serving_targets(record: FlightRecord, values: dict) -> dict:
 # ---------------------------------------------------------------- RL post-training (engine/rl.py)
 
 
-def _rl_probe(record: FlightRecord):
-	"""The probe that measured a rollout: generation stats, and a rollout phase in its step."""
-	for p in record.probes:
-		if p.status in OK_PROBE and p.generation and p.generation.calls and p.generation.sequences:
-			return p
-	return None
+def _rl_probe(record: FlightRecord, values: dict | None = None):
+	"""The probe that measured a rollout: the one at the query's settings when there is one, else the one whose
+	sequences per call are nearest the query's."""
+	ps = [
+		p
+		for p in record.probes
+		if p.status in OK_PROBE and p.generation and p.generation.calls and p.generation.sequences
+	]
+	if not ps or values is None:
+		return ps[0] if ps else None
+	match = _matching_probe(record, values)
+	if match is not None and match in ps:
+		return match
+	b = float(values.get("batch_size") or 1)
+	return min(ps, key=lambda p: abs(math.log(float(_probe_values(record, p).get("batch_size") or 1) / b)))
+
+
+# guess: a probe whose responses hit its cap this often hasn't seen how long they run uncapped
+TRUNCATED_PROBE = 0.05
+
+
+def _probe_truncation(p) -> float | None:
+	return (p.rl.truncation_rate if p.rl else None) or (
+		p.generation.truncation_rate if p.generation else None
+	)
 
 
 def _lengths(p) -> rl.LengthSample | None:
@@ -1800,16 +1819,12 @@ def _lengths(p) -> rl.LengthSample | None:
 def _rollout_query(record: FlightRecord, values: dict, p) -> tuple[int, int, float | None, float | None]:
 	"""(sequences per call at the probe, at the query, cap at the probe, cap at the query).
 
-	Sequences per call follow batch x group size (an assumption the reason states: in TRL's GRPO the batch counts
-	completions, so there a group-size change moves prompts, not sequences, and this overstates the change)."""
+	Sequences per call follow the batch. In TRL's GRPO the batch counts completions, so group size moves how many
+	prompts share them, not how many are generated (_group_size_meaning)."""
 	pv = _probe_values(record, p)
 	n_p = max(1, round(p.generation.sequences / p.generation.calls))
-	scale = 1.0
-	for k in ("batch_size", "group_size"):
-		a, b = pv.get(k), values.get(k)
-		if a and b:
-			scale *= float(b) / float(a)
-	n_q = max(1, round(n_p * scale))
+	a, b = pv.get("batch_size"), values.get("batch_size")
+	n_q = max(1, round(n_p * float(b) / float(a))) if a and b else n_p
 	cap_p = p.generation.max_new_tokens or pv.get("max_completion_len")
 	cap_q = values.get("max_completion_len") or cap_p
 	return n_p, n_q, (float(cap_p) if cap_p else None), (float(cap_q) if cap_q else None)
@@ -1824,9 +1839,31 @@ def _measured_rollout_s(p) -> float | None:
 	return r or None
 
 
+def _rollout_blocker(record: FlightRecord, values: dict, p) -> str | None:
+	"""Why the rollout can't be carried to these settings, or None."""
+	pv = _probe_values(record, p)
+	g_p, g_q = pv.get("group_size"), values.get("group_size")
+	fw = record.job.framework or (record.job.script_map.framework if record.job.script_map else None)
+	if g_p and g_q and float(g_p) != float(g_q) and fw != "trl":
+		return (
+			"whether the batch counts prompts or completions depends on the trainer, so a group-size change "
+			"can't be timed here; probe at this group size"
+		)
+	cap_p = p.generation.max_new_tokens or pv.get("max_completion_len")
+	cap_q = values.get("max_completion_len") or cap_p
+	trunc = _probe_truncation(p)
+	if cap_p and cap_q and float(cap_q) > float(cap_p) and (trunc is None or trunc > TRUNCATED_PROBE):
+		seen = f"{trunc:.0%} of" if trunc is not None else "an unknown share of"
+		return (
+			f"{seen} the probe's responses hit its {float(cap_p):g}-token cap, so how long they run past it wasn't "
+			"measured; probe at the higher cap"
+		)
+	return None
+
+
 def _rollout(record: FlightRecord, values: dict) -> Estimate:
 	mid = rl.MODEL_ID_ROLLOUT
-	p = _rl_probe(record)
+	p = _rl_probe(record, values)
 	if p is None:
 		return _abstain("s", mid, "no probe timed a rollout (generation stats missing)")
 	measured, sample = _measured_rollout_s(p), _lengths(p)
@@ -1834,6 +1871,9 @@ def _rollout(record: FlightRecord, values: dict) -> Estimate:
 		return _abstain("s", mid, "the probe's step has no rollout phase to scale")
 	if sample is None:
 		return _abstain("s", mid, "the probe recorded no response lengths")
+	blocked = _rollout_blocker(record, values, p)
+	if blocked:
+		return _abstain("s", mid, blocked)
 	n_p, n_q, cap_p, cap_q = _rollout_query(record, values, p)
 	iv = rl.rollout_seconds(measured, sample, n_p, cap_p, n_q, cap_q)
 	same = n_q == n_p and cap_q == cap_p
@@ -1846,6 +1886,14 @@ def _with_rollout(record: FlightRecord, values: dict, step: _StepResult) -> _Ste
 	ph = dict(step.phases or {})
 	linear = ph.get("rollout", 0.0) + ph.get("generate", 0.0)
 	ro = _rollout(record, values)
+	if (
+		linear
+		and ro.status == "abstain"
+		and ro.reason
+		and ("group-size" in ro.reason or "past it" in ro.reason)
+	):
+		# the step's biggest phase can't be carried to these settings, so the step can't either
+		return replace(step, est=_abstain("s", step.est.model_id, f"rollout: {ro.reason}"))
 	if not linear or ro.status == "abstain":
 		return step
 	rest = max(step.est.point - linear, 0.0)
@@ -1871,7 +1919,7 @@ def _with_rollout(record: FlightRecord, values: dict, step: _StepResult) -> _Ste
 
 def _rl_targets(record: FlightRecord, values: dict) -> dict:
 	out = {"time.rollout": _rollout(record, values)}
-	p = _rl_probe(record) or next((q for q in record.probes if q.status in OK_PROBE and q.rl), None)
+	p = _rl_probe(record, values) or next((q for q in record.probes if q.status in OK_PROBE and q.rl), None)
 	g = values.get("group_size")
 	mid = rl.MODEL_ID_ZERO
 	if p is None or not p.rl or not p.rl.pass_rate_per_prompt:
@@ -1896,16 +1944,24 @@ def _rl_targets(record: FlightRecord, values: dict) -> dict:
 		)
 		out["rl.truncation"] = _abstain("fraction", rl.MODEL_ID_ROLLOUT, why)
 	else:
-		share = rl.truncation_share(sample, float(cap))
-		why = (
-			f"share of responses reaching the {float(cap):g}-token cap, from the probe's length distribution"
-		)
-		measured = (p.rl.truncation_rate if p.rl else None) or (
-			p.generation.truncation_rate if p.generation else None
-		)
-		if measured is not None:
-			why += f"; the probe measured {measured:.0%}"
-		out["rl.truncation"] = _est(share, share, share, "fraction", "predicted", rl.MODEL_ID_ROLLOUT, why)
+		cap_p = p.generation.max_new_tokens if p.generation else None
+		measured = _probe_truncation(p)
+		if cap_p and float(cap) > float(cap_p) and (measured is None or measured > TRUNCATED_PROBE):
+			out["rl.truncation"] = _abstain(
+				"fraction",
+				rl.MODEL_ID_ROLLOUT,
+				_rollout_blocker(record, {**values, "group_size": None}, p)
+				or "the probe's lengths were capped",
+			)
+		else:
+			share, lo, hi = rl.truncation_band(sample, float(cap))
+			why = f"share of responses reaching the {float(cap):g}-token cap, from the probe's length distribution"
+			if measured is not None:
+				why += f"; the probe measured {measured:.0%}"
+			same = cap_p is not None and float(cap) == float(cap_p)
+			out["rl.truncation"] = _est(
+				share, lo, hi, "fraction", "predicted" if same else "extrapolated", rl.MODEL_ID_ROLLOUT, why
+			)
 	return out
 
 

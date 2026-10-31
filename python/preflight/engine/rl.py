@@ -94,7 +94,8 @@ def _beta_moment(a: np.ndarray, b: np.ndarray, g: int) -> np.ndarray:
 
 
 def lognormal_from(mean: float, p95: float) -> tuple[float, float] | None:
-	"""(mu, sigma) of the log-normal with this mean and 95th percentile; None when no log-normal has them."""
+	"""(mu, sigma) of the log-normal with this mean and 95th percentile. None for a non-positive input; a 95th
+	percentile too far above the mean for any log-normal gets the widest one, sigma = 1.645."""
 	if mean <= 0 or p95 <= 0:
 		return None
 	gap = math.log(p95) - math.log(mean)  # = 1.645 sigma - sigma^2 / 2
@@ -146,6 +147,17 @@ class LengthSample:
 def truncation_share(sample: LengthSample, cap: float, draws: int = 20000, seed: int = 0) -> float:
 	"""Share of responses that would hit `cap`."""
 	return float(np.mean(sample.draws(draws, np.random.default_rng(seed)) >= cap))
+
+
+def truncation_band(
+	sample: LengthSample, cap: float, reps: int = 200, seed: int = 0
+) -> tuple[float, float, float]:
+	"""(share, 5%, 95%): the share hitting `cap`, with the probe's length sample bootstrapped for the band."""
+	rng = np.random.default_rng(seed)
+	point = truncation_share(sample, cap, seed=seed)
+	shares = [float(np.mean(sample.resampled(rng) >= cap)) for _ in range(reps)]
+	lo, hi = np.quantile(shares, [0.05, 0.95])
+	return point, min(float(lo), point), max(float(hi), point)
 
 
 def rollout_seconds(

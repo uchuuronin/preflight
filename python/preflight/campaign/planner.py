@@ -290,6 +290,31 @@ def segments_needed(
 MAX_EXPECTED_FAILURES = 1e5  # past this the run effectively never finishes: interruptions outpace checkpoints
 
 
+def _piece_losses(
+	rng: np.random.Generator, pieces: np.ndarray, length: np.ndarray, mtti_s: float, restart_s: float
+) -> np.ndarray:
+	"""Seconds lost before `pieces` pieces of `length` each complete, per draw; inf where it effectively never ends."""
+	out = np.zeros(length.shape)
+	todo = (pieces > 0) & (length > 0)
+	x = np.where(todo, length / mtti_s, 0.0)
+	expected = pieces * np.expm1(x)
+	never = todo & (expected >= MAX_EXPECTED_FAILURES)
+	out[never] = np.inf
+	ok = todo & ~never
+	if not ok.any():
+		return out
+	p = np.exp(-x[ok])
+	fails = rng.negative_binomial(pieces[ok], p)
+	# a failed piece lasts t ~ Exp(M) given t < L: mean M - L/(e^x - 1), second moment 2M^2 - (L^2 + 2ML)/(e^x - 1)
+	em1 = np.expm1(x[ok])
+	L, M = length[ok], mtti_s
+	mean = M - L / em1
+	var = np.maximum(2 * M * M - (L * L + 2 * M * L) / em1 - mean * mean, 0.0)
+	lost = fails * (mean + restart_s) + np.sqrt(fails * var) * rng.standard_normal(fails.shape)
+	out[ok] = np.maximum(lost, 0.0)
+	return out
+
+
 def redone_seconds(
 	rng: np.random.Generator,
 	work_s: np.ndarray,
@@ -299,29 +324,18 @@ def redone_seconds(
 ) -> np.ndarray:
 	"""Wall seconds lost to Poisson interruptions, per draw, when each one sends the run back to its last checkpoint.
 
-	The run is n pieces of length L (the checkpoint interval, or the whole run without checkpoints). A piece
-	succeeds with probability exp(-L/M), so the failures before n successes are negative binomial, and each failure
-	loses a truncated-exponential stretch of time plus the restart. Interruptions during redone work are counted,
-	so a long run without checkpoints grows like (M + R)(e^(T/M) - 1), not linearly. inf: it won't finish."""
+	The run is whole pieces of length L (the checkpoint interval, or the whole run without checkpoints) plus a
+	shorter last piece. A piece succeeds with probability exp(-L/M), so the failures before every piece succeeds are
+	negative binomial, and each failure loses a truncated-exponential stretch plus the restart. Interruptions during
+	redone work are counted, so a long run without checkpoints grows like (M + R)(e^(T/M) - 1), not linearly.
+	inf: it won't finish."""
 	work = np.asarray(work_s, dtype=float)
 	L = np.minimum(interval_s, work) if interval_s else work
-	n = np.maximum(1, np.ceil(work / np.maximum(L, 1e-9)))
-	x = L / mtti_s
-	expected = n * np.expm1(x)
-	out = np.full(work.shape, np.inf)
-	ok = expected < MAX_EXPECTED_FAILURES
-	if not ok.any():
-		return out
-	p = np.exp(-x[ok])
-	fails = rng.negative_binomial(n[ok], p)
-	# a failed piece lasts t ~ Exp(M) given t < L: mean M - L/(e^x - 1), second moment 2M^2 - (L^2 + 2ML)/(e^x - 1)
-	em1 = np.expm1(x[ok])
-	Lk, M = L[ok], mtti_s
-	mean = M - Lk / em1
-	var = np.maximum(2 * M * M - (Lk * Lk + 2 * M * Lk) / em1 - mean * mean, 0.0)
-	lost = fails * (mean + restart_s) + np.sqrt(fails * var) * rng.standard_normal(fails.shape)
-	out[ok] = np.maximum(lost, 0.0)
-	return out
+	full = np.floor(work / np.maximum(L, 1e-9))
+	rest = np.maximum(work - full * L, 0.0)
+	return _piece_losses(rng, full, L, mtti_s, restart_s) + _piece_losses(
+		rng, (rest > 1e-9).astype(float), rest, mtti_s, restart_s
+	)
 
 
 # ---------------------------------------------------------------- ASHA
@@ -595,8 +609,15 @@ def plan(
 		for i in order:
 			slot_end[lane_of[i]] = slot_end[lane_of[i]] + wall[i]
 		finish = np.max(np.stack(list(slot_end.values())), axis=0)
-		finish = np.where(np.isfinite(finish), finish, np.nan)
-		q = np.nanquantile(finish, [0.05, 0.10, 0.50, 0.90, 0.95])
+		stuck = float(np.mean(~np.isfinite(finish)))
+	if kept and all(runnable[i] for i in kept) and stuck > 0.05:
+		finish_est = _abstain(
+			"s", f"in {stuck:.0%} of draws a run never finishes: interruptions outpace its checkpoints"
+		)
+	elif kept and all(runnable[i] for i in kept):
+		if stuck:
+			notes.append(f"in {stuck:.1%} of draws a run never finishes; the dates leave those draws out")
+		q = np.quantile(finish[np.isfinite(finish)], [0.05, 0.10, 0.50, 0.90, 0.95])
 		finish_est = _est(
 			float(q[2]),
 			float(q[0]),

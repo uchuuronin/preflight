@@ -151,21 +151,91 @@ def test_rl_lens_reports_zero_spread_rollout_and_truncation(rl_on):
 	assert "measured 4%" in t.reason and 0 <= t.point <= 1
 
 
-def test_group_size_and_cap_now_move_step_time(rl_on, monkeypatch):
-	rec = _rl_record()
-	base = api.predict(rec).root["time.step"]
-	more = api.predict(rec, {"group_size": 32}).root
-	assert more["time.step"].point > base.point and "rollout:" in more["time.step"].reason
-	assert more["time.total"].point > api.predict(rec).root["time.total"].point
-	capped = api.predict(rec, {"max_completion_len": 128}).root["time.step"]
-	assert capped.point < base.point
-	on_change = more["time.step"].point - base.point
-	monkeypatch.setitem(api.FEATURES, "rl", False)
-	off = (
-		api.predict(rec, {"group_size": 32}).root["time.step"].point
-		- api.predict(rec).root["time.step"].point
+def _as_trl(rec: FlightRecord, truncation: float | None = None) -> FlightRecord:
+	sm = rec.job.script_map.model_copy(update={"framework": "trl"})
+	out = rec.model_copy(update={"job": rec.job.model_copy(update={"framework": "trl", "script_map": sm})})
+	if truncation is None:
+		return out
+	probes = [
+		p.model_copy(
+			update={
+				"rl": p.rl.model_copy(update={"truncation_rate": truncation}),
+				"generation": p.generation.model_copy(update={"truncation_rate": truncation}),
+			}
+		)
+		for p in out.probes
+	]
+	return out.model_copy(update={"probes": probes})
+
+
+def test_the_batch_and_the_cap_move_step_time_through_the_rollout(rl_on):
+	rec = _as_trl(_rl_record())
+	base = api.predict(rec).root
+	bigger = api.predict(rec, {"batch_size": 8}).root
+	assert bigger["time.rollout"].point > base["time.rollout"].point  # more sequences: a longer longest one
+	capped = api.predict(rec, {"max_completion_len": 128}).root
+	assert capped["time.rollout"].point < base["time.rollout"].point
+	assert capped["time.step"].point < base["time.step"].point and "rollout:" in capped["time.step"].reason
+	assert capped["time.total"].point < base["time.total"].point
+
+
+def test_group_size_in_trl_moves_the_prompts_not_the_rollout(rl_on):
+	rec = _as_trl(_rl_record())
+	base, g32 = api.predict(rec).root, api.predict(rec, {"group_size": 32}).root
+	# TRL's batch counts completions: 4x the group means a quarter of the prompts, the same generation work
+	assert g32["time.rollout"].point == pytest.approx(base["time.rollout"].point)
+	assert g32["rl.zero_spread"].point < base["rl.zero_spread"].point
+
+
+def test_group_size_abstains_when_the_trainer_doesnt_say_what_the_batch_counts(rl_on):
+	rec = _rl_record()  # hf_trainer: prompts or completions per batch isn't known
+	pred = api.predict(rec, {"group_size": 32}).root
+	assert (
+		pred["time.rollout"].status == "abstain" and "prompts or completions" in pred["time.rollout"].reason
 	)
-	assert off < 0.5 * on_change  # without the model, the per-phase line barely sees a group-size change
+	assert (
+		pred["time.step"].status == "abstain"
+	)  # its biggest phase can't be carried, so neither can the step
+	assert pred["rl.zero_spread"].status != "abstain"  # the closed form doesn't need the batch's meaning
+
+
+def test_raising_the_cap_past_a_probe_that_hit_it_abstains(rl_on):
+	ok = api.predict(
+		_as_trl(_rl_record()), {"max_completion_len": 1024}
+	).root  # the probe hit its cap 4% of the time
+	assert ok["time.rollout"].status == "extrapolated"
+	assert (
+		ok["rl.truncation"].status == "extrapolated" and ok["rl.truncation"].lo <= ok["rl.truncation"].point
+	)
+	hit = api.predict(_as_trl(_rl_record(), truncation=0.41), {"max_completion_len": 4096}).root
+	assert hit["time.rollout"].status == "abstain" and "41%" in hit["time.rollout"].reason
+	assert hit["rl.truncation"].status == "abstain"
+	same = api.predict(_as_trl(_rl_record(), truncation=0.41)).root["rl.truncation"]
+	assert (
+		same.status == "predicted" and same.lo <= same.point <= same.hi
+	)  # at the probe's own cap it's measured
+
+
+def test_the_probe_at_the_querys_settings_is_the_one_used(rl_on):
+	rec = _as_trl(_rl_record())
+	cur = {k.id: k.current for k in rec.knobs}
+	match = next(p for p in rec.probes if all(cur.get(k) == v for k, v in p.knobs.items() if k in cur))
+	q = {k: v for k, v in match.knobs.items() if k in cur}
+	assert api._rl_probe(rec, {**cur, **q}) is match
+
+
+def test_without_the_model_the_per_phase_line_cant_see_the_cap(rl_on, monkeypatch):
+	rec = _as_trl(_rl_record())
+	on = (
+		api.predict(rec, {"max_completion_len": 128}).root["time.step"].point
+		/ api.predict(rec).root["time.step"].point
+	)
+	monkeypatch.setitem(api.FEATURES, "rl", False)
+	off = api.predict(rec, {"max_completion_len": 128}).root
+	off_ratio = (
+		off["time.step"].point / api.predict(rec).root["time.step"].point if off["time.step"].point else 1.0
+	)
+	assert on < off_ratio or off["time.step"].status == "abstain"
 
 
 def test_missing_rl_data_abstains_with_a_reason(rl_on):

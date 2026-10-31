@@ -62,13 +62,13 @@ Only B edits this file. Each line is something this agent needs from another (or
   - per-prompt pass rates from TRL's reward logs (rewards per group, threshold at the task's pass mark);
   - the raw response lengths as `extras` or a new `LengthStats.values` list, capped at 512 entries. With them, the rollout bootstrap uses the real lengths instead of a log-normal fitted to the mean and p95.
 
-  Also say whether the batch knob counts prompts or completions in each framework. The rollout model assumes sequences per call follow batch × group size; in TRL's GRPO the batch counts completions. (Oct 31)
+  Also record whether the batch knob counts prompts or completions. The rollout model uses TRL's meaning (the batch counts completions, so group size moves prompts, not generation work). For any other trainer, a group-size change abstains on rollout and step time until the record says which it is. (Oct 31)
 - TODO(contract) [B -> C] With `engine.rl` on, the RL lens has three more targets:
   - `rl.zero_spread`, unit `fraction`, readout `risk`: the share of groups whose responses all pass or all fail, so they teach nothing;
   - `time.rollout`, unit `s`: rollout seconds per step;
   - `rl.truncation`, unit `fraction`: the share of responses reaching the completion cap.
 
-  `time.step` and `time.total` now move with `group_size` and `max_completion_len` through the rollout model, and their reason starts "rollout: ...". The labels are `target.rl.zero_spread`, `target.time.rollout` and `target.rl.truncation`. (Oct 31)
+  `time.step` and `time.total` now move with the batch and `max_completion_len` through the rollout model, and their reason starts "rollout: ...". When the rollout can't be carried to a setting (a group-size change outside TRL, or a cap raised past one the probe often hit), `time.rollout`, `time.step` and `time.total` all abstain, with the reason. A cap far outside the probed work units can still leave `time.rollout` with a number while `time.step` abstains: show the step's reason beside it. The labels are `target.rl.zero_spread`, `target.time.rollout` and `target.rl.truncation`. (Oct 31)
 - TODO(contract) [B -> A] Serving model (engine/serving.py), behind `engine.serving` (off). Set `engine.api.FEATURES["serving"] = flag("engine.serving")` beside the RL one. On the serving lens it simulates the probe's own requests and fits one scale factor to the probe's wall time, so it needs a probe with:
   - `generation.backend == "vllm"`; an HF generate probe gives an uncalibrated band, labelled as such;
   - `generation.sequences`, `seconds_total`, `new_tokens_mean`, `new_tokens_p95` and `max_new_tokens`;
