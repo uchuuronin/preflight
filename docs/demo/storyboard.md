@@ -23,11 +23,11 @@ accumulation, one L4), checked in on Oct 28.
 | --- | --- | --- |
 | 189 s | probe time until the eval out-of-memory was caught (probe `p1-eval`) | measured, A's status, record `ICDYrfHQ2nBNbv3mlRHHMg` |
 | $0.042 | GPU cost of that probe at L4 list price | measured (probe time x $0.80/h list), A's status |
-| 21.9 GB | memory allocated when the eval batch ran out | measured, A's status; **confirm GB or GiB against the record before any caption** (the L4 holds 23,689,363,456 bytes: 23.7 GB or 22.1 GiB) |
 | step 200 | where the real run would have crashed: its first evaluation | the script (`EVAL_EVERY = 200`) |
 | 1.68 s | measured step time with eval off (probe `p1`, p50) | measured, A's status |
 
-Not used: the derived "about 6 minutes and $0.09" for the crash it saved (derived, not measured),
+Not used: the memory figure in A's status ("21.9 GB" allocated when the eval ran out) until A says
+whether it is GB or GiB (asked in `docs/requests/from-d.md`); the derived "about 6 minutes and $0.09" for the crash it saved (derived, not measured),
 any hours or monthly savings, and any accuracy rate (one script gives no rate).
 
 ## Shots
