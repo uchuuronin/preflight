@@ -8,6 +8,43 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sat Oct 31: every plan item D owns
+
+Sources: the Contracts tab (Contract D, the Oct 27 review, the competitive review's adopted items) and the main tab (bug zoo, exports, validation targets), plus the items moved to D on Oct 31. "On main" means merged into `main`; "on ws-d" means pushed to `ws-d` but not yet merged. Hours are D's own work, honest, not counting waits on other agents.
+
+| Item | Where it is | Hours left | Waiting on |
+| --- | --- | --- | --- |
+| **Zoo scripts with planted problems (moved from A, Oct 31)** | | | |
+| Agent eval on Muse Spark (no prompt caching, context overflow at step 12, a tool that retries forever) | not started | 1.5 | nothing; A probes it (paid, Chiya's yes) |
+| Eval sweep (no thinking cap, activations dumped at every layer) | not started | 1 | as above |
+| Serving with vLLM (max context too high for the concurrency) | not started | 1 | as above |
+| Retrieval with sentence-transformers (contrastive batch too small) | not started | 1 | as above |
+| GNN with PyG (fan-out too high on the outer hops) | not started | 1 | as above |
+| Vision (data-bound loader, no channels-last) | not started | 1 | as above |
+| **Exports panel (moved from C, Oct 31)**: config, patch, sbatch, CLI command, share link, from the record | not started | 5 | a registry slot for it: checked when I start |
+| **Add-ons (Contract D)** | | | |
+| D1 Expertise dial (glossary, levels, "New to this" view, census baseline) | on main; Oct 30 glossary entries on ws-d; flag off | 0.5 | the worth-checking list waits on C's slot |
+| D1 dial re-run on real grids | not started | 1.5 | B's grids in the golden records |
+| D2 Share cards and README badge | not started | 5 | C's share route and `workers/` in the deploy |
+| D3 Local currency and regional prices | currency on main, flag off; regional rows written | 0 | regional rows deferred (schema field and B's wiring, not a G2 priority) |
+| D4 Free-tier presets | on main, flag off | 0.5 | the one-session check against A's real runs; T4/P100/L4 on the grid (B) |
+| D5 Notebook intake | on main, check-in wired; desk-limit fix on ws-d; flag off | 0 | nothing |
+| D6 Jobs like yours | dropped (review, Oct 27) | 0 | |
+| D7 Localisation | deferred beyond the guide's language field | 0 | |
+| D8 Hugging Face quick start | not started | 4 | A's `template` job source |
+| D9 Energy and carbon | dropped | 0 | |
+| D10 Command palette | deferred | 0 | |
+| D11 Phone view and dark theme | dark theme done by C; phone view not started | 2.5 | C's share route |
+| D12 Alerts outside the app | dropped | 0 | |
+| "Done means" for D1 to D5: a README line each and a nightly check that each still renders | not started | 2 | flags on in production are Chiya's call |
+| **Follow-ups and support** | | | |
+| Builder kit (competitive review item 10) | on ws-d | 0 | Chiya schedules the sessions (paid check-ins) |
+| Stranger-path audit, 12 findings to C | on ws-d | 1 | re-check the top four when C's fixes land |
+| Demo storyboard | on ws-d (GiB figure Oct 31) | 0.5 | the record's share link (A) |
+| Validation rows D feeds: planted problems caught on the six new zoo scripts; the dial on real grids; the free-tier one-session check | not started | counted above | A's probes and full runs, B's grids |
+
+Order today: the six zoo scripts (agent first), then the exports panel, then the audit re-check and the dial. About 13 hours of D's own work before the waits: the six scripts 6.5, exports 5, README lines and render checks 2.
+
 ## Fri Oct 30, evening (builder kit, stranger-path audit, demo storyboard)
 
 **Done** (committed on `ws-d` as Shreya; push requested below with `4ba6c18`). No tokens, GPU or Actions minutes spent: the audit ran on a local dev server with the job API answered by the test.
@@ -28,7 +65,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Storyboard numbers | measured: A's status, record `ICDYrfHQ2nBNbv3mlRHHMg`; step 200 from the script | review against the sources; the "Before recording" checklist |
 | 21.9 GB kept out of narration | the unit (GB or GiB) isn't stated in A's status | marked "confirm against the record" in the storyboard |
 
-**Push request:** `ws-d`, this commit and `4ba6c18`, one batch, normal push (one CI run).
+**Pushed** at `895633b` (Chiya's yes, Oct 30).
 
 ## Fri Oct 30 (round two merged; Notebook tab checks in)
 

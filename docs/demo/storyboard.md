@@ -22,12 +22,12 @@ accumulation, one L4), checked in on Oct 28.
 | Number | What it is | Source |
 | --- | --- | --- |
 | 189 s | probe time until the eval out-of-memory was caught (probe `p1-eval`) | measured, A's status, record `ICDYrfHQ2nBNbv3mlRHHMg` |
+| 20.4 GiB of a 22.06 GiB card | memory in use at the peak when the eval ran out, on the L4 | measured: 21,902,642,688 bytes at the peak (A, Oct 31) and 23,689,363,456 bytes of L4 (the record's env), shown in GiB as the app shows memory |
 | $0.042 | GPU cost of that probe at L4 list price | measured (probe time x $0.80/h list), A's status |
 | step 200 | where the real run would have crashed: its first evaluation | the script (`EVAL_EVERY = 200`) |
 | 1.68 s | measured step time with eval off (probe `p1`, p50) | measured, A's status |
 
-Not used: the memory figure in A's status ("21.9 GB" allocated when the eval ran out) until A says
-whether it is GB or GiB (asked in `docs/requests/from-d.md`); the derived "about 6 minutes and $0.09" for the crash it saved (derived, not measured),
+Not used: the derived "about 6 minutes and $0.09" for the crash it saved (derived, not measured),
 any hours or monthly savings, and any accuracy rate (one script gives no rate).
 
 ## Shots
@@ -41,7 +41,7 @@ any hours or monthly savings, and any accuracy rate (one script gives no rate).
 | 5 | 0:38 | Boarding | Stages light in turn; "Reading your script" with the Muse Spark tag | "Muse Spark reads the code and finds the training loop." | "Muse Spark (Meta)" at the moment the stage lights |
 | 6 | 0:50 | Boarding | "Running probe steps" lights; route fills | "Then it runs a few real steps on a real GPU." | "L4, measured" |
 | 7 | 1:00 | Boarding | "Checking the logs" with the Muse Spark Open tag | "Muse Spark Open, open weights on Baseten, reads the logs." | "Muse Spark Open (Meta, open weights)" |
-| 8 | 1:10 | Cockpit of the Oct 28 record | Map draws; the memory ring fills past the line; red finding "runs out of memory" | "In 189 seconds it caught the crash: the evaluation pass runs out of memory on this GPU." | "189 s · $0.042 · one script" |
+| 8 | 1:10 | Cockpit of the Oct 28 record | Map draws; the memory ring fills past the line; red finding "runs out of memory" | "In 189 seconds it caught the crash: the evaluation pass reaches 20.4 GiB of a 22.06 GiB card and runs out." | "189 s · $0.042 · 20.4 of 22.06 GiB · one script" |
 | 9 | 1:25 | Cockpit, detail sheet on the eval node | Open the finding; press "Adjust eval batch" | "It says why, and which setting fixes it." | |
 | 10 | 1:35 | Cockpit, knob dock | Drag eval batch size down; dials and ring move together | "Move a setting and the whole run answers at once." | "Predicted" (the app's own label on the dials) |
 | 11 | 1:50 | Cockpit, live guide | The guide proposes one knob move; Accept | "Ask the guide, and Muse Spark moves the knobs that matter, one at a time." | "Muse Spark (Meta)" |
