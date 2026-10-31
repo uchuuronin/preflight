@@ -748,5 +748,7 @@
 	"checks.predicted": "predicted {value}",
 	"checks.predicted_no_eval": "predicted {value} without eval",
 	"checks.measured.oom": "out of memory",
-	"checks.measured.oom_eval": "out of memory in eval"
+	"checks.measured.oom_eval": "out of memory in eval",
+	"exports.label": "Exports",
+	"exports.title": "Take it with you"
 }
