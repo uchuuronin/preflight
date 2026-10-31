@@ -8,6 +8,29 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Fri Oct 30 (round two merged; Notebook tab checks in)
+
+**Done** (committed on `ws-d` as Shreya; push requested below)
+
+- Merged `main` at round two (408a7c7). One conflict, in `convert.ts`: both sides made `NotebookSource` a type alias; kept main's comment. All 316 web tests pass, as do the typecheck and build; D's Python tests 33 passed; Python suite 944 passed, with the same 10 environment failures as before (A's sandbox, overhead and pip-install tests need a non-root, networked runner).
+- Notebook tab checks in through C's hand-off. End to end in Chromium on ws-d itself after the round-two merge (also earlier on ws-d merged with ws-c; `POST /v1/jobs` answered by the test): check-in off before a notebook, on after one, off again after leaving the tab, never on for a notebook with no code; clicking it sends kind `notebook` as `train_1.ipynb` without outputs (1,065 bytes, from a 5.4 KB file), with an idempotency key, and the desk moves to boarding. The Upload tab no longer offers `.ipynb`. With check-in closed the panel says so and the button stays off. No overflow at 390 px, no console errors.
+- Notebook limit is C's 5 MB, measured as the desk measures it: the whole source as JSON in UTF-8 bytes. The largest notebook D takes fits the desk and one line more is refused, for ASCII and two-byte text.
+- `knob.optimizer` (Optimiser) and `knob.lr_schedule` (Learning rate schedule) added to en.json with glossary entries, in one commit, as C asked.
+- Read-only review (a git-free copy, no remote): no blocking defects; fixed its points (non-ASCII boundary case, optimiser memory consistent with the ZeRO entry, the 8-bit argument and bitsandbytes, cosine T after warm-up). Asked C for one shared byte-count function.
+- No tokens, GPU or Actions minutes spent.
+
+**Basis for every decision in this commit**
+
+| Decision | Basis | Test that fails if it's wrong |
+| --- | --- | --- |
+| Notebook limit = the desk's measure (whole source, UTF-8 bytes, 5 MB) | cited: C's `NewFlight.tsx` handedTooBig and `upload.ts` MAX_TOTAL_BYTES; API body cap 6 MiB | `convert.test.ts` boundary tests (ASCII and é; checked failing with a files-only measure and with a character count) |
+| `NotebookSource` is a type alias | Chiya, Oct 30; derived: only an alias is assignable to `JobRequest["source"]`, an index-signature type | `tsc -b` on ws-d and on ws-d merged with ws-c |
+| Optimiser memory: 8 bytes moments + 4 bytes master copy in mixed precision; 8-bit about 2; SGD momentum 4 | cited: ZeRO (Rajbhandari et al.), bitsandbytes 8-bit optimisers | `glossary.test.ts` (coverage, length, spelling); accuracy by review |
+| Cosine schedule formula, t and T after warm-up; HF cosine ends at 0 | cited: SGDR (Loshchilov and Hutter); transformers `get_cosine_schedule_with_warmup` | `glossary.test.ts`; accuracy by review |
+| Check-in flow (enable, clear on tab change, refuse no-code) | C's hand-off contract (from-c.md, Oct 28) | Chromium end-to-end run above, on ws-d (a browser test, not in CI) |
+
+**Push request:** `ws-d` (the round-two merge and two commits on top of `6d61463`), one batch, normal push. Pushing starts one CI run.
+
 ## Wed Oct 28, afternoon (merged `main` at contract 0.4.0)
 
 **Done** (committed on `ws-d`; `ea2f578` pushed with Chiya's yes)
@@ -33,7 +56,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | One notebook path, (a) or (b), left to C and Chiya | measured: C's `precheck` refuses `train (1).ipynb` and A's `fetch` refuses `train (1).py`; outputs count against C's 5 MB | `test_d_notebook_parity.py::test_a_accepts_every_name_d_sends` |
 | D5 holds what it sends to C's 5 MB of files as JSON | cited: `app/upload.ts` MAX_TOTAL_BYTES, `routes/jobs.py` MAX_BODY_BYTES 6 MiB | `convert.test.ts` "won't fit a check-in" and "just under"; `NotebookIntake.test.tsx` "says the check-in limit" |
 
-**Push request:** `ws-d`, the merge of `main` and this commit, on top of `ea2f578`. Normal push.
+**Pushed** at `6d61463`.
 
 ## Wed Oct 28, early (D5 notebook intake; dial counted per record)
 

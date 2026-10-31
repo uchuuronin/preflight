@@ -207,6 +207,27 @@ describe("what is sent stays small and valid", () => {
 		expect(deskBytes("x = 1\n".repeat(n + 1))).toBeNull();
 	});
 
+	it("counts bytes, not characters, at the desk's limit (two-byte é)", () => {
+		const shell = (code: string) => JSON.stringify({ cells: [{ cell_type: "code", source: code }] });
+		const deskBytes = (code: string) => {
+			const out = prepareNotebook("e.ipynb", shell(code));
+			return out.ok ? utf8Length(JSON.stringify(out.source)) : null;
+		};
+		const line = "é = 1\n";
+		const a = deskBytes(line.repeat(1000)) as number;
+		const b = deskBytes(line.repeat(2000)) as number;
+		const perLine = (b - a) / 1000;
+		const n = Math.floor((CHECKIN_BYTES - a) / perLine) + 1000;
+		expect(deskBytes(line.repeat(n)) as number).toBeLessThanOrEqual(CHECKIN_BYTES);
+		expect(deskBytes(line.repeat(n + 1))).toBeNull();
+		// Counted in characters the same notebook looks well under the limit, so a character count
+		// would let through notebooks the desk refuses.
+		const taken = prepareNotebook("e.ipynb", shell(line.repeat(n + 1000)));
+		expect(taken.ok).toBe(false);
+		const chars = JSON.stringify({ kind: "notebook", files: { "e.ipynb": JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: [{ cell_type: "code", metadata: {}, execution_count: null, outputs: [], source: line.repeat(n + 1000) }] }) } }).length;
+		expect(chars).toBeLessThan(CHECKIN_BYTES);
+	});
+
 	it("takes a notebook just under the check-in limit", () => {
 		const code = "x = 1\n".repeat(Math.floor(CHECKIN_BYTES / 6 / 2));
 		expect(prepareNotebook("ok.ipynb", JSON.stringify({ cells: [{ cell_type: "code", source: code }] })).ok).toBe(true);
