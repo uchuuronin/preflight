@@ -170,7 +170,7 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		parts.append(f"sandbox: {ended}")  # e.g. install_failed: not the same as making no calls
 	why = {"timeout": f", cut at {timeout_s:.0f} s", "cancelled": ", cancelled", "lost": ", sandbox lost",
 		"stalled": f", stopped after {stall_s:.0f} s with no model calls"}.get(cut, "")  # fmt: skip
-	parts.append(f"script wall {wall:.0f} s{why}")
+	parts.insert(1, f"script wall {wall:.0f} s{why}")  # how it ended survives the 200-character cut
 	selection = "; ".join(parts)
 	if len(selection) > 200:
 		selection = selection[:197].rsplit(" ", 1)[0] + "..."
