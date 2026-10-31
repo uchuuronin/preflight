@@ -233,11 +233,13 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 	got = json.loads((clone / "out" / "app_logs.json").read_text())
 	assert got["app"] == "preflight-runner-ops" and "a-gt-lora-l4-2" in got["state"]
 	# read over the run's own window (Modal's default is the last hour), to an hour past its end
-	assert got["since"] == "2026-10-28T22:46:12" and got["until"] == "2026-10-29T00:31:28"
+	assert got["since"] == "2026-10-28T22:46:12Z" and got["until"] == "2026-10-29T00:31:28Z"
 	assert logs[-1][-5:] == [
 		"--since",
-		"2026-10-28T22:46:12",
+		"2026-10-28T22:46:12Z",
 		"--until",
-		"2026-10-29T00:31:28",
+		"2026-10-29T00:31:28Z",
 		"ap-opsAAAAAA",
 	]
+	assert app_logs.main(["--env", "main", "ap-opsAAAAAA", "--since", "2026-10-28T22:00:00"]) == 0
+	assert logs[-1][-3:-1] == ["--since", "2026-10-28T22:00:00Z"]  # a bare time is UTC

@@ -101,7 +101,7 @@ def run_window(run: str) -> tuple[str, str] | None:
 		return None
 	if start is None:
 		return None
-	fmt = "%Y-%m-%dT%H:%M:%S"
+	fmt = "%Y-%m-%dT%H:%M:%SZ"  # with its zone: Modal reads a time without one as local time
 	return (start - timedelta(minutes=5)).strftime(fmt), (end + timedelta(seconds=AFTER_RUN_S)).strftime(fmt)
 
 
@@ -120,7 +120,8 @@ def main(argv: list[str] | None = None) -> int:
 		print("an app id looks like ap-..., --seconds is 5 to 600, times look like 2026-10-28T22:45:00",
 			file=sys.stderr)  # fmt: skip
 		return 2
-	window = (ns.since, ns.until)
+	# a time without a zone is UTC here (Modal would take it as the machine's local time)
+	window = tuple(t if t is None or t.endswith("Z") else t + "Z" for t in (ns.since, ns.until))
 	app = _app(ns.env, ns.app_id)
 	if app is None:
 		run = ops_run_for(ns.app_id, ns.env)
