@@ -25,5 +25,6 @@ describe("the data-use notice", () => {
 		// flags.json ships both off
 		expect(lines).not.toContain(en["datause.script_map"]);
 		expect(lines).not.toContain(en["datause.guide"]);
+		expect(lines).not.toContain(en["datause.fix"]);
 	});
 });

@@ -666,6 +666,7 @@
 	"datause.probe": "It runs a few minutes on a rented Modal GPU, sandboxed with none of our keys.",
 	"datause.script_map": "Muse Spark (Meta) reads the code to find the training loop.",
 	"datause.guide": "The live guide sends your note and messages to Muse Spark (Meta).",
+	"datause.fix": "Fixes are written by Meta’s Muse Code from your script.",
 	"datause.record": "Results become a flight record anyone with its link can open.",
 	"datause.retention.repo": "A repo's code is deleted once read; its record keeps only the repo link and commit.",
 	"datause.retention.uploads": "Uploaded files are deleted about {days} days after they are sent.",
