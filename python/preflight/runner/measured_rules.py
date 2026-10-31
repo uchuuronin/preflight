@@ -39,7 +39,7 @@ def agent_findings(rec) -> list[Finding]:
 			detail=f"0 of {inp:,} input tokens were served from cache over {len(tasks)} sampled tasks "
 			f"({multi} of them multi-turn). A prefix that changes every call (a timestamp, a reordered "
 			"tool list) defeats the provider's cache.",
-			node_id="llm", source="rule", fix_template="agent.stable_prompt_prefix",
+			node_id="llm", source="rule", fix_template="agent.stable_prompt_prefix", knob_id="prompt_caching",
 			evidence=[Evidence(metric="agent.cached_input_fraction", value=0.0),
 				Evidence(metric="agent.input_tokens", value=float(inp))]))  # fmt: skip
 	pairs = [
@@ -61,7 +61,9 @@ def agent_findings(rec) -> list[Finding]:
 		g = statistics.median(pairs)
 		t1 = statistics.median(firsts)
 		if g > 0:
-			turn = 1 + math.ceil((limit - t1) / g)
+			turn = 2 + math.floor(
+				(limit - t1) / g
+			)  # the first turn past the limit (turn n holds t1 + (n-1)g)
 			if max_turns is None or turn <= max_turns:
 				out.append(Finding(id="measured.agent.context_overflow", severity="warn", code="agent.context_overflow",
 					title=f"The history passes the context limit at about turn {turn}",

@@ -22,3 +22,15 @@ def test_a_cached_sample_raises_no_caching_finding():
 	tasks = [t.model_copy(update={"cached_input_tokens": 100}) for t in rec.agent_sample.tasks]
 	rec = rec.model_copy(update={"agent_sample": rec.agent_sample.model_copy(update={"tasks": tasks})})
 	assert "agent.no_prompt_caching" not in {f.code for f in agent_findings(rec)}
+
+
+def test_no_projection_without_a_limit_or_growth():
+	rec = load_record(REC.read_text())
+	no_limit = rec.model_copy(update={"knobs": [k for k in rec.knobs if k.id != "context_limit"]})
+	assert "agent.context_overflow" not in {f.code for f in agent_findings(no_limit)}
+	flat = [
+		t.model_copy(update={"context_tokens_by_turn": [500] * max(1, t.turns)})
+		for t in rec.agent_sample.tasks
+	]
+	flat_rec = rec.model_copy(update={"agent_sample": rec.agent_sample.model_copy(update={"tasks": flat})})
+	assert "agent.context_overflow" not in {f.code for f in agent_findings(flat_rec)}
