@@ -20,6 +20,7 @@ it is tested without torch.
 """
 
 import math
+import numbers
 import time
 from collections.abc import Mapping
 
@@ -31,7 +32,7 @@ TOKEN_KEYS = ("input_ids", "tokens", "ids", "token_ids")
 def _is_float(x) -> bool:
 	dt = getattr(x, "dtype", None)
 	return dt is not None and (bool(getattr(dt, "is_floating_point", False)) or bool(getattr(dt, "is_complex", False))
-		or any(w in str(dt) for w in ("float", "complex", "bfloat")))  # fmt: skip
+		or any(w in str(dt) for w in ("float", "complex", "bfloat", "bool")))  # fmt: skip
 
 
 def _length(row) -> int | None:
@@ -52,7 +53,11 @@ def _length(row) -> int | None:
 		if len(dims) > 1 and any(d != 1 for d in dims[:-1]):
 			return None  # several sequences in one row: not a single row's length
 		return dims[-1]
-	if isinstance(row, list | tuple) and row and all(type(t) is int for t in row[:8]):
+	if (
+		isinstance(row, list | tuple)
+		and row
+		and all(isinstance(t, numbers.Integral) and not isinstance(t, bool) for t in row[:8])
+	):  # Python or numpy integers, never bools
 		return len(row)
 	return None
 

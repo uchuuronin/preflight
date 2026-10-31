@@ -163,3 +163,9 @@ def test_nested_arrow_lists_are_read_row_by_row_not_as_length_one():
 			return {"input_ids": Shape(1, len(self.rows[i][0]))}
 
 	assert measure(HF())["dataset_max_tokens"] == 300
+
+
+def test_numpy_integer_lists_count_and_bool_masks_dont():
+	np = pytest.importorskip("numpy")
+	assert measure(Rows([{"input_ids": [np.int64(5)] * 9}]))["dataset_max_tokens"] == 9
+	assert measure(Rows([Shape(12, dtype="torch.bool")])) == {}
