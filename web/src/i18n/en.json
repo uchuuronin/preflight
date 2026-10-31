@@ -228,6 +228,8 @@
 	"knob.eval_no_grad": "Eval without gradients",
 	"knob.num_workers": "Data workers",
 	"knob.lr": "Learning rate",
+	"knob.lr_schedule": "Learning rate schedule",
+	"knob.optimizer": "Optimiser",
 	"value.on": "On",
 	"value.off": "Off",
 	"value.none": "No value",

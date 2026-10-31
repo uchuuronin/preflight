@@ -1,7 +1,7 @@
 {
 	"_meta": {
 		"addon": "expertise",
-		"version": "0.4.0",
+		"version": "0.5.0",
 		"tiers": [
 			"new",
 			"practitioner",
@@ -593,6 +593,19 @@
 			"new": "Ways to split training memory across several GPUs, so each one holds only part of the model's state.",
 			"practitioner": "ZeRO stage 1 splits optimiser state, stage 2 also gradients, stage 3 also weights. FSDP full_shard matches stage 3, shard_grad_op stage 2.",
 			"expert": "Per-GPU bytes for mixed-precision Adam: 4P + 12P/N at stage 1, 2P + 14P/N at stage 2, 16P/N at stage 3 (Rajbhandari et al., ZeRO)."
+		},
+		"optimiser": {
+			"label": "Optimiser",
+			"new": "The rule that turns each batch's mistakes into changes to the model. Most fine-tuning uses AdamW.",
+			"practitioner": "AdamW keeps two extra numbers per trained weight, so the optimiser adds memory beyond the model; 8-bit AdamW and SGD keep less, and LoRA only for the adapters.",
+			"expert": "AdamW keeps both moments in fp32, 8 bytes per trainable parameter; 8-bit AdamW about 2; SGD with momentum 4. The step itself is a small share of step time.",
+			"act": "On a full fine-tune short of memory, try 8-bit AdamW (optim adamw_bnb_8bit) before lowering the batch."
+		},
+		"learning_rate_schedule": {
+			"label": "Learning rate schedule",
+			"new": "How the learning rate changes during training: usually a short warm-up, then a slow fall towards zero.",
+			"practitioner": "Linear or cosine decay after warm-up is the usual choice (lr_scheduler_type); it changes how training settles, not memory or time.",
+			"expert": "Cosine after warm-up: lr(t) = lr_min + ½(lr_max − lr_min)(1 + cos(πt/T)). Set T to the steps the run will take, or the rate is still high when it stops."
 		}
 	}
 }

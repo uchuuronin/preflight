@@ -43,10 +43,11 @@ export interface NotebookPreview {
 	renamedFrom: string | null;
 }
 
-export interface NotebookSource {
+/** A type alias, not an interface, so it fits C's `JobRequest["source"]` hand-off (Chiya, Oct 30). */
+export type NotebookSource = {
 	kind: "notebook";
 	files: Record<string, string>;
-}
+};
 
 export type Prepared = { ok: true; source: NotebookSource; preview: NotebookPreview } | { ok: false; error: NotebookError };
 
@@ -242,11 +243,12 @@ export function prepareNotebook(name: string, text: string): Prepared {
 			return { ok: false, error: "too_big" };
 		}
 		const sent = stripped(nb);
-		// What the API counts, as C's desk does: the files as JSON, escapes included.
-		if (utf8(JSON.stringify({ [safe]: sent })) > CHECKIN_BYTES) return { ok: false, error: "too_big" };
+		// Measured as C's desk measures a handed source: the whole source as JSON, escapes included.
+		const source: NotebookSource = { kind: "notebook", files: { [safe]: sent } };
+		if (utf8(JSON.stringify(source)) > CHECKIN_BYTES) return { ok: false, error: "too_big" };
 		return {
 			ok: true,
-			source: { kind: "notebook", files: { [safe]: sent } },
+			source,
 			preview: {
 				files,
 				entrypoint,

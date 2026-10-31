@@ -188,6 +188,25 @@ describe("what is sent stays small and valid", () => {
 		expect(prepareNotebook("big.ipynb", nb)).toEqual({ ok: false, error: "too_big" });
 	});
 
+	it("measures a notebook exactly as C's desk does, the whole source as JSON", () => {
+		const shell = (code: string) => JSON.stringify({ cells: [{ cell_type: "code", source: code }] });
+		const deskBytes = (code: string) => {
+			const out = prepareNotebook("e.ipynb", shell(code));
+			return out.ok ? utf8Length(JSON.stringify(out.source)) : null;
+		};
+		// Bytes grow by a fixed amount per line: measure it on two small notebooks, then check the
+		// line count where the desk's limit falls: D takes it and the desk fits it; one line more,
+		// D refuses.
+		const a = deskBytes("x = 1\n".repeat(1000)) as number;
+		const b = deskBytes("x = 1\n".repeat(2000)) as number;
+		const perLine = (b - a) / 1000;
+		const n = Math.floor((CHECKIN_BYTES - a) / perLine) + 1000;
+		const atLimit = deskBytes("x = 1\n".repeat(n));
+		expect(atLimit).not.toBeNull();
+		expect(atLimit as number).toBeLessThanOrEqual(CHECKIN_BYTES);
+		expect(deskBytes("x = 1\n".repeat(n + 1))).toBeNull();
+	});
+
 	it("takes a notebook just under the check-in limit", () => {
 		const code = "x = 1\n".repeat(Math.floor(CHECKIN_BYTES / 6 / 2));
 		expect(prepareNotebook("ok.ipynb", JSON.stringify({ cells: [{ cell_type: "code", source: code }] })).ok).toBe(true);
