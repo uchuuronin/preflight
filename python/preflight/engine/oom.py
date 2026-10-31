@@ -89,6 +89,27 @@ MIN_OOM_EVENTS = (
 )
 
 
+# Chiya, Oct 31: P(OOM) shows as a number only where the reliability diagram verifies it. Below 5% and above 95%
+# it is shown; in between it reads "uncertain (5-95%)" until every middle bin holds MIN_SHOWN points that agree with
+# what happened, then it switches to a number by itself when the table is rebuilt
+SHOWN_EDGES = (0.0, 0.05, 0.30, 0.70, 0.95, 1.0001)
+UNCERTAIN = (0.05, 0.95)
+MIN_SHOWN = 10
+
+
+def middle_verified(bins) -> bool:
+	"""Every bin between 5% and 95% has at least MIN_SHOWN points and agrees with outcomes.
+
+	Takes Bin objects or the table's (lo, hi, n, consistent) tuples."""
+	rows = [(b.lo, b.hi, b.n, b.consistent) if isinstance(b, Bin) else tuple(b) for b in bins]
+	middle = [r for r in rows if r[0] >= UNCERTAIN[0] - 1e-9 and r[1] <= UNCERTAIN[1] + 1e-9]
+	return bool(middle) and all(n >= MIN_SHOWN and ok for _, _, n, ok in middle)
+
+
+def shown_as_number(p: float, bins) -> bool:
+	return p < UNCERTAIN[0] or p > UNCERTAIN[1] or middle_verified(bins)
+
+
 def reliable(bins: list[Bin], min_per_bin: int = 10, min_ooms: int = MIN_OOM_EVENTS) -> bool:
 	"""Probabilities can be shown as numbers only when every populated bin agrees with what happened, at least two
 	bins are populated, and real out-of-memory runs were seen: a check made only on jobs that fit says nothing about

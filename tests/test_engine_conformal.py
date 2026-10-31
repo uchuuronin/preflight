@@ -146,3 +146,32 @@ def test_notes_follow_the_band_that_was_used(monkeypatch):
 	roof = next((c for i, c in cards.items() if i.startswith("steptime-roofline")), None)
 	if roof is not None:
 		assert roof.coverage is None and not roof.per_gpu_coverage
+
+
+def test_step_time_bands_cover_only_the_approved_lenses():
+	# Chiya, Oct 31: vision, retrieval and pretrain get held-out step-time bands; HF fine-tune stays simulated
+	from preflight.engine import api, conformal, steptime
+
+	t = conformal.TABLE
+	for lens in ("vision", "retrieval", "pretrain"):
+		assert t.lookup("time.step", "L4", lens) is not None
+	for lens in ("finetune", "rl", "serving", ""):
+		assert t.lookup("time.step", "L4", lens) is None  # no all-lens cell to borrow
+	assert t.lookup("memory.peak", "L4", "finetune") is not None
+	(card,) = api._cards({steptime.MODEL_ID_SAME})
+	assert "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2." in card.notes
+	assert "keeps the simulated band" in card.notes
+
+
+def test_lens_limits_parse_and_refuse_nonsense():
+	import pytest
+
+	from preflight.corpus.calibrate import parse_lenses
+
+	assert parse_lenses("time.step=pretrain+vision; memory.peak=vision") == {
+		"time.step": frozenset({"pretrain", "vision"}),
+		"memory.peak": frozenset({"vision"}),
+	}
+	assert parse_lenses("") == {}
+	with pytest.raises(SystemExit):
+		parse_lenses("time.step=")

@@ -339,6 +339,20 @@ def reliability_lines(pairs: list[tuple[float, bool]], min_per_bin: int = MIN_PE
 	return out
 
 
+def parse_lenses(spec: str) -> dict[str, frozenset[str]]:
+	"""'time.step=pretrain+retrieval+vision;memory.peak=vision' -> {target: lenses}; empty means no limit."""
+	out: dict[str, frozenset[str]] = {}
+	for part in (p.strip() for p in spec.split(";")):
+		if not part:
+			continue
+		target, _, lenses = part.partition("=")
+		names = frozenset(x.strip() for x in lenses.split("+") if x.strip())
+		if not target.strip() or not names:
+			raise SystemExit(f"--lenses wants target=lens+lens, got {part!r}")
+		out[target.strip()] = names
+	return out
+
+
 def main(argv: list[str] | None = None) -> int:
 	ap = argparse.ArgumentParser(prog="preflight.corpus.calibrate")
 	ap.add_argument("--store", type=Path, required=True)
@@ -352,7 +366,14 @@ def main(argv: list[str] | None = None) -> int:
 		default="memory.peak,time.step",
 		help="targets whose cells go into the table; the others keep their simulated bands and say so",
 	)
+	ap.add_argument(
+		"--lenses",
+		default="",
+		help="'target=lens+lens;...': for these targets, only these lenses get cells, and there is no pooled "
+		"all-lens cell, so every other lens keeps its simulated band",
+	)
 	args = ap.parse_args(argv)
+	only = parse_lenses(args.lenses)
 	holdout = tuple(g.strip() for g in args.holdout_gpus.split(",") if g.strip())
 	rows = load_rows(args.store)
 	scores = scores_from_rows(rows)  # grouped rows -> conformal scores
@@ -363,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
 		print(
 			f"left out of the table: {len(synthetic)} scores from synthetic lenses {sorted({s.lens for s in synthetic})}"
 		)
+	scores = [s for s in scores if s.target not in only or s.lens in only[s.target]]
 	if not scores:
 		print("no grouped rows with probes and queries; nothing to calibrate")
 		return 1
@@ -377,11 +399,17 @@ def main(argv: list[str] | None = None) -> int:
 	print("\n".join(reliability_lines(pairs)))
 	ok = oom.reliable(oom.reliability(pairs), min_per_bin=MIN_PER_BIN)
 	print(f"  reliable enough to show as a probability: {ok}")
+	middle = oom.middle_verified(oom.reliability(pairs, edges=oom.SHOWN_EDGES))
+	print(f"  shown as a number between 5% and 95%: {middle} (each middle bin needs {oom.MIN_SHOWN} points)")
 	keep = {t.strip() for t in args.targets.split(",") if t.strip()}
 	table = replace(
 		table,
 		oom_reliable=ok,
-		cells={k: c for k, c in table.cells.items() if k[0] in keep},
+		oom_bins=tuple(
+			(b.lo, b.hi, b.n, b.consistent) for b in oom.reliability(pairs, edges=oom.SHOWN_EDGES)
+		),
+		# a lens-limited target has no all-lens cell: an unlisted lens must not borrow the listed lenses' band
+		cells={k: c for k, c in table.cells.items() if k[0] in keep and not (k[0] in only and not k[2])},
 		coverage={t: v for t, v in table.coverage.items() if t in keep},
 		holdout={t: v for t, v in table.holdout.items() if t in keep},
 	)

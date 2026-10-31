@@ -152,3 +152,19 @@ Two rows are not a test, and the holdout is scored once, so it waits for the rer
 | below the smallest probe (10) | anchored | 1 of 10 (2% to 40%) | 0.323 |
 
 The fitted line does as well or better on both sides, so `EXTRAPOLATION` stays `"line"`. On every held-out group in phase 2 (A100 boards excluded), the line puts 461 of 575 queries within 15% (80%).
+
+## Chiya's calls, Oct 31: step-time bands for three lenses, P(OOM) a number only where verified
+
+**Step time, installed for vision, retrieval and pretrain** (`calibrate --lenses "time.step=pretrain+retrieval+vision"`). Leave-one-architecture-out coverage over those three lenses is 404 of 449 (90.0%, Wilson 95% 86.9% to 92.4%), median half-width 0.226 (measured). Fine-tune keeps its simulated band, and so does every other lens: the table has no all-lens step-time cell to borrow. The same-GPU model card adds "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2."
+
+**P(OOM): a number only where the reliability diagram verifies it.** Below 5% and above 95%, it is shown as a number. In between, it is reported as the range 5–95% and worded "uncertain (5–95%)". It switches to a number by itself once every middle bin (5–30%, 30–70%, 70–95%) holds at least 10 points whose mean prediction sits inside the Wilson interval of what happened. The table now stores these bins (`oom_bins`), and `engine.oom.shown_as_number` reads them. Today's bins (measured):
+
+| Bin | Points | Predicted | Observed (Wilson 95%) | Agrees |
+| --- | --- | --- | --- | --- |
+| 0–5% | 587 | 0.010 | 0.003 (0.001 to 0.012) | yes |
+| 5–30% | 5 | 0.11 | 0.20 (0.04 to 0.62) | too few |
+| 30–70% | 6 | 0.37 | 0.33 (0.10 to 0.70) | too few |
+| 70–95% | 4 | 0.91 | 1.00 (0.51 to 1.00) | too few |
+| 95–100% | 10 | 0.990 | 0.90 (0.60 to 0.98) | **no** |
+
+**For Chiya: the top bin doesn't verify yet.** 9 of its 10 jobs ran out of memory, against a mean prediction of 0.99. The one miss had a predicted P of 0.9955. As you set it, the rule shows numbers above 95% anyway. With ten points, one miss is enough to fail a 0.99 prediction (10 of 10 would pass), so this bin needs more OOM runs to settle. The other choice is to cap what's shown there at "above 95%".

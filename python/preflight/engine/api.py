@@ -557,13 +557,22 @@ def _from_memory_estimate(
 		)
 	peak = _est(est.point, est.lo, est.hi, "bytes", est.status, mid, est.reason)
 	words = {"fits": "fits", "tight": "tight", "fails": "won't fit"}[est.oom_status]
-	# Review, Oct 27: shown in bins until the reliability diagram on real outcomes passes (TABLE.oom_reliable)
-	why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
+	# Chiya, Oct 31: a number only where the reliability diagram verifies it; in between, the 5-95% range
+	shown = oom_model.shown_as_number(est.p_oom, conformal.TABLE.oom_bins)
+	if shown:
+		why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
+		lo = hi = est.p_oom
+	else:
+		why = (
+			f"{words}: out of memory uncertain (5–95%) ({oom_source}); between 5% and 95% the chance isn't "
+			"verified on real outcomes yet"
+		)
+		lo, hi = oom_model.UNCERTAIN
 	if est.breakdown is not None and est.breakdown.peak_moment != "train":
 		why += f"; the peak comes at {est.breakdown.peak_moment}, not during training steps"
 	# a probe that fitted measured the peak, not an OOM: P(OOM) is "measured" only from an OOM probe
 	oom_status = "predicted" if est.status == "measured" else est.status
-	oom = _est(est.p_oom, est.p_oom, est.p_oom, "probability", oom_status, mid, why)
+	oom = _est(est.p_oom, lo, hi, "probability", oom_status, mid, why)
 	return _MemoryResult(peak, oom, est)
 
 
@@ -965,6 +974,11 @@ def _strategy(record: FlightRecord, values: dict) -> str:
 
 
 # ---------------------------------------------------------------- run totals
+
+
+def total_steps(record: FlightRecord, knob_values: dict | None = None) -> tuple[float | None, str]:
+	"""Optimizer steps in the whole run at these knob values, or None and why (for the campaign planner)."""
+	return _total_steps(record, _values(record, knob_values))
 
 
 def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]:
@@ -1920,6 +1934,11 @@ _CARD_TARGET = {
 # but no cross-GPU prediction has been scored yet, so its card carries no coverage
 _CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME})
 
+# Chiya, Oct 31: what a held-out band does and doesn't cover yet, said on the card itself
+_CARD_CAVEAT = {
+	steptime.MODEL_ID_SAME: "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2.",
+}
+
 
 def _calibration(mid: str) -> tuple[str, float | None]:
 	"""("held_out", None) when the conformal table has a cell for this model's target, else ("simulated", None)."""
@@ -1943,7 +1962,7 @@ def _cards(ids: set[str]) -> list[ModelCard]:
 				h, n = t.coverage[target]
 				extra["coverage"] = h / n
 			extra["per_gpu_coverage"] = {g: h / n for g, (h, n) in t.holdout.get(target, {}).items() if n}
-			notes = f"{notes or ''}. {t.describe(target)}".strip(". ")
+			notes = f"{notes or ''}. {_CARD_CAVEAT.get(mid, '')} {t.describe(target)}".strip(". ")
 		out.append(
 			ModelCard(
 				id=mid,
