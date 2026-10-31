@@ -457,3 +457,17 @@ def test_many_events_in_one_chunk_are_split_in_linear_time():
 	t0 = time.monotonic()
 	out = r.feed(one * 40_000)
 	assert out.count(b"\n\n") == 40_000 and time.monotonic() - t0 < 1.5
+
+
+def test_an_empty_reply_reaches_the_script_only_once_the_call_is_logged():
+	def handler(request):
+		return httpx.Response(502, content=b"")
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		r = _chat(proxy, "n1")
+		assert r.status_code == 502 and r.content == b""
+		assert len(proxy.calls("n1")) == 1  # read straight after the reply, with no wait
+	finally:
+		proxy.stop()

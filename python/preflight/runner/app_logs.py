@@ -66,7 +66,8 @@ def ops_run_for(app_id: str, env: str) -> str | None:
 			continue
 		run = path.rsplit("/", 1)[0]
 		log = _git("show", f"{REMOTE_RUNS}:{path}").stdout
-		started = re.search(_STARTED.format(env=re.escape(env)), log)
+		head = "\n".join(log.splitlines()[:20])  # Modal prints it first; a cut log's tail never counts
+		started = re.search(_STARTED.format(env=re.escape(env)), head)
 		if started is None or started.group(1) != app_id:
 			continue  # this run didn't start the app (it mentions it, or started another)
 		try:

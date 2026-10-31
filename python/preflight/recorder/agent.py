@@ -413,7 +413,7 @@ class AgentProxy:
 		stream = req.get("stream") is True
 		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
 		sent = [False]  # this request's reply has started: a failure now can only close the connection
-		last: list[bytes] = []  # the reply's last bytes, written once the call is logged
+		last: list = []  # the reply's last bytes (or the headers' end), sent once the call is logged
 		broke, never_sent, upstream_status, fail_reply = False, False, 0, False
 		self._went.out = False
 		try:  # from here on the admitted call is always logged, so its slot and reservation are freed
@@ -437,7 +437,12 @@ class AgentProxy:
 			broke = True
 			# never reached the provider: nothing to bill
 			never_sent = not self._went.out or isinstance(
-				exc, httpx.ConnectError | httpx.ConnectTimeout | httpx.PoolTimeout
+				exc,
+				httpx.ConnectError
+				| httpx.ConnectTimeout
+				| httpx.PoolTimeout
+				| httpx.ProxyError
+				| httpx.LocalProtocolError,
 			)
 			upstream_status = call.status  # 0 when the provider's reply never began
 			call.status = call.status or 502
@@ -468,7 +473,11 @@ class AgentProxy:
 					"message": "preflight: the provider didn't answer"}}, close=True)  # fmt: skip
 		if last:
 			with contextlib.suppress(OSError):
-				h.wfile.write(b"".join(last))
+				for part in last:
+					if callable(part):
+						part()
+					else:
+						h.wfile.write(part)
 				h.wfile.flush()
 
 	def _note(self, task_id: str, req: dict, error: str) -> None:
@@ -497,9 +506,12 @@ class AgentProxy:
 			if k.lower() not in _HOP:
 				h.send_header(k, v)
 		h.send_header("Content-Length", str(len(r.content)))
-		h.end_headers()
-		h.wfile.write(r.content[:-1])
-		last.append(r.content[-1:])
+		if r.content:
+			h.end_headers()
+			h.wfile.write(r.content[:-1])
+			last.append(r.content[-1:])
+		else:  # no body to hold a byte of: the headers' end waits for the log instead
+			last.append(h.end_headers)
 
 	def _relay_stream(
 		self, h, url, headers, body, call: Call, sent: list, last: list, *, drop_usage: bool

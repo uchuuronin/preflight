@@ -446,6 +446,7 @@ def _prune_records_daily() -> dict:
 	"""Once a day (the last run's time is kept in the jobs Dict), delete everything about a job
 	older than 30 days: its record, its uploaded files, its cached probe results and its entry in
 	the job index (runner/retention.py). Each part runs even if another fails."""
+	import itertools
 	import json
 	import time
 
@@ -477,7 +478,7 @@ def _prune_records_daily() -> dict:
 		records_vol.reload()
 		state = jobs_dict.get("state") or {}
 		live = [json.dumps(j.get("request")) for j in state.get("jobs", []) if isinstance(j, dict)]
-		keep = upload_refs([*records_text(RECORDS_DIR), *live])
+		keep = upload_refs(itertools.chain(records_text(RECORDS_DIR), live))  # one record at a time
 		removed = prune_uploads(UPLOADS_DIR, keep=keep)
 		if removed:
 			uploads_vol.commit()
@@ -521,8 +522,12 @@ def tick() -> dict:
 
 	cleaning = False
 	try:  # a failed start never holds up the queue, but it says so
-		due = time.time() - (jobs_dict.get("records_pruned_at") or 0) >= PRUNE_EVERY_S
-		if due and deployed_here()[0] is True:  # a temporary copy's tick never deletes shared data
+		now = time.time()
+		due = now - (jobs_dict.get("records_pruned_at") or 0) >= PRUNE_EVERY_S
+		# one cleanup at a time: it marks itself done only once it starts, which can take a minute
+		busy = now - (jobs_dict.get("cleanup_started_at") or 0) < CLEANUP_TIMEOUT_S
+		if due and not busy and deployed_here()[0] is True:  # a temporary copy never deletes shared data
+			jobs_dict["cleanup_started_at"] = now
 			cleanup.spawn()
 			cleaning = True
 	except Exception as exc:

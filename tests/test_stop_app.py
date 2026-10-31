@@ -201,6 +201,9 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 		# a runner id passed as an argument: Modal's arg parser fails and prints it; nothing started
 		"r5-a-injected": ("modal run --env main python/preflight/runner/ops_app.py::startup_check ap-runrDDDDDD",
 			"Error: Got unexpected extra argument (ap-runrDDDDDD)\n"),
+		# Modal's line must open the log: one printed later (a cut log's tail, a script's output) doesn't count
+		"r7-a-late-line": ("modal run --env main python/preflight/runner/ops_app.py::ground_truth",
+			"\n".join(["x"] * 25) + "\n" + view.format("ap-lateFFFFFF")),
 		"r6-a-injected-url": ("modal run --env main python/preflight/runner/ops_app.py::startup_check "
 			"https://modal.com/apps/me/main/ap-runrEEEEEE", view.format("ap-runrEEEEEE")),
 	})  # fmt: skip
@@ -223,6 +226,7 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 	assert app_logs.ops_run_for("ap-nowhere99", "main") is None
 	assert app_logs.ops_run_for("ap-runrDDDDDD", "main") is None  # only mentioned, never started
 	assert app_logs.ops_run_for("ap-runrEEEEEE", "main") is None  # its id came from the command
+	assert app_logs.ops_run_for("ap-lateFFFFFF", "main") is None  # not where Modal prints it
 	assert app_logs.main(["--env", "main", "ap-runrBBBBBB"]) == 2 and not logs
 	assert app_logs.main(["--env", "main", "ap-opsAAAAAA"]) == 0
 	assert logs[-1][-1] == "ap-opsAAAAAA" and "--tail" in logs[-1]
