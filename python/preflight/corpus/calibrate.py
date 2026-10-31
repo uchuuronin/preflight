@@ -23,6 +23,7 @@ from typing import Any
 from preflight.engine import conformal, knobs, memory, oom, steptime
 from preflight.engine.memory import TrainingSetup, TransformerArch
 
+SYNTHETIC_LENSES = frozenset({"finetune_synthetic"})
 LENS = {
 	"gpt": "pretrain",
 	"lora": "finetune_synthetic",  # the corpus's own LoRA models: kept apart, users' fine-tunes are real HF models
@@ -99,7 +100,7 @@ ARCH_FIELDS = {
 	"lora": _TRANSFORMER,
 	"cnn": ("depth", "width"),
 	"mlp": ("depth", "width", "in_features"),
-	"gnn": ("layers", "hidden", "kind"),
+	"gnn": ("layers", "hidden", "conv"),
 	"hf_lora": ("model_id",),
 }
 
@@ -346,6 +347,13 @@ def main(argv: list[str] | None = None) -> int:
 	holdout = tuple(g.strip() for g in args.holdout_gpus.split(",") if g.strip())
 	rows = load_rows(args.store)
 	scores = scores_from_rows(rows)  # grouped rows -> conformal scores
+	# the corpus's synthetic LoRA models aren't what users send (real HF models are): reported, never calibrated on
+	synthetic = [s for s in scores if s.lens in SYNTHETIC_LENSES]
+	scores = [s for s in scores if s.lens not in SYNTHETIC_LENSES]
+	if synthetic:
+		print(
+			f"left out of the table: {len(synthetic)} scores from synthetic lenses {sorted({s.lens for s in synthetic})}"
+		)
 	if not scores:
 		print("no grouped rows with probes and queries; nothing to calibrate")
 		return 1

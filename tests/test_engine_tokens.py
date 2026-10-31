@@ -96,25 +96,27 @@ def test_a_declared_accumulation_moves_the_measured_one_by_its_ratio(smoke):
 	assert api._step_work(off, api._values(off, {})) == pytest.approx(base)
 
 
-def test_activations_follow_the_longest_padded_row(smoke):
-	assert api._padded_seq(smoke, api._values(smoke, {"seq_len": 1024})) == pytest.approx(504)
+def test_probes_are_fitted_on_their_rows_but_queries_keep_seq_len(smoke):
+	p1 = next(p for p in smoke.probes if p.id == "p1")
+	p3 = next(p for p in smoke.probes if p.id == "p3")
+	assert api._padded_seq(smoke, {}, probe=p1) == 517  # its warm-up's longest row
+	assert api._padded_seq(smoke, {}, probe=p3) == 512  # a row reached its limit
 	assert (
-		api._padded_seq(smoke, api._values(smoke, {"seq_len": 128})) == 128
-	)  # a limit the rows reach cuts them
-	p = api.predict(smoke, {"seq_len": 512}).root["memory.peak"].point
-	q = api.predict(smoke, {"seq_len": 768}).root["memory.peak"].point  # 1024 is where a probe ran out of memory
-	assert p == pytest.approx(q)  # rows never reach 512, so the two settings hold the same activations
+		api._padded_seq(smoke, api._values(smoke, {"seq_len": 1024})) is None
+	)  # a full run may meet longer rows
+	short = api.predict(smoke, {"seq_len": 512}).root["memory.peak"].point
+	long = api.predict(smoke, {"seq_len": 768}).root["memory.peak"].point
+	assert long > short  # sized by the setting: never "fits" for rows the probes happened not to see
 
 
-def test_held_out_memory_on_the_real_record(smoke):
-	"""C's memory check, leave-one-probe-out, each probe predicted as it ran (no eval pass): a sanity check."""
+def test_held_out_memory_errs_high_never_low(smoke):
+	"""C's memory check, leave-one-probe-out, each probe predicted as it ran. Queries are sized by seq_len, so on
+	data shorter than the limit the engine over-predicts; it must not under-predict."""
 	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES
 
-	errs = {}
 	for p in [p for p in smoke.probes if p.status == "ok"]:
 		pk = api.predict_as_run(_without(smoke, p.id), p).root["memory.peak"]
-		errs[p.id] = abs((pk.point - DEFAULT_CONTEXT_BYTES) / p.memory.peak_reserved_bytes - 1)
-	assert errs["p1"] <= 0.10 and errs["p3"] <= 0.10  # read off their batch-4 twin; p2 extrapolates batch 2
+		assert pk.hi - DEFAULT_CONTEXT_BYTES >= p.memory.peak_reserved_bytes
 
 
 def test_one_rule_for_whether_a_probe_ran_eval(smoke):

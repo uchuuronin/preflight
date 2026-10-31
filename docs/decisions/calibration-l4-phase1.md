@@ -63,3 +63,23 @@ P(OOM) reliability (predicted vs observed, Wilson 95% on each bin):
 The fix is a step-time model with a floor below the probes and proportional growth above. It can't be validated on these same 19 queries, so phase 2's A10 HF jobs are its held-out test.
 
 **P(OOM):** still shown in bins. Only 7 points fall above 30%, too few to draw, so the reliability check can't pass yet.
+
+## Update, after review: memory errs high, synthetic LoRA out of the table
+
+**Memory queries are sized by seq_len again.**
+- **Why:** a run's memory peak comes from the longest row in the whole dataset (or seq_len if rows reach it), and a few probe batches don't see that row. Sizing a query by the rows the probes saw could say "fits" for a run that runs out of memory later.
+- **How it works now:** probes are fitted with the longest padded row they processed, warm-up included. Queries keep the setting, so on data shorter than the limit the engine over-predicts and never under-predicts.
+- **Held out on A's L4 smoke record:** p3 is within 0.5%. p1 and p2 are 76% and 61% high, because their rows reached 517 of 1024.
+- **What would make it tight and still safe:** the dataset's own longest tokenized row, which the probe could record.
+
+**Step time:** a probe cut by its seq_len now gives a lower bound on row length at its batch, instead of being dropped. Held out on the same record: 2 of 3 within 15% (Wilson 95% 21% to 94%), 3 of 3 inside the 90% interval (44% to 100%).
+
+**Installed table:** memory cells only, with the corpus's synthetic LoRA left out entirely (66 scores), so it can't reach a card or a pooled cell. Leave-one-architecture-out coverage is 136 of 149 (91.3%, Wilson 95% 85.6% to 94.8%).
+
+| Cell | n | 90% half-width (log) |
+|---|---|---|
+| finetune (real HF) | 19 | 0.067 |
+| pretrain | 35 | 0.152 |
+| retrieval | 32 | 0.148 |
+| vision | 63 | 0.131 |
+| all job types, pooled | 149 | 0.127 |

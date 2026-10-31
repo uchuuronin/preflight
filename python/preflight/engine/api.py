@@ -403,55 +403,25 @@ def probe_ran_eval(p) -> bool:
 	return p.eval is not None
 
 
-def _row_lengths(record: FlightRecord) -> list[tuple[float, float, float, bool]] | None:
-	"""(batch, longest padded row, seq_len, truncated) for every memory probe of a token lens whose step log
-	records row lengths, or None (then the settings size activations, as before)."""
-	if record.job.lens not in TOKEN_LENSES or all(k.id != "batch_size" for k in record.knobs):
-		return None
-	pts = []
-	for p in record.probes:
-		if p.status not in OK_PROBE or not p.memory or not p.memory.peak_reserved_bytes:
-			continue
-		longest, pv = _longest_row(p), _probe_values(record, p)
-		b, sq = pv.get("batch_size"), float(pv.get("seq_len") or 0)
-		if longest is None or not isinstance(b, (int, float)) or b <= 0:
-			return None
-		pts.append((float(b), min(longest, sq) if sq else longest, sq, bool(sq) and longest >= sq))
-	if not pts or all(t for *_, t in pts):
-		return None
-	return pts
+def _longest_seen(p) -> float | None:
+	"""The longest padded row this probe processed in any logged step (warm-up included: its memory peak covers
+	the whole probe)."""
+	rows = [s.padded_len for s in (p.step_log or []) if s.padded_len]
+	return float(max(rows)) if rows else None
 
 
 def _padded_seq(record: FlightRecord, values: dict, probe=None) -> float | None:
-	"""The sequence length activations are really sized by (Chiya, Oct 30): the longest padded row of a micro-batch,
-	not seq_len. A probe uses the longest row it logged; a query the longest row the probes saw at its batch size,
-	linear in log2(batch) between probed batches and flat beyond them, cut by its own seq_len. None: use the setting."""
-	pts = _row_lengths(record)
-	if pts is None:
+	"""The sequence length activations were sized by, for fitting the memory model: a probe's longest padded row
+	(cut by its seq_len), from its step log. Queries keep their seq_len setting (None here): a full run meets the
+	dataset's longest row, which a few probe batches don't see, so sizing a query by the rows the probes saw could
+	say "fits" for a run that runs out of memory later (review, Oct 30)."""
+	if probe is None or record.job.lens not in TOKEN_LENSES:
 		return None
-	if probe is not None:
-		longest = _longest_row(probe)
-		sq = float(_probe_values(record, probe).get("seq_len") or 0)
-		return None if longest is None else (min(longest, sq) if sq else longest)
-	b_q = float(values.get("batch_size") or 1)
-	seq_q = float(values.get("seq_len") or 0) or math.inf
-	by_batch: dict[float, list[float]] = {}
-	for b, longest, _, trunc in pts:
-		if not trunc:
-			by_batch.setdefault(b, []).append(longest)
-	free = sorted((b, max(ls)) for b, ls in by_batch.items())  # the longest row seen at each batch
-	if b_q <= free[0][0]:
-		l_q = free[0][1]
-	elif b_q >= free[-1][0]:
-		l_q = free[-1][1]
-	else:
-		l_q = free[-1][1]
-		for (b0, l0), (b1, l1) in itertools.pairwise(free):
-			if b0 <= b_q <= b1:
-				t = 0.0 if b1 == b0 else (math.log2(b_q) - math.log2(b0)) / (math.log2(b1) - math.log2(b0))
-				l_q = l0 + t * (l1 - l0)
-				break
-	return min(seq_q, l_q)
+	longest = _longest_seen(probe)
+	sq = float(_probe_values(record, probe).get("seq_len") or 0)
+	if longest is None:
+		return None
+	return min(longest, sq) if sq else longest
 
 
 def _sized(shape, values: dict, seq: float | None) -> tuple[knobs.Shape, dict]:
@@ -697,11 +667,6 @@ def _measured_tokens(p) -> tuple[float, float] | None:
 	return (float(t), float(n)) if ok else None
 
 
-def _longest_row(p) -> float | None:
-	rows = [s.padded_len for s in (p.step_log or []) if s.kind == "timed" and s.padded_len]
-	return float(max(rows)) if rows else None
-
-
 def _token_points(record: FlightRecord) -> list[tuple[float, float, float, float, bool]] | None:
 	"""(batch, accumulation, padded tokens per sample, seq_len, truncated) for every timed probe, or None unless
 	the measured-token axis applies: a token lens, a batch_size knob, every timed probe reporting tokens (mixing
@@ -719,7 +684,7 @@ def _token_points(record: FlightRecord) -> list[tuple[float, float, float, float
 			return None
 		tokens, samples = m
 		sq = float(pv.get("seq_len") or 0)
-		longest = _longest_row(p)
+		longest = _longest_seen(p)
 		cut = (longest >= sq) if longest is not None else (tokens / samples >= TRUNCATED_SHARE * sq)
 		pts.append((float(b), samples / float(b), tokens / samples, sq, bool(sq) and cut))
 	if not pts or all(trunc for *_, trunc in pts):
@@ -767,7 +732,12 @@ def _step_work(record: FlightRecord, values: dict) -> float:
 				t = 0.0 if b1 == b0 else (math.log2(b_q) - math.log2(b0)) / (math.log2(b1) - math.log2(b0))
 				u_q = u0 + t * (u1 - u0)
 				break
-	return b_q * accum * min(seq_q, u_q)
+	# a probe cut by its seq_len still bounds the rows from below: at its batch, rows are at least that long
+	floor = max(
+		(u for b, _, u, sq, trunc in pts if trunc and b == b_q and seq_q >= sq),
+		default=0.0,
+	)
+	return b_q * accum * min(seq_q, max(u_q, floor))
 
 
 def _probe_work(record: FlightRecord, p) -> float:
