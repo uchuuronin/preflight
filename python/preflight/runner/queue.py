@@ -497,6 +497,27 @@ class InMemoryJobStore:
 
 			return self._txn(do)
 
+	def expire(self, older_than_s: float) -> list[str]:
+		"""Forget finished jobs submitted more than older_than_s ago: their index entry, their
+		idempotency key and any copy kept for reads (Chiya, Oct 30: everything about a job expires
+		with its record). Live jobs are never touched. Returns the ids forgotten."""
+		cutoff = self._clock() - older_than_s
+		with self._lock:
+			old = [j for j, info in self._index.items() if (info.get("submitted_at") or 0) < cutoff]
+			if not old:
+				return []
+
+			def do():
+				for job_id in old:
+					info = self._index.pop(job_id)
+					self._done.pop(job_id, None)
+					key = (info.get("visitor"), info.get("idempotency_key"))
+					if self._keys.get(key) == job_id:
+						del self._keys[key]
+				return old
+
+			return self._txn(do)
+
 	def emit(self, job_id: str, *, stage: str, token: int | None = None, **fields) -> JobEvent:
 		"""Progress from a worker. With its lease token, it is fenced like heartbeat and complete: an
 		attempt that was reaped or cancelled can't add events or move the job's record."""

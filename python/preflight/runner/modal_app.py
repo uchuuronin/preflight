@@ -114,9 +114,11 @@ _base = modal.Image.debian_slim(python_version="3.11").env(
 	{"PYTHONPATH": REMOTE_PKG, "PREFLIGHT_ZOO": "/root/zoo", "PREFLIGHT_GPU_CEILING": GPU_CEILING}
 )
 # The worker reads flags as C's API does (runner/flags.py) and ships the same flag files as the
-# API's image (api/app.py: flags.json only, with PREFLIGHT_ENV=production). Both are baked in, so
-# changing a flag takes a deploy of the runner as well as the API.
+# API's image (api/app.py), with PREFLIGHT_ENV=production: flags.json, then flags.production.json
+# (Chiya, Oct 30) when the repo has it. Both are baked in, so changing a flag takes a deploy of
+# the runner as well as the API; tests/test_pipeline.py holds the two images to the same files.
 FLAG_ENV = "production"  # api/app.py's PREFLIGHT_ENV
+FLAG_OVERRIDE = FLAGS_SRC.parent / f"flags.{FLAG_ENV}.json"
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
@@ -125,6 +127,8 @@ worker_image = (
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 	.add_local_file(FLAGS_SRC, f"{REMOTE_PKG}/flags.json")
 )
+if FLAG_OVERRIDE.is_file():
+	worker_image = worker_image.add_local_file(FLAG_OVERRIDE, f"{REMOTE_PKG}/flags.{FLAG_ENV}.json")
 probe_image = (
 	_base.apt_install("git")
 	.pip_install(*PROBE_PACKAGES)
@@ -171,20 +175,25 @@ def image_tag() -> str:
 
 
 class DictCache:
-	"""Probe cache over a Modal Dict: content-hash key, probe JSON value."""
+	"""Probe cache over a Modal Dict: content-hash key, the probe and when it was cached (entries
+	expire at 30 days, runner/retention.py)."""
 
 	def __init__(self, d):
 		self._d = d
 
 	def get(self, key: str) -> dict | None:
+		from preflight.runner.retention import cached_probe
+
 		try:
-			return self._d.get(key)
+			return cached_probe(self._d.get(key))
 		except Exception:
 			return None  # a cache outage costs a probe run, never a job
 
 	def put(self, key: str, probe: dict) -> None:
+		from preflight.runner.retention import cache_entry
+
 		with contextlib.suppress(Exception):
-			self._d[key] = probe
+			self._d[key] = cache_entry(probe)
 
 
 # ---------------------------------------------------------------- the job store
@@ -353,6 +362,10 @@ class JobStoreService:
 		return self.m.reap()
 
 	@modal.method()
+	def expire(self, older_than_s: float) -> int:
+		return self.m.expire(older_than_s)
+
+	@modal.method()
 	def demand(self) -> dict:
 		return self.m.demand()
 
@@ -429,33 +442,66 @@ def run_worker() -> int:
 PRUNE_EVERY_S = 86_400  # PM decision (Oct 28): records go after 30 days, checked once a day
 
 
-def _prune_records_daily() -> list[str]:
-	"""Once a day (the last run's time is kept in the jobs Dict), delete records older than 30 days."""
+def _prune_records_daily() -> dict:
+	"""Once a day (the last run's time is kept in the jobs Dict), delete everything about a job
+	older than 30 days: its record, its uploaded files, its cached probe results and its entry in
+	the job index (runner/retention.py). Each part runs even if another fails."""
 	import time
 
 	from preflight.runner.records import prune
+	from preflight.runner.retention import TTL_S, prune_cache, prune_uploads
 
 	last = jobs_dict.get("records_pruned_at") or 0
 	if time.time() - last < PRUNE_EVERY_S:
-		return []
+		return {}
 	jobs_dict["records_pruned_at"] = time.time()  # first, so a failure doesn't retry every minute
-	records_vol.reload()
-	removed = prune(RECORDS_DIR)
-	if removed:
-		records_vol.commit()
-		print(f"pruned {len(removed)} records older than 30 days", flush=True)
-	return removed
+	out: dict = {}
+
+	def part(name, fn):
+		try:
+			out[name] = fn()
+		except Exception as exc:
+			out[name] = f"failed: {type(exc).__name__}"
+			print(f"cleanup of {name} failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+
+	def records():
+		records_vol.reload()
+		removed = prune(RECORDS_DIR)
+		if removed:
+			records_vol.commit()
+		return len(removed)
+
+	def uploads():
+		uploads_vol.reload()
+		removed = prune_uploads(UPLOADS_DIR)
+		if removed:
+			uploads_vol.commit()
+		return len(removed)
+
+	def cache():
+		return len(prune_cache(list(cache_dict.items()), cache_dict.pop))
+
+	def jobs():
+		return JobStoreService().expire.remote(TTL_S)
+
+	for name, fn in (("records", records), ("uploads", uploads), ("probe_cache", cache), ("job_index", jobs)):
+		part(name, fn)
+	print(f"daily cleanup (older than 30 days): {out}", flush=True)
+	return out
 
 
 @app.function(
-	image=worker_image, schedule=modal.Period(minutes=1), timeout=120, volumes={RECORDS_DIR: records_vol}
+	image=worker_image,
+	schedule=modal.Period(minutes=1),
+	timeout=120,
+	volumes={RECORDS_DIR: records_vol, UPLOADS_DIR: uploads_vol},
 )
 def tick() -> dict:
 	"""Free leases whose workers died; start workers for jobs waiting in the queue; once a day,
-	delete records older than 30 days."""
+	delete everything about a job older than 30 days."""
 	import time
 
-	pruned: list[str] = []
+	pruned: dict = {}
 	try:  # a failed cleanup never holds up the queue, but it says so
 		due = time.time() - (jobs_dict.get("records_pruned_at") or 0) >= PRUNE_EVERY_S
 		if due and deployed_here()[0] is True:  # a temporary copy's tick never deletes shared records
@@ -469,4 +515,4 @@ def tick() -> dict:
 		run_worker.spawn()
 	if d["oldest_queued_s"] > 600:
 		print(f"ALERT backlog: oldest queued job has waited {d['oldest_queued_s']:.0f} s", flush=True)
-	return {"reaped": reaped, "pruned": len(pruned), **d}
+	return {"reaped": reaped, "pruned": pruned, **d}
