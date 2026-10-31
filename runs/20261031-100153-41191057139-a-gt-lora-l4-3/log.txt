@@ -1,0 +1,85 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Gm15oSsW1zrEPhoTf3KnTJ
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function startup_check_worker.
+└── ✓ Created Function startup_check_sandbox.
+Traceback (most recent call last):
+Stopping app - uncaught exception raised locally: ValueError('/root/zoo/finetune_lora_hf has no train.py').
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/ops_app.py", line 330, in ground_truth_on_l4
+    return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/preflight/preflight/recorder/ground_truth.py", line 145, in measure
+    raise ValueError(f"{script_dir} has no train.py")
+ValueError: /root/zoo/finetune_lora_hf has no train.py
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py:345 │
+│ in ground_truth                                                              │
+│                                                                              │
+│   344 │                                                                      │
+│ ❱ 345 │   res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps │
+│   346 │   Path("out").mkdir(exist_ok=True)                                   │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_object.py:49 in wrapped                                                  │
+│                                                                              │
+│    48 │   │   await self.hydrate()                                           │
+│ ❱  49 │   │   return await method(self, *args, **kwargs)                     │
+│    50                                                                        │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2081 in remote                                              │
+│                                                                              │
+│   2080 │   │                                                                 │
+│ ❱ 2081 │   │   return await self._call_function(args, kwargs)                │
+│   2082                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2018 in _call_function                                      │
+│                                                                              │
+│   2017 │   │                                                                 │
+│ ❱ 2018 │   │   return await invocation.run_function()                        │
+│   2019                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:517 in run_function                                         │
+│                                                                              │
+│    516 │   │   │   # No more retries left.                                   │
+│ ❱  517 │   │   │   return await _process_result(                             │
+│    518 │   │   │   │   await_response.output.result, await_response.output.d │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_utils/function_utils.py:572 in _process_result                           │
+│                                                                              │
+│   571 │   │   │                                                              │
+│ ❱ 572 │   │   │   raise exc_with_hints(exc)                                  │
+│   573                                                                        │
+│                                                                              │
+│     ...Remote call to Modal Function (ta-01M68R28345KNJKMWDRBNW12GR)...      │
+│                                                                              │
+│ /root/ops_app.py:330 in ground_truth_on_l4                                   │
+│                                                                              │
+│ ❱ 330 return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=rec │
+│                                                                              │
+│                                                                              │
+│ /opt/preflight/preflight/recorder/ground_truth.py:145 in measure             │
+│                                                                              │
+│ ❱ 145 raise ValueError(f"{script_dir} has no train.py")                      │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ValueError: /root/zoo/finetune_lora_hf has no train.py
