@@ -150,3 +150,15 @@ def test_the_bare_run_keeps_its_own_hf_home_so_the_probe_can_write_its_locks(tmp
 	own = Path(seen["env"]["HF_HOME"])
 	assert own != home and seen["link"] == weights.resolve()
 	assert os.environ["HF_HOME"] == str(home)  # the probe keeps the shared one
+
+
+def test_the_log_line_summarises_the_rl_lists():
+	res = {"script": "grpo_trl", "bare": {"walls_s": [1.0]}, "recorder": {"step_log": [], "log_tail": "",
+		"rl": {"group_size": 8, "pass_rate_per_prompt": [0.5] * 200, "kl": [0.1] * 50, "zero_spread_fraction": 0.2}}}  # fmt: skip
+	b = gt.brief(res)
+	assert b["recorder"]["rl"] == {
+		"group_size": 8,
+		"prompts": 200,
+		"truncation_rate": None,
+		"zero_spread_fraction": 0.2,
+	}
