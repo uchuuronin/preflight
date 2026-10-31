@@ -177,7 +177,7 @@ def _remote_runs(tmp_path, runs):
 		d = src / "runs" / name
 		d.mkdir(parents=True)
 		(d / "log.txt").write_text(log)
-		(d / "result.json").write_text(json.dumps({"cmd": cmd}))
+		(d / "result.json").write_text(json.dumps({"cmd": cmd, "finished_at": "2026-10-28T23:31:28Z"}))
 	git("add", "-A", cwd=src)
 	git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "runs", cwd=src)
 	clone = tmp_path / "clone"
@@ -190,7 +190,7 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 
 	view = "\u2713 Initialized. View run at \nhttps://modal.com/apps/me/main/{}\n"
 	clone = _remote_runs(tmp_path, {
-		"r1-a-gt-lora-l4-2": ("modal run --env main python/preflight/runner/ops_app.py::ground_truth --script x",
+		"20261028-225112-1-a-gt-lora-l4-2": ("modal run --env main python/preflight/runner/ops_app.py::ground_truth --script x",
 			view.format("ap-opsAAAAAA")),
 		"r2-a-stop-ops-main": ("python -m preflight.runner.stop_app --env main --app preflight-runner-ops",
 			"stopping ap-runrBBBBBB and ap-opsAAAAAA"),  # mentions apps, started none
@@ -220,7 +220,7 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 		return Done(0, "[ground truth 22:52:01] bare run of finetune_lora_hf")
 
 	monkeypatch.setattr(app_logs.subprocess, "run", run)
-	assert app_logs.ops_run_for("ap-opsAAAAAA", "main") == "runs/r1-a-gt-lora-l4-2"
+	assert app_logs.ops_run_for("ap-opsAAAAAA", "main") == "runs/20261028-225112-1-a-gt-lora-l4-2"
 	assert app_logs.ops_run_for("ap-runrBBBBBB", "main") is None  # the job runner, never
 	assert app_logs.ops_run_for("ap-devCCCCCC", "main") is None  # another environment's run
 	assert app_logs.ops_run_for("ap-nowhere99", "main") is None
@@ -231,4 +231,13 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 	assert app_logs.main(["--env", "main", "ap-opsAAAAAA"]) == 0
 	assert logs[-1][-1] == "ap-opsAAAAAA" and "--tail" in logs[-1]
 	got = json.loads((clone / "out" / "app_logs.json").read_text())
-	assert got["app"] == "preflight-runner-ops" and "r1-a-gt-lora-l4-2" in got["state"]
+	assert got["app"] == "preflight-runner-ops" and "a-gt-lora-l4-2" in got["state"]
+	# read over the run's own window (Modal's default is the last hour), to an hour past its end
+	assert got["since"] == "2026-10-28T22:46:12" and got["until"] == "2026-10-29T00:31:28"
+	assert logs[-1][-5:] == [
+		"--since",
+		"2026-10-28T22:46:12",
+		"--until",
+		"2026-10-29T00:31:28",
+		"ap-opsAAAAAA",
+	]

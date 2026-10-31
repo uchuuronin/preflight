@@ -32,6 +32,10 @@ _STARTED = (
 	r"Initialized\. View run at\s*\n?\s*https://modal\.com/apps/[A-Za-z0-9_-]+/{env}/(ap-[A-Za-z0-9]{{6,40}})"
 )
 TAIL = 5000  # log entries fetched (Modal's default is 100)
+# Modal fetches the last hour unless told otherwise: an app no longer listed is read over its
+# run's own window, from the run's start to an hour past its end (an app outlives a cut-off run)
+AFTER_RUN_S = 3600
+_ISO = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?")
 MAX_LOG_CHARS = 2_000_000
 
 
@@ -83,26 +87,57 @@ def ops_run_for(app_id: str, env: str) -> str | None:
 	return found
 
 
+def run_window(run: str) -> tuple[str, str] | None:
+	"""(since, until) for a remote-runs record: its directory's start time to an hour past the
+	finished_at in its result.json, as Modal's --since/--until take them."""
+	from datetime import UTC, datetime, timedelta
+
+	m = re.search(r"/(\d{8}-\d{6})-", run + "/")
+	try:
+		start = datetime.strptime(m.group(1), "%Y%m%d-%H%M%S").replace(tzinfo=UTC) if m else None
+		res = json.loads(_git("show", f"{REMOTE_RUNS}:{run}/result.json").stdout)
+		end = datetime.fromisoformat(str(res.get("finished_at")).replace("Z", "+00:00"))
+	except (ValueError, TypeError, AttributeError):
+		return None
+	if start is None:
+		return None
+	fmt = "%Y-%m-%dT%H:%M:%S"
+	return (start - timedelta(minutes=5)).strftime(fmt), (end + timedelta(seconds=AFTER_RUN_S)).strftime(fmt)
+
+
 def main(argv: list[str] | None = None) -> int:
 	ap = argparse.ArgumentParser(prog="python -m preflight.runner.app_logs")
 	ap.add_argument("--env", required=True, help="Modal environment, e.g. main")
 	ap.add_argument("app_id")
-	ap.add_argument("--seconds", type=int, default=90, help="stop following a live app after this long")
+	ap.add_argument("--seconds", type=int, default=90, help="stop a slow fetch after this long")
+	ap.add_argument(
+		"--since", help="UTC, e.g. 2026-10-28T22:45:00 (default: Modal's last hour, or the run's window)"
+	)
+	ap.add_argument("--until", help="UTC, same form")
 	ns = ap.parse_args(argv)
-	if not APP_ID.fullmatch(ns.app_id) or not 5 <= ns.seconds <= 600:
-		print("an app id looks like ap-..., and --seconds is 5 to 600", file=sys.stderr)
+	bad_time = any(t is not None and not _ISO.fullmatch(t) for t in (ns.since, ns.until))
+	if not APP_ID.fullmatch(ns.app_id) or not 5 <= ns.seconds <= 600 or bad_time:
+		print("an app id looks like ap-..., --seconds is 5 to 600, times look like 2026-10-28T22:45:00",
+			file=sys.stderr)  # fmt: skip
 		return 2
+	window = (ns.since, ns.until)
 	app = _app(ns.env, ns.app_id)
 	if app is None:
 		run = ops_run_for(ns.app_id, ns.env)
 		if run is not None:
 			app = {"name": "preflight-runner-ops", "state": f"no longer listed; started by {run}"}
+			if ns.since is None and ns.until is None:
+				window = run_window(run) or window
 	if app is None or app["name"] not in ALLOWED_APPS:
 		print(f"only the logs of {sorted(ALLOWED_APPS)} are read here; {ns.app_id} is "
 			f"{app['name'] if app else 'not in the app list'}", file=sys.stderr)  # fmt: skip
 		return 2
 	# fetch (not follow): Modal returns the last TAIL entries and exits; --seconds bounds a slow fetch
-	cmd = ["modal", "app", "logs", "--env", ns.env, "--tail", str(TAIL), "--timestamps", ns.app_id]
+	cmd = ["modal", "app", "logs", "--env", ns.env, "--tail", str(TAIL), "--timestamps"]
+	for flag, value in zip(("--since", "--until"), window, strict=True):
+		if value is not None:
+			cmd += [flag, value]
+	cmd.append(ns.app_id)
 	try:
 		r = subprocess.run(cmd, capture_output=True, text=True, timeout=ns.seconds)
 		text, ended, code = r.stdout + r.stderr, f"exit {r.returncode}", r.returncode
@@ -117,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
 	Path("out").mkdir(exist_ok=True)
 	Path("out/app_logs.txt").write_text(text[-MAX_LOG_CHARS:])
 	summary = {"app_id": ns.app_id, "env": ns.env, "app": app["name"], "state": app["state"], "read": ended,
+		"since": window[0], "until": window[1],
 		"chars": len(text)}  # fmt: skip
 	Path("out/app_logs.json").write_text(json.dumps(summary, indent=2))
 	print(json.dumps(summary, indent=2))
