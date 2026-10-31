@@ -181,6 +181,7 @@ class ProbeSpec:
 	out_dir: Path | None = None
 	gpu_usd_per_hour: float = 0.0
 	nproc: int = 1  # processes on this node, one per GPU, under torchrun (DDP, FSDP)
+	image: str = "probe"  # which sandbox image runs it: "probe", or "serving" (vLLM, its own torch)
 
 
 @dataclass

@@ -144,7 +144,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"seed_force": spec.seed_force,
 		"install_requirements": spec.install_requirements,
 		"gpu": gpu,
-		"image": image,
+		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
@@ -251,6 +251,7 @@ def _spec(
 		seed=p.seed,
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
+		image="serving" if sm.lens == "serving" else "probe",  # vLLM lives in its own image
 	)
 
 

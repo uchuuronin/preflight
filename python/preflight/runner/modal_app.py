@@ -144,6 +144,32 @@ probe_image = (
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 
+# serving probes only (zoo/serving_vllm): vLLM 0.6.4.post1 pins torch 2.5.1 and needs numpy below 2,
+# and its pyairports dependency has no wheel, so it can't share the probe image (numpy 2, wheels
+# only). Its own pins; the probe image above is unchanged.
+SERVING_PACKAGES = [
+	"vllm==0.6.4.post1",
+	"torch==2.5.1",
+	"transformers==4.46.3",
+	"numpy<2",
+	"datasets==3.1.0",
+	"psutil==6.1.0",
+]
+serving_image = (
+	_base.apt_install("git")
+	.pip_install(*SERVING_PACKAGES)
+	.env(
+		{
+			"HF_HOME": HF_HOME,
+			"PREFLIGHT_WEIGHTS_HUB": f"{WEIGHTS_DIR}/hf/hub",
+			"PREFLIGHT_SANDBOX_DIR": "/tmp",
+			"PREFLIGHT_PROBE_UID": "61000",
+		}
+	)
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+)
+SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image}
+
 jobs_dict = modal.Dict.from_name("preflight-jobs", create_if_missing=True)
 cache_dict = modal.Dict.from_name("preflight-probe-cache", create_if_missing=True)
 records_vol = modal.Volume.from_name("preflight-records", create_if_missing=True)
@@ -377,13 +403,14 @@ def _sandbox_factory(owner=None):
 	"""The probe sandbox, created inside `owner` (this app by default; the startup check passes its
 	own running app). gpu "cpu" makes a GPU-less sandbox with every other setting the same."""
 
-	def create(gpu: str, extra_egress: list[str] | tuple = ()):
-		"""extra_egress: hosts beyond EGRESS, only the agent proxy's tunnel (runner/agent_jobs.py)."""
+	def create(gpu: str, extra_egress: list[str] | tuple = (), image: str = "probe"):
+		"""extra_egress: hosts beyond EGRESS, only the agent proxy's tunnel (runner/agent_jobs.py).
+		image: "probe", or "serving" for vLLM probes (SANDBOX_IMAGES)."""
 		from preflight.probes.gpu_choice import modal_gpu
 
 		return modal.Sandbox.create(
 			app=owner if owner is not None else app,
-			image=probe_image,
+			image=SANDBOX_IMAGES[image],
 			gpu=None if gpu == "cpu" else modal_gpu(gpu),
 			timeout=30 * 60,
 			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes

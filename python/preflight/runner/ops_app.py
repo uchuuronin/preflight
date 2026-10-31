@@ -12,6 +12,7 @@ reuses the runner's images, so what it checks is what the runner runs.
 """
 
 import contextlib
+import json
 import os
 import uuid
 from pathlib import Path
@@ -26,6 +27,7 @@ from preflight.runner.modal_app import (
 	image_tag,
 	probe_image,
 	records_vol,
+	serving_image,
 	weights_vol,
 	worker_image,
 )
@@ -445,3 +447,40 @@ def agent_sample(script: str = "agent_eval_spark", k: int = 30, max_usd: float =
 	res = agent_sample_hosted.remote(files, entry, k, max_usd)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/agent_sample_{script}.json").write_text(json.dumps(res, indent=2))
+
+
+# ---------------------------------------------------------------- serving image (CPU, before any serving probe)
+
+
+@ops.function(image=serving_image, timeout=600)
+def startup_check_serving_image() -> dict:
+	"""The serving image starts: vLLM, its torch and numpy, and the recorder import, without a GPU."""
+	import subprocess
+	import sys
+
+	cmd = ("import json, numpy, torch, vllm, preflight.recorder.runtime as r; print(json.dumps({'vllm': vllm.__version__,"
+		" 'torch': torch.__version__, 'numpy': numpy.__version__, 'recorder': r.__file__}))")  # fmt: skip
+	p = subprocess.run([sys.executable, "-c", cmd], capture_output=True, text=True, timeout=300)
+	out = {"exit": p.returncode, "stderr": p.stderr[-1500:] if p.returncode else ""}
+	if p.returncode == 0:
+		out.update(json.loads(p.stdout.strip().splitlines()[-1]))
+	return out
+
+
+@ops.local_entrypoint()
+def startup_check_serving():
+	"""modal run --env main python/preflight/runner/ops_app.py::startup_check_serving
+	Writes out/startup_check_serving.json; exits non-zero unless vLLM 0.6.4.post1 on torch 2.5.1 imports."""
+	import sys
+
+	res = startup_check_serving_image.remote()
+	res["ok"] = (
+		res.get("exit") == 0
+		and res.get("vllm") == "0.6.4.post1"
+		and str(res.get("torch", "")).startswith("2.5.1")
+	)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/startup_check_serving.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps(res, indent=2), flush=True)
+	if not res["ok"]:
+		sys.exit(1)
