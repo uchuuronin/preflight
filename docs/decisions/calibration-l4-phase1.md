@@ -181,3 +181,32 @@ The method was fixed before looking: the calibrator as committed, the A100 never
 | Step time, same GPU | 11 of 12 | 15 of 16 | **26 of 28, 93% (77% to 98%)** |
 
 **Step time holds up on an unseen GPU. Memory under-covers:** the 95% interval tops out just under 90%. Of the six misses, two are underestimates, the dangerous direction: one actual peak is 40% above the prediction (a PCIe vision group), the other 16% above (a PCIe pretrain group). The other four are overestimates, two of them extreme: SXM vision groups at 3.4× and 6.9× below the prediction. These are diagnoses, not fixes. Nothing is tuned on these rows. The card reports the per-board figures (`per_gpu_coverage`) beside the leave-one-architecture-out coverage. The fix has to be checked on data other than the A100: the AMD rows, and the unseen scripts on Nov 2.
+
+## Cross-GPU step time on the corpus: K1 alone, the GBDT residual, and K1's band (Oct 31)
+
+`scripts/fit_steptime_gbdt.py` builds every case where two non-A100 GPUs ran the same config: 2,286 cases over 566 configs, on A10, L4, L40S and T4. Each case replays the source GPU's op table onto the target with K1 and compares the result with the target's measured step. Scoring is leave-one-GPU-out: for each GPU, train on the pairs that don't touch it, and test on the pairs that target it.
+
+**The corpus op table counts device time three times.** The worker keeps profiler ranges, aten ops and the CUDA kernels under them, each with its own self device time. Together they sum to 2.6× the step (median, L4 rows), which made K1 look 2–3× off. The script uses the aten ops alone, which carry the FLOPs and byte estimates and cover about 0.9 of the step. The worker's table should keep one view; that is a corpus fix for the next sweep.
+
+**GBDT residual: fails held out, not installed.** Its hyperparameters were fixed before any test GPU was scored (200 trees, depth 3, rate 0.05). Within 20% of the measured step (measured):
+
+| Target GPU | K1 | K1 + GBDT |
+| --- | --- | --- |
+| A10 (830) | 522, 63% | 428, 52% |
+| L4 (830) | 503, 61% | 395, 48% |
+| L40S (435) | 245, 56% | 212, 49% |
+| T4 (191) | 112, 59% | 129, 68% |
+| All, Wilson 95% | **1,382 of 2,286, 60% (58% to 62%)** | 1,164, 51% (49% to 53%) |
+
+The residual only helps on T4. Overall it is worse, so `engine/steptime_gbdt.py` stays unused: `available()` is False until a generated file shows it beating K1 held out. By the plan's rule, the GNN would have to beat the GBDT; the more useful bar now is beating K1.
+
+**K1's band is overconfident on the corpus: a decision for Chiya.** The band is σ = 0.12, sized by simulation (S4c), and its 90% band covers only 1,352 of 2,286 cases (59%, Wilson 57% to 61%). A split-conformal half-width fitted on the other GPUs' pairs covers 2,130 of 2,286 held out (93%, Wilson 92% to 94%). The pooled half-width is 0.45, roughly ×0.64 to ×1.57.
+
+| Held-out GPU | Half-width from the others | Covered |
+| --- | --- | --- |
+| A10 | 0.59 | 98% |
+| L4 | 0.49 | 94% |
+| L40S | 0.44 | 87% |
+| T4 | 0.43 | 84% |
+
+The proposal is to install it as the cross-GPU band, behind `engine.steptime_cross_gpu` (already off). These are the corpus's aten ops, not A's kernel tables, so it also gets checked on the AMD rows and the Nov 2 scripts.
