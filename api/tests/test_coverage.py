@@ -36,7 +36,10 @@ def test_a_real_run_is_scored_only_on_probes_held_out():
 	# engine reads p3's time back: the test is weak here, and the page says so.
 	p2 = next(c for c in steps if c["probe"] == "p2")
 	assert abs(p2["measured"] - 0.837) < 0.001
-	assert p2["predicted"]["point"] == pytest.approx(1.666, rel=0.01)
+	# The exact number moves with the engine (1.666 s before B's tokens-per-step scaling, about 1.07 s
+	# after, Oct 31), so check only that it was predicted, not read back from p2 itself.
+	assert p2["predicted"]["point"] is not None
+	assert p2["predicted"]["point"] != pytest.approx(p2["measured"], rel=0.001)
 	# Eval-off re-runs after the eval OOM are scored against the peak less the engine's eval term.
 	mem = [c for c in checks if c["metric"] == "peak_memory"]
 	assert {c["probe"] for c in mem} == {"p1", "p2", "p3"}

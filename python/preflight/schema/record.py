@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.4.0"
+SCHEMA_VERSION = "0.5.0"
 
 
 def _now() -> datetime:
@@ -602,6 +602,34 @@ class CampaignCell(Strict):
 	segments: int | None = Field(default=None, description="Wall-time-capped segments the run splits into")
 	lane: str | None = None
 	cut: bool = False
+	time: Estimate | None = Field(default=None, description="0.5.0: this run's wall time, with its interval")
+	start_s: Estimate | None = Field(
+		default=None,
+		description="0.5.0: when this run starts, in seconds after the campaign starts, in its lane's slot order",
+	)
+
+
+class CampaignQuota(Strict):
+	"""0.5.0: whether the campaign's checkpoints and outputs fit the storage quota."""
+
+	needed_bytes: Estimate
+	quota_bytes: float | None = None
+	fits: bool | None = Field(default=None, description="None when the need straddles the quota")
+	reason: str | None = None
+
+
+class AshaRung(Strict):
+	steps: int = Field(ge=0)
+	runs: int = Field(ge=0)
+
+
+class CampaignAsha(Strict):
+	"""0.5.0: an ASHA pruning plan and the GPU-hours it saves."""
+
+	rungs: list[AshaRung] = Field(default_factory=list)
+	gpu_hours: Estimate | None = None
+	saved_gpu_hours: Estimate | None = None
+	reason: str | None = None
 
 
 class Campaign(Strict):
@@ -611,6 +639,16 @@ class Campaign(Strict):
 	cut_list: list[str] = Field(default_factory=list)
 	completion_quantiles: dict[str, datetime] = Field(default_factory=dict, description="p10, p50, p90 ...")
 	checkpoint_interval_s: float | None = None
+	# 0.5.0 (B's request, Oct 31): the plan's intervals. gpu_hours and usd cover the runs that go ahead;
+	# grid_gpu_hours and grid_usd the whole grid before any budget cut.
+	gpu_hours: Estimate | None = None
+	usd: Estimate | None = None
+	finish_s: Estimate | None = Field(default=None, description="Seconds from start until the last run ends")
+	grid_gpu_hours: Estimate | None = None
+	grid_usd: Estimate | None = None
+	quota: CampaignQuota | None = None
+	asha: CampaignAsha | None = None
+	notes: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------- provenance and costs

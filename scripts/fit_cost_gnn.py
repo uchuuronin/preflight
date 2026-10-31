@@ -31,7 +31,9 @@ SEED = 0
 
 
 def node_vocab(rows: list[dict], top: int = 24) -> list[str]:
-	c = Counter(n["target"] if n["op"] == "call_module" else n["op"] for r in rows for n in r["graph"]["nodes"])
+	c = Counter(
+		n["target"] if n["op"] == "call_module" else n["op"] for r in rows for n in r["graph"]["nodes"]
+	)
 	return [k for k, _ in c.most_common(top)]
 
 
@@ -96,7 +98,12 @@ def fit_gbdt(x, y):
 	from sklearn.ensemble import GradientBoostingRegressor
 
 	return GradientBoostingRegressor(
-		n_estimators=300, max_depth=4, learning_rate=0.05, subsample=0.8, min_samples_leaf=10, random_state=SEED
+		n_estimators=300,
+		max_depth=4,
+		learning_rate=0.05,
+		subsample=0.8,
+		min_samples_leaf=10,
+		random_state=SEED,
 	).fit(x, y)
 
 
@@ -125,7 +132,12 @@ def fit_gnn(graphs, globals_, y, epochs: int = 40):
 	model = Sage()
 	opt = torch.optim.Adam(model.parameters(), lr=3e-3, weight_decay=1e-4)
 	data = [
-		(torch.tensor(x), torch.tensor(a), torch.tensor((g - mu_g) / sd_g, dtype=torch.float32), torch.tensor(t, dtype=torch.float32))
+		(
+			torch.tensor(x),
+			torch.tensor(a),
+			torch.tensor((g - mu_g) / sd_g, dtype=torch.float32),
+			torch.tensor(t, dtype=torch.float32),
+		)
 		for (x, a), g, t in zip(graphs, globals_, y, strict=True)
 	]
 	rng = np.random.default_rng(SEED)
@@ -140,7 +152,16 @@ def fit_gnn(graphs, globals_, y, epochs: int = 40):
 	def predict(gs, globs):
 		with torch.no_grad():
 			return np.asarray(
-				[float(model(torch.tensor(x), torch.tensor(a), torch.tensor((g - mu_g) / sd_g, dtype=torch.float32))) for (x, a), g in zip(gs, globs, strict=True)]
+				[
+					float(
+						model(
+							torch.tensor(x),
+							torch.tensor(a),
+							torch.tensor((g - mu_g) / sd_g, dtype=torch.float32),
+						)
+					)
+					for (x, a), g in zip(gs, globs, strict=True)
+				]
 			)
 
 	return predict
@@ -159,7 +180,9 @@ def report(name: str, pred: np.ndarray, y: np.ndarray) -> tuple[int, int]:
 	err = np.abs(np.exp(pred - y) - 1)
 	h, n = int((err <= TOL).sum()), len(y)
 	lo, hi = conformal.wilson(h, n)
-	print(f"  {name}: within 20% {h}/{n} ({lo:.0%} to {hi:.0%}); median |log| {np.median(np.abs(pred - y)):.3f}")
+	print(
+		f"  {name}: within 20% {h}/{n} ({lo:.0%} to {hi:.0%}); median |log| {np.median(np.abs(pred - y)):.3f}"
+	)
 	return h, n
 
 
@@ -175,7 +198,9 @@ def main(argv: list[str] | None = None) -> int:
 	xg = np.hstack([glob, summ])
 	graphs = [(node_features(r, vocab), adjacency(r)) for r in rows]
 	fold = np.asarray(folds_by_arch(rows))
-	print(f"{len(rows)} rows, {len({cal.arch_key(r['config']) for r in rows})} architectures, {FOLDS} folds by architecture")
+	print(
+		f"{len(rows)} rows, {len({cal.arch_key(r['config']) for r in rows})} architectures, {FOLDS} folds by architecture"
+	)
 	p_gb = np.zeros(len(rows))
 	p_gnn = np.zeros(len(rows))
 	for k in range(FOLDS):
@@ -189,7 +214,9 @@ def main(argv: list[str] | None = None) -> int:
 	gn = report("GNN (GraphSAGE over the module graph)", p_gnn, y)
 	ens_w = 0.5
 	report("mean of the two", ens_w * p_gb + (1 - ens_w) * p_gnn, y)
-	print("verdict:", "the GNN beats the GBDT" if gn[0] > gb[0] else "the GNN does not beat the GBDT: not used")
+	print(
+		"verdict:", "the GNN beats the GBDT" if gn[0] > gb[0] else "the GNN does not beat the GBDT: not used"
+	)
 	# Chiya, Oct 31: the mix is used only if its paired gain over the GBDT excludes zero, with architectures resampled
 	ens = ens_w * p_gb + (1 - ens_w) * p_gnn
 	hit_gb = np.abs(np.exp(p_gb - y) - 1) <= TOL

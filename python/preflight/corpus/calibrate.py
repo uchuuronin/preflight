@@ -407,7 +407,9 @@ def main(argv: list[str] | None = None) -> int:
 			"and pass --keep-holdout <table> to carry the earlier scores forward"
 		)
 	elif held_rows and not args.out:
-		raise SystemExit("--score-holdout needs --out: the one score is written to the table, never just printed")
+		raise SystemExit(
+			"--score-holdout needs --out: the one score is written to the table, never just printed"
+		)
 	elif held_rows and args.out.exists() and "'holdout': {}" not in args.out.read_text():
 		raise SystemExit(f"{args.out} already holds holdout scores: the holdout is scored once")
 	scores = scores_from_rows(rows)  # grouped rows -> conformal scores

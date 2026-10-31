@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.4.0. Generated; do not edit.
+ * Preflight contract v0.5.0. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -1262,6 +1262,17 @@ export interface Campaign {
 		[k: string]: string | undefined;
 	};
 	checkpoint_interval_s?: number | null;
+	gpu_hours?: Estimate | undefined | null;
+	usd?: Estimate | undefined | null;
+	/**
+	 * Seconds from start until the last run ends
+	 */
+	finish_s?: Estimate | undefined | null;
+	grid_gpu_hours?: Estimate | undefined | null;
+	grid_usd?: Estimate | undefined | null;
+	quota?: CampaignQuota | null;
+	asha?: CampaignAsha | null;
+	notes?: string[];
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1281,6 +1292,49 @@ export interface CampaignCell {
 	segments?: number | null;
 	lane?: string | null;
 	cut?: boolean;
+	/**
+	 * 0.5.0: this run's wall time, with its interval
+	 */
+	time?: Estimate | undefined | null;
+	/**
+	 * 0.5.0: when this run starts, in seconds after the campaign starts, in its lane's slot order
+	 */
+	start_s?: Estimate | undefined | null;
+}
+/**
+ * 0.5.0: whether the campaign's checkpoints and outputs fit the storage quota.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "CampaignQuota".
+ */
+export interface CampaignQuota {
+	needed_bytes: Estimate | undefined;
+	quota_bytes?: number | null;
+	/**
+	 * None when the need straddles the quota
+	 */
+	fits?: boolean | null;
+	reason?: string | null;
+}
+/**
+ * 0.5.0: an ASHA pruning plan and the GPU-hours it saves.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "CampaignAsha".
+ */
+export interface CampaignAsha {
+	rungs?: AshaRung[];
+	gpu_hours?: Estimate | undefined | null;
+	saved_gpu_hours?: Estimate | undefined | null;
+	reason?: string | null;
+}
+/**
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "AshaRung".
+ */
+export interface AshaRung {
+	steps: number;
+	runs: number;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1518,6 +1572,10 @@ export interface JobRequest {
 	 * Who asked, for the logbook, e.g. guide.run_probe
 	 */
 	purpose?: string | null;
+	/**
+	 * 0.5.0: a unified diff applied to the record's code before a probe or verify job (C's fix loop); code fixes can't be passed as knob overrides
+	 */
+	patch?: string | null;
 }
 /**
  * target_id -> Estimate, for one knob setting.
@@ -1554,4 +1612,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.4.0";
+export const SCHEMA_VERSION = "0.5.0";
