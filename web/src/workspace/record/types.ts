@@ -4,6 +4,8 @@
  * a contract shape.
  */
 export type {
+	Campaign,
+	CodeLocation,
 	Estimate,
 	Finding,
 	FlightRecord,
@@ -18,8 +20,10 @@ export type {
 	KnobImpact,
 	ModelCard,
 	Objective,
+	Patch,
 	Prediction,
 	Probe,
+	Source,
 	Target,
 } from "../../../../schema/ts/contract";
 

@@ -9,6 +9,7 @@ import { errorCopy } from "../../lib/errors";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { FitMark } from "../components/StatusMark";
+import { isFixture } from "../record/model";
 import type { KnobValue } from "../record/types";
 import { useWorkspace } from "../state";
 import type { Fit } from "../status";
@@ -49,6 +50,9 @@ export function Measured() {
 	// One column order for every chip: the knobs any probe set, in the record's order; a probe
 	// holds a knob it didn't list at the record's current value.
 	const cols = record.knobs.filter((k) => record.probes.some((p) => p.knobs && k.id in p.knobs));
+	// A sample's probes are part of its illustrative fixture, not a measurement: say so, and leave
+	// out the made-up probe cost (the cockpit head says "Illustrative numbers, not measured").
+	const illustrative = isFixture(record);
 	return (
 		<>
 			<button
@@ -59,7 +63,9 @@ export function Measured() {
 				aria-controls={id}
 				onClick={() => setOpen(!open)}
 			>
-				{t("measured.capsule", { n: fmt(record.probes.length, "count"), cost: fmt(total, "usd") })}
+				{illustrative
+					? t("measured.capsule_illustrative", { n: fmt(record.probes.length, "count") })
+					: t("measured.capsule", { n: fmt(record.probes.length, "count"), cost: fmt(total, "usd") })}
 				{failed ? <FitMark fit="fails" label={fmt(failed, "count")} /> : null}
 			</button>
 			<aside
@@ -67,13 +73,13 @@ export function Measured() {
 				ref={panel}
 				tabIndex={-1}
 				className={`glass pf-drawer${open ? " is-open" : ""}`}
-				aria-label={t("measured.title")}
+				aria-label={t(illustrative ? "measured.title_illustrative" : "measured.title")}
 				aria-hidden={!open}
 				inert={!open}
 			>
 				<div className="pf-drawer__head">
-					<b>{t("measured.title")}</b>
-					<span className="pf-dim">{fmt(total, "usd")}</span>
+					<b>{t(illustrative ? "measured.title_illustrative" : "measured.title")}</b>
+					{illustrative ? null : <span className="pf-dim">{fmt(total, "usd")}</span>}
 					<button type="button" className="pf-drawer__close" aria-label={t("measured.close")} onClick={() => setOpen(false)}>
 						×
 					</button>
@@ -107,7 +113,7 @@ export function Measured() {
 										{cols.length ? cols.map((k) => valueText(k, (p.knobs?.[k.id] as KnobValue | undefined) ?? k.current)).join(" · ") : t("measured.as_written")}
 									</span>
 									<span className="pf-chip__nums">
-										{[peak ? fmt(peak, "bytes") : null, p.cost?.usd ? fmt(p.cost.usd, "usd") : null].filter(Boolean).join(" · ")}
+										{[peak ? fmt(peak, "bytes") : null, p.cost?.usd && !illustrative ? fmt(p.cost.usd, "usd") : null].filter(Boolean).join(" · ")}
 									</span>
 								</button>
 							</li>

@@ -1,6 +1,6 @@
 {
-	"generated_at": "2026-10-28T19:02Z",
-	"engine_commit": "206c3f3",
+	"generated_at": "2026-10-31T01:36Z",
+	"engine_commit": "6c65ccd",
 	"inputs": [
 		"api/tests/fixtures/a-smoke-l4-main-3.record.json",
 		"api/tests/fixtures/a-smoke-l4-main-4.record.json"
@@ -31,23 +31,26 @@
 			"tolerance": 0.1,
 			"rate_bar": 0.88,
 			"rate_bar_source": "guess",
-			"n": 0,
-			"hits": 0,
-			"rate": null,
-			"wilson95": null,
-			"abstained": 0,
-			"runs": 0
-		},
-		"interval": {
-			"tolerance": null,
-			"rate_bar": 0.88,
-			"rate_bar_source": "cited",
 			"n": 3,
 			"hits": 0,
 			"rate": 0.0,
 			"wilson95": [
 				0.0,
 				0.5615
+			],
+			"abstained": 0,
+			"runs": 1
+		},
+		"interval": {
+			"tolerance": null,
+			"rate_bar": 0.88,
+			"rate_bar_source": "cited",
+			"n": 6,
+			"hits": 0,
+			"rate": 0.0,
+			"wilson95": [
+				0.0,
+				0.3904
 			],
 			"abstained": 0,
 			"runs": 1
@@ -138,6 +141,50 @@
 		},
 		{
 			"run": "a-smoke-l4-main-4",
+			"probe": "p1",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 1024
+			},
+			"measured": 18645778432,
+			"predicted": {
+				"status": "extrapolated",
+				"point": 24699600896.0,
+				"lo": 22111507595.940918,
+				"hi": 27579978583.42418,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
+			"basis": "peak_less_eval_and_context",
+			"metric": "peak_memory",
+			"error": 0.3247,
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p1",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 1024
+			},
+			"measured": 18645778432,
+			"predicted": {
+				"status": "extrapolated",
+				"point": 24699600896.0,
+				"lo": 22111507595.940918,
+				"hi": 27579978583.42418,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
+			"basis": "peak_less_eval_and_context",
+			"metric": "interval",
+			"of": "memory.peak",
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
 			"probe": "p2",
 			"gpu": "L4",
 			"knobs": {
@@ -174,6 +221,50 @@
 				"hi": 1.9006336904168488,
 				"model_id": "steptime-phases@0.2.0"
 			},
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p2",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 2,
+				"seq_len": 1024
+			},
+			"measured": 11569987584,
+			"predicted": {
+				"status": "extrapolated",
+				"point": 18608029696.0,
+				"lo": 16638074483.892578,
+				"hi": 20800460331.34445,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
+			"basis": "peak_less_eval_and_context",
+			"metric": "peak_memory",
+			"error": 0.6083,
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p2",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 2,
+				"seq_len": 1024
+			},
+			"measured": 11569987584,
+			"predicted": {
+				"status": "extrapolated",
+				"point": 18608029696.0,
+				"lo": 16638074483.892578,
+				"hi": 20800460331.34445,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
+			"basis": "peak_less_eval_and_context",
+			"metric": "interval",
+			"of": "memory.peak",
 			"hit": false
 		},
 		{
@@ -215,37 +306,6 @@
 				"model_id": "steptime-phases@0.2.0"
 			},
 			"hit": false
-		}
-	],
-	"skipped": [
-		{
-			"run": "a-smoke-l4-main-3",
-			"why": "nothing_measured",
-			"codes": [
-				"recorder"
-			]
-		},
-		{
-			"run": "a-smoke-l4-main-4",
-			"probe": "p1",
-			"gpu": "L4",
-			"knobs": {
-				"batch_size": 4,
-				"seq_len": 1024
-			},
-			"metric": "peak_memory",
-			"why": "no_eval_pass"
-		},
-		{
-			"run": "a-smoke-l4-main-4",
-			"probe": "p2",
-			"gpu": "L4",
-			"knobs": {
-				"batch_size": 2,
-				"seq_len": 1024
-			},
-			"metric": "peak_memory",
-			"why": "no_eval_pass"
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -255,8 +315,50 @@
 				"batch_size": 4,
 				"seq_len": 512
 			},
+			"measured": 18608029696,
+			"predicted": {
+				"status": "extrapolated",
+				"point": 11569987584.0,
+				"lo": 10314212958.67366,
+				"hi": 12967582180.431633,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
+			"basis": "peak_less_eval_and_context",
 			"metric": "peak_memory",
-			"why": "no_eval_pass"
+			"error": 0.3782,
+			"hit": false
+		},
+		{
+			"run": "a-smoke-l4-main-4",
+			"probe": "p3",
+			"gpu": "L4",
+			"knobs": {
+				"batch_size": 4,
+				"seq_len": 512
+			},
+			"measured": 18608029696,
+			"predicted": {
+				"status": "extrapolated",
+				"point": 11569987584.0,
+				"lo": 10314212958.67366,
+				"hi": 12967582180.431633,
+				"model_id": "memory-analytical@0.2.0",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+			},
+			"basis": "peak_less_eval_and_context",
+			"metric": "interval",
+			"of": "memory.peak",
+			"hit": false
+		}
+	],
+	"skipped": [
+		{
+			"run": "a-smoke-l4-main-3",
+			"why": "nothing_measured",
+			"codes": [
+				"recorder"
+			]
 		}
 	]
 }

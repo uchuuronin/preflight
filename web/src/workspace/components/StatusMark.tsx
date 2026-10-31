@@ -1,5 +1,7 @@
 import { t } from "../../lib/i18n";
+import { isFixture } from "../record/model";
 import type { EstimateStatus } from "../record/types";
+import { useOptionalWorkspace } from "../state";
 import type { Fit } from "../status";
 
 /** Icon shape plus a word: never colour alone. */
@@ -17,12 +19,20 @@ export function FitMark({ fit, label }: { fit: Fit; label?: string }) {
 	);
 }
 
+/** The word for where a number comes from; on a sample (a fixture record) every number that
+ * isn't an abstention is illustrative, whatever its status, since nothing about it was measured. */
+export function provenanceKey(status: EstimateStatus, illustrative: boolean): string {
+	return illustrative && status !== "abstain" ? "provenance.illustrative" : `provenance.${status}`;
+}
+
 /** Measured / predicted / extrapolated / not trusted, as a short word with its line style. */
 export function Provenance({ status }: { status: EstimateStatus }) {
+	const ws = useOptionalWorkspace();
+	const key = provenanceKey(status, ws ? isFixture(ws.record) : false);
 	return (
-		<span className={`pf-prov pf-prov--${status}`} title={t(`provenance.${status}.help`)}>
+		<span className={`pf-prov pf-prov--${status}`} title={t(`${key}.help`)}>
 			<span className="pf-prov__line" aria-hidden="true" />
-			{t(`provenance.${status}`)}
+			{t(key)}
 		</span>
 	);
 }

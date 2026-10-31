@@ -1805,3 +1805,44 @@ a {
 	.pf-checks__list .pf-chip__where,
 	.pf-checks__list .pf-chip__nums { white-space: normal; overflow: visible; text-overflow: clip; }
 }
+
+/* Check-in: the hint that takes a phone visitor to "Got it" stays hint-coloured, and the box shows
+   where focus landed even after a tap (a programmatic focus isn't :focus-visible). */
+.pf-desk__foot .pf-link.pf-hint { color: var(--pf-fg-dim); min-height: 24px; text-align: left; }
+.pf-datause__ok:focus-within { outline: 2px solid var(--pf-focus); outline-offset: 3px; border-radius: 8px; }
+
+/* HOPs: one possible outcome per frame (workspace/hops.ts); all at once, faint, with reduced motion */
+.pf-hops { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; max-width: 140px; }
+.pf-hops__help { font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
+.pf-dial__hop { fill: none; stroke: var(--pf-accent); stroke-width: 14; }
+.pf-dial__hop.is-all { stroke-opacity: 0.35; stroke-width: 10; }
+.pf-hop { position: absolute; top: -6px; bottom: -6px; width: 0; border-left: 3px solid var(--pf-accent); pointer-events: none; }
+.pf-hop.is-all { border-left-width: 1px; opacity: 0.5; }
+.pf-hop.is-over { border-left-color: var(--pf-fail); }
+.pf-hop-note { font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fail); }
+
+/* "Run a probe here" under the status line when a readout abstains (cockpit/ProbeHere.tsx) */
+.pf-probehere { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; flex-basis: 100%; }
+.pf-probehere__why { margin: 0; flex-basis: 100%; font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
+.pf-probehere__cost { margin: 0; font-size: 10.5px; color: var(--pf-fg-dim); max-width: 44ch; }
+.pf-probehere__error { margin: 0; flex-basis: 100%; font-size: var(--pf-text-xs); color: var(--pf-fail); }
+
+/* Campaign calendar (workspace/campaign/Calendar.tsx): one row per team lane */
+.pf-cal__totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 24px; margin: 12px 0 16px; }
+.pf-cal__totals dt { font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--pf-fg-dim); }
+.pf-cal__totals dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.pf-cal__lanes { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.pf-cal__lane { display: grid; grid-template-columns: minmax(64px, 120px) 1fr; gap: 12px; align-items: start; padding-top: 10px; border-top: 1px solid var(--pf-stroke); }
+.pf-cal__who { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); font-weight: 600; overflow-wrap: anywhere; }
+.pf-cal__runs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: var(--pf-text-xs); }
+.pf-cal__runs li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; }
+.pf-cal__runs li.is-abstain, .pf-cal__runs li.is-cut { padding: 2px 6px; border-radius: 6px; background: repeating-linear-gradient(135deg, transparent 0 6px, var(--pf-stroke) 6px 7px); }
+.pf-cal__run { font-family: var(--pf-font-mono); }
+.pf-cal__abstain { color: var(--pf-tight); }
+.pf-cal__track { position: relative; min-height: 28px; }
+.pf-cal__bar { position: absolute; top: 0; height: 24px; border-radius: 6px; background: var(--pf-accent-glow); border: 1px solid var(--pf-accent); overflow: visible; font-size: 10.5px; white-space: nowrap; }
+.pf-cal__bar span { position: relative; padding: 0 6px; line-height: 22px; }
+.pf-cal__whisker { position: absolute; left: 100%; top: 11px; height: 0; border-top: 1px dashed var(--pf-fg-dim); }
+.pf-cal__unplaced { margin-top: 14px; font-size: var(--pf-text-xs); }
+.pf-cal__unplaced > b { display: block; margin-bottom: 6px; }
+.pf-cal__notes { margin: 14px 0 0; padding-left: 18px; font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }

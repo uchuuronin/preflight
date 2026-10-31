@@ -54,7 +54,7 @@ try {
 	check("four readouts", dials.length >= 4, { dials: dials.length });
 	check(
 		"every dial has a status word",
-		dials.every((d) => /Measured|Predicted|Extrapolated|Not trusted/.test(d.status)),
+		dials.every((d) => /Measured|Predicted|Extrapolated|Not trusted|Illustrative/.test(d.status)),
 		{ dials },
 	);
 
@@ -140,7 +140,7 @@ try {
 	});
 	await page.reload({ waitUntil: "load" });
 	await page.getByLabel("GitHub repository").fill("github.com/karpathy/nanoGPT");
-	const checkIn = page.getByRole("button", { name: "Check in" });
+	const checkIn = page.getByRole("button", { name: "Check in", exact: true });
 	check("data-use notice is shown", await page.locator(".pf-datause").isVisible());
 	check("check-in waits for the notice", await checkIn.isDisabled());
 	await page.getByLabel("Got it").check();

@@ -8,19 +8,23 @@
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useReadouts } from "../../registry";
-import { failureTarget, target, targetFor } from "../record/model";
+import { failureTarget, isFixture, target, targetFor } from "../record/model";
 import type { Estimate, ObjectiveKind, Readout } from "../record/types";
-import { Provenance } from "../components/StatusMark";
+import { Provenance, provenanceKey } from "../components/StatusMark";
 import { useWorkspace } from "../state";
 import { type DialScale, dialScale, scaleFraction } from "../record/scale";
 import { FAILS_AT, FITS_BELOW, oomStatus } from "../record/terms";
 import { bounds, trusted } from "../status";
+import { flag } from "../../lib/flags";
+import { outcomes, setHops, useHops, useHopsOwner } from "../hops";
 
 const ARC = 188.5; // 270 degrees of a radius-40 circle
 const FULL = 251.3;
 
 interface DialSpec {
 	id: string;
+	/** Possible outcomes for the HOPs toggle; off for probabilities, which the engine states itself. */
+	hops?: boolean;
 	label: string;
 	unit: string;
 	est: Estimate | undefined;
@@ -37,12 +41,13 @@ interface DialSpec {
 }
 
 /** The one word under every dial: where this number comes from. */
-function statusWord(est: Estimate | undefined): string {
-	return t(`provenance.${est?.status ?? "abstain"}`);
+function statusWord(est: Estimate | undefined, illustrative: boolean): string {
+	return t(provenanceKey(est?.status ?? "abstain", illustrative));
 }
 
 function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean }) {
 	const est = spec.est;
+	const illustrative = isFixture(useWorkspace().record);
 	const ok = trusted(est) && !!spec.scale;
 	const scale = spec.scale;
 	const point = ok ? est.point : 0;
@@ -54,10 +59,13 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 	const bandStart = fLo * ARC;
 	const bandLen = Math.max(0, fHi - fLo) * ARC;
 	const scaleNote = ok && scale ? scaleText(scale, spec.format) : "";
+	const hops = useHops();
+	const draws = hops.on && ok && scale && spec.hops ? outcomes(est) : [];
+	const shown = hops.frame === null ? draws : draws.length ? [draws[hops.frame % draws.length]!] : [];
 	const title = [spec.reason, scaleNote].filter(Boolean).join("\n");
 	const value = ok ? spec.format(point) : t("readout.abstain_short");
 	const aria = ok
-		? `${t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
+		? `${t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est, illustrative)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
 		: t("dial.aria_abstain", { label: spec.label });
 	const face = (
 		<>
@@ -67,6 +75,22 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 					<>
 						<circle className="pf-dial__band" cx="50" cy="50" r="40" strokeDasharray={`0 ${bandStart.toFixed(1)} ${bandLen.toFixed(1)} 400`} transform="rotate(135 50 50)" />
 						<circle className={`pf-dial__val${spec.noteRisk ? " is-risk" : ""}${at.off ? " is-off" : ""}`} cx="50" cy="50" r="40" strokeDasharray={`${(frac * ARC).toFixed(1)} ${FULL}`} transform="rotate(135 50 50)" />
+						{scale
+							? shown.map((v, i) => {
+									const f = Math.min(1, scaleFraction(scale, v).frac);
+									return (
+										<circle
+											key={hops.frame === null ? i : "hop"}
+											className={`pf-dial__hop${hops.frame === null ? " is-all" : ""}`}
+											cx="50"
+											cy="50"
+											r="40"
+											strokeDasharray={`0 ${Math.max(0, f * ARC - 2).toFixed(1)} 4 400`}
+											transform="rotate(135 50 50)"
+										/>
+									);
+								})
+							: null}
 					</>
 				) : null}
 			</svg>
@@ -142,6 +166,7 @@ export function Dials() {
 			est: timeEst,
 			scale: timeScale,
 			goal: "min_time",
+			hops: true,
 			format: (v) => fmt(v, "s_short"),
 		},
 		{
@@ -151,6 +176,7 @@ export function Dials() {
 			est: costEst,
 			scale: costScale,
 			goal: "min_cost",
+			hops: true,
 			format: (v) => fmt(v, "usd"),
 			...(costEst?.reason && costEst.status !== "abstain" ? { reason: costEst.reason } : {}),
 		},
@@ -201,6 +227,7 @@ export function Dials() {
 							: {})}
 					/>
 				))}
+			{flag("c.hops") ? <HopsToggle /> : null}
 			{extra.map((r) => {
 				const tg = target(record, r.targetId);
 				if (!tg) return null;
@@ -212,6 +239,19 @@ export function Dials() {
 					/>
 				);
 			})}
+		</div>
+	);
+}
+
+/** "Possible outcomes": the time and cost dials and the memory band show one outcome per frame. */
+export function HopsToggle() {
+	const hops = useHopsOwner();
+	return (
+		<div className="pf-hops">
+			<button type="button" className={`pf-tag pf-tag--button${hops.on ? " is-on" : ""}`} aria-pressed={hops.on} onClick={() => setHops(!hops.on)}>
+				{t("hops.toggle")}
+			</button>
+			{hops.on ? <span className="pf-hops__help">{t(hops.frame === null ? "hops.help_still" : "hops.help")}</span> : null}
 		</div>
 	);
 }

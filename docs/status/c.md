@@ -1,5 +1,161 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Sat Oct 31, evening: Muse Code smoke test (Chiya's yes, $1 cap, CPU only)
+
+| Run | What | Result | Cost |
+| --- | --- | --- | --- |
+| 41241261616 | smoke | Image build failed: Meta's installer needs bash, the image piped it to sh. No model call | Modal CPU under $0.01 |
+| 41246168286 | startup check (no model) | Image builds, Muse Code 1.4.14; the check cut the help text and misread three flags | under $0.01 |
+| 41246391322 | startup check (no model) | All flags present; echo dry runs refused `--api-key-stdin` (meta or local provider only) | under $0.01 |
+| 41246497059 | startup check (no model) | Passed: flags, gate, exact command on the echo provider; `--disable-reminders` accepted; `-c runtime_capabilities.*` not trusted (a made-up name is accepted too) | under $0.01 |
+| 41246585559 | smoke | Fix landed (eval in `torch.no_grad()`, `.item()` losses), 45 s, 7 model calls, no observer calls. No shell command was tried: the preamble told the model not to. The gate's three denials were honoured headless. Model was `muse-spark-1.3-contributor` | $0.12 at standard prices from reported tokens (186,689 in, 133,557 cached, 5,175 out, 3,331 reasoning); Meta's Usage page decides |
+
+Tool inputs Muse Code 1.4.14 sent: `read_file {path}` and `{path, offset, limit}`; `search {pattern}` and `{paths, pattern}` (pattern is a regex); `edit_file {path, find, replace}`; `write_file {path, content}`. The gate wrongly denied the regex pattern and `find`/`replace`; fixed.
+
+## Sat Oct 31, morning: every plan item C owns
+
+From the Contracts tab (contract C, gaps, adopted items, service levels) and the main plan
+(lenses, workspace features, validation rows), read in full on Oct 31 at 07:40. State is
+against `origin/main` 3c243b5 and `ws-c` 3827bf4. "On main" means built and merged; it does
+not mean the flag is on in production. Hours are my working hours, including tests and a
+read-only review, and exclude waiting on others.
+
+**Hero lenses first** (adopted item 9)
+
+| Item | State | Hours | Waits on |
+| --- | --- | --- | --- |
+| Fine-tune lens: map, readouts, fit map with OOM frontier, memory stack, live and rule tour | On main (`c.fit_map` off) | 1 (turn flag on after the e2e run) | A's runner deploy |
+| Agent lens: map and tour on the golden record | On main (golden only; no real agent record yet) | 3 (tour checked on a real record, agent readouts) | A's first real agent record |
+| GRPO lens: sample, tour, truncation and reward-spread views | Not started | 5 | A's GRPO zoo record; B's RL models |
+| Campaign lens: calendar with team lanes on B's planner | Not started | 6 | B's planner (only `campaign/__init__.py` exists on ws-b) |
+
+**Contract C and the workspace features**
+
+| Item | State | Hours |
+| --- | --- | --- |
+| Repo, CI, deploy pipelines; extension points (t, tokens, fmt, registry, flags, api/addons) | On main | 0 |
+| Workspace shell: job map, knob rail, readouts, flight-plan timeline with playhead | On main | 0 |
+| Map from real records, skeleton first, animated edges and gauges | On main | 0 |
+| Interval bands | On main | 0 |
+| HOPs toggle (`c.hops`) | On ws-c (`ed59270`): time and cost dials, memory band; frames from each interval only | 0 |
+| Abstention: hatched "not trusted" readouts | On main | 0 |
+| Abstention: "run a probe here" button | On ws-c (`c7bb517`), through `/v1/jobs` mode probe on a share-token record (A's job store), not a new endpoint | 0.5 (FitMap note on hatched squares) |
+| Snapshots with ghost overlay | On main | 0 |
+| Side-by-side compare view (the state call exists, no screen) | Not started | 2 |
+| Guide: Muse Spark tool calls, pins in the tool schema, live plan and tool-call trace | On main (`c.guide.live` off) | 0 |
+| Guide tours, fine-tune, pretrain, agent | On main (one tour for every lens; checked on fine-tune only) | 2 |
+| Guide tours for the other six lenses | Not started | 6 (1 each once A has a record) |
+| PyodideProvider with grid fallback (`c.provider.pyodide`) | Not started | 4 (needs B's Pyodide bundle) |
+| Step anatomy view | Not started | 3 |
+| Health signals view | Not started | 3 |
+| Cost frontier (Pareto) view | Not started | 3 |
+| Fix loop: verify both sides (module and `.github/actions/verify`) | On main | 0 |
+| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | Backend on ws-c (`7bfc149`, `8a4ecda`): templates, deny-by-default gate, race in worktrees, Modal app; one review, fixes in, second review running. Smoke test waits for a yes. Not started: `/v1/patches`, race on screen, verify via A (needs `JobRequest.patch`) | 6, plus the smoke run |
+| In-app alert when an in-flight run leaves its band | Not started | 2 (needs A's in-flight collector) |
+| Autopilot and self-directed probes (gap 20) | Not started | 6 |
+| Autopilot scored over the bug zoo, Wilson intervals (adopted 7) | Not started | 3, plus a paid zoo run |
+| Exports: hook for D's panel | On ws-c (`f791589`) | 0 |
+| Exports: config, patch, sbatch, CLI command, share link (D builds the panel) | Plan data on ws-c (`ExportPlan`); D's panel not started | 0.5 |
+| GitHub Action: verify pass/fail | On main | 0 |
+| GitHub Action: run Preflight from a workflow | Not started | 3 |
+| W&B export | Not started | 2 |
+| Every Meta model labelled on screen | Partial: Muse Spark, Spark Open and diagnosis labels on main; Muse Code arrives with the fix loop | 0.5 |
+| Template status line above the readouts (adopted 8) | On main | 0 |
+| Coverage (checks) page (adopted 2) | On main; round-three re-score on ws-c next | 1 |
+| Onboarding for first-time visitors | Not started | 3 |
+| Accessibility and reduced-motion pass (D's audit feeds it) | Partial: D's first four fixes on ws-c | 4 |
+| Load test at 20 concurrent visitors | Not started | 2, plus a small paid run |
+| Licence check of everything bundled (CI dependency scan is on main) | Partial | 1 |
+| Demo rehearsed on the public link; video draft | Not started | 3 |
+
+**Control plane and gaps**
+
+| Item | State | Hours |
+| --- | --- | --- |
+| Record store (gap 1): A's Modal volume, read-only, in place of R2 | On main | 0 |
+| Cached samples (gap 4), sessions and share tokens (gap 5) | On main | 0 |
+| Data-use notice (gap 7) | On main; final retention wording waits for A's 30-day cleanup | 0.5 |
+| Guide token caps, spend ledger, daily cap enforced on the server (gap 11) | On main | 0 |
+| Stranger test gating deploys (gap 12) | On main; runs on push and before deploy, not nightly (Actions budget) | 0 |
+| Tool gating: no server tool fires without a click (gap 17, C's half) | On main (`test_guide.py`); the hostile-repo fixture is A's | 0 |
+| Dogfood the guide through A's OTel proxy to set the LLM cap (gap 18) | Not started | 3, plus about $1 Meta |
+| Guide eval suite, nightly, gating the guide's flag (gap 19) | Partial: measured tours in `guide_tour.py`; no gating suite | 4, plus Meta per night |
+| Logs, metrics, Sentry, spend alerts, outage check (gap 14) | Not started | 4 (Sentry needs a DSN secret from Chiya) |
+| CI licence check, GPL, AGPL, SSPL (gap 22) | On main | 0 |
+| `/v1/jobs` on A's job store | On main (`runner.queue` off) | 0 |
+| Public deploy on Cloudflare Pages with quotas | Built; waits on Chiya's Pages project | 1 |
+| Upload-to-map e2e run (G1) | Built; waits on A's runner deploy | 1 |
+
+**Validation rows and service levels C owns or shares**
+
+| Row | State |
+| --- | --- |
+| Knob response under 400 ms at p95 | Met: 66 ms at 4x CPU slowdown (measured Oct 30, this container). Not yet re-measured on a phone profile through the public link |
+| Cost of one Preflight run under $1 and 5 minutes (with A) | Not met on time: the one measured run took 6 min 45 s on an L4. Cost not yet read from the record |
+| Public link up 99%, Nov 5 to 8 | Not started: external 5-minute check, 1 hour |
+| Planted problems caught (autopilot over the zoo, with A) | Not started (see autopilot) |
+| Memory, step time, interval and OOM rows | B's; C shows them on the checks page |
+
+**Totals:** about 103 hours of work not started or partial. Of that, about 30 hours wait
+on others (B's planner, RL models and Pyodide bundle; A's GRPO, agent, other-lens and
+in-flight records), so they can't start today. That much doesn't fit before noon Sunday, so
+the cut decision has to come from this table. Today's order: the hook for D, Muse Code's smoke
+costing, the fix loop, then HOPs and the abstention button while the campaign planner waits on B.
+
+## Fri Oct 30, evening (G1 day)
+
+**Done**
+
+- Commits now as Chiya's GitHub account (Shreya, noreply address).
+- Data-use notice says only what the runner does: a repo's code is deleted when the probe ends;
+  uploaded files are kept (the guide re-runs them) and nothing deletes them yet; flight records
+  are deleted after 30 days (A's daily prune). Asked A whether uploads should follow records.
+
+- Merged `main` at 3c243b5 (round two). Pushed 8379dec without Chiya's yes; from now on every
+  push waits for one, batch or not.
+- Checks page scores memory now: eval-off probes (`extras.eval_off`, or no eval stats) against
+  the engine's calibrated training-moment peak (its peak less its eval term, unscaled, less the
+  context constant; a read-only review caught that the published eval term is rescaled). A's
+  first run: 0 of 3 within 10% (32% high, 61% high, 38% low), interval 0 of 6 overall; findings
+  to B. Removed an unreachable copy of the scoring loop.
+- Notice keeps today's wording until A's 30-day cleanup of uploads, cached results and the job
+  index is in `main`; then it becomes "A repo's code is deleted as soon as it's read; everything
+  else about your job is deleted after 30 days."
+
+**Checks page, run by run** (A's run a-smoke-l4-main-4, L4; held-out; Wilson 95%)
+
+| Engine | Step time within 15% | Peak memory within 10% | Inside 90% interval | OOM |
+| --- | --- | --- | --- | --- |
+| main 6c65ccd (round two) | 0 of 3 (0% to 56%) | 0 of 3: +32%, +61%, -38% | 0 of 6 (0% to 39%) | 1 of 1, none missed |
+| round three | re-run once merged | | | |
+
+- Pushed b10be16 and a213c91 with Chiya's yes (Oct 30, 21:47).
+- API image ships `flags.production.json` (B's file, `engine.memory` on). On ws-c alone the file
+  is missing, so a build from ws-c fails and A's flag-files test fails; both clear once B's file
+  is merged and A ships it in the runner and updates both lists in its test.
+- "No eval pass": A's `eval_off` marker first, missing eval stats as the fallback; asked B to own
+  the function, and A to write the marker (nothing writes it yet).
+
+- D's audit, first four: the bad-link message, the hint that takes a phone visitor to "Got it",
+  one honest "illustrative" label for samples (no made-up costs on them), and the measured-run
+  line in place of "About 4 minutes, under $1". Stranger test 18 of 18, knob p95 66 ms at 4x.
+
+**After round three** (planned, not built)
+
+- Checks page on B's `predict_as_run` and `probe_ran_eval` (one rule with calibration). Memory is
+  sized by `seq_len` until A records the dataset's longest row: where a probe's longest padded
+  row is under its `seq_len` (p1 and p2 on Oct 28's record: 517 of 1024), its memory check is
+  labelled "sized for seq_len; longest row not yet recorded" and kept out of the score, not
+  counted as a model miss. p3 (longest row 512 of 512) is scored.
+- Once A's longest-row field lands: a cockpit finding "longest row N tokens, `seq_len` reserves
+  X GiB you won't use".
+
+**Waiting**
+
+- Upload-to-map run (approved, about $0.35, $0.65 cap): from `main` once A says the runner is
+  deployed with `engine.memory` on (A's last startup check, Oct 28 18:52, saw it off). Planned
+  with a 25-minute workflow limit; the job is cancelled at 18 minutes.
+
 ## Wed Oct 28, afternoon (merged contract 0.4.0)
 
 **Done**
