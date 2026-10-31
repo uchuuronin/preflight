@@ -480,3 +480,26 @@ def test_kernel_rows_validate_dict_tables():
 	assert e.status == "abstain" and "malformed" in e.reason
 	neg = st.predict_cross_gpu([st.KernelRow("x", -1.0)], 0.1, "L4", "H100-SXM-80GB")
 	assert neg.status == "abstain"
+
+
+def test_multi_node_adds_the_network_and_says_it_is_analytical():
+	from preflight.engine import steptime as st
+
+	g = 2e9  # 1B params of bf16 gradients
+	one_node = st.hierarchical_allreduce_seconds(g, 1, 8, "A100-SXM-80GB")
+	assert one_node == pytest.approx(st.allreduce_seconds(g, 8, "A100-SXM-80GB"))
+	two = st.hierarchical_allreduce_seconds(g, 2, 8, "A100-SXM-80GB", inter_gbps=200)
+	# the network term: 2(n-1)/n x bytes over the node's link at 70% efficiency
+	assert two - one_node == pytest.approx(g / (200e9 / 8 * 0.7) + 2 * 20e-6, rel=1e-6)
+	assert st.hierarchical_allreduce_seconds(
+		g, 4, 8, "A100-SXM-80GB", inter_gbps=400
+	) < st.hierarchical_allreduce_seconds(g, 4, 8, "A100-SXM-80GB", inter_gbps=100)
+	est = st.multi_node_step(1.0, g, 2, 8, "A100-SXM-80GB")
+	assert (
+		est.status == "extrapolated"
+		and "analytical only" in est.reason
+		and est.sigma_log == st.SIGMA_MULTINODE
+	)
+	assert (
+		est.point > st.multi_gpu_step(1.0, g, 16, "A100-SXM-80GB").point
+	)  # the network is slower than NVLink

@@ -117,7 +117,7 @@ def test_engine_cards_and_reasons_name_the_cell(monkeypatch):
 		"band from held-out runs: pretrain, merged across GPUs (n = 20)" in peak.reason
 	)  # probe GPU is an A100
 	card = next(c for c in api.fill_predictions(rec).models if c.id.startswith("memory"))
-	assert card.training_data == "corpus test" and card.coverage == pytest.approx(0.9)
+	assert card.training_data == "corpus test; table 0" and card.coverage == pytest.approx(0.9)
 	assert "merged across GPUs" in card.notes
 
 
@@ -146,3 +146,40 @@ def test_notes_follow_the_band_that_was_used(monkeypatch):
 	roof = next((c for i, c in cards.items() if i.startswith("steptime-roofline")), None)
 	if roof is not None:
 		assert roof.coverage is None and not roof.per_gpu_coverage
+
+
+def test_step_time_bands_cover_only_the_approved_lenses():
+	# Chiya, Oct 31: vision, retrieval and pretrain get held-out step-time bands; HF fine-tune stays simulated
+	from preflight.engine import api, conformal, steptime
+
+	t = conformal.TABLE
+	for lens in ("vision", "retrieval", "pretrain"):
+		assert t.lookup("time.step", "L4", lens) is not None
+	for lens in ("finetune", "rl", "serving", ""):
+		assert t.lookup("time.step", "L4", lens) is None  # no all-lens cell to borrow
+	assert t.lookup("memory.peak", "L4", "finetune") is not None
+	(card,) = api._cards({steptime.MODEL_ID_SAME})
+	assert "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2." in card.notes
+	assert "keeps the simulated band" in card.notes
+
+
+def test_lens_limits_parse_and_refuse_nonsense():
+	import pytest
+
+	from preflight.corpus.calibrate import parse_lenses
+
+	assert parse_lenses("time.step=pretrain+vision; memory.peak=vision") == {
+		"time.step": frozenset({"pretrain", "vision"}),
+		"memory.peak": frozenset({"vision"}),
+	}
+	assert parse_lenses("") == {}
+	with pytest.raises(SystemExit):
+		parse_lenses("time.step=")
+
+
+def test_a_score_without_a_lens_counts_once_in_the_pooled_cell():
+	from preflight.engine import conformal as cf
+
+	ss = [cf.Score("time.step.cross", "L4", "", f"g{i}", 1.0, 1.0 + i / 100) for i in range(20)]
+	t = cf.calibrate(ss)
+	assert t.cells[("time.step.cross", "", "")].n == 20

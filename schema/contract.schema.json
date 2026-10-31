@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.4.0/contract",
+	"$id": "https://preflight.dev/schema/0.5.0/contract",
 	"title": "PreflightContract",
-	"description": "Preflight contract v0.4.0. Generated; do not edit.",
+	"description": "Preflight contract v0.5.0. Generated; do not edit.",
 	"type": "object",
 	"properties": {
 		"FlightRecord": {
@@ -341,6 +341,27 @@
 			"title": "AgentTask",
 			"type": "object"
 		},
+		"AshaRung": {
+			"additionalProperties": false,
+			"properties": {
+				"steps": {
+					"minimum": 0,
+					"title": "Steps",
+					"type": "integer"
+				},
+				"runs": {
+					"minimum": 0,
+					"title": "Runs",
+					"type": "integer"
+				}
+			},
+			"required": [
+				"steps",
+				"runs"
+			],
+			"title": "AshaRung",
+			"type": "object"
+		},
 		"Block": {
 			"additionalProperties": false,
 			"properties": {
@@ -462,9 +483,143 @@
 					],
 					"default": null,
 					"title": "Checkpoint Interval S"
+				},
+				"gpu_hours": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"usd": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"finish_s": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Seconds from start until the last run ends"
+				},
+				"grid_gpu_hours": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"grid_usd": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"quota": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CampaignQuota"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"asha": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/CampaignAsha"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"notes": {
+					"items": {
+						"type": "string"
+					},
+					"title": "Notes",
+					"type": "array"
 				}
 			},
 			"title": "Campaign",
+			"type": "object"
+		},
+		"CampaignAsha": {
+			"additionalProperties": false,
+			"description": "0.5.0: an ASHA pruning plan and the GPU-hours it saves.",
+			"properties": {
+				"rungs": {
+					"items": {
+						"$ref": "#/$defs/AshaRung"
+					},
+					"title": "Rungs",
+					"type": "array"
+				},
+				"gpu_hours": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"saved_gpu_hours": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null
+				},
+				"reason": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Reason"
+				}
+			},
+			"title": "CampaignAsha",
 			"type": "object"
 		},
 		"CampaignCell": {
@@ -559,6 +714,30 @@
 					"default": false,
 					"title": "Cut",
 					"type": "boolean"
+				},
+				"time": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.5.0: this run's wall time, with its interval"
+				},
+				"start_s": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.5.0: when this run starts, in seconds after the campaign starts, in its lane's slot order"
 				}
 			},
 			"required": [
@@ -566,6 +745,57 @@
 				"knobs"
 			],
 			"title": "CampaignCell",
+			"type": "object"
+		},
+		"CampaignQuota": {
+			"additionalProperties": false,
+			"description": "0.5.0: whether the campaign's checkpoints and outputs fit the storage quota.",
+			"properties": {
+				"needed_bytes": {
+					"$ref": "#/$defs/Estimate"
+				},
+				"quota_bytes": {
+					"anyOf": [
+						{
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Quota Bytes"
+				},
+				"fits": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "None when the need straddles the quota",
+					"title": "Fits"
+				},
+				"reason": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"title": "Reason"
+				}
+			},
+			"required": [
+				"needed_bytes"
+			],
+			"title": "CampaignQuota",
 			"type": "object"
 		},
 		"CheckpointStats": {
@@ -1663,7 +1893,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"schema_version": {
-					"default": "0.4.0",
+					"default": "0.5.0",
 					"pattern": "^\\d+\\.\\d+\\.\\d+$",
 					"title": "Schema Version",
 					"type": "string"
@@ -2800,6 +3030,21 @@
 					"default": null,
 					"description": "Who asked, for the logbook, e.g. guide.run_probe",
 					"title": "Purpose"
+				},
+				"patch": {
+					"anyOf": [
+						{
+							"maxLength": 262144,
+							"minLength": 1,
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.5.0: a unified diff applied to the record's code before a probe or verify job (C's fix loop); code fixes can't be passed as knob overrides",
+					"title": "Patch"
 				}
 			},
 			"required": [

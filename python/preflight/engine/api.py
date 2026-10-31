@@ -16,13 +16,16 @@ A's scripts/make_golden.py makes to replace the golden fixtures.
 
 from __future__ import annotations
 
+import contextvars
+import itertools
 import math
+import statistics
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 import numpy as np
 
-from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, steptime
+from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, rl, serving, steptime
 from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
@@ -46,7 +49,7 @@ MODEL_ID_TOTAL = "time-total@0.1.0"
 MODEL_ID_COST = "cost-gpu-hours@0.1.0"
 MODEL_ID_AGENT_TIME = "agent-time-concurrency@0.1.0"
 MODEL_ID_CONTEXT = "agent-context-fill@0.1.0"
-MODEL_ID_PREEMPT = "preemption-poisson@0.1.0"
+MODEL_ID_PREEMPT = "preemption-poisson@0.2.0"  # 0.2.0 (Oct 31): interruptions during redone work count
 MODEL_ID_RUN_COST = "run-cost@0.1.0"
 
 _TARGETS = {
@@ -60,7 +63,25 @@ _TARGETS = {
 	"tokens.total": ("tokens", None),
 	"memory.context_fill": ("fraction", "memory"),
 	"risk.runaway": ("probability", "risk"),
+	"rl.zero_spread": ("fraction", "risk"),
+	"rl.truncation": ("fraction", None),
+	"time.rollout": ("s", None),
+	"serving.throughput": ("tokens/s", "time"),
+	"serving.ttft_p95": ("s", None),
+	"serving.tpot": ("s", None),
+	"serving.kv_tokens": ("tokens", "memory"),
 }
+
+# Features the caller switches on from its flags (the engine reads no files). Off by default.
+# flags.json engine.rl: zero-spread groups, rollout time and truncation on the RL lens;
+# engine.serving: throughput, time to first token, time per token and KV capacity on the serving lens
+FEATURES = {
+	"rl": False,
+	"serving": False,
+	"steptime_cross_gpu": False,
+}  # + flags.json engine.steptime_cross_gpu
+RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
+SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
 
 
 # ---------------------------------------------------------------- small helpers
@@ -142,6 +163,10 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		if _has_shape(record):  # the per-term split needs the analytical model
 			ids += [f"memory.{t}" for t in MEMORY_TERMS]
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
+		if FEATURES["rl"] and record.job.lens == "rl":
+			ids += list(RL_TARGETS)
+		if FEATURES["serving"] and record.job.lens == "serving":
+			ids += list(SERVING_TARGETS)
 		c = record.job.constraints
 		if c.wall_time_cap_s:
 			ids.append("risk.wall_cap")
@@ -391,7 +416,47 @@ class _MemoryResult:
 	terms: dict | None = None  # memory.<term> estimates at the peak moment
 
 
-def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
+def probe_ran_eval(p) -> bool:
+	"""Whether this probe ran an eval pass, so its peak can include one. One rule for the engine and C's checks
+	(Chiya, Oct 30): A's `extras.eval_off` first (set when a point is re-run with eval off after an eval OOM),
+	then whether the probe recorded eval stats."""
+	off = (p.extras or {}).get("eval_off")
+	# records store extras as numbers, so A's marker arrives as 1.0 or 0.0: any finite number, non-zero is off
+	if isinstance(off, (int, float)) and math.isfinite(off):
+		return off == 0
+	return p.eval is not None
+
+
+def _longest_seen(p) -> float | None:
+	"""The longest padded row this probe processed in any logged step (warm-up included: its memory peak covers
+	the whole probe)."""
+	rows = [s.padded_len for s in (p.step_log or []) if s.padded_len]
+	return float(max(rows)) if rows else None
+
+
+def _padded_seq(record: FlightRecord, values: dict, probe=None) -> float | None:
+	"""The sequence length activations were sized by, for fitting the memory model: a probe's longest padded row
+	(cut by its seq_len), from its step log. Queries keep their seq_len setting (None here): a full run meets the
+	dataset's longest row, which a few probe batches don't see, so sizing a query by the rows the probes saw could
+	say "fits" for a run that runs out of memory later (review, Oct 30)."""
+	if probe is None or record.job.lens not in TOKEN_LENSES:
+		return None
+	longest = _longest_seen(probe)
+	sq = float(_probe_values(record, probe).get("seq_len") or 0)
+	if longest is None:
+		return None
+	return min(longest, sq) if sq else longest
+
+
+def _sized(shape, values: dict, seq: float | None) -> tuple[knobs.Shape, dict]:
+	"""The shape and knob values with seq_len replaced by the padded length rows really reach."""
+	if seq is None:
+		return shape, values
+	s = max(1, round(seq))
+	return replace(shape, seq=s), {**values, "seq_len": s}
+
+
+def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _MemoryResult:
 	mid = memory.MODEL_ID
 	gpu = _target_gpu(record, values)
 	if gpu is None:
@@ -414,6 +479,9 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		arch, setup, shape = knobs.setup_from(sm, values)
 	except (ValueError, AttributeError) as exc:
 		return _empirical_memory(record, values, capacity, str(exc))
+	shape, sized_values = _sized(shape, values, _padded_seq(record, values))
+	if eval_off:
+		setup = replace(setup, eval_batch=None)  # predict_as_run: the probe ran this point without eval
 	mprobes = []
 	for p in record.probes:
 		if p.status not in OK_PROBE or not p.memory or not p.memory.peak_reserved_bytes:
@@ -423,7 +491,8 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 			pa, ps, psh = knobs.setup_from(sm, pv)
 		except (ValueError, AttributeError):
 			continue
-		if p.eval is None:
+		psh, pv = _sized(psh, pv, _padded_seq(record, pv, probe=p))
+		if not probe_ran_eval(p):
 			ps = replace(ps, eval_batch=None)  # the probe never ran eval, so its peak can't include it
 		an = memory.breakdown(pa, ps, psh.batch, psh.seq, capacity_bytes=capacity).allocator_peak
 		mprobes.append(
@@ -434,7 +503,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 	if match is not None and mprobes:
 		# a probe at these knobs measured the peak only if it saw the moment that sets it
 		moment = memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=capacity).peak_moment
-		measured = moment == "train" or (moment == "eval" and match.eval is not None)
+		measured = moment == "train" or (moment == "eval" and probe_ran_eval(match))
 	est = memory.predict_peak(
 		arch,
 		setup,
@@ -442,7 +511,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		shape.seq,
 		probes=mprobes or None,
 		capacity_bytes=capacity,
-		work_units=knobs.work_units(lens, values),
+		work_units=knobs.work_units(lens, sized_values),
 		measured=measured,
 		base_half_width=conformal.TABLE.lookup("memory.peak", gpu, lens).half_width
 		if conformal.TABLE.lookup("memory.peak", gpu, lens)
@@ -452,7 +521,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		est.status == "predicted"
 		and est.breakdown is not None
 		and est.breakdown.peak_moment != "train"
-		and not any(p.eval is not None for p in record.probes if p.status in OK_PROBE)
+		and not any(probe_ran_eval(p) for p in record.probes if p.status in OK_PROBE)
 	):
 		why = f"the peak comes at {est.breakdown.peak_moment}, which no probe ran; run a probe with {est.breakdown.peak_moment} in it"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
@@ -511,13 +580,32 @@ def _from_memory_estimate(
 		)
 	peak = _est(est.point, est.lo, est.hi, "bytes", est.status, mid, est.reason)
 	words = {"fits": "fits", "tight": "tight", "fails": "won't fit"}[est.oom_status]
-	# Review, Oct 27: shown in bins until the reliability diagram on real outcomes passes (TABLE.oom_reliable)
-	why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
+	# Chiya, Oct 31: a number only where the reliability diagram verifies it; in between, the 5-95% range
+	# the bins verify the empirical P(OOM) from held-out residuals; a simulated band's P(OOM) is never verified
+	empirical = oom_source != "simulated band"
+	bins = conformal.TABLE.oom_bins if empirical else ()
+	shown = oom_model.shown_as_number(est.p_oom, bins)
+	evidence = oom_model.end_evidence(est.p_oom, bins)
+	if evidence is not None:
+		# Chiya, Oct 31: an end bin that doesn't verify shows what happened to similar runs, not a probability
+		k, n = evidence
+		lead = "Likely" if est.p_oom > oom_model.UNCERTAIN[1] else "Unlikely"
+		why = f"{lead} to run out of memory: {k} of {n} similar runs did ({oom_source})"
+		lo, hi = conformal.wilson(k, n)
+	elif shown:
+		why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
+		lo = hi = est.p_oom
+	else:
+		why = (
+			f"{words}: out of memory uncertain (5–95%) ({oom_source}); between 5% and 95% the chance isn't "
+			"verified on real outcomes yet"
+		)
+		lo, hi = oom_model.UNCERTAIN
 	if est.breakdown is not None and est.breakdown.peak_moment != "train":
 		why += f"; the peak comes at {est.breakdown.peak_moment}, not during training steps"
 	# a probe that fitted measured the peak, not an OOM: P(OOM) is "measured" only from an OOM probe
 	oom_status = "predicted" if est.status == "measured" else est.status
-	oom = _est(est.p_oom, est.p_oom, est.p_oom, "probability", oom_status, mid, why)
+	oom = _est(est.p_oom, lo, hi, "probability", oom_status, mid, why)
 	return _MemoryResult(peak, oom, est)
 
 
@@ -529,7 +617,11 @@ def _empirical_memory(
 	lens = record.job.lens
 	pts = [
 		memory.MemoryProbe(
-			knobs.work_units(lens, _probe_values(record, p)), float(p.memory.peak_reserved_bytes), 0.0
+			knobs.work_units(
+				lens, _sized(knobs.Shape(), _probe_values(record, p), _padded_seq(record, {}, probe=p))[1]
+			),
+			float(p.memory.peak_reserved_bytes),
+			0.0,
 		)
 		for p in record.probes
 		if p.status in OK_PROBE and p.memory and p.memory.peak_reserved_bytes
@@ -550,7 +642,7 @@ def _empirical_memory(
 		why = f"no model shape ({why_no_shape}) and fewer than two probe sizes to fit a line through"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	cal = memory.Calibration.fit(pts)
-	x = knobs.work_units(lens, values)
+	x = knobs.work_units(lens, _sized(knobs.Shape(), values, _padded_seq(record, values))[1])
 	measured = _matching_probe(record, values) is not None
 	cell = conformal.TABLE.lookup("memory.peak", _target_gpu(record, values), lens)
 	h = (
@@ -567,8 +659,11 @@ def _empirical_memory(
 		why = "the line through the probes goes below zero here; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	p = memory.p_oom(point, h / memory.Z90, capacity)
+	hi = point * math.exp(h)
+	if cal.is_below(x):  # the same floor as the analytical path (memory.predict_peak)
+		hi = max(hi, cal.correct(cal.min_tokens, 0.0) + memory.DEFAULT_CONTEXT_BYTES)
 	est = memory.MemoryEstimate(
-		point, point * math.exp(-h), point * math.exp(h), "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
+		point, point * math.exp(-h), hi, "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
 		h / memory.Z90, None, "; ".join(x for x in (
 			"fitted to the probes alone: the script map has no model shape",
 			_band_note(cell) if cell is not None and not measured else None,
@@ -597,8 +692,107 @@ class _StepResult:
 
 
 def _step_x(lens: str, values: dict) -> float:
-	"""Work per optimizer step: work units per micro-batch times accumulation."""
+	"""Work per optimizer step from the settings: work units per micro-batch times accumulation."""
 	return knobs.work_units(lens, values) * max(1, int(values.get("grad_accum", 1) or 1))
+
+
+# A probe was cut by seq_len when its longest padded row reached the limit (rows are padded to the longest in
+# their batch and never past seq_len). guess: without row lengths, a mean padded length at this share of the limit
+# counts as cut; replaced by the step log's longest row whenever A's recorder has one (it does since Oct 28)
+TRUNCATED_SHARE = 0.95
+TOKEN_LENSES = ("finetune", "pretrain")  # RL work also counts completions, which the dataloader's tokens miss
+
+
+def _measured_tokens(p) -> tuple[float, float] | None:
+	"""(tokens, samples) one optimizer step of this probe processed, from A's recorder (Probe.extras)."""
+	ex = p.extras or {}
+	t, n = ex.get("tokens_per_step"), ex.get("samples_per_step")
+	ok = all(
+		isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v > 0 for v in (t, n)
+	)
+	return (float(t), float(n)) if ok else None
+
+
+def _token_points(record: FlightRecord) -> list[tuple[float, float, float, float, bool]] | None:
+	"""(batch, accumulation, padded tokens per sample, seq_len, truncated) for every timed probe, or None unless
+	the measured-token axis applies: a token lens, a batch_size knob, every timed probe reporting tokens (mixing
+	measured and set work on one axis would bend the fit) and at least one probe the limit didn't cut."""
+	if record.job.lens not in TOKEN_LENSES or all(k.id != "batch_size" for k in record.knobs):
+		return None
+	pts = []
+	for p in record.probes:
+		if p.status not in OK_PROBE or not p.step_time or not p.step_time.p50_s:
+			continue
+		m = _measured_tokens(p)
+		pv = _probe_values(record, p)
+		b = pv.get("batch_size")
+		if m is None or not isinstance(b, (int, float)) or b <= 0:
+			return None
+		tokens, samples = m
+		sq = float(pv.get("seq_len") or 0)
+		longest = _longest_seen(p)
+		cut = (longest >= sq) if longest is not None else (tokens / samples >= TRUNCATED_SHARE * sq)
+		pts.append((float(b), samples / float(b), tokens / samples, sq, bool(sq) and cut))
+	if not pts or all(trunc for *_, trunc in pts):
+		return None  # the data may run longer than any limit seen: the settings are the axis
+	return pts
+
+
+def _on_token_axis(record: FlightRecord) -> bool:
+	"""One switch for both sides of the step-time fit: probes and queries use measured tokens, or neither does."""
+	return _token_points(record) is not None
+
+
+def _step_work(record: FlightRecord, values: dict) -> float:
+	"""Tokens one optimizer step will process at these settings (Chiya, Oct 30: scale by measured tokens, not by
+	seq_len). Samples per step times padded tokens per sample, which A's probes measure: rows are padded to the
+	longest in their batch, so the per-sample figure follows batch size, and seq_len only cuts it when the rows
+	reach it. On the settings' axis when _on_token_axis says so, for probes and queries alike."""
+	pts = _token_points(record)
+	if pts is None:
+		return _step_x(record.job.lens, values)
+	b_q = float(values.get("batch_size") or 1)
+	seq_q = float(values.get("seq_len") or 0) or math.inf
+	# accumulation: what the probes measured (samples / batch); a declared grad_accum knob moves it by the ratio of
+	# the query's value to the knob's current one, so a knob that disagrees with what ran (a DeepSpeed config) can't
+	# put the query on a different scale from the probes
+	measured = statistics.median(a for _, a, *_ in pts)
+	accum = measured
+	if any(k.id == "grad_accum" for k in record.knobs):
+		cur = float(_current(record).get("grad_accum") or 1) or 1.0
+		accum = measured * float(values.get("grad_accum") or cur) / cur
+	by_batch: dict[float, list[float]] = {}
+	for b, _, u, _, trunc in pts:
+		if not trunc:
+			by_batch.setdefault(b, []).append(u)
+	free = sorted((b, statistics.fmean(us)) for b, us in by_batch.items())  # probes at one batch: their mean
+	# padded tokens per sample at this batch: linear in log2(batch) between probed batches, flat beyond them
+	if b_q <= free[0][0]:
+		u_q = free[0][1]
+	elif b_q >= free[-1][0]:
+		u_q = free[-1][1]
+	else:
+		u_q = free[-1][1]
+		for (b0, u0), (b1, u1) in itertools.pairwise(free):
+			if b0 <= b_q <= b1:
+				t = 0.0 if b1 == b0 else (math.log2(b_q) - math.log2(b0)) / (math.log2(b1) - math.log2(b0))
+				u_q = u0 + t * (u1 - u0)
+				break
+	# a probe cut by its seq_len still bounds the rows from below: at its batch, rows are at least that long
+	floor = max(
+		(u for b, _, u, sq, trunc in pts if trunc and b == b_q and seq_q >= sq),
+		default=0.0,
+	)
+	return b_q * accum * min(seq_q, max(u_q, floor))
+
+
+def _probe_work(record: FlightRecord, p) -> float:
+	"""A probe's place on the step-time axis: the tokens it measured when the record's probes all report them."""
+	if _on_token_axis(record):
+		m = _measured_tokens(p)
+		if m is not None:
+			return m[0]
+	return _step_x(record.job.lens, _probe_values(record, p))
 
 
 _PRECISION_KNOBS = ("precision", "dtype", "torch_dtype", "ptdtype")
@@ -637,9 +831,8 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		st_ = p.step_time
 		if p.status not in OK_PROBE or not st_ or not st_.p50_s:
 			continue
-		pv = _probe_values(record, p)
 		phases = steptime.phases_seconds(st_.by_phase, st_.p50_s) or {"step": st_.p50_s}
-		sprobes.append(steptime.StepProbe(_step_x(lens, pv), phases, p.id))
+		sprobes.append(steptime.StepProbe(_probe_work(record, p), phases, p.id))
 		if p.kernels and current_probe is None:
 			current_probe = p
 	mid = steptime.MODEL_ID_SAME
@@ -664,7 +857,9 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		why = f"{src_gpu if gpus.is_unlisted(src_gpu) else tgt_gpu} isn't in the GPU table, so time can't be carried across GPUs"
 		return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), 0.0)
 	est = model.predict(
-		_step_x(lens, values), recompute=recompute, measured_probe=match.id if match and same_gpu else None
+		_step_work(record, values),
+		recompute=recompute,
+		measured_probe=match.id if match and same_gpu else None,
 	)
 	if est.status == "abstain":
 		return _StepResult(_abstain("s", mid, est.reason), est.sigma_log)
@@ -672,10 +867,14 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 
 	# precision moved away from what the probes ran
 	q_prec = _precision(values)
-	x_q = _step_x(lens, values)
+	x_q = _step_work(record, values)
 	by_dist = sorted(
-		(abs(math.log(max(_step_x(lens, pv), 1e-9) / max(x_q, 1e-9))), i, _precision(pv))
-		for i, pv in enumerate(_probe_values(record, p) for p in record.probes if p.status in OK_PROBE)
+		(
+			abs(math.log(max(_probe_work(record, p), 1e-9) / max(x_q, 1e-9))),
+			i,
+			_precision(_probe_values(record, p)),
+		)
+		for i, p in enumerate(p for p in record.probes if p.status in OK_PROBE)
 	)
 	p_precs = {pr for _, _, pr in by_dist}
 	if q_prec and p_precs and q_prec not in p_precs and gpus.is_unlisted(src_gpu):
@@ -706,9 +905,21 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			cross = steptime.predict_cross_gpu_from_probe(
 				current_probe.kernels, current_probe.step_time.p50_s, src_gpu, tgt_gpu
 			)
+		# Chiya, Oct 31: the held-out cross-GPU band, only with engine.steptime_cross_gpu on (it makes GPU moves abstain)
+		xcell = (
+			conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
+			if FEATURES["steptime_cross_gpu"]
+			else None
+		)
 		if cross is not None and cross.status != "abstain":
 			ratio = cross.point / current_probe.step_time.p50_s
-			sigma = math.hypot(sigma, cross.sigma_log)
+			# Chiya, Oct 31: K1's band from held-out corpus pairs, never narrower than the simulated one
+			cross_sigma = max(cross.sigma_log, xcell.half_width / steptime.Z90) if xcell else cross.sigma_log
+			sigma = math.hypot(sigma, cross_sigma)
+			if xcell:
+				reasons.append(
+					f"cross-GPU band from {xcell.n} held-out corpus pairs ({xcell.groups} architectures)"
+				)
 			if cross.reason:
 				reasons.append(cross.reason)
 		else:
@@ -739,16 +950,30 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		if grad_bytes is None:
 			why = "the trainable parameter count isn't known, so the gradient all-reduce can't be sized"
 			return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, why), sigma)
-		multi = steptime.multi_gpu_step(
-			point, grad_bytes, world, tgt_gpu or src_gpu, _strategy(record, values)
-		)
+		nodes = int(values.get("nodes") or 1)
+		if nodes > 1:
+			if world % nodes:
+				why = f"{world} GPUs don't split evenly across {nodes} nodes"
+				return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, why), sigma)
+			multi = steptime.multi_node_step(
+				point, grad_bytes, nodes, world // nodes, tgt_gpu or src_gpu, _strategy(record, values),
+				float(values.get("inter_node_gbps") or steptime.INTER_NODE_GBPS),
+			)  # fmt: skip
+			comm_sigma = steptime.SIGMA_MULTINODE
+		else:
+			multi = steptime.multi_gpu_step(
+				point, grad_bytes, world, tgt_gpu or src_gpu, _strategy(record, values)
+			)
+			comm_sigma = steptime.SIGMA_COMM
 		if multi.status == "abstain":
 			return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, multi.reason), sigma)
-		# each part keeps its own error: the measured step its sigma, the estimated all-reduce SIGMA_COMM
+		# each part keeps its own error: the measured step its sigma, the estimated all-reduce its own
 		comm = multi.breakdown.get("comm_exposed", 0.0)
-		sigma = math.hypot(point * sigma, comm * steptime.SIGMA_COMM) / multi.point
+		sigma = math.hypot(point * sigma, comm * comm_sigma) / multi.point
 		point, status, mid = multi.point, "extrapolated", steptime.MODEL_ID_COMM
-		reasons.append(f"{world} GPUs: the gradient all-reduce is estimated, not measured")
+		reasons.append(
+			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
+		)
 
 	off = [
 		k for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"})) if k not in _PRECISION_KNOBS
@@ -813,6 +1038,19 @@ def _strategy(record: FlightRecord, values: dict) -> str:
 # ---------------------------------------------------------------- run totals
 
 
+def checkpoint_every(record: FlightRecord, knob_values: dict | None = None) -> float | None:
+	"""Steps between the script's checkpoint saves at these knob values, or None when it doesn't save."""
+	values = _values(record, knob_values)
+	tr = record.job.script_map.training if record.job.script_map else None
+	every = values.get("checkpoint_every") or (tr.checkpoint_every if tr else None)
+	return float(every) if every else None
+
+
+def total_steps(record: FlightRecord, knob_values: dict | None = None) -> tuple[float | None, str]:
+	"""Optimizer steps in the whole run at these knob values, or None and why (for the campaign planner)."""
+	return _total_steps(record, _values(record, knob_values))
+
+
 def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]:
 	sm = record.job.script_map
 	tr = sm.training if sm else None
@@ -865,6 +1103,8 @@ class _TimeResult:
 
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
 	step = _step(record, values)
+	if FEATURES["rl"] and record.job.lens == "rl" and step.est.status != "abstain":
+		step = _with_rollout(record, values, step)
 	if step.est.status == "abstain":
 		return _TimeResult(_abstain("s", MODEL_ID_TOTAL, step.est.reason), step.est, step.sigma)
 	steps, why = _total_steps(record, values)
@@ -945,12 +1185,25 @@ def _preemption(record: FlightRecord, values: dict, time: _TimeResult) -> Estima
 	interval = min(float(every) * step, time.total.point) if every else time.total.point
 	# guess: a requeue plus reload takes at least a minute; replaced by A's measured first-step time per job
 	restart = (rule.grace_s or 0.0) + 60.0
-	lost_each = interval / 2 + restart  # Young/Daly: on average half an interval is redone
+	m = rule.mtti_s
 
 	def loss(t):
-		return t / rule.mtti_s * lost_each
+		"""Expected seconds lost: the run is n pieces of length L, each retried from its checkpoint until one attempt
+		outlasts it, so failures per piece are geometric and interruptions during redone work count too. Exactly
+		n((M + R)(e^(L/M) - 1) - L); for L much shorter than M, that is about t/M x (L/2 + R) (Young/Daly)."""
+		if t <= 0:
+			return 0.0
+		piece = min(interval, t)
+		x = piece / m
+		if x > 50:  # interruptions come far faster than any piece finishes: it never ends
+			return math.inf
+		return math.ceil(t / piece) * ((m + restart) * math.expm1(x) - piece)
 
-	why = f"about {time.total.point / rule.mtti_s:.1f} interruptions, each redoing half a checkpoint interval"
+	why = (
+		f"about {time.total.point / m:.1f} interruptions, each redoing the work since the last checkpoint"
+		if every
+		else f"about {time.total.point / m:.1f} interruptions, and with no checkpoints each one restarts the run"
+	)
 	return _est(
 		loss(time.total.point),
 		loss(time.total.lo),
@@ -1207,6 +1460,7 @@ def _peak_moment(record: FlightRecord, values: dict, mem: _MemoryResult) -> str:
 	gpu = _target_gpu(record, values)
 	try:
 		arch, setup, shape = knobs.setup_from(record.job.script_map, values)
+		shape, _ = _sized(shape, values, _padded_seq(record, values))
 		cap = _capacity(record, gpu) if gpu else None
 		return memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap).peak_moment
 	except (ValueError, AttributeError, KeyError):
@@ -1409,15 +1663,26 @@ def run_cost(
 # ---------------------------------------------------------------- the three calls
 
 
+def predict_as_run(record: FlightRecord, probe) -> Prediction:
+	"""The prediction for a probe's own setting as that probe ran it: with no eval pass when it ran none
+	(probe_ran_eval), so a held-out check compares like with like. For C's coverage checks."""
+	return _predict_values(
+		record, _values(record, _probe_values(record, probe)), eval_off=not probe_ran_eval(probe)
+	)
+
+
 def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction:
 	"""Every target for this lens at these knob values (others at their current values)."""
-	values = _values(record, knob_values)
+	return _predict_values(record, _values(record, knob_values))
+
+
+def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) -> Prediction:
 	why = _invalid(values)
 	if why:
 		return Prediction({t.id: _abstain(t.unit, "input-check@0.1.0", why) for t in targets_for(record)})
 	if _api_lens(record):
 		return Prediction(_agent(record, values))
-	mem = _memory(record, values)
+	mem = _memory(record, values, eval_off=eval_off)
 	tm = _time(record, values)
 	out = {
 		"memory.peak": mem.peak,
@@ -1443,7 +1708,408 @@ def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction
 		out["risk.wall_cap"] = _wall_cap(record, tm)
 	if c.preemption.kind != "none":
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
+	if FEATURES["rl"] and record.job.lens == "rl":
+		out.update(_rl_targets(record, values))
+	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET.get():
+		out.update(_serving_targets(record, values))
 	return Prediction(out)
+
+
+# the serving simulation takes tens of milliseconds; grids and rankings that don't read it skip it. A context
+# variable, so a fill running in another thread (the pipeline runs one per job) never sees this one's setting
+_QUIET = contextvars.ContextVar("preflight_quiet_serving", default=False)
+
+
+class _quiet_serving:
+	def __init__(self, on: bool):
+		self.on = on
+		self.token = None
+
+	def __enter__(self):
+		self.token = _QUIET.set(_QUIET.get() or self.on)
+
+	def __exit__(self, *exc):
+		_QUIET.reset(self.token)
+
+
+# ---------------------------------------------------------------- self-hosted serving (engine/serving.py)
+
+
+def _serve_probe(record: FlightRecord, values: dict | None = None):
+	"""A probe that generated: the one at the query's settings when there is one, else the first. Its requests are the
+	workload, and its wall time calibrates the simulation."""
+	ps = [
+		p
+		for p in record.probes
+		if p.status in OK_PROBE
+		and p.generation
+		and p.generation.sequences
+		and p.generation.seconds_total
+		and p.generation.new_tokens_mean
+	]
+	if values is not None:
+		match = _matching_probe(record, values)
+		if match is not None and match in ps:
+			return match
+	return ps[0] if ps else None
+
+
+def _serve_setup(record: FlightRecord, values: dict) -> tuple[serving.ServeSetup | None, str]:
+	try:
+		arch, setup, _ = knobs.setup_from(record.job.script_map, values)
+	except (ValueError, AttributeError) as exc:
+		return None, f"no model shape to size the KV cache: {exc}"
+	if not isinstance(arch, memory.TransformerArch):
+		return None, "the serving model needs a transformer's layers and heads"
+	gpu = _target_gpu(record, values)
+	if gpu is None or gpus.is_unlisted(gpu):
+		return None, f"{gpu or 'this GPU'} isn't in the GPU table"
+	weights = memory.static_terms(arch, setup)["weights"]
+	kv = "fp8" if str(values.get("kv_cache_dtype", "")).startswith("fp8") else setup.compute_dtype
+	return serving.ServeSetup(
+		arch=arch,
+		gpu=gpu,
+		weight_bytes=weights,
+		kv_dtype=kv,
+		compute_dtype=setup.compute_dtype,
+		tensor=setup.parallel.tensor,
+		mem_util=float(values.get("gpu_memory_utilization") or 0.9),
+		max_num_seqs=int(values.get("max_num_seqs") or 256),
+		max_batched_tokens=int(values.get("max_batched_tokens") or 8192),
+		max_model_len=int(values["max_model_len"]) if values.get("max_model_len") else None,
+		capacity_bytes=float(_capacity(record, gpu)),
+	), ""
+
+
+def _serve_workload(record: FlightRecord, values: dict, p) -> tuple[list[list[serving.Request]], bool]:
+	"""(batches, online): the probe's requests, in as many back-to-back calls as the probe made, each with the
+	probe's output lengths and a prompt length from the data (else the knob's cap). With a `request_rate` knob, the
+	same requests arrive at that rate instead (online serving)."""
+	g = p.generation
+	pv = _probe_values(record, p)
+	dat = p.data
+	prompt = (
+		(dat.tokens_per_sample_mean if dat else None)
+		or values.get("max_prompt_len")
+		or pv.get("max_prompt_len")
+		or 512
+	)
+	p95 = (dat.tokens_per_sample_p95 if dat and dat.tokens_per_sample_mean else None) or None
+	cap = values.get("max_new_tokens") or g.max_new_tokens
+	rate = values.get("request_rate")
+	calls = max(1, int(g.calls or 1))
+	reqs = serving.workload(
+		int(g.sequences),
+		float(prompt),
+		float(g.new_tokens_mean),
+		float(p95) if p95 else None,
+		float(g.new_tokens_p95) if g.new_tokens_p95 else None,
+		rate_per_s=float(rate) if rate else None,
+		max_output=int(cap) if cap else None,
+	)
+	if rate:
+		return [reqs], True
+	size = math.ceil(len(reqs) / calls)
+	return [reqs[i : i + size] for i in range(0, len(reqs), size)], False
+
+
+# guess: a probe whose outputs hit its cap this often hasn't seen how long they run uncapped (per call, not per
+# response: the longest output in a call sets its pace)
+TRUNCATED_CALL = 0.05
+
+
+def _serving_blocker(record: FlightRecord, values: dict, p) -> str | None:
+	g = p.generation
+	cap_p, cap_q = g.max_new_tokens, values.get("max_new_tokens") or g.max_new_tokens
+	t = g.truncation_rate
+	if cap_p and cap_q and float(cap_q) > float(cap_p):
+		per_call = max(1, round(g.sequences / max(g.calls, 1)))
+		hit = 1 - (1 - t) ** per_call if t is not None else None
+		if hit is None or hit > TRUNCATED_CALL:
+			seen = f"{t:.0%} of" if t is not None else "an unknown share of"
+			return (
+				f"{seen} the probe's outputs hit its {float(cap_p):g}-token cap, so how long they run past it wasn't "
+				"measured; probe at the higher cap"
+			)
+	return None
+
+
+_SERVE_CAL: dict = {}  # (record id, probe id, setup) -> Calibration: the probe's simulation runs once per record
+
+
+def _serving_targets(record: FlightRecord, values: dict) -> dict:
+	mid = serving.MODEL_ID
+	setup, why = _serve_setup(record, values)
+	p = _serve_probe(record, values)
+	if setup is None or p is None:
+		why = why or "no probe generated, so there is no workload to simulate or calibrate on"
+		return {t: _abstain(_meta(t)[0], mid, why) for t in SERVING_TARGETS}
+	blocked = _serving_blocker(record, values, p)
+	if blocked:
+		return {t: _abstain(_meta(t)[0], mid, blocked) for t in SERVING_TARGETS}
+	pv = _probe_values(record, p)
+	probe_setup, _ = _serve_setup(record, pv)
+	backend = p.generation.backend
+	if (
+		backend != "vllm"
+	):  # an HF generate probe doesn't batch like vLLM: its wall time can't scale a vLLM simulation
+		cal = serving.Calibration(
+			source=f"uncalibrated: the probe generated with {backend or 'an unknown backend'}, not vLLM"
+		)
+	else:
+		g = p.generation  # the measurements are in the key: a refilled probe with new numbers recalibrates
+		key = (
+			record.record_id,
+			p.id,
+			probe_setup or setup,
+			g.calls,
+			g.sequences,
+			g.seconds_total,
+			g.new_tokens_mean,
+			g.new_tokens_p95,
+			g.max_new_tokens,
+		)
+		if key not in _SERVE_CAL:
+			if len(_SERVE_CAL) > 64:
+				_SERVE_CAL.clear()
+			_SERVE_CAL[key] = serving.calibrate(
+				probe_setup or setup, _serve_workload(record, pv, p)[0], float(p.generation.seconds_total)
+			)
+		cal = _SERVE_CAL[key]
+		same_hw = probe_setup is not None and (
+			probe_setup.gpu,
+			probe_setup.tensor,
+			probe_setup.compute_dtype,
+		) == (
+			setup.gpu,
+			setup.tensor,
+			setup.compute_dtype,
+		)
+		if not same_hw:  # the scale carries over, but one probe on other hardware doesn't narrow the band
+			cal = replace(cal, sigma=serving.SIGMA_UNCALIBRATED, source=cal.source + ", on other hardware")
+	batches, online = _serve_workload(record, values, p)
+	f = serving.forecast(setup, batches, cal, online)
+	if f is None:
+		why = f"the model doesn't fit: no room for a KV cache on {setup.gpu} at {setup.mem_util:.0%} of its memory"
+		return {t: _abstain(_meta(t)[0], mid, why) for t in SERVING_TARGETS}
+	status = "predicted" if _matching_probe(record, values) is p and backend == "vllm" else "extrapolated"
+	out = {}
+	for tid, r, unit in (
+		("serving.throughput", f.throughput, "tokens/s"),
+		("serving.ttft_p95", f.ttft_p95, "s"),
+		("serving.tpot", f.tpot_p50, "s"),
+	):
+		out[tid] = _est(r.point, r.lo, r.hi, unit, status, mid, r.reason)
+	kv = float(f.kv_capacity_tokens)
+	out["serving.kv_tokens"] = _est(
+		kv,
+		kv,
+		kv,
+		"tokens",
+		"predicted",
+		mid,
+		f"KV pool after the weights at {setup.mem_util:.0%} of the card; at most {f.peak_running} requests ran at once",
+	)
+	return out
+
+
+# ---------------------------------------------------------------- RL post-training (engine/rl.py)
+
+
+def _rl_probe(record: FlightRecord, values: dict | None = None):
+	"""The probe that measured a rollout: the one at the query's settings when there is one, else the one whose
+	sequences per call are nearest the query's."""
+	ps = [
+		p
+		for p in record.probes
+		if p.status in OK_PROBE and p.generation and p.generation.calls and p.generation.sequences
+	]
+	if not ps or values is None:
+		return ps[0] if ps else None
+	match = _matching_probe(record, values)
+	if match is not None and match in ps:
+		return match
+	b = float(values.get("batch_size") or 1)
+	return min(ps, key=lambda p: abs(math.log(float(_probe_values(record, p).get("batch_size") or 1) / b)))
+
+
+# guess: a probe whose calls hit its cap this often (any response in the call reaching it) hasn't seen how long
+# they run uncapped
+TRUNCATED_PROBE = 0.05
+
+
+def _probe_truncation(p) -> float | None:
+	return (p.rl.truncation_rate if p.rl else None) or (
+		p.generation.truncation_rate if p.generation else None
+	)
+
+
+def _lengths(p) -> rl.LengthSample | None:
+	r = p.rl.response_length if p.rl else None
+	if r is not None and r.mean and r.p95:
+		return rl.LengthSample(r.mean, r.p95, r.max, r.n)
+	g = p.generation
+	if g and g.new_tokens_mean and g.new_tokens_p95:
+		return rl.LengthSample(
+			g.new_tokens_mean, g.new_tokens_p95, g.new_tokens_max or g.new_tokens_p95, g.sequences
+		)
+	return None
+
+
+def _rollout_query(record: FlightRecord, values: dict, p) -> tuple[int, int, float | None, float | None]:
+	"""(sequences per call at the probe, at the query, cap at the probe, cap at the query).
+
+	Sequences per call follow the batch. In TRL's GRPO the batch counts completions, so group size moves how many
+	prompts share them, not how many are generated (_group_size_meaning)."""
+	pv = _probe_values(record, p)
+	n_p = max(1, round(p.generation.sequences / p.generation.calls))
+	a, b = pv.get("batch_size"), values.get("batch_size")
+	n_q = max(1, round(n_p * float(b) / float(a))) if a and b else n_p
+	cap_p = p.generation.max_new_tokens or pv.get("max_completion_len")
+	cap_q = values.get("max_completion_len") or cap_p
+	return n_p, n_q, (float(cap_p) if cap_p else None), (float(cap_q) if cap_q else None)
+
+
+def _measured_rollout_s(p) -> float | None:
+	st = p.step_time
+	if not st or not st.p50_s:
+		return None
+	ph = steptime.phases_seconds(st.by_phase, st.p50_s)
+	r = ph.get("rollout", 0.0) + ph.get("generate", 0.0)
+	return r or None
+
+
+def _rollout_blocker(record: FlightRecord, values: dict, p) -> str | None:
+	"""Why the rollout can't be carried to these settings, or None."""
+	pv = _probe_values(record, p)
+	g_p, g_q = pv.get("group_size"), values.get("group_size")
+	fw = record.job.framework or (record.job.script_map.framework if record.job.script_map else None)
+	if g_p and g_q and float(g_p) != float(g_q) and fw != "trl":
+		return (
+			"whether the batch counts prompts or completions depends on the trainer, so a group-size change "
+			"can't be timed here; probe at this group size"
+		)
+	cap_p = p.generation.max_new_tokens or pv.get("max_completion_len")
+	cap_q = values.get("max_completion_len") or cap_p
+	trunc = _probe_truncation(p)
+	# the longest response in a call sets its pace, so what matters is how often a whole call hit the cap
+	per_call = max(1, round(p.generation.sequences / max(p.generation.calls, 1)))
+	call_hit = 1 - (1 - trunc) ** per_call if trunc is not None else None
+	if cap_p and cap_q and float(cap_q) > float(cap_p) and (call_hit is None or call_hit > TRUNCATED_PROBE):
+		seen = f"{trunc:.0%} of" if trunc is not None else "an unknown share of"
+		return (
+			f"{seen} the probe's responses hit its {float(cap_p):g}-token cap, so how long they run past it wasn't "
+			"measured; probe at the higher cap"
+		)
+	return None
+
+
+def _rollout(record: FlightRecord, values: dict) -> Estimate:
+	mid = rl.MODEL_ID_ROLLOUT
+	p = _rl_probe(record, values)
+	if p is None:
+		return _abstain("s", mid, "no probe timed a rollout (generation stats missing)")
+	measured, sample = _measured_rollout_s(p), _lengths(p)
+	if measured is None:
+		return _abstain("s", mid, "the probe's step has no rollout phase to scale")
+	if sample is None:
+		return _abstain("s", mid, "the probe recorded no response lengths")
+	blocked = _rollout_blocker(record, values, p)
+	if blocked:
+		return _abstain("s", mid, blocked)
+	n_p, n_q, cap_p, cap_q = _rollout_query(record, values, p)
+	iv = rl.rollout_seconds(measured, sample, n_p, cap_p, n_q, cap_q)
+	same = n_q == n_p and cap_q == cap_p
+	return _est(iv.point, iv.lo, iv.hi, "s", "predicted" if same else "extrapolated", mid, iv.reason)
+
+
+def _with_rollout(record: FlightRecord, values: dict, step: _StepResult) -> _StepResult:
+	"""Swap the step's rollout phase, which the per-phase line scales by tokens, for the batch-maximum model, which
+	follows group size and the completion cap as well."""
+	ph = dict(step.phases or {})
+	linear = ph.get("rollout", 0.0) + ph.get("generate", 0.0)
+	ro = _rollout(record, values)
+	if (
+		linear
+		and ro.status == "abstain"
+		and ro.reason
+		and ("group-size" in ro.reason or "past it" in ro.reason)
+	):
+		# the step's biggest phase can't be carried to these settings, so the step can't either
+		return replace(step, est=_abstain("s", step.est.model_id, f"rollout: {ro.reason}"))
+	if not linear or ro.status == "abstain":
+		return step
+	rest = max(step.est.point - linear, 0.0)
+	h = memory.Z90 * step.sigma
+	point = rest + ro.point
+	lo, hi = rest * math.exp(-h) + ro.lo, rest * math.exp(h) + ro.hi
+	for k in ("rollout", "generate"):
+		if k in ph:
+			ph[k] = ro.point * ph[k] / linear
+	sigma = max(step.sigma, math.log(hi / point) / memory.Z90 if point > 0 else step.sigma)
+	note = f"rollout: {ro.reason}"
+	est = _est(
+		point,
+		lo,
+		hi,
+		"s",
+		step.est.status if ro.status == "predicted" else "extrapolated",
+		step.est.model_id,
+		"; ".join(x for x in (step.est.reason, note) if x),
+	)
+	return replace(step, est=est, sigma=sigma, phases=ph)
+
+
+def _rl_targets(record: FlightRecord, values: dict) -> dict:
+	out = {"time.rollout": _rollout(record, values)}
+	p = _rl_probe(record, values) or next((q for q in record.probes if q.status in OK_PROBE and q.rl), None)
+	g = values.get("group_size")
+	mid = rl.MODEL_ID_ZERO
+	if p is None or not p.rl or not p.rl.pass_rate_per_prompt:
+		out["rl.zero_spread"] = _abstain("fraction", mid, "the probe recorded no per-prompt pass rates")
+	elif not g:
+		out["rl.zero_spread"] = _abstain("fraction", mid, "no group size: set the group_size knob")
+	else:
+		k = p.rl.group_size or (_probe_values(record, p).get("group_size"))
+		iv = rl.zero_spread(p.rl.pass_rate_per_prompt, int(g), int(k) if k else None)
+		why = iv.reason
+		if p.rl.zero_spread_fraction is not None and k:
+			why += f"; the probe measured {p.rl.zero_spread_fraction:.0%} at its group size of {int(k)}"
+		status = "predicted" if k and int(g) == int(k) else "extrapolated"
+		out["rl.zero_spread"] = _est(iv.point, iv.lo, iv.hi, "fraction", status, mid, why)
+	sample = _lengths(p) if p is not None else None
+	cap = values.get("max_completion_len") or (
+		p.generation.max_new_tokens if p is not None and p.generation else None
+	)
+	if sample is None or not cap:
+		why = (
+			"no response lengths recorded" if sample is None else "no completion cap: set max_completion_len"
+		)
+		out["rl.truncation"] = _abstain("fraction", rl.MODEL_ID_ROLLOUT, why)
+	else:
+		cap_p = p.generation.max_new_tokens if p.generation else None
+		measured = _probe_truncation(p)
+		if cap_p and float(cap) > float(cap_p) and (measured is None or measured > TRUNCATED_PROBE):
+			out["rl.truncation"] = _abstain(
+				"fraction",
+				rl.MODEL_ID_ROLLOUT,
+				_rollout_blocker(record, {**values, "group_size": None}, p)
+				or "the probe's lengths were capped",
+			)
+		else:
+			share, lo, hi = rl.truncation_band(sample, float(cap))
+			why = f"share of responses reaching the {float(cap):g}-token cap, from the probe's length distribution"
+			if measured is not None:
+				why += f"; the probe measured {measured:.0%}"
+			if cap_p and float(cap) > float(cap_p) and measured is not None:
+				# past the probe's cap the tail wasn't seen: at most the share that hit the old cap
+				share, lo, hi = min(share, measured), 0.0, measured
+				why += f" at its {float(cap_p):g}-token cap, so at most that at a higher one"
+			same = cap_p is not None and float(cap) == float(cap_p)
+			out["rl.truncation"] = _est(
+				share, lo, hi, "fraction", "predicted" if same else "extrapolated", rl.MODEL_ID_ROLLOUT, why
+			)
+	return out
 
 
 def axis_values(knob: Knob, n: int = 6) -> list:
@@ -1514,9 +2180,11 @@ def build_grids(
 	vals: dict[str, dict[str, list]] = {
 		t: {"point": [], "lo": [], "hi": [], "abstain": [], "model": []} for t in tids
 	}
+	quiet = not set(tids) & set(SERVING_TARGETS)
 	for combo in np.ndindex(*[len(a) for a in axes]):
 		knob_set = {k.id: axes[i][j] for i, (k, j) in enumerate(zip(axes_knobs, combo, strict=True))}
-		pred = predict(record, knob_set).root
+		with _quiet_serving(quiet):
+			pred = predict(record, knob_set).root
 		for t in tids:
 			e = pred.get(t)
 			v = vals[t]
@@ -1610,7 +2278,7 @@ def _objective_fn(record: FlightRecord, objective: Objective) -> tuple[Metric, s
 			e = pred.root.get("time.step")
 			if e is None or e.status == "abstain" or not e.point:
 				return None
-			return e.point / max(_step_x(record.job.lens, values), 1e-12)
+			return e.point / max(_step_work(record, values), 1e-12)
 
 		return seconds_per_unit, "time.step per unit of work"
 	table = {
@@ -1637,6 +2305,11 @@ def _noise(pred: Prediction, tid: str) -> float:
 	return (e.hi - e.lo) / (2 * abs(e.point))
 
 
+# derived: P(OOM) from a cell of n runs sits at (over + 0.5) / (n + 1) (engine/oom.py), so the smallest cell
+# (conformal.MIN_CELL runs) can't place it closer than 0.5 / (n + 1) = 0.05 to 0 or 1
+OOM_FLOOR = 0.5 / (conformal.MIN_CELL + 1)
+
+
 def sensitivity(
 	record: FlightRecord,
 	objective: Objective,
@@ -1648,6 +2321,17 @@ def sensitivity(
 	Impact is the change across the range relative to the current value, capped at 1 (a probability
 	objective uses the change itself). Knobs that move it less than its own band are left out.
 	"""
+	_, tid = _objective_fn(record, objective)
+	with _quiet_serving(tid not in SERVING_TARGETS):
+		return _sensitivity(record, objective, pinned, knobs)
+
+
+def _sensitivity(
+	record: FlightRecord,
+	objective: Objective,
+	pinned: list[str] | set[str] | None = None,
+	knobs: dict | None = None,
+) -> list[KnobImpact]:
 	f, tid = _objective_fn(record, objective)
 	start = dict(knobs or {})  # rank from this setting (C's provider passes the live one)
 	pinned = set(pinned or ())
@@ -1671,19 +2355,23 @@ def sensitivity(
 			pred = predict(record, q)
 			y = f(pred, _values(record, q))
 			if y is not None and (not check or _feasible(record, pred)):
-				scored.append((v, y))
+				peak = pred.root.get("memory.peak")
+				scored.append((v, y, peak.point if peak is not None and peak.point else math.inf))
 		if len(scored) < 2:
 			continue
-		ys = [y for _, y in scored]
-		spread = max(ys) - min(ys)
+		ys = [y for _, y, _ in scored]
+		# P(OOM) is ranked between the smallest cell's floor and ceiling, so a lever doesn't outrank another only
+		# because its range reached a cell with more runs and a lower floor; other probabilities are sampled rates
+		ranked = [min(max(y, OOM_FLOOR), 1 - OOM_FLOOR) for y in ys] if tid == "risk.oom" else ys
+		spread = max(ranked) - min(ranked)
 		ref = abs(base) if base else max(abs(y) for y in ys) or 1.0
 		impact = min(1.0, spread) if prob else min(1.0, spread / ref)
 		if impact <= noise or impact == 0:
 			continue
-		best_v, _ = min(scored, key=lambda s: s[1])
+		best_v, _, best_peak = min(zip(scored, ranked, strict=True), key=lambda s: (s[1], s[0][2]))[0]
 		direction = "either"
 		if k.kind in ("int", "float"):
-			xs = np.asarray([float(v) for v, _ in scored])
+			xs = np.asarray([float(v) for v, _, _ in scored])
 			r = np.corrcoef(xs, np.asarray(ys))[0, 1] if np.ptp(xs) > 0 and np.ptp(ys) > 0 else 0.0
 			if r <= -0.5:
 				direction = "increase"
@@ -1693,15 +2381,37 @@ def sensitivity(
 		if k.id in TRUNCATING_KNOBS:
 			why += "; shorter cuts what the model sees, so check quality before taking it"
 		out.append(
-			KnobImpact(knob_id=k.id, impact=impact, direction=direction, best_value=best_v, reason=why)
+			(
+				KnobImpact(knob_id=k.id, impact=impact, direction=direction, best_value=best_v, reason=why),
+				best_peak,
+			)
 		)
-	return sorted(out, key=lambda r: -r.impact)
+	# ties (two levers both reaching P(OOM)'s floor, say) go first to the lever that doesn't cut what the model
+	# sees, then to the one leaving more memory headroom
+	out.sort(key=lambda o: (-round(o[0].impact, 6), o[0].knob_id in TRUNCATING_KNOBS, o[1]))
+	return [r for r, _ in out]
 
 
 # ---------------------------------------------------------------- the whole predictions block
 
 
 _CARDS = {
+	serving.MODEL_ID: (
+		"simulation",
+		"KV-cache capacity, prefill and decode rooflines and a continuous-batching scheduler (vLLM, Vidur); one scale "
+		"factor fitted on the probe's own requests; not yet checked against a full vLLM run (validation row: "
+		"tokens/sec within 15%)",
+	),
+	rl.MODEL_ID_ZERO: (
+		"bootstrap",
+		"p^G + (1-p)^G per prompt, each pass rate with a Jeffreys posterior, prompts resampled (DAPO, Dr. GRPO); "
+		"not yet checked against a full RL run (validation row: GRPO zoo script)",
+	),
+	rl.MODEL_ID_ROLLOUT: (
+		"bootstrap",
+		"the expected longest capped response in a batch, bootstrapped from the probe's lengths (HybridFlow); "
+		"not yet checked against a full RL run (validation row: rollout time within 20%)",
+	),
 	memory.MODEL_ID: ("analytical", "Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d"),
 	steptime.MODEL_ID_SAME: (
 		"analytical",
@@ -1731,38 +2441,56 @@ CALIBRATION = "simulated"  # Review, Oct 27: until real held-out runs replace th
 _CARD_TARGET = {
 	memory.MODEL_ID: "memory.peak",
 	steptime.MODEL_ID_SAME: "time.step",
-	steptime.MODEL_ID_CROSS: "time.step",
+	steptime.MODEL_ID_CROSS: "time.step.cross",
 }
 
 
-# the models whose own predictions the corpus scores; the cross-GPU model's band starts from the same-GPU cell,
-# but no cross-GPU prediction has been scored yet, so its card carries no coverage
-_CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME})
+# the models whose own predictions the corpus scores: memory and same-GPU step time leave-one-architecture-out, the
+# cross-GPU replay leave-one-GPU-out (Chiya, Oct 31: installed)
+_CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME, steptime.MODEL_ID_CROSS})
+
+# Chiya, Oct 31: what a held-out band does and doesn't cover yet, said on the card itself
+_CARD_CAVEAT = {
+	steptime.MODEL_ID_SAME: "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2.",
+	steptime.MODEL_ID_CROSS: (
+		"Band from corpus pairs, scored on GPUs left out; calibrated on corpus models' op tables, not users' "
+		"kernel tables; checked on the AMD rows and unseen scripts Nov 2."
+	),
+}
 
 
-def _calibration(mid: str) -> tuple[str, float | None]:
-	"""("held_out", None) when the conformal table has a cell for this model's target, else ("simulated", None)."""
+def _calibration(mid: str, record: FlightRecord | None = None) -> tuple[str, float | None]:
+	"""("held_out", None) when the conformal table has a cell this record's band really uses (its GPU and lens, or
+	the merged cells it falls back to), else ("simulated", None). Without a record: any cell for the target."""
 	target = _CARD_TARGET.get(mid)
-	cells = [c for k, c in conformal.TABLE.cells.items() if target and k[0] == target]
+	if not target:
+		return CALIBRATION, None
+	if mid == steptime.MODEL_ID_CROSS and not FEATURES["steptime_cross_gpu"]:
+		return CALIBRATION, None  # the held-out band is installed but not switched on
+	if record is not None:
+		cell = conformal.TABLE.lookup(target, _env_gpu(record), record.job.lens)
+		return ("held_out", None) if cell is not None else (CALIBRATION, None)
+	cells = [c for k, c in conformal.TABLE.cells.items() if k[0] == target]
 	return ("held_out", None) if cells else (CALIBRATION, None)
 
 
-def _cards(ids: set[str]) -> list[ModelCard]:
-	"""Model cards; until held-out real runs fill the conformal table, each says calibration: simulated."""
+def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]:
+	"""Model cards. With a record, a card says held_out only when that record's own band comes from held-out runs:
+	a fine-tune's step time keeps its simulated band, so its card says so, whatever other lenses have."""
 	out = []
 	for mid in sorted(ids):
 		kind, notes = _CARDS.get(mid, ("analytical", None))
-		calib, _ = _calibration(mid)
+		calib, _ = _calibration(mid, record)
 		target = _CARD_TARGET.get(mid)
 		extra: dict = {}
 		if calib == "held_out" and target and mid in _CARD_SCORED:
 			t = conformal.TABLE
-			extra["training_data"] = t.built_from
+			extra["training_data"] = f"{t.built_from}; table {t.version}"
 			if target in t.coverage and t.coverage[target][1]:
 				h, n = t.coverage[target]
 				extra["coverage"] = h / n
 			extra["per_gpu_coverage"] = {g: h / n for g, (h, n) in t.holdout.get(target, {}).items() if n}
-			notes = f"{notes or ''}. {t.describe(target)}".strip(". ")
+			notes = f"{notes or ''}. {_CARD_CAVEAT.get(mid, '')} {t.describe(target)}".strip(". ")
 		out.append(
 			ModelCard(
 				id=mid,
@@ -1806,6 +2534,95 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	)
 
 
+def calibration_summary() -> dict:
+	"""What the coverage self-test page shows from the corpus: each target's leave-one-architecture-out coverage and
+	the cross-GPU holdout, both with Wilson 95% intervals, and P(OOM)'s reliability bins. Plain data for C's page."""
+	t = conformal.TABLE
+
+	def row(hits: int, n: int) -> dict:
+		lo, hi = conformal.wilson(hits, n)
+		return {"hits": hits, "n": n, "rate": hits / n if n else None, "wilson95": [lo, hi]}
+
+	targets = sorted({k[0] for k in t.cells} | set(t.coverage))
+	return {
+		"built_from": t.built_from,
+		"targets": {
+			tid: {
+				"coverage": row(*t.coverage[tid]) if tid in t.coverage else None,
+				"holdout": {g: row(h, n) for g, (h, n) in sorted(t.holdout.get(tid, {}).items())},
+				"lenses": sorted({k[2] for k in t.cells if k[0] == tid and k[2]}),
+			}
+			for tid in targets
+		},
+		"oom_bins": [
+			{
+				"lo": b[0],
+				"hi": b[1],
+				"n": b[2],
+				"ooms": b[4] if len(b) > 4 else None,
+				"agrees": b[3],
+				"verified": b[2] >= oom_model.MIN_SHOWN and b[3],
+				# what the engine shows: a number at an end only once that bin verifies (else its counts), and in the
+				# middle only once every middle bin does (else "uncertain (5-95%)")
+				"shown_as_number": (
+					(b[2] >= oom_model.MIN_SHOWN and b[3]) or len(b) <= 4
+					if b[1] <= oom_model.UNCERTAIN[0] + 1e-9 or b[0] >= oom_model.UNCERTAIN[1] - 1e-9
+					else oom_model.middle_verified(t.oom_bins)
+				),
+			}
+			for b in t.oom_bins
+		],
+		"oom_middle_verified": oom_model.middle_verified(t.oom_bins),
+	}
+
+
+def current_models() -> dict[str, str]:
+	"""Every model the engine can put on a record, name -> its id now (gap 15: records pin the id they used)."""
+	from preflight.campaign import planner  # the planner's card rides on records too
+
+	ids = [
+		memory.MODEL_ID,
+		steptime.MODEL_ID_SAME,
+		steptime.MODEL_ID_CROSS,
+		steptime.MODEL_ID_COMM,
+		agent_cost.MODEL_ID,
+		rl.MODEL_ID_ZERO,
+		rl.MODEL_ID_ROLLOUT,
+		serving.MODEL_ID,
+		planner.MODEL_ID,
+		MODEL_ID_TOTAL,
+		MODEL_ID_COST,
+		MODEL_ID_AGENT_TIME,
+		MODEL_ID_CONTEXT,
+		MODEL_ID_PREEMPT,
+		MODEL_ID_RUN_COST,
+	]
+	return {i.split("@")[0]: i for i in ids}
+
+
+def stale_models(record: FlightRecord) -> list[tuple[str, str]]:
+	"""(the id a record's numbers came from, the id the engine has now) for every model that has moved on since.
+
+	A shared record keeps the numbers it was predicted with; this is how the page says "predicted with
+	memory-analytical@0.1.0; the current model is 0.2.0" instead of silently showing different numbers."""
+	now = current_models()
+	used = {m.id for m in record.models} | {e.model_id for e in record.predictions.estimates.values()}
+	out = []
+	for mid in sorted(used):
+		name = mid.split("@")[0]
+		if name in now and now[name] != mid:
+			out.append((mid, now[name]))
+	# the held-out bands are versioned too: a card names the table it was banded with
+	tables = {
+		m.training_data.rsplit("; table ", 1)[1]
+		for m in record.models
+		if m.training_data and "; table " in m.training_data
+	}
+	for v in sorted(tables - {conformal.TABLE.version}):
+		out.append((f"conformal-table@{v}", f"conformal-table@{conformal.TABLE.version}"))
+	return out
+
+
 def fill_predictions(record: FlightRecord) -> FlightRecord:
 	"""The record with B's parts filled: predictions, model cards, knobs' probed ranges. Returns a copy.
 
@@ -1820,7 +2637,7 @@ def fill_predictions(record: FlightRecord) -> FlightRecord:
 	return record.model_copy(
 		update={
 			"predictions": preds,
-			"models": [*others, *_cards(used)],
+			"models": [*others, *_cards(used, record)],
 			"knobs": _probed_ranges(record),
 			"cost_basis": basis,
 			"job_cost": cost,

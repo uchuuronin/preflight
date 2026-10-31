@@ -6,12 +6,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Info } from "../../workspace/components/Info";
 import { Measured } from "../../workspace/cockpit/Measured";
+import { ProbeHere } from "../../workspace/cockpit/ProbeHere";
 import { statusLine } from "../../workspace/cockpit/statusLine";
 import { fitMapKnobs } from "../../workspace/record/fitmap";
 import { GuidePanel } from "../../guide/GuidePanel";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { usePanels } from "../../registry";
+import { ExportsSection } from "../../workspace/export/ExportsSection";
 import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
 import { FitMap } from "../../workspace/cockpit/FitMap";
 import { flag } from "../../lib/flags";
@@ -96,7 +98,7 @@ function Cockpit() {
 			<span className="pf-map-key">
 				<span>
 					<i className="pf-key-band" />
-					{source.kind === "prediction" ? t("map.key.band") : source.kind === "probe" ? t("map.key.band_probe", { where }) : t("map.key.band_none")}
+					{source.kind === "prediction" ? t("map.key.band") : source.kind === "probe" ? t(isFixture(record) ? "map.key.band_probe_illustrative" : "map.key.band_probe", { where }) : t("map.key.band_none")}
 				</span>
 				<span>
 					<i className="pf-key-ring" />
@@ -120,7 +122,8 @@ function Cockpit() {
 					<header className="pf-cockpit__head">
 						<h1>{record.job.title ?? t(`lens.${record.job.lens}`)}</h1>
 						{isFixture(record) ? <span className="pf-tag">{t("cockpit.illustrative")}</span> : null}
-						{spent > 0 ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
+						{/* A sample's own cost is part of its fixture, not money anyone spent. */}
+						{spent > 0 && !isFixture(record) ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
 						<Measured />
 						{headPanels.map((p) => (
 							<AddonBoundary key={p.id} id={p.id}>
@@ -130,6 +133,7 @@ function Cockpit() {
 						<p className={`pf-statusline is-${line.tone}`} aria-live="polite">
 							{line.text}
 						</p>
+						<ProbeHere />
 					</header>
 					<div className={`pf-deck${fit ? " is-fit" : ""}`}>
 						<Dials />
@@ -171,6 +175,7 @@ function Cockpit() {
 						</AddonBoundary>
 					))}
 				</section>
+				<ExportsSection />
 			</div>
 		</div>
 	);

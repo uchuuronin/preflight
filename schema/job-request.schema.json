@@ -328,6 +328,21 @@
 			"default": null,
 			"description": "Who asked, for the logbook, e.g. guide.run_probe",
 			"title": "Purpose"
+		},
+		"patch": {
+			"anyOf": [
+				{
+					"maxLength": 262144,
+					"minLength": 1,
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "0.5.0: a unified diff applied to the record's code before a probe or verify job (C's fix loop); code fixes can't be passed as knob overrides",
+			"title": "Patch"
 		}
 	},
 	"required": [
@@ -336,5 +351,5 @@
 	"title": "JobRequest",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.4.0/JobRequest"
+	"$id": "https://preflight.dev/schema/0.5.0/JobRequest"
 }

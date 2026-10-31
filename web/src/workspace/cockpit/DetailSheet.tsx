@@ -9,7 +9,7 @@ import { usePanels } from "../../registry";
 import { valueText } from "../../guide/GuidePanel";
 import { useOrbitLayout } from "../map/Orbit";
 import { resolveMetric } from "../provider/metrics";
-import { target } from "../record/model";
+import { isFixture, target } from "../record/model";
 import { useWorkspace } from "../state";
 import { bounds, trusted } from "../status";
 import { Provenance } from "../components/StatusMark";
@@ -77,7 +77,7 @@ export function DetailSheet() {
 											{m.kind === "prediction" && est ? <Provenance status={est.status} /> : null}
 											{m.kind === "measured_here" ? <Provenance status="measured" /> : null}
 											{m.kind === "measured_elsewhere" ? (
-												<span className="pf-dim">{t("detail.measured_at", { where: probeWhere(m.probeKnobs) })}</span>
+												<span className="pf-dim">{t(isFixture(record) ? "detail.illustrative_at" : "detail.measured_at", { where: probeWhere(m.probeKnobs) })}</span>
 											) : null}
 										</>
 									) : (

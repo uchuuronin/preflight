@@ -34,6 +34,8 @@ export const KNOB_TERMS: Readonly<Record<string, string>> = {
 	packing: "packing",
 	num_workers: "dataloader_workers",
 	lr: "learning_rate",
+	lr_schedule: "learning_rate_schedule",
+	optimizer: "optimiser",
 	checkpoint_every: "checkpoint_interval",
 	max_steps: "max_steps",
 	gpu_type: "gpu_type",

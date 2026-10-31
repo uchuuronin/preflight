@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../lib/flags", () => ({ flag: (name: string) => name === "runner.queue" }));
 
 import { type IntakePanelProps, registerAppPanel, unregister } from "../../registry";
+import en from "../../i18n/en.json";
+import { DATA_USE_OK_ID } from "../DataUse";
 import { NewFlight } from "./NewFlight";
 
 const SOURCE = { kind: "notebook", files: { "train.ipynb": '{"cells":[]}' } };
@@ -104,5 +106,47 @@ describe("the check-in desk and intake panels", () => {
 		const input = document.querySelector("input[type=file]") as HTMLInputElement;
 		expect(input.accept).not.toContain(".ipynb");
 		expect(input.accept).toContain(".py");
+	});
+
+	it("says why Check in is grey when the link isn't a GitHub repo, and marks the field", () => {
+		render(<NewFlight onSample={() => {}} />);
+		const field = screen.getByLabelText("GitHub repository") as HTMLInputElement;
+		expect(screen.queryByText(en["newflight.repo.invalid"])).toBeNull(); // nothing typed: no complaint
+		for (const bad of ["not a link", "https://gitlab.com/a/b", "github.com/owner"]) {
+			fireEvent.change(field, { target: { value: bad } });
+			expect(screen.queryByText(en["newflight.repo.invalid"])).toBeNull(); // still typing
+			fireEvent.blur(field);
+			const msg = screen.getByText(en["newflight.repo.invalid"]);
+			expect(msg.id).not.toBe("");
+			expect(field.getAttribute("aria-describedby")?.split(" ")).toContain(msg.id);
+			expect(field.getAttribute("aria-invalid")).toBe("true");
+			expect(msg.closest("[role=status]")).not.toBeNull(); // spoken when it appears
+		}
+		fireEvent.change(field, { target: { value: "github.com/karpathy/nanoGPT" } });
+		fireEvent.blur(field);
+		expect(screen.queryByText(en["newflight.repo.invalid"])).toBeNull();
+		expect(field.getAttribute("aria-invalid")).toBeNull();
+	});
+
+	it("takes the visitor to the Got it box, then back to Check in once it's ticked", async () => {
+		render(<NewFlight onSample={() => {}} />);
+		Element.prototype.scrollIntoView = vi.fn();
+		fireEvent.change(screen.getByLabelText("GitHub repository"), { target: { value: "github.com/karpathy/nanoGPT" } });
+		const box = document.getElementById(DATA_USE_OK_ID) as HTMLInputElement;
+		fireEvent.click(screen.getByRole("button", { name: en["datause.needed"] }));
+		expect(document.activeElement).toBe(box);
+		fireEvent.click(box);
+		await act(async () => {
+			await new Promise((r) => requestAnimationFrame(() => r(null)));
+		});
+		expect(document.activeElement).toBe(screen.getByRole("button", { name: "Check in" }));
+	});
+
+	it("states the measured run, with no dollar promise, once the notice is ticked", () => {
+		render(<NewFlight onSample={() => {}} />);
+		fireEvent.click(screen.getByRole("checkbox"));
+		const hint = screen.getByText(en["newflight.cost_hint"]);
+		expect(hint.textContent).toMatch(/measured/i);
+		expect(hint.textContent).not.toMatch(/\$|US\$|£/);
 	});
 });

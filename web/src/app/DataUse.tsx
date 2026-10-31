@@ -9,13 +9,27 @@ import { flag } from "../lib/flags";
 import { t } from "../lib/i18n";
 
 const SEEN_KEY = "pf.data_use.v1";
+/** The "Got it" box, so the check-in button's hint can take a visitor to it. */
+export const DATA_USE_OK_ID = "pf-datause-ok";
 
 /**
- * How long records and code are kept. null until Chiya decides and deletion is built; the
- * notice then says plainly that nothing is deleted automatically yet, instead of a promise
- * the system doesn't keep.
+ * How long code and records are kept: only what A's runner does today (python/preflight/runner).
+ * - A repo's clone is deleted as soon as it is read, before any probe runs (sources.py); the
+ *   record keeps only the repo link and commit.
+ * - Uploaded files (a notebook as sent, outputs included) stay on the "preflight-uploads" volume
+ *   by content hash, even after their record goes, so the guide can re-run them; nothing deletes
+ *   them yet (`uploadDays: null`), and the notice says so.
+ * - Records are deleted about 30 days after they are made (records.py RECORD_TTL_S; PM decision,
+ *   Oct 28): the deployed app's tick prunes once a day, at most a quarter of them per pass, and
+ *   keeps any record whose date can't be read.
+ * - Probe results, error messages included (which can quote the visitor's code), stay in the
+ *   probe cache with no expiry, so a repeat run reuses them (modal_app.py DictCache).
  */
-export const RETENTION: { codeHours: number; recordDays: number } | null = null;
+export const RETENTION: { repoDeletedAtProbeEnd: boolean; uploadDays: number | null; recordDays: number | null } = {
+	repoDeletedAtProbeEnd: true,
+	uploadDays: null,
+	recordDays: 30,
+};
 
 function readSeen(): boolean {
 	try {
@@ -34,16 +48,15 @@ function writeSeen(): void {
 }
 
 /** The lines that apply to this build, in the order a visitor's data travels. */
-export function dataUseLines(): string[] {
+export function dataUseLines(retention: typeof RETENTION = RETENTION): string[] {
 	const lines = [t("datause.sent"), t("datause.probe")];
 	if (flag("harness.spark_script_map")) lines.push(t("datause.script_map"));
 	if (flag("c.guide.live")) lines.push(t("datause.guide"));
 	lines.push(t("datause.record"));
-	lines.push(
-		RETENTION
-			? t("datause.retention", { hours: String(RETENTION.codeHours), days: String(RETENTION.recordDays) })
-			: t("datause.retention.unset"),
-	);
+	if (retention.repoDeletedAtProbeEnd) lines.push(t("datause.retention.repo"));
+	lines.push(retention.uploadDays ? t("datause.retention.uploads", { days: String(retention.uploadDays) }) : t("datause.retention.uploads_kept"));
+	lines.push(retention.recordDays ? t("datause.retention.records", { days: String(retention.recordDays) }) : t("datause.retention.unset"));
+	lines.push(t("datause.retention.probe_errors"));
 	lines.push(t("datause.secrets"));
 	return lines;
 }
@@ -63,6 +76,7 @@ export function DataUseNotice({ onChange }: { onChange: (accepted: boolean) => v
 			</ul>
 			<label className="pf-datause__ok">
 				<input
+					id={DATA_USE_OK_ID}
 					type="checkbox"
 					checked={accepted}
 					onChange={(e) => {

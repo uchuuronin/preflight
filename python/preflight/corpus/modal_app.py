@@ -86,13 +86,13 @@ class Sweeper:
 		small = next(c for c in configs.kernel_configs(20) if c.family == "mlp")
 		child = isolate.run_isolated(small, device="cuda", timeout_s=120.0)
 		return {
-			"child_status": child.get("status"),
+			"child_status": str(child.get("status")),
 			"child_seconds": round(float(child.get("gpu_seconds") or 0.0), 1),
-			"text_asset": os.path.exists(TEXT),
-			"gpu": gpus.resolve(props.name, props.total_memory, props.multi_processor_count),
-			"total_memory": props.total_memory,
-			"torch": torch.__version__,
-			"transformers": md.version("transformers"),
+			"text_asset": bool(os.path.exists(TEXT)),
+			"gpu": str(gpus.resolve(props.name, props.total_memory, props.multi_processor_count)),
+			"total_memory": int(props.total_memory),
+			"torch": str(torch.__version__),  # a TorchVersion would need torch to unpickle on the client
+			"transformers": str(md.version("transformers")),
 			"volume_ok": True,
 		}
 
@@ -108,8 +108,9 @@ class Sweeper:
 
 		import torch
 
+		from preflight.corpus import sweep
 		from preflight.corpus.configs import CorpusConfig
-		from preflight.corpus.isolate import KILL_GRACE_S, run_isolated
+		from preflight.corpus.isolate import run_isolated
 		from preflight.corpus.store import ResultStore
 		from preflight.corpus.sweep import make_record
 		from preflight.engine import gpus
@@ -125,7 +126,7 @@ class Sweeper:
 		out = []
 		for d in items:
 			# a restart after preemption sees the same end time, so the wave never runs past its bound
-			if end_at is not None and _time.time() + (timeout_s or 0.0) + KILL_GRACE_S + 60.0 > end_at:
+			if end_at is not None and not sweep.may_start_config(_time.time(), timeout_s or 0.0, end_at):
 				break
 			cfg = CorpusConfig.from_dict(d)
 			prior = store.read(cfg.kind, actual, cfg.key)
@@ -210,21 +211,15 @@ def lease(kind: str, gpu: str, run_id: str, until: float | None = None) -> str |
 
 @app.function(image=image, volumes={MOUNT: vol}, timeout=15 * 60)
 def ledger(kind: str, gpu: str, retry_errors: bool = False) -> dict[str, Any]:
-	"""For one GPU: keys already done, GPU-seconds spent (failed attempts included), and each
+	"""For one requested GPU (and the boards it can land on, sweep.LANDS_ON): keys already done, GPU-seconds spent (failed attempts included), and each
 	config's latest seconds for the running estimate. Reads the small .meta summaries only.
 	Errors and timeouts count as done unless retried.
 	"""
 	from preflight.corpus.store import ResultStore
+	from preflight.corpus.sweep import ledger_from
 
 	vol.reload()
-	out: dict[str, Any] = {"done": [], "gpu_seconds": 0.0, "history": []}
-	for _, key, meta in ResultStore(MOUNT).iter_meta(kind, gpu):
-		if not (retry_errors and meta.get("status") in ("error", "timeout")):
-			out["done"].append(key)
-		secs = float(meta.get("gpu_seconds") or 0.0)
-		out["gpu_seconds"] += secs + float(meta.get("prior_gpu_seconds") or 0.0)
-		out["history"].append(secs)
-	return out
+	return ledger_from(ResultStore(MOUNT), kind, gpu, retry_errors)
 
 
 def runs_on(cfg, gpu: str) -> bool:
@@ -304,10 +299,14 @@ def main(
 	dry_run: bool = False,
 	prior_usd: float = 0.0,  # money this GPU and kind already cost before container billing was recorded (Modal's bill)
 	max_minutes: float = 100.0,  # every wave's worst case must end inside this; set it under the workflow's timeout
+	deadline_s: float = 0.0,  # per-config deadline before any config has finished; 0 keeps the kind's default
 ) -> None:
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
 	from preflight.corpus.isolate import DEFAULT_TIMEOUT_S
+
+	if deadline_s < 0:
+		raise SystemExit("--deadline-s must be 0 (the kind's default) or a positive number of seconds")
 	from preflight.engine import gpus
 
 	plan = sweep.parse_budget_plan(budgets)
@@ -328,7 +327,9 @@ def main(
 		import time
 		import uuid
 
-		default_deadline = DEFAULT_TIMEOUT_S.get(store_kind, 900.0)
+		# a smoke run that knows its configs are short can set a tighter first deadline, so its worst case fits a
+		# small cap; the adaptive deadline takes over after 10 configs either way
+		default_deadline = deadline_s or DEFAULT_TIMEOUT_S.get(store_kind, 900.0)
 		run_id = uuid.uuid4().hex[:12]
 		owner = lease.remote(store_kind, gpu, run_id, time.time() + (max_minutes + 30) * 60)
 		if owner != run_id:
@@ -382,7 +383,7 @@ def main(
 			sweeper = Sweeper.with_options(
 				gpu=sweep.modal_gpu(gpu), max_containers=max_containers, timeout=cap_s
 			)()
-			end_at = time.time() + cap_s
+			end_at = sweep.wave_end_at(time.time(), batch, deadline)
 			args = [(gpu, [c.to_dict() for c in b], deadline, end_at) for b in chunk]
 			billing.remote(store_kind, gpu, {"wave": wave, "kind": "pending", "billed_s": round(worst, 1)})
 			w0 = time.monotonic()

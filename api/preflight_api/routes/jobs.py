@@ -34,6 +34,10 @@ JOB_ID = re.compile(r"^[0-9A-Za-z_-]{8,64}$")
 IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_.:-]{8,128}$")
 TERMINAL = {"done", "failed", "cancelled"}
 SOURCE_KINDS = {"repo", "upload", "notebook", "sample", "template"}
+# The cockpit's "Run a probe here": one probe at one setting of a real record, never a sample's
+# (a sample has no script to run). The visitor's click is the approval; quotas are A's as for any job.
+RECORD_REF = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+PROBE_HERE_PURPOSE = "cockpit.run_probe_here"
 MAX_BODY_BYTES = 6 * 2**20  # source: derived, the upload limit shown at check-in (5 MB) plus JSON overhead
 
 # The event stream. Source: guess, one poll a second keeps a stage change under a second late on
@@ -110,8 +114,17 @@ async def create_job(request: Request) -> dict:
 		source = Source.model_validate({k: v for k, v in body.source.items() if k != "files"})
 	except (ValidationError, ValueError) as e:
 		raise ApiError(422, "invalid_request", "The check-in isn't in the expected shape.") from e
-	if source.kind not in SOURCE_KINDS:
+	if source.kind == "record":
+		ref = source.record_ref or ""
+		if body.mode != "probe" or not body.knobs or not RECORD_REF.match(ref):
+			raise ApiError(
+				422, "invalid_request", "A probe on a record needs mode probe, the setting and a share token."
+			)
+		body = body.model_copy(update={"purpose": PROBE_HERE_PURPOSE})
+	elif source.kind not in SOURCE_KINDS:
 		raise ApiError(422, "invalid_request", f"Jobs can't come from {source.kind!r} here.")
+	elif body.mode != "plan":
+		raise ApiError(422, "invalid_request", "Only a record's probe can name a mode here.")
 	request_body = body.model_dump(mode="json", exclude_none=True)
 	resolved = None
 	if source.kind == "repo":
