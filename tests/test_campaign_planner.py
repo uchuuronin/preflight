@@ -297,3 +297,20 @@ def test_the_record_block_carries_the_plans_intervals_and_each_runs_start(ft):
 	by_id = {c.id: c for c in pl.cells}
 	assert all(c.start_s == by_id[c.id].start_s and c.time == by_id[c.id].time for c in block.cells)
 	assert sum(1 for c in block.cells if c.start_s and c.start_s.point == 0) == 2
+
+
+def test_a_start_abstains_when_a_run_before_it_often_never_finishes(ft):
+	# review, Oct 31: dates from the good draws alone were too sure
+	cl = P.Cluster(slots=1, mtti_s=400, checkpoint_interval_s=1e9, budget_usd=1e9)
+	pl = P.plan(ft, {"seed": [0, 1, 2]}, cl, start=START)
+	assert pl.finish_s.status == "abstain"
+	first, *later = sorted(pl.cells, key=lambda c: c.start_s.status != "predicted")
+	assert first.start_s.point == 0 and first.start == START
+	assert all(c.start_s.status == "abstain" and c.start is None and c.slot == 0 for c in later)
+	assert all("never finishes" in c.start_s.reason for c in later)
+
+
+def test_runs_that_cant_be_dated_have_a_slot_and_an_abstaining_start(ft):
+	cl = P.Cluster(slots=1, mtti_s=220, checkpoint_interval_s=1e9, budget_usd=1e9)
+	pl = P.plan(ft, {"seed": [0, 1, 2]}, cl, start=START)
+	assert all(c.slot == 0 and c.start_s.status == "abstain" and c.start is None for c in pl.cells)

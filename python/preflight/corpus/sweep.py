@@ -118,6 +118,31 @@ def wave_wait_s(container_timeout: float, minutes_left: float) -> float:
 	return max(0.0, min(container_timeout + QUEUE_S, minutes_left * 60))
 
 
+def collect_wave(calls, wait_s: float, started: float, clock) -> tuple[list, int]:
+	"""Each spawned batch's result, waiting until `started + wait_s` at most. A call still running then is cancelled
+	and counted late. Any other exception, a container hitting its own cut-off included (Modal's
+	FunctionTimeoutError), is that one batch's result, as `starmap(return_exceptions=True)` gave, and the rest go on.
+	Only the built-in TimeoutError is the driver's own wait running out (Modal 1.6, FunctionCall.get)."""
+	results: list = []
+	late = 0
+	for fc in calls:
+		left = wait_s - (clock() - started)
+		try:
+			if left <= 0:
+				raise TimeoutError
+			results.append(fc.get(timeout=left))
+		except TimeoutError as exc:
+			if type(exc) is not TimeoutError:  # a subclass is the call's own failure, not the wait
+				results.append(exc)
+				continue
+			fc.cancel()
+			results.append(exc)
+			late += 1
+		except Exception as exc:
+			results.append(exc)
+	return results, late
+
+
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
 	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
 	at its deadline, and idles out. Retries are off, so a preempted batch is not re-run inside the wave."""

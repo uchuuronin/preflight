@@ -635,3 +635,42 @@ def test_the_driver_gives_up_on_a_wave_with_nothing_back():
 	assert sweep.wave_wait_s(cap, 20) == cap + sweep.QUEUE_S
 	assert sweep.wave_wait_s(cap, 5) == 300  # never past the sweep's own time left
 	assert sweep.wave_wait_s(cap, -1) == 0
+
+
+class _Call:
+	def __init__(self, out=None, exc=None, hang=False):
+		self.out, self.exc, self.hang, self.cancelled = out, exc, hang, False
+
+	def get(self, timeout):
+		if self.hang:
+			raise TimeoutError
+		if self.exc:
+			raise self.exc
+		return self.out
+
+	def cancel(self):
+		self.cancelled = True
+
+
+def test_a_wave_keeps_each_batchs_result_and_cancels_only_the_late_ones():
+	from preflight.corpus import sweep
+
+	class FunctionTimeoutError(Exception):  # Modal's own: a container hit its cut-off, not the driver's wait
+		pass
+
+	ok, died, late = (
+		_Call(out=[{"status": "ok"}]),
+		_Call(exc=FunctionTimeoutError("cut off")),
+		_Call(hang=True),
+	)
+	results, n_late = sweep.collect_wave([ok, died, late], 100.0, 0.0, lambda: 1.0)
+	assert results[0] == [{"status": "ok"}] and isinstance(results[1], FunctionTimeoutError)
+	assert n_late == 1 and late.cancelled and not died.cancelled
+
+
+def test_past_the_wait_every_call_left_is_cancelled_unread():
+	from preflight.corpus import sweep
+
+	calls = [_Call(out=[]), _Call(out=[])]
+	_, n_late = sweep.collect_wave(calls, 10.0, 0.0, lambda: 50.0)
+	assert n_late == 2 and all(c.cancelled for c in calls)

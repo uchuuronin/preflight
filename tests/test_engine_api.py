@@ -646,4 +646,4 @@ def test_without_a_kernel_table_a_gpu_move_still_takes_the_held_out_band(ft, mon
 def test_with_the_feature_off_another_vendor_keeps_k1s_band(ft, monkeypatch):
 	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
 	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
-	assert "another vendor" not in (amd.reason or "")
+	assert amd.status == "predicted" and "another vendor" not in (amd.reason or "")

@@ -1313,9 +1313,13 @@ def _agent(record: FlightRecord, values: dict) -> dict[str, Estimate]:
 		why = f"no sampled task ran on {model}; sample it first"
 		return {t: _abstain(_meta(t)[0], agent_cost.MODEL_ID, why) for t in ids}
 	pop = int(values.get("n_tasks") or s.population or 0) or None
-	tasks, cut, hit = _cap_turns(tasks, values.get("max_turns"))
+	cap = values.get("max_turns")
+	capped = frozenset(
+		t.task_id for t in tasks if cap and t.turns > cap
+	)  # stopped by the what-if, not the recorder
+	tasks, cut, hit = _cap_turns(tasks, cap)
 	sub = s.model_copy(update={"tasks": tasks})
-	tot = agent_cost.agent_totals(sub, population=pop)
+	tot = agent_cost.agent_totals(sub, population=pop, capped_ids=capped)
 	out = {}
 	cost = tot["cost.total"]
 	if "prompt_caching" in values and _sampled_differs(record, "prompt_caching", values["prompt_caching"]):

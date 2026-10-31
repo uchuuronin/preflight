@@ -24,7 +24,6 @@ import concurrent.futures as cf
 from typing import Any
 
 import modal
-import modal.exception
 
 APP_NAME = "preflight-corpus"
 VOLUME = "preflight-corpus"
@@ -391,19 +390,7 @@ def main(
 			# spawn, then wait with a wall-clock guard: starmap alone waits forever on a wave that never gets its GPUs
 			calls = [sweeper.run_batch.spawn(*a) for a in args]
 			wait_s = sweep.wave_wait_s(cap_s, minutes_left)
-			results: list[Any] = []
-			late = 0
-			for fc in calls:
-				try:
-					results.append(fc.get(timeout=max(1.0, wait_s - (time.monotonic() - w0))))
-				except (TimeoutError, modal.exception.TimeoutError) as exc:
-					fc.cancel()
-					results.append(exc)
-					late += 1
-				except (
-					Exception
-				) as exc:  # a container died (preemption, infra), as return_exceptions gave before
-					results.append(exc)
+			results, late = sweep.collect_wave(calls, wait_s, w0, time.monotonic)
 			wall = time.monotonic() - w0
 			measured = sweep.wave_billed_seconds(wall, len(args))
 			n_ran = sum(
