@@ -11,8 +11,13 @@ Checks, each against the run before the fix:
   throughput_floor    tokens per second no lower than THROUGHPUT_FLOOR of before
   fixed_seed_loss     loss at the same steps with the same seed within LOSS_TOLERANCE
 
+  eval_kept           (eval fixes only) the evaluation still covers the same examples, and runs
+                      without gradients afterwards when the fix was for that
+
 A check whose inputs weren't measured is "not measured", never a pass: the verify result is then
-"error" (can't verify), not "passed".
+"error" (can't verify), not "passed". A fix template may name checks it is allowed to move
+(packing changes the tokens seen on purpose); those are still reported, marked allowed, and don't
+decide the result.
 
 Stdlib only, so the Action runs it with a bare Python:
 
@@ -135,6 +140,55 @@ def _same(a: float | None, b: float | None, rel: float) -> bool | None:
 	return abs(a - b) <= rel * max(abs(a), abs(b), 1e-12)
 
 
+def _model(rec: dict) -> dict:
+	m = ((rec.get("job") or {}).get("script_map") or {}).get("model") or {}
+	return {k: m.get(k) for k in ("name", "hf_id", "param_count")}
+
+
+def _same_model(before: dict, after: dict) -> dict | None:
+	"""The same model before and after: a fix may not swap in a smaller one. Never allowed to move.
+	None when neither record names its model (nothing to compare)."""
+	mb, ma = _model(before), _model(after)
+	if not any(mb.values()) and not any(ma.values()):
+		return None
+	if not any(mb.values()) or not any(ma.values()):
+		return _check("same_model", None, mb, ma, "model not named on both sides")
+	return _check("same_model", mb == ma, mb, ma)
+
+
+def _eval_kept(pb: dict, pa: dict, *, no_grad: bool) -> dict:
+	"""The evaluation still covers the same examples (loader batches x batch size, within one
+	batch), and after a no-grad fix it runs with autograd off."""
+	eb, ea = pb.get("eval") or {}, pa.get("eval") or {}
+
+	def examples(e: dict) -> float | None:
+		n, size = e.get("loader_batches"), e.get("batch_size")
+		return None if n is None or size is None else float(n) * float(size)
+
+	xb, xa = examples(eb), examples(ea)
+	if xb is None or xa is None:
+		return _check("eval_kept", None, xb, xa, "evaluation size not measured on both sides")
+	slack = max(float(eb.get("batch_size") or 1), float(ea.get("batch_size") or 1))
+	same = abs(xb - xa) <= slack
+	# loader_batches is the loader's length, not what ran: the probe runs a capped number of eval
+	# batches, and the patched script must run as many (or the whole loader if that is fewer), so a
+	# fix can't pass by stopping the eval loop early.
+	nb, na = eb.get("batches"), ea.get("batches")
+	if nb is None or na is None:
+		return _check("eval_kept", None, xb, xa, "eval batches run in the probe not measured on both sides")
+	same = same and float(na) >= min(float(nb), float(ea.get("loader_batches") or 0))
+	grad_off = ea.get("grad_enabled") is False if no_grad else True
+	if no_grad and ea.get("grad_enabled") is None:
+		return _check("eval_kept", None, xb, xa, "autograd during eval not measured after the fix")
+	return _check(
+		"eval_kept",
+		same and grad_off,
+		xb,
+		xa,
+		"examples evaluated" + (", autograd off after" if no_grad else ""),
+	)
+
+
 def check(
 	before: dict,
 	after: dict,
@@ -142,6 +196,9 @@ def check(
 	metric: str = "memory.peak",
 	before_probe: str | None = None,
 	after_probe: str | None = None,
+	may_change: tuple[str, ...] | list[str] = (),
+	keep_eval: bool = False,
+	no_grad: bool = False,
 ) -> dict:
 	"""Compare a run before a fix with the verify run after it. Returns the verify result."""
 	pb, pa = _probe(before, before_probe), _probe(after, after_probe)
@@ -203,8 +260,17 @@ def check(
 		)
 	)
 
-	failed = [c for c in checks if c["ok"] is False]
-	unknown = [c for c in checks if c["ok"] is None]
+	if keep_eval:
+		checks.append(_eval_kept(pb, pa, no_grad=no_grad))
+	if (model_check := _same_model(before, after)) is not None:
+		checks.append(model_check)
+
+	for c in checks:
+		if c["id"] in may_change and c["id"] != "same_model":
+			c["allowed"] = True
+	deciding = [c for c in checks if not c.get("allowed")]
+	failed = [c for c in deciding if c["ok"] is False]
+	unknown = [c for c in deciding if c["ok"] is None]
 	status = "failed" if failed else "error" if unknown else "passed"
 	return {
 		"status": status,

@@ -96,6 +96,11 @@
 
 .pf-addon-freetier__sources a {
 	color: inherit;
+	/* A 24 px tap area on phones (WCAG 2.2, 2.5.8). The line grows slightly taller, and each link
+	   stays on one line; the sources are short names, so none overflow at 390 px (checked). */
+	display: inline-block;
+	padding-block: 5px;
+	min-height: 24px;
 }
 
 .pf-addon-freetier__fp16 {

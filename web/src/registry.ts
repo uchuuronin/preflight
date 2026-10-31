@@ -10,6 +10,7 @@ import type { ComponentType } from "react";
 import { useSyncExternalStore } from "react";
 import type { Estimate, JobRequest, Knob, KnobValue, Lens, LoadedRecord } from "./workspace/record/types";
 import type { PredictionProvider } from "./workspace/provider/PredictionProvider";
+import type { ExportPlan } from "./workspace/export/plan";
 import { guidedKnobs, useOptionalWorkspace, useRanked } from "./workspace/state";
 import { flag } from "./lib/flags";
 
@@ -86,6 +87,25 @@ export interface CockpitExtras {
 	ranked: readonly string[];
 }
 
+/**
+ * An exports panel (D's: config, patch, sbatch, CLI command, share link). The cockpit renders
+ * these in a "Take it with you" section under the whole-run band while `c.exports` is on, and
+ * hands each the plan at the current setting (workspace/export/plan.ts): the moved knobs with
+ * where the script sets them, the readouts with their status and interval (no numbers when one
+ * abstains), the wall-time upper end, the patches and whether every code change is verified,
+ * and the share link. A panel formats the plan; it never computes a number of its own.
+ */
+export interface ExportsPanelEntry {
+	id: string;
+	titleKey: string;
+	lenses?: Lens[];
+	order?: number;
+	flag?: string;
+	component: ComponentType<WorkspaceContextValue & { plan: ExportPlan }>;
+}
+
+export type { ExportPlan };
+
 export interface MapOverlayEntry {
 	id: string;
 	lenses?: Lens[];
@@ -137,9 +157,10 @@ interface Registry {
 	knobDecorations: KnobDecorationEntry[];
 	mapOverlays: MapOverlayEntry[];
 	knobViews: KnobViewEntry[];
+	exportsPanels: ExportsPanelEntry[];
 }
 
-let state: Registry = { appPanels: [], panels: [], readouts: [], knobDecorations: [], mapOverlays: [], knobViews: [] };
+let state: Registry = { appPanels: [], panels: [], readouts: [], knobDecorations: [], mapOverlays: [], knobViews: [], exportsPanels: [] };
 const listeners = new Set<() => void>();
 
 function emit(next: Registry): void {
@@ -176,6 +197,10 @@ export function registerKnobView(entry: KnobViewEntry): void {
 	emit({ ...state, knobViews: upsert(state.knobViews, entry) });
 }
 
+export function registerExportsPanel(entry: ExportsPanelEntry): void {
+	emit({ ...state, exportsPanels: upsert(state.exportsPanels, entry) });
+}
+
 /** Remove an entry by id from every list (for an add-on that turns itself off). */
 export function unregister(id: string): void {
 	const drop = <T extends { id: string }>(l: T[]) => l.filter((e) => e.id !== id);
@@ -186,6 +211,7 @@ export function unregister(id: string): void {
 		knobDecorations: drop(state.knobDecorations),
 		mapOverlays: drop(state.mapOverlays),
 		knobViews: drop(state.knobViews),
+		exportsPanels: drop(state.exportsPanels),
 	});
 }
 
@@ -223,6 +249,10 @@ export function usePanels(slot: PanelSlot, lens: Lens): PanelEntry[] {
 
 export function useReadouts(lens: Lens): ReadoutEntry[] {
 	return visible(useRegistry().readouts, lens);
+}
+
+export function useExportsPanels(lens: Lens): ExportsPanelEntry[] {
+	return visible(useRegistry().exportsPanels, lens);
 }
 
 export function useMapOverlays(lens: Lens): MapOverlayEntry[] {

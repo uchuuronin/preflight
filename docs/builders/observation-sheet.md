@@ -1,0 +1,61 @@
+# Observation sheet
+
+One copy per builder. Times from the screen clock. Don't help; after 2 minutes stuck, offer one
+hint and mark it.
+
+**Builder:** B__ (no names here)  **Date:** ______  **Device:** desktop / phone  **Theme:** light / dark
+**Background (their words):** ______________________________________________
+
+| Moment | Clock time |
+| --- | --- |
+| Session start (home page open) | |
+| First map on screen (sample or own) | |
+| Pressed "Check in" (task 2) | |
+| Own map on screen (task 2) | |
+| Changed a setting a finding points to (task 3) | |
+
+**Time to first map:** ____ min ____ s  **Check-in to own map:** ____ min ____ s
+
+## Hesitations and stuck points
+
+A hesitation is a pause of about 5 seconds or more, a wrong click, or "where is…?". Stuck means
+they couldn't go on without a hint.
+
+| # | Clock | Screen and spot (e.g. check-in, Notebook tab, error line) | What happened (their words if possible) | Hesitated / stuck / needed hint |
+| --- | --- | --- | --- | --- |
+| 1 | | | | |
+| 2 | | | | |
+| 3 | | | | |
+| 4 | | | | |
+| 5 | | | | |
+
+## Per task
+
+| Task | Done? | Without help? | Notes |
+| --- | --- | --- | --- |
+| 1 Open a sample | yes / no | yes / no | |
+| 2 Check in own job | yes / no / failed outside their control | yes / no | tab used: repo / upload / notebook |
+| 3 Act on a finding | yes / no | yes / no | finding: ______ |
+
+**Acted on a finding?** yes / no  **Said they'd change their real run because of it?** yes / no / unsure
+
+**Any number they said looked wrong** (which, and why): ________________________________
+
+---
+
+## Tally across builders
+
+Counts only, never percentages.
+
+| Measure | Count |
+| --- | --- |
+| Reached a first map without help | __ of __ |
+| Checked in their own job without help | __ of __ |
+| Acted on a finding | __ of __ |
+| Would change their real run because of a finding | __ of __ |
+| Time to first map, each builder | __, __, __ |
+| Check-in to own map, each builder | __, __, __ |
+
+| Stuck point (where) | Builders it stopped | Request filed |
+| --- | --- | --- |
+| | __ of __ | |

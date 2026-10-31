@@ -26,6 +26,7 @@ so the last step's logging, save and eval still run and get measured.
 StopProbe is a BaseException, so a script's `except Exception` can't swallow it.
 """
 
+import functools
 import gc
 import importlib.abc
 import importlib.machinery
@@ -47,6 +48,7 @@ import torch.nn as nn
 from .arch import model_shape
 from .gpuinfo import canonical_gpu_name, peak
 from .kernels import KERNEL_ROWS  # noqa: F401  (re-exported for callers and tests)
+from .rl_groups import reward_groups
 
 PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zoo traces (Oct 28-29)
 # guess: batches a loop may fetch in eval mode before any backward; a sanity check or eval_on_start
@@ -54,6 +56,7 @@ PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zo
 PRETRAIN_EVAL_CAP = 8
 # synchronised steps after the timed ones, for the phase split (data/forward/backward/optimizer):
 # timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
+LENS_STATS_BATCHES = 64  # derived: enough batches to average a sampler's varying graph sizes
 PHASE_STEPS = (
 	2  # guess: two synchronised steps for the phase split; compare with the profiled window on zoo runs
 )
@@ -117,6 +120,43 @@ def _batch_stats(batch) -> tuple[int | None, int | None, int | None]:
 	tokens = int(ids.numel())
 	real = int(mask.sum().item()) if isinstance(mask, torch.Tensor) else tokens
 	return tokens, real, samples
+
+
+def _lens_stats(batch) -> dict[str, float]:
+	"""What the vision and graph lenses read from a training batch, by shape alone (no sync):
+	images (N, C, H, W) as the first tensor of the batch, and a PyG-style graph batch (num_nodes,
+	edge_index, batch_size seeds, num_sampled_nodes per hop)."""
+	out: dict[str, float] = {}
+	with suppress(Exception):
+		if hasattr(batch, "edge_index") and hasattr(batch, "num_nodes"):
+			out["graph_nodes_per_batch"] = float(batch.num_nodes)
+			ei = batch.edge_index
+			if isinstance(ei, torch.Tensor) and ei.dim() == 2:
+				out["graph_edges_per_batch"] = float(ei.shape[1])
+			seeds = getattr(batch, "batch_size", None)
+			if isinstance(seeds, int) and seeds > 0:
+				out["graph_seed_nodes"] = float(seeds)
+			hops = getattr(batch, "num_sampled_nodes", None)
+			if isinstance(hops, list | tuple):
+				for i, n in enumerate(hops[:4]):
+					out[f"graph_nodes_hop{i}"] = float(n)
+			return out
+		first = batch
+		if hasattr(batch, "keys") and hasattr(batch, "get"):
+			first = batch.get("pixel_values", batch.get("image", batch.get("images")))
+		elif isinstance(batch, list | tuple) and batch:
+			first = batch[0]
+		if (
+			isinstance(first, torch.Tensor)
+			and first.dim() == 4
+			and (first.is_floating_point() or first.dtype == torch.uint8)
+		):
+			# uint8 too: DALI, FFCV and torchvision.io hand over raw images and normalise on the GPU
+			n, c, h, w = (int(x) for x in first.shape)
+			if c in (1, 3, 4):
+				out["images_per_batch"] = float(n)
+				out["image_height"], out["image_width"] = float(h), float(w)
+	return out
 
 
 def _quantile(xs, q):
@@ -258,6 +298,8 @@ class Recorder:
 		self._reset_acc()
 		self._last_post = None
 		self._data_end = None
+		self._data_end_bwd = False  # the forward window was started by a backward, not a fetch
+		self._generating = 0  # HF generate calls in progress (a rollout is not a reference forward)
 		self._t_start = time.perf_counter()
 		self._first_fetch = None
 		self._prof = None
@@ -293,9 +335,19 @@ class Recorder:
 		self._io_depth = 0
 		self.gens: list[dict] = []
 		self.trainer_logs: list[dict] = []
+		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
+		# be read without trusting the trainer's own logs; the group size from the trainer
+		self.reward_calls: list[dict] = []
+		self.group_size: int | None = None
 		# how long the real run is, for B's time.total: the training loader's batches per epoch,
 		# and from an HF Trainer its epochs and the optimizer steps it plans (state.max_steps)
 		self.train_loader_batches: int | None = None
+		self._train_iter: int | None = None
+		self.retrieval: dict[str, dict] = {}  # encode, index_add, index_train, search: calls, items, seconds
+		self._retrieval_depth = threading.local()
+		self._retrieval_lock = threading.Lock()
+		self.lens_stats: list[dict] = []  # vision and graph batch shapes, the first training batches
+		self._train_dataset = None
 		self.run_length: dict = {}
 		self._scalers: weakref.WeakSet = weakref.WeakSet()
 		self._attn_calls = 0
@@ -385,6 +437,9 @@ class Recorder:
 			"io_bytes": 0,
 			"eval": 0.0,
 			"generate": 0.0,
+			"reference": 0.0,  # RL: the reference model's log-probs (a forward with no gradient)
+			"reward": 0.0,  # RL: reward functions and reward models
+			"weight_sync": 0.0,  # RL: the policy's weights copied into the vLLM engine
 			"attn_max": None,
 			"loss_t": [],  # timed steps: losses kept on device, read after the probe
 			"scales_t": [],
@@ -458,6 +513,10 @@ class Recorder:
 			rec._sync()
 			rec.acc["backward"] += rec._now() - t0
 			rec.acc["micro"] += 1
+			# the next micro-step's forward starts here when its batch was fetched ahead (HF Trainer
+			# fetches every accumulation batch up front); a fetch in between moves the start again
+			rec._data_end = rec._now()
+			rec._data_end_bwd = True
 			return out
 
 		def next_(it):
@@ -497,6 +556,8 @@ class Recorder:
 				with suppress(Exception):
 					n = len(it)
 				rec.train_loader_batches = n if isinstance(n, int) and n > 0 else None
+				rec._train_dataset = getattr(it, "_dataset", None)  # its row lengths, read at the end
+				rec._train_iter = id(it)
 			rec._maybe_stop()
 			rec._sync()
 			t0 = rec._now()
@@ -519,7 +580,12 @@ class Recorder:
 				rec.acc["real"] += real
 			if samples is not None:
 				rec.acc["samples"] += samples
+			if not rec.eval_active and id(it) == rec._train_iter and len(rec.lens_stats) < LENS_STATS_BATCHES:
+				st = _lens_stats(batch)
+				if st:
+					rec.lens_stats.append(st)
 			rec._data_end = rec._now()
+			rec._data_end_bwd = False
 			return batch
 
 		def train(m, mode=True):
@@ -566,9 +632,12 @@ class Recorder:
 		self._importer.on("safetensors.torch", self._hook_safetensors)
 		self._importer.on("transformers.generation.utils", self._hook_hf_generate)
 		self._importer.on("transformers.trainer", self._hook_trainer)
+		self._importer.on("trl.trainer.grpo_trainer", self._hook_grpo)
 		if self.hf_overrides:
 			self._importer.on("transformers.training_args", self._hook_training_args)
 		self._importer.on("vllm.entrypoints.llm", self._hook_vllm)
+		self._importer.on("sentence_transformers.SentenceTransformer", self._hook_st_encode)
+		self._importer.on("faiss", self._hook_faiss)
 		threading.Thread(target=self._sample_loop, daemon=True).start()
 		return self
 
@@ -717,7 +786,11 @@ class Recorder:
 				rec._maybe_stop()
 				rec._sync()
 				t0 = rec._now()
-				out = orig(model, *args, **kwargs)
+				rec._generating += 1
+				try:
+					out = orig(model, *args, **kwargs)
+				finally:
+					rec._generating -= 1
 				rec._sync()
 				dt = rec._now() - t0
 				with suppress(Exception):
@@ -750,6 +823,71 @@ class Recorder:
 		self.gens.append(
 			{"seconds": dt, "lengths": lengths, "truncated": truncated, "cap": cap, "backend": "hf"}
 		)
+
+	def _retrieval_timed(self, kind: str, fn, count):
+		"""A retrieval stage (encode, index add, index train, search), timed with a sync either side,
+		and how many items it took. Stages run outside the training step as often as inside it."""
+		rec = self
+
+		@functools.wraps(fn)
+		def run(*args, **kwargs):
+			depth = getattr(rec._retrieval_depth, "n", 0)
+			if depth:
+				return fn(*args, **kwargs)  # a stage inside another, on this thread (encode calling itself)
+			rec._retrieval_depth.n = depth + 1
+			try:
+				rec._sync()
+				t0 = rec._now()
+				out = fn(*args, **kwargs)
+				rec._sync()
+				dt = rec._now() - t0
+			finally:
+				rec._retrieval_depth.n = depth
+			n = None
+			with suppress(Exception):
+				n = int(count(args, kwargs))
+			with rec._retrieval_lock:
+				st = rec.retrieval.setdefault(kind, {"calls": 0, "items": 0, "seconds": 0.0})
+				st["calls"] += 1
+				st["seconds"] += dt
+				st["items"] += n or 0
+			return out
+
+		return run
+
+	def _hook_st_encode(self, mod):
+		cls = getattr(mod, "SentenceTransformer", None)
+		if cls is None or not hasattr(cls, "encode"):
+			return
+
+		def n(args, kwargs):
+			x = args[1] if len(args) > 1 else kwargs.get("sentences", kwargs.get("inputs"))
+			return 1 if isinstance(x, str) else len(x)
+
+		self._patch(cls, "encode", lambda orig: self._retrieval_timed("encode", orig, n))
+
+	def _hook_faiss(self, mod):
+		"""faiss swaps each index class's add, train and search for a numpy wrapper at import; those
+		wrappers are what the script calls, so each is timed by class (count: the vectors' rows)."""
+
+		def rows(args, kwargs):
+			x = args[1] if len(args) > 1 else kwargs.get("x")
+			return x.shape[0]
+
+		base = getattr(mod, "Index", None)
+		for name in dir(mod):
+			cls = getattr(mod, name, None)
+			if not isinstance(cls, type) or not (
+				(isinstance(base, type) and issubclass(cls, base)) or name.startswith(("Index", "GpuIndex"))
+			):
+				continue  # GPU indexes (index_cpu_to_gpu) are Index subclasses with their own wrappers
+			for meth, kind in (("add", "index_add"), ("add_with_ids", "index_add"), ("train", "index_train"),
+				("search", "search")):  # fmt: skip
+				if meth in cls.__dict__:  # the class's own wrapper, not one inherited (timed once)
+					with suppress(Exception):
+						self._patch(
+							cls, meth, lambda orig, kind=kind: self._retrieval_timed(kind, orig, rows)
+						)
 
 	def _hook_vllm(self, mod):
 		rec = self
@@ -817,6 +955,119 @@ class Recorder:
 
 		if hasattr(tr, "create_scheduler"):
 			self._patch(tr, "create_scheduler", plan_factory)
+
+	def _hook_grpo(self, mod):
+		"""TRL's GRPOTrainer: the reference model's log-probs (computed with no gradient) and the
+		reward functions, timed as their own phases; each reward call's values kept for pass rate
+		per prompt. Generation is already timed by the generate hooks (rollout)."""
+		rec = self
+		tr = getattr(mod, "GRPOTrainer", None)
+		if tr is None:
+			return
+
+		inside: set = set()  # kinds being timed now, so nested seams don't count twice
+
+		def timed(kind, fn):
+			@functools.wraps(fn)  # transformers reads forward's signature (logits_to_keep)
+			def run(*args, **kwargs):
+				if kind in inside:
+					return fn(*args, **kwargs)
+				inside.add(kind)
+				rec._sync()
+				t0 = rec._now()
+				try:
+					return fn(*args, **kwargs)
+				finally:
+					rec._sync()
+					rec.acc[kind] += rec._now() - t0
+					inside.discard(kind)
+
+			return run
+
+		def no_grad_call():
+			return not torch.is_grad_enabled() or torch.is_inference_mode_enabled()
+
+		def logps_factory(orig):
+			# later TRL: a method, called with no gradient for the reference; the policy's old
+			# log-probs (num_iterations > 1) go through it too, with the policy as the model
+			def logps(self_, *args, **kwargs):
+				if not no_grad_call():
+					return orig(self_, *args, **kwargs)  # the policy's own forward: part of the update
+				ref = getattr(self_, "ref_model", None)
+				model = args[0] if args else kwargs.get("model")
+				if ref is not None:
+					is_ref = model is ref
+				else:  # PEFT: the policy with its adapter off; only when there is a KL term at all
+					is_ref = (
+						float(getattr(self_, "beta", 0) or 0) > 0
+						and int(getattr(self_, "num_iterations", 1) or 1) == 1
+					)
+				if not is_ref:
+					return orig(self_, *args, **kwargs)
+				return timed("reference", orig)(self_, *args, **kwargs)
+
+			return logps
+
+		if hasattr(tr, "_get_per_token_logps"):
+			self._patch(tr, "_get_per_token_logps", logps_factory)
+		if hasattr(tr, "_move_model_to_vllm"):  # later TRL: the weight sync is a method
+			self._patch(tr, "_move_model_to_vllm", lambda orig: timed("weight_sync", orig))
+
+		def policy_forward(fn):
+			# TRL 0.14 with PEFT has no ref_model: the reference is the policy with its adapter
+			# off, under inference_mode. Generation runs with no_grad, not inference_mode.
+			@functools.wraps(fn)
+			def forward(*args, **kwargs):
+				if torch.is_inference_mode_enabled() and not rec._generating:
+					return timed("reference", fn)(*args, **kwargs)
+				return fn(*args, **kwargs)
+
+			return forward
+
+		def wrap_reward(i, fn):
+			@functools.wraps(fn)  # TRL logs each reward under its function's __name__
+			def reward(*args, **kwargs):
+				out = timed("reward", fn)(*args, **kwargs)
+				with suppress(Exception):
+					vals = [float(v) for v in out][:4096]
+					if len(rec.reward_calls) < 512:
+						rec.reward_calls.append({"func": i, "values": vals})
+				return out
+
+			return reward
+
+		def init_factory(orig):
+			def init(self_, *args, **kwargs):
+				orig(self_, *args, **kwargs)
+				with suppress(Exception):
+					rec.group_size = int(getattr(self_, "num_generations", 0)) or None
+				with suppress(Exception):
+					# TRL 0.14: the reference log-probs are a closure inside compute_loss, so the
+					# reference model's own forward is the seam (or the policy's, with PEFT)
+					ref = getattr(self_, "ref_model", None)
+					if isinstance(ref, nn.Module):
+						ref.forward = timed("reference", ref.forward)
+					elif isinstance(getattr(self_, "model", None), nn.Module):
+						self_.model.forward = policy_forward(self_.model.forward)
+				with suppress(Exception):
+					# TRL 0.14 with use_vllm: the sync is inline in compute_loss, through the vLLM
+					# model's load_weights (main process only)
+					llm = getattr(self_, "llm", None)
+					if llm is not None and not hasattr(tr, "_move_model_to_vllm"):
+						m = llm.llm_engine.model_executor.driver_worker.model_runner.model
+						m.load_weights = timed("weight_sync", m.load_weights)
+				with suppress(Exception):
+					funcs = list(self_.reward_funcs)
+					for i, fn in enumerate(funcs):
+						if isinstance(fn, nn.Module):
+							fn.forward = timed("reward", fn.forward)  # a reward model: timed, not read
+						elif callable(fn):
+							funcs[i] = wrap_reward(i, fn)
+					self_.reward_funcs = funcs
+
+			return init
+
+		self._patch(tr, "__init__", init_factory)
 
 	def _hook_training_args(self, mod):
 		ta = getattr(mod, "TrainingArguments", None)
@@ -922,7 +1173,12 @@ class Recorder:
 		self._maybe_stop()
 		self._sync()
 		self._t_pre = self._now()
-		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"], self.acc["generate"])
+		if self._data_end_bwd:
+			# between the last backward and the step is not forward time; a window a fetch started
+			# stays open, for step(closure) loops (Lightning, LBFGS) that run forward inside the step
+			self._data_end = None
+		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"],
+			self.acc["generate"] + self.acc["reference"] + self.acc["reward"] + self.acc["weight_sync"])  # fmt: skip
 		# update-to-weight needs the weights before the step; a small sample, and not on timed steps
 		self._sample = [] if self._clean else [(p, p.detach().clone()) for p in self._sample_params]
 		self._sync()
@@ -987,7 +1243,8 @@ class Recorder:
 		overhead = self._overhead_pre + (self._now() - t0) + self.acc["overhead"]
 		f0, b0, d0, g0 = self._acc_at_pre
 		a = self.acc
-		inner = (a["forward"] - f0) + (a["backward"] - b0) + (a["data"] - d0) + (a["generate"] - g0)
+		rl_inner = a["generate"] + a["reference"] + a["reward"] + a["weight_sync"]
+		inner = (a["forward"] - f0) + (a["backward"] - b0) + (a["data"] - d0) + (rl_inner - g0)
 		opt_time = max(0.0, (t_post - self._t_pre) - self._overhead_pre - inner)
 		start = self._last_post if self._last_post is not None else (self._first_fetch or self._t_start)
 		wall = max(1e-9, t_post - start - overhead - a["io"] - a["eval"])
@@ -997,8 +1254,11 @@ class Recorder:
 				"wall": wall,
 				"event": event,
 				"data": a["data"],
-				"forward": max(0.0, a["forward"] - a["generate"]),
+				"forward": max(0.0, a["forward"] - rl_inner),
 				"rollout": a["generate"],
+				"reference": a["reference"],
+				"reward": a["reward"],
+				"weight_sync": a["weight_sync"],
 				"backward": a["backward"],
 				"optimizer": opt_time,
 				"loss": a["loss"] if a["loss_n"] else None,
@@ -1139,6 +1399,28 @@ class Recorder:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
+		for kind, st in self.retrieval.items():
+			out[f"{kind}_items"] = st["items"]
+			out[f"{kind}_seconds"] = st["seconds"]
+			if st["seconds"] > 0 and st["items"]:
+				out[f"{kind}_items_per_s"] = st["items"] / st["seconds"]
+		if self.lens_stats:
+			# the mean over the batches seen, and the largest graph batch (the memory one)
+			keys = {k for st in self.lens_stats for k in st}
+			out.update({k: statistics.fmean(st[k] for st in self.lens_stats if k in st) for k in keys})
+			if any("graph_nodes_per_batch" in st for st in self.lens_stats):
+				out["graph_nodes_max"] = max(st.get("graph_nodes_per_batch", 0) for st in self.lens_stats)
+			if "images_per_batch" in out:
+				# the model's layout, from its conv weights (scripts convert the batch after the fetch)
+				with suppress(Exception):
+					convs = [
+						p for r in self._roots for p in r.parameters() if p.dim() == 4 and p.shape[-1] > 1
+					]
+					if convs:
+						# every weight channels-last; at least one not also plain-contiguous (a depthwise
+						# (C, 1, k, k) weight is both, so it can't tell)
+						out["channels_last"] = float(all(p.is_contiguous(memory_format=torch.channels_last) for p in convs)
+							and any(not p.is_contiguous() for p in convs))  # fmt: skip
 		out.update({k: v for k, v in self.run_length.items() if v is not None})
 		out["host_rss_peak_bytes"] = self._rss_peak or None
 		if self._kernels is not None:
@@ -1169,9 +1451,9 @@ class Recorder:
 		if timed:
 			walls = sorted(s["wall"] for s in timed)
 			mean = statistics.fmean(walls)
-			keys = ["data", "forward", "backward", "optimizer"] + (
-				["rollout"] if any(s["rollout"] for s in phased) else []
-			)
+			keys = ["data", "forward", "backward", "optimizer"] + [
+				k for k in ("rollout", "reference", "reward", "weight_sync") if any(s.get(k) for s in phased)
+			]
 			by_phase = {}
 			if phased:
 				ref = statistics.fmean(s["wall"] for s in phased)
@@ -1325,6 +1607,7 @@ class Recorder:
 		):
 			if col(kind):
 				rl[name] = col(kind)
+		rl.update(reward_groups(self.reward_calls, self.group_size))
 		if gen and gen["sequences"]:
 			rl["response_length"] = {
 				"mean": gen["new_tokens_mean"],

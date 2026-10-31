@@ -98,6 +98,9 @@ def test_hf_trainer_probe_measures_padding(tmp_path):
 	# the real run's length: the Trainer plans args.max_steps optimizer steps; no epoch count then
 	assert p.extras["planned_steps"] == 500 and "epochs" not in p.extras
 	assert p.extras["train_loader_batches"] > 0  # the Varlen set over per-device batches
+	# the training set's rows as the script built them: 8..47 tokens each (B, Oct 30)
+	assert 40 <= p.extras["dataset_max_tokens"] <= 47 and p.extras["dataset_rows_total"] == 10_000
+	assert 0 < p.extras["dataset_rows_scanned"] <= 10_000
 	assert len(p.stability.series["loss"]) == 4 + PHASE_STEPS
 
 
@@ -138,6 +141,8 @@ def test_extras_carry_the_counts_b_reads_by_name(loop_result):
 	assert x["tokens_per_step"] == 4 * 32
 	assert x["train_loader_batches"] == 100_000 // 4  # the training loader's length, one epoch
 	assert "planned_steps" not in x and "epochs" not in x  # a plain loop says neither
+	assert x["dataset_max_tokens"] == 32 == x["dataset_p999_tokens"]  # fixed blocks of seq_len
+	assert 0 < x["dataset_rows_scanned"] <= 100_000 == x["dataset_rows_total"]
 	assert x["samples_per_step"] == 4
 	assert x["micro_steps_per_step"] == 1
 
@@ -253,3 +258,87 @@ def test_timed_steps_lose_no_signal_to_deferred_reads(loop_result):
 	s = loop_result.probe.stability.series
 	# (the output head is found at the first optimizer step, so its norm starts at step 2)
 	assert all(v is not None and v > 0 for v in s["loss"] + s["grad_norm"] + s["output_logit_norm"][1:])
+
+
+@needs_transformers
+@pytest.mark.parametrize("variant", ["ref_model", "peft", "vllm"])
+def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(tmp_path, variant):
+	"""A CPU stand-in shaped as TRL 0.14 is (tests/fixtures/fake_grpo): generate, the reference
+	log-probs in a closure under inference_mode (through ref_model, or the policy with PEFT),
+	reward functions, then the update, two accumulation micro-steps fetched up front."""
+	root = FIX / "fake_grpo"
+	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
+	flag = {"peft": "FAKE_GRPO_PEFT", "vllm": "FAKE_GRPO_VLLM"}.get(variant)
+	if flag:
+		files["train.py"] = f"import os\nos.environ['{flag}'] = '1'\n" + files["train.py"]
+	r = run_probe(
+		ProbeSpec(probe_id="p1", files=files, entrypoint="train.py", warmup=2, timed=3, timeout_s=240)
+	)
+	p = r.probe
+	assert p.status == "ok", p.error
+	phases = p.step_time.by_phase
+	assert phases.get("rollout", 0) > 0 and phases.get("reference", 0) > 0 and phases.get("reward", 0) > 0
+	# every micro-step's policy forward counts, not only the first one's (review, Oct 31)
+	assert phases.get("forward", 0) > 0.5 * phases["reference"]
+	assert (phases.get("weight_sync", 0) > 0) == (variant == "vllm")
+	assert sum(phases.values()) == pytest.approx(1.0, abs=0.02)
+	rl = p.rl
+	assert rl.group_size == 4
+	assert rl.pass_rate_per_prompt and all(0 <= x <= 1 for x in rl.pass_rate_per_prompt)
+	assert rl.zero_spread_fraction is not None
+
+
+def test_a_closure_loop_keeps_its_forward_out_of_the_optimizer():
+	"""opt.step(closure): the pre-step hook runs before the closure's forward (review, Oct 31)."""
+	r = run_probe(ProbeSpec(probe_id="p1", files={"train.py": (FIX / "closure_loop.py").read_text()},
+		entrypoint="train.py", warmup=2, timed=3, timeout_s=120))  # fmt: skip
+	assert r.probe.status == "ok", r.probe.error
+	ph = r.probe.step_time.by_phase
+	assert ph["forward"] > ph["optimizer"]
+
+
+def test_an_image_batch_records_its_size_and_layout():
+	r = run_probe(spec("vision_loop.py", warmup=1, timed=2))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["images_per_batch"] == 16 and ex["image_height"] == 32 and ex["image_width"] == 32
+	assert ex["channels_last"] == 1.0
+
+
+def test_a_sampled_graph_batch_records_nodes_edges_and_hops():
+	r = run_probe(spec("graph_loop.py", warmup=1, timed=2))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["graph_seed_nodes"] == 32 and ex["graph_nodes_hop1"] == 320 and ex["graph_nodes_hop2"] == 1600
+	assert ex["graph_nodes_per_batch"] == ex["graph_nodes_max"] == 32 + 320 + 1600
+	assert ex["graph_edges_per_batch"] == 320 + 1600
+
+
+def test_retrieval_stages_record_items_and_throughput():
+	"""A stand-in with sentence-transformers' and faiss's seams (tests/fixtures/fake_retrieval)."""
+	root = FIX / "fake_retrieval"
+	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
+	r = run_probe(
+		ProbeSpec(probe_id="p1", files=files, entrypoint="train.py", warmup=1, timed=2, timeout_s=120)
+	)
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["encode_items"] == 2100 and ex["encode_items_per_s"] > 0
+	assert ex["index_add_items"] == 2000 and ex["search_items"] == 100
+	assert "index_train_items" not in ex  # the script never trained the index
+
+
+def test_a_ddp_script_runs_one_recorder_per_rank_under_torchrun():
+	r = run_probe(spec("ddp_loop.py", warmup=1, timed=3, nproc=2, timeout_s=240))
+	assert r.probe.status == "ok", (r.probe.error, r.log_tail[-2000:])
+	ex = r.probe.extras
+	assert ex["world_size"] == 2 and ex["ranks_reported"] == 2
+	assert ex["rank_step_p50_max_s"] >= r.probe.step_time.p50_s
+
+
+def test_a_profiled_ddp_probe_keeps_every_rank_in_step():
+	"""Review, Oct 31: ranks above 0 stopped before rank 0's profiled steps and left its all-reduce
+	without a partner."""
+	r = run_probe(spec("ddp_loop.py", warmup=1, timed=2, nproc=2, profile=True, timeout_s=240))
+	assert r.probe.status == "ok", (r.probe.error, r.log_tail[-2000:])
+	assert r.probe.extras["ranks_reported"] == 2

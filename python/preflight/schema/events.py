@@ -87,6 +87,13 @@ class JobRequest(Strict):
 		pattern=r"^[a-z][a-z0-9_.]*$",
 		description="Who asked, for the logbook, e.g. guide.run_probe",
 	)
+	patch: str | None = Field(
+		default=None,
+		min_length=1,
+		max_length=262_144,
+		description="0.5.0: a unified diff applied to the record's code before a probe or verify job "
+		"(C's fix loop); code fixes can't be passed as knob overrides",
+	)
 
 	@model_validator(mode="after")
 	def _check(self):
@@ -99,6 +106,8 @@ class JobRequest(Strict):
 			raise ValueError("mode probe needs knobs")
 		if self.knobs is not None and self.mode not in ("probe", "verify"):
 			raise ValueError("knobs go with mode probe or verify")
+		if self.patch is not None and self.mode not in ("probe", "verify"):
+			raise ValueError("patch goes with mode probe or verify")
 		if (self.tasks is not None) != (self.mode == "sample_more"):
 			raise ValueError("tasks goes with mode sample_more, and sample_more needs it")
 		return self

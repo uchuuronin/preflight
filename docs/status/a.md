@@ -99,6 +99,15 @@ Updated Tue Oct 27, evening ET.
 - The queue saves under its lock. At 8 GPUs and a few visitors that is tens of saves a minute;
   revisit if the store moves off a single container.
 - Repos need a full 40-character commit: GitHub only serves a fetch by the whole hash.
+- RL phases: weight sync misses the ZeRO-3 parameter gather (it lands in forward) and vLLM V1
+  (only the V0 engine path is wrapped); with PEFT and `num_iterations` > 1 the reference forward
+  isn't told apart from the policy's old log-probs, so it counts as forward.
+- Agent sampler: a task's key hashes its first call without the system prompt, so a timestamp or
+  id in the first user message still defeats the top-up's skip; tasks that all open with the same
+  call can't be topped up. A run with no model calls for 5 minutes is stopped as stalled.
+  The proxy's refusals carry `x-should-retry: false`, which the OpenAI SDKs honour; other
+  clients may back off on them. Side calls (judges, sub-agents) start tasks of their own.
+- In-flight mode: an eval or checkpoint pause inside a window can raise a false step-time alert.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
@@ -133,6 +142,84 @@ first minute); a version clash between the image's packages and the zoo's pins (
 `fsspec<=2024.9.0`). The planted eval OOM may not fire on 192 GB, or may fire later: the eval keeps
 every batch's graph, so its memory grows with the batch count; either way the record says which.
 
+## Every plan item A owns (Oct 31 morning ET; updated 08:45 ET)
+
+From the Contracts tab (Contract A, the gaps table, the Oct 27 review, the competitive review) and
+the main plan's feature set and validation targets. "main" = merged; "ws-a" = pushed to the
+branch, not yet merged (it carries round three: agent recorder, retention, longest-row extras,
+ground-truth module, log reader); hours are A's remaining work, honest guesses, GPU time not
+included. Hero lenses first.
+
+| # | Item (source) | Where | Left, h |
+| --- | --- | --- | --- |
+| **Fine-tuning (hero)** | | | |
+| 1 | Probes, recorder, memory terms by term, eval-OOM re-run, P(OOM) inputs (lens) | main; L4 run Oct 28 | 0 |
+| 2 | Packing and padding-waste measurement (lens, contract) | main (`padding_fraction`, `tokens_per_sample_mean`) | 0 |
+| 3 | Longest dataset row for B's memory rule (B, Oct 30) | ws-a | 0 |
+| 4 | FakeTensor cross-check of the analytical memory terms (contract) | not started | 3 |
+| 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | bare run measured Oct 31; recorder half failed on a cache permission (fixed locally); rerun with 210 steps needs a yes | 0.5 + paid run |
+| **Agent and API runs (hero)** | | | |
+| 6 | OTel GenAI proxy around any OpenAI-compatible client (lens, contract) | ws-a (`recorder/agent.py`) | 0 |
+| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | ws-a: proxy run mode, pipeline, `sample_more`, CLI; local: the hosted path (proxy behind a tunnel, script in a sandbox with no secrets), first run waits for a yes; the bound is B's `agent_totals` | 1 + API spend |
+| 8 | Rate-limit wall-clock (lens) | not started | 2 |
+| 9 | Pareto model sweep across Muse Spark and Spark Open (lens, contract) | not started | 4 |
+| 10 | Agent zoo script and an agent record on the public app (G1) | not started (D writes the script) | 2 |
+| **RL post-training (hero)** | | | |
+| 11 | GRPO zoo script, public model and data, 512-token completion cap planted (competitive #1) | local (`zoo/grpo_trl`); review: at 512 the truncation rate may be only a few percent on Qwen2.5-0.5B, ground truth will say | 0.5 |
+| 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | local: all five; weight sync misses the ZeRO-3 gather and vLLM V1 (V0 engine path only) | 0.5 |
+| 13 | Pass rate per prompt for B's zero-variance fraction (lens) | local (`recorder/rl_groups.py`, `rl.pass_rate_per_prompt`, `rl.zero_spread_fraction`) | 0 |
+| 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals) | 2 |
+| **Campaign (hero; B owns the model)** | | | |
+| 15 | Probes for a grid's points (a campaign is many records from one script) | not started; needs B's campaign spec | 3 |
+| **Other lenses** | | | |
+| 16 | LM pretraining: throughput, MFU, loader probe, stability signals (lens) | main | 0 |
+| 17 | LR range test (lens, contract) | not started | 3 |
+| 18 | Checkpoint resume exact-match (lens, contract, hygiene) | not started | 3 |
+| 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
+| 20 | Serving probes on vLLM for B's model (contract) | hooks on main; local: the serving image (vLLM 0.6.4.post1, its own torch) and routing; startup check and first probe wait for a yes | 3 + paid run |
+| 21 | Retrieval probes through an adapter (lens) | local: encode, faiss add/train/search timed with items a second; a stage after training isn't reached by a probe | 3 |
+| 22 | GNN probes through an adapter (lens) | local: nodes, edges, seeds, nodes per hop, largest batch; sampling time is the data phase; needs a PyG script on a GPU | 3 |
+| 23 | Vision probes through an adapter (lens) | local: images per batch, resolution, channels-last; images/s from samples; needs a vision script on a GPU | 2 |
+| 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
+| 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | not started | 3 |
+| 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
+| 27 | In-flight collector (feature, contract) | local (`recorder/inflight.py`, `preflight watch`); getting the live record to the guide waits on C | 1 |
+| 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | partial | 4 |
+| **Muse Spark** | | | |
+| 29 | Spark Open triage of every probe log on Baseten, every call logged (contract) | client on main, triage not wired | 3 |
+| 30 | Spark Open checks each claim against the raw probe numbers (competitive #5) | not started | 5 |
+| 31 | Spark diagnosis: traces and plots as images, search grounding, cited findings (contract) | not started | 5 |
+| 32 | Glimmer host proposal with B (competitive #6) | not started | 2 |
+| **AMD** | | | |
+| 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); session this morning | 2 + droplet |
+| 34 | Droplet idle watchdog (contract) | not started (B's sweep has an uptime ledger) | 2 |
+| **Platform and gaps** | | | |
+| 35 | Job store, queue, leases, reaper, probe cache, sandbox policy, migrations, token caps, AMD offline (gaps 1, 2, 3, 6, 8, 9, 11) | main | 0 |
+| 36 | Hostile-repo fixture and sandbox tests (gap 17) | main | 0 |
+| 37 | LICENSE (gap 22) | main | 0 |
+| 38 | 30-day retention of uploads, probe cache, job index (Chiya, Oct 30) | ws-a | 0 |
+| 39 | Runner deploy with `engine.memory` on (G1) | waits for round three on main | 1 |
+| 40 | Execution-plane logs and metrics (gap 14) | partial (backlog alarm, cleanup log) | 2 |
+| 41 | GPU power sampling (contract) | main | 0 |
+| 42 | pip-installable CLI, one-command install, 60-second quickstart (contract) | CLI on main, packaging not started | 3 |
+| 43 | 8 of 9 unseen scripts harnessed, failures name the step (contract; PM picks them) | not started | 6 |
+| 44 | Hash of the unseen-script list, published before Nov 2 (competitive #3) | not started (needs the PM's list) | 0.5 |
+| 45 | Prebuilt images and a warm pool for judging, Nov 5–8 (contract) | not started | 3 |
+| 46 | Chakra trace export (contract) | not started | 3 |
+| 47 | Any OpenAI-compatible endpoint in the CLI's model sweep (competitive #11, after G2) | not started | 2 |
+| 48 | First public number, "one script" (competitive #2) | ws-a (status file) | 0 |
+| **Validation rows A feeds** | | | |
+| 49 | Peak memory within 10%, no missed OOMs: full runs of the zoo and unseen scripts | 1 real run so far | 3 + paid runs |
+| 50 | Step time within 15%, same GPU: full runs | L4 ground truth pending | 2 + paid runs |
+| 51 | Rollout time within 20%: GRPO zoo script and an unseen TRL script | blocked on 11, 12 | 2 + paid runs |
+| 52 | Agent run total cost inside the 90% interval: a full benchmark vs the 30-task sample | blocked on 7 | 2 + API spend |
+| 53 | Planted problems caught (bug zoo) | LoRA eval OOM caught; nanoGPT not yet on a GPU | 1 + paid run |
+| 54 | Cost of one Preflight run under $1 and under 5 minutes | $0.10 GPU, but 6 min 45 s on Oct 28: over 5 min | 3 |
+
+**Total left: about 113 hours of A's work (was 138 in this morning's first version) (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
+order the PM set (hero lenses, then the rest) is the order I work in; Chiya's cuts at noon Sunday
+can read the hours column. Paid runs are asked for one at a time.
+
 ## Cloud runs
 
 Every run's GPU, minutes and dollars. Runs go through GitHub Actions (docs/setup/cloud.md) on T4
@@ -164,6 +251,23 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Oct 28 22:49 | `a-startup-check-6` (40782894652): ok | none (CPU sandbox) | 1.5 | under $0.01 (estimate) |
 | Oct 28 22:51 | `a-gt-lora-l4-2` (40783074654): ground truth again, LoRA 120 bare + 40 recorder steps in a 30-minute budget. No result: nothing printed in 40 minutes and the workflow limit ended `modal run` (exit 124); not even the measurement's first stage line arrived, so the function may never have started. App `ap-smlQhBII0aKV0BnMwULRzO` | L4 (if it started) | at most 50 (Modal's own limit on the function) | at most $0.67 GPU at list (estimate); Modal's bill says whether it ran |
 | Oct 28 23:32 | `a-stop-ops-main-2` and `-3` (40788021207, 40788111609): never started. GitHub: "recent account payments have failed or your spending limit needs to be increased" | none | 0 | $0 |
+| Oct 31 00:52 | `a-app-logs-gt-lora-2` (41152518808): log read of `ap-smlQhBII0aKV0BnMwULRzO`, refused: Modal no longer lists the app | none | 1 (runner) | $0 Modal; GitHub Actions minutes |
+| Oct 31 02:33 | `a-app-logs-gt-lora-2b` (41160545127): read allowed through its remote-runs record; 0 lines (Modal fetches only the last hour by default) | none | 1 (runner) | $0 Modal; Actions minutes |
+| Oct 31 03:3x | `a-app-logs-gt-lora-2c`: read over the run's own window (22:46 to 00:31 UTC, Oct 28): 0 lines, no error | none | 1 (runner) | $0 Modal; Actions minutes |
+| Oct 31 03:4x | `a-app-logs-calibrate`: the same read on `a-startup-check-6`'s app (same day, known to have run containers): also 0 lines. So the empty reads say nothing about the rerun: Modal returns no logs for these stopped temporary apps two days on. Where the 45 minutes went stays unknown; round two's unbuffered `remote-run` logs and the ground truth's own progress lines are how the next run will show it | none | 1 (runner) | $0 Modal; Actions minutes |
+| Oct 31 09:59 | `a-startup-check-7` (41190958484): ok | none (CPU sandbox) | 1.5 | under $0.01 (estimate) |
+| Oct 31 10:01 | `a-gt-lora-l4-3` (41191057139): LoRA ground truth, 120 + 40 steps, 30-min budget. Modal queued the L4 function for 25 minutes ("waiting to be scheduled on a GPU_L4 worker", 10:03 to 10:28), then it failed at once: "/root/zoo/finetune_lora_hf has no train.py" (the probe image has no zoo; fixed: the files now come from the checkout) | L4, about 10 s | about 25 waiting, 27 in all | under $0.01 GPU (seconds on the L4; no container while queued) |
+| Oct 31 10:30 | `a-app-logs-gt-lora-3`: the read above, with timestamps (the app was still listed) | none | 1 (runner) | $0 Modal; Actions minutes |
+| Oct 31 11:30 | `a-gt-lora-l4-4` (41197146925): 120 bare steps ran (median 1.79 s, peak 17.78 GB allocated, 23.21 GB reserved); the recorder half failed at once on root's dataset locks in the shared HF cache (fixed, 82d6404) | L4 | about 26 queued, 6.5 on the L4 | about $0.09 GPU (estimate) |
+| Oct 31 20:51 | `a-startup-check-8` (41240812675): ok, both images; CPU probe 9 steps as uid 61000 | none (CPU sandbox) | 2.3 | under $0.01 (estimate) |
+| Oct 31 20:54 | `a-gt-lora-l4-5` (41241033277): bare run OOM at step 200, the first eval, at 22.13 GB (20.61 GiB) allocated, 23.37 GB reserved; the Oct 28 probe caught it at 21.9 GB (20.4 GiB). Recorder 5 + 40 steps ok; hook overhead median 1.010 (95% CI 1.004–1.017, 20 pairs), synced phase steps 1.084 (0.99–1.20, 19 pairs) [measured] | L4 | about 20 queued, 11 on the L4 | about $0.15 GPU at list (estimate) |
+
+**What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
+is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,
+and the first line it prints comes only once it has a GPU. So the three Oct 28 runs probably billed
+little or no L4 time, not the ~$1.90 estimated in the rows above (their logs are gone, so this is
+an inference; Modal's bill for Oct 28 is the check). Had any of them got a GPU, it would have failed
+within seconds on the missing zoo (the earliest code read an empty file set rather than raising).
 
 ### First public number (one script)
 
@@ -174,17 +278,17 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 > 1.68 s a step plus loading, about $0.09 of L4 [derived]. The saving is one failed run, not hours.
 
 Sources: record `ICDYrfHQ2nBNbv3mlRHHMg` (probe `p1-eval`: status oom, code oom.eval, eval batch 1
-of 33 at 21.9 GB; probe `p1`: p50 1.68 s); `EVAL_EVERY = 200` in `zoo/finetune_lora_hf/train.py`;
+of 33 at 21.9 GB (20.4 GiB) allocated on a 23.69 GB (22.06 GiB) card; probe `p1`: p50 1.68 s); `EVAL_EVERY = 200` in `zoo/finetune_lora_hf/train.py`;
 L4 list price $0.80/h. One script and one run, so no interval: it is an example, not a rate.
 
 First end-to-end run on a real GPU, Oct 28 05:51 UTC (record `ICDYrfHQ2nBNbv3mlRHHMg` on
 `preflight-records`, env L4 with 23,689,363,456 bytes): the planted eval OOM was caught by the
-first probe (`p1-eval`, status oom, code oom.eval, eval batch 1 of 33 at 21.9 GB allocated) and the
+first probe (`p1-eval`, status oom, code oom.eval, eval batch 1 of 33 at 21.9 GB, i.e. 20.4 GiB, allocated) and the
 point re-ran with eval off. Measured on the L4 (step_time.p50 over the timed steps, peak allocated):
 
 | Probe | Setting | p50 step | Peak | Probe time | GPU at list |
 | --- | --- | --- | --- | --- | --- |
-| p1-eval | batch 4, seq 1024, eval on | 1.36 s | 21.9 GB in eval | 189 s | $0.0420 |
+| p1-eval | batch 4, seq 1024, eval on | 1.36 s | 21.9 GB (20.4 GiB) in eval | 189 s | $0.0420 |
 | p1 | batch 4, seq 1024, eval off | 1.68 s | 15.7 GB | 122 s | $0.0272 |
 | p2 | batch 2, seq 1024 | 0.84 s | 9.6 GB | 22 s | $0.0049 |
 | p3 | batch 4, seq 512 | 1.67 s | 15.5 GB | 53 s | $0.0117 |

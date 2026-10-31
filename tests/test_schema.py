@@ -30,8 +30,8 @@ GOLDEN = ["finetune", "pretrain", "agent"]
 
 
 def test_schema_version_is_semver_0_x():
-	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields. All additive over the 0.1.0 freeze
-	assert SCHEMA_VERSION == "0.4.0"
+	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch. All additive over the 0.1.0 freeze
+	assert SCHEMA_VERSION == "0.5.0"
 
 
 def test_ulid_is_26_crockford_chars_and_sortable():
@@ -353,3 +353,40 @@ def test_load_record_refuses_a_gzip_bomb():
 	bomb = gzip.compress(b" " * (64 * 1024 * 1024))
 	with pytest.raises(ValueError, match="too large"):
 		load_record(bomb)
+
+
+def test_job_request_patch_only_with_probe_or_verify():
+	# contract 0.5.0: C's fix loop sends its diff on a probe or verify job, never on a plan
+	import pytest
+
+	from preflight.schema import JobRequest
+
+	rec = {"kind": "record", "record_ref": "abc"}
+	diff = "--- a/train.py\n+++ b/train.py\n@@ -1 +1 @@\n-x = 1\n+x = 2\n"
+	assert JobRequest(source=rec, mode="verify", knobs={"batch_size": 2}, patch=diff).patch == diff
+	with pytest.raises(ValueError):
+		JobRequest(source={"kind": "sample", "id": "lora-qwen"}, patch=diff)
+	with pytest.raises(ValueError):
+		JobRequest(source=rec, mode="verify", knobs={"batch_size": 2}, patch="x" * 262_145)
+
+
+def test_campaign_takes_the_planners_intervals():
+	from preflight.schema import Campaign, CampaignCell
+
+	est = {
+		"point": 10.0,
+		"lo": 8.0,
+		"hi": 13.0,
+		"unit": "gpu_h",
+		"status": "predicted",
+		"model_id": "m",
+		"source": "exact",
+	}
+	c = Campaign(
+		cells=[CampaignCell(id="c1", knobs={}, time={**est, "unit": "s"}, start_s={**est, "unit": "s"})],
+		gpu_hours=est,
+		grid_gpu_hours=est,
+		asha={"rungs": [{"steps": 100, "runs": 8}], "saved_gpu_hours": est},
+		quota={"needed_bytes": {**est, "unit": "B"}, "quota_bytes": 1e12},
+	)
+	assert c.asha.rungs[0].runs == 8 and c.cells[0].start_s.hi == 13.0

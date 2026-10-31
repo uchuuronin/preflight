@@ -9,6 +9,7 @@ import json
 import os
 import runpy
 import sys
+import time
 import traceback
 from pathlib import Path
 
@@ -110,11 +111,27 @@ def _force_seed(seed: int) -> None:
 		pass
 
 
+def _rank() -> int:
+	try:
+		return int(os.environ.get("RANK") or 0)
+	except ValueError:
+		return 0
+
+
 def main(spec_path: str) -> int:
 	spec = json.loads(Path(spec_path).read_text())
 	set_limits()
 	workdir = os.path.abspath(spec["workdir"])
 	out_path = spec["out"]
+	rank = _rank()
+	if rank > 0:
+		# torchrun (spec nproc > 1): every rank runs under its own recorder; rank 0 writes the
+		# result and progress, the others a result of their own beside it (memory per rank)
+		out_path = f"{out_path}.rank{rank}"
+		# profiling stays on so every rank runs the same steps (a rank that stops early leaves rank 0's
+		# next all-reduce without a partner); its trace goes beside rank 0's and is never read
+		trace = f"{spec['trace']}.rank{rank}" if spec.get("trace") else None
+		spec = {**spec, "progress": None, "trace": trace}
 	try:
 		import torch  # noqa: F401  (fails here, inside the try, when torch is missing)
 
@@ -139,7 +156,17 @@ def main(spec_path: str) -> int:
 
 		if spec.get("progress"):
 			_write(spec["progress"], {"stage": "installing requirements", "steps": 0})
-		err, dirs = install(Path(workdir), Path(spec["deps"]))
+		done = Path(spec["deps"]).with_name("deps.done.json")
+		if rank == 0:
+			err, dirs = install(Path(workdir), Path(spec["deps"]))
+			_write(str(done), {"error": err, "dirs": [str(d) for d in dirs]})
+		else:
+			# torchrun: rank 0 installs once into the shared prefix; the other ranks wait for it and
+			# put the same directories on their path (never a second pip into files rank 0 runs from)
+			while not done.exists():
+				time.sleep(0.5)
+			got = json.loads(done.read_text())
+			err, dirs = got.get("error"), [Path(d) for d in got.get("dirs", [])]
 		if err:
 			_write(out_path, {"status": "error", "error_code": "missing_package.install",
 				"error": f"requirements.txt didn't install: {err}", "summary": {}})  # fmt: skip
@@ -192,6 +219,14 @@ def main(spec_path: str) -> int:
 		rec.uninstall()
 
 	summary = rec.summary()
+	# the training set's longest row (B, Oct 30), read after the hooks are gone so nothing is timed
+	try:
+		from preflight.recorder.dataset_len import measure_bounded
+
+		if status == "ok" and rec._train_dataset is not None:  # a failed probe writes its result now
+			summary.update(measure_bounded(rec._train_dataset))
+	except Exception as exc:
+		print(f"[preflight] dataset lengths not read: {type(exc).__name__}", file=sys.stderr, flush=True)
 	env = detect_env()
 	flops, util = mfu(summary, env)
 	summary["flops_per_step"] = flops

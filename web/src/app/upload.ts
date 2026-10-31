@@ -42,6 +42,12 @@ export interface UploadOptions {
 
 const lower = (n: string) => n.toLowerCase();
 
+/** What a check-in source weighs as the API sees it: UTF-8 bytes of its JSON. D's notebook panel
+ * calls this too, so the panel and the desk can't measure differently. */
+export function checkinBytes(source: unknown): number {
+	return new TextEncoder().encode(JSON.stringify(source)).length;
+}
+
 /** What can be said from names and sizes alone, before reading anything into memory. */
 export function precheck(picked: ReadonlyArray<{ name: string; size: number }>, opts: UploadOptions = {}): string | null {
 	if (!picked.length) return "upload.empty";
@@ -67,7 +73,7 @@ export function uploadSource(picked: readonly PickedFile[], entrypoint?: string,
 		files[p.name] = p.text;
 	}
 	// What the API counts: the files as JSON, escapes included (notebooks grow when escaped).
-	if (new TextEncoder().encode(JSON.stringify(files)).length > MAX_TOTAL_BYTES) return { ok: false, reason: "upload.too_big" };
+	if (checkinBytes(files) > MAX_TOTAL_BYTES) return { ok: false, reason: "upload.too_big" };
 	const names = Object.keys(files);
 	if (names.some((n) => n.endsWith(".ipynb"))) {
 		if (names.length > 1) return { ok: false, reason: "upload.notebook_alone" };

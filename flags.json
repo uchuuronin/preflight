@@ -22,5 +22,6 @@
 	"corpus.sweep": false,
 	"campaign.planner": false,
 	"d.freetier": false,
-	"d.notebook": false
+	"d.notebook": false,
+	"d.exports_cli": false
 }

@@ -54,6 +54,9 @@ image = (
 		}
 	)
 	.add_local_file(ROOT / "flags.json", "/root/repo/flags.json")
+	# PREFLIGHT_ENV=production reads this over flags.json (preflight_api/flags.py). B's file; the
+	# runner's image ships the same two (A's test holds both images to one list).
+	.add_local_file(ROOT / "flags.production.json", "/root/repo/flags.production.json")
 	.add_local_dir(ROOT / "python" / "preflight", "/root/repo/python/preflight")
 	.add_local_dir(ROOT / "api" / "preflight_api", "/root/repo/api/preflight_api")
 	.add_local_dir(ROOT / "api" / "addons", "/root/repo/api/addons")

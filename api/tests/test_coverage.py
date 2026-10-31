@@ -36,9 +36,15 @@ def test_a_real_run_is_scored_only_on_probes_held_out():
 	# engine reads p3's time back: the test is weak here, and the page says so.
 	p2 = next(c for c in steps if c["probe"] == "p2")
 	assert abs(p2["measured"] - 0.837) < 0.001
-	assert p2["predicted"]["point"] == pytest.approx(1.666, rel=0.01)
-	# Eval-off re-runs after the eval OOM aren't compared with a job-as-written memory prediction.
-	assert {s["probe"] for s in skipped if s.get("metric") == "peak_memory"} == {"p1", "p2", "p3"}
+	# The exact number moves with the engine (1.666 s before B's tokens-per-step scaling, about 1.07 s
+	# after, Oct 31), so check only that it was predicted, not read back from p2 itself.
+	assert p2["predicted"]["point"] is not None
+	assert p2["predicted"]["point"] != pytest.approx(p2["measured"], rel=0.001)
+	# Eval-off re-runs after the eval OOM are scored against the peak less the engine's eval term.
+	mem = [c for c in checks if c["metric"] == "peak_memory"]
+	assert {c["probe"] for c in mem} == {"p1", "p2", "p3"}
+	assert {c["basis"] for c in mem} == {"peak_less_eval_and_context"}
+	assert not [s for s in skipped if s.get("metric") == "peak_memory"]
 	oom = [c for c in checks if c["metric"] == "oom"]
 	assert [c["probe"] for c in oom] == ["p1-eval"]
 
@@ -76,15 +82,55 @@ def test_held_out_records_carry_nothing_derived_from_the_probe():
 	assert held.models == [] and held.findings == [] and not held.predictions.estimates
 
 
-def test_a_probe_without_an_eval_pass_is_skipped_only_when_the_engine_peak_includes_eval():
+def test_an_eval_off_probe_is_scored_against_the_engine_training_peak():
+	"""Independent of coverage.py's arithmetic: the engine's analytical training-moment peak (eval
+	batch removed) plus the same calibration offset the engine applied to its eval-moment peak."""
+	from dataclasses import replace
+
+	from preflight.engine import api, knobs, memory
+	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES as C
+	from preflight.schema import load_record
+
+	rec = load_record(REAL.read_text())
+	for pid in ("p1", "p2", "p3"):
+		p = next(q for q in rec.probes if q.id == pid)
+		held = coverage.held_out(rec, p)
+		pred = api.predict(held, dict(p.knobs)).root
+		values = api._probe_values(rec, p)
+		arch, setup, shape = knobs.setup_from(rec.job.script_map, values)
+		cap = api._capacity(held, api._target_gpu(held, values))
+		with_eval = memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap)
+		training = memory.breakdown(
+			arch, replace(setup, eval_batch=None), shape.batch, shape.seq, capacity_bytes=cap
+		)
+		offset = pred["memory.peak"].point - C - with_eval.allocator_peak
+		m, basis = coverage.memory_target(p, pred)
+		assert basis == "peak_less_eval_and_context"
+		assert m["point"] == pytest.approx(training.allocator_peak + offset, rel=1e-6)
+
+
+def test_a_probe_that_ran_eval_keeps_the_eval_term():
 	from preflight.engine.api import predict
+	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES
 	from preflight.schema import load_record
 
 	rec = load_record(REAL.read_text())
 	p2 = next(p for p in rec.probes if p.id == "p2")
-	as_written = predict(coverage.held_out(rec, p2), dict(p2.knobs)).root
-	assert coverage.memory_comparable(p2, as_written) == "no_eval_pass"
-	# The same job with an eval that adds nothing to the peak: the training peak is comparable.
-	quiet = predict(coverage.held_out(rec, p2), {**p2.knobs, "eval_no_grad": True, "eval_batch_size": 2}).root
-	assert (quiet["memory.eval_spike"].point or 0) == 0
-	assert coverage.memory_comparable(p2, quiet) is None
+	with_eval = p2.model_copy(update={"eval": next(p for p in rec.probes if p.id == "p1-eval").eval})
+	pred = predict(coverage.held_out(rec, p2), dict(p2.knobs)).root
+	m, basis = coverage.memory_target(with_eval, pred)
+	assert basis == "peak_less_context"
+	assert m["point"] == pytest.approx(pred["memory.peak"].point - DEFAULT_CONTEXT_BYTES)
+
+
+def test_the_eval_off_marker_decides_first_and_missing_stats_only_without_one():
+	from preflight.schema import load_record
+
+	rec = load_record(REAL.read_text())
+	p1e = next(p for p in rec.probes if p.id == "p1-eval")
+	p2 = next(p for p in rec.probes if p.id == "p2")
+	mark = lambda p, v: p.model_copy(update={"extras": {**(p.extras or {}), "eval_off": v}})  # noqa: E731
+	assert coverage.ran_without_eval(mark(p1e, 1.0))  # marker says off, though eval stats exist
+	assert not coverage.ran_without_eval(mark(p2, 0.0))  # marker says eval ran, though stats are missing
+	assert coverage.ran_without_eval(p2)  # no marker: missing stats decide
+	assert not coverage.ran_without_eval(p1e)

@@ -31,6 +31,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -114,6 +115,39 @@ EXTRAS_KEYS = (
 	"train_loader_batches",
 	"epochs",
 	"planned_steps",
+	# the training set's row lengths in tokens, as the script tokenised them (B, Oct 30), over
+	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
+	"dataset_max_tokens",
+	"dataset_p999_tokens",
+	"dataset_rows_scanned",
+	"dataset_rows_total",
+	# vision: the batch's images (mean over the first training batches)
+	"images_per_batch",
+	"image_height",
+	"image_width",
+	"channels_last",
+	# graphs: a sampled batch's size, per hop (PyG NeighborLoader), and the largest batch seen
+	"graph_nodes_per_batch",
+	"graph_edges_per_batch",
+	"graph_seed_nodes",
+	"graph_nodes_hop0",
+	"graph_nodes_hop1",
+	"graph_nodes_hop2",
+	"graph_nodes_hop3",
+	"graph_nodes_max",
+	# retrieval: each stage the probe reached (sentence-transformers encode, faiss add, train and
+	# search): items (sentences or vectors), seconds, and items a second
+	*(
+		f"{k}_{m}"
+		for k in ("encode", "index_add", "index_train", "search")
+		for m in ("items", "seconds", "items_per_s")
+	),
+	# torchrun (nproc > 1): ranks on the node, how many wrote a result, the largest rank peak and
+	# the slowest rank's median step
+	"world_size",
+	"ranks_reported",
+	"rank_peak_allocated_max_bytes",
+	"rank_step_p50_max_s",
 )
 
 
@@ -146,6 +180,8 @@ class ProbeSpec:
 	install_requirements: bool = False  # pip-install requirements.txt in the probe (hosted probes only)
 	out_dir: Path | None = None
 	gpu_usd_per_hour: float = 0.0
+	nproc: int = 1  # processes on this node, one per GPU, under torchrun (DDP, FSDP)
+	image: str = "probe"  # which sandbox image runs it: "probe", or "serving" (vLLM, its own torch)
 
 
 @dataclass
@@ -574,6 +610,43 @@ def _extras(summary: dict) -> dict[str, float]:
 # ---------------------------------------------------------------- run
 
 
+def _read_untrusted(path: Path, cap: int = 5_000_000) -> str:
+	"""A file the probe's uid could write: never through a link, only a regular file, at most cap
+	bytes (a planted link to /dev/zero or a FIFO can't stall or flood the parent)."""
+	fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+	try:
+		if not stat.S_ISREG(os.fstat(fd).st_mode):
+			raise OSError(f"{path.name} is not a regular file")
+		return os.read(fd, cap).decode(errors="replace")
+	finally:
+		os.close(fd)
+
+
+def _rank_extras(out: Path, nproc: int, summary: dict) -> dict:
+	"""What the other ranks' results add to rank 0's: the world size, the largest peak and the
+	slowest median step of any rank (the rank that OOMs or straggles sets the run)."""
+
+	def peak_p50(s):
+		return (s.get("memory") or {}).get("peak"), (s.get("step_time") or {}).get("p50_s")
+
+	vals, seen = [peak_p50(summary)], 1
+	for r in range(1, nproc):
+		with contextlib.suppress(OSError, ValueError):
+			_, _, _, s, _ = parse_result(_read_untrusted(Path(f"{out}.rank{r}")))
+			vals.append(peak_p50(s))
+			seen += 1
+
+	def num(x):
+		return isinstance(x, int | float) and not isinstance(x, bool)
+
+	res = {"world_size": nproc, "ranks_reported": seen}
+	if peaks := [v[0] for v in vals if num(v[0])]:
+		res["rank_peak_allocated_max_bytes"] = max(peaks)
+	if times := [v[1] for v in vals if num(v[1])]:
+		res["rank_step_p50_max_s"] = max(times)
+	return res
+
+
 def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None) -> ProbeResult:
 	validate_files(spec.files, entrypoint=spec.entrypoint)
 	# where the caller keeps artifacts (log, trace); wiped of any earlier attempt first
@@ -610,6 +683,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"alternate_sync": spec.alternate_sync,
 				"install_requirements": spec.install_requirements,
 				"deps": str(box / "deps"),
+				"nproc": spec.nproc,
 			}
 		)
 	)
@@ -633,8 +707,13 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	t0 = time.monotonic()
 	_PROBE_LOCK.acquire()  # one probe at a time per process: the descendant sweep below must not touch another probe
 	try:
+		launch = [python, "-m", "preflight.recorder.run", str(spec_path)]
+		if spec.nproc > 1:
+			# one recorder per rank; --standalone: a rendezvous on this node only
+			launch = [python, "-m", "torch.distributed.run", "--standalone", f"--nproc_per_node={spec.nproc}",
+				"-m", "preflight.recorder.run", str(spec_path)]  # fmt: skip
 		proc = subprocess.Popen(
-			[python, "-m", "preflight.recorder.run", str(spec_path)],
+			launch,
 			cwd=work,
 			env=env,
 			stdin=subprocess.DEVNULL,
@@ -679,12 +758,15 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 
 	prog = {"stage": "starting", "steps": 0}
 	with contextlib.suppress(OSError, ValueError):
-		prog = json.loads(progress.read_text())
+		prog = json.loads(_read_untrusted(progress, 64_000))
+	raw = None
+	with contextlib.suppress(OSError):
+		raw = _read_untrusted(out)
 	if cancelled:
 		status, code = "cancelled", "cancelled"
 		error = "Cancelled while running"
 		summary, raw_env = {"steps": int(prog.get("steps", 0))}, {}
-	elif timed_out or not out.exists():
+	elif raw is None:
 		steps = int(prog.get("steps", 0))
 		c = classify_exit(
 			returncode=None if timed_out else proc.returncode,
@@ -698,7 +780,12 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 			error += " (during the eval pass)"
 		summary, raw_env = {"steps": steps}, {}
 	else:
-		status, code, error, summary, raw_env = parse_result(out.read_text(errors="replace")[:5_000_000])
+		# a result written before the time limit stands (a rank hung in teardown after writing it)
+		if timed_out:
+			log.warning("probe %s hit its time limit after writing its result", spec.probe_id)
+		status, code, error, summary, raw_env = parse_result(raw)
+		if spec.nproc > 1:
+			summary = {**summary, **_rank_extras(out, spec.nproc, summary)}
 	try:
 		probe = _probe_model(spec, status, code, error, summary, started, duration)
 	except (ValidationError, TypeError, ValueError, ArithmeticError) as exc:

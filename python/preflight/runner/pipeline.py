@@ -32,6 +32,7 @@ step up after an OOM only while the job's dollar budget holds it.
 import hashlib
 import json
 import logging
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -144,7 +145,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"seed_force": spec.seed_force,
 		"install_requirements": spec.install_requirements,
 		"gpu": gpu,
-		"image": image,
+		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
@@ -165,6 +166,9 @@ class Deps:
 	# what a probe's sandbox costs beside its GPU (Modal bills sandbox CPU and memory at 3x list),
 	# counted against the job budget; 0 for local runs
 	overhead_usd_per_h: float = 0.0
+	# agent and API runs: runner/agent_jobs.py's sampler (the CLI's runs here with the user's key);
+	# None where no sampler is wired (the hosted runner, for now)
+	agent: Callable | None = None
 
 
 @dataclass
@@ -224,6 +228,18 @@ def _skipped(p: PlannedProbe, why: str) -> Probe:
 	)
 
 
+_VLLM_IMPORT = re.compile(r"^\s*(?:from\s+vllm\b|import\s+vllm\b)", re.M)
+
+
+def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
+	"""Serving, or any script that imports vLLM (an eval sweep on vLLM is lens eval): the probe
+	image has no vLLM."""
+	if sm.lens == "serving":
+		return True
+	# only an eval may need it: a GRPO script with an optional `import vllm` (use_vllm) needs trl
+	return sm.lens == "eval" and any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
+
+
 def _spec(
 	fetched: Fetched, sm: ScriptMap, p: PlannedProbe, deps: Deps, *, eval_off: bool = False
 ) -> ProbeSpec:
@@ -248,6 +264,7 @@ def _spec(
 		seed=p.seed,
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
+		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 	)
 
 
@@ -351,18 +368,17 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			raise InvalidSubmission(
 				"sampling more tasks is for agent and API runs", code="submission.not_agent"
 			)
-		# the agent sampler (OTel proxy) isn't built yet: say so rather than pretend
-		raise PermanentError(
-			"sampling more agent tasks isn't available yet", code="unsupported.agent_sampling"
-		)
+		return _sample_agent(rec, rev, fetched, sm, deps, ctx, top_up=True, tasks=req.tasks)
 	if rec.job.lens == "agent":
 		if followup:
 			raise InvalidSubmission(
 				"agent runs are measured by sampling tasks, not GPU probes", code="submission.not_gpu_job"
 			)
-		# agent runs are sampled by the agent recorder (OTel proxy), not by GPU probes
-		_emit(ctx, "harnessing", rec, rev, message="agent jobs run through the agent sampler")
-		return rec
+		if deps.agent is None:
+			# agent runs are sampled through the agent recorder's proxy, not by GPU probes
+			_emit(ctx, "harnessing", rec, rev, message="agent jobs run through the agent sampler")
+			return rec
+		return _sample_agent(rec, rev, fetched, sm, deps, ctx, top_up=False)
 
 	ctx.check()
 	_emit(ctx, "harnessing", rec, rev)
@@ -413,6 +429,54 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		finding = record_jobs.verify_finding(by_id[vid], by_id.get(f"{vid}-base"), plan_knobs, base_knobs,
 			{n.id for n in out.graph.nodes}, other_seed=by_id.get(f"{vid}-seed"))  # fmt: skip
 		out = out.model_copy(update={"findings": [*out.findings, finding]})
+	return out
+
+
+def _sample_agent(rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx, *, top_up: bool,
+	tasks: int | None = None) -> FlightRecord:  # fmt: skip
+	"""30 tasks of the agent run through the proxy, or up to 20 more on top of the record's sample (D3)."""
+	from preflight.engine.agent_cost import DEFAULT_SAMPLE, MAX_SAMPLE, TOP_UP_TASKS, combine_samples
+	from preflight.recorder.agent import task_key
+	from preflight.recorder.agent_sampler import draw_indices
+
+	if deps.agent is None:
+		raise PermanentError(
+			"sampling agent tasks isn't available here yet", code="unsupported.agent_sampling"
+		)
+	first = rec.agent_sample
+	if top_up and (first is None or not first.tasks):
+		raise InvalidSubmission("this record has no task sample to add to; sample it first",
+			code="submission.no_sample")  # fmt: skip
+	ctx.check()
+	population = getattr(getattr(sm, "agent", None), "n_tasks", None)
+	if top_up:
+		k = min(tasks or TOP_UP_TASKS, TOP_UP_TASKS, MAX_SAMPLE - len(first.tasks))
+		if k <= 0:
+			raise InvalidSubmission(f"this record's sample already has {len(first.tasks)} tasks",
+				code="submission.sample_full")  # fmt: skip
+		skip_keys = [key for t in first.tasks if (key := task_key(t.task_id))]
+		if len(skip_keys) < len(first.tasks):
+			# sampled before tasks were keyed by content: a top-up couldn't tell them apart and would
+			# pay for them again
+			raise PermanentError("this record's sample can't be topped up; sample the run again",
+				code="unsupported.agent_sampling")  # fmt: skip
+		# the first sample's indices are offered again first, and refused by content
+		offered = tuple(draw_indices(population, DEFAULT_SAMPLE) or ())
+	else:
+		k, skip_keys, offered = DEFAULT_SAMPLE, set(), ()
+	_emit(ctx, "probing", rec, rev, message=f"sampling {k} tasks through the agent proxy"
+		+ (f", skipping the {len(first.tasks)} already sampled" if top_up else ""))  # fmt: skip
+	sample = deps.agent(fetched, sm, k=k, skip_keys=skip_keys, offered_first=offered,
+		run_id="s2" if top_up else "s1", should_stop=getattr(ctx, "should_stop", None))  # fmt: skip
+	ctx.check()
+	if not sample.tasks:
+		why = ("the top-up ran no new tasks: the script may only have the tasks already sampled, or its tasks all open with the same first call"
+			if top_up else "the script made no model calls through the proxy: is its client reading OPENAI_BASE_URL?")  # fmt: skip
+		raise PermanentError(why, code="probe.no_agent_calls")
+	if top_up:
+		sample = combine_samples(first, sample)
+	out = rec.model_copy(update={"agent_sample": sample})
+	_emit(ctx, "probing", out, deps.records.put(out), message=f"{len(sample.tasks)} tasks sampled")
 	return out
 
 
@@ -529,7 +593,7 @@ def _probe_points(
 				probes.append(out.probe.model_copy(update={"id": f"{p.probe_id}-eval"}))
 				if isinstance(out, ProbeResult):
 					results.append(out)
-				out = again
+				out = _marked_eval_off(again, rec)
 			except OverrideError:
 				pass
 		probe = out.probe
@@ -545,6 +609,15 @@ def _probe_points(
 			a.probe.cost.usd for a in attempts if isinstance(a, ProbeResult) and id(a) not in kept_ids
 		)
 	return probes, results, gpu, discarded_usd
+
+
+def _marked_eval_off(out, rec: FlightRecord):
+	"""The eval-off re-run, saying so (C, Oct 28): extras.eval_off, so a held-out check knows its
+	peak is training's alone. Its knobs stay the record's (B's engine abstains on an eval batch of
+	0, and 0 is outside the knob's domain). Marked in place: the attempt's identity is how its cost
+	is counted as kept, not discarded."""
+	out.probe = out.probe.model_copy(update={"extras": {**out.probe.extras, "eval_off": 1.0}})
+	return out
 
 
 def _price(gpu: str) -> float:

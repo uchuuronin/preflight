@@ -12,6 +12,7 @@ reuses the runner's images, so what it checks is what the runner runs.
 """
 
 import contextlib
+import json
 import os
 import uuid
 from pathlib import Path
@@ -26,6 +27,7 @@ from preflight.runner.modal_app import (
 	image_tag,
 	probe_image,
 	records_vol,
+	serving_image,
 	weights_vol,
 	worker_image,
 )
@@ -315,20 +317,21 @@ GROUND_TRUTH_TIMEOUT_S = 50 * 60
 
 @ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=GROUND_TRUTH_TIMEOUT_S)
 def ground_truth_on_l4(
-	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float
+	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict
 ) -> dict:
 	"""recorder/ground_truth.py on an L4: a bare run, then a recorder run alternating clean and
 	synced steps, and the paired overhead. The AMD droplet runs the same module."""
 	from preflight.probes import remote
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, measure
-	from preflight.runner.sources import ZOO
 
 	if script not in ZOO_SCRIPTS:
 		raise ValueError(f"unknown zoo script {script!r}")
+	print(f"[ground truth] container up on the GPU; {len(files)} files of {script}", flush=True)
 	remote.link_weights()
 	remote.deps_dir()
-	return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
-		budget_s=budget_s)  # fmt: skip
+	# the probe image has no zoo (Oct 31: "has no train.py"): the files come from the checkout
+	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
+		budget_s=budget_s, files=files)  # fmt: skip
 
 
 @ops.local_entrypoint()
@@ -340,9 +343,146 @@ def ground_truth(
 	budget_min: the whole measurement ends inside it; keep it under the run's own time limit."""
 	import json
 
-	from preflight.recorder.ground_truth import brief
+	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief
+	from preflight.runner.sources import _read_tree
 
-	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60)
+	if script not in ZOO_SCRIPTS:
+		raise SystemExit(f"unknown zoo script {script!r}")
+	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
+	if "train.py" not in files:
+		raise SystemExit(f"zoo/{script} has no train.py in this checkout")
+	print(
+		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4 (Modal queues it)", flush=True
+	)
+	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60, files)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(brief(res), indent=2), flush=True)
+
+
+# ---------------------------------------------------------------- multi-GPU (2 x L4, paid: ask first)
+
+MULTI_GPU_TIMEOUT_S = 20 * 60  # the container's own end, whatever the probes do
+
+
+@ops.function(image=probe_image, gpu="L4:2", timeout=MULTI_GPU_TIMEOUT_S)
+def multi_gpu_on_l4x2(files: dict, warmup: int = 3, timed: int = 10) -> dict:
+	"""DDP and FSDP probes on one node of two L4s, one recorder per rank under torchrun."""
+	from preflight.probes.local import ProbeSpec, run_probe
+
+	print("[multi-gpu] container up on 2 x L4", flush=True)
+	out = {}
+	for name in ("ddp", "fsdp"):
+		r = run_probe(ProbeSpec(probe_id=name, files={"train.py": files[f"{name}.py"]}, entrypoint="train.py",
+			warmup=warmup, timed=timed, nproc=2, timeout_s=360))  # fmt: skip
+		p = r.probe
+		out[name] = {"status": p.status, "error": p.error, "steps": p.steps,
+			"p50_s": p.step_time.p50_s if p.step_time else None,
+			"peak_allocated_bytes": p.memory.peak_allocated_bytes if p.memory else None,
+			"extras": p.extras, "gpu": r.env.gpu.name if r.env and r.env.gpu else None,
+			"log_tail": r.log_tail[-1500:] if p.status != "ok" else ""}  # fmt: skip
+		print(f"[multi-gpu] {name}: {p.status}, {p.steps} steps, extras {p.extras}", flush=True)
+	return out
+
+
+@ops.local_entrypoint()
+def multi_gpu():
+	"""modal run --env main python/preflight/runner/ops_app.py::multi_gpu
+	Writes out/multi_gpu.json: the DDP and FSDP probes on 2 x L4 (tests/fixtures/multi_gpu)."""
+	import json
+
+	root = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "multi_gpu"
+	files = {f.name: f.read_text() for f in root.glob("*.py")}
+	print("[multi-gpu] waiting for a node with 2 x L4 (Modal queues it)", flush=True)
+	res = multi_gpu_on_l4x2.remote(files)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/multi_gpu.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps({k: {kk: v for kk, v in r.items() if kk != "log_tail"} for k, r in res.items()}, indent=2),
+		flush=True)  # fmt: skip
+
+
+# ---------------------------------------------------------------- agent sample (Meta API, paid: ask first)
+
+AGENT_SAMPLE_TIMEOUT_S = 45 * 60  # the container's own end: the sample's 30 min plus installs and tasks
+AGENT_MAX_USD = 3.0  # proposed to Chiya for one sample (the proxy stops at it); her yes sets it
+
+
+@ops.function(
+	image=worker_image, secrets=[modal.Secret.from_name("preflight-meta")], timeout=AGENT_SAMPLE_TIMEOUT_S
+)
+def agent_sample_hosted(files: dict, entrypoint: str, k: int, max_usd: float) -> dict:
+	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
+	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
+	from preflight.harness.static import map_static
+	from preflight.runner.agent_jobs import sandbox_sampler
+	from preflight.runner.modal_app import _sandbox_factory
+	from preflight.runner.sources import Fetched
+
+	owner = modal.App._get_container_app()
+	create = _sandbox_factory(owner)
+	upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
+	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
+		os.environ["META_API_KEY"],
+		max_usd_total=max_usd)  # fmt: skip
+	sm = map_static(files, entrypoint=entrypoint)
+	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
+		flush=True)  # fmt: skip
+	s = sample(Fetched(files=files, entrypoint=entrypoint), sm, k=k)
+	usd = round(sum(t.cost_usd or 0 for t in s.tasks), 4)
+	print(f"[agent] {len(s.tasks)} tasks, ${usd} of model calls; {s.selection}", flush=True)
+	return {"sample": s.model_dump(mode="json"), "usd": usd}
+
+
+@ops.local_entrypoint()
+def agent_sample(script: str = "agent_eval_spark", k: int = 30, max_usd: float = AGENT_MAX_USD):
+	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
+	Writes out/agent_sample_<script>.json: the sampled tasks (counts and timings, no content)."""
+	import json
+
+	from preflight.runner.sources import _read_tree
+
+	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
+	entry = next((e for e in ("run.py", "train.py") if e in files), None)
+	if entry is None:
+		raise SystemExit(f"zoo/{script} has no run.py or train.py in this checkout")
+	res = agent_sample_hosted.remote(files, entry, k, max_usd)
+	Path("out").mkdir(exist_ok=True)
+	Path(f"out/agent_sample_{script}.json").write_text(json.dumps(res, indent=2))
+
+
+# ---------------------------------------------------------------- serving image (CPU, before any serving probe)
+
+
+@ops.function(image=serving_image, timeout=600)
+def startup_check_serving_image() -> dict:
+	"""The serving image starts: vLLM, its torch and numpy, and the recorder import, without a GPU."""
+	import subprocess
+	import sys
+
+	cmd = ("import json, numpy, torch, vllm, preflight.probes.remote, preflight.recorder.runtime as r; "
+		"print(json.dumps({'vllm': vllm.__version__,"
+		" 'torch': torch.__version__, 'numpy': numpy.__version__, 'recorder': r.__file__}))")  # fmt: skip
+	p = subprocess.run([sys.executable, "-c", cmd], capture_output=True, text=True, timeout=300)
+	out = {"exit": p.returncode, "stderr": p.stderr[-1500:] if p.returncode else ""}
+	if p.returncode == 0:
+		out.update(json.loads(p.stdout.strip().splitlines()[-1]))
+	return out
+
+
+@ops.local_entrypoint()
+def startup_check_serving():
+	"""modal run --env main python/preflight/runner/ops_app.py::startup_check_serving
+	Writes out/startup_check_serving.json; exits non-zero unless vLLM 0.6.4.post1 on torch 2.5.1 imports."""
+	import sys
+
+	res = startup_check_serving_image.remote()
+	res["ok"] = (
+		res.get("exit") == 0
+		and res.get("vllm") == "0.6.4.post1"
+		and str(res.get("torch", "")).startswith("2.5.1")
+	)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/startup_check_serving.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps(res, indent=2), flush=True)
+	if not res["ok"]:
+		sys.exit(1)

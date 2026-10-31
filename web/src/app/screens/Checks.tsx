@@ -27,6 +27,8 @@ interface Check {
 	predicted_peak?: { point?: number } | null;
 	error?: number;
 	hit?: boolean;
+	/** How the memory prediction was formed (coverage.py memory_target). */
+	basis?: string;
 	verdict?: string;
 }
 
@@ -113,7 +115,9 @@ export function Checks() {
 								c.metric === "oom"
 									? [t(`checks.oom.${c.verdict ?? "abstained"}`), c.predicted_peak?.point ? t("checks.oom.peak", { peak: fmt(c.predicted_peak.point, "bytes") }) : null].filter(Boolean).join(", ")
 									: p?.point !== undefined && unit
-										? t("checks.predicted", { value: `${fmt(p.point, unit)} (${fmtRange(p.lo ?? p.point, p.hi ?? p.point, unit)})` })
+										? t(c.basis === "peak_less_eval_and_context" ? "checks.predicted_no_eval" : "checks.predicted", {
+												value: `${fmt(p.point, unit)} (${fmtRange(p.lo ?? p.point, p.hi ?? p.point, unit)})`,
+											})
 										: t("checks.abstain");
 							const got = c.metric === "oom" ? t(String(c.measured) === "oom.eval" ? "checks.measured.oom_eval" : "checks.measured.oom") : typeof c.measured === "number" && unit ? fmt(c.measured, unit) : String(c.measured);
 							return (

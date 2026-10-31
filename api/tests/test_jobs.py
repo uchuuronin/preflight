@@ -205,3 +205,29 @@ def test_unknown_branches_and_rate_limits_are_explained():
 	busy = {**BODY, "source": {"kind": "repo", "uri": "https://github.com/x/y", "commit": "limited"}}
 	r = c.post("/v1/jobs", json=busy, headers={"Idempotency-Key": "k-limited-0001"})
 	assert r.status_code == 503 and r.json()["error"]["code"] == "repo_unavailable"
+
+
+def test_run_a_probe_here_takes_one_setting_of_a_real_record_only():
+	store = Store()
+	c = client(store)
+	ref = "test-share-ref-000001"
+	probe = {
+		"source": {"kind": "record", "record_ref": ref},
+		"mode": "probe",
+		"knobs": {"seq_len": 2048, "batch_size": 8},
+	}
+	r = c.post("/v1/jobs", json=probe, headers=KEY)
+	assert r.status_code == 202
+	sent = next(iter(store.jobs.values()))["request"]
+	assert sent["mode"] == "probe" and sent["knobs"] == {"seq_len": 2048, "batch_size": 8}
+	assert sent["purpose"] == "cockpit.run_probe_here"  # whatever the browser said
+	other = {"Idempotency-Key": "checkin-aaaa-0002"}
+	for bad in (
+		{**probe, "source": {"kind": "record", "record_ref": "lora-7b"}},  # a sample: nothing to run
+		{**probe, "source": {"kind": "record", "record_ref": "sample:lora-7b"}},
+		{**probe, "mode": "verify"},
+		{**probe, "mode": "sample_more", "knobs": None, "tasks": 20},
+		{**BODY, "mode": "probe", "knobs": {"seq_len": 1}},  # a repo check-in can't name a mode
+	):
+		assert c.post("/v1/jobs", json=bad, headers=other).status_code == 422, bad
+	assert len(store.jobs) == 1
