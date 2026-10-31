@@ -46,14 +46,14 @@ UNITS = {
 # words), and the sign kept ("-12%")
 _NUM = re.compile(
 	r"(?<![\w.])(?P<sign>[-−])?(?P<usd>\$)?(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*"
-	r"(?P<unit>TiB|GiB|MiB|KiB|TB|GB|MB|KB|ms|sec|seconds|s|minutes|min|m|hours|hrs|hr|h|%)?(?![\w.])"
+	r"(?P<unit>TiB|GiB|MiB|KiB|TB|GB|MB|KB|ms|sec|seconds|s|minutes|min|m|hours|hrs|hr|h|%)?(?!\w|\.\d)"
 )
-_VERSION = re.compile(r"(?i)(cuda|rocm|python|torch|pytorch|transformers|version|v)\s*$")
+_VERSION = re.compile(r"(?i)\b(cuda|rocm|python|torch|pytorch|transformers|version|v)\s*$")
 # which raw fields can back which kind of number (by the field path's last part)
 FIELD_KIND = (
 	(
 		"fraction",
-		re.compile(r"(by_phase\.\w+|fraction|share|ratio|mfu)$"),
+		re.compile(r"(by_phase\.\w+|fraction|share|ratio|mfu|rate)$"),
 	),  # before bytes: by_phase.optimizer
 	("rate", re.compile(r"(_per_s|per_second|_items_per_s)$")),  # before seconds: tokens_per_s isn't a time
 	("bytes", re.compile(r"(bytes|peak|reserved|weights|gradients|optimizer|activations|logits)$")),

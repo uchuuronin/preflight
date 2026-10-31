@@ -92,3 +92,13 @@ def test_knob_values_never_back_a_claim():
 	from preflight.harness.claim_check import raw_numbers
 
 	assert not any(".knobs." in k for k in raw_numbers(_rec()))
+
+
+def test_a_number_ending_a_sentence_keeps_its_unit_and_dev_is_not_a_version():
+	ns = numbers_in("It took 189 s. Peak was 21.9 GB. Padding is 13%. On dev 12 GB.")
+	assert [(n.text, n.kind) for n in ns] == [("189 s", "seconds"), ("21.9 GB", "bytes"), ("13%", "fraction"),
+		("12 GB", "bytes")]  # fmt: skip
+	from preflight.harness.claim_check import _kind_of
+
+	assert _kind_of("probes.p1.generation.truncation_rate") == "fraction"
+	assert _kind_of("probes.p1.throughput.tokens_per_s") == "rate"
