@@ -406,7 +406,9 @@ def main(argv: list[str] | None = None) -> int:
 			f"the store holds {len(held_rows)} holdout rows: pass --score-holdout to score them (once), or remove them "
 			"and pass --keep-holdout <table> to carry the earlier scores forward"
 		)
-	elif held_rows and args.out and args.out.exists() and "'holdout': {}" not in args.out.read_text():
+	elif held_rows and not args.out:
+		raise SystemExit("--score-holdout needs --out: the one score is written to the table, never just printed")
+	elif held_rows and args.out.exists() and "'holdout': {}" not in args.out.read_text():
 		raise SystemExit(f"{args.out} already holds holdout scores: the holdout is scored once")
 	scores = scores_from_rows(rows)  # grouped rows -> conformal scores
 	# the corpus's synthetic LoRA models aren't what users send (real HF models are): reported, never calibrated on
