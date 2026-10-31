@@ -255,3 +255,14 @@ def test_bad_inputs_become_notes_not_crashes(ft):
 	assert {c.lane for c in pl.cells} == {"ana"} and any("no slots" in n for n in pl.notes)
 	with pytest.raises(ValueError):
 		P.plan(ft, {"batch_size": [2]}, P.Cluster(lanes={"ana": 0}), start=START)
+
+
+def test_each_run_has_a_slot_and_a_start_for_the_calendar(ft):
+	pl = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2, 3]}, P.Cluster(slots=2), start=START)
+	assert sorted(c.slot for c in pl.cells) == [0, 0, 1, 1]
+	firsts = [c for c in pl.cells if c.start_s.point == 0]
+	assert len(firsts) == 2  # one run starts at once on each slot
+	later = [c for c in pl.cells if c.start_s.point > 0]
+	assert all(c.start > START for c in later) and all(
+		c.start_s.lo <= c.start_s.point <= c.start_s.hi for c in later
+	)

@@ -77,6 +77,9 @@ class CellPlan:
 	lane: str | None = None
 	cut: bool = False
 	reason: str = ""
+	slot: int | None = None  # which of the lane's slots runs it, 0-based
+	start_s: Estimate | None = None  # seconds from the campaign's start until it starts, p50 with 5% and 95%
+	start: datetime | None = None  # the p50 start as a date
 
 
 @dataclass(frozen=True)
@@ -592,7 +595,12 @@ def plan(
 		)
 		lane_of[i] = (name, slot)
 		load[name][slot] += cells[i].time.point or 0.0
-	cells = [_replace(c, lane=lane_of[i][0] if i in lane_of else None) for i, c in enumerate(cells)]
+	cells = [
+		_replace(
+			c, lane=lane_of[i][0] if i in lane_of else None, slot=lane_of[i][1] if i in lane_of else None
+		)
+		for i, c in enumerate(cells)
+	]
 
 	# ---- the end date: each slot runs its runs back to back; the campaign ends with its last slot
 	completion: dict[str, datetime] = {}
@@ -606,8 +614,19 @@ def plan(
 		)
 	else:
 		slot_end = {nk: np.zeros(draws) for nk in ((n, k) for n, ss in load.items() for k in range(len(ss)))}
+		starts: dict[int, np.ndarray] = {}
 		for i in order:
+			starts[i] = slot_end[lane_of[i]]
 			slot_end[lane_of[i]] = slot_end[lane_of[i]] + wall[i]
+		for i, st in starts.items():  # C's calendar: each run's slot and when it starts
+			ok = st[np.isfinite(st)]
+			if ok.size:
+				q5, q50, q95 = (float(v) for v in np.quantile(ok, [0.05, 0.5, 0.95]))
+				cells[i] = _replace(
+					cells[i],
+					start_s=_est(q50, q5, q95, "s", "predicted", "when its slot frees up; Monte Carlo"),
+					start=start + timedelta(seconds=q50),
+				)
 		finish = np.max(np.stack(list(slot_end.values())), axis=0)
 		stuck = float(np.mean(~np.isfinite(finish)))
 	if kept and all(runnable[i] for i in kept) and stuck > 0.05:
