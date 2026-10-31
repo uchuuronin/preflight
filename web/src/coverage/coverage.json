@@ -1,6 +1,6 @@
 {
-	"generated_at": "2026-10-31T01:36Z",
-	"engine_commit": "6c65ccd",
+	"generated_at": "2026-10-31T23:28Z",
+	"engine_commit": "006bc57",
 	"inputs": [
 		"api/tests/fixtures/a-smoke-l4-main-3.record.json",
 		"api/tests/fixtures/a-smoke-l4-main-4.record.json"
@@ -18,41 +18,44 @@
 			"rate_bar": 0.88,
 			"rate_bar_source": "guess",
 			"n": 3,
-			"hits": 0,
-			"rate": 0.0,
+			"hits": 2,
+			"rate": 0.6667,
 			"wilson95": [
-				0.0,
-				0.5615
+				0.2076,
+				0.9386
 			],
 			"abstained": 0,
+			"sized_for_seq_len": 0,
 			"runs": 1
 		},
 		"peak_memory": {
 			"tolerance": 0.1,
 			"rate_bar": 0.88,
 			"rate_bar_source": "guess",
-			"n": 3,
-			"hits": 0,
-			"rate": 0.0,
+			"n": 1,
+			"hits": 1,
+			"rate": 1.0,
 			"wilson95": [
-				0.0,
-				0.5615
+				0.2065,
+				1.0
 			],
 			"abstained": 0,
+			"sized_for_seq_len": 2,
 			"runs": 1
 		},
 		"interval": {
 			"tolerance": null,
 			"rate_bar": 0.88,
 			"rate_bar_source": "cited",
-			"n": 6,
-			"hits": 0,
-			"rate": 0.0,
+			"n": 4,
+			"hits": 4,
+			"rate": 1.0,
 			"wilson95": [
-				0.0,
-				0.3904
+				0.5101,
+				1.0
 			],
 			"abstained": 0,
+			"sized_for_seq_len": 0,
 			"runs": 1
 		},
 		"oom": {
@@ -67,6 +70,7 @@
 				1.0
 			],
 			"abstained": 0,
+			"sized_for_seq_len": 0,
 			"runs": 1
 		}
 	},
@@ -83,19 +87,19 @@
 			"measured": "oom.eval",
 			"predicted": {
 				"status": "extrapolated",
-				"point": 1.0,
-				"lo": 1.0,
-				"hi": 1.0,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "won't fit: out of memory very likely (simulated band); the peak comes at eval, not during training steps"
+				"point": 0.975,
+				"lo": 0.5958499732047615,
+				"hi": 0.9821237869049271,
+				"model_id": "memory-analytical@0.3.1",
+				"reason": "Likely to run out of memory: 9 of 10 similar runs did (from 19 held-out runs); the peak comes at eval, not during training steps"
 			},
 			"predicted_peak": {
 				"status": "extrapolated",
-				"point": 140064784384.0,
-				"lo": 125851804650.87563,
-				"hi": 155882896387.21454,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+				"point": 148188114806.65878,
+				"lo": 138552279211.9548,
+				"hi": 158494089702.83267,
+				"model_id": "memory-analytical@0.3.1",
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it; band from held-out runs: L4, finetune (n = 19)"
 			},
 			"verdict": "caught"
 		},
@@ -111,13 +115,13 @@
 			"measured": 1.680131103515625,
 			"predicted": {
 				"status": "predicted",
-				"point": 2.1097550484548937,
-				"lo": 1.7318486377725195,
-				"hi": 2.5701243557900146,
+				"point": 1.5908434812668886,
+				"lo": 1.3946954510476708,
+				"hi": 1.8145774978962423,
 				"model_id": "steptime-phases@0.2.0"
 			},
-			"error": 0.2557,
-			"hit": false
+			"error": 0.0531,
+			"hit": true
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -132,12 +136,12 @@
 			"measured": 1.680131103515625,
 			"predicted": {
 				"status": "predicted",
-				"point": 2.1097550484548937,
-				"lo": 1.7318486377725195,
-				"hi": 2.5701243557900146,
+				"point": 1.5908434812668886,
+				"lo": 1.3946954510476708,
+				"hi": 1.8145774978962423,
 				"model_id": "steptime-phases@0.2.0"
 			},
-			"hit": false
+			"hit": true
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -147,41 +151,20 @@
 				"batch_size": 4,
 				"seq_len": 1024
 			},
-			"measured": 18645778432,
-			"predicted": {
-				"status": "extrapolated",
-				"point": 24699600896.0,
-				"lo": 22111507595.940918,
-				"hi": 27579978583.42418,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
-			},
-			"basis": "peak_less_eval_and_context",
 			"metric": "peak_memory",
-			"error": 0.3247,
-			"hit": false
-		},
-		{
-			"run": "a-smoke-l4-main-4",
-			"probe": "p1",
-			"gpu": "L4",
-			"knobs": {
-				"batch_size": 4,
-				"seq_len": 1024
-			},
 			"measured": 18645778432,
 			"predicted": {
-				"status": "extrapolated",
-				"point": 24699600896.0,
-				"lo": 22111507595.940918,
-				"hi": 27579978583.42418,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+				"status": "predicted",
+				"point": 32822931318.65878,
+				"lo": 30636277077.79039,
+				"hi": 35161659858.75423,
+				"model_id": "memory-analytical@0.3.1",
+				"reason": "band from held-out runs: L4, finetune (n = 19)"
 			},
 			"basis": "peak_less_eval_and_context",
-			"metric": "interval",
-			"of": "memory.peak",
-			"hit": false
+			"verdict": "sized_for_seq_len",
+			"longest_row": 517.0,
+			"seq_len": 1024.0
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -194,13 +177,14 @@
 			"metric": "step_time",
 			"measured": 0.8370115966796875,
 			"predicted": {
-				"status": "predicted",
-				"point": 1.666289105966178,
-				"lo": 1.4608387711219701,
-				"hi": 1.9006336904168488,
-				"model_id": "steptime-phases@0.2.0"
+				"status": "extrapolated",
+				"point": 1.0709744079952448,
+				"lo": 0.7954768447010258,
+				"hi": 1.441885065820931,
+				"model_id": "steptime-phases@0.2.0",
+				"reason": "below the smallest probed size (4722 work units), so the range is wider; run a probe here for a measured number"
 			},
-			"error": 0.9908,
+			"error": 0.2795,
 			"hit": false
 		},
 		{
@@ -215,13 +199,14 @@
 			"of": "time.step",
 			"measured": 0.8370115966796875,
 			"predicted": {
-				"status": "predicted",
-				"point": 1.666289105966178,
-				"lo": 1.4608387711219701,
-				"hi": 1.9006336904168488,
-				"model_id": "steptime-phases@0.2.0"
+				"status": "extrapolated",
+				"point": 1.0709744079952448,
+				"lo": 0.7954768447010258,
+				"hi": 1.441885065820931,
+				"model_id": "steptime-phases@0.2.0",
+				"reason": "below the smallest probed size (4722 work units), so the range is wider; run a probe here for a measured number"
 			},
-			"hit": false
+			"hit": true
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -231,41 +216,20 @@
 				"batch_size": 2,
 				"seq_len": 1024
 			},
-			"measured": 11569987584,
-			"predicted": {
-				"status": "extrapolated",
-				"point": 18608029696.0,
-				"lo": 16638074483.892578,
-				"hi": 20800460331.34445,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
-			},
-			"basis": "peak_less_eval_and_context",
 			"metric": "peak_memory",
-			"error": 0.6083,
-			"hit": false
-		},
-		{
-			"run": "a-smoke-l4-main-4",
-			"probe": "p2",
-			"gpu": "L4",
-			"knobs": {
-				"batch_size": 2,
-				"seq_len": 1024
-			},
 			"measured": 11569987584,
 			"predicted": {
-				"status": "extrapolated",
+				"status": "predicted",
 				"point": 18608029696.0,
-				"lo": 16638074483.892578,
-				"hi": 20800460331.34445,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+				"lo": 17345690169.6385,
+				"hi": 19958160604.862747,
+				"model_id": "memory-analytical@0.3.1",
+				"reason": "band from held-out runs: L4, finetune (n = 19)"
 			},
 			"basis": "peak_less_eval_and_context",
-			"metric": "interval",
-			"of": "memory.peak",
-			"hit": false
+			"verdict": "sized_for_seq_len",
+			"longest_row": 517.0,
+			"seq_len": 1024.0
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -279,13 +243,13 @@
 			"measured": 1.6661207275390626,
 			"predicted": {
 				"status": "predicted",
-				"point": 0.9871607558774371,
-				"lo": 0.8654456782754131,
-				"hi": 1.1259936728627349,
+				"point": 1.6046854788163358,
+				"lo": 1.4068307561502524,
+				"hi": 1.8303662147467268,
 				"model_id": "steptime-phases@0.2.0"
 			},
-			"error": 0.4075,
-			"hit": false
+			"error": 0.0369,
+			"hit": true
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -300,12 +264,12 @@
 			"measured": 1.6661207275390626,
 			"predicted": {
 				"status": "predicted",
-				"point": 0.9871607558774371,
-				"lo": 0.8654456782754131,
-				"hi": 1.1259936728627349,
+				"point": 1.6046854788163358,
+				"lo": 1.4068307561502524,
+				"hi": 1.8303662147467268,
 				"model_id": "steptime-phases@0.2.0"
 			},
-			"hit": false
+			"hit": true
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -317,17 +281,17 @@
 			},
 			"measured": 18608029696,
 			"predicted": {
-				"status": "extrapolated",
-				"point": 11569987584.0,
-				"lo": 10314212958.67366,
-				"hi": 12967582180.431633,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+				"status": "predicted",
+				"point": 18508915939.775627,
+				"lo": 17253021220.822586,
+				"hi": 19852153826.98919,
+				"model_id": "memory-analytical@0.3.1",
+				"reason": "band from held-out runs: L4, finetune (n = 19)"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "peak_memory",
-			"error": 0.3782,
-			"hit": false
+			"error": 0.0053,
+			"hit": true
 		},
 		{
 			"run": "a-smoke-l4-main-4",
@@ -339,17 +303,17 @@
 			},
 			"measured": 18608029696,
 			"predicted": {
-				"status": "extrapolated",
-				"point": 11569987584.0,
-				"lo": 10314212958.67366,
-				"hi": 12967582180.431633,
-				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
+				"status": "predicted",
+				"point": 18508915939.775627,
+				"lo": 17253021220.822586,
+				"hi": 19852153826.98919,
+				"model_id": "memory-analytical@0.3.1",
+				"reason": "band from held-out runs: L4, finetune (n = 19)"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "interval",
 			"of": "memory.peak",
-			"hit": false
+			"hit": true
 		}
 	],
 	"skipped": [

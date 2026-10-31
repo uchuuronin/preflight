@@ -777,5 +777,7 @@
 	"campaign.segments": "{n} jobs under the time limit",
 	"campaign.lane_empty": "No runs",
 	"campaign.unplaced": "Not scheduled ({n})",
-	"campaign.cut": "Cut to stay inside the budget"
+	"campaign.cut": "Cut to stay inside the budget",
+	"checks.sized_for_seq_len": "sized for seq_len; longest row not yet recorded (rows up to {longest} tokens, seq_len {seq}), not scored",
+	"checks.sized_for_seq_len_n": "{n} sized for seq_len, not scored"
 }

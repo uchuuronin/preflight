@@ -38,8 +38,9 @@ from preflight.engine import conformal
 from preflight.engine.api import (
 	_MATCH_IGNORES,
 	_probe_values,
-	predict,
-)  # the engine's own idea of "same point"
+	predict_as_run,
+	probe_ran_eval,
+)  # the engine's own idea of "same point", and its predictions as a probe ran
 from preflight.engine.memory import DEFAULT_CONTEXT_BYTES, FAILS_AT, FITS_BELOW
 from preflight.schema import load_record
 
@@ -85,44 +86,40 @@ def siblings(rec, probe, other) -> bool:
 
 
 def ran_without_eval(probe) -> bool:
-	"""One test of "no eval pass", shared with B's calibration: A's marker first (`extras.eval_off`,
-	1.0 for a re-run with eval off, 0.0 when eval ran), missing eval stats only when there is no
-	marker."""
-	marker = (probe.extras or {}).get("eval_off")
-	if marker is not None:
-		return bool(marker)
-	return probe.eval is None
+	"""B's one rule (engine.api.probe_ran_eval): A's `extras.eval_off` marker first, then whether the
+	probe recorded eval stats."""
+	return not probe_ran_eval(probe)
 
 
 def memory_target(probe, pred) -> tuple[dict | None, str]:
-	"""The prediction to score a probe's reserved peak against, and how it was formed.
-
-	The engine predicts reserved bytes plus its CUDA-context constant, so the constant comes off.
-	For a probe that ran no eval pass, the engine's eval term comes off too: the probe measured
-	training only. The engine publishes its terms rescaled so they add up to the peak (the
-	calibration offset spread across them), so the eval term is first put back on the unscaled
-	scale, using the context term (exactly DEFAULT_CONTEXT_BYTES before scaling) as the ruler.
-	What is left is the engine's own calibrated training-moment peak."""
+	"""The prediction to score a probe's reserved peak against, and how it was formed. `pred` is the
+	engine's prediction for the probe as it ran (engine.api.predict_as_run: no eval pass when the
+	probe ran none), so only the engine's CUDA-context constant comes off."""
 	peak = _est(pred.get("memory.peak"))
 	if not peak or peak["status"] == "abstain":
 		return peak, "abstained"
 	ctx = float(DEFAULT_CONTEXT_BYTES)
-	out = {k: peak[k] - ctx for k in ("point", "lo", "hi") if k in peak}
-	basis = "peak_less_context"
-	if ran_without_eval(probe):
-		spike = _est(pred.get("memory.eval_spike"))
-		context = _est(pred.get("memory.context"))
-		if spike and spike["status"] == "abstain":
-			return {**peak, "status": "abstain"}, "abstained"
-		if spike and (spike.get("point") or 0) > 0:
-			if not context or not context.get("point"):
-				return {**peak, "status": "abstain"}, "abstained"  # no ruler: can't undo the scaling
-			raw = spike["point"] * ctx / context["point"]
-			for k in out:
-				out[k] -= raw * (peak[k] / peak["point"])  # the peak's own band factor at each end
-			basis = "peak_less_eval_and_context"
-	m = {**peak, **out}
-	return m, basis
+	m = {**peak, **{k: peak[k] - ctx for k in ("point", "lo", "hi") if k in peak}}
+	return m, "peak_less_eval_and_context" if ran_without_eval(probe) else "peak_less_context"
+
+
+def longest_row(probe) -> float | None:
+	"""The longest padded row the probe processed (its step log), or None when it logged none."""
+	rows = [s.padded_len for s in (probe.step_log or []) if s.padded_len]
+	return float(max(rows)) if rows else None
+
+
+def sized_for_seq_len(probe) -> tuple[float, float] | None:
+	"""(longest row, seq_len) when the probe's rows were all shorter than its seq_len. The engine
+	sizes memory by seq_len on purpose (a full run meets the dataset's longest row, which a few
+	probe batches don't), so such a probe's measured peak is below what the engine should predict:
+	its memory check is labelled and kept out of the score until A records the longest row
+	(Chiya, Oct 30)."""
+	longest = longest_row(probe)
+	seq = (probe.knobs or {}).get("seq_len")
+	if longest is None or not isinstance(seq, (int, float)) or longest >= seq:
+		return None
+	return longest, float(seq)
 
 
 def _est(e) -> dict | None:
@@ -155,7 +152,7 @@ def check_record(name: str, raw: str) -> tuple[list[dict], list[dict]]:
 		if p.status not in OK and p.status != "oom":
 			continue
 		where = {"run": name, "probe": p.id, "gpu": gpu, "knobs": dict(p.knobs)}
-		pred = predict(held_out(rec, p), dict(p.knobs)).root
+		pred = predict_as_run(held_out(rec, p), p).root
 		if p.status == "oom":
 			e = _est(pred.get("risk.oom"))
 			if not e or e["status"] == "abstain":
@@ -208,7 +205,22 @@ def check_record(name: str, raw: str) -> tuple[list[dict], list[dict]]:
 				{**where, "metric": "step_time", "measured": measured, "predicted": e, "verdict": "abstained"}
 			)
 		reserved = p.memory.peak_reserved_bytes if p.memory else None
-		if reserved:
+		short = sized_for_seq_len(p) if reserved else None
+		if reserved and short:
+			m, basis = memory_target(p, pred)
+			checks.append(
+				{
+					**where,
+					"metric": "peak_memory",
+					"measured": reserved,
+					"predicted": m,
+					"basis": basis,
+					"verdict": "sized_for_seq_len",
+					"longest_row": short[0],
+					"seq_len": short[1],
+				}
+			)
+		elif reserved:
 			m, basis = memory_target(p, pred)
 			if m and m["status"] != "abstain":
 				err = abs(m["point"] - reserved) / reserved
@@ -254,6 +266,7 @@ def summarise(checks: list[dict]) -> dict:
 			"rate": round(k / n, 4) if n else None,
 			"wilson95": wilson(k, n),
 			"abstained": sum(1 for c in rows if c.get("verdict") == "abstained"),
+			"sized_for_seq_len": sum(1 for c in rows if c.get("verdict") == "sized_for_seq_len"),
 			"runs": len({c.get("run") for c in scored}),
 		}
 	return out

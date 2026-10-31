@@ -129,7 +129,7 @@ costing, the fix loop, then HOPs and the abstention button while the campaign pl
 | Engine | Step time within 15% | Peak memory within 10% | Inside 90% interval | OOM |
 | --- | --- | --- | --- | --- |
 | main 6c65ccd (round two) | 0 of 3 (0% to 56%) | 0 of 3: +32%, +61%, -38% | 0 of 6 (0% to 39%) | 1 of 1, none missed |
-| round three | re-run once merged | | | |
+| main 006bc57 (round three, `predict_as_run`) | 2 of 3 (21% to 94%): p1 5% low, p2 28% high, p3 4% low | 1 of 1 scored: p3 0.5% low; p1 and p2 sized for seq_len (rows up to 517 of 1024 tokens), not scored | 4 of 4 (51% to 100%) | 1 of 1, none missed |
 
 - Pushed b10be16 and a213c91 with Chiya's yes (Oct 30, 21:47).
 - API image ships `flags.production.json` (B's file, `engine.memory` on). On ws-c alone the file
