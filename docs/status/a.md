@@ -133,7 +133,7 @@ first minute); a version clash between the image's packages and the zoo's pins (
 `fsspec<=2024.9.0`). The planted eval OOM may not fire on 192 GB, or may fire later: the eval keeps
 every batch's graph, so its memory grows with the batch count; either way the record says which.
 
-## Every plan item A owns (Oct 31, 08:00 ET)
+## Every plan item A owns (Oct 31 morning ET; rows 7, 11–13 updated 07:55 ET)
 
 From the Contracts tab (Contract A, the gaps table, the Oct 27 review, the competitive review) and
 the main plan's feature set and validation targets. "main" = merged; "ws-a" = pushed to the
@@ -151,14 +151,14 @@ included. Hero lenses first.
 | 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | ws-a; running now (queued for an L4) | 1 |
 | **Agent and API runs (hero)** | | | |
 | 6 | OTel GenAI proxy around any OpenAI-compatible client (lens, contract) | ws-a (`recorder/agent.py`) | 0 |
-| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | not started | 6 |
+| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | local (`recorder/agent_sampler.py`, run mode on the proxy); pipeline and hosted path not started; the bound is B's `agent_totals` | 3 |
 | 8 | Rate-limit wall-clock (lens) | not started | 2 |
 | 9 | Pareto model sweep across Muse Spark and Spark Open (lens, contract) | not started | 4 |
 | 10 | Agent zoo script and an agent record on the public app (G1) | not started (D writes the script) | 2 |
 | **RL post-training (hero)** | | | |
-| 11 | GRPO zoo script, public model and data, 512-token completion cap planted (competitive #1) | not started | 3 |
-| 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | partial on main (rollout via the generate hooks only) | 5 |
-| 13 | Pass rate per prompt for B's zero-variance fraction (lens) | not started | 3 |
+| 11 | GRPO zoo script, public model and data, 512-token completion cap planted (competitive #1) | local (`zoo/grpo_trl`); review: at 512 the truncation rate may be only a few percent on Qwen2.5-0.5B, ground truth will say | 0.5 |
+| 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | local: rollout, reference (TRL 0.14 and later, with or without PEFT), reward, update; weight sync to vLLM not timed yet | 1 |
+| 13 | Pass rate per prompt for B's zero-variance fraction (lens) | local (`recorder/rl_groups.py`, `rl.pass_rate_per_prompt`, `rl.zero_spread_fraction`) | 0 |
 | 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals) | 2 |
 | **Campaign (hero; B owns the model)** | | | |
 | 15 | Probes for a grid's points (a campaign is many records from one script) | not started; needs B's campaign spec | 3 |
@@ -207,7 +207,7 @@ included. Hero lenses first.
 | 53 | Planted problems caught (bug zoo) | LoRA eval OOM caught; nanoGPT not yet on a GPU | 1 + paid run |
 | 54 | Cost of one Preflight run under $1 and under 5 minutes | $0.10 GPU, but 6 min 45 s on Oct 28: over 5 min | 3 |
 
-**Total left: about 138 hours of A's work (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
+**Total left: about 126 hours of A's work (was 138 in this morning's first version) (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
 order the PM set (hero lenses, then the rest) is the order I work in; Chiya's cuts at noon Sunday
 can read the hours column. Paid runs are asked for one at a time.
 
