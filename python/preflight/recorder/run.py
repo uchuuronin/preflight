@@ -9,6 +9,7 @@ import json
 import os
 import runpy
 import sys
+import time
 import traceback
 from pathlib import Path
 
@@ -127,7 +128,7 @@ def main(spec_path: str) -> int:
 		# torchrun (spec nproc > 1): every rank runs under its own recorder; rank 0 writes the
 		# result, progress and trace, the others a result of their own beside it (memory per rank)
 		out_path = f"{out_path}.rank{rank}"
-		spec = {**spec, "progress": None, "trace": None, "profile": False, "install_requirements": False}
+		spec = {**spec, "progress": None, "trace": None, "profile": False}
 	try:
 		import torch  # noqa: F401  (fails here, inside the try, when torch is missing)
 
@@ -152,7 +153,17 @@ def main(spec_path: str) -> int:
 
 		if spec.get("progress"):
 			_write(spec["progress"], {"stage": "installing requirements", "steps": 0})
-		err, dirs = install(Path(workdir), Path(spec["deps"]))
+		done = Path(spec["deps"]).with_name("deps.done.json")
+		if rank == 0:
+			err, dirs = install(Path(workdir), Path(spec["deps"]))
+			_write(str(done), {"error": err, "dirs": [str(d) for d in dirs]})
+		else:
+			# torchrun: rank 0 installs once into the shared prefix; the other ranks wait for it and
+			# put the same directories on their path (never a second pip into files rank 0 runs from)
+			while not done.exists():
+				time.sleep(0.5)
+			got = json.loads(done.read_text())
+			err, dirs = got.get("error"), [Path(d) for d in got.get("dirs", [])]
 		if err:
 			_write(out_path, {"status": "error", "error_code": "missing_package.install",
 				"error": f"requirements.txt didn't install: {err}", "summary": {}})  # fmt: skip
