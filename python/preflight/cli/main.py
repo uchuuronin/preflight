@@ -4,6 +4,7 @@
 	preflight run train.py -- --batch_size 16   # probes on this machine's GPU (or CPU)
 	preflight run path/to/project --entrypoint train.py --out records/
 	OPENAI_API_KEY=... preflight run agent_eval.py --agent-max-usd 5   # 30 of its tasks, your key
+	preflight watch records/<share>.json train.py -- --epochs 3   # the real run, against its bands
 
 `run` uses the same pipeline as the hosted app, with probes on the local device
 and no GPU bill; the record lands in --out as <share_token>.json.
@@ -59,9 +60,25 @@ def main(argv: list[str] | None = None) -> int:
 		"spending at most this many dollars of it",
 	)
 	r.epilog = "Arguments for the script go after --, e.g. preflight run train.py -- --batch_size 16"
+	w = sub.add_parser(
+		"watch", help="run the script for real, streaming a live record against its predictions"
+	)
+	w.add_argument("record", type=Path, help="the flight record whose predictions the run is checked against")
+	w.add_argument("path", type=Path, help="the script to run")
+	w.add_argument("--out", type=Path, default=Path("records"))
+	w.add_argument(
+		"--total-steps", type=int, help="optimizer steps in the whole run, for the time.total check"
+	)
+	w.add_argument("--window", type=int, help="steps per update (default 20)")
 	argv = list(sys.argv[1:] if argv is None else argv)
 	script_args = argv[argv.index("--") + 1 :] if "--" in argv else []
 	ns = ap.parse_args(argv[: argv.index("--")] if "--" in argv else argv)
+	if ns.cmd == "watch":
+		from preflight.recorder import inflight
+
+		extra = [*(["--total-steps", str(ns.total_steps)] if ns.total_steps else []),
+			*(["--window", str(ns.window)] if ns.window else [])]  # fmt: skip
+		return inflight.main([str(ns.record), str(ns.out), str(ns.path), *extra, "--", *script_args])
 	try:
 		files, entry = _files(ns.path, ns.entrypoint)
 		if ns.cmd == "map":

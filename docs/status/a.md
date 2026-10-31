@@ -148,16 +148,16 @@ included. Hero lenses first.
 | 2 | Packing and padding-waste measurement (lens, contract) | main (`padding_fraction`, `tokens_per_sample_mean`) | 0 |
 | 3 | Longest dataset row for B's memory rule (B, Oct 30) | ws-a | 0 |
 | 4 | FakeTensor cross-check of the analytical memory terms (contract) | not started | 3 |
-| 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | ws-a; running now (queued for an L4) | 1 |
+| 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | bare run measured Oct 31; recorder half failed on a cache permission (fixed locally); rerun with 210 steps needs a yes | 0.5 + paid run |
 | **Agent and API runs (hero)** | | | |
 | 6 | OTel GenAI proxy around any OpenAI-compatible client (lens, contract) | ws-a (`recorder/agent.py`) | 0 |
-| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | local (`recorder/agent_sampler.py`, run mode on the proxy); pipeline and hosted path not started; the bound is B's `agent_totals` | 3 |
+| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | local: proxy run mode, pipeline, `sample_more`, CLI (`--agent-max-usd`); hosted path not started; the bound is B's `agent_totals` | 2 |
 | 8 | Rate-limit wall-clock (lens) | not started | 2 |
 | 9 | Pareto model sweep across Muse Spark and Spark Open (lens, contract) | not started | 4 |
 | 10 | Agent zoo script and an agent record on the public app (G1) | not started (D writes the script) | 2 |
 | **RL post-training (hero)** | | | |
 | 11 | GRPO zoo script, public model and data, 512-token completion cap planted (competitive #1) | local (`zoo/grpo_trl`); review: at 512 the truncation rate may be only a few percent on Qwen2.5-0.5B, ground truth will say | 0.5 |
-| 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | local: rollout, reference (TRL 0.14 and later, with or without PEFT), reward, update; weight sync to vLLM not timed yet | 1 |
+| 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | local: all five; weight sync misses the ZeRO-3 gather and vLLM V1 (V0 engine path only) | 0.5 |
 | 13 | Pass rate per prompt for B's zero-variance fraction (lens) | local (`recorder/rl_groups.py`, `rl.pass_rate_per_prompt`, `rl.zero_spread_fraction`) | 0 |
 | 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals) | 2 |
 | **Campaign (hero; B owns the model)** | | | |
@@ -174,7 +174,7 @@ included. Hero lenses first.
 | 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
 | 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | not started | 3 |
 | 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
-| 27 | In-flight collector (feature, contract) | not started | 5 |
+| 27 | In-flight collector (feature, contract) | local (`recorder/inflight.py`, `preflight watch`); getting the live record to the guide waits on C | 1 |
 | 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | partial | 4 |
 | **Muse Spark** | | | |
 | 29 | Spark Open triage of every probe log on Baseten, every call logged (contract) | client on main, triage not wired | 3 |
