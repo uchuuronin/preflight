@@ -175,3 +175,11 @@ def test_lens_limits_parse_and_refuse_nonsense():
 	assert parse_lenses("") == {}
 	with pytest.raises(SystemExit):
 		parse_lenses("time.step=")
+
+
+def test_a_score_without_a_lens_counts_once_in_the_pooled_cell():
+	from preflight.engine import conformal as cf
+
+	ss = [cf.Score("time.step.cross", "L4", "", f"g{i}", 1.0, 1.0 + i / 100) for i in range(20)]
+	t = cf.calibrate(ss)
+	assert t.cells[("time.step.cross", "", "")].n == 20

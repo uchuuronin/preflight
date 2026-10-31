@@ -224,3 +224,12 @@ Those Wilson intervals treat the 2,286 pairs as independent. They aren't: they c
 The GNN alone doesn't beat the GBDT. The plan's validation row is "GNN + GBDT ensemble vs GBDT alone", though, and the ensemble does beat the GBDT, by 58 rows. These Wilson intervals treat rows as independent and they overlap, so the difference needs an architecture-clustered check before the ensemble is used.
 
 Either way, a no-probe cost model is a prior, not a prediction. At 41–46% within 20%, it is well behind K1 with a probe (60%) and the same-GPU line (80%).
+
+**Installed (Chiya, Oct 31): the cross-GPU band, `time.step.cross`.** `calibrate --cross` builds it from the 2,286 corpus pairs, and the engine uses it in K1's replay. K1's band is never narrower than this: pooled half-width 0.448 (2,286 pairs, 95 architectures), with per-GPU cells for the four corpus GPUs. The card reports leave-one-GPU-out coverage, 2,130 of 2,286.
+
+**Consequence for the GPU dial: every GPU move now abstains.** The plan abstains when a band is wider than ±50%. K1's honest band is ±45% before the probe's own error is added, and ±50% after. So moving to another GPU now says "run a probe here" instead of showing a range. That is the truth about the corpus, but it changes what visitors see. Chiya's options:
+- keep it;
+- show cross-GPU time as a wide range labelled "rough, no probe on this GPU", past the ±50% rule;
+- or wait for a better replay. The corpus fed K1 aten-op tables, while users' probes carry kernel tables, so the AMD rows and the Nov 2 scripts may tell a different story.
+
+The flag `engine.steptime_cross_gpu` stays off either way.

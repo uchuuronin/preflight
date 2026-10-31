@@ -187,9 +187,9 @@ def calibrate(scores: Iterable[Score], level: float = LEVEL, built_from: str = "
 	"""A table from held-out scores: every cell with at least MIN_CELL runs at each level of detail."""
 	by: dict[tuple[str, ...], list[Score]] = defaultdict(list)
 	for s in scores:
-		by[(s.target, s.gpu, s.lens)].append(s)
-		by[(s.target, "", s.lens)].append(s)
-		by[(s.target, "", "")].append(s)
+		# a score with no lens (the cross-GPU band) would land in the same pooled cell twice
+		for key in dict.fromkeys(((s.target, s.gpu, s.lens), (s.target, "", s.lens), (s.target, "", ""))):
+			by[key].append(s)
 	cells = {}
 	for key, rows in by.items():
 		h = conformal_half_width([r.value for r in rows], level) if len(rows) >= MIN_CELL else None

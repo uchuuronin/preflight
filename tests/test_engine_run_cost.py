@@ -136,7 +136,18 @@ def test_unknown_provider_uses_the_cheapest_listed_rate_and_says_so(ft):
 	assert "no somecloud rate for L4" in jc.lines[0].usd.reason
 
 
-def test_unpriced_gpu_abstains_with_the_reason(ft):
+@pytest.fixture
+def no_cross_band(monkeypatch):
+	"""K1 alone: the held-out cross-GPU band makes every GPU move abstain (test_engine_api)."""
+	from dataclasses import replace as dc_replace
+
+	from preflight.engine import conformal
+
+	cells = {k: c for k, c in conformal.TABLE.cells.items() if k[0] != "time.step.cross"}
+	monkeypatch.setattr(conformal, "TABLE", dc_replace(conformal.TABLE, cells=cells))
+
+
+def test_unpriced_gpu_abstains_with_the_reason(ft, no_cross_band):
 	_, jc = api.run_cost(ft, {"gpu_type": "V100-SXM2-32GB"})
 	assert jc.total_usd.status == "abstain"
 	assert jc.at_risk_usd.status == "abstain"

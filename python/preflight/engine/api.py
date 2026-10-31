@@ -890,9 +890,16 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			cross = steptime.predict_cross_gpu_from_probe(
 				current_probe.kernels, current_probe.step_time.p50_s, src_gpu, tgt_gpu
 			)
+		xcell = conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
 		if cross is not None and cross.status != "abstain":
 			ratio = cross.point / current_probe.step_time.p50_s
-			sigma = math.hypot(sigma, cross.sigma_log)
+			# Chiya, Oct 31: K1's band from held-out corpus pairs, never narrower than the simulated one
+			cross_sigma = max(cross.sigma_log, xcell.half_width / steptime.Z90) if xcell else cross.sigma_log
+			sigma = math.hypot(sigma, cross_sigma)
+			if xcell:
+				reasons.append(
+					f"cross-GPU band from {xcell.n} held-out corpus pairs ({xcell.groups} architectures)"
+				)
 			if cross.reason:
 				reasons.append(cross.reason)
 		else:
@@ -2414,17 +2421,21 @@ CALIBRATION = "simulated"  # Review, Oct 27: until real held-out runs replace th
 _CARD_TARGET = {
 	memory.MODEL_ID: "memory.peak",
 	steptime.MODEL_ID_SAME: "time.step",
-	steptime.MODEL_ID_CROSS: "time.step",
+	steptime.MODEL_ID_CROSS: "time.step.cross",
 }
 
 
-# the models whose own predictions the corpus scores; the cross-GPU model's band starts from the same-GPU cell,
-# but no cross-GPU prediction has been scored yet, so its card carries no coverage
-_CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME})
+# the models whose own predictions the corpus scores: memory and same-GPU step time leave-one-architecture-out, the
+# cross-GPU replay leave-one-GPU-out (Chiya, Oct 31: installed)
+_CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME, steptime.MODEL_ID_CROSS})
 
 # Chiya, Oct 31: what a held-out band does and doesn't cover yet, said on the card itself
 _CARD_CAVEAT = {
 	steptime.MODEL_ID_SAME: "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2.",
+	steptime.MODEL_ID_CROSS: (
+		"Band from corpus pairs, scored on GPUs left out; calibrated on corpus models' op tables, not users' "
+		"kernel tables; checked on the AMD rows and unseen scripts Nov 2."
+	),
 }
 
 

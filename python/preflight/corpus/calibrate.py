@@ -367,6 +367,11 @@ def main(argv: list[str] | None = None) -> int:
 		help="targets whose cells go into the table; the others keep their simulated bands and say so",
 	)
 	ap.add_argument(
+		"--cross",
+		action="store_true",
+		help="also build the cross-GPU band (time.step.cross) from configs two GPUs both ran",
+	)
+	ap.add_argument(
 		"--lenses",
 		default="",
 		help="'target=lens+lens;...': for these targets, only these lenses get cells, and there is no pooled "
@@ -388,6 +393,12 @@ def main(argv: list[str] | None = None) -> int:
 	if not scores:
 		print("no grouped rows with probes and queries; nothing to calibrate")
 		return 1
+	cross_cases = []
+	if args.cross:
+		from preflight.corpus import crossgpu
+
+		cross_cases = crossgpu.cases(rows)  # held-out boards never enter (calibrate.held_out)
+		scores = scores + crossgpu.scores(cross_cases)
 	table, report = build(
 		scores,
 		holdout,
@@ -402,6 +413,17 @@ def main(argv: list[str] | None = None) -> int:
 	middle = oom.middle_verified(oom.reliability(pairs, edges=oom.SHOWN_EDGES))
 	print(f"  shown as a number between 5% and 95%: {middle} (each middle bin needs {oom.MIN_SHOWN} points)")
 	keep = {t.strip() for t in args.targets.split(",") if t.strip()}
+	if cross_cases:
+		from preflight.corpus import crossgpu
+
+		keep.add(crossgpu.TARGET)
+		h, n = crossgpu.gpu_out_coverage(cross_cases)
+		lo, hi = conformal.wilson(h, n)
+		print(
+			f"{crossgpu.TARGET}: leave-one-GPU-out coverage {h} of {n} ({h / n:.1%}, Wilson 95% {lo:.1%} to {hi:.1%}; "
+			"pairs share architectures, so the honest interval is wider: see the decision doc)"
+		)
+		table = replace(table, coverage={**table.coverage, crossgpu.TARGET: (h, n)})
 	table = replace(
 		table,
 		oom_reliable=ok,
@@ -412,6 +434,11 @@ def main(argv: list[str] | None = None) -> int:
 		cells={k: c for k, c in table.cells.items() if k[0] in keep and not (k[0] in only and not k[2])},
 		coverage={t: v for t, v in table.coverage.items() if t in keep},
 		holdout={t: v for t, v in table.holdout.items() if t in keep},
+	)
+	# only memory's residuals are read (P(OOM)); the rest would only bloat the module the browser loads
+	table = replace(
+		table,
+		cells={k: (c if k[0] == "memory.peak" else replace(c, residuals=())) for k, c in table.cells.items()},
 	)
 	# the table's version is a hash of its bands, so a record can tell when the bands behind its numbers changed
 	import hashlib

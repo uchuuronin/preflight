@@ -67,7 +67,18 @@ def test_predict_is_pure_and_fast(ft):
 	assert ft.model_dump_json() == before
 
 
-def test_unknown_knobs_are_refused_but_gpu_what_ifs_are_not(ft):
+@pytest.fixture
+def no_cross_band(monkeypatch):
+	"""K1's own behaviour, without the held-out cross-GPU band, whose ±45% width makes every GPU move abstain."""
+	from dataclasses import replace as dc_replace
+
+	from preflight.engine import conformal
+
+	cells = {k: c for k, c in conformal.TABLE.cells.items() if k[0] != "time.step.cross"}
+	monkeypatch.setattr(conformal, "TABLE", dc_replace(conformal.TABLE, cells=cells))
+
+
+def test_unknown_knobs_are_refused_but_gpu_what_ifs_are_not(ft, no_cross_band):
 	with pytest.raises(ValueError, match="unknown knob"):
 		api.predict(ft, {"not_a_knob": 3})
 	assert api.predict(ft, {"gpu_type": "H100-SXM-80GB"}).root["time.step"].status == "predicted"
@@ -101,7 +112,7 @@ def test_precision_change_scales_time_with_tf32_in_mind(pt):
 	assert bf16["memory.peak"].status == "abstain"  # no model shape: the probes' line can't follow precision
 
 
-def test_other_gpus(ft):
+def test_other_gpus(ft, no_cross_band):
 	l4 = api.predict(ft).root["time.step"]
 	h100 = api.predict(ft, {"gpu_type": "H100-SXM-80GB"}).root["time.step"]
 	mi = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
@@ -370,7 +381,7 @@ def test_memory_terms_add_up_to_the_peak_with_eval_as_its_own_wedge(ft):
 	assert calm["memory.eval_spike"].point == 0
 
 
-def test_phase_times_add_up_to_the_step(ft):
+def test_phase_times_add_up_to_the_step(ft, no_cross_band):
 	p = api.predict(ft).root
 	phases = {k: v for k, v in p.items() if k.startswith("time.phase.")}
 	assert {"time.phase.forward", "time.phase.backward"} <= set(phases)
@@ -576,3 +587,23 @@ def test_one_threads_quiet_grid_doesnt_silence_another():
 		t.join()
 		assert api._QUIET.get() is True
 	assert seen == [False] and api._QUIET.get() is False
+
+
+def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft):
+	from preflight.engine import conformal, steptime
+
+	cell = conformal.TABLE.lookup("time.step.cross", "A100-SXM-80GB", None)
+	assert cell is not None and cell.key == ("time.step.cross", "", "")
+	moved = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	assert "held-out corpus pairs" in moved.reason  # with this band the move abstains (the test below)
+	(card,) = api._cards({steptime.MODEL_ID_CROSS}, ft)
+	assert card.notes.startswith("calibration: held_out") and card.coverage == pytest.approx(
+		2130 / 2286, abs=0.02
+	)
+
+
+def test_with_the_held_out_band_a_gpu_move_says_run_a_probe_there(ft):
+	# Chiya, Oct 31: the honest cross-GPU band is about +-45%, past the +-50% abstention once the probe's own error
+	# is added, so moving the GPU dial asks for a probe on that GPU instead of showing a range
+	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	assert e.status == "abstain" and "run a probe here" in e.reason and "held-out corpus pairs" in e.reason
