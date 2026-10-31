@@ -1,0 +1,98 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-A6jvp4QRnJxb1Av3D5MIPY
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[A10] wave 0: $0.06 of $0.70 spent (container time, worst case for unsettled waves), 4 done, 46 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 0 took 23 s on 1 containers: 53 container-s ($0.02, worst case was $0.38) for 1 configs
+[A10] batch: 18.0 s in the container, reload 0.2 s, commits 2.2 s
+[A10] config 958e1415062b hf_lora query ok: 15.6 s
+[A10] wave 1: $0.08 of $0.70 spent (container time, worst case for unsettled waves), 5 done, 45 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 1 took 15 s on 1 containers: 45 container-s ($0.02, worst case was $0.38) for 1 configs
+[A10] batch: 14.9 s in the container, reload 0.5 s, commits 1.6 s
+[A10] config ecd7cfed33ca hf_lora probe ok: 12.8 s
+[A10] wave 2: $0.09 of $0.70 spent (container time, worst case for unsettled waves), 6 done, 44 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 2 took 13 s on 1 containers: 43 container-s ($0.01, worst case was $0.38) for 1 configs
+[A10] batch: 12.7 s in the container, reload 0.3 s, commits 1.6 s
+[A10] config 437607691d36 hf_lora probe ok: 10.9 s
+[A10] wave 3: $0.11 of $0.70 spent (container time, worst case for unsettled waves), 7 done, 43 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 3 took 13 s on 1 containers: 43 container-s ($0.01, worst case was $0.38) for 1 configs
+[A10] batch: 13.0 s in the container, reload 0.4 s, commits 2.0 s
+[A10] config 9465fa18697f hf_lora probe ok: 10.6 s
+[A10] wave 4: $0.12 of $0.70 spent (container time, worst case for unsettled waves), 8 done, 42 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 4 took 20 s on 1 containers: 50 container-s ($0.02, worst case was $0.38) for 1 configs
+[A10] batch: 19.6 s in the container, reload 0.6 s, commits 2.2 s
+[A10] config cb9378f6bc42 hf_lora query ok: 16.8 s
+[A10] wave 5: $0.14 of $0.70 spent (container time, worst case for unsettled waves), 9 done, 41 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 5 took 12 s on 1 containers: 42 container-s ($0.01, worst case was $0.38) for 1 configs
+[A10] batch: 11.8 s in the container, reload 0.3 s, commits 1.4 s
+[A10] config 527de38179ec hf_lora query ok: 10.0 s
+[A10] wave 6: $0.15 of $0.70 spent (container time, worst case for unsettled waves), 10 done, 40 to do, deadline 120 s, next wave 1 x 8
+[A10] wave 6 took 131 s on 1 containers: 161 container-s ($0.05, worst case was $0.47) for 8 configs
+[A10] batch: 124.9 s in the container, reload 0.1 s, commits 1.9 s
+[A10] config c580abd77747 hf_lora probe ok: 20.6 s
+[A10] config c0cb5a5f4a7f hf_lora probe ok: 14.3 s
+[A10] config 19c618c195ea hf_lora probe ok: 13.5 s
+[A10] config 05a6c864eacd hf_lora query ok: 16.2 s
+[A10] config ccf1a603ab18 hf_lora query ok: 13.1 s
+[A10] config 996ae225a3a6 hf_lora probe ok: 16.0 s
+[A10] config 748a17c150c0 hf_lora probe ok: 14.4 s
+[A10] config 285dce6b95e7 hf_lora probe ok: 14.7 s
+[A10] wave 7: $0.21 of $0.70 spent (container time, worst case for unsettled waves), 18 done, 32 to do, deadline 120 s, next wave 1 x 8
+Container terminated due to preemption. Your Function will be restarted with the same input. For more details, see https://modal.com/docs/guide/preemption
+[A10] wave 7 took 141 s on 1 containers: 171 container-s ($0.06, worst case was $0.47) for 4 configs
+[A10] batch: 59.2 s in the container, reload 0.1 s, commits 1.4 s
+[A10] config ba393c836b31 hf_lora probe ok: 18.7 s
+[A10] config 07adc2ca8407 hf_lora query ok: 14.1 s
+[A10] config 4cb9853039c9 hf_lora query ok: 9.3 s
+[A10] config 40465d6f206b hf_lora probe ok: 14.5 s
+[A10] wave 8: $0.26 of $0.70 spent (container time, worst case for unsettled waves), 26 done, 24 to do, deadline 120 s, next wave 1 x 7
+[A10] wave 8 took 123 s on 1 containers: 153 container-s ($0.05, worst case was $0.42) for 7 configs
+[A10] batch: 117.7 s in the container, reload 0.2 s, commits 3.7 s
+[A10] config bca4bbf3398d hf_lora probe ok: 24.2 s
+[A10] config 7dbc52f0d0a3 hf_lora probe ok: 11.6 s
+[A10] config 7165975ca38f hf_lora query ok: 20.6 s
+[A10] config 1701cde694b1 hf_lora query ok: 10.3 s
+[A10] config 8f56c6a97935 hf_lora probe ok: 25.1 s
+[A10] config ad6ec10eadff hf_lora probe ok: 11.0 s
+[A10] config 8f8fae9dac0c hf_lora probe ok: 10.9 s
+[A10] wave 9: $0.32 of $0.70 spent (container time, worst case for unsettled waves), 33 done, 17 to do, deadline 120 s, next wave 1 x 6
+[A10] wave 9 took 110 s on 1 containers: 140 container-s ($0.05, worst case was $0.37) for 6 configs
+[A10] batch: 104.7 s in the container, reload 0.2 s, commits 3.2 s
+[A10] config d97f3293e9e7 hf_lora query oom: 24.7 s
+[A10] config f256fc12d994 hf_lora query ok: 10.2 s
+[A10] config bb713f749faa hf_lora probe ok: 16.9 s
+[A10] config 8a3706c48b1a hf_lora probe ok: 12.8 s
+[A10] config 252a1c802894 hf_lora probe ok: 12.5 s
+[A10] config 59d3c8437f1a hf_lora query ok: 24.2 s
+[A10] wave 10: $0.36 of $0.70 spent (container time, worst case for unsettled waves), 39 done, 11 to do, deadline 120 s, next wave 1 x 5
+[A10] wave 10 took 95 s on 1 containers: 125 container-s ($0.04, worst case was $0.32) for 5 configs
+[A10] batch: 90.3 s in the container, reload 0.2 s, commits 3.4 s
+[A10] config 9fb2857c562d hf_lora query ok: 23.3 s
+[A10] config cc6b2b7685c8 hf_lora probe ok: 25.5 s
+[A10] config 0757027485f1 hf_lora probe ok: 10.8 s
+[A10] config eb631effd078 hf_lora probe ok: 10.6 s
+[A10] config 2dc794999375 hf_lora query ok: 16.4 s
+[A10] wave 11: $0.40 of $0.70 spent (container time, worst case for unsettled waves), 44 done, 6 to do, deadline 120 s, next wave 1 x 4
+[A10] wave 11 took 74 s on 1 containers: 104 container-s ($0.03, worst case was $0.27) for 4 configs
+[A10] batch: 68.9 s in the container, reload 0.4 s, commits 1.4 s
+[A10] config b598d0d12b34 hf_lora query ok: 25.4 s
+[A10] config 5e633c4dbb3e hf_lora probe ok: 16.2 s
+[A10] config df3a55446cd2 hf_lora probe ok: 12.7 s
+[A10] config d5352906504b hf_lora probe ok: 12.7 s
+[A10] wave 12: $0.44 of $0.70 spent (container time, worst case for unsettled waves), 48 done, 2 to do, deadline 120 s, next wave 1 x 2
+[A10] wave 12 took 54 s on 1 containers: 84 container-s ($0.03, worst case was $0.17) for 2 configs
+[A10] batch: 48.9 s in the container, reload 0.2 s, commits 1.7 s
+[A10] config cc85a992f83c hf_lora query ok: 35.8 s
+[A10] config c1bae8f2790b hf_lora query ok: 11.2 s
+[A10] wave 13: $0.47 of $0.70 spent (container time, worst case for unsettled waves), 50 done, 0 to do, deadline 120 s, next wave 0 x 0
+[A10] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-A6jvp4QRnJxb1Av3D5MIPY
