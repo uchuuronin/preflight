@@ -125,7 +125,10 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Oct 30 | `b-corpus-a10-hf` (GitHub run 41163888314): 4 HF jobs ok, then it stopped itself because one more worst-case wave wouldn't fit its 20 minutes (nothing measured yet, so the 900 s deadline); rerun queued | A10 | 178 container-s | $0.05 |
 | Oct 30 | `b-corpus-t4` (GitHub run 41164044206): 75 fp32 and fp16 configs (71 ok, 4 out of memory), 8 waves | T4 | 3,528 container-s | $0.65 |
 | Oct 30 | `b-corpus-l40s` (GitHub run 41165087592): 195 configs (194 ok, 1 out of memory), 10 waves | L40S | 2,986 container-s | $1.78 |
+| Oct 30 | `b-corpus-a10-hf-2` (GitHub run 41166235925): the other 46 A10 HF jobs, 13 waves, all 50 done (49 ok, 1 out of memory) | A10 | 16 min wall, 1,214 container-s | $0.41 (container-time bound; $0.47 with the first run) |
 | Oct 30 | `b-corpus-a100` (GitHub run 41165933860): **no configs**. The containers' ~150 s cold start ate a 60 s margin in the start check, so each quit before its only config; the no-progress guard stopped the run. Fixed in `a330f9b` | A100-80GB x 3 | 576 container-s | $0.44 |
+| Oct 31 | `b-corpus-a100-2` (GitHub run 41191432272, cap $2.50 total): 2 configs ok, on an **A100-PCIe-80GB**. Modal's A100-80GB landed on the PCIe board, the rows were filed under it, and the no-progress guard stopped the run. Fixed in `20e0372` (sibling boards count as done) | A100-80GB x 1 | 63 container-s | $0.05 ($0.49 of the $2.50 with the first run) |
+| Oct 31 | `b-corpus-export-2` and `b-corpus-export-hf-2` (GitHub runs 41191537650, 41191862052): every kernels and HF row back | CPU | about 7 min wall | about $0.02 |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 

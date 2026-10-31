@@ -1803,6 +1803,11 @@ def _noise(pred: Prediction, tid: str) -> float:
 	return (e.hi - e.lo) / (2 * abs(e.point))
 
 
+# derived: P(OOM) from a cell of n runs sits at (over + 0.5) / (n + 1) (engine/oom.py), so the smallest cell
+# (conformal.MIN_CELL runs) can't place it closer than 0.5 / (n + 1) = 0.05 to 0 or 1
+PROB_STEP = 0.5 / (conformal.MIN_CELL + 1)
+
+
 def sensitivity(
 	record: FlightRecord,
 	objective: Objective,
@@ -1844,7 +1849,9 @@ def sensitivity(
 		ys = [y for _, y, _ in scored]
 		spread = max(ys) - min(ys)
 		ref = abs(base) if base else max(abs(y) for y in ys) or 1.0
-		impact = min(1.0, spread) if prob else min(1.0, spread / ref)
+		# a probability is ranked at the resolution the smallest cell gives it, so a lever doesn't outrank another
+		# only because its range reached a cell with more runs and a lower floor
+		impact = min(1.0, round(spread / PROB_STEP) * PROB_STEP) if prob else min(1.0, spread / ref)
 		if impact <= noise or impact == 0:
 			continue
 		best_v, _, best_peak = min(scored, key=lambda s: (s[1], s[2]))

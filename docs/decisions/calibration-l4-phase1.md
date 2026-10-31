@@ -96,3 +96,48 @@ The fix is a step-time model with a floor below the probes and proportional grow
 | Held out, grouped corpus on L4, below | 57 of 82 (59% to 78%) | 18 of 82 (14% to 32%) |
 
 It fits the jobs it was tuned on and is worse everywhere else, so it stays off and the line remains the model. Whether the HF pattern holds on other HF jobs is the A10 HF test, which needs those rows exported. The HF step-time band stays uninstalled meanwhile.
+
+## Phase 2 rows in (Oct 31): four GPUs, memory reinstalled, A100 holdout still to run
+
+Rows: `remote-runs` exports `b-corpus-export-2` and `b-corpus-export-hf-2`. Grouped: L4 577, A10 577, L40S 195, T4 75. HF: 50 each on L4 and A10. The 214 synthetic LoRA scores stay out of the table, as before. That leaves 487 scores per target. The two A100 rows are withheld from everything.
+
+**Memory, installed** (`engine/_calibration_table.py`, 17 cells). Leave-one-architecture-out coverage is 439 of 487 (90.1%, Wilson 95% 87.2% to 92.5%), median half-width 0.134 (measured):
+
+| Lens | Inside | Median half-width |
+| --- | --- | --- |
+| finetune (real HF) | 36 of 38 | 0.084 |
+| pretrain | 105 of 117 | 0.134 |
+| retrieval | 105 of 115 | 0.148 |
+| vision | 193 of 217 | 0.127 |
+
+L4 and A10 now have their own cells for every lens. L40S has its own for pretrain, retrieval and vision. T4's cells are under 9 points, so T4 uses the pooled cells.
+
+**Step time, not installed: a decision for Chiya.** Coverage is also 439 of 487 (the same count by coincidence; the per-lens counts differ). The bands are wider: median half-width 0.236. By lens:
+
+| Lens | Inside | Median half-width |
+| --- | --- | --- |
+| finetune (real HF) | 35 of 38 | 0.558 |
+| pretrain | 106 of 117 | 0.267 |
+| retrieval | 106 of 115 | 0.210 |
+| vision | 192 of 217 | 0.172 |
+
+The HF finetune band stays off, per the earlier decision. The other three are honest at 90%, but a ±0.17 to ±0.27 log band means roughly ×0.8 to ×1.3.
+
+**P(OOM) now passes the reliability rule** (at least 2 bins with at least 10 points, and at least 10 real OOMs: there are 29). By bin:
+
+| Bin | Points | Predicted | Observed (Wilson 95%) |
+| --- | --- | --- | --- |
+| [0, 0.05) | 587 | 0.01 | 0.00 (0.00 to 0.01) |
+| [0.70, 1] | 14 | 0.97 | 0.93 (0.69 to 0.99) |
+| [0.05, 0.30) | 5 | | too few to draw |
+| [0.30, 0.70) | 6 | | too few to draw |
+
+So the table sets `oom_reliable`. The middle bins are still thin: the probability is checked only near 0 and near 1.
+
+**A100 holdout: not scored.** The rerun asked Modal for an A100-80GB and got an A100-PCIe-80GB. Its rows were filed under the board it ran on, so the sweep's ledger saw no progress and stopped after 2 configs, as its guard should (measured). Two fixes:
+- The ledger now counts rows on a sibling board as done (`sweep.LANDS_ON`).
+- The calibrator holds out both 80 GB boards by default, so a PCIe row can never reach calibration.
+
+Two rows are not a test, and the holdout is scored once, so it waits for the rerun.
+
+**Sensitivity tie.** With an A10 finetune cell, a bigger GPU now reaches the pooled cell, which has 38 runs. Its P(OOM) floor is 0.013, against 0.025 for 19 runs, so `gpu_type` outranked `eval_batch_size` for "make it fit" on resolution alone. Probability impacts are now ranked in steps of 0.05, the floor of the smallest allowed cell (derived: 0.5 / (9 + 1)). At that resolution the two tie, and the cheaper lever leads.

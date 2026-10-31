@@ -207,6 +207,9 @@ def test_sensitivity_ranks_levers_not_the_workload(pt, ft):
 	assert "check quality" in cost["seq_len"].reason
 	mem = api.sensitivity(ft, Objective(kind="fit_memory"))
 	assert mem[0].knob_id == "eval_batch_size" and mem[0].best_value == 1
+	# a bigger GPU reaches the pooled cell's lower floor; at the shown resolution it ties, and the cheaper lever leads
+	gpu = next(r for r in mem if r.knob_id == "gpu_type")
+	assert gpu.impact == pytest.approx(mem[0].impact)
 
 
 # ---------------------------------------------------------------- the predictions block
