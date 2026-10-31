@@ -207,18 +207,24 @@ def test_only_generation_endpoints_of_opened_tasks_are_forwarded(setup, path):
 
 def test_parallel_calls_cant_spend_past_the_cap(setup):
 	prov, _proxy = setup
-	rate = token_rate("muse-spark-1.3")
-	one = rate.usd(100, 50)  # what the reservation allows for, for one call (max_tokens 50)
+	proxy = AgentProxy(prov.url, "k", rate=token_rate)
+	body = {
+		"model": "muse-spark-1.3",
+		"max_tokens": 50,
+		"messages": [{"role": "user", "content": "x"}],
+		"n_": 10,
+	}
+	one = proxy._worst_case_usd(body, json.dumps(body).encode())  # one call's reservation
+	proxy.stop()
 	proxy = AgentProxy(prov.url, "k", rate=token_rate, max_usd_per_task=one * 3.5)
 	proxy.start()
 	try:
 		from concurrent.futures import ThreadPoolExecutor
 
 		url = proxy.open_task("par")
-		body = {"model": "muse-spark-1.3", "max_tokens": 50, "messages": [{"role": "user", "content": "x"}]}
 
 		def go(i):
-			return httpx.post(f"{url}/chat/completions", json={**body, "n_": i}, timeout=10).status_code
+			return httpx.post(f"{url}/chat/completions", json={**body, "n_": 10 + i}, timeout=10).status_code
 
 		with ThreadPoolExecutor(20) as pool:
 			codes = list(pool.map(go, range(20)))
@@ -305,3 +311,66 @@ def test_usage_shapes_are_read_defensively():
 		"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "reasoning_tokens": 0}  # fmt: skip
 	got = read_usage({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 99}})
 	assert got["cached_input_tokens"] == 10  # never more than the input
+
+
+def test_a_bad_stream_options_doesnt_leak_the_calls_slot(setup):
+	_prov, proxy = setup
+	_chat(proxy, "b1", stream=True, stream_options=["x"])
+	t = proxy._tasks[proxy._tokens[_url(proxy, "b1").split("/t/", 1)[1].split("/", 1)[0]]]
+	assert t.in_flight == 0 and t.reserved_usd == 0.0
+
+
+def test_a_call_that_breaks_before_its_usage_is_charged_its_reservation():
+	def handler(request):
+		def gen():
+			yield b'data: {"model": "muse-spark-1.3", "choices": [{"delta": {"content": "hi"}}]}\n\n'
+			raise httpx.ReadError("provider went away")
+
+		return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=_Gen(gen()))
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		with pytest.raises(httpx.HTTPError):
+			_chat(proxy, "x1", stream=True).read()
+		call = proxy.calls("x1")[0]
+		assert call.usd > 0  # the reservation stands in: the provider may bill what it ran
+		assert proxy.task("x1").cost_usd is None  # and the task says it isn't exactly costed
+	finally:
+		proxy.stop()
+
+
+def test_a_reply_naming_an_unpriced_model_is_priced_by_the_requested_one():
+	def handler(request):
+		return httpx.Response(200, json={"model": "some-internal-name", "choices": [{"message": {}, "finish_reason": "stop"}],
+			"usage": {"prompt_tokens": 50_000, "completion_tokens": 1000}})  # fmt: skip
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		assert _chat(proxy, "m1").status_code == 200
+		assert proxy.task("m1").cost_usd == pytest.approx(
+			token_rate("muse-spark-1.3").usd(50_000, 1000), abs=1e-6
+		)
+	finally:
+		proxy.stop()
+
+
+def test_crlf_split_across_chunks_doesnt_merge_events():
+	from preflight.recorder.agent import _StreamReader
+
+	r = _StreamReader(drop_usage_chunk=True)
+	stream = (b'data: {"choices": [{"delta": {}, "finish_reason": "stop"}]}\r\n\r\n'
+		b'data: {"choices": [], "usage": {"prompt_tokens": 3, "completion_tokens": 1}}\r\n\r\ndata: [DONE]\r\n\r\n')  # fmt: skip
+	cut = stream.index(b"\r\n\r\n") + 1  # between a \r and its \n
+	out = r.feed(stream[:cut]) + r.feed(stream[cut:]) + r.rest()
+	assert b'"finish_reason": "stop"' in out and b"usage" not in out and b"[DONE]" in out
+	assert r.found["finish_reason"] == "stop" and r.found["input_tokens"] == 3
+
+
+def test_the_reservation_counts_every_choice():
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate)
+	base = {"model": "muse-spark-1.3", "max_tokens": 1000, "messages": []}
+	one = proxy._worst_case_usd(base, b"{}")
+	assert proxy._worst_case_usd({**base, "n": 8}, b"{}") > 7 * one
+	proxy.stop()

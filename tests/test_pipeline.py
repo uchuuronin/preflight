@@ -139,7 +139,7 @@ def test_eval_oom_reruns_with_eval_off_on_the_same_gpu(tmp_path):
 	assert rec.costs.gpu_usd == pytest.approx(paid, abs=2e-6)  # the re-run is a kept probe, not a discard
 
 
-def test_the_eval_off_rerun_sets_the_eval_batch_knob_to_zero_where_there_is_one(tmp_path):
+def test_the_eval_off_rerun_keeps_the_records_knobs_and_the_engine_still_predicts_there(tmp_path):
 	runner = FakeRunner({("p1", "L4"): ("oom", "oom.eval")})
 
 	def flip(spec, gpu, *, should_stop):
@@ -151,16 +151,15 @@ def test_the_eval_off_rerun_sets_the_eval_batch_knob_to_zero_where_there_is_one(
 	rec = run_pipeline(
 		{"source": {"kind": "upload", "files": {"train.py": script}}}, _Ctx(), deps(tmp_path, flip)
 	)
-	assert any(k.id == "eval_batch_size" for k in rec.knobs)
 	rerun = next(p for p in rec.probes if p.id == "p1")
-	assert rerun.knobs["eval_batch_size"] == 0 and rerun.extras["eval_off"] == 1.0
+	assert rerun.extras["eval_off"] == 1.0 and "eval_batch_size" not in rerun.knobs
+	from preflight.engine.api import predict
 	from preflight.schema import dump_record
 
 	back = load_record(dump_record(rec))  # the record as stored still validates
-	assert next(p for p in back.probes if p.id == "p1").knobs["eval_batch_size"] == 0
-	from preflight.engine.api import fill_predictions
-
-	assert fill_predictions(back).predictions is not None  # B's engine takes it
+	preds = predict(back, next(p for p in back.probes if p.id == "p1").knobs)
+	# predicting at the probe's own knobs (what the checks page does) doesn't abstain for an invalid knob
+	assert not any("must be at least" in (e.reason or "") for e in preds.root.values())
 
 
 def test_budget_stops_probing_and_keeps_what_was_measured(tmp_path):

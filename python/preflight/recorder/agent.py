@@ -51,6 +51,7 @@ MAX_BODY_BYTES = 8 * 2**20
 MAX_EVENT_BYTES = 4 * 2**20  # one server-sent event; a stream that never ends an event is cut off
 # guess: the output a call may produce when it doesn't say (max_tokens), for the dollar reservation
 DEFAULT_MAX_OUTPUT_TOKENS = 8192
+SETTLE_S = 10.0  # guess: a call's tail (logging after the provider's last byte) takes milliseconds
 CHARS_PER_TOKEN = 3  # guess, on the high side for tokens: the reservation over-, never under-counts
 FORWARDED = {"chat/completions", "responses", "completions"}
 _PATH = re.compile(r"^/t/(?P<token>[A-Za-z0-9_-]{16,64})/v1/(?P<rest>[a-z/]{1,40})$")
@@ -144,7 +145,8 @@ class _StreamReader:
 
 	def feed(self, chunk: bytes) -> bytes:
 		"""The bytes of the whole events in buf so far that go on to the script."""
-		self.buf += chunk.replace(b"\r\n", b"\n")
+		# normalised on the whole buffer: a chunk may end between a \r and its \n
+		self.buf = (self.buf + chunk).replace(b"\r\n", b"\n")
 		out = []
 		while b"\n\n" in self.buf:
 			event, self.buf = self.buf.split(b"\n\n", 1)
@@ -235,6 +237,7 @@ class AgentProxy:
 		self._client = httpx.Client(timeout=httpx.Timeout(timeout_s, connect=10.0), transport=transport,
 			headers={"Accept-Encoding": "identity"})  # fmt: skip
 		self._lock = threading.Lock()
+		self._settled = threading.Condition(self._lock)
 		self._tasks: dict[str, _Task] = {}
 		self._tokens: dict[str, str] = {}  # path token -> task id
 		self._server: ThreadingHTTPServer | None = None
@@ -301,11 +304,15 @@ class AgentProxy:
 		)
 
 	def _worst_case_usd(self, req: dict, body: bytes) -> float:
-		"""What the call can cost at most: its whole body as input, its max output, uncached."""
+		"""What the call can cost at most: its whole body as input, its max output for each of its n
+		(or best_of) choices, uncached. Not counted: images sent by URL (their tokens aren't in the
+		body); a call that bills more than this still counts in full once its usage arrives."""
 		cap = next((req[k] for k in ("max_tokens", "max_completion_tokens", "max_output_tokens")
 			if _int(req.get(k))), DEFAULT_MAX_OUTPUT_TOKENS)  # fmt: skip
+		choices = max(_int(req.get("n")) or 1, _int(req.get("best_of")) or 1)
 		return self._price(
-			req.get("model"), {"input_tokens": len(body) // CHARS_PER_TOKEN + 1, "output_tokens": cap}
+			req.get("model"),
+			{"input_tokens": len(body) // CHARS_PER_TOKEN + 1, "output_tokens": cap * choices},
 		)
 
 	def _admit(self, task_id: str, req: dict, body: bytes) -> tuple[str | None, float]:
@@ -338,12 +345,14 @@ class AgentProxy:
 			t.reserved_usd += reserve
 			return None, reserve
 
-	def _log(self, task_id: str, call: Call, reserved: float) -> None:
+	def _log(self, task_id: str, call: Call, reserved: float, *, uncosted: bool = False) -> None:
 		with self._lock:
 			t = self._tasks.setdefault(task_id, _Task())
 			t.in_flight -= 1
 			t.reserved_usd = max(0.0, t.reserved_usd - reserved)
+			t.unpriced = t.unpriced or uncosted
 			t.calls.append(call)
+			self._settled.notify_all()
 
 	# ------------------------------------------------------------- one request
 
@@ -386,23 +395,24 @@ class AgentProxy:
 			_reply(h, 429, {"error": {"type": "preflight_task_stopped", "code": why,
 				"message": f"preflight: this task was stopped ({why}); it counts as a runaway in the sample"}})  # fmt: skip
 			return
-		stream = req.get("stream") is True
-		asked = (
-			isinstance(req.get("stream_options"), dict) and req["stream_options"].get("include_usage") is True
-		)
-		inject = stream and rest in ("chat/completions", "completions") and not asked
-		if inject:
-			# the usage arrives only when asked for; the extra chunk it adds is read and dropped
-			req["stream_options"] = {**(req.get("stream_options") or {}), "include_usage": True}
-			body = json.dumps(req).encode()
-		headers = {k: v for k, v in h.headers.items() if k.lower() not in _DROP_HEADERS}
-		headers.update({"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})
 		started, t0 = time.time(), time.monotonic()
 		model = req.get("model") if isinstance(req.get("model"), str) else None
+		stream = req.get("stream") is True
 		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
 		sent = [False]  # this request's reply has started: a failure now can only close the connection
 		last: list[bytes] = []  # the reply's last bytes, written once the call is logged
-		try:
+		broke = False
+		try:  # from here on the admitted call is always logged, so its slot and reservation are freed
+			opts = req.get("stream_options")
+			opts = opts if isinstance(opts, dict) else {}
+			asked = opts.get("include_usage") is True
+			inject = stream and rest in ("chat/completions", "completions") and not asked
+			if inject:
+				# the usage arrives only when asked for; the extra chunk it adds is read and dropped
+				req["stream_options"] = {**opts, "include_usage": True}
+				body = json.dumps(req).encode()
+			headers = {k: v for k, v in h.headers.items() if k.lower() not in _DROP_HEADERS}
+			headers.update({"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})
 			if stream:
 				self._relay_stream(
 					h, f"{self.upstream}/{rest}", headers, body, call, sent, last, drop_usage=inject
@@ -410,6 +420,7 @@ class AgentProxy:
 			else:
 				self._relay(h, f"{self.upstream}/{rest}", headers, body, call, sent, last)
 		except (httpx.HTTPError, OSError) as exc:
+			broke = True
 			call.status = call.status or 502
 			call.error = call.error or type(exc).__name__
 			if sent[0]:
@@ -418,11 +429,23 @@ class AgentProxy:
 				with contextlib.suppress(OSError):
 					_reply(h, 502, {"error": {"type": "upstream_unreachable",
 						"message": "preflight: the provider didn't answer"}}, close=True)  # fmt: skip
+		except Exception as exc:  # anything else: the script gets a 502, the call is still counted
+			broke = True
+			call.status, call.error = call.status or 502, call.error or type(exc).__name__
+			h.close_connection = True
 		finally:
 			call.seconds = time.monotonic() - t0
-			call.usd = self._price(call.model or model, call.__dict__)
+			# priced by the reply's model, else the request's (which _admit found a price for)
+			priced_as = call.model if self._rate_for(call.model) is not None else model
+			call.usd = self._price(priced_as, call.__dict__)
+			no_usage = call.input_tokens == call.output_tokens == 0
+			# broke off with no usage seen, or answered without saying what it used: the provider may
+			# still bill it, so its reservation stands in for the cost and the task isn't exactly costed
+			uncosted = self._rate is not None and no_usage and (broke or call.status < 400)
+			if uncosted:
+				call.usd = reserved
 			# logged before the script gets its last byte: once its call returns, the task is counted
-			self._log(task_id, call, reserved)
+			self._log(task_id, call, reserved, uncosted=uncosted)
 		if last:
 			with contextlib.suppress(OSError):
 				h.wfile.write(b"".join(last))
@@ -504,9 +527,11 @@ class AgentProxy:
 
 	def task(self, task_id: str, *, success: bool | None = None, wall_s: float | None = None,
 		timed_out: bool = False) -> AgentTask:  # fmt: skip
-		"""The task as the record's AgentTask: turns are the calls the provider answered."""
+		"""The task as the record's AgentTask: turns are the calls the provider answered. Waits (up
+		to SETTLE_S) for calls still in flight, so a script that exits at [DONE] is counted whole."""
 		with self._lock:
 			t = self._tasks.get(task_id, _Task())
+			self._settled.wait_for(lambda: t.in_flight <= 0, timeout=SETTLE_S)
 			calls, stopped, unpriced = list(t.calls), t.stopped, t.unpriced
 		ok = [c for c in calls if c.status and c.status < 400]
 		models = [c.model for c in ok if c.model]
