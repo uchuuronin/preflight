@@ -907,10 +907,16 @@ def predict_peak(
 		return MemoryEstimate(None, None, None, "bytes", "abstain", MODEL_ID, None, None, sigma, bd, why)
 	point = alloc + context_bytes
 	p = p_oom(point, sigma, capacity_bytes, margin_bytes)
+	hi = point * math.exp(h)
+	if probes and cal.is_below(tokens):
+		# memory doesn't shrink faster than the work does: below the smallest probe, the top of the range is at least
+		# what the line gives at that probe (measured, Oct 31: on non-A100 corpus rows, queries above the band's top
+		# fell from 11 of 236 to 2; the A100 holdout isn't re-scored, the AMD rows and Nov 2 scripts check it)
+		hi = max(hi, cal.correct(cal.min_tokens, bd.allocator_peak) + context_bytes)
 	return MemoryEstimate(
 		point=point,
 		lo=point * math.exp(-h),
-		hi=point * math.exp(h),
+		hi=hi,
 		unit="bytes",
 		status=status,
 		model_id=MODEL_ID,

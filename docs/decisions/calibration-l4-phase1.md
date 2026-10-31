@@ -233,3 +233,20 @@ Either way, a no-probe cost model is a prior, not a prediction. At 41–46% with
 - or wait for a better replay. The corpus fed K1 aten-op tables, while users' probes carry kernel tables, so the AMD rows and the Nov 2 scripts may tell a different story.
 
 The flag `engine.steptime_cross_gpu` stays off either way.
+
+## The A100 memory underestimates: what non-A100 data says (Oct 31)
+
+Chiya asked for the cause of the two A100 underestimates (40% and 16% low), found on non-A100 data only. `scripts/diagnose_memory_misses.py` splits every held-out memory miss on L4, A10, L40S and T4 by what could grow with the card. Measured, on 487 queries:
+
+- **The misses don't grow with the card.** The same config misses by the same amount on 24 GB and 48 GB cards: a CNN query is 2.0× under on both the L4 and the L40S, and an encoder query 1.32× under on A10, L4 and L40S. The median miss is 0.000 on every GPU.
+- **Not the allocator's reserved-to-allocated gap.** The miss on allocated memory alone is the same size as on reserved (+0.81 against +0.71 for the worst). The correlation between the miss and how much the gap moved is 0.19.
+- **Not fixed workspaces or the CUDA context.** The underestimates have a smaller fixed share of reserved memory than the queries overall (0.22 against 0.52).
+- **It's the config, and where the query sits.** Underestimates by more than 10% hit 14% of queries below the smallest probe, against 5% above it. They come from CNNs (17%), GPTs (13%) and encoders (11%); MLPs and the HF LoRA jobs have none. Below the probes, the line through them drops faster than memory does: the real curve has a floor the line can't see.
+
+**Fix (memory-analytical@0.3.1):** below the smallest probe, the top of the range is at least what the line gives at that probe, because memory doesn't shrink faster than the work does. On non-A100 rows, below-probe queries above the band's top fall from 11 of 236 to 2. The point estimate is unchanged. Above the probes, 4 of 251 still exceed the top. The worst is an encoder going to a longer sequence, which is config-specific.
+
+**What this can't say:** whether the two A100 misses were below-probe queries. Telling would mean looking at holdout rows, which are never re-scored. Two checks are still to come:
+- The AMD rows (MI300X, 192 GB, a different allocator) test whether misses grow with the card.
+- The Nov 2 scripts test the fix on users' jobs.
+
+Monotonicity also means a below-probe underestimate can't hide an OOM when the smallest probe fit. The OOM-relevant misses are the ones above the probes.
