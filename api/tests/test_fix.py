@@ -501,3 +501,14 @@ def test_a_run_the_gate_never_saw_is_refused_whatever_it_changed(box):
 		box, {**FILES, "MODE": "nohook\n"}, [("eval.wrap_no_grad", None)], KEY, python=sys.executable
 	)
 	assert out[0].status == "refused" and out[0].problem == "gate_not_seen"
+
+
+def test_real_races_run_without_shell_or_web_tools_and_only_the_smoke_test_keeps_shell():
+	argv = muse.command("/p")
+	assert (
+		"--disable-shell" in argv
+		and "--disable-web-tools" in argv
+		and "--no-foreign-personal-context" in argv
+	)
+	assert "--disable-shell" not in muse.command("/p", allow_shell=True)
+	assert set(muse.REQUIRED_FLAGS) <= set(argv)

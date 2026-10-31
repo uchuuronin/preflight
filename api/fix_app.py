@@ -160,8 +160,10 @@ def _sandbox(app_ref, *, network: bool):
 
 @app.function(timeout=10 * 60, retries=0)
 def startup_check_fix() -> dict:
-	"""No model call: the fix image starts, `muse` is there and says which flags it takes, the hook's
-	interpreter exists, and the gate denies a command run exactly as Muse Code will run it."""
+	"""No model call: the fix image starts, `muse` is there and takes every flag the fix loop passes,
+	the hook's interpreter exists, the gate denies a command run exactly as Muse Code will run it,
+	and the exact command line starts and ends with Muse Code's no-model `echo` provider. It also
+	finds what turns the background observers off, the same way."""
 	_pkg()
 	from preflight_api.fix import muse, race
 
@@ -169,6 +171,7 @@ def startup_check_fix() -> dict:
 	box = ModalBox(sb)
 	try:
 		out: dict = {}
+		help_text = ""
 		for name, argv in {
 			"which": ["sh", "-c", "command -v muse"],
 			"version": ["env", "-i", f"PATH={MUSE_PATH}", "muse", "--version"],
@@ -176,41 +179,41 @@ def startup_check_fix() -> dict:
 			"python": ["sh", "-c", f"test -x {muse.HOOK_PYTHON} && {muse.HOOK_PYTHON} --version"],
 		}.items():
 			code, so, se = box.run(argv, timeout=60)
-			out[name] = {"code": code, "out": so[-4000:], "err": se[-1000:]}
-		help_text = out["exec_help"]["out"] + out["exec_help"]["err"]
+			if name == "exec_help":
+				help_text = so + se  # judged whole; only the report is shortened
+			out[name] = {"code": code, "out": so[:12000], "err": se[-1000:]}
 		# Every flag the fix loop passes must exist; without --api-key-stdin the key would have to
 		# travel in the environment, so nothing runs.
 		out["flags"] = {f: f in help_text for f in muse.REQUIRED_FLAGS}
-		out["observers"] = _observer_switch(box, help_text)
 		try:
 			race.prepare(box, {"train.py": "print('hello')\n"})  # ends with gate_check
 			out["gate"] = "denies a command and a read outside the worktree"
 		except Exception as e:  # GateBroken or git failing in the image
 			out["gate"] = f"FAILED: {type(e).__name__}: {e}"
+		echo = _echo_runner(box)
+		out["echo"] = echo(())
+		out["observers"] = _observer_switch(echo, help_text)
 		out["ok"] = (
 			out["version"]["code"] == 0
 			and out["python"]["code"] == 0
 			and all(out["flags"].values())
 			and not out["gate"].startswith("FAILED")
+			and out["echo"]["code"] == 0
 		)
 		return out
 	finally:
 		sb.terminate()
 
 
-# Settings that might turn Muse Code's background observers off. Source: guess, from the names
-# Meta's docs give them; a block is used only when `muse config validate` both refuses a made-up
-# key (so validation means something) and accepts this one.
-OBSERVER_SETTINGS = (
-	{
-		"runtime_capabilities": {
-			"memory_recall": False,
-			"skill_recommendations": False,
-			"goal_tracking": False,
-			"verification": False,
-		}
-	},
-	{"runtime_capabilities": {"observers": False}},
+# Settings that might turn Muse Code's background observers off, tried as `-c KEY=VALUE`, which
+# refuses the run on an unknown key (Muse Code 1.4.14 help). Source: guess, from the observer
+# names in Meta's docs; one is used only when the echo provider accepts it and refuses a made-up key.
+OBSERVER_CONFIG = (
+	"runtime_capabilities.memory_recall=false",
+	"runtime_capabilities.skill_recommendations=false",
+	"runtime_capabilities.goal_tracking=false",
+	"runtime_capabilities.verification=false",
+	"runtime_capabilities.observers=false",
 )
 
 
@@ -224,41 +227,61 @@ def _bare_flag(help_text: str, flag: str) -> bool:
 	return bool(re.search(re.escape(flag) + r"(?![\w-])(?!\s*[=<]|\s+[A-Z]{2,})", help_text))
 
 
-def _observer_switch(box: ModalBox, help_text: str) -> dict:
-	"""Whether this Muse Code can run without its background observers, and how: a flag in
-	`muse exec --help`, or a settings block its validator accepts. Nothing here calls a model."""
+def _echo_runner(box: ModalBox):
+	"""Run the fix loop's exact `muse exec` line in a worktree with the hook configured, on the `echo`
+	provider (no model, no key needed), adding `extra` flags. Returns its exit code and output."""
+	from preflight_api.fix import muse, race
+
+	wt, cfg, home = "/fix/wt/echo", "/fix/cfg/echo", "/fix/home/echo"
+	box.run([*race.GIT, "-C", race.REPO, "worktree", "add", "-q", "--detach", wt])
+	box.write(
+		f"{cfg}/muse/settings.json",
+		json.dumps(muse.settings("/fix/hook.py", wt, log="/fix/hooklog/echo.jsonl")),
+	)
+	box.write(f"{home}/.keep", "")
+	box.write("/fix/prompt-echo.txt", "Say hello.")
+
+	def run(extra: tuple[str, ...]) -> dict:
+		argv = [
+			"env",
+			"-i",
+			f"PATH={MUSE_PATH}",
+			f"XDG_CONFIG_HOME={cfg}",
+			f"HOME={home}",
+			*muse.command("/fix/prompt-echo.txt", steps=2, extra_flags=("--provider", "echo", *extra)),
+		]
+		code, so, se = box.run(argv, cwd=wt, stdin="not-a-key\n", timeout=90)
+		return {
+			"code": code,
+			"out_head": "\n".join(so.splitlines()[:30]),
+			"err": se[-800:],
+			"extra": list(extra),
+		}
+
+	return run
+
+
+def _observer_switch(echo, help_text: str) -> dict:
+	"""Whether this Muse Code can run without its background observers, and how: a bare flag from
+	`muse exec --help`, or `-c` settings, each kept only if the echo provider runs with it (and, for
+	settings, refuses a made-up key, so acceptance means something). Nothing here calls a model."""
 	from preflight_api.fix import muse
 
-	found: dict = {
-		# A flag only when its help line shows it takes no value (a bare flag that needs one would
-		# fail the run at argument parsing).
-		"flags": [f for f in muse.OBSERVER_FLAGS if _bare_flag(help_text, f)],
-		"help_lines": [ln.strip() for ln in help_text.splitlines() if "observer" in ln.lower()][:10],
-		"settings": None,
-		"validate": {},
-	}
-	env = ["env", "-i", f"PATH={MUSE_PATH}", "HOME=/fix/home/check", "XDG_CONFIG_HOME=/fix/home/check"]
-	_, so, se = box.run([*env, "muse", "config", "--help"], timeout=60)
-	found["config_help"] = [ln.strip() for ln in (so + se).splitlines() if ln.strip()][:40]
-
-	def validate(name: str, obj: dict) -> int:
-		# Validated merged with the hooks block it will sit beside, so an accepted file is the file
-		# Muse Code will read.
-		path = f"/fix/validate-{name}.json"
-		box.write(
-			path, json.dumps({**muse.settings("/fix/hook.py", "/fix/repo"), **obj, "schema_version": 1})
-		)
-		c, o, e = box.run(
-			[*env, "muse", "config", "validate", "--plane", "defaults", "--file", path], timeout=60
-		)
-		found["validate"][name] = {"code": c, "says": (o + e).strip()[-300:]}
-		return c
-
-	if validate("made_up_key", {"zz_not_a_setting": True}) != 0:
-		for i, block in enumerate(OBSERVER_SETTINGS):
-			if validate(f"candidate_{i}", block) == 0:
-				found["settings"] = block
-				break
+	found: dict = {"flags": [], "config": [], "tried": []}
+	for f in muse.OBSERVER_FLAGS:
+		if _bare_flag(help_text, f):
+			r = echo((f,))
+			found["tried"].append(r)
+			if r["code"] == 0:
+				found["flags"].append(f)
+	bogus = echo(("-c", "zz_not_a_setting=false"))
+	found["tried"].append(bogus)
+	if bogus["code"] != 0:
+		for kv in OBSERVER_CONFIG:
+			r = echo(("-c", kv))
+			found["tried"].append(r)
+			if r["code"] == 0:
+				found["config"].append(kv)
 	return found
 
 
@@ -284,14 +307,16 @@ def smoke_fix(files: dict[str, str], observers: dict | None = None) -> dict:
 	t0 = time.monotonic()
 	try:
 		obs = observers or {}
+		extra = tuple(obs.get("flags", [])) + tuple(x for kv in obs.get("config", []) for x in ("-c", kv))
 		cands = race.race(
 			box,
 			files,
 			[("eval.wrap_no_grad", None)],
 			key,
 			path=MUSE_PATH,
-			settings_extra=obs.get("settings"),
-			extra_flags=tuple(obs.get("flags", [])[:1]),
+			extra_flags=extra,
+			# Shell stays available here only, so the smoke test proves the gate blocks a command.
+			allow_shell=True,
 			log_lines=3000,
 		)
 	finally:

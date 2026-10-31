@@ -173,7 +173,7 @@ def hook_command(hook_path: str, root: str, python: str = HOOK_PYTHON, log: str 
 # looks for each in `muse exec --help` and the fix loop passes the ones it finds. Source: guess,
 # Meta's docs name the observers (memory recall, skill recommendations, goal tracking,
 # verification) but no switch for them; replaced by what the installed help text says.
-OBSERVER_FLAGS = ("--no-observers", "--disable-observers", "--observers=off")
+OBSERVER_FLAGS = ("--disable-reminders", "--no-observers", "--disable-observers", "--observers=off")
 
 
 def settings(
@@ -205,6 +205,9 @@ REQUIRED_FLAGS = (
 	"--contributor-mode",
 	"--sandbox-network",
 	"--api-key-stdin",
+	"--disable-web-tools",
+	"--disable-shell",
+	"--no-foreign-personal-context",
 )
 
 
@@ -214,8 +217,12 @@ def command(
 	steps: int = MAX_MODEL_STEPS,
 	model: str | None = None,
 	extra_flags: tuple[str, ...] = (),
+	allow_shell: bool = False,
 ) -> list[str]:
-	"""The `muse exec` line for one candidate. Root options go after `exec` (kenn-io/kit PR 194)."""
+	"""The `muse exec` line for one candidate. Root options go after `exec` (kenn-io/kit PR 194).
+	Defence in depth around the gate (Muse Code 1.4.14 help): no web tools, no personal rules or
+	skills from elsewhere, and no shell at all unless `allow_shell` is set, which only the smoke test does,
+	to prove the gate blocks a command on its own."""
 	argv = [
 		"muse",
 		"exec",
@@ -231,7 +238,11 @@ def command(
 		"--sandbox-network",
 		"proxy-only",
 		"--api-key-stdin",
+		"--disable-web-tools",
+		"--no-foreign-personal-context",
 	]
+	if not allow_shell:
+		argv.append("--disable-shell")
 	if model:
 		argv += ["--model", model]
 	argv += list(extra_flags)

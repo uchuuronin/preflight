@@ -185,6 +185,7 @@ def _one(
 	settings_extra: dict | None,
 	extra_flags: tuple[str, ...],
 	log_lines: int,
+	allow_shell: bool,
 ) -> Candidate:
 	wt = f"{ROOT}/wt/{cand.id}"
 	cfg = f"{ROOT}/cfg/{cand.id}"
@@ -213,7 +214,7 @@ def _one(
 		f"PATH={path}",
 		f"XDG_CONFIG_HOME={cfg}",
 		f"HOME={home}",
-		*muse.command(prompt, steps=steps, extra_flags=extra_flags),
+		*muse.command(prompt, steps=steps, extra_flags=extra_flags, allow_shell=allow_shell),
 	]
 	t0 = time.monotonic()
 	code, out, _err = box.run(argv, cwd=wt, stdin=key + "\n", timeout=timeout)
@@ -290,6 +291,7 @@ def race(
 	settings_extra: dict | None = None,
 	extra_flags: tuple[str, ...] = (),
 	log_lines: int = 200,
+	allow_shell: bool = False,
 ) -> list[Candidate]:
 	"""Run every candidate at once; each is (template id, the knob value it sets or None).
 	`measured` is Preflight's own sentence about the problem (A's rule finding), never visitor text."""
@@ -321,6 +323,7 @@ def race(
 				settings_extra=settings_extra,
 				extra_flags=extra_flags,
 				log_lines=log_lines,
+				allow_shell=allow_shell,
 			)
 			for c in cands
 		]
