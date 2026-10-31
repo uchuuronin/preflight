@@ -267,7 +267,9 @@ def write_table(table: conformal.Table, out: Path) -> None:
 	)
 
 
-HOLDOUT_GPUS = ("A100-SXM-80GB",)  # PM, Oct 27: the cross-GPU holdout; never tuned on, reported once
+# PM, Oct 27: the cross-GPU holdout; never tuned on, reported once. Both 80 GB boards: Modal's A100-80GB lands on
+# either (sweep.LANDS_ON), and a PCIe row must never reach calibration
+HOLDOUT_GPUS = ("A100-SXM-80GB", "A100-PCIe-80GB")
 MIN_PER_BIN = 10  # guess: fewer points than this and a bin's Wilson interval is too wide to read; not drawn
 
 

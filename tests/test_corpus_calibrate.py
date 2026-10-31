@@ -115,6 +115,14 @@ def test_holdout_gpus_never_calibrate_and_are_reported_once():
 	assert "A100-SXM-80GB" in report and "Wilson" in report
 
 
+def test_both_a100_boards_are_held_out_by_default():
+	from preflight.corpus import calibrate as cal
+	from preflight.corpus import sweep
+
+	# a request for the holdout GPU can land on any of these boards; every one must stay out of calibration
+	assert set(sweep.landing_gpus("A100-SXM-80GB")) <= set(cal.HOLDOUT_GPUS)
+
+
 def test_reliability_report_leaves_out_thin_bins():
 	from preflight.corpus.calibrate import reliability_lines
 
