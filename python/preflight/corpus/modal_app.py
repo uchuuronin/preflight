@@ -299,6 +299,7 @@ def main(
 	dry_run: bool = False,
 	prior_usd: float = 0.0,  # money this GPU and kind already cost before container billing was recorded (Modal's bill)
 	max_minutes: float = 100.0,  # every wave's worst case must end inside this; set it under the workflow's timeout
+	deadline_s: float = 0.0,  # per-config deadline before any config has finished; 0 keeps the kind's default
 ) -> None:
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
@@ -323,7 +324,9 @@ def main(
 		import time
 		import uuid
 
-		default_deadline = DEFAULT_TIMEOUT_S.get(store_kind, 900.0)
+		# a smoke run that knows its configs are short can set a tighter first deadline, so its worst case fits a
+		# small cap; the adaptive deadline takes over after 10 configs either way
+		default_deadline = deadline_s or DEFAULT_TIMEOUT_S.get(store_kind, 900.0)
 		run_id = uuid.uuid4().hex[:12]
 		owner = lease.remote(store_kind, gpu, run_id, time.time() + (max_minutes + 30) * 60)
 		if owner != run_id:
