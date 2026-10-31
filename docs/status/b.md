@@ -56,7 +56,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Abstention: every query outside the probed range is flagged | `main` (automated tests) | 0 | |
 | Coverage self-test page (with C) | not started | 2 | |
 
-**Total: about 82 hours of B work left.** That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
+**Total: about 72 hours of B work left** (14.5 for the hero lenses, 46 for the rest of the engine, 12 for validation). That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
 
 ## Done
 - **Settings chosen by Monte Carlo** (`docs/decisions/engine-settings.md`, `scripts/mc_engine_settings.py`): memory calibration on A's three-probe plan, the 90% band (including one or two probes) and the fits/tight/fails cut-offs, the divergence label (D9 catches early collapses, a case a CPU smoke run turned up), cross-GPU step time and the corpus budget rule.
