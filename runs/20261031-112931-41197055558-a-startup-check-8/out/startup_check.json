@@ -1,0 +1,70 @@
+{
+  "worker": {
+    "module": "ops_app",
+    "file": "/root/ops_app.py",
+    "runner_loaded_as": "/mc-z3qcnaxg/modal_app.py (module modal_app, tag probe-619ae9e50ff820f8, PKG /opt/preflight/preflight, zoo /root/zoo)",
+    "zoo": "/root/zoo",
+    "zoo_samples": [
+      "README.md",
+      "finetune_lora_hf",
+      "pretrain_nanogpt"
+    ],
+    "submitted": {
+      "job_id": "01M68VJAW35SDG1XV5WV7JQQKD",
+      "created": true,
+      "position": 0
+    },
+    "saves": 1,
+    "lens": "finetune",
+    "knobs": 20,
+    "imported": [
+      "preflight.runner.pipeline",
+      "preflight.runner.records",
+      "preflight.runner.sandbox_runner",
+      "preflight.runner.worker",
+      "preflight.runner.wire",
+      "preflight.runner.record_jobs",
+      "preflight.harness.spark",
+      "preflight.harness.mapper",
+      "preflight.probes.gpu_choice",
+      "preflight.probes.plan"
+    ],
+    "container_environment": "main",
+    "flags": {
+      "root": "/opt/preflight",
+      "env": "production",
+      "engine.memory": false
+    },
+    "job_store_would_claim_here": false,
+    "guard": "preflight-runner in main isn't deployed; this container is app ap-aiHobbWvbkPHTCdeF5kXBt",
+    "image_tag": "probe-619ae9e50ff820f8"
+  },
+  "probe": {
+    "pkg_root": "/opt/preflight",
+    "reachable_by_probe_uid": true,
+    "euid": 0,
+    "probe_uid": "61000",
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 9,
+    "backend": "cpu",
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n/opt/preflight/preflight/recorder/runtime.py:869: FutureWarning: `torch.distributed.reduce_op` is deprecated, please use `torch.distributed.ReduceOp` instead\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\n"
+  },
+  "sandbox": {
+    "entry": [
+      "python",
+      "-m",
+      "preflight.probes.remote"
+    ],
+    "created": true,
+    "import_stdout": "IMPORT /opt/preflight/preflight/__init__.py 2.5.1+cu124\n",
+    "import_stderr": "",
+    "import_exit": 0,
+    "probe_status": "ok",
+    "probe_steps": 9,
+    "probe_error": null,
+    "probe_error_code": null
+  },
+  "ok": true
+}
