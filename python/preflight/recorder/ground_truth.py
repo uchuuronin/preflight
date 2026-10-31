@@ -29,7 +29,7 @@ import tempfile
 import time
 from pathlib import Path
 
-ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt"}
+ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt", "grpo_trl"}
 # derived: the whole measurement must end, and write its result, inside the run's own time limit
 # (remote-run.yml's timeout); Oct 28's first try ran into that limit with nothing written
 BUDGET_S = 40 * 60

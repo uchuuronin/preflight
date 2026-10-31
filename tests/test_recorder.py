@@ -258,3 +258,23 @@ def test_timed_steps_lose_no_signal_to_deferred_reads(loop_result):
 	s = loop_result.probe.stability.series
 	# (the output head is found at the first optimizer step, so its norm starts at step 2)
 	assert all(v is not None and v > 0 for v in s["loss"] + s["grad_norm"] + s["output_logit_norm"][1:])
+
+
+@needs_transformers
+def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(tmp_path):
+	"""A CPU stand-in with TRL's seams (tests/fixtures/fake_grpo): generate, a no-grad reference
+	forward, reward functions, then the update."""
+	root = FIX / "fake_grpo"
+	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
+	r = run_probe(
+		ProbeSpec(probe_id="p1", files=files, entrypoint="train.py", warmup=2, timed=3, timeout_s=240)
+	)
+	p = r.probe
+	assert p.status == "ok", p.error
+	phases = p.step_time.by_phase
+	assert phases.get("rollout", 0) > 0 and phases.get("reference", 0) > 0 and phases.get("reward", 0) > 0
+	assert sum(phases.values()) == pytest.approx(1.0, abs=0.02)
+	rl = p.rl
+	assert rl.group_size == 4
+	assert rl.pass_rate_per_prompt and all(0 <= x <= 1 for x in rl.pass_rate_per_prompt)
+	assert rl.zero_spread_fraction is not None

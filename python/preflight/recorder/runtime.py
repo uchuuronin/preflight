@@ -47,6 +47,7 @@ import torch.nn as nn
 from .arch import model_shape
 from .gpuinfo import canonical_gpu_name, peak
 from .kernels import KERNEL_ROWS  # noqa: F401  (re-exported for callers and tests)
+from .rl_groups import reward_groups
 
 PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zoo traces (Oct 28-29)
 # guess: batches a loop may fetch in eval mode before any backward; a sanity check or eval_on_start
@@ -293,6 +294,10 @@ class Recorder:
 		self._io_depth = 0
 		self.gens: list[dict] = []
 		self.trainer_logs: list[dict] = []
+		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
+		# be read without trusting the trainer's own logs; the group size from the trainer
+		self.reward_calls: list[dict] = []
+		self.group_size: int | None = None
 		# how long the real run is, for B's time.total: the training loader's batches per epoch,
 		# and from an HF Trainer its epochs and the optimizer steps it plans (state.max_steps)
 		self.train_loader_batches: int | None = None
@@ -386,6 +391,8 @@ class Recorder:
 			"io_bytes": 0,
 			"eval": 0.0,
 			"generate": 0.0,
+			"reference": 0.0,  # RL: the reference model's log-probs (a forward with no gradient)
+			"reward": 0.0,  # RL: reward functions and reward models
 			"attn_max": None,
 			"loss_t": [],  # timed steps: losses kept on device, read after the probe
 			"scales_t": [],
@@ -568,6 +575,7 @@ class Recorder:
 		self._importer.on("safetensors.torch", self._hook_safetensors)
 		self._importer.on("transformers.generation.utils", self._hook_hf_generate)
 		self._importer.on("transformers.trainer", self._hook_trainer)
+		self._importer.on("trl.trainer.grpo_trainer", self._hook_grpo)
 		if self.hf_overrides:
 			self._importer.on("transformers.training_args", self._hook_training_args)
 		self._importer.on("vllm.entrypoints.llm", self._hook_vllm)
@@ -820,6 +828,67 @@ class Recorder:
 		if hasattr(tr, "create_scheduler"):
 			self._patch(tr, "create_scheduler", plan_factory)
 
+	def _hook_grpo(self, mod):
+		"""TRL's GRPOTrainer: the reference model's log-probs (computed with no gradient) and the
+		reward functions, timed as their own phases; each reward call's values kept for pass rate
+		per prompt. Generation is already timed by the generate hooks (rollout)."""
+		rec = self
+		tr = getattr(mod, "GRPOTrainer", None)
+		if tr is None:
+			return
+
+		def timed(kind, fn):
+			def run(*args, **kwargs):
+				rec._sync()
+				t0 = rec._now()
+				try:
+					return fn(*args, **kwargs)
+				finally:
+					rec._sync()
+					rec.acc[kind] += rec._now() - t0
+
+			return run
+
+		def logps_factory(orig):
+			def logps(self_, *args, **kwargs):
+				if torch.is_grad_enabled():
+					return orig(self_, *args, **kwargs)  # the policy's own forward: part of the update
+				return timed("reference", orig)(self_, *args, **kwargs)
+
+			return logps
+
+		if hasattr(tr, "_get_per_token_logps"):
+			self._patch(tr, "_get_per_token_logps", logps_factory)
+
+		def wrap_reward(i, fn):
+			def reward(*args, **kwargs):
+				out = timed("reward", fn)(*args, **kwargs)
+				with suppress(Exception):
+					vals = [float(v) for v in out][:4096]
+					if len(rec.reward_calls) < 512:
+						rec.reward_calls.append({"func": i, "values": vals})
+				return out
+
+			return reward
+
+		def init_factory(orig):
+			def init(self_, *args, **kwargs):
+				orig(self_, *args, **kwargs)
+				with suppress(Exception):
+					rec.group_size = int(getattr(self_, "num_generations", 0)) or None
+				with suppress(Exception):
+					funcs = list(self_.reward_funcs)
+					for i, fn in enumerate(funcs):
+						if isinstance(fn, nn.Module):
+							fn.forward = timed("reward", fn.forward)  # a reward model: timed, not read
+						elif callable(fn):
+							funcs[i] = wrap_reward(i, fn)
+					self_.reward_funcs = funcs
+
+			return init
+
+		self._patch(tr, "__init__", init_factory)
+
 	def _hook_training_args(self, mod):
 		ta = getattr(mod, "TrainingArguments", None)
 		if ta is None:
@@ -924,7 +993,8 @@ class Recorder:
 		self._maybe_stop()
 		self._sync()
 		self._t_pre = self._now()
-		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"], self.acc["generate"])
+		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"],
+			self.acc["generate"] + self.acc["reference"] + self.acc["reward"])  # fmt: skip
 		# update-to-weight needs the weights before the step; a small sample, and not on timed steps
 		self._sample = [] if self._clean else [(p, p.detach().clone()) for p in self._sample_params]
 		self._sync()
@@ -989,7 +1059,8 @@ class Recorder:
 		overhead = self._overhead_pre + (self._now() - t0) + self.acc["overhead"]
 		f0, b0, d0, g0 = self._acc_at_pre
 		a = self.acc
-		inner = (a["forward"] - f0) + (a["backward"] - b0) + (a["data"] - d0) + (a["generate"] - g0)
+		rl_inner = a["generate"] + a["reference"] + a["reward"]
+		inner = (a["forward"] - f0) + (a["backward"] - b0) + (a["data"] - d0) + (rl_inner - g0)
 		opt_time = max(0.0, (t_post - self._t_pre) - self._overhead_pre - inner)
 		start = self._last_post if self._last_post is not None else (self._first_fetch or self._t_start)
 		wall = max(1e-9, t_post - start - overhead - a["io"] - a["eval"])
@@ -999,8 +1070,10 @@ class Recorder:
 				"wall": wall,
 				"event": event,
 				"data": a["data"],
-				"forward": max(0.0, a["forward"] - a["generate"]),
+				"forward": max(0.0, a["forward"] - a["generate"] - a["reference"] - a["reward"]),
 				"rollout": a["generate"],
+				"reference": a["reference"],
+				"reward": a["reward"],
 				"backward": a["backward"],
 				"optimizer": opt_time,
 				"loss": a["loss"] if a["loss_n"] else None,
@@ -1171,9 +1244,9 @@ class Recorder:
 		if timed:
 			walls = sorted(s["wall"] for s in timed)
 			mean = statistics.fmean(walls)
-			keys = ["data", "forward", "backward", "optimizer"] + (
-				["rollout"] if any(s["rollout"] for s in phased) else []
-			)
+			keys = ["data", "forward", "backward", "optimizer"] + [
+				k for k in ("rollout", "reference", "reward") if any(s.get(k) for s in phased)
+			]
 			by_phase = {}
 			if phased:
 				ref = statistics.fmean(s["wall"] for s in phased)
@@ -1327,6 +1400,7 @@ class Recorder:
 		):
 			if col(kind):
 				rl[name] = col(kind)
+		rl.update(reward_groups(self.reward_calls, self.group_size))
 		if gen and gen["sequences"]:
 			rl["response_length"] = {
 				"mean": gen["new_tokens_mean"],

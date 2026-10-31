@@ -89,7 +89,7 @@ PROBE_PACKAGES = [
 	"transformers==4.46.3",
 	"accelerate==1.1.1",
 	"peft==0.13.2",
-	"trl==0.12.1",
+	"trl==0.14.0",  # GRPOTrainer arrived in 0.14 (zoo/grpo_trl)
 	"datasets==3.1.0",
 	"safetensors==0.4.5",
 	"psutil==6.1.0",
