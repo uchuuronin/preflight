@@ -249,6 +249,20 @@ def test_ledger_reads_small_summaries(tmp_path):
 	assert meta.exists() and "ops" not in meta.read_text()
 
 
+def test_rows_filed_under_a_sibling_board_count_as_done(tmp_path):
+	# Oct 31: an A100-SXM-80GB request ran on A100-PCIe-80GB, the ledger saw no progress and the sweep stopped
+	st = s.ResultStore(tmp_path)
+	st.write_once("kernels", "A100-PCIe-80GB", "a", {"status": "ok", "gpu_seconds": 13.0})
+	st.write_once("kernels", "A100-SXM-80GB", "b", {"status": "oom", "gpu_seconds": 2.0})
+	st.write_once("kernels", "A100-SXM-80GB", "a", {"status": "ok", "gpu_seconds": 11.0})  # both boards: once
+	st.write_once("kernels", "L4", "c", {"status": "ok", "gpu_seconds": 5.0})
+	led = sw.ledger_from(st, "kernels", "A100-80GB")
+	assert sorted(led["done"]) == ["a", "b"]
+	assert led["gpu_seconds"] == pytest.approx(13.0)  # 11 + 2: the requested board's row wins
+	assert sw.ledger_from(st, "kernels", "L4")["done"] == ["c"]  # no sibling, no change
+	assert sw.landing_gpus("A100-80GB") == ("A100-SXM-80GB", "A100-PCIe-80GB")
+
+
 def test_local_driver_counts_billing_overhead(tmp_path):
 	st = s.ResultStore(tmp_path)
 	cfgs = c.kernel_configs(10, seed=8)

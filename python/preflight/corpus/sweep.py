@@ -271,6 +271,43 @@ def modal_gpu(gpu: str) -> str:
 	return gpus.MODAL_GPU[key]
 
 
+# Modal's string for a board can land on its sibling, so a sweep counts rows filed under either as done
+LANDS_ON = {
+	# measured: run b-corpus-a100-2 (Oct 31) asked for A100-80GB and ran on PCIe
+	"A100-SXM-80GB": ("A100-PCIe-80GB",),
+	# guess: the same Modal string family as the 80 GB board
+	"A100-SXM-40GB": ("A100-PCIe-40GB",),
+}
+
+
+def landing_gpus(gpu: str) -> tuple[str, ...]:
+	"""Every table name a request for this GPU can come back as, the requested one first."""
+	from preflight.engine import gpus
+
+	key = gpus.resolve(gpu)
+	return (key, *LANDS_ON.get(key, ()))
+
+
+def ledger_from(store: ResultStore, kind: str, gpu: str, retry_errors: bool = False) -> dict[str, Any]:
+	"""For one requested GPU: keys already done, GPU-seconds spent (failed attempts included), and each
+	config's latest seconds for the running estimate, across every board the request can land on.
+	Reads the small .meta summaries only. Errors and timeouts count as done unless retried.
+	"""
+	out: dict[str, Any] = {"done": [], "gpu_seconds": 0.0, "history": []}
+	seen: set[str] = set()
+	for board in landing_gpus(gpu):
+		for _, key, meta in store.iter_meta(kind, board):
+			if key in seen:  # the same config on both boards counts once
+				continue
+			seen.add(key)
+			if not (retry_errors and meta.get("status") in ("error", "timeout")):
+				out["done"].append(key)
+			secs = float(meta.get("gpu_seconds") or 0.0)
+			out["gpu_seconds"] += secs + float(meta.get("prior_gpu_seconds") or 0.0)
+			out["history"].append(secs)
+	return out
+
+
 def parse_budget_plan(spec: str) -> dict[str, float]:
 	"""'L4=25,A100-80GB=45,H100=70' -> {table name: dollars}; Modal strings and table names both work."""
 	from preflight.engine import gpus

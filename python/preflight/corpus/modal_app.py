@@ -211,21 +211,15 @@ def lease(kind: str, gpu: str, run_id: str, until: float | None = None) -> str |
 
 @app.function(image=image, volumes={MOUNT: vol}, timeout=15 * 60)
 def ledger(kind: str, gpu: str, retry_errors: bool = False) -> dict[str, Any]:
-	"""For one GPU: keys already done, GPU-seconds spent (failed attempts included), and each
+	"""For one requested GPU (and the boards it can land on, sweep.LANDS_ON): keys already done, GPU-seconds spent (failed attempts included), and each
 	config's latest seconds for the running estimate. Reads the small .meta summaries only.
 	Errors and timeouts count as done unless retried.
 	"""
 	from preflight.corpus.store import ResultStore
+	from preflight.corpus.sweep import ledger_from
 
 	vol.reload()
-	out: dict[str, Any] = {"done": [], "gpu_seconds": 0.0, "history": []}
-	for _, key, meta in ResultStore(MOUNT).iter_meta(kind, gpu):
-		if not (retry_errors and meta.get("status") in ("error", "timeout")):
-			out["done"].append(key)
-		secs = float(meta.get("gpu_seconds") or 0.0)
-		out["gpu_seconds"] += secs + float(meta.get("prior_gpu_seconds") or 0.0)
-		out["history"].append(secs)
-	return out
+	return ledger_from(ResultStore(MOUNT), kind, gpu, retry_errors)
 
 
 def runs_on(cfg, gpu: str) -> bool:
