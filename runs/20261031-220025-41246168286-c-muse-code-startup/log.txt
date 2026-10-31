@@ -1,0 +1,65 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-OxLnZawhFvNsP4EJZPUmlq
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/fix_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/preflight_api/fix
+├── ✓ Created Function startup_check_fix.
+└── ✓ Created Function smoke_fix.
+{
+ "which": {
+  "code": 0,
+  "out": "/root/.local/bin/muse\n",
+  "err": ""
+ },
+ "version": {
+  "code": 0,
+  "out": "Muse Code 1.4.14 (1.4.14-R7309.1)\n",
+  "err": ""
+ },
+ "exec_help": {
+  "code": 0,
+  "out": "the provider API key from stdin\n      --provider <MODE>\n          Startup provider: echo or meta (default: meta)\n      --preset <NAME>\n          Run a built-in preset: native-basic, miniswe, empty, ac_orch,\n          openai-apply-patch\n      --permission-profile <ID>\n          Select a named permission profile for this session.\n      --model <ID>\n          Model id for non-echo providers\n      --contributor-mode <on|off>\n          Per-run contributor mode override (this run only; never persisted)\n  -c, --config <KEY=VALUE>\n          Set one setting for this run (repeatable; values are JSON). Secrets\n          only as whole-value ${VAR}; unknown or clashing keys refuse the run.\n      --reasoning-effort <EFFORT>\n          Meta reasoning effort: none|minimal|low|medium|high|xhigh|max|ultra\n          (default: high; alias: --effort)\n      --parallel-tool-calls\n          Enable Meta API parallel tool calls\n      --no-parallel-tool-calls\n          Disable Meta API parallel tool calls\n      --base-url <URL>\n          Override the provider base URL\n      --image <PATH>\n          Attach a local image file (repeatable)\n      --workspace <PATH>\n          Root policy-gated workspace tools at PATH\n  -w, --worktree [<MODE>]\n          Session git worktree: off|create|existing\n      --worktree-base <REF>\n          Base ref for --worktree create (default: HEAD)\n      --worktree-existing <PATH>\n          Existing worktree path for --worktree existing\n      --context-compaction-strategy <ID>\n          Context compaction strategy: summary-preserved-suffix/v1,\n          prefix-extension-summary/v1, prefix-extension-inventory-summary/v1\n      --context-compaction-soft-threshold <FRAC>\n          Soft compaction threshold\n      --context-compaction-hard-threshold <FRAC>\n          Hard compaction threshold\n      --output-schema <FILE>\n          Shape the final answer with the JSON schema in FILE (meta provider\n          only)\n      --max-model-steps <N>\n          Cap the number of model steps\n      --max-tool-output-bytes <N>\n          Cap tool output bytes fed back to the model (0 or >=9)\n      --session-id <UUID>\n          Use a specific session id\n      --allow-workspace-switch\n          Allow switching the workspace mid-run\n      --user-input-auto-resolve\n          Offer request_user_input and auto-cancel prompts (headless)\n      --subagent-worktree-isolation\n          Compatibility flag; capability defaults on. Only an affirmative\n          per-child request asks for isolation; omission stays shared. Requests\n          may reject when capability, provider, or Git prerequisites are\n          unavailable.\n      --disable-web-tools\n          Disable web tools for this run\n      --disable-reminders\n          Disable reminder agents for this run\n      --disable-request-user-input\n          Withhold request_user_input for this run\n      --no-foreign-personal-context\n          Exclude foreign personal rules and skills from this run\n      --no-session-log\n          Do not persist session event logs to disk\n      --approval-mode <MODE>\n          Tool approval mode: untrusted|on-request|never (default: on-request)\n      --approval-judge <off|on>\n          LLM approval judge for Prompt-bound calls (default: on)\n  -h, --help\n          Print this help\n\nSafety (approval and the sandbox are ON by default):\n      --yolo\n          Disable approval and sandbox, trust this workspace (this run)\n      --trust-workspace\n          Load this workspace's skills and rules (this run)\n      --disable-approval\n          Disable tool approval prompts for this run\n      --disable-sandbox\n          Disable shell filesystem/network sandboxing for this run\n      --sandbox-network <MODE>\n          Sandbox network mode (default: proxy-only)\n      --disable-write\n          Disable non-shell workspace filesystem writes\n      --disable-shell\n          Disable workspace shell execution\n      --enable-shell-tool\n          Use the legacy shell tool instead of the managed platform shell\n\n",
+  "err": ""
+ },
+ "python": {
+  "code": 0,
+  "out": "Python 3.11.12\n",
+  "err": ""
+ },
+ "flags": {
+  "--json": false,
+  "--prompt-file": false,
+  "--max-model-steps": true,
+  "--approval-mode": true,
+  "--contributor-mode": true,
+  "--sandbox-network": true,
+  "--api-key-stdin": false
+ },
+ "observers": {
+  "flags": [],
+  "help_lines": [],
+  "settings": null,
+  "validate": {
+   "made_up_key": {
+    "code": 1,
+    "says": "enterprise_document_invalid: plane=defaults reason=unknown_member"
+   },
+   "candidate_0": {
+    "code": 1,
+    "says": "enterprise_document_invalid: plane=defaults reason=unknown_member"
+   },
+   "candidate_1": {
+    "code": 1,
+    "says": "enterprise_document_invalid: plane=defaults reason=unknown_member"
+   }
+  },
+  "config_help": [
+   "Usage: muse config validate --plane <defaults|policy> --file <path>",
+   "muse config status",
+   "validate checks an enterprise plane document ({\"schema_version\":1,\"settings\":{...}} for defaults), not the user's flat settings.json; unknown top-level settings.json members are named at startup instead."
+  ]
+ },
+ "gate": "denies a command and a read outside the worktree",
+ "ok": false
+}
+Stopping app - uncaught exception raised locally: SystemExit(1).
