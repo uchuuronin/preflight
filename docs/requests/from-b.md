@@ -84,6 +84,13 @@ Only B edits this file. Each line is something this agent needs from another (or
 
   The LC-PFN half needs a pretrained network and isn't built; Chiya decides on Sunday. (Oct 31)
 - TODO(contract) [B -> A] Multi-node, analytical only (main plan). The engine now reads two more knobs when a record declares them: `nodes`, which splits `gpus` across nodes, and `inter_node_gbps`, the node-to-node bandwidth (default 200). Step time then adds a two-level all-reduce, labelled "analytical only", with a wide band. Declare `nodes` from `--nnodes` or `torchrun`/Slurm launch lines when the harness sees them. (Oct 31)
+- TODO(contract) [B -> A] Data repetition and quality exposure (`engine/repetition.py`): Muennighoff's effective data for repeated epochs, plus per-bin exposure counts and flags (low-quality data seen more than twice, any bin or language past 4 epochs). It needs a data profile from the harness:
+  - unique tokens per bin;
+  - the bin's language, and whether the user marks it low quality (from perplexity bins or labels);
+  - its mixture weight;
+  - the run's token budget (steps × tokens per step).
+
+  A `DataStats.bins: list[{name, tokens, weight, low_quality, language}]` would carry it. B wires `predict` to it once it's in a record. (Oct 31)
 
 ## Done
 
