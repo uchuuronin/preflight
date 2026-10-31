@@ -126,9 +126,12 @@ def main(spec_path: str) -> int:
 	rank = _rank()
 	if rank > 0:
 		# torchrun (spec nproc > 1): every rank runs under its own recorder; rank 0 writes the
-		# result, progress and trace, the others a result of their own beside it (memory per rank)
+		# result and progress, the others a result of their own beside it (memory per rank)
 		out_path = f"{out_path}.rank{rank}"
-		spec = {**spec, "progress": None, "trace": None, "profile": False}
+		# profiling stays on so every rank runs the same steps (a rank that stops early leaves rank 0's
+		# next all-reduce without a partner); its trace goes beside rank 0's and is never read
+		trace = f"{spec['trace']}.rank{rank}" if spec.get("trace") else None
+		spec = {**spec, "progress": None, "trace": trace}
 	try:
 		import torch  # noqa: F401  (fails here, inside the try, when torch is missing)
 

@@ -334,3 +334,11 @@ def test_a_ddp_script_runs_one_recorder_per_rank_under_torchrun():
 	ex = r.probe.extras
 	assert ex["world_size"] == 2 and ex["ranks_reported"] == 2
 	assert ex["rank_step_p50_max_s"] >= r.probe.step_time.p50_s
+
+
+def test_a_profiled_ddp_probe_keeps_every_rank_in_step():
+	"""Review, Oct 31: ranks above 0 stopped before rank 0's profiled steps and left its all-reduce
+	without a partner."""
+	r = run_probe(spec("ddp_loop.py", warmup=1, timed=2, nproc=2, profile=True, timeout_s=240))
+	assert r.probe.status == "ok", (r.probe.error, r.log_tail[-2000:])
+	assert r.probe.extras["ranks_reported"] == 2

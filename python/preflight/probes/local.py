@@ -31,6 +31,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -608,6 +609,18 @@ def _extras(summary: dict) -> dict[str, float]:
 # ---------------------------------------------------------------- run
 
 
+def _read_untrusted(path: Path, cap: int = 5_000_000) -> str:
+	"""A file the probe's uid could write: never through a link, only a regular file, at most cap
+	bytes (a planted link to /dev/zero or a FIFO can't stall or flood the parent)."""
+	fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+	try:
+		if not stat.S_ISREG(os.fstat(fd).st_mode):
+			raise OSError(f"{path.name} is not a regular file")
+		return os.read(fd, cap).decode(errors="replace")
+	finally:
+		os.close(fd)
+
+
 def _rank_extras(out: Path, nproc: int, summary: dict) -> dict:
 	"""What the other ranks' results add to rank 0's: the world size, the largest peak and the
 	slowest median step of any rank (the rank that OOMs or straggles sets the run)."""
@@ -618,7 +631,7 @@ def _rank_extras(out: Path, nproc: int, summary: dict) -> dict:
 	vals, seen = [peak_p50(summary)], 1
 	for r in range(1, nproc):
 		with contextlib.suppress(OSError, ValueError):
-			_, _, _, s, _ = parse_result(Path(f"{out}.rank{r}").read_text(errors="replace")[:5_000_000])
+			_, _, _, s, _ = parse_result(_read_untrusted(Path(f"{out}.rank{r}")))
 			vals.append(peak_p50(s))
 			seen += 1
 
@@ -744,12 +757,15 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 
 	prog = {"stage": "starting", "steps": 0}
 	with contextlib.suppress(OSError, ValueError):
-		prog = json.loads(progress.read_text())
+		prog = json.loads(_read_untrusted(progress, 64_000))
+	raw = None
+	with contextlib.suppress(OSError):
+		raw = _read_untrusted(out)
 	if cancelled:
 		status, code = "cancelled", "cancelled"
 		error = "Cancelled while running"
 		summary, raw_env = {"steps": int(prog.get("steps", 0))}, {}
-	elif timed_out or not out.exists():
+	elif raw is None:
 		steps = int(prog.get("steps", 0))
 		c = classify_exit(
 			returncode=None if timed_out else proc.returncode,
@@ -763,7 +779,10 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 			error += " (during the eval pass)"
 		summary, raw_env = {"steps": steps}, {}
 	else:
-		status, code, error, summary, raw_env = parse_result(out.read_text(errors="replace")[:5_000_000])
+		# a result written before the time limit stands (a rank hung in teardown after writing it)
+		if timed_out:
+			log.warning("probe %s hit its time limit after writing its result", spec.probe_id)
+		status, code, error, summary, raw_env = parse_result(raw)
 		if spec.nproc > 1:
 			summary = {**summary, **_rank_extras(out, spec.nproc, summary)}
 	try:
