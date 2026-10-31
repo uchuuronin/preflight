@@ -151,7 +151,12 @@ class GateBroken(RuntimeError):
 def gate_check(box: Box, root: str, python: str = muse.HOOK_PYTHON) -> None:
 	"""Run the hook exactly as settings.json will, with an empty environment, on a shell command and
 	on a read outside the worktree, and require a deny for both."""
-	argv = ["env", "-i", *muse.hook_command(f"{ROOT}/hook.py", root, python).split()]
+	# The same command settings.json gives Muse Code, log argument included.
+	argv = [
+		"env",
+		"-i",
+		*muse.hook_command(f"{ROOT}/hook.py", root, python, f"{ROOT}/hooklog/gate.jsonl").split(),
+	]
 	for tool, args in (("bash", {"command": "env"}), ("read_file", {"path": "/proc/self/environ"})):
 		payload = json.dumps(
 			{"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": args, "cwd": root}
@@ -254,6 +259,11 @@ def _one(
 	cand.diff, cand.files = diff, touched
 	if code in TIMED_OUT:
 		cand.status = "timeout"
+		return cand
+	if ev.tools and not cand.tool_calls:
+		# Muse Code used tools but the gate never saw one: its settings (and the hook) weren't
+		# loaded, so nothing it did can be trusted.
+		cand.status, cand.problem = "refused", "gate_not_seen"
 		return cand
 	problem = muse.diff_problem(diff, touched, files)
 	if problem == "no_change":

@@ -214,13 +214,25 @@ OBSERVER_SETTINGS = (
 )
 
 
+def _bare_flag(help_text: str, flag: str) -> bool:
+	import re
+
+	if "=" in flag:
+		return flag.split("=")[0] in help_text and bool(
+			re.search(re.escape(flag.split("=")[0]) + r"[ =]<?(on|off)", help_text)
+		)
+	return bool(re.search(re.escape(flag) + r"(?![\w-])(?!\s*[=<]|\s+[A-Z]{2,})", help_text))
+
+
 def _observer_switch(box: ModalBox, help_text: str) -> dict:
 	"""Whether this Muse Code can run without its background observers, and how: a flag in
 	`muse exec --help`, or a settings block its validator accepts. Nothing here calls a model."""
 	from preflight_api.fix import muse
 
 	found: dict = {
-		"flags": [f for f in muse.OBSERVER_FLAGS if f.split("=")[0] in help_text],
+		# A flag only when its help line shows it takes no value (a bare flag that needs one would
+		# fail the run at argument parsing).
+		"flags": [f for f in muse.OBSERVER_FLAGS if _bare_flag(help_text, f)],
 		"help_lines": [ln.strip() for ln in help_text.splitlines() if "observer" in ln.lower()][:10],
 		"settings": None,
 		"validate": {},
@@ -230,8 +242,12 @@ def _observer_switch(box: ModalBox, help_text: str) -> dict:
 	found["config_help"] = [ln.strip() for ln in (so + se).splitlines() if ln.strip()][:40]
 
 	def validate(name: str, obj: dict) -> int:
+		# Validated merged with the hooks block it will sit beside, so an accepted file is the file
+		# Muse Code will read.
 		path = f"/fix/validate-{name}.json"
-		box.write(path, json.dumps({"schema_version": 1, **obj}))
+		box.write(
+			path, json.dumps({**muse.settings("/fix/hook.py", "/fix/repo"), **obj, "schema_version": 1})
+		)
 		c, o, e = box.run(
 			[*env, "muse", "config", "validate", "--plane", "defaults", "--file", path], timeout=60
 		)

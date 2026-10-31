@@ -142,6 +142,12 @@ FAKE_MUSE = textwrap.dedent(
 	def ask(tool, inp):
 		r = subprocess.run(hook, input=json.dumps({"tool_name": tool, "tool_input": inp, "cwd": os.getcwd()}), capture_output=True, text=True, env={})
 		return not r.stdout.strip()
+	if mode == "nohook":  # settings not loaded: tools run with no gate at all
+		print(json.dumps({"type": "tool_result", "tool_name": "edit_file", "result": "ok"}))
+		src = open("train.py").read()
+		open("train.py", "w").write(src.replace("model.eval()", "model.eval()\nwith torch.no_grad():"))
+		print(json.dumps({"role": "assistant", "text": "done"}))
+		sys.exit(0)
 	# Muse Code runs a tool when its hook fails; this stand-in does the same.
 	ran = ask("bash", {"command": "env"})
 	print(json.dumps({"type": "tool_result", "tool_name": "bash", "result": "ran" if ran else "tool blocked by hook: Preflight"}))
@@ -488,3 +494,10 @@ def test_a_race_reports_every_tool_call_the_gate_saw_without_contents(box):
 	settings = json.loads((box.root / "cfg" / "c1" / "muse" / "settings.json").read_text())
 	assert settings["x_extra"] == 1 and settings["schema_version"] == 1
 	assert "--no-observers" in muse.command("/p", extra_flags=("--no-observers",))
+
+
+def test_a_run_the_gate_never_saw_is_refused_whatever_it_changed(box):
+	out = race.race(
+		box, {**FILES, "MODE": "nohook\n"}, [("eval.wrap_no_grad", None)], KEY, python=sys.executable
+	)
+	assert out[0].status == "refused" and out[0].problem == "gate_not_seen"
