@@ -112,7 +112,7 @@ def test_files_sent_from_the_checkout_are_measured_where_the_zoo_isnt(tmp_path, 
 	def probe(spec, **kw):
 		seen["probe_files"] = spec.files
 		p = types.SimpleNamespace(status="error", steps=0, step_time=None, memory=None, cost=None,
-			step_log=[], error="x", error_code="x")  # fmt: skip
+			step_log=[], error="x", error_code="x", rl=None, generation=None, extras={})  # fmt: skip
 		return types.SimpleNamespace(probe=p, env=None, log_tail="")
 
 	monkeypatch.setattr(gt, "_bare", bare)
@@ -145,7 +145,7 @@ def test_the_bare_run_keeps_its_own_hf_home_so_the_probe_can_write_its_locks(tmp
 	monkeypatch.setattr(gt, "_bare", bare)
 	monkeypatch.setattr(local, "run_probe", lambda spec, **kw: types.SimpleNamespace(
 		probe=types.SimpleNamespace(status="error", steps=0, step_time=None, memory=None, cost=None,
-			step_log=[], error="x", error_code="x"), env=None, log_tail=""))  # fmt: skip
+			step_log=[], error="x", error_code="x", rl=None, generation=None, extras={}), env=None, log_tail=""))  # fmt: skip
 	gt.measure(tmp_path / "s", bare_steps=1, files={"train.py": ""}, budget_s=60)
 	own = Path(seen["env"]["HF_HOME"])
 	assert own != home and seen["link"] == weights.resolve()

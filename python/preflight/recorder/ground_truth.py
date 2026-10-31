@@ -197,7 +197,10 @@ def measure(
 			"steps": r.probe.steps, "p50_s": r.probe.step_time.p50_s if r.probe.step_time else None,
 			"peak_allocated_bytes": r.probe.memory.peak_allocated_bytes if r.probe.memory else None,
 			"seconds": r.probe.cost.gpu_seconds if r.probe.cost else None,
-			"step_log": log, "log_tail": r.log_tail[-1500:]},
+			"by_phase": r.probe.step_time.by_phase if r.probe.step_time else {},
+			"rl": r.probe.rl.model_dump(mode="json") if r.probe.rl else None,
+			"generation": r.probe.generation.model_dump(mode="json") if r.probe.generation else None,
+			"extras": r.probe.extras, "step_log": log, "log_tail": r.log_tail[-1500:]},
 		"overhead": over}  # fmt: skip
 
 
