@@ -1,0 +1,11 @@
+{
+	"name": "20261031-230250-41250821790-a-agent-sample-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41250821790",
+	"ref": "ws-a",
+	"sha": "3c12712d842de4a3cd710aff09acd9a0ee9ecf80",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark --k 30 --max-usd 3",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T23:05:48Z"
+}
