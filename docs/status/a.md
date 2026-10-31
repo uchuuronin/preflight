@@ -99,6 +99,14 @@ Updated Tue Oct 27, evening ET.
 - The queue saves under its lock. At 8 GPUs and a few visitors that is tens of saves a minute;
   revisit if the store moves off a single container.
 - Repos need a full 40-character commit: GitHub only serves a fetch by the whole hash.
+- RL phases: weight sync misses the ZeRO-3 parameter gather (it lands in forward) and vLLM V1
+  (only the V0 engine path is wrapped); with PEFT and `num_iterations` > 1 the reference forward
+  isn't told apart from the policy's old log-probs, so it counts as forward.
+- Agent sampler: a task's key hashes its whole first call, so a timestamp or id in the first
+  prompt defeats the top-up's skip; tasks that all open with the same call can't be topped up.
+  The proxy's refusals carry `x-should-retry: false`, which the OpenAI SDKs honour; other
+  clients may back off on them. Side calls (judges, sub-agents) start tasks of their own.
+- In-flight mode: an eval or checkpoint pause inside a window can raise a false step-time alert.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
