@@ -86,13 +86,13 @@ class Sweeper:
 		small = next(c for c in configs.kernel_configs(20) if c.family == "mlp")
 		child = isolate.run_isolated(small, device="cuda", timeout_s=120.0)
 		return {
-			"child_status": child.get("status"),
+			"child_status": str(child.get("status")),
 			"child_seconds": round(float(child.get("gpu_seconds") or 0.0), 1),
-			"text_asset": os.path.exists(TEXT),
-			"gpu": gpus.resolve(props.name, props.total_memory, props.multi_processor_count),
-			"total_memory": props.total_memory,
-			"torch": torch.__version__,
-			"transformers": md.version("transformers"),
+			"text_asset": bool(os.path.exists(TEXT)),
+			"gpu": str(gpus.resolve(props.name, props.total_memory, props.multi_processor_count)),
+			"total_memory": int(props.total_memory),
+			"torch": str(torch.__version__),  # a TorchVersion would need torch to unpickle on the client
+			"transformers": str(md.version("transformers")),
 			"volume_ok": True,
 		}
 

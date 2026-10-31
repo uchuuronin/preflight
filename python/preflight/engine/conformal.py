@@ -230,7 +230,8 @@ try:  # written by corpus/calibrate.py once held-out real runs exist; a plain mo
 	from preflight.engine._calibration_table import DATA as _DATA
 
 	TABLE = Table.from_dict(_DATA)
-except ImportError:
+except (ImportError, SyntaxError, NameError, KeyError, TypeError, ValueError):
+	# a missing or broken generated table must never stop the engine importing: bands fall back to simulated
 	TABLE = Table(built_from="none: no held-out real runs yet")
 
 

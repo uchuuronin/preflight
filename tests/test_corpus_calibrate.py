@@ -174,3 +174,31 @@ def test_reliability_needs_real_out_of_memory_runs():
 		+ [(0.5, False)] * 6
 	)
 	assert oom.reliable(oom.reliability(mixed))
+
+
+def test_the_written_table_imports_as_python_and_round_trips(tmp_path):
+	import importlib.util
+
+	from preflight.engine import conformal as cf
+
+	table = cf.Table(
+		{
+			("memory.peak", "L4", "finetune"): cf.Cell(
+				0.1, 12, 4, "held_out", ("memory.peak", "L4", "finetune"), (0.01, -0.02)
+			)
+		},
+		"test",
+		oom_reliable=False,
+		coverage={"memory.peak": (11, 12)},
+	)
+	out = tmp_path / "_calibration_table.py"
+	calibrate.write_table(table, out)
+	spec = importlib.util.spec_from_file_location("t", out)
+	mod = importlib.util.module_from_spec(spec)
+	spec.loader.exec_module(mod)  # JSON's true/false/null would raise NameError here
+	back = cf.Table.from_dict(mod.DATA)
+	assert (
+		back.cells.keys() == table.cells.keys()
+		and back.oom_reliable is False
+		and back.coverage == table.coverage
+	)

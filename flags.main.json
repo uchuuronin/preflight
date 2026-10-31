@@ -1,0 +1,4 @@
+{
+	"$comment": "Overrides for Modal's main environment only (testing, not the public site). engine.memory on: Chiya, Oct 30. The public turn-on waits for the held-out results.",
+	"engine.memory": true
+}
