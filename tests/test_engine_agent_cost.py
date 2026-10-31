@@ -210,3 +210,42 @@ def test_top_up_is_not_offered_again_after_dedup():
 		25, 20, 30, "usd", "predicted", detail={"n": 45, "population": 500, "topped_up": True}
 	)
 	assert not ac.budget_check(e, 25).offer_top_up
+
+
+def _tasks(costs, latencies, stops=None):
+	from preflight.schema.record import AgentSample, AgentTask
+
+	stops = stops or [None] * len(costs)
+	tasks = [
+		AgentTask(
+			task_id=f"t{i}", turns=1, input_tokens=1, output_tokens=1, latency_s=w, cost_usd=c, stop_reason=s
+		)
+		for i, (c, w, s) in enumerate(zip(costs, latencies, stops, strict=True))
+	]
+	return AgentSample(tasks=tasks, population=500)
+
+
+def test_a_tool_loop_that_makes_no_model_calls_runs_away_by_time():
+	# Chiya, Oct 31: D's planted tool loop costs nothing more, so only its wall time shows it
+	costs = [0.014] * 30
+	walls = [20.0] * 28 + [600.0, 20.0]
+	stops = [None] * 29 + ["timeout"]
+	r = ac.agent_totals(_tasks(costs, walls, stops))["risk.runaway"]
+	assert r.point == pytest.approx(2 / 30)
+	rules = r.detail["by_rule"]
+	assert rules["cost"]["runaways"] == 0 and rules["time"]["runaways"] == 2
+	assert rules["time"]["hi"] == pytest.approx(ac.cp_upper(2, 30, 0.95))
+	assert "by time: 2 of 30" in r.reason and r.lo <= r.point <= r.hi
+
+
+def test_a_task_that_runs_away_both_ways_counts_once():
+	costs = [0.01] * 29 + [1.0]
+	walls = [10.0] * 29 + [500.0]
+	r = ac.agent_totals(_tasks(costs, walls))["risk.runaway"]
+	assert r.point == pytest.approx(1 / 30) and r.detail["by_rule"]["cost"]["runaways"] == 1
+
+
+def test_no_runaways_either_way_keeps_the_upper_end_from_the_sample_size():
+	r = ac.agent_totals(_tasks([0.014] * 30, [20.0] * 30))["risk.runaway"]
+	assert r.point == 0 and r.hi == pytest.approx(ac.cp_upper(0, 30, 0.95))
+	assert "none of 30" in r.reason and "by time: 0 of 30" in r.reason

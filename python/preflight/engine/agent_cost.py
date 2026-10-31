@@ -29,6 +29,13 @@ import numpy as np
 MODEL_ID = "agent-bootstrap-cp@0.1.0"
 LEVEL = 0.9  # cited: contract, 90% intervals
 RUNAWAY_FACTOR = 8.0  # simulated: A's D3, a task above 8x the sample median is a runaway
+# guess: the cost rule's 8x carried over to wall time, until D's planted tool loop is measured against it. A tool
+# loop makes no model calls, so the cost rule can't see it; its wall time can (Chiya, Oct 31)
+TIME_RUNAWAY_FACTOR = 8.0
+RUNAWAY_STOPS = (
+	"timeout",
+	"loop",
+)  # measured: the recorder stopped the task itself, which the time rule counts
 UNSEEN_RUNAWAY_MULT = 20.0  # simulated: A's D3, a runaway nobody saw is priced at 20x the median
 RUNAWAY_BOUND = 0.80  # simulated: A's D3 rerun and S6; a full benchmark run against its sample replaces it
 N_BOOT = 2000  # derived: 2,000 resamples put the 5th and 95th percentiles within about 1% of their limit
@@ -253,6 +260,65 @@ def runaway_rate(
 	)
 
 
+def time_runaways(
+	latencies: list[float | None], stops: list[str | None], factor: float = TIME_RUNAWAY_FACTOR
+):
+	"""Per task: did it run away by time? Its wall time is above `factor` x the sample's median, or the recorder
+	stopped it for a timeout or a loop. A task with no wall time counts only by its stop."""
+	s, _ = _clean(latencies)
+	cut = runaway_threshold(s, factor) if s.size else math.inf
+	return [
+		(v is not None and math.isfinite(v) and v > cut) or (stop in RUNAWAY_STOPS)
+		for v, stop in zip(latencies, stops, strict=True)
+	]
+
+
+def runaway_rate_by_cost_and_time(
+	values: list[float | None],
+	latencies: list[float | None],
+	stops: list[str | None],
+	level: float = LEVEL,
+	min_sample: int = MIN_SAMPLE,
+	runaway_factor: float = RUNAWAY_FACTOR,
+	time_factor: float = TIME_RUNAWAY_FACTOR,
+) -> TotalEstimate:
+	"""Share of tasks that run away by cost (or tokens) or by time, with a two-sided Clopper-Pearson interval.
+	Each rule's own count and bound are in `detail` and the reason (Chiya, Oct 31)."""
+	n = len(values)
+	if n < min_sample:
+		return _abstain("probability", f"only {n} tasks measured; run at least {min_sample}", n=n)
+	s, dropped = _clean(values)
+	cut = runaway_threshold(s, runaway_factor) if s.size else math.inf
+	by_cost = [v is not None and math.isfinite(v) and v > cut for v in values]
+	by_time = time_runaways(latencies, stops, time_factor)
+	either = [a or b for a, b in zip(by_cost, by_time, strict=True)]
+	side = (1 + level) / 2
+	xc, xt, x = sum(by_cost), sum(by_time), sum(either)
+
+	def bound(k: int) -> dict:
+		return {"runaways": k, "lo": cp_lower(k, n, side), "hi": cp_upper(k, n, side)}
+
+	rules = {"cost": bound(xc), "time": bound(xt)}
+	pct = round(level * 100)
+	why = (
+		f"by cost: {xc} of {n} (up to {rules['cost']['hi']:.0%}); by time: {xt} of {n} (up to "
+		f"{rules['time']['hi']:.0%}), a task over {time_factor:g}x the median wall time or stopped for a timeout or a "
+		f"loop; {pct}% Clopper-Pearson"
+	)
+	if not x:
+		why = f"none of {n} sampled tasks ran away; the upper end is what {n} tasks can rule out. {why}"
+	return TotalEstimate(
+		x / n,
+		cp_lower(x, n, side),
+		cp_upper(x, n, side),
+		"probability",
+		"predicted",
+		reason=why,
+		level=level,
+		detail={"n": n, "runaways": x, "dropped": dropped, "by_rule": rules},
+	)
+
+
 # ---------------------------------------------------------------- from A's AgentSample
 
 
@@ -284,11 +350,14 @@ def agent_totals(
 	out = {
 		"cost.total": _flag(estimate_total(costs, pop, "usd", **kw), topped),
 		"tokens.total": _flag(estimate_total(tokens, pop, "tokens", **kw), topped),
-		"risk.runaway": runaway_rate(
+		"risk.runaway": runaway_rate_by_cost_and_time(
 			costs if any(c is not None for c in costs) else tokens,
+			[t.latency_s for t in tasks],
+			[t.stop_reason for t in tasks],
 			level=kw.get("level", LEVEL),
 			min_sample=kw.get("min_sample", MIN_SAMPLE),
 			runaway_factor=kw.get("runaway_factor", RUNAWAY_FACTOR),
+			time_factor=kw.get("time_factor", TIME_RUNAWAY_FACTOR),
 		),
 	}
 	return out
