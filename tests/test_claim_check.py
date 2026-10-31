@@ -64,3 +64,31 @@ def test_findings_are_checked_by_id():
 	rec = _rec()
 	out, _ = check_findings(rec)
 	assert all(isinstance(k, str) for k in out)
+
+
+def test_numbers_inside_names_and_versions_are_not_claims():
+	texts = [
+		n.text
+		for n in numbers_in(
+			"H100 in bf16 with Qwen2.5-1.5B on CUDA 12.4 took 1.5 hr, -12% and 4,096 tokens/s"
+		)
+	]
+	assert texts == ["1.5 hr", "-12%", "4,096"]
+	ns = numbers_in("1.5 hr, 4,096 tokens/s, 0%")
+	assert ns[0].kind == "seconds" and ns[0].value == 5400 and ns[1].kind == "rate" and ns[2].value == 0
+
+
+def test_phase_shares_and_rates_have_their_own_kinds():
+	from preflight.harness.claim_check import _kind_of
+
+	assert _kind_of("probes.p1.step_time.by_phase.optimizer") == "fraction"
+	assert _kind_of("probes.p1.throughput.tokens_per_s") == "rate"
+	assert _kind_of("probes.p1.extras.encode_items_per_s") == "rate"
+	assert _kind_of("probes.p1.memory.peak_allocated_bytes") == "bytes"
+	assert _kind_of("probes.p1.step_time.p50_s") == "seconds"
+
+
+def test_knob_values_never_back_a_claim():
+	from preflight.harness.claim_check import raw_numbers
+
+	assert not any(".knobs." in k for k in raw_numbers(_rec()))

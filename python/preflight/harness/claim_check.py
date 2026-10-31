@@ -35,21 +35,32 @@ UNITS = {
 	"seconds": ("seconds", 1.0),
 	"min": ("seconds", 60.0),
 	"minutes": ("seconds", 60.0),
+	"m": ("seconds", 60.0),
 	"h": ("seconds", 3600.0),
+	"hr": ("seconds", 3600.0),
+	"hrs": ("seconds", 3600.0),
 	"hours": ("seconds", 3600.0),
 	"%": ("fraction", 0.01),
 }
+# not a number inside a name ("H100", "bf16", "Qwen2.5-1.5B", "CUDA 12.4" stays: a version is
+# words), and the sign kept ("-12%")
 _NUM = re.compile(
-	r"(?P<usd>\$)?(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*"
-	r"(?P<unit>TiB|GiB|MiB|KiB|TB|GB|MB|KB|ms|sec|seconds|s|minutes|min|hours|h|%)?(?![A-Za-z])"
+	r"(?<![\w.])(?P<sign>[-−])?(?P<usd>\$)?(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*"
+	r"(?P<unit>TiB|GiB|MiB|KiB|TB|GB|MB|KB|ms|sec|seconds|s|minutes|min|m|hours|hrs|hr|h|%)?(?![\w.])"
 )
+_VERSION = re.compile(r"(?i)(cuda|rocm|python|torch|pytorch|transformers|version|v)\s*$")
 # which raw fields can back which kind of number (by the field path's last part)
 FIELD_KIND = (
+	(
+		"fraction",
+		re.compile(r"(by_phase\.\w+|fraction|share|ratio|mfu)$"),
+	),  # before bytes: by_phase.optimizer
+	("rate", re.compile(r"(_per_s|per_second|_items_per_s)$")),  # before seconds: tokens_per_s isn't a time
 	("bytes", re.compile(r"(bytes|peak|reserved|weights|gradients|optimizer|activations|logits)$")),
 	("seconds", re.compile(r"(_s|seconds|duration_s|wall_s)$")),
 	("usd", re.compile(r"(usd|cost)$")),
-	("fraction", re.compile(r"(fraction|share|by_phase\.\w+|ratio|rate|mfu)$")),
 )
+_RATE_AFTER = re.compile(r"\s*(?:[A-Za-z]+\s*)?(?:/\s*s(?:ec)?\b|a second|per second)")  # "4,096 tokens/s"
 
 
 @dataclass(frozen=True)
@@ -71,21 +82,27 @@ class ClaimCheck:
 
 def numbers_in(text: str) -> list[Number]:
 	out = []
-	for m in _NUM.finditer(text or ""):
+	text = text or ""
+	for m in _NUM.finditer(text):
+		if _VERSION.search(text[: m.start()]):
+			continue  # "CUDA 12.4", "torch 2.5": a version, not a measurement
 		raw = m["num"].replace(",", "")
-		v = float(raw)
+		v = float(raw) * (-1 if m["sign"] else 1)
 		decimals = len(raw.split(".")[1]) if "." in raw else 0
 		# half a unit in the last written place, relative to the value (21.9 -> 0.05 / 21.9)
-		rel = max(0.5 * 10**-decimals / v, 1e-6) if v else 1e-6
+		rel = max(0.5 * 10**-decimals / abs(v), 1e-6) if v else 0.5 * 10**-decimals
 		unit = (m["unit"] or "").lower()
 		if m["usd"]:
 			kind, scale = "usd", 1.0
 		elif unit in UNITS:
 			kind, scale = UNITS[unit]
+		elif _RATE_AFTER.match(text, m.end()):
+			kind, scale = "rate", 1.0  # "4,096 tokens/s" reads as a rate even with a word between
 		else:
 			kind, scale = "count", 1.0
-		if kind == "count" and decimals == 0 and v < 10:
+		if kind == "count" and decimals == 0 and abs(v) < 10:
 			continue  # "2 seeds", "step 1": too small to tell a measurement from words
+		# GB is 10^9 bytes; a sentence written in GiB-as-GB is a different number and gets flagged
 		out.append(Number(m.group(0).strip(), v * scale, kind, rel))
 	return out
 
@@ -110,7 +127,10 @@ def raw_numbers(record) -> dict[str, float]:
 	"""The record's measured numbers: its probes and agent sample, never its predictions."""
 	out: dict[str, float] = {}
 	for p in record.probes:
-		out.update(flatten(p.model_dump(mode="json", exclude={"kernels", "step_log"}), f"probes.{p.id}"))
+		# knobs are settings, not measurements: "bf16" or "batch 16" is never backed by a knob value
+		out.update(
+			flatten(p.model_dump(mode="json", exclude={"kernels", "step_log", "knobs"}), f"probes.{p.id}")
+		)
 	if record.agent_sample is not None:
 		out.update(flatten(record.agent_sample, "agent_sample"))
 	return out
@@ -127,6 +147,8 @@ def _kind_of(path: str) -> str:
 def candidates(n: Number, raw: dict[str, float]) -> list[str]:
 	"""Raw fields of the number's kind whose value rounds to it as written."""
 	tol = max(n.rel, 1e-9)
+	if n.value == 0:  # "0%": fields that are exactly zero
+		return [path for path, v in raw.items() if _kind_of(path) == n.kind and v == 0]
 	return [
 		path
 		for path, v in raw.items()
