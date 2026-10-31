@@ -1,0 +1,2 @@
+# 1.55.0 fails with httpx 0.28 (the probe image's); 1.57.0 works (tested Oct 31)
+openai==1.57.0
