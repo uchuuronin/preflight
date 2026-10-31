@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Info } from "../../workspace/components/Info";
 import { Measured } from "../../workspace/cockpit/Measured";
+import { ProbeHere } from "../../workspace/cockpit/ProbeHere";
 import { statusLine } from "../../workspace/cockpit/statusLine";
 import { fitMapKnobs } from "../../workspace/record/fitmap";
 import { GuidePanel } from "../../guide/GuidePanel";
@@ -132,6 +133,7 @@ function Cockpit() {
 						<p className={`pf-statusline is-${line.tone}`} aria-live="polite">
 							{line.text}
 						</p>
+						<ProbeHere />
 					</header>
 					<div className={`pf-deck${fit ? " is-fit" : ""}`}>
 						<Dials />

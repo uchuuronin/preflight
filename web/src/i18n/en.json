@@ -754,5 +754,14 @@
 	"hops.toggle": "Possible outcomes",
 	"hops.help": "Each frame is one outcome inside the 90% interval. The risk dial is the engine's own chance.",
 	"hops.help_still": "Every outcome inside the 90% interval, drawn at once. The risk dial is the engine's own chance.",
-	"hops.oom": "Out of memory in this outcome"
+	"hops.oom": "Out of memory in this outcome",
+	"probehere.label": "Measure this setting",
+	"probehere.why": "Not trusted at this setting: {what}. Nothing measured is close enough to predict it.",
+	"probehere.readout.memory": "peak memory",
+	"probehere.readout.time": "time to finish",
+	"probehere.readout.cost": "run cost",
+	"probehere.readout.risk": "chance of running out of memory",
+	"probehere.go": "Run a probe here",
+	"probehere.sending": "Sending",
+	"probehere.cost": "Measures this setting on a real GPU. One measured run took under 7 minutes on an L4 (28 Oct 2026, UTC)."
 }

@@ -1820,3 +1820,9 @@ a {
 .pf-hop.is-all { border-left-width: 1px; opacity: 0.5; }
 .pf-hop.is-over { border-left-color: var(--pf-fail); }
 .pf-hop-note { font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fail); }
+
+/* "Run a probe here" under the status line when a readout abstains (cockpit/ProbeHere.tsx) */
+.pf-probehere { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; flex-basis: 100%; }
+.pf-probehere__why { margin: 0; flex-basis: 100%; font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
+.pf-probehere__cost { margin: 0; font-size: 10.5px; color: var(--pf-fg-dim); max-width: 44ch; }
+.pf-probehere__error { margin: 0; flex-basis: 100%; font-size: var(--pf-text-xs); color: var(--pf-fail); }
