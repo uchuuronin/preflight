@@ -84,7 +84,15 @@ def reliability(
 	return out
 
 
-def reliable(bins: list[Bin], min_per_bin: int = 10) -> bool:
-	"""Probabilities can be shown as numbers only when every populated bin agrees with what happened."""
+MIN_OOM_EVENTS = (
+	10  # guess: real out-of-memory runs needed before the upper bins mean anything; revisit with the corpus
+)
+
+
+def reliable(bins: list[Bin], min_per_bin: int = 10, min_ooms: int = MIN_OOM_EVENTS) -> bool:
+	"""Probabilities can be shown as numbers only when every populated bin agrees with what happened, at least two
+	bins are populated, and real out-of-memory runs were seen: a check made only on jobs that fit says nothing about
+	the probabilities that matter."""
 	populated = [b for b in bins if b.n >= min_per_bin]
-	return bool(populated) and all(b.consistent for b in populated)
+	ooms = sum(round(b.observed * b.n) for b in bins if b.n)
+	return len(populated) >= 2 and ooms >= min_ooms and all(b.consistent for b in populated)

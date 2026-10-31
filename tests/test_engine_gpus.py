@@ -268,3 +268,21 @@ def test_unlisted_gpu_falls_back_to_what_the_probe_reported():
 	assert gpus.price(name) is None and gpus.on_demand_reference(name) is None
 	with pytest.raises(KeyError):
 		gpus.get_gpu("unlisted:bad")
+
+
+@pytest.mark.parametrize("name", ["A100 MIG 1g.0gb", "NVIDIA A100-SXM4-80GB MIG 0g.10gb", "A100 MIG 0g.0gb"])
+def test_impossible_mig_profiles_are_unknown_not_a_crash(name):
+	with pytest.raises(KeyError):
+		gpus.resolve(name)
+
+
+def test_predict_survives_an_impossible_mig_what_if():
+	from pathlib import Path
+
+	from preflight.engine import api
+	from preflight.schema import load_record
+
+	rec = load_record((Path(__file__).resolve().parents[1] / "schema/examples/finetune.json").read_text())
+	p = api.predict(rec, {"gpu_type": "A100 MIG 1g.0gb"}).root
+	assert p["time.step"].status == "abstain" and "isn't a GPU the table knows" in p["time.step"].reason
+	api.run_cost(rec, {"gpu_type": "A100 MIG 1g.0gb"})

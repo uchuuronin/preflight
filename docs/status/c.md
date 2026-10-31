@@ -1,5 +1,32 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Wed Oct 28, afternoon (merged contract 0.4.0)
+
+**Done**
+
+- API startup check, run from `main` with Chiya's yes: the image starts as Modal loads it
+  (`/root/app.py`), session keys and the edge secret work, the records volume mounts read-only
+  and reloads in 0.105 s (measured) with 2 records seen, the ledger restores. It exited 1 only
+  because A's `preflight-runner` was stopped at the time (`NotFoundError`), which is A's app
+  being down, not the API.
+- Notebook hand-off for D: intake panels get `setSource`; while D's Notebook tab is on, the
+  Upload tab sends notebooks there.
+- Coverage page `#/checks` from A's real L4 run, held-out only, Wilson 95%: out of memory none
+  missed yet (1 of 1, 21% to 100%); step time 0 of 3 within 15% and 0 of 3 inside the 90%
+  interval (0% to 56%, below target); peak memory not scored, because the probes ran no eval
+  pass and nothing records that (asked A). Findings sent to B: the likely cause is work units
+  (p1 and p3 measured the same tokens per step), with the caveat that three probes make a weak
+  held-out test. Independent review: no Critical; its 3 High and 7 Medium fixed (a stale
+  notebook source after a tab switch, memory scored on the engine's own quantity, siblings by
+  knobs and cache key, rate bars shown with their source, stable setSource).
+- Upload-to-map run: waits for A's `fill_predictions` in `main`, then runs from `main`.
+
+**Cloud runs**
+
+| Date | Run | Where | Minutes | USD |
+| --- | --- | --- | --- | --- |
+| Oct 28 18:34 UTC | c-api-startup-check (from main) | Modal CPU, no GPU, nothing deployed | 0.6 | under 0.01 (CPU for about 30 s; Modal's bill replaces this) |
+
 ## Wed Oct 28, early (critical path: upload to map)
 
 **Done** (branch `ws-c`; `main` unchanged since last night)

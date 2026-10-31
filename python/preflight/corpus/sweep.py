@@ -17,6 +17,7 @@ so a run of slow configs can't push the sweep past its budget.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import time
 import traceback
@@ -38,6 +39,17 @@ ESTIMATE_QUANTILE = 0.9  # simulated: S5 B5
 MIN_HISTORY = 3  # simulated: S5 B5
 MAX_CONSECUTIVE_USER_ERRORS = 3  # guess: three corpus-code errors in a row means a bug, not a config
 _EPS = 1e-6
+# set, not a platform default: modal_app.Sweeper's scaledown_window, so each container's idle tail is known
+SCALEDOWN_S = 30.0
+STARTUP_S = (
+	180.0  # guess: cold start, image pull, imports and the volume reload; each batch now reports its own
+)
+RATE_OVERHEAD = (
+	1.10  # guess: Modal also bills a GPU container's CPU and memory; replaced by Modal's bill per run
+)
+MIN_DEADLINE_S = 120.0  # guess: floor for a config's deadline, so a slow-but-healthy config isn't cut short
+DEADLINE_FACTOR = 3.0  # cited: isolate.py, the deadline is 3x the measured p99 once configs have run
+MIN_DEADLINE_HISTORY = 10  # guess: configs measured before the deadline follows them
 
 Runner = Callable[[CorpusConfig], dict[str, Any]]
 
@@ -63,6 +75,128 @@ def estimate_seconds(
 	if history and len(history) >= MIN_HISTORY:
 		return quantile(history, ESTIMATE_QUANTILE), True
 	return DEFAULT_EST_SECONDS[kind], False
+
+
+def wave_billed_seconds(wall_s: float, containers: int, scaledown_s: float = SCALEDOWN_S) -> float:
+	"""Upper bound on the container-seconds one wave is billed: every container up for the whole wave, start-up,
+	volume reloads and commits included, plus its idle tail. Phase 1 (Oct 28) showed config seconds alone can be
+	a ninth of this."""
+	return max(0.0, wall_s + scaledown_s) * max(0, containers)
+
+
+def container_timeout_s(batch: int, deadline_s: float) -> int:
+	"""Modal's timeout for one wave's containers: a full batch at the deadline plus start-up, the child's kill grace
+	and the volume work, so a hang anywhere in the container (not only in a config) ends where the bound assumed."""
+	from preflight.corpus.isolate import KILL_GRACE_S
+
+	return math.ceil(batch * (deadline_s + KILL_GRACE_S) + STARTUP_S)
+
+
+def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
+	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
+	at its deadline, and idles out. Retries are off, so a preempted batch is not re-run inside the wave."""
+	if containers <= 0 or batch <= 0:
+		return 0.0
+	# each container is cut off at container_timeout_s by Modal, then idles out
+	return containers * (container_timeout_s(batch, deadline_s) + SCALEDOWN_S)
+
+
+def plan_wave(
+	n_todo: int,
+	budget_left_usd: float,
+	minutes_left: float,
+	deadline_s: float,
+	usd_per_hour: float,
+	max_containers: int,
+	max_batch: int,
+) -> tuple[int, int]:
+	"""(containers, batch size) for the next wave: as many configs as possible such that the wave's worst case
+	fits the money left and ends before the time left. (0, 0) when not even one config fits."""
+	from preflight.corpus.isolate import KILL_GRACE_S
+
+	rate = usd_per_hour * RATE_OVERHEAD / 3600
+	room_s = minutes_left * 60 - STARTUP_S - SCALEDOWN_S
+	per = deadline_s + KILL_GRACE_S
+	batch = min(max_batch, int(room_s // per) if per > 0 else max_batch, max(1, n_todo))
+	best = (0, 0)
+	for b in range(batch, 0, -1):
+		c = min(max_containers, math.ceil(n_todo / b))
+		while c > 0 and worst_wave_seconds(c, b, deadline_s) * rate > budget_left_usd + _EPS:
+			c -= 1
+		if c * b > best[0] * best[1]:
+			best = (c, b)
+	return best
+
+
+def adaptive_deadline(config_seconds: list[float], default_s: float) -> float:
+	"""A config's deadline: DEADLINE_FACTOR x the measured p99 once enough configs have run, never above the
+	default and never below MIN_DEADLINE_S."""
+	if len(config_seconds) < MIN_DEADLINE_HISTORY:
+		return default_s
+	return min(default_s, max(MIN_DEADLINE_S, DEADLINE_FACTOR * quantile(config_seconds, 0.99)))
+
+
+def prior_usd(path: str | Path) -> float:
+	"""Money spent before container billing was recorded (Modal's own figure), counted once however often passed."""
+	return max(
+		(float(r.get("prior_usd", 0.0)) for r in _billing_rows(path) if r.get("kind") == "prior"), default=0.0
+	)
+
+
+def write_lease(directory: str | Path, run_id: str, until: float, at: float) -> None:
+	"""One file per run, so two runs starting together never overwrite each other's lease."""
+	d = Path(directory)
+	d.mkdir(parents=True, exist_ok=True)
+	(d / f"{run_id}.json").write_text(json.dumps({"run": run_id, "until": until, "at": at}))
+
+
+def release_lease(directory: str | Path, run_id: str) -> None:
+	(Path(directory) / f"{run_id}.json").unlink(missing_ok=True)
+
+
+def lease_winner(directory: str | Path, now: float) -> str | None:
+	"""The run that owns this GPU's budget: the earliest live lease, the run id breaking ties."""
+	d = Path(directory)
+	live = []
+	for f in d.glob("*.json") if d.exists() else []:
+		try:
+			r = json.loads(f.read_text())
+		except (json.JSONDecodeError, OSError):
+			continue
+		if float(r.get("until", 0)) > now:
+			live.append((float(r.get("at", 0)), str(r.get("run")), r))
+	return min(live)[1] if live else None
+
+
+def add_billing(path: str | Path, row: dict[str, Any]) -> None:
+	path = Path(path)
+	path.parent.mkdir(parents=True, exist_ok=True)
+	with path.open("a") as f:
+		f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def _billing_rows(path: str | Path) -> list[dict[str, Any]]:
+	path = Path(path)
+	if not path.exists():
+		return []
+	return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def billed_seconds(path: str | Path) -> float:
+	"""Container-seconds billed so far on one GPU for one kind, across every run (the file lives on the volume).
+
+	A wave first writes a pending row at its worst case, then a settle row with (measured - worst), so a wave
+	killed before it settles stays on the bill at its worst case."""
+	return sum(float(r.get("billed_s", 0.0)) for r in _billing_rows(path))
+
+
+def container_history(path: str | Path) -> list[float]:
+	"""Measured container-seconds per config, one entry per settled wave that ran configs."""
+	return [
+		float(r.get("measured_s", r.get("billed_s", 0.0))) / r["configs"]
+		for r in _billing_rows(path)
+		if r.get("configs")
+	]
 
 
 def plan_from(
@@ -212,6 +346,10 @@ def run_local(
 				f"{user_errors} configs in a row failed inside corpus code (last: {result.get('error')}); stopping. Fix the bug, then rerun with --retry-errors."
 			)
 			break
+	if ledger is not None:
+		rows = ledger.rows()
+		if not rows or rows[-1].get("event") != "stop":  # every run ends with the spend at that moment
+			ledger.record("stop", reason="finished", configs=n)
 	return n
 
 
