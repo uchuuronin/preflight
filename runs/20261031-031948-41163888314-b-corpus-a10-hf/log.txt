@@ -1,0 +1,33 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-GbLJF3F9PTmt1kG5H84DHD
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[A10] wave 0: $0.00 of $0.70 spent (container time, worst case for unsettled waves), 0 done, 50 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 0 took 22 s on 1 containers: 52 container-s ($0.02, worst case was $0.38) for 1 configs
+[A10] batch: 17.3 s in the container, reload 0.1 s, commits 1.1 s
+[A10] config 504dc1bb26a6 hf_lora probe ok: 16.1 s
+[A10] wave 1: $0.02 of $0.70 spent (container time, worst case for unsettled waves), 1 done, 49 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 1 took 11 s on 1 containers: 41 container-s ($0.01, worst case was $0.38) for 1 configs
+[A10] batch: 11.0 s in the container, reload 0.2 s, commits 0.8 s
+[A10] config 296a8f74af4f hf_lora probe ok: 10.0 s
+[A10] wave 2: $0.03 of $0.70 spent (container time, worst case for unsettled waves), 2 done, 48 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 2 took 11 s on 1 containers: 41 container-s ($0.01, worst case was $0.38) for 1 configs
+[A10] batch: 10.8 s in the container, reload 0.2 s, commits 1.0 s
+[A10] config 59dae3691188 hf_lora probe ok: 9.6 s
+[A10] wave 3: $0.04 of $0.70 spent (container time, worst case for unsettled waves), 3 done, 47 to do, deadline 900 s, next wave 1 x 1
+[A10] wave 3 took 14 s on 1 containers: 44 container-s ($0.01, worst case was $0.38) for 1 configs
+[A10] batch: 14.1 s in the container, reload 0.3 s, commits 1.6 s
+[A10] config b50b5941a5ea hf_lora query ok: 12.2 s
+[A10] wave 4: $0.06 of $0.70 spent (container time, worst case for unsettled waves), 4 done, 46 to do, deadline 900 s, next wave 0 x 0
+[A10] the next wave's worst case doesn't fit the money or the 19 minutes left; stopping, a rerun resumes
+[A10] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-GbLJF3F9PTmt1kG5H84DHD
