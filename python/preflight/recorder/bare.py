@@ -22,6 +22,9 @@ class _Enough(Exception):
 	pass
 
 
+PROGRESS_EVERY = 50  # optimizer steps between progress lines on stderr
+
+
 def main(argv: list[str] | None = None) -> int:
 	argv = list(sys.argv[1:] if argv is None else argv)
 	script_args = argv[argv.index("--") + 1 :] if "--" in argv else []
@@ -41,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
 
 	def hook(_opt, _args, _kwargs):
 		host.append(time.perf_counter())
+		if len(host) % PROGRESS_EVERY == 0:  # host clock only: no sync, nothing on the GPU
+			print(f"[bare] step {len(host)} at {host[-1] - t0:.0f} s", file=sys.stderr, flush=True)
 		if cuda:
 			ev = torch.cuda.Event(enable_timing=True)
 			ev.record()
@@ -57,6 +62,7 @@ def main(argv: list[str] | None = None) -> int:
 	sys.argv = [ns.script, *script_args]
 	ended, error = "finished", None
 	t0 = time.perf_counter()
+	print(f"[bare] running {ns.script} for {ns.steps} optimizer steps", file=sys.stderr, flush=True)
 	try:
 		runpy.run_path(os.path.abspath(ns.script), run_name="__main__")
 	except _Enough:

@@ -111,7 +111,9 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 
 | Oct 28 | `b-corpus-smoke-hf` (GitHub run 40622922548): all 50 HF LoRA and QLoRA jobs, 49 ok and 1 out of memory (a query), 14 to 38 s each | L4 | 16.1 GPU-min (18.9 min wall) | $0.27 (ledger) |
 
-Total so far: $0.33 of the $45 corpus budget (phase 0 cap $0.70). Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
+| Oct 28 | `b-corpus-l4` (GitHub run 40633186279, Modal app ap-CTVbvqPCmY8QdS4PdaXdSA): grouped n = 600, stopped by the workflow's 120-minute timeout after 340 of 590 configs, 332 ok and 8 out of memory; per-config median 8.0 s, p90 14.3 s | L4 x 4 containers | 53 config-min; containers up for most of 118 min | ledger $0.88; billed estimate $4.50 to $6.40 (4 L4 containers for most of 2 h), waiting on Modal's figure |
+
+Total so far: ledger $1.21; billed estimate $4.80 to $6.70 until Modal's usage page gives the real figure. **The ledger under-counts container time.** It sums each config's own seconds, but containers are also billed for start-up, the per-batch volume reload, a volume commit after every config, and the waits between waves. That overhead was small in phase 0's single container and dominant in phase 1 (about 80 container-seconds per config against about 9 counted). So the $6 cap was enforced on the wrong measure. Phase 2 is on hold until the budget counts container wall time. Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
 
 ## Contract requests
 In `docs/requests/from-b.md`.

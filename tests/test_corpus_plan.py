@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -391,3 +392,198 @@ def test_deadline_pricing_makes_the_cap_hard_before_any_history():
 	# after three measured configs the running p90 takes over
 	todo = sw.plan_from(cfgs, set(), 0.05, 0.30, 0.80, history=[40.0, 45.0, 50.0], worst_seconds=600.0)
 	assert len(todo) > 1
+
+
+def test_wave_billing_is_an_upper_bound_on_container_time():
+	from preflight.corpus import sweep as sw
+
+	# 4 containers for a 10-minute wave, each with its 30 s idle tail: 4 x 630 s
+	assert sw.wave_billed_seconds(600.0, 4) == pytest.approx(4 * (600.0 + sw.SCALEDOWN_S))
+	# Modal cuts each container off at its timeout, so the worst case is bounded however a container hangs
+	assert sw.worst_wave_seconds(4, 8, 120.0) == 4 * (sw.container_timeout_s(8, 120.0) + sw.SCALEDOWN_S)
+	assert sw.wave_billed_seconds(600.0, 0) == 0.0
+	# phase 1's shape: 32 configs in an 11-minute wave cost far more than their 9 s each
+	per = sw.wave_billed_seconds(660.0, 4) / 32
+	assert per > 80
+
+
+def test_container_history_prices_the_next_wave():
+	from preflight.corpus import configs as C
+	from preflight.corpus import sweep as sw
+
+	cfgs = C.configs_for("grouped", 600, 0)
+	# three measured waves at ~85 container-seconds a config; $6 on an L4 with $5 already billed
+	todo = sw.plan_from(
+		cfgs, set(), 5.0, 6.0, 0.80, overhead=1.0, history=[85.0, 80.0, 90.0], reserve_configs=0
+	)
+	assert len(todo) == math.floor(1.0 / sw.cost_usd(sw.quantile([85.0, 80.0, 90.0], 0.9), 0.80, 1.0))
+
+
+def test_billing_file_round_trips(tmp_path):
+	from preflight.corpus import sweep as sw
+
+	p = tmp_path / "_billing" / "kernels-L4.jsonl"
+	assert sw.billed_seconds(p) == 0.0
+	sw.add_billing(p, {"wave": 0, "wall_s": 100.0, "containers": 2, "billed_s": 260.0, "configs": 16})
+	sw.add_billing(p, {"wave": 1, "wall_s": 50.0, "containers": 1, "billed_s": 80.0, "configs": 8})
+	assert sw.billed_seconds(p) == pytest.approx(340.0)
+	assert sw.container_history(p) == pytest.approx([260.0 / 16, 80.0 / 8])
+
+
+def test_modal_idle_window_matches_what_the_sweep_bills():
+	pytest.importorskip("modal")
+	import re
+
+	from preflight.corpus import modal_app, sweep
+
+	src = Path(modal_app.__file__).read_text()
+	assert float(re.search(r"scaledown_window=(\d+)", src).group(1)) == sweep.SCALEDOWN_S
+	assert modal_app.COMMIT_EVERY >= 1
+
+
+def test_a_wave_launches_only_if_its_worst_case_fits_money_and_time():
+	from preflight.corpus import sweep as sw
+
+	rate = 0.80 * sw.RATE_OVERHEAD
+	# $6 left, 100 minutes left, configs capped at 120 s: the worst case of whatever launches fits both
+	c, b = sw.plan_wave(
+		500,
+		budget_left_usd=6.0,
+		minutes_left=100.0,
+		deadline_s=120.0,
+		usd_per_hour=0.80,
+		max_containers=4,
+		max_batch=8,
+	)
+	assert c * b > 0
+	worst = sw.worst_wave_seconds(c, b, 120.0)
+	assert worst / 3600 * rate <= 6.0
+	assert (sw.container_timeout_s(b, 120.0) + sw.SCALEDOWN_S) / 60 <= 100.0
+	# 600 s deadlines and 30 minutes left: batches shrink so the slowest container still ends in time
+	c, b = sw.plan_wave(500, 6.0, 30.0, 600.0, 0.80, 4, 8)
+	assert sw.container_timeout_s(b, 600.0) + sw.SCALEDOWN_S <= 30 * 60
+	# not enough money for one worst-case config: nothing launches
+	assert sw.plan_wave(500, 0.05, 100.0, 600.0, 0.80, 4, 8) == (0, 0)
+	# fewer configs than slots: no idle containers are paid for
+	c, b = sw.plan_wave(3, 6.0, 100.0, 120.0, 0.80, 4, 8)
+	assert c * b >= 3 and c <= 3
+
+
+def test_deadline_follows_measured_configs():
+	from preflight.corpus import sweep as sw
+
+	assert sw.adaptive_deadline([], 600.0) == 600.0  # nothing measured: the default
+	measured = [10.0] * 30 + [36.0]
+	d = sw.adaptive_deadline(measured, 600.0)
+	assert sw.MIN_DEADLINE_S <= d < 600.0 and d >= 3 * 36.0 * 0.99
+
+
+def test_pending_rows_bill_a_killed_wave_at_its_worst(tmp_path):
+	from preflight.corpus import sweep as sw
+
+	p = tmp_path / "b.jsonl"
+	sw.add_billing(p, {"wave": 0, "kind": "pending", "billed_s": 4000.0})
+	assert sw.billed_seconds(p) == 4000.0  # killed here: the worst case stays on the bill
+	sw.add_billing(
+		p, {"wave": 0, "kind": "settle", "billed_s": 1200.0 - 4000.0, "configs": 32, "measured_s": 1200.0}
+	)
+	assert sw.billed_seconds(p) == pytest.approx(1200.0)
+	assert sw.container_history(p) == pytest.approx([1200.0 / 32])
+	sw.add_billing(p, {"kind": "prior", "prior_usd": 6.4})
+	sw.add_billing(p, {"kind": "prior", "prior_usd": 6.4})  # passed again on a rerun: counted once
+	assert sw.prior_usd(p) == 6.4
+
+
+@pytest.mark.parametrize("seed", range(40))
+def test_simulated_sweeps_never_pass_the_cap_or_the_clock(seed, tmp_path):
+	"""The wave loop of modal_app.main, with configs that sometimes hang to their deadline and containers whose
+	start-up varies, billed the way Modal bills: every container from start to idle-out."""
+	import random
+
+	from preflight.corpus import sweep as sw
+
+	r = random.Random(seed)
+	budget, max_minutes, rate, default_deadline = (
+		r.choice([0.3, 2.0, 6.0]),
+		r.choice([45.0, 100.0]),
+		0.80,
+		600.0,
+	)
+	n_todo, history, done, path = 600, [], 0, tmp_path / "bill.jsonl"
+	true_bill_s, clock = 0.0, 0.0
+	while n_todo - done > 0:
+		spent = sw.billed_seconds(path) / 3600 * rate * sw.RATE_OVERHEAD
+		deadline = sw.adaptive_deadline(history, default_deadline)
+		c, b = sw.plan_wave(n_todo - done, budget - spent, max_minutes - clock / 60, deadline, rate, 4, 8)
+		if not c:
+			break
+		worst = sw.worst_wave_seconds(c, b, deadline)
+		sw.add_billing(path, {"kind": "pending", "billed_s": worst})
+		walls = []
+		for _ in range(c):
+			start = r.uniform(20, sw.STARTUP_S)
+			# most configs take 5-40 s; one in 30 hangs to its deadline plus the kill grace
+			runs = [deadline + 30.0 if r.random() < 1 / 30 else r.uniform(5, 40) for _ in range(b)]
+			history += [x for x in runs if x < deadline]
+			wall_c = start + sum(runs)
+			if (
+				r.random() < 1 / 50
+			):  # the container hangs outside any config (volume, driver): Modal cuts it off
+				wall_c = 10 * 3600.0
+			walls.append(min(wall_c, sw.container_timeout_s(b, deadline)))
+		wall = max(walls)
+		billed = sum(w + sw.SCALEDOWN_S for w in walls)  # what Modal charges
+		true_bill_s += billed
+		clock += wall
+		sw.add_billing(
+			path, {"kind": "settle", "billed_s": sw.wave_billed_seconds(wall, c) - worst, "configs": c * b}
+		)
+		done += c * b
+	assert true_bill_s / 3600 * rate * sw.RATE_OVERHEAD <= budget + 1e-9
+	assert clock / 60 <= max_minutes + 1e-9
+
+
+def test_a_killed_child_is_never_waited_on_forever():
+	from preflight.corpus import isolate
+
+	assert 0 < isolate.KILL_GRACE_S <= 60
+
+
+def test_lease_files_pick_one_winner_and_release(tmp_path):
+	from preflight.corpus import sweep as sw
+
+	d = tmp_path / "leases"
+	sw.write_lease(d, "b", until=1000.0, at=10.0)
+	sw.write_lease(d, "a", until=1000.0, at=10.0)  # same moment: the run id breaks the tie
+	sw.write_lease(d, "c", until=1000.0, at=5.0)
+	assert sw.lease_winner(d, now=100.0) == "c"  # the earliest live lease
+	sw.release_lease(d, "c")
+	assert sw.lease_winner(d, now=100.0) == "a"
+	assert sw.lease_winner(d, now=2000.0) is None  # all expired
+
+
+def test_uptime_ledger_records_a_stop_when_the_sweep_finishes(tmp_path):
+	from datetime import UTC, datetime
+
+	from preflight.corpus import configs as C
+	from preflight.corpus.ledger import UptimeLedger
+	from preflight.corpus.store import ResultStore
+	from preflight.corpus.sweep import run_local
+
+	now = [1_000_000.0]
+	ledger = UptimeLedger(
+		tmp_path / "l.jsonl", datetime.fromtimestamp(now[0], UTC), 2.0, clock=lambda: now[0]
+	)
+	run_local(
+		C.kernel_configs(2),
+		ResultStore(tmp_path / "o"),
+		"MI300X",
+		50.0,
+		2.0,
+		lambda c: {"status": "ok", "gpu_seconds": 1.0},
+		est_seconds=1,
+		ledger=ledger,
+		log=lambda m: None,
+	)
+	last = ledger.rows()[-1]
+	assert last["event"] == "stop" and last["reason"] == "finished" and last["configs"] == 2

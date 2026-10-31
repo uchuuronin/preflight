@@ -28,7 +28,7 @@ a warning's knob shows when the visitor opens it and stays for the visit. Reques
 | --- | --- | --- |
 | At most 5 knobs picked | cited: Cowan 2001, about 4 chunks in working memory; 5 is the upper end of 4 ± 1 | `tiers.test.ts` "picks at most five"; `dial.zoo.test.ts` "at most five" |
 | Failures first, never dropped | Chiya and the Oct 27 review | `tiers.test.ts` "never drops a failure's knob"; `dial.zoo.test.ts` failure knobs in the dock for every goal |
-| Warnings stay in the dock until the list is on screen | Chiya, Oct 27 night | `tiers.test.ts`, `knobView.test.ts` "keeps a warning's knob ... while C's list isn't showing"; `dial.zoo.test.ts` on-screen 9 of 9 |
+| Warnings stay in the dock until the list is on screen | Chiya, Oct 27 night | `tiers.test.ts`, `knobView.test.ts` "keeps a warning's knob ... while C's list isn't showing"; `dial.zoo.test.ts` on screen, every planted problem in the dock for every goal |
 | A warning's knob shows once opened, and stays | Chiya, Oct 27 | `knobView.test.ts` reveal test; `dial.zoo.test.ts` "shows a listed warning's knob once the visitor opens it" |
 | Goal's top knobs before the baseline, and how many (2) | guess; kept unless B's grids show a version that beats it by a clear margin (Wilson intervals not overlapping), see below | `dial.zoo.test.ts` "keeps the configured policy unless another beats it by a clear margin"; `wilson.test.ts` for the margin rule |
 | Baseline for finetune, pretrain, rl, vision | measured: the census below | `tiers.test.ts` "takes each training lens's baseline from the census ranking"; `test_d_knob_census.py` consistency and engine-id checks |
@@ -38,19 +38,29 @@ a warning's knob shows when the visitor opens it and stays for the visit. Reques
 
 `dial.zoo.test.ts` compares three orders (failures, top, baseline; failures, baseline, top;
 failures, top only) with the goal's top 1, 2 or 3, by how often the planted problems' knobs are
-in the dock with the list on screen, pooled over records and goals.
+in the dock with the list on screen. Each record is counted once, under its own goal (the
+fine-tune's is fastest, the pretrain's cheapest): one count per planted problem, pooled over
+records (Chiya, Oct 28). Until Oct 27 it counted each problem once per goal, three times per
+record, which made the intervals look narrower than the evidence is.
 
 These are the two zoo records the rule is tuned on, so taking the best of nine would test on its
 own training data (Chiya, Oct 27). Today's version (failures, top, baseline; top 2) stays unless
 another beats it by a clear margin: its Wilson 95% interval wholly above today's. The comparison
-is recorded here either way. Goals reuse the same records, so the counts aren't independent and
-the intervals are narrower than they should be, which makes the margin rule more lenient, not
-stricter.
+is recorded here either way. Problems in the same record share a script, so even per record the
+counts aren't fully independent.
 
 | Predictions | Today's version | Best challenger | Clear margin? | Kept |
 | --- | --- | --- | --- | --- |
-| `golden-fixture@0`, Oct 27 | 9 of 18, 50% [29, 71] | all eight tie at 9 of 18 | no | failures, top, baseline; top 2 |
+| `golden-fixture@0`, Oct 27, counted per goal (superseded) | 9 of 18, 50% [29, 71] | all eight tie | no | failures, top, baseline; top 2 |
+| `golden-fixture@0`, Oct 28, counted per record | 3 of 6, 50% [19, 81] | all eight tie at 3 of 6 | no | failures, top, baseline; top 2 |
 | B's grids (Wed Oct 28) | to run | | | |
+
+How much the comparison can tell: none of it yet. With 6 planted problems, today's 3 of 6 has
+an interval of [19, 81], and even a perfect 6 of 6 has a lower bound of 61, so no challenger can
+clear it [derived: Wilson 95%]. A clear win needs at least 12 planted problems if today's version
+scores half (12 of 12 gives a lower bound of 76 against 75 for 6 of 12), so 4 zoo records at 3
+problems each. B's grids change the predictions, not the number of records, so they alone won't
+make it decide; the test reports "can't decide" until it can.
 
 Why 2 and not 1 or 3: not yet shown by data; on the fixtures all three counts tie. Two keeps
 room for at least one basic beside two failures within the five. If B's grids also tie or show
@@ -148,12 +158,14 @@ and which make the run fail. For each golden record built from a zoo script (mat
 `job.source.entrypoint`), a newcomer arrives at the record's own setting with one of three goals
 (cheapest, fastest, fits in memory); the test runs C's `applyKnobViews` with D's view.
 
-On A's fixture predictions (`golden-fixture@0`), Oct 27:
+On A's fixture predictions (`golden-fixture@0`), Oct 28, each record under its own goal, one
+count per planted problem. Safety checks (failure knobs in the dock, nothing lost) run for every
+goal and pass.
 
 | Record | On screen today (in-sample, 2 records) | Design check with the list (in-sample, 2 records, counts a list not yet on screen) |
 | --- | --- | --- |
-| finetune.json (zoo/finetune_lora_hf) | 9 of 9 in the dock, 100% [70, 100]; at most 5 knobs | 9 of 9 visible, 100% [70, 100]; 6 of 9 in the dock |
-| pretrain.json (zoo/pretrain_nanogpt) | 9 of 9 in the dock, 100% [70, 100]; at most 5 knobs | 9 of 9 visible, 100% [70, 100]; 3 of 9 in the dock |
+| finetune.json (zoo/finetune_lora_hf), fastest | 3 of 3 in the dock, 100% [44, 100]; at most 5 knobs | 3 of 3 visible, 100% [44, 100]; 2 of 3 in the dock |
+| pretrain.json (zoo/pretrain_nanogpt), cheapest | 3 of 3 in the dock, 100% [44, 100]; at most 5 knobs | 3 of 3 visible, 100% [44, 100]; 1 of 3 in the dock |
 
 Neither column is a result: both are in-sample on the two records the rule was written against.
 The result is the held-out run on the unseen scripts (Mon Nov 2): their planted fixes as ground

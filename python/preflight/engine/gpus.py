@@ -408,6 +408,9 @@ def resolve(name: str, memory_bytes: int | None = None, compute_units: int | Non
 		raise KeyError(f"unknown GPU (name longer than {MAX_NAME_LEN} characters)")
 	cleaned = _clean(name)
 	mig = _MIG.search(cleaned)
+	if mig and (int(mig.group(1)) <= 0 or int(mig.group(2)) <= 0):
+		# "1g.0gb", "0g.10gb": no real profile, and a zero size would divide by zero below
+		raise KeyError(f"no MIG profile {mig.group(1)}g.{mig.group(2)}gb in {name!r}")
 	s = _MIG.sub("", cleaned).strip(" -_")
 	for spec in _SPECS:
 		if s == spec.name.lower():
