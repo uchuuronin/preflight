@@ -168,3 +168,16 @@ The fitted line does as well or better on both sides, so `EXTRAPOLATION` stays `
 | 95–100% | 10 | 0.990 | 0.90 (0.60 to 0.98) | **no** |
 
 **For Chiya: the top bin doesn't verify yet.** 9 of its 10 jobs ran out of memory, against a mean prediction of 0.99. The one miss had a predicted P of 0.9955. As you set it, the rule shows numbers above 95% anyway. With ten points, one miss is enough to fail a 0.99 prediction (10 of 10 would pass), so this bin needs more OOM runs to settle. The other choice is to cap what's shown there at "above 95%".
+
+## A100 holdout, scored once (Oct 31)
+
+`b-corpus-a100-3` ran the other 93 configs on the fixed code. Modal put the work on both boards: 42 rows on A100-PCIe-80GB and 53 on A100-SXM-80GB, with no OOMs, as expected on 80 GB. One group was split across the boards and couldn't be scored. The 16 synthetic LoRA scores stay out, as they do everywhere. That leaves 28 scored queries per target.
+
+The method was fixed before looking: the calibrator as committed, the A100 never calibrated on, each query scored against cells built without its own architecture, and the installed lenses only. Results (measured, scored once, never tuned on):
+
+| Target | A100-PCIe-80GB | A100-SXM-80GB | Both boards (Wilson 95%) |
+| --- | --- | --- | --- |
+| Memory peak | 8 of 12 | 14 of 16 | **22 of 28, 79% (60% to 90%)** |
+| Step time, same GPU | 11 of 12 | 15 of 16 | **26 of 28, 93% (77% to 98%)** |
+
+**Step time holds up on an unseen GPU. Memory under-covers:** the 95% interval tops out just under 90%. Of the six misses, two are underestimates, the dangerous direction: one actual peak is 40% above the prediction (a PCIe vision group), the other 16% above (a PCIe pretrain group). The other four are overestimates, two of them extreme: SXM vision groups at 3.4× and 6.9× below the prediction. These are diagnoses, not fixes. Nothing is tuned on these rows. The card reports the per-board figures (`per_gpu_coverage`) beside the leave-one-architecture-out coverage. The fix has to be checked on data other than the A100: the AMD rows, and the unseen scripts on Nov 2.
