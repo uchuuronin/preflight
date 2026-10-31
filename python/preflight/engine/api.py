@@ -78,7 +78,7 @@ _TARGETS = {
 FEATURES = {
 	"rl": False,
 	"serving": False,
-	"steptime_cross_gpu": False,
+	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
 }  # + flags.json engine.steptime_cross_gpu
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
@@ -899,6 +899,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		mid = steptime.MODEL_ID_CROSS
 
 	# another GPU than the probes ran on
+	rough = False
 	if not same_gpu:
 		cross = None
 		if current_probe is not None and current_probe.step_time and current_probe.step_time.p50_s:
@@ -911,8 +912,15 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			if FEATURES["steptime_cross_gpu"]
 			else None
 		)
+		if xcell and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
+			why = (
+				f"{tgt_gpu} is another vendor, and no corpus rows from it exist yet, so time across vendors isn't "
+				"measured; run a probe there"
+			)
+			return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), sigma)
 		if cross is not None and cross.status != "abstain":
 			ratio = cross.point / current_probe.step_time.p50_s
+			rough = bool(xcell)
 			# Chiya, Oct 31: K1's band from held-out corpus pairs, never narrower than the simulated one
 			cross_sigma = max(cross.sigma_log, xcell.half_width / steptime.Z90) if xcell else cross.sigma_log
 			sigma = math.hypot(sigma, cross_sigma)
@@ -990,7 +998,11 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		status = "extrapolated" if status != "abstain" else status
 		reasons.append(f"{', '.join(moves)} isn't modelled for time yet; held at its probed effect")
 	h = memory.Z90 * sigma
-	if h > memory.ABSTAIN_HALF_WIDTH:
+	if rough and h > memory.ABSTAIN_HALF_WIDTH:
+		# Chiya, Oct 31 (option b): the held-out cross-GPU band is shown past +-50%, labelled, beside the probe offer
+		reasons.append("rough, no probe on this GPU; run a probe here")
+		status = "extrapolated"
+	elif h > memory.ABSTAIN_HALF_WIDTH:
 		why = "; ".join([*reasons, "the range would be wider than +-50%; run a probe here"])
 		return _StepResult(_abstain("s", mid, why), sigma)
 	first = 0.0
@@ -2453,8 +2465,10 @@ _CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME, steptime.MODE
 _CARD_CAVEAT = {
 	steptime.MODEL_ID_SAME: "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2.",
 	steptime.MODEL_ID_CROSS: (
-		"Band from corpus pairs, scored on GPUs left out; calibrated on corpus models' op tables, not users' "
-		"kernel tables; checked on the AMD rows and unseen scripts Nov 2."
+		"Rough, no probe on this GPU: the band comes from corpus pairs, scored on GPUs left out, and is shown past "
+		"+-50% with a run-a-probe offer beside it. Calibrated on corpus models' op tables, not users' kernel tables; "
+		"checked on unseen scripts Nov 2. Another vendor abstains until corpus rows from it exist. The pairs share "
+		"architectures: clustered by architecture, the 95% interval on coverage is 90% to 96%."
 	),
 }
 
@@ -2491,6 +2505,11 @@ def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]
 				extra["coverage"] = h / n
 			extra["per_gpu_coverage"] = {g: h / n for g, (h, n) in t.holdout.get(target, {}).items() if n}
 			notes = f"{notes or ''}. {_CARD_CAVEAT.get(mid, '')} {t.describe(target)}".strip(". ")
+			if mid == steptime.MODEL_ID_CROSS:
+				# Chiya, Oct 31: the A100 holdout on the card too; it scored same-GPU step time, and the card says so
+				h, n = (sum(v[i] for v in t.holdout.get("time.step", {}).values()) for i in (0, 1))
+				if n:
+					notes += f" A100 holdout (same-GPU step time, scored once): {h} of {n} inside the band."
 		out.append(
 			ModelCard(
 				id=mid,

@@ -607,16 +607,26 @@ def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft, monkeyp
 	)
 
 
-def test_without_the_feature_a_gpu_move_keeps_k1s_own_band(ft):
+def test_without_the_feature_a_gpu_move_keeps_k1s_own_band(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
 	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
 	assert e.status != "abstain" and "held-out corpus pairs" not in (e.reason or "")
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
 	assert card.notes.startswith("calibration: simulated")
 
 
-def test_with_the_held_out_band_a_gpu_move_says_run_a_probe_there(ft, monkeypatch):
+def test_with_the_held_out_band_a_gpu_move_is_rough_with_a_probe_offer(ft, monkeypatch):
+	# Chiya, Oct 31 (option b): the calibrated band is shown past +-50%, labelled rough, with "run a probe here"
 	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
-	# Chiya, Oct 31: the honest cross-GPU band is about +-45%, past the +-50% abstention once the probe's own error
-	# is added, so moving the GPU dial asks for a probe on that GPU instead of showing a range
 	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
-	assert e.status == "abstain" and "run a probe here" in e.reason and "held-out corpus pairs" in e.reason
+	assert e.status == "extrapolated" and "rough, no probe on this GPU; run a probe here" in e.reason
+	assert math.log(e.hi / e.point) > math.log(1.5)  # past the usual +-50% abstention, on purpose
+	total = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.total"]
+	assert total.status != "abstain"
+	# abstains only where it did: no bf16 path on T4, and another vendor until corpus rows from it exist
+	assert api.predict(ft, {"gpu_type": "T4"}).root["time.step"].status == "abstain"
+	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
+	assert amd.status == "abstain" and "another vendor" in amd.reason
+	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
+	assert "Rough, no probe on this GPU" in card.notes and "26 of 28" in card.notes
+	assert card.coverage == pytest.approx(2130 / 2286)
