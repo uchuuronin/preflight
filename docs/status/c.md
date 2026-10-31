@@ -20,6 +20,19 @@
   index is in `main`; then it becomes "A repo's code is deleted as soon as it's read; everything
   else about your job is deleted after 30 days."
 
+**Checks page, run by run** (A's run a-smoke-l4-main-4, L4; held-out; Wilson 95%)
+
+| Engine | Step time within 15% | Peak memory within 10% | Inside 90% interval | OOM |
+| --- | --- | --- | --- | --- |
+| main 6c65ccd (round two) | 0 of 3 (0% to 56%) | 0 of 3: +32%, +61%, -38% | 0 of 6 (0% to 39%) | 1 of 1, none missed |
+| round three | re-run once merged | | | |
+
+- Pushed b10be16 and a213c91 with Chiya's yes (Oct 30, 21:47).
+- API image ships `flags.production.json` (B's file, `engine.memory` on). A's flag-files test fails
+  on ws-c alone until the runner ships it too; it passes in the round-three merge.
+- "No eval pass": A's `eval_off` marker first, missing eval stats as the fallback; asked B to own
+  the function so calibration and the checks page share it.
+
 **Waiting**
 
 - Upload-to-map run (approved, about $0.35, $0.65 cap): from `main` once A says the runner is

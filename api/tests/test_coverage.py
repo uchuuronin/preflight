@@ -120,11 +120,14 @@ def test_a_probe_that_ran_eval_keeps_the_eval_term():
 	assert m["point"] == pytest.approx(pred["memory.peak"].point - DEFAULT_CONTEXT_BYTES)
 
 
-def test_the_eval_off_marker_counts_even_when_eval_stats_exist():
+def test_the_eval_off_marker_decides_first_and_missing_stats_only_without_one():
 	from preflight.schema import load_record
 
 	rec = load_record(REAL.read_text())
 	p1e = next(p for p in rec.probes if p.id == "p1-eval")
-	marked = p1e.model_copy(update={"extras": {**(p1e.extras or {}), "eval_off": 1.0}})
-	assert coverage.ran_without_eval(marked)
+	p2 = next(p for p in rec.probes if p.id == "p2")
+	mark = lambda p, v: p.model_copy(update={"extras": {**(p.extras or {}), "eval_off": v}})  # noqa: E731
+	assert coverage.ran_without_eval(mark(p1e, 1.0))  # marker says off, though eval stats exist
+	assert not coverage.ran_without_eval(mark(p2, 0.0))  # marker says eval ran, though stats are missing
+	assert coverage.ran_without_eval(p2)  # no marker: missing stats decide
 	assert not coverage.ran_without_eval(p1e)

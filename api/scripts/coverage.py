@@ -85,9 +85,13 @@ def siblings(rec, probe, other) -> bool:
 
 
 def ran_without_eval(probe) -> bool:
-	"""A probe that ran no eval pass: A's re-run after an eval OOM says so (`extras.eval_off`), and
-	a probe with no eval stats never reached one."""
-	return bool((probe.extras or {}).get("eval_off")) or probe.eval is None
+	"""One test of "no eval pass", shared with B's calibration: A's marker first (`extras.eval_off`,
+	1.0 for a re-run with eval off, 0.0 when eval ran), missing eval stats only when there is no
+	marker."""
+	marker = (probe.extras or {}).get("eval_off")
+	if marker is not None:
+		return bool(marker)
+	return probe.eval is None
 
 
 def memory_target(probe, pred) -> tuple[dict | None, str]:
