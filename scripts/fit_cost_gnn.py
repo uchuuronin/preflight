@@ -100,7 +100,7 @@ def fit_gbdt(x, y):
 	).fit(x, y)
 
 
-def fit_gnn(graphs, globals_, y, epochs: int = 150):
+def fit_gnn(graphs, globals_, y, epochs: int = 40):
 	import torch
 	from torch import nn
 
@@ -130,7 +130,7 @@ def fit_gnn(graphs, globals_, y, epochs: int = 150):
 	]
 	rng = np.random.default_rng(SEED)
 	for _ in range(epochs):
-		for i in rng.permutation(len(data))[:256]:
+		for i in rng.permutation(len(data))[:128]:
 			x, a, g, t = data[i]
 			loss = (model(x, a, g) - t) ** 2
 			opt.zero_grad()
