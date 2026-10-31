@@ -1,0 +1,89 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-oc7wR7y5WpsdEt7Y3OO48B
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_worker.
+└── ✓ Created Function startup_check_sandbox.
+[ground truth] grpo_trl: 2 files sent; waiting for an L4 (Modal queues it)
+[ground truth] container up on the GPU; 2 files of grpo_trl
+[ground truth 21:28:15] bare run of grpo_trl: 4 optimizer steps, at most 900 s
+[bare] running /tmp/gt-fttdlhtw/train.py for 4 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+
+[1AGenerating train split:   0%|          | 0/7473 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 7473/7473 [00:00<00:00, 228628.36 examples/s]
+
+[1AGenerating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 1319/1319 [00:00<00:00, 174009.59 examples/s]
+
+[1AMap:   0%|          | 0/7473 [00:00<?, ? examples/s]
+[1AMap:  40%|████      | 3000/7473 [00:00<00:00, 28946.40 examples/s]
+[1AMap:  83%|████████▎ | 6206/7473 [00:00<00:00, 30748.86 examples/s]Map: 100%|██████████| 7473/7473 [00:00<00:00, 30325.37 examples/s]
+Detected kernel version 4.19.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+
+[1A  0%|          | 0/934 [00:00<?, ?it/s]{"steps": 0, "ended": "oom", "error": "CUDA out of memory. Tried to allocate 2.32 GiB. GPU 0 has a total capacity of 22.06 GiB of which 565.94 MiB is free. Process 1 has 21.50 GiB memory in use. Of the allocated memory 20.91 GiB is allocated by PyTorch, and 371.17 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environmen", "seconds": 41.21035237700001, "peak_allocated_bytes": 22450881024, "peak_reserved_bytes": 22863151104, "device": "NVIDIA L4", "timing": "cuda_events"}
+  0%|          | 0/934 [00:23<?, ?it/s]
+[ground truth 21:29:02] bare run ended (oom) after 46 s, 0 steps
+[ground truth 21:29:02] recorder run: 2 warmup + 3 timed steps, at most 1694 s
+{
+  "script": "grpo_trl",
+  "gpu": "L4",
+  "backend": "cuda",
+  "overhead": null,
+  "bare": {
+    "steps": 0,
+    "ended": "oom",
+    "error": "CUDA out of memory. Tried to allocate 2.32 GiB. GPU 0 has a total capacity of 22.06 GiB of which 565.94 MiB is free. Process 1 has 21.50 GiB memory in use. Of the allocated memory 20.91 GiB is allocated by PyTorch, and 371.17 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environmen",
+    "seconds": 41.21035237700001,
+    "peak_allocated_bytes": 22450881024,
+    "peak_reserved_bytes": 22863151104,
+    "device": "NVIDIA L4",
+    "timing": "cuda_events",
+    "wall_s": 46.1
+  },
+  "recorder": {
+    "status": "oom",
+    "error": "Ran out of GPU memory before the first step. OutOfMemoryError: CUDA out of memory. Tried to allocate 2.32 GiB. GPU 0 has a total capacity of 22.06 GiB of which 565.94 MiB is free. Process 1 has 21.50 GiB memory in use. Of the allocated memory 20.91 GiB is allocated by PyTorch, and 371.17 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environmen at train.py:92, before the first optimizer step (stage: first batch)",
+    "error_code": "oom",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 44.564,
+    "by_phase": {},
+    "generation": {
+      "calls": 1,
+      "seconds_total": 22.412279377999994,
+      "sequences": 16,
+      "new_tokens_mean": 218.9375,
+      "new_tokens_p95": 438.0,
+      "new_tokens_max": 512.0,
+      "max_new_tokens": null,
+      "truncation_rate": 0.0,
+      "backend": "hf"
+    },
+    "extras": {
+      "host_rss_peak_bytes": 7933415424.0,
+      "train_loader_batches": 3737.0,
+      "epochs": 1.0,
+      "planned_steps": 934.0
+    },
+    "rl": {
+      "group_size": null,
+      "prompts": 0,
+      "truncation_rate": 0.0,
+      "zero_spread_fraction": null
+    }
+  }
+}
+[ground truth 21:29:46] recorder run ended (oom) after 0 steps
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-oc7wR7y5WpsdEt7Y3OO48B

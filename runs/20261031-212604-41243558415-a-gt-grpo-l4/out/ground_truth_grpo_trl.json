@@ -1,0 +1,65 @@
+{
+  "script": "grpo_trl",
+  "gpu": "L4",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "oom",
+    "error": "CUDA out of memory. Tried to allocate 2.32 GiB. GPU 0 has a total capacity of 22.06 GiB of which 565.94 MiB is free. Process 1 has 21.50 GiB memory in use. Of the allocated memory 20.91 GiB is allocated by PyTorch, and 371.17 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environmen",
+    "seconds": 41.21035237700001,
+    "peak_allocated_bytes": 22450881024,
+    "peak_reserved_bytes": 22863151104,
+    "device": "NVIDIA L4",
+    "timing": "cuda_events",
+    "wall_s": 46.1
+  },
+  "recorder": {
+    "status": "oom",
+    "error": "Ran out of GPU memory before the first step. OutOfMemoryError: CUDA out of memory. Tried to allocate 2.32 GiB. GPU 0 has a total capacity of 22.06 GiB of which 565.94 MiB is free. Process 1 has 21.50 GiB memory in use. Of the allocated memory 20.91 GiB is allocated by PyTorch, and 371.17 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environmen at train.py:92, before the first optimizer step (stage: first batch)",
+    "error_code": "oom",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 44.564,
+    "by_phase": {},
+    "rl": {
+      "response_length": {
+        "mean": 218.9375,
+        "p95": 438.0,
+        "max": 512.0,
+        "n": 16
+      },
+      "truncation_rate": 0.0,
+      "zero_spread_fraction": null,
+      "pass_rate_per_prompt": [],
+      "group_size": null,
+      "entropy": [],
+      "kl": [],
+      "clip_fraction": [],
+      "reward_mean": []
+    },
+    "generation": {
+      "calls": 1,
+      "seconds_total": 22.412279377999994,
+      "sequences": 16,
+      "new_tokens_mean": 218.9375,
+      "new_tokens_p95": 438.0,
+      "new_tokens_max": 512.0,
+      "max_new_tokens": null,
+      "truncation_rate": 0.0,
+      "backend": "hf"
+    },
+    "extras": {
+      "host_rss_peak_bytes": 7933415424.0,
+      "train_loader_batches": 3737.0,
+      "epochs": 1.0,
+      "planned_steps": 934.0
+    },
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\nThe cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.\n\r0it [00:00, ?it/s]\r0it [00:00, ?it/s]\n\rGenerating train split:   0%|          | 0/7473 [00:00<?, ? examples/s]\rGenerating train split: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 7473/7473 [00:00<00:00, 212264.48 examples/s]\n\rGenerating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]\rGenerating test split: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 1319/1319 [00:00<00:00, 180539.99 examples/s]\n\rMap:   0%|          | 0/7473 [00:00<?, ? examples/s]\rMap:  40%|\u2588\u2588\u2588\u2588      | 3000/7473 [00:00<00:00, 28621.20 examples/s]\rMap:  85%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258d | 6329/7473 [00:00<00:00, 31309.29 examples/s]\rMap: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 7473/7473 [00:00<00:00, 29694.42 examples/s]\nDetected kernel version 4.19.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.\n"
+  },
+  "overhead": null
+}

@@ -1,0 +1,11 @@
+{
+	"name": "20261031-212604-41243558415-a-gt-grpo-l4",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41243558415",
+	"ref": "ws-a",
+	"sha": "144fce8ba2524bc14fd6625b137609a87f7b703a",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script grpo_trl --bare-steps 4 --recorder-steps 3 --warmup 2 --budget-min 30",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T21:29:50Z"
+}
