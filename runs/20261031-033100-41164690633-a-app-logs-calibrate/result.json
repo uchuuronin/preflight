@@ -1,0 +1,11 @@
+{
+	"name": "20261031-033100-41164690633-a-app-logs-calibrate",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41164690633",
+	"ref": "ws-a",
+	"sha": "80e63628edc590d9977924a20cc250e8d48a6db9",
+	"cmd": "python -m preflight.runner.app_logs --env main ap-TcodaC9B4VAgycrOuRTYLc --seconds 120",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T03:31:17Z"
+}
