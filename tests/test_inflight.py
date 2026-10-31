@@ -29,10 +29,17 @@ def _run(col, clock, step_s, n):
 		col.step()
 
 
+def _go(col, clock, setup_s=30.0):
+	"""Start the run, spend setup_s loading, then the first optimizer step (where windows start)."""
+	col.start()
+	clock.t += setup_s
+	col.step()
+
+
 def test_a_slow_stretch_alerts_once_after_two_windows_and_again_after_recovery():
 	clock, said, lines = Clock(), [], []
 	col = Collector(Bands(step_s=(1.0, 1.5)), window=10, clock=clock, alert=said.append, write=lines.append)
-	col.start()
+	_go(col, clock)
 	_run(col, clock, 1.2, 20)  # in band
 	_run(col, clock, 2.0, 10)  # one slow window: noise
 	assert said == []
@@ -41,15 +48,16 @@ def test_a_slow_stretch_alerts_once_after_two_windows_and_again_after_recovery()
 	_run(col, clock, 1.2, 10)  # back in band
 	_run(col, clock, 0.5, 20)  # fast now: a new alert
 	assert len(said) == 2 and "below" in said[1]
-	assert [w["step"] for w in lines][:3] == [10, 20, 30] and lines[0]["step_s"] == pytest.approx(1.2)
+	assert [w["step"] for w in lines][:3] == [11, 21, 31] and lines[0]["step_s"] == pytest.approx(1.2)
+	assert col.setup_s == pytest.approx(30.0)  # loading is not step time
 
 
 def test_memory_over_the_band_alerts_at_once_and_the_total_is_projected():
 	clock, said = Clock(), []
 	peak = {"v": 10 * 2**30}
-	col = Collector(Bands(peak_bytes=(9 * 2**30, 11 * 2**30), total_s=(90.0, 110.0), total_steps=100), window=10,
-		clock=clock, peak=lambda: peak["v"], alert=said.append)  # fmt: skip
-	col.start()
+	col = Collector(Bands(peak_bytes=(9 * 2**30, 11 * 2**30), total_s=(90.0, 110.0), total_steps=101), window=10,
+		clock=clock, peak=lambda: (peak["v"] - 2**30, peak["v"]), alert=said.append)  # fmt: skip
+	_go(col, clock, setup_s=0.0)
 	_run(col, clock, 1.0, 10)
 	assert said == [] and col.windows[-1]["projected_total_s"] == pytest.approx(100.0)
 	peak["v"] = 12 * 2**30
@@ -61,10 +69,10 @@ def test_memory_over_the_band_alerts_at_once_and_the_total_is_projected():
 def test_the_summary_thins_a_long_log_to_the_schema_cap():
 	clock = Clock()
 	col = Collector(Bands(), window=1, clock=clock)
-	col.start()
+	_go(col, clock)
 	_run(col, clock, 0.1, 1000)
 	s = col.finish()
-	assert s["steps"] == 1000 and len(s["step_log"]) == 256 and s["step_log"][-1]["index"] == 1000
+	assert s["steps"] == 1001 and len(s["step_log"]) == 256 and s["step_log"][-1]["index"] == 1001
 	assert s["step_time"]["n_steps"] == 1000 and s["step_time"]["mean_s"] == pytest.approx(0.1)
 
 
@@ -74,13 +82,15 @@ def test_the_live_record_is_a_new_record_on_the_predicted_one():
 	assert b.peak_bytes is not None and b.total_s is not None
 	clock = Clock()
 	col = Collector(b, window=5, clock=clock)
-	col.start()
+	_go(col, clock)
 	_run(col, clock, 1.0, 12)
 	rec = live_record(parent, col.finish(), status="ok")
 	assert rec.parent_id == parent.record_id and rec.job.source.kind == "inflight"
 	live = rec.probes[-1]
-	assert live.id == "live" and live.status == "ok" and live.steps == 12 and len(live.step_log) == 3
+	assert live.id == "live" and live.status == "ok" and live.steps == 13 and len(live.step_log) == 3
 	load_record(rec.model_dump_json())  # valid against the schema
+	again = live_record(rec, col.summary(), status="ok")  # watching the live record: still one live probe
+	assert [p.id for p in again.probes].count("live") == 1
 
 
 @pytest.mark.skipif(importlib.util.find_spec("torch") is None, reason="torch not installed")
@@ -100,3 +110,16 @@ def test_a_real_loop_streams_a_live_record(tmp_path):
 	assert live.id == "live" and live.status == "ok" and live.steps > 0
 	lines = [json.loads(x) for x in next(out.glob("*.live.jsonl")).read_text().splitlines()]
 	assert lines and all("step_s" in x for x in lines)
+
+
+def test_a_failing_script_prints_its_traceback_and_keeps_its_exit_code(tmp_path):
+	import subprocess
+
+	pytest.importorskip("torch")
+	bad = tmp_path / "bad.py"
+	bad.write_text("raise RuntimeError('boom in user code')\n")
+	r = subprocess.run([sys.executable, "-m", "preflight.recorder.inflight", str(ROOT / "schema" / "examples" /
+		"finetune.json"), str(tmp_path / "o"), str(bad)], capture_output=True, text=True, timeout=120)  # fmt: skip
+	assert r.returncode == 1 and "Traceback" in r.stderr and "boom in user code" in r.stderr
+	live = load_record(next((tmp_path / "o").glob("*.json")).read_text()).probes[-1]
+	assert live.status == "error" and "boom" in live.error

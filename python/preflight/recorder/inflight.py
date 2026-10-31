@@ -20,10 +20,13 @@ Alerts go to stderr as `[preflight] ...` lines and into the jsonl, once each unt
 in its band. Nothing leaves the machine; the guide reads the live record.
 """
 
+import contextlib
 import json
 import os
+import signal
 import sys
 import time
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -51,9 +54,10 @@ def bands_from(record, total_steps: int | None = None) -> Bands:
 	est = record.predictions.estimates
 	planned = total_steps
 	if planned is None:
-		for p in record.probes:
+		# the current-settings probe's count (p1); other probes ran at other knobs
+		for p in sorted(record.probes, key=lambda p: p.id != "p1"):
 			v = p.extras.get("planned_steps")
-			if v:
+			if v and p.id == "p1":
 				planned = int(v)
 				break
 	return Bands(
@@ -66,35 +70,44 @@ class Collector:
 	bands: Bands
 	window: int = WINDOW
 	clock: object = time.monotonic
-	peak: object = None  # () -> peak allocated bytes so far, or None (no GPU)
+	peak: object = None  # () -> (peak allocated, peak reserved) bytes so far, or None (no GPU)
 	alert: object = None  # (text) -> None
 	write: object = None  # (dict) -> None, one jsonl line
 	steps: int = 0
 	t0: float | None = None
+	setup_s: float | None = None  # run start to the first optimizer step: imports, loading, data
 	windows: list = field(default_factory=list)
 	_w_start: float | None = None
+	_base: int = 0  # the step the first window starts after
 	_out_of_band: dict = field(default_factory=dict)
 	_alerted: set = field(default_factory=set)
 
 	def start(self):
-		self.t0 = self._w_start = self.clock()
+		self.t0 = self.clock()
 
 	def step(self):
-		"""Called after every optimizer step."""
+		"""Called after every optimizer step. Windows start at the first step, so setup (imports,
+		loading the model and data) is kept out of step time."""
 		self.steps += 1
-		if self.steps % self.window == 0:
+		if self._w_start is None:
+			self._w_start = self.clock()
+			self.setup_s = self._w_start - (self.t0 if self.t0 is not None else self._w_start)
+			self._base = self.steps
+			return
+		if (self.steps - self._base) % self.window == 0:
 			self._flush()
 
 	def _flush(self, partial: bool = False):
 		now = self.clock()
-		n = self.steps % self.window if partial else self.window
+		n = (self.steps - self._base) % self.window if partial else self.window
 		if n <= 0 or self._w_start is None:
 			return None
 		w = {"step": self.steps, "elapsed_s": now - self.t0, "step_s": (now - self._w_start) / n, "steps": n}
 		self._w_start = now
 		pk = self.peak() if self.peak else None
 		if pk is not None:
-			w["peak_bytes"] = int(pk)
+			# the band is fitted on reserved memory (what the allocator holds, fragmentation included)
+			w["peak_allocated_bytes"], w["peak_bytes"] = int(pk[0]), int(pk[1])
 		w["alerts"] = self._check(w)
 		self.windows.append(w)
 		if self.write:
@@ -154,7 +167,7 @@ class Collector:
 
 	def summary(self) -> dict:
 		ws = self.windows
-		out: dict = {"steps": self.steps}
+		out: dict = {"steps": self.steps, "setup_s": self.setup_s}
 		if self.t0 is not None:
 			out["duration_s"] = self.clock() - self.t0
 		if ws:
@@ -165,14 +178,16 @@ class Collector:
 				"first_step_s": ws[0]["step_s"], "unprofiled": True}  # fmt: skip
 			peaks = [x["peak_bytes"] for x in ws if "peak_bytes" in x]
 			if peaks:
-				out["memory"] = {"peak_allocated_bytes": max(peaks)}
+				out["memory"] = {"peak_reserved_bytes": max(peaks),
+					"peak_allocated_bytes": max(x["peak_allocated_bytes"] for x in ws if "peak_allocated_bytes" in x)}  # fmt: skip
 			keep = (
 				ws
 				if len(ws) <= MAX_LOG
 				else [ws[round(i * (len(ws) - 1) / (MAX_LOG - 1))] for i in range(MAX_LOG)]
 			)
 			out["step_log"] = [{"index": x["step"], "kind": "timed", "wall_s": x["step_s"],
-				**({"peak_allocated_bytes": x["peak_bytes"]} if "peak_bytes" in x else {})} for x in keep]  # fmt: skip
+				**({"peak_allocated_bytes": x["peak_allocated_bytes"], "peak_reserved_bytes": x["peak_bytes"]}
+					if "peak_bytes" in x else {})} for x in keep]  # fmt: skip
 		out["alerts"] = [a for x in ws for a in x["alerts"]]
 		return out
 
@@ -187,8 +202,9 @@ def live_record(parent, summary: dict, *, status: str, error: str | None = None,
 	probe = Probe.model_validate({"id": "live", "knobs": {}, "status": status, "steps": summary["steps"],
 		"duration_s": summary.get("duration_s"), "error": error, "step_time": summary.get("step_time"),
 		"memory": summary.get("memory"), "step_log": summary.get("step_log", [])})  # fmt: skip
+	kept = [p for p in parent.probes if p.id != "live"]  # watching a live record: one live probe
 	return rec.model_copy(
-		update={"job": rec.job.model_copy(update={"source": src}), "probes": [*parent.probes, probe]}
+		update={"job": rec.job.model_copy(update={"source": src}), "probes": [*kept, probe]}
 	)
 
 
@@ -196,6 +212,25 @@ def _atomic(path: Path, text: str):
 	tmp = path.with_suffix(path.suffix + ".tmp")
 	tmp.write_text(text)
 	os.replace(tmp, path)
+
+
+WRITE_EVERY_S = 5.0  # derived: the live record (the parent's probes and all) is rewritten at most this often
+
+
+def _rank() -> int:
+	for k in ("RANK", "LOCAL_RANK"):
+		with contextlib.suppress(ValueError):
+			if os.environ.get(k):
+				return int(os.environ[k])
+	return 0
+
+
+def _run_script(script: Path, args: list[str]) -> None:
+	import runpy
+
+	sys.argv = [str(script), *args]
+	sys.path.insert(0, str(script.resolve().parent))
+	runpy.run_path(str(script), run_name="__main__")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -211,14 +246,16 @@ def main(argv: list[str] | None = None) -> int:
 	ap.add_argument("--total-steps", type=int)
 	ap.add_argument("--window", type=int, default=WINDOW)
 	ns = ap.parse_args(head)
+	if _rank() != 0:
+		# torchrun: rank 0 watches; the others run as they would, writing and saying nothing
+		_run_script(ns.script, script_args)
+		return 0
 
 	from preflight.schema import load_record
+	from preflight.schema.record import new_share_token, new_ulid
 
 	parent = load_record(ns.record.read_text())
 	ns.out.mkdir(parents=True, exist_ok=True)
-	ids = None
-	from preflight.schema.record import new_share_token, new_ulid
-
 	ids = (new_ulid(), new_share_token())
 	rec_path = ns.out / f"{ids[1]}.json"
 	log_path = ns.out / f"{ids[1]}.live.jsonl"
@@ -228,38 +265,71 @@ def main(argv: list[str] | None = None) -> int:
 
 	cuda = torch.cuda.is_available()
 
+	def say(t):
+		print(f"[preflight] {t}", file=sys.stderr, flush=True)
+
+	last_write = [0.0]
+
 	def write(w):
 		log.write(json.dumps(w) + "\n")
-		_atomic(rec_path, live_record(parent, col.summary(), status="running", ids=ids).model_dump_json())
+		now = time.monotonic()
+		if now - last_write[0] >= WRITE_EVERY_S:
+			last_write[0] = now
+			_atomic(rec_path, live_record(parent, col.summary(), status="running", ids=ids).model_dump_json())
 
-	col = Collector(bands_from(parent, ns.total_steps), window=max(1, ns.window),
-		peak=(lambda: torch.cuda.max_memory_allocated()) if cuda else None,
-		alert=lambda t: print(f"[preflight] {t}", file=sys.stderr, flush=True), write=write)  # fmt: skip
-	seen: dict = {}
+	def peak():
+		return torch.cuda.max_memory_allocated(), torch.cuda.max_memory_reserved()  # counters, no sync
+
+	col = Collector(bands_from(parent, ns.total_steps), window=max(1, ns.window), peak=peak if cuda else None,
+		alert=say, write=write)  # fmt: skip
+	if script_args != list(parent.job.source.args or []):
+		say(f"the record was predicted for arguments {parent.job.source.args or []}, this run has {script_args}: "
+			"its bands may not apply")  # fmt: skip
+	counts: dict = {}
+	main_opt = {"id": None, "others": 0}
 
 	def post(opt, args, kwargs):
-		first = seen.setdefault("opt", opt)
-		if opt is first:  # several optimizers (GANs, multi-head): count the first one's steps
+		# the optimizer that steps the run: the first one, until another steps 50 times without it
+		# (an LR finder's throwaway, or one rebuilt for the next stage); GANs alternate, so both stay
+		k = id(opt)
+		counts[k] = counts.get(k, 0) + 1
+		if main_opt["id"] is None:
+			main_opt["id"] = k
+		if k == main_opt["id"]:
+			main_opt["others"] = 0
+			col.step()
+			return
+		main_opt["others"] += 1
+		if main_opt["others"] > 50:
+			main_opt["id"], main_opt["others"] = k, 0
 			col.step()
 
 	from torch.optim.optimizer import register_optimizer_step_post_hook
 
 	handle = register_optimizer_step_post_hook(post)
-	print(f"[preflight] watching {ns.script} against record {parent.share_token}; live record {rec_path}",
-		file=sys.stderr, flush=True)  # fmt: skip
+
+	def on_term(signum, frame):
+		raise SystemExit(128 + signum)
+
+	if signal.getsignal(signal.SIGTERM) is signal.SIG_DFL:  # Slurm preemption: the record still ends
+		signal.signal(signal.SIGTERM, on_term)
+	say(f"watching {ns.script} against record {parent.share_token}; live record {rec_path}")
 	status, error, code = "ok", None, 0
-	sys.argv = [str(ns.script), *script_args]
-	sys.path.insert(0, str(ns.script.resolve().parent))
 	col.start()
 	try:
-		import runpy
-
-		runpy.run_path(str(ns.script), run_name="__main__")
+		_run_script(ns.script, script_args)
 	except SystemExit as exc:
+		if isinstance(exc.code, str):
+			print(exc.code, file=sys.stderr)
 		code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
-		if code:
+		if code == 128 + signal.SIGTERM:
+			status, error = "cancelled", "stopped by SIGTERM"
+		elif code:
 			status, error = "error", f"the script exited with {exc.code}"
-	except BaseException as exc:  # the run's own failure, recorded; an OOM says so
+	except KeyboardInterrupt:
+		status, error, code = "cancelled", "interrupted", 130
+	except BaseException as exc:  # the run's own failure: its traceback, and the record says so
+		traceback.print_exc()
 		status = "oom" if "out of memory" in str(exc).lower() else "error"
 		error, code = f"{type(exc).__name__}: {str(exc)[:500]}", 1
 	finally:
@@ -267,8 +337,7 @@ def main(argv: list[str] | None = None) -> int:
 		summary = col.finish()
 		_atomic(rec_path, live_record(parent, summary, status=status, error=error, ids=ids).model_dump_json())
 		log.close()
-		print(f"[preflight] {summary['steps']} steps, {len(summary['alerts'])} alerts; record {rec_path}",
-			file=sys.stderr, flush=True)  # fmt: skip
+		say(f"{summary['steps']} steps, {len(summary['alerts'])} alerts; record {rec_path}")
 	return code
 
 
