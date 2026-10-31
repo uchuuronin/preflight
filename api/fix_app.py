@@ -1,0 +1,231 @@
+"""The fix loop's Modal app: Muse Code in a sandbox, edits only (preflight_api/fix/).
+
+Two entry points, both run with `modal run --env main` (an ephemeral app: nothing is deployed and
+nothing bills once the call returns), each only after Chiya's yes:
+
+	modal run --env main api/fix_app.py::startup_check   # no model call
+	modal run --env main api/fix_app.py::smoke            # one Muse Code fix, capped
+
+How a fix runs: a Function holding `preflight-meta` creates a Sandbox from the fix image with no
+secrets, outbound traffic only to Meta's API host, writes the visitor's files in, and runs one
+`muse exec` per candidate in its own git worktree. The key goes to each Muse Code process on
+stdin, never into the sandbox's environment or a file. The Sandbox is terminated when the race
+ends, at the token-cost cap, or at its own timeout.
+
+Secrets (never in the repo): "preflight-meta" with META_API_KEY and META_API_BASE.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import os
+import shlex
+import threading
+import time
+from pathlib import Path
+from urllib.parse import urlparse
+
+import modal
+
+_HERE = Path(__file__).resolve()
+ROOT = _HERE.parent.parent if (_HERE.parent.parent / "flags.json").is_file() else Path("/repo-not-here")
+
+# Source: derived, where Meta's installer puts the binary is not documented, so both likely
+# places are on PATH and the startup check records which one `muse` resolved to.
+MUSE_PATH = "/root/.local/bin:/root/.muse/bin:/usr/local/bin:/usr/bin:/bin"
+# Source: derived, the guide's measured price table (guide/muse_spark.py; $3.01 measured on
+# Meta's Usage page against $2.91 from the table, docs/decisions/guide-limits.md).
+PRICE_IN, PRICE_CACHED, PRICE_OUT = 1.25, 0.15, 4.25
+# Source: guess, the smoke test's approved cap (Oct 31); a public race's cap comes from the
+# smoke test's measured cost per candidate.
+SMOKE_STOP_USD = 1.00
+# Source: derived, CANDIDATE_TIMEOUT_S (5 min, the contract's Muse Code timeout) plus image
+# start and git; the Sandbox ends on its own after this however the Function fares.
+SANDBOX_TIMEOUT_S = 8 * 60
+
+fix_image = (
+	modal.Image.debian_slim(python_version="3.11")
+	.apt_install("git", "curl", "ca-certificates", "coreutils")
+	# Meta's documented install (dev.meta.ai/docs/muse-code); no version pin exists, so the
+	# version is printed here and recorded by the startup check and every fix.
+	.run_commands("curl -fsSL https://dev.meta.ai/install.sh | sh", f"PATH={MUSE_PATH} muse --version")
+	.env({"PATH": MUSE_PATH})
+)
+
+runner_image = modal.Image.debian_slim(python_version="3.11").add_local_dir(
+	ROOT / "api" / "preflight_api" / "fix", "/root/fixpkg/preflight_api/fix"
+)
+
+app = modal.App("preflight-fix", image=runner_image)
+META = modal.Secret.from_name("preflight-meta")
+
+
+def _pkg():
+	import sys
+
+	if "/root/fixpkg" not in sys.path:
+		sys.path.insert(0, "/root/fixpkg")
+	(Path("/root/fixpkg/preflight_api/__init__.py")).touch()
+
+
+class ModalBox:
+	"""race.Box over a Modal Sandbox. `stop_usd` ends the whole sandbox once Muse Code's reported
+	token cost across every candidate passes it."""
+
+	def __init__(self, sb, stop_usd: float | None = None):
+		self.sb = sb
+		self.stop_usd = stop_usd
+		self.spent = 0.0
+		self.stopped = False
+		self._lock = threading.Lock()
+		self._seen: dict[int, float] = {}
+
+	def write(self, path: str, text: str) -> None:
+		d = os.path.dirname(path)
+		p = self.sb.exec("sh", "-c", f"mkdir -p {shlex.quote(d)} && cat > {shlex.quote(path)}")
+		p.stdin.write(text)
+		p.stdin.write_eof()
+		p.stdin.drain()
+		if p.wait() != 0:
+			raise RuntimeError(f"write {path} failed")
+
+	def run(self, argv, *, cwd=None, stdin=None, timeout=60):
+		from preflight_api.fix import muse
+
+		argv = ["timeout", "--kill-after=5", str(int(timeout)), *argv]
+		p = self.sb.exec(*argv, workdir=cwd)
+		if stdin is not None:
+			p.stdin.write(stdin)
+			p.stdin.write_eof()
+			p.stdin.drain()
+		lines: list[str] = []
+		watch = self.stop_usd is not None and "muse" in argv
+		for line in p.stdout:
+			lines.append(line)
+			if watch:
+				u = muse.parse_events(lines[-50:]).usage.usd(PRICE_IN, PRICE_CACHED, PRICE_OUT)
+				with self._lock:
+					self._seen[id(p)] = max(self._seen.get(id(p), 0.0), u)
+					self.spent = sum(self._seen.values())
+					over = self.spent > self.stop_usd
+				if over and not self.stopped:
+					self.stopped = True
+					self.sb.terminate()
+					return 125, "".join(lines), "stopped at the cost cap"
+		code = p.wait()
+		return code, "".join(lines), p.stderr.read()
+
+
+def _sandbox(app_ref, *, network: bool):
+	host = urlparse(os.environ.get("META_API_BASE", "https://api.meta.ai/v1")).hostname or "api.meta.ai"
+	kw = {"outbound_domain_allowlist": [host]} if network else {"block_network": True}
+	return modal.Sandbox.create(
+		app=app_ref, image=fix_image, timeout=SANDBOX_TIMEOUT_S, cpu=1.0, memory=2048, **kw
+	)
+
+
+@app.function(timeout=10 * 60, retries=0)
+def startup_check_fix() -> dict:
+	"""No model call: the fix image starts, `muse` is there and says which flags it takes, the hook's
+	interpreter exists, and the gate denies a command run exactly as Muse Code will run it."""
+	_pkg()
+	from preflight_api.fix import muse, race
+
+	sb = _sandbox(app, network=False)
+	box = ModalBox(sb)
+	try:
+		out: dict = {}
+		for name, argv in {
+			"which": ["sh", "-c", "command -v muse"],
+			"version": ["env", "-i", f"PATH={MUSE_PATH}", "muse", "--version"],
+			"exec_help": ["muse", "exec", "--help"],
+			"python": ["sh", "-c", f"test -x {muse.HOOK_PYTHON} && {muse.HOOK_PYTHON} --version"],
+		}.items():
+			code, so, se = box.run(argv, timeout=60)
+			out[name] = {"code": code, "out": so[-4000:], "err": se[-1000:]}
+		help_text = out["exec_help"]["out"] + out["exec_help"]["err"]
+		out["flags"] = {
+			f: f in help_text
+			for f in (
+				"--json",
+				"--prompt-file",
+				"--max-model-steps",
+				"--approval-mode",
+				"--contributor-mode",
+				"--sandbox-network",
+				"--api-key-stdin",
+			)
+		}
+		race.prepare(box, {"train.py": "print('hello')\n"})  # runs gate_check
+		out["gate"] = "denies commands"
+		out["ok"] = (
+			out["version"]["code"] == 0
+			and out["python"]["code"] == 0
+			and all(out["flags"][f] for f in ("--json", "--approval-mode"))
+		)
+		return out
+	finally:
+		sb.terminate()
+
+
+SMOKE_EXTRA = (
+	"\nBefore editing, run `python train.py --help` to see the script's options. If you can't run "
+	"it, say so in your reply and carry on with the edit.\n"
+)
+
+
+@app.function(secrets=[META], timeout=12 * 60, retries=0)
+def smoke_fix(files: dict[str, str], key_on_stdin: bool = True) -> dict:
+	"""One Muse Code fix on our own zoo script: eval.wrap_no_grad, one candidate, capped at
+	SMOKE_STOP_USD. The task also asks for a command, to prove the gate blocks it headless."""
+	_pkg()
+	from preflight_api.fix import race, templates
+
+	key = os.environ["META_API_KEY"]
+	# The smoke test's own task text: the template plus the command request.
+	orig = templates.PREAMBLE
+	templates.PREAMBLE = orig + SMOKE_EXTRA
+	sb = _sandbox(app, network=True)
+	box = ModalBox(sb, stop_usd=SMOKE_STOP_USD)
+	t0 = time.monotonic()
+	try:
+		cands = race.race(
+			box, files, [("eval.wrap_no_grad", None)], key, key_on_stdin=key_on_stdin, path=MUSE_PATH
+		)
+	finally:
+		templates.PREAMBLE = orig
+		with contextlib.suppress(Exception):  # it may have ended already (cost cap, timeout)
+			sb.terminate()
+	return {
+		"seconds": round(time.monotonic() - t0, 1),
+		"usd_from_reported_tokens": round(box.spent, 4),
+		"stopped_at_cap": box.stopped,
+		"candidates": [c.public(with_log=True) for c in cands],
+	}
+
+
+@app.local_entrypoint()
+def startup_check() -> None:
+	import json
+
+	res = startup_check_fix.remote()
+	print(json.dumps(res, indent=1))
+	if not res.get("ok"):
+		raise SystemExit(1)
+
+
+@app.local_entrypoint()
+def smoke() -> None:
+	import json
+
+	zoo = ROOT / "zoo" / "finetune_lora_hf"
+	files = {p.name: p.read_text() for p in sorted(zoo.iterdir()) if p.suffix in (".py", ".txt")}
+	check = startup_check_fix.remote()
+	if not check.get("ok"):
+		print(json.dumps(check, indent=1))
+		raise SystemExit("startup check failed; no model call made")
+	res = smoke_fix.remote(files, key_on_stdin=bool(check["flags"].get("--api-key-stdin")))
+	print(json.dumps({"startup": {k: check[k] for k in ("flags", "gate", "version")}, **res}, indent=1))
+	c = res["candidates"][0]
+	ok = c["status"] == "patched" and "bash" in c["blocked"] and not res["stopped_at_cap"]
+	raise SystemExit(0 if ok else 1)

@@ -1,0 +1,271 @@
+"""The fix loop's edits-only gate, output checks and race, against a stand-in `muse` that calls the
+real hook the way Muse Code does (settings.json's PreToolUse command, the payload on stdin)."""
+
+import base64
+import json
+import os
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
+
+import pytest
+
+from preflight_api.fix import muse, race
+from preflight_api.fix.templates import TEMPLATES, task_for
+
+KEY = "mk-test-0123456789abcdefABCDEF"
+
+
+def gate(tmp_path: Path, tool: str, tool_input: dict, cwd: Path | None = None) -> dict | None:
+	hook = tmp_path / "hook.py"
+	hook.write_text(muse.HOOK_SOURCE)
+	root = tmp_path / "wt"
+	root.mkdir(exist_ok=True)
+	argv = muse.hook_command(str(hook), str(root), sys.executable).split()
+	payload = {
+		"hook_event_name": "PreToolUse",
+		"tool_name": tool,
+		"tool_input": tool_input,
+		"cwd": str(cwd or root),
+	}
+	out = subprocess.run(argv, input=json.dumps(payload), capture_output=True, text=True, env={}, timeout=10)  # noqa: S603 (our own hook, fixed argv)
+	assert out.returncode == 0
+	return json.loads(out.stdout) if out.stdout.strip() else None
+
+
+def denied(d: dict | None) -> bool:
+	return bool(d) and d["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_the_gate_lets_only_reads_and_edits_inside_the_worktree(tmp_path):
+	assert gate(tmp_path, "read_file", {"path": "train.py"}) is None
+	assert gate(tmp_path, "edit_file", {"path": "src/train.py"}) is None
+	for tool in (
+		"bash",
+		"bash_input",
+		"shell",
+		"web_fetch",
+		"subagent_spawn",
+		"add_memory",
+		"cron_create",
+		"mcp__x__y",
+		"a_tool_added_later",
+	):
+		assert denied(gate(tmp_path, tool, {"command": "env"})), tool
+
+
+def test_the_gate_keeps_tools_out_of_proc_home_and_git(tmp_path):
+	assert denied(gate(tmp_path, "read_file", {"path": "/proc/self/environ"}))
+	assert denied(gate(tmp_path, "read_file", {"path": "../../etc/passwd"}))
+	assert denied(gate(tmp_path, "search", {"path": "/"}))
+	assert denied(gate(tmp_path, "write_file", {"path": ".git/config"}))
+	assert denied(gate(tmp_path, "edit_file", {"file_path": ".muse/hooks.json"}))
+	assert denied(gate(tmp_path, "read_file", {"path": "train.py"}, cwd=tmp_path))  # cwd outside
+	# A symlink inside the worktree that points out is outside.
+	(tmp_path / "wt").mkdir(exist_ok=True)
+	os.symlink("/etc", tmp_path / "wt" / "etc")
+	assert denied(gate(tmp_path, "read_file", {"path": "etc/passwd"}))
+	assert gate(tmp_path, "read_file", {"path": ".git/HEAD"}) is None  # reading git is fine
+
+
+def test_the_gate_denies_when_it_cannot_read_its_input(tmp_path):
+	hook = tmp_path / "hook.py"
+	hook.write_text(muse.HOOK_SOURCE)
+	argv = muse.hook_command(str(hook), str(tmp_path), sys.executable).split()
+	out = subprocess.run(argv, input="not json", capture_output=True, text=True, env={}, timeout=10)  # noqa: S603 (our own hook, fixed argv)
+	assert denied(json.loads(out.stdout))
+
+
+def test_the_key_is_found_in_output_however_it_is_dressed():
+	b = KEY.encode()
+	for text in (
+		KEY,
+		KEY[::-1],
+		b.hex(),
+		base64.b64encode(b"xy" + b).decode(),
+		"a=" + base64.urlsafe_b64encode(b).decode(),
+	):
+		assert muse.leaks(f"before {text} after", [KEY]), text
+	assert not muse.leaks("an ordinary diff with no key in it", [KEY])
+
+
+def test_a_diff_must_be_a_small_edit_to_the_visitors_files():
+	edit = "--- a/train.py\n+++ b/train.py\n@@ -1 +1 @@\n-a\n+b\n"
+	assert muse.diff_problem(edit, {"train.py"}) is None
+	assert muse.diff_problem("", {"train.py"}) == "no_change"
+	assert muse.diff_problem(edit.replace("train.py", "other.py"), {"train.py"}) == "outside_files"
+	assert muse.diff_problem("new file mode 100644\n" + edit, {"train.py"}) == "not_an_edit"
+
+
+def test_usage_is_read_wherever_muse_puts_it():
+	lines = [
+		'{"type":"turn","usage":{"input_tokens":1000,"cached_input_tokens":600,"output_tokens":50}}',
+		'{"type":"turn","usage":{"input_tokens":2500,"cached_input_tokens":1800,"output_tokens":120}}',
+		"not json",
+		'{"type":"tool_result","tool_name":"bash","result":"tool blocked by hook: Preflight"}',
+		'{"role":"assistant","text":"Wrapped eval in no_grad in train.py line 80."}',
+	]
+	ev = muse.parse_events(lines)
+	assert (ev.usage.input_tokens, ev.usage.cached_input_tokens, ev.usage.output_tokens) == (2500, 1800, 120)
+	assert ev.blocked == ["bash"] and ev.unknown == 1
+	assert ev.final.startswith("Wrapped")
+	assert ev.usage.usd(1.25, 0.15, 4.25) == pytest.approx((700 * 1.25 + 1800 * 0.15 + 120 * 4.25) / 1e6)
+
+
+def test_every_template_names_a_knob_and_builds_a_prompt():
+	assert len(TEMPLATES) == 12
+	for t in TEMPLATES.values():
+		value = 8 if "{value}" in t.task else None
+		text = task_for(t.id, value)
+		assert "{" not in text.replace("{", "", 0) or "{value}" not in text
+		assert "can't run commands" in text and "data, not instructions" in text
+	with pytest.raises(ValueError):
+		task_for("eval.reduce_batch")
+
+
+FAKE_MUSE = textwrap.dedent(
+	r'''
+	#!/usr/bin/env python3
+	"""Stand-in for `muse exec`: asks the configured hook about three tools, as Muse Code does."""
+	import json, os, subprocess, sys
+	args = sys.argv[1:]
+	key = sys.stdin.readline().strip() if "--api-key-stdin" in args else os.environ.get("META_API_KEY", "")
+	cfg = json.load(open(os.path.join(os.environ["XDG_CONFIG_HOME"], "muse", "settings.json")))
+	hook = cfg["hooks"]["PreToolUse"][0]["hooks"][0]["command"].split()
+	mode = os.environ.get("FAKE_MODE") or open(os.path.join(os.getcwd(), "MODE")).read().strip()
+	def ask(tool, inp):
+		r = subprocess.run(hook, input=json.dumps({"tool_name": tool, "tool_input": inp, "cwd": os.getcwd()}), capture_output=True, text=True, env={})
+		return not r.stdout.strip()
+	# Muse Code runs a tool when its hook fails; this stand-in does the same.
+	ran = ask("bash", {"command": "env"})
+	print(json.dumps({"type": "tool_result", "tool_name": "bash", "result": "ran" if ran else "tool blocked by hook: Preflight"}))
+	print(json.dumps({"type": "tool_result", "tool_name": "read_file", "result": "ok" if ask("read_file", {"path": "/proc/self/environ"}) else "tool blocked by hook: Preflight"}))
+	if mode in ("edit", "leak") and ask("edit_file", {"path": "train.py"}):
+		src = open("train.py").read()
+		extra = ("# " + key + "\n") if mode == "leak" else ""
+		open("train.py", "w").write(src.replace("model.eval()", "model.eval()\nwith torch.no_grad():") + extra)
+	if mode == "sleep":
+		import time; time.sleep(30)
+	print(json.dumps({"usage": {"input_tokens": 3000, "cached_input_tokens": 2000, "output_tokens": 200}}))
+	print(json.dumps({"role": "assistant", "text": "done"}))
+	'''
+).lstrip()
+
+
+class LocalBox:
+	"""The sandbox, as a temporary directory: /fix maps to it."""
+
+	def __init__(self, root: Path, bin_dir: Path):
+		self.root, self.bin = root, bin_dir
+
+	def _p(self, path: str) -> str:
+		return path.replace(race.ROOT, str(self.root), 1) if path.startswith(race.ROOT) else path
+
+	def write(self, path: str, text: str) -> None:
+		p = Path(self._p(path))
+		p.parent.mkdir(parents=True, exist_ok=True)
+		# Paths inside config files too (settings.json names the hook by its sandbox path).
+		p.write_text(text.replace(race.ROOT + "/", str(self.root) + "/") if path.endswith(".json") else text)
+
+	def run(self, argv, *, cwd=None, stdin=None, timeout=60):
+		argv = [self._p(a) if a.startswith(race.ROOT) else a.replace(race.ROOT, str(self.root)) for a in argv]
+		argv = [
+			a.replace(
+				"PATH=/usr/local/bin:/usr/bin:/bin",
+				f"PATH={self.bin}:/usr/bin:/bin:{os.path.dirname(sys.executable)}",
+			)
+			for a in argv
+		]
+		try:
+			r = subprocess.run(  # noqa: S603 (the test sandbox)
+				argv,
+				cwd=self._p(cwd) if cwd else None,
+				input=stdin,
+				capture_output=True,
+				text=True,
+				timeout=timeout,
+			)
+		except subprocess.TimeoutExpired:
+			return 124, "", "timeout"
+		return r.returncode, r.stdout, r.stderr
+
+
+@pytest.fixture
+def box(tmp_path):
+	bin_dir = tmp_path / "bin"
+	bin_dir.mkdir()
+	fake = bin_dir / "muse"
+	fake.write_text(FAKE_MUSE.replace("/usr/bin/env python3", sys.executable, 1))
+	fake.chmod(0o755)
+	(tmp_path / "fix").mkdir()
+	return LocalBox(tmp_path / "fix", bin_dir)
+
+
+FILES = {"train.py": "import torch\nmodel.eval()\nloss = model(x)\n", "MODE": "edit\n"}
+
+
+def test_a_race_returns_each_candidates_diff_with_commands_blocked(box):
+	files = dict(FILES)
+	out = race.race(
+		box, files, [("eval.wrap_no_grad", None), ("eval.reduce_batch", 8)], KEY, python=sys.executable
+	)
+	assert [c.status for c in out] == ["patched", "patched"]
+	for c in out:
+		assert "with torch.no_grad():" in c.diff
+		assert c.blocked == ["bash", "read_file"]  # the command and the /proc read never ran
+		assert c.usage["output_tokens"] == 200
+		assert KEY not in json.dumps(c.public())
+
+
+def test_a_candidate_that_writes_the_key_is_discarded_whole(box):
+	out = race.race(
+		box, {**FILES, "MODE": "leak\n"}, [("eval.wrap_no_grad", None)], KEY, python=sys.executable
+	)
+	assert out[0].status == "leaked"
+	assert out[0].public()["diff"] == "" and out[0].public()["final"] is None
+
+
+def test_a_candidate_past_its_deadline_loses(box):
+	out = race.race(
+		box,
+		{**FILES, "MODE": "sleep\n"},
+		[("eval.wrap_no_grad", None)],
+		KEY,
+		timeout=2,
+		python=sys.executable,
+	)
+	assert out[0].status == "timeout"
+
+
+def test_a_race_takes_one_to_three_known_templates(box):
+	with pytest.raises(ValueError):
+		race.race(box, FILES, [], KEY, python=sys.executable)
+	with pytest.raises(ValueError):
+		race.race(box, FILES, [("eval.wrap_no_grad", None)] * 4, KEY, python=sys.executable)
+	with pytest.raises(KeyError):
+		race.race(box, FILES, [("rm.everything", None)], KEY, python=sys.executable)
+	with pytest.raises(ValueError):
+		race.prepare(box, {"../escape.py": ""})
+
+
+def test_the_command_line_never_carries_the_key():
+	argv = muse.command("/fix/p.txt")
+	assert KEY not in " ".join(argv)
+	assert argv[argv.index("--approval-mode") : argv.index("--approval-mode") + 2] == [
+		"--approval-mode",
+		"never",
+	]
+	assert "--api-key-stdin" in argv and "--contributor-mode" in argv
+
+
+def test_no_candidate_starts_when_the_gate_would_fail_open(box, tmp_path, monkeypatch):
+	monkeypatch.setattr(race.muse, "HOOK_SOURCE", "import sys\nsys.exit(1)\n")
+	with pytest.raises(race.GateBroken):
+		race.race(box, FILES, [("eval.wrap_no_grad", None)], KEY, python=sys.executable)
+	# A hook interpreter that isn't there fails open in Muse Code; the check catches it.
+	monkeypatch.undo()
+	(tmp_path / "fix2").mkdir()
+	fresh = LocalBox(tmp_path / "fix2", box.bin)
+	with pytest.raises(race.GateBroken):
+		race.race(fresh, FILES, [("eval.wrap_no_grad", None)], KEY, python="/no/such/python3")
