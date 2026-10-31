@@ -1,0 +1,264 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-iEJ4OYC17kZrnaTUqRPKwn
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[L40S] wave 0: $0.00 of $3.70 spent (container time, worst case for unsettled waves), 0 done, 200 to do, deadline 600 s, next wave 4 x 2
+[L40S] wave 0 took 42 s on 4 containers: 288 container-s ($0.17, worst case was $3.50) for 8 configs
+[L40S] batch: 22.5 s in the container, reload 0.2 s, commits 1.3 s
+[L40S] config a664141541ef gpt probe ok: 11.4 s
+[L40S] config 7170b4c653ba gpt probe ok: 9.6 s
+[L40S] batch: 24.3 s in the container, reload 0.3 s, commits 2.6 s
+[L40S] config b1e2e5803066 gpt probe ok: 8.3 s
+[L40S] config ed4cc249ed86 gpt query ok: 13.0 s
+[L40S] batch: 19.6 s in the container, reload 0.3 s, commits 3.0 s
+[L40S] config cf41c4e0bc6e gpt query ok: 7.9 s
+[L40S] config c6510a28e719 lora probe ok: 8.4 s
+[L40S] batch: 20.6 s in the container, reload 0.7 s, commits 2.5 s
+[L40S] config 2575481ea06a lora probe ok: 8.7 s
+[L40S] config f3672bd716b6 lora probe ok: 8.7 s
+[L40S] wave 1: $0.17 of $3.70 spent (container time, worst case for unsettled waves), 8 done, 192 to do, deadline 600 s, next wave 4 x 2
+[L40S] wave 1 took 28 s on 4 containers: 234 container-s ($0.14, worst case was $3.50) for 8 configs
+[L40S] batch: 28.2 s in the container, reload 0.8 s, commits 9.9 s
+[L40S] config 18ee65f94e8c lora query ok: 8.7 s
+[L40S] config b263ed173f59 lora query ok: 8.7 s
+[L40S] batch: 18.7 s in the container, reload 0.4 s, commits 8.4 s
+[L40S] config a8767444c6e2 encoder probe ok: 5.2 s
+[L40S] config 5c74ceb9ef7d encoder probe ok: 4.7 s
+[L40S] batch: 11.4 s in the container, reload 0.7 s, commits 2.3 s
+[L40S] config f0839512436c encoder probe ok: 4.2 s
+[L40S] config 3c40d029e755 encoder query ok: 4.2 s
+[L40S] batch: 11.4 s in the container, reload 0.7 s, commits 2.3 s
+[L40S] config e1b75d8ca638 encoder query ok: 4.0 s
+[L40S] config 5d73fe896419 cnn probe ok: 4.3 s
+[L40S] wave 2: $0.31 of $3.70 spent (container time, worst case for unsettled waves), 16 done, 184 to do, deadline 120 s, next wave 4 x 8
+[L40S] wave 2 took 63 s on 4 containers: 371 container-s ($0.22, worst case was $3.36) for 32 configs
+[L40S] batch: 43.5 s in the container, reload 0.0 s, commits 2.4 s
+[L40S] config b5aa136b5b88 cnn probe ok: 5.8 s
+[L40S] config 74b3ecdd5d94 cnn probe ok: 5.1 s
+[L40S] config d1f6128cc08f cnn query ok: 6.1 s
+[L40S] config 01cf6e8287eb cnn query ok: 5.0 s
+[L40S] config 24dd068a6eae mlp probe ok: 4.8 s
+[L40S] config 8fbb578a546a mlp probe ok: 4.8 s
+[L40S] config 7350f6685d96 mlp probe ok: 4.7 s
+[L40S] config 4460e9714c49 mlp query ok: 4.7 s
+[L40S] batch: 49.9 s in the container, reload 0.3 s, commits 6.0 s
+[L40S] config d8092a5d2861 mlp query ok: 4.2 s
+[L40S] config 1744e3960f84 gpt probe ok: 5.3 s
+[L40S] config f46fe3e709e5 gpt probe ok: 5.1 s
+[L40S] config 3e7a7d7eda3d gpt probe ok: 5.1 s
+[L40S] config c05f807e437b gpt query ok: 5.7 s
+[L40S] config 9665844030b6 gpt query ok: 5.1 s
+[L40S] config 2ce8db9521ba lora probe ok: 6.4 s
+[L40S] config 5531a85d48a9 lora probe ok: 6.7 s
+[L40S] batch: 52.1 s in the container, reload 0.3 s, commits 14.6 s
+[L40S] config 29993f54999c lora probe ok: 7.0 s
+[L40S] config 08dfbebdf96b lora query ok: 6.6 s
+[L40S] config 140f0f3251a4 lora query ok: 6.3 s
+[L40S] config 1a28eb828f37 encoder probe ok: 3.4 s
+[L40S] config 93899b87b3ce encoder probe ok: 3.5 s
+[L40S] config 99344bb74d3a encoder probe ok: 3.3 s
+[L40S] config 5088d0c47c8d encoder query ok: 3.4 s
+[L40S] config 4caf8c8e53c5 encoder query ok: 3.4 s
+[L40S] batch: 56.7 s in the container, reload 0.6 s, commits 17.3 s
+[L40S] config 2b2119dee204 cnn probe ok: 5.7 s
+[L40S] config 917f41894cf8 cnn probe ok: 5.0 s
+[L40S] config d1c1c01298ad cnn probe ok: 4.8 s
+[L40S] config 18fb49e28d92 cnn query ok: 5.5 s
+[L40S] config 630da2e23359 cnn query ok: 4.8 s
+[L40S] config 84fc7f5851b4 mlp probe ok: 4.3 s
+[L40S] config 0a20beb052b7 mlp probe ok: 4.3 s
+[L40S] config 0aef91357208 mlp probe ok: 4.4 s
+[L40S] wave 3: $0.53 of $3.70 spent (container time, worst case for unsettled waves), 48 done, 147 to do, deadline 120 s, next wave 4 x 7
+[L40S] wave 3 took 101 s on 4 containers: 524 container-s ($0.31, worst case was $3.00) for 28 configs
+[L40S] batch: 55.2 s in the container, reload 0.1 s, commits 8.7 s
+[L40S] config c47183d4ee3e mlp query ok: 4.3 s
+[L40S] config 7602583674d7 mlp query ok: 3.9 s
+[L40S] config 4e495169d381 gpt probe ok: 7.2 s
+[L40S] config 8f072e94c2da gpt probe ok: 7.3 s
+[L40S] config d93f8632c8b6 gpt probe ok: 8.2 s
+[L40S] config fa882dd776f7 gpt query ok: 8.0 s
+[L40S] config 90b3140da94d gpt query ok: 7.2 s
+[L40S] batch: 55.5 s in the container, reload 0.2 s, commits 6.0 s
+[L40S] config dc5bbfe73efd lora probe ok: 7.7 s
+[L40S] config 1c2713691c1b lora probe ok: 7.0 s
+[L40S] config b4a95ef216e7 lora probe ok: 7.0 s
+[L40S] config 7d33cffde96a lora query ok: 8.3 s
+[L40S] config 545ceaf65395 lora query ok: 6.9 s
+[L40S] config 71041856e914 encoder probe ok: 6.1 s
+[L40S] config 012662f60032 encoder probe ok: 6.2 s
+[L40S] batch: 40.0 s in the container, reload 0.7 s, commits 9.0 s
+[L40S] config 14dc290ced93 encoder probe ok: 5.5 s
+[L40S] config 9e264705555c encoder query ok: 5.3 s
+[L40S] config 815b679b0bc4 encoder query ok: 5.2 s
+[L40S] config 613fbb3b1cd1 cnn probe ok: 3.7 s
+[L40S] config a7fd1fadb3be cnn probe ok: 3.5 s
+[L40S] config be3d9b959535 cnn probe ok: 3.4 s
+[L40S] config a3d8c344d7c9 cnn query ok: 3.6 s
+[L40S] batch: 41.0 s in the container, reload 0.7 s, commits 6.7 s
+[L40S] config e650410a0cfe cnn query ok: 4.0 s
+[L40S] config 402c008d74be gpt probe ok: 4.8 s
+[L40S] config 5885807480cf gpt probe ok: 4.7 s
+[L40S] config 065ca1b3a9b5 gpt probe ok: 4.7 s
+[L40S] config 20f3df9ebd29 gpt query ok: 4.9 s
+[L40S] config 706401a04fa7 gpt query ok: 4.7 s
+[L40S] config f28a60c8a195 lora probe ok: 5.8 s
+[L40S] wave 4: $0.84 of $3.70 spent (container time, worst case for unsettled waves), 76 done, 119 to do, deadline 120 s, next wave 3 x 8
+[L40S] wave 4 took 61 s on 3 containers: 274 container-s ($0.16, worst case was $2.52) for 24 configs
+[L40S] batch: 57.6 s in the container, reload 0.1 s, commits 1.5 s
+[L40S] config 4622a007b180 lora probe ok: 7.8 s
+[L40S] config cec3ab45951b lora probe ok: 7.8 s
+[L40S] config 9e56fa6ee3af lora query ok: 8.1 s
+[L40S] config b9071be47040 lora query ok: 8.0 s
+[L40S] config 10f867106524 encoder probe ok: 6.0 s
+[L40S] config 6e4a8b128681 encoder probe ok: 5.5 s
+[L40S] config 2f57b5b15b28 encoder probe ok: 5.5 s
+[L40S] config 05871ce2465e encoder query ok: 7.2 s
+[L40S] batch: 45.0 s in the container, reload 0.0 s, commits 6.8 s
+[L40S] config 47de71065914 encoder query ok: 5.4 s
+[L40S] config 03e717cf5bed cnn probe ok: 5.1 s
+[L40S] config ed1518c3be9d cnn probe ok: 4.8 s
+[L40S] config 00a5a2017122 cnn probe ok: 4.8 s
+[L40S] config 5188e81759b6 cnn query ok: 4.9 s
+[L40S] config 02334f9c1830 cnn query ok: 4.8 s
+[L40S] config 919791c5dd3a mlp probe ok: 4.2 s
+[L40S] config 1440ad0c488c mlp probe ok: 4.2 s
+[L40S] batch: 55.4 s in the container, reload 0.0 s, commits 1.6 s
+[L40S] config 86e71949abad mlp probe ok: 4.3 s
+[L40S] config 4dbdcbf40616 mlp query ok: 4.2 s
+[L40S] config 3cca51f2bb80 mlp query ok: 4.1 s
+[L40S] config 6466c46bd7b8 gpt probe ok: 8.2 s
+[L40S] config 683997fd0830 gpt probe ok: 8.2 s
+[L40S] config 167c82bad622 gpt probe ok: 8.2 s
+[L40S] config 478483d38df1 gpt query ok: 8.5 s
+[L40S] config 6b3d614e0382 gpt query ok: 8.2 s
+[L40S] wave 5: $1.01 of $3.70 spent (container time, worst case for unsettled waves), 100 done, 95 to do, deadline 120 s, next wave 3 x 8
+[L40S] wave 5 took 63 s on 3 containers: 280 container-s ($0.17, worst case was $2.52) for 24 configs
+[L40S] batch: 63.4 s in the container, reload 0.3 s, commits 1.6 s
+[L40S] config e31a4de68c9f lora probe ok: 8.3 s
+[L40S] config 0ed1a5f30cf7 lora probe ok: 8.3 s
+[L40S] config 927387af307c lora probe ok: 8.3 s
+[L40S] config 8810a062da98 lora query ok: 8.7 s
+[L40S] config 3ee18a1e6598 lora query ok: 8.4 s
+[L40S] config 53d004d3704e encoder probe ok: 6.7 s
+[L40S] config 79982da01ef0 encoder probe ok: 6.4 s
+[L40S] config 2742afd390bc encoder probe ok: 6.4 s
+[L40S] batch: 43.9 s in the container, reload 0.3 s, commits 1.7 s
+[L40S] config 58699601266d encoder query ok: 7.2 s
+[L40S] config 3af668d09c87 encoder query ok: 6.6 s
+[L40S] config 4baee22e51b5 cnn probe ok: 4.9 s
+[L40S] config 062a6546af39 cnn probe ok: 4.8 s
+[L40S] config 5b2907e294a6 cnn probe ok: 5.0 s
+[L40S] config a2ce0e6040d6 cnn query ok: 4.8 s
+[L40S] config 084f8859792b cnn query ok: 4.9 s
+[L40S] config 5c6a6b67c8f3 mlp probe ok: 3.8 s
+[L40S] batch: 38.0 s in the container, reload 0.2 s, commits 1.4 s
+[L40S] config 376d1a92a958 mlp probe ok: 3.8 s
+[L40S] config 26486f9eccce mlp probe ok: 3.8 s
+[L40S] config e74cbf1c119f mlp query ok: 3.8 s
+[L40S] config 3084e5f6a058 mlp query ok: 3.9 s
+[L40S] config 1a95ff7eee77 gpt probe ok: 5.3 s
+[L40S] config b9d7a265be69 gpt probe ok: 5.3 s
+[L40S] config ddee050b2e3d gpt probe ok: 5.3 s
+[L40S] config 3ffa574332a3 gpt query ok: 5.2 s
+[L40S] wave 6: $1.17 of $3.70 spent (container time, worst case for unsettled waves), 124 done, 71 to do, deadline 120 s, next wave 3 x 8
+[L40S] wave 6 took 76 s on 3 containers: 318 container-s ($0.19, worst case was $2.52) for 24 configs
+[L40S] batch: 51.1 s in the container, reload 0.2 s, commits 1.9 s
+[L40S] config f6eb35f169ad gpt query ok: 5.3 s
+[L40S] config 34a66739f641 lora probe ok: 6.9 s
+[L40S] config e4d7c54c4d03 lora probe ok: 6.8 s
+[L40S] config b048cbcb0ca2 lora probe ok: 6.9 s
+[L40S] config b2adfd465fc5 lora query ok: 7.1 s
+[L40S] config 1cff1e647f86 lora query ok: 6.9 s
+[L40S] config ce147ef0e64d encoder probe ok: 4.5 s
+[L40S] config 4fdea5c87967 encoder probe ok: 4.4 s
+[L40S] batch: 75.8 s in the container, reload 0.2 s, commits 1.6 s
+[L40S] config 07edbe6ed2f0 encoder probe ok: 4.4 s
+[L40S] config 8adf1d9f43d1 encoder query ok: 4.5 s
+[L40S] config c10ecce92e0a encoder query ok: 4.2 s
+[L40S] config 40fa5af1e18a cnn probe ok: 23.2 s
+[L40S] config 733dfd89d6f6 cnn probe ok: 14.5 s
+[L40S] config d9ce2d57b3cd cnn probe ok: 10.3 s
+[L40S] config 82049b25cc2e cnn query oom: 4.8 s
+[L40S] config 7d2f5cd539a5 cnn query ok: 8.1 s
+[L40S] batch: 45.3 s in the container, reload 0.2 s, commits 1.2 s
+[L40S] config 2dd669e94aa0 mlp probe ok: 5.2 s
+[L40S] config 7912f89ae9ee mlp probe ok: 5.1 s
+[L40S] config b61ad421cc80 mlp probe ok: 5.1 s
+[L40S] config 279d80120804 mlp query ok: 5.2 s
+[L40S] config 1b15a1ff73b9 mlp query ok: 5.1 s
+[L40S] config 194cc562022f gpt probe ok: 6.3 s
+[L40S] config 87f8c1f46bca gpt probe ok: 6.0 s
+[L40S] config fa18405bad85 gpt probe ok: 5.9 s
+[L40S] wave 7: $1.36 of $3.70 spent (container time, worst case for unsettled waves), 148 done, 47 to do, deadline 120 s, next wave 3 x 7
+[L40S] wave 7 took 51 s on 3 containers: 242 container-s ($0.14, worst case was $2.25) for 21 configs
+[L40S] batch: 47.1 s in the container, reload 0.1 s, commits 1.7 s
+[L40S] config fd2290d1d1fa gpt query ok: 6.3 s
+[L40S] config b3d228da3e15 gpt query ok: 5.9 s
+[L40S] config cf6577e5aeb8 lora probe ok: 6.8 s
+[L40S] config b3bc18dd250c lora probe ok: 6.5 s
+[L40S] config 0d0501d2aaa0 lora probe ok: 6.5 s
+[L40S] config 1c82d982bb62 lora query ok: 6.6 s
+[L40S] config 5de6132cbaf3 lora query ok: 6.4 s
+[L40S] batch: 37.3 s in the container, reload 0.0 s, commits 1.5 s
+[L40S] config 4edcdc19c2dd encoder probe ok: 4.9 s
+[L40S] config 87570c1664f9 encoder probe ok: 4.7 s
+[L40S] config fd837f36201d encoder probe ok: 4.7 s
+[L40S] config 69af90057b49 encoder query ok: 5.3 s
+[L40S] config 8f2296f81630 encoder query ok: 4.9 s
+[L40S] config ea8f32d9540b cnn probe ok: 5.6 s
+[L40S] config b5a41aa4d802 cnn probe ok: 5.5 s
+[L40S] batch: 45.5 s in the container, reload 0.2 s, commits 13.9 s
+[L40S] config 3a4d297dfca7 cnn probe ok: 4.8 s
+[L40S] config b54968cc3f37 cnn query ok: 5.3 s
+[L40S] config 357827bcabf0 cnn query ok: 4.5 s
+[L40S] config ab48986486a6 mlp probe ok: 4.2 s
+[L40S] config 3c82f5fc1d54 mlp probe ok: 4.2 s
+[L40S] config 52f6897f5079 mlp probe ok: 4.2 s
+[L40S] config f59c47d69805 mlp query ok: 4.2 s
+[L40S] wave 8: $1.51 of $3.70 spent (container time, worst case for unsettled waves), 169 done, 26 to do, deadline 120 s, next wave 3 x 6
+[L40S] wave 8 took 74 s on 3 containers: 311 container-s ($0.19, worst case was $1.98) for 18 configs
+[L40S] batch: 33.4 s in the container, reload 0.1 s, commits 1.6 s
+[L40S] config a4b315ae71c1 mlp query ok: 5.2 s
+[L40S] config d312c80f86e4 gpt probe ok: 5.4 s
+[L40S] config d4a3e51f44d2 gpt probe ok: 5.2 s
+[L40S] config d865e21879f5 gpt probe ok: 5.3 s
+[L40S] config 5a292fcf7426 gpt query ok: 5.3 s
+[L40S] config 6f6f15c6f24f gpt query ok: 5.3 s
+[L40S] batch: 68.8 s in the container, reload 0.1 s, commits 2.7 s
+[L40S] config 65186e215de1 lora probe ok: 12.4 s
+[L40S] config 2b4b952f5492 lora probe ok: 10.7 s
+[L40S] config dccd86100f5e lora probe ok: 10.7 s
+[L40S] config 2602d72d8c33 lora query ok: 16.9 s
+[L40S] config 88bbf7d1e395 lora query ok: 10.3 s
+[L40S] config 24c5871cbd88 encoder probe ok: 4.9 s
+[L40S] batch: 31.7 s in the container, reload 0.1 s, commits 1.9 s
+[L40S] config f454e6bf9a5d encoder probe ok: 5.2 s
+[L40S] config 80c3c7768b19 encoder probe ok: 4.6 s
+[L40S] config a38e42db448e encoder query ok: 4.9 s
+[L40S] config 8a308310a97b encoder query ok: 4.8 s
+[L40S] config d227b8ceaf78 cnn probe ok: 5.2 s
+[L40S] config 76115d4d9486 cnn probe ok: 4.9 s
+[L40S] wave 9: $1.69 of $3.70 spent (container time, worst case for unsettled waves), 187 done, 8 to do, deadline 120 s, next wave 2 x 7
+[L40S] wave 9 took 42 s on 2 containers: 144 container-s ($0.09, worst case was $1.50) for 8 configs
+[L40S] batch: 32.9 s in the container, reload 0.0 s, commits 1.4 s
+[L40S] config 76c0332db9a7 cnn probe ok: 4.9 s
+[L40S] config 9a54eee19b7d cnn query ok: 4.8 s
+[L40S] config bcf330652b2f cnn query ok: 4.8 s
+[L40S] config ce78b1e0f00b mlp probe ok: 4.2 s
+[L40S] config 2202303f1745 mlp probe ok: 4.2 s
+[L40S] config 6f9ecfa3905e mlp probe ok: 4.3 s
+[L40S] config 02a8543e3347 mlp query ok: 4.2 s
+[L40S] batch: 5.1 s in the container, reload 0.2 s, commits 0.7 s
+[L40S] config bc779cc90698 mlp query ok: 4.2 s
+[L40S] wave 10: $1.78 of $3.70 spent (container time, worst case for unsettled waves), 195 done, 0 to do, deadline 120 s, next wave 0 x 0
+[L40S] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-iEJ4OYC17kZrnaTUqRPKwn
