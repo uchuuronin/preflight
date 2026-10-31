@@ -458,14 +458,13 @@ class FakeSampler:
 	def __init__(self):
 		self.calls = []
 
-	def __call__(self, fetched, sm, *, k, skip=0, exclude=(), run_id="s1"):
+	def __call__(self, fetched, sm, *, k, skip_keys=(), offered_first=(), run_id="s1", should_stop=None):
 		from preflight.schema import AgentSample
 
-		self.calls.append(
-			{"k": k, "skip": skip, "exclude": exclude, "run_id": run_id, "entry": fetched.entrypoint}
-		)
+		self.calls.append({"k": k, "skip_keys": set(skip_keys), "offered_first": offered_first, "run_id": run_id,
+			"entry": fetched.entrypoint})  # fmt: skip
 		n = len(self.calls)
-		tasks = [{"task_id": f"{run_id}-{n}-{i}", "turns": 3, "input_tokens": 900, "output_tokens": 120,
+		tasks = [{"task_id": f"{run_id}-{n:06d}{i:06d}", "turns": 3, "input_tokens": 900, "output_tokens": 120,
 			"latency_s": 4.0, "cost_usd": 0.01 + 0.001 * i} for i in range(k)]  # fmt: skip
 		return AgentSample.model_validate(
 			{"tasks": tasks, "population": 500, "selection": f"first {k} tasks"}
@@ -478,11 +477,15 @@ def test_an_agent_run_is_sampled_and_a_top_up_adds_twenty_more(tmp_path):
 	request = externalise_files({"source": {"kind": "upload", "files": {"run.py": AGENT_SCRIPT}}}, d.blobs)
 	rec = run_pipeline(request, _Ctx(), d)
 	assert rec.job.lens == "agent" and not rec.probes
-	assert len(rec.agent_sample.tasks) == 30 and sampler.calls[0]["k"] == 30 and sampler.calls[0]["skip"] == 0
+	assert (
+		len(rec.agent_sample.tasks) == 30
+		and sampler.calls[0]["k"] == 30
+		and not sampler.calls[0]["skip_keys"]
+	)
 	d.records.put(rec)
 	more = run_pipeline(_on(rec, "sample_more", tasks=20), _Ctx(), d)
 	c = sampler.calls[1]
-	assert c["k"] == 20 and c["skip"] == 30 and c["run_id"] == "s2"
+	assert c["k"] == 20 and len(c["skip_keys"]) == 30 and c["run_id"] == "s2" and len(c["offered_first"]) == 0
 	assert more.parent_id == rec.record_id and len(more.agent_sample.tasks) == 50
 	assert "top-up of 20" in more.agent_sample.selection
 

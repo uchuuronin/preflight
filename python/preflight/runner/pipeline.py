@@ -354,7 +354,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			raise InvalidSubmission(
 				"sampling more tasks is for agent and API runs", code="submission.not_agent"
 			)
-		return _sample_agent(rec, rev, fetched, sm, deps, ctx, top_up=True)
+		return _sample_agent(rec, rev, fetched, sm, deps, ctx, top_up=True, tasks=req.tasks)
 	if rec.job.lens == "agent":
 		if followup:
 			raise InvalidSubmission(
@@ -418,11 +418,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	return out
 
 
-def _sample_agent(
-	rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx, *, top_up: bool
-) -> FlightRecord:
-	"""30 tasks of the agent run through the proxy, or 20 more on top of the record's sample (D3)."""
-	from preflight.engine.agent_cost import DEFAULT_SAMPLE, TOP_UP_TASKS, combine_samples
+def _sample_agent(rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx, *, top_up: bool,
+	tasks: int | None = None) -> FlightRecord:  # fmt: skip
+	"""30 tasks of the agent run through the proxy, or up to 20 more on top of the record's sample (D3)."""
+	from preflight.engine.agent_cost import DEFAULT_SAMPLE, MAX_SAMPLE, TOP_UP_TASKS, combine_samples
+	from preflight.recorder.agent import task_key
 	from preflight.recorder.agent_sampler import draw_indices
 
 	if deps.agent is None:
@@ -434,17 +434,26 @@ def _sample_agent(
 		raise InvalidSubmission("this record has no task sample to add to; sample it first",
 			code="submission.no_sample")  # fmt: skip
 	ctx.check()
-	k = TOP_UP_TASKS if top_up else DEFAULT_SAMPLE
-	skip = len(first.tasks) if top_up else 0
 	population = getattr(getattr(sm, "agent", None), "n_tasks", None)
-	# the first sample's indices, offered first again so a script that reads them skips the same tasks
-	exclude = tuple(draw_indices(population, DEFAULT_SAMPLE) or ()) if top_up else ()
+	if top_up:
+		k = min(tasks or TOP_UP_TASKS, TOP_UP_TASKS, MAX_SAMPLE - len(first.tasks))
+		if k <= 0:
+			raise InvalidSubmission(f"this record's sample already has {len(first.tasks)} tasks",
+				code="submission.sample_full")  # fmt: skip
+		skip_keys = {key for t in first.tasks if (key := task_key(t.task_id))}
+		# the first sample's indices are offered again first, and refused by content
+		offered = tuple(draw_indices(population, DEFAULT_SAMPLE) or ())
+	else:
+		k, skip_keys, offered = DEFAULT_SAMPLE, set(), ()
 	_emit(ctx, "probing", rec, rev, message=f"sampling {k} tasks through the agent proxy"
-		+ (f", after the {skip} already sampled" if skip else ""))  # fmt: skip
-	sample = deps.agent(fetched, sm, k=k, skip=skip, exclude=exclude, run_id="s2" if top_up else "s1")
+		+ (f", skipping the {len(first.tasks)} already sampled" if top_up else ""))  # fmt: skip
+	sample = deps.agent(fetched, sm, k=k, skip_keys=skip_keys, offered_first=offered,
+		run_id="s2" if top_up else "s1", should_stop=getattr(ctx, "should_stop", None))  # fmt: skip
+	ctx.check()
 	if not sample.tasks:
-		raise PermanentError("the script made no model calls through the proxy: is its client reading "
-			"OPENAI_BASE_URL?", code="probe.no_agent_calls")  # fmt: skip
+		why = ("the top-up ran no new tasks: the script may only have the tasks already sampled"
+			if top_up else "the script made no model calls through the proxy: is its client reading OPENAI_BASE_URL?")  # fmt: skip
+		raise PermanentError(why, code="probe.no_agent_calls")
 	if top_up:
 		sample = combine_samples(first, sample)
 	out = rec.model_copy(update={"agent_sample": sample})

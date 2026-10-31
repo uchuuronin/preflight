@@ -84,18 +84,23 @@ class Call:
 class _Run:
 	run_id: str
 	max_tasks: int
-	skip: int = 0
+	skip_keys: frozenset = frozenset()  # opening keys of tasks already sampled (a top-up)
 	skipped: list[list[str]] = field(default_factory=list)  # first calls of the tasks refused
 	order: list[str] = field(default_factory=list)
 	last: dict[str, list[str]] = field(default_factory=dict)  # task -> its last call's message hashes
 	by_response: dict[str, str] = field(default_factory=dict)  # response id -> task (responses API)
+	keys: dict[str, int] = field(default_factory=dict)  # opening key -> tasks opened with it
+	refused: int = 0  # calls refused because the sample was full
 
 
 def _conversation(req: dict) -> list[str]:
-	"""A call's conversation as hashes of its messages (chat `messages`, responses `input`)."""
+	"""A call's conversation as hashes of its messages (chat `messages`, responses `input`,
+	legacy completions `prompt`)."""
 	items = req.get("messages")
 	if items is None:
 		items = req.get("input")
+	if items is None:
+		items = req.get("prompt")
 	if isinstance(items, str):
 		items = [{"role": "user", "content": items}]
 	if not isinstance(items, list):
@@ -103,6 +108,18 @@ def _conversation(req: dict) -> list[str]:
 	return [
 		hashlib.sha256(json.dumps(x, sort_keys=True, default=str).encode()).hexdigest()[:16] for x in items
 	]
+
+
+def opening_key(msgs: list[str]) -> str:
+	"""A task's key: a hash of its first call's message hashes (no content). A rerun of the same
+	script opens the same task with the same key, so a top-up can refuse it by content."""
+	return hashlib.sha256(",".join(msgs).encode()).hexdigest()[:12]
+
+
+def task_key(task_id: str) -> str | None:
+	"""The opening key inside a run-mode task id (`<run>-<key>` or `<run>-<key>.<n>`)."""
+	tail = task_id.rsplit("-", 1)[-1].split(".", 1)[0]
+	return tail if re.fullmatch(r"[0-9a-f]{12}", tail) else None
 
 
 @dataclass
@@ -320,30 +337,48 @@ class AgentProxy:
 		host, port = self._server.server_address[:2]
 		return f"http://{host}:{port}/t/{token}/v1"
 
-	def open_run(self, run_id: str, *, max_tasks: int, skip: int = 0) -> str:
+	def open_run(self, run_id: str, *, max_tasks: int, skip_keys=()) -> str:
 		"""The base URL for a script that runs many tasks in one process (the usual agent eval
 		loop): its calls are split into tasks by conversation (a call whose messages extend a
 		task's last messages, or name its last response, belongs to that task; anything else
 		starts one), and once max_tasks tasks have started, a call that would start another is
-		refused with a 429, so the script's later tasks end at once and the sample costs only
-		its own tasks. skip: the first `skip` tasks to start are refused at their first call (a
-		top-up after a first sample: a script that can't be told where to start runs its first
-		tasks again, and they cost nothing this way)."""
+		refused with a 429 that tells the SDK not to retry, so the script's later tasks end at once
+		and the sample costs only its own tasks. Task ids are `<run_id>-<opening key>`. skip_keys:
+		tasks whose opening key is here are refused at their first call (a top-up after a first
+		sample: a script that can't be told where to start runs its first tasks again, and they
+		cost nothing this way, in whatever order they start)."""
 		if not _TASK_ID.fullmatch(run_id):
 			raise ValueError(f"run id {run_id!r}: letters, digits, '_', '.', '-', up to 64")
 		if self._server is None:
 			raise RuntimeError("start() the proxy first")
 		token = secrets.token_urlsafe(24)
 		with self._lock:
-			self._tokens[token] = _Run(run_id, max_tasks, skip=skip)
+			if any(isinstance(r, _Run) and r.run_id == run_id for r in self._tokens.values()):
+				raise ValueError(f"run id {run_id!r} is already open on this proxy")
+			self._tokens[token] = _Run(run_id, max_tasks, skip_keys=frozenset(skip_keys))
 		host, port = self._server.server_address[:2]
 		return f"http://{host}:{port}/t/{token}/v1"
+
+	def _run(self, run_id: str):
+		return next((r for r in self._tokens.values() if isinstance(r, _Run) and r.run_id == run_id), None)
 
 	def run_tasks(self, run_id: str) -> list[str]:
 		"""The task ids a run's calls were split into, in the order they started."""
 		with self._lock:
-			run = next((r for r in self._tokens.values() if isinstance(r, _Run) and r.run_id == run_id), None)
+			run = self._run(run_id)
 			return list(run.order) if run else []
+
+	def run_stats(self, run_id: str) -> dict:
+		"""What the selection line says: tasks skipped and calls refused, tasks with a call in
+		flight now, and tasks of one call (side calls, or a history trimmed mid-task, split tasks)."""
+		with self._lock:
+			run = self._run(run_id)
+			if run is None:
+				return {}
+			ts = {tid: self._tasks.get(tid, _Task()) for tid in run.order}
+			return {"skipped": len(run.skipped), "refused": run.refused,
+				"in_flight": [tid for tid, t in ts.items() if t.in_flight > 0],
+				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1)}  # fmt: skip
 
 	def _task_for(self, run: "_Run", req: dict) -> str | None:
 		"""The task this call belongs to, opening one if it starts a conversation; None when the
@@ -353,21 +388,35 @@ class AgentProxy:
 		with self._lock:
 			if prev and prev in run.by_response:
 				return run.by_response[prev]
-			best, best_len = None, -1
+			best, best_key = None, None
 			for tid, last in run.last.items():
-				if len(last) <= len(msgs) and msgs[: len(last)] == last and len(last) > best_len:
-					best, best_len = tid, len(last)
-			if best is not None and best_len > 0:
+				if not last or len(last) > len(msgs) or msgs[: len(last)] != last:
+					continue
+				t = self._tasks.get(tid, _Task())
+				failed = bool(t.calls) and (
+					t.calls[-1].error or not t.calls[-1].status or t.calls[-1].status >= 400
+				)
+				if len(last) == len(msgs) and not (t.in_flight or failed):
+					continue  # the same call again after a good answer: a repeat (pass@k), not a retry
+				# the longest match; among equals, a task with nothing in flight (its turn is next)
+				k = (len(last), t.in_flight == 0)
+				if best_key is None or k > best_key:
+					best, best_key = tid, k
+			if best is not None:
 				run.last[best] = msgs
 				return best
 			if any(len(k) <= len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
 				return ""  # a retry or a later turn of a skipped task: still skipped
-			if len(run.skipped) < run.skip:
+			key = opening_key(msgs)
+			if key in run.skip_keys:
 				run.skipped.append(msgs)
 				return ""
 			if len(run.order) >= run.max_tasks:
+				run.refused += 1
 				return None
-			tid = f"{run.run_id}-{len(run.order) + 1:03d}"
+			n = run.keys.get(key, 0) + 1
+			run.keys[key] = n
+			tid = f"{run.run_id}-{key}" + (f".{n}" if n > 1 else "")
 			run.order.append(tid)
 			run.last[tid] = msgs
 			self._tasks.setdefault(tid, _Task())
@@ -484,11 +533,13 @@ class AgentProxy:
 			task_id = self._task_for(run, req)
 			if task_id == "":
 				_reply(h, 429, {"error": {"type": "preflight_task_skipped", "code": "already_sampled",
-					"message": "preflight: this task was in the first sample; skipped in the top-up"}})  # fmt: skip
+					"message": "preflight: this task was in the first sample; skipped in the top-up"}},
+					headers=NO_RETRY)  # fmt: skip
 				return
 			if task_id is None:
 				_reply(h, 429, {"error": {"type": "preflight_sample_complete", "code": "sample_complete",
-					"message": f"preflight: the sample's {run.max_tasks} tasks are running; this task isn't one"}})  # fmt: skip
+					"message": f"preflight: the sample's {run.max_tasks} tasks are running; this task isn't one"}},
+					headers=NO_RETRY)  # fmt: skip
 				return
 		why, reserved = self._admit(task_id, req, body)
 		if why == "unpriced_model":
@@ -733,12 +784,19 @@ class AgentProxy:
 		return out
 
 
-def _reply(h: BaseHTTPRequestHandler, status: int, obj: dict, *, close: bool = False) -> None:
+# the OpenAI SDKs retry a 429 unless the server says not to (x-should-retry: false); a refusal
+# of the proxy's own is final, so a script past its sample ends at once rather than backing off
+NO_RETRY = {"x-should-retry": "false"}
+
+
+def _reply(h: BaseHTTPRequestHandler, status: int, obj: dict, *, close: bool = False, headers=None) -> None:
 	"""A reply of the proxy's own. close: the request's body may be unread, so the connection can't
 	carry another request."""
 	data = json.dumps(obj).encode()
 	h.send_response(status)
 	h.send_header("Content-Type", "application/json")
+	for k, v in (headers or {}).items():
+		h.send_header(k, v)
 	h.send_header("Content-Length", str(len(data)))
 	if close:
 		h.send_header("Connection", "close")

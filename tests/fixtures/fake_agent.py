@@ -1,7 +1,9 @@
 """A stand-in agent eval: 100 tasks, three turns each, one process, through OPENAI_BASE_URL.
 
 Each turn appends the reply and a tool result, as agent loops do. A refused call (429) ends the
-task, as a client that gives up would. Reads PREFLIGHT_TASK_INDICES when given.
+task, as a client that gives up would. Reads PREFLIGHT_TASK_INDICES when FAKE_AGENT_READS_INDICES
+is set; FAKE_AGENT_THREADS runs that many tasks at once; FAKE_AGENT_ENV_OUT writes the
+environment's variable names there.
 """
 
 import json
@@ -32,7 +34,7 @@ def chat(messages):
 		return json.loads(r.read())
 
 
-for t in tasks:
+def run(t):
 	messages = [{"role": "system", "content": "you are a coder"}, {"role": "user", "content": f"task {t}"}]
 	try:
 		for turn in range(3):
@@ -42,4 +44,18 @@ for t in tasks:
 				{"role": "tool", "content": f"ran step {turn}"},
 			]
 	except urllib.error.HTTPError:
-		continue
+		pass
+
+
+if os.environ.get("FAKE_AGENT_ENV_OUT"):
+	with open(os.environ["FAKE_AGENT_ENV_OUT"], "w") as f:
+		f.write("\n".join(sorted(os.environ)))
+threads = int(os.environ.get("FAKE_AGENT_THREADS", "1"))
+if threads > 1:
+	from concurrent.futures import ThreadPoolExecutor
+
+	with ThreadPoolExecutor(threads) as pool:
+		list(pool.map(run, tasks))
+else:
+	for t in tasks:
+		run(t)
