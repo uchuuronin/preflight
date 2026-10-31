@@ -12,6 +12,7 @@ the re-probe runs the patched script afterwards in A's sandbox, with no key.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 # verify.py's check ids.
@@ -35,6 +36,12 @@ class Template:
 	may_change: tuple[str, ...] = field(default_factory=tuple)
 	#: verify's target metric for this fix.
 	metric: str = "memory.peak"
+	#: The fix touches evaluation: verify must also see the same evaluation still run (a fix that
+	#: shrinks or drops the eval pass would otherwise pass every training check).
+	keep_eval: bool = False
+	#: False where verify has no checks for this lens yet (agent runs): the patch can be proposed
+	#: and shown, never called verified.
+	verifiable: bool = True
 
 
 _TRAIN = ("finetune", "pretrain", "rl", "vision", "retrieval", "gnn")
@@ -51,6 +58,7 @@ TEMPLATES: dict[str, Template] = {
 			"`evaluate()` (custom loops and callbacks included) run without building a gradient "
 			"graph: wrap it in `torch.no_grad()` (or `torch.inference_mode()`), and keep only "
 			"detached numbers (`.item()`) from it. Trainer's own `evaluate()` already does this.",
+			keep_eval=True,
 		),
 		Template(
 			"eval.reduce_batch",
@@ -58,7 +66,9 @@ TEMPLATES: dict[str, Template] = {
 			_TRAIN,
 			"eval_batch_size",
 			"Set the evaluation batch size to {value}. Change only the evaluation batch size; the "
-			"training batch size, gradient accumulation and every other setting stay as they are.",
+			"training batch size, gradient accumulation, the evaluation data and every other setting "
+			"stay as they are.",
+			keep_eval=True,
 		),
 		Template(
 			"data.enable_packing",
@@ -149,6 +159,7 @@ TEMPLATES: dict[str, Template] = {
 			"definitions are sent as a cached prefix (the client's documented caching option). "
 			"Don't change the prompts' wording or order.",
 			metric="cost.total",
+			verifiable=False,
 		),
 		Template(
 			"agent.cap_tool_retries",
@@ -158,6 +169,7 @@ TEMPLATES: dict[str, Template] = {
 			"Give the tool call that retries without a useful limit a cap of {value} attempts, after "
 			"which it returns its last error to the agent instead of trying again.",
 			metric="cost.total",
+			verifiable=False,
 		),
 	]
 }
@@ -181,14 +193,38 @@ Task: {task}
 """
 
 
-def task_for(template_id: str, value: object | None = None, finding: str | None = None) -> str:
-	"""The whole prompt for one candidate. Raises KeyError on an unknown template."""
+# A knob value goes into the task as text, so it may only be a plain number, a boolean or a short
+# identifier (a GPU, dtype or attention kernel name), never free text.
+_SAFE_VALUE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
+
+
+def task_for(template_id: str, value: object | None = None, measured: str | None = None) -> str:
+	"""The whole prompt for one candidate. Raises KeyError on an unknown template and ValueError on a
+	missing or unsafe value. `measured` is Preflight's own sentence about the problem (A's rule
+	finding title), never text from the visitor's files or a model's diagnosis of them."""
 	t = TEMPLATES[template_id]
-	task = t.task.replace("{value}", "" if value is None else str(value))
-	if "{value}" in t.task and value is None:
+	needs = "{value}" in t.task
+	if needs and value is None:
 		raise ValueError(f"template {template_id} needs a value for {t.knob}")
+	if value is not None and not isinstance(value, (bool, int, float, str)):
+		raise ValueError("a template value is a number, a boolean or a short name")
+	if isinstance(value, str) and not _SAFE_VALUE.match(value):
+		raise ValueError("a template value is a number, a boolean or a short name")
+	task = t.task.replace("{value}", "" if value is None else str(value))
 	text = PREAMBLE.replace("{task}", task)
-	if finding:
-		# Our own finding text (A's rule or a cited diagnosis), never the visitor's.
-		text += f"\nWhat Preflight measured: {finding}\n"
+	if measured:
+		if len(measured) > 200 or "\n" in measured:
+			raise ValueError("measured is one short sentence")
+		text += f"\nWhat Preflight measured: {measured}\n"
 	return text
+
+
+def verify_options(template_id: str) -> dict:
+	"""What verify.check is told for a fix from this template."""
+	t = TEMPLATES[template_id]
+	return {
+		"metric": t.metric,
+		"may_change": t.may_change,
+		"keep_eval": t.keep_eval,
+		"no_grad": t.id == "eval.wrap_no_grad",
+	}

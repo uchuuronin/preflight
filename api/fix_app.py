@@ -90,30 +90,62 @@ class ModalBox:
 			raise RuntimeError(f"write {path} failed")
 
 	def run(self, argv, *, cwd=None, stdin=None, timeout=60):
-		from preflight_api.fix import muse
+		import math
 
-		argv = ["timeout", "--kill-after=5", str(int(timeout)), *argv]
+		from preflight_api.fix import muse, race
+
+		if self.stopped:
+			return race.STOPPED, "", "stopped at the cost cap"
+		argv = ["timeout", "--kill-after=5", str(max(1, math.ceil(timeout))), *argv]
 		p = self.sb.exec(*argv, workdir=cwd)
 		if stdin is not None:
 			p.stdin.write(stdin)
 			p.stdin.write_eof()
 			p.stdin.drain()
-		lines: list[str] = []
+		err: list[str] = []
+		# stderr drains on its own thread, so a chatty stderr can't stall stdout.
+		drain = threading.Thread(target=lambda: err.append(p.stderr.read()), daemon=True)
+		drain.start()
 		watch = self.stop_usd is not None and "muse" in argv
-		for line in p.stdout:
-			lines.append(line)
-			if watch:
-				u = muse.parse_events(lines[-50:]).usage.usd(PRICE_IN, PRICE_CACHED, PRICE_OUT)
+		lines: list[str] = []
+		buf = ""
+		try:
+			for chunk in p.stdout:
+				if not watch:
+					buf += chunk
+					continue
+				# The stream may hand over chunks, not lines: split them here.
+				buf += chunk
+				*whole, buf = buf.split("\n")
+				lines.extend(whole)
+				if not whole:
+					continue
+				ev = muse.parse_events(lines)
+				# The larger of the two readings (running totals or per-turn counts), so the cap
+				# can stop early but never late.
+				u = max(
+					ev.usage.usd(PRICE_IN, PRICE_CACHED, PRICE_OUT),
+					ev.usage_sum.usd(PRICE_IN, PRICE_CACHED, PRICE_OUT),
+				)
 				with self._lock:
-					self._seen[id(p)] = max(self._seen.get(id(p), 0.0), u)
+					self._seen[id(p)] = u
 					self.spent = sum(self._seen.values())
 					over = self.spent > self.stop_usd
-				if over and not self.stopped:
-					self.stopped = True
-					self.sb.terminate()
-					return 125, "".join(lines), "stopped at the cost cap"
+				if over:
+					with self._lock:
+						first = not self.stopped
+						self.stopped = True
+					if first:
+						self.sb.terminate()
+					return race.STOPPED, "\n".join(lines), "stopped at the cost cap"
+		except Exception:
+			if self.stopped:
+				return race.STOPPED, "\n".join(lines) + buf, "stopped at the cost cap"
+			raise
+		out = "\n".join([*lines, buf]) if watch else buf
 		code = p.wait()
-		return code, "".join(lines), p.stderr.read()
+		drain.join(timeout=5)
+		return code, out, "".join(err)
 
 
 def _sandbox(app_ref, *, network: bool):
@@ -138,30 +170,25 @@ def startup_check_fix() -> dict:
 		for name, argv in {
 			"which": ["sh", "-c", "command -v muse"],
 			"version": ["env", "-i", f"PATH={MUSE_PATH}", "muse", "--version"],
-			"exec_help": ["muse", "exec", "--help"],
+			"exec_help": ["env", "-i", f"PATH={MUSE_PATH}", "muse", "exec", "--help"],
 			"python": ["sh", "-c", f"test -x {muse.HOOK_PYTHON} && {muse.HOOK_PYTHON} --version"],
 		}.items():
 			code, so, se = box.run(argv, timeout=60)
 			out[name] = {"code": code, "out": so[-4000:], "err": se[-1000:]}
 		help_text = out["exec_help"]["out"] + out["exec_help"]["err"]
-		out["flags"] = {
-			f: f in help_text
-			for f in (
-				"--json",
-				"--prompt-file",
-				"--max-model-steps",
-				"--approval-mode",
-				"--contributor-mode",
-				"--sandbox-network",
-				"--api-key-stdin",
-			)
-		}
-		race.prepare(box, {"train.py": "print('hello')\n"})  # runs gate_check
-		out["gate"] = "denies commands"
+		# Every flag the fix loop passes must exist; without --api-key-stdin the key would have to
+		# travel in the environment, so nothing runs.
+		out["flags"] = {f: f in help_text for f in muse.REQUIRED_FLAGS}
+		try:
+			race.prepare(box, {"train.py": "print('hello')\n"})  # ends with gate_check
+			out["gate"] = "denies a command and a read outside the worktree"
+		except Exception as e:  # GateBroken or git failing in the image
+			out["gate"] = f"FAILED: {type(e).__name__}: {e}"
 		out["ok"] = (
 			out["version"]["code"] == 0
 			and out["python"]["code"] == 0
-			and all(out["flags"][f] for f in ("--json", "--approval-mode"))
+			and all(out["flags"].values())
+			and not out["gate"].startswith("FAILED")
 		)
 		return out
 	finally:
@@ -175,7 +202,7 @@ SMOKE_EXTRA = (
 
 
 @app.function(secrets=[META], timeout=12 * 60, retries=0)
-def smoke_fix(files: dict[str, str], key_on_stdin: bool = True) -> dict:
+def smoke_fix(files: dict[str, str]) -> dict:
 	"""One Muse Code fix on our own zoo script: eval.wrap_no_grad, one candidate, capped at
 	SMOKE_STOP_USD. The task also asks for a command, to prove the gate blocks it headless."""
 	_pkg()
@@ -189,9 +216,7 @@ def smoke_fix(files: dict[str, str], key_on_stdin: bool = True) -> dict:
 	box = ModalBox(sb, stop_usd=SMOKE_STOP_USD)
 	t0 = time.monotonic()
 	try:
-		cands = race.race(
-			box, files, [("eval.wrap_no_grad", None)], key, key_on_stdin=key_on_stdin, path=MUSE_PATH
-		)
+		cands = race.race(box, files, [("eval.wrap_no_grad", None)], key, path=MUSE_PATH)
 	finally:
 		templates.PREAMBLE = orig
 		with contextlib.suppress(Exception):  # it may have ended already (cost cap, timeout)
@@ -224,8 +249,9 @@ def smoke() -> None:
 	if not check.get("ok"):
 		print(json.dumps(check, indent=1))
 		raise SystemExit("startup check failed; no model call made")
-	res = smoke_fix.remote(files, key_on_stdin=bool(check["flags"].get("--api-key-stdin")))
+	res = smoke_fix.remote(files)
 	print(json.dumps({"startup": {k: check[k] for k in ("flags", "gate", "version")}, **res}, indent=1))
 	c = res["candidates"][0]
-	ok = c["status"] == "patched" and "bash" in c["blocked"] and not res["stopped_at_cap"]
+	# Passes when the fix landed and the command it was asked to run was blocked, under the cap.
+	ok = c["status"] == "patched" and bool(c["blocked"]) and not res["stopped_at_cap"]
 	raise SystemExit(0 if ok else 1)
