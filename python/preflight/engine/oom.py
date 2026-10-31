@@ -89,6 +89,56 @@ MIN_OOM_EVENTS = (
 )
 
 
+# Chiya, Oct 31: P(OOM) shows as a number only where the reliability diagram verifies it. Below 5% and above 95%
+# it is shown; in between it reads "uncertain (5-95%)" until every middle bin holds MIN_SHOWN points that agree with
+# what happened, then it switches to a number by itself when the table is rebuilt
+SHOWN_EDGES = (0.0, 0.05, 0.30, 0.70, 0.95, 1.0001)
+UNCERTAIN = (0.05, 0.95)
+MIN_SHOWN = 10
+
+
+def _rows(bins) -> list[tuple]:
+	"""(lo, hi, n, consistent, ooms or None) from Bin objects or the table's tuples."""
+	out = []
+	for b in bins:
+		if isinstance(b, Bin):
+			out.append((b.lo, b.hi, b.n, b.consistent, round(b.observed * b.n) if b.n else 0))
+		else:
+			t = tuple(b)
+			out.append((*t[:4], t[4] if len(t) > 4 else None))
+	return out
+
+
+def _verified(row) -> bool:
+	return row[2] >= MIN_SHOWN and bool(row[3])
+
+
+def middle_verified(bins) -> bool:
+	"""Every bin between 5% and 95% has at least MIN_SHOWN points and agrees with outcomes."""
+	middle = [r for r in _rows(bins) if r[0] >= UNCERTAIN[0] - 1e-9 and r[1] <= UNCERTAIN[1] + 1e-9]
+	return bool(middle) and all(_verified(r) for r in middle)
+
+
+def end_evidence(p: float, bins) -> tuple[int, int] | None:
+	"""Chiya, Oct 31: for P(OOM) below 5% or above 95% in a bin that doesn't verify yet, (OOMs, runs) in that bin,
+	to show instead of a number ("9 of 10 similar runs did"). None when the bin verifies, or there are no counts."""
+	if UNCERTAIN[0] <= p <= UNCERTAIN[1]:
+		return None
+	for r in _rows(bins):
+		if r[0] - 1e-9 <= p < r[1] + 1e-9 and (r[1] <= UNCERTAIN[0] + 1e-9 or r[0] >= UNCERTAIN[1] - 1e-9):
+			if _verified(r) or r[4] is None or r[2] == 0:
+				return None
+			return int(r[4]), int(r[2])
+	return None
+
+
+def shown_as_number(p: float, bins) -> bool:
+	"""A number below 5% and above 95% where that bin verifies, and in between once every middle bin does."""
+	if p < UNCERTAIN[0] or p > UNCERTAIN[1]:
+		return end_evidence(p, bins) is None
+	return middle_verified(bins)
+
+
 def reliable(bins: list[Bin], min_per_bin: int = 10, min_ooms: int = MIN_OOM_EVENTS) -> bool:
 	"""Probabilities can be shown as numbers only when every populated bin agrees with what happened, at least two
 	bins are populated, and real out-of-memory runs were seen: a check made only on jobs that fit says nothing about

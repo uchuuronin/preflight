@@ -27,3 +27,93 @@ def test_reliability_diagram_flags_overconfidence():
 	overconfident = [(min(1.0, p * 3), y) for p, y in honest]  # says 3x the real chance
 	assert not oom.reliable(oom.reliability(overconfident))
 	assert not oom.reliable(oom.reliability([]))  # nothing measured: not reliable
+
+
+# ---------------------------------------------------------------- Chiya, Oct 31: a number only where verified
+
+
+def _bins(middle_n: int, middle_ok: bool = True):
+	return (
+		(0.0, 0.05, 587, True),
+		(0.05, 0.30, middle_n, middle_ok),
+		(0.30, 0.70, middle_n, middle_ok),
+		(0.70, 0.95, middle_n, middle_ok),
+		(0.95, 1.0, 10, True),
+	)
+
+
+def test_middle_probabilities_switch_to_numbers_once_every_middle_bin_is_verified():
+	from preflight.engine import oom
+
+	assert oom.shown_as_number(0.01, _bins(0)) and oom.shown_as_number(0.99, _bins(0))  # the ends always show
+	for p in (0.05, 0.3, 0.5, 0.95):
+		assert not oom.shown_as_number(p, _bins(9))  # one point short in every middle bin
+		assert oom.shown_as_number(p, _bins(10))  # the switch
+	thin = ((0.0, 0.05, 587, True), (0.05, 0.30, 40, True), (0.30, 0.70, 9, True), (0.70, 0.95, 40, True))
+	assert not oom.shown_as_number(0.1, thin)  # each middle bin, not the middle as a whole
+	assert not oom.shown_as_number(
+		0.5, _bins(50, middle_ok=False)
+	)  # enough points that disagree with outcomes
+	assert not oom.shown_as_number(0.5, ())  # no table: nothing is verified
+
+
+def test_the_engine_reports_the_uncertain_range_until_the_switch(monkeypatch):
+	from dataclasses import replace
+
+	from preflight.engine import api, conformal, memory
+
+	est = memory.MemoryEstimate(
+		1.0e10, 0.9e10, 1.1e10, "bytes", "predicted", memory.MODEL_ID, 0.4, "tight", 0.1, None
+	)
+	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=_bins(5)))
+	oom = api._from_memory_estimate(est, memory.MODEL_ID).oom
+	assert (oom.lo, oom.hi) == (0.05, 0.95) and "uncertain (5–95%)" in oom.reason
+	assert oom.point == 0.4  # the fit map and the ranking still read the model's value
+	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=_bins(10)))
+	oom = api._from_memory_estimate(est, memory.MODEL_ID, "from 19 held-out runs").oom
+	assert oom.lo == oom.hi == 0.4 and "uncertain" not in oom.reason
+	# a P(OOM) from the simulated band is never what the bins verified: it stays uncertain
+	oom = api._from_memory_estimate(est, memory.MODEL_ID, "simulated band").oom
+	assert (oom.lo, oom.hi) == (0.05, 0.95)
+
+
+def test_the_installed_table_carries_the_bins_the_switch_reads():
+	from preflight.engine import conformal, oom
+
+	edges = [(b[0], b[1]) for b in conformal.TABLE.oom_bins]
+	assert edges == [(lo, min(hi, 1.0)) for lo, hi in zip(oom.SHOWN_EDGES, oom.SHOWN_EDGES[1:], strict=False)]
+
+
+def test_an_unverified_top_bin_shows_its_own_counts_until_it_verifies(monkeypatch):
+	# Chiya, Oct 31: not a number, not "above 95%": "Likely to run out of memory: 9 of 10 similar runs did"
+	from dataclasses import replace
+
+	from preflight.engine import api, conformal, memory, oom
+
+	failing = ((0.0, 0.05, 587, True, 2), (0.95, 1.0, 10, False, 9))
+	assert oom.end_evidence(0.99, failing) == (9, 10) and not oom.shown_as_number(0.99, failing)
+	assert oom.end_evidence(0.01, failing) is None and oom.shown_as_number(
+		0.01, failing
+	)  # the bottom verifies
+	est = memory.MemoryEstimate(
+		3.0e10, 2.8e10, 3.2e10, "bytes", "predicted", memory.MODEL_ID, 0.99, "fails", 0.1, None
+	)
+	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=failing))
+	r = api._from_memory_estimate(est, memory.MODEL_ID, "from 19 held-out runs").oom
+	assert r.reason.startswith("Likely to run out of memory: 9 of 10 similar runs did")
+	lo, hi = conformal.wilson(9, 10)
+	assert r.lo == pytest.approx(lo) and r.hi == pytest.approx(
+		max(hi, 0.99)
+	)  # the range holds the model's point
+	# the switch: once that bin holds 10 runs that agree with outcomes, a number again
+	passing = ((0.0, 0.05, 587, True, 2), (0.95, 1.0, 12, True, 12))
+	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=passing))
+	r = api._from_memory_estimate(est, memory.MODEL_ID, "from 19 held-out runs").oom
+	assert r.lo == r.hi == 0.99 and "similar runs did" not in r.reason
+
+
+def test_the_installed_table_shows_the_top_bin_as_evidence():
+	from preflight.engine import conformal, oom
+
+	top = next(b for b in conformal.TABLE.oom_bins if b[0] >= 0.95 - 1e-9)
+	assert len(top) == 5 and oom.end_evidence(0.99, conformal.TABLE.oom_bins) == (top[4], top[2])

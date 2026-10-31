@@ -115,6 +115,17 @@ def test_holdout_gpus_never_calibrate_and_are_reported_once():
 	assert "A100-SXM-80GB" in report and "Wilson" in report
 
 
+def test_both_a100_boards_are_held_out_by_default():
+	from preflight.corpus import calibrate as cal
+	from preflight.corpus import sweep
+
+	# a request for the holdout GPU can land on any of these boards; every one must stay out of calibration
+	assert set(sweep.landing_gpus("A100-SXM-80GB")) <= set(cal.HOLDOUT_GPUS)
+	for g in ("A100-PCIe-80GB", "A100-SXM-40GB", "A100-SXM-80GB-MIG-3g.40gb"):
+		assert cal.held_out(g)
+	assert not cal.held_out("L4") and not cal.held_out(None) and not cal.held_out("A100-SXM-80GBX")
+
+
 def test_reliability_report_leaves_out_thin_bins():
 	from preflight.corpus.calibrate import reliability_lines
 
@@ -174,3 +185,55 @@ def test_reliability_needs_real_out_of_memory_runs():
 		+ [(0.5, False)] * 6
 	)
 	assert oom.reliable(oom.reliability(mixed))
+
+
+def test_the_written_table_imports_as_python_and_round_trips(tmp_path):
+	import importlib.util
+
+	from preflight.engine import conformal as cf
+
+	table = cf.Table(
+		{
+			("memory.peak", "L4", "finetune"): cf.Cell(
+				0.1, 12, 4, "held_out", ("memory.peak", "L4", "finetune"), (0.01, -0.02)
+			)
+		},
+		"test",
+		oom_reliable=False,
+		coverage={"memory.peak": (11, 12)},
+	)
+	out = tmp_path / "_calibration_table.py"
+	calibrate.write_table(table, out)
+	spec = importlib.util.spec_from_file_location("t", out)
+	mod = importlib.util.module_from_spec(spec)
+	spec.loader.exec_module(mod)  # JSON's true/false/null would raise NameError here
+	back = cf.Table.from_dict(mod.DATA)
+	assert back.cells == table.cells and back.oom_reliable is False and back.coverage == table.coverage
+
+
+def test_a_table_with_non_finite_numbers_is_refused(tmp_path):
+	from preflight.engine import conformal as cf
+
+	bad = cf.Table(
+		{("memory.peak", "", ""): cf.Cell(float("nan"), 9, 3, "held_out", ("memory.peak", "", ""), ())}
+	)
+	with pytest.raises(ValueError):
+		calibrate.write_table(bad, tmp_path / "t.py")
+	assert not (tmp_path / "t.py").exists()
+
+
+def test_scores_are_grouped_by_architecture_not_by_config_group():
+	"""Two config groups that differ only in dtype are one architecture: near-duplicates, never split."""
+	base = next(c for c in configs.grouped_configs(50) if c.family == "gpt" and c.params["role"] == "probe")
+	a = {**base.params, "dtype": "bf16"}
+	b = {**base.params, "dtype": "fp32"}
+	assert calibrate.arch_key({"family": "gpt", "params": a}) == calibrate.arch_key(
+		{"family": "gpt", "params": b}
+	)
+	assert calibrate.arch_key(
+		{"family": "gpt", "params": {**a, "n_layers": a["n_layers"] + 1}}
+	) != calibrate.arch_key({"family": "gpt", "params": a})
+	hf = {"family": "hf_lora", "params": {"model_id": "Qwen/Qwen2.5-0.5B", "quantization": "nf4"}}
+	assert calibrate.arch_key(hf) == calibrate.arch_key(
+		{**hf, "params": {**hf["params"], "quantization": "none"}}
+	)

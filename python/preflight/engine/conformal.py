@@ -97,6 +97,8 @@ class Table:
 	holdout: dict[str, dict[str, tuple[int, int]]] = field(
 		default_factory=dict
 	)  # target -> gpu -> (hits, n), once
+	# P(OOM)'s reliability diagram on oom.SHOWN_EDGES: (lo, hi, points, agrees with outcomes) per bin
+	oom_bins: tuple[tuple, ...] = ()  # (lo, hi, n, consistent, ooms); older tables have no ooms
 
 	def describe(self, target: str) -> str:
 		"""For a model card: the cells this target has, how pairs below MIN_CELL merge, coverage and holdout."""
@@ -106,9 +108,14 @@ class Table:
 		if not own:
 			return "no held-out cells"
 		parts = [f"Own cells: {'; '.join(c.label() for c in own)}."]
+		pooled = (target, "", "") in self.cells
 		parts.append(
 			f"A GPU and job type with fewer than {MIN_CELL} held-out runs has no band of its own: it uses its job "
-			"type merged across GPUs, then all runs."
+			+ (
+				"type merged across GPUs, then all runs."
+				if pooled
+				else "type merged across GPUs. A job type with no cell keeps the simulated band."
+			)
 		)
 		if self.coverage.get(target, (0, 0))[1]:
 			h, n = self.coverage[target]
@@ -138,6 +145,7 @@ class Table:
 			"oom_reliable": self.oom_reliable,
 			"coverage": {t: list(v) for t, v in self.coverage.items()},
 			"holdout": {t: {g: list(v) for g, v in d.items()} for t, d in self.holdout.items()},
+			"oom_bins": [list(b) for b in self.oom_bins],
 			"cells": [
 				{
 					"key": list(c.key),
@@ -171,6 +179,10 @@ class Table:
 			bool(d.get("oom_reliable", False)),
 			{t: (int(v[0]), int(v[1])) for t, v in d.get("coverage", {}).items()},
 			{t: {g: (int(v[0]), int(v[1])) for g, v in gs.items()} for t, gs in d.get("holdout", {}).items()},
+			tuple(
+				(float(b[0]), float(b[1]), int(b[2]), bool(b[3]), *((int(b[4]),) if len(b) > 4 else ()))
+				for b in d.get("oom_bins", ())
+			),
 		)
 
 
@@ -178,9 +190,9 @@ def calibrate(scores: Iterable[Score], level: float = LEVEL, built_from: str = "
 	"""A table from held-out scores: every cell with at least MIN_CELL runs at each level of detail."""
 	by: dict[tuple[str, ...], list[Score]] = defaultdict(list)
 	for s in scores:
-		by[(s.target, s.gpu, s.lens)].append(s)
-		by[(s.target, "", s.lens)].append(s)
-		by[(s.target, "", "")].append(s)
+		# a score with no lens (the cross-GPU band) would land in the same pooled cell twice
+		for key in dict.fromkeys(((s.target, s.gpu, s.lens), (s.target, "", s.lens), (s.target, "", ""))):
+			by[key].append(s)
 	cells = {}
 	for key, rows in by.items():
 		h = conformal_half_width([r.value for r in rows], level) if len(rows) >= MIN_CELL else None
@@ -227,11 +239,19 @@ def evaluate(scores: list[Score], level: float = LEVEL) -> dict[str, Coverage]:
 # The table the engine uses. Empty until corpus/calibrate.py builds one from held-out real runs; with no
 # cell, every band falls back to the simulated constants and its model card says calibration: simulated.
 try:  # written by corpus/calibrate.py once held-out real runs exist; a plain module, so Pyodide imports it too
-	from preflight.engine._calibration_table import DATA as _DATA
+	import preflight.engine._calibration_table as _MOD  # absent: ModuleNotFoundError, quietly simulated
 
-	TABLE = Table.from_dict(_DATA)
-except ImportError:
+	TABLE = Table.from_dict(_MOD.DATA)  # a module without DATA raises AttributeError: warned below
+except ModuleNotFoundError:
 	TABLE = Table(built_from="none: no held-out real runs yet")
+except (SyntaxError, NameError, AttributeError, ImportError, KeyError, TypeError, ValueError) as _exc:
+	# a broken generated table must never stop the engine importing, but it must not pass silently either
+	import warnings
+
+	warnings.warn(
+		f"engine/_calibration_table.py is unusable ({_exc!r}); bands fall back to simulated", stacklevel=1
+	)
+	TABLE = Table(built_from=f"none: the generated table is unusable ({type(_exc).__name__})")
 
 
 def half_width(target: str, gpu: str | None, lens: str | None, simulated: float, table: Table | None = None):

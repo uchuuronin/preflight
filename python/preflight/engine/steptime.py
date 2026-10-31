@@ -30,8 +30,8 @@ from preflight.engine import gpus
 from preflight.engine.memory import TransformerArch
 
 MODEL_ID_SAME = "steptime-phases@0.2.0"
-MODEL_ID_CROSS = "steptime-roofline@0.2.0"
-MODEL_ID_COMM = "steptime-comm-analytical@0.1.0"
+MODEL_ID_CROSS = "steptime-roofline@0.3.0"  # 0.3.0 (Oct 31): the held-out cross-GPU band, behind a feature
+MODEL_ID_COMM = "steptime-comm-analytical@0.2.0"  # 0.2.0 (Oct 31): nodes > 1 adds the network
 Z90 = 1.6448536269514722  # derived: the normal 95th percentile
 SIGMA_SAME_GPU = 0.08  # simulated: A's D1, median of 5 timed steps within 15% in 99.3% of trials
 SIGMA_SAME_VENDOR = (
@@ -47,6 +47,10 @@ SIGMA_COMM = (
 LATENCY_KERNEL_S = (
 	20e-6  # guess: launch-bound below 20 us; replaced by the corpus kernel tables on L4 (target Oct 30)
 )
+INTER_NODE_GBPS = (
+	200.0  # guess: node-to-node Gbit/s on a cloud or campus cluster (2 x 100GbE or one HDR IB port)
+)
+SIGMA_MULTINODE = 0.5  # guess: analytical only, never measured here; the band says so by its width
 EXPOSED_COMM_SHARE = (
 	0.3  # guess: share of gradient comm not hidden under backward; replaced by a 2-GPU probe (target Oct 31)
 )
@@ -161,6 +165,16 @@ BELOW_GROWTH_LOG = (
 )
 ABSTAIN_HALF_WIDTH = math.log(1.5)  # cited: Hackathon Project Goals, abstain when the band exceeds +-50%
 
+# Outside the probed sizes, "anchored" extrapolates from the nearest probe's measured time instead of the fitted line
+# (Oct 30). "line" is the model the engine shipped with and stays the default until the held-out test passes.
+EXTRAPOLATION = "line"
+# fitted: L4 HF LoRA and QLoRA jobs, Oct 28 (9 models): twice the largest probe's work took 2.11x to 2.28x its time,
+# an elasticity of about 1.1; to be validated on the A10 HF jobs and the grouped corpus, never on these
+ABOVE_ELASTICITY = 1.1
+# fitted: same jobs: half the smallest probe's work took 0.50x to 1.01x its time (latency-bound models stay flat,
+# compute-bound ones halve), so the point uses elasticity 0.5 and the band spans 0 to 1
+BELOW_ELASTICITY = (0.0, 1.0)
+
 
 # ---------------------------------------------------------------- same GPU
 
@@ -234,11 +248,57 @@ class SameGpuModel:
 		"""Predicted between the smallest probe and twice the largest; below it, extrapolated (S4b)."""
 		return min(self.probe_tokens), max(self.probe_tokens) * RANGE_FACTOR
 
+	def _anchor(self, tokens: float) -> dict[str, float]:
+		"""Measured phases of the probes at this work size, averaged."""
+		rows = [
+			m for (pid, m), t in zip(self._measured.items(), self.probe_tokens, strict=False) if t == tokens
+		]
+		names = {k for r in rows for k in r}
+		return {n: sum(r.get(n, 0.0) for r in rows) / len(rows) for n in names}
+
+	def _anchored(self, tokens: float, recompute: bool) -> StepEstimate | None:
+		"""Outside the probed sizes, scale the nearest probe's measured phases by a power of the work ratio."""
+		lo_t, hi_t = min(self.probe_tokens), max(self.probe_tokens)
+		if lo_t <= tokens <= hi_t or tokens <= 0 or len(self._measured) != len(self.probe_tokens):
+			return None
+		if tokens > hi_t:
+			if tokens > hi_t * RANGE_FACTOR:
+				why = f"{tokens:.0f} work units per step is outside the probed range ({lo_t:.0f} to {hi_t * RANGE_FACTOR:.0f}); run a probe here"
+				return _abstain(MODEL_ID_SAME, self.sigma, why)
+			base, e, h = self._anchor(hi_t), ABOVE_ELASTICITY, Z90 * self.sigma
+			status, reason = "predicted", ""
+			ratio = tokens / hi_t
+		else:
+			base, ratio = self._anchor(lo_t), tokens / lo_t
+			e_lo, e_hi = BELOW_ELASTICITY
+			e = (e_lo + e_hi) / 2
+			spread = (
+				(e_hi - e_lo) / 2 * abs(math.log(ratio))
+			)  # latency-bound (flat) to compute-bound (proportional)
+			h = math.hypot(Z90 * self.sigma, spread)
+			if h > ABSTAIN_HALF_WIDTH:
+				why = f"{tokens:.0f} work units per step is too far below the smallest probe ({lo_t:.0f}); run a probe here"
+				return _abstain(MODEL_ID_SAME, h / Z90, why)
+			status = "extrapolated"
+			reason = f"below the smallest probed size ({lo_t:.0f} work units): time there may stay flat or fall with the work, so the range is wider; run a probe here for a measured number"
+		bd = {n: v * ratio**e for n, v in base.items()}
+		if recompute:
+			bd = with_recompute(bd)
+		point = sum(bd.values())
+		lo, hi = _band(point, h / Z90)
+		return StepEstimate(point, lo, hi, "s", status, MODEL_ID_SAME, h / Z90, bd, reason)
+
 	def predict(
 		self, tokens: float, recompute: bool = False, measured_probe: str | None = None
 	) -> StepEstimate:
 		"""Step time at `tokens`. `measured_probe` is the caller's claim that every knob equals that probe's."""
 		reason = ""
+		if EXTRAPOLATION == "anchored" and not (
+			measured_probe is not None and measured_probe in self._measured
+		):
+			anchored = self._anchored(tokens, recompute)
+			if anchored is not None:
+				return anchored
 		if measured_probe is not None and measured_probe in self._measured and not recompute:
 			bd = dict(self._measured[measured_probe])
 			status, sigma = "measured", self.sigma / 2
@@ -590,6 +650,55 @@ def allreduce_seconds(
 		raise ValueError(f"{spec.name} has no GPU-to-GPU link (a MIG slice can't join a data-parallel group)")
 	bw = spec.link_bytes_one_way() * efficiency
 	return 2 * (world - 1) / world * nbytes / bw + 2 * (world - 1) * hop_latency_s
+
+
+def hierarchical_allreduce_seconds(
+	nbytes: float,
+	nodes: int,
+	per_node: int,
+	gpu: str,
+	inter_gbps: float = INTER_NODE_GBPS,
+	efficiency: float = 0.7,
+	hop_latency_s: float = 20e-6,
+) -> float:
+	"""Two-level all-reduce (NCCL's tree/ring over nodes): reduce-scatter and all-gather inside each node over its GPU
+	links, and an all-reduce of the node's share across nodes over the network. The node's NIC carries every byte
+	of the gradient once each way, so the network term is 2(n-1)/n x bytes / node bandwidth (Calculon-style)."""
+	intra = allreduce_seconds(nbytes, per_node, gpu) if per_node > 1 else 0.0
+	if nodes <= 1:
+		return intra
+	inter_bw = inter_gbps * 1e9 / 8 * efficiency
+	inter = 2 * (nodes - 1) / nodes * nbytes / inter_bw + 2 * (nodes - 1) * hop_latency_s
+	return intra + inter
+
+
+def multi_node_step(
+	single_gpu_s: float,
+	grad_bytes: float,
+	nodes: int,
+	per_node: int,
+	gpu: str,
+	strategy: str = "ddp",
+	inter_gbps: float = INTER_NODE_GBPS,
+	exposed_share: float = EXPOSED_COMM_SHARE,
+) -> StepEstimate:
+	"""Data-parallel step across nodes from a measured single-GPU step: the hierarchical all-reduce is added.
+	Labelled analytical only, with a wide band: no multi-node run has been measured."""
+	traffic = grad_bytes * (1.5 if strategy in ("fsdp", "zero3", "hsdp") else 1.0)
+	try:
+		comm = hierarchical_allreduce_seconds(traffic, nodes, per_node, gpu, inter_gbps)
+	except ValueError as exc:
+		return _abstain(MODEL_ID_COMM, SIGMA_MULTINODE, str(exc))
+	point = single_gpu_s + exposed_share * comm
+	lo, hi = _band(point, SIGMA_MULTINODE)
+	why = (
+		f"analytical only: {nodes} nodes x {per_node} GPUs, a two-level all-reduce at {inter_gbps:g} Gbit/s between "
+		"nodes; no multi-node run was measured"
+	)
+	return StepEstimate(
+		point, lo, hi, "s", "extrapolated", MODEL_ID_COMM, SIGMA_MULTINODE,
+		{"compute": single_gpu_s, "comm_exposed": exposed_share * comm, "comm_total": comm}, why,
+	)  # fmt: skip
 
 
 def multi_gpu_step(

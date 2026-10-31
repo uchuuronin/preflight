@@ -44,6 +44,7 @@ SCALEDOWN_S = 30.0
 STARTUP_S = (
 	180.0  # guess: cold start, image pull, imports and the volume reload; each batch now reports its own
 )
+END_MARGIN_S = 60.0  # guess: the last commit and the reply after the final config, inside Modal's cut-off
 RATE_OVERHEAD = (
 	1.10  # guess: Modal also bills a GPU container's CPU and memory; replaced by Modal's bill per run
 )
@@ -89,7 +90,20 @@ def container_timeout_s(batch: int, deadline_s: float) -> int:
 	and the volume work, so a hang anywhere in the container (not only in a config) ends where the bound assumed."""
 	from preflight.corpus.isolate import KILL_GRACE_S
 
-	return math.ceil(batch * (deadline_s + KILL_GRACE_S) + STARTUP_S)
+	return math.ceil(batch * (deadline_s + KILL_GRACE_S) + STARTUP_S + END_MARGIN_S)
+
+
+def wave_end_at(dispatched_at: float, batch: int, deadline_s: float) -> float:
+	"""The latest moment a wave's last config may end: Modal's cut-off less the margin for the final commit. The
+	container's start-up counts against it, as it does against the bill (Oct 30: measured from dispatch)."""
+	return dispatched_at + container_timeout_s(batch, deadline_s) - END_MARGIN_S
+
+
+def may_start_config(now: float, deadline_s: float, end_at: float) -> bool:
+	"""A config starts only if, run to its deadline and killed, it still ends by end_at."""
+	from preflight.corpus.isolate import KILL_GRACE_S
+
+	return now + deadline_s + KILL_GRACE_S <= end_at
 
 
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
@@ -255,6 +269,44 @@ def modal_gpu(gpu: str) -> str:
 	if key not in gpus.MODAL_GPU:
 		raise ValueError(f"{key} is not offered on Modal")
 	return gpus.MODAL_GPU[key]
+
+
+# Modal's string for a board can land on its sibling, so a sweep counts rows filed under either as done
+LANDS_ON = {
+	# measured: run b-corpus-a100-2 (Oct 31) asked for A100-80GB and ran on PCIe
+	"A100-SXM-80GB": ("A100-PCIe-80GB",),
+	# guess: the same Modal string family as the 80 GB board
+	"A100-SXM-40GB": ("A100-PCIe-40GB",),
+}
+
+
+def landing_gpus(gpu: str) -> tuple[str, ...]:
+	"""Every table name a request for this GPU can come back as, the requested one first."""
+	from preflight.engine import gpus
+
+	key = gpus.resolve(gpu)
+	return (key, *LANDS_ON.get(key, ()))
+
+
+def ledger_from(store: ResultStore, kind: str, gpu: str, retry_errors: bool = False) -> dict[str, Any]:
+	"""For one requested GPU: keys already done, GPU-seconds spent (failed attempts included), and each
+	config's latest seconds for the running estimate, across every board the request can land on.
+	Reads the small .meta summaries only. Errors and timeouts count as done unless retried.
+	"""
+	out: dict[str, Any] = {"done": [], "gpu_seconds": 0.0, "history": []}
+	done: dict[str, None] = {}  # ordered, each key once
+	for board in landing_gpus(gpu):
+		for _, key, meta in store.iter_meta(kind, board):
+			# done on any board: an ok row on PCIe isn't rerun because SXM holds an error being retried
+			if not (retry_errors and meta.get("status") in ("error", "timeout")):
+				done.setdefault(key)
+			secs = float(meta.get("gpu_seconds") or 0.0)
+			out["gpu_seconds"] += secs + float(
+				meta.get("prior_gpu_seconds") or 0.0
+			)  # every attempt was paid for
+			out["history"].append(secs)
+	out["done"] = list(done)
+	return out
 
 
 def parse_budget_plan(spec: str) -> dict[str, float]:

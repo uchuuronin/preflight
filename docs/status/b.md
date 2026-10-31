@@ -2,6 +2,62 @@
 
 Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; from now on merges, not rebases).
 
+## Plan items B owns (Sat Oct 31, 8 AM ET)
+
+Every B item in the Contracts tab (Contract B, the gaps table, the adopted items) and the main plan (feature set, prediction engine, validation targets). "Branch" means on `ws-b` but not on `main`. Hours are my honest estimate of work left, review and fixes included. They don't include waiting on A's data or on a paid run.
+
+**Hero lenses first**
+
+| Item | Where | Hours left | Notes |
+| --- | --- | --- | --- |
+| Fine-tune lens: memory, P(OOM), step time, cost, money at risk | `main`; phase 2 table and fixes on branch | 1 | Today: step-time bands for vision, retrieval and pretrain, and P(OOM) shown "uncertain (5–95%)" in the middle |
+| Agent lens: per-task bootstrap, context growth, cache prices, rate-limit wall clock, runaway rate | `main` | 0.5 | Tokens-only cost when tasks lack `cost_usd`, now that the price table is in |
+| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | A's fields already exist in the schema; calibrated on A's RL probes when they land |
+| Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`, behind `campaign.planner`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
+
+**The other lenses and engine features**
+
+| Item | Where | Hours left | Notes |
+| --- | --- | --- | --- |
+| Serving: KV-cache formula, prefill and decode rooflines | branch (`engine/serving.py`, behind `engine.serving`) | 0 | |
+| Serving: discrete-event scheduler simulation, calibrated on A's vLLM probes | branch | 1 | Calibration code is in; it needs A's vLLM probe records |
+| Multi-node closed forms, labelled analytical-only | branch (`nodes`, `inter_node_gbps` knobs; two-level all-reduce) | 0 | Needs A to declare `nodes` |
+| Loss forecast: power-law fit, plus LC-PFN posterior, abstaining on wide bands | branch: the power-law half (`engine/lossforecast.py`; band covers 89/100 on synthetic curves) | 3 for LC-PFN | LC-PFN needs a pretrained network: a cut candidate for Sunday |
+| Data repetition and quality exposure (with A) | branch (`engine/repetition.py`) | 1 | Needs A's data profile per bin |
+| Proxy campaigns | branch (`engine/proxy.py`: rank agreement and proxy settings) | 1 | Proxy runs themselves go through the campaign planner |
+| Power analysis: seeds needed from seed-to-seed variance | branch (`engine/power.py`) | 0.5 | Needs A's multi-seed probe |
+| GBDT residual on cross-GPU step time | branch: fitted and scored, **fails held out** (51% vs K1's 60% within 20%), so not used | 0 | |
+| Divergence classifier: 800+ short runs, AUROC target 0.85 | not started (the corpus `divergence` kind and the D9 label exist) | 4, plus a paid sweep | The sweep needs your yes; I'll post its cost first |
+| GNN cost model, used only if it beats the GBDT held out | branch: `scripts/fit_cost_gnn.py`, scoring now | 1 | |
+| Muse Spark Open batch-labels the corpus | not started | 2 | Needs a Baseten run through Actions: a paid ask |
+| Conformal layer, abstention rules, float16 grids within the cell budget | `main`; real table on branch | 0 | |
+| Pyodide parity test and import allowlist (gap 10) | `main` | 0 | |
+| Sample records for the library (gap 4, with C) | `main` (`fill_predictions`) | 0 | C serves them |
+| Run cost and its basis (gap 21) | `main` | 0 | |
+| Corpus sweep: resumable, keyed, halts at budget (gap 13) | `main`; A100 board fix on branch | 0 | |
+| Versioned model cards pinned in records (gap 15) | branch: `stale_models`, `current_models` | 0 | C shows it |
+| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: B's draft (`docs/decisions/glimmer-host.md`) | 0.5 | A to complete |
+| Corpus published with its datasheet (gap 16) | branch (`corpus/DATASHEET.md`) | 0.5 | Publishing the rows themselves |
+
+**Validation rows (README table)**
+
+| Row | Where | Hours left | Notes |
+| --- | --- | --- | --- |
+| Interval coverage ≥ 88% | branch: memory 90.1% held out on the corpus | 2 | Still to do on full runs of unseen scripts (Nov 2) |
+| Peak memory within 10% | partly measured: HF jobs and A's smoke record | 1 | Scored on A's full runs |
+| OOM: no misses, ≤ 1 false alarm per 10 scripts, reliability diagram | branch: reliability bins | 1 | Scored on the bug zoo |
+| Step time within 15%, same GPU | branch: the line puts 461 of 575 held-out queries within 15% | 1 | Full runs still to come |
+| Step time within 20%, unmeasured GPU (4th type, incl. AMD) | corpus: K1 60% within 20% leave-one-GPU-out; A100 holdout same-GPU time 93% in band | 2 | AMD rows still to come; K1's band needs Chiya's call |
+| GNN + GBDT beats GBDT alone | scoring now | with the GNN | |
+| Divergence warning: AUROC 0.85+, 100+ steps early | not started | with the classifier | |
+| RL rollout time within 20% | not started | 1 | Needs A's GRPO zoo script run |
+| Serving tokens/sec within 15% | not started | 1 | Needs A's vLLM full runs |
+| Agent total cost inside the 90% interval | simulated on `main` (S6); no full run yet | 1 | |
+| Abstention: every query outside the probed range is flagged | `main` (automated tests) | 0 | |
+| Coverage self-test page (with C) | branch: corpus half (`calibration_summary`) | 0.5 | C renders it |
+
+**Total: about 72 hours of B work left** (14.5 for the hero lenses, 46 for the rest of the engine, 12 for validation). Since the table was written, most engine items have landed on the branch, which leaves about 20 hours. Most of that waits on others: A's probes, the paid divergence and AMD runs, and the Nov 2 full runs. That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
+
 ## Done
 - **Settings chosen by Monte Carlo** (`docs/decisions/engine-settings.md`, `scripts/mc_engine_settings.py`): memory calibration on A's three-probe plan, the 90% band (including one or two probes) and the fits/tight/fails cut-offs, the divergence label (D9 catches early collapses, a case a CPU smoke run turned up), cross-GPU step time and the corpus budget rule.
 - **GPU table** (`engine/gpus.py`): 47 devices (40 NVIDIA, 7 AMD) covering Modal, Unity, Colab, Kaggle and AMD Developer Cloud, one row per device as PyTorch sees it (MI250X per GCD). Every row carries a confidence label (datasheet, derived or secondary) and GPU-to-GPU link bandwidth. `resolve()` handles PyTorch, ROCm `gfx`, MIG and Modal names; `peak_flops()` is a drop-in for the recorder. Prices are dated and sourced.
@@ -113,7 +169,28 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 
 | Oct 28 | `b-corpus-l4` (GitHub run 40633186279, Modal app ap-CTVbvqPCmY8QdS4PdaXdSA): grouped n = 600, stopped by the workflow's 120-minute timeout after 340 of 590 configs, 332 ok and 8 out of memory; per-config median 8.0 s, p90 14.3 s | L4 x 4 containers | 53 config-min; containers up for most of 118 min | ledger $0.88; billed estimate $4.50 to $6.40 (4 L4 containers for most of 2 h), waiting on Modal's figure |
 
-Total so far: ledger $1.21; billed estimate $4.80 to $6.70 until Modal's usage page gives the real figure. **The ledger under-counts container time.** It sums each config's own seconds, but containers are also billed for start-up, the per-batch volume reload, a volume commit after every config, and the waits between waves. That overhead was small in phase 0's single container and dominant in phase 1 (about 80 container-seconds per config against about 9 counted). So the $6 cap was enforced on the wrong measure. Phase 2 is on hold until the budget counts container wall time. Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
+| Oct 30 | `b-corpus-startup` (GitHub run 41152541453): the T4 container started in the real image and ran its check; the reply failed to unpickle on the runner (a torch object), fixed with plain values | T4 | about 1 min | about $0.01 |
+| Oct 30 | `b-corpus-export` (GitHub run 41152543575): 426 L4 kernel rows back as `out/corpus/kernels/L4.jsonl.gz` | CPU | under 1 min | about $0.01 |
+
+| Oct 30 | `b-corpus-startup-2` (GitHub run 41156645584): the app starts in its real image, one small config through the child in 5.6 s, plain values back | T4 | about 1 min | about $0.01 |
+
+| Oct 30 | `b-corpus-export-hf` (GitHub run 41157095457): the 50 HF rows back | CPU | under 1 min | about $0.01 |
+| Oct 30 | `b-corpus-l4-2` (GitHub run 41159946133): phase 1 finished, 151 configs (150 ok, 1 out of memory), 6 waves, each settled under its worst case | L4 x 4 | 25 min wall, 5,588 container-s | $1.37 (container-time bound) |
+
+| Oct 30 | `b-corpus-a10` (GitHub run 41161812522): phase 2, 577 grouped configs (566 ok, 11 out of memory), 19 waves | A10 x 4 | about 28 min wall, 7,669 container-s | $2.60 (container-time bound) |
+| Oct 30 | `b-corpus-a10-hf` (GitHub run 41163888314): 4 HF jobs ok, then it stopped itself because one more worst-case wave wouldn't fit its 20 minutes (nothing measured yet, so the 900 s deadline); rerun queued | A10 | 178 container-s | $0.05 |
+| Oct 30 | `b-corpus-t4` (GitHub run 41164044206): 75 fp32 and fp16 configs (71 ok, 4 out of memory), 8 waves | T4 | 3,528 container-s | $0.65 |
+| Oct 30 | `b-corpus-l40s` (GitHub run 41165087592): 195 configs (194 ok, 1 out of memory), 10 waves | L40S | 2,986 container-s | $1.78 |
+| Oct 30 | `b-corpus-a10-hf-2` (GitHub run 41166235925): the other 46 A10 HF jobs, 13 waves, all 50 done (49 ok, 1 out of memory) | A10 | 16 min wall, 1,214 container-s | $0.41 (container-time bound; $0.47 with the first run) |
+| Oct 30 | `b-corpus-a100` (GitHub run 41165933860): **no configs**. The containers' ~150 s cold start ate a 60 s margin in the start check, so each quit before its only config; the no-progress guard stopped the run. Fixed in `a330f9b` | A100-80GB x 3 | 576 container-s | $0.44 |
+| Oct 31 | `b-corpus-a100-2` (GitHub run 41191432272, cap $2.50 total): 2 configs ok, on an **A100-PCIe-80GB**. Modal's A100-80GB landed on the PCIe board, the rows were filed under it, and the no-progress guard stopped the run. Fixed in `20e0372` (sibling boards count as done) | A100-80GB x 1 | 63 container-s | $0.05 ($0.49 of the $2.50 with the first run) |
+| Oct 31 | `b-corpus-a100-3` (GitHub run 41197041814, cap $2.50 total): the other 93 of the list's 95 distinct configs (the 100 sampled repeat 5), 14 waves, all ok; 42 rows landed on A100-PCIe-80GB and 53 on A100-SXM-80GB, and the sweep kept going across both | A100-80GB x 1–2 | 12 min wall, 1,271 container-s | $0.97 ($1.46 of the $2.50 with the earlier runs) |
+| Oct 31 | `b-corpus-export-3` (GitHub run 41197942422): every kernels row, A100 included, for the one holdout score | CPU | about 2 min | about $0.01 |
+| Oct 31 | `b-corpus-export-2` and `b-corpus-export-hf-2` (GitHub runs 41191537650, 41191862052): every kernels and HF row back | CPU | about 7 min wall | about $0.02 |
+
+**Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
+
+Total so far: ledger $1.21 plus about $0.03 today; billed estimate $4.80 to $6.70 until Modal's usage page gives the real figure. **The ledger under-counts container time.** It sums each config's own seconds, but containers are also billed for start-up, the per-batch volume reload, a volume commit after every config, and the waits between waves. That overhead was small in phase 0's single container and dominant in phase 1 (about 80 container-seconds per config against about 9 counted). So the $6 cap was enforced on the wrong measure. Phase 2 is on hold until the budget counts container wall time. Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
 
 ## Contract requests
 In `docs/requests/from-b.md`.

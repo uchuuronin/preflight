@@ -67,7 +67,18 @@ def test_predict_is_pure_and_fast(ft):
 	assert ft.model_dump_json() == before
 
 
-def test_unknown_knobs_are_refused_but_gpu_what_ifs_are_not(ft):
+@pytest.fixture
+def no_cross_band(monkeypatch):
+	"""K1's own behaviour, without the held-out cross-GPU band, whose ±45% width makes every GPU move abstain."""
+	from dataclasses import replace as dc_replace
+
+	from preflight.engine import conformal
+
+	cells = {k: c for k, c in conformal.TABLE.cells.items() if k[0] != "time.step.cross"}
+	monkeypatch.setattr(conformal, "TABLE", dc_replace(conformal.TABLE, cells=cells))
+
+
+def test_unknown_knobs_are_refused_but_gpu_what_ifs_are_not(ft, no_cross_band):
 	with pytest.raises(ValueError, match="unknown knob"):
 		api.predict(ft, {"not_a_knob": 3})
 	assert api.predict(ft, {"gpu_type": "H100-SXM-80GB"}).root["time.step"].status == "predicted"
@@ -101,7 +112,7 @@ def test_precision_change_scales_time_with_tf32_in_mind(pt):
 	assert bf16["memory.peak"].status == "abstain"  # no model shape: the probes' line can't follow precision
 
 
-def test_other_gpus(ft):
+def test_other_gpus(ft, no_cross_band):
 	l4 = api.predict(ft).root["time.step"]
 	h100 = api.predict(ft, {"gpu_type": "H100-SXM-80GB"}).root["time.step"]
 	mi = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
@@ -207,6 +218,16 @@ def test_sensitivity_ranks_levers_not_the_workload(pt, ft):
 	assert "check quality" in cost["seq_len"].reason
 	mem = api.sensitivity(ft, Objective(kind="fit_memory"))
 	assert mem[0].knob_id == "eval_batch_size" and mem[0].best_value == 1
+	# a bigger GPU reaches the pooled cell's lower floor; at the shown resolution it ties, and the cheaper lever leads
+	gpu = next(r for r in mem if r.knob_id == "gpu_type")
+	assert gpu.impact == pytest.approx(mem[0].impact)
+
+
+def test_sampled_rates_keep_their_resolution_in_the_ranking(ag):
+	# only P(OOM) is clamped at the smallest cell's floor; a runaway rate is a sampled rate, ranked as measured
+	rec = _agent_with(ag, 30)
+	(turns,) = [r for r in api.sensitivity(rec, Objective(kind="min_risk")) if r.knob_id == "max_turns"]
+	assert turns.impact == pytest.approx(api.predict(rec).root["risk.runaway"].point, abs=1e-6)
 
 
 # ---------------------------------------------------------------- the predictions block
@@ -290,15 +311,26 @@ def test_more_gpus_add_communication(ft):
 	assert (eight["time.step"].hi - eight["time.step"].lo) >= (one["time.step"].hi - one["time.step"].lo)
 
 
-def test_preemption_never_loses_more_than_the_run(pt):
+def test_preemption_without_a_checkpoint_in_the_run_restarts_it_from_zero(pt):
+	m = 4 * 3600.0
 	c = pt.job.constraints
-	c = c.model_copy(
-		update={"preemption": c.preemption.model_copy(update={"kind": "poisson", "mtti_s": 4 * 3600.0})}
-	)
+	c = c.model_copy(update={"preemption": c.preemption.model_copy(update={"kind": "poisson", "mtti_s": m})})
 	rec = pt.model_copy(update={"job": pt.job.model_copy(update={"constraints": c})})
-	p = api.predict(rec, {"checkpoint_every": 100000}).root
-	per_interrupt = p["risk.preemption_loss"].point / (p["time.total"].point / (4 * 3600.0))
-	assert per_interrupt <= p["time.total"].point / 2 + 60 + (c.preemption.grace_s or 0) + 1e-6
+	p = api.predict(
+		rec, {"checkpoint_every": 100000}
+	).root  # an interval longer than the run: capped at the run
+	t, r = p["time.total"].point, 60 + (c.preemption.grace_s or 0)
+	# restart from zero, interruptions during redone work included: (M + R)(e^(T/M) - 1) - T
+	assert p["risk.preemption_loss"].point == pytest.approx((m + r) * math.expm1(t / m) - t)
+	assert (
+		"restarts the run" not in p["risk.preemption_loss"].reason
+	)  # the script does checkpoint, just rarely
+	# with frequent checkpoints it is close to Young/Daly's first order: T/M x (half an interval + restart)
+	q = api.predict(rec, {"checkpoint_every": 100}).root
+	step = q["time.step"].point
+	assert q["risk.preemption_loss"].point == pytest.approx(
+		q["time.total"].point / m * (50 * step + r), rel=0.05
+	)
 
 
 def test_log_axis_from_zero():
@@ -349,7 +381,7 @@ def test_memory_terms_add_up_to_the_peak_with_eval_as_its_own_wedge(ft):
 	assert calm["memory.eval_spike"].point == 0
 
 
-def test_phase_times_add_up_to_the_step(ft):
+def test_phase_times_add_up_to_the_step(ft, no_cross_band):
 	p = api.predict(ft).root
 	phases = {k: v for k, v in p.items() if k.startswith("time.phase.")}
 	assert {"time.phase.forward", "time.phase.backward"} <= set(phases)
@@ -398,9 +430,20 @@ def test_one_dimensional_grids_for_every_knob_around_the_current_point(ft):
 	assert 4 in bs and min(bs) >= 1 and max(bs) <= 32  # 4 x 1/8 .. 4 x 8, inside the domain
 
 
-def test_model_cards_say_calibration_simulated(ft):
-	cards = api.fill_predictions(ft).models
-	assert cards and all(c.notes.startswith("calibration: simulated") and c.coverage is None for c in cards)
+def test_model_cards_say_where_their_calibration_comes_from(ft):
+	from preflight.engine import conformal
+
+	cards = {c.id: c for c in api.fill_predictions(ft).models}
+	gpu, lens = api._env_gpu(ft), ft.job.lens
+	for mid, c in cards.items():
+		target = api._CARD_TARGET.get(mid)
+		# held out only where this record's own band is: a fine-tune's step time has no cell, so its card says simulated
+		if target and conformal.TABLE.lookup(target, gpu, lens) is not None and mid in api._CARD_SCORED:
+			assert c.notes.startswith("calibration: held_out") and c.coverage is not None
+		else:
+			assert c.notes.startswith("calibration: simulated") and c.coverage is None
+	assert cards[api.memory.MODEL_ID].notes.startswith("calibration: held_out")
+	assert cards[api.steptime.MODEL_ID_SAME].notes.startswith("calibration: simulated")
 
 
 def test_unknown_probe_gpu_uses_its_reported_memory(ft):
@@ -452,3 +495,128 @@ def test_a_stale_knob_predicts_for_the_gpu_it_shows(ft):
 	rec = _as_harness_builds_it(ft, "L40S", 48 * 10**9, knob_current="L4")
 	assert api._target_gpu(rec, api._values(rec, None)) == "L4"
 	assert api._target_gpu(rec, api._values(rec, {"gpu_type": "L40S"})) == "L40S"
+
+
+def test_records_pin_their_models_and_say_when_one_has_moved_on(ft):
+	# gap 15: a shared record keeps the numbers it was predicted with, and names the model that made them
+	out = api.fill_predictions(ft)
+	assert api.stale_models(out) == []
+	now = api.current_models()
+	assert now["memory-analytical"] == api.memory.MODEL_ID
+	old = out.model_copy(
+		update={
+			"models": [
+				m.model_copy(update={"id": "memory-analytical@0.1.0"}) if m.id == api.memory.MODEL_ID else m
+				for m in out.models
+			]
+		}
+	)
+	assert ("memory-analytical@0.1.0", api.memory.MODEL_ID) in api.stale_models(old)
+	assert all("@" in mid for mid in now.values())
+
+
+def test_nodes_split_the_gpus_and_the_step_says_analytical_only(pt):
+	from preflight.schema.record import Domain, Knob
+
+	knobs = [
+		*pt.knobs,
+		Knob(id="nodes", label_key="knob.nodes", kind="int", current=1, domain=Domain(min=1, max=16)),
+	]
+	if not any(k.id == "gpus" for k in pt.knobs):
+		knobs.append(
+			Knob(id="gpus", label_key="knob.gpus", kind="int", current=1, domain=Domain(min=1, max=64))
+		)
+	rec = pt.model_copy(update={"knobs": knobs})
+	one = api.predict(rec, {"gpus": 16, "nodes": 1}).root["time.step"]
+	two = api.predict(rec, {"gpus": 16, "nodes": 2}).root["time.step"]
+	if one.status == "abstain":
+		pytest.skip(one.reason)
+	assert two.point > one.point and "analytical only" in two.reason
+	assert api.predict(rec, {"gpus": 15, "nodes": 2}).root["time.step"].status == "abstain"
+
+
+def test_calibration_summary_is_what_the_coverage_page_needs():
+	out = api.calibration_summary()
+	mem = out["targets"]["memory.peak"]
+	assert (
+		mem["coverage"]["n"] > 0
+		and mem["coverage"]["wilson95"][0] <= mem["coverage"]["rate"] <= mem["coverage"]["wilson95"][1]
+	)
+	assert "A100-SXM-80GB" in mem["holdout"] and "finetune" in mem["lenses"]
+	assert "finetune" not in out["targets"]["time.step"]["lenses"]  # HF fine-tune step time stays simulated
+	assert out["oom_bins"] and out["oom_middle_verified"] is False
+	import json
+
+	json.dumps(out)  # plain data
+
+
+def test_a_record_banded_with_an_older_table_is_reported(ft):
+	from preflight.engine import conformal
+
+	out = api.fill_predictions(ft)
+	assert api.stale_models(out) == []
+	cards = [
+		m.model_copy(
+			update={"training_data": m.training_data.replace(f"table {conformal.TABLE.version}", "table 0")}
+		)
+		if m.training_data and "; table " in m.training_data
+		else m
+		for m in out.models
+	]
+	old = out.model_copy(update={"models": cards})
+	assert ("conformal-table@0", f"conformal-table@{conformal.TABLE.version}") in api.stale_models(old)
+
+
+def test_the_summary_says_what_the_engine_shows():
+	bins = api.calibration_summary()["oom_bins"]
+	ends = [b for b in bins if b["hi"] <= 0.05 + 1e-9 or b["lo"] >= 0.95 - 1e-9]
+	assert ends and all(
+		b["shown_as_number"] == b["verified"] for b in ends
+	)  # an end shows a number once verified
+	middle = [b for b in bins if b not in ends]
+	assert middle and not any(b["shown_as_number"] for b in middle)
+	top = next(b for b in bins if b["lo"] >= 0.95 - 1e-9)
+	assert (
+		top["verified"] is False and top["ooms"] == 9 and top["n"] == 10
+	)  # shown as "9 of 10 similar runs did"
+
+
+def test_one_threads_quiet_grid_doesnt_silence_another():
+	import threading
+
+	seen = []
+	with api._quiet_serving(True):
+		t = threading.Thread(target=lambda: seen.append(api._QUIET.get()))
+		t.start()
+		t.join()
+		assert api._QUIET.get() is True
+	assert seen == [False] and api._QUIET.get() is False
+
+
+def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
+	from preflight.engine import conformal, steptime
+
+	cell = conformal.TABLE.lookup("time.step.cross", "A100-SXM-80GB", None)
+	assert cell is not None and cell.key == ("time.step.cross", "", "")
+	moved = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	assert "held-out corpus pairs" in moved.reason  # with this band the move abstains (the test below)
+	(card,) = api._cards({steptime.MODEL_ID_CROSS}, ft)
+	assert card.notes.startswith("calibration: held_out") and card.coverage == pytest.approx(
+		2130 / 2286, abs=0.02
+	)
+
+
+def test_without_the_feature_a_gpu_move_keeps_k1s_own_band(ft):
+	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	assert e.status != "abstain" and "held-out corpus pairs" not in (e.reason or "")
+	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
+	assert card.notes.startswith("calibration: simulated")
+
+
+def test_with_the_held_out_band_a_gpu_move_says_run_a_probe_there(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
+	# Chiya, Oct 31: the honest cross-GPU band is about +-45%, past the +-50% abstention once the probe's own error
+	# is added, so moving the GPU dial asks for a probe on that GPU instead of showing a range
+	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	assert e.status == "abstain" and "run a probe here" in e.reason and "held-out corpus pairs" in e.reason
