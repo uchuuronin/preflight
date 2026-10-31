@@ -356,3 +356,44 @@ def ground_truth(
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(brief(res), indent=2), flush=True)
+
+
+# ---------------------------------------------------------------- multi-GPU (2 x L4, paid: ask first)
+
+MULTI_GPU_TIMEOUT_S = 20 * 60  # the container's own end, whatever the probes do
+
+
+@ops.function(image=probe_image, gpu="L4:2", timeout=MULTI_GPU_TIMEOUT_S)
+def multi_gpu_on_l4x2(files: dict, warmup: int = 3, timed: int = 10) -> dict:
+	"""DDP and FSDP probes on one node of two L4s, one recorder per rank under torchrun."""
+	from preflight.probes.local import ProbeSpec, run_probe
+
+	print("[multi-gpu] container up on 2 x L4", flush=True)
+	out = {}
+	for name in ("ddp", "fsdp"):
+		r = run_probe(ProbeSpec(probe_id=name, files={"train.py": files[f"{name}.py"]}, entrypoint="train.py",
+			warmup=warmup, timed=timed, nproc=2, timeout_s=360))  # fmt: skip
+		p = r.probe
+		out[name] = {"status": p.status, "error": p.error, "steps": p.steps,
+			"p50_s": p.step_time.p50_s if p.step_time else None,
+			"peak_allocated_bytes": p.memory.peak_allocated_bytes if p.memory else None,
+			"extras": p.extras, "gpu": r.env.gpu.name if r.env and r.env.gpu else None,
+			"log_tail": r.log_tail[-1500:] if p.status != "ok" else ""}  # fmt: skip
+		print(f"[multi-gpu] {name}: {p.status}, {p.steps} steps, extras {p.extras}", flush=True)
+	return out
+
+
+@ops.local_entrypoint()
+def multi_gpu():
+	"""modal run --env main python/preflight/runner/ops_app.py::multi_gpu
+	Writes out/multi_gpu.json: the DDP and FSDP probes on 2 x L4 (tests/fixtures/multi_gpu)."""
+	import json
+
+	root = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "multi_gpu"
+	files = {f.name: f.read_text() for f in root.glob("*.py")}
+	print("[multi-gpu] waiting for a node with 2 x L4 (Modal queues it)", flush=True)
+	res = multi_gpu_on_l4x2.remote(files)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/multi_gpu.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps({k: {kk: v for kk, v in r.items() if kk != "log_tail"} for k, r in res.items()}, indent=2),
+		flush=True)  # fmt: skip
