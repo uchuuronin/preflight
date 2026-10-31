@@ -597,7 +597,9 @@ def test_a_late_starting_container_still_runs_what_its_bill_covers():
 	dispatched, deadline = 1_000.0, 600.0
 	end_at = sw.wave_end_at(dispatched, 1, deadline)
 	assert sw.may_start_config(dispatched + 150.0, deadline, end_at)  # a 150 s start-up still leaves room
-	assert sw.may_start_config(dispatched + sw.STARTUP_S, deadline, end_at)  # up to the start-up the bill assumed
+	assert sw.may_start_config(
+		dispatched + sw.STARTUP_S, deadline, end_at
+	)  # up to the start-up the bill assumed
 	assert not sw.may_start_config(dispatched + sw.STARTUP_S + 1.0, deadline, end_at)
 	# and Modal's own cut-off comes after the last config could end, with the margin, all inside the bill
 	cap = sw.container_timeout_s(1, deadline)
