@@ -32,6 +32,7 @@ step up after an OOM only while the job's dollar budget holds it.
 import hashlib
 import json
 import logging
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -227,6 +228,15 @@ def _skipped(p: PlannedProbe, why: str) -> Probe:
 	)
 
 
+_VLLM_IMPORT = re.compile(r"^\s*(?:from\s+vllm\b|import\s+vllm\b)", re.M)
+
+
+def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
+	"""Serving, or any script that imports vLLM (an eval sweep on vLLM is lens eval): the probe
+	image has no vLLM."""
+	return sm.lens == "serving" or any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
+
+
 def _spec(
 	fetched: Fetched, sm: ScriptMap, p: PlannedProbe, deps: Deps, *, eval_off: bool = False
 ) -> ProbeSpec:
@@ -251,7 +261,7 @@ def _spec(
 		seed=p.seed,
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
-		image="serving" if sm.lens == "serving" else "probe",  # vLLM lives in its own image
+		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 	)
 
 

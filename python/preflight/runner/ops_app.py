@@ -421,7 +421,8 @@ def agent_sample_hosted(files: dict, entrypoint: str, k: int, max_usd: float) ->
 	owner = modal.App._get_container_app()
 	create = _sandbox_factory(owner)
 	upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
-	sample = sandbox_sampler(lambda extra_egress: create("cpu", extra_egress), upstream, os.environ["META_API_KEY"],
+	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
+		os.environ["META_API_KEY"],
 		max_usd_total=max_usd)  # fmt: skip
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
@@ -458,7 +459,8 @@ def startup_check_serving_image() -> dict:
 	import subprocess
 	import sys
 
-	cmd = ("import json, numpy, torch, vllm, preflight.recorder.runtime as r; print(json.dumps({'vllm': vllm.__version__,"
+	cmd = ("import json, numpy, torch, vllm, preflight.probes.remote, preflight.recorder.runtime as r; "
+		"print(json.dumps({'vllm': vllm.__version__,"
 		" 'torch': torch.__version__, 'numpy': numpy.__version__, 'recorder': r.__file__}))")  # fmt: skip
 	p = subprocess.run([sys.executable, "-c", cmd], capture_output=True, text=True, timeout=300)
 	out = {"exit": p.returncode, "stderr": p.stderr[-1500:] if p.returncode else ""}

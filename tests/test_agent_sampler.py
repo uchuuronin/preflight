@@ -320,8 +320,9 @@ def test_the_hosted_sampler_keeps_the_key_outside_and_routes_through_the_tunnel(
 	def forward(port):
 		yield types.SimpleNamespace(url=f"http://127.0.0.1:{port}")
 
-	def create(extra_egress):
+	def create(extra_egress, timeout_s):
 		made.append(_FakeSandbox(extra_egress))
+		made[-1].timeout_s = timeout_s
 		return made[-1]
 
 	monkeypatch.setenv("META_API_KEY", "worker-secret")  # the worker's own env must not reach the script
@@ -335,3 +336,43 @@ def test_the_hosted_sampler_keeps_the_key_outside_and_routes_through_the_tunnel(
 	assert len(out.tasks) == 4 and all(t.turns == 3 for t in out.tasks)
 	assert {s["auth"] for s in prov.seen} == {"Bearer our-key"}
 	assert made[0].extra_egress == ["127.0.0.1"] and made[0].terminated
+	assert made[0].timeout_s > 1800  # the sandbox outlives the sample's own limit
+
+
+def test_past_the_dollar_cap_new_tasks_are_refused_not_counted_empty():
+	"""Review, Oct 31: tasks opened after the cap became 0-turn, $0 tasks that lowered the projection."""
+	prov = Provider()
+	px = AgentProxy(prov.url, "our-key", rate=token_rate, max_usd_total=0.02)
+	px.start()
+	try:
+		url = px.open_run("r", max_tasks=30)
+		codes = []
+		for i in range(10):
+			body = {
+				"model": "muse-spark-1.3",
+				"messages": [{"role": "user", "content": f"t{i}"}],
+				"max_tokens": 50,
+			}
+			codes.append(_post(url, body)[0])
+		tasks = [px.task(t) for t in px.run_tasks("r")]
+		assert 429 in codes and all(t.turns >= 1 for t in tasks)  # no empty tasks in the sample
+		assert px.run_stats("r")["budget_hit"]
+	finally:
+		px.stop()
+		prov.server.shutdown()
+
+
+def test_tasks_told_apart_only_by_their_system_prompt_can_be_topped_up(proxy):
+	_, px = proxy
+
+	def body(i):
+		return {"model": "muse-spark-1.3", "max_tokens": 5,
+			"messages": [{"role": "system", "content": f"task {i}"}, {"role": "user", "content": "Begin."}]}  # fmt: skip
+
+	url = px.open_run("s1", max_tasks=3)
+	for i in range(3):
+		_post(url, body(i))
+	first = px.run_tasks("s1")
+	url2 = px.open_run("s2", max_tasks=3, skip_keys=[task_key(t) for t in first])
+	codes = [_post(url2, body(i))[0] for i in range(6)]
+	assert codes == [429, 429, 429, 200, 200, 200] and len(px.run_tasks("s2")) == 3

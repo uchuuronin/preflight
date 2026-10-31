@@ -77,7 +77,9 @@ def _scrubbed(env: dict, upstream_key: str | None) -> tuple[dict, list[str]]:
 # dummy key
 BASE_URL_VARS = ("OPENAI_BASE_URL", "OPENAI_API_BASE", "META_API_BASE", "META_BASE_URL")
 KEY_VARS = ("OPENAI_API_KEY", "META_API_KEY")
-STALL_S = 300.0  # guess: no call through the proxy for 5 min with tasks open is a stuck run (a tool loop)
+STALL_S = (
+	600.0  # guess: 10 min with no call through the proxy and none in flight is a stuck run (a tool loop)
+)
 
 
 class _LocalProc:
@@ -126,7 +128,13 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	t0 = time.monotonic()
 	proc = launch(child_env) if launch is not None else _LocalProc(cmd, cwd, child_env)
 	cut = None
-	while proc.poll() is None:
+	while True:
+		try:
+			if proc.poll() is not None:
+				break
+		except Exception:  # the sandbox went away under us: what was measured still counts
+			cut = "lost"
+			break
 		idle = proxy.run_stats(run_id).get("idle_s")
 		if time.monotonic() - t0 > timeout_s:
 			cut = "timeout"
@@ -137,6 +145,8 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		if cut:
 			break
 		proc.wait(1.0)
+	if cut is None and time.monotonic() - t0 >= timeout_s - 5:
+		cut = "timeout"  # ended by its sandbox's own limit, at about the same time
 	at_cut = proxy.run_stats(run_id) if cut else {}
 	in_flight = {*at_cut.get("in_flight", []), *at_cut.get("mid_tool", [])}
 	proc.kill()
@@ -153,7 +163,12 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		parts.append(f"{len(withheld)} other provider keys withheld")
 	if st.get("single_call") and len(ids) and st["single_call"] * 2 > len(ids):
 		parts.append(f"{st['single_call']} one-call tasks (side calls may split tasks)")
-	why = {"timeout": f", cut at {timeout_s:.0f} s", "cancelled": ", cancelled",
+	if st.get("budget_hit"):
+		parts.append("dollar cap reached")
+	ended = (getattr(proc, "report", None) or {}).get("ended")
+	if ended and ended not in ("exited", "timeout"):
+		parts.append(f"sandbox: {ended}")  # e.g. install_failed: not the same as making no calls
+	why = {"timeout": f", cut at {timeout_s:.0f} s", "cancelled": ", cancelled", "lost": ", sandbox lost",
 		"stalled": f", stopped after {stall_s:.0f} s with no model calls"}.get(cut, "")  # fmt: skip
 	parts.append(f"script wall {wall:.0f} s{why}")
 	selection = "; ".join(parts)

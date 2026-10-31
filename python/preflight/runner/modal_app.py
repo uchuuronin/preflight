@@ -154,6 +154,10 @@ SERVING_PACKAGES = [
 	"numpy<2",
 	"datasets==3.1.0",
 	"psutil==6.1.0",
+	# what the recorder imports in the sandbox, pinned as in the probe image
+	"nvidia-ml-py==12.560.30",
+	"pydantic>=2.8,<3",
+	"httpx>=0.27",
 ]
 serving_image = (
 	_base.apt_install("git")
@@ -191,6 +195,7 @@ def image_tag() -> str:
 
 	pkg = Path(preflight.__file__).resolve().parent  # the installed package, here or in the container
 	h = hashlib.sha256("\n".join(PROBE_PACKAGES).encode())
+	h.update("\n".join(SERVING_PACKAGES).encode())  # the serving image's pins key its probes too
 	files = [p for sub in ("recorder", "probes") for p in sorted((pkg / sub).glob("*.py"))]
 	if not files:  # never key the cache on nothing: a wrong path would make every probe a hit
 		raise RuntimeError(f"no recorder or probe sources under {pkg}")
@@ -403,16 +408,19 @@ def _sandbox_factory(owner=None):
 	"""The probe sandbox, created inside `owner` (this app by default; the startup check passes its
 	own running app). gpu "cpu" makes a GPU-less sandbox with every other setting the same."""
 
-	def create(gpu: str, extra_egress: list[str] | tuple = (), image: str = "probe"):
+	def create(
+		gpu: str, extra_egress: list[str] | tuple = (), image: str = "probe", timeout_s: int | None = None
+	):
 		"""extra_egress: hosts beyond EGRESS, only the agent proxy's tunnel (runner/agent_jobs.py).
-		image: "probe", or "serving" for vLLM probes (SANDBOX_IMAGES)."""
+		image: "probe", or "serving" for vLLM probes (SANDBOX_IMAGES). timeout_s: the sandbox's
+		lifetime, 30 min unless the caller's run needs longer (an agent sample)."""
 		from preflight.probes.gpu_choice import modal_gpu
 
 		return modal.Sandbox.create(
 			app=owner if owner is not None else app,
 			image=SANDBOX_IMAGES[image],
 			gpu=None if gpu == "cpu" else modal_gpu(gpu),
-			timeout=30 * 60,
+			timeout=timeout_s or 30 * 60,
 			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes
 			outbound_domain_allowlist=[*EGRESS, *(h for h in extra_egress if h)],
 			volumes={WEIGHTS_DIR: _read_only(weights_vol)},

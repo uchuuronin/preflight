@@ -429,7 +429,8 @@ def test_the_cli_as_root_gives_each_run_fresh_caches_it_never_walks(monkeypatch)
 	from preflight.cli.main import _run_caches_when_root
 
 	for v in ("HF_HOME", "PREFLIGHT_PIP_CACHE", "PREFLIGHT_DEPS_DIR", "PREFLIGHT_PROBE_UID"):
-		monkeypatch.delenv(v, raising=False)
+		monkeypatch.setenv(v, "")  # registers the undo, so what the CLI sets is gone after the test
+		monkeypatch.delenv(v)
 	run = _run_caches_when_root()
 	try:
 		uid = int(os.environ["PREFLIGHT_PROBE_UID"])

@@ -108,8 +108,9 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 		try:
 			with forward(port) as tunnel:
 				proxy.public_base = tunnel.url
-				sb = create_sandbox(extra_egress=[urlparse(tunnel.url).hostname])
 				limit = timeout_s or TIMEOUT_S
+				# the sandbox outlives the sample's own limit (installs come first inside it)
+				sb = create_sandbox(extra_egress=[urlparse(tunnel.url).hostname], timeout_s=int(limit) + 900)
 
 				def launch(env):
 					return _SandboxProc(sb, {"files": fetched.files, "entrypoint": fetched.entrypoint,

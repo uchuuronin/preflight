@@ -94,6 +94,7 @@ class _Run:
 	refused: int = 0  # calls refused because the sample was full
 	system: dict[str, str | None] = field(default_factory=dict)  # task -> its last system prompt hash
 	last_call_at: float | None = None  # monotonic: any call through the run, refused ones too
+	budget_hit: bool = False  # a task was refused because the proxy's dollar cap was reached
 
 
 def _h(x) -> str:
@@ -316,6 +317,7 @@ class AgentProxy:
 		self._tokens: dict[str, str] = {}  # path token -> task id
 		self._server: ThreadingHTTPServer | None = None
 		self.public_base: str | None = None  # e.g. a Modal tunnel's https URL
+		self._last_activity = 0.0  # monotonic: the last call logged
 
 	# ------------------------------------------------------------- lifecycle
 
@@ -332,6 +334,7 @@ class AgentProxy:
 
 		class Handler(BaseHTTPRequestHandler):
 			protocol_version = "HTTP/1.1"
+			timeout = 60  # a slow or silent client (the tunnel is public) can't hold a thread forever
 
 			def log_message(self, *a):  # requests are counted, never logged
 				pass
@@ -408,7 +411,10 @@ class AgentProxy:
 				# a task whose last answer asked for a tool was mid-task (running the tool) if cut now
 				"mid_tool": [tid for tid, t in ts.items() if t.calls and t.calls[-1].finish_reason == "tool_calls"],
 				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1),
-				"idle_s": None if run.last_call_at is None else time.monotonic() - run.last_call_at}  # fmt: skip
+				"budget_hit": run.budget_hit,
+				# since the last call started or ended; never idle while a call is in flight
+				"idle_s": None if run.last_call_at is None or any(t.in_flight > 0 for t in ts.values())
+					else time.monotonic() - max(run.last_call_at, self._last_activity)}  # fmt: skip
 
 	def _task_for(self, run: "_Run", req: dict) -> str | None:
 		"""The task this call belongs to, opening one if it starts a conversation; None when the
@@ -432,6 +438,10 @@ class AgentProxy:
 					bool(t.calls)
 					and bool(t.calls[-1].error or not t.calls[-1].status or t.calls[-1].status >= 400)
 				)
+				# a retry of a failed opening is the same task only under the same system prompt: the
+				# same opening under another one is another task (task text in the system prompt)
+				if len(last) == len(msgs) and len(msgs) == 1 and run.system.get(tid) != sys_h:
+					failed = False
 				if len(last) == len(msgs) and not failed:
 					# the same call again, unless its last answer failed: a repeat (pass@k, or n samples
 					# sent at once), not a retry; a client's own retry after a timeout opens a task too
@@ -445,18 +455,32 @@ class AgentProxy:
 				run.last[best] = msgs
 				run.system[best] = sys_h
 				return best
-			if any(len(k) <= len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
-				# a retry (a framework's own, past the SDK) or a later turn of a skipped task: still
-				# skipped. Tasks that all open with the same call can't be told from retries of it,
-				# so a top-up of such a script runs nothing new and says so
-				return ""
+			for k_sys, k in run.skipped:
+				if not k or len(k) > len(msgs) or msgs[: len(k)] != k:
+					continue
+				if len(k) < len(msgs) or k_sys == sys_h:
+					# a later turn of a skipped task, or a retry of its opening (same system prompt):
+					# still skipped. Tasks that open with the very same call can't be told from
+					# retries of it, so a top-up of such a script runs nothing new and says so
+					return ""
+			# the same messages under another system prompt: tasks whose text is in the system prompt
+			# (or a prompt rebuilt each call), skipped by their key's count below
 			key = opening_key(msgs)
 			if run.skipped_keys.get(key, 0) < run.skip_keys.get(key, 0):
 				run.skipped_keys[key] = run.skipped_keys.get(key, 0) + 1
-				run.skipped.append(msgs)
+				run.skipped.append((sys_h, msgs))
 				return ""
 			if len(run.order) >= run.max_tasks:
 				run.refused += 1
+				return None
+			spent = sum(c.usd for x in self._tasks.values() for c in x.calls) + sum(
+				x.reserved_usd for x in self._tasks.values()
+			)
+			if spent + self._worst_case_usd(req, json.dumps(req).encode()) > self.max_usd_total:
+				# the purse is spent: a new task would be a stopped, empty one that lowers the
+				# sample's cost per task; refused like a task past the sample, and said so
+				run.refused += 1
+				run.budget_hit = True
 				return None
 			n = run.keys.get(key, 0) + 1
 			run.keys[key] = n
@@ -537,6 +561,7 @@ class AgentProxy:
 		with self._lock:
 			t = self._tasks.setdefault(task_id, _Task())
 			t.in_flight -= 1
+			self._last_activity = time.monotonic()
 			with contextlib.suppress(ValueError):
 				t.open.remove(call)
 			t.reserved_usd = max(0.0, t.reserved_usd - reserved)
