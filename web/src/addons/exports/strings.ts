@@ -44,6 +44,9 @@ export const EXPORTS_EN: Record<string, string> = {
 	"addon.exports.command.name": "Command",
 	"addon.exports.command.say": "Runs the job as the record found it, from your project's top folder. Make the edits first if you changed any settings.",
 
+	"addon.exports.recheck.name": "Check it again on your machine",
+	"addon.exports.recheck.say": "Installs Preflight's command-line tool and measures a few steps of the edited job on your machine, on its GPU if it has one, for a new flight record.",
+
 	"addon.exports.link.name": "Link to this record",
 	"addon.exports.link.say": "Opens this record at its own settings. Your changes travel in the plan file.",
 };

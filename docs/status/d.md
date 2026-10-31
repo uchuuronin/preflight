@@ -8,6 +8,25 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sat Oct 31, evening (pushed; the exports CLI item)
+
+Pushed `ws-d` with Chiya's yes (`895633b..129bfb1`: 3590fa7, 59acc38, 4ff522e, 129bfb1), as a normal push after merging `main` (no change, still 3c243b5).
+
+Chiya's decision on the exports CLI line: build it now, behind a setting that turns on when the repo goes public (Nov 3 to 4). It's a new item, "Check it again on your machine", behind the new flag `d.exports_cli` (off in `flags.json`). When on, it shows `pip install git+https://github.com/uchuuronin/preflight` and `preflight run . --entrypoint=<entry> --out .preflight/records -- <args>`.
+
+Decisions, each with its basis and the test that fails if it's wrong:
+
+1. **The plain install is enough; no extra.** Measured: installed from this checkout (the same package a `git+` install builds, but not the URL itself, which can't be tried while the repo is private) in a fresh Python 3.11 venv that also has torch 2.5.1. Run as a non-root user on a small torch loop, the generated command ran three CPU probes (all `ok`) and wrote a record; run twice, both records carry the same content hash. Without torch the CLI installs and maps, but its probes can't start, so the item says to install it where the job's torch is. psutil (the `probe` extra) isn't needed. Test: none in CI, since it needs a network install. The steps are here to repeat, and the URL install should be tried once the repo is public.
+2. **Offered only where it can work.** Not for API runs (the CLI measures nothing for them), samples (no folder of the visitor's holds the script) or notebooks (the entry point is a generated `.py`). Derived from A's `pipeline.py` and `sources.py`. Test: `build.test.ts`, "offers no re-check", and `ExportsPanel.cli.test.tsx` (no item on a sample).
+3. **The command's shape.** It runs from the project's top folder with `.`, the same folder the edit script and the run command use. `--entrypoint=` keeps a name starting with a dash from being read as an option, which argparse does otherwise. Records go to `.preflight/records`, a dot-folder the CLI skips when it reads the project, so a second run doesn't read the first one's output. Arguments are shell-quoted after `--`, and any holding a control character are left out, with a note, here and in the run command. The copy says "on its GPU if it has one", because `preflight run` falls back to the CPU. Test: `build.test.ts` (the CLI tests and "leaves out arguments").
+4. **Hidden until the flag is on.** `flag()` is `=== true`, and URL overrides are off in production builds. Test: `ExportsPanel.test.tsx` (no item and no `pip install` text with the real flags) and `ExportsPanel.cli.test.tsx` (shown when on; the flag is off in `flags.json`).
+
+A read-only review (git-free copy) found decisions 2 and 3's gaps (the item on API runs, samples and notebooks; records read back on the next run; dash names; control characters; "your own GPU" when it may run on the CPU), all fixed above.
+
+Test runs: `web` 47 files, 364 tests pass, and `tsc` is clean; Python passes 974 with the `torch`-marked tests left out.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sat Oct 31, late morning (exports panel)
 
 The exports panel, moved from C, is in `web/src/addons/exports/`: a band under the cockpit's whole run (C's `below` slot) behind the existing flag `c.exports`, so no flag key changes. From the record and the settings on screen it offers five things to copy, and the three files also download: the plan (`preflight-plan.json`), the edits (`preflight-edits.sh`), a Slurm batch file (`preflight.sbatch`), the command, and the record's link. Checked in Chromium at 1280 and 390 px on the `lora-7b` sample with `?flags=c.exports`: it renders, every control is at least 24 px, and there's no sideways scroll.
@@ -64,7 +83,7 @@ Sources: the Contracts tab (Contract D, the Oct 27 review, the competitive revie
 | Retrieval with sentence-transformers (contrastive batch too small) | written, local commit on ws-d | 0 | as above |
 | GNN with PyG (fan-out too high on the outer hops) | written, local commit on ws-d; CPU smoke run | 0 | as above |
 | Vision (data-bound loader, no channels-last) | written, local commit on ws-d; CPU smoke run | 0 (A's reader misses one finding; request filed) | as above |
-| **Exports panel (moved from C, Oct 31)**: config, patch, sbatch, CLI command, share link, from the record | on ws-d (local commits 4ff522e, 704754f); flag `c.exports` off | 0 | Muse Code diffs need C's blob route; unified diffs need A; the CLI line needs an install route (Chiya) |
+| **Exports panel (moved from C, Oct 31)**: config, patch, sbatch, CLI command, share link, from the record | on ws-d (4ff522e, 129bfb1); CLI item behind `d.exports_cli` (local); both flags off | 0 | Muse Code diffs need C's blob route; unified diffs need A; the CLI item turns on when the repo is public (Nov 3 to 4) |
 | **Add-ons (Contract D)** | | | |
 | D1 Expertise dial (glossary, levels, "New to this" view, census baseline) | on main; Oct 30 glossary entries on ws-d; flag off | 0.5 | the worth-checking list waits on C's slot |
 | D1 dial re-run on real grids | not started | 1.5 | B's grids in the golden records |

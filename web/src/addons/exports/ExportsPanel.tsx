@@ -5,11 +5,13 @@
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { href, useRoute } from "../../app/route";
+import { flag } from "../../lib/flags";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import type { WorkspaceContextValue } from "../../registry";
 import { isFixture } from "../../workspace/record/model";
-import { askedTime, changes, commandText, configText, editsText, type ExportInput, gpu, isApi, sbatchText } from "./build";
+import { askedTime, canRecheck, changes, commandText, configText, editsText, type ExportInput, gpu, isApi, recheckText, sbatchText } from "./build";
+import { CLI_FLAG } from "./flags";
 
 interface Item {
 	id: string;
@@ -105,6 +107,18 @@ export function ExportsPanel({ record, knobs, estimates }: WorkspaceContextValue
 			file: null,
 			type: "text/plain",
 		},
+		...(flag(CLI_FLAG) && canRecheck(record)
+			? [
+					{
+						id: "recheck",
+						name: t("addon.exports.recheck.name"),
+						say: t("addon.exports.recheck.say"),
+						text: recheckText(input) ?? "",
+						file: null,
+						type: "text/plain",
+					},
+				]
+			: []),
 		{
 			id: "link",
 			name: t("addon.exports.link.name"),

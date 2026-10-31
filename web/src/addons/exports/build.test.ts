@@ -6,6 +6,7 @@ import agentGolden from "../../../../schema/examples/agent.json";
 import type { FlightRecord } from "../../../../schema/ts/contract";
 import { normaliseRecord, type KnobValue, type LoadedRecord } from "../../workspace/record/types";
 import {
+	CLI_INSTALL,
 	changes,
 	commandText,
 	configText,
@@ -14,6 +15,7 @@ import {
 	editsText,
 	type ExportInput,
 	pyLiteral,
+	recheckText,
 	SETUP_S,
 	sbatchText,
 	shq,
@@ -330,6 +332,30 @@ describe("helpers", () => {
 
 	it("formats Slurm time", () => {
 		expect([slurmTime(1), slurmTime(3600), slurmTime(90061)]).toEqual(["00:05:00", "01:00:00", "1-01:05:00"]);
+	});
+
+	it("writes the CLI re-check with the record's entry point and arguments", () => {
+		const repo = (r: LoadedRecord, source: Record<string, unknown>) => ({ ...r, job: { ...r.job, source: { ...r.job.source, kind: "repo", ...source } } }) as LoadedRecord;
+		const text = recheckText({ record: repo(gold, { entrypoint: "src/my train.py", args: ["--name", "my run"] }) }) ?? "";
+		expect(text).toContain(`${CLI_INSTALL}\n`);
+		expect(text.trim().split("\n").at(-1)).toBe("preflight run . --entrypoint='src/my train.py' --out .preflight/records -- --name 'my run'");
+		expect(recheckText({ record: repo(real, { entrypoint: "-x.py" }) })?.trim().split("\n").at(-1)).toBe("preflight run . --entrypoint=-x.py --out .preflight/records");
+	});
+
+	it("offers no re-check for samples, notebooks or API runs", () => {
+		const as = (kind: string) => ({ ...real, job: { ...real.job, source: { ...real.job.source, kind } } }) as LoadedRecord;
+		expect(recheckText({ record: as("sample") })).toBeNull();
+		expect(recheckText({ record: as("notebook") })).toBeNull();
+		expect(recheckText({ record: { ...as("repo"), env: { ...real.env, backend: "api" } } as LoadedRecord })).toBeNull();
+		expect(recheckText({ record: as("upload") })).not.toBeNull();
+	});
+
+	it("leaves out arguments that hold control characters, and says so", () => {
+		const r = { ...real, job: { ...real.job, source: { ...real.job.source, kind: "repo", args: ["--name", "ok\r$(evil)"] } } } as LoadedRecord;
+		for (const text of [commandText({ record: r }), recheckText({ record: r }) ?? ""]) {
+			expect(text).not.toContain("evil");
+			expect(text).toContain("left out: add them yourself");
+		}
 	});
 
 	it("quotes an entry point with a space that A's launch line leaves bare", () => {

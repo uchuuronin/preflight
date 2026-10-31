@@ -43,6 +43,9 @@ describe("ExportsPanel", () => {
 		for (const n of names) expect(screen.getByRole("button", { name: `Copy: ${n}` })).toBeTruthy();
 		const downloads = screen.getAllByRole("button", { name: /^Download:/ }).map((b) => b.getAttribute("aria-label"));
 		expect(downloads).toEqual(["Download: preflight-plan.json", "Download: preflight-edits.sh", "Download: preflight.sbatch"]);
+		// The CLI item stays hidden while d.exports_cli is off (the repo is private until Nov 3 to 4).
+		expect(screen.queryByRole("button", { name: "Copy: Check it again on your machine" })).toBeNull();
+		expect(document.body.textContent).not.toContain("pip install");
 		expect(screen.getByLabelText("Link to this record").textContent).toBe(`${window.location.origin}/#/cockpit/ICDYrfHQ2nBNbv3mlRHHMg`);
 	});
 

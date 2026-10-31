@@ -214,6 +214,17 @@ export function shq(s: string): string {
 	return /^[A-Za-z0-9_./:=@%+,-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`;
 }
 
+/**
+ * The record's script arguments, shell-quoted; null when any holds a control character (a
+ * carriage return or escape sequence can hide what a pasted command really says).
+ */
+function quotedArgs(record: LoadedRecord): string[] | null {
+	const args = record.job.source?.args ?? [];
+	return args.every((a) => oneLine(a) === a) ? args.map(shq) : null;
+}
+
+const ARGS_LEFT_OUT = "# The record's script arguments hold control characters, so they are left out: add them yourself.";
+
 /** The command line that runs the job, from the record. */
 export function commandText(input: Pick<ExportInput, "record">): string {
 	const { record } = input;
@@ -221,8 +232,8 @@ export function commandText(input: Pick<ExportInput, "record">): string {
 	const launch = oneLine(record.job.script_map?.launch ?? "").trim();
 	// A's reader writes "python <entrypoint>" unquoted; quote the path so spaces survive.
 	const head = !launch || launch === `python ${entry}` ? `python ${shq(entry)}` : launch;
-	const args = (record.job.source?.args ?? []).map(shq);
-	return [head, ...args].join(" ");
+	const args = quotedArgs(record);
+	return args ? [head, ...args].join(" ") : `${ARGS_LEFT_OUT}\n${head}`;
 }
 
 /**
@@ -299,6 +310,42 @@ function slug(s: string): string {
 			.slice(0, 40)
 			.replace(/-$/, "") || "preflight-job"
 	);
+}
+
+/** Installs Preflight's command-line tool from the public repo (shown once the repo is public). */
+export const CLI_INSTALL = "pip install git+https://github.com/uchuuronin/preflight";
+
+/**
+ * Whether the CLI can measure this job again on the visitor's machine: not an API run (the CLI
+ * measures nothing for those), and not a sample or a notebook (no project folder of theirs holds
+ * the script the record ran).
+ */
+export function canRecheck(record: LoadedRecord): boolean {
+	const kind = record.job.source?.kind;
+	return !isApi(record) && kind !== "sample" && kind !== "notebook";
+}
+
+/**
+ * Install Preflight's CLI and measure the job again on the visitor's own machine, after the
+ * edits; null when that can't work (canRecheck). Checked Oct 31: the plain install plus the
+ * user's own torch runs `preflight run` (Python 3.11 or 3.12; torch is not installed by it).
+ * Records go to a dot-folder, which the CLI skips when it reads the project next time.
+ */
+export function recheckText(input: Pick<ExportInput, "record">): string | null {
+	const { record } = input;
+	if (!canRecheck(record)) return null;
+	const entry = record.job.source?.entrypoint ?? record.job.script_map?.entrypoint ?? "train.py";
+	const args = quotedArgs(record);
+	const run = ["preflight run .", `--entrypoint=${shq(entry)}`, "--out .preflight/records", ...(args?.length ? ["--", ...args] : [])].join(" ");
+	return [
+		"# Preflight's command-line tool (Python 3.11 or 3.12, in the environment that has your torch):",
+		CLI_INSTALL,
+		"# From your project's top folder, after the edits: measures a few steps on this machine,",
+		"# on its GPU if it has one, and writes a new flight record to .preflight/records/.",
+		...(args ? [] : [ARGS_LEFT_OUT]),
+		run,
+		"",
+	].join("\n");
 }
 
 /** Whether the job calls APIs rather than running on a GPU. */

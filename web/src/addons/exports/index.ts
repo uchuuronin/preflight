@@ -3,14 +3,16 @@
  *
  * A band under the cockpit's whole run: the plan, the edits to the script, a Slurm batch file,
  * the command and the record's link, from the record and the settings on screen. Behind the
- * existing flag c.exports (off), so no flag key changes.
+ * existing flag c.exports (off). The CLI item has its own flag, d.exports_cli (off until the
+ * repo is public).
  */
 import { registerPanel } from "../../registry";
 import { ExportsPanel } from "./ExportsPanel";
+import { FLAG } from "./flags";
 import { registerExportsStrings } from "./strings";
 import "./exports.css";
 
-export const FLAG = "c.exports";
+export { CLI_FLAG, FLAG } from "./flags";
 
 registerExportsStrings();
 

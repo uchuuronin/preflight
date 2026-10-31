@@ -19,5 +19,6 @@
 	"engine.steptime_cross_gpu": false,
 	"corpus.sweep": false,
 	"d.freetier": false,
-	"d.notebook": false
+	"d.notebook": false,
+	"d.exports_cli": false
 }
