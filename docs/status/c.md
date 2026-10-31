@@ -28,10 +28,11 @@
 | round three | re-run once merged | | | |
 
 - Pushed b10be16 and a213c91 with Chiya's yes (Oct 30, 21:47).
-- API image ships `flags.production.json` (B's file, `engine.memory` on). A's flag-files test fails
-  on ws-c alone until the runner ships it too; it passes in the round-three merge.
+- API image ships `flags.production.json` (B's file, `engine.memory` on). On ws-c alone the file
+  is missing, so a build from ws-c fails and A's flag-files test fails; both clear once B's file
+  is merged and A ships it in the runner and updates both lists in its test.
 - "No eval pass": A's `eval_off` marker first, missing eval stats as the fallback; asked B to own
-  the function so calibration and the checks page share it.
+  the function, and A to write the marker (nothing writes it yet).
 
 **Waiting**
 
