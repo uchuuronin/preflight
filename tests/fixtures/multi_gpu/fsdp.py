@@ -1,6 +1,5 @@
 """FSDP on one node over NCCL: the same 134M-parameter stack, each layer its own shard unit."""
 
-import functools
 import os
 
 import torch
@@ -14,9 +13,7 @@ rank = int(os.environ["LOCAL_RANK"])
 torch.cuda.set_device(rank)
 torch.manual_seed(0)
 layers = [m for _ in range(8) for m in (nn.Linear(4096, 4096), nn.GELU())]
-model = FSDP(
-	nn.Sequential(*layers).cuda(), auto_wrap_policy=functools.partial(ModuleWrapPolicy, {nn.Linear})()
-)
+model = FSDP(nn.Sequential(*layers).cuda(), auto_wrap_policy=ModuleWrapPolicy({nn.Linear}))
 opt = torch.optim.AdamW(model.parameters(), lr=1e-4)
 for _ in range(10_000):
 	x = torch.randn(32, 4096, device="cuda")
