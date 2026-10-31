@@ -11,11 +11,18 @@ import { t } from "../lib/i18n";
 const SEEN_KEY = "pf.data_use.v1";
 
 /**
- * How long records and code are kept. null until Chiya decides and deletion is built; the
- * notice then says plainly that nothing is deleted automatically yet, instead of a promise
- * the system doesn't keep.
+ * How long code and records are kept: only what A's runner does today (python/preflight/runner).
+ * - A repo's clone is deleted when the probe ends (sources.py reads git's objects and deletes it).
+ * - Uploaded files stay on the "preflight-uploads" volume by content hash, so the guide can re-run
+ *   a record's code; nothing deletes them yet (`uploadDays: null`), and the notice says so.
+ * - Records are deleted 30 days after they are made (records.py RECORD_TTL_S, pruned daily by
+ *   the runner's tick; PM decision, Oct 28).
  */
-export const RETENTION: { codeHours: number; recordDays: number } | null = null;
+export const RETENTION: { repoDeletedAtProbeEnd: boolean; uploadDays: number | null; recordDays: number | null } = {
+	repoDeletedAtProbeEnd: true,
+	uploadDays: null,
+	recordDays: 30,
+};
 
 function readSeen(): boolean {
 	try {
@@ -39,11 +46,9 @@ export function dataUseLines(): string[] {
 	if (flag("harness.spark_script_map")) lines.push(t("datause.script_map"));
 	if (flag("c.guide.live")) lines.push(t("datause.guide"));
 	lines.push(t("datause.record"));
-	lines.push(
-		RETENTION
-			? t("datause.retention", { hours: String(RETENTION.codeHours), days: String(RETENTION.recordDays) })
-			: t("datause.retention.unset"),
-	);
+	if (RETENTION.repoDeletedAtProbeEnd) lines.push(t("datause.retention.repo"));
+	lines.push(RETENTION.uploadDays ? t("datause.retention.uploads", { days: String(RETENTION.uploadDays) }) : t("datause.retention.uploads_kept"));
+	lines.push(RETENTION.recordDays ? t("datause.retention.records", { days: String(RETENTION.recordDays) }) : t("datause.retention.unset"));
 	lines.push(t("datause.secrets"));
 	return lines;
 }

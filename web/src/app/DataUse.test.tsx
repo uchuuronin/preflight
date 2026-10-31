@@ -3,11 +3,18 @@ import en from "../i18n/en.json";
 import { dataUseLines, RETENTION } from "./DataUse";
 
 describe("the data-use notice", () => {
-	it("only states what this build does: no deletion promise until deletion exists", () => {
+	it("states only the deletion A's runner does: repo code at probe end, records at 30 days", () => {
 		const lines = dataUseLines();
-		expect(RETENTION).toBeNull();
-		expect(lines).toContain(en["datause.retention.unset"]);
-		expect(lines.join(" ")).not.toMatch(/deleted \d/);
+		expect(RETENTION).toEqual({ repoDeletedAtProbeEnd: true, uploadDays: null, recordDays: 30 });
+		expect(lines).toContain(en["datause.retention.repo"]);
+		expect(lines).toContain("Flight records are deleted after 30 days.");
+		expect(lines).not.toContain(en["datause.retention.unset"]);
+	});
+
+	it("never promises to delete uploaded files, which nothing deletes yet", () => {
+		const lines = dataUseLines();
+		expect(lines).toContain(en["datause.retention.uploads_kept"]);
+		expect(lines.join(" ")).not.toMatch(/Uploaded files are deleted/);
 	});
 
 	it("mentions Muse Spark reading code or messages only when that behaviour's flag is on", () => {
