@@ -141,3 +141,14 @@ So the table sets `oom_reliable`. The middle bins are still thin: the probabilit
 Two rows are not a test, and the holdout is scored once, so it waits for the rerun.
 
 **Sensitivity tie.** With an A10 finetune cell, a bigger GPU now reaches the pooled cell, which has 38 runs. Its P(OOM) floor is 0.013, against 0.025 for 19 runs, so `gpu_type` outranked `eval_batch_size` for "make it fit" on resolution alone. Probability impacts are now ranked in steps of 0.05, the floor of the smallest allowed cell (derived: 0.5 / (9 + 1)). At that resolution the two tie, and the cheaper lever leads.
+
+**Anchored step time on the A10 HF jobs (Oct 31): fails again, stays off.** This is the anchored model's held-out test on the same job type it was fitted on (the L4 HF jobs), but on another GPU. It scores the 19 A10 queries (measured):
+
+| Queries | Model | Within 15% (Wilson 95%) | Median abs log error |
+| --- | --- | --- | --- |
+| above the largest probe (9) | line | 7 of 9 (45% to 94%) | 0.020 |
+| above the largest probe (9) | anchored | 7 of 9 (45% to 94%) | 0.096 |
+| below the smallest probe (10) | line | 8 of 10 (49% to 94%) | 0.064 |
+| below the smallest probe (10) | anchored | 1 of 10 (2% to 40%) | 0.323 |
+
+The fitted line does as well or better on both sides, so `EXTRAPOLATION` stays `"line"`. On every held-out group in phase 2, the line puts 461 of 575 queries within 15% (80%).
