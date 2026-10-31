@@ -763,5 +763,16 @@
 	"probehere.readout.risk": "chance of running out of memory",
 	"probehere.go": "Run a probe here",
 	"probehere.sending": "Sending",
-	"probehere.cost": "Measures this setting on a real GPU. One measured run took under 7 minutes on an L4 (28 Oct 2026, UTC)."
+	"probehere.cost": "Measures this setting on a real GPU. One measured run took under 7 minutes on an L4 (28 Oct 2026, UTC).",
+	"campaign.title": "Campaign calendar",
+	"campaign.cost": "Run cost",
+	"campaign.gpu_hours": "GPU hours",
+	"campaign.finish": "Last run finishes",
+	"campaign.finish_band": "Most likely {p50} UTC; 80% between {p10} and {p90}",
+	"campaign.abstain": "Not predicted: {why}",
+	"campaign.no_time": "No run time: too far from anything measured",
+	"campaign.segments": "{n} jobs under the time limit",
+	"campaign.lane_empty": "No runs",
+	"campaign.unplaced": "Not scheduled ({n})",
+	"campaign.cut": "Cut to stay inside the budget"
 }
