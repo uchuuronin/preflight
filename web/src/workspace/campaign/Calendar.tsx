@@ -11,7 +11,7 @@ import { hasKey, t } from "../../lib/i18n";
 import { Info } from "../components/Info";
 import type { Estimate } from "../record/types";
 import { trusted } from "../status";
-import { type CampaignPlan, hasSchedule, lanesOf, type PlanCell, unitOf } from "./plan";
+import { type CampaignPlan, hasSchedule, lanesOf, type PlanCell, startOf, unitOf } from "./plan";
 
 function said(e: Estimate | null | undefined): string {
 	if (!e || !trusted(e)) return e?.reason ? t("campaign.abstain", { why: e.reason }) : t("value.none");
@@ -43,7 +43,7 @@ function Duration({ c }: { c: PlanCell }) {
 export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 	const { rows, unplaced } = lanesOf(plan);
 	const timed = hasSchedule(plan);
-	const span = timed ? Math.max(1, ...plan.cells.filter((c) => c.lane && !c.cut && trusted(c.time)).map((c) => (c.start_s ?? 0) + (c.time.hi ?? c.time.point ?? 0))) : 1;
+	const span = timed ? Math.max(1, ...plan.cells.filter((c) => c.lane && !c.cut && trusted(c.time)).map((c) => (startOf(c) ?? 0) + (c.time.hi ?? c.time.point ?? 0))) : 1;
 	const pct = (s: number) => `${Math.min(100, (s / span) * 100).toFixed(2)}%`;
 	const q = plan.completion;
 	return (
@@ -79,7 +79,7 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 						) : timed ? (
 							<div className="pf-cal__track" role="list">
 								{r.cells.map((c) => (
-									<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(c.start_s ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
+									<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
 										<i className="pf-cal__whisker" style={{ width: `${(((c.time.hi ?? 0) - (c.time.point ?? 0)) / Math.max(1, c.time.point ?? 1)) * 100}%` }} />
 										<span>{cellLabel(c)}</span>
 									</div>

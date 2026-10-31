@@ -17,9 +17,8 @@ export interface PlanCell {
 	lane: string | null;
 	cut: boolean;
 	reason: string;
-	/** Asked of B (from-c.md, Oct 31): the slot inside the lane and the start, from B's schedule. */
-	slot?: number | null;
-	start_s?: number | null;
+	/** Contract 0.5.0: when this run starts, seconds after the campaign starts, in its lane's slot order. */
+	start_s?: Estimate | number | null;
 }
 
 export interface CampaignPlan {
@@ -61,8 +60,15 @@ export function lanesOf(plan: CampaignPlan): { rows: LaneRow[]; unplaced: PlanCe
 	return { rows, unplaced: plan.cells.filter((c) => !placed.has(c.id)) };
 }
 
+/** A run's start as a number of seconds, or null: the contract's Estimate (its point), or a bare number. */
+export function startOf(c: PlanCell): number | null {
+	const s = c.start_s;
+	if (typeof s === "number") return Number.isFinite(s) ? s : null;
+	return s && s.status !== "abstain" && typeof s.point === "number" ? s.point : null;
+}
+
 /** True when B gave every placed run a start, so the lanes can be drawn against time. */
 export function hasSchedule(plan: CampaignPlan): boolean {
 	const placed = plan.cells.filter((c) => c.lane && !c.cut);
-	return placed.length > 0 && placed.every((c) => typeof c.start_s === "number");
+	return placed.length > 0 && placed.every((c) => startOf(c) !== null);
 }
