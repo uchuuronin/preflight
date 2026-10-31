@@ -2,9 +2,9 @@
 # Modal GPU and Actions minutes). Revisit when the repo goes public.
 name: zoo
 
+# Manual only: every run probes the zoo on Modal GPUs, so it needs Chiya's yes like any paid run
+# (no nightly schedule; PM, Oct 30).
 on:
-  schedule:
-    - cron: "30 8 * * *"
   workflow_dispatch:
     inputs:
       scripts:
