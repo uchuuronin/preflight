@@ -476,6 +476,11 @@ def _sample_agent(rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx,
 	if top_up:
 		sample = combine_samples(first, sample)
 	out = rec.model_copy(update={"agent_sample": sample})
+	from .measured_rules import agent_findings
+
+	fresh = agent_findings(out)  # measured: replaces the parent's, keeps what was read from the code
+	keep = [f for f in out.findings if not f.id.startswith("measured.agent.")]
+	out = out.model_copy(update={"findings": [*keep, *fresh]})
 	_emit(ctx, "probing", out, deps.records.put(out), message=f"{len(sample.tasks)} tasks sampled")
 	return out
 
