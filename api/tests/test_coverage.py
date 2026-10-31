@@ -79,19 +79,31 @@ def test_held_out_records_carry_nothing_derived_from_the_probe():
 	assert held.models == [] and held.findings == [] and not held.predictions.estimates
 
 
-def test_an_eval_off_probe_is_scored_against_the_peak_less_the_eval_term():
-	from preflight.engine.api import predict
-	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES
+def test_an_eval_off_probe_is_scored_against_the_engine_training_peak():
+	"""Independent of coverage.py's arithmetic: the engine's analytical training-moment peak (eval
+	batch removed) plus the same calibration offset the engine applied to its eval-moment peak."""
+	from dataclasses import replace
+
+	from preflight.engine import api, knobs, memory
+	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES as C
 	from preflight.schema import load_record
 
 	rec = load_record(REAL.read_text())
-	p2 = next(p for p in rec.probes if p.id == "p2")
-	pred = predict(coverage.held_out(rec, p2), dict(p2.knobs)).root
-	m, basis = coverage.memory_target(p2, pred)
-	assert basis == "peak_less_eval_and_context"
-	expected = pred["memory.peak"].point - pred["memory.eval_spike"].point - DEFAULT_CONTEXT_BYTES
-	assert m["point"] == pytest.approx(expected)
-	assert m["lo"] <= m["point"] <= m["hi"]
+	for pid in ("p1", "p2", "p3"):
+		p = next(q for q in rec.probes if q.id == pid)
+		held = coverage.held_out(rec, p)
+		pred = api.predict(held, dict(p.knobs)).root
+		values = api._probe_values(rec, p)
+		arch, setup, shape = knobs.setup_from(rec.job.script_map, values)
+		cap = api._capacity(held, api._target_gpu(held, values))
+		with_eval = memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap)
+		training = memory.breakdown(
+			arch, replace(setup, eval_batch=None), shape.batch, shape.seq, capacity_bytes=cap
+		)
+		offset = pred["memory.peak"].point - C - with_eval.allocator_peak
+		m, basis = coverage.memory_target(p, pred)
+		assert basis == "peak_less_eval_and_context"
+		assert m["point"] == pytest.approx(training.allocator_peak + offset, rel=1e-6)
 
 
 def test_a_probe_that_ran_eval_keeps_the_eval_term():

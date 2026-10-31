@@ -1,5 +1,5 @@
 {
-	"generated_at": "2026-10-31T01:30Z",
+	"generated_at": "2026-10-31T01:36Z",
 	"engine_commit": "6c65ccd",
 	"inputs": [
 		"api/tests/fixtures/a-smoke-l4-main-3.record.json",
@@ -150,20 +150,15 @@
 			"measured": 18645778432,
 			"predicted": {
 				"status": "extrapolated",
-				"point": 22959506716.04619,
-				"lo": 20547988301.831406,
-				"hi": 25643368164.533463,
+				"point": 24699600896.0,
+				"lo": 22111507595.940918,
+				"hi": 27579978583.42418,
 				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it",
-				"less_bytes": {
-					"point": 117105277668,
-					"lo": 105303816349,
-					"hi": 130239528223
-				}
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "peak_memory",
-			"error": 0.2314,
+			"error": 0.3247,
 			"hit": false
 		},
 		{
@@ -177,16 +172,11 @@
 			"measured": 18645778432,
 			"predicted": {
 				"status": "extrapolated",
-				"point": 22959506716.04619,
-				"lo": 20547988301.831406,
-				"hi": 25643368164.533463,
+				"point": 24699600896.0,
+				"lo": 22111507595.940918,
+				"hi": 27579978583.42418,
 				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it",
-				"less_bytes": {
-					"point": 117105277668,
-					"lo": 105303816349,
-					"hi": 130239528223
-				}
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "interval",
@@ -244,20 +234,15 @@
 			"measured": 11569987584,
 			"predicted": {
 				"status": "extrapolated",
-				"point": 13554881875.298416,
-				"lo": 12097691437.577179,
-				"hi": 15176639028.738098,
+				"point": 18608029696.0,
+				"lo": 16638074483.892578,
+				"hi": 20800460331.34445,
 				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it",
-				"less_bytes": {
-					"point": 130028923565,
-					"lo": 116916043976,
-					"hi": 144622696434
-				}
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "peak_memory",
-			"error": 0.1716,
+			"error": 0.6083,
 			"hit": false
 		},
 		{
@@ -271,16 +256,11 @@
 			"measured": 11569987584,
 			"predicted": {
 				"status": "extrapolated",
-				"point": 13554881875.298416,
-				"lo": 12097691437.577179,
-				"hi": 15176639028.738098,
+				"point": 18608029696.0,
+				"lo": 16638074483.892578,
+				"hi": 20800460331.34445,
 				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it",
-				"less_bytes": {
-					"point": 130028923565,
-					"lo": 116916043976,
-					"hi": 144622696434
-				}
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "interval",
@@ -338,20 +318,15 @@
 			"measured": 18608029696,
 			"predicted": {
 				"status": "extrapolated",
-				"point": 12716879685.045097,
-				"lo": 11344724955.612473,
-				"hi": 14243997685.876488,
+				"point": 11569987584.0,
+				"lo": 10314212958.67366,
+				"hi": 12967582180.431633,
 				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it",
-				"less_bytes": {
-					"point": 56901423291,
-					"lo": 51209107578,
-					"hi": 63236596435
-				}
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "peak_memory",
-			"error": 0.3166,
+			"error": 0.3782,
 			"hit": false
 		},
 		{
@@ -365,16 +340,11 @@
 			"measured": 18608029696,
 			"predicted": {
 				"status": "extrapolated",
-				"point": 12716879685.045097,
-				"lo": 11344724955.612473,
-				"hi": 14243997685.876488,
+				"point": 11569987584.0,
+				"lo": 10314212958.67366,
+				"hi": 12967582180.431633,
 				"model_id": "memory-analytical@0.2.0",
-				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it",
-				"less_bytes": {
-					"point": 56901423291,
-					"lo": 51209107578,
-					"hi": 63236596435
-				}
+				"reason": "the peak comes at eval, which no probe ran; run a probe with eval in it"
 			},
 			"basis": "peak_less_eval_and_context",
 			"metric": "interval",

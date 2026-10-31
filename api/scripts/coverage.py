@@ -94,24 +94,30 @@ def memory_target(probe, pred) -> tuple[dict | None, str]:
 	"""The prediction to score a probe's reserved peak against, and how it was formed.
 
 	The engine predicts reserved bytes plus its CUDA-context constant, so the constant comes off.
-	For a probe that ran no eval pass, the engine's eval term (`memory.eval_spike`, the eval
-	moment's excess over the training moment) comes off too: the probe measured training only."""
+	For a probe that ran no eval pass, the engine's eval term comes off too: the probe measured
+	training only. The engine publishes its terms rescaled so they add up to the peak (the
+	calibration offset spread across them), so the eval term is first put back on the unscaled
+	scale, using the context term (exactly DEFAULT_CONTEXT_BYTES before scaling) as the ruler.
+	What is left is the engine's own calibrated training-moment peak."""
 	peak = _est(pred.get("memory.peak"))
 	if not peak or peak["status"] == "abstain":
 		return peak, "abstained"
-	off = {k: float(DEFAULT_CONTEXT_BYTES) for k in ("point", "lo", "hi")}
+	ctx = float(DEFAULT_CONTEXT_BYTES)
+	out = {k: peak[k] - ctx for k in ("point", "lo", "hi") if k in peak}
 	basis = "peak_less_context"
-	spike = _est(pred.get("memory.eval_spike"))
-	if ran_without_eval(probe) and spike and (spike.get("point") or 0) > 0:
-		if spike["status"] == "abstain":
+	if ran_without_eval(probe):
+		spike = _est(pred.get("memory.eval_spike"))
+		context = _est(pred.get("memory.context"))
+		if spike and spike["status"] == "abstain":
 			return {**peak, "status": "abstain"}, "abstained"
-		# The terms share the peak's relative band, so the training band is the peak's band less
-		# the eval term's at the same end.
-		for k in off:
-			off[k] += spike.get(k, spike["point"])
-		basis = "peak_less_eval_and_context"
-	m = {**peak, **{k: peak[k] - off[k] for k in ("point", "lo", "hi") if k in peak}}
-	m["less_bytes"] = {k: round(v) for k, v in off.items()}
+		if spike and (spike.get("point") or 0) > 0:
+			if not context or not context.get("point"):
+				return {**peak, "status": "abstain"}, "abstained"  # no ruler: can't undo the scaling
+			raw = spike["point"] * ctx / context["point"]
+			for k in out:
+				out[k] -= raw * (peak[k] / peak["point"])  # the peak's own band factor at each end
+			basis = "peak_less_eval_and_context"
+	m = {**peak, **out}
 	return m, basis
 
 
