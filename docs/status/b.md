@@ -118,6 +118,11 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 
 | Oct 30 | `b-corpus-startup-2` (GitHub run 41156645584): the app starts in its real image, one small config through the child in 5.6 s, plain values back | T4 | about 1 min | about $0.01 |
 
+| Oct 30 | `b-corpus-export-hf` (GitHub run 41157095457): the 50 HF rows back | CPU | under 1 min | about $0.01 |
+| Oct 30 | `b-corpus-l4-2` (GitHub run 41159946133): phase 1 finished, 151 configs (150 ok, 1 out of memory), 6 waves, each settled under its worst case | L4 x 4 | 25 min wall, 5,588 container-s | $1.37 (container-time bound) |
+
+**Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
+
 Total so far: ledger $1.21 plus about $0.03 today; billed estimate $4.80 to $6.70 until Modal's usage page gives the real figure. **The ledger under-counts container time.** It sums each config's own seconds, but containers are also billed for start-up, the per-batch volume reload, a volume commit after every config, and the waits between waves. That overhead was small in phase 0's single container and dominant in phase 1 (about 80 container-seconds per config against about 9 counted). So the $6 cap was enforced on the wrong measure. Phase 2 is on hold until the budget counts container wall time. Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
 
 ## Contract requests
