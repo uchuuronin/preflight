@@ -85,3 +85,12 @@ def test_both_sides_leave_the_token_axis_together(smoke):
 def test_unusable_token_counts_are_refused(smoke, bad):
 	p = smoke.probes[1].model_copy(update={"extras": {**smoke.probes[1].extras, "tokens_per_step": bad}})
 	assert api._measured_tokens(p) is None
+
+
+def test_a_declared_accumulation_moves_the_measured_one_by_its_ratio(smoke):
+	base = api._step_work(smoke, api._values(smoke, {}))
+	assert api._step_work(smoke, api._values(smoke, {"grad_accum": 8})) == pytest.approx(2 * base)
+	# the knob says 1 but the probes ran 4 micro-steps (accumulation set elsewhere): the measured scale wins
+	knobs = [k.model_copy(update={"current": 1}) if k.id == "grad_accum" else k for k in smoke.knobs]
+	off = smoke.model_copy(update={"knobs": knobs})
+	assert api._step_work(off, api._values(off, {})) == pytest.approx(base)

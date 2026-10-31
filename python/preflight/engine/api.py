@@ -665,10 +665,19 @@ def _step_work(record: FlightRecord, values: dict) -> float:
 		return _step_x(record.job.lens, values)
 	b_q = float(values.get("batch_size") or 1)
 	seq_q = float(values.get("seq_len") or 0) or math.inf
-	# accumulation: the knob when the script declares it, else what the probes measured (samples / batch)
-	declared = any(k.id == "grad_accum" for k in record.knobs)
-	accum = float(values.get("grad_accum") or 1) if declared else statistics.median(a for _, a, *_ in pts)
-	free = sorted((b, u) for b, _, u, _, trunc in pts if not trunc)
+	# accumulation: what the probes measured (samples / batch); a declared grad_accum knob moves it by the ratio of
+	# the query's value to the knob's current one, so a knob that disagrees with what ran (a DeepSpeed config) can't
+	# put the query on a different scale from the probes
+	measured = statistics.median(a for _, a, *_ in pts)
+	accum = measured
+	if any(k.id == "grad_accum" for k in record.knobs):
+		cur = float(_current(record).get("grad_accum") or 1) or 1.0
+		accum = measured * float(values.get("grad_accum") or cur) / cur
+	by_batch: dict[float, list[float]] = {}
+	for b, _, u, _, trunc in pts:
+		if not trunc:
+			by_batch.setdefault(b, []).append(u)
+	free = sorted((b, statistics.fmean(us)) for b, us in by_batch.items())  # probes at one batch: their mean
 	# padded tokens per sample at this batch: linear in log2(batch) between probed batches, flat beyond them
 	if b_q <= free[0][0]:
 		u_q = free[0][1]

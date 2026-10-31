@@ -227,12 +227,12 @@ def evaluate(scores: list[Score], level: float = LEVEL) -> dict[str, Coverage]:
 # The table the engine uses. Empty until corpus/calibrate.py builds one from held-out real runs; with no
 # cell, every band falls back to the simulated constants and its model card says calibration: simulated.
 try:  # written by corpus/calibrate.py once held-out real runs exist; a plain module, so Pyodide imports it too
-	from preflight.engine._calibration_table import DATA as _DATA
+	import preflight.engine._calibration_table as _MOD  # absent: ModuleNotFoundError, quietly simulated
 
-	TABLE = Table.from_dict(_DATA)
-except ImportError:
+	TABLE = Table.from_dict(_MOD.DATA)  # a module without DATA raises AttributeError: warned below
+except ModuleNotFoundError:
 	TABLE = Table(built_from="none: no held-out real runs yet")
-except (SyntaxError, NameError, KeyError, TypeError, ValueError) as _exc:
+except (SyntaxError, NameError, AttributeError, ImportError, KeyError, TypeError, ValueError) as _exc:
 	# a broken generated table must never stop the engine importing, but it must not pass silently either
 	import warnings
 
