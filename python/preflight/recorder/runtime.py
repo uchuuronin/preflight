@@ -338,6 +338,8 @@ class Recorder:
 		# and from an HF Trainer its epochs and the optimizer steps it plans (state.max_steps)
 		self.train_loader_batches: int | None = None
 		self._train_iter: int | None = None
+		self.retrieval: dict[str, dict] = {}  # encode, index_add, index_train, search: calls, items, seconds
+		self._retrieval_depth = 0
 		self.lens_stats: list[dict] = []  # vision and graph batch shapes, the first training batches
 		self._train_dataset = None
 		self.run_length: dict = {}
@@ -628,6 +630,8 @@ class Recorder:
 		if self.hf_overrides:
 			self._importer.on("transformers.training_args", self._hook_training_args)
 		self._importer.on("vllm.entrypoints.llm", self._hook_vllm)
+		self._importer.on("sentence_transformers.SentenceTransformer", self._hook_st_encode)
+		self._importer.on("faiss", self._hook_faiss)
 		threading.Thread(target=self._sample_loop, daemon=True).start()
 		return self
 
@@ -813,6 +817,63 @@ class Recorder:
 		self.gens.append(
 			{"seconds": dt, "lengths": lengths, "truncated": truncated, "cap": cap, "backend": "hf"}
 		)
+
+	def _retrieval_timed(self, kind: str, fn, count):
+		"""A retrieval stage (encode, index add, index train, search), timed with a sync either side,
+		and how many items it took. Stages run outside the training step as often as inside it."""
+		rec = self
+
+		@functools.wraps(fn)
+		def run(*args, **kwargs):
+			if rec._retrieval_depth:
+				return fn(*args, **kwargs)  # a stage inside another (encode calling itself)
+			rec._retrieval_depth += 1
+			try:
+				rec._sync()
+				t0 = rec._now()
+				out = fn(*args, **kwargs)
+				rec._sync()
+				dt = rec._now() - t0
+			finally:
+				rec._retrieval_depth -= 1
+			st = rec.retrieval.setdefault(kind, {"calls": 0, "items": 0, "seconds": 0.0})
+			st["calls"] += 1
+			st["seconds"] += dt
+			with suppress(Exception):
+				st["items"] += int(count(args, kwargs))
+			return out
+
+		return run
+
+	def _hook_st_encode(self, mod):
+		cls = getattr(mod, "SentenceTransformer", None)
+		if cls is None or not hasattr(cls, "encode"):
+			return
+
+		def n(args, kwargs):
+			x = args[1] if len(args) > 1 else kwargs.get("sentences", kwargs.get("inputs"))
+			return 1 if isinstance(x, str) else len(x)
+
+		self._patch(cls, "encode", lambda orig: self._retrieval_timed("encode", orig, n))
+
+	def _hook_faiss(self, mod):
+		"""faiss swaps each index class's add, train and search for a numpy wrapper at import; those
+		wrappers are what the script calls, so each is timed by class (count: the vectors' rows)."""
+
+		def rows(args, kwargs):
+			x = args[1] if len(args) > 1 else kwargs.get("x")
+			return x.shape[0]
+
+		for name in dir(mod):
+			cls = getattr(mod, name, None)
+			if not isinstance(cls, type) or not name.startswith("Index"):
+				continue
+			for meth, kind in (("add", "index_add"), ("train", "index_train"), ("search", "search")):
+				if meth in cls.__dict__:  # the class's own wrapper, not one inherited (timed once)
+					with suppress(Exception):
+						self._patch(
+							cls, meth, lambda orig, kind=kind: self._retrieval_timed(kind, orig, rows)
+						)
 
 	def _hook_vllm(self, mod):
 		rec = self
@@ -1324,6 +1385,11 @@ class Recorder:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
+		for kind, st in self.retrieval.items():
+			out[f"{kind}_items"] = st["items"]
+			out[f"{kind}_seconds"] = st["seconds"]
+			if st["seconds"] > 0 and st["items"]:
+				out[f"{kind}_items_per_s"] = st["items"] / st["seconds"]
 		if self.lens_stats:
 			# the mean over the batches seen, and the largest graph batch (the memory one)
 			keys = {k for st in self.lens_stats for k in st}

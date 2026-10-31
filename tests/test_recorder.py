@@ -312,3 +312,17 @@ def test_a_sampled_graph_batch_records_nodes_edges_and_hops():
 	assert ex["graph_seed_nodes"] == 32 and ex["graph_nodes_hop1"] == 320 and ex["graph_nodes_hop2"] == 1600
 	assert ex["graph_nodes_per_batch"] == ex["graph_nodes_max"] == 32 + 320 + 1600
 	assert ex["graph_edges_per_batch"] == 320 + 1600
+
+
+def test_retrieval_stages_record_items_and_throughput():
+	"""A stand-in with sentence-transformers' and faiss's seams (tests/fixtures/fake_retrieval)."""
+	root = FIX / "fake_retrieval"
+	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
+	r = run_probe(
+		ProbeSpec(probe_id="p1", files=files, entrypoint="train.py", warmup=1, timed=2, timeout_s=120)
+	)
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["encode_items"] == 2100 and ex["encode_items_per_s"] > 0
+	assert ex["index_add_items"] == 2000 and ex["search_items"] == 100
+	assert "index_train_items" not in ex  # the script never trained the index

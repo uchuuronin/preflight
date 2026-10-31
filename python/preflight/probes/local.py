@@ -134,6 +134,13 @@ EXTRAS_KEYS = (
 	"graph_nodes_hop2",
 	"graph_nodes_hop3",
 	"graph_nodes_max",
+	# retrieval: each stage the probe reached (sentence-transformers encode, faiss add, train and
+	# search): items (sentences or vectors), seconds, and items a second
+	*(
+		f"{k}_{m}"
+		for k in ("encode", "index_add", "index_train", "search")
+		for m in ("items", "seconds", "items_per_s")
+	),
 )
 
 
