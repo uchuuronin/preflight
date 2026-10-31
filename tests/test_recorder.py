@@ -286,3 +286,12 @@ def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(t
 	assert rl.group_size == 4
 	assert rl.pass_rate_per_prompt and all(0 <= x <= 1 for x in rl.pass_rate_per_prompt)
 	assert rl.zero_spread_fraction is not None
+
+
+def test_a_closure_loop_keeps_its_forward_out_of_the_optimizer():
+	"""opt.step(closure): the pre-step hook runs before the closure's forward (review, Oct 31)."""
+	r = run_probe(ProbeSpec(probe_id="p1", files={"train.py": (FIX / "closure_loop.py").read_text()},
+		entrypoint="train.py", warmup=2, timed=3, timeout_s=120))  # fmt: skip
+	assert r.probe.status == "ok", r.probe.error
+	ph = r.probe.step_time.by_phase
+	assert ph["forward"] > ph["optimizer"]

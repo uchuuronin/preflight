@@ -260,6 +260,8 @@ class Recorder:
 		self._reset_acc()
 		self._last_post = None
 		self._data_end = None
+		self._data_end_bwd = False  # the forward window was started by a backward, not a fetch
+		self._generating = 0  # HF generate calls in progress (a rollout is not a reference forward)
 		self._t_start = time.perf_counter()
 		self._first_fetch = None
 		self._prof = None
@@ -471,6 +473,7 @@ class Recorder:
 			# the next micro-step's forward starts here when its batch was fetched ahead (HF Trainer
 			# fetches every accumulation batch up front); a fetch in between moves the start again
 			rec._data_end = rec._now()
+			rec._data_end_bwd = True
 			return out
 
 		def next_(it):
@@ -534,6 +537,7 @@ class Recorder:
 			if samples is not None:
 				rec.acc["samples"] += samples
 			rec._data_end = rec._now()
+			rec._data_end_bwd = False
 			return batch
 
 		def train(m, mode=True):
@@ -732,7 +736,11 @@ class Recorder:
 				rec._maybe_stop()
 				rec._sync()
 				t0 = rec._now()
-				out = orig(model, *args, **kwargs)
+				rec._generating += 1
+				try:
+					out = orig(model, *args, **kwargs)
+				finally:
+					rec._generating -= 1
 				rec._sync()
 				dt = rec._now() - t0
 				with suppress(Exception):
@@ -845,6 +853,7 @@ class Recorder:
 		inside: set = set()  # kinds being timed now, so nested seams don't count twice
 
 		def timed(kind, fn):
+			@functools.wraps(fn)  # transformers reads forward's signature (logits_to_keep)
 			def run(*args, **kwargs):
 				if kind in inside:
 					return fn(*args, **kwargs)
@@ -864,10 +873,22 @@ class Recorder:
 			return not torch.is_grad_enabled() or torch.is_inference_mode_enabled()
 
 		def logps_factory(orig):
-			# later TRL: a method, called with no gradient for the reference
+			# later TRL: a method, called with no gradient for the reference; the policy's old
+			# log-probs (num_iterations > 1) go through it too, with the policy as the model
 			def logps(self_, *args, **kwargs):
 				if not no_grad_call():
 					return orig(self_, *args, **kwargs)  # the policy's own forward: part of the update
+				ref = getattr(self_, "ref_model", None)
+				model = args[0] if args else kwargs.get("model")
+				if ref is not None:
+					is_ref = model is ref
+				else:  # PEFT: the policy with its adapter off; only when there is a KL term at all
+					is_ref = (
+						float(getattr(self_, "beta", 0) or 0) > 0
+						and int(getattr(self_, "num_iterations", 1) or 1) == 1
+					)
+				if not is_ref:
+					return orig(self_, *args, **kwargs)
 				return timed("reference", orig)(self_, *args, **kwargs)
 
 			return logps
@@ -880,8 +901,9 @@ class Recorder:
 		def policy_forward(fn):
 			# TRL 0.14 with PEFT has no ref_model: the reference is the policy with its adapter
 			# off, under inference_mode. Generation runs with no_grad, not inference_mode.
+			@functools.wraps(fn)
 			def forward(*args, **kwargs):
-				if torch.is_inference_mode_enabled():
+				if torch.is_inference_mode_enabled() and not rec._generating:
 					return timed("reference", fn)(*args, **kwargs)
 				return fn(*args, **kwargs)
 
@@ -1036,7 +1058,10 @@ class Recorder:
 		self._maybe_stop()
 		self._sync()
 		self._t_pre = self._now()
-		self._data_end = None  # between the last backward and the step is not forward time
+		if self._data_end_bwd:
+			# between the last backward and the step is not forward time; a window a fetch started
+			# stays open, for step(closure) loops (Lightning, LBFGS) that run forward inside the step
+			self._data_end = None
 		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"],
 			self.acc["generate"] + self.acc["reference"] + self.acc["reward"] + self.acc["weight_sync"])  # fmt: skip
 		# update-to-weight needs the weights before the step; a small sample, and not on timed steps
