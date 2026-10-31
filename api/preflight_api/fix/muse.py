@@ -43,7 +43,18 @@ _ROT13 = str.maketrans(
 ALLOWED_TOOLS = ("read_file", "search", "edit_file", "write_file")
 # Paths inside the worktree a candidate may not write: git's own state and Muse Code's config,
 # which could otherwise loosen the hook.
-NO_WRITE = (".git", ".muse", ".agents", "AGENTS.md", "CLAUDE.md", ".claude")
+NO_WRITE = (
+	".git",
+	".muse",
+	".agents",
+	"AGENTS.md",
+	"CLAUDE.md",
+	"MUSE.md",
+	".claude",
+	".mcp.json",
+	".cursor",
+	"copilot-instructions.md",
+)
 
 # Source: guess, a template fix is a few lines in one or two files; 15 model steps leaves room
 # to read, edit and summarise. Replaced by the smoke test's measured step count.
@@ -63,10 +74,10 @@ NO_WRITE = set(sys.argv[2].split(","))
 # Input keys each allowed tool may carry. Path keys hold a path (or a list of paths for "paths");
 # pattern keys hold a glob that must stay relative; text keys hold scalars only.
 PATH_KEYS = {"path", "file_path", "paths", "directory", "dir"}
-PATTERN_KEYS = {"glob", "include", "exclude"}
+PATTERN_KEYS = {"glob", "include", "exclude", "pattern"}
 TEXT_KEYS = {
 	"read_file": {"offset", "limit", "start_line", "end_line", "line"},
-	"search": {"query", "pattern", "regex", "case_sensitive", "max_results", "literal"},
+	"search": {"query", "regex", "case_sensitive", "max_results", "literal"},
 	"edit_file": {"old_string", "new_string", "old_str", "new_str", "replace_all", "old_text", "new_text"},
 	"write_file": {"content", "text"},
 }
@@ -105,12 +116,14 @@ try:
 				full = inside(v)
 				if full is None:
 					out("outside the repository.")
-				first = os.path.relpath(full, ROOT).split(os.sep)[0]
-				if tool in WRITES and first in NO_WRITE:
+				parts = os.path.relpath(full, ROOT).split(os.sep)
+				if tool in WRITES and any(p in NO_WRITE for p in parts):
 					out("that file isn't part of the fix.")
 				seen_path = True
 		elif key in PATTERN_KEYS:
-			if not isinstance(value, str) or value.startswith(("/", "~", "$")) or ".." in value or ":" in value:
+			# No absolute or parent paths, and none of the glob syntax that can spell one
+			# indirectly ({/proc,x}, [/]proc, an escaped slash).
+			if not isinstance(value, str) or value.startswith(("/", "~", "$")) or ".." in value or any(c in value for c in ":{}[]\\"):
 				out("patterns must stay inside the repository.")
 		elif key in TEXT_KEYS[tool]:
 			if isinstance(value, (dict, list)):
@@ -206,8 +219,10 @@ class Usage:
 class Events:
 	#: The largest value seen per counter (right if events repeat running totals).
 	usage: Usage = field(default_factory=Usage)
-	#: Every value added up (right if events report per turn). The cost cap uses this, the larger.
+	#: Every value added up (right if events report per turn).
 	usage_sum: Usage = field(default_factory=Usage)
+	#: What the cost cap reads: per counter, the largest value for running totals, the sum otherwise.
+	usage_cap: Usage = field(default_factory=Usage)
 	#: Tools the hook blocked, by name, in order.
 	blocked: list[str] = field(default_factory=list)
 	tools: list[str] = field(default_factory=list)
@@ -241,6 +256,8 @@ def parse_events(lines) -> Events:
 	ev = Events()
 	best = {"in": 0, "cached": 0, "out": 0}
 	total = {"in": 0, "cached": 0, "out": 0}
+	last = {"in": 0, "cached": 0, "out": 0}
+	dropped = {"in": False, "cached": False, "out": False}
 	for raw in lines:
 		raw = raw.strip()
 		if not raw:
@@ -265,6 +282,9 @@ def parse_events(lines) -> Events:
 					else None
 				)
 				if kind:
+					if v < last[kind]:
+						dropped[kind] = True
+					last[kind] = v
 					best[kind] = max(best[kind], v)
 					total[kind] += v
 			name = d.get("tool_name") or d.get("tool")
@@ -272,8 +292,9 @@ def parse_events(lines) -> Events:
 				ev.tools.append(name)
 			for k in ("result", "output", "error", "message"):
 				v = d.get(k)
-				if isinstance(v, str) and (
-					"by hook" in v or v.startswith("Preflight: ") or "\nPreflight: " in v
+				# Muse Code's own wording when a hook denies; text a tool read back can't start a result.
+				if isinstance(v, str) and v.lstrip().startswith(
+					("tool blocked by hook", "tool denied by hook", "Preflight: ")
 				):
 					ev.blocked.append(name if isinstance(name, str) else "?")
 			sid = d.get("session_id")
@@ -288,6 +309,10 @@ def parse_events(lines) -> Events:
 				ev.final = obj[k]
 	ev.usage = Usage(best["in"], best["cached"], best["out"])
 	ev.usage_sum = Usage(total["in"], total["cached"], total["out"])
+	# For the cost cap: a counter that never goes down is a running total (its largest value is
+	# the spend); one that goes down is per turn (its sum is).
+	pick = {k: total[k] if dropped[k] else best[k] for k in best}
+	ev.usage_cap = Usage(pick["in"], pick["cached"], pick["out"])
 	return ev
 
 

@@ -210,8 +210,12 @@ def test_unknown_branches_and_rate_limits_are_explained():
 def test_run_a_probe_here_takes_one_setting_of_a_real_record_only():
 	store = Store()
 	c = client(store)
-	token = "AbCdEfGhIjKlMnOpQrSt"
-	probe = {"source": {"kind": "record", "record_ref": token}, "mode": "probe", "knobs": {"seq_len": 2048, "batch_size": 8}}
+	ref = "test-share-ref-000001"
+	probe = {
+		"source": {"kind": "record", "record_ref": ref},
+		"mode": "probe",
+		"knobs": {"seq_len": 2048, "batch_size": 8},
+	}
 	r = c.post("/v1/jobs", json=probe, headers=KEY)
 	assert r.status_code == 202
 	sent = next(iter(store.jobs.values()))["request"]

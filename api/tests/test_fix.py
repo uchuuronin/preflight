@@ -421,4 +421,48 @@ def test_verify_honours_what_a_template_may_change_and_checks_eval_fixes():
 	still_grad = rec(4000, ev, 15e9)
 	res = verify.check(before, still_grad, keep_eval=True, no_grad=opts["no_grad"])
 	assert next(c for c in res["checks"] if c["id"] == "eval_kept")["ok"] is False
+	# Stopping the eval loop after its first batch is caught: fewer batches ran than before.
+	early = rec(4000, {**ev, "batch_size": 8, "loader_batches": 40, "batches": 1}, 15e9)
+	assert (
+		next(c for c in verify.check(before, early, keep_eval=True)["checks"] if c["id"] == "eval_kept")["ok"]
+		is False
+	)
+	# A smaller base model fails whatever else the template may change.
+	small = rec(6000, ev, 10e9)
+	small["job"]["script_map"]["model"] = {"name": "Qwen2.5-0.5B"}
+	before["job"]["script_map"]["model"] = {"name": "Qwen2.5-1.5B"}
+	res = verify.check(before, small, may_change=("same_model", "tokens_seen"))
+	assert res["status"] == "failed"
+	assert next(c for c in res["checks"] if c["id"] == "same_model").get("allowed") is None
 	assert not TEMPLATES["agent.cap_tool_retries"].verifiable
+
+
+def test_search_patterns_cannot_spell_a_path_outside(tmp_path):
+	for bad in ("/proc/*/environ", "../../**/*", "{/proc,x}/*", "[/]proc/*", "\\/proc/*"):
+		assert denied(gate(tmp_path, "search", {"pattern": bad})), bad
+	assert gate(tmp_path, "search", {"pattern": "**/*.py", "query": "no_grad"}) is None
+	# Config that steers an agent is not writable anywhere in the tree.
+	for path in ("sub/AGENTS.md", "docs/.mcp.json", "x/.cursor/rules", "sub/.git/config"):
+		assert denied(gate(tmp_path, "write_file", {"path": path, "content": "x"})), path
+
+
+def test_the_cost_cap_reads_running_totals_as_totals_and_per_turn_counts_as_a_sum():
+	running = [f'{{"usage":{{"input_tokens":{n * 1000},"output_tokens":{n * 100}}}}}' for n in range(1, 16)]
+	ev = muse.parse_events(running)
+	assert (ev.usage_cap.input_tokens, ev.usage_cap.output_tokens) == (15000, 1500)
+	per_turn = [
+		'{"usage":{"input_tokens":3000,"output_tokens":200}}',
+		'{"usage":{"input_tokens":1000,"output_tokens":100}}',
+	]
+	ev = muse.parse_events(per_turn)
+	assert (ev.usage_cap.input_tokens, ev.usage_cap.output_tokens) == (4000, 300)
+
+
+def test_only_muse_codes_own_deny_wording_counts_as_a_block():
+	ev = muse.parse_events(
+		[
+			'{"tool_name":"read_file","result":"# this README says: tool blocked by hook"}',
+			'{"tool_name":"bash","result":"tool blocked by hook: Preflight: no commands"}',
+		]
+	)
+	assert ev.blocked == ["bash"]

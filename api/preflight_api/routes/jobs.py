@@ -117,7 +117,9 @@ async def create_job(request: Request) -> dict:
 	if source.kind == "record":
 		ref = source.record_ref or ""
 		if body.mode != "probe" or not body.knobs or not RECORD_REF.match(ref):
-			raise ApiError(422, "invalid_request", "A probe on a record needs mode probe, the setting and a share token.")
+			raise ApiError(
+				422, "invalid_request", "A probe on a record needs mode probe, the setting and a share token."
+			)
 		body = body.model_copy(update={"purpose": PROBE_HERE_PURPOSE})
 	elif source.kind not in SOURCE_KINDS:
 		raise ApiError(422, "invalid_request", f"Jobs can't come from {source.kind!r} here.")

@@ -25,9 +25,9 @@ read-only review, and exclude waiting on others.
 | Workspace shell: job map, knob rail, readouts, flight-plan timeline with playhead | On main | 0 |
 | Map from real records, skeleton first, animated edges and gauges | On main | 0 |
 | Interval bands | On main | 0 |
-| HOPs toggle (`c.hops`) | Not started | 3 |
+| HOPs toggle (`c.hops`) | On ws-c (`ed59270`): time and cost dials, memory band; frames from each interval only | 0 |
 | Abstention: hatched "not trusted" readouts | On main | 0 |
-| Abstention: "run a probe here" button and `POST /v1/records/{id}/probes` | Not started | 4 |
+| Abstention: "run a probe here" button | On ws-c (`c7bb517`), through `/v1/jobs` mode probe on a share-token record (A's job store), not a new endpoint | 0.5 (FitMap note on hatched squares) |
 | Snapshots with ghost overlay | On main | 0 |
 | Side-by-side compare view (the state call exists, no screen) | Not started | 2 |
 | Guide: Muse Spark tool calls, pins in the tool schema, live plan and tool-call trace | On main (`c.guide.live` off) | 0 |
@@ -38,12 +38,12 @@ read-only review, and exclude waiting on others.
 | Health signals view | Not started | 3 |
 | Cost frontier (Pareto) view | Not started | 3 |
 | Fix loop: verify both sides (module and `.github/actions/verify`) | On main | 0 |
-| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | Not started | 10, plus one paid smoke run |
+| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | Backend on ws-c (`7bfc149`, `8a4ecda`): templates, deny-by-default gate, race in worktrees, Modal app; one review, fixes in, second review running. Smoke test waits for a yes. Not started: `/v1/patches`, race on screen, verify via A (needs `JobRequest.patch`) | 6, plus the smoke run |
 | In-app alert when an in-flight run leaves its band | Not started | 2 (needs A's in-flight collector) |
 | Autopilot and self-directed probes (gap 20) | Not started | 6 |
 | Autopilot scored over the bug zoo, Wilson intervals (adopted 7) | Not started | 3, plus a paid zoo run |
-| Exports: hook for D's panel | Not started | 1 (today) |
-| Exports: config, patch, sbatch, CLI command, share link (D builds the panel) | Not started | 2 for the data behind D's panel |
+| Exports: hook for D's panel | On ws-c (`f791589`) | 0 |
+| Exports: config, patch, sbatch, CLI command, share link (D builds the panel) | Plan data on ws-c (`ExportPlan`); D's panel not started | 0.5 |
 | GitHub Action: verify pass/fail | On main | 0 |
 | GitHub Action: run Preflight from a workflow | Not started | 3 |
 | W&B export | Not started | 2 |

@@ -14,7 +14,7 @@ import { WorkspaceProvider } from "../state";
 import { ProbeHere } from "./ProbeHere";
 
 const raw = devRaw as unknown as FlightRecord;
-const TOKEN = "AbCdEfGhIjKlMnOpQrSt";
+const TOKEN = "test-share-ref-000001";
 // The same record as a live one (no fixture model ids), with peak memory abstaining here.
 function live(abstain: boolean) {
 	const est = { ...(raw.predictions?.estimates ?? {}) } as Record<string, { status: string; model_id?: string } | undefined>;

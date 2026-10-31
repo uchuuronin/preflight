@@ -216,9 +216,15 @@ def _one(
 		cand.status = "over_budget"
 		return cand
 	try:
-		_, diff, _ = box.run([*GIT, "-C", wt, "diff", "--no-color", "--no-ext-diff", "--no-textconv"])
-		_, names, _ = box.run([*GIT, "-C", wt, "diff", "--name-only", "-z", "--no-ext-diff"])
+		c1, diff, _ = box.run([*GIT, "-C", wt, "diff", "--no-color", "--no-ext-diff", "--no-textconv"])
+		c2, names, _ = box.run([*GIT, "-C", wt, "diff", "--name-only", "-z", "--no-ext-diff"])
 	except Exception:
+		cand.status, cand.problem = "failed", "diff"
+		return cand
+	if STOPPED in (c1, c2):  # another candidate hit the cost cap and the sandbox ended
+		cand.status = "over_budget"
+		return cand
+	if c1 != 0 or c2 != 0:
 		cand.status, cand.problem = "failed", "diff"
 		return cand
 	touched = [n for n in names.split("\0") if n]

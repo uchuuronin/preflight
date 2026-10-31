@@ -121,12 +121,7 @@ class ModalBox:
 				if not whole:
 					continue
 				ev = muse.parse_events(lines)
-				# The larger of the two readings (running totals or per-turn counts), so the cap
-				# can stop early but never late.
-				u = max(
-					ev.usage.usd(PRICE_IN, PRICE_CACHED, PRICE_OUT),
-					ev.usage_sum.usd(PRICE_IN, PRICE_CACHED, PRICE_OUT),
-				)
+				u = ev.usage_cap.usd(PRICE_IN, PRICE_CACHED, PRICE_OUT)
 				with self._lock:
 					self._seen[id(p)] = u
 					self.spent = sum(self._seen.values())
@@ -143,7 +138,12 @@ class ModalBox:
 				return race.STOPPED, "\n".join(lines) + buf, "stopped at the cost cap"
 			raise
 		out = "\n".join([*lines, buf]) if watch else buf
-		code = p.wait()
+		try:
+			code = p.wait()
+		except Exception:
+			if self.stopped:
+				return race.STOPPED, out, "stopped at the cost cap"
+			raise
 		drain.join(timeout=5)
 		return code, out, "".join(err)
 
@@ -253,5 +253,9 @@ def smoke() -> None:
 	print(json.dumps({"startup": {k: check[k] for k in ("flags", "gate", "version")}, **res}, indent=1))
 	c = res["candidates"][0]
 	# Passes when the fix landed and the command it was asked to run was blocked, under the cap.
-	ok = c["status"] == "patched" and bool(c["blocked"]) and not res["stopped_at_cap"]
+	ok = (
+		c["status"] == "patched"
+		and any(b in ("bash", "shell", "bash_input") for b in c["blocked"])
+		and not res["stopped_at_cap"]
+	)
 	raise SystemExit(0 if ok else 1)
