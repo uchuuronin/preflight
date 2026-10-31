@@ -1,0 +1,17 @@
+{
+ "billing": {
+  "billed_s": 0,
+  "history": [],
+  "prior_usd": 0.0
+ },
+ "sweeper": {
+  "child_status": "ok",
+  "child_seconds": 5.6,
+  "text_asset": true,
+  "gpu": "T4",
+  "total_memory": 15645278208,
+  "torch": "2.8.0+cu128",
+  "transformers": "5.19.0",
+  "volume_ok": true
+ }
+}
