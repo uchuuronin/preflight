@@ -106,6 +106,18 @@ def may_start_config(now: float, deadline_s: float, end_at: float) -> bool:
 	return now + deadline_s + KILL_GRACE_S <= end_at
 
 
+QUEUE_S = (
+	300.0  # guess: how long a wave may wait for its GPUs before the driver gives up (queueing isn't billed)
+)
+
+
+def wave_wait_s(container_timeout: float, minutes_left: float) -> float:
+	"""How long the driver waits for a wave before cancelling it (Oct 31: a smoke wave sat about 13 minutes with
+	nothing back, past its 540 s cap, until the workflow killed it). Modal's cut-off plus time to get a GPU, never
+	past the sweep's own time left."""
+	return max(0.0, min(container_timeout + QUEUE_S, minutes_left * 60))
+
+
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
 	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
 	at its deadline, and idles out. Retries are off, so a preempted batch is not re-run inside the wave."""

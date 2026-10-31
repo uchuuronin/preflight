@@ -78,8 +78,10 @@ class CellPlan:
 	cut: bool = False
 	reason: str = ""
 	slot: int | None = None  # which of the lane's slots runs it, 0-based
-	start_s: Estimate | None = None  # seconds from the campaign's start until it starts, p50 with 5% and 95%
-	start: datetime | None = None  # the p50 start as a date
+	# seconds from the campaign's start until it starts, p50 with 5% and 95%; abstains when its slot can't be dated.
+	# Medians don't add: the p50 start of the next run on a slot isn't this one's p50 start plus its p50 time.
+	start_s: Estimate | None = None
+	start: datetime | None = None  # the p50 start as a date; None when start_s abstains
 
 
 @dataclass(frozen=True)
@@ -612,6 +614,8 @@ def plan(
 		finish_est = _abstain(
 			"s", f"{sum(1 for i in kept if not runnable[i])} runs can't be dated ({bad.id}: {bad.reason})"
 		)
+		for i in kept:
+			cells[i] = _replace(cells[i], start_s=_abstain("s", finish_est.reason))
 	else:
 		slot_end = {nk: np.zeros(draws) for nk in ((n, k) for n, ss in load.items() for k in range(len(ss)))}
 		starts: dict[int, np.ndarray] = {}
@@ -620,13 +624,19 @@ def plan(
 			slot_end[lane_of[i]] = slot_end[lane_of[i]] + wall[i]
 		for i, st in starts.items():  # C's calendar: each run's slot and when it starts
 			ok = st[np.isfinite(st)]
-			if ok.size:
-				q5, q50, q95 = (float(v) for v in np.quantile(ok, [0.05, 0.5, 0.95]))
-				cells[i] = _replace(
-					cells[i],
-					start_s=_est(q50, q5, q95, "s", "predicted", "when its slot frees up; Monte Carlo"),
-					start=start + timedelta(seconds=q50),
-				)
+			late = 1 - ok.size / st.size
+			if (
+				late > 0.05
+			):  # the same rule as the end date: dates from the good draws alone would be too sure
+				why = f"in {late:.0%} of draws a run before it on its slot never finishes"
+				cells[i] = _replace(cells[i], start_s=_abstain("s", why))
+				continue
+			q5, q50, q95 = (float(v) for v in np.quantile(ok, [0.05, 0.5, 0.95]))
+			cells[i] = _replace(
+				cells[i],
+				start_s=_est(q50, q5, q95, "s", "predicted", "when its slot frees up; Monte Carlo"),
+				start=start + timedelta(seconds=q50),
+			)
 		finish = np.max(np.stack(list(slot_end.values())), axis=0)
 		stuck = float(np.mean(~np.isfinite(finish)))
 	if kept and all(runnable[i] for i in kept) and stuck > 0.05:

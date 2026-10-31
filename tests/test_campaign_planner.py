@@ -1,5 +1,6 @@
 """Campaign planner (campaign/planner.py): its numbers are the engine's, scheduled, segmented and dated."""
 
+import itertools
 import math
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -266,3 +267,14 @@ def test_each_run_has_a_slot_and_a_start_for_the_calendar(ft):
 	assert all(c.start > START for c in later) and all(
 		c.start_s.lo <= c.start_s.point <= c.start_s.hi for c in later
 	)
+
+
+def test_runs_on_a_slot_start_in_order_and_cut_runs_get_no_slot(ft):
+	pl = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2, 3, 4, 5]}, P.Cluster(slots=2), start=START)
+	for k in (0, 1):
+		on = sorted((c for c in pl.cells if c.slot == k), key=lambda c: c.start_s.point)
+		assert on[0].start_s.point == 0
+		for a, b in itertools.pairwise(on):  # the next starts once the one before it has run
+			assert b.start_s.point > a.start_s.point and b.start_s.lo >= a.start_s.lo
+	cut = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2]}, P.Cluster(slots=1, budget_usd=1e-9), start=START)
+	assert all(c.slot is None and c.start_s is None for c in cut.cells if c.cut)

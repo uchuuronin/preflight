@@ -24,6 +24,7 @@ import concurrent.futures as cf
 from typing import Any
 
 import modal
+import modal.exception
 
 APP_NAME = "preflight-corpus"
 VOLUME = "preflight-corpus"
@@ -387,7 +388,22 @@ def main(
 			args = [(gpu, [c.to_dict() for c in b], deadline, end_at) for b in chunk]
 			billing.remote(store_kind, gpu, {"wave": wave, "kind": "pending", "billed_s": round(worst, 1)})
 			w0 = time.monotonic()
-			results = list(sweeper.run_batch.starmap(args, return_exceptions=True))
+			# spawn, then wait with a wall-clock guard: starmap alone waits forever on a wave that never gets its GPUs
+			calls = [sweeper.run_batch.spawn(*a) for a in args]
+			wait_s = sweep.wave_wait_s(cap_s, minutes_left)
+			results: list[Any] = []
+			late = 0
+			for fc in calls:
+				try:
+					results.append(fc.get(timeout=max(1.0, wait_s - (time.monotonic() - w0))))
+				except (TimeoutError, modal.exception.TimeoutError) as exc:
+					fc.cancel()
+					results.append(exc)
+					late += 1
+				except (
+					Exception
+				) as exc:  # a container died (preemption, infra), as return_exceptions gave before
+					results.append(exc)
 			wall = time.monotonic() - w0
 			measured = sweep.wave_billed_seconds(wall, len(args))
 			n_ran = sum(
@@ -425,6 +441,12 @@ def main(
 				bad = [r for r in res if r["gpu"] != gpu]
 				if bad:
 					print(f"[{gpu}] warning: ran on {bad[0]['gpu']}; rows filed under the actual GPU")
+			if late:
+				print(
+					f"[{gpu}] {late} of {len(calls)} batches gave nothing back in {wait_s:.0f} s (no {gpu} free, or a "
+					"hang past Modal's cut-off); cancelled them and stopping. Committed configs are kept; a rerun resumes."
+				)
+				return gpu
 			ran = [r for r in rows if r["status"] != "skipped"]
 			bugs = [r for r in ran if r.get("error_code") == "user_error"]
 			if ran and len(bugs) * 2 >= len(ran):

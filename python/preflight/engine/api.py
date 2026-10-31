@@ -79,7 +79,7 @@ FEATURES = {
 	"rl": False,
 	"serving": False,
 	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
-}  # + flags.json engine.steptime_cross_gpu
+}  # this dict is the switch until the runner sets it from flags.json (from-b.md, B -> A); keep the two the same
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
 
@@ -906,13 +906,14 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			cross = steptime.predict_cross_gpu_from_probe(
 				current_probe.kernels, current_probe.step_time.p50_s, src_gpu, tgt_gpu
 			)
-		# Chiya, Oct 31: the held-out cross-GPU band, only with engine.steptime_cross_gpu on (it makes GPU moves abstain)
+		# Chiya, Oct 31 (option b): with engine.steptime_cross_gpu on, a GPU move takes the held-out cross-GPU band,
+		# shown past +-50% as rough; off, K1's simulated band and the usual abstain
 		xcell = (
 			conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
 			if FEATURES["steptime_cross_gpu"]
 			else None
 		)
-		if xcell and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
+		if FEATURES["steptime_cross_gpu"] and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
 			why = (
 				f"{tgt_gpu} is another vendor, and no corpus rows from it exist yet, so time across vendors isn't "
 				"measured; run a probe there"
@@ -939,7 +940,12 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			except ValueError as exc:
 				return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, str(exc)), sigma)
 			ratio = sum(scaled.values()) / max(sum(phases.values()), 1e-12)
-			sigma = math.hypot(sigma, steptime.cross_sigma(src_gpu, tgt_gpu) * steptime.SIGMA_SECONDARY_SPECS)
+			class_sigma = steptime.cross_sigma(src_gpu, tgt_gpu) * steptime.SIGMA_SECONDARY_SPECS
+			# review, Oct 31: never narrower than the held-out band either, since the card says held_out
+			rough = bool(xcell)
+			sigma = math.hypot(
+				sigma, max(class_sigma, xcell.half_width / steptime.Z90) if xcell else class_sigma
+			)
 			status = "extrapolated"
 			reasons.append("no kernel table on the probe, so phases are scaled by class")
 		point *= ratio
@@ -2507,7 +2513,8 @@ def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]
 			notes = f"{notes or ''}. {_CARD_CAVEAT.get(mid, '')} {t.describe(target)}".strip(". ")
 			if mid == steptime.MODEL_ID_CROSS:
 				# Chiya, Oct 31: the A100 holdout on the card too; it scored same-GPU step time, and the card says so
-				h, n = (sum(v[i] for v in t.holdout.get("time.step", {}).values()) for i in (0, 1))
+				a100 = [v for g, v in t.holdout.get("time.step", {}).items() if g.upper().startswith("A100")]
+				h, n = (sum(v[i] for v in a100) for i in (0, 1))
 				if n:
 					notes += f" A100 holdout (same-GPU step time, scored once): {h} of {n} inside the band."
 		out.append(

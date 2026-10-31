@@ -69,11 +69,12 @@ def test_predict_is_pure_and_fast(ft):
 
 @pytest.fixture
 def no_cross_band(monkeypatch):
-	"""K1's own behaviour, without the held-out cross-GPU band, whose ±45% width makes every GPU move abstain."""
+	"""K1's own behaviour: engine.steptime_cross_gpu off and its held-out cross-GPU band gone."""
 	from dataclasses import replace as dc_replace
 
 	from preflight.engine import conformal
 
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
 	cells = {k: c for k, c in conformal.TABLE.cells.items() if k[0] != "time.step.cross"}
 	monkeypatch.setattr(conformal, "TABLE", dc_replace(conformal.TABLE, cells=cells))
 
@@ -630,3 +631,19 @@ def test_with_the_held_out_band_a_gpu_move_is_rough_with_a_probe_offer(ft, monke
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
 	assert "Rough, no probe on this GPU" in card.notes and "26 of 28" in card.notes
 	assert card.coverage == pytest.approx(2130 / 2286)
+
+
+def test_without_a_kernel_table_a_gpu_move_still_takes_the_held_out_band(ft, monkeypatch):
+	# review, Oct 31: the class-scaling fallback once kept a narrower band than the card's held_out claims
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
+	bare = ft.model_copy(update={"probes": [p.model_copy(update={"kernels": None}) for p in ft.probes]})
+	e = api.predict(bare, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	cell = api.conformal.TABLE.lookup("time.step.cross", "A100-SXM-80GB", None)
+	assert e.status == "extrapolated" and "rough, no probe on this GPU" in e.reason
+	assert math.log(e.hi / e.point) >= cell.half_width * 0.999
+
+
+def test_with_the_feature_off_another_vendor_keeps_k1s_band(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
+	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
+	assert "another vendor" not in (amd.reason or "")

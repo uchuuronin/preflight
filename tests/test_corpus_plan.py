@@ -625,3 +625,13 @@ def test_a_late_starting_container_still_runs_what_its_bill_covers():
 	cap = sw.container_timeout_s(1, deadline)
 	assert end_at - dispatched + sw.END_MARGIN_S == cap
 	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.SCALEDOWN_S)
+
+
+def test_the_driver_gives_up_on_a_wave_with_nothing_back():
+	from preflight.corpus import sweep
+
+	# Oct 31: a smoke wave sat about 13 minutes past its 540 s cap until the workflow killed the run
+	cap = sweep.container_timeout_s(2, 120)
+	assert sweep.wave_wait_s(cap, 20) == cap + sweep.QUEUE_S
+	assert sweep.wave_wait_s(cap, 5) == 300  # never past the sweep's own time left
+	assert sweep.wave_wait_s(cap, -1) == 0
