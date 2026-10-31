@@ -9,8 +9,8 @@ Preflight must catch every one from a few minutes of probing.
   2. Eight completions per prompt on easy, short questions: many groups are all right or all
      wrong, so their advantages are zero and those rollouts teach nothing (zero-spread fraction,
      from the pass rate per prompt).
-  3. The reference model's log-probs are recomputed for every batch at full precision while
-     the policy trains in bf16 (beta 0.04 keeps the KL term, and its forward, on every step).
+  3. beta 0.04 keeps the KL term, so a whole reference-model forward runs on every micro-step
+     (step_time.by_phase.reference).
 
 Everything is public: the model (Apache-2.0) and GSM8K (MIT). Written for Preflight, not taken
 from any other project.

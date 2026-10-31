@@ -261,11 +261,15 @@ def test_timed_steps_lose_no_signal_to_deferred_reads(loop_result):
 
 
 @needs_transformers
-def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(tmp_path):
-	"""A CPU stand-in with TRL's seams (tests/fixtures/fake_grpo): generate, a no-grad reference
-	forward, reward functions, then the update."""
+@pytest.mark.parametrize("peft", [False, True], ids=["ref_model", "peft"])
+def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(tmp_path, peft):
+	"""A CPU stand-in shaped as TRL 0.14 is (tests/fixtures/fake_grpo): generate, the reference
+	log-probs in a closure under inference_mode (through ref_model, or the policy with PEFT),
+	reward functions, then the update, two accumulation micro-steps fetched up front."""
 	root = FIX / "fake_grpo"
 	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
+	if peft:
+		files["train.py"] = "import os\nos.environ['FAKE_GRPO_PEFT'] = '1'\n" + files["train.py"]
 	r = run_probe(
 		ProbeSpec(probe_id="p1", files=files, entrypoint="train.py", warmup=2, timed=3, timeout_s=240)
 	)
@@ -273,6 +277,8 @@ def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(t
 	assert p.status == "ok", p.error
 	phases = p.step_time.by_phase
 	assert phases.get("rollout", 0) > 0 and phases.get("reference", 0) > 0 and phases.get("reward", 0) > 0
+	# every micro-step's policy forward counts, not only the first one's (review, Oct 31)
+	assert phases.get("forward", 0) > 0.5 * phases["reference"]
 	assert sum(phases.values()) == pytest.approx(1.0, abs=0.02)
 	rl = p.rl
 	assert rl.group_size == 4

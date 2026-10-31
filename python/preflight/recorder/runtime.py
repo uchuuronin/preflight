@@ -26,6 +26,7 @@ so the last step's logging, save and eval still run and get measured.
 StopProbe is a BaseException, so a script's `except Exception` can't swallow it.
 """
 
+import functools
 import gc
 import importlib.abc
 import importlib.machinery
@@ -466,6 +467,9 @@ class Recorder:
 			rec._sync()
 			rec.acc["backward"] += rec._now() - t0
 			rec.acc["micro"] += 1
+			# the next micro-step's forward starts here when its batch was fetched ahead (HF Trainer
+			# fetches every accumulation batch up front); a fetch in between moves the start again
+			rec._data_end = rec._now()
 			return out
 
 		def next_(it):
@@ -837,8 +841,13 @@ class Recorder:
 		if tr is None:
 			return
 
+		inside: set = set()  # kinds being timed now, so nested seams don't count twice
+
 		def timed(kind, fn):
 			def run(*args, **kwargs):
+				if kind in inside:
+					return fn(*args, **kwargs)
+				inside.add(kind)
 				rec._sync()
 				t0 = rec._now()
 				try:
@@ -846,12 +855,17 @@ class Recorder:
 				finally:
 					rec._sync()
 					rec.acc[kind] += rec._now() - t0
+					inside.discard(kind)
 
 			return run
 
+		def no_grad_call():
+			return not torch.is_grad_enabled() or torch.is_inference_mode_enabled()
+
 		def logps_factory(orig):
+			# later TRL: a method, called with no gradient for the reference
 			def logps(self_, *args, **kwargs):
-				if torch.is_grad_enabled():
+				if not no_grad_call():
 					return orig(self_, *args, **kwargs)  # the policy's own forward: part of the update
 				return timed("reference", orig)(self_, *args, **kwargs)
 
@@ -860,7 +874,18 @@ class Recorder:
 		if hasattr(tr, "_get_per_token_logps"):
 			self._patch(tr, "_get_per_token_logps", logps_factory)
 
+		def policy_forward(fn):
+			# TRL 0.14 with PEFT has no ref_model: the reference is the policy with its adapter
+			# off, under inference_mode. Generation runs with no_grad, not inference_mode.
+			def forward(*args, **kwargs):
+				if torch.is_inference_mode_enabled():
+					return timed("reference", fn)(*args, **kwargs)
+				return fn(*args, **kwargs)
+
+			return forward
+
 		def wrap_reward(i, fn):
+			@functools.wraps(fn)  # TRL logs each reward under its function's __name__
 			def reward(*args, **kwargs):
 				out = timed("reward", fn)(*args, **kwargs)
 				with suppress(Exception):
@@ -876,6 +901,14 @@ class Recorder:
 				orig(self_, *args, **kwargs)
 				with suppress(Exception):
 					rec.group_size = int(getattr(self_, "num_generations", 0)) or None
+				with suppress(Exception):
+					# TRL 0.14: the reference log-probs are a closure inside compute_loss, so the
+					# reference model's own forward is the seam (or the policy's, with PEFT)
+					ref = getattr(self_, "ref_model", None)
+					if isinstance(ref, nn.Module):
+						ref.forward = timed("reference", ref.forward)
+					elif isinstance(getattr(self_, "model", None), nn.Module):
+						self_.model.forward = policy_forward(self_.model.forward)
 				with suppress(Exception):
 					funcs = list(self_.reward_funcs)
 					for i, fn in enumerate(funcs):
@@ -993,6 +1026,7 @@ class Recorder:
 		self._maybe_stop()
 		self._sync()
 		self._t_pre = self._now()
+		self._data_end = None  # between the last backward and the step is not forward time
 		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"],
 			self.acc["generate"] + self.acc["reference"] + self.acc["reward"])  # fmt: skip
 		# update-to-weight needs the weights before the step; a small sample, and not on timed steps
