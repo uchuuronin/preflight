@@ -83,3 +83,16 @@ The fix is a step-time model with a floor below the probes and proportional grow
 | retrieval | 32 | 0.148 |
 | vision | 63 | 0.131 |
 | all job types, pooled | 149 | 0.127 |
+
+## Latency-floor step time: fitted, then failed its held-out test (Oct 31)
+
+`steptime.EXTRAPOLATION = "anchored"` scales the nearest probe's measured phases by a power of the work ratio outside the probed sizes. The powers were fitted on the 19 L4 HF queries only: about 1.1 above the probes, and 0.5 with a 0-to-1 band below. `scripts/eval_steptime_extrapolation.py` scores it against the fitted line.
+
+| Queries | Line (shipped) | Anchored |
+|---|---|---|
+| Design set, L4 HF, above the probes | 6 of 9 within 15% | 9 of 9 |
+| Design set, L4 HF, below | 6 of 10 | 1 of 10 (10 of 10 inside the band) |
+| Held out, grouped corpus on L4, above | 62 of 77 (Wilson 95% 70% to 88%) | 30 of 77 (29% to 50%) |
+| Held out, grouped corpus on L4, below | 57 of 82 (59% to 78%) | 18 of 82 (14% to 32%) |
+
+It fits the jobs it was tuned on and is worse everywhere else, so it stays off and the line remains the model. Whether the HF pattern holds on other HF jobs is the A10 HF test, which needs those rows exported. The HF step-time band stays uninstalled meanwhile.
