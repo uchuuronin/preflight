@@ -85,12 +85,17 @@ DATA = _load()
 
 
 def available() -> bool:
-	"""True only when the installed trees beat K1 alone on held-out GPUs."""
+	"""True only when the installed trees beat K1 alone on held-out GPUs by more than chance: the Wilson 95% lower
+	bound of the trees' hit rate above K1's rate."""
 	if not DATA:
 		return False
+	from preflight.engine.conformal import wilson
+
 	h = DATA.get("held_out") or {}
 	k1, gb = h.get("k1"), h.get("gbdt")
-	return bool(k1 and gb and gb[1] and gb[0] > k1[0])
+	if not (k1 and gb and gb[1] and k1[1]):
+		return False
+	return wilson(gb[0], gb[1])[0] > k1[0] / k1[1]
 
 
 def residual(x: list[float]) -> float:

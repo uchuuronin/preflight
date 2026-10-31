@@ -209,4 +209,4 @@ The residual only helps on T4. Overall it is worse, so `engine/steptime_gbdt.py`
 | L40S | 0.44 | 87% |
 | T4 | 0.43 | 84% |
 
-The proposal is to install it as the cross-GPU band, behind `engine.steptime_cross_gpu` (already off). These are the corpus's aten ops, not A's kernel tables, so it also gets checked on the AMD rows and the Nov 2 scripts.
+Those Wilson intervals treat the 2,286 pairs as independent. They aren't: they come from 566 configs and 95 architectures. A bootstrap clustered by architecture gives the honest intervals: the conformal band covers 93% (95% interval 90% to 96%), and the simulated band 59% (53% to 67%). The proposal is to install it as the cross-GPU band, behind `engine.steptime_cross_gpu` (already off). These are the corpus's aten ops, not A's kernel tables, so it also gets checked on the AMD rows and the Nov 2 scripts.

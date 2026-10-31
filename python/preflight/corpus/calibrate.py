@@ -413,6 +413,11 @@ def main(argv: list[str] | None = None) -> int:
 		coverage={t: v for t, v in table.coverage.items() if t in keep},
 		holdout={t: v for t, v in table.holdout.items() if t in keep},
 	)
+	# the table's version is a hash of its bands, so a record can tell when the bands behind its numbers changed
+	import hashlib
+
+	body = json.dumps({"cells": table.to_dict()["cells"], "oom": table.to_dict()["oom_bins"]}, sort_keys=True)
+	table = replace(table, version=hashlib.sha256(body.encode()).hexdigest()[:10])
 	if args.out:
 		write_table(table, args.out)
 		print(f"wrote {args.out} with {len(table.cells)} cells")

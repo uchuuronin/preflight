@@ -7,6 +7,9 @@ least squares inside. The interval comes from a residual block bootstrap: the se
 and every refit is extrapolated to the last step. It abstains when the probe saw too few steps, or when the 90% band
 is wider than +-50% of the forecast. The LC-PFN half needs a pretrained network and isn't built. Pure numpy: it runs
 in Pyodide.
+
+Known limit (review, Oct 31): with strongly autocorrelated noise (AR 0.8) the band covered 20 of 30, against 89 of 100
+with independent noise. It stays out of `predict` until it covers on real probe losses.
 """
 
 from __future__ import annotations
@@ -66,8 +69,8 @@ def forecast(
 	t = np.asarray([p[0] for p in pts], dtype=float)
 	y = np.asarray([p[1] for p in pts], dtype=float)
 	if last_step <= t[-1]:
-		v = float(y[-1])
-		return Forecast(v, v, v, "extrapolated", "the probe already reached the last step")
+		v = float(y[int(np.argmin(np.abs(t - last_step)))])
+		return Forecast(v, v, v, "extrapolated", f"the probe already reached step {last_step}: its loss there")
 	try:
 		a, b, c, _ = _fit(t, y)
 	except ValueError as exc:

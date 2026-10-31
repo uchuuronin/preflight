@@ -12,7 +12,7 @@ CAMPAIGN = ROOT / "python" / "preflight" / "campaign"  # the planner runs in the
 
 STDLIB = {
 	"__future__", "math", "re", "dataclasses", "typing", "collections", "functools", "itertools",
-	"json", "hashlib", "enum", "statistics", "bisect", "warnings", "base64", "datetime",
+	"json", "hashlib", "enum", "statistics", "bisect", "warnings", "base64", "datetime", "contextvars",
 }  # fmt: skip
 THIRD_PARTY = {"numpy", "scipy", "sklearn", "lightgbm"}
 OURS = {"preflight.engine", "preflight.schema", "preflight.campaign"}

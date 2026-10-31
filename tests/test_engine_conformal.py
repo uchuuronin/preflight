@@ -117,7 +117,7 @@ def test_engine_cards_and_reasons_name_the_cell(monkeypatch):
 		"band from held-out runs: pretrain, merged across GPUs (n = 20)" in peak.reason
 	)  # probe GPU is an A100
 	card = next(c for c in api.fill_predictions(rec).models if c.id.startswith("memory"))
-	assert card.training_data == "corpus test" and card.coverage == pytest.approx(0.9)
+	assert card.training_data == "corpus test; table 0" and card.coverage == pytest.approx(0.9)
 	assert "merged across GPUs" in card.notes
 
 

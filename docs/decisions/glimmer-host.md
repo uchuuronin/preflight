@@ -16,15 +16,17 @@ Glimmer is a 30B dense model with 128K context, text and tools, which fits one 2
 
 ## Cost per triage on Modal
 
-From B's serving model (`engine/serving.py`), **uncalibrated**: its efficiencies are guesses until A's vLLM probes land, so read these as ±35%. One triage is an 8K-token prompt and an 800-token answer. Simulated:
+From B's serving model (`engine/serving.py`), **uncalibrated**: its efficiencies are guesses until A's vLLM probes land, so the model's own uncalibrated band is ×0.61 to ×1.64. One triage is an 8K-token prompt and an 800-token answer. Simulated:
 
-| GPU | Modal $/h | KV tokens | One triage, alone | $ per triage | Output tok/s at 0.2 triages/s |
-| --- | --- | --- | --- | --- | --- |
-| L4 | 0.80 | 21K | 74 s | $0.016 | 20 |
-| A10 | 1.10 | 21K | 42 s | $0.013 | 34 |
-| L40S | 1.95 | 184K | 27 s | $0.015 | 111 |
-| A100-40GB | 2.10 | 149K | 18 s | $0.010 | 122 |
-| A100-80GB | 2.50 | 442K | 15 s | $0.010 | 126 |
+| GPU | Modal $/h | KV tokens | One triage, alone | $ per triage |
+| --- | --- | --- | --- | --- |
+| L4 | 0.80 | 21K | 74 s | $0.016 |
+| A10 | 1.10 | 21K | 42 s | $0.013 |
+| L40S | 1.95 | 184K | 27 s | $0.015 |
+| A100-40GB | 2.10 | 149K | 18 s | $0.010 |
+| A100-80GB | 2.50 | 442K | 15 s | $0.010 |
+
+None of them keeps up with one triage every 5 seconds (160 output tokens per second offered). Under that load the A100s drain at about 120 tokens per second, roughly one triage every 7 seconds. So one container serves a demo's trickle, and a rush queues: the per-visitor cap matters more than the GPU choice.
 
 **Cold starts dominate a demo with sparse traffic.** Loading 17 GB from a Modal volume and starting vLLM takes on the order of 90 s (guess; A's first run will measure it). That is about $0.05 on an A100-40GB, more than five triages. Scaling to zero after 2 minutes idle keeps a quiet day near $0, and a busy hour under $2.50.
 

@@ -537,3 +537,42 @@ def test_calibration_summary_is_what_the_coverage_page_needs():
 	import json
 
 	json.dumps(out)  # plain data
+
+
+def test_a_record_banded_with_an_older_table_is_reported(ft):
+	from preflight.engine import conformal
+
+	out = api.fill_predictions(ft)
+	assert api.stale_models(out) == []
+	cards = [
+		m.model_copy(
+			update={"training_data": m.training_data.replace(f"table {conformal.TABLE.version}", "table 0")}
+		)
+		if m.training_data and "; table " in m.training_data
+		else m
+		for m in out.models
+	]
+	old = out.model_copy(update={"models": cards})
+	assert ("conformal-table@0", f"conformal-table@{conformal.TABLE.version}") in api.stale_models(old)
+
+
+def test_the_summary_says_what_the_engine_shows():
+	bins = api.calibration_summary()["oom_bins"]
+	ends = [b for b in bins if b["hi"] <= 0.05 + 1e-9 or b["lo"] >= 0.95 - 1e-9]
+	assert ends and all(b["shown_as_number"] for b in ends)  # the ends always show, verified or not
+	middle = [b for b in bins if b not in ends]
+	assert middle and not any(b["shown_as_number"] for b in middle)
+	top = next(b for b in bins if b["lo"] >= 0.95 - 1e-9)
+	assert top["verified"] is False  # shown, but not verified: the page can say so
+
+
+def test_one_threads_quiet_grid_doesnt_silence_another():
+	import threading
+
+	seen = []
+	with api._quiet_serving(True):
+		t = threading.Thread(target=lambda: seen.append(api._QUIET.get()))
+		t.start()
+		t.join()
+		assert api._QUIET.get() is True
+	assert seen == [False] and api._QUIET.get() is False

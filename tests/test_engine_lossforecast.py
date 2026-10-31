@@ -38,4 +38,4 @@ def test_it_abstains_when_it_should():
 	f = L.forecast(noisy, last_step=100_000)
 	assert f.status == "abstain"  # a band wider than +-50%
 	ys, _ = _curve(noise=0.0, n=100)
-	assert L.forecast(ys, last_step=50).point == pytest.approx(ys[-1])  # already past the last step
+	assert L.forecast(ys, last_step=50).point == pytest.approx(ys[49])  # already past it: the loss seen there

@@ -75,11 +75,11 @@ Only B edits this file. Each line is something this agent needs from another (or
   - the prompt length, read from `max_prompt_len`, else `data.tokens_per_sample_mean` and `p95`.
 
   It also reads the knobs `max_num_seqs`, `max_batched_tokens`, `gpu_memory_utilization`, `max_model_len`, `kv_cache_dtype` and `tensor_parallel` when the script exposes them, plus `request_rate` (requests per second) for online serving. Without `request_rate`, the probe's requests are sent at once in as many back-to-back calls as `generation.calls` says, so time to first token is how long a batch takes to drain. Please record `generation.calls` faithfully. For the validation row (tokens per second within 15%), a full vLLM run of the same model and workload. (Oct 31)
-- TODO(contract) [B -> C] Gap 15, versioned models: when a shared record opens, call `engine.api.stale_models(record)`. It lists (the id the record's numbers came from, the id the engine has now) for every model that has moved on since. Show the record's stored numbers, with a line such as "predicted with preemption-poisson@0.1.0; the current model is 0.2.0, re-run to update", rather than recomputing silently. `current_models()` gives every current id. Today `preemption-poisson` moved to 0.2.0: interruptions during redone work now count. (Oct 31)
+- TODO(contract) [B -> C] Gap 15, versioned models: when a shared record opens, call `engine.api.stale_models(record)`. It lists (the id the record's numbers came from, the id the engine has now) for every model that has moved on since. Show the record's stored numbers, with a line such as "predicted with preemption-poisson@0.1.0; the current model is 0.2.0, re-run to update", rather than recomputing silently. `current_models()` gives every current id. Moved today: `preemption-poisson@0.2.0` (interruptions during redone work count), `memory-analytical@0.3.0` (P(OOM) reports the 5–95% range until it's verified) and `steptime-comm-analytical@0.2.0` (multi-node). The held-out bands are versioned too: cards carry `; table <hash>`, and a record banded with an older table is reported as `conformal-table@<old>`. (Oct 31)
 - TODO(contract) [B -> A] Power analysis (`engine/power.py`): `seed_spread(values)` and `seeds_needed(spread, gap, alpha, power)` turn short multi-seed probes into seeds per arm, with an interval. They need a multi-seed probe: the same setting run with 3 to 5 seeds, reporting the loss at matched steps (a `seed` value in `Probe.knobs` and the loss series in `stability.series["loss"]`). B wires it into `predict` once the record carries it. (Oct 31)
 - TODO(contract) [B -> C] Loss forecast (`engine/lossforecast.py`, the power-law half). `forecast(losses, last_step)` returns the loss at the last step with a 90% band, or abstains with a reason: fewer than 30 steps, no falling trend, or a band wider than ±50%.
-  - On synthetic curves the band covers 89 of 100.
-  - It takes about 0.8 s per call in CPython, so call it once per record, not per grid cell.
+  - On synthetic curves with independent noise the band covers 89 of 100, but with autocorrelated noise only 20 of 30. Don't show it until it covers on real probe losses.
+  - It takes about 1 s per call in CPython, so call it once per record, not per grid cell.
   - It reads `stability.series["loss"]` from the longest probe.
 
   The LC-PFN half needs a pretrained network and isn't built; Chiya decides on Sunday. (Oct 31)
@@ -96,7 +96,7 @@ Only B edits this file. Each line is something this agent needs from another (or
   - the A100 holdout per board;
   - which lenses have held-out bands.
 
-  It also includes P(OOM)'s reliability bins, each with whether it shows as a number. Today that's memory 439/487 and step time 404/449, the A100 holdout (step 26/28, memory 22/28), and 5 OOM bins. It's the corpus's numbers beside your real-probe ones. (Oct 31)
+  It also includes P(OOM)'s reliability bins, each with `verified` (10 points that agree with outcomes) and `shown_as_number` (what the engine shows: always at the ends, in the middle only once every middle bin verifies). Today the top bin is shown but not verified: say so on the page. Today that's memory 439/487 and step time 404/449, the A100 holdout (step 26/28, memory 22/28), and 5 OOM bins. It's the corpus's numbers beside your real-probe ones. (Oct 31)
 
 ## Done
 

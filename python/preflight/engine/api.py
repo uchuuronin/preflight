@@ -16,6 +16,7 @@ A's scripts/make_golden.py makes to replace the golden fixtures.
 
 from __future__ import annotations
 
+import contextvars
 import itertools
 import math
 import statistics
@@ -1682,24 +1683,26 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
 	if FEATURES["rl"] and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
-	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET_SERVING[0]:
+	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))
 	return Prediction(out)
 
 
-# the serving simulation takes tens of milliseconds; grids and rankings that don't read it skip it (depth counter)
-_QUIET_SERVING = [0]
+# the serving simulation takes tens of milliseconds; grids and rankings that don't read it skip it. A context
+# variable, so a fill running in another thread (the pipeline runs one per job) never sees this one's setting
+_QUIET = contextvars.ContextVar("preflight_quiet_serving", default=False)
 
 
 class _quiet_serving:
 	def __init__(self, on: bool):
 		self.on = on
+		self.token = None
 
 	def __enter__(self):
-		_QUIET_SERVING[0] += int(self.on)
+		self.token = _QUIET.set(_QUIET.get() or self.on)
 
 	def __exit__(self, *exc):
-		_QUIET_SERVING[0] -= int(self.on)
+		_QUIET.reset(self.token)
 
 
 # ---------------------------------------------------------------- self-hosted serving (engine/serving.py)
@@ -1827,7 +1830,18 @@ def _serving_targets(record: FlightRecord, values: dict) -> dict:
 			source=f"uncalibrated: the probe generated with {backend or 'an unknown backend'}, not vLLM"
 		)
 	else:
-		key = (record.record_id, p.id, probe_setup or setup)
+		g = p.generation  # the measurements are in the key: a refilled probe with new numbers recalibrates
+		key = (
+			record.record_id,
+			p.id,
+			probe_setup or setup,
+			g.calls,
+			g.sequences,
+			g.seconds_total,
+			g.new_tokens_mean,
+			g.new_tokens_p95,
+			g.max_new_tokens,
+		)
 		if key not in _SERVE_CAL:
 			if len(_SERVE_CAL) > 64:
 				_SERVE_CAL.clear()
@@ -2438,7 +2452,7 @@ def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]
 		extra: dict = {}
 		if calib == "held_out" and target and mid in _CARD_SCORED:
 			t = conformal.TABLE
-			extra["training_data"] = t.built_from
+			extra["training_data"] = f"{t.built_from}; table {t.version}"
 			if target in t.coverage and t.coverage[target][1]:
 				h, n = t.coverage[target]
 				extra["coverage"] = h / n
@@ -2508,7 +2522,17 @@ def calibration_summary() -> dict:
 			for tid in targets
 		},
 		"oom_bins": [
-			{"lo": lo, "hi": hi, "n": n, "agrees": ok, "shown_as_number": n >= oom_model.MIN_SHOWN and ok}
+			{
+				"lo": lo,
+				"hi": hi,
+				"n": n,
+				"agrees": ok,
+				"verified": n >= oom_model.MIN_SHOWN and ok,
+				# what the engine shows: always a number at the ends, in the middle only once every middle bin verifies
+				"shown_as_number": hi <= oom_model.UNCERTAIN[0] + 1e-9
+				or lo >= oom_model.UNCERTAIN[1] - 1e-9
+				or oom_model.middle_verified(t.oom_bins),
+			}
 			for lo, hi, n, ok in t.oom_bins
 		],
 		"oom_middle_verified": oom_model.middle_verified(t.oom_bins),
@@ -2551,6 +2575,14 @@ def stale_models(record: FlightRecord) -> list[tuple[str, str]]:
 		name = mid.split("@")[0]
 		if name in now and now[name] != mid:
 			out.append((mid, now[name]))
+	# the held-out bands are versioned too: a card names the table it was banded with
+	tables = {
+		m.training_data.rsplit("; table ", 1)[1]
+		for m in record.models
+		if m.training_data and "; table " in m.training_data
+	}
+	for v in sorted(tables - {conformal.TABLE.version}):
+		out.append((f"conformal-table@{v}", f"conformal-table@{conformal.TABLE.version}"))
 	return out
 
 
