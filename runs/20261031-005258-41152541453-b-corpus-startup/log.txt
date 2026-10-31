@@ -1,0 +1,83 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-VRuo5e5uQAuwCkWY5MTMnO
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+Stopping app - uncaught exception raised locally: DeserializationError("Deserialization failed because the 'torch' module is not available in the local environment.").
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_serialization.py:117 in deserialize                                      │
+│                                                                              │
+│   116 │   try:                                                               │
+│ ❱ 117 │   │   return Unpickler(client, io.BytesIO(s)).load()                 │
+│   118 │   except AttributeError as exc:                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ModuleNotFoundError: No module named 'torch'
+
+The above exception was the direct cause of the following exception:
+
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py:2 │
+│ 65 in startup_check                                                          │
+│                                                                              │
+│   264 │   │   "billing": billing.remote("kernels", gpu),                     │
+│ ❱ 265 │   │   "sweeper": Sweeper.with_options(gpu=sweep.modal_gpu(gpu))().ch │
+│   266 │   }                                                                  │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_object.py:49 in wrapped                                                  │
+│                                                                              │
+│    48 │   │   await self.hydrate()                                           │
+│ ❱  49 │   │   return await method(self, *args, **kwargs)                     │
+│    50                                                                        │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2081 in remote                                              │
+│                                                                              │
+│   2080 │   │                                                                 │
+│ ❱ 2081 │   │   return await self._call_function(args, kwargs)                │
+│   2082                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2018 in _call_function                                      │
+│                                                                              │
+│   2017 │   │                                                                 │
+│ ❱ 2018 │   │   return await invocation.run_function()                        │
+│   2019                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:498 in run_function                                         │
+│                                                                              │
+│    497 │   │   │   if await_response.output.result.status in TERMINAL_STATUS │
+│ ❱  498 │   │   │   │   return await _process_result(                         │
+│    499 │   │   │   │   │   await_response.output.result, await_response.outp │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_utils/function_utils.py:577 in _process_result                           │
+│                                                                              │
+│   576 │   try:                                                               │
+│ ❱ 577 │   │   return deserialize_data_format(data, data_format, client)      │
+│   578 │   except ModuleNotFoundError as deser_exc:                           │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_serialization.py:397 in deserialize_data_format                          │
+│                                                                              │
+│   396 │   if data_format == api_pb2.DATA_FORMAT_PICKLE:                      │
+│ ❱ 397 │   │   return deserialize(s, client)                                  │
+│   398 │   elif data_format == api_pb2.DATA_FORMAT_ASGI:                      │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_serialization.py:134 in deserialize                                      │
+│                                                                              │
+│   133 │   except ModuleNotFoundError as exc:                                 │
+│ ❱ 134 │   │   raise DeserializationError(                                    │
+│   135 │   │   │   f"Deserialization failed because the '{exc.name}' module i │
+╰──────────────────────────────────────────────────────────────────────────────╯
+DeserializationError: Deserialization failed because the 'torch' module is not 
+available in the local environment.

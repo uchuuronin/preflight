@@ -1,0 +1,11 @@
+{
+	"name": "20261031-005258-41152541453-b-corpus-startup",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41152541453",
+	"ref": "ws-b",
+	"sha": "6c65ccd94fa78c96ae5e7f694a7321067dcc1f57",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::startup_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T00:53:38Z"
+}
