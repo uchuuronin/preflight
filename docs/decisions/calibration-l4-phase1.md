@@ -210,3 +210,17 @@ The residual only helps on T4. Overall it is worse, so `engine/steptime_gbdt.py`
 | T4 | 0.43 | 84% |
 
 Those Wilson intervals treat the 2,286 pairs as independent. They aren't: they come from 566 configs and 95 architectures. A bootstrap clustered by architecture gives the honest intervals: the conformal band covers 93% (95% interval 90% to 96%), and the simulated band 59% (53% to 67%). The proposal is to install it as the cross-GPU band, behind `engine.steptime_cross_gpu` (already off). These are the corpus's aten ops, not A's kernel tables, so it also gets checked on the AMD rows and the Nov 2 scripts.
+
+## GNN cost model against the GBDT, on held-out architectures (Oct 31)
+
+`scripts/fit_cost_gnn.py` predicts log(step) with no probe at all, from the module graph, the config and the GPU: what the GPU dial needs before anything has run. It uses 1,203 non-A100 rows over 79 architectures, in five folds by architecture, so no architecture is ever trained and tested on. Everything was fixed before any fold was scored: the hyperparameters, the 0.5/0.5 ensemble weight, and the shorter training needed to finish in time. Within 20% of the measured step (measured):
+
+| Model | Within 20% (Wilson 95%) | Median abs log error |
+| --- | --- | --- |
+| GBDT on config, GPU and graph counts | 491 of 1,203, 41% (38% to 44%) | 0.251 |
+| GNN (GraphSAGE over the module graph) | 422 of 1,203, 35% (32% to 38%) | 0.310 |
+| Mean of the two | 549 of 1,203, 46% (43% to 48%) | 0.229 |
+
+The GNN alone doesn't beat the GBDT. The plan's validation row is "GNN + GBDT ensemble vs GBDT alone", though, and the ensemble does beat the GBDT, by 58 rows. These Wilson intervals treat rows as independent and they overlap, so the difference needs an architecture-clustered check before the ensemble is used.
+
+Either way, a no-probe cost model is a prior, not a prediction. At 41–46% within 20%, it is well behind K1 with a probe (60%) and the same-GPU line (80%).
