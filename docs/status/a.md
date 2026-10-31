@@ -133,7 +133,7 @@ first minute); a version clash between the image's packages and the zoo's pins (
 `fsspec<=2024.9.0`). The planted eval OOM may not fire on 192 GB, or may fire later: the eval keeps
 every batch's graph, so its memory grows with the batch count; either way the record says which.
 
-## Every plan item A owns (Oct 31 morning ET; rows 7, 11–13 updated 07:55 ET)
+## Every plan item A owns (Oct 31 morning ET; updated 08:45 ET)
 
 From the Contracts tab (Contract A, the gaps table, the Oct 27 review, the competitive review) and
 the main plan's feature set and validation targets. "main" = merged; "ws-a" = pushed to the
@@ -168,9 +168,9 @@ included. Hero lenses first.
 | 18 | Checkpoint resume exact-match (lens, contract, hygiene) | not started | 3 |
 | 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
 | 20 | Serving probes on vLLM for B's model (contract) | hooks on main; probe not started | 5 |
-| 21 | Retrieval probes through an adapter (lens) | not started | 5 |
-| 22 | GNN probes through an adapter (lens) | not started | 5 |
-| 23 | Vision probes through an adapter (lens) | not started | 4 |
+| 21 | Retrieval probes through an adapter (lens) | local: encode, faiss add/train/search timed with items a second; a stage after training isn't reached by a probe | 3 |
+| 22 | GNN probes through an adapter (lens) | local: nodes, edges, seeds, nodes per hop, largest batch; sampling time is the data phase; needs a PyG script on a GPU | 3 |
+| 23 | Vision probes through an adapter (lens) | local: images per batch, resolution, channels-last; images/s from samples; needs a vision script on a GPU | 2 |
 | 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
 | 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | not started | 3 |
 | 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
@@ -207,7 +207,7 @@ included. Hero lenses first.
 | 53 | Planted problems caught (bug zoo) | LoRA eval OOM caught; nanoGPT not yet on a GPU | 1 + paid run |
 | 54 | Cost of one Preflight run under $1 and under 5 minutes | $0.10 GPU, but 6 min 45 s on Oct 28: over 5 min | 3 |
 
-**Total left: about 126 hours of A's work (was 138 in this morning's first version) (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
+**Total left: about 113 hours of A's work (was 138 in this morning's first version) (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
 order the PM set (hero lenses, then the rest) is the order I work in; Chiya's cuts at noon Sunday
 can read the hours column. Paid runs are asked for one at a time.
 
