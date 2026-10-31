@@ -1,0 +1,11 @@
+{
+  "app_id": "ap-smlQhBII0aKV0BnMwULRzO",
+  "env": "main",
+  "app": "preflight-runner-ops",
+  "state": "no longer listed; started by runs/20261028-225112-40783074654-a-gt-lora-l4-2",
+  "read": "exit 0",
+  "since": "2026-10-28T22:46:12Z",
+  "until": "2026-10-29T00:31:28Z",
+  "chars": 0
+}
+
