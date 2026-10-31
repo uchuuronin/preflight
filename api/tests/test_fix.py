@@ -466,3 +466,25 @@ def test_only_muse_codes_own_deny_wording_counts_as_a_block():
 		]
 	)
 	assert ev.blocked == ["bash"]
+
+
+def test_a_race_reports_every_tool_call_the_gate_saw_without_contents(box):
+	out = race.race(
+		box,
+		dict(FILES),
+		[("eval.wrap_no_grad", None)],
+		KEY,
+		python=sys.executable,
+		settings_extra={"x_extra": 1},
+	)
+	calls = out[0].tool_calls
+	assert [(c["tool"], c["decision"]) for c in calls] == [
+		("bash", "deny"),
+		("read_file", "deny"),
+		("edit_file", "allow"),
+	]
+	assert calls[0]["keys"] == ["command"] and calls[0]["paths"] == []  # the command itself isn't kept
+	assert calls[1]["paths"] == ["/proc/self/environ"]
+	settings = json.loads((box.root / "cfg" / "c1" / "muse" / "settings.json").read_text())
+	assert settings["x_extra"] == 1 and settings["schema_version"] == 1
+	assert "--no-observers" in muse.command("/p", extra_flags=("--no-observers",))

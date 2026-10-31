@@ -71,6 +71,19 @@ import json, os, sys
 
 ROOT = os.path.realpath(sys.argv[1])
 NO_WRITE = set(sys.argv[2].split(","))
+# Optional: where to note each call (tool, input key names, paths, decision), never contents.
+LOG = sys.argv[3] if len(sys.argv) > 3 else None
+SEEN = {"tool": None, "keys": [], "paths": []}
+
+
+def note(decision, reason=""):
+	if not LOG:
+		return
+	try:
+		with open(LOG, "a") as f:
+			f.write(json.dumps({**SEEN, "decision": decision, "reason": reason}) + "\n")
+	except BaseException:
+		pass
 # Input keys each allowed tool may carry. Path keys hold a path (or a list of paths for "paths");
 # pattern keys hold a glob that must stay relative; text keys hold scalars only.
 PATH_KEYS = {"path", "file_path", "paths", "directory", "dir"}
@@ -85,6 +98,7 @@ WRITES = {"edit_file", "write_file"}
 
 
 def out(reason):
+	note("deny", reason)
 	print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
 		"permissionDecision": "deny", "permissionDecisionReason": "Preflight: " + reason}}))
 	sys.exit(0)
@@ -100,12 +114,16 @@ def inside(p):
 try:
 	ev = json.loads(sys.stdin.read() or "{}")
 	tool = ev.get("tool_name")
+	args = ev.get("tool_input")
+	SEEN["tool"] = str(tool)[:60]
+	if isinstance(args, dict):
+		SEEN["keys"] = sorted(str(k)[:40] for k in args)[:20]
+		SEEN["paths"] = [str(args[k])[:120] for k in sorted(args) if k in PATH_KEYS | PATTERN_KEYS][:5]
 	if tool not in TEXT_KEYS:
 		out("only reading and editing files is allowed here; no commands.")
 	cwd = ev.get("cwd")
 	if cwd is not None and inside(cwd) is None:
 		out("outside the repository.")
-	args = ev.get("tool_input")
 	if not isinstance(args, dict):
 		out("unreadable tool input.")
 	seen_path = False
@@ -132,6 +150,7 @@ try:
 			out("unexpected tool input: " + str(key)[:40])
 	if tool in WRITES and not seen_path:
 		out("an edit must name its file.")
+	note("allow")
 	sys.exit(0)  # no decision: the tool runs
 except SystemExit:
 	raise
@@ -146,24 +165,35 @@ except BaseException:
 HOOK_PYTHON = "/usr/local/bin/python3"
 
 
-def hook_command(hook_path: str, root: str, python: str = HOOK_PYTHON) -> str:
-	return f"{python} {hook_path} {root} {','.join(NO_WRITE)}"
+def hook_command(hook_path: str, root: str, python: str = HOOK_PYTHON, log: str | None = None) -> str:
+	return f"{python} {hook_path} {root} {','.join(NO_WRITE)}" + (f" {log}" if log else "")
 
 
-def settings(hook_path: str, root: str, python: str = HOOK_PYTHON) -> dict:
+# Flags some Muse Code versions might take to turn the background observers off; the startup check
+# looks for each in `muse exec --help` and the fix loop passes the ones it finds. Source: guess,
+# Meta's docs name the observers (memory recall, skill recommendations, goal tracking,
+# verification) but no switch for them; replaced by what the installed help text says.
+OBSERVER_FLAGS = ("--no-observers", "--disable-observers", "--observers=off")
+
+
+def settings(
+	hook_path: str, root: str, python: str = HOOK_PYTHON, log: str | None = None, extra: dict | None = None
+) -> dict:
 	"""$XDG_CONFIG_HOME/muse/settings.json for one candidate: Claude-format hooks, matching every
 	tool. `schema_version` 1 is required or Muse Code won't start (kenn-io/kit PR 194)."""
-	return {
+	out = {
+		**(extra or {}),
 		"schema_version": 1,
 		"hooks": {
 			"PreToolUse": [
 				{
 					"matcher": "*",
-					"hooks": [{"type": "command", "command": hook_command(hook_path, root, python)}],
+					"hooks": [{"type": "command", "command": hook_command(hook_path, root, python, log)}],
 				}
 			]
 		},
 	}
+	return out
 
 
 #: Every flag `command` passes; the startup check requires all of them in `muse exec --help`.
@@ -178,7 +208,13 @@ REQUIRED_FLAGS = (
 )
 
 
-def command(prompt_file: str, *, steps: int = MAX_MODEL_STEPS, model: str | None = None) -> list[str]:
+def command(
+	prompt_file: str,
+	*,
+	steps: int = MAX_MODEL_STEPS,
+	model: str | None = None,
+	extra_flags: tuple[str, ...] = (),
+) -> list[str]:
 	"""The `muse exec` line for one candidate. Root options go after `exec` (kenn-io/kit PR 194)."""
 	argv = [
 		"muse",
@@ -198,6 +234,7 @@ def command(prompt_file: str, *, steps: int = MAX_MODEL_STEPS, model: str | None
 	]
 	if model:
 		argv += ["--model", model]
+	argv += list(extra_flags)
 	return argv
 
 

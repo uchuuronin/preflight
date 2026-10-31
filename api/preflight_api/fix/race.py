@@ -87,6 +87,8 @@ class Candidate:
 	problem: str | None = None
 	#: The last lines of Muse Code's JSONL, for the smoke test only (they can quote visitor code).
 	log_tail: str = ""
+	#: Every tool call the gate saw: tool, input key names, paths, decision (never contents).
+	tool_calls: list[dict] = field(default_factory=list)
 
 	def public(self, *, with_log: bool = False) -> dict:
 		"""What may leave the sandbox and be shown: never stderr, which can quote the environment."""
@@ -94,7 +96,7 @@ class Candidate:
 		if not with_log or self.status == "leaked":
 			d.pop("log_tail")
 		if self.status == "leaked":
-			d.update(diff="", final=None, files=[])
+			d.update(diff="", final=None, files=[], tool_calls=[])
 		return d
 
 
@@ -175,18 +177,26 @@ def _one(
 	files: set[str],
 	python: str,
 	path: str,
+	settings_extra: dict | None,
+	extra_flags: tuple[str, ...],
+	log_lines: int,
 ) -> Candidate:
 	wt = f"{ROOT}/wt/{cand.id}"
 	cfg = f"{ROOT}/cfg/{cand.id}"
 	home = f"{ROOT}/home/{cand.id}"
 	prompt = f"{ROOT}/prompt-{cand.id}.txt"
+	hooklog = f"{ROOT}/hooklog/{cand.id}.jsonl"
 	try:
 		code, _, _ = box.run([*GIT, "-C", REPO, "worktree", "add", "-q", "--detach", wt])
 		if code != 0:
 			cand.status, cand.problem = "failed", "worktree"
 			return cand
-		box.write(f"{cfg}/muse/settings.json", json.dumps(muse.settings(f"{ROOT}/hook.py", wt, python)))
+		box.write(
+			f"{cfg}/muse/settings.json",
+			json.dumps(muse.settings(f"{ROOT}/hook.py", wt, python, hooklog, settings_extra)),
+		)
 		box.write(f"{home}/.keep", "")
+		box.write(hooklog, "")
 		box.write(prompt, task_for(cand.template_id, cand.value, measured))
 	except Exception:  # the sandbox ended (cost cap) or a write failed
 		cand.status, cand.problem = "failed", "setup"
@@ -198,7 +208,7 @@ def _one(
 		f"PATH={path}",
 		f"XDG_CONFIG_HOME={cfg}",
 		f"HOME={home}",
-		*muse.command(prompt, steps=steps),
+		*muse.command(prompt, steps=steps, extra_flags=extra_flags),
 	]
 	t0 = time.monotonic()
 	code, out, _err = box.run(argv, cwd=wt, stdin=key + "\n", timeout=timeout)
@@ -208,7 +218,17 @@ def _one(
 	cand.usage = {**asdict(ev.usage), "summed": asdict(ev.usage_sum)}
 	cand.blocked = ev.blocked
 	cand.final = ev.final
-	cand.log_tail = "\n".join(out.splitlines()[-200:])
+	cand.log_tail = "\n".join(out.splitlines()[-log_lines:])
+	try:
+		_, calls, _ = box.run(["cat", hooklog])
+		if not muse.leaks(calls, secrets):
+			for line in calls.splitlines()[:200]:
+				try:
+					cand.tool_calls.append(json.loads(line))
+				except ValueError:
+					continue
+	except Exception:  # the log is a report, never part of the decision
+		cand.tool_calls = [{"tool": None, "decision": "log_unreadable"}]
 	if muse.leaks(out, secrets) or muse.leaks(ev.final or "", secrets):
 		cand.status, cand.problem, cand.log_tail, cand.final = "leaked", "secret_in_output", "", None
 		return cand
@@ -257,6 +277,9 @@ def race(
 	extra_secrets: list[str] | None = None,
 	python: str = muse.HOOK_PYTHON,
 	path: str = SYSTEM_PATH,
+	settings_extra: dict | None = None,
+	extra_flags: tuple[str, ...] = (),
+	log_lines: int = 200,
 ) -> list[Candidate]:
 	"""Run every candidate at once; each is (template id, the knob value it sets or None).
 	`measured` is Preflight's own sentence about the problem (A's rule finding), never visitor text."""
@@ -285,6 +308,9 @@ def race(
 				files=set(kept),
 				python=python,
 				path=path,
+				settings_extra=settings_extra,
+				extra_flags=extra_flags,
+				log_lines=log_lines,
 			)
 			for c in cands
 		]

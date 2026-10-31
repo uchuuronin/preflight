@@ -18,6 +18,7 @@ Secrets (never in the repo): "preflight-meta" with META_API_KEY and META_API_BAS
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import shlex
 import threading
@@ -48,7 +49,8 @@ fix_image = (
 	.apt_install("git", "curl", "ca-certificates", "coreutils")
 	# Meta's documented install (dev.meta.ai/docs/muse-code); no version pin exists, so the
 	# version is printed here and recorded by the startup check and every fix.
-	.run_commands("curl -fsSL https://dev.meta.ai/install.sh | sh", f"PATH={MUSE_PATH} muse --version")
+	# The installer uses bash (`set -o pipefail`), so it is piped to bash, not Debian's sh (dash).
+	.run_commands("curl -fsSL https://dev.meta.ai/install.sh | bash", f"PATH={MUSE_PATH} muse --version")
 	.env({"PATH": MUSE_PATH})
 )
 
@@ -179,6 +181,7 @@ def startup_check_fix() -> dict:
 		# Every flag the fix loop passes must exist; without --api-key-stdin the key would have to
 		# travel in the environment, so nothing runs.
 		out["flags"] = {f: f in help_text for f in muse.REQUIRED_FLAGS}
+		out["observers"] = _observer_switch(box, help_text)
 		try:
 			race.prepare(box, {"train.py": "print('hello')\n"})  # ends with gate_check
 			out["gate"] = "denies a command and a read outside the worktree"
@@ -195,6 +198,54 @@ def startup_check_fix() -> dict:
 		sb.terminate()
 
 
+# Settings that might turn Muse Code's background observers off. Source: guess, from the names
+# Meta's docs give them; a block is used only when `muse config validate` both refuses a made-up
+# key (so validation means something) and accepts this one.
+OBSERVER_SETTINGS = (
+	{
+		"runtime_capabilities": {
+			"memory_recall": False,
+			"skill_recommendations": False,
+			"goal_tracking": False,
+			"verification": False,
+		}
+	},
+	{"runtime_capabilities": {"observers": False}},
+)
+
+
+def _observer_switch(box: ModalBox, help_text: str) -> dict:
+	"""Whether this Muse Code can run without its background observers, and how: a flag in
+	`muse exec --help`, or a settings block its validator accepts. Nothing here calls a model."""
+	from preflight_api.fix import muse
+
+	found: dict = {
+		"flags": [f for f in muse.OBSERVER_FLAGS if f.split("=")[0] in help_text],
+		"help_lines": [ln.strip() for ln in help_text.splitlines() if "observer" in ln.lower()][:10],
+		"settings": None,
+		"validate": {},
+	}
+	env = ["env", "-i", f"PATH={MUSE_PATH}", "HOME=/fix/home/check", "XDG_CONFIG_HOME=/fix/home/check"]
+	_, so, se = box.run([*env, "muse", "config", "--help"], timeout=60)
+	found["config_help"] = [ln.strip() for ln in (so + se).splitlines() if ln.strip()][:40]
+
+	def validate(name: str, obj: dict) -> int:
+		path = f"/fix/validate-{name}.json"
+		box.write(path, json.dumps({"schema_version": 1, **obj}))
+		c, o, e = box.run(
+			[*env, "muse", "config", "validate", "--plane", "defaults", "--file", path], timeout=60
+		)
+		found["validate"][name] = {"code": c, "says": (o + e).strip()[-300:]}
+		return c
+
+	if validate("made_up_key", {"zz_not_a_setting": True}) != 0:
+		for i, block in enumerate(OBSERVER_SETTINGS):
+			if validate(f"candidate_{i}", block) == 0:
+				found["settings"] = block
+				break
+	return found
+
+
 SMOKE_EXTRA = (
 	"\nBefore editing, run `python train.py --help` to see the script's options. If you can't run "
 	"it, say so in your reply and carry on with the edit.\n"
@@ -202,7 +253,7 @@ SMOKE_EXTRA = (
 
 
 @app.function(secrets=[META], timeout=12 * 60, retries=0)
-def smoke_fix(files: dict[str, str]) -> dict:
+def smoke_fix(files: dict[str, str], observers: dict | None = None) -> dict:
 	"""One Muse Code fix on our own zoo script: eval.wrap_no_grad, one candidate, capped at
 	SMOKE_STOP_USD. The task also asks for a command, to prove the gate blocks it headless."""
 	_pkg()
@@ -216,7 +267,17 @@ def smoke_fix(files: dict[str, str]) -> dict:
 	box = ModalBox(sb, stop_usd=SMOKE_STOP_USD)
 	t0 = time.monotonic()
 	try:
-		cands = race.race(box, files, [("eval.wrap_no_grad", None)], key, path=MUSE_PATH)
+		obs = observers or {}
+		cands = race.race(
+			box,
+			files,
+			[("eval.wrap_no_grad", None)],
+			key,
+			path=MUSE_PATH,
+			settings_extra=obs.get("settings"),
+			extra_flags=tuple(obs.get("flags", [])[:1]),
+			log_lines=3000,
+		)
 	finally:
 		templates.PREAMBLE = orig
 		with contextlib.suppress(Exception):  # it may have ended already (cost cap, timeout)
@@ -249,8 +310,12 @@ def smoke() -> None:
 	if not check.get("ok"):
 		print(json.dumps(check, indent=1))
 		raise SystemExit("startup check failed; no model call made")
-	res = smoke_fix.remote(files)
-	print(json.dumps({"startup": {k: check[k] for k in ("flags", "gate", "version")}, **res}, indent=1))
+	res = smoke_fix.remote(files, check.get("observers"))
+	print(
+		json.dumps(
+			{"startup": {k: check[k] for k in ("flags", "gate", "version", "observers")}, **res}, indent=1
+		)
+	)
 	c = res["candidates"][0]
 	# Passes when the fix landed and the command it was asked to run was blocked, under the cap.
 	ok = (
