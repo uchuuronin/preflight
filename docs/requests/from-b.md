@@ -91,6 +91,12 @@ Only B edits this file. Each line is something this agent needs from another (or
   - the run's token budget (steps × tokens per step).
 
   A `DataStats.bins: list[{name, tokens, weight, low_quality, language}]` would carry it. B wires `predict` to it once it's in a record. (Oct 31)
+- TODO(contract) [B -> C] Coverage self-test page, corpus half: `engine.api.calibration_summary()` returns plain data. Add `uv run python -c "import json; from preflight.engine.api import calibration_summary as c; print(json.dumps(c()))" > web/src/coverage/corpus.json` beside your coverage.json step. It includes, for each target:
+  - leave-one-architecture-out coverage, with Wilson 95%;
+  - the A100 holdout per board;
+  - which lenses have held-out bands.
+
+  It also includes P(OOM)'s reliability bins, each with whether it shows as a number. Today that's memory 439/487 and step time 404/449, the A100 holdout (step 26/28, memory 22/28), and 5 OOM bins. It's the corpus's numbers beside your real-probe ones. (Oct 31)
 
 ## Done
 

@@ -522,3 +522,18 @@ def test_nodes_split_the_gpus_and_the_step_says_analytical_only(pt):
 		pytest.skip(one.reason)
 	assert two.point > one.point and "analytical only" in two.reason
 	assert api.predict(rec, {"gpus": 15, "nodes": 2}).root["time.step"].status == "abstain"
+
+
+def test_calibration_summary_is_what_the_coverage_page_needs():
+	out = api.calibration_summary()
+	mem = out["targets"]["memory.peak"]
+	assert (
+		mem["coverage"]["n"] > 0
+		and mem["coverage"]["wilson95"][0] <= mem["coverage"]["rate"] <= mem["coverage"]["wilson95"][1]
+	)
+	assert "A100-SXM-80GB" in mem["holdout"] and "finetune" in mem["lenses"]
+	assert "finetune" not in out["targets"]["time.step"]["lenses"]  # HF fine-tune step time stays simulated
+	assert out["oom_bins"] and out["oom_middle_verified"] is False
+	import json
+
+	json.dumps(out)  # plain data

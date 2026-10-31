@@ -2487,6 +2487,34 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	)
 
 
+def calibration_summary() -> dict:
+	"""What the coverage self-test page shows from the corpus: each target's leave-one-architecture-out coverage and
+	the cross-GPU holdout, both with Wilson 95% intervals, and P(OOM)'s reliability bins. Plain data for C's page."""
+	t = conformal.TABLE
+
+	def row(hits: int, n: int) -> dict:
+		lo, hi = conformal.wilson(hits, n)
+		return {"hits": hits, "n": n, "rate": hits / n if n else None, "wilson95": [lo, hi]}
+
+	targets = sorted({k[0] for k in t.cells} | set(t.coverage))
+	return {
+		"built_from": t.built_from,
+		"targets": {
+			tid: {
+				"coverage": row(*t.coverage[tid]) if tid in t.coverage else None,
+				"holdout": {g: row(h, n) for g, (h, n) in sorted(t.holdout.get(tid, {}).items())},
+				"lenses": sorted({k[2] for k in t.cells if k[0] == tid and k[2]}),
+			}
+			for tid in targets
+		},
+		"oom_bins": [
+			{"lo": lo, "hi": hi, "n": n, "agrees": ok, "shown_as_number": n >= oom_model.MIN_SHOWN and ok}
+			for lo, hi, n, ok in t.oom_bins
+		],
+		"oom_middle_verified": oom_model.middle_verified(t.oom_bins),
+	}
+
+
 def current_models() -> dict[str, str]:
 	"""Every model the engine can put on a record, name -> its id now (gap 15: records pin the id they used)."""
 	from preflight.campaign import planner  # the planner's card rides on records too
