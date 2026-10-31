@@ -1,0 +1,11 @@
+{
+	"name": "20261031-100714-41191432272-b-corpus-a100-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41191432272",
+	"ref": "ws-b",
+	"sha": "b6ef276690dafc2130467900ad5557d07209099e",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 100 --budgets A100-SXM-80GB=2.5 --max-minutes 35",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T10:08:28Z"
+}
