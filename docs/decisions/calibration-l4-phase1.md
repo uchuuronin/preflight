@@ -140,7 +140,7 @@ So the table sets `oom_reliable`. The middle bins are still thin: the probabilit
 
 Two rows are not a test, and the holdout is scored once, so it waits for the rerun.
 
-**Sensitivity tie.** With an A10 finetune cell, a bigger GPU now reaches the pooled cell, which has 38 runs. Its P(OOM) floor is 0.013, against 0.025 for 19 runs, so `gpu_type` outranked `eval_batch_size` for "make it fit" on resolution alone. For ranking, P(OOM) is now clamped to [0.05, 0.95], the floor and ceiling of the smallest allowed cell (derived: 0.5 / (9 + 1)). Other probabilities, such as a sampled runaway rate, are ranked as measured. Clamped, the two levers tie, and the tie goes to the one leaving more memory headroom: `eval_batch_size`. A lever that only moves P(OOM) below 0.05 (the pretrain fixture, at about 1e-63) is no longer listed.
+**Sensitivity tie.** With an A10 finetune cell, a bigger GPU now reaches the pooled cell, which has 38 runs. Its P(OOM) floor is 0.013, against 0.025 for 19 runs, so `gpu_type` outranked `eval_batch_size` for "make it fit" on resolution alone. For ranking, P(OOM) is now clamped to [0.05, 0.95], the floor and ceiling of the smallest allowed cell (derived: 0.5 / (9 + 1)). Other probabilities, such as a sampled runaway rate, are ranked as measured. Clamped, the two levers tie, and the tie goes to the one with the lower peak memory: `eval_batch_size`. A lever that only moves P(OOM) below 0.05 (the pretrain fixture, at about 1e-63) is no longer listed.
 
 **Anchored step time on the A10 HF jobs (Oct 31): fails again, stays off.** This is the anchored model's held-out test on the same job type it was fitted on (the L4 HF jobs), but on another GPU. It scores the 19 A10 queries (measured):
 
