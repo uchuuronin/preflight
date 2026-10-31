@@ -10,7 +10,9 @@
 | 41246497059 | startup check (no model) | Passed: flags, gate, exact command on the echo provider; `--disable-reminders` accepted; `-c runtime_capabilities.*` not trusted (a made-up name is accepted too) | under $0.01 |
 | 41246585559 | smoke | Fix landed (eval in `torch.no_grad()`, `.item()` losses), 45 s, 7 model calls, no observer calls. No shell command was tried: the preamble told the model not to. The gate's three denials were honoured headless. Model was `muse-spark-1.3-contributor` | $0.12 at standard prices from reported tokens (186,689 in, 133,557 cached, 5,175 out, 3,331 reasoning); Meta's Usage page decides |
 
-Tool inputs Muse Code 1.4.14 sent: `read_file {path}` and `{path, offset, limit}`; `search {pattern}` and `{paths, pattern}` (pattern is a regex); `edit_file {path, find, replace}`; `write_file {path, content}`. The gate wrongly denied the regex pattern and `find`/`replace`; fixed.
+| 41250977670 | smoke, shell block (Chiya's yes) | **Passed.** The model's first call was `bash` (`python train.py --help`); the gate refused it and Muse Code rejected the call with the gate's reason; the same correct fix landed. Model `muse-spark-1.3` (standard), observers off, 19 s | $0.09 at standard prices from reported tokens (148,560 in, 98,884 cached, 1,671 out, 913 reasoning) |
+
+Tool inputs Muse Code 1.4.14 sent: `read_file {path}` and `{path, offset, limit}`; `search {pattern}` and `{paths, pattern}` (pattern is a regex); `edit_file {path, find, replace}`; `write_file {path, content}`. The gate wrongly denied the regex pattern and `find`/`replace`; fixed. The second run added `bash {command, description, workdir}` (refused, as it should be), `search {glob: [list], output_mode, pattern}` and `search {paths, output_mode, pattern}`; the gate now takes a glob list and `output_mode`.
 
 ## Sat Oct 31, morning: every plan item C owns
 
