@@ -396,7 +396,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 				message=f"not knobs of this record, left as they are: {', '.join(sorted(unknown))}")  # fmt: skip
 		plan_knobs = record_jobs.full_setting(rec, knobs)
 		base_knobs = record_jobs.full_setting(rec, {})
-		plan = _followup_plan(rec, req.mode, knobs, plan_knobs, base_knobs)
+		plan = _followup_plan(rec, req.mode, knobs, plan_knobs, base_knobs, patched=req.patch is not None)
 		if "gpu_type" in knobs:
 			request = {**request, "gpu": knobs["gpu_type"]}
 			pinned = True
@@ -409,8 +409,30 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip
 		gpu = cap
 	budget = deps.budget()
+	patched_for: dict = {}
+	if req.patch is not None:
+		# C's fix loop: probe runs the patched code; verify runs the setting on it and the base
+		# and its second seed on the record's own code, so the finding reads before and after
+		from .patches import apply_patch
+
+		fixed = replace(fetched, files=apply_patch(fetched.files, req.patch))
+		ids = [p.probe_id for p in plan] if req.mode == "probe" else [plan[0].probe_id]
+		patched_for = dict.fromkeys(ids, fixed)
+		_emit(ctx, "harnessing", rec, rev, message=f"patch applied to {', '.join(ids)}")
 	probes, results, gpu, discarded_usd = _probe_points(
-		plan, rec, rev, fetched, sm, deps, ctx, budget, gpu=gpu, allowed=allowed, need=need, pinned=pinned
+		plan,
+		rec,
+		rev,
+		fetched,
+		sm,
+		deps,
+		ctx,
+		budget,
+		gpu=gpu,
+		allowed=allowed,
+		need=need,
+		pinned=pinned,
+		patched_for=patched_for,
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
 	kept = rec.probes
@@ -428,6 +450,13 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		vid = plan[0].probe_id
 		finding = record_jobs.verify_finding(by_id[vid], by_id.get(f"{vid}-base"), plan_knobs, base_knobs,
 			{n.id for n in out.graph.nodes}, other_seed=by_id.get(f"{vid}-seed"))  # fmt: skip
+		if req.patch is not None:
+			from preflight.schema import Evidence
+
+			from .patches import patch_id
+
+			finding = finding.model_copy(update={"evidence": [*finding.evidence,
+				Evidence(metric="verify.patch", value=patch_id(req.patch), probe_id=vid)]})  # fmt: skip
 		out = out.model_copy(update={"findings": [*out.findings, finding]})
 	return out
 
@@ -485,7 +514,8 @@ def _sample_agent(rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx,
 	return out
 
 
-def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, base_knobs: dict):
+def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, base_knobs: dict, *,
+	patched: bool = False):  # fmt: skip
 	"""probe: one profiled point at the setting. verify: the setting, and the current settings
 	beside it when they differ, both for VERIFY_STEPS at one fixed seed."""
 	if mode == "probe":
@@ -494,7 +524,7 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	steps = {"warmup": record_jobs.VERIFY_WARMUP, "timed": record_jobs.VERIFY_STEPS, "cadence": False}
 	plan = [point_probe(rec, vid, knobs, role="verify", **steps)]
 	differs = {k: v for k, v in plan_knobs.items() if k != "gpu_type" and base_knobs.get(k) != v}
-	if differs:
+	if differs or patched:  # a patch is a difference too: its verify needs the base beside it
 		base = {k: base_knobs[k] for k in knobs if k in base_knobs}
 		plan.append(point_probe(rec, f"{vid}-base", base, role="verify_base", **steps))
 		plan.append(point_probe(rec, f"{vid}-seed", base, role="verify_seed", **steps))
@@ -532,6 +562,7 @@ def _probe_points(
 	allowed: list[str] | None,
 	need: float,
 	pinned: bool = False,
+	patched_for: dict | None = None,
 ) -> tuple[list[Probe], list[ProbeResult], str, float]:
 	"""Run the planned points in order; returns their probes, fresh results, the GPU they settled on
 	and what discarded attempts cost."""
@@ -558,7 +589,7 @@ def _probe_points(
 			)
 			continue
 		try:
-			spec = _spec(fetched, sm, p, deps)
+			spec = _spec((patched_for or {}).get(p.probe_id, fetched), sm, p, deps)
 		except OverrideError as exc:
 			probes.append(_skipped(p, f"this point can't be set in the code: {exc}"))
 			continue

@@ -499,3 +499,47 @@ def test_an_agent_script_that_never_calls_the_proxy_fails_with_a_reason(tmp_path
 	with pytest.raises(PermanentError) as exc:
 		run_pipeline(request, _Ctx(), d)
 	assert exc.value.code == "probe.no_agent_calls"
+
+
+# ---------------------------------------------------------------- JobRequest.patch (contract 0.5.0)
+
+PATCH = """--- a/train.py
++++ b/train.py
+@@ -6,3 +6,3 @@
+ lr = 0.1
+-model = torch.nn.Linear(4, 4)
++model = torch.nn.Linear(4, 4, bias=False)
+ opt = torch.optim.SGD(model.parameters(), lr)
+"""
+
+
+def test_a_verify_with_a_patch_runs_the_fix_against_the_records_own_code(tmp_path):
+	parent, _ = _parent(tmp_path)
+	runner = LossRunner()
+	rec = run_pipeline(_on(parent, "verify", patch=PATCH), _Ctx(), _deps(tmp_path, runner))
+	by = {c["id"]: c["files"]["train.py"] for c in runner.calls}
+	v = next(k for k in by if k.startswith("v") and "-" not in k)
+	assert (
+		"bias=False" in by[v] and "bias=False" not in by[f"{v}-base"] and "bias=False" not in by[f"{v}-seed"]
+	)
+	ev = {e.metric: e.value for e in rec.findings[-1].evidence}
+	assert str(ev["verify.patch"]).startswith("sha256:")
+
+
+def test_a_probe_with_a_patch_runs_the_patched_code(tmp_path):
+	parent, _ = _parent(tmp_path)
+	runner = LossRunner()
+	run_pipeline(_on(parent, "probe", knobs={"batch_size": 4}, patch=PATCH), _Ctx(), _deps(tmp_path, runner))
+	assert all("bias=False" in c["files"]["train.py"] for c in runner.calls)
+
+
+def test_a_patch_that_doesnt_apply_or_adds_a_file_is_refused(tmp_path):
+	parent, _ = _parent(tmp_path)
+	bad = PATCH.replace("torch.nn.Linear(4, 4)\n", "torch.nn.Linear(8, 8)\n")
+	with pytest.raises(InvalidSubmission) as exc:
+		run_pipeline(_on(parent, "verify", patch=bad), _Ctx(), _deps(tmp_path, LossRunner()))
+	assert exc.value.code == "patch.does_not_apply"
+	new = "--- /dev/null\n+++ b/evil.py\n@@ -0,0 +1 @@\n+import os\n"
+	with pytest.raises(InvalidSubmission) as exc:
+		run_pipeline(_on(parent, "verify", patch=new), _Ctx(), _deps(tmp_path, LossRunner()))
+	assert exc.value.code == "patch.not_allowed"
