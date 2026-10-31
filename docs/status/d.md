@@ -8,6 +8,28 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Fri Oct 30, evening (builder kit, stranger-path audit, demo storyboard)
+
+**Done** (committed on `ws-d` as Shreya; push requested below with `4ba6c18`). No tokens, GPU or Actions minutes spent: the audit ran on a local dev server with the job API answered by the test.
+
+- `docs/builders/`: a one-page brief, three tasks (open a sample; check in your own script or notebook; act on one finding), an observation sheet (hesitations, stuck points, time to first map, acted on a finding) and a 5-question form. Results are counts ("2 of 3"); stuck points become ranked requests. The public link is a placeholder until the deploy; the sessions' paid check-ins need Chiya's yes first.
+- `docs/audit/oct30/`: the stranger path in Chromium (home, check-in on each tab, boarding mid-run and failed, cockpit, checks) at 1440 and 390 px in both themes, 40 states, plus D's panels with their flags on. No overflow, no console errors; axe found day-theme contrast (16 states) and 14 px flight-plan markers. Twelve findings filed to C, ranked by how many strangers each would stop, with screenshots and fixes. D's own fix: the free-GPU band's source links now have a 24 px tap area.
+- `docs/demo/storyboard.md`: 15 shots, about 3 minutes, on the Oct 28 LoRA run, with a 45-second cut. Only measured numbers (189 s, $0.042, step 200, 1.68 s), each with its source; every shot's flag dependency and fallback listed.
+
+**Basis for every decision in this commit**
+
+| Decision | Basis | Test that fails if it's wrong |
+| --- | --- | --- |
+| Builder results as counts, not percentages | Chiya, Oct 30 (three builders) | the tally table has count fields only |
+| Kit timings and costs | measured: A's status (upload to record 6 min 45 s; GPU $0.086 and Muse Spark $0.018 measured; sandbox about $0.10 a guess, so the session cost is a lower bound) | review against `docs/status/a.md` |
+| Findings ranked by how many strangers they would stop | Chiya, Oct 30 | the ranking states who each finding stops |
+| Contrast fixes #2D4855, error panel over glass-hi, #1F5A3D | derived: WCAG 2.x contrast formula on the measured backgrounds (axe's fg and bg colours) | axe colour-contrast in the audit script, re-run after C applies them |
+| D's source links get a 24 px tap area | cited: WCAG 2.2, 2.5.8 target size | the audit's small-target check on D's panels (none left) |
+| Storyboard numbers | measured: A's status, record `ICDYrfHQ2nBNbv3mlRHHMg`; step 200 from the script | review against the sources; the "Before recording" checklist |
+| 21.9 GB kept out of narration | the unit (GB or GiB) isn't stated in A's status | marked "confirm against the record" in the storyboard |
+
+**Push request:** `ws-d`, this commit and `4ba6c18`, one batch, normal push (one CI run).
+
 ## Fri Oct 30 (round two merged; Notebook tab checks in)
 
 **Done** (committed on `ws-d` as Shreya; push requested below)
@@ -29,7 +51,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Cosine schedule formula, t and T after warm-up; HF cosine ends at 0 | cited: SGDR (Loshchilov and Hutter); transformers `get_cosine_schedule_with_warmup` | `glossary.test.ts`; accuracy by review |
 | Check-in flow (enable, clear on tab change, refuse no-code) | C's hand-off contract (from-c.md, Oct 28) | Chromium end-to-end run above, on ws-d (a browser test, not in CI) |
 
-**Push request:** `ws-d` (the round-two merge and two commits on top of `6d61463`), one batch, normal push. Pushing starts one CI run.
+**Pushed** at `b4a0801` (Chiya's yes, Oct 30).
 
 ## Wed Oct 28, afternoon (merged `main` at contract 0.4.0)
 
