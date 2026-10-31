@@ -1,0 +1,116 @@
+/* Exports. Theme tokens only (var(--pf-*)); no literal colours. */
+
+.pf-addon-exports {
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-3);
+}
+
+.pf-addon-exports__title {
+	margin: 0;
+	font-family: var(--pf-font-serif);
+	font-weight: 400;
+	font-size: var(--pf-text-2xl);
+}
+
+.pf-addon-exports__lede {
+	margin: 0;
+	font-size: var(--pf-text-sm);
+	line-height: 1.5;
+	color: var(--pf-fg-dim);
+	max-width: 70ch;
+}
+
+.pf-addon-exports__items {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--pf-space-2);
+}
+
+.pf-addon-exports__item {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: var(--pf-space-2) var(--pf-space-3);
+	align-items: start;
+	padding: var(--pf-space-3);
+	border-radius: var(--pf-radius-sm);
+	background: var(--pf-glass);
+	box-shadow: inset 0 0 0 1px var(--pf-stroke);
+}
+
+.pf-addon-exports__item summary {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-height: 44px;
+	justify-content: center;
+	cursor: pointer;
+	list-style-position: outside;
+}
+
+.pf-addon-exports__item summary:focus-visible {
+	outline: 2px solid var(--pf-accent);
+	outline-offset: 4px;
+	border-radius: 4px;
+}
+
+.pf-addon-exports__name {
+	font-weight: 600;
+	font-size: var(--pf-text-md);
+}
+
+.pf-addon-exports__say {
+	font-size: var(--pf-text-sm);
+	line-height: 1.45;
+	color: var(--pf-fg-dim);
+}
+
+.pf-addon-exports__text {
+	margin: var(--pf-space-2) 0 0;
+	padding: var(--pf-space-3);
+	max-height: 22rem;
+	overflow: auto;
+	border-radius: var(--pf-radius-sm);
+	background: var(--pf-glass-hi);
+	font-family: var(--pf-font-mono);
+	font-size: 12.5px;
+	line-height: 1.5;
+	white-space: pre;
+	tab-size: 4;
+}
+
+.pf-addon-exports__text:focus-visible {
+	outline: 2px solid var(--pf-accent);
+	outline-offset: 2px;
+}
+
+.pf-addon-exports__patches h3 {
+	margin: var(--pf-space-3) 0 var(--pf-space-1);
+	font-size: var(--pf-text-sm);
+}
+
+.pf-addon-exports__patches ul {
+	margin: 0;
+	padding-left: 1.2em;
+	font-size: var(--pf-text-sm);
+}
+
+.pf-addon-exports__actions {
+	display: flex;
+	gap: var(--pf-space-1);
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+	.pf-addon-exports__item {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.pf-addon-exports__actions {
+		justify-content: flex-start;
+	}
+}
