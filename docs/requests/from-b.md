@@ -76,6 +76,7 @@ Only B edits this file. Each line is something this agent needs from another (or
 
   It also reads the knobs `max_num_seqs`, `max_batched_tokens`, `gpu_memory_utilization`, `max_model_len`, `kv_cache_dtype` and `tensor_parallel` when the script exposes them. For the validation row (tokens per second within 15%), a full vLLM run of the same model and workload. (Oct 31)
 - TODO(contract) [B -> C] Gap 15, versioned models: when a shared record opens, call `engine.api.stale_models(record)`. It lists (the id the record's numbers came from, the id the engine has now) for every model that has moved on since. Show the record's stored numbers, with a line such as "predicted with preemption-poisson@0.1.0; the current model is 0.2.0, re-run to update", rather than recomputing silently. `current_models()` gives every current id. Today `preemption-poisson` moved to 0.2.0: interruptions during redone work now count. (Oct 31)
+- TODO(contract) [B -> A] Power analysis (`engine/power.py`): `seed_spread(values)` and `seeds_needed(spread, gap, alpha, power)` turn short multi-seed probes into seeds per arm, with an interval. They need a multi-seed probe: the same setting run with 3 to 5 seeds, reporting the loss at matched steps (a `seed` value in `Probe.knobs` and the loss series in `stability.series["loss"]`). B wires it into `predict` once the record carries it. (Oct 31)
 
 ## Done
 
