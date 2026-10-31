@@ -25,7 +25,15 @@ import numpy as np
 
 from preflight.engine import api, knobs
 from preflight.schema.prediction import Estimate
-from preflight.schema.record import Campaign, CampaignCell, FlightRecord, ModelCard
+from preflight.schema.record import (
+	AshaRung,
+	Campaign,
+	CampaignAsha,
+	CampaignCell,
+	CampaignQuota,
+	FlightRecord,
+	ModelCard,
+)
 
 MODEL_ID = "campaign-mc@0.1.0"
 Z90 = 1.6448536269514722  # the 90% two-sided normal quantile; the engine's bands are 90%
@@ -145,6 +153,8 @@ class CampaignPlan:
 					segments=c.segments,
 					lane=c.lane,
 					cut=c.cut,
+					time=c.time,
+					start_s=c.start_s,
 				)
 				for c in self.cells
 			],
@@ -152,6 +162,27 @@ class CampaignPlan:
 			cut_list=list(self.cut_list),
 			completion_quantiles=dict(self.completion),
 			checkpoint_interval_s=self.checkpoint_interval.point,
+			# 0.5.0: the intervals, not only the points
+			gpu_hours=self.gpu_hours,
+			usd=self.usd,
+			finish_s=self.finish_s,
+			grid_gpu_hours=self.grid_gpu_hours,
+			grid_usd=self.grid_usd,
+			quota=CampaignQuota(
+				needed_bytes=self.quota.needed_bytes,
+				quota_bytes=self.quota.quota_bytes,
+				fits=self.quota.fits,
+				reason=self.quota.reason,
+			),
+			asha=CampaignAsha(
+				rungs=[AshaRung(steps=r.steps, runs=r.runs) for r in self.asha.rungs],
+				gpu_hours=self.asha.gpu_hours,
+				saved_gpu_hours=self.asha.saved_gpu_hours,
+				reason=self.asha.reason,
+			)
+			if self.asha
+			else None,
+			notes=list(self.notes),
 		)
 
 

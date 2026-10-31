@@ -278,3 +278,22 @@ def test_runs_on_a_slot_start_in_order_and_cut_runs_get_no_slot(ft):
 			assert b.start_s.point > a.start_s.point and b.start_s.lo >= a.start_s.lo
 	cut = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2]}, P.Cluster(slots=1, budget_usd=1e-9), start=START)
 	assert all(c.slot is None and c.start_s is None for c in cut.cells if c.cut)
+
+
+def test_the_record_block_carries_the_plans_intervals_and_each_runs_start(ft):
+	# contract 0.5.0: C draws the calendar from CampaignCell.start_s and the readouts from the intervals
+	pl = P.plan(
+		ft,
+		{"batch_size": [2], "seed": list(range(4))},
+		P.Cluster(slots=2),
+		asha=P.Asha(min_steps=100),
+		start=START,
+	)
+	block = pl.to_campaign()
+	FlightRecord.model_validate(ft.model_copy(update={"campaign": block}).model_dump())
+	assert block.usd == pl.usd and block.gpu_hours == pl.gpu_hours and block.finish_s == pl.finish_s
+	assert block.grid_usd == pl.grid_usd and block.grid_gpu_hours == pl.grid_gpu_hours
+	assert block.quota.needed_bytes == pl.quota.needed_bytes and block.asha.rungs
+	by_id = {c.id: c for c in pl.cells}
+	assert all(c.start_s == by_id[c.id].start_s and c.time == by_id[c.id].time for c in block.cells)
+	assert sum(1 for c in block.cells if c.start_s and c.start_s.point == 0) == 2
