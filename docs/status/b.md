@@ -12,15 +12,15 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | --- | --- | --- | --- |
 | Fine-tune lens: memory, P(OOM), step time, cost, money at risk | `main`; phase 2 table and fixes on branch | 1 | Today: step-time bands for vision, retrieval and pretrain, and P(OOM) shown "uncertain (5–95%)" in the middle |
 | Agent lens: per-task bootstrap, context growth, cache prices, rate-limit wall clock, runaway rate | `main` | 0.5 | Tokens-only cost when tasks lack `cost_usd`, now that the price table is in |
-| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | not started | 3 | A's fields already exist in the schema; calibrated on A's RL probes when they land |
-| Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | not started (schema only) | 10 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
+| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | A's fields already exist in the schema; calibrated on A's RL probes when they land |
+| Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`, behind `campaign.planner`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
 
 **The other lenses and engine features**
 
 | Item | Where | Hours left | Notes |
 | --- | --- | --- | --- |
-| Serving: KV-cache formula, prefill and decode rooflines | not started (the KV term exists in the memory model) | 3 | |
-| Serving: discrete-event scheduler simulation, calibrated on A's vLLM probes | not started | 6 | Calibration needs A's vLLM probe records |
+| Serving: KV-cache formula, prefill and decode rooflines | branch (`engine/serving.py`, behind `engine.serving`) | 0 | |
+| Serving: discrete-event scheduler simulation, calibrated on A's vLLM probes | branch | 1 | Calibration code is in; it needs A's vLLM probe records |
 | Multi-node closed forms, labelled analytical-only | not started (single-node multi-GPU all-reduce is on `main`) | 3 | |
 | Loss forecast: power-law fit, plus LC-PFN posterior, abstaining on wide bands | not started | 5 | The power law alone is 2 of these hours |
 | Data repetition and quality exposure (with A) | not started | 4 | |
@@ -56,7 +56,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Abstention: every query outside the probed range is flagged | `main` (automated tests) | 0 | |
 | Coverage self-test page (with C) | not started | 2 | |
 
-**Total: about 72 hours of B work left** (14.5 for the hero lenses, 46 for the rest of the engine, 12 for validation). That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
+**Total: about 72 hours of B work left** (14.5 for the hero lenses, 46 for the rest of the engine, 12 for validation). Since the table was written, the campaign planner and the RL and serving models have landed on the branch, which leaves about 53. That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
 
 ## Done
 - **Settings chosen by Monte Carlo** (`docs/decisions/engine-settings.md`, `scripts/mc_engine_settings.py`): memory calibration on A's three-probe plan, the 90% band (including one or two probes) and the fits/tight/fails cut-offs, the divergence label (D9 catches early collapses, a case a CPU smoke run turned up), cross-GPU step time and the corpus budget rule.
