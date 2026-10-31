@@ -4,8 +4,9 @@ An agent or API run is measured by running a sample of its tasks (the sampler, n
 script's client pointed at this proxy instead of the provider:
 
 	proxy = AgentProxy(upstream="https://api.llama.com/compat/v1", api_key=..., rate=token_rate)
-	host, port = proxy.start()
-	# the task's process gets OPENAI_BASE_URL=http://127.0.0.1:<port>/t/<task_id>/v1
+	proxy.start()
+	url = proxy.open_task("t017")   # http://127.0.0.1:<port>/t/<random token>/v1
+	# the task's process gets OPENAI_BASE_URL=url
 	...
 	task = proxy.task("t017", success=True)   # an AgentTask for the record's agent_sample
 	spans = proxy.spans("t017")               # OTel GenAI spans, counts only
@@ -16,10 +17,14 @@ latency and the HTTP status. It never keeps prompts or completions: the spans fo
 GenAI semantic conventions (`gen_ai.*`) without the content attributes.
 
 What it guards: the visitor's script never holds the provider key (the proxy drops whatever
-Authorization the script sends and sets its own), it binds to 127.0.0.1 only, it forwards only
-the generation endpoints, and it stops a task that runs away (too many calls, too many dollars,
-or the same request over and over) with a 429 the client sees as a rate limit, so a runaway in a
-sample costs at most its cap. The caps are guesses until the agent validation run.
+Authorization the script sends and sets its own; run the proxy in another process or uid than the
+script, or the script could read the key from /proc), it binds to 127.0.0.1 only, a task is
+reached only through the random token open_task gave it, it forwards only the generation
+endpoints, and it stops a task that runs away (too many calls, too many dollars, or the same
+request over and over) with a 429 the client sees as a rate limit. Dollars are reserved before a
+call goes out (its input and its max output at the model's price), so parallel calls can't spend
+past a cap, and a model without a price is refused: a sample that can't be costed isn't run. The
+caps are guesses until the agent validation run.
 """
 
 import contextlib
@@ -43,8 +48,13 @@ MAX_USD_PER_TASK = 2.0  # guess: 40x the golden record's median task ($0.046)
 MAX_USD_TOTAL = 20.0  # guess: a 50-task sample at the per-task cap is $100; 20 is the sampler's purse
 REPEATS_FOR_LOOP = 5  # the same request body this many times in a row is a loop, not a retry
 MAX_BODY_BYTES = 8 * 2**20
+MAX_EVENT_BYTES = 4 * 2**20  # one server-sent event; a stream that never ends an event is cut off
+# guess: the output a call may produce when it doesn't say (max_tokens), for the dollar reservation
+DEFAULT_MAX_OUTPUT_TOKENS = 8192
+CHARS_PER_TOKEN = 3  # guess, on the high side for tokens: the reservation over-, never under-counts
 FORWARDED = {"chat/completions", "responses", "completions"}
-_PATH = re.compile(r"^/t/(?P<task>[A-Za-z0-9_.-]{1,64})/v1/(?P<rest>[a-z/]{1,40})$")
+_PATH = re.compile(r"^/t/(?P<token>[A-Za-z0-9_-]{16,64})/v1/(?P<rest>[a-z/]{1,40})$")
+_TASK_ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}")
 _DROP_HEADERS = {"authorization", "host", "content-length", "connection", "transfer-encoding",
 	"accept-encoding", "x-api-key", "api-key", "openai-organization", "openai-project", "cookie"}  # fmt: skip
 _HOP = {"connection", "transfer-encoding", "content-length", "content-encoding", "keep-alive"}
@@ -74,6 +84,9 @@ class _Task:
 	last_hash: str | None = None
 	repeats: int = 0
 	stopped: str | None = None  # why the proxy stopped it: max_turns, loop, budget
+	in_flight: int = 0
+	reserved_usd: float = 0.0
+	unpriced: bool = False
 	trace_id: str = field(default_factory=lambda: secrets.token_hex(16))
 
 
@@ -86,8 +99,10 @@ def read_usage(usage: dict | None) -> dict:
 	u = usage if isinstance(usage, dict) else {}
 	in_d = u.get("prompt_tokens_details") or u.get("input_tokens_details") or {}
 	out_d = u.get("completion_tokens_details") or u.get("output_tokens_details") or {}
-	inp = _int(u.get("prompt_tokens", u.get("input_tokens")))
-	out = _int(u.get("completion_tokens", u.get("output_tokens")))
+	inp = _int(u.get("prompt_tokens") if u.get("prompt_tokens") is not None else u.get("input_tokens"))
+	out = _int(
+		u.get("completion_tokens") if u.get("completion_tokens") is not None else u.get("output_tokens")
+	)
 	return {
 		"input_tokens": inp,
 		"output_tokens": out,
@@ -114,17 +129,40 @@ def read_response(data: dict) -> dict:
 
 
 class _StreamReader:
-	"""Reads usage, tool calls and the finish reason out of a server-sent-events reply as it passes."""
+	"""Reads usage, tool calls and the finish reason out of a server-sent-events reply as it passes,
+	event by event, and says which events to pass on (the usage-only chunk the proxy asked for on
+	the script's behalf is read and dropped, so the script sees the stream it asked for)."""
 
-	def __init__(self):
+	ENDS = ("response.completed", "response.incomplete", "response.failed")
+
+	def __init__(self, drop_usage_chunk: bool = False):
 		self.buf = b""
 		self.found: dict = {"tool_calls": 0}
 		self._tool_ids: set = set()
+		self.drop_usage_chunk = drop_usage_chunk
+		self.overflow = False
 
-	def feed(self, chunk: bytes) -> None:
-		self.buf += chunk
-		while b"\n" in self.buf:
-			line, self.buf = self.buf.split(b"\n", 1)
+	def feed(self, chunk: bytes) -> bytes:
+		"""The bytes of the whole events in buf so far that go on to the script."""
+		self.buf += chunk.replace(b"\r\n", b"\n")
+		out = []
+		while b"\n\n" in self.buf:
+			event, self.buf = self.buf.split(b"\n\n", 1)
+			if self._event_bytes(event):
+				out.append(event + b"\n\n")
+		if len(self.buf) > MAX_EVENT_BYTES:
+			self.overflow = True
+		return b"".join(out)
+
+	def rest(self) -> bytes:
+		left, self.buf = self.buf, b""
+		if left.strip():
+			self._event_bytes(left)
+		return left
+
+	def _event_bytes(self, event: bytes) -> bool:
+		keep = True
+		for line in event.split(b"\n"):
 			line = line.strip()
 			if not line.startswith(b"data:"):
 				continue
@@ -137,16 +175,24 @@ class _StreamReader:
 				continue
 			if isinstance(ev, dict):
 				self._event(ev)
+				if self.drop_usage_chunk and ev.get("usage") and ev.get("choices") == []:
+					keep = False
+		return keep
 
 	def _event(self, ev: dict) -> None:
 		if isinstance(ev.get("model"), str):
 			self.found["model"] = ev["model"]
 		if ev.get("usage"):
 			self.found.update(read_usage(ev["usage"]))
+		err = ev.get("error")
+		if isinstance(err, dict):
+			self.found["error"] = str(err.get("code") or err.get("type") or "error")[:64]
 		resp = ev.get("response")
-		if ev.get("type") == "response.completed" and isinstance(resp, dict):  # responses API
+		if ev.get("type") in self.ENDS and isinstance(resp, dict):  # responses API
 			done = read_response(resp)
 			self.found.update({k: v for k, v in done.items() if v is not None})
+			if ev["type"] != "response.completed":
+				self.found["finish_reason"] = ev["type"].split(".", 1)[1]
 			return
 		for ch in ev.get("choices") or []:
 			if not isinstance(ch, dict):
@@ -157,6 +203,13 @@ class _StreamReader:
 				if isinstance(tc, dict):
 					self._tool_ids.add(tc.get("index", tc.get("id")))
 					self.found["tool_calls"] = len(self._tool_ids)
+
+
+def _error_code(data) -> str | None:
+	err = data.get("error") if isinstance(data, dict) else None
+	if isinstance(err, dict):
+		return str(err.get("code") or err.get("type") or "error")[:64]
+	return None
 
 
 class AgentProxy:
@@ -178,9 +231,12 @@ class AgentProxy:
 		self.max_calls_per_task = max_calls_per_task
 		self.max_usd_per_task = max_usd_per_task
 		self.max_usd_total = max_usd_total
-		self._client = httpx.Client(timeout=httpx.Timeout(timeout_s, connect=10.0), transport=transport)
+		# identity: the reply is relayed as it comes, and the script must get bytes it can read
+		self._client = httpx.Client(timeout=httpx.Timeout(timeout_s, connect=10.0), transport=transport,
+			headers={"Accept-Encoding": "identity"})  # fmt: skip
 		self._lock = threading.Lock()
 		self._tasks: dict[str, _Task] = {}
+		self._tokens: dict[str, str] = {}  # path token -> task id
 		self._server: ThreadingHTTPServer | None = None
 
 	# ------------------------------------------------------------- lifecycle
@@ -198,21 +254,27 @@ class AgentProxy:
 				proxy._handle(self)
 
 			def do_GET(self):
-				self._send_json(404, {"error": {"type": "not_found", "message": "preflight: POST only"}})
-
-			def _send_json(self, status, obj):
-				_reply(self, status, obj)
+				_reply(
+					self, 404, {"error": {"type": "not_found", "message": "preflight: POST only"}}, close=True
+				)
 
 		self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 		self._server.daemon_threads = True
 		threading.Thread(target=self._server.serve_forever, name="agent-proxy", daemon=True).start()
 		return self._server.server_address[0], self._server.server_address[1]
 
-	def base_url(self, task_id: str) -> str:
+	def open_task(self, task_id: str) -> str:
+		"""The base URL for one task's process: only it knows the token in the path."""
 		if self._server is None:
 			raise RuntimeError("start() the proxy first")
+		if not _TASK_ID.fullmatch(task_id):
+			raise ValueError(f"task id {task_id!r}: letters, digits, '_', '.', '-', up to 64")
+		token = secrets.token_urlsafe(24)
+		with self._lock:
+			self._tokens[token] = task_id
+			self._tasks.setdefault(task_id, _Task())
 		host, port = self._server.server_address[:2]
-		return f"http://{host}:{port}/t/{task_id}/v1"
+		return f"http://{host}:{port}/t/{token}/v1"
 
 	def stop(self) -> None:
 		if self._server is not None:
@@ -227,57 +289,80 @@ class AgentProxy:
 		with self._lock:
 			return sum(c.usd for t in self._tasks.values() for c in t.calls)
 
+	def _rate_for(self, model: str | None):
+		return self._rate(model) if (self._rate is not None and model) else None
+
 	def _price(self, model: str | None, u: dict) -> float:
-		r = self._rate(model) if (self._rate is not None and model) else None
+		r = self._rate_for(model)
 		if r is None:
 			return 0.0
 		return float(
 			r.usd(u.get("input_tokens", 0), u.get("output_tokens", 0), u.get("cached_input_tokens", 0))
 		)
 
-	def _admit(self, task_id: str, body: bytes) -> str | None:
-		"""Whether this call may go out; when not, the reason the task is stopped."""
+	def _worst_case_usd(self, req: dict, body: bytes) -> float:
+		"""What the call can cost at most: its whole body as input, its max output, uncached."""
+		cap = next((req[k] for k in ("max_tokens", "max_completion_tokens", "max_output_tokens")
+			if _int(req.get(k))), DEFAULT_MAX_OUTPUT_TOKENS)  # fmt: skip
+		return self._price(
+			req.get("model"), {"input_tokens": len(body) // CHARS_PER_TOKEN + 1, "output_tokens": cap}
+		)
+
+	def _admit(self, task_id: str, req: dict, body: bytes) -> tuple[str | None, float]:
+		"""Whether this call may go out (None) or why the task is stopped, and the dollars reserved."""
 		h = hashlib.sha256(body).hexdigest()
+		priced = self._rate is None or self._rate_for(req.get("model")) is not None
+		reserve = self._worst_case_usd(req, body) if self._rate is not None and priced else 0.0
 		with self._lock:
 			t = self._tasks.setdefault(task_id, _Task())
 			if t.stopped:
-				return t.stopped
+				return t.stopped, 0.0
+			if not priced:
+				t.unpriced = True
+				return "unpriced_model", 0.0  # this call only; the task may go on with a priced model
 			t.repeats = t.repeats + 1 if h == t.last_hash else 1
 			t.last_hash = h
-			spent_task = sum(c.usd for c in t.calls)
-			spent = sum(c.usd for x in self._tasks.values() for c in x.calls)
+			spent_task = sum(c.usd for c in t.calls) + t.reserved_usd
+			spent = sum(c.usd for x in self._tasks.values() for c in x.calls) + sum(
+				x.reserved_usd for x in self._tasks.values()
+			)
 			if t.repeats >= REPEATS_FOR_LOOP:
 				t.stopped = "loop"
-			elif len(t.calls) >= self.max_calls_per_task:
+			elif len(t.calls) + t.in_flight >= self.max_calls_per_task:
 				t.stopped = "max_turns"
-			elif spent_task >= self.max_usd_per_task or spent >= self.max_usd_total:
+			elif spent_task + reserve > self.max_usd_per_task or spent + reserve > self.max_usd_total:
 				t.stopped = "budget"
-			return t.stopped
+			if t.stopped:
+				return t.stopped, 0.0
+			t.in_flight += 1
+			t.reserved_usd += reserve
+			return None, reserve
 
-	def _log(self, task_id: str, call: Call) -> None:
+	def _log(self, task_id: str, call: Call, reserved: float) -> None:
 		with self._lock:
-			self._tasks.setdefault(task_id, _Task()).calls.append(call)
+			t = self._tasks.setdefault(task_id, _Task())
+			t.in_flight -= 1
+			t.reserved_usd = max(0.0, t.reserved_usd - reserved)
+			t.calls.append(call)
 
 	# ------------------------------------------------------------- one request
 
 	def _handle(self, h: BaseHTTPRequestHandler) -> None:
 		m = _PATH.match(h.path.split("?", 1)[0])
-		if m is None or m["rest"] not in FORWARDED:
-			_reply(
-				h, 404, {"error": {"type": "not_found", "message": "preflight: not a generation endpoint"}}
-			)
+		with self._lock:
+			task_id = self._tokens.get(m["token"]) if m else None
+		if m is None or m["rest"] not in FORWARDED or task_id is None:
+			_reply(h, 404, {"error": {"type": "not_found", "message": "preflight: not a generation endpoint"}},
+				close=True)  # fmt: skip
 			return
-		task_id, rest = m["task"], m["rest"]
+		rest = m["rest"]
 		try:
 			n = int(h.headers.get("Content-Length") or 0)
 		except ValueError:
 			n = -1
-		if not 0 < n <= MAX_BODY_BYTES:
-			_reply(
-				h,
-				413,
-				{"error": {"type": "invalid_request", "message": "preflight: body missing or too large"}},
-			)
+		if not 0 < n <= MAX_BODY_BYTES or h.headers.get("Transfer-Encoding"):
+			_reply(h, 413, {"error": {"type": "invalid_request", "message": "preflight: body missing or too large"}},
+				close=True)  # fmt: skip
 			return
 		body = h.rfile.read(n)
 		try:
@@ -291,97 +376,125 @@ class AgentProxy:
 				{"error": {"type": "invalid_request", "message": "preflight: body is not a JSON object"}},
 			)
 			return
-		why = self._admit(task_id, body)
+		why, reserved = self._admit(task_id, req, body)
+		if why == "unpriced_model":
+			_reply(h, 400, {"error": {"type": "preflight_unpriced_model", "code": why,
+				"message": "preflight: this model has no price, so the sample can't be costed"}})  # fmt: skip
+			self._note(task_id, req, why)
+			return
 		if why:
 			_reply(h, 429, {"error": {"type": "preflight_task_stopped", "code": why,
 				"message": f"preflight: this task was stopped ({why}); it counts as a runaway in the sample"}})  # fmt: skip
 			return
-		stream = bool(req.get("stream"))
-		if stream and rest == "chat/completions":
-			# the usage arrives only when asked for; the script's own chunks are unchanged otherwise
-			opts = req.get("stream_options") if isinstance(req.get("stream_options"), dict) else {}
-			req["stream_options"] = {**opts, "include_usage": True}
+		stream = req.get("stream") is True
+		asked = (
+			isinstance(req.get("stream_options"), dict) and req["stream_options"].get("include_usage") is True
+		)
+		inject = stream and rest in ("chat/completions", "completions") and not asked
+		if inject:
+			# the usage arrives only when asked for; the extra chunk it adds is read and dropped
+			req["stream_options"] = {**(req.get("stream_options") or {}), "include_usage": True}
 			body = json.dumps(req).encode()
 		headers = {k: v for k, v in h.headers.items() if k.lower() not in _DROP_HEADERS}
 		headers.update({"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})
 		started, t0 = time.time(), time.monotonic()
-		call = Call(start=started, seconds=0.0, status=0, model=req.get("model") if isinstance(req.get("model"), str) else None,
-			stream=stream)  # fmt: skip
+		model = req.get("model") if isinstance(req.get("model"), str) else None
+		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
+		sent = [False]  # this request's reply has started: a failure now can only close the connection
+		last: list[bytes] = []  # the reply's last bytes, written once the call is logged
 		try:
 			if stream:
-				self._relay_stream(h, f"{self.upstream}/{rest}", headers, body, call)
-			else:
-				self._relay(h, f"{self.upstream}/{rest}", headers, body, call)
-		except httpx.HTTPError as exc:
-			call.status, call.error = 502, type(exc).__name__
-			if not getattr(h, "_started", False):
-				_reply(
-					h,
-					502,
-					{
-						"error": {
-							"type": "upstream_unreachable",
-							"message": "preflight: the provider didn't answer",
-						}
-					},
+				self._relay_stream(
+					h, f"{self.upstream}/{rest}", headers, body, call, sent, last, drop_usage=inject
 				)
+			else:
+				self._relay(h, f"{self.upstream}/{rest}", headers, body, call, sent, last)
+		except (httpx.HTTPError, OSError) as exc:
+			call.status = call.status or 502
+			call.error = call.error or type(exc).__name__
+			if sent[0]:
+				h.close_connection = True
+			else:
+				with contextlib.suppress(OSError):
+					_reply(h, 502, {"error": {"type": "upstream_unreachable",
+						"message": "preflight: the provider didn't answer"}}, close=True)  # fmt: skip
 		finally:
 			call.seconds = time.monotonic() - t0
-			call.usd = self._price(call.model, call.__dict__)
-			self._log(task_id, call)
+			call.usd = self._price(call.model or model, call.__dict__)
+			# logged before the script gets its last byte: once its call returns, the task is counted
+			self._log(task_id, call, reserved)
+		if last:
+			with contextlib.suppress(OSError):
+				h.wfile.write(b"".join(last))
+				h.wfile.flush()
 
-	def _relay(self, h, url, headers, body, call: Call) -> None:
+	def _note(self, task_id: str, req: dict, error: str) -> None:
+		"""A call refused before it went out, counted as an error."""
+		model = req.get("model") if isinstance(req.get("model"), str) else None
+		with self._lock:
+			self._tasks.setdefault(task_id, _Task()).calls.append(
+				Call(start=time.time(), seconds=0.0, status=400, model=model, error=error)
+			)
+
+	def _relay(self, h, url, headers, body, call: Call, sent: list, last: list) -> None:
 		r = self._client.post(url, content=body, headers=headers)
 		call.status = r.status_code
 		data = None
 		with contextlib.suppress(ValueError):
 			data = r.json()
-		if isinstance(data, dict):
-			if r.status_code < 400:
-				for k, v in read_response(data).items():
-					if v is not None:
-						setattr(call, k, v)
-			else:
-				err = data.get("error")
-				call.error = (
-					str((err or {}).get("code") or (err or {}).get("type") or r.status_code)[:64]
-					if isinstance(err, dict)
-					else str(r.status_code)
-				)
+		if r.status_code < 400 and isinstance(data, dict):
+			for k, v in read_response(data).items():
+				if v is not None:
+					setattr(call, k, v)
 		elif r.status_code >= 400:
-			call.error = str(r.status_code)
+			call.error = _error_code(data) or str(r.status_code)
+		sent[0] = True
 		h.send_response(r.status_code)
 		for k, v in r.headers.items():
 			if k.lower() not in _HOP:
 				h.send_header(k, v)
 		h.send_header("Content-Length", str(len(r.content)))
 		h.end_headers()
-		h.wfile.write(r.content)
+		h.wfile.write(r.content[:-1])
+		last.append(r.content[-1:])
 
-	def _relay_stream(self, h, url, headers, body, call: Call) -> None:
-		reader = _StreamReader()
-		with self._client.stream("POST", url, content=body, headers=headers) as r:
-			call.status = r.status_code
-			h.send_response(r.status_code)
-			for k, v in r.headers.items():
-				if k.lower() not in _HOP:
-					h.send_header(k, v)
-			h.send_header("Transfer-Encoding", "chunked")
-			h.end_headers()
-			h._started = True
-			for chunk in r.iter_raw():
-				if not chunk:
-					continue
-				reader.feed(chunk)
-				h.wfile.write(b"%x\r\n%s\r\n" % (len(chunk), chunk))
+	def _relay_stream(
+		self, h, url, headers, body, call: Call, sent: list, last: list, *, drop_usage: bool
+	) -> None:
+		reader = _StreamReader(drop_usage_chunk=drop_usage)
+
+		def write(data: bytes) -> None:
+			if data:
+				h.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
 				h.wfile.flush()
-			h.wfile.write(b"0\r\n\r\n")
-			h.wfile.flush()
-		if r.status_code >= 400:
-			call.error = str(r.status_code)
-		for k, v in reader.found.items():
-			if v is not None:
-				setattr(call, k, v)
+
+		try:
+			with self._client.stream("POST", url, content=body, headers=headers) as r:
+				call.status = r.status_code
+				sent[0] = True
+				h.send_response(r.status_code)
+				for k, v in r.headers.items():
+					if k.lower() not in _HOP:
+						h.send_header(k, v)
+				h.send_header("Transfer-Encoding", "chunked")
+				h.end_headers()
+				if r.status_code >= 400:  # an error body, not events: pass it on and read its code
+					raw = r.read()
+					with contextlib.suppress(ValueError):
+						call.error = _error_code(json.loads(raw)) or str(r.status_code)
+					call.error = call.error or str(r.status_code)
+					write(raw)
+				else:
+					for chunk in r.iter_bytes():
+						write(reader.feed(chunk))
+						if reader.overflow:
+							raise OSError("an event past the size cap")
+					write(reader.rest())
+				last.append(b"0\r\n\r\n")
+		finally:
+			for k, v in reader.found.items():  # what was read before any failure is still billed
+				if v is not None and not (k == "error" and call.error):
+					setattr(call, k, v)
 
 	# ------------------------------------------------------------- results
 
@@ -394,7 +507,7 @@ class AgentProxy:
 		"""The task as the record's AgentTask: turns are the calls the provider answered."""
 		with self._lock:
 			t = self._tasks.get(task_id, _Task())
-			calls, stopped = list(t.calls), t.stopped
+			calls, stopped, unpriced = list(t.calls), t.stopped, t.unpriced
 		ok = [c for c in calls if c.status and c.status < 400]
 		models = [c.model for c in ok if c.model]
 		if stopped in ("loop", "max_turns"):
@@ -425,7 +538,7 @@ class AgentProxy:
 			latency_s=round(wall_s if wall_s is not None else span, 3),
 			success=success,
 			context_tokens_by_turn=[c.input_tokens for c in ok],
-			cost_usd=round(sum(c.usd for c in calls), 6) if self._rate is not None else None,
+			cost_usd=round(sum(c.usd for c in calls), 6) if self._rate is not None and not unpriced else None,
 			stop_reason=reason,
 		)
 
@@ -466,10 +579,15 @@ class AgentProxy:
 		return out
 
 
-def _reply(h: BaseHTTPRequestHandler, status: int, obj: dict) -> None:
+def _reply(h: BaseHTTPRequestHandler, status: int, obj: dict, *, close: bool = False) -> None:
+	"""A reply of the proxy's own. close: the request's body may be unread, so the connection can't
+	carry another request."""
 	data = json.dumps(obj).encode()
 	h.send_response(status)
 	h.send_header("Content-Type", "application/json")
 	h.send_header("Content-Length", str(len(data)))
+	if close:
+		h.send_header("Connection", "close")
+		h.close_connection = True
 	h.end_headers()
 	h.wfile.write(data)

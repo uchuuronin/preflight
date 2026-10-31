@@ -92,9 +92,19 @@ def setup():
 	prov.server.shutdown()
 
 
-def _chat(proxy, task, **extra):
+_URLS: dict = {}
+
+
+def _url(proxy, task):
+	key = (id(proxy), task)
+	if key not in _URLS:
+		_URLS[key] = proxy.open_task(task)
+	return _URLS[key]
+
+
+def _chat(proxy, task, client=httpx, **extra):
 	body = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": "do it"}], **extra}
-	return httpx.post(f"{proxy.base_url(task)}/chat/completions", json=body,
+	return client.post(f"{_url(proxy, task)}/chat/completions", json=body,
 		headers={"Authorization": "Bearer visitors-key", "Cookie": "s=1"}, timeout=10)  # fmt: skip
 
 
@@ -120,6 +130,9 @@ def test_a_streamed_call_is_counted_and_the_usage_is_asked_for(setup):
 	r = _chat(proxy, "t2", stream=True)
 	assert r.status_code == 200 and "data: [DONE]" in r.text  # the script still gets its stream
 	assert prov.seen[-1]["body"]["stream_options"] == {"include_usage": True}
+	assert '"choices": []' not in r.text  # the usage chunk it didn't ask for is not passed on
+	r = _chat(proxy, "t2b", stream=True, stream_options={"include_usage": True})
+	assert '"choices": []' in r.text  # asked for, so kept
 	c = proxy.calls("t2")[0]
 	assert (c.input_tokens, c.output_tokens, c.tool_calls, c.finish_reason) == (1200, 30, 1, "tool_calls")
 
@@ -127,7 +140,7 @@ def test_a_streamed_call_is_counted_and_the_usage_is_asked_for(setup):
 def test_the_responses_api_is_read_too(setup):
 	_, proxy = setup
 	r = httpx.post(
-		f"{proxy.base_url('t3')}/responses", json={"model": "muse-spark-1.3", "input": "x"}, timeout=10
+		f"{_url(proxy, 't3')}/responses", json={"model": "muse-spark-1.3", "input": "x"}, timeout=10
 	)
 	assert r.status_code == 200
 	t = proxy.task("t3")
@@ -154,11 +167,17 @@ def test_call_and_dollar_caps_stop_a_runaway(setup):
 		assert codes == [200, 200, 429] and proxy.task("t6").stop_reason == "max_turns"
 	finally:
 		proxy.stop()
-	proxy = AgentProxy(prov.url, "k", rate=token_rate, max_usd_total=1e-9)
+	# a total purse with room for one call's worst case: the first goes out, the next can't fit
+	small = {"max_tokens": 50}
+	probe = AgentProxy(prov.url, "k", rate=token_rate)
+	body = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": "do it"}], **small}
+	one = probe._worst_case_usd(body, json.dumps(body).encode())
+	probe.stop()
+	proxy = AgentProxy(prov.url, "k", rate=token_rate, max_usd_total=one * 1.5)
 	proxy.start()
 	try:
-		assert _chat(proxy, "a").status_code == 200
-		assert _chat(proxy, "b").status_code == 429  # the sample's purse is spent
+		assert _chat(proxy, "a", **small).status_code == 200
+		assert _chat(proxy, "b", **small).status_code == 429  # the sample's purse is spent
 		assert proxy.task("b").stop_reason == "max_turns"
 	finally:
 		proxy.stop()
@@ -174,13 +193,111 @@ def test_provider_errors_are_counted_without_their_message(setup):
 	assert "secret detail" not in json.dumps(proxy.spans("t7"))
 
 
-@pytest.mark.parametrize("path", ["/t/x/v1/files", "/t/../v1/chat/completions", "/v1/chat/completions",
-	"/t/" + "a" * 65 + "/v1/chat/completions"])  # fmt: skip
-def test_only_generation_endpoints_are_forwarded(setup, path):
+@pytest.mark.parametrize("path", ["/t/{tok}/v1/files", "/t/notarealtokenatall123/v1/chat/completions",
+	"/v1/chat/completions", "/t/t1/v1/chat/completions"])  # fmt: skip
+def test_only_generation_endpoints_of_opened_tasks_are_forwarded(setup, path):
 	prov, proxy = setup
+	tok = _url(proxy, "t1").split("/t/", 1)[1].split("/", 1)[0]
 	host, port = proxy._server.server_address[:2]
-	r = httpx.post(f"http://{host}:{port}{path}", json={"model": "m"}, timeout=10)
+	r = httpx.post(f"http://{host}:{port}{path.format(tok=tok)}", json={"model": "m"}, timeout=10)
 	assert r.status_code == 404 and not prov.seen
+	with pytest.raises(ValueError):
+		proxy.open_task("../t1")
+
+
+def test_parallel_calls_cant_spend_past_the_cap(setup):
+	prov, _proxy = setup
+	rate = token_rate("muse-spark-1.3")
+	one = rate.usd(100, 50)  # what the reservation allows for, for one call (max_tokens 50)
+	proxy = AgentProxy(prov.url, "k", rate=token_rate, max_usd_per_task=one * 3.5)
+	proxy.start()
+	try:
+		from concurrent.futures import ThreadPoolExecutor
+
+		url = proxy.open_task("par")
+		body = {"model": "muse-spark-1.3", "max_tokens": 50, "messages": [{"role": "user", "content": "x"}]}
+
+		def go(i):
+			return httpx.post(f"{url}/chat/completions", json={**body, "n_": i}, timeout=10).status_code
+
+		with ThreadPoolExecutor(20) as pool:
+			codes = list(pool.map(go, range(20)))
+		assert codes.count(200) <= 3 and len(prov.seen) == codes.count(200)
+	finally:
+		proxy.stop()
+
+
+def test_a_model_without_a_price_is_refused_and_the_task_is_not_costed(setup):
+	prov, proxy = setup
+	r = _chat(proxy, "u1", model="someone-elses-model")
+	assert r.status_code == 400 and r.json()["error"]["code"] == "unpriced_model" and not prov.seen
+	assert proxy.task("u1").cost_usd is None and proxy.task("u1").errors == 1
+
+
+def test_a_failure_after_the_stream_started_closes_cleanly_and_keeps_the_usage():
+
+	def handler(request):
+		def gen():
+			yield b'data: {"model": "muse-spark-1.3", "choices": [], "usage": {"prompt_tokens": 7, "completion_tokens": 3}}\n\n'
+			raise httpx.ReadError("provider went away")
+
+		return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=_Gen(gen()))
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		with httpx.Client(timeout=5) as c:
+			with pytest.raises(httpx.HTTPError):
+				_chat(proxy, "s1", client=c, stream=True, stream_options={"include_usage": True}).read()
+			call = proxy.calls("s1")[0]
+			assert (call.input_tokens, call.output_tokens) == (7, 3) and call.error
+			# the same client goes on: the broken connection was closed, not left hanging
+			assert _chat(proxy, "s2", client=c).status_code in (200, 502)
+	finally:
+		proxy.stop()
+
+
+class _Gen(httpx.SyncByteStream):
+	def __init__(self, it):
+		self.it = it
+
+	def __iter__(self):
+		yield from self.it
+
+
+def test_a_compressed_reply_reaches_the_script_readable():
+	import gzip
+
+	events = b'data: {"model": "m", "choices": [{"delta": {}, "finish_reason": "stop"}]}\n\ndata: {"choices": [], "usage": {"prompt_tokens": 5, "completion_tokens": 1}}\n\ndata: [DONE]\n\n'
+	seen = {}
+
+	def handler(request):
+		seen["enc"] = request.headers.get("accept-encoding")
+		if seen["enc"] == "identity":
+			return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=events)
+		return httpx.Response(200, headers={"content-type": "text/event-stream", "content-encoding": "gzip"},
+			content=gzip.compress(events))  # fmt: skip
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		r = _chat(proxy, "z1", stream=True)
+		assert seen["enc"] == "identity" and r.text.startswith("data: ")
+		assert proxy.calls("z1")[0].input_tokens == 5
+	finally:
+		proxy.stop()
+
+
+def test_an_early_refusal_doesnt_poison_the_connection(setup):
+	_prov, proxy = setup
+	tok = _url(proxy, "k1").split("/t/", 1)[1].split("/", 1)[0]
+	host, port = proxy._server.server_address[:2]
+	with httpx.Client(timeout=5) as c:
+		assert (
+			c.post(f"http://{host}:{port}/t/{tok}/v1/embeddings", json={"input": "x" * 1000}).status_code
+			== 404
+		)
+		assert _chat(proxy, "k1", client=c).status_code == 200
 
 
 def test_usage_shapes_are_read_defensively():
