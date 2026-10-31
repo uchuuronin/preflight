@@ -295,3 +295,20 @@ def test_a_closure_loop_keeps_its_forward_out_of_the_optimizer():
 	assert r.probe.status == "ok", r.probe.error
 	ph = r.probe.step_time.by_phase
 	assert ph["forward"] > ph["optimizer"]
+
+
+def test_an_image_batch_records_its_size_and_layout():
+	r = run_probe(spec("vision_loop.py", warmup=1, timed=2))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["images_per_batch"] == 16 and ex["image_height"] == 32 and ex["image_width"] == 32
+	assert ex["channels_last"] == 1.0
+
+
+def test_a_sampled_graph_batch_records_nodes_edges_and_hops():
+	r = run_probe(spec("graph_loop.py", warmup=1, timed=2))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["graph_seed_nodes"] == 32 and ex["graph_nodes_hop1"] == 320 and ex["graph_nodes_hop2"] == 1600
+	assert ex["graph_nodes_per_batch"] == ex["graph_nodes_max"] == 32 + 320 + 1600
+	assert ex["graph_edges_per_batch"] == 320 + 1600

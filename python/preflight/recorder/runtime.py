@@ -56,6 +56,7 @@ PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zo
 PRETRAIN_EVAL_CAP = 8
 # synchronised steps after the timed ones, for the phase split (data/forward/backward/optimizer):
 # timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
+LENS_STATS_BATCHES = 64  # derived: enough batches to average a sampler's varying graph sizes
 PHASE_STEPS = (
 	2  # guess: two synchronised steps for the phase split; compare with the profiled window on zoo runs
 )
@@ -119,6 +120,38 @@ def _batch_stats(batch) -> tuple[int | None, int | None, int | None]:
 	tokens = int(ids.numel())
 	real = int(mask.sum().item()) if isinstance(mask, torch.Tensor) else tokens
 	return tokens, real, samples
+
+
+def _lens_stats(batch) -> dict[str, float]:
+	"""What the vision and graph lenses read from a training batch, by shape alone (no sync):
+	images (N, C, H, W) as the first tensor of the batch, and a PyG-style graph batch (num_nodes,
+	edge_index, batch_size seeds, num_sampled_nodes per hop)."""
+	out: dict[str, float] = {}
+	with suppress(Exception):
+		if hasattr(batch, "edge_index") and hasattr(batch, "num_nodes"):
+			out["graph_nodes_per_batch"] = float(batch.num_nodes)
+			ei = batch.edge_index
+			if isinstance(ei, torch.Tensor) and ei.dim() == 2:
+				out["graph_edges_per_batch"] = float(ei.shape[1])
+			seeds = getattr(batch, "batch_size", None)
+			if isinstance(seeds, int) and seeds > 0:
+				out["graph_seed_nodes"] = float(seeds)
+			hops = getattr(batch, "num_sampled_nodes", None)
+			if isinstance(hops, list | tuple):
+				for i, n in enumerate(hops[:4]):
+					out[f"graph_nodes_hop{i}"] = float(n)
+			return out
+		first = batch
+		if hasattr(batch, "keys") and hasattr(batch, "get"):
+			first = batch.get("pixel_values", batch.get("image", batch.get("images")))
+		elif isinstance(batch, list | tuple) and batch:
+			first = batch[0]
+		if isinstance(first, torch.Tensor) and first.dim() == 4 and first.is_floating_point():
+			n, c, h, w = (int(x) for x in first.shape)
+			if c in (1, 3, 4):
+				out["images_per_batch"] = float(n)
+				out["image_height"], out["image_width"] = float(h), float(w)
+	return out
 
 
 def _quantile(xs, q):
@@ -304,6 +337,8 @@ class Recorder:
 		# how long the real run is, for B's time.total: the training loader's batches per epoch,
 		# and from an HF Trainer its epochs and the optimizer steps it plans (state.max_steps)
 		self.train_loader_batches: int | None = None
+		self._train_iter: int | None = None
+		self.lens_stats: list[dict] = []  # vision and graph batch shapes, the first training batches
 		self._train_dataset = None
 		self.run_length: dict = {}
 		self._scalers: weakref.WeakSet = weakref.WeakSet()
@@ -514,6 +549,7 @@ class Recorder:
 					n = len(it)
 				rec.train_loader_batches = n if isinstance(n, int) and n > 0 else None
 				rec._train_dataset = getattr(it, "_dataset", None)  # its row lengths, read at the end
+				rec._train_iter = id(it)
 			rec._maybe_stop()
 			rec._sync()
 			t0 = rec._now()
@@ -536,6 +572,10 @@ class Recorder:
 				rec.acc["real"] += real
 			if samples is not None:
 				rec.acc["samples"] += samples
+			if not rec.eval_active and id(it) == rec._train_iter and len(rec.lens_stats) < LENS_STATS_BATCHES:
+				st = _lens_stats(batch)
+				if st:
+					rec.lens_stats.append(st)
 			rec._data_end = rec._now()
 			rec._data_end_bwd = False
 			return batch
@@ -1284,6 +1324,21 @@ class Recorder:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
+		if self.lens_stats:
+			# the mean over the batches seen, and the largest graph batch (the memory one)
+			keys = {k for st in self.lens_stats for k in st}
+			out.update({k: statistics.fmean(st[k] for st in self.lens_stats if k in st) for k in keys})
+			if any("graph_nodes_per_batch" in st for st in self.lens_stats):
+				out["graph_nodes_max"] = max(st.get("graph_nodes_per_batch", 0) for st in self.lens_stats)
+			if "images_per_batch" in out:
+				# the model's layout, from its conv weights (scripts convert the batch after the fetch)
+				with suppress(Exception):
+					convs = [
+						p for r in self._roots for p in r.parameters() if p.dim() == 4 and p.shape[-1] > 1
+					]
+					if convs:
+						out["channels_last"] = float(all(
+							p.is_contiguous(memory_format=torch.channels_last) and not p.is_contiguous() for p in convs))  # fmt: skip
 		out.update({k: v for k, v in self.run_length.items() if v is not None})
 		out["host_rss_peak_bytes"] = self._rss_peak or None
 		if self._kernels is not None:

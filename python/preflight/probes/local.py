@@ -120,6 +120,20 @@ EXTRAS_KEYS = (
 	"dataset_p999_tokens",
 	"dataset_rows_scanned",
 	"dataset_rows_total",
+	# vision: the batch's images (mean over the first training batches)
+	"images_per_batch",
+	"image_height",
+	"image_width",
+	"channels_last",
+	# graphs: a sampled batch's size, per hop (PyG NeighborLoader), and the largest batch seen
+	"graph_nodes_per_batch",
+	"graph_edges_per_batch",
+	"graph_seed_nodes",
+	"graph_nodes_hop0",
+	"graph_nodes_hop1",
+	"graph_nodes_hop2",
+	"graph_nodes_hop3",
+	"graph_nodes_max",
 )
 
 
