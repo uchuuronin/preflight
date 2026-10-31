@@ -165,6 +165,9 @@ class Deps:
 	# what a probe's sandbox costs beside its GPU (Modal bills sandbox CPU and memory at 3x list),
 	# counted against the job budget; 0 for local runs
 	overhead_usd_per_h: float = 0.0
+	# agent and API runs: runner/agent_jobs.py's sampler (the CLI's runs here with the user's key);
+	# None where no sampler is wired (the hosted runner, for now)
+	agent: Callable | None = None
 
 
 @dataclass
@@ -351,18 +354,17 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			raise InvalidSubmission(
 				"sampling more tasks is for agent and API runs", code="submission.not_agent"
 			)
-		# the agent sampler (OTel proxy) isn't built yet: say so rather than pretend
-		raise PermanentError(
-			"sampling more agent tasks isn't available yet", code="unsupported.agent_sampling"
-		)
+		return _sample_agent(rec, rev, fetched, sm, deps, ctx, top_up=True)
 	if rec.job.lens == "agent":
 		if followup:
 			raise InvalidSubmission(
 				"agent runs are measured by sampling tasks, not GPU probes", code="submission.not_gpu_job"
 			)
-		# agent runs are sampled by the agent recorder (OTel proxy), not by GPU probes
-		_emit(ctx, "harnessing", rec, rev, message="agent jobs run through the agent sampler")
-		return rec
+		if deps.agent is None:
+			# agent runs are sampled through the agent recorder's proxy, not by GPU probes
+			_emit(ctx, "harnessing", rec, rev, message="agent jobs run through the agent sampler")
+			return rec
+		return _sample_agent(rec, rev, fetched, sm, deps, ctx, top_up=False)
 
 	ctx.check()
 	_emit(ctx, "harnessing", rec, rev)
@@ -413,6 +415,40 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		finding = record_jobs.verify_finding(by_id[vid], by_id.get(f"{vid}-base"), plan_knobs, base_knobs,
 			{n.id for n in out.graph.nodes}, other_seed=by_id.get(f"{vid}-seed"))  # fmt: skip
 		out = out.model_copy(update={"findings": [*out.findings, finding]})
+	return out
+
+
+def _sample_agent(
+	rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx, *, top_up: bool
+) -> FlightRecord:
+	"""30 tasks of the agent run through the proxy, or 20 more on top of the record's sample (D3)."""
+	from preflight.engine.agent_cost import DEFAULT_SAMPLE, TOP_UP_TASKS, combine_samples
+	from preflight.recorder.agent_sampler import draw_indices
+
+	if deps.agent is None:
+		raise PermanentError(
+			"sampling agent tasks isn't available here yet", code="unsupported.agent_sampling"
+		)
+	first = rec.agent_sample
+	if top_up and (first is None or not first.tasks):
+		raise InvalidSubmission("this record has no task sample to add to; sample it first",
+			code="submission.no_sample")  # fmt: skip
+	ctx.check()
+	k = TOP_UP_TASKS if top_up else DEFAULT_SAMPLE
+	skip = len(first.tasks) if top_up else 0
+	population = getattr(getattr(sm, "agent", None), "n_tasks", None)
+	# the first sample's indices, offered first again so a script that reads them skips the same tasks
+	exclude = tuple(draw_indices(population, DEFAULT_SAMPLE) or ()) if top_up else ()
+	_emit(ctx, "probing", rec, rev, message=f"sampling {k} tasks through the agent proxy"
+		+ (f", after the {skip} already sampled" if skip else ""))  # fmt: skip
+	sample = deps.agent(fetched, sm, k=k, skip=skip, exclude=exclude, run_id="s2" if top_up else "s1")
+	if not sample.tasks:
+		raise PermanentError("the script made no model calls through the proxy: is its client reading "
+			"OPENAI_BASE_URL?", code="probe.no_agent_calls")  # fmt: skip
+	if top_up:
+		sample = combine_samples(first, sample)
+	out = rec.model_copy(update={"agent_sample": sample})
+	_emit(ctx, "probing", out, deps.records.put(out), message=f"{len(sample.tasks)} tasks sampled")
 	return out
 
 

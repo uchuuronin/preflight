@@ -67,3 +67,20 @@ def test_draws_are_seeded_and_exclude_what_was_run():
 	b = draw_indices(500, 20, exclude=a)
 	assert not set(a) & set(b)
 	assert draw_indices(None, 30) is None and draw_indices(5, 30) == [0, 1, 2, 3, 4]
+
+
+def test_the_cli_sampler_runs_the_files_with_the_proxy_holding_the_key(tmp_path):
+	from preflight.runner.agent_jobs import local_sampler
+	from preflight.runner.sources import Fetched
+	from preflight.schema.script_map import AgentInfo, ScriptMap
+
+	prov = Provider()
+	try:
+		sample = local_sampler(prov.url, "users-key")
+		fetched = Fetched(files={"run.py": (FIX / "fake_agent.py").read_text()}, entrypoint="run.py")
+		sm = ScriptMap.model_construct(agent=AgentInfo(client="openai", n_tasks=100))
+		out = sample(fetched, sm, k=5, env=dict(os.environ))
+		assert len(out.tasks) == 5 and out.population == 100
+		assert {s["auth"] for s in prov.seen} == {"Bearer users-key"}
+	finally:
+		prov.server.shutdown()
