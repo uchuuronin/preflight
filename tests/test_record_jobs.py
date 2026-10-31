@@ -543,3 +543,19 @@ def test_a_patch_that_doesnt_apply_or_adds_a_file_is_refused(tmp_path):
 	with pytest.raises(InvalidSubmission) as exc:
 		run_pipeline(_on(parent, "verify", patch=new), _Ctx(), _deps(tmp_path, LossRunner()))
 	assert exc.value.code == "patch.not_allowed"
+
+
+SHIFT = "--- a/train.py\n+++ b/train.py\n@@ -1,3 +1,4 @@\n \n import torch\n+import os\n batch_size = 8\n"
+
+
+def test_a_patch_that_moves_lines_still_sets_the_knobs_and_its_probes_are_marked(tmp_path):
+	"""Review, Oct 31: knobs were found by their line in the unpatched code."""
+	parent, _ = _parent(tmp_path)
+	runner = LossRunner()
+	rec = run_pipeline(
+		_on(parent, "probe", knobs={"batch_size": 4}, patch=SHIFT), _Ctx(), _deps(tmp_path, runner)
+	)
+	src = runner.calls[-1]["files"]["train.py"]
+	assert "import os" in src and "batch_size = 4" in src
+	new = [p for p in rec.probes if p.id not in {q.id for q in parent.probes}]
+	assert new and all(p.status == "ok" and p.extras.get("patched") == 1.0 for p in new)

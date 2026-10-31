@@ -128,7 +128,6 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	t0 = time.monotonic()
 	proc = launch(child_env) if launch is not None else _LocalProc(cmd, cwd, child_env)
 	cut = None
-	stalled_tasks: set[str] = set()
 	while True:
 		try:
 			if proc.poll() is not None:
@@ -136,11 +135,7 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		except Exception:  # the sandbox went away under us: what was measured still counts
 			cut = "lost"
 			break
-		stats = proxy.run_stats(run_id)
-		idle = stats.get("idle_s")
-		# a task waiting on its tools past the cutoff is stalled on its own (D's plant 3), even while
-		# the script's other workers still call the model
-		stalled_tasks.update(t for t, w in (stats.get("tool_wait_s") or {}).items() if w > stall_s)
+		idle = proxy.run_stats(run_id).get("idle_s")
 		if time.monotonic() - t0 > timeout_s:
 			cut = "timeout"
 		elif should_stop is not None and should_stop():
@@ -153,12 +148,18 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	if cut is None and time.monotonic() - t0 >= timeout_s - 5:
 		cut = "timeout"  # ended by its sandbox's own limit, at about the same time
 	at_cut = proxy.run_stats(run_id) if cut else {}
-	in_flight = {*at_cut.get("in_flight", []), *at_cut.get("mid_tool", [])}
+	# the tasks open when the script was stopped: those with a call in flight, then as many of the
+	# ones waiting on a tool as the script had workers (the most recent waits; an older task that
+	# ended on a tool call, a submit, finished and its worker moved on)
+	waiting = sorted((at_cut.get("tool_wait_s") or {}).items(), key=lambda kv: kv[1])
+	in_flight = set(at_cut.get("in_flight", []))
+	free = max(0, (at_cut.get("peak_concurrent") or 1) - len(in_flight))
+	open_tools = {t for t, _ in waiting[:free]}
+	stalled_tasks = open_tools if cut == "stalled" else set()  # stuck on a tool, no model call since
+	in_flight |= open_tools - stalled_tasks
 	proc.kill()
 	wall = time.monotonic() - t0
 	ids = proxy.run_tasks(run_id)
-	if cut == "stalled":
-		stalled_tasks.update(at_cut.get("mid_tool", []))
 	tasks = [proxy.task(t, timed_out=t in in_flight and t not in stalled_tasks, stalled=t in stalled_tasks)
 		for t in ids]  # fmt: skip
 	st = proxy.run_stats(run_id)

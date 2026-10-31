@@ -77,6 +77,7 @@ class Call:
 	usd: float = 0.0
 	stream: bool = False
 	response_id: str | None = None  # responses API: the next turn names it as previous_response_id
+	end_mono: float = 0.0  # time.monotonic() when it was logged, for the wait since
 	span_id: str = field(default_factory=lambda: secrets.token_hex(8))
 
 
@@ -95,6 +96,7 @@ class _Run:
 	system: dict[str, str | None] = field(default_factory=dict)  # task -> its last system prompt hash
 	last_call_at: float | None = None  # monotonic: any call through the run, refused ones too
 	budget_hit: bool = False  # a task was refused because the proxy's dollar cap was reached
+	peak_concurrent: int = 0  # the most tasks with a call in flight at once: the script's workers
 
 
 def _h(x) -> str:
@@ -410,9 +412,10 @@ class AgentProxy:
 				"in_flight": [tid for tid, t in ts.items() if t.in_flight > 0],
 				# a task whose last answer asked for a tool was mid-task (running the tool) if cut now
 				"mid_tool": [tid for tid, t in ts.items() if t.calls and t.calls[-1].finish_reason == "tool_calls"],
-				# a task waiting on its tools: seconds since its last answer (that asked for a tool) ended
-				"tool_wait_s": {tid: time.time() - (t.calls[-1].start + t.calls[-1].seconds) for tid, t in ts.items()
+				# a task whose last answer asked for a tool: seconds since that answer was logged
+				"tool_wait_s": {tid: time.monotonic() - t.calls[-1].end_mono for tid, t in ts.items()
 					if t.calls and not t.in_flight and t.calls[-1].finish_reason == "tool_calls"},
+				"peak_concurrent": run.peak_concurrent,
 				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1),
 				"budget_hit": run.budget_hit,
 				# since the last call started or ended; never idle while a call is in flight
@@ -557,6 +560,9 @@ class AgentProxy:
 			if t.stopped:
 				return t.stopped, 0.0
 			t.in_flight += 1
+			for run in (r for r in self._tokens.values() if isinstance(r, _Run) and task_id in r.last):
+				run.peak_concurrent = max(run.peak_concurrent,
+					sum(1 for tid in run.order if self._tasks.get(tid, _Task()).in_flight > 0))  # fmt: skip
 			t.reserved_usd += reserve
 			return None, reserve
 
@@ -564,7 +570,7 @@ class AgentProxy:
 		with self._lock:
 			t = self._tasks.setdefault(task_id, _Task())
 			t.in_flight -= 1
-			self._last_activity = time.monotonic()
+			call.end_mono = self._last_activity = time.monotonic()
 			with contextlib.suppress(ValueError):
 				t.open.remove(call)
 			t.reserved_usd = max(0.0, t.reserved_usd - reserved)

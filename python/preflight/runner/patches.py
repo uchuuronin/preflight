@@ -4,7 +4,8 @@ before a probe or verify job.
 Only edits to files the record already has: a diff that creates, deletes or renames a file, changes
 a mode, or touches a binary file is refused (`patch.not_allowed`); one that doesn't apply cleanly is
 `patch.does_not_apply`. `git apply` does the work in a scratch directory holding only the record's
-files, so a diff can't reach anything else.
+files, with no git configuration read from anywhere (the record's files may not hold any), so a
+diff can't reach anything else. Probes run on patched code carry extras["patched"] = 1.
 """
 
 import hashlib
@@ -22,23 +23,39 @@ def patch_id(diff: str) -> str:
 	return "sha256:" + hashlib.sha256(diff.encode("utf-8", "surrogatepass")).hexdigest()[:16]
 
 
-def _git(args, cwd: Path, diff: str) -> subprocess.CompletedProcess:
-	return subprocess.run(["git", "apply", *args, "-"], cwd=cwd, input=diff, capture_output=True, text=True,
-		timeout=GIT_TIMEOUT_S, env={"PATH": "/usr/bin:/bin:/usr/local/bin", "GIT_CONFIG_NOSYSTEM": "1",
-		"HOME": str(cwd)})  # fmt: skip
+def _git(args, cwd: Path, home: Path, diff: str) -> subprocess.CompletedProcess:
+	"""git apply with no configuration from anywhere: not the system's, not a user's, not the files'
+	(no repository above the work dir is found, no attributes are read)."""
+	env = {"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": str(home), "GIT_CONFIG_NOSYSTEM": "1",
+		"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_ATTR_NOSYSTEM": "1", "GIT_CEILING_DIRECTORIES": str(cwd.parent),
+		"LC_ALL": "C.UTF-8"}  # fmt: skip
+	try:
+		return subprocess.run(["git", "apply", *args, "-"], cwd=cwd, input=diff, capture_output=True, text=True,
+			encoding="utf-8", errors="replace", timeout=GIT_TIMEOUT_S, env=env)  # fmt: skip
+	except subprocess.TimeoutExpired:
+		raise InvalidSubmission("the patch took too long to apply", code="patch.does_not_apply") from None
 
 
 def apply_patch(files: dict[str, str], diff: str) -> dict[str, str]:
 	"""The files with the diff applied; only the files it edits change."""
+	if any(part.startswith(".git") for rel in files for part in Path(rel).parts):
+		raise InvalidSubmission("the record's files can't hold git settings", code="patch.not_allowed")
 	with tempfile.TemporaryDirectory(prefix="preflight-patch-") as d:
-		root = Path(d)
-		for rel, text in files.items():
-			p = (root / rel).resolve()
-			if root.resolve() not in p.parents:
-				continue
-			p.parent.mkdir(parents=True, exist_ok=True)
-			p.write_text(text, encoding="utf-8", newline="")
-		summary = _git(["--summary", "--numstat"], root, diff)
+		root, home = Path(d) / "work", Path(d) / "home"
+		root.mkdir()
+		home.mkdir()
+		try:
+			for rel, text in files.items():
+				p = (root / rel).resolve()
+				if root.resolve() not in p.parents:
+					continue
+				p.parent.mkdir(parents=True, exist_ok=True)
+				p.write_text(text, encoding="utf-8", newline="")
+		except OSError as exc:  # a file and a directory of the same name, say
+			raise InvalidSubmission(
+				f"the record's files can't be laid out to patch: {exc}", code="patch.not_allowed"
+			) from None
+		summary = _git(["--summary", "--numstat"], root, home, diff)
 		if summary.returncode != 0:
 			raise InvalidSubmission(f"the patch doesn't apply: {summary.stderr.strip()[:300]}",
 				code="patch.does_not_apply")  # fmt: skip
@@ -59,15 +76,16 @@ def apply_patch(files: dict[str, str], diff: str) -> dict[str, str]:
 		if unknown:
 			raise InvalidSubmission(f"the patch edits files the record doesn't have: {unknown[:3]}",
 				code="patch.not_allowed")  # fmt: skip
-		check = _git(["--check"], root, diff)
+		check = _git(["--check"], root, home, diff)
 		if check.returncode != 0:
 			raise InvalidSubmission(f"the patch doesn't apply: {check.stderr.strip()[:300]}",
 				code="patch.does_not_apply")  # fmt: skip
-		done = _git([], root, diff)
+		done = _git([], root, home, diff)
 		if done.returncode != 0:
 			raise InvalidSubmission(f"the patch doesn't apply: {done.stderr.strip()[:300]}",
 				code="patch.does_not_apply")  # fmt: skip
 		out = dict(files)
 		for rel in touched:
-			out[rel] = (root / rel).read_text(encoding="utf-8")
+			with open(root / rel, encoding="utf-8", newline="") as f:  # line endings as they are (CRLF too)
+				out[rel] = f.read()
 		return out

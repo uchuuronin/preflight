@@ -328,6 +328,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			raise InvalidSubmission("this record's code has changed since it was measured; check it in again",
 				code="submission.code_changed")  # fmt: skip
 	ctx.check()
+	fixed = None
+	if req.patch is not None:  # applied before anything is stored: a refused patch leaves no record
+		from .patches import apply_patch
+
+		fixed = replace(fetched, files=apply_patch(fetched.files, req.patch))
 
 	_emit(ctx, "mapping")
 	followup = req.mode != "plan"
@@ -410,15 +415,16 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		gpu = cap
 	budget = deps.budget()
 	patched_for: dict = {}
-	if req.patch is not None:
+	if fixed is not None:
 		# C's fix loop: probe runs the patched code; verify runs the setting on it and the base
-		# and its second seed on the record's own code, so the finding reads before and after
-		from .patches import apply_patch
-
-		fixed = replace(fetched, files=apply_patch(fetched.files, req.patch))
-		ids = [p.probe_id for p in plan] if req.mode == "probe" else [plan[0].probe_id]
-		patched_for = dict.fromkeys(ids, fixed)
-		_emit(ctx, "harnessing", rec, rev, message=f"patch applied to {', '.join(ids)}")
+		# and its second seed on the record's own code, so the finding reads before and after. The
+		# knobs are found again in the patched code (a fix that adds a line moves them)
+		fixed_sm = values_from_args(
+			fixed.files, map_static(fixed.files, entrypoint=fixed.entrypoint), fixed.args
+		)
+		patched_ids = [p.probe_id for p in plan] if req.mode == "probe" else [plan[0].probe_id]
+		patched_for = dict.fromkeys(patched_ids, (fixed, fixed_sm))
+		_emit(ctx, "harnessing", rec, rev, message=f"patch applied to {', '.join(patched_ids)}")
 	probes, results, gpu, discarded_usd = _probe_points(
 		plan,
 		rec,
@@ -443,6 +449,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		dropped = {p.id for p in rec.probes}
 		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
 		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
+	if patched_for:
+		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
+		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
+			for q in probes]  # fmt: skip
 	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.gpu_usd, overhead_usd=budget.overhead_usd,
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	if req.mode == "verify":
@@ -589,7 +599,8 @@ def _probe_points(
 			)
 			continue
 		try:
-			spec = _spec((patched_for or {}).get(p.probe_id, fetched), sm, p, deps)
+			use_f, use_sm = (patched_for or {}).get(p.probe_id, (fetched, sm))
+			spec = _spec(use_f, use_sm, p, deps)
 		except OverrideError as exc:
 			probes.append(_skipped(p, f"this point can't be set in the code: {exc}"))
 			continue

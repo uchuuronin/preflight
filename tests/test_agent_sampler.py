@@ -405,3 +405,23 @@ def test_a_task_stuck_in_its_tools_is_a_loop_while_the_others_go_on(proxy, tmp_p
 	by = {t.stop_reason for t in out.tasks if t.turns == 1 and t.tool_calls}
 	assert by == {"loop"} and "stalled on their tools" in out.selection
 	assert sum(t.stop_reason == "loop" for t in out.tasks) == 1  # the busy worker's tasks finished
+
+
+def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):
+	"""Review, Oct 31: a task that waited past the cutoff on its tool and then finished came out as
+	a loop. Only the tasks still open when a stalled run is stopped are."""
+	_, px = proxy
+	script = tmp_path / "slow.py"
+	script.write_text(
+		"import json, os, time, urllib.request\n"
+		"base = os.environ['META_API_BASE']\n"
+		"def call(body):\n"
+		"    r = urllib.request.Request(base + '/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})\n"
+		"    return urllib.request.urlopen(r).read()\n"
+		"call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': 'slow'}]})\n"
+		"time.sleep(3)  # a slow tool, past the 1 s cutoff below, then the task's next turn\n"
+		"call({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': 'slow'}, {'role': 'tool', 'content': 'ok'}]})\n"
+	)
+	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=5,
+		env=dict(os.environ), stall_s=10.0)  # fmt: skip
+	assert [t.stop_reason for t in out.tasks] == ["done"] and out.tasks[0].turns == 2
