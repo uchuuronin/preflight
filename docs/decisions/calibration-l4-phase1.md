@@ -221,7 +221,7 @@ Those Wilson intervals treat the 2,286 pairs as independent. They aren't: they c
 | GNN (GraphSAGE over the module graph) | 422 of 1,203, 35% (32% to 38%) | 0.310 |
 | Mean of the two | 549 of 1,203, 46% (43% to 48%) | 0.229 |
 
-The GNN alone doesn't beat the GBDT. The plan's validation row is "GNN + GBDT ensemble vs GBDT alone", though, and the ensemble does beat the GBDT, by 58 rows. These Wilson intervals treat rows as independent and they overlap, so the difference needs an architecture-clustered check before the ensemble is used.
+The GNN alone doesn't beat the GBDT. The plan's validation row is "GNN + GBDT ensemble vs GBDT alone", though, and the ensemble does beat the GBDT, by 58 rows. These Wilson intervals treat rows as independent and they overlap. **The paired test (Chiya, Oct 31) says GBDT.** It bootstraps over the 79 architectures, rows paired: the mix's gain over the GBDT is +4.8 points within 20%, 95% interval −1.4 to +11.6. The interval includes zero, so the mix isn't used, and the validation table says GBDT.
 
 Either way, a no-probe cost model is a prior, not a prediction. At 41–46% within 20%, it is well behind K1 with a probe (60%) and the same-GPU line (80%).
 
