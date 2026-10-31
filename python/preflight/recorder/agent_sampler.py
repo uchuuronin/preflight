@@ -77,9 +77,9 @@ def _scrubbed(env: dict, upstream_key: str | None) -> tuple[dict, list[str]]:
 # dummy key
 BASE_URL_VARS = ("OPENAI_BASE_URL", "OPENAI_API_BASE", "META_API_BASE", "META_BASE_URL")
 KEY_VARS = ("OPENAI_API_KEY", "META_API_KEY")
-STALL_S = (
-	600.0  # guess: 10 min with no call through the proxy and none in flight is a stuck run (a tool loop)
-)
+# Chiya, Oct 31: 2 min with no model call through the proxy, and none in flight, is a stalled run
+# (D's plant 3, a tool retried forever, then shows as a stalled task, not a long wait)
+STALL_S = 120.0
 
 
 class _LocalProc:
@@ -128,6 +128,7 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	t0 = time.monotonic()
 	proc = launch(child_env) if launch is not None else _LocalProc(cmd, cwd, child_env)
 	cut = None
+	stalled_tasks: set[str] = set()
 	while True:
 		try:
 			if proc.poll() is not None:
@@ -135,7 +136,11 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		except Exception:  # the sandbox went away under us: what was measured still counts
 			cut = "lost"
 			break
-		idle = proxy.run_stats(run_id).get("idle_s")
+		stats = proxy.run_stats(run_id)
+		idle = stats.get("idle_s")
+		# a task waiting on its tools past the cutoff is stalled on its own (D's plant 3), even while
+		# the script's other workers still call the model
+		stalled_tasks.update(t for t, w in (stats.get("tool_wait_s") or {}).items() if w > stall_s)
 		if time.monotonic() - t0 > timeout_s:
 			cut = "timeout"
 		elif should_stop is not None and should_stop():
@@ -152,7 +157,10 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	proc.kill()
 	wall = time.monotonic() - t0
 	ids = proxy.run_tasks(run_id)
-	tasks = [proxy.task(t, timed_out=t in in_flight) for t in ids]
+	if cut == "stalled":
+		stalled_tasks.update(at_cut.get("mid_tool", []))
+	tasks = [proxy.task(t, timed_out=t in in_flight and t not in stalled_tasks, stalled=t in stalled_tasks)
+		for t in ids]  # fmt: skip
 	st = proxy.run_stats(run_id)
 	parts = [f"the first {len(ids)} tasks the script started"]
 	if st.get("skipped"):
@@ -163,6 +171,8 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		parts.append(f"{len(withheld)} other provider keys withheld")
 	if st.get("single_call") and len(ids) and st["single_call"] * 2 > len(ids):
 		parts.append(f"{st['single_call']} one-call tasks (side calls may split tasks)")
+	if stalled_tasks:
+		parts.append(f"{len(stalled_tasks)} tasks stalled on their tools for {stall_s:.0f} s")
 	if st.get("budget_hit"):
 		parts.append("dollar cap reached")
 	ended = (getattr(proc, "report", None) or {}).get("ended")

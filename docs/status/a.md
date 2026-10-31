@@ -104,7 +104,7 @@ Updated Tue Oct 27, evening ET.
   isn't told apart from the policy's old log-probs, so it counts as forward.
 - Agent sampler: a task's key hashes its first call without the system prompt, so a timestamp or
   id in the first user message still defeats the top-up's skip; tasks that all open with the same
-  call can't be topped up. A run with no model calls for 5 minutes is stopped as stalled.
+  call can't be topped up. A run with no model call for 2 minutes (and none in flight) is stopped as stalled, so a coding agent's tool step longer than that is cut.
   The proxy's refusals carry `x-should-retry: false`, which the OpenAI SDKs honour; other
   clients may back off on them. Side calls (judges, sub-agents) start tasks of their own.
 - In-flight mode: an eval or checkpoint pause inside a window can raise a false step-time alert.

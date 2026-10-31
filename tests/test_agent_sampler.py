@@ -376,3 +376,32 @@ def test_tasks_told_apart_only_by_their_system_prompt_can_be_topped_up(proxy):
 	url2 = px.open_run("s2", max_tasks=3, skip_keys=[task_key(t) for t in first])
 	codes = [_post(url2, body(i))[0] for i in range(6)]
 	assert codes == [429, 429, 429, 200, 200, 200] and len(px.run_tasks("s2")) == 3
+
+
+def test_a_task_stuck_in_its_tools_is_a_loop_while_the_others_go_on(proxy, tmp_path):
+	"""D's plant 3: one worker's tool retries forever after the model asked for it; the other
+	worker keeps calling the model. The stuck task is marked a loop at the 2-minute cutoff (2 s here)."""
+	_, px = proxy
+	script = tmp_path / "two.py"
+	script.write_text(
+		"import json, os, threading, time, urllib.request\n"
+		"base = os.environ['META_API_BASE']\n"
+		"def call(body):\n"
+		"    r = urllib.request.Request(base + '/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})\n"
+		"    return urllib.request.urlopen(r).read()\n"
+		"def stuck():\n"
+		"    call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': 'stuck'}]})\n"
+		"    while True: time.sleep(1)\n"
+		"def busy():\n"
+		"    time.sleep(1)  # after the stuck call, so the fake provider's one tool-call answer is its\n"
+		"    for i in range(12):\n"
+		"        call({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': f'busy {i}'}]}); time.sleep(0.5)\n"
+		"    while True: time.sleep(1)\n"
+		"threading.Thread(target=stuck, daemon=True).start(); threading.Thread(target=busy, daemon=True).start()\n"
+		"while True: time.sleep(1)\n"
+	)
+	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=20,
+		env=dict(os.environ), stall_s=2.0)  # fmt: skip
+	by = {t.stop_reason for t in out.tasks if t.turns == 1 and t.tool_calls}
+	assert by == {"loop"} and "stalled on their tools" in out.selection
+	assert sum(t.stop_reason == "loop" for t in out.tasks) == 1  # the busy worker's tasks finished

@@ -12,6 +12,14 @@ Preflight must catch every one from a few minutes of probing.
   3. beta 0.04 keeps the KL term, so a whole reference-model forward runs on every micro-step
      (step_time.by_phase.reference).
 
+Caught by the first probe (Oct 31, a-gt-grpo-l4, before this script's settings changed): loaded in
+fp32 with 2 prompts x 8 completions a micro-step, the run ran out of memory on an L4 before its
+first step, in the bare run and the probe alike (20.91 GiB allocated, asking 2.32 GiB more of the
+22.06 GiB card) [measured]. The likely cause is the logits: a 152k-token vocabulary over 16
+completions in fp32 is several GB a forward pass, for the policy and the reference [inference]. The
+script now loads in bf16 with 1 prompt a micro-step, so the planted problems above can be measured;
+Preflight should show the fp32 setting's OOM before it runs.
+
 Everything is public: the model (Apache-2.0) and GSM8K (MIT). Written for Preflight, not taken
 from any other project.
 """
@@ -27,7 +35,7 @@ DATASET = "openai/gsm8k"
 MAX_COMPLETION = 512  # planted 1
 GROUP = 8  # planted 2
 BETA = 0.04  # planted 3: the KL term keeps a reference forward on every step
-PROMPTS_PER_STEP = 2
+PROMPTS_PER_STEP = 1  # 8 completions a micro-step (2 ran out of memory on an L4 in fp32, Oct 31)
 
 SYSTEM = (
 	"Solve the problem. First reason step by step inside <think> </think>, "
@@ -77,6 +85,7 @@ args = GRPOConfig(
 	beta=BETA,
 	num_train_epochs=1,
 	bf16=torch.cuda.is_available(),
+	model_init_kwargs={"torch_dtype": "bfloat16" if torch.cuda.is_available() else "float32"},  # policy and reference
 	logging_steps=5,
 	save_steps=500,
 	report_to=[],

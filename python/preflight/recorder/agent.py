@@ -410,6 +410,9 @@ class AgentProxy:
 				"in_flight": [tid for tid, t in ts.items() if t.in_flight > 0],
 				# a task whose last answer asked for a tool was mid-task (running the tool) if cut now
 				"mid_tool": [tid for tid, t in ts.items() if t.calls and t.calls[-1].finish_reason == "tool_calls"],
+				# a task waiting on its tools: seconds since its last answer (that asked for a tool) ended
+				"tool_wait_s": {tid: time.time() - (t.calls[-1].start + t.calls[-1].seconds) for tid, t in ts.items()
+					if t.calls and not t.in_flight and t.calls[-1].finish_reason == "tool_calls"},
 				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1),
 				"budget_hit": run.budget_hit,
 				# since the last call started or ended; never idle while a call is in flight
@@ -781,7 +784,7 @@ class AgentProxy:
 			return list(self._tasks.get(task_id, _Task()).calls)
 
 	def task(self, task_id: str, *, success: bool | None = None, wall_s: float | None = None,
-		timed_out: bool = False) -> AgentTask:  # fmt: skip
+		timed_out: bool = False, stalled: bool = False) -> AgentTask:  # fmt: skip
 		"""The task as the record's AgentTask: turns are the calls the provider answered. Waits (up
 		to SETTLE_S) for calls still in flight, so a script that exits at [DONE] is counted whole."""
 		with self._lock:
@@ -794,6 +797,8 @@ class AgentProxy:
 			reason = stopped
 		elif stopped == "budget":
 			reason = "max_turns"  # the record's closest word: stopped for running on, not for failing
+		elif stalled:
+			reason = "loop"  # waited on its tools past the stall cutoff with no model call: a tool stuck or looping
 		elif timed_out:
 			reason = "timeout"
 		elif any(c.error and "context" in c.error for c in calls) or (
