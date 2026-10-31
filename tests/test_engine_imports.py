@@ -8,13 +8,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / "python" / "preflight" / "engine"
+CAMPAIGN = ROOT / "python" / "preflight" / "campaign"  # the planner runs in the browser beside the engine
 
 STDLIB = {
 	"__future__", "math", "re", "dataclasses", "typing", "collections", "functools", "itertools",
 	"json", "hashlib", "enum", "statistics", "bisect", "warnings", "base64", "datetime",
 }  # fmt: skip
 THIRD_PARTY = {"numpy", "scipy", "sklearn", "lightgbm"}
-OURS = {"preflight.engine", "preflight.schema"}
+OURS = {"preflight.engine", "preflight.schema", "preflight.campaign"}
 
 
 def _imports(path: Path) -> list[str]:
@@ -29,7 +30,7 @@ def _imports(path: Path) -> list[str]:
 
 def test_engine_imports_only_the_allowlist():
 	bad = {}
-	for f in sorted(ENGINE.rglob("*.py")):
+	for f in sorted([*ENGINE.rglob("*.py"), *CAMPAIGN.rglob("*.py")]):
 		for mod in _imports(f):
 			top = mod.split(".")[0]
 			if top in STDLIB or top in THIRD_PARTY or any(mod == o or mod.startswith(o + ".") for o in OURS):

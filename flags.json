@@ -18,6 +18,7 @@
 	"engine.steptime_same_gpu": false,
 	"engine.steptime_cross_gpu": false,
 	"corpus.sweep": false,
+	"campaign.planner": false,
 	"d.freetier": false,
 	"d.notebook": false
 }

@@ -976,6 +976,14 @@ def _strategy(record: FlightRecord, values: dict) -> str:
 # ---------------------------------------------------------------- run totals
 
 
+def checkpoint_every(record: FlightRecord, knob_values: dict | None = None) -> float | None:
+	"""Steps between the script's checkpoint saves at these knob values, or None when it doesn't save."""
+	values = _values(record, knob_values)
+	tr = record.job.script_map.training if record.job.script_map else None
+	every = values.get("checkpoint_every") or (tr.checkpoint_every if tr else None)
+	return float(every) if every else None
+
+
 def total_steps(record: FlightRecord, knob_values: dict | None = None) -> tuple[float | None, str]:
 	"""Optimizer steps in the whole run at these knob values, or None and why (for the campaign planner)."""
 	return _total_steps(record, _values(record, knob_values))
