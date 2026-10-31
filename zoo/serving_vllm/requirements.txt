@@ -1,0 +1,2 @@
+# Needs a serving image (numpy<2, and pyairports built from source); see serve.py's header
+vllm==0.6.4.post1
