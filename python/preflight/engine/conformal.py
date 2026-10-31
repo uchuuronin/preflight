@@ -230,9 +230,16 @@ try:  # written by corpus/calibrate.py once held-out real runs exist; a plain mo
 	from preflight.engine._calibration_table import DATA as _DATA
 
 	TABLE = Table.from_dict(_DATA)
-except (ImportError, SyntaxError, NameError, KeyError, TypeError, ValueError):
-	# a missing or broken generated table must never stop the engine importing: bands fall back to simulated
+except ImportError:
 	TABLE = Table(built_from="none: no held-out real runs yet")
+except (SyntaxError, NameError, KeyError, TypeError, ValueError) as _exc:
+	# a broken generated table must never stop the engine importing, but it must not pass silently either
+	import warnings
+
+	warnings.warn(
+		f"engine/_calibration_table.py is unusable ({_exc!r}); bands fall back to simulated", stacklevel=1
+	)
+	TABLE = Table(built_from=f"none: the generated table is unusable ({type(_exc).__name__})")
 
 
 def half_width(target: str, gpu: str | None, lens: str | None, simulated: float, table: Table | None = None):

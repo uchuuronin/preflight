@@ -197,8 +197,15 @@ def test_the_written_table_imports_as_python_and_round_trips(tmp_path):
 	mod = importlib.util.module_from_spec(spec)
 	spec.loader.exec_module(mod)  # JSON's true/false/null would raise NameError here
 	back = cf.Table.from_dict(mod.DATA)
-	assert (
-		back.cells.keys() == table.cells.keys()
-		and back.oom_reliable is False
-		and back.coverage == table.coverage
+	assert back.cells == table.cells and back.oom_reliable is False and back.coverage == table.coverage
+
+
+def test_a_table_with_non_finite_numbers_is_refused(tmp_path):
+	from preflight.engine import conformal as cf
+
+	bad = cf.Table(
+		{("memory.peak", "", ""): cf.Cell(float("nan"), 9, 3, "held_out", ("memory.peak", "", ""), ())}
 	)
+	with pytest.raises(ValueError):
+		calibrate.write_table(bad, tmp_path / "t.py")
+	assert not (tmp_path / "t.py").exists()

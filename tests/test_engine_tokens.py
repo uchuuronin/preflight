@@ -56,3 +56,32 @@ def test_records_without_measured_tokens_keep_the_setting(smoke):
 	assert api._step_work(rec, api._values(rec, {"seq_len": 512})) < api._step_work(
 		rec, api._values(rec, {"seq_len": 1024})
 	)
+
+
+def _drop_knob(rec, kid):
+	return rec.model_copy(update={"knobs": [k for k in rec.knobs if k.id != kid]})
+
+
+def test_accumulation_comes_from_the_probes_when_the_script_declares_none(smoke):
+	rec = _drop_knob(smoke, "grad_accum")  # the script still accumulates 4 micro-steps
+	assert api._step_work(rec, api._values(rec, {"batch_size": 8})) == pytest.approx(
+		api._step_work(smoke, api._values(smoke, {"batch_size": 8}))
+	)
+	t = api.predict(rec, {"batch_size": 8}).root["time.step"].point
+	assert t > 2.5  # twice the batch-4 work, not a quarter of it
+
+
+def test_both_sides_leave_the_token_axis_together(smoke):
+	for rec in (
+		_drop_knob(smoke, "batch_size"),
+		smoke.model_copy(update={"job": smoke.job.model_copy(update={"lens": "rl"})}),
+	):
+		assert not api._on_token_axis(rec)
+		p = next(p for p in rec.probes if p.id == "p1")
+		assert api._probe_work(rec, p) == pytest.approx(api._step_x(rec.job.lens, api._probe_values(rec, p)))
+
+
+@pytest.mark.parametrize("bad", [float("inf"), float("nan"), True, 0, -5])
+def test_unusable_token_counts_are_refused(smoke, bad):
+	p = smoke.probes[1].model_copy(update={"extras": {**smoke.probes[1].extras, "tokens_per_step": bad}})
+	assert api._measured_tokens(p) is None

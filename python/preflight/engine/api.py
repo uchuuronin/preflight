@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import itertools
 import math
+import statistics
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
@@ -602,52 +603,72 @@ def _step_x(lens: str, values: dict) -> float:
 	return knobs.work_units(lens, values) * max(1, int(values.get("grad_accum", 1) or 1))
 
 
-# derived: a probe whose rows fill at least this share of seq_len was truncated by it (A's padding is to the
-# longest row in the batch, so untruncated rows sit well below the limit; this probe's rows reached 295 of 1024)
+# A probe was cut by seq_len when its longest padded row reached the limit (rows are padded to the longest in
+# their batch and never past seq_len). guess: without row lengths, a mean padded length at this share of the limit
+# counts as cut; replaced by the step log's longest row whenever A's recorder has one (it does since Oct 28)
 TRUNCATED_SHARE = 0.95
+TOKEN_LENSES = ("finetune", "pretrain")  # RL work also counts completions, which the dataloader's tokens miss
 
 
 def _measured_tokens(p) -> tuple[float, float] | None:
 	"""(tokens, samples) one optimizer step of this probe processed, from A's recorder (Probe.extras)."""
 	ex = p.extras or {}
 	t, n = ex.get("tokens_per_step"), ex.get("samples_per_step")
-	if isinstance(t, (int, float)) and isinstance(n, (int, float)) and t > 0 and n > 0:
-		return float(t), float(n)
-	return None
+	ok = all(
+		isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v > 0 for v in (t, n)
+	)
+	return (float(t), float(n)) if ok else None
 
 
-def _token_points(record: FlightRecord) -> list[tuple[float, float, float, bool]] | None:
-	"""(batch, seq_len, padded tokens per sample, truncated) for every timed probe, or None unless all of them
-	report measured tokens (mixing measured and set work on one axis would bend the fit)."""
+def _longest_row(p) -> float | None:
+	rows = [s.padded_len for s in (p.step_log or []) if s.kind == "timed" and s.padded_len]
+	return float(max(rows)) if rows else None
+
+
+def _token_points(record: FlightRecord) -> list[tuple[float, float, float, float, bool]] | None:
+	"""(batch, accumulation, padded tokens per sample, seq_len, truncated) for every timed probe, or None unless
+	the measured-token axis applies: a token lens, a batch_size knob, every timed probe reporting tokens (mixing
+	measured and set work on one axis would bend the fit) and at least one probe the limit didn't cut."""
+	if record.job.lens not in TOKEN_LENSES or all(k.id != "batch_size" for k in record.knobs):
+		return None
 	pts = []
 	for p in record.probes:
 		if p.status not in OK_PROBE or not p.step_time or not p.step_time.p50_s:
 			continue
 		m = _measured_tokens(p)
-		if m is None:
-			return None
 		pv = _probe_values(record, p)
-		b, sq = float(pv.get("batch_size") or 0), float(pv.get("seq_len") or 0)
-		u = m[0] / m[1]
-		pts.append((b, sq, u, bool(sq) and u >= TRUNCATED_SHARE * sq))
-	return pts or None
+		b = pv.get("batch_size")
+		if m is None or not isinstance(b, (int, float)) or b <= 0:
+			return None
+		tokens, samples = m
+		sq = float(pv.get("seq_len") or 0)
+		longest = _longest_row(p)
+		cut = (longest >= sq) if longest is not None else (tokens / samples >= TRUNCATED_SHARE * sq)
+		pts.append((float(b), samples / float(b), tokens / samples, sq, bool(sq) and cut))
+	if not pts or all(trunc for *_, trunc in pts):
+		return None  # the data may run longer than any limit seen: the settings are the axis
+	return pts
+
+
+def _on_token_axis(record: FlightRecord) -> bool:
+	"""One switch for both sides of the step-time fit: probes and queries use measured tokens, or neither does."""
+	return _token_points(record) is not None
 
 
 def _step_work(record: FlightRecord, values: dict) -> float:
 	"""Tokens one optimizer step will process at these settings (Chiya, Oct 30: scale by measured tokens, not by
 	seq_len). Samples per step times padded tokens per sample, which A's probes measure: rows are padded to the
 	longest in their batch, so the per-sample figure follows batch size, and seq_len only cuts it when the rows
-	reach it. Falls back to the settings when a probe was truncated (the data may run longer than any limit seen)
-	or when the probes don't all report tokens."""
+	reach it. On the settings' axis when _on_token_axis says so, for probes and queries alike."""
 	pts = _token_points(record)
-	lens = record.job.lens
-	if pts is None or lens not in ("finetune", "pretrain", "rl") or values.get("batch_size") is None:
-		return _step_x(lens, values)
+	if pts is None:
+		return _step_x(record.job.lens, values)
 	b_q = float(values.get("batch_size") or 1)
 	seq_q = float(values.get("seq_len") or 0) or math.inf
-	free = sorted((b, u) for b, _, u, trunc in pts if not trunc and b > 0)
-	if not free:
-		return _step_x(lens, values)
+	# accumulation: the knob when the script declares it, else what the probes measured (samples / batch)
+	declared = any(k.id == "grad_accum" for k in record.knobs)
+	accum = float(values.get("grad_accum") or 1) if declared else statistics.median(a for _, a, *_ in pts)
+	free = sorted((b, u) for b, _, u, _, trunc in pts if not trunc)
 	# padded tokens per sample at this batch: linear in log2(batch) between probed batches, flat beyond them
 	if b_q <= free[0][0]:
 		u_q = free[0][1]
@@ -660,13 +681,12 @@ def _step_work(record: FlightRecord, values: dict) -> float:
 				t = 0.0 if b1 == b0 else (math.log2(b_q) - math.log2(b0)) / (math.log2(b1) - math.log2(b0))
 				u_q = u0 + t * (u1 - u0)
 				break
-	samples = b_q * max(1, int(values.get("grad_accum", 1) or 1))
-	return samples * min(seq_q, u_q)
+	return b_q * accum * min(seq_q, u_q)
 
 
 def _probe_work(record: FlightRecord, p) -> float:
 	"""A probe's place on the step-time axis: the tokens it measured when the record's probes all report them."""
-	if _token_points(record) is not None and record.job.lens in ("finetune", "pretrain", "rl"):
+	if _on_token_axis(record):
 		m = _measured_tokens(p)
 		if m is not None:
 			return m[0]
