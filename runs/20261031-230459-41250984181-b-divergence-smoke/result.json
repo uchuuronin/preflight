@@ -1,0 +1,11 @@
+{
+	"name": "20261031-230459-41250984181-b-divergence-smoke",
+	"exit_code": 137,
+	"workflow": "remote-run",
+	"run_id": "41250984181",
+	"ref": "ws-b",
+	"sha": "a22fb16c50a7093355d8be4964548306f6711d27",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::main --kind divergence --n 10 --budgets L4=0.25 --batch-size 2 --max-containers 1 --max-minutes 12 --deadline-s 120",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T23:20:17Z"
+}

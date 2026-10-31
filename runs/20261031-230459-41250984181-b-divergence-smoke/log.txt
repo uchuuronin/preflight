@@ -1,0 +1,13 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-cqcYrRtr2P2TGmqjPSveJx
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[L4] wave 0: $0.00 of $0.25 spent (container time, worst case for unsettled waves), 0 done, 10 to do, deadline 120 s, next wave 1 x 2
+[remote-run] stop step done
