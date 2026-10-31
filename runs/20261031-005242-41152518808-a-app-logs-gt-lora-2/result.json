@@ -1,0 +1,11 @@
+{
+	"name": "20261031-005242-41152518808-a-app-logs-gt-lora-2",
+	"exit_code": 2,
+	"workflow": "remote-run",
+	"run_id": "41152518808",
+	"ref": "ws-a",
+	"sha": "349f8093eae65884c8058aa66a3080655ad1b65d",
+	"cmd": "python -m preflight.runner.app_logs --env main ap-smlQhBII0aKV0BnMwULRzO --seconds 120",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T00:52:59Z"
+}
