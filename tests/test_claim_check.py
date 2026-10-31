@@ -1,0 +1,66 @@
+"""harness/claim_check.py: numbers in a text against a record's raw probe numbers."""
+
+from pathlib import Path
+
+from preflight.harness.claim_check import _Picks, check_findings, check_text, numbers_in
+from preflight.schema import load_record
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _rec():
+	return load_record((ROOT / "schema" / "examples" / "finetune.json").read_text())
+
+
+def test_numbers_carry_units_and_the_precision_they_were_written_at():
+	ns = {
+		n.text: n
+		for n in numbers_in("peak 21.9 GB (20.4 GiB) in 189 s, $0.042, 13% padding, 1,024 tokens, 2 seeds")
+	}
+	assert ns["21.9 GB"].kind == "bytes" and ns["21.9 GB"].value == 21.9e9
+	assert ns["20.4 GiB"].value == 20.4 * 2**30 and ns["189 s"].kind == "seconds"
+	assert ns["$0.042"].kind == "usd" and ns["13%"].value == 0.13 and ns["1,024"].value == 1024
+	assert "2" not in ns  # a small bare count is words, not a measurement
+
+
+def test_a_number_the_probes_show_is_supported_and_one_they_dont_is_flagged():
+	rec = _rec()
+	p = rec.probes[0]
+	peak = p.memory.peak_allocated_bytes
+	gb = f"{peak / 1e9:.1f} GB"
+	checks, calls = check_text(f"The run peaked at {gb}, and at 999.9 GB in eval.", rec)
+	by = {c.number: c for c in checks}
+	assert by[gb].verdict in ("supported", "ambiguous") and calls == []
+	assert by["999.9 GB"].verdict == "unsupported"
+
+
+class Fake:
+	def __init__(self, field):
+		self.field, self.seen = field, None
+
+	def structured(self, msgs, schema, *, purpose):
+		self.seen = msgs
+		text = msgs[1]["content"]
+		number = text.split("\n- ", 1)[1].split(":", 1)[0]
+		return _Picks.model_validate(
+			{"picks": [{"number": number, "field": self.field, "not_a_measurement": False}]}
+		), "call"
+
+
+def test_the_model_only_chooses_among_the_fields_the_code_found():
+	rec = _rec()
+	p = rec.probes[0]
+	# a value two fields share, so the code can't decide alone
+	rec.probes[0] = p.model_copy(
+		update={"extras": {**p.extras, "tokens_per_step": 4096.0, "samples_per_step": 4096.0}}
+	)
+	ok, calls = check_text("4096 tokens a step", rec, client=Fake(f"probes.{p.id}.extras.tokens_per_step"))
+	assert ok[0].verdict == "supported" and ok[0].field.endswith("tokens_per_step") and calls == ["call"]
+	made_up, _ = check_text("4096 tokens a step", rec, client=Fake("probes.p9.invented"))
+	assert made_up[0].verdict == "ambiguous"  # the model's pick wasn't a candidate: not supported
+
+
+def test_findings_are_checked_by_id():
+	rec = _rec()
+	out, _ = check_findings(rec)
+	assert all(isinstance(k, str) for k in out)
