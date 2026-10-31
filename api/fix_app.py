@@ -193,6 +193,20 @@ def startup_check_fix() -> dict:
 		echo = _echo_runner(box)
 		out["echo"] = echo(())
 		out["observers"] = _observer_switch(echo, help_text)
+		_, so, se = box.run(
+			[
+				"env",
+				"-i",
+				f"PATH={MUSE_PATH}",
+				"HOME=/fix/home/echo",
+				"XDG_CONFIG_HOME=/fix/cfg/echo",
+				"muse",
+				"config",
+				"status",
+			],
+			timeout=60,
+		)
+		out["config_status"] = (so + se)[:6000]
 		out["ok"] = (
 			out["version"]["code"] == 0
 			and out["python"]["code"] == 0
@@ -248,9 +262,14 @@ def _echo_runner(box: ModalBox):
 			f"PATH={MUSE_PATH}",
 			f"XDG_CONFIG_HOME={cfg}",
 			f"HOME={home}",
-			*muse.command("/fix/prompt-echo.txt", steps=2, extra_flags=("--provider", "echo", *extra)),
+			*muse.command(
+				"/fix/prompt-echo.txt",
+				steps=2,
+				extra_flags=("--provider", "echo", *extra),
+				key_on_stdin=False,
+			),
 		]
-		code, so, se = box.run(argv, cwd=wt, stdin="not-a-key\n", timeout=90)
+		code, so, se = box.run(argv, cwd=wt, timeout=90)
 		return {
 			"code": code,
 			"out_head": "\n".join(so.splitlines()[:30]),
@@ -274,9 +293,12 @@ def _observer_switch(echo, help_text: str) -> dict:
 			found["tried"].append(r)
 			if r["code"] == 0:
 				found["flags"].append(f)
+	# A made-up key at the top and inside the map: a capability name counts only if Muse Code would
+	# have refused a made-up one in the same place.
 	bogus = echo(("-c", "zz_not_a_setting=false"))
-	found["tried"].append(bogus)
-	if bogus["code"] != 0:
+	inner = echo(("-c", "runtime_capabilities.zz_not_a_capability=false"))
+	found["tried"] += [bogus, inner]
+	if bogus["code"] != 0 and inner["code"] != 0:
 		for kv in OBSERVER_CONFIG:
 			r = echo(("-c", kv))
 			found["tried"].append(r)

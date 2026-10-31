@@ -218,6 +218,7 @@ def command(
 	model: str | None = None,
 	extra_flags: tuple[str, ...] = (),
 	allow_shell: bool = False,
+	key_on_stdin: bool = True,
 ) -> list[str]:
 	"""The `muse exec` line for one candidate. Root options go after `exec` (kenn-io/kit PR 194).
 	Defence in depth around the gate (Muse Code 1.4.14 help): no web tools, no personal rules or
@@ -237,10 +238,13 @@ def command(
 		"off",
 		"--sandbox-network",
 		"proxy-only",
-		"--api-key-stdin",
 		"--disable-web-tools",
 		"--no-foreign-personal-context",
 	]
+	# Always for real runs; only the startup check's no-model `echo` runs leave it out, since Muse
+	# Code refuses it with any provider but meta or local.
+	if key_on_stdin:
+		argv.append("--api-key-stdin")
 	if not allow_shell:
 		argv.append("--disable-shell")
 	if model:
