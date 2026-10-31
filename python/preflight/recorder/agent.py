@@ -76,7 +76,33 @@ class Call:
 	error: str | None = None  # the provider's error type, never its message
 	usd: float = 0.0
 	stream: bool = False
+	response_id: str | None = None  # responses API: the next turn names it as previous_response_id
 	span_id: str = field(default_factory=lambda: secrets.token_hex(8))
+
+
+@dataclass
+class _Run:
+	run_id: str
+	max_tasks: int
+	skip: int = 0
+	skipped: list[list[str]] = field(default_factory=list)  # first calls of the tasks refused
+	order: list[str] = field(default_factory=list)
+	last: dict[str, list[str]] = field(default_factory=dict)  # task -> its last call's message hashes
+	by_response: dict[str, str] = field(default_factory=dict)  # response id -> task (responses API)
+
+
+def _conversation(req: dict) -> list[str]:
+	"""A call's conversation as hashes of its messages (chat `messages`, responses `input`)."""
+	items = req.get("messages")
+	if items is None:
+		items = req.get("input")
+	if isinstance(items, str):
+		items = [{"role": "user", "content": items}]
+	if not isinstance(items, list):
+		return []
+	return [
+		hashlib.sha256(json.dumps(x, sort_keys=True, default=str).encode()).hexdigest()[:16] for x in items
+	]
 
 
 @dataclass
@@ -200,6 +226,8 @@ class _StreamReader:
 			self.found["error"] = str(err.get("code") or err.get("type") or "error")[:64]
 		resp = ev.get("response")
 		if ev.get("type") in self.ENDS and isinstance(resp, dict):  # responses API
+			if isinstance(resp.get("id"), str):
+				self.found["response_id"] = resp["id"][:128]
 			done = read_response(resp)
 			self.found.update({k: v for k, v in done.items() if v is not None})
 			if ev["type"] != "response.completed":
@@ -292,6 +320,59 @@ class AgentProxy:
 		host, port = self._server.server_address[:2]
 		return f"http://{host}:{port}/t/{token}/v1"
 
+	def open_run(self, run_id: str, *, max_tasks: int, skip: int = 0) -> str:
+		"""The base URL for a script that runs many tasks in one process (the usual agent eval
+		loop): its calls are split into tasks by conversation (a call whose messages extend a
+		task's last messages, or name its last response, belongs to that task; anything else
+		starts one), and once max_tasks tasks have started, a call that would start another is
+		refused with a 429, so the script's later tasks end at once and the sample costs only
+		its own tasks. skip: the first `skip` tasks to start are refused at their first call (a
+		top-up after a first sample: a script that can't be told where to start runs its first
+		tasks again, and they cost nothing this way)."""
+		if not _TASK_ID.fullmatch(run_id):
+			raise ValueError(f"run id {run_id!r}: letters, digits, '_', '.', '-', up to 64")
+		if self._server is None:
+			raise RuntimeError("start() the proxy first")
+		token = secrets.token_urlsafe(24)
+		with self._lock:
+			self._tokens[token] = _Run(run_id, max_tasks, skip=skip)
+		host, port = self._server.server_address[:2]
+		return f"http://{host}:{port}/t/{token}/v1"
+
+	def run_tasks(self, run_id: str) -> list[str]:
+		"""The task ids a run's calls were split into, in the order they started."""
+		with self._lock:
+			run = next((r for r in self._tokens.values() if isinstance(r, _Run) and r.run_id == run_id), None)
+			return list(run.order) if run else []
+
+	def _task_for(self, run: "_Run", req: dict) -> str | None:
+		"""The task this call belongs to, opening one if it starts a conversation; None when the
+		run already has max_tasks tasks and this would be a new one."""
+		msgs = _conversation(req)
+		prev = req.get("previous_response_id") if isinstance(req.get("previous_response_id"), str) else None
+		with self._lock:
+			if prev and prev in run.by_response:
+				return run.by_response[prev]
+			best, best_len = None, -1
+			for tid, last in run.last.items():
+				if len(last) <= len(msgs) and msgs[: len(last)] == last and len(last) > best_len:
+					best, best_len = tid, len(last)
+			if best is not None and best_len > 0:
+				run.last[best] = msgs
+				return best
+			if any(len(k) <= len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
+				return ""  # a retry or a later turn of a skipped task: still skipped
+			if len(run.skipped) < run.skip:
+				run.skipped.append(msgs)
+				return ""
+			if len(run.order) >= run.max_tasks:
+				return None
+			tid = f"{run.run_id}-{len(run.order) + 1:03d}"
+			run.order.append(tid)
+			run.last[tid] = msgs
+			self._tasks.setdefault(tid, _Task())
+			return tid
+
 	def stop(self) -> None:
 		if self._server is not None:
 			self._server.shutdown()
@@ -373,6 +454,7 @@ class AgentProxy:
 		m = _PATH.match(h.path.split("?", 1)[0])
 		with self._lock:
 			task_id = self._tokens.get(m["token"]) if m else None
+		run = task_id if isinstance(task_id, _Run) else None
 		if m is None or m["rest"] not in FORWARDED or task_id is None:
 			_reply(h, 404, {"error": {"type": "not_found", "message": "preflight: not a generation endpoint"}},
 				close=True)  # fmt: skip
@@ -398,6 +480,16 @@ class AgentProxy:
 				{"error": {"type": "invalid_request", "message": "preflight: body is not a JSON object"}},
 			)
 			return
+		if run is not None:
+			task_id = self._task_for(run, req)
+			if task_id == "":
+				_reply(h, 429, {"error": {"type": "preflight_task_skipped", "code": "already_sampled",
+					"message": "preflight: this task was in the first sample; skipped in the top-up"}})  # fmt: skip
+				return
+			if task_id is None:
+				_reply(h, 429, {"error": {"type": "preflight_sample_complete", "code": "sample_complete",
+					"message": f"preflight: the sample's {run.max_tasks} tasks are running; this task isn't one"}})  # fmt: skip
+				return
 		why, reserved = self._admit(task_id, req, body)
 		if why == "unpriced_model":
 			self._note(task_id, req, why)  # counted before the script hears back
@@ -465,6 +557,9 @@ class AgentProxy:
 			uncosted = self._rate is not None and no_usage and billable
 			if uncosted:
 				call.usd = reserved
+			if run is not None and call.response_id:
+				with self._lock:
+					run.by_response[call.response_id] = task_id
 			# logged before the script gets its last byte: once its call returns, the task is counted
 			self._log(task_id, call, reserved, uncosted=uncosted)
 		if fail_reply:
@@ -498,6 +593,8 @@ class AgentProxy:
 			for k, v in read_response(data).items():
 				if v is not None:
 					setattr(call, k, v)
+			if isinstance(data.get("id"), str) and data.get("object") == "response":
+				call.response_id = data["id"][:128]
 		elif r.status_code >= 400:
 			call.error = _error_code(data) or str(r.status_code)
 		sent[0] = True
