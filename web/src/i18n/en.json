@@ -750,5 +750,9 @@
 	"checks.measured.oom": "out of memory",
 	"checks.measured.oom_eval": "out of memory in eval",
 	"exports.label": "Exports",
-	"exports.title": "Take it with you"
+	"exports.title": "Take it with you",
+	"hops.toggle": "Possible outcomes",
+	"hops.help": "Each frame is one outcome inside the 90% interval. The risk dial is the engine's own chance.",
+	"hops.help_still": "Every outcome inside the 90% interval, drawn at once. The risk dial is the engine's own chance.",
+	"hops.oom": "Out of memory in this outcome"
 }

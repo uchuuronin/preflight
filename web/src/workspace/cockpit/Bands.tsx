@@ -14,6 +14,7 @@ import { useWorkspace } from "../state";
 import { Info } from "../components/Info";
 import { Provenance } from "../components/StatusMark";
 import { bounds, likelyFails, trusted } from "../status";
+import { outcomes, useHops } from "../hops";
 
 const MAX_MARKS = 24;
 
@@ -180,6 +181,7 @@ function partsLabel(s: MemorySegment): string {
  */
 export function MemoryBand() {
 	const { record, estimates } = useWorkspace();
+	const hops = useHops();
 	const layout = useOrbitLayout();
 	const { segments, total, capacity, breakdown, untrusted, abstaining, partsBytes } = layout.memory;
 	const memT = targetFor(record, "memory");
@@ -199,6 +201,9 @@ export function MemoryBand() {
 	const offScale = Math.max(total ?? 0, partsBytes) > scaleMax;
 	const status = peak?.status ?? "abstain";
 	const unit = memT?.unit === "fraction" ? "fraction" : "bytes";
+	const hopDraws = hops.on && unit === "bytes" ? outcomes(peak) : [];
+	const shownHops = hops.frame === null ? hopDraws : hopDraws.length ? [hopDraws[hops.frame % hopDraws.length]!] : [];
+	const frameOver = hops.frame !== null && shownHops.length === 1 && shownHops[0]! > capacity;
 	return (
 		<div className="glass pf-band" aria-label={t("membar.title")}>
 			<div className="pf-band__head">
@@ -206,6 +211,7 @@ export function MemoryBand() {
 				<span>{total ? t("membar.line", { total: fmt(total, unit), cap: fmt(capacity, unit) }) : ""}</span>
 				<Provenance status={status} />
 				{!breakdown ? <span className="pf-dim">{t("membar.no_breakdown")}</span> : null}
+				{frameOver ? <span className="pf-hop-note" aria-hidden="true">{t("hops.oom")}</span> : null}
 			</div>
 			<div className="pf-stack" role="img" aria-label={`${t("membar.aria", { total: fmt(total ?? 0, unit), cap: fmt(capacity, unit) })}${offScale ? `. ${t("membar.off_scale")}` : ""}`}>
 				{segments.map((s) => (
@@ -226,6 +232,14 @@ export function MemoryBand() {
 				{total && breakdown ? (
 					<div className="pf-peak" style={{ left: pct(total) }} title={t("membar.peak", { total: fmt(total, unit) })} />
 				) : null}
+				{shownHops.map((v, i) => (
+					<div
+						key={hops.frame === null ? i : "hop"}
+						className={`pf-hop${v > capacity ? " is-over" : ""}${hops.frame === null ? " is-all" : ""}`}
+						style={{ left: pct(v) }}
+						aria-hidden="true"
+					/>
+				))}
 				<div className="pf-cap" style={{ left: pct(capacity) }}>
 					<span>{t("membar.capacity", { cap: fmt(capacity, unit) })}</span>
 				</div>
