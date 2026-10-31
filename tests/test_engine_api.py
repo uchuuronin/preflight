@@ -502,3 +502,23 @@ def test_records_pin_their_models_and_say_when_one_has_moved_on(ft):
 	)
 	assert ("memory-analytical@0.1.0", api.memory.MODEL_ID) in api.stale_models(old)
 	assert all("@" in mid for mid in now.values())
+
+
+def test_nodes_split_the_gpus_and_the_step_says_analytical_only(pt):
+	from preflight.schema.record import Domain, Knob
+
+	knobs = [
+		*pt.knobs,
+		Knob(id="nodes", label_key="knob.nodes", kind="int", current=1, domain=Domain(min=1, max=16)),
+	]
+	if not any(k.id == "gpus" for k in pt.knobs):
+		knobs.append(
+			Knob(id="gpus", label_key="knob.gpus", kind="int", current=1, domain=Domain(min=1, max=64))
+		)
+	rec = pt.model_copy(update={"knobs": knobs})
+	one = api.predict(rec, {"gpus": 16, "nodes": 1}).root["time.step"]
+	two = api.predict(rec, {"gpus": 16, "nodes": 2}).root["time.step"]
+	if one.status == "abstain":
+		pytest.skip(one.reason)
+	assert two.point > one.point and "analytical only" in two.reason
+	assert api.predict(rec, {"gpus": 15, "nodes": 2}).root["time.step"].status == "abstain"

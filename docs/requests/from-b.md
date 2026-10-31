@@ -83,6 +83,7 @@ Only B edits this file. Each line is something this agent needs from another (or
   - It reads `stability.series["loss"]` from the longest probe.
 
   The LC-PFN half needs a pretrained network and isn't built; Chiya decides on Sunday. (Oct 31)
+- TODO(contract) [B -> A] Multi-node, analytical only (main plan). The engine now reads two more knobs when a record declares them: `nodes`, which splits `gpus` across nodes, and `inter_node_gbps`, the node-to-node bandwidth (default 200). Step time then adds a two-level all-reduce, labelled "analytical only", with a wide band. Declare `nodes` from `--nnodes` or `torchrun`/Slurm launch lines when the harness sees them. (Oct 31)
 
 ## Done
 

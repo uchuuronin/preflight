@@ -922,16 +922,30 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		if grad_bytes is None:
 			why = "the trainable parameter count isn't known, so the gradient all-reduce can't be sized"
 			return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, why), sigma)
-		multi = steptime.multi_gpu_step(
-			point, grad_bytes, world, tgt_gpu or src_gpu, _strategy(record, values)
-		)
+		nodes = int(values.get("nodes") or 1)
+		if nodes > 1:
+			if world % nodes:
+				why = f"{world} GPUs don't split evenly across {nodes} nodes"
+				return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, why), sigma)
+			multi = steptime.multi_node_step(
+				point, grad_bytes, nodes, world // nodes, tgt_gpu or src_gpu, _strategy(record, values),
+				float(values.get("inter_node_gbps") or steptime.INTER_NODE_GBPS),
+			)  # fmt: skip
+			comm_sigma = steptime.SIGMA_MULTINODE
+		else:
+			multi = steptime.multi_gpu_step(
+				point, grad_bytes, world, tgt_gpu or src_gpu, _strategy(record, values)
+			)
+			comm_sigma = steptime.SIGMA_COMM
 		if multi.status == "abstain":
 			return _StepResult(_abstain("s", steptime.MODEL_ID_COMM, multi.reason), sigma)
-		# each part keeps its own error: the measured step its sigma, the estimated all-reduce SIGMA_COMM
+		# each part keeps its own error: the measured step its sigma, the estimated all-reduce its own
 		comm = multi.breakdown.get("comm_exposed", 0.0)
-		sigma = math.hypot(point * sigma, comm * steptime.SIGMA_COMM) / multi.point
+		sigma = math.hypot(point * sigma, comm * comm_sigma) / multi.point
 		point, status, mid = multi.point, "extrapolated", steptime.MODEL_ID_COMM
-		reasons.append(f"{world} GPUs: the gradient all-reduce is estimated, not measured")
+		reasons.append(
+			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
+		)
 
 	off = [
 		k for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"})) if k not in _PRECISION_KNOBS

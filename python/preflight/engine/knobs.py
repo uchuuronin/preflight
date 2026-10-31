@@ -92,6 +92,8 @@ _SPECS = [
 	# hardware
 	_k("gpu_type", "gpu", "memory time cost risk", "memory time cost risk"),
 	_k("gpus", "parallel.world_size", "memory time cost"),
+	_k("nodes", "parallel.nodes", "time cost", note="Splits gpus across nodes; multi-node comm is analytical only."),
+	_k("inter_node_gbps", "cluster.network", "time cost", note="Node-to-node bandwidth for the multi-node closed form."),
 	_k("tensor_parallel", "parallel.tensor", "memory time cost"),
 	_k("pipeline_parallel", "parallel.pipeline", "memory time cost"),
 	# RL

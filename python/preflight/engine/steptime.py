@@ -47,6 +47,10 @@ SIGMA_COMM = (
 LATENCY_KERNEL_S = (
 	20e-6  # guess: launch-bound below 20 us; replaced by the corpus kernel tables on L4 (target Oct 30)
 )
+INTER_NODE_GBPS = (
+	200.0  # guess: node-to-node Gbit/s on a cloud or campus cluster (2 x 100GbE or one HDR IB port)
+)
+SIGMA_MULTINODE = 0.5  # guess: analytical only, never measured here; the band says so by its width
 EXPOSED_COMM_SHARE = (
 	0.3  # guess: share of gradient comm not hidden under backward; replaced by a 2-GPU probe (target Oct 31)
 )
@@ -646,6 +650,55 @@ def allreduce_seconds(
 		raise ValueError(f"{spec.name} has no GPU-to-GPU link (a MIG slice can't join a data-parallel group)")
 	bw = spec.link_bytes_one_way() * efficiency
 	return 2 * (world - 1) / world * nbytes / bw + 2 * (world - 1) * hop_latency_s
+
+
+def hierarchical_allreduce_seconds(
+	nbytes: float,
+	nodes: int,
+	per_node: int,
+	gpu: str,
+	inter_gbps: float = INTER_NODE_GBPS,
+	efficiency: float = 0.7,
+	hop_latency_s: float = 20e-6,
+) -> float:
+	"""Two-level all-reduce (NCCL's tree/ring over nodes): reduce-scatter and all-gather inside each node over its GPU
+	links, and an all-reduce of the node's share across nodes over the network. The node's NIC carries every byte
+	of the gradient once each way, so the network term is 2(n-1)/n x bytes / node bandwidth (Calculon-style)."""
+	intra = allreduce_seconds(nbytes, per_node, gpu) if per_node > 1 else 0.0
+	if nodes <= 1:
+		return intra
+	inter_bw = inter_gbps * 1e9 / 8 * efficiency
+	inter = 2 * (nodes - 1) / nodes * nbytes / inter_bw + 2 * (nodes - 1) * hop_latency_s
+	return intra + inter
+
+
+def multi_node_step(
+	single_gpu_s: float,
+	grad_bytes: float,
+	nodes: int,
+	per_node: int,
+	gpu: str,
+	strategy: str = "ddp",
+	inter_gbps: float = INTER_NODE_GBPS,
+	exposed_share: float = EXPOSED_COMM_SHARE,
+) -> StepEstimate:
+	"""Data-parallel step across nodes from a measured single-GPU step: the hierarchical all-reduce is added.
+	Labelled analytical only, with a wide band: no multi-node run has been measured."""
+	traffic = grad_bytes * (1.5 if strategy in ("fsdp", "zero3", "hsdp") else 1.0)
+	try:
+		comm = hierarchical_allreduce_seconds(traffic, nodes, per_node, gpu, inter_gbps)
+	except ValueError as exc:
+		return _abstain(MODEL_ID_COMM, SIGMA_MULTINODE, str(exc))
+	point = single_gpu_s + exposed_share * comm
+	lo, hi = _band(point, SIGMA_MULTINODE)
+	why = (
+		f"analytical only: {nodes} nodes x {per_node} GPUs, a two-level all-reduce at {inter_gbps:g} Gbit/s between "
+		"nodes; no multi-node run was measured"
+	)
+	return StepEstimate(
+		point, lo, hi, "s", "extrapolated", MODEL_ID_COMM, SIGMA_MULTINODE,
+		{"compute": single_gpu_s, "comm_exposed": exposed_share * comm, "comm_total": comm}, why,
+	)  # fmt: skip
 
 
 def multi_gpu_step(
