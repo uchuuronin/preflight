@@ -124,6 +124,24 @@ def _bare(
 	return {"failed": tail[-3000:]}
 
 
+def _bare_hf_home(caches: Path) -> dict:
+	"""The bare run's own HF_HOME, with the probes' prefetched weights linked in. On a root box the
+	bare run is root and the recorder's probe is an unprivileged uid: sharing HF_HOME left root's
+	dataset locks there, and the probe failed on them (Oct 31, a-gt-lora-l4-4: "Permission denied:
+	/tmp/hf/datasets/..._tmp_hf_datasets_yahma___alpaca-cleaned....lock")."""
+	home = os.environ.get("HF_HOME")
+	if not home:
+		return {}
+	own = caches / "hf"
+	(own / "hub").mkdir(parents=True, exist_ok=True)
+	hub = Path(home) / "hub"
+	if hub.is_dir():
+		for entry in hub.iterdir():
+			if entry.name.startswith(("models--", "datasets--")) and not (own / "hub" / entry.name).exists():
+				(own / "hub" / entry.name).symlink_to(entry.resolve(), target_is_directory=True)
+	return {"HF_HOME": str(own)}
+
+
 def measure(
 	script_dir: Path,
 	*,
@@ -157,7 +175,7 @@ def measure(
 			f"bare run of {script_dir.name}: {bare_steps} optimizer steps, at most {budget_s * BARE_SHARE:.0f} s"
 		)
 		bare = _bare(work, bare_steps, install_requirements=install_requirements, caches=caches,
-			env=bare_env or {}, timeout_s=budget_s * BARE_SHARE)  # fmt: skip
+			env={**_bare_hf_home(caches), **(bare_env or {})}, timeout_s=budget_s * BARE_SHARE)  # fmt: skip
 		bare_wall = time.monotonic() - t0
 		_say(
 			f"bare run ended ({bare.get('ended') or 'failed'}) after {bare_wall:.0f} s, {bare.get('steps')} steps"

@@ -121,3 +121,32 @@ def test_files_sent_from_the_checkout_are_measured_where_the_zoo_isnt(tmp_path, 
 	res = gt.measure(tmp_path / "not-here" / "finetune_lora_hf", bare_steps=3, files=files, budget_s=60)
 	assert seen["train"] == "print('hi')\n" and seen["probe_files"] == files
 	assert res["script"] == "finetune_lora_hf"
+
+
+def test_the_bare_run_keeps_its_own_hf_home_so_the_probe_can_write_its_locks(tmp_path, monkeypatch):
+	"""Oct 31, a-gt-lora-l4-4: root's dataset locks in the shared HF_HOME stopped the probe uid."""
+	home = tmp_path / "hf"
+	weights = tmp_path / "volume" / "models--Qwen--Qwen2.5-1.5B"
+	weights.mkdir(parents=True)
+	(home / "hub").mkdir(parents=True)
+	(home / "hub" / "models--Qwen--Qwen2.5-1.5B").symlink_to(weights, target_is_directory=True)
+	monkeypatch.setenv("HF_HOME", str(home))
+	seen = {}
+
+	def bare(work, steps, *, env, **kw):
+		seen["env"] = env
+		seen["link"] = (Path(env["HF_HOME"]) / "hub" / "models--Qwen--Qwen2.5-1.5B").resolve()
+		return {"steps": steps, "walls_s": [None], "ended": "steps"}
+
+	import types
+
+	import preflight.probes.local as local
+
+	monkeypatch.setattr(gt, "_bare", bare)
+	monkeypatch.setattr(local, "run_probe", lambda spec, **kw: types.SimpleNamespace(
+		probe=types.SimpleNamespace(status="error", steps=0, step_time=None, memory=None, cost=None,
+			step_log=[], error="x", error_code="x"), env=None, log_tail=""))  # fmt: skip
+	gt.measure(tmp_path / "s", bare_steps=1, files={"train.py": ""}, budget_s=60)
+	own = Path(seen["env"]["HF_HOME"])
+	assert own != home and seen["link"] == weights.resolve()
+	assert os.environ["HF_HOME"] == str(home)  # the probe keeps the shared one
