@@ -69,6 +69,12 @@ Only B edits this file. Each line is something this agent needs from another (or
   - `rl.truncation`, unit `fraction`: the share of responses reaching the completion cap.
 
   `time.step` and `time.total` now move with `group_size` and `max_completion_len` through the rollout model, and their reason starts "rollout: ...". The labels are `target.rl.zero_spread`, `target.time.rollout` and `target.rl.truncation`. (Oct 31)
+- TODO(contract) [B -> A] Serving model (engine/serving.py), behind `engine.serving` (off). Set `engine.api.FEATURES["serving"] = flag("engine.serving")` beside the RL one. On the serving lens it simulates the probe's own requests and fits one scale factor to the probe's wall time, so it needs a probe with:
+  - `generation.backend == "vllm"`; an HF generate probe gives an uncalibrated band, labelled as such;
+  - `generation.sequences`, `seconds_total`, `new_tokens_mean`, `new_tokens_p95` and `max_new_tokens`;
+  - the prompt length, read from `max_prompt_len`, else `data.tokens_per_sample_mean` and `p95`.
+
+  It also reads the knobs `max_num_seqs`, `max_batched_tokens`, `gpu_memory_utilization`, `max_model_len`, `kv_cache_dtype` and `tensor_parallel` when the script exposes them. For the validation row (tokens per second within 15%), a full vLLM run of the same model and workload. (Oct 31)
 
 ## Done
 

@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, rl, steptime
+from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, rl, serving, steptime
 from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
@@ -65,13 +65,18 @@ _TARGETS = {
 	"rl.zero_spread": ("fraction", "risk"),
 	"rl.truncation": ("fraction", None),
 	"time.rollout": ("s", None),
+	"serving.throughput": ("tokens/s", "time"),
+	"serving.ttft_p95": ("s", None),
+	"serving.tpot": ("s", None),
+	"serving.kv_tokens": ("tokens", "memory"),
 }
 
 # Features the caller switches on from its flags (the engine reads no files). Off by default.
-FEATURES = {
-	"rl": False
-}  # flags.json engine.rl: zero-spread groups, rollout time and truncation on the RL lens
+# flags.json engine.rl: zero-spread groups, rollout time and truncation on the RL lens;
+# engine.serving: throughput, time to first token, time per token and KV capacity on the serving lens
+FEATURES = {"rl": False, "serving": False}
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
+SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
 
 
 # ---------------------------------------------------------------- small helpers
@@ -155,6 +160,8 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
 		if FEATURES["rl"] and record.job.lens == "rl":
 			ids += list(RL_TARGETS)
+		if FEATURES["serving"] and record.job.lens == "serving":
+			ids += list(SERVING_TARGETS)
 		c = record.job.constraints
 		if c.wall_time_cap_s:
 			ids.append("risk.wall_cap")
@@ -1661,7 +1668,110 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
 	if FEATURES["rl"] and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
+	if FEATURES["serving"] and record.job.lens == "serving":
+		out.update(_serving_targets(record, values))
 	return Prediction(out)
+
+
+# ---------------------------------------------------------------- self-hosted serving (engine/serving.py)
+
+
+def _serve_probe(record: FlightRecord):
+	"""A probe that generated: its requests are the workload, and its wall time calibrates the simulation."""
+	for p in record.probes:
+		g = p.generation
+		if p.status in OK_PROBE and g and g.sequences and g.seconds_total and g.new_tokens_mean:
+			return p
+	return None
+
+
+def _serve_setup(record: FlightRecord, values: dict) -> tuple[serving.ServeSetup | None, str]:
+	try:
+		arch, setup, _ = knobs.setup_from(record.job.script_map, values)
+	except (ValueError, AttributeError) as exc:
+		return None, f"no model shape to size the KV cache: {exc}"
+	if not isinstance(arch, memory.TransformerArch):
+		return None, "the serving model needs a transformer's layers and heads"
+	gpu = _target_gpu(record, values)
+	if gpu is None or gpus.is_unlisted(gpu):
+		return None, f"{gpu or 'this GPU'} isn't in the GPU table"
+	weights = memory.static_terms(arch, setup)["weights"]
+	kv = "fp8" if str(values.get("kv_cache_dtype", "")).startswith("fp8") else setup.compute_dtype
+	return serving.ServeSetup(
+		arch=arch,
+		gpu=gpu,
+		weight_bytes=weights,
+		kv_dtype=kv,
+		compute_dtype=setup.compute_dtype,
+		tensor=setup.parallel.tensor,
+		mem_util=float(values.get("gpu_memory_utilization") or 0.9),
+		max_num_seqs=int(values.get("max_num_seqs") or 256),
+		max_batched_tokens=int(values.get("max_batched_tokens") or 8192),
+		max_model_len=int(values["max_model_len"]) if values.get("max_model_len") else None,
+		capacity_bytes=float(_capacity(record, gpu)),
+	), ""
+
+
+def _serve_workload(record: FlightRecord, values: dict, p) -> list[serving.Request]:
+	"""The probe's requests, all at once: its sequences, its output lengths, a prompt length from the knobs or data."""
+	g = p.generation
+	pv = _probe_values(record, p)
+	dat = p.data
+	prompt = (
+		values.get("max_prompt_len")
+		or pv.get("max_prompt_len")
+		or (dat.tokens_per_sample_mean if dat else None)
+		or 512
+	)
+	cap = values.get("max_new_tokens") or g.max_new_tokens
+	return serving.workload(
+		int(g.sequences),
+		float(prompt),
+		float(g.new_tokens_mean),
+		float(dat.tokens_per_sample_p95) if dat and dat.tokens_per_sample_p95 else None,
+		float(g.new_tokens_p95) if g.new_tokens_p95 else None,
+		max_output=int(cap) if cap else None,
+	)
+
+
+def _serving_targets(record: FlightRecord, values: dict) -> dict:
+	mid = serving.MODEL_ID
+	setup, why = _serve_setup(record, values)
+	p = _serve_probe(record)
+	if setup is None or p is None:
+		why = why or "no probe generated, so there is no workload to simulate or calibrate on"
+		return {t: _abstain(_meta(t)[0], mid, why) for t in SERVING_TARGETS}
+	pv = _probe_values(record, p)
+	probe_setup, _ = _serve_setup(record, pv)
+	backend = p.generation.backend
+	if backend == "vllm":
+		cal = serving.calibrate(
+			probe_setup or setup, _serve_workload(record, pv, p), float(p.generation.seconds_total)
+		)
+	else:  # an HF generate probe doesn't batch like vLLM: its wall time can't scale a vLLM simulation
+		cal = serving.Calibration(
+			source=f"uncalibrated: the probe generated with {backend or 'an unknown backend'}, not vLLM"
+		)
+	f = serving.forecast(setup, _serve_workload(record, values, p), cal)
+	status = "predicted" if _matching_probe(record, values) is p and backend == "vllm" else "extrapolated"
+	out = {}
+	for tid, r, unit in (
+		("serving.throughput", f.throughput, "tokens/s"),
+		("serving.ttft_p95", f.ttft_p95, "s"),
+		("serving.tpot", f.tpot_p50, "s"),
+	):
+		out[tid] = _est(r.point, r.lo, r.hi, unit, status, mid, r.reason)
+	kv = float(f.kv_capacity_tokens)
+	out["serving.kv_tokens"] = _est(
+		kv,
+		kv,
+		kv,
+		"tokens",
+		"predicted",
+		mid,
+		f"KV pool after the weights at {setup.mem_util:.0%} of the card; at most {f.peak_running} requests ran at once",
+	)
+	return out
 
 
 # ---------------------------------------------------------------- RL post-training (engine/rl.py)
@@ -2070,6 +2180,12 @@ def sensitivity(
 
 
 _CARDS = {
+	serving.MODEL_ID: (
+		"simulation",
+		"KV-cache capacity, prefill and decode rooflines and a continuous-batching scheduler (vLLM, Vidur); one scale "
+		"factor fitted on the probe's own requests; not yet checked against a full vLLM run (validation row: "
+		"tokens/sec within 15%)",
+	),
 	rl.MODEL_ID_ZERO: (
 		"bootstrap",
 		"p^G + (1-p)^G per prompt, each pass rate with a Jeffreys posterior, prompts resampled (DAPO, Dr. GRPO); "

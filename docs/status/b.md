@@ -2,7 +2,7 @@
 
 Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; from now on merges, not rebases).
 
-## Plan items B owns (Sat Oct 31, 9 AM ET)
+## Plan items B owns (Sat Oct 31, 8 AM ET)
 
 Every B item in the Contracts tab (Contract B, the gaps table, the adopted items) and the main plan (feature set, prediction engine, validation targets). "Branch" means on `ws-b` but not on `main`. Hours are my honest estimate of work left, review and fixes included. They don't include waiting on A's data or on a paid run.
 
