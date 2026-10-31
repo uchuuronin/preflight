@@ -125,3 +125,18 @@ def test_one_rule_for_whether_a_probe_ran_eval(smoke):
 	on = p.model_copy(update={"extras": {**p.extras, "eval_off": False}})
 	off = p.model_copy(update={"extras": {**p.extras, "eval_off": True}, "eval": None})
 	assert api.probe_ran_eval(on) and not api.probe_ran_eval(off)
+
+
+@pytest.mark.parametrize(("stored", "ran"), [(1.0, False), (0.0, True), (1, False), (0, True), (True, False)])
+def test_eval_off_as_a_loaded_record_stores_it(smoke, stored, ran):
+	"""A's pipeline marks an eval-off re-run with extras["eval_off"] = 1.0 (runner/pipeline.py _marked_eval_off),
+	and records store extras as numbers, so the marker arrives as 1.0 or 0.0 after a round trip, not a bool."""
+	from preflight.schema import dump_record
+
+	probes = [
+		p.model_copy(update={"extras": {**p.extras, "eval_off": stored}}) if p.id == "p1" else p
+		for p in smoke.probes
+	]
+	rec = load_record(dump_record(smoke.model_copy(update={"probes": probes})))
+	p1 = next(p for p in rec.probes if p.id == "p1")
+	assert api.probe_ran_eval(p1) is ran

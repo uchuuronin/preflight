@@ -398,8 +398,9 @@ def probe_ran_eval(p) -> bool:
 	(Chiya, Oct 30): A's `extras.eval_off` first (set when a point is re-run with eval off after an eval OOM),
 	then whether the probe recorded eval stats."""
 	off = (p.extras or {}).get("eval_off")
-	if isinstance(off, bool):
-		return not off
+	# records store extras as numbers, so A's marker arrives as 1.0 or 0.0: any finite number, non-zero is off
+	if isinstance(off, (int, float)) and math.isfinite(off):
+		return off == 0
 	return p.eval is not None
 
 
