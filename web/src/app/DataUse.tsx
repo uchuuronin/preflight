@@ -12,11 +12,16 @@ const SEEN_KEY = "pf.data_use.v1";
 
 /**
  * How long code and records are kept: only what A's runner does today (python/preflight/runner).
- * - A repo's clone is deleted when the probe ends (sources.py reads git's objects and deletes it).
- * - Uploaded files stay on the "preflight-uploads" volume by content hash, so the guide can re-run
- *   a record's code; nothing deletes them yet (`uploadDays: null`), and the notice says so.
- * - Records are deleted 30 days after they are made (records.py RECORD_TTL_S, pruned daily by
- *   the runner's tick; PM decision, Oct 28).
+ * - A repo's clone is deleted as soon as it is read, before any probe runs (sources.py); the
+ *   record keeps only the repo link and commit.
+ * - Uploaded files (a notebook as sent, outputs included) stay on the "preflight-uploads" volume
+ *   by content hash, even after their record goes, so the guide can re-run them; nothing deletes
+ *   them yet (`uploadDays: null`), and the notice says so.
+ * - Records are deleted about 30 days after they are made (records.py RECORD_TTL_S; PM decision,
+ *   Oct 28): the deployed app's tick prunes once a day, at most a quarter of them per pass, and
+ *   keeps any record whose date can't be read.
+ * - Probe results, error messages included (which can quote the visitor's code), stay in the
+ *   probe cache with no expiry, so a repeat run reuses them (modal_app.py DictCache).
  */
 export const RETENTION: { repoDeletedAtProbeEnd: boolean; uploadDays: number | null; recordDays: number | null } = {
 	repoDeletedAtProbeEnd: true,
@@ -41,14 +46,15 @@ function writeSeen(): void {
 }
 
 /** The lines that apply to this build, in the order a visitor's data travels. */
-export function dataUseLines(): string[] {
+export function dataUseLines(retention: typeof RETENTION = RETENTION): string[] {
 	const lines = [t("datause.sent"), t("datause.probe")];
 	if (flag("harness.spark_script_map")) lines.push(t("datause.script_map"));
 	if (flag("c.guide.live")) lines.push(t("datause.guide"));
 	lines.push(t("datause.record"));
-	if (RETENTION.repoDeletedAtProbeEnd) lines.push(t("datause.retention.repo"));
-	lines.push(RETENTION.uploadDays ? t("datause.retention.uploads", { days: String(RETENTION.uploadDays) }) : t("datause.retention.uploads_kept"));
-	lines.push(RETENTION.recordDays ? t("datause.retention.records", { days: String(RETENTION.recordDays) }) : t("datause.retention.unset"));
+	if (retention.repoDeletedAtProbeEnd) lines.push(t("datause.retention.repo"));
+	lines.push(retention.uploadDays ? t("datause.retention.uploads", { days: String(retention.uploadDays) }) : t("datause.retention.uploads_kept"));
+	lines.push(retention.recordDays ? t("datause.retention.records", { days: String(retention.recordDays) }) : t("datause.retention.unset"));
+	lines.push(t("datause.retention.probe_errors"));
 	lines.push(t("datause.secrets"));
 	return lines;
 }
