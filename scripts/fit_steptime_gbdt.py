@@ -15,7 +15,6 @@ walks with numpy, so it runs in Pyodide.
 from __future__ import annotations
 
 import argparse
-import math
 import pprint
 import sys
 from collections import defaultdict
@@ -24,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from preflight.corpus import calibrate as cal
-from preflight.engine import conformal, gpus, steptime
+from preflight.engine import conformal, steptime
 from preflight.engine import steptime_gbdt as G
 
 TOL = 0.20  # cited: main plan, step time on an unmeasured GPU within 20%
