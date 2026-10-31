@@ -21,23 +21,23 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | --- | --- | --- | --- |
 | Serving: KV-cache formula, prefill and decode rooflines | branch (`engine/serving.py`, behind `engine.serving`) | 0 | |
 | Serving: discrete-event scheduler simulation, calibrated on A's vLLM probes | branch | 1 | Calibration code is in; it needs A's vLLM probe records |
-| Multi-node closed forms, labelled analytical-only | not started (single-node multi-GPU all-reduce is on `main`) | 3 | |
-| Loss forecast: power-law fit, plus LC-PFN posterior, abstaining on wide bands | not started | 5 | The power law alone is 2 of these hours |
-| Data repetition and quality exposure (with A) | not started | 4 | |
-| Proxy campaigns | not started | 3 | |
-| Power analysis: seeds needed from seed-to-seed variance | not started | 2 | |
-| GBDT residual on cross-GPU step time | not started | 4 | Corpus rows are in |
+| Multi-node closed forms, labelled analytical-only | branch (`nodes`, `inter_node_gbps` knobs; two-level all-reduce) | 0 | Needs A to declare `nodes` |
+| Loss forecast: power-law fit, plus LC-PFN posterior, abstaining on wide bands | branch: the power-law half (`engine/lossforecast.py`; band covers 89/100 on synthetic curves) | 3 for LC-PFN | LC-PFN needs a pretrained network: a cut candidate for Sunday |
+| Data repetition and quality exposure (with A) | branch (`engine/repetition.py`) | 1 | Needs A's data profile per bin |
+| Proxy campaigns | branch (`engine/proxy.py`: rank agreement and proxy settings) | 1 | Proxy runs themselves go through the campaign planner |
+| Power analysis: seeds needed from seed-to-seed variance | branch (`engine/power.py`) | 0.5 | Needs A's multi-seed probe |
+| GBDT residual on cross-GPU step time | branch: fitted and scored, **fails held out** (51% vs K1's 60% within 20%), so not used | 0 | |
 | Divergence classifier: 800+ short runs, AUROC target 0.85 | not started (the corpus `divergence` kind and the D9 label exist) | 4, plus a paid sweep | The sweep needs your yes; I'll post its cost first |
-| GNN cost model, used only if it beats the GBDT held out | not started | 6 | |
-| Muse Spark Open batch-labels the corpus | not started | 2 | |
+| GNN cost model, used only if it beats the GBDT held out | branch: `scripts/fit_cost_gnn.py`, scoring now | 1 | |
+| Muse Spark Open batch-labels the corpus | not started | 2 | Needs a Baseten run through Actions: a paid ask |
 | Conformal layer, abstention rules, float16 grids within the cell budget | `main`; real table on branch | 0 | |
 | Pyodide parity test and import allowlist (gap 10) | `main` | 0 | |
 | Sample records for the library (gap 4, with C) | `main` (`fill_predictions`) | 0 | C serves them |
 | Run cost and its basis (gap 21) | `main` | 0 | |
 | Corpus sweep: resumable, keyed, halts at budget (gap 13) | `main`; A100 board fix on branch | 0 | |
-| Versioned model cards pinned in records (gap 15) | `main` (ids like `memory-analytical@0.2.0` on every estimate) | 1 | Needs a test that an old record keeps the model it was predicted with |
-| Glimmer private-mode host proposal (with A, by Sun Nov 1) | not started | 1 | |
-| Corpus published with its datasheet (gap 16) | not started | 2 | |
+| Versioned model cards pinned in records (gap 15) | branch: `stale_models`, `current_models` | 0 | C shows it |
+| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: B's draft (`docs/decisions/glimmer-host.md`) | 0.5 | A to complete |
+| Corpus published with its datasheet (gap 16) | branch (`corpus/DATASHEET.md`) | 0.5 | Publishing the rows themselves |
 
 **Validation rows (README table)**
 
@@ -47,16 +47,16 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Peak memory within 10% | partly measured: HF jobs and A's smoke record | 1 | Scored on A's full runs |
 | OOM: no misses, ≤ 1 false alarm per 10 scripts, reliability diagram | branch: reliability bins | 1 | Scored on the bug zoo |
 | Step time within 15%, same GPU | branch: the line puts 461 of 575 held-out queries within 15% | 1 | Full runs still to come |
-| Step time within 20%, unmeasured GPU (4th type, incl. AMD) | waiting on the A100 and AMD runs | 2 | The A100 run is going now |
-| GNN + GBDT beats GBDT alone | not started | with the GNN | |
+| Step time within 20%, unmeasured GPU (4th type, incl. AMD) | corpus: K1 60% within 20% leave-one-GPU-out; A100 holdout same-GPU time 93% in band | 2 | AMD rows still to come; K1's band needs Chiya's call |
+| GNN + GBDT beats GBDT alone | scoring now | with the GNN | |
 | Divergence warning: AUROC 0.85+, 100+ steps early | not started | with the classifier | |
 | RL rollout time within 20% | not started | 1 | Needs A's GRPO zoo script run |
 | Serving tokens/sec within 15% | not started | 1 | Needs A's vLLM full runs |
 | Agent total cost inside the 90% interval | simulated on `main` (S6); no full run yet | 1 | |
 | Abstention: every query outside the probed range is flagged | `main` (automated tests) | 0 | |
-| Coverage self-test page (with C) | not started | 2 | |
+| Coverage self-test page (with C) | branch: corpus half (`calibration_summary`) | 0.5 | C renders it |
 
-**Total: about 72 hours of B work left** (14.5 for the hero lenses, 46 for the rest of the engine, 12 for validation). Since the table was written, the campaign planner and the RL and serving models have landed on the branch, which leaves about 53. That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
+**Total: about 72 hours of B work left** (14.5 for the hero lenses, 46 for the rest of the engine, 12 for validation). Since the table was written, most engine items have landed on the branch, which leaves about 20 hours. Most of that waits on others: A's probes, the paid divergence and AMD runs, and the Nov 2 full runs. That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
 
 ## Done
 - **Settings chosen by Monte Carlo** (`docs/decisions/engine-settings.md`, `scripts/mc_engine_settings.py`): memory calibration on A's three-probe plan, the 90% band (including one or two probes) and the fits/tight/fails cut-offs, the divergence label (D9 catches early collapses, a case a CPU smoke run turned up), cross-GPU step time and the corpus budget rule.
