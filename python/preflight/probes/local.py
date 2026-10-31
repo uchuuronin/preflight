@@ -141,6 +141,12 @@ EXTRAS_KEYS = (
 		for k in ("encode", "index_add", "index_train", "search")
 		for m in ("items", "seconds", "items_per_s")
 	),
+	# torchrun (nproc > 1): ranks on the node, how many wrote a result, the largest rank peak and
+	# the slowest rank's median step
+	"world_size",
+	"ranks_reported",
+	"rank_peak_allocated_max_bytes",
+	"rank_step_p50_max_s",
 )
 
 
@@ -173,6 +179,7 @@ class ProbeSpec:
 	install_requirements: bool = False  # pip-install requirements.txt in the probe (hosted probes only)
 	out_dir: Path | None = None
 	gpu_usd_per_hour: float = 0.0
+	nproc: int = 1  # processes on this node, one per GPU, under torchrun (DDP, FSDP)
 
 
 @dataclass
@@ -601,6 +608,31 @@ def _extras(summary: dict) -> dict[str, float]:
 # ---------------------------------------------------------------- run
 
 
+def _rank_extras(out: Path, nproc: int, summary: dict) -> dict:
+	"""What the other ranks' results add to rank 0's: the world size, the largest peak and the
+	slowest median step of any rank (the rank that OOMs or straggles sets the run)."""
+
+	def peak_p50(s):
+		return (s.get("memory") or {}).get("peak"), (s.get("step_time") or {}).get("p50_s")
+
+	vals, seen = [peak_p50(summary)], 1
+	for r in range(1, nproc):
+		with contextlib.suppress(OSError, ValueError):
+			_, _, _, s, _ = parse_result(Path(f"{out}.rank{r}").read_text(errors="replace")[:5_000_000])
+			vals.append(peak_p50(s))
+			seen += 1
+
+	def num(x):
+		return isinstance(x, int | float) and not isinstance(x, bool)
+
+	res = {"world_size": nproc, "ranks_reported": seen}
+	if peaks := [v[0] for v in vals if num(v[0])]:
+		res["rank_peak_allocated_max_bytes"] = max(peaks)
+	if times := [v[1] for v in vals if num(v[1])]:
+		res["rank_step_p50_max_s"] = max(times)
+	return res
+
+
 def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None) -> ProbeResult:
 	validate_files(spec.files, entrypoint=spec.entrypoint)
 	# where the caller keeps artifacts (log, trace); wiped of any earlier attempt first
@@ -637,6 +669,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"alternate_sync": spec.alternate_sync,
 				"install_requirements": spec.install_requirements,
 				"deps": str(box / "deps"),
+				"nproc": spec.nproc,
 			}
 		)
 	)
@@ -660,8 +693,13 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	t0 = time.monotonic()
 	_PROBE_LOCK.acquire()  # one probe at a time per process: the descendant sweep below must not touch another probe
 	try:
+		launch = [python, "-m", "preflight.recorder.run", str(spec_path)]
+		if spec.nproc > 1:
+			# one recorder per rank; --standalone: a rendezvous on this node only
+			launch = [python, "-m", "torch.distributed.run", "--standalone", f"--nproc_per_node={spec.nproc}",
+				"-m", "preflight.recorder.run", str(spec_path)]  # fmt: skip
 		proc = subprocess.Popen(
-			[python, "-m", "preflight.recorder.run", str(spec_path)],
+			launch,
 			cwd=work,
 			env=env,
 			stdin=subprocess.DEVNULL,
@@ -726,6 +764,8 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		summary, raw_env = {"steps": steps}, {}
 	else:
 		status, code, error, summary, raw_env = parse_result(out.read_text(errors="replace")[:5_000_000])
+		if spec.nproc > 1:
+			summary = {**summary, **_rank_extras(out, spec.nproc, summary)}
 	try:
 		probe = _probe_model(spec, status, code, error, summary, started, duration)
 	except (ValidationError, TypeError, ValueError, ArithmeticError) as exc:

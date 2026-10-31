@@ -110,11 +110,24 @@ def _force_seed(seed: int) -> None:
 		pass
 
 
+def _rank() -> int:
+	try:
+		return int(os.environ.get("RANK") or 0)
+	except ValueError:
+		return 0
+
+
 def main(spec_path: str) -> int:
 	spec = json.loads(Path(spec_path).read_text())
 	set_limits()
 	workdir = os.path.abspath(spec["workdir"])
 	out_path = spec["out"]
+	rank = _rank()
+	if rank > 0:
+		# torchrun (spec nproc > 1): every rank runs under its own recorder; rank 0 writes the
+		# result, progress and trace, the others a result of their own beside it (memory per rank)
+		out_path = f"{out_path}.rank{rank}"
+		spec = {**spec, "progress": None, "trace": None, "profile": False, "install_requirements": False}
 	try:
 		import torch  # noqa: F401  (fails here, inside the try, when torch is missing)
 

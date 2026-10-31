@@ -326,3 +326,11 @@ def test_retrieval_stages_record_items_and_throughput():
 	assert ex["encode_items"] == 2100 and ex["encode_items_per_s"] > 0
 	assert ex["index_add_items"] == 2000 and ex["search_items"] == 100
 	assert "index_train_items" not in ex  # the script never trained the index
+
+
+def test_a_ddp_script_runs_one_recorder_per_rank_under_torchrun():
+	r = run_probe(spec("ddp_loop.py", warmup=1, timed=3, nproc=2, timeout_s=240))
+	assert r.probe.status == "ok", (r.probe.error, r.log_tail[-2000:])
+	ex = r.probe.extras
+	assert ex["world_size"] == 2 and ex["ranks_reported"] == 2
+	assert ex["rank_step_p50_max_s"] >= r.probe.step_time.p50_s
