@@ -133,14 +133,17 @@ def measure(
 	install_requirements: bool = False,
 	budget_s: float = BUDGET_S,
 	bare_env: dict | None = None,
+	files: dict[str, str] | None = None,
 ) -> dict:
 	"""Both runs and the paired overhead, as one dict (what out/ground_truth_<script>.json holds).
-	bare_env: environment overrides for the bare run only (its own caches on a root box)."""
+	bare_env: environment overrides for the bare run only (its own caches on a root box).
+	files: the script's files, when the machine that runs it doesn't have script_dir (Modal's probe
+	image has no zoo: the ops app's local entrypoint reads them from the checkout and sends them)."""
 	from preflight.probes.local import ProbeSpec, run_probe
 	from preflight.recorder.overhead import report
 	from preflight.runner.sources import _read_tree
 
-	files = _read_tree(script_dir)
+	files = _read_tree(script_dir) if files is None else files
 	if "train.py" not in files:
 		raise ValueError(f"{script_dir} has no train.py")
 	caches = Path(tempfile.mkdtemp(prefix="gt-caches-"))

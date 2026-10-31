@@ -315,20 +315,21 @@ GROUND_TRUTH_TIMEOUT_S = 50 * 60
 
 @ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=GROUND_TRUTH_TIMEOUT_S)
 def ground_truth_on_l4(
-	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float
+	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict
 ) -> dict:
 	"""recorder/ground_truth.py on an L4: a bare run, then a recorder run alternating clean and
 	synced steps, and the paired overhead. The AMD droplet runs the same module."""
 	from preflight.probes import remote
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, measure
-	from preflight.runner.sources import ZOO
 
 	if script not in ZOO_SCRIPTS:
 		raise ValueError(f"unknown zoo script {script!r}")
+	print(f"[ground truth] container up on the GPU; {len(files)} files of {script}", flush=True)
 	remote.link_weights()
 	remote.deps_dir()
-	return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
-		budget_s=budget_s)  # fmt: skip
+	# the probe image has no zoo (Oct 31: "has no train.py"): the files come from the checkout
+	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
+		budget_s=budget_s, files=files)  # fmt: skip
 
 
 @ops.local_entrypoint()
@@ -340,9 +341,18 @@ def ground_truth(
 	budget_min: the whole measurement ends inside it; keep it under the run's own time limit."""
 	import json
 
-	from preflight.recorder.ground_truth import brief
+	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief
+	from preflight.runner.sources import _read_tree
 
-	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60)
+	if script not in ZOO_SCRIPTS:
+		raise SystemExit(f"unknown zoo script {script!r}")
+	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
+	if "train.py" not in files:
+		raise SystemExit(f"zoo/{script} has no train.py in this checkout")
+	print(
+		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4 (Modal queues it)", flush=True
+	)
+	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60, files)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(brief(res), indent=2), flush=True)

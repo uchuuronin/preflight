@@ -95,3 +95,29 @@ def test_a_worker_left_holding_the_pipe_doesnt_hold_the_run(tmp_path):
 	assert code == 0 and "done" in tail
 	assert time.monotonic() - t0 < gt.DRAIN_S + 5  # not the 30 s deadline
 	assert subprocess.run(["pgrep", "-f", "time.sleep(60)"], capture_output=True).returncode != 0  # killed
+
+
+def test_files_sent_from_the_checkout_are_measured_where_the_zoo_isnt(tmp_path, monkeypatch):
+	"""Oct 31: Modal's probe image has no zoo, so the ops app sends the files with the call."""
+	import types
+
+	import preflight.probes.local as local
+
+	seen = {}
+
+	def bare(work, steps, **kw):
+		seen["train"] = (work / "train.py").read_text()
+		return {"steps": steps, "walls_s": [None], "ended": "steps"}
+
+	def probe(spec, **kw):
+		seen["probe_files"] = spec.files
+		p = types.SimpleNamespace(status="error", steps=0, step_time=None, memory=None, cost=None,
+			step_log=[], error="x", error_code="x")  # fmt: skip
+		return types.SimpleNamespace(probe=p, env=None, log_tail="")
+
+	monkeypatch.setattr(gt, "_bare", bare)
+	monkeypatch.setattr(local, "run_probe", probe)
+	files = {"train.py": "print('hi')\n", "requirements.txt": "peft\n"}
+	res = gt.measure(tmp_path / "not-here" / "finetune_lora_hf", bare_steps=3, files=files, budget_s=60)
+	assert seen["train"] == "print('hi')\n" and seen["probe_files"] == files
+	assert res["script"] == "finetune_lora_hf"
