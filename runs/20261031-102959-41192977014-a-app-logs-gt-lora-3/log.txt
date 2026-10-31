@@ -1,0 +1,31 @@
+{
+  "app_id": "ap-Gm15oSsW1zrEPhoTf3KnTJ",
+  "env": "main",
+  "app": "preflight-runner-ops",
+  "state": "stopped",
+  "read": "exit 0",
+  "since": null,
+  "until": null,
+  "chars": 2328
+}
+2026-10-31 10:03:37+00:00 Function 'ground_truth_on_l4' (fu-tsX90dSBltVsbTBdSUqgyU) is waiting to be scheduled on a GPU_L4 worker. We are actively working on acquiring more capacity for your workload.
+2026-10-31 10:04:24+00:00 Function 'ground_truth_on_l4' (fu-tsX90dSBltVsbTBdSUqgyU) is waiting to be scheduled on a GPU_L4 worker. We are actively working on acquiring more capacity for your workload.
+2026-10-31 10:12:33+00:00 Function 'ground_truth_on_l4' (fu-tsX90dSBltVsbTBdSUqgyU) is waiting to be scheduled on a GPU_L4 worker. We are actively working on acquiring more capacity for your workload.
+2026-10-31 10:28:34+00:00 Function 'ground_truth_on_l4' (fu-tsX90dSBltVsbTBdSUqgyU) is waiting to be scheduled on a GPU_L4 worker. We are actively working on acquiring more capacity for your workload.
+2026-10-31 10:28:44+00:00 Traceback (most recent call last):
+2026-10-31 10:28:44+00:00   File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+2026-10-31 10:28:44+00:00     yield
+2026-10-31 10:28:44+00:00   File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+2026-10-31 10:28:44+00:00     values = io_context.call_function_sync()
+2026-10-31 10:28:44+00:00              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-10-31 10:28:44+00:00   File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+2026-10-31 10:28:44+00:00     expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+2026-10-31 10:28:44+00:00                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-10-31 10:28:44+00:00   File "/root/ops_app.py", line 330, in ground_truth_on_l4
+2026-10-31 10:28:44+00:00     return measure(ZOO / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
+2026-10-31 10:28:44+00:00            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-10-31 10:28:44+00:00   File "/opt/preflight/preflight/recorder/ground_truth.py", line 145, in measure
+2026-10-31 10:28:44+00:00     raise ValueError(f"{script_dir} has no train.py")
+2026-10-31 10:28:44+00:00 ValueError: /root/zoo/finetune_lora_hf has no train.py
+2026-10-31 10:28:45+00:00 Stopping app - uncaught exception raised locally: ValueError('/root/zoo/finetune_lora_hf has no train.py').
+
