@@ -191,7 +191,7 @@ included. Hero lenses first.
 | 31 | Spark diagnosis: traces and plots as images, search grounding, cited findings (contract) | not started | 5 |
 | 32 | Glimmer host proposal with B (competitive #6) | not started | 2 |
 | **AMD** | | | |
-| 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); session this morning | 2 + droplet |
+| 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); blocked: the AMD Developer Cloud account is on a verification hold (Oct 31 evening). Session Sunday 9 AM if it clears, else to the noon cut with AMD answers from datasheets and the cross-GPU model, labelled not measured | 2 + droplet |
 | 34 | Droplet idle watchdog (contract) | not started (B's sweep has an uptime ledger) | 2 |
 | **Platform and gaps** | | | |
 | 35 | Job store, queue, leases, reaper, probe cache, sandbox policy, migrations, token caps, AMD offline (gaps 1, 2, 3, 6, 8, 9, 11) | main | 0 |
