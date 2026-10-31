@@ -667,7 +667,7 @@
 	"datause.retention.uploads_kept": "Uploaded files are kept so the guide can re-run them; nothing deletes them yet.",
 	"datause.retention.records": "Flight records are deleted after {days} days.",
 	"datause.retention.unset": "Nothing is deleted automatically yet.",
-	"datause.secrets": "Keep keys and passwords out of the repo.",
+	"datause.secrets": "Keep keys and passwords out of your code.",
 	"datause.accept": "Got it",
 	"datause.needed": "Tick “Got it” below to check in.",
 	"guide.ask.datause": "Your message goes to Muse Spark through Meta's Model API.",

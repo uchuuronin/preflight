@@ -1,5 +1,21 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Fri Oct 30, evening (G1 day)
+
+**Done**
+
+- Commits now as Chiya's GitHub account (Shreya, noreply address).
+- Data-use notice says only what the runner does: a repo's code is deleted when the probe ends;
+  uploaded files are kept (the guide re-runs them) and nothing deletes them yet; flight records
+  are deleted after 30 days (A's daily prune). Asked A whether uploads should follow records.
+
+**Waiting**
+
+- `main` on GitHub is still 206c3f3 (Oct 28); round two isn't there to merge yet.
+- Upload-to-map run (approved, about $0.35, $0.65 cap): from `main` once A says the runner is
+  deployed with `engine.memory` on (A's last startup check, Oct 28 18:52, saw it off). Planned
+  with a 25-minute workflow limit; the job is cancelled at 18 minutes.
+
 ## Wed Oct 28, afternoon (merged contract 0.4.0)
 
 **Done**
