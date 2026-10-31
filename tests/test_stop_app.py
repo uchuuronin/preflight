@@ -133,3 +133,30 @@ def test_ownership_is_claimed_only_on_a_match_and_never_guessed():
 	assert decide_ownership("ap-2", missing, where="x", env_known=False)[0] is None  # don't guess
 	assert decide_ownership("ap-1", flaky, where="x", tries=3)[0] is None and len(calls) == 3  # restart
 	assert decide_ownership(None, found("ap-1"), where="x")[0] is None
+
+
+def test_app_logs_reads_and_never_runs(monkeypatch, tmp_path):
+	from preflight.runner import app_logs
+
+	monkeypatch.chdir(tmp_path)
+	calls = []
+
+	def run(cmd, **kw):
+		calls.append(cmd)
+		if cmd[:3] == ["modal", "app", "logs"]:
+			raise app_logs.subprocess.TimeoutExpired(
+				cmd, kw["timeout"], output=b"[ground truth] bare run", stderr=b""
+			)
+		return Done(0, json.dumps([{"App ID": "ap-abcdef12", "Description": "preflight-runner-ops", "State": "ephemeral"},
+			{"App ID": "ap-runner99", "Description": "preflight-runner", "State": "deployed"}]))  # fmt: skip
+
+	monkeypatch.setattr(app_logs.subprocess, "run", run)
+	assert app_logs.main(["--env", "main", "ap-abcdef12", "--seconds", "5"]) == 0
+	assert (tmp_path / "out" / "app_logs.txt").read_text() == "[ground truth] bare run"
+	got = json.loads((tmp_path / "out" / "app_logs.json").read_text())
+	assert got["state"] == "ephemeral" and "cut off" in got["read"]
+	assert all(c[:2] == ["modal", "app"] and c[2] in ("logs", "list") for c in calls)  # read-only commands
+	assert app_logs.main(["--env", "main", "ap-x; rm -rf /"]) == 2
+	n = len(calls)
+	assert app_logs.main(["--env", "main", "ap-runner99"]) == 2  # visitors' output is never published
+	assert not any(c[2] == "logs" for c in calls[n:])

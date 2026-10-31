@@ -67,11 +67,32 @@ jobs:
           set +e
           mkdir -p out
           read -r -a argv <<< "$RUN_CMD"
-          timeout "${RUN_TIMEOUT}m" uv run "${argv[@]}" > run.log 2>&1
+          # Run the command directly (no uv layer between it and the signal). At the limit send
+          # SIGINT, which `modal run` handles by stopping its app; SIGKILL follows 2 minutes later.
+          # A plain SIGTERM killed the client and left its GPU functions running (A, Oct 28).
+          source .venv/bin/activate
+          # unbuffered, so a run that is cut off still leaves its last lines in the log
+          export PYTHONUNBUFFERED=1
+          timeout -s INT -k 2m "${RUN_TIMEOUT}m" "${argv[@]}" > run.log 2>&1
           code=$?
           echo "exit=$code" >> "$GITHUB_OUTPUT"
           tail -n 50 run.log
           exit 0
+      - name: Stop this run's Modal apps if it was cut off
+        # 124 timed out after SIGINT, 137 needed SIGKILL, 130 interrupted. Only app ids printed in
+        # this run's own log are stopped, so other agents' runs are never touched.
+        if: always() && (steps.run.outputs.exit == '124' || steps.run.outputs.exit == '137' || steps.run.outputs.exit == '130')
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          set +e
+          source .venv/bin/activate
+          grep -oE 'modal\.com/apps/[^/ ]+/[^/ ]+/ap-[A-Za-z0-9]+' run.log | sort -u | while IFS=/ read -r _ _ _ env app; do
+            echo "stopping $app in $env"
+            modal app stop "$app" --env "$env" --yes >> run.log 2>&1 || echo "could not stop $app" >> run.log
+          done
+          echo "[remote-run] stop step done" >> run.log
       - name: Publish to the remote-runs branch
         if: always()
         env:

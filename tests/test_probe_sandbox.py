@@ -59,6 +59,37 @@ def test_sibling_prefix_directory_is_rejected():
 		validate_files({"../p1-work-evil/x.py": "x"}, entrypoint="../p1-work-evil/x.py")
 
 
+@pytest.mark.parametrize(
+	("text", "says"),
+	[("x = '\ud800'\n", "line 1"), ("a = 1\nb = '\udfff'\n", "line 2"), (None, "not text"), (3, "not text")],
+)
+def test_text_that_is_not_valid_unicode_is_a_visitor_error_not_a_crash(text, says):
+	"""D's finding (Oct 28): an unpaired surrogate raised UnicodeEncodeError, a server error."""
+	with pytest.raises(InvalidSubmission) as got:
+		validate_files({"run.py": text}, entrypoint="run.py")
+	assert got.value.code == "submission.invalid"
+	assert "run.py" in str(got.value) and says in str(got.value)
+
+
+def test_a_script_argument_with_an_unpaired_surrogate_is_refused_clearly():
+	from preflight.runner.sources import fetch
+
+	with pytest.raises(InvalidSubmission) as got:
+		fetch({"kind": "upload", "files": {"run.py": "x = 1\n"}, "args": ["--name", "\ud800"]})
+	assert got.value.code == "submission.invalid" and "argument" in str(got.value)
+
+
+def test_a_notebook_with_an_unpaired_surrogate_is_refused_clearly():
+	import json
+
+	from preflight.runner.sources import fetch
+
+	nb = {"cells": [{"cell_type": "code", "source": ["x = '\ud800'\n"]}], "metadata": {}, "nbformat": 4}
+	with pytest.raises(InvalidSubmission) as got:
+		fetch({"kind": "notebook", "files": {"run.ipynb": json.dumps(nb)}})
+	assert got.value.code == "submission.invalid" and "unpaired surrogate" in str(got.value)
+
+
 def test_submission_size_caps():
 	with pytest.raises(InvalidSubmission, match="files"):
 		validate_files({f"f{i}.py": "" for i in range(5000)}, entrypoint="f0.py")
