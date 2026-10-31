@@ -1,5 +1,95 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Sat Oct 31, morning: every plan item C owns
+
+From the Contracts tab (contract C, gaps, adopted items, service levels) and the main plan
+(lenses, workspace features, validation rows), read in full on Oct 31 at 07:40. State is
+against `origin/main` 3c243b5 and `ws-c` 3827bf4. "On main" means built and merged; it does
+not mean the flag is on in production. Hours are my working hours, including tests and a
+read-only review, and exclude waiting on others.
+
+**Hero lenses first** (adopted item 9)
+
+| Item | State | Hours | Waits on |
+| --- | --- | --- | --- |
+| Fine-tune lens: map, readouts, fit map with OOM frontier, memory stack, live and rule tour | On main (`c.fit_map` off) | 1 (turn flag on after the e2e run) | A's runner deploy |
+| Agent lens: map and tour on the golden record | On main (golden only; no real agent record yet) | 3 (tour checked on a real record, agent readouts) | A's first real agent record |
+| GRPO lens: sample, tour, truncation and reward-spread views | Not started | 5 | A's GRPO zoo record; B's RL models |
+| Campaign lens: calendar with team lanes on B's planner | Not started | 6 | B's planner (only `campaign/__init__.py` exists on ws-b) |
+
+**Contract C and the workspace features**
+
+| Item | State | Hours |
+| --- | --- | --- |
+| Repo, CI, deploy pipelines; extension points (t, tokens, fmt, registry, flags, api/addons) | On main | 0 |
+| Workspace shell: job map, knob rail, readouts, flight-plan timeline with playhead | On main | 0 |
+| Map from real records, skeleton first, animated edges and gauges | On main | 0 |
+| Interval bands | On main | 0 |
+| HOPs toggle (`c.hops`) | Not started | 3 |
+| Abstention: hatched "not trusted" readouts | On main | 0 |
+| Abstention: "run a probe here" button and `POST /v1/records/{id}/probes` | Not started | 4 |
+| Snapshots with ghost overlay | On main | 0 |
+| Side-by-side compare view (the state call exists, no screen) | Not started | 2 |
+| Guide: Muse Spark tool calls, pins in the tool schema, live plan and tool-call trace | On main (`c.guide.live` off) | 0 |
+| Guide tours, fine-tune, pretrain, agent | On main (one tour for every lens; checked on fine-tune only) | 2 |
+| Guide tours for the other six lenses | Not started | 6 (1 each once A has a record) |
+| PyodideProvider with grid fallback (`c.provider.pyodide`) | Not started | 4 (needs B's Pyodide bundle) |
+| Step anatomy view | Not started | 3 |
+| Health signals view | Not started | 3 |
+| Cost frontier (Pareto) view | Not started | 3 |
+| Fix loop: verify both sides (module and `.github/actions/verify`) | On main | 0 |
+| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | Not started | 10, plus one paid smoke run |
+| In-app alert when an in-flight run leaves its band | Not started | 2 (needs A's in-flight collector) |
+| Autopilot and self-directed probes (gap 20) | Not started | 6 |
+| Autopilot scored over the bug zoo, Wilson intervals (adopted 7) | Not started | 3, plus a paid zoo run |
+| Exports: hook for D's panel | Not started | 1 (today) |
+| Exports: config, patch, sbatch, CLI command, share link (D builds the panel) | Not started | 2 for the data behind D's panel |
+| GitHub Action: verify pass/fail | On main | 0 |
+| GitHub Action: run Preflight from a workflow | Not started | 3 |
+| W&B export | Not started | 2 |
+| Every Meta model labelled on screen | Partial: Muse Spark, Spark Open and diagnosis labels on main; Muse Code arrives with the fix loop | 0.5 |
+| Template status line above the readouts (adopted 8) | On main | 0 |
+| Coverage (checks) page (adopted 2) | On main; round-three re-score on ws-c next | 1 |
+| Onboarding for first-time visitors | Not started | 3 |
+| Accessibility and reduced-motion pass (D's audit feeds it) | Partial: D's first four fixes on ws-c | 4 |
+| Load test at 20 concurrent visitors | Not started | 2, plus a small paid run |
+| Licence check of everything bundled (CI dependency scan is on main) | Partial | 1 |
+| Demo rehearsed on the public link; video draft | Not started | 3 |
+
+**Control plane and gaps**
+
+| Item | State | Hours |
+| --- | --- | --- |
+| Record store (gap 1): A's Modal volume, read-only, in place of R2 | On main | 0 |
+| Cached samples (gap 4), sessions and share tokens (gap 5) | On main | 0 |
+| Data-use notice (gap 7) | On main; final retention wording waits for A's 30-day cleanup | 0.5 |
+| Guide token caps, spend ledger, daily cap enforced on the server (gap 11) | On main | 0 |
+| Stranger test gating deploys (gap 12) | On main; runs on push and before deploy, not nightly (Actions budget) | 0 |
+| Tool gating: no server tool fires without a click (gap 17, C's half) | On main (`test_guide.py`); the hostile-repo fixture is A's | 0 |
+| Dogfood the guide through A's OTel proxy to set the LLM cap (gap 18) | Not started | 3, plus about $1 Meta |
+| Guide eval suite, nightly, gating the guide's flag (gap 19) | Partial: measured tours in `guide_tour.py`; no gating suite | 4, plus Meta per night |
+| Logs, metrics, Sentry, spend alerts, outage check (gap 14) | Not started | 4 (Sentry needs a DSN secret from Chiya) |
+| CI licence check, GPL, AGPL, SSPL (gap 22) | On main | 0 |
+| `/v1/jobs` on A's job store | On main (`runner.queue` off) | 0 |
+| Public deploy on Cloudflare Pages with quotas | Built; waits on Chiya's Pages project | 1 |
+| Upload-to-map e2e run (G1) | Built; waits on A's runner deploy | 1 |
+
+**Validation rows and service levels C owns or shares**
+
+| Row | State |
+| --- | --- |
+| Knob response under 400 ms at p95 | Met: 66 ms at 4x CPU slowdown (measured Oct 30, this container). Not yet re-measured on a phone profile through the public link |
+| Cost of one Preflight run under $1 and 5 minutes (with A) | Not met on time: the one measured run took 6 min 45 s on an L4. Cost not yet read from the record |
+| Public link up 99%, Nov 5 to 8 | Not started: external 5-minute check, 1 hour |
+| Planted problems caught (autopilot over the zoo, with A) | Not started (see autopilot) |
+| Memory, step time, interval and OOM rows | B's; C shows them on the checks page |
+
+**Totals:** about 103 hours of work not started or partial. Of that, about 30 hours wait
+on others (B's planner, RL models and Pyodide bundle; A's GRPO, agent, other-lens and
+in-flight records), so they can't start today. That much doesn't fit before noon Sunday, so
+the cut decision has to come from this table. Today's order: the hook for D, Muse Code's smoke
+costing, the fix loop, then HOPs and the abstention button while the campaign planner waits on B.
+
 ## Fri Oct 30, evening (G1 day)
 
 **Done**
