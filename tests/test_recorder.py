@@ -261,15 +261,16 @@ def test_timed_steps_lose_no_signal_to_deferred_reads(loop_result):
 
 
 @needs_transformers
-@pytest.mark.parametrize("peft", [False, True], ids=["ref_model", "peft"])
-def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(tmp_path, peft):
+@pytest.mark.parametrize("variant", ["ref_model", "peft", "vllm"])
+def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(tmp_path, variant):
 	"""A CPU stand-in shaped as TRL 0.14 is (tests/fixtures/fake_grpo): generate, the reference
 	log-probs in a closure under inference_mode (through ref_model, or the policy with PEFT),
 	reward functions, then the update, two accumulation micro-steps fetched up front."""
 	root = FIX / "fake_grpo"
 	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
-	if peft:
-		files["train.py"] = "import os\nos.environ['FAKE_GRPO_PEFT'] = '1'\n" + files["train.py"]
+	flag = {"peft": "FAKE_GRPO_PEFT", "vllm": "FAKE_GRPO_VLLM"}.get(variant)
+	if flag:
+		files["train.py"] = f"import os\nos.environ['{flag}'] = '1'\n" + files["train.py"]
 	r = run_probe(
 		ProbeSpec(probe_id="p1", files=files, entrypoint="train.py", warmup=2, timed=3, timeout_s=240)
 	)
@@ -279,6 +280,7 @@ def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(t
 	assert phases.get("rollout", 0) > 0 and phases.get("reference", 0) > 0 and phases.get("reward", 0) > 0
 	# every micro-step's policy forward counts, not only the first one's (review, Oct 31)
 	assert phases.get("forward", 0) > 0.5 * phases["reference"]
+	assert (phases.get("weight_sync", 0) > 0) == (variant == "vllm")
 	assert sum(phases.values()) == pytest.approx(1.0, abs=0.02)
 	rl = p.rl
 	assert rl.group_size == 4

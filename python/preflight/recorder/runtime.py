@@ -394,6 +394,7 @@ class Recorder:
 			"generate": 0.0,
 			"reference": 0.0,  # RL: the reference model's log-probs (a forward with no gradient)
 			"reward": 0.0,  # RL: reward functions and reward models
+			"weight_sync": 0.0,  # RL: the policy's weights copied into the vLLM engine
 			"attn_max": None,
 			"loss_t": [],  # timed steps: losses kept on device, read after the probe
 			"scales_t": [],
@@ -873,6 +874,8 @@ class Recorder:
 
 		if hasattr(tr, "_get_per_token_logps"):
 			self._patch(tr, "_get_per_token_logps", logps_factory)
+		if hasattr(tr, "_move_model_to_vllm"):  # later TRL: the weight sync is a method
+			self._patch(tr, "_move_model_to_vllm", lambda orig: timed("weight_sync", orig))
 
 		def policy_forward(fn):
 			# TRL 0.14 with PEFT has no ref_model: the reference is the policy with its adapter
@@ -909,6 +912,13 @@ class Recorder:
 						ref.forward = timed("reference", ref.forward)
 					elif isinstance(getattr(self_, "model", None), nn.Module):
 						self_.model.forward = policy_forward(self_.model.forward)
+				with suppress(Exception):
+					# TRL 0.14 with use_vllm: the sync is inline in compute_loss, through the vLLM
+					# model's load_weights (main process only)
+					llm = getattr(self_, "llm", None)
+					if llm is not None and not hasattr(tr, "_move_model_to_vllm"):
+						m = llm.llm_engine.model_executor.driver_worker.model_runner.model
+						m.load_weights = timed("weight_sync", m.load_weights)
 				with suppress(Exception):
 					funcs = list(self_.reward_funcs)
 					for i, fn in enumerate(funcs):
@@ -1028,7 +1038,7 @@ class Recorder:
 		self._t_pre = self._now()
 		self._data_end = None  # between the last backward and the step is not forward time
 		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"],
-			self.acc["generate"] + self.acc["reference"] + self.acc["reward"])  # fmt: skip
+			self.acc["generate"] + self.acc["reference"] + self.acc["reward"] + self.acc["weight_sync"])  # fmt: skip
 		# update-to-weight needs the weights before the step; a small sample, and not on timed steps
 		self._sample = [] if self._clean else [(p, p.detach().clone()) for p in self._sample_params]
 		self._sync()
@@ -1093,7 +1103,7 @@ class Recorder:
 		overhead = self._overhead_pre + (self._now() - t0) + self.acc["overhead"]
 		f0, b0, d0, g0 = self._acc_at_pre
 		a = self.acc
-		rl_inner = a["generate"] + a["reference"] + a["reward"]
+		rl_inner = a["generate"] + a["reference"] + a["reward"] + a["weight_sync"]
 		inner = (a["forward"] - f0) + (a["backward"] - b0) + (a["data"] - d0) + (rl_inner - g0)
 		opt_time = max(0.0, (t_post - self._t_pre) - self._overhead_pre - inner)
 		start = self._last_post if self._last_post is not None else (self._first_fetch or self._t_start)
@@ -1104,10 +1114,11 @@ class Recorder:
 				"wall": wall,
 				"event": event,
 				"data": a["data"],
-				"forward": max(0.0, a["forward"] - a["generate"] - a["reference"] - a["reward"]),
+				"forward": max(0.0, a["forward"] - rl_inner),
 				"rollout": a["generate"],
 				"reference": a["reference"],
 				"reward": a["reward"],
+				"weight_sync": a["weight_sync"],
 				"backward": a["backward"],
 				"optimizer": opt_time,
 				"loss": a["loss"] if a["loss_n"] else None,
@@ -1279,7 +1290,7 @@ class Recorder:
 			walls = sorted(s["wall"] for s in timed)
 			mean = statistics.fmean(walls)
 			keys = ["data", "forward", "backward", "optimizer"] + [
-				k for k in ("rollout", "reference", "reward") if any(s.get(k) for s in phased)
+				k for k in ("rollout", "reference", "reward", "weight_sync") if any(s.get(k) for s in phased)
 			]
 			by_phase = {}
 			if phased:

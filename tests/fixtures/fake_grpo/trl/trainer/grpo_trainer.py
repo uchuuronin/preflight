@@ -3,14 +3,32 @@ __init__ keeps reward_funcs, num_generations and ref_model; the per-token log-pr
 inside compute_loss (no method to patch); the reference runs under torch.inference_mode, through
 ref_model or, with no ref_model (PEFT), the policy itself; generation goes through transformers'
 generate; batches are fetched for every accumulation micro-step up front, as transformers 4.46
-does. Small enough for a CPU test."""
+does. With vllm=True the weights are copied into a stand-in engine through load_weights once per
+optimizer step, inline in compute_loss as 0.14 does. Small enough for a CPU test."""
+
+import types
 
 import torch
 
 
+class _EngineModel:
+	def __init__(self):
+		self.weights = {}
+
+	def load_weights(self, items):
+		for k, v in items:
+			self.weights[k] = v.detach().clone()
+
+
 class GRPOTrainer:
-	def __init__(self, model, ref_model, reward_funcs, num_generations, prompts, accumulation=1):
+	def __init__(self, model, ref_model, reward_funcs, num_generations, prompts, accumulation=1, vllm=False):
 		self.model, self.ref_model = model, ref_model
+		self.step, self._last_loaded_step = 0, -1
+		if vllm:
+			runner = types.SimpleNamespace(model=_EngineModel())
+			worker = types.SimpleNamespace(model_runner=runner)
+			engine = types.SimpleNamespace(model_executor=types.SimpleNamespace(driver_worker=worker))
+			self.llm = types.SimpleNamespace(llm_engine=engine)
 		self.reward_funcs = reward_funcs
 		self.num_generations = num_generations
 		self.prompts = prompts
@@ -19,6 +37,11 @@ class GRPOTrainer:
 
 	def compute_loss(self, model, batch):
 		g = self.num_generations
+		if getattr(self, "llm", None) is not None and self.step != self._last_loaded_step:
+			engine_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
+			for _ in range(20):  # big enough to time on a tiny model
+				engine_model.load_weights(model.state_dict().items())
+			self._last_loaded_step = self.step
 		ids = torch.tensor(batch).repeat_interleave(g, 0)
 		seqs = model.generate(ids, max_new_tokens=6, do_sample=True, pad_token_id=0)
 
@@ -51,3 +74,4 @@ class GRPOTrainer:
 				(self.compute_loss(self.model, batch) / self.accumulation).backward()
 			self.opt.step()
 			self.opt.zero_grad()
+			self.step += 1
