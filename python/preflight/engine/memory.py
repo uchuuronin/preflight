@@ -34,9 +34,8 @@ from typing import Literal, Protocol
 
 from preflight.engine import gpus
 
-MODEL_ID = (
-	"memory-analytical@0.3.0"  # 0.3.0 (Oct 31): P(OOM) between 5% and 95% reports that range until verified
-)
+# 0.3.0 (Oct 31): P(OOM) between 5% and 95% reports that range until verified; 0.3.1: the below-probe floor
+MODEL_ID = "memory-analytical@0.3.1"
 DEFAULT_CONTEXT_BYTES = int(0.75 * 2**30)  # CUDA/ROCm context, typically 0.5-1 GB
 Z90 = 1.6448536269514722  # derived: the normal 95th percentile, so +-Z90 sigma is a two-sided 90% band
 HALF_WIDTH_CALIBRATED = (
