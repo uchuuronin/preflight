@@ -1,0 +1,28 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-E769JXvAxjl7psNU9Yq7vh
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+{
+  "exit": 0,
+  "stderr": "",
+  "vllm": "0.6.4.post1",
+  "torch": "2.5.1+cu124",
+  "numpy": "1.26.4",
+  "recorder": "/opt/preflight/preflight/recorder/runtime.py",
+  "ok": true
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-E769JXvAxjl7psNU9Yq7vh

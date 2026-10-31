@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "stderr": "",
+  "vllm": "0.6.4.post1",
+  "torch": "2.5.1+cu124",
+  "numpy": "1.26.4",
+  "recorder": "/opt/preflight/preflight/recorder/runtime.py",
+  "ok": true
+}
