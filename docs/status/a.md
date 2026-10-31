@@ -178,17 +178,17 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 > 1.68 s a step plus loading, about $0.09 of L4 [derived]. The saving is one failed run, not hours.
 
 Sources: record `ICDYrfHQ2nBNbv3mlRHHMg` (probe `p1-eval`: status oom, code oom.eval, eval batch 1
-of 33 at 21.9 GB; probe `p1`: p50 1.68 s); `EVAL_EVERY = 200` in `zoo/finetune_lora_hf/train.py`;
+of 33 at 21.9 GB (20.4 GiB) allocated on a 23.69 GB (22.06 GiB) card; probe `p1`: p50 1.68 s); `EVAL_EVERY = 200` in `zoo/finetune_lora_hf/train.py`;
 L4 list price $0.80/h. One script and one run, so no interval: it is an example, not a rate.
 
 First end-to-end run on a real GPU, Oct 28 05:51 UTC (record `ICDYrfHQ2nBNbv3mlRHHMg` on
 `preflight-records`, env L4 with 23,689,363,456 bytes): the planted eval OOM was caught by the
-first probe (`p1-eval`, status oom, code oom.eval, eval batch 1 of 33 at 21.9 GB allocated) and the
+first probe (`p1-eval`, status oom, code oom.eval, eval batch 1 of 33 at 21.9 GB, i.e. 20.4 GiB, allocated) and the
 point re-ran with eval off. Measured on the L4 (step_time.p50 over the timed steps, peak allocated):
 
 | Probe | Setting | p50 step | Peak | Probe time | GPU at list |
 | --- | --- | --- | --- | --- | --- |
-| p1-eval | batch 4, seq 1024, eval on | 1.36 s | 21.9 GB in eval | 189 s | $0.0420 |
+| p1-eval | batch 4, seq 1024, eval on | 1.36 s | 21.9 GB (20.4 GiB) in eval | 189 s | $0.0420 |
 | p1 | batch 4, seq 1024, eval off | 1.68 s | 15.7 GB | 122 s | $0.0272 |
 | p2 | batch 2, seq 1024 | 0.84 s | 9.6 GB | 22 s | $0.0049 |
 | p3 | batch 4, seq 512 | 1.67 s | 15.5 GB | 53 s | $0.0117 |
