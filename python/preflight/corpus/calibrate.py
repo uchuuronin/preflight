@@ -25,7 +25,7 @@ from preflight.engine.memory import TrainingSetup, TransformerArch
 
 LENS = {
 	"gpt": "pretrain",
-	"lora": "finetune",
+	"lora": "finetune_synthetic",  # the corpus's own LoRA models: kept apart, users' fine-tunes are real HF models
 	"encoder": "retrieval",
 	"cnn": "vision",
 	"mlp": "vision",
@@ -89,6 +89,29 @@ def _analytical(row: dict[str, Any]) -> float | None:
 	return memory.breakdown(arch, setup, b, s, context_bytes=0).allocator_peak
 
 
+# What makes two configs the same architecture: everything that shapes the model, nothing about how it is run
+# (dtype, attention kernel, checkpointing, LoRA rank). Scores are grouped by it, so leave-one-architecture-out
+# never calibrates on a near-duplicate of the architecture it tests (Chiya, Oct 30).
+_TRANSFORMER = ("n_layers", "d_model", "n_heads", "n_kv_heads", "d_ff", "gated_mlp", "vocab_size", "causal")
+ARCH_FIELDS = {
+	"gpt": _TRANSFORMER,
+	"encoder": _TRANSFORMER,
+	"lora": _TRANSFORMER,
+	"cnn": ("depth", "width"),
+	"mlp": ("depth", "width", "in_features"),
+	"gnn": ("layers", "hidden", "kind"),
+	"hf_lora": ("model_id",),
+}
+
+
+def arch_key(config: dict[str, Any]) -> str:
+	fam, p = config.get("family", ""), config.get("params", {})
+	fields = ARCH_FIELDS.get(fam)
+	if fields is None:
+		return f"{fam}:{p.get('group', '')}"
+	return f"{fam}:" + json.dumps({k: p.get(k) for k in fields}, sort_keys=True, default=str)
+
+
 def _ok(row: dict[str, Any]) -> bool:
 	return row.get("status") == "ok" and bool((row.get("memory") or {}).get("peak_reserved"))
 
@@ -101,13 +124,14 @@ def scores_from_rows(rows: Iterable[dict[str, Any]]) -> list[conformal.Score]:
 		if g and _ok(r):
 			groups[(g, r.get("gpu", ""))].append(r)
 	out: list[conformal.Score] = []
-	for (gid, gpu), rs in sorted(groups.items()):
+	for (_gid, gpu), rs in sorted(groups.items()):
 		probes = [r for r in rs if r["config"]["params"].get("role") == "probe"]
 		queries = [r for r in rs if r["config"]["params"].get("role") == "query"]
 		if len(probes) < 2 or not queries:
 			continue
 		fam = rs[0]["config"]["family"]
 		lens = LENS.get(fam, "pretrain")
+		arch = arch_key(rs[0]["config"])
 		an = {id(r): _analytical(r) for r in rs}
 		mp = [
 			memory.MemoryProbe(float(r["work_units"]), float(r["memory"]["peak_reserved"]), an[id(r)] or 0.0)
@@ -124,12 +148,12 @@ def scores_from_rows(rows: Iterable[dict[str, Any]]) -> list[conformal.Score]:
 			pred = cal.correct(x, an[id(q)] or 0.0)
 			if pred > 0:
 				out.append(
-					conformal.Score("memory.peak", gpu, lens, gid, pred, float(q["memory"]["peak_reserved"]))
+					conformal.Score("memory.peak", gpu, lens, arch, pred, float(q["memory"]["peak_reserved"]))
 				)
 			est = model.predict(x)
 			if est.status != "abstain" and est.point and q.get("timing", {}).get("step_s"):
 				out.append(
-					conformal.Score("time.step", gpu, lens, gid, est.point, float(q["timing"]["step_s"]))
+					conformal.Score("time.step", gpu, lens, arch, est.point, float(q["timing"]["step_s"]))
 				)
 	return out
 
@@ -154,14 +178,15 @@ def oom_pairs(rows: list[dict[str, Any]], scores: list[conformal.Score]) -> list
 			groups[(g, r.get("gpu", ""))].append(r)
 	tables: dict[str, conformal.Table] = {}
 	out = []
-	for (gid, gpu), rs in sorted(groups.items()):
+	for (_gid, gpu), rs in sorted(groups.items()):
 		probes = [r for r in rs if r["config"]["params"].get("role") == "probe" and _ok(r)]
 		if len(probes) < 2:
 			continue
-		if gid not in tables:
-			tables[gid] = conformal.calibrate([s for s in mem if s.group != gid])
+		arch = arch_key(rs[0]["config"])
+		if arch not in tables:
+			tables[arch] = conformal.calibrate([s for s in mem if s.group != arch])
 		lens = LENS.get(rs[0]["config"]["family"], "pretrain")
-		cell = tables[gid].lookup("memory.peak", gpu, lens)
+		cell = tables[arch].lookup("memory.peak", gpu, lens)
 		if cell is None or not cell.residuals:
 			continue
 		mp = [
@@ -312,6 +337,11 @@ def main(argv: list[str] | None = None) -> int:
 	ap.add_argument(
 		"--built-from", help="where the rows came from, for the model cards (default: the store path)"
 	)
+	ap.add_argument(
+		"--targets",
+		default="memory.peak,time.step",
+		help="targets whose cells go into the table; the others keep their simulated bands and say so",
+	)
 	args = ap.parse_args(argv)
 	holdout = tuple(g.strip() for g in args.holdout_gpus.split(",") if g.strip())
 	rows = load_rows(args.store)
@@ -330,7 +360,14 @@ def main(argv: list[str] | None = None) -> int:
 	print("\n".join(reliability_lines(pairs)))
 	ok = oom.reliable(oom.reliability(pairs), min_per_bin=MIN_PER_BIN)
 	print(f"  reliable enough to show as a probability: {ok}")
-	table = replace(table, oom_reliable=ok)
+	keep = {t.strip() for t in args.targets.split(",") if t.strip()}
+	table = replace(
+		table,
+		oom_reliable=ok,
+		cells={k: c for k, c in table.cells.items() if k[0] in keep},
+		coverage={t: v for t, v in table.coverage.items() if t in keep},
+		holdout={t: v for t, v in table.holdout.items() if t in keep},
+	)
 	if args.out:
 		write_table(table, args.out)
 		print(f"wrote {args.out} with {len(table.cells)} cells")

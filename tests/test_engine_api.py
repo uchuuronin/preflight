@@ -398,9 +398,17 @@ def test_one_dimensional_grids_for_every_knob_around_the_current_point(ft):
 	assert 4 in bs and min(bs) >= 1 and max(bs) <= 32  # 4 x 1/8 .. 4 x 8, inside the domain
 
 
-def test_model_cards_say_calibration_simulated(ft):
-	cards = api.fill_predictions(ft).models
-	assert cards and all(c.notes.startswith("calibration: simulated") and c.coverage is None for c in cards)
+def test_model_cards_say_where_their_calibration_comes_from(ft):
+	from preflight.engine import conformal
+
+	cards = {c.id: c for c in api.fill_predictions(ft).models}
+	held = {t for t, *_ in conformal.TABLE.cells}  # the targets the installed table covers
+	for mid, c in cards.items():
+		target = api._CARD_TARGET.get(mid)
+		if target in held and mid in api._CARD_SCORED:
+			assert c.notes.startswith("calibration: held_out") and c.coverage is not None
+		else:
+			assert c.notes.startswith("calibration: simulated") and c.coverage is None
 
 
 def test_unknown_probe_gpu_uses_its_reported_memory(ft):

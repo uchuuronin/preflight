@@ -393,7 +393,76 @@ class _MemoryResult:
 	terms: dict | None = None  # memory.<term> estimates at the peak moment
 
 
-def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
+def probe_ran_eval(p) -> bool:
+	"""Whether this probe ran an eval pass, so its peak can include one. One rule for the engine and C's checks
+	(Chiya, Oct 30): A's `extras.eval_off` first (set when a point is re-run with eval off after an eval OOM),
+	then whether the probe recorded eval stats."""
+	off = (p.extras or {}).get("eval_off")
+	if isinstance(off, bool):
+		return not off
+	return p.eval is not None
+
+
+def _row_lengths(record: FlightRecord) -> list[tuple[float, float, float, bool]] | None:
+	"""(batch, longest padded row, seq_len, truncated) for every memory probe of a token lens whose step log
+	records row lengths, or None (then the settings size activations, as before)."""
+	if record.job.lens not in TOKEN_LENSES or all(k.id != "batch_size" for k in record.knobs):
+		return None
+	pts = []
+	for p in record.probes:
+		if p.status not in OK_PROBE or not p.memory or not p.memory.peak_reserved_bytes:
+			continue
+		longest, pv = _longest_row(p), _probe_values(record, p)
+		b, sq = pv.get("batch_size"), float(pv.get("seq_len") or 0)
+		if longest is None or not isinstance(b, (int, float)) or b <= 0:
+			return None
+		pts.append((float(b), min(longest, sq) if sq else longest, sq, bool(sq) and longest >= sq))
+	if not pts or all(t for *_, t in pts):
+		return None
+	return pts
+
+
+def _padded_seq(record: FlightRecord, values: dict, probe=None) -> float | None:
+	"""The sequence length activations are really sized by (Chiya, Oct 30): the longest padded row of a micro-batch,
+	not seq_len. A probe uses the longest row it logged; a query the longest row the probes saw at its batch size,
+	linear in log2(batch) between probed batches and flat beyond them, cut by its own seq_len. None: use the setting."""
+	pts = _row_lengths(record)
+	if pts is None:
+		return None
+	if probe is not None:
+		longest = _longest_row(probe)
+		sq = float(_probe_values(record, probe).get("seq_len") or 0)
+		return None if longest is None else (min(longest, sq) if sq else longest)
+	b_q = float(values.get("batch_size") or 1)
+	seq_q = float(values.get("seq_len") or 0) or math.inf
+	by_batch: dict[float, list[float]] = {}
+	for b, longest, _, trunc in pts:
+		if not trunc:
+			by_batch.setdefault(b, []).append(longest)
+	free = sorted((b, max(ls)) for b, ls in by_batch.items())  # the longest row seen at each batch
+	if b_q <= free[0][0]:
+		l_q = free[0][1]
+	elif b_q >= free[-1][0]:
+		l_q = free[-1][1]
+	else:
+		l_q = free[-1][1]
+		for (b0, l0), (b1, l1) in itertools.pairwise(free):
+			if b0 <= b_q <= b1:
+				t = 0.0 if b1 == b0 else (math.log2(b_q) - math.log2(b0)) / (math.log2(b1) - math.log2(b0))
+				l_q = l0 + t * (l1 - l0)
+				break
+	return min(seq_q, l_q)
+
+
+def _sized(shape, values: dict, seq: float | None) -> tuple[knobs.Shape, dict]:
+	"""The shape and knob values with seq_len replaced by the padded length rows really reach."""
+	if seq is None:
+		return shape, values
+	s = max(1, round(seq))
+	return replace(shape, seq=s), {**values, "seq_len": s}
+
+
+def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _MemoryResult:
 	mid = memory.MODEL_ID
 	gpu = _target_gpu(record, values)
 	if gpu is None:
@@ -416,6 +485,9 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		arch, setup, shape = knobs.setup_from(sm, values)
 	except (ValueError, AttributeError) as exc:
 		return _empirical_memory(record, values, capacity, str(exc))
+	shape, sized_values = _sized(shape, values, _padded_seq(record, values))
+	if eval_off:
+		setup = replace(setup, eval_batch=None)  # predict_as_run: the probe ran this point without eval
 	mprobes = []
 	for p in record.probes:
 		if p.status not in OK_PROBE or not p.memory or not p.memory.peak_reserved_bytes:
@@ -425,7 +497,8 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 			pa, ps, psh = knobs.setup_from(sm, pv)
 		except (ValueError, AttributeError):
 			continue
-		if p.eval is None:
+		psh, pv = _sized(psh, pv, _padded_seq(record, pv, probe=p))
+		if not probe_ran_eval(p):
 			ps = replace(ps, eval_batch=None)  # the probe never ran eval, so its peak can't include it
 		an = memory.breakdown(pa, ps, psh.batch, psh.seq, capacity_bytes=capacity).allocator_peak
 		mprobes.append(
@@ -436,7 +509,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 	if match is not None and mprobes:
 		# a probe at these knobs measured the peak only if it saw the moment that sets it
 		moment = memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=capacity).peak_moment
-		measured = moment == "train" or (moment == "eval" and match.eval is not None)
+		measured = moment == "train" or (moment == "eval" and probe_ran_eval(match))
 	est = memory.predict_peak(
 		arch,
 		setup,
@@ -444,7 +517,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		shape.seq,
 		probes=mprobes or None,
 		capacity_bytes=capacity,
-		work_units=knobs.work_units(lens, values),
+		work_units=knobs.work_units(lens, sized_values),
 		measured=measured,
 		base_half_width=conformal.TABLE.lookup("memory.peak", gpu, lens).half_width
 		if conformal.TABLE.lookup("memory.peak", gpu, lens)
@@ -454,7 +527,7 @@ def _memory(record: FlightRecord, values: dict) -> _MemoryResult:
 		est.status == "predicted"
 		and est.breakdown is not None
 		and est.breakdown.peak_moment != "train"
-		and not any(p.eval is not None for p in record.probes if p.status in OK_PROBE)
+		and not any(probe_ran_eval(p) for p in record.probes if p.status in OK_PROBE)
 	):
 		why = f"the peak comes at {est.breakdown.peak_moment}, which no probe ran; run a probe with {est.breakdown.peak_moment} in it"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
@@ -531,7 +604,11 @@ def _empirical_memory(
 	lens = record.job.lens
 	pts = [
 		memory.MemoryProbe(
-			knobs.work_units(lens, _probe_values(record, p)), float(p.memory.peak_reserved_bytes), 0.0
+			knobs.work_units(
+				lens, _sized(knobs.Shape(), _probe_values(record, p), _padded_seq(record, {}, probe=p))[1]
+			),
+			float(p.memory.peak_reserved_bytes),
+			0.0,
 		)
 		for p in record.probes
 		if p.status in OK_PROBE and p.memory and p.memory.peak_reserved_bytes
@@ -552,7 +629,7 @@ def _empirical_memory(
 		why = f"no model shape ({why_no_shape}) and fewer than two probe sizes to fit a line through"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	cal = memory.Calibration.fit(pts)
-	x = knobs.work_units(lens, values)
+	x = knobs.work_units(lens, _sized(knobs.Shape(), values, _padded_seq(record, values))[1])
 	measured = _matching_probe(record, values) is not None
 	cell = conformal.TABLE.lookup("memory.peak", _target_gpu(record, values), lens)
 	h = (
@@ -1313,6 +1390,7 @@ def _peak_moment(record: FlightRecord, values: dict, mem: _MemoryResult) -> str:
 	gpu = _target_gpu(record, values)
 	try:
 		arch, setup, shape = knobs.setup_from(record.job.script_map, values)
+		shape, _ = _sized(shape, values, _padded_seq(record, values))
 		cap = _capacity(record, gpu) if gpu else None
 		return memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap).peak_moment
 	except (ValueError, AttributeError, KeyError):
@@ -1515,15 +1593,26 @@ def run_cost(
 # ---------------------------------------------------------------- the three calls
 
 
+def predict_as_run(record: FlightRecord, probe) -> Prediction:
+	"""The prediction for a probe's own setting as that probe ran it: with no eval pass when it ran none
+	(probe_ran_eval), so a held-out check compares like with like. For C's coverage checks."""
+	return _predict_values(
+		record, _values(record, _probe_values(record, probe)), eval_off=not probe_ran_eval(probe)
+	)
+
+
 def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction:
 	"""Every target for this lens at these knob values (others at their current values)."""
-	values = _values(record, knob_values)
+	return _predict_values(record, _values(record, knob_values))
+
+
+def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) -> Prediction:
 	why = _invalid(values)
 	if why:
 		return Prediction({t.id: _abstain(t.unit, "input-check@0.1.0", why) for t in targets_for(record)})
 	if _api_lens(record):
 		return Prediction(_agent(record, values))
-	mem = _memory(record, values)
+	mem = _memory(record, values, eval_off=eval_off)
 	tm = _time(record, values)
 	out = {
 		"memory.peak": mem.peak,
@@ -1777,19 +1866,20 @@ def sensitivity(
 			pred = predict(record, q)
 			y = f(pred, _values(record, q))
 			if y is not None and (not check or _feasible(record, pred)):
-				scored.append((v, y))
+				peak = pred.root.get("memory.peak")
+				scored.append((v, y, peak.point if peak is not None and peak.point else math.inf))
 		if len(scored) < 2:
 			continue
-		ys = [y for _, y in scored]
+		ys = [y for _, y, _ in scored]
 		spread = max(ys) - min(ys)
 		ref = abs(base) if base else max(abs(y) for y in ys) or 1.0
 		impact = min(1.0, spread) if prob else min(1.0, spread / ref)
 		if impact <= noise or impact == 0:
 			continue
-		best_v, _ = min(scored, key=lambda s: s[1])
+		best_v, _, best_peak = min(scored, key=lambda s: (s[1], s[2]))
 		direction = "either"
 		if k.kind in ("int", "float"):
-			xs = np.asarray([float(v) for v, _ in scored])
+			xs = np.asarray([float(v) for v, _, _ in scored])
 			r = np.corrcoef(xs, np.asarray(ys))[0, 1] if np.ptp(xs) > 0 and np.ptp(ys) > 0 else 0.0
 			if r <= -0.5:
 				direction = "increase"
@@ -1799,9 +1889,15 @@ def sensitivity(
 		if k.id in TRUNCATING_KNOBS:
 			why += "; shorter cuts what the model sees, so check quality before taking it"
 		out.append(
-			KnobImpact(knob_id=k.id, impact=impact, direction=direction, best_value=best_v, reason=why)
+			(
+				KnobImpact(knob_id=k.id, impact=impact, direction=direction, best_value=best_v, reason=why),
+				best_peak,
+			)
 		)
-	return sorted(out, key=lambda r: -r.impact)
+	# ties (two levers both reaching P(OOM)'s floor, say) go first to the lever that doesn't cut what the model
+	# sees, then to the one leaving more memory headroom
+	out.sort(key=lambda o: (-round(o[0].impact, 6), o[0].knob_id in TRUNCATING_KNOBS, o[1]))
+	return [r for r, _ in out]
 
 
 # ---------------------------------------------------------------- the whole predictions block

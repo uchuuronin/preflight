@@ -94,3 +94,32 @@ def test_a_declared_accumulation_moves_the_measured_one_by_its_ratio(smoke):
 	knobs = [k.model_copy(update={"current": 1}) if k.id == "grad_accum" else k for k in smoke.knobs]
 	off = smoke.model_copy(update={"knobs": knobs})
 	assert api._step_work(off, api._values(off, {})) == pytest.approx(base)
+
+
+def test_activations_follow_the_longest_padded_row(smoke):
+	assert api._padded_seq(smoke, api._values(smoke, {"seq_len": 1024})) == pytest.approx(504)
+	assert (
+		api._padded_seq(smoke, api._values(smoke, {"seq_len": 128})) == 128
+	)  # a limit the rows reach cuts them
+	p = api.predict(smoke, {"seq_len": 512}).root["memory.peak"].point
+	q = api.predict(smoke, {"seq_len": 768}).root["memory.peak"].point  # 1024 is where a probe ran out of memory
+	assert p == pytest.approx(q)  # rows never reach 512, so the two settings hold the same activations
+
+
+def test_held_out_memory_on_the_real_record(smoke):
+	"""C's memory check, leave-one-probe-out, each probe predicted as it ran (no eval pass): a sanity check."""
+	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES
+
+	errs = {}
+	for p in [p for p in smoke.probes if p.status == "ok"]:
+		pk = api.predict_as_run(_without(smoke, p.id), p).root["memory.peak"]
+		errs[p.id] = abs((pk.point - DEFAULT_CONTEXT_BYTES) / p.memory.peak_reserved_bytes - 1)
+	assert errs["p1"] <= 0.10 and errs["p3"] <= 0.10  # read off their batch-4 twin; p2 extrapolates batch 2
+
+
+def test_one_rule_for_whether_a_probe_ran_eval(smoke):
+	p = next(p for p in smoke.probes if p.id == "p1")
+	assert api.probe_ran_eval(p) is (p.eval is not None)  # no eval_off recorded: the eval stats decide
+	on = p.model_copy(update={"extras": {**p.extras, "eval_off": False}})
+	off = p.model_copy(update={"extras": {**p.extras, "eval_off": True}, "eval": None})
+	assert api.probe_ran_eval(on) and not api.probe_ran_eval(off)

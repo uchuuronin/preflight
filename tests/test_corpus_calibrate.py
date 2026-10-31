@@ -209,3 +209,20 @@ def test_a_table_with_non_finite_numbers_is_refused(tmp_path):
 	with pytest.raises(ValueError):
 		calibrate.write_table(bad, tmp_path / "t.py")
 	assert not (tmp_path / "t.py").exists()
+
+
+def test_scores_are_grouped_by_architecture_not_by_config_group():
+	"""Two config groups that differ only in dtype are one architecture: near-duplicates, never split."""
+	base = next(c for c in configs.grouped_configs(50) if c.family == "gpt" and c.params["role"] == "probe")
+	a = {**base.params, "dtype": "bf16"}
+	b = {**base.params, "dtype": "fp32"}
+	assert calibrate.arch_key({"family": "gpt", "params": a}) == calibrate.arch_key(
+		{"family": "gpt", "params": b}
+	)
+	assert calibrate.arch_key(
+		{"family": "gpt", "params": {**a, "n_layers": a["n_layers"] + 1}}
+	) != calibrate.arch_key({"family": "gpt", "params": a})
+	hf = {"family": "hf_lora", "params": {"model_id": "Qwen/Qwen2.5-0.5B", "quantization": "nf4"}}
+	assert calibrate.arch_key(hf) == calibrate.arch_key(
+		{**hf, "params": {**hf["params"], "quantization": "none"}}
+	)
