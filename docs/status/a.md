@@ -102,8 +102,9 @@ Updated Tue Oct 27, evening ET.
 - RL phases: weight sync misses the ZeRO-3 parameter gather (it lands in forward) and vLLM V1
   (only the V0 engine path is wrapped); with PEFT and `num_iterations` > 1 the reference forward
   isn't told apart from the policy's old log-probs, so it counts as forward.
-- Agent sampler: a task's key hashes its whole first call, so a timestamp or id in the first
-  prompt defeats the top-up's skip; tasks that all open with the same call can't be topped up.
+- Agent sampler: a task's key hashes its first call without the system prompt, so a timestamp or
+  id in the first user message still defeats the top-up's skip; tasks that all open with the same
+  call can't be topped up. A run with no model calls for 5 minutes is stopped as stalled.
   The proxy's refusals carry `x-should-retry: false`, which the OpenAI SDKs honour; other
   clients may back off on them. Side calls (judges, sub-agents) start tasks of their own.
 - In-flight mode: an eval or checkpoint pause inside a window can raise a false step-time alert.
@@ -159,7 +160,7 @@ included. Hero lenses first.
 | 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | bare run measured Oct 31; recorder half failed on a cache permission (fixed locally); rerun with 210 steps needs a yes | 0.5 + paid run |
 | **Agent and API runs (hero)** | | | |
 | 6 | OTel GenAI proxy around any OpenAI-compatible client (lens, contract) | ws-a (`recorder/agent.py`) | 0 |
-| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | local: proxy run mode, pipeline, `sample_more`, CLI (`--agent-max-usd`); hosted path not started; the bound is B's `agent_totals` | 2 |
+| 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | ws-a: proxy run mode, pipeline, `sample_more`, CLI; local: the hosted path (proxy behind a tunnel, script in a sandbox with no secrets), first run waits for a yes; the bound is B's `agent_totals` | 1 + API spend |
 | 8 | Rate-limit wall-clock (lens) | not started | 2 |
 | 9 | Pareto model sweep across Muse Spark and Spark Open (lens, contract) | not started | 4 |
 | 10 | Agent zoo script and an agent record on the public app (G1) | not started (D writes the script) | 2 |
@@ -175,7 +176,7 @@ included. Hero lenses first.
 | 17 | LR range test (lens, contract) | not started | 3 |
 | 18 | Checkpoint resume exact-match (lens, contract, hygiene) | not started | 3 |
 | 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
-| 20 | Serving probes on vLLM for B's model (contract) | hooks on main; probe not started | 5 |
+| 20 | Serving probes on vLLM for B's model (contract) | hooks on main; local: the serving image (vLLM 0.6.4.post1, its own torch) and routing; startup check and first probe wait for a yes | 3 + paid run |
 | 21 | Retrieval probes through an adapter (lens) | local: encode, faiss add/train/search timed with items a second; a stage after training isn't reached by a probe | 3 |
 | 22 | GNN probes through an adapter (lens) | local: nodes, edges, seeds, nodes per hop, largest batch; sampling time is the data phase; needs a PyG script on a GPU | 3 |
 | 23 | Vision probes through an adapter (lens) | local: images per batch, resolution, channels-last; images/s from samples; needs a vision script on a GPU | 2 |
