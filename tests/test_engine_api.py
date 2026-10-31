@@ -484,3 +484,21 @@ def test_a_stale_knob_predicts_for_the_gpu_it_shows(ft):
 	rec = _as_harness_builds_it(ft, "L40S", 48 * 10**9, knob_current="L4")
 	assert api._target_gpu(rec, api._values(rec, None)) == "L4"
 	assert api._target_gpu(rec, api._values(rec, {"gpu_type": "L40S"})) == "L40S"
+
+
+def test_records_pin_their_models_and_say_when_one_has_moved_on(ft):
+	# gap 15: a shared record keeps the numbers it was predicted with, and names the model that made them
+	out = api.fill_predictions(ft)
+	assert api.stale_models(out) == []
+	now = api.current_models()
+	assert now["memory-analytical"] == api.memory.MODEL_ID
+	old = out.model_copy(
+		update={
+			"models": [
+				m.model_copy(update={"id": "memory-analytical@0.1.0"}) if m.id == api.memory.MODEL_ID else m
+				for m in out.models
+			]
+		}
+	)
+	assert ("memory-analytical@0.1.0", api.memory.MODEL_ID) in api.stale_models(old)
+	assert all("@" in mid for mid in now.values())

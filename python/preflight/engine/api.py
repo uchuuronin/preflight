@@ -48,7 +48,7 @@ MODEL_ID_TOTAL = "time-total@0.1.0"
 MODEL_ID_COST = "cost-gpu-hours@0.1.0"
 MODEL_ID_AGENT_TIME = "agent-time-concurrency@0.1.0"
 MODEL_ID_CONTEXT = "agent-context-fill@0.1.0"
-MODEL_ID_PREEMPT = "preemption-poisson@0.1.0"
+MODEL_ID_PREEMPT = "preemption-poisson@0.2.0"  # 0.2.0 (Oct 31): interruptions during redone work count
 MODEL_ID_RUN_COST = "run-cost@0.1.0"
 
 _TARGETS = {
@@ -2366,6 +2366,45 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	return Predictions(
 		targets=targets, estimates={t.id: est[t.id] for t in targets if t.id in est}, grids=grids
 	)
+
+
+def current_models() -> dict[str, str]:
+	"""Every model the engine can put on a record, name -> its id now (gap 15: records pin the id they used)."""
+	from preflight.campaign import planner  # the planner's card rides on records too
+
+	ids = [
+		memory.MODEL_ID,
+		steptime.MODEL_ID_SAME,
+		steptime.MODEL_ID_CROSS,
+		steptime.MODEL_ID_COMM,
+		agent_cost.MODEL_ID,
+		rl.MODEL_ID_ZERO,
+		rl.MODEL_ID_ROLLOUT,
+		serving.MODEL_ID,
+		planner.MODEL_ID,
+		MODEL_ID_TOTAL,
+		MODEL_ID_COST,
+		MODEL_ID_AGENT_TIME,
+		MODEL_ID_CONTEXT,
+		MODEL_ID_PREEMPT,
+		MODEL_ID_RUN_COST,
+	]
+	return {i.split("@")[0]: i for i in ids}
+
+
+def stale_models(record: FlightRecord) -> list[tuple[str, str]]:
+	"""(the id a record's numbers came from, the id the engine has now) for every model that has moved on since.
+
+	A shared record keeps the numbers it was predicted with; this is how the page says "predicted with
+	memory-analytical@0.1.0; the current model is 0.2.0" instead of silently showing different numbers."""
+	now = current_models()
+	used = {m.id for m in record.models} | {e.model_id for e in record.predictions.estimates.values()}
+	out = []
+	for mid in sorted(used):
+		name = mid.split("@")[0]
+		if name in now and now[name] != mid:
+			out.append((mid, now[name]))
+	return out
 
 
 def fill_predictions(record: FlightRecord) -> FlightRecord:

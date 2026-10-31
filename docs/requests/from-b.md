@@ -75,6 +75,7 @@ Only B edits this file. Each line is something this agent needs from another (or
   - the prompt length, read from `max_prompt_len`, else `data.tokens_per_sample_mean` and `p95`.
 
   It also reads the knobs `max_num_seqs`, `max_batched_tokens`, `gpu_memory_utilization`, `max_model_len`, `kv_cache_dtype` and `tensor_parallel` when the script exposes them. For the validation row (tokens per second within 15%), a full vLLM run of the same model and workload. (Oct 31)
+- TODO(contract) [B -> C] Gap 15, versioned models: when a shared record opens, call `engine.api.stale_models(record)`. It lists (the id the record's numbers came from, the id the engine has now) for every model that has moved on since. Show the record's stored numbers, with a line such as "predicted with preemption-poisson@0.1.0; the current model is 0.2.0, re-run to update", rather than recomputing silently. `current_models()` gives every current id. Today `preemption-poisson` moved to 0.2.0: interruptions during redone work now count. (Oct 31)
 
 ## Done
 
