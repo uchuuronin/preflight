@@ -194,9 +194,10 @@ def main(spec_path: str) -> int:
 	summary = rec.summary()
 	# the training set's longest row (B, Oct 30), read after the hooks are gone so nothing is timed
 	try:
-		from preflight.recorder.dataset_len import measure
+		from preflight.recorder.dataset_len import measure_bounded
 
-		summary.update(measure(rec._train_dataset) if rec._train_dataset is not None else {})
+		if status == "ok" and rec._train_dataset is not None:  # a failed probe writes its result now
+			summary.update(measure_bounded(rec._train_dataset))
 	except Exception as exc:
 		print(f"[preflight] dataset lengths not read: {type(exc).__name__}", file=sys.stderr, flush=True)
 	env = detect_env()

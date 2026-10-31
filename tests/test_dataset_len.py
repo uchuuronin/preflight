@@ -6,8 +6,9 @@ from preflight.recorder.dataset_len import measure, percentile
 
 
 class Shape:
-	def __init__(self, *dims):
+	def __init__(self, *dims, dtype="torch.int64"):
 		self.shape = dims
+		self.dtype = dtype
 
 
 class Rows:
@@ -56,12 +57,51 @@ def test_a_slow_getitem_stops_at_the_time_budget():
 			return {"input_ids": [1, 2, 3]}
 
 	got = measure(Slow([None] * 100_000), budget_s=1.0, clock=lambda: t[0])
-	assert 64 <= got["dataset_rows_scanned"] < 200 and got["dataset_rows_total"] == 100_000
+	assert 90 <= got["dataset_rows_scanned"] <= 102 and got["dataset_rows_total"] == 100_000
+
+
+def test_a_set_sorted_by_length_doesnt_hide_its_longest_rows_past_the_cap():
+	class Sorted(Rows):
+		def __len__(self):
+			return 1_000_000
+
+		def __getitem__(self, i):
+			return {"input_ids": [1] * (1 + i // 1000)}  # longest rows last
+
+	got = measure(Sorted([]), max_rows=2000)
+	assert got["dataset_max_tokens"] == 1000 and got["dataset_rows_scanned"] <= 2000
+
+
+def test_a_stuck_row_costs_seconds_not_the_probe():
+	import threading
+	import time
+
+	from preflight.recorder.dataset_len import measure_bounded
+
+	never = threading.Event()
+
+	class Stuck(Rows):
+		def __getitem__(self, i):
+			if i > 10:
+				never.wait()
+			return {"input_ids": [1, 2]}
+
+	t0 = time.monotonic()
+	assert measure_bounded(Stuck([None] * 1000), budget_s=0.2, grace_s=0.3) == {}
+	assert time.monotonic() - t0 < 2.0
+	never.set()
 
 
 @pytest.mark.parametrize(
 	"ds",
-	[Rows([{"text": "raw text, not tokens"}] * 3), Rows([]), Rows([Shape(4, 128)] * 2)],
+	[
+		Rows([{"text": "raw text, not tokens"}] * 3),
+		Rows([]),
+		Rows([Shape(4, 128)] * 2),
+		Rows([(Shape(1, 16000, dtype="torch.float32"), 16000)] * 3),  # audio: a waveform, not tokens
+		Rows([(Shape(784, dtype="torch.float32"), 3)] * 3),  # a flattened image
+		Rows([{"input_ids": [1, 2]}, {"text": "x"}]),  # stops at a row that isn't tokens: nothing
+	],
 )
 def test_rows_that_arent_token_sequences_give_nothing(ds):
 	assert measure(ds) == {}
@@ -102,3 +142,24 @@ def test_an_hf_dataset_is_read_from_its_arrow_column():
 
 def test_percentile_is_nearest_rank():
 	assert percentile([1, 2, 3, 4], 0.5) == 2 and percentile([7], 0.999) == 7
+
+
+def test_nested_arrow_lists_are_read_row_by_row_not_as_length_one():
+	pa = pytest.importorskip("pyarrow")
+
+	class HF:
+		_indices = None
+		column_names = ("input_ids",)
+		format = None  # no custom transform
+
+		def __init__(self):
+			self.rows = [[list(range(n))] for n in (5, 300)]  # return_tensors="pt" per row: [[ids]]
+			self.data = pa.table({"input_ids": self.rows})
+
+		def __len__(self):
+			return 2
+
+		def __getitem__(self, i):
+			return {"input_ids": Shape(1, len(self.rows[i][0]))}
+
+	assert measure(HF())["dataset_max_tokens"] == 300
