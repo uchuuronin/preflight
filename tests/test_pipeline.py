@@ -139,7 +139,7 @@ def test_eval_oom_reruns_with_eval_off_on_the_same_gpu(tmp_path):
 	assert rec.costs.gpu_usd == pytest.approx(paid, abs=2e-6)  # the re-run is a kept probe, not a discard
 
 
-def test_the_eval_off_rerun_keeps_the_records_knobs_and_the_engine_still_predicts_there(tmp_path):
+def test_the_eval_off_rerun_keeps_the_records_knobs_so_the_engine_accepts_them(tmp_path):
 	runner = FakeRunner({("p1", "L4"): ("oom", "oom.eval")})
 
 	def flip(spec, gpu, *, should_stop):
@@ -158,7 +158,9 @@ def test_the_eval_off_rerun_keeps_the_records_knobs_and_the_engine_still_predict
 
 	back = load_record(dump_record(rec))  # the record as stored still validates
 	preds = predict(back, next(p for p in back.probes if p.id == "p1").knobs)
-	# predicting at the probe's own knobs (what the checks page does) doesn't abstain for an invalid knob
+	# its knobs are valid ones: the engine doesn't refuse them (an eval batch of 0 made it abstain on
+	# everything). In the record as a whole memory there abstains on p1-eval's OOM; C's checks page
+	# holds p1 and p1-eval out together, so that match isn't there when it predicts p1
 	assert not any("must be at least" in (e.reason or "") for e in preds.root.values())
 
 
@@ -569,18 +571,15 @@ def test_an_estimate_keeps_its_nulls_only_where_storage_would_drop_them():
 
 
 def test_the_worker_reads_the_same_flag_files_as_the_api():
-	"""Flags are baked into both images: the runner must ship the API's flag files and env."""
-	import re
-
-	def shipped(text):
-		return sorted(re.findall(r"add_local_file\([^\n]*?(flags[\w.{}]*\.json)", text)), re.findall(
-			r"glob\([^)]*flags", text
-		)
-
+	"""Flags are baked into both images: every flag file in the repo must ship in the runner's image
+	and the API's (Chiya, Oct 30: flags.production.json beside flags.json), with the same env."""
 	runner = (ROOT / "python" / "preflight" / "runner" / "modal_app.py").read_text()
 	api = (ROOT / "api" / "app.py").read_text()
-	assert shipped(runner) == shipped(api) == (["flags.json"], [])
-	# an override file is a deliberate change to both images and this test, never a silent one
-	assert sorted(p.name for p in ROOT.glob("flags*.json")) == ["flags.json"]
+	files = sorted(p.name for p in ROOT.glob("flags*.json"))
+	assert "flags.json" in files and set(files) <= {"flags.json", "flags.production.json"}, files
+	for name in files:
+		# the runner ships flags.json and its override by name; the API must name each one too
+		assert name == "flags.json" or 'FLAG_OVERRIDE = FLAGS_SRC.parent / f"flags.{FLAG_ENV}.json"' in runner
+		assert f'"{name}"' in api or f"/ {name!r}" in api.replace('"', "'"), f"api/app.py doesn't ship {name}"
 	assert 'FLAG_ENV = "production"' in runner and '"PREFLIGHT_ENV": FLAG_ENV' in runner
 	assert '"PREFLIGHT_ENV": "production"' in api

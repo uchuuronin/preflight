@@ -2,6 +2,7 @@
 
 import json
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
@@ -374,3 +375,57 @@ def test_the_reservation_counts_every_choice():
 	one = proxy._worst_case_usd(base, b"{}")
 	assert proxy._worst_case_usd({**base, "n": 8}, b"{}") > 7 * one
 	proxy.stop()
+
+
+def test_a_call_that_never_reached_the_provider_isnt_charged():
+	def handler(request):
+		raise httpx.ConnectError("no route")
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		assert _chat(proxy, "c1").status_code == 502
+		assert proxy.calls("c1")[0].usd == 0 and proxy.task("c1").cost_usd == 0.0
+	finally:
+		proxy.stop()
+
+
+def test_any_failure_before_the_reply_starts_still_answers_the_script():
+	def handler(request):
+		raise RuntimeError("a bug in a transport")
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		r = _chat(proxy, "e1")
+		assert r.status_code == 502 and r.json()["error"]["type"] == "upstream_unreachable"
+	finally:
+		proxy.stop()
+
+
+def test_a_streamed_error_that_breaks_while_read_isnt_charged():
+	def handler(request):
+		def gen():
+			yield b'{"error": {"type": "rate_limit"'
+			raise httpx.ReadError("gone")
+
+		return httpx.Response(429, headers={"content-type": "application/json"}, stream=_Gen(gen()))
+
+	proxy = AgentProxy("http://up/v1", "k", rate=token_rate, transport=httpx.MockTransport(handler))
+	proxy.start()
+	try:
+		with pytest.raises(httpx.HTTPError):
+			_chat(proxy, "r1", stream=True).read()
+		assert proxy.calls("r1")[0].usd == 0 and proxy.task("r1").cost_usd == 0.0
+	finally:
+		proxy.stop()
+
+
+def test_one_long_event_in_small_chunks_is_read_in_linear_time():
+	from preflight.recorder.agent import _StreamReader
+
+	big = b'data: {"choices": [{"delta": {"content": "' + b"x" * 2_000_000 + b'"}}]}\r\n\r\n'
+	r = _StreamReader()
+	t0 = time.monotonic()
+	out = b"".join(r.feed(big[i : i + 4096]) for i in range(0, len(big), 4096))
+	assert out.endswith(b"\n\n") and time.monotonic() - t0 < 2.0

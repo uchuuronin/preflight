@@ -138,6 +138,7 @@ class _StreamReader:
 
 	def __init__(self, drop_usage_chunk: bool = False):
 		self.buf = b""
+		self._cr = b""
 		self.found: dict = {"tool_calls": 0}
 		self._tool_ids: set = set()
 		self.drop_usage_chunk = drop_usage_chunk
@@ -145,11 +146,17 @@ class _StreamReader:
 
 	def feed(self, chunk: bytes) -> bytes:
 		"""The bytes of the whole events in buf so far that go on to the script."""
-		# normalised on the whole buffer: a chunk may end between a \r and its \n
-		self.buf = (self.buf + chunk).replace(b"\r\n", b"\n")
+		# a chunk may end between a \r and its \n: that \r waits for the next chunk
+		chunk = self._cr + chunk
+		self._cr = b""
+		if chunk.endswith(b"\r"):
+			chunk, self._cr = chunk[:-1], b"\r"
+		start = max(0, len(self.buf) - 1)  # an event's end can straddle the old buffer's last byte
+		self.buf += chunk.replace(b"\r\n", b"\n")
 		out = []
-		while b"\n\n" in self.buf:
-			event, self.buf = self.buf.split(b"\n\n", 1)
+		while (i := self.buf.find(b"\n\n", start)) != -1:
+			event, self.buf = self.buf[:i], self.buf[i + 2 :]
+			start = 0
 			if self._event_bytes(event):
 				out.append(event + b"\n\n")
 		if len(self.buf) > MAX_EVENT_BYTES:
@@ -157,7 +164,7 @@ class _StreamReader:
 		return b"".join(out)
 
 	def rest(self) -> bytes:
-		left, self.buf = self.buf, b""
+		left, self.buf, self._cr = self.buf + self._cr, b"", b""
 		if left.strip():
 			self._event_bytes(left)
 		return left
@@ -401,7 +408,7 @@ class AgentProxy:
 		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
 		sent = [False]  # this request's reply has started: a failure now can only close the connection
 		last: list[bytes] = []  # the reply's last bytes, written once the call is logged
-		broke = False
+		broke, never_sent, upstream_status = False, False, 0
 		try:  # from here on the admitted call is always logged, so its slot and reservation are freed
 			opts = req.get("stream_options")
 			opts = opts if isinstance(opts, dict) else {}
@@ -419,8 +426,11 @@ class AgentProxy:
 				)
 			else:
 				self._relay(h, f"{self.upstream}/{rest}", headers, body, call, sent, last)
-		except (httpx.HTTPError, OSError) as exc:
+		except Exception as exc:  # the script gets a 502 or a closed connection; the call is counted
 			broke = True
+			# never reached the provider: nothing to bill
+			never_sent = isinstance(exc, httpx.ConnectError | httpx.ConnectTimeout)
+			upstream_status = call.status  # 0 when the provider's reply never began
 			call.status = call.status or 502
 			call.error = call.error or type(exc).__name__
 			if sent[0]:
@@ -429,10 +439,6 @@ class AgentProxy:
 				with contextlib.suppress(OSError):
 					_reply(h, 502, {"error": {"type": "upstream_unreachable",
 						"message": "preflight: the provider didn't answer"}}, close=True)  # fmt: skip
-		except Exception as exc:  # anything else: the script gets a 502, the call is still counted
-			broke = True
-			call.status, call.error = call.status or 502, call.error or type(exc).__name__
-			h.close_connection = True
 		finally:
 			call.seconds = time.monotonic() - t0
 			# priced by the reply's model, else the request's (which _admit found a price for)
@@ -441,7 +447,10 @@ class AgentProxy:
 			no_usage = call.input_tokens == call.output_tokens == 0
 			# broke off with no usage seen, or answered without saying what it used: the provider may
 			# still bill it, so its reservation stands in for the cost and the task isn't exactly costed
-			uncosted = self._rate is not None and no_usage and (broke or call.status < 400)
+			# broken: billable unless it never reached the provider or its reply was an error (status 0:
+			# no reply began, so it may have run); answered: a 4xx or 5xx the provider sent isn't billed
+			billable = (not never_sent and upstream_status < 400) if broke else call.status < 400
+			uncosted = self._rate is not None and no_usage and billable
 			if uncosted:
 				call.usd = reserved
 			# logged before the script gets its last byte: once its call returns, the task is counted
