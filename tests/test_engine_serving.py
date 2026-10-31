@@ -76,8 +76,8 @@ def test_batching_raises_throughput_and_the_kv_cache_caps_concurrency():
 
 def test_light_traffic_waits_for_nothing():
 	s = _setup()
-	light = serving.forecast(s, serving.workload(200, 512, 128, rate_per_s=0.5, seed=2))
-	heavy = serving.forecast(s, serving.workload(200, 512, 128, rate_per_s=200.0, seed=2))
+	light = serving.forecast(s, [serving.workload(200, 512, 128, rate_per_s=0.5, seed=2)], online=True)
+	heavy = serving.forecast(s, [serving.workload(200, 512, 128, rate_per_s=200.0, seed=2)], online=True)
 	assert light.ttft_p95.point < 0.5 and heavy.ttft_p95.point > light.ttft_p95.point
 	assert light.tpot_p50.point < heavy.tpot_p50.point
 
@@ -92,9 +92,9 @@ def test_one_probe_calibrates_the_scale():
 	s = _setup()
 	reqs = serving.workload(64, 512, 200, seed=3)
 	sim = serving.simulate(s, reqs).seconds
-	cal = serving.calibrate(s, reqs, 1.5 * sim)
+	cal = serving.calibrate(s, [reqs], 1.5 * sim)
 	assert cal.scale == pytest.approx(1.5) and cal.sigma == serving.SIGMA_CALIBRATED
-	f = serving.forecast(s, reqs, cal)
+	f = serving.forecast(s, [reqs], cal)
 	assert f.throughput.point == pytest.approx(serving.simulate(s, reqs).throughput / 1.5)
 	assert f.throughput.lo < f.throughput.point < f.throughput.hi
 
@@ -150,3 +150,62 @@ def test_an_hf_probe_doesnt_calibrate_a_vllm_simulation(monkeypatch):
 	tp = api.predict(_serve_record("hf")).root["serving.throughput"]
 	assert "uncalibrated" in tp.reason and tp.status == "extrapolated"
 	assert np.log(tp.hi / tp.point) > 0.4  # the uncalibrated band is wide
+
+
+def test_batches_run_back_to_back_as_the_probe_ran_them():
+	s = _setup()
+	reqs = serving.workload(64, 512, 200, seed=4)
+	one = serving.simulate_batches(s, [reqs])
+	four = serving.simulate_batches(s, [reqs[i : i + 16] for i in range(0, 64, 16)])
+	assert four.seconds > one.seconds and four.output_tokens == one.output_tokens
+
+
+def test_a_model_that_doesnt_fit_has_no_forecast():
+	s = serving.ServeSetup(arch=LLAMA8B, gpu="L4", weight_bytes=40 * 2**30)
+	assert serving.forecast(s, [serving.workload(8, 512, 64)]) is None
+
+
+def test_prompts_past_max_model_len_are_refused_and_outputs_cut():
+	s = _setup(max_model_len=256)
+	r = serving.simulate(s, [serving.Request(0.0, 300, 10), serving.Request(0.0, 200, 100)])
+	assert r.rejected == 1 and r.output_tokens == 56  # 256 - 200 tokens of output fit
+
+
+def test_tensor_parallel_past_the_kv_heads_replicates_them():
+	assert serving.kv_bytes_per_token(LLAMA8B, tensor=16) == serving.kv_bytes_per_token(LLAMA8B, tensor=8)
+
+
+def test_grids_skip_the_serving_simulation(monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	calls = []
+	real = api._serving_targets
+	monkeypatch.setattr(api, "_serving_targets", lambda r, v: calls.append(1) or real(r, v))
+	rec = _serve_record()
+	api.build_grids(rec, ["batch_size"], local=True)
+	assert not calls
+	api.predict(rec)
+	assert calls
+
+
+def test_raising_max_new_tokens_past_a_cap_the_probe_hit_abstains(monkeypatch):
+	from preflight.schema.record import Domain, Knob
+
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	base = _serve_record()
+	probes = [
+		p.model_copy(update={"generation": p.generation.model_copy(update={"truncation_rate": 0.1})})
+		for p in base.probes
+	]
+	knob = Knob(id="max_new_tokens", label_key="k", kind="int", current=512, domain=Domain(min=1, max=8192))
+	rec = base.model_copy(update={"probes": probes, "knobs": [*base.knobs, knob]})
+	tp = api.predict(rec, {"max_new_tokens": 2048}).root["serving.throughput"]
+	assert tp.status == "abstain" and "hit its 512-token cap" in tp.reason
+
+
+def test_a_calibration_on_other_hardware_keeps_the_wide_band(monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	rec = _serve_record()
+	here = api.predict(rec).root["serving.throughput"]
+	there = api.predict(rec, {"gpu_type": "A100-SXM-80GB"}).root["serving.throughput"]
+	assert np.log(there.hi / there.point) > np.log(here.hi / here.point)
+	assert "other hardware" in there.reason

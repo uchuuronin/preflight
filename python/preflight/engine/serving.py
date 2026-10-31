@@ -86,8 +86,10 @@ class SimResult:
 
 
 def kv_bytes_per_token(arch: TransformerArch, kv_dtype: str = "bf16", tensor: int = 1) -> float:
-	"""2 (K and V) x layers x KV heads x head dim x bytes, per token, per GPU."""
-	return 2.0 * arch.n_layers * arch.kv_heads * arch.head_dim * dtype_bytes(kv_dtype) / max(tensor, 1)
+	"""2 (K and V) x layers x KV heads x head dim x bytes, per token, per GPU. Tensor parallel splits the KV heads,
+	but never below one per GPU: with more GPUs than KV heads, vLLM replicates them."""
+	per_gpu = max(arch.kv_heads / max(tensor, 1), 1.0)
+	return 2.0 * arch.n_layers * per_gpu * arch.head_dim * dtype_bytes(kv_dtype)
 
 
 def kv_capacity_tokens(s: ServeSetup) -> int:
@@ -143,11 +145,17 @@ def simulate(s: ServeSetup, requests: list[Request]) -> SimResult:
 	n = len(reqs)
 	first = np.full(n, np.nan)
 	done = np.full(n, np.nan)
-	need = [min(r.prompt + r.output, s.max_model_len or 10**9) for r in reqs]
-	rejected = {i for i in range(n) if need[i] > cap}
-	if rejected:
+	limit = s.max_model_len or 10**9
+	# an output stops at the model length; a prompt that reaches it is refused
+	reqs = [Request(r.arrival_s, r.prompt, min(r.output, max(1, limit - r.prompt))) for r in reqs]
+	need = [r.prompt + r.output for r in reqs]
+	too_long = {i for i in range(n) if reqs[i].prompt >= limit}
+	rejected = {i for i in range(n) if need[i] > cap} | too_long
+	if too_long:
+		notes.append(f"{len(too_long)} prompts are longer than max_model_len ({limit}) and are refused")
+	if rejected - too_long:
 		notes.append(
-			f"{len(rejected)} requests are longer than the whole KV cache ({cap} tokens) and never run"
+			f"{len(rejected - too_long)} requests are longer than the whole KV cache ({cap} tokens) and never run"
 		)
 	waiting = [i for i in range(n) if i not in rejected]
 	waiting.reverse()  # pop() from the end: first come, first served
@@ -225,6 +233,29 @@ def simulate(s: ServeSetup, requests: list[Request]) -> SimResult:
 	)
 
 
+def simulate_batches(s: ServeSetup, batches: list[list[Request]]) -> SimResult:
+	"""Batches sent one after another, each starting when the last ends: how a probe that made several generate calls
+	ran them. Times inside each batch are relative to its own start."""
+	results = [simulate(s, b) for b in batches if b]
+	if not results:
+		raise ValueError("no requests")
+	if len(results) == 1:
+		return results[0]
+	return SimResult(
+		seconds=sum(r.seconds for r in results),
+		output_tokens=sum(r.output_tokens for r in results),
+		throughput=sum(r.output_tokens for r in results) / max(sum(r.seconds for r in results), 1e-12),
+		ttft=np.concatenate([r.ttft for r in results]),
+		tpot=np.concatenate([r.tpot for r in results]),
+		latency=np.concatenate([r.latency for r in results]),
+		peak_running=max(r.peak_running for r in results),
+		kv_capacity_tokens=results[0].kv_capacity_tokens,
+		iterations=sum(r.iterations for r in results),
+		rejected=sum(r.rejected for r in results),
+		notes=tuple(dict.fromkeys(n for r in results for n in r.notes)),
+	)
+
+
 # ---------------------------------------------------------------- workloads
 
 
@@ -269,15 +300,14 @@ class Calibration:
 	source: str = "uncalibrated: guessed efficiencies"
 
 
-def calibrate(s: ServeSetup, probe_requests: list[Request], measured_s: float) -> Calibration:
-	"""One scale factor from A's vLLM probe: its measured wall time over the simulated one for the same requests."""
-	sim = simulate(s, probe_requests).seconds
-	if sim <= 0 or measured_s <= 0:
+def calibrate(s: ServeSetup, probe_batches: list[list[Request]], measured_s: float) -> Calibration:
+	"""One scale factor from A's vLLM probe: its measured wall time over the simulated one for the same batches."""
+	n = sum(len(b) for b in probe_batches)
+	sim = simulate_batches(s, probe_batches)
+	if sim.seconds <= 0 or measured_s <= 0 or sim.output_tokens == 0:
 		return Calibration()
-	scale = measured_s / sim
-	return Calibration(
-		scale, SIGMA_CALIBRATED, f"calibrated on the probe's {len(probe_requests)} requests (x{scale:.2f})"
-	)
+	scale = measured_s / sim.seconds
+	return Calibration(scale, SIGMA_CALIBRATED, f"calibrated on the probe's {n} requests (x{scale:.2f})")
 
 
 @dataclass(frozen=True)
@@ -298,11 +328,22 @@ class ServingForecast:
 	notes: tuple[str, ...] = field(default_factory=tuple)
 
 
-def forecast(s: ServeSetup, requests: list[Request], cal: Calibration | None = None) -> ServingForecast:
+def forecast(
+	s: ServeSetup, batches: list[list[Request]], cal: Calibration | None = None, online: bool = False
+) -> ServingForecast | None:
+	"""Throughput and latencies for these batches; None when nothing can run (the model doesn't fit the card)."""
 	cal = cal or Calibration()
-	r = simulate(s, requests)
+	r = simulate_batches(s, batches)
+	if r.output_tokens == 0 or r.kv_capacity_tokens == 0:
+		return None
+	n = sum(len(b) for b in batches)
 	h = Z90 * cal.sigma
-	why = f"{len(requests)} requests through a continuous-batching simulation; {cal.source}"
+	mode = (
+		"arriving at the request rate"
+		if online
+		else "sent at once, so time to first token is how long the batch takes to drain"
+	)
+	why = f"{n} requests {mode}, through a continuous-batching simulation; {cal.source}"
 
 	def band(v: float, unit_why: str, slower_is_bigger: bool) -> Readout:
 		v = v * cal.scale if slower_is_bigger else v / cal.scale

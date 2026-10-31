@@ -200,13 +200,16 @@ def test_group_size_abstains_when_the_trainer_doesnt_say_what_the_batch_counts(r
 
 
 def test_raising_the_cap_past_a_probe_that_hit_it_abstains(rl_on):
-	ok = api.predict(
-		_as_trl(_rl_record()), {"max_completion_len": 1024}
-	).root  # the probe hit its cap 4% of the time
+	# 0.2% of responses hit the cap: with 16 per call, 3% of calls did, so the longer tail barely set the pace
+	ok = api.predict(_as_trl(_rl_record(), truncation=0.002), {"max_completion_len": 1024}).root
 	assert ok["time.rollout"].status == "extrapolated"
+	t = ok["rl.truncation"]
 	assert (
-		ok["rl.truncation"].status == "extrapolated" and ok["rl.truncation"].lo <= ok["rl.truncation"].point
-	)
+		t.status == "extrapolated" and t.lo == 0.0 and t.hi == pytest.approx(0.002)
+	)  # at most what hit the old cap
+	# 4% of responses is 48% of calls of 16: the unseen tail sets the pace about half the time
+	half = api.predict(_as_trl(_rl_record()), {"max_completion_len": 1024}).root
+	assert half["time.rollout"].status == "abstain" and "4%" in half["time.rollout"].reason
 	hit = api.predict(_as_trl(_rl_record(), truncation=0.41), {"max_completion_len": 4096}).root
 	assert hit["time.rollout"].status == "abstain" and "41%" in hit["time.rollout"].reason
 	assert hit["rl.truncation"].status == "abstain"

@@ -111,6 +111,7 @@ _SPECS = [
 	_k("max_new_tokens", "generation.new_tokens", "memory time cost risk", "memory time cost risk"),
 	_k("max_model_len", "serving.max_model_len", "memory time cost"),
 	_k("max_num_seqs", "serving.max_num_seqs", "memory time cost"),
+	_k("request_rate", "serving.request_rate", "time cost", note="Online serving: requests per second, Poisson."),
 	_k("max_batched_tokens", "serving.max_batched_tokens", "memory time"),
 	_k("gpu_memory_utilization", "generation.colocated_fraction", "memory time"),
 	_k("kv_cache_dtype", "generation.kv_dtype", "memory time quality", "memory time"),

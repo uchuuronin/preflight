@@ -1682,21 +1682,46 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
 	if FEATURES["rl"] and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
-	if FEATURES["serving"] and record.job.lens == "serving":
+	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET_SERVING[0]:
 		out.update(_serving_targets(record, values))
 	return Prediction(out)
+
+
+# the serving simulation takes tens of milliseconds; grids and rankings that don't read it skip it (depth counter)
+_QUIET_SERVING = [0]
+
+
+class _quiet_serving:
+	def __init__(self, on: bool):
+		self.on = on
+
+	def __enter__(self):
+		_QUIET_SERVING[0] += int(self.on)
+
+	def __exit__(self, *exc):
+		_QUIET_SERVING[0] -= int(self.on)
 
 
 # ---------------------------------------------------------------- self-hosted serving (engine/serving.py)
 
 
-def _serve_probe(record: FlightRecord):
-	"""A probe that generated: its requests are the workload, and its wall time calibrates the simulation."""
-	for p in record.probes:
-		g = p.generation
-		if p.status in OK_PROBE and g and g.sequences and g.seconds_total and g.new_tokens_mean:
-			return p
-	return None
+def _serve_probe(record: FlightRecord, values: dict | None = None):
+	"""A probe that generated: the one at the query's settings when there is one, else the first. Its requests are the
+	workload, and its wall time calibrates the simulation."""
+	ps = [
+		p
+		for p in record.probes
+		if p.status in OK_PROBE
+		and p.generation
+		and p.generation.sequences
+		and p.generation.seconds_total
+		and p.generation.new_tokens_mean
+	]
+	if values is not None:
+		match = _matching_probe(record, values)
+		if match is not None and match in ps:
+			return match
+	return ps[0] if ps else None
 
 
 def _serve_setup(record: FlightRecord, values: dict) -> tuple[serving.ServeSetup | None, str]:
@@ -1726,47 +1751,106 @@ def _serve_setup(record: FlightRecord, values: dict) -> tuple[serving.ServeSetup
 	), ""
 
 
-def _serve_workload(record: FlightRecord, values: dict, p) -> list[serving.Request]:
-	"""The probe's requests, all at once: its sequences, its output lengths, a prompt length from the knobs or data."""
+def _serve_workload(record: FlightRecord, values: dict, p) -> tuple[list[list[serving.Request]], bool]:
+	"""(batches, online): the probe's requests, in as many back-to-back calls as the probe made, each with the
+	probe's output lengths and a prompt length from the data (else the knob's cap). With a `request_rate` knob, the
+	same requests arrive at that rate instead (online serving)."""
 	g = p.generation
 	pv = _probe_values(record, p)
 	dat = p.data
 	prompt = (
-		values.get("max_prompt_len")
+		(dat.tokens_per_sample_mean if dat else None)
+		or values.get("max_prompt_len")
 		or pv.get("max_prompt_len")
-		or (dat.tokens_per_sample_mean if dat else None)
 		or 512
 	)
+	p95 = (dat.tokens_per_sample_p95 if dat and dat.tokens_per_sample_mean else None) or None
 	cap = values.get("max_new_tokens") or g.max_new_tokens
-	return serving.workload(
+	rate = values.get("request_rate")
+	calls = max(1, int(g.calls or 1))
+	reqs = serving.workload(
 		int(g.sequences),
 		float(prompt),
 		float(g.new_tokens_mean),
-		float(dat.tokens_per_sample_p95) if dat and dat.tokens_per_sample_p95 else None,
+		float(p95) if p95 else None,
 		float(g.new_tokens_p95) if g.new_tokens_p95 else None,
+		rate_per_s=float(rate) if rate else None,
 		max_output=int(cap) if cap else None,
 	)
+	if rate:
+		return [reqs], True
+	size = math.ceil(len(reqs) / calls)
+	return [reqs[i : i + size] for i in range(0, len(reqs), size)], False
+
+
+# guess: a probe whose outputs hit its cap this often hasn't seen how long they run uncapped (per call, not per
+# response: the longest output in a call sets its pace)
+TRUNCATED_CALL = 0.05
+
+
+def _serving_blocker(record: FlightRecord, values: dict, p) -> str | None:
+	g = p.generation
+	cap_p, cap_q = g.max_new_tokens, values.get("max_new_tokens") or g.max_new_tokens
+	t = g.truncation_rate
+	if cap_p and cap_q and float(cap_q) > float(cap_p):
+		per_call = max(1, round(g.sequences / max(g.calls, 1)))
+		hit = 1 - (1 - t) ** per_call if t is not None else None
+		if hit is None or hit > TRUNCATED_CALL:
+			seen = f"{t:.0%} of" if t is not None else "an unknown share of"
+			return (
+				f"{seen} the probe's outputs hit its {float(cap_p):g}-token cap, so how long they run past it wasn't "
+				"measured; probe at the higher cap"
+			)
+	return None
+
+
+_SERVE_CAL: dict = {}  # (record id, probe id, setup) -> Calibration: the probe's simulation runs once per record
 
 
 def _serving_targets(record: FlightRecord, values: dict) -> dict:
 	mid = serving.MODEL_ID
 	setup, why = _serve_setup(record, values)
-	p = _serve_probe(record)
+	p = _serve_probe(record, values)
 	if setup is None or p is None:
 		why = why or "no probe generated, so there is no workload to simulate or calibrate on"
 		return {t: _abstain(_meta(t)[0], mid, why) for t in SERVING_TARGETS}
+	blocked = _serving_blocker(record, values, p)
+	if blocked:
+		return {t: _abstain(_meta(t)[0], mid, blocked) for t in SERVING_TARGETS}
 	pv = _probe_values(record, p)
 	probe_setup, _ = _serve_setup(record, pv)
 	backend = p.generation.backend
-	if backend == "vllm":
-		cal = serving.calibrate(
-			probe_setup or setup, _serve_workload(record, pv, p), float(p.generation.seconds_total)
-		)
-	else:  # an HF generate probe doesn't batch like vLLM: its wall time can't scale a vLLM simulation
+	if (
+		backend != "vllm"
+	):  # an HF generate probe doesn't batch like vLLM: its wall time can't scale a vLLM simulation
 		cal = serving.Calibration(
 			source=f"uncalibrated: the probe generated with {backend or 'an unknown backend'}, not vLLM"
 		)
-	f = serving.forecast(setup, _serve_workload(record, values, p), cal)
+	else:
+		key = (record.record_id, p.id, probe_setup or setup)
+		if key not in _SERVE_CAL:
+			if len(_SERVE_CAL) > 64:
+				_SERVE_CAL.clear()
+			_SERVE_CAL[key] = serving.calibrate(
+				probe_setup or setup, _serve_workload(record, pv, p)[0], float(p.generation.seconds_total)
+			)
+		cal = _SERVE_CAL[key]
+		same_hw = probe_setup is not None and (
+			probe_setup.gpu,
+			probe_setup.tensor,
+			probe_setup.compute_dtype,
+		) == (
+			setup.gpu,
+			setup.tensor,
+			setup.compute_dtype,
+		)
+		if not same_hw:  # the scale carries over, but one probe on other hardware doesn't narrow the band
+			cal = replace(cal, sigma=serving.SIGMA_UNCALIBRATED, source=cal.source + ", on other hardware")
+	batches, online = _serve_workload(record, values, p)
+	f = serving.forecast(setup, batches, cal, online)
+	if f is None:
+		why = f"the model doesn't fit: no room for a KV cache on {setup.gpu} at {setup.mem_util:.0%} of its memory"
+		return {t: _abstain(_meta(t)[0], mid, why) for t in SERVING_TARGETS}
 	status = "predicted" if _matching_probe(record, values) is p and backend == "vllm" else "extrapolated"
 	out = {}
 	for tid, r, unit in (
@@ -1808,7 +1892,8 @@ def _rl_probe(record: FlightRecord, values: dict | None = None):
 	return min(ps, key=lambda p: abs(math.log(float(_probe_values(record, p).get("batch_size") or 1) / b)))
 
 
-# guess: a probe whose responses hit its cap this often hasn't seen how long they run uncapped
+# guess: a probe whose calls hit its cap this often (any response in the call reaching it) hasn't seen how long
+# they run uncapped
 TRUNCATED_PROBE = 0.05
 
 
@@ -1866,7 +1951,10 @@ def _rollout_blocker(record: FlightRecord, values: dict, p) -> str | None:
 	cap_p = p.generation.max_new_tokens or pv.get("max_completion_len")
 	cap_q = values.get("max_completion_len") or cap_p
 	trunc = _probe_truncation(p)
-	if cap_p and cap_q and float(cap_q) > float(cap_p) and (trunc is None or trunc > TRUNCATED_PROBE):
+	# the longest response in a call sets its pace, so what matters is how often a whole call hit the cap
+	per_call = max(1, round(p.generation.sequences / max(p.generation.calls, 1)))
+	call_hit = 1 - (1 - trunc) ** per_call if trunc is not None else None
+	if cap_p and cap_q and float(cap_q) > float(cap_p) and (call_hit is None or call_hit > TRUNCATED_PROBE):
 		seen = f"{trunc:.0%} of" if trunc is not None else "an unknown share of"
 		return (
 			f"{seen} the probe's responses hit its {float(cap_p):g}-token cap, so how long they run past it wasn't "
@@ -1972,6 +2060,10 @@ def _rl_targets(record: FlightRecord, values: dict) -> dict:
 			why = f"share of responses reaching the {float(cap):g}-token cap, from the probe's length distribution"
 			if measured is not None:
 				why += f"; the probe measured {measured:.0%}"
+			if cap_p and float(cap) > float(cap_p) and measured is not None:
+				# past the probe's cap the tail wasn't seen: at most the share that hit the old cap
+				share, lo, hi = min(share, measured), 0.0, measured
+				why += f" at its {float(cap_p):g}-token cap, so at most that at a higher one"
 			same = cap_p is not None and float(cap) == float(cap_p)
 			out["rl.truncation"] = _est(
 				share, lo, hi, "fraction", "predicted" if same else "extrapolated", rl.MODEL_ID_ROLLOUT, why
@@ -2047,9 +2139,11 @@ def build_grids(
 	vals: dict[str, dict[str, list]] = {
 		t: {"point": [], "lo": [], "hi": [], "abstain": [], "model": []} for t in tids
 	}
+	quiet = not set(tids) & set(SERVING_TARGETS)
 	for combo in np.ndindex(*[len(a) for a in axes]):
 		knob_set = {k.id: axes[i][j] for i, (k, j) in enumerate(zip(axes_knobs, combo, strict=True))}
-		pred = predict(record, knob_set).root
+		with _quiet_serving(quiet):
+			pred = predict(record, knob_set).root
 		for t in tids:
 			e = pred.get(t)
 			v = vals[t]
@@ -2186,6 +2280,17 @@ def sensitivity(
 	Impact is the change across the range relative to the current value, capped at 1 (a probability
 	objective uses the change itself). Knobs that move it less than its own band are left out.
 	"""
+	_, tid = _objective_fn(record, objective)
+	with _quiet_serving(tid not in SERVING_TARGETS):
+		return _sensitivity(record, objective, pinned, knobs)
+
+
+def _sensitivity(
+	record: FlightRecord,
+	objective: Objective,
+	pinned: list[str] | set[str] | None = None,
+	knobs: dict | None = None,
+) -> list[KnobImpact]:
 	f, tid = _objective_fn(record, objective)
 	start = dict(knobs or {})  # rank from this setting (C's provider passes the live one)
 	pinned = set(pinned or ())
