@@ -1,0 +1,11 @@
+{
+	"name": "20261031-014839-41157095457-b-corpus-export-hf",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41157095457",
+	"ref": "ws-b",
+	"sha": "ed475dbb428902b909d670247debe3f81da5e1fc",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::export --kind hf",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T01:49:10Z"
+}
