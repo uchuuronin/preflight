@@ -159,4 +159,7 @@ def test_app_logs_reads_and_never_runs(monkeypatch, tmp_path):
 	assert app_logs.main(["--env", "main", "ap-x; rm -rf /"]) == 2
 	n = len(calls)
 	assert app_logs.main(["--env", "main", "ap-runner99"]) == 2  # visitors' output is never published
+	assert app_logs.main(["--env", "main", "ap-unknown123"]) == 2  # unlisted and not one of ours
 	assert not any(c[2] == "logs" for c in calls[n:])
+	assert app_logs.main(["--env", "main", "ap-smlQhBII0aKV0BnMwULRzO"]) == 0  # ours, no longer listed
+	assert calls[-1][2] == "logs" and "--tail" in calls[-1] and calls[-1][-1] == "ap-smlQhBII0aKV0BnMwULRzO"

@@ -5,7 +5,7 @@
 Run through `remote-run.yml` (which only takes `modal run`, `modal deploy` and our own entry
 points). `modal run` doesn't pass a remote function's output into the workflow's log, so this is
 how a stuck or silent run is diagnosed without starting anything: it reads, it never runs code in
-the app. `modal app logs` follows a live app, so it is cut off after --seconds. Writes
+the app. Fetches the last log entries with timestamps; a slow fetch is cut off after --seconds. Writes
 out/app_logs.txt (the logs) and out/app_logs.json (the app's state and how the read ended).
 """
 
@@ -20,6 +20,11 @@ APP_ID = re.compile(r"ap-[A-Za-z0-9]{6,40}")
 # Only our own measurement apps: their logs go to the remote-runs branch, and the job runner's
 # (preflight-runner) hold visitors' script output, which must never be published
 ALLOWED_APPS = {"preflight-runner-ops"}
+# Modal's app list drops apps a while after they stop. These ran our own ground-truth code on
+# Oct 28 (remote-runs: runs/*-a-gt-lora-l4, *-a-gt-nanogpt-l4, *-a-gt-lora-l4-2, each
+# `modal run ... ops_app.py::ground_truth`), so their logs are ours to read even once unlisted
+KNOWN_OPS_APP_IDS = {"ap-A3JZoka21eHVb6Ze0bnHVm", "ap-948odHjhzUDCbwoCLISH8R", "ap-smlQhBII0aKV0BnMwULRzO"}
+TAIL = 5000  # log entries fetched (Modal's default is 100)
 MAX_LOG_CHARS = 2_000_000
 
 
@@ -47,11 +52,14 @@ def main(argv: list[str] | None = None) -> int:
 		print("an app id looks like ap-..., and --seconds is 5 to 600", file=sys.stderr)
 		return 2
 	app = _app(ns.env, ns.app_id)
+	if app is None and ns.app_id in KNOWN_OPS_APP_IDS:
+		app = {"name": "preflight-runner-ops", "state": "no longer listed"}
 	if app is None or app["name"] not in ALLOWED_APPS:
 		print(f"only the logs of {sorted(ALLOWED_APPS)} are read here; {ns.app_id} is "
 			f"{app['name'] if app else 'not in the app list'}", file=sys.stderr)  # fmt: skip
 		return 2
-	cmd = ["modal", "app", "logs", "--env", ns.env, ns.app_id]
+	# fetch (not follow): Modal returns the last TAIL entries and exits; --seconds bounds a slow fetch
+	cmd = ["modal", "app", "logs", "--env", ns.env, "--tail", str(TAIL), "--timestamps", ns.app_id]
 	try:
 		r = subprocess.run(cmd, capture_output=True, text=True, timeout=ns.seconds)
 		text, ended, code = r.stdout + r.stderr, f"exit {r.returncode}", r.returncode
