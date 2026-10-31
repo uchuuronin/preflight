@@ -1,0 +1,11 @@
+{
+	"name": "20261031-230454-41250977670-c-muse-code-smoke-shell",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41250977670",
+	"ref": "58a4f474c3e4a78c817f9ad5178ff50eef326857",
+	"sha": "58a4f474c3e4a78c817f9ad5178ff50eef326857",
+	"cmd": "modal run --env main api/fix_app.py::smoke",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T23:06:15Z"
+}
