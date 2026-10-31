@@ -5,12 +5,12 @@ Preflight must catch every one from a few minutes of probing.
 
   1. No prompt caching: the system prompt starts with the current time, so its prefix changes
      on every call and the API can never reuse a cached prefix.
-  2. Context overflow at step 12: every run_python result echoes this harness's source "for
-     traceability", so the history grows by about 2,450 tokens a turn and passes
-     CONTEXT_LIMIT (26,000 tokens, the agent's own context budget) at turn 12 on any task still
-     open by then [simulated: tests/test_d_zoo_scripts.py replays the history with short
-     replies; longer replies move the turn earlier, and A's probe measures it]. The run then
-     fails that task.
+  2. Context overflow at turn 11, measured on Muse Spark: every run_python result echoes this
+     harness's source "for traceability", so by Muse Spark's count the history starts near 730
+     tokens and grows about 2,745 a turn, passing CONTEXT_LIMIT, the agent's own 26,000-token
+     budget, at turn 11 for a typical task, 9 to 11 across the measured growth [derived from
+     A's per-turn counts, 30 tasks, Oct 31; none ran past turn 4, so not yet observed]. The
+     script's own check (characters / 4) stops the task a turn later, and the run fails it.
   3. A tool that retries forever: run_tests raises when the tests fail, and call_tool retries
      it in `while True` with `except: continue`, so a failing build is re-run without end and
      never reported to the model. Any other tool error (a timeout, a missing argument) loops

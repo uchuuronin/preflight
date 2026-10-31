@@ -8,6 +8,40 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sat Oct 31, night (round three merged; agent overflow at turn 11)
+
+Merged `main` at `006bc57` (round three, contract 0.5.0) as a fast-forward. On it: Python passes 1177 with the `torch`-marked tests left out, `web` passes 396 in 55 files, and `tsc` is clean.
+
+**Agent overflow is at turn 11 by Muse Spark's count (correction from A), derived from A's measured growth.** A's run of 30 of the 500 MBPP tasks on muse-spark-1.3 (Oct 31, run 41250821790; `zoo/agent_eval_spark/record_oct31.json` on ws-a) grew the history by 2,745 tokens a turn by the provider's count (median of 43 turn pairs, 2,653 to 4,013). My header used characters / 4, about 2,450 a turn. Turn 11 is derived, not observed: no task in the sample went past turn 4 (largest context 10,862 tokens). From the record's per-turn counts (`context_tokens_by_turn`), a typical task starts at 733 tokens (698 to 946) and grows 2,745 a turn, so it holds 25,438 tokens at turn 10 and 28,183 at turn 11, passing 26,000 at turn 11; across the middle 80% of the measured growth (2,676 to 3,187 a turn) that's turn 9 to 11. A reviewer's turn-10 estimate assumed a 2,627-token start, but the record's first turns are 698 to 946. The header now gives turn 11 with that tag and range. The header now says turn 11, and that the script's own character-based check stops the task a turn later. I kept the header short so the script stays near the size A measured, because it echoes its own source every turn: 7,728 bytes against 7,641, about 30 tokens a turn more, which still leaves turn 10 under the limit. Test: `test_agent_script_stays_the_size_a_measured` (within 300 bytes of the measured version, about 4% of the growth; a bigger change needs A to measure again) and `test_agent_scripts_own_check_stops_at_turn_12_with_short_replies` (the script's own check).
+
+**Audit re-check on round three** (`docs/audit/oct31/README.md`, screenshots there). Findings 1 (the bad-link message), 2 (the phone hint to "Got it"), 3 (honest sample labels) and 5 (the measured check-in time) are fixed, each checked in Chromium. Finding 4 is not fixed: a failed job's boarding screen marks no stage, and nothing says "Stopped here". The whole 40-state sweep matches Oct 30: no overflow, no console errors, colour contrast in the same 16 day-theme states, eval markers under 24 px, the same two job-map nodes with no focus ring. Findings 4 and 6 to 12 stay open with C, which lists them as next.
+
+**Dial on B's engine output.** B's `make_golden.py` hasn't run on the golden records yet (B: it waits on A's 30-task agent top-up), so I ran B's `engine.api.fill_predictions` on copies of the three golden records in my scratch folder (CPU, no cost) and ran `dial.zoo.test.ts` once against them, unchanged except for where it reads records. The dial counts only records whose script has written ground truth (fine-tune and pretrain); the agent record has none in the dial's table, so it's read but not counted. Simulated: B's models on the golden records' hand-made probes, not on measurements. In-sample, 2 records, 6 planted problems:
+- On screen today, both records have 3 of 3 planted knobs in the dock (Wilson 95%: 44 to 100%).
+- In the design check with C's list, all 3 are visible on both; in the dock, finetune has 2 of 3 and pretrain 1 of 3.
+- Every one of the nine order variants ties at 3 of 6 (19 to 81%), so nothing can beat today's order and it stays frozen.
+
+That is identical, count for count, to the fixture predictions. The engine output is B's real models (memory-analytical@0.3.1, time-total@0.1.0, cost-gpu-hours@0.1.0, steptime-phases@0.2.0 and others), but the records' probes are still the hand-made golden ones, so this is not yet a run on real measurements. The real test stays the held-out Nov 2 run, with the policy frozen. Nothing from the scratch run is committed. Test: the dial test itself; rerun it when `make_golden.py` writes engine output into `schema/examples/`.
+
+**Exports moved onto C's hook.** Round three brings `registerExportsPanel`. Its "Take it with you" section hands each panel C's `ExportPlan`, and C asks exports to format only, with no numbers of their own, and to say "not verified" when `codeChangesVerified` is false. The panel now registers there instead of the general `below` slot, sits under C's heading, and formats the plan: changes with A's code locations, GPU, launch line, readouts (null where the cockpit abstains), `wallTimeHiS`, patches and the share link.
+- The batch time is the plan's upper time, rounded up to 5 minutes. I dropped my 15 minutes of setup, which was a number of my own; the file now says to add the cluster's start-up time if it counts. The time limit still caps it.
+- "Not verified" shows on screen, in the plan JSON, in the edit script and in the batch file whenever a code change lacks a passed patch.
+- The edit script's safety work is unchanged.
+
+A read-only review (git-free copy) found these, all fixed and tested:
+- A GPU count the script sets on its launch line (`--nproc_per_node`) was treated as launch-only, so Slurm got 8 GPUs while the script ran on 4. It is now an edit.
+- Rounding up to 5 minutes could pass the time limit; the ask is now held to the limit.
+- A template-only change was listed as a code change that C's `codeChangesVerified` doesn't count, so it never showed "not verified". Only what C counts is listed as code now.
+- GPUs per node was a number of my own; the file now asks `--gpus=<the plan's count>` for the whole job.
+
+Checked in Chromium on `lora-7b` with `c.exports` on: one panel, inside C's section, and the panel and file agree (4 h 55 min, `--time=04:55:00`). Test: `build.test.ts` and both panel test files now run on C's own `exportPlan` (49 tests), and the registration test checks it's in `exportsPanels` and not in `panels`.
+
+**Notebook intake now calls C's `checkinBytes`**, as asked on Oct 30, so the panel and the desk can't measure differently. Test: the notebook suite (50 pass).
+
+Test runs: `web` 55 files, 402 tests pass, and `tsc` is clean. Python passes 1178 with the `torch`-marked tests left out. The audit's 16 contrast states are the same states as on Oct 30, checked state by state.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sat Oct 31, evening (pushed; the exports CLI item)
 
 Pushed `ws-d` with Chiya's yes (`895633b..129bfb1`: 3590fa7, 59acc38, 4ff522e, 129bfb1), as a normal push after merging `main` (no change, still 3c243b5).

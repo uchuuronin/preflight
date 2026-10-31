@@ -4,6 +4,7 @@ import realRecord from "../../../../api/tests/fixtures/a-smoke-l4-main-4.record.
 import golden from "../../../../schema/examples/finetune.json";
 import agentGolden from "../../../../schema/examples/agent.json";
 import type { FlightRecord } from "../../../../schema/ts/contract";
+import { exportPlan } from "../../workspace/export/plan";
 import { normaliseRecord, type KnobValue, type LoadedRecord } from "../../workspace/record/types";
 import {
 	CLI_INSTALL,
@@ -16,11 +17,11 @@ import {
 	type ExportInput,
 	pyLiteral,
 	recheckText,
-	SETUP_S,
 	sbatchText,
 	shq,
 	slurmTime,
-	wallTime,
+	askedTime,
+	verified,
 } from "./build";
 
 /**
@@ -54,14 +55,17 @@ function current(r: LoadedRecord): Record<string, KnobValue> {
 	return Object.fromEntries(r.knobs.map((k) => [k.id, k.current as KnobValue]));
 }
 
-function input(r: LoadedRecord, set: Record<string, KnobValue> = {}, extra: Partial<ExportInput> = {}): ExportInput {
+/** The input the cockpit hands the panel: C's own plan for these settings. */
+function input(
+	r: LoadedRecord,
+	set: Record<string, KnobValue> = {},
+	opts: { estimates?: LoadedRecord["predictions"]["estimates"]; illustrative?: boolean; ref?: string | null } = {},
+): ExportInput {
+	const ref = opts.ref === undefined ? "tok" : opts.ref;
 	return {
+		plan: exportPlan(r, { ...current(r), ...set }, opts.estimates ?? r.predictions.estimates, ref, "https://example.test/"),
 		record: r,
-		knobs: { ...current(r), ...set },
-		estimates: r.predictions.estimates,
-		link: "https://example.test/#/cockpit/tok",
-		illustrative: false,
-		...extra,
+		illustrative: opts.illustrative ?? false,
 	};
 }
 
@@ -244,13 +248,14 @@ describe("edit script safety", () => {
 });
 
 describe("sbatch", () => {
-	it("sizes the time from the slow end of the range plus setup, in whole 5-minute steps", () => {
+	it("asks for the plan's upper time, rounded up to whole 5 minutes, adding nothing of its own", () => {
 		const est = gold.predictions.estimates["time.total"];
-		const text = sbatchText(input(gold));
-		expect(text).toContain(`#SBATCH --time=${slurmTime((est?.hi ?? 0) + SETUP_S)}`);
-		expect(wallTime(est)).toBe(Math.ceil(((est?.hi ?? 0) + SETUP_S) / 300) * 300);
-		expect((wallTime(est) ?? 0) % 300).toBe(0);
-		expect(text).toContain("#SBATCH --gres=gpu:1");
+		const i = input(gold);
+		expect(i.plan.wallTimeHiS).toBe(est?.hi);
+		const text = sbatchText(i);
+		expect(text).toContain(`#SBATCH --time=${slurmTime(est?.hi ?? 0)}`);
+		expect(slurmTime(est?.hi ?? 0)).toMatch(/:[0-5][05]:00$/);
+		expect(text).toContain("#SBATCH --gpus=1");
 		expect(text).toContain("Planned on 1 x L4");
 		expect(text.trim().split("\n").at(-1)).toBe("python train.py");
 	});
@@ -266,7 +271,7 @@ describe("sbatch", () => {
 	});
 
 	it("asks for no GPU for an agent run", () => {
-		expect(sbatchText(input(agent))).not.toContain("--gres");
+		expect(sbatchText(input(agent))).not.toContain("--gpus");
 	});
 
 	it("asks for the cluster's limit, never more, and says the plan needs longer", () => {
@@ -282,10 +287,42 @@ describe("sbatch", () => {
 		expect(text).toContain("# 1 more change to make by hand or with Muse Code");
 	});
 
-	it("puts GPUs per node in --gres", () => {
+	it("asks for the plan's GPU count as the job's total, on any number of nodes", () => {
 		const two = { ...gold, env: { ...gold.env, nodes: 2 } } as LoadedRecord;
-		expect(sbatchText(input(two, { gpu_count: 8 }))).toContain("#SBATCH --gres=gpu:4");
-		expect(gpu(input(two, { gpu_count: 8 })).count).toBe(8);
+		const withGpus = { ...two, knobs: [...two.knobs, { ...two.knobs[0], id: "gpus", current: 1, label_key: "knob.gpus" }] } as LoadedRecord;
+		const text = sbatchText(input(withGpus, { gpus: 3 }));
+		expect(text).toContain("#SBATCH --nodes=2");
+		expect(text).toContain("#SBATCH --gpus=3");
+		expect(text).not.toContain("--gres");
+		expect(gpu(input(withGpus, { gpus: 3 })).count).toBe(3);
+	});
+
+	it("never asks past the time limit, even when rounding up would", () => {
+		const est = gold.predictions.estimates["time.total"];
+		const hi = est?.hi ?? 0;
+		const justOver = { ...gold, job: { ...gold.job, constraints: { ...gold.job.constraints, wall_time_cap_s: hi + 10 } } } as LoadedRecord;
+		const a = askedTime(input(justOver));
+		expect(a?.capped).toBe(false);
+		expect(a?.ask ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(hi + 10);
+		expect(sbatchText(input(justOver))).toContain(`#SBATCH --time=${slurmTime(hi + 10, "down")}`);
+		expect(sbatchText(input(justOver))).toContain("held to your limit");
+	});
+
+	it("edits a GPU count the script sets itself, rather than only asking Slurm for it", () => {
+		const launch = { file: "run.sh", line: 1, expr: "--nproc_per_node=4" };
+		const rec = withKnob("gpus", 4, launch);
+		const [c] = changes(input(rec, { gpus: 8 }));
+		expect(c.how).not.toBe("launch");
+		expect(editsText(input(rec, { gpus: 8 }))).toContain("run.sh line 1");
+	});
+
+	it("lists as a code change only what C counts as one, so not verified always covers it", () => {
+		const rec = withKnob("tpl", 1, null, { needs_code: false, patch_template: "x.y" });
+		const [c] = changes(input(rec, { tpl: 2 }));
+		expect(c.how).toBe("by_hand");
+		const code = withKnob("q", false, null, { needs_code: true, patch_template: "x.y" });
+		expect(changes(input(code, { q: true }))[0].how).toBe("code");
+		expect(verified(input(code, { q: true }))).toBe(false);
 	});
 });
 
@@ -295,7 +332,7 @@ describe("config", () => {
 		expect(plan.settings.batch_size).toBe(8);
 		expect(plan.changed).toEqual({ batch_size: { from: 4, to: 8 } });
 		expect(plan.gpu).toEqual({ type: "L4", count: 1 });
-		expect(plan.predicted["time.total"]).toMatchObject({ unit: "s", level: 0.9 });
+		expect(plan.predicted["time.total"]).toMatchObject({ unit: "s", lo: gold.predictions.estimates["time.total"]?.lo });
 		expect(plan.link).toBe("https://example.test/#/cockpit/tok");
 		expect(JSON.stringify(plan)).not.toContain(gold.record_id);
 	});
@@ -311,6 +348,21 @@ describe("config", () => {
 
 	it("marks a sample's numbers as illustrative", () => {
 		expect(JSON.parse(configText(input(gold, {}, { illustrative: true }))).note).toMatch(/illustrative/);
+	});
+
+	it("says not verified when a code change has no passed patch, in the plan, the edits and the batch file", () => {
+		const i = input(real, { packing: true });
+		expect(verified(i)).toBe(false);
+		expect(JSON.parse(configText(i))).toMatchObject({ code_changes_verified: false });
+		expect(editsText(i)).toContain("# Not verified:");
+		expect(sbatchText(i)).toContain("# Not verified:");
+		const ok = input(real, { batch_size: 8 });
+		expect(verified(ok)).toBe(true);
+		expect(editsText(ok)).not.toContain("Not verified");
+	});
+
+	it("leaves the link out when the cockpit has no reference to share", () => {
+		expect(JSON.parse(configText(input(gold, {}, { ref: null }))).link).toBeUndefined();
 	});
 });
 
@@ -336,23 +388,23 @@ describe("helpers", () => {
 
 	it("writes the CLI re-check with the record's entry point and arguments", () => {
 		const repo = (r: LoadedRecord, source: Record<string, unknown>) => ({ ...r, job: { ...r.job, source: { ...r.job.source, kind: "repo", ...source } } }) as LoadedRecord;
-		const text = recheckText({ record: repo(gold, { entrypoint: "src/my train.py", args: ["--name", "my run"] }) }) ?? "";
+		const text = recheckText(input(repo(gold, { entrypoint: "src/my train.py", args: ["--name", "my run"] }))) ?? "";
 		expect(text).toContain(`${CLI_INSTALL}\n`);
 		expect(text.trim().split("\n").at(-1)).toBe("preflight run . --entrypoint='src/my train.py' --out .preflight/records -- --name 'my run'");
-		expect(recheckText({ record: repo(real, { entrypoint: "-x.py" }) })?.trim().split("\n").at(-1)).toBe("preflight run . --entrypoint=-x.py --out .preflight/records");
+		expect(recheckText(input(repo(real, { entrypoint: "-x.py" })))?.trim().split("\n").at(-1)).toBe("preflight run . --entrypoint=-x.py --out .preflight/records");
 	});
 
 	it("offers no re-check for samples, notebooks or API runs", () => {
 		const as = (kind: string) => ({ ...real, job: { ...real.job, source: { ...real.job.source, kind } } }) as LoadedRecord;
-		expect(recheckText({ record: as("sample") })).toBeNull();
-		expect(recheckText({ record: as("notebook") })).toBeNull();
-		expect(recheckText({ record: { ...as("repo"), env: { ...real.env, backend: "api" } } as LoadedRecord })).toBeNull();
-		expect(recheckText({ record: as("upload") })).not.toBeNull();
+		expect(recheckText(input(as("sample")))).toBeNull();
+		expect(recheckText(input(as("notebook")))).toBeNull();
+		expect(recheckText(input({ ...as("repo"), env: { ...real.env, backend: "api" } } as LoadedRecord))).toBeNull();
+		expect(recheckText(input(as("upload")))).not.toBeNull();
 	});
 
 	it("leaves out arguments that hold control characters, and says so", () => {
 		const r = { ...real, job: { ...real.job, source: { ...real.job.source, kind: "repo", args: ["--name", "ok\r$(evil)"] } } } as LoadedRecord;
-		for (const text of [commandText({ record: r }), recheckText({ record: r }) ?? ""]) {
+		for (const text of [commandText(input(r)), recheckText(input(r)) ?? ""]) {
 			expect(text).not.toContain("evil");
 			expect(text).toContain("left out: add them yourself");
 		}
@@ -360,11 +412,11 @@ describe("helpers", () => {
 
 	it("quotes an entry point with a space that A's launch line leaves bare", () => {
 		const spaced = { ...real, job: { ...real.job, source: { ...real.job.source, entrypoint: "my train.py" }, script_map: { ...real.job.script_map, launch: "python my train.py" } } } as LoadedRecord;
-		expect(commandText({ record: spaced })).toBe("python 'my train.py'");
+		expect(commandText(input(spaced))).toBe("python 'my train.py'");
 	});
 
 	it("builds the command from the record, quoting arguments", () => {
 		const withArgs = { ...gold, job: { ...gold.job, source: { ...gold.job.source, args: ["--name", "my run"] } } };
-		expect(commandText({ record: withArgs })).toBe("python train.py --name 'my run'");
+		expect(commandText(input(withArgs))).toBe("python train.py --name 'my run'");
 	});
 });

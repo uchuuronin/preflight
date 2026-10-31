@@ -173,14 +173,24 @@ def test_agent_script_is_the_golden_agent_records_job():
 	)
 	assert c["MODEL"].startswith(knobs["model"])
 	# Known difference, raised with A: the golden record says 32,768; the script keeps a
-	# 26,000-token budget so the overflow lands at turn 12 (the next test).
+	# 26,000-token budget; by Muse Spark's count it overflows at turn 11 (header), and its own check at 12.
 	assert (c["CONTEXT_LIMIT"], knobs["context_limit"]) == (26_000, 32768)
 
 
-def test_agent_context_overflows_at_turn_12_with_short_replies():
+def test_agent_script_stays_the_size_a_measured():
+	"""The script echoes its own source every turn, so its size sets the growth. A measured the
+	growth behind turn 11 on Muse Spark (Oct 31) with the 7,641-byte version; keep within 300
+	bytes (about 4% of the growth) of it, or ask A to measure again."""
+	size = len((ZOO / "agent_eval_spark/run.py").read_bytes())
+	assert abs(size - 7641) <= 300, size
+
+
+def test_agent_scripts_own_check_stops_at_turn_12_with_short_replies():
 	"""Replay the history the script builds, offline: the user's task, then each turn one short
-	run_python call and its result, which echoes the script's own source. Uses the script's
-	token count (characters of each JSON message / 4) and its own text as the echo."""
+	run_python call and its result, which echoes the script's own source. Uses the script's own
+	token estimate (characters of each JSON message / 4) and its own text as the echo. By Muse
+	Spark's count the context passes the budget at turn 11 for a typical task (the header; derived
+	from A's per-turn counts, Oct 31), so the script's own check stops it a turn later, at 12."""
 	import json
 
 	path = ZOO / "agent_eval_spark/run.py"
