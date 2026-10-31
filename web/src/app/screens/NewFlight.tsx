@@ -12,8 +12,11 @@ import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
-import { DataUseNotice, dataUseAccepted } from "../DataUse";
-import { ACCEPT, ACCEPT_SCRIPTS, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";
+import { DATA_USE_OK_ID, DataUseNotice, dataUseAccepted } from "../DataUse";
+import { ACCEPT, ACCEPT_SCRIPTS, checkinBytes, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";
+
+/** A public GitHub repository link: A's runner fetches from GitHub only, at a pinned commit. */
+const GITHUB_REPO = /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/;
 
 /** D's notebook intake panel (addons/notebook); while it is on, notebooks check in there. */
 const NOTEBOOK_TAB = "notebook.intake";
@@ -50,7 +53,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [entry, setEntry] = useState<string | undefined>();
 	const [reading, setReading] = useState(false);
 	const idem = useRef<{ key: string; body: string | null }>({ key: newKey(), body: null });
-	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId() };
+	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId(), repoHint: useId(), repoError: useId() };
 	// Uploads open with live probes (the same flag the API checks before taking a job).
 	const uploadsOpen = flag("runner.queue");
 	// A notebook tab (D's intake panel) previews what will run, so notebooks go through it there.
@@ -61,7 +64,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [handed, setHanded] = useState<Record<string, JobRequest["source"] | null>>({});
 	const handedSource = intake !== "repo" && intake !== "upload" ? (handed[intake] ?? null) : null;
 	// Measured once per source, not on every keystroke elsewhere on the desk.
-	const handedTooBig = useMemo(() => handedSource !== null && new TextEncoder().encode(JSON.stringify(handedSource)).length > MAX_TOTAL_BYTES, [handedSource]);
+	const handedTooBig = useMemo(() => handedSource !== null && checkinBytes(handedSource) > MAX_TOTAL_BYTES, [handedSource]);
 	// One stable setSource per panel, so a panel may call it from an effect without a render loop.
 	const setters = useRef(new Map<string, (src: JobRequest["source"] | null) => void>());
 	const setterFor = (id: string) => {
@@ -72,6 +75,11 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		}
 		return fn;
 	};
+	const focusDataUse = () => {
+		const box = document.getElementById(DATA_USE_OK_ID);
+		box?.scrollIntoView({ block: "center", behavior: "smooth" });
+		box?.focus({ preventScroll: true });
+	};
 	const switchTab = (next: Intake) => {
 		if (next === intake) return;
 		setHanded((m) => (m[intake] == null ? m : { ...m, [intake]: null }));
@@ -80,8 +88,11 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	};
 
 	// GitHub only: A's runner fetches from GitHub, and the API pins the link to a commit there.
+	const repoOk = GITHUB_REPO.test(repo.trim());
+	// Say why Check in is grey as soon as the field holds something that isn't a repo link.
+	const repoBad = intake === "repo" && repo.trim() !== "" && !repoOk;
 	const canSubmit =
-		intake === "repo" ? /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/.test(repo.trim()) : intake === "upload" ? uploadsOpen && check.ok : uploadsOpen && handedSource !== null && !handedTooBig;
+		intake === "repo" ? repoOk : intake === "upload" ? uploadsOpen && check.ok : uploadsOpen && handedSource !== null && !handedTooBig;
 
 	const pick = async (list: FileList | null) => {
 		if (!list?.length) return;
@@ -176,9 +187,25 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								<div className="pf-pane">
 									<div className="pf-field">
 										<label htmlFor={ids.repo}>{t("newflight.repo.label")}</label>
-										<input id={ids.repo} type="url" inputMode="url" placeholder={t("newflight.repo.placeholder")} value={repo} onChange={(e) => setRepo(e.currentTarget.value)} />
+										<input
+											id={ids.repo}
+											type="url"
+											inputMode="url"
+											placeholder={t("newflight.repo.placeholder")}
+											value={repo}
+											aria-invalid={repoBad || undefined}
+											aria-describedby={repoBad ? `${ids.repoError} ${ids.repoHint}` : ids.repoHint}
+											onChange={(e) => setRepo(e.currentTarget.value)}
+										/>
 									</div>
-									<p className="pf-hint">{t("newflight.repo.hint")}</p>
+									{repoBad ? (
+										<p id={ids.repoError} className="pf-error pf-field__error">
+											{t("newflight.repo.invalid")}
+										</p>
+									) : null}
+									<p id={ids.repoHint} className="pf-hint">
+										{t("newflight.repo.hint")}
+									</p>
 								</div>
 							) : intake === "upload" ? (
 								<div className="pf-pane">
@@ -305,7 +332,17 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 							</p>
 						) : null}
 						<div className="pf-desk__foot">
-							<span className="pf-hint">{accepted ? t("newflight.cost_hint") : t("datause.needed")}</span>
+							{accepted ? (
+								// Source: measured, A's run a-smoke-l4-main-4 (Oct 28): the LoRA zoo script from
+								// upload to record in 6 min 45 s on an L4 (docs/status/a.md). No dollar figure until
+								// the sandbox's CPU and memory cost is read off the bill.
+								<span className="pf-hint">{t("newflight.cost_hint")}</span>
+							) : (
+								// On a phone the box is two panels down: the hint takes the visitor there.
+								<button type="button" className="pf-link pf-hint" onClick={focusDataUse}>
+									{t("datause.needed")}
+								</button>
+							)}
 							<button type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
 								{busy ? t("newflight.checking_in") : t("newflight.check_in")}
 							</button>

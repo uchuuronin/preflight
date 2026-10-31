@@ -120,7 +120,8 @@ function Cockpit() {
 					<header className="pf-cockpit__head">
 						<h1>{record.job.title ?? t(`lens.${record.job.lens}`)}</h1>
 						{isFixture(record) ? <span className="pf-tag">{t("cockpit.illustrative")}</span> : null}
-						{spent > 0 ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
+						{/* A sample's own cost is part of its fixture, not money anyone spent. */}
+						{spent > 0 && !isFixture(record) ? <span className="pf-tag">{t("cockpit.made_for", { cost: fmt(spent, "usd") })}</span> : null}
 						<Measured />
 						{headPanels.map((p) => (
 							<AddonBoundary key={p.id} id={p.id}>

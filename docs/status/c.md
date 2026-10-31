@@ -34,6 +34,10 @@
 - "No eval pass": A's `eval_off` marker first, missing eval stats as the fallback; asked B to own
   the function, and A to write the marker (nothing writes it yet).
 
+- D's audit, first four: the bad-link message, the hint that takes a phone visitor to "Got it",
+  one honest "illustrative" label for samples (no made-up costs on them), and the measured-run
+  line in place of "About 4 minutes, under $1". Stranger test 18 of 18, knob p95 66 ms at 4x.
+
 **Waiting**
 
 - Upload-to-map run (approved, about $0.35, $0.65 cap): from `main` once A says the runner is

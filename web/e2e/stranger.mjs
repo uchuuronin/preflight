@@ -140,7 +140,7 @@ try {
 	});
 	await page.reload({ waitUntil: "load" });
 	await page.getByLabel("GitHub repository").fill("github.com/karpathy/nanoGPT");
-	const checkIn = page.getByRole("button", { name: "Check in" });
+	const checkIn = page.getByRole("button", { name: "Check in", exact: true });
 	check("data-use notice is shown", await page.locator(".pf-datause").isVisible());
 	check("check-in waits for the notice", await checkIn.isDisabled());
 	await page.getByLabel("Got it").check();

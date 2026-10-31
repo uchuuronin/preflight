@@ -9,6 +9,8 @@ import { flag } from "../lib/flags";
 import { t } from "../lib/i18n";
 
 const SEEN_KEY = "pf.data_use.v1";
+/** The "Got it" box, so the check-in button's hint can take a visitor to it. */
+export const DATA_USE_OK_ID = "pf-datause-ok";
 
 /**
  * How long code and records are kept: only what A's runner does today (python/preflight/runner).
@@ -74,6 +76,7 @@ export function DataUseNotice({ onChange }: { onChange: (accepted: boolean) => v
 			</ul>
 			<label className="pf-datause__ok">
 				<input
+					id={DATA_USE_OK_ID}
 					type="checkbox"
 					checked={accepted}
 					onChange={(e) => {
