@@ -114,6 +114,12 @@ EXTRAS_KEYS = (
 	"train_loader_batches",
 	"epochs",
 	"planned_steps",
+	# the training set's row lengths in tokens, as the script tokenised them (B, Oct 30), over
+	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
+	"dataset_max_tokens",
+	"dataset_p999_tokens",
+	"dataset_rows_scanned",
+	"dataset_rows_total",
 )
 
 

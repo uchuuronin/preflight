@@ -296,6 +296,7 @@ class Recorder:
 		# how long the real run is, for B's time.total: the training loader's batches per epoch,
 		# and from an HF Trainer its epochs and the optimizer steps it plans (state.max_steps)
 		self.train_loader_batches: int | None = None
+		self._train_dataset = None
 		self.run_length: dict = {}
 		self._scalers: weakref.WeakSet = weakref.WeakSet()
 		self._attn_calls = 0
@@ -497,6 +498,7 @@ class Recorder:
 				with suppress(Exception):
 					n = len(it)
 				rec.train_loader_batches = n if isinstance(n, int) and n > 0 else None
+				rec._train_dataset = getattr(it, "_dataset", None)  # its row lengths, read at the end
 			rec._maybe_stop()
 			rec._sync()
 			t0 = rec._now()

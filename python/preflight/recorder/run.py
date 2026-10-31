@@ -192,6 +192,13 @@ def main(spec_path: str) -> int:
 		rec.uninstall()
 
 	summary = rec.summary()
+	# the training set's longest row (B, Oct 30), read after the hooks are gone so nothing is timed
+	try:
+		from preflight.recorder.dataset_len import measure
+
+		summary.update(measure(rec._train_dataset) if rec._train_dataset is not None else {})
+	except Exception as exc:
+		print(f"[preflight] dataset lengths not read: {type(exc).__name__}", file=sys.stderr, flush=True)
 	env = detect_env()
 	flops, util = mfu(summary, env)
 	summary["flops_per_step"] = flops

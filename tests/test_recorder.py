@@ -98,6 +98,9 @@ def test_hf_trainer_probe_measures_padding(tmp_path):
 	# the real run's length: the Trainer plans args.max_steps optimizer steps; no epoch count then
 	assert p.extras["planned_steps"] == 500 and "epochs" not in p.extras
 	assert p.extras["train_loader_batches"] > 0  # the Varlen set over per-device batches
+	# the training set's rows as the script built them: 8..47 tokens each (B, Oct 30)
+	assert 40 <= p.extras["dataset_max_tokens"] <= 47 and p.extras["dataset_rows_total"] == 10_000
+	assert 0 < p.extras["dataset_rows_scanned"] <= 10_000
 	assert len(p.stability.series["loss"]) == 4 + PHASE_STEPS
 
 
@@ -138,6 +141,8 @@ def test_extras_carry_the_counts_b_reads_by_name(loop_result):
 	assert x["tokens_per_step"] == 4 * 32
 	assert x["train_loader_batches"] == 100_000 // 4  # the training loader's length, one epoch
 	assert "planned_steps" not in x and "epochs" not in x  # a plain loop says neither
+	assert x["dataset_max_tokens"] == 32 == x["dataset_p999_tokens"]  # fixed blocks of seq_len
+	assert 0 < x["dataset_rows_scanned"] <= 100_000 == x["dataset_rows_total"]
 	assert x["samples_per_step"] == 4
 	assert x["micro_steps_per_step"] == 1
 
