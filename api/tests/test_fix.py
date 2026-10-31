@@ -14,7 +14,7 @@ import pytest
 from preflight_api.fix import muse, race
 from preflight_api.fix.templates import TEMPLATES, task_for
 
-KEY = "mk-test-0123456789abcdefABCDEF"
+KEY = "not-a-key-test-value-xxxxxxxxxx"
 
 
 def gate(tmp_path: Path, tool: str, tool_input: dict, cwd: Path | None = None) -> dict | None:
