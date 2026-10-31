@@ -29,7 +29,7 @@ import tempfile
 import time
 from pathlib import Path
 
-ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt"}
+ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt", "grpo_trl"}
 # derived: the whole measurement must end, and write its result, inside the run's own time limit
 # (remote-run.yml's timeout); Oct 28's first try ran into that limit with nothing written
 BUDGET_S = 40 * 60
@@ -124,6 +124,24 @@ def _bare(
 	return {"failed": tail[-3000:]}
 
 
+def _bare_hf_home(caches: Path) -> dict:
+	"""The bare run's own HF_HOME, with the probes' prefetched weights linked in. On a root box the
+	bare run is root and the recorder's probe is an unprivileged uid: sharing HF_HOME left root's
+	dataset locks there, and the probe failed on them (Oct 31, a-gt-lora-l4-4: "Permission denied:
+	/tmp/hf/datasets/..._tmp_hf_datasets_yahma___alpaca-cleaned....lock")."""
+	home = os.environ.get("HF_HOME")
+	if not home:
+		return {}
+	own = caches / "hf"
+	(own / "hub").mkdir(parents=True, exist_ok=True)
+	hub = Path(home) / "hub"
+	if hub.is_dir():
+		for entry in hub.iterdir():
+			if entry.name.startswith(("models--", "datasets--")) and not (own / "hub" / entry.name).exists():
+				(own / "hub" / entry.name).symlink_to(entry.resolve(), target_is_directory=True)
+	return {"HF_HOME": str(own)}
+
+
 def measure(
 	script_dir: Path,
 	*,
@@ -133,14 +151,17 @@ def measure(
 	install_requirements: bool = False,
 	budget_s: float = BUDGET_S,
 	bare_env: dict | None = None,
+	files: dict[str, str] | None = None,
 ) -> dict:
 	"""Both runs and the paired overhead, as one dict (what out/ground_truth_<script>.json holds).
-	bare_env: environment overrides for the bare run only (its own caches on a root box)."""
+	bare_env: environment overrides for the bare run only (its own caches on a root box).
+	files: the script's files, when the machine that runs it doesn't have script_dir (Modal's probe
+	image has no zoo: the ops app's local entrypoint reads them from the checkout and sends them)."""
 	from preflight.probes.local import ProbeSpec, run_probe
 	from preflight.recorder.overhead import report
 	from preflight.runner.sources import _read_tree
 
-	files = _read_tree(script_dir)
+	files = _read_tree(script_dir) if files is None else files
 	if "train.py" not in files:
 		raise ValueError(f"{script_dir} has no train.py")
 	caches = Path(tempfile.mkdtemp(prefix="gt-caches-"))
@@ -154,7 +175,7 @@ def measure(
 			f"bare run of {script_dir.name}: {bare_steps} optimizer steps, at most {budget_s * BARE_SHARE:.0f} s"
 		)
 		bare = _bare(work, bare_steps, install_requirements=install_requirements, caches=caches,
-			env=bare_env or {}, timeout_s=budget_s * BARE_SHARE)  # fmt: skip
+			env={**_bare_hf_home(caches), **(bare_env or {})}, timeout_s=budget_s * BARE_SHARE)  # fmt: skip
 		bare_wall = time.monotonic() - t0
 		_say(
 			f"bare run ended ({bare.get('ended') or 'failed'}) after {bare_wall:.0f} s, {bare.get('steps')} steps"
@@ -176,7 +197,10 @@ def measure(
 			"steps": r.probe.steps, "p50_s": r.probe.step_time.p50_s if r.probe.step_time else None,
 			"peak_allocated_bytes": r.probe.memory.peak_allocated_bytes if r.probe.memory else None,
 			"seconds": r.probe.cost.gpu_seconds if r.probe.cost else None,
-			"step_log": log, "log_tail": r.log_tail[-1500:]},
+			"by_phase": r.probe.step_time.by_phase if r.probe.step_time else {},
+			"rl": r.probe.rl.model_dump(mode="json") if r.probe.rl else None,
+			"generation": r.probe.generation.model_dump(mode="json") if r.probe.generation else None,
+			"extras": r.probe.extras, "step_log": log, "log_tail": r.log_tail[-1500:]},
 		"overhead": over}  # fmt: skip
 
 
@@ -184,7 +208,12 @@ def brief(res: dict) -> dict:
 	"""The result without the per-step lists, for a log line."""
 	out = {k: v for k, v in res.items() if k not in ("bare", "recorder")}
 	out["bare"] = {k: v for k, v in res["bare"].items() if k != "walls_s"}
-	out["recorder"] = {k: v for k, v in res["recorder"].items() if k not in ("step_log", "log_tail")}
+	out["recorder"] = {k: v for k, v in res["recorder"].items() if k not in ("step_log", "log_tail", "rl")}
+	rl = res["recorder"].get("rl")
+	if rl:  # the lists stay in the json; the log line gets their summary
+		rates = rl.get("pass_rate_per_prompt") or []
+		out["recorder"]["rl"] = {"group_size": rl.get("group_size"), "prompts": len(rates),
+			"truncation_rate": rl.get("truncation_rate"), "zero_spread_fraction": rl.get("zero_spread_fraction")}  # fmt: skip
 	return out
 
 
@@ -205,11 +234,8 @@ def main(argv: list[str] | None = None) -> int:
 		return 2
 	from preflight.cli.main import _run_caches_when_root
 
-	# as root: the bare run (root) and the probe (its own uid) each get fresh caches of their own
+	# as root the probe gets fresh caches of its own uid; measure() gives the bare run (root) its own
 	bare_env, own = {}, None
-	if os.geteuid() == 0:
-		own = Path(tempfile.mkdtemp(prefix="gt-root-", dir="/var/tmp"))
-		bare_env = {"HF_HOME": str(own / "hf")}
 	run = _run_caches_when_root()
 	try:
 		res = measure(ns.script_dir, bare_steps=ns.bare_steps, recorder_steps=ns.recorder_steps,

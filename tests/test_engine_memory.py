@@ -534,3 +534,20 @@ def test_hf_eval_logit_accumulation_grows_the_eval_peak():
 	a = m.breakdown(LLAMA2_7B, base, 1, 512).moments["eval"]
 	b = m.breakdown(LLAMA2_7B, acc, 1, 512).moments["eval"]
 	assert b - a == pytest.approx(500 * 512 * LLAMA2_7B.vocab_size * 2)
+
+
+def test_below_the_smallest_probe_the_range_still_reaches_that_probe():
+	# a steep line through the probes drops fast below them; the top of the range never goes under what the line
+	# gives at the smallest probe (memory doesn't shrink faster than the work)
+	setup = m.TrainingSetup(param_dtype="bf16")
+	probes = []
+	for b, extra in ((4, 2e9), (8, 6e9)):  # residual grows steeply: a fixed floor the line can't see
+		an = m.breakdown(GPT2_SMALL, setup, batch=b, seq=1024).allocator_peak
+		probes.append(m.MemoryProbe(tokens=b * 1024, measured_bytes=an + extra, analytical_bytes=an))
+	low = m.predict_peak(GPT2_SMALL, setup, batch=2, seq=1024, probes=probes, gpu="A100-SXM-80GB")
+	cal = m.Calibration.fit(probes)
+	an_q = m.breakdown(GPT2_SMALL, setup, batch=2, seq=1024).allocator_peak
+	floor = cal.correct(cal.min_tokens, an_q) + m.DEFAULT_CONTEXT_BYTES
+	assert low.status == "extrapolated" and low.hi >= floor > low.point * math.exp(
+		m.HALF_WIDTH_CALIBRATED * 1.25
+	)

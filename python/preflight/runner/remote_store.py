@@ -47,8 +47,10 @@ class DirBlobs:
 			tmp = p.with_suffix(".tmp")
 			tmp.write_text(json.dumps(files))
 			tmp.replace(p)
-			if self._commit:
-				self._commit()
+		else:
+			p.touch()  # uploaded again: its 30 days run from this job, the newest that uses it
+		if self._commit:
+			self._commit()
 
 	def get(self, key: str) -> dict[str, str]:
 		p = self._path(key)
@@ -144,6 +146,9 @@ class StoreMethods:
 
 	def reap(self) -> list[str]:
 		return self.store.reap()
+
+	def expire(self, older_than_s: float) -> int:
+		return len(self.store.expire(older_than_s))
 
 	def demand(self) -> dict:
 		"""Queued and running counts, and how long the oldest queued job has waited (the lateness

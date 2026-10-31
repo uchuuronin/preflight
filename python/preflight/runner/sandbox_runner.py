@@ -30,6 +30,7 @@ class SandboxRunner:
 		self._clock = clock
 		self._sb = None
 		self._gpu: str | None = None
+		self._image: str = "probe"
 		self._started = 0.0
 		self.gpu_seconds: dict[str, float] = {}  # sandbox lifetime per GPU: what Modal bills
 
@@ -39,12 +40,13 @@ class SandboxRunner:
 	def __exit__(self, *exc):
 		self.close()
 
-	def _sandbox(self, gpu: str):
-		if self._sb is not None and self._gpu == gpu:
+	def _sandbox(self, gpu: str, image: str = "probe"):
+		if self._sb is not None and self._gpu == gpu and self._image == image:
 			return self._sb
 		self.close()
-		self._sb = self._create(gpu)
-		self._gpu, self._started = gpu, self._clock()
+		# the probe image by its old one-argument call; another image (serving) by name
+		self._sb = self._create(gpu) if image == "probe" else self._create(gpu, image=image)
+		self._gpu, self._image, self._started = gpu, image, self._clock()
 		return self._sb
 
 	def close(self) -> None:
@@ -67,7 +69,7 @@ class SandboxRunner:
 	def __call__(self, spec: ProbeSpec, gpu: str, *, should_stop: Callable[[], bool]) -> ProbeResult:
 		t0 = self._clock()
 		try:
-			sb = self._sandbox(gpu)
+			sb = self._sandbox(gpu, spec.image)
 			proc = sb.exec(*ENTRY, timeout=int(spec.timeout_s + EXEC_SLACK_S))
 		except Exception:
 			log.warning("probe %s: no sandbox on %s", spec.probe_id, gpu, exc_info=True)

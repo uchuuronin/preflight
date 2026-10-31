@@ -3,6 +3,8 @@
 	preflight map train.py                      # the script map, as JSON
 	preflight run train.py -- --batch_size 16   # probes on this machine's GPU (or CPU)
 	preflight run path/to/project --entrypoint train.py --out records/
+	OPENAI_API_KEY=... preflight run agent_eval.py --agent-max-usd 5   # 30 of its tasks, your key
+	preflight watch records/<share>.json train.py -- --epochs 3   # the real run, against its bands
 
 `run` uses the same pipeline as the hosted app, with probes on the local device
 and no GPU bill; the record lands in --out as <share_token>.json.
@@ -51,10 +53,32 @@ def main(argv: list[str] | None = None) -> int:
 	r.add_argument(
 		"--require-gpu", action="store_true", help="fail if the probes ran on the CPU (no GPU was visible)"
 	)
+	r.add_argument(
+		"--agent-max-usd",
+		type=float,
+		help="agent and API runs: sample 30 tasks through a local proxy holding your OPENAI_API_KEY, "
+		"spending at most this many dollars of it",
+	)
 	r.epilog = "Arguments for the script go after --, e.g. preflight run train.py -- --batch_size 16"
+	w = sub.add_parser(
+		"watch", help="run the script for real, streaming a live record against its predictions"
+	)
+	w.add_argument("record", type=Path, help="the flight record whose predictions the run is checked against")
+	w.add_argument("path", type=Path, help="the script to run")
+	w.add_argument("--out", type=Path, default=Path("records"))
+	w.add_argument(
+		"--total-steps", type=int, help="optimizer steps in the whole run, for the time.total check"
+	)
+	w.add_argument("--window", type=int, help="steps per update (default 20)")
 	argv = list(sys.argv[1:] if argv is None else argv)
 	script_args = argv[argv.index("--") + 1 :] if "--" in argv else []
 	ns = ap.parse_args(argv[: argv.index("--")] if "--" in argv else argv)
+	if ns.cmd == "watch":
+		from preflight.recorder import inflight
+
+		extra = [*(["--total-steps", str(ns.total_steps)] if ns.total_steps else []),
+			*(["--window", str(ns.window)] if ns.window else [])]  # fmt: skip
+		return inflight.main([str(ns.record), str(ns.out), str(ns.path), *extra, "--", *script_args])
 	try:
 		files, entry = _files(ns.path, ns.entrypoint)
 		if ns.cmd == "map":
@@ -65,7 +89,11 @@ def main(argv: list[str] | None = None) -> int:
 		ctx = _Ctx()
 		store = LocalRecordWriter(ns.out)
 		d = Deps(
-			records=store, runner=local_runner, reader=store, install_requirements=ns.install_requirements
+			records=store,
+			runner=local_runner,
+			reader=store,
+			install_requirements=ns.install_requirements,
+			agent=_agent_sampler(ns.agent_max_usd),
 		)
 		try:
 			rec = run_pipeline({"source": source}, ctx, d)
@@ -85,12 +113,38 @@ def main(argv: list[str] | None = None) -> int:
 	]  # fmt: skip
 	backend = rec.env.backend if rec.env is not None else None
 	gpu = rec.env.gpu.name if rec.env is not None and rec.env.gpu is not None else None
-	print(json.dumps({"record": str(ns.out / f"{rec.share_token}.json"), "lens": rec.job.lens,
-		"backend": backend, "gpu": gpu, "probes": summary}, indent=2))  # fmt: skip
+	out = {"record": str(ns.out / f"{rec.share_token}.json"), "lens": rec.job.lens, "backend": backend,
+		"gpu": gpu, "probes": summary}  # fmt: skip
+	if rec.agent_sample is not None:
+		out["agent_tasks"] = len(rec.agent_sample.tasks)
+		out["agent_sample_usd"] = round(sum(t.cost_usd or 0 for t in rec.agent_sample.tasks), 4)
+	print(json.dumps(out, indent=2))
+	if rec.job.lens == "agent":
+		if rec.agent_sample is None:
+			print("preflight: an agent run; add --agent-max-usd 5 (and OPENAI_API_KEY) to sample 30 of its "
+				"tasks with your key", file=sys.stderr)  # fmt: skip
+			return 2
+		return 0  # no GPU probes in an agent run
 	if ns.require_gpu and backend not in ("cuda", "rocm"):
 		print(f"preflight: the probes ran on {backend or 'nothing'}, not a GPU", file=sys.stderr)
 		return 3
 	return 0
+
+
+def _agent_sampler(max_usd: float | None):
+	"""Agent and API scripts: 30 tasks through a local proxy that holds your key (the script gets a
+	dummy one), only when you name a spending cap. The provider is PREFLIGHT_AGENT_UPSTREAM, else
+	your OPENAI_BASE_URL, else OpenAI."""
+	key = os.environ.get("OPENAI_API_KEY")
+	if not key or not max_usd or max_usd <= 0:
+		return None
+	from preflight.runner.agent_jobs import local_sampler
+
+	upstream = (os.environ.get("PREFLIGHT_AGENT_UPSTREAM") or os.environ.get("OPENAI_BASE_URL")
+		or "https://api.openai.com/v1")  # fmt: skip
+	print(f"preflight: an agent run samples tasks through {upstream} with your key, at most ${max_usd:.2f}",
+		file=sys.stderr)  # fmt: skip
+	return local_sampler(upstream, key, max_usd_total=max_usd)
 
 
 def _run_caches_when_root() -> Path | None:

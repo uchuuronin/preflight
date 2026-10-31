@@ -268,3 +268,42 @@ def test_one_prune_pass_removes_at_most_its_share_oldest_first(tmp_path):
 	assert len(removed) == max(PRUNE_MIN_GUARD, 25)
 	left = {p.name for p in tmp_path.iterdir()}
 	assert "f" * 22 + ".json" in left and len(left) == 101 - len(removed)
+
+
+def test_a_serving_probe_gets_the_serving_image_and_its_own_sandbox():
+	from dataclasses import replace
+
+	made = []
+
+	def create(gpu, image="probe"):
+		made.append((FakeSandbox(gpu), image))
+		return made[-1][0]
+
+	with SandboxRunner(create) as run:
+		run(spec("p1"), "L4", should_stop=lambda: False)
+		run(replace(spec("p2"), image="serving"), "L4", should_stop=lambda: False)
+		run(replace(spec("p3"), image="serving"), "L4", should_stop=lambda: False)
+	assert [(s.gpu, s.execs, img) for s, img in made] == [("L4", 1, "probe"), ("L4", 2, "serving")]
+	assert all(s.terminated for s, _ in made)
+
+
+def test_a_serving_scripts_probes_ask_for_the_serving_image_and_key_the_cache_apart(tmp_path):
+	from dataclasses import replace
+	from pathlib import Path
+
+	from preflight.harness.static import map_static
+	from preflight.probes.plan import PlannedProbe
+	from preflight.runner.pipeline import Deps, _spec, cache_key
+	from preflight.runner.records import LocalRecordWriter
+	from preflight.runner.sources import Fetched
+
+	root = Path(__file__).resolve().parents[1] / "zoo" / "serving_vllm"
+	files = {"serve.py": (root / "serve.py").read_text()}
+	sm = map_static(files, entrypoint="serve.py")
+	assert sm.lens == "serving"
+	deps = Deps(records=LocalRecordWriter(tmp_path))
+	s = _spec(
+		Fetched(files=files, entrypoint="serve.py"), sm, PlannedProbe(probe_id="p1", role="current"), deps
+	)
+	assert s.image == "serving"
+	assert cache_key(s, "L4", "t") != cache_key(replace(s, image="probe"), "L4", "t")

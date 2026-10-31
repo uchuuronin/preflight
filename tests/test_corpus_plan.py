@@ -249,6 +249,26 @@ def test_ledger_reads_small_summaries(tmp_path):
 	assert meta.exists() and "ops" not in meta.read_text()
 
 
+def test_rows_filed_under_a_sibling_board_count_as_done(tmp_path):
+	# Oct 31: an A100-SXM-80GB request ran on A100-PCIe-80GB, the ledger saw no progress and the sweep stopped
+	st = s.ResultStore(tmp_path)
+	st.write_once("kernels", "A100-PCIe-80GB", "a", {"status": "ok", "gpu_seconds": 13.0})
+	st.write_once("kernels", "A100-SXM-80GB", "b", {"status": "oom", "gpu_seconds": 2.0})
+	st.write_once(
+		"kernels", "A100-SXM-80GB", "a", {"status": "ok", "gpu_seconds": 11.0}
+	)  # both boards: done once
+	st.write_once("kernels", "L4", "c", {"status": "ok", "gpu_seconds": 5.0})
+	led = sw.ledger_from(st, "kernels", "A100-80GB")
+	assert sorted(led["done"]) == ["a", "b"]
+	assert led["gpu_seconds"] == pytest.approx(26.0)  # every attempt on either board was paid for
+	assert sw.ledger_from(st, "kernels", "L4")["done"] == ["c"]  # no sibling, no change
+	assert sw.landing_gpus("A100-80GB") == ("A100-SXM-80GB", "A100-PCIe-80GB")
+	# an error being retried on one board doesn't undo an ok row on the other
+	st.write_once("kernels", "A100-SXM-80GB", "e", {"status": "error", "gpu_seconds": 1.0})
+	st.write_once("kernels", "A100-PCIe-80GB", "e", {"status": "ok", "gpu_seconds": 9.0})
+	assert "e" in sw.ledger_from(st, "kernels", "A100-80GB", retry_errors=True)["done"]
+
+
 def test_local_driver_counts_billing_overhead(tmp_path):
 	st = s.ResultStore(tmp_path)
 	cfgs = c.kernel_configs(10, seed=8)
@@ -587,3 +607,21 @@ def test_uptime_ledger_records_a_stop_when_the_sweep_finishes(tmp_path):
 	)
 	last = ledger.rows()[-1]
 	assert last["event"] == "stop" and last["reason"] == "finished" and last["configs"] == 2
+
+
+def test_a_late_starting_container_still_runs_what_its_bill_covers():
+	"""Oct 30, A100: no history (600 s deadline), batch of 1, ~150 s cold start. The container quit before its first
+	config, so the wave billed three A100s for nothing."""
+	from preflight.corpus import sweep as sw
+
+	dispatched, deadline = 1_000.0, 600.0
+	end_at = sw.wave_end_at(dispatched, 1, deadline)
+	assert sw.may_start_config(dispatched + 150.0, deadline, end_at)  # a 150 s start-up still leaves room
+	assert sw.may_start_config(
+		dispatched + sw.STARTUP_S, deadline, end_at
+	)  # up to the start-up the bill assumed
+	assert not sw.may_start_config(dispatched + sw.STARTUP_S + 1.0, deadline, end_at)
+	# and Modal's own cut-off comes after the last config could end, with the margin, all inside the bill
+	cap = sw.container_timeout_s(1, deadline)
+	assert end_at - dispatched + sw.END_MARGIN_S == cap
+	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.SCALEDOWN_S)

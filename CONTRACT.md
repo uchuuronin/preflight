@@ -1,4 +1,4 @@
-# Preflight contract v0.4.0
+# Preflight contract v0.5.0
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,15 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.5.0 (Oct 31, additive): `Campaign` gains the planner's intervals (B's request): `gpu_hours`, `usd`
+  and `finish_s` as `Estimate` for the runs that go ahead, `grid_gpu_hours` and `grid_usd` for the whole
+  grid before budget cuts, `quota` (`CampaignQuota`), `asha` (`CampaignAsha` with `AshaRung`s) and
+  `notes`; `CampaignCell` gains `time` and `start_s` (`Estimate`, for C's calendar). `JobRequest.patch`
+  (a unified diff, at most 256 KiB, probe and verify only) carries C's fix-loop patches to A's runner.
+  0.4.0 records load unchanged.
+- Rules (Oct 30, Chiya): everything about a job (upload, record, cached probe results with their error
+  text, job index) is deleted 30 days after the job; a repo's code is deleted as soon as it's read.
+  Every push needs Chiya's yes in chat, batch or not; reviewers are read-only.
 - 0.4.0 (Oct 28, additive; A's fields, asked for by C and approved through the PM): `JobRequest.mode` (plan, probe, verify, sample_more; default plan), `knobs`,
   `tasks` and `purpose`, with `Source.kind` "record" and `Source.record_ref` (a share token or
   `sample:<id>`); a job on a record writes a new record whose `parent_id` is it. `Knob.affects`

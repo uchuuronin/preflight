@@ -429,7 +429,8 @@ def test_the_cli_as_root_gives_each_run_fresh_caches_it_never_walks(monkeypatch)
 	from preflight.cli.main import _run_caches_when_root
 
 	for v in ("HF_HOME", "PREFLIGHT_PIP_CACHE", "PREFLIGHT_DEPS_DIR", "PREFLIGHT_PROBE_UID"):
-		monkeypatch.delenv(v, raising=False)
+		monkeypatch.setenv(v, "")  # registers the undo, so what the CLI sets is gone after the test
+		monkeypatch.delenv(v)
 	run = _run_caches_when_root()
 	try:
 		uid = int(os.environ["PREFLIGHT_PROBE_UID"])
@@ -442,3 +443,59 @@ def test_the_cli_as_root_gives_each_run_fresh_caches_it_never_walks(monkeypatch)
 		shutil.rmtree(again)
 	finally:
 		shutil.rmtree(run)
+
+
+AGENT_SCRIPT = """from openai import OpenAI
+
+client = OpenAI()
+for task in range(500):
+	client.chat.completions.create(model="muse-spark-1.3", messages=[{"role": "user", "content": str(task)}])
+"""
+
+
+class FakeSampler:
+	"""Stands in for runner/agent_jobs.local_sampler: k tasks with fresh ids, and what it was asked."""
+
+	def __init__(self):
+		self.calls = []
+
+	def __call__(self, fetched, sm, *, k, skip_keys=(), offered_first=(), run_id="s1", should_stop=None):
+		from preflight.schema import AgentSample
+
+		self.calls.append({"k": k, "skip_keys": set(skip_keys), "offered_first": offered_first, "run_id": run_id,
+			"entry": fetched.entrypoint})  # fmt: skip
+		n = len(self.calls)
+		tasks = [{"task_id": f"{run_id}-{n:06d}{i:06d}", "turns": 3, "input_tokens": 900, "output_tokens": 120,
+			"latency_s": 4.0, "cost_usd": 0.01 + 0.001 * i} for i in range(k)]  # fmt: skip
+		return AgentSample.model_validate(
+			{"tasks": tasks, "population": 500, "selection": f"first {k} tasks"}
+		)
+
+
+def test_an_agent_run_is_sampled_and_a_top_up_adds_twenty_more(tmp_path):
+	sampler = FakeSampler()
+	d = _deps(tmp_path, LossRunner(), agent=sampler)
+	request = externalise_files({"source": {"kind": "upload", "files": {"run.py": AGENT_SCRIPT}}}, d.blobs)
+	rec = run_pipeline(request, _Ctx(), d)
+	assert rec.job.lens == "agent" and not rec.probes
+	assert (
+		len(rec.agent_sample.tasks) == 30
+		and sampler.calls[0]["k"] == 30
+		and not sampler.calls[0]["skip_keys"]
+	)
+	d.records.put(rec)
+	more = run_pipeline(_on(rec, "sample_more", tasks=20), _Ctx(), d)
+	c = sampler.calls[1]
+	assert c["k"] == 20 and len(c["skip_keys"]) == 30 and c["run_id"] == "s2" and len(c["offered_first"]) == 0
+	assert more.parent_id == rec.record_id and len(more.agent_sample.tasks) == 50
+	assert "top-up of 20" in more.agent_sample.selection
+
+
+def test_an_agent_script_that_never_calls_the_proxy_fails_with_a_reason(tmp_path):
+	from preflight.schema import AgentSample
+
+	d = _deps(tmp_path, LossRunner(), agent=lambda *a, **kw: AgentSample(tasks=[], population=None))
+	request = externalise_files({"source": {"kind": "upload", "files": {"run.py": AGENT_SCRIPT}}}, d.blobs)
+	with pytest.raises(PermanentError) as exc:
+		run_pipeline(request, _Ctx(), d)
+	assert exc.value.code == "probe.no_agent_calls"

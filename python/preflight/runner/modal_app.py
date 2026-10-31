@@ -89,7 +89,7 @@ PROBE_PACKAGES = [
 	"transformers==4.46.3",
 	"accelerate==1.1.1",
 	"peft==0.13.2",
-	"trl==0.12.1",
+	"trl==0.14.0",  # GRPOTrainer arrived in 0.14 (zoo/grpo_trl)
 	"datasets==3.1.0",
 	"safetensors==0.4.5",
 	"psutil==6.1.0",
@@ -114,9 +114,11 @@ _base = modal.Image.debian_slim(python_version="3.11").env(
 	{"PYTHONPATH": REMOTE_PKG, "PREFLIGHT_ZOO": "/root/zoo", "PREFLIGHT_GPU_CEILING": GPU_CEILING}
 )
 # The worker reads flags as C's API does (runner/flags.py) and ships the same flag files as the
-# API's image (api/app.py: flags.json only, with PREFLIGHT_ENV=production). Both are baked in, so
-# changing a flag takes a deploy of the runner as well as the API.
+# API's image (api/app.py), with PREFLIGHT_ENV=production: flags.json, then flags.production.json
+# (Chiya, Oct 30) when the repo has it. Both are baked in, so changing a flag takes a deploy of
+# the runner as well as the API; tests/test_pipeline.py holds the two images to the same files.
 FLAG_ENV = "production"  # api/app.py's PREFLIGHT_ENV
+FLAG_OVERRIDE = FLAGS_SRC.parent / f"flags.{FLAG_ENV}.json"
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
@@ -125,6 +127,8 @@ worker_image = (
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 	.add_local_file(FLAGS_SRC, f"{REMOTE_PKG}/flags.json")
 )
+if FLAG_OVERRIDE.is_file():
+	worker_image = worker_image.add_local_file(FLAG_OVERRIDE, f"{REMOTE_PKG}/flags.{FLAG_ENV}.json")
 probe_image = (
 	_base.apt_install("git")
 	.pip_install(*PROBE_PACKAGES)
@@ -139,6 +143,36 @@ probe_image = (
 	)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
+
+# serving probes only (zoo/serving_vllm): vLLM 0.6.4.post1 pins torch 2.5.1 and needs numpy below 2,
+# and its pyairports dependency has no wheel, so it can't share the probe image (numpy 2, wheels
+# only). Its own pins; the probe image above is unchanged.
+SERVING_PACKAGES = [
+	"vllm==0.6.4.post1",
+	"torch==2.5.1",
+	"transformers==4.46.3",
+	"numpy<2",
+	"datasets==3.1.0",
+	"psutil==6.1.0",
+	# what the recorder imports in the sandbox, pinned as in the probe image
+	"nvidia-ml-py==12.560.30",
+	"pydantic>=2.8,<3",
+	"httpx>=0.27",
+]
+serving_image = (
+	_base.apt_install("git")
+	.pip_install(*SERVING_PACKAGES)
+	.env(
+		{
+			"HF_HOME": HF_HOME,
+			"PREFLIGHT_WEIGHTS_HUB": f"{WEIGHTS_DIR}/hf/hub",
+			"PREFLIGHT_SANDBOX_DIR": "/tmp",
+			"PREFLIGHT_PROBE_UID": "61000",
+		}
+	)
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+)
+SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image}
 
 jobs_dict = modal.Dict.from_name("preflight-jobs", create_if_missing=True)
 cache_dict = modal.Dict.from_name("preflight-probe-cache", create_if_missing=True)
@@ -161,6 +195,7 @@ def image_tag() -> str:
 
 	pkg = Path(preflight.__file__).resolve().parent  # the installed package, here or in the container
 	h = hashlib.sha256("\n".join(PROBE_PACKAGES).encode())
+	h.update("\n".join(SERVING_PACKAGES).encode())  # the serving image's pins key its probes too
 	files = [p for sub in ("recorder", "probes") for p in sorted((pkg / sub).glob("*.py"))]
 	if not files:  # never key the cache on nothing: a wrong path would make every probe a hit
 		raise RuntimeError(f"no recorder or probe sources under {pkg}")
@@ -171,20 +206,25 @@ def image_tag() -> str:
 
 
 class DictCache:
-	"""Probe cache over a Modal Dict: content-hash key, probe JSON value."""
+	"""Probe cache over a Modal Dict: content-hash key, the probe and when it was cached (entries
+	expire at 30 days, runner/retention.py)."""
 
 	def __init__(self, d):
 		self._d = d
 
 	def get(self, key: str) -> dict | None:
+		from preflight.runner.retention import cached_probe
+
 		try:
-			return self._d.get(key)
+			return cached_probe(self._d.get(key))
 		except Exception:
 			return None  # a cache outage costs a probe run, never a job
 
 	def put(self, key: str, probe: dict) -> None:
+		from preflight.runner.retention import cache_entry
+
 		with contextlib.suppress(Exception):
-			self._d[key] = probe
+			self._d[key] = cache_entry(probe)
 
 
 # ---------------------------------------------------------------- the job store
@@ -353,6 +393,10 @@ class JobStoreService:
 		return self.m.reap()
 
 	@modal.method()
+	def expire(self, older_than_s: float) -> int:
+		return self.m.expire(older_than_s)
+
+	@modal.method()
 	def demand(self) -> dict:
 		return self.m.demand()
 
@@ -364,16 +408,21 @@ def _sandbox_factory(owner=None):
 	"""The probe sandbox, created inside `owner` (this app by default; the startup check passes its
 	own running app). gpu "cpu" makes a GPU-less sandbox with every other setting the same."""
 
-	def create(gpu: str):
+	def create(
+		gpu: str, extra_egress: list[str] | tuple = (), image: str = "probe", timeout_s: int | None = None
+	):
+		"""extra_egress: hosts beyond EGRESS, only the agent proxy's tunnel (runner/agent_jobs.py).
+		image: "probe", or "serving" for vLLM probes (SANDBOX_IMAGES). timeout_s: the sandbox's
+		lifetime, 30 min unless the caller's run needs longer (an agent sample)."""
 		from preflight.probes.gpu_choice import modal_gpu
 
 		return modal.Sandbox.create(
 			app=owner if owner is not None else app,
-			image=probe_image,
+			image=SANDBOX_IMAGES[image],
 			gpu=None if gpu == "cpu" else modal_gpu(gpu),
-			timeout=30 * 60,
+			timeout=timeout_s or 30 * 60,
 			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes
-			outbound_domain_allowlist=EGRESS,
+			outbound_domain_allowlist=[*EGRESS, *(h for h in extra_egress if h)],
 			volumes={WEIGHTS_DIR: _read_only(weights_vol)},
 			workdir="/tmp",
 		)
@@ -429,39 +478,96 @@ def run_worker() -> int:
 PRUNE_EVERY_S = 86_400  # PM decision (Oct 28): records go after 30 days, checked once a day
 
 
-def _prune_records_daily() -> list[str]:
-	"""Once a day (the last run's time is kept in the jobs Dict), delete records older than 30 days."""
+def _prune_records_daily() -> dict:
+	"""Once a day (the last run's time is kept in the jobs Dict), delete everything about a job
+	older than 30 days: its record, its uploaded files, its cached probe results and its entry in
+	the job index (runner/retention.py). Each part runs even if another fails."""
+	import itertools
+	import json
 	import time
 
 	from preflight.runner.records import prune
+	from preflight.runner.retention import TTL_S, prune_cache, prune_uploads, records_text, upload_refs
 
 	last = jobs_dict.get("records_pruned_at") or 0
 	if time.time() - last < PRUNE_EVERY_S:
-		return []
+		return {}
 	jobs_dict["records_pruned_at"] = time.time()  # first, so a failure doesn't retry every minute
-	records_vol.reload()
-	removed = prune(RECORDS_DIR)
-	if removed:
-		records_vol.commit()
-		print(f"pruned {len(removed)} records older than 30 days", flush=True)
-	return removed
+	out: dict = {}
+
+	def part(name, fn):
+		try:
+			out[name] = fn()
+		except Exception as exc:
+			out[name] = f"failed: {type(exc).__name__}"
+			print(f"cleanup of {name} failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+
+	def records():
+		records_vol.reload()
+		removed = prune(RECORDS_DIR)
+		if removed:
+			records_vol.commit()
+		return len(removed)
+
+	def uploads():
+		uploads_vol.reload()
+		records_vol.reload()
+		state = jobs_dict.get("state") or {}
+		live = [json.dumps(j.get("request")) for j in state.get("jobs", []) if isinstance(j, dict)]
+		keep = upload_refs(itertools.chain(records_text(RECORDS_DIR), live))  # one record at a time
+		removed = prune_uploads(UPLOADS_DIR, keep=keep)
+		if removed:
+			uploads_vol.commit()
+		return len(removed)
+
+	def cache():
+		removed = 0
+		for key in list(cache_dict.keys()):  # one entry at a time: the values can be large
+			removed += len(prune_cache([(key, cache_dict.get(key))], cache_dict.pop))
+		return removed
+
+	def jobs():
+		return JobStoreService().expire.remote(TTL_S)
+
+	for name, fn in (("records", records), ("uploads", uploads), ("probe_cache", cache), ("job_index", jobs)):
+		part(name, fn)
+	print(f"daily cleanup (older than 30 days): {out}", flush=True)
+	return out
+
+
+CLEANUP_TIMEOUT_S = 1800  # guess: a first pass over a month of records, uploads and cache entries
 
 
 @app.function(
-	image=worker_image, schedule=modal.Period(minutes=1), timeout=120, volumes={RECORDS_DIR: records_vol}
+	image=worker_image,
+	timeout=CLEANUP_TIMEOUT_S,
+	volumes={RECORDS_DIR: records_vol, UPLOADS_DIR: uploads_vol},
 )
+def cleanup() -> dict:
+	"""The daily 30-day cleanup, in its own container so it never holds up the minute's tick."""
+	if deployed_here()[0] is not True:  # a temporary copy never deletes shared data
+		return {}
+	return _prune_records_daily()
+
+
+@app.function(image=worker_image, schedule=modal.Period(minutes=1), timeout=120)
 def tick() -> dict:
 	"""Free leases whose workers died; start workers for jobs waiting in the queue; once a day,
-	delete records older than 30 days."""
+	start the cleanup of everything about a job older than 30 days."""
 	import time
 
-	pruned: list[str] = []
-	try:  # a failed cleanup never holds up the queue, but it says so
-		due = time.time() - (jobs_dict.get("records_pruned_at") or 0) >= PRUNE_EVERY_S
-		if due and deployed_here()[0] is True:  # a temporary copy's tick never deletes shared records
-			pruned = _prune_records_daily()
+	cleaning = False
+	try:  # a failed start never holds up the queue, but it says so
+		now = time.time()
+		due = now - (jobs_dict.get("records_pruned_at") or 0) >= PRUNE_EVERY_S
+		# one cleanup at a time: it marks itself done only once it starts, which can take a minute
+		busy = now - (jobs_dict.get("cleanup_started_at") or 0) < CLEANUP_TIMEOUT_S
+		if due and not busy and deployed_here()[0] is True:  # a temporary copy never deletes shared data
+			jobs_dict["cleanup_started_at"] = now
+			cleanup.spawn()
+			cleaning = True
 	except Exception as exc:
-		print(f"record cleanup failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+		print(f"cleanup start failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
 	svc = JobStoreService()
 	reaped = svc.reap.remote()
 	d = svc.demand.remote()
@@ -469,4 +575,4 @@ def tick() -> dict:
 		run_worker.spawn()
 	if d["oldest_queued_s"] > 600:
 		print(f"ALERT backlog: oldest queued job has waited {d['oldest_queued_s']:.0f} s", flush=True)
-	return {"reaped": reaped, "pruned": len(pruned), **d}
+	return {"reaped": reaped, "cleanup_started": cleaning, **d}
