@@ -70,8 +70,11 @@ def test_the_engine_reports_the_uncertain_range_until_the_switch(monkeypatch):
 	assert (oom.lo, oom.hi) == (0.05, 0.95) and "uncertain (5–95%)" in oom.reason
 	assert oom.point == 0.4  # the fit map and the ranking still read the model's value
 	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=_bins(10)))
-	oom = api._from_memory_estimate(est, memory.MODEL_ID).oom
+	oom = api._from_memory_estimate(est, memory.MODEL_ID, "from 19 held-out runs").oom
 	assert oom.lo == oom.hi == 0.4 and "uncertain" not in oom.reason
+	# a P(OOM) from the simulated band is never what the bins verified: it stays uncertain
+	oom = api._from_memory_estimate(est, memory.MODEL_ID, "simulated band").oom
+	assert (oom.lo, oom.hi) == (0.05, 0.95)
 
 
 def test_the_installed_table_carries_the_bins_the_switch_reads():

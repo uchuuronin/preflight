@@ -300,15 +300,26 @@ def test_more_gpus_add_communication(ft):
 	assert (eight["time.step"].hi - eight["time.step"].lo) >= (one["time.step"].hi - one["time.step"].lo)
 
 
-def test_preemption_never_loses_more_than_the_run(pt):
+def test_preemption_without_a_checkpoint_in_the_run_restarts_it_from_zero(pt):
+	m = 4 * 3600.0
 	c = pt.job.constraints
-	c = c.model_copy(
-		update={"preemption": c.preemption.model_copy(update={"kind": "poisson", "mtti_s": 4 * 3600.0})}
-	)
+	c = c.model_copy(update={"preemption": c.preemption.model_copy(update={"kind": "poisson", "mtti_s": m})})
 	rec = pt.model_copy(update={"job": pt.job.model_copy(update={"constraints": c})})
-	p = api.predict(rec, {"checkpoint_every": 100000}).root
-	per_interrupt = p["risk.preemption_loss"].point / (p["time.total"].point / (4 * 3600.0))
-	assert per_interrupt <= p["time.total"].point / 2 + 60 + (c.preemption.grace_s or 0) + 1e-6
+	p = api.predict(
+		rec, {"checkpoint_every": 100000}
+	).root  # an interval longer than the run: capped at the run
+	t, r = p["time.total"].point, 60 + (c.preemption.grace_s or 0)
+	# restart from zero, interruptions during redone work included: (M + R)(e^(T/M) - 1) - T
+	assert p["risk.preemption_loss"].point == pytest.approx((m + r) * math.expm1(t / m) - t)
+	assert (
+		"restarts the run" not in p["risk.preemption_loss"].reason
+	)  # the script does checkpoint, just rarely
+	# with frequent checkpoints it is close to Young/Daly's first order: T/M x (half an interval + restart)
+	q = api.predict(rec, {"checkpoint_every": 100}).root
+	step = q["time.step"].point
+	assert q["risk.preemption_loss"].point == pytest.approx(
+		q["time.total"].point / m * (50 * step + r), rel=0.05
+	)
 
 
 def test_log_axis_from_zero():
@@ -412,13 +423,16 @@ def test_model_cards_say_where_their_calibration_comes_from(ft):
 	from preflight.engine import conformal
 
 	cards = {c.id: c for c in api.fill_predictions(ft).models}
-	held = {t for t, *_ in conformal.TABLE.cells}  # the targets the installed table covers
+	gpu, lens = api._env_gpu(ft), ft.job.lens
 	for mid, c in cards.items():
 		target = api._CARD_TARGET.get(mid)
-		if target in held and mid in api._CARD_SCORED:
+		# held out only where this record's own band is: a fine-tune's step time has no cell, so its card says simulated
+		if target and conformal.TABLE.lookup(target, gpu, lens) is not None and mid in api._CARD_SCORED:
 			assert c.notes.startswith("calibration: held_out") and c.coverage is not None
 		else:
 			assert c.notes.startswith("calibration: simulated") and c.coverage is None
+	assert cards[api.memory.MODEL_ID].notes.startswith("calibration: held_out")
+	assert cards[api.steptime.MODEL_ID_SAME].notes.startswith("calibration: simulated")
 
 
 def test_unknown_probe_gpu_uses_its_reported_memory(ft):

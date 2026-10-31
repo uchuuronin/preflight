@@ -49,12 +49,26 @@ def test_daly_interval_starts_from_young_and_caps_at_the_interruption_interval()
 	assert P.daly_interval(5000, 2000) == 2000  # a save longer than twice M: checkpoint every M
 
 
-def test_the_young_daly_interval_minimises_the_waste():
-	tau = P.daly_interval(120, 6 * 3600)
-	w = P.waste_fraction(tau, 120, 6 * 3600, 60)
-	assert w < P.waste_fraction(tau / 2, 120, 6 * 3600, 60) and w < P.waste_fraction(
-		tau * 2, 120, 6 * 3600, 60
-	)
+def test_youngs_interval_minimises_the_first_order_waste_and_daly_sits_beside_it():
+	d, m = 120.0, 6 * 3600.0
+	taus = [d * 1.01**k for k in range(1, 700)]
+	best = min(taus, key=lambda t: P.waste_fraction(t, d, m, 60))
+	assert best == pytest.approx(math.sqrt(2 * d * m), rel=0.01)
+	assert P.daly_interval(d, m) == pytest.approx(best, rel=0.05)
+
+
+def test_interruptions_without_checkpoints_grow_exponentially():
+	import numpy as np
+
+	rng = np.random.default_rng(0)
+	m, r, t = 3600.0, 60.0, 2 * 3600.0
+	lost = P.redone_seconds(rng, np.full(20000, t), None, m, r)
+	# restart from zero: expected wall time (M + R)(e^(T/M) - 1), so the loss is that minus T
+	assert lost.mean() == pytest.approx((m + r) * math.expm1(t / m) - t, rel=0.05)
+	# with checkpoints every 10 min, the same run loses only about T/M x (half an interval + restart)
+	small = P.redone_seconds(rng, np.full(20000, t), 600.0, m, r)
+	assert small.mean() == pytest.approx(t / m * (300 + r), rel=0.15)
+	assert np.isinf(P.redone_seconds(rng, np.full(4, 40 * m), None, m, r)).all()  # it never finishes
 
 
 def test_segments_bank_only_whole_checkpoint_intervals():
@@ -132,7 +146,8 @@ def test_a_run_that_cant_checkpoint_inside_the_limit_says_so(ft):
 	pl = P.plan(
 		ft, {"batch_size": [2]}, P.Cluster(wall_time_cap_s=600, checkpoint_interval_s=3 * 3600), start=START
 	)
-	assert pl.cells[0].segments is None and "without checkpoints" in pl.cells[0].reason
+	assert pl.cells[0].segments is None and "10 min job limit without checkpoints" in pl.cells[0].reason
+	assert pl.finish_s.status == "abstain" and not pl.completion  # no date for a run that can't end
 
 
 def test_young_daly_needs_a_measured_save_and_an_interruption_rate(ft):
@@ -150,6 +165,10 @@ def test_the_budget_cuts_the_dearest_runs_and_they_are_not_scheduled(ft):
 	pl = P.plan(ft, {"batch_size": [1, 2], "seed": [0, 1]}, P.Cluster(budget_usd=budget), start=START)
 	kept = [c for c in pl.cells if not c.cut]
 	assert pl.cut_list and sum(c.usd.hi for c in kept) <= budget
+	assert (
+		pl.usd.hi == pytest.approx(sum(c.usd.hi for c in kept)) and pl.usd.hi <= budget
+	)  # totals are what runs
+	assert pl.grid_usd.hi == pytest.approx(full.usd.hi)  # the whole grid is still reported beside it
 	assert all(c.lane is None for c in pl.cells if c.cut)
 	assert max(c.usd.hi for c in kept) <= min(c.usd.hi for c in pl.cells if c.cut)
 	assert pl.finish_s.point < full.finish_s.point
@@ -203,3 +222,36 @@ def test_a_run_the_engine_cant_time_leaves_the_campaign_undated(ft):
 def test_grids_are_bounded(ft):
 	with pytest.raises(ValueError):
 		P.plan(ft, {"seed": list(range(P.MAX_CELLS + 1))}, start=START)
+
+
+def test_job_limits_charge_each_killed_jobs_unsaved_tail(ft):
+	# 1 h limit, 25 min interval, no measured save: each job banks 2 intervals (50 min) and wastes the last 10
+	pl = P.plan(
+		ft, {"batch_size": [2]}, P.Cluster(wall_time_cap_s=3600, checkpoint_interval_s=1500), start=START
+	)
+	c = pl.cells[0]
+	assert c.segments == math.ceil(c.time.hi / 3000)
+	assert pl.finish_s.point == pytest.approx(c.time.point + (c.segments - 1) * 600, rel=0.02)
+	assert "redone after interruptions and job limits" in c.usd.reason  # the GPUs bill those tails too
+
+
+def test_a_lora_checkpoint_is_the_adapters_not_the_base(ft):
+	from preflight.engine import api
+
+	ck = P._checkpoint_bytes(ft, {})
+	assert ck.point < 0.5 * api.predict(ft).root["memory.weights"].point  # the frozen base isn't saved
+	assert "adapters" in ck.reason
+
+
+def test_bad_inputs_become_notes_not_crashes(ft):
+	pl = P.plan(ft, {"batch_size": [2], "seed": [0, 1]}, asha=P.Asha(min_steps=10**9), start=START)
+	assert pl.asha is None and any("first rung" in n for n in pl.notes)
+	naive = _with(ft, deadline=datetime(2026, 12, 1))  # no time zone, which the schema accepts
+	pl = P.plan(naive, {"batch_size": [2]}, start=START)
+	assert pl.p_by_deadline == 1.0 and any("read as UTC" in n for n in pl.notes)
+	pl = P.plan(
+		ft, {"batch_size": [2], "seed": [0, 1, 2]}, P.Cluster(lanes={"ana": 2, "ben": 0}), start=START
+	)
+	assert {c.lane for c in pl.cells} == {"ana"} and any("no slots" in n for n in pl.notes)
+	with pytest.raises(ValueError):
+		P.plan(ft, {"batch_size": [2]}, P.Cluster(lanes={"ana": 0}), start=START)

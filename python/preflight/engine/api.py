@@ -569,7 +569,9 @@ def _from_memory_estimate(
 	peak = _est(est.point, est.lo, est.hi, "bytes", est.status, mid, est.reason)
 	words = {"fits": "fits", "tight": "tight", "fails": "won't fit"}[est.oom_status]
 	# Chiya, Oct 31: a number only where the reliability diagram verifies it; in between, the 5-95% range
-	shown = oom_model.shown_as_number(est.p_oom, conformal.TABLE.oom_bins)
+	# the bins verify the empirical P(OOM) from held-out residuals; a simulated band's P(OOM) is never verified
+	empirical = oom_source != "simulated band"
+	shown = oom_model.shown_as_number(est.p_oom, conformal.TABLE.oom_bins if empirical else ())
 	if shown:
 		why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
 		lo = hi = est.p_oom
@@ -1134,12 +1136,25 @@ def _preemption(record: FlightRecord, values: dict, time: _TimeResult) -> Estima
 	interval = min(float(every) * step, time.total.point) if every else time.total.point
 	# guess: a requeue plus reload takes at least a minute; replaced by A's measured first-step time per job
 	restart = (rule.grace_s or 0.0) + 60.0
-	lost_each = interval / 2 + restart  # Young/Daly: on average half an interval is redone
+	m = rule.mtti_s
 
 	def loss(t):
-		return t / rule.mtti_s * lost_each
+		"""Expected seconds lost: the run is n pieces of length L, each retried from its checkpoint until one attempt
+		outlasts it, so failures per piece are geometric and interruptions during redone work count too. Exactly
+		n((M + R)(e^(L/M) - 1) - L); for L much shorter than M, that is about t/M x (L/2 + R) (Young/Daly)."""
+		if t <= 0:
+			return 0.0
+		piece = min(interval, t)
+		x = piece / m
+		if x > 50:  # interruptions come far faster than any piece finishes: it never ends
+			return math.inf
+		return math.ceil(t / piece) * ((m + restart) * math.expm1(x) - piece)
 
-	why = f"about {time.total.point / rule.mtti_s:.1f} interruptions, each redoing half a checkpoint interval"
+	why = (
+		f"about {time.total.point / m:.1f} interruptions, each redoing the work since the last checkpoint"
+		if every
+		else f"about {time.total.point / m:.1f} interruptions, and with no checkpoints each one restarts the run"
+	)
 	return _est(
 		loss(time.total.point),
 		loss(time.total.lo),
@@ -2108,19 +2123,26 @@ _CARD_CAVEAT = {
 }
 
 
-def _calibration(mid: str) -> tuple[str, float | None]:
-	"""("held_out", None) when the conformal table has a cell for this model's target, else ("simulated", None)."""
+def _calibration(mid: str, record: FlightRecord | None = None) -> tuple[str, float | None]:
+	"""("held_out", None) when the conformal table has a cell this record's band really uses (its GPU and lens, or
+	the merged cells it falls back to), else ("simulated", None). Without a record: any cell for the target."""
 	target = _CARD_TARGET.get(mid)
-	cells = [c for k, c in conformal.TABLE.cells.items() if target and k[0] == target]
+	if not target:
+		return CALIBRATION, None
+	if record is not None:
+		cell = conformal.TABLE.lookup(target, _env_gpu(record), record.job.lens)
+		return ("held_out", None) if cell is not None else (CALIBRATION, None)
+	cells = [c for k, c in conformal.TABLE.cells.items() if k[0] == target]
 	return ("held_out", None) if cells else (CALIBRATION, None)
 
 
-def _cards(ids: set[str]) -> list[ModelCard]:
-	"""Model cards; until held-out real runs fill the conformal table, each says calibration: simulated."""
+def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]:
+	"""Model cards. With a record, a card says held_out only when that record's own band comes from held-out runs:
+	a fine-tune's step time keeps its simulated band, so its card says so, whatever other lenses have."""
 	out = []
 	for mid in sorted(ids):
 		kind, notes = _CARDS.get(mid, ("analytical", None))
-		calib, _ = _calibration(mid)
+		calib, _ = _calibration(mid, record)
 		target = _CARD_TARGET.get(mid)
 		extra: dict = {}
 		if calib == "held_out" and target and mid in _CARD_SCORED:
@@ -2188,7 +2210,7 @@ def fill_predictions(record: FlightRecord) -> FlightRecord:
 	return record.model_copy(
 		update={
 			"predictions": preds,
-			"models": [*others, *_cards(used)],
+			"models": [*others, *_cards(used, record)],
 			"knobs": _probed_ranges(record),
 			"cost_basis": basis,
 			"job_cost": cost,

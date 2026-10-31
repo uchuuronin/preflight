@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
-from preflight.engine import api
+from preflight.engine import api, knobs
 from preflight.schema.prediction import Estimate
 from preflight.schema.record import Campaign, CampaignCell, FlightRecord, ModelCard
 
@@ -104,7 +104,7 @@ class QuotaCheck:
 @dataclass(frozen=True)
 class CampaignPlan:
 	cells: tuple[CellPlan, ...]
-	gpu_hours: Estimate
+	gpu_hours: Estimate  # the runs that go ahead (after any budget cut), redone work included
 	usd: Estimate
 	finish_s: Estimate  # seconds from the start until the last run ends
 	completion: dict[str, datetime]  # p10, p50, p90
@@ -115,6 +115,8 @@ class CampaignPlan:
 	lanes: tuple[str, ...]
 	cut_list: tuple[str, ...]
 	notes: tuple[str, ...] = ()
+	grid_gpu_hours: Estimate | None = None  # every cell, before any cut
+	grid_usd: Estimate | None = None
 	card: ModelCard = field(
 		default_factory=lambda: ModelCard(
 			id=MODEL_ID,
@@ -210,7 +212,8 @@ def daly_interval(save_s: float, mtti_s: float) -> float:
 
 
 def waste_fraction(interval_s: float, save_s: float, mtti_s: float, restart_s: float) -> float:
-	"""Expected share of wall time spent saving or redoing work (Young's first-order model)."""
+	"""Expected share of wall time spent saving or redoing work (Young's first-order model); minimised at
+	Young's interval sqrt(2 d M)."""
 	return save_s / interval_s + (interval_s + save_s) / (2 * mtti_s) + restart_s / mtti_s
 
 
@@ -222,44 +225,103 @@ def _save_seconds(record: FlightRecord) -> float | None:
 	return None
 
 
-def _checkpoint_bytes(record: FlightRecord, knobs: dict) -> Estimate:
-	"""Bytes per checkpoint: measured by a probe, else the memory model's weights, master copy and optimizer."""
+def _checkpoint_bytes(record: FlightRecord, knob_values: dict) -> Estimate:
+	"""Bytes per checkpoint: measured by a probe, else from the memory model. A LoRA or QLoRA checkpoint holds the
+	adapters and their optimizer state, not the frozen base (PEFT saves only what trains); a full fine-tune holds
+	the weights, the master copy and the optimizer state."""
 	for p in record.probes:
 		if p.checkpoint and p.checkpoint.bytes_mean:
 			b = float(p.checkpoint.bytes_mean)
 			return _est(b, b, b, "bytes", "measured", "measured by a probe's checkpoint save")
-	pred = api.predict(record, knobs).root
-	terms = [pred.get(f"memory.{t}") for t in ("weights", "master_weights", "optimizer")]
+	pred = api.predict(record, knob_values).root
+	try:
+		_, setup, _ = knobs.setup_from(record.job.script_map, api._values(record, knob_values))
+		adapters = setup.method in ("lora", "qlora")
+	except (ValueError, AttributeError):
+		adapters = False
+	# the adapters are as big as their gradients, which the memory model already counts
+	names = (
+		("gradients", "master_weights", "optimizer")
+		if adapters
+		else ("weights", "master_weights", "optimizer")
+	)
+	terms = [pred.get(f"memory.{t}") for t in names]
 	terms = [t for t in terms if _ok(t)]
 	if not terms:
 		return _abstain(
 			"bytes", "no probe saved a checkpoint, and the memory model has no weights for this job"
 		)
+	what = "adapters and their optimizer state" if adapters else "weights, master copy and optimizer state"
 	return _est(
 		sum(t.point for t in terms),
 		sum(t.lo for t in terms),
 		sum(t.hi for t in terms),
 		"bytes",
 		"predicted",
-		"no probe saved a checkpoint: weights, master copy and optimizer state from the memory model",
+		f"no probe saved a checkpoint: {what} from the memory model",
 	)
 
 
 # ---------------------------------------------------------------- Slurm segments
 
 
+def banked_per_segment(cap_s: float, interval_s: float, save_s: float, restart_s: float) -> int:
+	"""Whole checkpoint intervals one job can finish and save before the time limit kills it."""
+	return max(0, math.floor((cap_s - restart_s) / (interval_s + save_s)))
+
+
 def segments_needed(
 	work_s: float, cap_s: float, interval_s: float, save_s: float, restart_s: float
 ) -> int | None:
-	"""Jobs a run of `work_s` seconds splits into under a `cap_s` time limit. Work after a segment's last
-	checkpoint is redone, so each segment banks only whole checkpoint intervals. None: it can't finish at all."""
-	usable = cap_s - restart_s
-	per_segment = math.floor(usable / (interval_s + save_s)) * interval_s
+	"""Jobs a run of `work_s` wall seconds (saves included) splits into under a `cap_s` time limit. Work after a
+	segment's last checkpoint is redone, so each job banks only whole intervals and their saves. None: it can't
+	finish at all."""
 	if work_s <= cap_s - restart_s:
 		return 1
-	if per_segment <= 0:
+	k = banked_per_segment(cap_s, interval_s, save_s, restart_s)
+	if k == 0:
 		return None
-	return math.ceil(work_s / per_segment)
+	return math.ceil(work_s / (k * (interval_s + save_s)))
+
+
+# ---------------------------------------------------------------- interruptions
+
+
+MAX_EXPECTED_FAILURES = 1e5  # past this the run effectively never finishes: interruptions outpace checkpoints
+
+
+def redone_seconds(
+	rng: np.random.Generator,
+	work_s: np.ndarray,
+	interval_s: float | None,
+	mtti_s: float,
+	restart_s: float,
+) -> np.ndarray:
+	"""Wall seconds lost to Poisson interruptions, per draw, when each one sends the run back to its last checkpoint.
+
+	The run is n pieces of length L (the checkpoint interval, or the whole run without checkpoints). A piece
+	succeeds with probability exp(-L/M), so the failures before n successes are negative binomial, and each failure
+	loses a truncated-exponential stretch of time plus the restart. Interruptions during redone work are counted,
+	so a long run without checkpoints grows like (M + R)(e^(T/M) - 1), not linearly. inf: it won't finish."""
+	work = np.asarray(work_s, dtype=float)
+	L = np.minimum(interval_s, work) if interval_s else work
+	n = np.maximum(1, np.ceil(work / np.maximum(L, 1e-9)))
+	x = L / mtti_s
+	expected = n * np.expm1(x)
+	out = np.full(work.shape, np.inf)
+	ok = expected < MAX_EXPECTED_FAILURES
+	if not ok.any():
+		return out
+	p = np.exp(-x[ok])
+	fails = rng.negative_binomial(n[ok], p)
+	# a failed piece lasts t ~ Exp(M) given t < L: mean M - L/(e^x - 1), second moment 2M^2 - (L^2 + 2ML)/(e^x - 1)
+	em1 = np.expm1(x[ok])
+	Lk, M = L[ok], mtti_s
+	mean = M - Lk / em1
+	var = np.maximum(2 * M * M - (Lk * Lk + 2 * M * Lk) / em1 - mean * mean, 0.0)
+	lost = fails * (mean + restart_s) + np.sqrt(fails * var) * rng.standard_normal(fails.shape)
+	out[ok] = np.maximum(lost, 0.0)
+	return out
 
 
 # ---------------------------------------------------------------- ASHA
@@ -294,6 +356,35 @@ def asha_steps(rungs: list[Rung]) -> int:
 # ---------------------------------------------------------------- the plan
 
 
+def _dur(seconds: float) -> str:
+	return f"{seconds / 3600:g} h" if seconds >= 3600 else f"{seconds / 60:.0f} min"
+
+
+def _grown(e: Estimate | None, f: float) -> Estimate | None:
+	"""A cost times f, the expected share of billed time once redone work and restarts are in."""
+	if not _ok(e):
+		return e
+	why = (
+		e.reason + "; " if e.reason else ""
+	) + f"plus {f - 1:.0%} redone after interruptions and job limits"
+	return _est(e.point * f, e.lo * f, e.hi * f, e.unit, e.status, why)
+
+
+def _replace(c: CellPlan, **kw) -> CellPlan:
+	return CellPlan(**{**c.__dict__, **kw})
+
+
+def _sum(es: list[Estimate | None], unit: str, why: str) -> Estimate:
+	"""Totals with every run's error shared (comonotone): lows and highs add, the widest honest range."""
+	if not es:
+		return _abstain(unit, "no runs")
+	if not all(_ok(e) for e in es):
+		return _abstain(unit, f"{sum(1 for e in es if not _ok(e))} of {len(es)} runs have no {unit}")
+	return _est(
+		sum(e.point for e in es), sum(e.lo for e in es), sum(e.hi for e in es), unit, "predicted", why
+	)
+
+
 def plan(
 	record: FlightRecord,
 	grid: dict[str, list],
@@ -307,6 +398,8 @@ def plan(
 	cl = cluster or Cluster()
 	cons = record.job.constraints
 	start = start or datetime.now(UTC)
+	if start.tzinfo is None:
+		start = start.replace(tzinfo=UTC)
 	knob_sets = cells_of(grid)
 	if not knob_sets or len(knob_sets) > MAX_CELLS:
 		raise ValueError(f"a campaign needs between 1 and {MAX_CELLS} cells, got {len(knob_sets)}")
@@ -315,6 +408,13 @@ def plan(
 	budget = cl.budget_usd if cl.budget_usd is not None else cons.budget_usd
 	quota = cl.disk_quota_bytes or (cons.quota.disk_bytes if cons.quota else None)
 	notes: list[str] = []
+	lane_slots = {k: int(v) for k, v in (cl.lanes or {"cluster": max(1, cl.slots)}).items() if int(v) > 0}
+	if cl.lanes and len(lane_slots) < len(cl.lanes):
+		notes.append(
+			f"lanes with no slots get no runs: {', '.join(k for k in cl.lanes if k not in lane_slots)}"
+		)
+	if not lane_slots:
+		raise ValueError("every lane has 0 slots, so nothing can run")
 
 	# ---- grid pricing: the engine's time and cost for each cell
 	declared = {k.id for k in record.knobs}
@@ -322,46 +422,48 @@ def plan(
 	if labels:
 		# a seed or a learning rate the script doesn't expose as a knob: the engine sees no difference, so those
 		# cells cost what the base run costs; the axis still multiplies the runs
+		verb = "isn't a knob" if len(labels) == 1 else "aren't knobs"
 		notes.append(
-			f"{', '.join(labels)} {'isn' if len(labels) == 1 else 'aren'}'t knobs the engine models, so each value costs what "
-			"the run costs at its other settings"
+			f"{', '.join(labels)} {verb} the engine models, so each value costs what the run costs at its other settings"
 		)
+	engine_sets = [{k: v for k, v in ks.items() if k in declared} for ks in knob_sets]
 	cells: list[CellPlan] = []
-	for ks in knob_sets:
-		engine_ks = {k: v for k, v in ks.items() if k in declared}
-		pred = api.predict(record, engine_ks).root
+	steps_of: list[Estimate | None] = []
+	for ks, eks in zip(knob_sets, engine_sets, strict=True):
+		pred = api.predict(record, eks).root
 		time = pred.get("time.total") or _abstain("s", "the engine has no run time for this job")
-		_, jc = api.run_cost(record, engine_ks, provider=cl.provider, billing=cl.billing, region=cl.region)
-		hours = jc.gpu_hours if jc.gpu_hours is not None else None
+		steps_of.append(pred.get("time.step"))
+		_, jc = api.run_cost(record, eks, provider=cl.provider, billing=cl.billing, region=cl.region)
 		usd = jc.total_usd if jc.total_usd is not None else jc.market_equivalent_usd
 		reason = "" if _ok(time) else (time.reason or "no run time")
-		cells.append(CellPlan(_cell_id(ks), ks, time, hours, usd, reason=reason))
-	missing = [c.id for c in cells if not _ok(c.time)]
-	if missing:
+		cells.append(CellPlan(_cell_id(ks), ks, time, jc.gpu_hours, usd, reason=reason))
+	if any(not _ok(c.time) for c in cells):
 		first = next(c for c in cells if not _ok(c.time))
 		notes.append(
-			f"{len(missing)} of {len(cells)} runs have no run time from the engine ({first.id}: {first.reason})"
+			f"{sum(1 for c in cells if not _ok(c.time))} of {len(cells)} runs have no run time from the engine ({first.id}: {first.reason})"
 		)
 
-	# ---- checkpoints: what the runs will do (your interval, else the script's), and Young/Daly's advice
+	# ---- checkpoints: what each run will do (your interval, else the script's), and Young/Daly's advice
 	save_s = _save_seconds(record)
-	base_ks = {k: v for k, v in knob_sets[0].items() if k in declared}
-	tau, tau_why = cl.checkpoint_interval_s, "your interval"
-	if tau is None:
-		every, step = (
-			api.checkpoint_every(record, base_ks),
-			api.predict(record, base_ks).root.get("time.step"),
-		)
-		if every and _ok(step):
-			tau, tau_why = float(every) * step.point, f"the script saves every {every:g} steps"
+	save = save_s or 0.0
+	taus: list[float | None] = []
+	tau_why = "your interval"
+	for eks, st in zip(engine_sets, steps_of, strict=True):
+		tau = cl.checkpoint_interval_s
+		if tau is None:
+			every = api.checkpoint_every(record, eks)
+			if every and _ok(st):
+				tau, tau_why = float(every) * st.point, f"the script saves every {every:g} steps"
+		taus.append(tau)
+	tau0 = taus[0]
 	if mtti and save_s:
 		best = daly_interval(save_s, mtti)
 		why = (
 			f"Young/Daly: save {save_s:.0f} s, one interruption every {mtti / 3600:.1f} h per run, so checkpoint "
 			f"every {best / 60:.0f} min ({waste_fraction(best, save_s, mtti, cl.restart_s):.1%} of wall time lost)"
 		)
-		if tau:
-			why += f"; {tau_why} ({tau / 60:.0f} min) loses {waste_fraction(tau, save_s, mtti, cl.restart_s):.1%}"
+		if tau0:
+			why += f"; {tau_why} ({tau0 / 60:.0f} min) loses {waste_fraction(tau0, save_s, mtti, cl.restart_s):.1%}"
 		else:
 			why += "; the runs don't checkpoint, so an interruption loses everything so far"
 		interval = _est(best, best, best, "s", "predicted", why)
@@ -372,91 +474,152 @@ def plan(
 			else "no probe timed a checkpoint save"
 		)
 		interval = _abstain("s", f"no Young/Daly interval: {missing_why}")
-	if tau and not save_s:
+	if any(taus) and not save_s:
 		notes.append("no probe timed a checkpoint save, so saves are counted as free")
-	save = save_s or 0.0
 
-	# ---- Slurm segments
-	seg_cells = []
-	for c in cells:
-		segs = None
-		if _ok(c.time) and cap:
-			segs = segments_needed(c.time.hi, cap, tau or c.time.hi, save, cl.restart_s)
-			if segs is None:
-				c = CellPlan(
-					**{
-						**c.__dict__,
-						"reason": (c.reason + "; " if c.reason else "")
-						+ "can't finish under the job time limit without checkpoints",
-					}
-				)
-		elif _ok(c.time):
-			segs = 1
-		seg_cells.append(CellPlan(**{**c.__dict__, "segments": segs}))
-	cells = seg_cells
-	if cap and any(c.segments is None and _ok(c.time) for c in cells):
-		notes.append(f"some runs outlast the {cap / 3600:.0f} h job limit and save no checkpoint in time")
+	# ---- Slurm segments: from the high end of each run's time, so a slow run still fits its jobs
+	for i, c in enumerate(cells):
+		if not _ok(c.time):
+			continue
+		if not cap:
+			cells[i] = _replace(c, segments=1)
+			continue
+		segs = segments_needed(c.time.hi, cap, taus[i] or c.time.hi, save, cl.restart_s)
+		why = c.reason
+		if segs is None:
+			why = (
+				why + "; " if why else ""
+			) + f"can't finish under the {_dur(cap)} job limit without checkpoints: none lands inside it"
+		cells[i] = _replace(c, segments=segs, reason=why)
 
-	# ---- totals, with every run's error shared (comonotone): the widest honest range
-	def total(attr: str, unit: str) -> Estimate:
-		es = [getattr(c, attr) for c in cells]
-		if not es or not all(_ok(e) for e in es):
-			return _abstain(unit, f"{sum(1 for e in es if not _ok(e))} of {len(es)} runs have no {unit}")
-		return _est(
-			sum(e.point for e in es),
-			sum(e.lo for e in es),
-			sum(e.hi for e in es),
-			unit,
-			"predicted",
-			f"{len(es)} runs; their errors added as if they move together",
-		)
+	# ---- each run's wall time per draw: the engine's band (one shared error), interruptions, job-limit tails
+	rng = np.random.default_rng(seed)
+	z = rng.standard_normal(draws)
+	runnable = [_ok(c.time) and c.segments is not None for c in cells]
+	wall = np.zeros((len(cells), draws))
+	billed = np.zeros((len(cells), draws))
+	never: dict[int, str] = {}
+	for i, c in enumerate(cells):
+		if not runnable[i]:
+			continue
+		base = _scale(z, c.time)
+		extra = np.zeros(draws)
+		if mtti:
+			lost = redone_seconds(rng, base, taus[i], mtti, cl.restart_s)
+			if not np.isfinite(lost).any():
+				never[i] = "interruptions come faster than it can checkpoint, so it never finishes"
+				continue
+			extra = extra + np.where(np.isfinite(lost), lost, np.nan)
+		waits = np.zeros(draws)
+		if c.segments and c.segments > 1:
+			k = banked_per_segment(cap, taus[i] or c.time.hi, save, cl.restart_s)
+			tail = cap - k * ((taus[i] or c.time.hi) + save)  # each killed job's unsaved tail and its restart
+			extra = extra + (c.segments - 1) * tail
+			if cl.queue_wait_s:
+				waits = rng.gamma(c.segments - 1, cl.queue_wait_s, draws)
+		billed[i] = base + extra  # GPUs bill redone work and restarts, not time waiting in the queue
+		wall[i] = billed[i] + waits
+	for i, why in never.items():
+		cells[i] = _replace(cells[i], reason=(cells[i].reason + "; " if cells[i].reason else "") + why)
+		runnable[i] = False
 
-	usd_total = total("usd", "usd")
-	hours_total = total("gpu_hours", "gpu_hours")
+	# ---- money and GPU-hours with the redone work in: each run's engine cost times its expected billed share
+	for i, c in enumerate(cells):
+		if not runnable[i] or (not mtti and not (c.segments and c.segments > 1)):
+			continue
+		f = float(np.nanmean(billed[i]) / np.nanmean(_scale(z, c.time)))
+		if f > 1.0001:
+			cells[i] = _replace(c, usd=_grown(c.usd, f), gpu_hours=_grown(c.gpu_hours, f))
 
-	# ---- budget: cut the dearest runs until the high end fits
+	grid_usd = _sum(
+		[c.usd for c in cells], "usd", f"all {len(cells)} runs; their errors added as if they move together"
+	)
+	grid_hours = _sum(
+		[c.gpu_hours for c in cells],
+		"gpu_hours",
+		f"all {len(cells)} runs; their errors added as if they move together",
+	)
+
+	# ---- budget: cut the dearest runs until the high end of what's left fits
 	cut: list[str] = []
-	if budget is not None and _ok(usd_total) and usd_total.hi > budget:
-		left = usd_total.hi
+	if budget is not None and _ok(grid_usd) and grid_usd.hi > budget:
+		left = grid_usd.hi
 		for c in sorted(cells, key=lambda c: -(c.usd.hi if _ok(c.usd) else 0.0)):
 			if left <= budget:
 				break
 			cut.append(c.id)
-			left -= c.usd.hi
-		cells = [CellPlan(**{**c.__dict__, "cut": c.id in cut}) for c in cells]
+			left -= c.usd.hi if _ok(c.usd) else 0.0
+		cells = [_replace(c, cut=c.id in cut) for c in cells]
 		notes.append(
-			f"the grid's high end (${usd_total.hi:,.2f}) is over the ${budget:,.2f} budget: {len(cut)} dearest runs cut"
+			f"the grid's high end (${grid_usd.hi:,.2f}) is over the ${budget:,.2f} budget: {len(cut)} dearest runs cut"
 		)
-
-	# ---- lanes: longest runs first, each to the lane that frees up soonest (LPT)
-	lane_slots = dict(cl.lanes) if cl.lanes else {"cluster": max(1, cl.slots)}
-	load = {name: [0.0] * max(1, n) for name, n in lane_slots.items()}
-	# runs that are cut don't run: they get no lane and don't count towards the end date
 	kept = [i for i, c in enumerate(cells) if not c.cut]
+	kept_why = (
+		f"{len(kept)} runs"
+		+ (f" after cutting {len(cut)}" if cut else "")
+		+ "; their errors added as if they move together"
+	)
+	usd_total = (
+		_sum([cells[i].usd for i in kept], "usd", kept_why) if kept else _abstain("usd", "every run is cut")
+	)
+	hours_total = (
+		_sum([cells[i].gpu_hours for i in kept], "gpu_hours", kept_why)
+		if kept
+		else _abstain("gpu_hours", "every run is cut")
+	)
+
+	# ---- lanes: the longest runs first, each to the slot that frees up soonest (LPT, on the point estimates)
+	load = {name: [0.0] * n for name, n in lane_slots.items()}
 	order = sorted(kept, key=lambda i: -(cells[i].time.point or 0.0))
 	lane_of: dict[int, tuple[str, int]] = {}
 	for i in order:
 		name, slot = min(
-			((n, s) for n, ss in load.items() for s in range(len(ss))), key=lambda ns: load[ns[0]][ns[1]]
+			((n, k) for n, ss in load.items() for k in range(len(ss))), key=lambda nk: load[nk[0]][nk[1]]
 		)
 		lane_of[i] = (name, slot)
 		load[name][slot] += cells[i].time.point or 0.0
-	cells = [
-		CellPlan(**{**c.__dict__, "lane": lane_of[i][0] if i in lane_of else None})
-		for i, c in enumerate(cells)
-	]
+	cells = [_replace(c, lane=lane_of[i][0] if i in lane_of else None) for i, c in enumerate(cells)]
 
-	# ---- quota: checkpoints kept by every run going at once
-	# the largest checkpoint in the grid: a bigger LoRA rank or another precision changes it
-	sizes = [
-		_checkpoint_bytes(record, ks)
-		for ks in {
-			_cell_id(e): e for e in ({k: v for k, v in ks.items() if k in declared} for ks in knob_sets)
-		}.values()
-	]
+	# ---- the end date: each slot runs its runs back to back; the campaign ends with its last slot
+	completion: dict[str, datetime] = {}
+	p_dead = None
+	if not kept:
+		finish_est = _abstain("s", "every run is cut, so nothing is scheduled")
+	elif not all(runnable[i] for i in kept):
+		bad = next(cells[i] for i in kept if not runnable[i])
+		finish_est = _abstain(
+			"s", f"{sum(1 for i in kept if not runnable[i])} runs can't be dated ({bad.id}: {bad.reason})"
+		)
+	else:
+		slot_end = {nk: np.zeros(draws) for nk in ((n, k) for n, ss in load.items() for k in range(len(ss)))}
+		for i in order:
+			slot_end[lane_of[i]] = slot_end[lane_of[i]] + wall[i]
+		finish = np.max(np.stack(list(slot_end.values())), axis=0)
+		finish = np.where(np.isfinite(finish), finish, np.nan)
+		q = np.nanquantile(finish, [0.05, 0.10, 0.50, 0.90, 0.95])
+		finish_est = _est(
+			float(q[2]),
+			float(q[0]),
+			float(q[4]),
+			"s",
+			"predicted",
+			f"the last of {len(kept)} runs ends; Monte Carlo over the engine's intervals",
+		)
+		completion = {
+			k: start + timedelta(seconds=float(v))
+			for k, v in zip(("p10", "p50", "p90"), (q[1], q[2], q[3]), strict=True)
+		}
+		if cons.deadline:
+			deadline = cons.deadline if cons.deadline.tzinfo else cons.deadline.replace(tzinfo=UTC)
+			if cons.deadline.tzinfo is None:
+				notes.append("the deadline has no time zone, so it is read as UTC")
+			p_dead = float(np.nanmean(finish <= (deadline - start).total_seconds()))
+
+	# ---- quota: the largest checkpoint in the grid, kept by every run going at once
+	sizes = [_checkpoint_bytes(record, e) for e in {_cell_id(e): e for e in engine_sets}.values()]
 	ck = max((c for c in sizes if _ok(c)), key=lambda c: c.hi, default=sizes[0])
 	concurrent = min(len(kept), sum(lane_slots.values()))
-	if _ok(ck):
+	if _ok(ck) and concurrent:
 		k = concurrent * max(1, cl.keep_checkpoints)
 		needed = _est(
 			ck.point * k,
@@ -479,94 +642,42 @@ def plan(
 	else:
 		qc = QuotaCheck(ck, quota, None, ck.reason or "checkpoint size unknown")
 
-	# ---- Monte Carlo: model error shared by every run, interruptions and resubmit waits per run
-	rng = np.random.default_rng(seed)
-	z = rng.standard_normal(draws)
-	if not kept:
-		finish_est = _abstain("s", "every run is cut, so nothing is scheduled")
-		completion, p_dead = {}, None
-	elif all(_ok(cells[i].time) for i in kept):
-		dur = np.zeros((len(cells), draws))
-		for i in kept:
-			dur[i] = _scale(z, cells[i].time)  # cells x draws; cut rows stay zero and are never scheduled
-		if mtti:
-			# Poisson interruptions; each redoes the work since the last checkpoint (on average half an
-			# interval, Young/Daly) or, with no checkpoints, everything so far, plus a restart
-			hits = rng.poisson(dur / mtti)
-			redo = tau if tau else dur
-			dur = dur + hits * (rng.uniform(0, 1, dur.shape) * redo + cl.restart_s)
-		extra_segs = np.array([[max(0, (c.segments or 1) - 1)] for c in cells], dtype=float)
-		if cap and extra_segs.any():
-			# each resubmit restarts and waits in the queue; the waits of k resubmits add up to a gamma(k)
-			waits = (
-				rng.gamma(np.maximum(extra_segs, 1e-12) * np.ones(dur.shape), cl.queue_wait_s)
-				if cl.queue_wait_s
-				else 0.0
-			)
-			dur = dur + extra_segs * cl.restart_s + np.where(extra_segs > 0, waits, 0.0)
-		# list-schedule each draw: runs in LPT order onto the slot the lanes gave them
-		finish = np.zeros(draws)
-		slot_end = {(n, s): np.zeros(draws) for n, ss in load.items() for s in range(len(ss))}
-		for i in order:
-			slot_end[lane_of[i]] = slot_end[lane_of[i]] + dur[i]
-		for v in slot_end.values():
-			finish = np.maximum(finish, v)
-		q = np.quantile(finish, [0.05, 0.10, 0.50, 0.90, 0.95])
-		finish_est = _est(
-			float(q[2]),
-			float(q[0]),
-			float(q[4]),
-			"s",
-			"predicted",
-			f"the last of {len(kept)} runs ends; Monte Carlo over the engine's intervals",
-		)
-		completion = {
-			k: start + timedelta(seconds=float(v))
-			for k, v in zip(("p10", "p50", "p90"), (q[1], q[2], q[3]), strict=True)
-		}
-		p_dead = None
-		if cons.deadline:
-			left = (cons.deadline - start).total_seconds()
-			p_dead = float(np.mean(finish <= left))
-	else:
-		finish_est = _abstain(
-			"s",
-			f"{sum(1 for i in kept if not _ok(cells[i].time))} runs have no run time, so the campaign has no end date",
-		)
-		completion, p_dead = {}, None
-
-	# ---- ASHA
+	# ---- ASHA: an alternative to cutting, over the whole grid
 	asha_plan = None
 	if asha is not None:
-		steps, why_steps = api.total_steps(record, {k: v for k, v in knob_sets[0].items() if k in declared})
-		max_steps = asha.max_steps or (int(steps) if steps else None)
-		if not max_steps or not _ok(hours_total):
-			asha_plan = None
+		steps, why_steps = api.total_steps(record, engine_sets[0])
+		run_steps = int(steps) if steps else None
+		top = min(asha.max_steps or run_steps or 0, run_steps or asha.max_steps or 0)
+		if not run_steps or not _ok(grid_hours):
 			notes.append(f"no ASHA plan: {why_steps or 'the grid has no GPU-hours'}")
+		elif asha.min_steps > top:
+			notes.append(
+				f"no ASHA plan: its first rung ({asha.min_steps} steps) is longer than the run ({top} steps)"
+			)
 		else:
-			rungs = asha_rungs(len(cells), asha.min_steps, asha.eta, max_steps)
-			share = asha_steps(rungs) / (len(cells) * max_steps)
+			rungs = asha_rungs(len(cells), asha.min_steps, asha.eta, top)
+			share = asha_steps(rungs) / (len(cells) * run_steps)
 			hrs = _est(
-				hours_total.point * share,
-				hours_total.lo * share,
-				hours_total.hi * share,
+				grid_hours.point * share,
+				grid_hours.lo * share,
+				grid_hours.hi * share,
 				"gpu_hours",
 				"predicted",
 				f"{share:.0%} of the full grid's steps",
 			)
 			saved = _est(
-				hours_total.point - hrs.point,
-				hours_total.lo - hrs.lo,
-				hours_total.hi - hrs.hi,
+				grid_hours.point - hrs.point,
+				grid_hours.lo - hrs.lo,
+				grid_hours.hi - hrs.hi,
 				"gpu_hours",
 				"predicted",
-				"against running every cell in full",
+				f"against running all {len(cells)} cells in full",
 			)
 			asha_plan = AshaPlan(
 				tuple(rungs),
 				hrs,
 				saved,
-				f"eta {asha.eta}, from {asha.min_steps} steps; assumes every step costs the same in every run",
+				f"all {len(cells)} cells, eta {asha.eta}, from {asha.min_steps} steps; an alternative to cutting; assumes every step costs the same in every run",
 			)
 
 	return CampaignPlan(
@@ -582,4 +693,6 @@ def plan(
 		lanes=tuple(lane_slots),
 		cut_list=tuple(cut),
 		notes=tuple(notes),
+		grid_gpu_hours=grid_hours,
+		grid_usd=grid_usd,
 	)
