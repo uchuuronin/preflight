@@ -1,0 +1,22 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-hgPxBJNJEXYE3hbV4TlJD5
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[A100-SXM-80GB] wave 0: $0.00 of $2.00 spent (container time, worst case for unsettled waves), 0 done, 100 to do, deadline 600 s, next wave 3 x 1
+[A100-SXM-80GB] wave 0 took 162 s on 3 containers: 576 container-s ($0.44, worst case was $1.93) for 0 configs
+[A100-SXM-80GB] batch: 0.1 s in the container, reload 0.1 s, commits 0.0 s
+[A100-SXM-80GB] batch: 0.0 s in the container, reload 0.0 s, commits 0.0 s
+[A100-SXM-80GB] batch: 0.1 s in the container, reload 0.1 s, commits 0.0 s
+[A100-SXM-80GB] wave 1: $0.44 of $2.00 spent (container time, worst case for unsettled waves), 0 done, 100 to do, deadline 600 s, next wave 1 x 2
+[A100-SXM-80GB] no progress in the last wave (rows filed under another GPU?); stopping
+[A100-SXM-80GB] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-hgPxBJNJEXYE3hbV4TlJD5
