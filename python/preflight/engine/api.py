@@ -16,6 +16,7 @@ A's scripts/make_golden.py makes to replace the golden fixtures.
 
 from __future__ import annotations
 
+import itertools
 import math
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -597,8 +598,79 @@ class _StepResult:
 
 
 def _step_x(lens: str, values: dict) -> float:
-	"""Work per optimizer step: work units per micro-batch times accumulation."""
+	"""Work per optimizer step from the settings: work units per micro-batch times accumulation."""
 	return knobs.work_units(lens, values) * max(1, int(values.get("grad_accum", 1) or 1))
+
+
+# derived: a probe whose rows fill at least this share of seq_len was truncated by it (A's padding is to the
+# longest row in the batch, so untruncated rows sit well below the limit; this probe's rows reached 295 of 1024)
+TRUNCATED_SHARE = 0.95
+
+
+def _measured_tokens(p) -> tuple[float, float] | None:
+	"""(tokens, samples) one optimizer step of this probe processed, from A's recorder (Probe.extras)."""
+	ex = p.extras or {}
+	t, n = ex.get("tokens_per_step"), ex.get("samples_per_step")
+	if isinstance(t, (int, float)) and isinstance(n, (int, float)) and t > 0 and n > 0:
+		return float(t), float(n)
+	return None
+
+
+def _token_points(record: FlightRecord) -> list[tuple[float, float, float, bool]] | None:
+	"""(batch, seq_len, padded tokens per sample, truncated) for every timed probe, or None unless all of them
+	report measured tokens (mixing measured and set work on one axis would bend the fit)."""
+	pts = []
+	for p in record.probes:
+		if p.status not in OK_PROBE or not p.step_time or not p.step_time.p50_s:
+			continue
+		m = _measured_tokens(p)
+		if m is None:
+			return None
+		pv = _probe_values(record, p)
+		b, sq = float(pv.get("batch_size") or 0), float(pv.get("seq_len") or 0)
+		u = m[0] / m[1]
+		pts.append((b, sq, u, bool(sq) and u >= TRUNCATED_SHARE * sq))
+	return pts or None
+
+
+def _step_work(record: FlightRecord, values: dict) -> float:
+	"""Tokens one optimizer step will process at these settings (Chiya, Oct 30: scale by measured tokens, not by
+	seq_len). Samples per step times padded tokens per sample, which A's probes measure: rows are padded to the
+	longest in their batch, so the per-sample figure follows batch size, and seq_len only cuts it when the rows
+	reach it. Falls back to the settings when a probe was truncated (the data may run longer than any limit seen)
+	or when the probes don't all report tokens."""
+	pts = _token_points(record)
+	lens = record.job.lens
+	if pts is None or lens not in ("finetune", "pretrain", "rl") or values.get("batch_size") is None:
+		return _step_x(lens, values)
+	b_q = float(values.get("batch_size") or 1)
+	seq_q = float(values.get("seq_len") or 0) or math.inf
+	free = sorted((b, u) for b, _, u, trunc in pts if not trunc and b > 0)
+	if not free:
+		return _step_x(lens, values)
+	# padded tokens per sample at this batch: linear in log2(batch) between probed batches, flat beyond them
+	if b_q <= free[0][0]:
+		u_q = free[0][1]
+	elif b_q >= free[-1][0]:
+		u_q = free[-1][1]
+	else:
+		u_q = free[-1][1]
+		for (b0, u0), (b1, u1) in itertools.pairwise(free):
+			if b0 <= b_q <= b1:
+				t = 0.0 if b1 == b0 else (math.log2(b_q) - math.log2(b0)) / (math.log2(b1) - math.log2(b0))
+				u_q = u0 + t * (u1 - u0)
+				break
+	samples = b_q * max(1, int(values.get("grad_accum", 1) or 1))
+	return samples * min(seq_q, u_q)
+
+
+def _probe_work(record: FlightRecord, p) -> float:
+	"""A probe's place on the step-time axis: the tokens it measured when the record's probes all report them."""
+	if _token_points(record) is not None and record.job.lens in ("finetune", "pretrain", "rl"):
+		m = _measured_tokens(p)
+		if m is not None:
+			return m[0]
+	return _step_x(record.job.lens, _probe_values(record, p))
 
 
 _PRECISION_KNOBS = ("precision", "dtype", "torch_dtype", "ptdtype")
@@ -637,9 +709,8 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		st_ = p.step_time
 		if p.status not in OK_PROBE or not st_ or not st_.p50_s:
 			continue
-		pv = _probe_values(record, p)
 		phases = steptime.phases_seconds(st_.by_phase, st_.p50_s) or {"step": st_.p50_s}
-		sprobes.append(steptime.StepProbe(_step_x(lens, pv), phases, p.id))
+		sprobes.append(steptime.StepProbe(_probe_work(record, p), phases, p.id))
 		if p.kernels and current_probe is None:
 			current_probe = p
 	mid = steptime.MODEL_ID_SAME
@@ -664,7 +735,9 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		why = f"{src_gpu if gpus.is_unlisted(src_gpu) else tgt_gpu} isn't in the GPU table, so time can't be carried across GPUs"
 		return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), 0.0)
 	est = model.predict(
-		_step_x(lens, values), recompute=recompute, measured_probe=match.id if match and same_gpu else None
+		_step_work(record, values),
+		recompute=recompute,
+		measured_probe=match.id if match and same_gpu else None,
 	)
 	if est.status == "abstain":
 		return _StepResult(_abstain("s", mid, est.reason), est.sigma_log)
@@ -672,10 +745,14 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 
 	# precision moved away from what the probes ran
 	q_prec = _precision(values)
-	x_q = _step_x(lens, values)
+	x_q = _step_work(record, values)
 	by_dist = sorted(
-		(abs(math.log(max(_step_x(lens, pv), 1e-9) / max(x_q, 1e-9))), i, _precision(pv))
-		for i, pv in enumerate(_probe_values(record, p) for p in record.probes if p.status in OK_PROBE)
+		(
+			abs(math.log(max(_probe_work(record, p), 1e-9) / max(x_q, 1e-9))),
+			i,
+			_precision(_probe_values(record, p)),
+		)
+		for i, p in enumerate(p for p in record.probes if p.status in OK_PROBE)
 	)
 	p_precs = {pr for _, _, pr in by_dist}
 	if q_prec and p_precs and q_prec not in p_precs and gpus.is_unlisted(src_gpu):
@@ -1610,7 +1687,7 @@ def _objective_fn(record: FlightRecord, objective: Objective) -> tuple[Metric, s
 			e = pred.root.get("time.step")
 			if e is None or e.status == "abstain" or not e.point:
 				return None
-			return e.point / max(_step_x(record.job.lens, values), 1e-12)
+			return e.point / max(_step_work(record, values), 1e-12)
 
 		return seconds_per_unit, "time.step per unit of work"
 	table = {
