@@ -98,6 +98,26 @@ def test_the_daily_cleanup_covers_every_kind_of_job_data():
 			"@app.function(", src.index("def _prune_records_daily")
 		)
 	]
-	for part in ("prune(RECORDS_DIR)", "prune_uploads(UPLOADS_DIR)", "prune_cache(", ".expire.remote(TTL_S)"):
+	for part in ("prune(RECORDS_DIR)", "prune_uploads(UPLOADS_DIR", "prune_cache(", ".expire.remote(TTL_S)"):
 		assert part in body, part
-	assert "UPLOADS_DIR: uploads_vol" in src[src.index("schedule=modal.Period(minutes=1)") - 200 :][:400]
+	# the cleanup runs in its own container (not inside the minute's tick) with both volumes mounted
+	cleanup = src[src.index("def cleanup() -> dict:") - 300 : src.index("def cleanup() -> dict:")]
+	assert "RECORDS_DIR: records_vol" in cleanup and "UPLOADS_DIR: uploads_vol" in cleanup
+	tick = src[src.index("def tick() -> dict:") : src.index("def tick() -> dict:") + 1200]
+	assert "cleanup.spawn()" in tick and "_prune_records_daily()" not in tick
+
+
+def test_an_upload_a_kept_record_or_a_live_job_names_is_kept(tmp_path):
+	from preflight.runner.retention import upload_refs
+
+	up = tmp_path / "up"
+	up.mkdir()
+	for h in ("a" * 64, "b" * 64, "c" * 64):
+		(up / f"{h}.json").write_text("{}")
+		_age(up / f"{h}.json", 40)
+	record = (
+		'{"source": {"kind": "upload", "uri": "upload://sha256:' + "a" * 64 + '"}}'
+	)  # re-probed on day 29
+	job = '{"source": {"kind": "record", "files_ref": "sha256:' + "b" * 64 + '"}}'  # queued now
+	keep = upload_refs([record, job])
+	assert prune_uploads(up, now=NOW, keep=keep) == [f"{'c' * 64}.json"]

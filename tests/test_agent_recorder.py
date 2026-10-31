@@ -429,3 +429,31 @@ def test_one_long_event_in_small_chunks_is_read_in_linear_time():
 	t0 = time.monotonic()
 	out = b"".join(r.feed(big[i : i + 4096]) for i in range(0, len(big), 4096))
 	assert out.endswith(b"\n\n") and time.monotonic() - t0 < 2.0
+
+
+def test_a_call_that_fails_before_it_is_sent_isnt_charged(setup):
+	_prov, proxy = setup
+	import socket
+
+	host, port = proxy._server.server_address[:2]
+	url = _url(proxy, "h1")
+	path = url.split(f":{port}", 1)[1] + "/chat/completions"
+	body = json.dumps({"model": "muse-spark-1.3", "messages": []}).encode()
+	with socket.create_connection((host, port), timeout=10) as s:
+		s.sendall(b"POST " + path.encode() + b" HTTP/1.1\r\nHost: x\r\nX-Note: caf\xe9\r\nContent-Type: application/json\r\n"
+			+ b"Content-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body)  # fmt: skip
+		reply = b""
+		while chunk := s.recv(65536):
+			reply += chunk
+	assert reply.startswith(b"HTTP/1.1 502")
+	assert proxy.calls("h1")[0].usd == 0 and proxy.task("h1").cost_usd == 0.0
+
+
+def test_many_events_in_one_chunk_are_split_in_linear_time():
+	from preflight.recorder.agent import _StreamReader
+
+	one = b'data: {"choices": [{"delta": {"content": "x"}}]}\n\n'
+	r = _StreamReader()
+	t0 = time.monotonic()
+	out = r.feed(one * 40_000)
+	assert out.count(b"\n\n") == 40_000 and time.monotonic() - t0 < 1.5

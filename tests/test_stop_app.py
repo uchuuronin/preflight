@@ -188,7 +188,7 @@ def _remote_runs(tmp_path, runs):
 def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monkeypatch, tmp_path):
 	from preflight.runner import app_logs
 
-	view = "\u2713 Initialized. View run at\nhttps://modal.com/apps/me/main/{}\n"
+	view = "\u2713 Initialized. View run at \nhttps://modal.com/apps/me/main/{}\n"
 	clone = _remote_runs(tmp_path, {
 		"r1-a-gt-lora-l4-2": ("modal run --env main python/preflight/runner/ops_app.py::ground_truth --script x",
 			view.format("ap-opsAAAAAA")),
@@ -198,6 +198,11 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 			view.format("ap-runrBBBBBB")),
 		"r4-a-ops-other-env": ("modal run --env dev python/preflight/runner/ops_app.py::startup_check",
 			view.format("ap-devCCCCCC")),
+		# a runner id passed as an argument: Modal's arg parser fails and prints it; nothing started
+		"r5-a-injected": ("modal run --env main python/preflight/runner/ops_app.py::startup_check ap-runrDDDDDD",
+			"Error: Got unexpected extra argument (ap-runrDDDDDD)\n"),
+		"r6-a-injected-url": ("modal run --env main python/preflight/runner/ops_app.py::startup_check "
+			"https://modal.com/apps/me/main/ap-runrEEEEEE", view.format("ap-runrEEEEEE")),
 	})  # fmt: skip
 	monkeypatch.chdir(clone)
 	real = app_logs.subprocess.run
@@ -216,6 +221,8 @@ def test_an_unlisted_app_is_read_only_when_its_run_record_shows_the_ops_app(monk
 	assert app_logs.ops_run_for("ap-runrBBBBBB", "main") is None  # the job runner, never
 	assert app_logs.ops_run_for("ap-devCCCCCC", "main") is None  # another environment's run
 	assert app_logs.ops_run_for("ap-nowhere99", "main") is None
+	assert app_logs.ops_run_for("ap-runrDDDDDD", "main") is None  # only mentioned, never started
+	assert app_logs.ops_run_for("ap-runrEEEEEE", "main") is None  # its id came from the command
 	assert app_logs.main(["--env", "main", "ap-runrBBBBBB"]) == 2 and not logs
 	assert app_logs.main(["--env", "main", "ap-opsAAAAAA"]) == 0
 	assert logs[-1][-1] == "ap-opsAAAAAA" and "--tail" in logs[-1]

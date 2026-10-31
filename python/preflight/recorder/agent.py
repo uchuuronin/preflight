@@ -151,14 +151,16 @@ class _StreamReader:
 		self._cr = b""
 		if chunk.endswith(b"\r"):
 			chunk, self._cr = chunk[:-1], b"\r"
+		pos = 0
 		start = max(0, len(self.buf) - 1)  # an event's end can straddle the old buffer's last byte
 		self.buf += chunk.replace(b"\r\n", b"\n")
 		out = []
 		while (i := self.buf.find(b"\n\n", start)) != -1:
-			event, self.buf = self.buf[:i], self.buf[i + 2 :]
-			start = 0
+			event = self.buf[pos:i]
+			pos = start = i + 2
 			if self._event_bytes(event):
 				out.append(event + b"\n\n")
+		self.buf = self.buf[pos:]  # one copy per chunk, however many events it held
 		if len(self.buf) > MAX_EVENT_BYTES:
 			self.overflow = True
 		return b"".join(out)
@@ -241,8 +243,12 @@ class AgentProxy:
 		self.max_usd_per_task = max_usd_per_task
 		self.max_usd_total = max_usd_total
 		# identity: the reply is relayed as it comes, and the script must get bytes it can read
+		# whether this thread's call left for the provider: the request hook fires as it is sent, so a
+		# call that failed before it (a header that won't encode, no free connection) is never billed
+		self._went = threading.local()
 		self._client = httpx.Client(timeout=httpx.Timeout(timeout_s, connect=10.0), transport=transport,
-			headers={"Accept-Encoding": "identity"})  # fmt: skip
+			headers={"Accept-Encoding": "identity"},
+			event_hooks={"request": [lambda _r: setattr(self._went, "out", True)]})  # fmt: skip
 		self._lock = threading.Lock()
 		self._settled = threading.Condition(self._lock)
 		self._tasks: dict[str, _Task] = {}
@@ -394,9 +400,9 @@ class AgentProxy:
 			return
 		why, reserved = self._admit(task_id, req, body)
 		if why == "unpriced_model":
+			self._note(task_id, req, why)  # counted before the script hears back
 			_reply(h, 400, {"error": {"type": "preflight_unpriced_model", "code": why,
 				"message": "preflight: this model has no price, so the sample can't be costed"}})  # fmt: skip
-			self._note(task_id, req, why)
 			return
 		if why:
 			_reply(h, 429, {"error": {"type": "preflight_task_stopped", "code": why,
@@ -408,7 +414,8 @@ class AgentProxy:
 		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
 		sent = [False]  # this request's reply has started: a failure now can only close the connection
 		last: list[bytes] = []  # the reply's last bytes, written once the call is logged
-		broke, never_sent, upstream_status = False, False, 0
+		broke, never_sent, upstream_status, fail_reply = False, False, 0, False
+		self._went.out = False
 		try:  # from here on the admitted call is always logged, so its slot and reservation are freed
 			opts = req.get("stream_options")
 			opts = opts if isinstance(opts, dict) else {}
@@ -429,16 +436,16 @@ class AgentProxy:
 		except Exception as exc:  # the script gets a 502 or a closed connection; the call is counted
 			broke = True
 			# never reached the provider: nothing to bill
-			never_sent = isinstance(exc, httpx.ConnectError | httpx.ConnectTimeout)
+			never_sent = not self._went.out or isinstance(
+				exc, httpx.ConnectError | httpx.ConnectTimeout | httpx.PoolTimeout
+			)
 			upstream_status = call.status  # 0 when the provider's reply never began
 			call.status = call.status or 502
 			call.error = call.error or type(exc).__name__
 			if sent[0]:
 				h.close_connection = True
 			else:
-				with contextlib.suppress(OSError):
-					_reply(h, 502, {"error": {"type": "upstream_unreachable",
-						"message": "preflight: the provider didn't answer"}}, close=True)  # fmt: skip
+				fail_reply = True  # sent once the call is logged, like any reply's last byte
 		finally:
 			call.seconds = time.monotonic() - t0
 			# priced by the reply's model, else the request's (which _admit found a price for)
@@ -455,6 +462,10 @@ class AgentProxy:
 				call.usd = reserved
 			# logged before the script gets its last byte: once its call returns, the task is counted
 			self._log(task_id, call, reserved, uncosted=uncosted)
+		if fail_reply:
+			with contextlib.suppress(OSError):
+				_reply(h, 502, {"error": {"type": "upstream_unreachable",
+					"message": "preflight: the provider didn't answer"}}, close=True)  # fmt: skip
 		if last:
 			with contextlib.suppress(OSError):
 				h.wfile.write(b"".join(last))

@@ -22,10 +22,15 @@ APP_ID = re.compile(r"ap-[A-Za-z0-9]{6,40}")
 ALLOWED_APPS = {"preflight-runner-ops"}
 # Modal's app list drops apps a while after they stop. Such an app is read only if its own run
 # record on the remote-runs branch shows our ops app started it: the run's command was `modal run
-# --env <env> python/preflight/runner/ops_app.py::...` and the app id is the one that run's log
-# opened with ("View run at .../<app id>"), not one it merely mentions (a stop or a log read)
+# --env <env> python/preflight/runner/ops_app.py::...` and doesn't name the app (an id passed as an
+# argument lands in the log of a run that started nothing), and the app is the one Modal's own
+# "Initialized. View run at https://modal.com/apps/<workspace>/<env>/<app id>" line names. This
+# guards against mistakes; who may dispatch runs at all is the real boundary.
 REMOTE_RUNS = "origin/remote-runs"
 _OPS_CMD = r"^modal run --env {env} python/preflight/runner/ops_app\.py::[a-z_]+(?: |$)"
+_STARTED = (
+	r"Initialized\. View run at\s*\n?\s*https://modal\.com/apps/[A-Za-z0-9_-]+/{env}/(ap-[A-Za-z0-9]{{6,40}})"
+)
 TAIL = 5000  # log entries fetched (Modal's default is 100)
 MAX_LOG_CHARS = 2_000_000
 
@@ -61,15 +66,17 @@ def ops_run_for(app_id: str, env: str) -> str | None:
 			continue
 		run = path.rsplit("/", 1)[0]
 		log = _git("show", f"{REMOTE_RUNS}:{path}").stdout
-		first = APP_ID.search(log)
-		if first is None or first.group(0) != app_id:
-			continue  # this run only mentions the app; it didn't start it
+		started = re.search(_STARTED.format(env=re.escape(env)), log)
+		if started is None or started.group(1) != app_id:
+			continue  # this run didn't start the app (it mentions it, or started another)
 		try:
 			cmd = json.loads(_git("show", f"{REMOTE_RUNS}:{run}/result.json").stdout).get("cmd") or ""
 		except ValueError:
 			continue
 		if "modal_app.py" in cmd:
 			return None  # the job runner: its logs hold visitors' output
+		if app_id in cmd:
+			continue  # the id came in as an argument, not from Modal
 		if re.match(_OPS_CMD.format(env=re.escape(env)), cmd):
 			found = run
 	return found

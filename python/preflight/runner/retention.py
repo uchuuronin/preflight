@@ -1,9 +1,10 @@
 """Everything about a job expires with its record, 30 days on (Chiya, Oct 30).
 
-The deployed runner's daily cleanup (modal_app.tick) runs these beside records.prune:
+The deployed runner's daily cleanup (modal_app.cleanup, started by tick) runs these beside records.prune:
 
   uploads       the files a visitor checked in (preflight-uploads, one file per content hash),
-                30 days after the newest job that used them (DirBlobs.put touches a reused file)
+                30 days after the newest job that used them (DirBlobs.put touches a reused file),
+                and never while a kept record or a queued or running job still names them
   probe cache   cached probe results, their error text included (the preflight-probe-cache Dict),
                 30 days after they were cached; an entry without a time is from before this rule
                 and goes on the first pass
@@ -15,6 +16,7 @@ Nothing here touches a file or entry dated in the future: a clock gone wrong kee
 never deletes it early.
 """
 
+import re
 import time
 from collections.abc import Iterable
 from pathlib import Path
@@ -25,8 +27,28 @@ TTL_S = RECORD_TTL_S
 TEMP_TTL_S = 86400  # a half-written upload from an interrupted job, a day old
 
 
-def prune_uploads(root: Path | str, *, max_age_s: float = TTL_S, now: float | None = None) -> list[str]:
-	"""Delete uploads last used more than max_age_s ago, and stale temp files; returns their names."""
+_UPLOAD_REF = re.compile(r'"(?:uri|files_ref)"\s*:\s*"(?:upload://)?sha256:([0-9a-f]{16,128})"')
+
+
+def upload_refs(texts: Iterable[str]) -> set[str]:
+	"""The uploads named in records or job requests (their `upload://sha256:...` uri or
+	`files_ref`), as the file names DirBlobs stores them under."""
+	return {f"{h}.json" for t in texts for h in _UPLOAD_REF.findall(t)}
+
+
+def records_text(root: Path | str) -> Iterable[str]:
+	for p in sorted(Path(root).glob("*.json")):
+		try:
+			yield p.read_text(errors="replace")
+		except OSError:
+			continue
+
+
+def prune_uploads(root: Path | str, *, max_age_s: float = TTL_S, now: float | None = None,
+	keep: set[str] = frozenset()) -> list[str]:  # fmt: skip
+	"""Delete uploads last used more than max_age_s ago, and stale temp files; returns their names.
+	keep: uploads a kept record or a live job still names (a re-probe reads its parent's files by
+	reference, so the file lives as long as the newest record made from it)."""
 	now = time.time() if now is None else now
 	root = Path(root)
 	if not root.is_dir():
@@ -37,6 +59,8 @@ def prune_uploads(root: Path | str, *, max_age_s: float = TTL_S, now: float | No
 			continue
 		age = now - p.stat().st_mtime
 		if age < 0:
+			continue
+		if p.name in keep:
 			continue
 		if (p.suffix == ".json" and age > max_age_s) or (p.suffix == ".tmp" and age > TEMP_TTL_S):
 			p.unlink(missing_ok=True)

@@ -446,10 +446,11 @@ def _prune_records_daily() -> dict:
 	"""Once a day (the last run's time is kept in the jobs Dict), delete everything about a job
 	older than 30 days: its record, its uploaded files, its cached probe results and its entry in
 	the job index (runner/retention.py). Each part runs even if another fails."""
+	import json
 	import time
 
 	from preflight.runner.records import prune
-	from preflight.runner.retention import TTL_S, prune_cache, prune_uploads
+	from preflight.runner.retention import TTL_S, prune_cache, prune_uploads, records_text, upload_refs
 
 	last = jobs_dict.get("records_pruned_at") or 0
 	if time.time() - last < PRUNE_EVERY_S:
@@ -473,13 +474,20 @@ def _prune_records_daily() -> dict:
 
 	def uploads():
 		uploads_vol.reload()
-		removed = prune_uploads(UPLOADS_DIR)
+		records_vol.reload()
+		state = jobs_dict.get("state") or {}
+		live = [json.dumps(j.get("request")) for j in state.get("jobs", []) if isinstance(j, dict)]
+		keep = upload_refs([*records_text(RECORDS_DIR), *live])
+		removed = prune_uploads(UPLOADS_DIR, keep=keep)
 		if removed:
 			uploads_vol.commit()
 		return len(removed)
 
 	def cache():
-		return len(prune_cache(list(cache_dict.items()), cache_dict.pop))
+		removed = 0
+		for key in list(cache_dict.keys()):  # one entry at a time: the values can be large
+			removed += len(prune_cache([(key, cache_dict.get(key))], cache_dict.pop))
+		return removed
 
 	def jobs():
 		return JobStoreService().expire.remote(TTL_S)
@@ -490,24 +498,35 @@ def _prune_records_daily() -> dict:
 	return out
 
 
+CLEANUP_TIMEOUT_S = 1800  # guess: a first pass over a month of records, uploads and cache entries
+
+
 @app.function(
 	image=worker_image,
-	schedule=modal.Period(minutes=1),
-	timeout=120,
+	timeout=CLEANUP_TIMEOUT_S,
 	volumes={RECORDS_DIR: records_vol, UPLOADS_DIR: uploads_vol},
 )
+def cleanup() -> dict:
+	"""The daily 30-day cleanup, in its own container so it never holds up the minute's tick."""
+	if deployed_here()[0] is not True:  # a temporary copy never deletes shared data
+		return {}
+	return _prune_records_daily()
+
+
+@app.function(image=worker_image, schedule=modal.Period(minutes=1), timeout=120)
 def tick() -> dict:
 	"""Free leases whose workers died; start workers for jobs waiting in the queue; once a day,
-	delete everything about a job older than 30 days."""
+	start the cleanup of everything about a job older than 30 days."""
 	import time
 
-	pruned: dict = {}
-	try:  # a failed cleanup never holds up the queue, but it says so
+	cleaning = False
+	try:  # a failed start never holds up the queue, but it says so
 		due = time.time() - (jobs_dict.get("records_pruned_at") or 0) >= PRUNE_EVERY_S
-		if due and deployed_here()[0] is True:  # a temporary copy's tick never deletes shared records
-			pruned = _prune_records_daily()
+		if due and deployed_here()[0] is True:  # a temporary copy's tick never deletes shared data
+			cleanup.spawn()
+			cleaning = True
 	except Exception as exc:
-		print(f"record cleanup failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+		print(f"cleanup start failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
 	svc = JobStoreService()
 	reaped = svc.reap.remote()
 	d = svc.demand.remote()
@@ -515,4 +534,4 @@ def tick() -> dict:
 		run_worker.spawn()
 	if d["oldest_queued_s"] > 600:
 		print(f"ALERT backlog: oldest queued job has waited {d['oldest_queued_s']:.0f} s", flush=True)
-	return {"reaped": reaped, "pruned": pruned, **d}
+	return {"reaped": reaped, "cleanup_started": cleaning, **d}
