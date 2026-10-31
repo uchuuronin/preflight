@@ -75,7 +75,11 @@ _TARGETS = {
 # Features the caller switches on from its flags (the engine reads no files). Off by default.
 # flags.json engine.rl: zero-spread groups, rollout time and truncation on the RL lens;
 # engine.serving: throughput, time to first token, time per token and KV capacity on the serving lens
-FEATURES = {"rl": False, "serving": False}
+FEATURES = {
+	"rl": False,
+	"serving": False,
+	"steptime_cross_gpu": False,
+}  # + flags.json engine.steptime_cross_gpu
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
 
@@ -655,8 +659,11 @@ def _empirical_memory(
 		why = "the line through the probes goes below zero here; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	p = memory.p_oom(point, h / memory.Z90, capacity)
+	hi = point * math.exp(h)
+	if cal.is_below(x):  # the same floor as the analytical path (memory.predict_peak)
+		hi = max(hi, cal.correct(cal.min_tokens, 0.0) + memory.DEFAULT_CONTEXT_BYTES)
 	est = memory.MemoryEstimate(
-		point, point * math.exp(-h), point * math.exp(h), "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
+		point, point * math.exp(-h), hi, "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
 		h / memory.Z90, None, "; ".join(x for x in (
 			"fitted to the probes alone: the script map has no model shape",
 			_band_note(cell) if cell is not None and not measured else None,
@@ -898,7 +905,12 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			cross = steptime.predict_cross_gpu_from_probe(
 				current_probe.kernels, current_probe.step_time.p50_s, src_gpu, tgt_gpu
 			)
-		xcell = conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
+		# Chiya, Oct 31: the held-out cross-GPU band, only with engine.steptime_cross_gpu on (it makes GPU moves abstain)
+		xcell = (
+			conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
+			if FEATURES["steptime_cross_gpu"]
+			else None
+		)
 		if cross is not None and cross.status != "abstain":
 			ratio = cross.point / current_probe.step_time.p50_s
 			# Chiya, Oct 31: K1's band from held-out corpus pairs, never narrower than the simulated one
@@ -2453,6 +2465,8 @@ def _calibration(mid: str, record: FlightRecord | None = None) -> tuple[str, flo
 	target = _CARD_TARGET.get(mid)
 	if not target:
 		return CALIBRATION, None
+	if mid == steptime.MODEL_ID_CROSS and not FEATURES["steptime_cross_gpu"]:
+		return CALIBRATION, None  # the held-out band is installed but not switched on
 	if record is not None:
 		cell = conformal.TABLE.lookup(target, _env_gpu(record), record.job.lens)
 		return ("held_out", None) if cell is not None else (CALIBRATION, None)

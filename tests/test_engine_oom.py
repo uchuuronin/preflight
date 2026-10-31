@@ -102,7 +102,9 @@ def test_an_unverified_top_bin_shows_its_own_counts_until_it_verifies(monkeypatc
 	r = api._from_memory_estimate(est, memory.MODEL_ID, "from 19 held-out runs").oom
 	assert r.reason.startswith("Likely to run out of memory: 9 of 10 similar runs did")
 	lo, hi = conformal.wilson(9, 10)
-	assert r.lo == pytest.approx(lo) and r.hi == pytest.approx(max(hi, 0.99))  # the range holds the model's point
+	assert r.lo == pytest.approx(lo) and r.hi == pytest.approx(
+		max(hi, 0.99)
+	)  # the range holds the model's point
 	# the switch: once that bin holds 10 runs that agree with outcomes, a number again
 	passing = ((0.0, 0.05, 587, True, 2), (0.95, 1.0, 12, True, 12))
 	monkeypatch.setattr(conformal, "TABLE", replace(conformal.TABLE, oom_bins=passing))

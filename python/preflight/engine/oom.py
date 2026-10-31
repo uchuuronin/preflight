@@ -126,7 +126,7 @@ def end_evidence(p: float, bins) -> tuple[int, int] | None:
 		return None
 	for r in _rows(bins):
 		if r[0] - 1e-9 <= p < r[1] + 1e-9 and (r[1] <= UNCERTAIN[0] + 1e-9 or r[0] >= UNCERTAIN[1] - 1e-9):
-			if _verified(r) or r[4] is None:
+			if _verified(r) or r[4] is None or r[2] == 0:
 				return None
 			return int(r[4]), int(r[2])
 	return None

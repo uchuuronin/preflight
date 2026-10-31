@@ -225,14 +225,14 @@ The GNN alone doesn't beat the GBDT. The plan's validation row is "GNN + GBDT en
 
 Either way, a no-probe cost model is a prior, not a prediction. At 41–46% within 20%, it is well behind K1 with a probe (60%) and the same-GPU line (80%).
 
-**Installed (Chiya, Oct 31): the cross-GPU band, `time.step.cross`.** `calibrate --cross` builds it from the 2,286 corpus pairs, and the engine uses it in K1's replay. K1's band is never narrower than this: pooled half-width 0.448 (2,286 pairs, 95 architectures), with per-GPU cells for the four corpus GPUs. The card reports leave-one-GPU-out coverage, 2,130 of 2,286.
+**Installed (Chiya, Oct 31): the cross-GPU band, `time.step.cross`, used only with `engine.api.FEATURES["steptime_cross_gpu"]` on, which the caller sets from the `engine.steptime_cross_gpu` flag; off, K1 keeps its own band and card.** `calibrate --cross` builds it from the 2,286 corpus pairs, and the engine uses it in K1's replay. K1's band is never narrower than this: pooled half-width 0.448 (2,286 pairs, 95 architectures), with per-GPU cells for the four corpus GPUs. The card reports leave-one-GPU-out coverage, 2,130 of 2,286.
 
 **Consequence for the GPU dial: every GPU move now abstains.** The plan abstains when a band is wider than ±50%. K1's honest band is ±45% before the probe's own error is added, and ±50% after. So moving to another GPU now says "run a probe here" instead of showing a range. That is the truth about the corpus, but it changes what visitors see. Chiya's options:
 - keep it;
 - show cross-GPU time as a wide range labelled "rough, no probe on this GPU", past the ±50% rule;
 - or wait for a better replay. The corpus fed K1 aten-op tables, while users' probes carry kernel tables, so the AMD rows and the Nov 2 scripts may tell a different story.
 
-The flag `engine.steptime_cross_gpu` stays off either way.
+The flag `engine.steptime_cross_gpu` stays off either way. The table now rebuilds from a store without the A100 rows and carries the holdout scores forward (`--keep-holdout`). A store that still holds them is refused unless `--score-holdout` is passed, and refused even then once the table already holds holdout scores.
 
 ## The A100 memory underestimates: what non-A100 data says (Oct 31)
 
@@ -243,10 +243,13 @@ Chiya asked for the cause of the two A100 underestimates (40% and 16% low), foun
 - **Not fixed workspaces or the CUDA context.** The underestimates have a smaller fixed share of reserved memory than the queries overall (0.22 against 0.52).
 - **It's the config, and where the query sits.** Underestimates by more than 10% hit 14% of queries below the smallest probe, against 5% above it. They come from CNNs (17%), GPTs (13%) and encoders (11%); MLPs and the HF LoRA jobs have none. Below the probes, the line through them drops faster than memory does: the real curve has a floor the line can't see.
 
-**Fix (memory-analytical@0.3.1):** below the smallest probe, the top of the range is at least what the line gives at that probe, because memory doesn't shrink faster than the work does. On non-A100 rows, below-probe queries above the band's top fall from 11 of 236 to 2. The point estimate is unchanged. Above the probes, 4 of 251 still exceed the top. The worst is an encoder going to a longer sequence, which is config-specific.
+**Fix (memory-analytical@0.3.1):** below the smallest probe, the top of the range is at least what the line gives at that probe, because memory doesn't shrink faster than the work does. It applies on both memory paths: the analytical one, and the probe-only line for models without a shape (most CNNs). The point estimate and P(OOM) are unchanged. Scored leave-one-architecture-out, as everything else here is (review, Oct 31; an earlier in-sample count read 11 → 2):
+- Below the probes, queries above the band's top fall from 19 of 236 to 9; 7 abstain.
+- CNNs go from 9 to 1. The 8 GPT and encoder misses remain.
+- Above the probes, 7 of 251 exceed the top. The worst is an encoder going to a longer sequence, which is config-specific.
 
 **What this can't say:** whether the two A100 misses were below-probe queries. Telling would mean looking at holdout rows, which are never re-scored. Two checks are still to come:
 - The AMD rows (MI300X, 192 GB, a different allocator) test whether misses grow with the card.
 - The Nov 2 scripts test the fix on users' jobs.
 
-Monotonicity also means a below-probe underestimate can't hide an OOM when the smallest probe fit. The OOM-relevant misses are the ones above the probes.
+Monotonicity also means a below-probe underestimate can't hide an OOM on the same card when the smallest probe fit there. Moving to a smaller card at the same time breaks that, and the floor doesn't raise P(OOM) either. The OOM-relevant misses are the ones above the probes, and on smaller cards.

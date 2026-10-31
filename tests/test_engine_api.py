@@ -593,7 +593,8 @@ def test_one_threads_quiet_grid_doesnt_silence_another():
 	assert seen == [False] and api._QUIET.get() is False
 
 
-def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft):
+def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
 	from preflight.engine import conformal, steptime
 
 	cell = conformal.TABLE.lookup("time.step.cross", "A100-SXM-80GB", None)
@@ -606,7 +607,15 @@ def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft):
 	)
 
 
-def test_with_the_held_out_band_a_gpu_move_says_run_a_probe_there(ft):
+def test_without_the_feature_a_gpu_move_keeps_k1s_own_band(ft):
+	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	assert e.status != "abstain" and "held-out corpus pairs" not in (e.reason or "")
+	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
+	assert card.notes.startswith("calibration: simulated")
+
+
+def test_with_the_held_out_band_a_gpu_move_says_run_a_probe_there(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
 	# Chiya, Oct 31: the honest cross-GPU band is about +-45%, past the +-50% abstention once the probe's own error
 	# is added, so moving the GPU dial asks for a probe on that GPU instead of showing a range
 	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]

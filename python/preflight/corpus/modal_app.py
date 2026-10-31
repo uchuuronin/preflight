@@ -304,6 +304,9 @@ def main(
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
 	from preflight.corpus.isolate import DEFAULT_TIMEOUT_S
+
+	if deadline_s < 0:
+		raise SystemExit("--deadline-s must be 0 (the kind's default) or a positive number of seconds")
 	from preflight.engine import gpus
 
 	plan = sweep.parse_budget_plan(budgets)

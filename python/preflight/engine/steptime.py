@@ -30,7 +30,7 @@ from preflight.engine import gpus
 from preflight.engine.memory import TransformerArch
 
 MODEL_ID_SAME = "steptime-phases@0.2.0"
-MODEL_ID_CROSS = "steptime-roofline@0.2.0"
+MODEL_ID_CROSS = "steptime-roofline@0.3.0"  # 0.3.0 (Oct 31): the held-out cross-GPU band, behind a feature
 MODEL_ID_COMM = "steptime-comm-analytical@0.2.0"  # 0.2.0 (Oct 31): nodes > 1 adds the network
 Z90 = 1.6448536269514722  # derived: the normal 95th percentile
 SIGMA_SAME_GPU = 0.08  # simulated: A's D1, median of 5 timed steps within 15% in 99.3% of trials

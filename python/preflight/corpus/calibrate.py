@@ -367,6 +367,16 @@ def main(argv: list[str] | None = None) -> int:
 		help="targets whose cells go into the table; the others keep their simulated bands and say so",
 	)
 	ap.add_argument(
+		"--keep-holdout",
+		type=Path,
+		help="carry the holdout scores forward from this table; the store must then hold no holdout rows",
+	)
+	ap.add_argument(
+		"--score-holdout",
+		action="store_true",
+		help="score the holdout rows in the store: once only, refused when --out already holds holdout scores",
+	)
+	ap.add_argument(
 		"--cross",
 		action="store_true",
 		help="also build the cross-GPU band (time.step.cross) from configs two GPUs both ran",
@@ -381,6 +391,23 @@ def main(argv: list[str] | None = None) -> int:
 	only = parse_lenses(args.lenses)
 	holdout = tuple(g.strip() for g in args.holdout_gpus.split(",") if g.strip())
 	rows = load_rows(args.store)
+	held_rows = [r for r in rows if held_out(r.get("gpu"), holdout)]
+	kept = None
+	if args.keep_holdout:
+		import ast
+
+		if held_rows:
+			raise SystemExit(
+				f"--keep-holdout: the store still holds {len(held_rows)} holdout rows; remove them so they aren't scored again"
+			)
+		kept = ast.literal_eval(args.keep_holdout.read_text().split("=", 1)[1]).get("holdout") or {}
+	elif held_rows and not args.score_holdout:
+		raise SystemExit(
+			f"the store holds {len(held_rows)} holdout rows: pass --score-holdout to score them (once), or remove them "
+			"and pass --keep-holdout <table> to carry the earlier scores forward"
+		)
+	elif held_rows and args.out and args.out.exists() and "'holdout': {}" not in args.out.read_text():
+		raise SystemExit(f"{args.out} already holds holdout scores: the holdout is scored once")
 	scores = scores_from_rows(rows)  # grouped rows -> conformal scores
 	# the corpus's synthetic LoRA models aren't what users send (real HF models are): reported, never calibrated on
 	synthetic = [s for s in scores if s.lens in SYNTHETIC_LENSES]
@@ -436,6 +463,11 @@ def main(argv: list[str] | None = None) -> int:
 		coverage={t: v for t, v in table.coverage.items() if t in keep},
 		holdout={t: v for t, v in table.holdout.items() if t in keep},
 	)
+	if kept is not None:
+		table = replace(
+			table, holdout={t: {g: (int(v[0]), int(v[1])) for g, v in gs.items()} for t, gs in kept.items()}
+		)
+		print(f"holdout scores carried forward from {args.keep_holdout}, not re-scored")
 	# only memory's residuals are read (P(OOM)); the rest would only bloat the module the browser loads
 	table = replace(
 		table,
