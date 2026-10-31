@@ -90,11 +90,12 @@ def test_the_script_gets_no_other_provider_keys(proxy, tmp_path):
 	_, px = proxy
 	out = tmp_path / "env.txt"
 	env = {**os.environ, "FAKE_AGENT_ENV_OUT": str(out), "ANTHROPIC_API_KEY": "sk-ant", "LLAMA_API_KEY": "x",
-		"MY_COPY": "our-key"}  # fmt: skip
+		"MY_COPY": "our-key", "TAVILY_API_KEY": "tool"}  # fmt: skip
 	run_sample([sys.executable, str(FIX / "fake_agent.py")], cwd=tmp_path, proxy=px, population=100, k=1,
 		env=env)  # fmt: skip
 	names = set(out.read_text().split())
 	assert "OPENAI_API_KEY" in names and not names & {"ANTHROPIC_API_KEY", "LLAMA_API_KEY", "MY_COPY"}
+	assert "TAVILY_API_KEY" in names  # a tool's key stays, or the agent's tools fail
 
 
 def test_a_cancelled_sample_stops_the_script_and_marks_what_was_running(proxy, tmp_path):
@@ -187,3 +188,15 @@ def test_a_run_id_is_used_once_per_proxy(proxy):
 	px.open_run("s1", max_tasks=1)
 	with pytest.raises(ValueError):
 		px.open_run("s1", max_tasks=1)
+
+
+def test_a_key_sampled_twice_is_skipped_twice_and_no_more(proxy):
+	"""Tasks that open with the same call ("Begin.") share a key: skip as many as were sampled."""
+	_, px = proxy
+	body = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": "Begin."}], "max_tokens": 5}
+	url = px.open_run("s1", max_tasks=2)
+	_post(url, body), _post(url, body)
+	first = px.run_tasks("s1")
+	url2 = px.open_run("s2", max_tasks=5, skip_keys=[task_key(t) for t in first])
+	codes = [_post(url2, body)[0] for _ in range(4)]
+	assert codes == [429, 429, 200, 200] and len(px.run_tasks("s2")) == 2

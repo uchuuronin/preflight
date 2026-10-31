@@ -440,7 +440,12 @@ def _sample_agent(rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx,
 		if k <= 0:
 			raise InvalidSubmission(f"this record's sample already has {len(first.tasks)} tasks",
 				code="submission.sample_full")  # fmt: skip
-		skip_keys = {key for t in first.tasks if (key := task_key(t.task_id))}
+		skip_keys = [key for t in first.tasks if (key := task_key(t.task_id))]
+		if len(skip_keys) < len(first.tasks):
+			# sampled before tasks were keyed by content: a top-up couldn't tell them apart and would
+			# pay for them again
+			raise PermanentError("this record's sample can't be topped up; sample the run again",
+				code="unsupported.agent_sampling")  # fmt: skip
 		# the first sample's indices are offered again first, and refused by content
 		offered = tuple(draw_indices(population, DEFAULT_SAMPLE) or ())
 	else:

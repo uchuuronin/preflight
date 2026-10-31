@@ -14,7 +14,9 @@ its calls into tasks by conversation and refuses the call that would start task 
 retry). A top-up refuses the tasks already sampled at their first call, matched by content (a hash
 of the first call), so they cost nothing the second time, in whatever order they start.
 
-Other provider keys (*_API_KEY, *_API_TOKEN) are taken out of the script's environment. Grouping
+Other model providers' keys (PROVIDER_KEYS) are taken out of the script's environment; tool keys
+stay. A task's key is a hash of its whole first call, so a timestamp or id in the first prompt
+gives it a new key each run and a top-up can't recognise it. Grouping
 is by conversation, so an agent's side calls (a judge, a sub-agent) and a history trimmed mid-task
 each start a task of their own; `selection` says so when most tasks are a single call.
 
@@ -48,16 +50,26 @@ def draw_indices(population: int | None, k: int, *, seed: int = SAMPLE_SEED, exc
 	return sorted(random.Random(seed).sample(pool, min(k, len(pool))))
 
 
-def _scrubbed(env: dict, upstream_key: str | None) -> dict:
-	"""The script's environment without other provider keys, so a client with a hard-coded base
-	URL can't reach a provider unmetered: *_API_KEY and *_API_TOKEN variables, and anything that
-	holds the proxy's own key, are dropped."""
-	out = {}
+# model providers' own key variables: a client that reads one of these with a hard-coded base URL
+# would reach that provider unmetered. Tool keys (search, sandboxes) stay, or the agent's tools fail.
+PROVIDER_KEYS = frozenset({
+	"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "AZURE_OPENAI_API_KEY", "BASETEN_API_KEY", "CEREBRAS_API_KEY",
+	"COHERE_API_KEY", "CO_API_KEY", "DEEPINFRA_API_KEY", "DEEPSEEK_API_KEY", "FIREWORKS_API_KEY",
+	"GEMINI_API_KEY", "GOOGLE_API_KEY", "GROQ_API_KEY", "HUGGINGFACEHUB_API_TOKEN", "LLAMA_API_KEY",
+	"META_API_KEY", "MISTRAL_API_KEY", "MOONSHOT_API_KEY", "NVIDIA_API_KEY", "OPENROUTER_API_KEY",
+	"PERPLEXITY_API_KEY", "PPLX_API_KEY", "REPLICATE_API_TOKEN", "TOGETHER_API_KEY", "XAI_API_KEY",
+})  # fmt: skip
+
+
+def _scrubbed(env: dict, upstream_key: str | None) -> tuple[dict, list[str]]:
+	"""The script's environment without other model providers' keys, and the names taken out."""
+	out, gone = {}, []
 	for k, v in env.items():
-		if k.endswith(("_API_KEY", "_API_TOKEN")) or (upstream_key and v == upstream_key):
+		if k in PROVIDER_KEYS or (upstream_key and v == upstream_key and k != "OPENAI_API_KEY"):
+			gone.append(k)
 			continue
 		out[k] = v
-	return out
+	return out, sorted(gone)
 
 
 def run_sample(cmd: list[str], *, cwd: Path, proxy, population: int | None, k: int = DEFAULT_SAMPLE,
@@ -73,8 +85,9 @@ def run_sample(cmd: list[str], *, cwd: Path, proxy, population: int | None, k: i
 	url = proxy.open_run(run_id, max_tasks=k, skip_keys=skip_keys)
 	new = draw_indices(population, k, exclude=offered_first)
 	indices = None if new is None else [*offered_first, *new]
+	kept, withheld = _scrubbed(env if env is not None else dict(os.environ), getattr(proxy, "_key", None))
 	child_env = {
-		**_scrubbed(env if env is not None else dict(os.environ), getattr(proxy, "_key", None)),
+		**kept,
 		"OPENAI_BASE_URL": url,
 		"OPENAI_API_BASE": url,
 		"OPENAI_API_KEY": DUMMY_KEY,
@@ -95,7 +108,8 @@ def run_sample(cmd: list[str], *, cwd: Path, proxy, population: int | None, k: i
 			break
 		with _quiet():
 			proc.wait(timeout=1.0)
-	in_flight = set(proxy.run_stats(run_id).get("in_flight", [])) if cut else set()
+	at_cut = proxy.run_stats(run_id) if cut else {}
+	in_flight = {*at_cut.get("in_flight", []), *at_cut.get("mid_tool", [])}
 	with _quiet():
 		os.killpg(proc.pid, signal.SIGKILL)  # the script, and anything it left running
 	with _quiet():
@@ -109,6 +123,8 @@ def run_sample(cmd: list[str], *, cwd: Path, proxy, population: int | None, k: i
 		parts.append(f"{st['skipped']} already sampled skipped")
 	if st.get("refused"):
 		parts.append(f"{st['refused']} calls refused past the sample")
+	if withheld:
+		parts.append(f"{len(withheld)} other provider keys withheld")
 	if st.get("single_call") and len(ids) and st["single_call"] * 2 > len(ids):
 		parts.append(f"{st['single_call']} one-call tasks (side calls may split tasks)")
 	parts.append(f"script wall {wall:.0f} s" + (f", {cut} at {timeout_s:.0f} s" if cut == "timeout" else

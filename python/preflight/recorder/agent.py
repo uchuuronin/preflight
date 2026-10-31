@@ -84,7 +84,8 @@ class Call:
 class _Run:
 	run_id: str
 	max_tasks: int
-	skip_keys: frozenset = frozenset()  # opening keys of tasks already sampled (a top-up)
+	skip_keys: dict = field(default_factory=dict)  # opening key -> tasks already sampled with it (a top-up)
+	skipped_keys: dict = field(default_factory=dict)  # opening key -> tasks refused with it so far
 	skipped: list[list[str]] = field(default_factory=list)  # first calls of the tasks refused
 	order: list[str] = field(default_factory=list)
 	last: dict[str, list[str]] = field(default_factory=dict)  # task -> its last call's message hashes
@@ -346,7 +347,8 @@ class AgentProxy:
 		and the sample costs only its own tasks. Task ids are `<run_id>-<opening key>`. skip_keys:
 		tasks whose opening key is here are refused at their first call (a top-up after a first
 		sample: a script that can't be told where to start runs its first tasks again, and they
-		cost nothing this way, in whatever order they start)."""
+		cost nothing this way, in whatever order they start; a key given twice skips two tasks
+		opened that way)."""
 		if not _TASK_ID.fullmatch(run_id):
 			raise ValueError(f"run id {run_id!r}: letters, digits, '_', '.', '-', up to 64")
 		if self._server is None:
@@ -355,7 +357,10 @@ class AgentProxy:
 		with self._lock:
 			if any(isinstance(r, _Run) and r.run_id == run_id for r in self._tokens.values()):
 				raise ValueError(f"run id {run_id!r} is already open on this proxy")
-			self._tokens[token] = _Run(run_id, max_tasks, skip_keys=frozenset(skip_keys))
+			counts: dict = {}
+			for k in skip_keys:  # a key twice: two sampled tasks opened the same way, both skipped
+				counts[k] = counts.get(k, 0) + 1
+			self._tokens[token] = _Run(run_id, max_tasks, skip_keys=counts)
 		host, port = self._server.server_address[:2]
 		return f"http://{host}:{port}/t/{token}/v1"
 
@@ -378,6 +383,8 @@ class AgentProxy:
 			ts = {tid: self._tasks.get(tid, _Task()) for tid in run.order}
 			return {"skipped": len(run.skipped), "refused": run.refused,
 				"in_flight": [tid for tid, t in ts.items() if t.in_flight > 0],
+				# a task whose last answer asked for a tool was mid-task (running the tool) if cut now
+				"mid_tool": [tid for tid, t in ts.items() if t.calls and t.calls[-1].finish_reason == "tool_calls"],
 				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1)}  # fmt: skip
 
 	def _task_for(self, run: "_Run", req: dict) -> str | None:
@@ -396,8 +403,10 @@ class AgentProxy:
 				failed = bool(t.calls) and (
 					t.calls[-1].error or not t.calls[-1].status or t.calls[-1].status >= 400
 				)
-				if len(last) == len(msgs) and not (t.in_flight or failed):
-					continue  # the same call again after a good answer: a repeat (pass@k), not a retry
+				if len(last) == len(msgs) and not failed:
+					# the same call again, unless its last answer failed: a repeat (pass@k, or n samples
+					# sent at once), not a retry; a client's own retry after a timeout opens a task too
+					continue
 				# the longest match; among equals, a task with nothing in flight (its turn is next)
 				k = (len(last), t.in_flight == 0)
 				if best_key is None or k > best_key:
@@ -405,10 +414,13 @@ class AgentProxy:
 			if best is not None:
 				run.last[best] = msgs
 				return best
-			if any(len(k) <= len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
-				return ""  # a retry or a later turn of a skipped task: still skipped
+			if any(len(k) < len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
+				return ""  # a later turn of a skipped task: still skipped
+			# the same first call again counts against its key's skips below: tasks that open the
+			# same way ("Begin.") are skipped as many times as they were sampled, then run
 			key = opening_key(msgs)
-			if key in run.skip_keys:
+			if run.skipped_keys.get(key, 0) < run.skip_keys.get(key, 0):
+				run.skipped_keys[key] = run.skipped_keys.get(key, 0) + 1
 				run.skipped.append(msgs)
 				return ""
 			if len(run.order) >= run.max_tasks:

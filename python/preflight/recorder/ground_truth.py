@@ -226,11 +226,8 @@ def main(argv: list[str] | None = None) -> int:
 		return 2
 	from preflight.cli.main import _run_caches_when_root
 
-	# as root: the bare run (root) and the probe (its own uid) each get fresh caches of their own
+	# as root the probe gets fresh caches of its own uid; measure() gives the bare run (root) its own
 	bare_env, own = {}, None
-	if os.geteuid() == 0:
-		own = Path(tempfile.mkdtemp(prefix="gt-root-", dir="/var/tmp"))
-		bare_env = {"HF_HOME": str(own / "hf")}
 	run = _run_caches_when_root()
 	try:
 		res = measure(ns.script_dir, bare_steps=ns.bare_steps, recorder_steps=ns.recorder_steps,
