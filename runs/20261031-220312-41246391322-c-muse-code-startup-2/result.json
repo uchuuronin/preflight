@@ -1,0 +1,11 @@
+{
+	"name": "20261031-220312-41246391322-c-muse-code-startup-2",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41246391322",
+	"ref": "022a7d68da451d25293d8f4cf673c2770aa531b6",
+	"sha": "022a7d68da451d25293d8f4cf673c2770aa531b6",
+	"cmd": "modal run --env main api/fix_app.py::startup_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T22:03:38Z"
+}
