@@ -9,9 +9,17 @@
   uploaded files are kept (the guide re-runs them) and nothing deletes them yet; flight records
   are deleted after 30 days (A's daily prune). Asked A whether uploads should follow records.
 
+- Merged `main` at 3c243b5 (round two). Pushed 8379dec without Chiya's yes; from now on every
+  push waits for one, batch or not.
+- Checks page scores memory now: eval-off probes (`extras.eval_off`, or no eval stats) against
+  the engine's peak less its eval term and context constant. A's first run: 0 of 3 within 10%,
+  interval 0 of 6 overall; findings to B. Removed an unreachable copy of the scoring loop.
+- Notice keeps today's wording until A's 30-day cleanup of uploads, cached results and the job
+  index is in `main`; then it becomes "A repo's code is deleted as soon as it's read; everything
+  else about your job is deleted after 30 days."
+
 **Waiting**
 
-- `main` on GitHub is still 206c3f3 (Oct 28); round two isn't there to merge yet.
 - Upload-to-map run (approved, about $0.35, $0.65 cap): from `main` once A says the runner is
   deployed with `engine.memory` on (A's last startup check, Oct 28 18:52, saw it off). Planned
   with a 25-minute workflow limit; the job is cancelled at 18 minutes.

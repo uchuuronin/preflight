@@ -37,8 +37,11 @@ def test_a_real_run_is_scored_only_on_probes_held_out():
 	p2 = next(c for c in steps if c["probe"] == "p2")
 	assert abs(p2["measured"] - 0.837) < 0.001
 	assert p2["predicted"]["point"] == pytest.approx(1.666, rel=0.01)
-	# Eval-off re-runs after the eval OOM aren't compared with a job-as-written memory prediction.
-	assert {s["probe"] for s in skipped if s.get("metric") == "peak_memory"} == {"p1", "p2", "p3"}
+	# Eval-off re-runs after the eval OOM are scored against the peak less the engine's eval term.
+	mem = [c for c in checks if c["metric"] == "peak_memory"]
+	assert {c["probe"] for c in mem} == {"p1", "p2", "p3"}
+	assert {c["basis"] for c in mem} == {"peak_less_eval_and_context"}
+	assert not [s for s in skipped if s.get("metric") == "peak_memory"]
 	oom = [c for c in checks if c["metric"] == "oom"]
 	assert [c["probe"] for c in oom] == ["p1-eval"]
 
@@ -76,15 +79,40 @@ def test_held_out_records_carry_nothing_derived_from_the_probe():
 	assert held.models == [] and held.findings == [] and not held.predictions.estimates
 
 
-def test_a_probe_without_an_eval_pass_is_skipped_only_when_the_engine_peak_includes_eval():
+def test_an_eval_off_probe_is_scored_against_the_peak_less_the_eval_term():
 	from preflight.engine.api import predict
+	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES
 	from preflight.schema import load_record
 
 	rec = load_record(REAL.read_text())
 	p2 = next(p for p in rec.probes if p.id == "p2")
-	as_written = predict(coverage.held_out(rec, p2), dict(p2.knobs)).root
-	assert coverage.memory_comparable(p2, as_written) == "no_eval_pass"
-	# The same job with an eval that adds nothing to the peak: the training peak is comparable.
-	quiet = predict(coverage.held_out(rec, p2), {**p2.knobs, "eval_no_grad": True, "eval_batch_size": 2}).root
-	assert (quiet["memory.eval_spike"].point or 0) == 0
-	assert coverage.memory_comparable(p2, quiet) is None
+	pred = predict(coverage.held_out(rec, p2), dict(p2.knobs)).root
+	m, basis = coverage.memory_target(p2, pred)
+	assert basis == "peak_less_eval_and_context"
+	expected = pred["memory.peak"].point - pred["memory.eval_spike"].point - DEFAULT_CONTEXT_BYTES
+	assert m["point"] == pytest.approx(expected)
+	assert m["lo"] <= m["point"] <= m["hi"]
+
+
+def test_a_probe_that_ran_eval_keeps_the_eval_term():
+	from preflight.engine.api import predict
+	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES
+	from preflight.schema import load_record
+
+	rec = load_record(REAL.read_text())
+	p2 = next(p for p in rec.probes if p.id == "p2")
+	with_eval = p2.model_copy(update={"eval": next(p for p in rec.probes if p.id == "p1-eval").eval})
+	pred = predict(coverage.held_out(rec, p2), dict(p2.knobs)).root
+	m, basis = coverage.memory_target(with_eval, pred)
+	assert basis == "peak_less_context"
+	assert m["point"] == pytest.approx(pred["memory.peak"].point - DEFAULT_CONTEXT_BYTES)
+
+
+def test_the_eval_off_marker_counts_even_when_eval_stats_exist():
+	from preflight.schema import load_record
+
+	rec = load_record(REAL.read_text())
+	p1e = next(p for p in rec.probes if p.id == "p1-eval")
+	marked = p1e.model_copy(update={"extras": {**(p1e.extras or {}), "eval_off": 1.0}})
+	assert coverage.ran_without_eval(marked)
+	assert not coverage.ran_without_eval(p1e)

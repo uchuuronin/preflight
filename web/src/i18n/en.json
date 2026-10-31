@@ -698,7 +698,7 @@
 	"stage.back_to_map": "Back to the map",
 	"checks.eyebrow": "Checks",
 	"checks.title": "Held-out checks on real runs",
-	"checks.method": "Every probe in a real run is held out in turn: the engine predicts that probe's setting from the rest of the record, and the prediction is scored against what the probe measured. Probes of the same point are held out together, so each prediction has one probe fewer than the cockpit has. Abstentions are listed, not scored. Step time, memory and the interval get a status only when the whole Wilson 95% interval is past their bar; one missed out-of-memory is a miss whatever the count. Checks from one run share its script and GPU, so they aren't independent, though the intervals treat them as if they were.",
+	"checks.method": "Every probe in a real run is held out in turn: the engine predicts that probe's setting from the rest of the record, and the prediction is scored against what the probe measured. Probes of the same point are held out together, so each prediction has one probe fewer than the cockpit has. Memory is compared on reserved bytes; for a probe that ran no eval pass, the engine's eval share comes off its prediction. Abstentions are listed, not scored. Step time, memory and the interval get a status only when the whole Wilson 95% interval is past their bar; one missed out-of-memory is a miss whatever the count. Checks from one run share its script and GPU, so they aren't independent, though the intervals treat them as if they were.",
 	"checks.meta": "{measured} of {runs} runs measured · engine {engine} · {date}",
 	"checks.summary": "Summary",
 	"checks.col.metric": "Check",
@@ -736,10 +736,10 @@
 	"checks.source.derived": "(derived)",
 	"checks.source.measured": "(measured)",
 	"checks.why.nothing_measured": "{run}: nothing measured. {codes}",
-	"checks.why.no_eval_pass": "the probe ran no eval pass, but the engine's peak includes eval",
 	"newflight.upload.limits_scripts": ".py with requirements, configs and small text data, up to 5 MB in all",
 	"newflight.handed.too_big": "That's more than 5 MB to check in, even without the notebook's outputs. Link a GitHub repo instead.",
 	"checks.predicted": "predicted {value}",
+	"checks.predicted_no_eval": "predicted {value} without eval",
 	"checks.measured.oom": "out of memory",
 	"checks.measured.oom_eval": "out of memory in eval"
 }
