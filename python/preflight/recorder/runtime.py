@@ -146,7 +146,12 @@ def _lens_stats(batch) -> dict[str, float]:
 			first = batch.get("pixel_values", batch.get("image", batch.get("images")))
 		elif isinstance(batch, list | tuple) and batch:
 			first = batch[0]
-		if isinstance(first, torch.Tensor) and first.dim() == 4 and first.is_floating_point():
+		if (
+			isinstance(first, torch.Tensor)
+			and first.dim() == 4
+			and (first.is_floating_point() or first.dtype == torch.uint8)
+		):
+			# uint8 too: DALI, FFCV and torchvision.io hand over raw images and normalise on the GPU
 			n, c, h, w = (int(x) for x in first.shape)
 			if c in (1, 3, 4):
 				out["images_per_batch"] = float(n)
@@ -339,7 +344,8 @@ class Recorder:
 		self.train_loader_batches: int | None = None
 		self._train_iter: int | None = None
 		self.retrieval: dict[str, dict] = {}  # encode, index_add, index_train, search: calls, items, seconds
-		self._retrieval_depth = 0
+		self._retrieval_depth = threading.local()
+		self._retrieval_lock = threading.Lock()
 		self.lens_stats: list[dict] = []  # vision and graph batch shapes, the first training batches
 		self._train_dataset = None
 		self.run_length: dict = {}
@@ -825,9 +831,10 @@ class Recorder:
 
 		@functools.wraps(fn)
 		def run(*args, **kwargs):
-			if rec._retrieval_depth:
-				return fn(*args, **kwargs)  # a stage inside another (encode calling itself)
-			rec._retrieval_depth += 1
+			depth = getattr(rec._retrieval_depth, "n", 0)
+			if depth:
+				return fn(*args, **kwargs)  # a stage inside another, on this thread (encode calling itself)
+			rec._retrieval_depth.n = depth + 1
 			try:
 				rec._sync()
 				t0 = rec._now()
@@ -835,12 +842,15 @@ class Recorder:
 				rec._sync()
 				dt = rec._now() - t0
 			finally:
-				rec._retrieval_depth -= 1
-			st = rec.retrieval.setdefault(kind, {"calls": 0, "items": 0, "seconds": 0.0})
-			st["calls"] += 1
-			st["seconds"] += dt
+				rec._retrieval_depth.n = depth
+			n = None
 			with suppress(Exception):
-				st["items"] += int(count(args, kwargs))
+				n = int(count(args, kwargs))
+			with rec._retrieval_lock:
+				st = rec.retrieval.setdefault(kind, {"calls": 0, "items": 0, "seconds": 0.0})
+				st["calls"] += 1
+				st["seconds"] += dt
+				st["items"] += n or 0
 			return out
 
 		return run
@@ -864,11 +874,15 @@ class Recorder:
 			x = args[1] if len(args) > 1 else kwargs.get("x")
 			return x.shape[0]
 
+		base = getattr(mod, "Index", None)
 		for name in dir(mod):
 			cls = getattr(mod, name, None)
-			if not isinstance(cls, type) or not name.startswith("Index"):
-				continue
-			for meth, kind in (("add", "index_add"), ("train", "index_train"), ("search", "search")):
+			if not isinstance(cls, type) or not (
+				(isinstance(base, type) and issubclass(cls, base)) or name.startswith(("Index", "GpuIndex"))
+			):
+				continue  # GPU indexes (index_cpu_to_gpu) are Index subclasses with their own wrappers
+			for meth, kind in (("add", "index_add"), ("add_with_ids", "index_add"), ("train", "index_train"),
+				("search", "search")):  # fmt: skip
 				if meth in cls.__dict__:  # the class's own wrapper, not one inherited (timed once)
 					with suppress(Exception):
 						self._patch(
@@ -1403,8 +1417,10 @@ class Recorder:
 						p for r in self._roots for p in r.parameters() if p.dim() == 4 and p.shape[-1] > 1
 					]
 					if convs:
-						out["channels_last"] = float(all(
-							p.is_contiguous(memory_format=torch.channels_last) and not p.is_contiguous() for p in convs))  # fmt: skip
+						# every weight channels-last; at least one not also plain-contiguous (a depthwise
+						# (C, 1, k, k) weight is both, so it can't tell)
+						out["channels_last"] = float(all(p.is_contiguous(memory_format=torch.channels_last) for p in convs)
+							and any(not p.is_contiguous() for p in convs))  # fmt: skip
 		out.update({k: v for k, v in self.run_length.items() if v is not None})
 		out["host_rss_peak_bytes"] = self._rss_peak or None
 		if self._kernels is not None:

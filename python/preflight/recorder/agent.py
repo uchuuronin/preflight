@@ -400,6 +400,8 @@ class AgentProxy:
 				if not last or len(last) > len(msgs) or msgs[: len(last)] != last:
 					continue
 				t = self._tasks.get(tid, _Task())
+				if t.stopped and len(last) == len(msgs):
+					return tid  # a retry of the call that stopped it: refused again, not a fresh task
 				failed = bool(t.calls) and (
 					t.calls[-1].error or not t.calls[-1].status or t.calls[-1].status >= 400
 				)
@@ -414,10 +416,11 @@ class AgentProxy:
 			if best is not None:
 				run.last[best] = msgs
 				return best
-			if any(len(k) < len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
-				return ""  # a later turn of a skipped task: still skipped
-			# the same first call again counts against its key's skips below: tasks that open the
-			# same way ("Begin.") are skipped as many times as they were sampled, then run
+			if any(len(k) <= len(msgs) and msgs[: len(k)] == k for k in run.skipped if k):
+				# a retry (a framework's own, past the SDK) or a later turn of a skipped task: still
+				# skipped. Tasks that all open with the same call can't be told from retries of it,
+				# so a top-up of such a script runs nothing new and says so
+				return ""
 			key = opening_key(msgs)
 			if run.skipped_keys.get(key, 0) < run.skip_keys.get(key, 0):
 				run.skipped_keys[key] = run.skipped_keys.get(key, 0) + 1
@@ -561,7 +564,8 @@ class AgentProxy:
 			return
 		if why:
 			_reply(h, 429, {"error": {"type": "preflight_task_stopped", "code": why,
-				"message": f"preflight: this task was stopped ({why}); it counts as a runaway in the sample"}})  # fmt: skip
+				"message": f"preflight: this task was stopped ({why}); it counts as a runaway in the sample"}},
+				headers=NO_RETRY)  # fmt: skip
 			return
 		started, t0 = time.time(), time.monotonic()
 		model = req.get("model") if isinstance(req.get("model"), str) else None

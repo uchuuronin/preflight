@@ -456,7 +456,7 @@ def _sample_agent(rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx,
 		run_id="s2" if top_up else "s1", should_stop=getattr(ctx, "should_stop", None))  # fmt: skip
 	ctx.check()
 	if not sample.tasks:
-		why = ("the top-up ran no new tasks: the script may only have the tasks already sampled"
+		why = ("the top-up ran no new tasks: the script may only have the tasks already sampled, or its tasks all open with the same first call"
 			if top_up else "the script made no model calls through the proxy: is its client reading OPENAI_BASE_URL?")  # fmt: skip
 		raise PermanentError(why, code="probe.no_agent_calls")
 	if top_up:

@@ -5,7 +5,14 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 torch.manual_seed(0)
-model = nn.Sequential(nn.Conv2d(3, 8, 3), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(8, 10))
+model = nn.Sequential(
+	nn.Conv2d(3, 8, 3),
+	nn.Conv2d(8, 8, 3, groups=8),
+	nn.ReLU(),
+	nn.AdaptiveAvgPool2d(1),
+	nn.Flatten(),
+	nn.Linear(8, 10),
+)  # a depthwise conv too (MobileNet-like)
 model = model.to(memory_format=torch.channels_last)
 opt = torch.optim.SGD(model.parameters(), lr=0.1)
 data = TensorDataset(torch.randn(4096, 3, 32, 32), torch.randint(0, 10, (4096,)))

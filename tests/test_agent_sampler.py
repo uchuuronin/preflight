@@ -190,13 +190,42 @@ def test_a_run_id_is_used_once_per_proxy(proxy):
 		px.open_run("s1", max_tasks=1)
 
 
-def test_a_key_sampled_twice_is_skipped_twice_and_no_more(proxy):
-	"""Tasks that open with the same call ("Begin.") share a key: skip as many as were sampled."""
+def test_tasks_that_open_the_same_way_cant_be_topped_up(proxy):
+	"""Openings like "Begin." can't be told from a framework's retry of a skipped call, so a top-up
+	refuses them all rather than pay for a sampled task again (review, Oct 31)."""
 	_, px = proxy
 	body = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": "Begin."}], "max_tokens": 5}
 	url = px.open_run("s1", max_tasks=2)
 	_post(url, body), _post(url, body)
 	first = px.run_tasks("s1")
 	url2 = px.open_run("s2", max_tasks=5, skip_keys=[task_key(t) for t in first])
-	codes = [_post(url2, body)[0] for _ in range(4)]
-	assert codes == [429, 429, 200, 200] and len(px.run_tasks("s2")) == 2
+	assert [_post(url2, body)[0] for _ in range(4)] == [429] * 4 and px.run_tasks("s2") == []
+
+
+def test_a_stopped_task_retried_stays_stopped(prov_and_capped):
+	"""A task stopped at its call cap: the SDK's retry of the refused call isn't a new task."""
+	prov, px = prov_and_capped
+	url = px.open_run("r", max_tasks=3)
+	b1 = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": "go"}], "max_tokens": 5}
+	assert _post(url, b1)[0] == 200
+	b2 = {
+		**b1,
+		"messages": [
+			*b1["messages"],
+			{"role": "assistant", "content": "x"},
+			{"role": "user", "content": "more"},
+		],
+	}
+	code, headers = _post(url, b2)
+	assert code == 429 and headers.get("x-should-retry") == "false"
+	assert _post(url, b2)[0] == 429 and len(px.run_tasks("r")) == 1 and len(prov.seen) == 1
+
+
+@pytest.fixture
+def prov_and_capped():
+	prov = Provider()
+	px = AgentProxy(prov.url, "our-key", rate=token_rate, max_calls_per_task=1)
+	px.start()
+	yield prov, px
+	px.stop()
+	prov.server.shutdown()
