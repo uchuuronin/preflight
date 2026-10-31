@@ -1,0 +1,11 @@
+{
+	"name": "20261031-022539-41159946133-b-corpus-l4-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41159946133",
+	"ref": "ws-b",
+	"sha": "ed475dbb428902b909d670247debe3f81da5e1fc",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 600 --budgets L4=6 --prior-usd 1.55 --max-minutes 45",
+	"actor": "uchuuronin",
+	"finished_at": "2026-10-31T02:50:16Z"
+}
