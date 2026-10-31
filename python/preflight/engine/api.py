@@ -1805,7 +1805,7 @@ def _noise(pred: Prediction, tid: str) -> float:
 
 # derived: P(OOM) from a cell of n runs sits at (over + 0.5) / (n + 1) (engine/oom.py), so the smallest cell
 # (conformal.MIN_CELL runs) can't place it closer than 0.5 / (n + 1) = 0.05 to 0 or 1
-PROB_STEP = 0.5 / (conformal.MIN_CELL + 1)
+OOM_FLOOR = 0.5 / (conformal.MIN_CELL + 1)
 
 
 def sensitivity(
@@ -1847,14 +1847,15 @@ def sensitivity(
 		if len(scored) < 2:
 			continue
 		ys = [y for _, y, _ in scored]
-		spread = max(ys) - min(ys)
+		# P(OOM) is ranked between the smallest cell's floor and ceiling, so a lever doesn't outrank another only
+		# because its range reached a cell with more runs and a lower floor; other probabilities are sampled rates
+		ranked = [min(max(y, OOM_FLOOR), 1 - OOM_FLOOR) for y in ys] if tid == "risk.oom" else ys
+		spread = max(ranked) - min(ranked)
 		ref = abs(base) if base else max(abs(y) for y in ys) or 1.0
-		# a probability is ranked at the resolution the smallest cell gives it, so a lever doesn't outrank another
-		# only because its range reached a cell with more runs and a lower floor
-		impact = min(1.0, round(spread / PROB_STEP) * PROB_STEP) if prob else min(1.0, spread / ref)
+		impact = min(1.0, spread) if prob else min(1.0, spread / ref)
 		if impact <= noise or impact == 0:
 			continue
-		best_v, _, best_peak = min(scored, key=lambda s: (s[1], s[2]))
+		best_v, _, best_peak = min(zip(scored, ranked, strict=True), key=lambda s: (s[1], s[0][2]))[0]
 		direction = "either"
 		if k.kind in ("int", "float"):
 			xs = np.asarray([float(v) for v, _, _ in scored])

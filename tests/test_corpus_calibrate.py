@@ -121,6 +121,9 @@ def test_both_a100_boards_are_held_out_by_default():
 
 	# a request for the holdout GPU can land on any of these boards; every one must stay out of calibration
 	assert set(sweep.landing_gpus("A100-SXM-80GB")) <= set(cal.HOLDOUT_GPUS)
+	for g in ("A100-PCIe-80GB", "A100-SXM-40GB", "A100-SXM-80GB-MIG-3g.40gb"):
+		assert cal.held_out(g)
+	assert not cal.held_out("L4") and not cal.held_out(None) and not cal.held_out("A100-SXM-80GBX")
 
 
 def test_reliability_report_leaves_out_thin_bins():

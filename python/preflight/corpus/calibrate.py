@@ -267,9 +267,16 @@ def write_table(table: conformal.Table, out: Path) -> None:
 	)
 
 
-# PM, Oct 27: the cross-GPU holdout; never tuned on, reported once. Both 80 GB boards: Modal's A100-80GB lands on
-# either (sweep.LANDS_ON), and a PCIe row must never reach calibration
-HOLDOUT_GPUS = ("A100-SXM-80GB", "A100-PCIe-80GB")
+# PM, Oct 27: the cross-GPU holdout; never tuned on, reported once. Every A100 board: Modal's A100-80GB lands on
+# SXM or PCIe (sweep.LANDS_ON), and no A100 row may reach calibration by default
+HOLDOUT_GPUS = ("A100-SXM-80GB", "A100-PCIe-80GB", "A100-SXM-40GB", "A100-PCIe-40GB")
+
+
+def held_out(gpu: str | None, holdout_gpus: tuple[str, ...] = HOLDOUT_GPUS) -> bool:
+	"""A row on a holdout board, or on a MIG slice of one ("A100-SXM-80GB-MIG-3g.40gb")."""
+	return bool(gpu) and any(gpu == h or gpu.startswith(f"{h}-MIG") for h in holdout_gpus)
+
+
 MIN_PER_BIN = 10  # guess: fewer points than this and a bin's Wilson interval is too wide to read; not drawn
 
 
@@ -278,8 +285,8 @@ def build(
 ) -> tuple[conformal.Table, str]:
 	"""The table from every GPU but the holdout, its leave-one-architecture-out coverage, and the holdout scored
 	once against it. Returns the table and a report to print."""
-	cal = [s for s in scores if s.gpu not in holdout_gpus]
-	held = [s for s in scores if s.gpu in holdout_gpus]
+	cal = [s for s in scores if not held_out(s.gpu, holdout_gpus)]
+	held = [s for s in scores if held_out(s.gpu, holdout_gpus)]
 	table = conformal.calibrate(cal, built_from=built_from)
 	lines, coverage = [], {}
 	for target, cov in conformal.evaluate(cal).items():
@@ -365,8 +372,8 @@ def main(argv: list[str] | None = None) -> int:
 		built_from=f"{args.built_from or args.store} ({len(scores)} scores, holdout {', '.join(holdout) or 'none'})",
 	)
 	print(report)
-	cal_rows = [r for r in rows if r.get("gpu") not in holdout]
-	pairs = oom_pairs(cal_rows, [s for s in scores if s.gpu not in holdout])
+	cal_rows = [r for r in rows if not held_out(r.get("gpu"), holdout)]
+	pairs = oom_pairs(cal_rows, [s for s in scores if not held_out(s.gpu, holdout)])
 	print("\n".join(reliability_lines(pairs)))
 	ok = oom.reliable(oom.reliability(pairs), min_per_bin=MIN_PER_BIN)
 	print(f"  reliable enough to show as a probability: {ok}")

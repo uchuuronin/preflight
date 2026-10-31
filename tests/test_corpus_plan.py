@@ -254,13 +254,19 @@ def test_rows_filed_under_a_sibling_board_count_as_done(tmp_path):
 	st = s.ResultStore(tmp_path)
 	st.write_once("kernels", "A100-PCIe-80GB", "a", {"status": "ok", "gpu_seconds": 13.0})
 	st.write_once("kernels", "A100-SXM-80GB", "b", {"status": "oom", "gpu_seconds": 2.0})
-	st.write_once("kernels", "A100-SXM-80GB", "a", {"status": "ok", "gpu_seconds": 11.0})  # both boards: once
+	st.write_once(
+		"kernels", "A100-SXM-80GB", "a", {"status": "ok", "gpu_seconds": 11.0}
+	)  # both boards: done once
 	st.write_once("kernels", "L4", "c", {"status": "ok", "gpu_seconds": 5.0})
 	led = sw.ledger_from(st, "kernels", "A100-80GB")
 	assert sorted(led["done"]) == ["a", "b"]
-	assert led["gpu_seconds"] == pytest.approx(13.0)  # 11 + 2: the requested board's row wins
+	assert led["gpu_seconds"] == pytest.approx(26.0)  # every attempt on either board was paid for
 	assert sw.ledger_from(st, "kernels", "L4")["done"] == ["c"]  # no sibling, no change
 	assert sw.landing_gpus("A100-80GB") == ("A100-SXM-80GB", "A100-PCIe-80GB")
+	# an error being retried on one board doesn't undo an ok row on the other
+	st.write_once("kernels", "A100-SXM-80GB", "e", {"status": "error", "gpu_seconds": 1.0})
+	st.write_once("kernels", "A100-PCIe-80GB", "e", {"status": "ok", "gpu_seconds": 9.0})
+	assert "e" in sw.ledger_from(st, "kernels", "A100-80GB", retry_errors=True)["done"]
 
 
 def test_local_driver_counts_billing_overhead(tmp_path):

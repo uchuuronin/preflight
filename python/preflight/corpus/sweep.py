@@ -294,17 +294,18 @@ def ledger_from(store: ResultStore, kind: str, gpu: str, retry_errors: bool = Fa
 	Reads the small .meta summaries only. Errors and timeouts count as done unless retried.
 	"""
 	out: dict[str, Any] = {"done": [], "gpu_seconds": 0.0, "history": []}
-	seen: set[str] = set()
+	done: dict[str, None] = {}  # ordered, each key once
 	for board in landing_gpus(gpu):
 		for _, key, meta in store.iter_meta(kind, board):
-			if key in seen:  # the same config on both boards counts once
-				continue
-			seen.add(key)
+			# done on any board: an ok row on PCIe isn't rerun because SXM holds an error being retried
 			if not (retry_errors and meta.get("status") in ("error", "timeout")):
-				out["done"].append(key)
+				done.setdefault(key)
 			secs = float(meta.get("gpu_seconds") or 0.0)
-			out["gpu_seconds"] += secs + float(meta.get("prior_gpu_seconds") or 0.0)
+			out["gpu_seconds"] += secs + float(
+				meta.get("prior_gpu_seconds") or 0.0
+			)  # every attempt was paid for
 			out["history"].append(secs)
+	out["done"] = list(done)
 	return out
 
 

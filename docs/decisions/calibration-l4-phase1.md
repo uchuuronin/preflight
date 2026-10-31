@@ -110,7 +110,7 @@ Rows: `remote-runs` exports `b-corpus-export-2` and `b-corpus-export-hf-2`. Grou
 | retrieval | 105 of 115 | 0.148 |
 | vision | 193 of 217 | 0.127 |
 
-L4 and A10 now have their own cells for every lens. L40S has its own for pretrain, retrieval and vision. T4's cells are under 9 points, so T4 uses the pooled cells.
+L4 and A10 now have their own cells for every lens. L40S has its own for pretrain, retrieval and vision. T4 has its own vision cell (n = 10, half-width 0.565, roughly ×0.57 to ×1.76); its pretrain and retrieval cells are under 9 points, so those use the pooled cells.
 
 **Step time, not installed: a decision for Chiya.** Coverage is also 439 of 487 (the same count by coincidence; the per-lens counts differ). The bands are wider: median half-width 0.236. By lens:
 
@@ -123,7 +123,7 @@ L4 and A10 now have their own cells for every lens. L40S has its own for pretrai
 
 The HF finetune band stays off, per the earlier decision. The other three are honest at 90%, but a ±0.17 to ±0.27 log band means roughly ×0.8 to ×1.3.
 
-**P(OOM) now passes the reliability rule** (at least 2 bins with at least 10 points, and at least 10 real OOMs: there are 29). By bin:
+**P(OOM) now passes the reliability rule** (at least 2 bins with at least 10 points, and at least 10 real OOMs: 18 in the scored pairs, from 29 OOM rows). By bin:
 
 | Bin | Points | Predicted | Observed (Wilson 95%) |
 | --- | --- | --- | --- |
@@ -136,11 +136,11 @@ So the table sets `oom_reliable`. The middle bins are still thin: the probabilit
 
 **A100 holdout: not scored.** The rerun asked Modal for an A100-80GB and got an A100-PCIe-80GB. Its rows were filed under the board it ran on, so the sweep's ledger saw no progress and stopped after 2 configs, as its guard should (measured). Two fixes:
 - The ledger now counts rows on a sibling board as done (`sweep.LANDS_ON`).
-- The calibrator holds out both 80 GB boards by default, so a PCIe row can never reach calibration.
+- By default, the calibrator holds out every A100 board, MIG slices included (`calibrate.held_out`). Passing `--holdout-gpus` overrides that. The step-time eval script drops those boards too, so the holdout never feeds a choice between models.
 
 Two rows are not a test, and the holdout is scored once, so it waits for the rerun.
 
-**Sensitivity tie.** With an A10 finetune cell, a bigger GPU now reaches the pooled cell, which has 38 runs. Its P(OOM) floor is 0.013, against 0.025 for 19 runs, so `gpu_type` outranked `eval_batch_size` for "make it fit" on resolution alone. Probability impacts are now ranked in steps of 0.05, the floor of the smallest allowed cell (derived: 0.5 / (9 + 1)). At that resolution the two tie, and the cheaper lever leads.
+**Sensitivity tie.** With an A10 finetune cell, a bigger GPU now reaches the pooled cell, which has 38 runs. Its P(OOM) floor is 0.013, against 0.025 for 19 runs, so `gpu_type` outranked `eval_batch_size` for "make it fit" on resolution alone. For ranking, P(OOM) is now clamped to [0.05, 0.95], the floor and ceiling of the smallest allowed cell (derived: 0.5 / (9 + 1)). Other probabilities, such as a sampled runaway rate, are ranked as measured. Clamped, the two levers tie, and the tie goes to the one leaving more memory headroom: `eval_batch_size`. A lever that only moves P(OOM) below 0.05 (the pretrain fixture, at about 1e-63) is no longer listed.
 
 **Anchored step time on the A10 HF jobs (Oct 31): fails again, stays off.** This is the anchored model's held-out test on the same job type it was fitted on (the L4 HF jobs), but on another GPU. It scores the 19 A10 queries (measured):
 
@@ -151,4 +151,4 @@ Two rows are not a test, and the holdout is scored once, so it waits for the rer
 | below the smallest probe (10) | line | 8 of 10 (49% to 94%) | 0.064 |
 | below the smallest probe (10) | anchored | 1 of 10 (2% to 40%) | 0.323 |
 
-The fitted line does as well or better on both sides, so `EXTRAPOLATION` stays `"line"`. On every held-out group in phase 2, the line puts 461 of 575 queries within 15% (80%).
+The fitted line does as well or better on both sides, so `EXTRAPOLATION` stays `"line"`. On every held-out group in phase 2 (A100 boards excluded), the line puts 461 of 575 queries within 15% (80%).

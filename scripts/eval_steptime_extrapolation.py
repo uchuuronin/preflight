@@ -65,7 +65,8 @@ def summary(rows, label):
 
 
 def main(paths: list[str]) -> int:
-	rows = [r for p in paths for r in cal.load_rows(Path(p))]
+	# the holdout is scored once, by calibrate.py; it never feeds a choice between models
+	rows = [r for p in paths for r in cal.load_rows(Path(p)) if not cal.held_out(r.get("gpu"))]
 	for mode in ("line", "anchored"):
 		res = scored(rows, mode)
 		print(f"== {mode}")

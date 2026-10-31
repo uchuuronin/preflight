@@ -212,6 +212,13 @@ def test_sensitivity_ranks_levers_not_the_workload(pt, ft):
 	assert gpu.impact == pytest.approx(mem[0].impact)
 
 
+def test_sampled_rates_keep_their_resolution_in_the_ranking(ag):
+	# only P(OOM) is clamped at the smallest cell's floor; a runaway rate is a sampled rate, ranked as measured
+	rec = _agent_with(ag, 30)
+	(turns,) = [r for r in api.sensitivity(rec, Objective(kind="min_risk")) if r.knob_id == "max_turns"]
+	assert turns.impact == pytest.approx(api.predict(rec).root["risk.runaway"].point, abs=1e-6)
+
+
 # ---------------------------------------------------------------- the predictions block
 
 
