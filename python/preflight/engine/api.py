@@ -17,6 +17,7 @@ A's scripts/make_golden.py makes to replace the golden fixtures.
 from __future__ import annotations
 
 import contextvars
+import functools
 import itertools
 import math
 import statistics
@@ -290,22 +291,28 @@ Z999 = 3.090232306167813  # derived: the normal 99.9th percentile
 LENGTH_DRAWS = 4000  # derived: 4,000 simulated steps put the step-token spread within about 2% of its limit
 
 
+@functools.lru_cache(maxsize=256)
 def _length_spread(mean: float, p999: float, longest: float | None, cap: float | None, batch: int) -> float:
 	"""Spread (log sigma) of a step's padded tokens when each batch pads to its longest row: rows from a lognormal
-	fitted to the probe's mean row length and the dataset's 99.9th percentile, cut at the longest row and seq_len."""
+	fitted to the probe's mean row length and the dataset's 99.9th percentile, cut at the longest row and seq_len.
+	A batch's longest row is drawn directly, exp(mu + s x the normal quantile of U^(1/batch)), so the cost doesn't
+	grow with the batch (review, Nov 1), and the result is cached for knob moves."""
+	from statistics import NormalDist
+
 	r = math.log(max(p999, mean) / mean)
 	disc = Z999 * Z999 - 2 * r
-	s = Z999 - math.sqrt(disc) if disc >= 0 else r / Z999  # the root with mean and p99.9 both matched
+	s = (
+		Z999 - math.sqrt(disc) if disc >= 0 else Z999
+	)  # the root with mean and p99.9 both matched; the edge past it
 	mu = math.log(mean) - s * s / 2
-	rng = np.random.default_rng(0)
-	rows = rng.lognormal(mu, s, size=(LENGTH_DRAWS, max(1, batch)))
+	u = (np.arange(LENGTH_DRAWS) + 0.5) / LENGTH_DRAWS  # evenly spaced, so the result is exact and repeatable
+	inv = NormalDist().inv_cdf
+	z = np.asarray([inv(min(x ** (1.0 / max(1, batch)), 1 - 1e-12)) for x in u])
+	padded = mu + s * z
 	top = min(x for x in (longest, cap) if x) if (longest or cap) else None
 	if top:
-		rows = np.minimum(rows, top)
-	padded = rows.max(
-		axis=1
-	)  # a step's tokens are batch x its longest row; the batch factor cancels in the spread
-	return float(np.std(np.log(padded)))
+		padded = np.minimum(padded, math.log(top))
+	return float(np.std(padded))
 
 
 def _length_sigma(record: FlightRecord, values: dict, match) -> tuple[float, str] | None:

@@ -71,7 +71,7 @@ def test_within_share_and_wilson():
 	assert (r.hits, r.n, r.hit) == (9, 10, True) and "misses: 9" in r.note
 	r = V._share_row("m", "t", "o", [(str(i), i < 8) for i in range(10)])
 	assert r.hit is False
-	assert r.cells()[4] == "49% to 94%"
+	assert r.cells()[4] == "49% to 95%"  # the lower end rounds down and the upper up, never a rosier interval
 
 
 def test_divergence_row_from_the_classifier_report():

@@ -90,7 +90,7 @@ class Row:
 			self.target,
 			self.measured_on,
 			counts,
-			f"{lo:.0%} to {hi:.0%}" if self.n else "",
+			f"{math.floor(lo * 100)}% to {math.ceil(hi * 100)}%" if self.n else "",  # never rounds up to 90%
 			verdict(self.hit, lo),
 			self.note,
 		]

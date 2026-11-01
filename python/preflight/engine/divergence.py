@@ -114,8 +114,10 @@ def config_features(cfg: dict) -> list[float | None]:
 		(1.0 if c["qk_norm"] else 0.0) if has("qk_norm") else None,
 		(1.0 if (_f(c["z_loss"]) or 0.0) > 0 else 0.0) if has("z_loss") else None,
 		(1.0 if (_f(c["beta2"]) or 0.0) > 0.99 else 0.0) if has("beta2") else None,
-		# the sweep writes grad_clip None for no clipping; a probe without the knob doesn't say
-		(1.0 if c["grad_clip"] in (0, 0.0, "none", "None") else 0.0) if has("grad_clip") else None,
+		# the fit writes the sweep's None (no clipping) as 0; a user's unset knob is unknown
+		(1.0 if str(c["grad_clip"]).lower() in ("0", "0.0", "none", "false") else 0.0)
+		if has("grad_clip")
+		else None,
 	]
 
 
