@@ -946,20 +946,32 @@ def test_every_memory_path_takes_the_measured_context(monkeypatch):
 	assert guessed - measured == pytest.approx(api.memory.DEFAULT_CONTEXT_BYTES - real, rel=0.05)
 
 
-def test_a_release_after_the_peak_doesnt_shrink_the_context():
-	# review, Nov 1: GRPO frees its generation cache, so some steps' boundary use sits below their reserved peak
-	rec = _lora()
-	probes = []
+def _with_gaps(rec, gaps_mib, rest=None):
+	"""The LoRA record with its timed steps' context gaps set, in order, to gaps_mib, then `rest` (the first if None)."""
+	rest = gaps_mib[0] if rest is None else rest
+	probes, k = [], 0
 	for p in rec.probes:
-		log = [
-			x.model_copy(update={"device_used_bytes": x.peak_reserved_bytes - 2**30})
-			if x.kind == "timed" and i % 2
-			else x
-			for i, x in enumerate(p.step_log or [])
-		]
+		log = []
+		for x in p.step_log or []:
+			if x.kind == "timed" and x.peak_reserved_bytes:
+				x = x.model_copy(
+					update={
+						"device_used_bytes": x.peak_reserved_bytes
+						+ int((gaps_mib[k] if k < len(gaps_mib) else rest) * 2**20)
+					}
+				)
+				k += 1
+			log.append(x)
 		probes.append(p.model_copy(update={"step_log": log}))
-	released = rec.model_copy(update={"probes": probes})
-	assert api._context_bytes(released) == pytest.approx(api._context_bytes(rec))
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_the_context_is_the_largest_gap_two_steps_agree_on():
+	# reviews, Nov 1: a release after the peak lowers a step's gap; a co-tenant's spike has no partner
+	rec = _with_gaps(_lora(), [252, 120, -900, 252, 2999, 1500], rest=200)
+	ctx = api._context_bytes(rec) / 2**20
+	assert ctx == pytest.approx(252, abs=0.5)  # not the median (200), not the one-off 1,500 MiB spike
+	assert api._context_bytes(_with_gaps(_lora(), [-50])) == api.memory.DEFAULT_CONTEXT_BYTES  # no usable gap
 
 
 def test_another_gpu_takes_the_guess():

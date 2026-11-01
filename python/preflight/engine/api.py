@@ -532,15 +532,18 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 	return sorted(out)
 
 
-CONTEXT_MAX_BYTES = 4 * 2**30  # guess: a measured context above 4 GiB means another process shares the GPU
+CONTEXT_MAX_BYTES = (
+	2 * 2**30
+)  # guess: a real context is 0.25-1 GiB; a gap above 2 GiB is another process on the GPU
+CONTEXT_AGREE_BYTES = 64 * 2**20  # guess: two steps within 64 MiB of each other agree on the context
 
 
 def _context_bytes(record: FlightRecord, gpu: str | None = None) -> float:
 	"""The device memory outside PyTorch's allocator (CUDA context, cuBLAS workspaces, other libraries), measured from
 	the probes' timed steps: whole-device use (cudaMemGetInfo, at the step boundary) less the step's reserved peak.
-	The largest such gap (review, Nov 1): when the allocator hands memory back between the peak and the boundary
-	(GRPO frees its generation cache) the gap reads low or negative, so the step that released nothing is the one
-	that shows the whole context. C, Nov 1: a guessed 0.75 GiB on a GRPO probe's reserved peak read 23.8 GB on a
+	The largest gap that a second step agrees with (reviews, Nov 1): when the allocator hands memory back between the
+	peak and the boundary (GRPO frees its generation cache) a step's gap reads low or negative, so the steps that
+	released nothing show the whole context; another process's one-step spike on a shared GPU has no partner. C, Nov 1: a guessed 0.75 GiB on a GRPO probe's reserved peak read 23.8 GB on a
 	23.7 GB L4 for a run that fit. The guess stays where no probe logged whole-device use, and on any GPU other than
 	the probe's, whose driver and libraries take their own."""
 	if gpu is not None and gpu != _env_gpu(record):
@@ -552,8 +555,17 @@ def _context_bytes(record: FlightRecord, gpu: str | None = None) -> float:
 		for x in (p.step_log or [])
 		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
 	]
-	gaps = [g for g in gaps if 0 < g <= CONTEXT_MAX_BYTES]
-	return float(max(gaps)) if gaps else float(memory.DEFAULT_CONTEXT_BYTES)
+	gaps = sorted((g for g in gaps if 0 < g <= CONTEXT_MAX_BYTES), reverse=True)
+	if not gaps:
+		return float(memory.DEFAULT_CONTEXT_BYTES)
+	if len(gaps) == 1:
+		return float(gaps[0])
+	# the largest gap that a second step agrees with: a release after the peak only lowers a step's gap, and a
+	# co-tenant's one-step spike on a shared GPU has no partner (review, Nov 1)
+	for i, g in enumerate(gaps[:-1]):
+		if g - gaps[i + 1] <= CONTEXT_AGREE_BYTES:
+			return float(g)
+	return float(np.median(gaps))
 
 
 def _capacity(record: FlightRecord, gpu: str) -> int:

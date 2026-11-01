@@ -302,7 +302,7 @@ _ROWS = {"memory": "memory", "step_same": "step", "step_other": "step", "rollout
 	"agent": "agent"}  # fmt: skip
 
 
-CALIBRATES = frozenset({*_ROWS.values(), "intervals", "*"})
+CALIBRATES = frozenset({*_ROWS.values(), "intervals", "*"})  # a Preflight run's own cost is never calibrated
 
 
 def _row_of(attr: str) -> str:
