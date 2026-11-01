@@ -2,7 +2,7 @@
 
 Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; from now on merges, not rebases).
 
-## Plan items B owns (Sat Oct 31, 8 AM ET)
+## Plan items B owns (updated Sun Nov 1, 1 AM ET)
 
 Every B item in the Contracts tab (Contract B, the gaps table, the adopted items) and the main plan (feature set, prediction engine, validation targets). "Branch" means on `ws-b` but not on `main`. Hours are my honest estimate of work left, review and fixes included. They don't include waiting on A's data or on a paid run.
 
@@ -12,7 +12,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | --- | --- | --- | --- |
 | Fine-tune lens: memory, P(OOM), step time, cost, money at risk | `main`; phase 2 table and fixes on branch | 1 | Today: step-time bands for vision, retrieval and pretrain, and P(OOM) shown "uncertain (5–95%)" in the middle |
 | Agent lens: per-task bootstrap, context growth, cache prices, rate-limit wall clock, runaway rate | `main` | 0.5 | Tokens-only cost when tasks lack `cost_usd`, now that the price table is in |
-| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | A's fields already exist in the schema; calibrated on A's RL probes when they land |
+| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | Calibrated Nov 1 on A's GRPO zoo runs 2 and 3: length drift 0.16, zero-spread abstains below 8 prompts |
 | Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`, behind `campaign.planner`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
 
 **The other lenses and engine features**
@@ -27,8 +27,8 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Proxy campaigns | branch (`engine/proxy.py`: rank agreement and proxy settings) | 1 | Proxy runs themselves go through the campaign planner |
 | Power analysis: seeds needed from seed-to-seed variance | branch (`engine/power.py`) | 0.5 | Needs A's multi-seed probe |
 | GBDT residual on cross-GPU step time | branch: fitted and scored, **fails held out** (51% vs K1's 60% within 20%), so not used | 0 | |
-| Divergence classifier: 800+ short runs, AUROC target 0.85 | not started (the corpus `divergence` kind and the D9 label exist) | 4, plus a paid sweep | The sweep needs your yes; I'll post its cost first |
-| GNN cost model, used only if it beats the GBDT held out | branch: `scripts/fit_cost_gnn.py`, scoring now | 1 | |
+| Divergence classifier: 800+ short runs, AUROC target 0.85 | branch: `engine/divergence.py` and `scripts/fit_divergence.py`, tested on synthetic sweeps; `risk.divergence` behind `engine.divergence` (off) | 1, after the sweep | The 800-config sweep is running (Nov 1, $12 cap); the fit and its held-out report follow |
+| GNN cost model, used only if it beats the GBDT held out | branch: paired gain +4.8 points (−1.4 to +11.6), so the GBDT is used and the table says so | 0 | |
 | Muse Spark Open batch-labels the corpus | not started | 2 | Needs a Baseten run through Actions: a paid ask |
 | Conformal layer, abstention rules, float16 grids within the cell budget | `main`; real table on branch | 0 | |
 | Pyodide parity test and import allowlist (gap 10) | `main` | 0 | |
@@ -36,7 +36,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Run cost and its basis (gap 21) | `main` | 0 | |
 | Corpus sweep: resumable, keyed, halts at budget (gap 13) | `main`; A100 board fix on branch | 0 | |
 | Versioned model cards pinned in records (gap 15) | branch: `stale_models`, `current_models` | 0 | C shows it |
-| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: B's draft (`docs/decisions/glimmer-host.md`) | 0.5 | A to complete |
+| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: settled with A (`docs/decisions/glimmer-host.md`) | 0 | Deferred: no host until the weights' download terms and licence are confirmed in writing (Chiya, Nov 1) |
 | Corpus published with its datasheet (gap 16) | branch (`corpus/DATASHEET.md`) | 0.5 | Publishing the rows themselves |
 
 **Validation rows (README table)**
@@ -48,13 +48,14 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | OOM: no misses, ≤ 1 false alarm per 10 scripts, reliability diagram | branch: reliability bins | 1 | Scored on the bug zoo |
 | Step time within 15%, same GPU | branch: the line puts 461 of 575 held-out queries within 15% | 1 | Full runs still to come |
 | Step time within 20%, unmeasured GPU (4th type, incl. AMD) | corpus: K1 60% within 20% leave-one-GPU-out; A100 holdout same-GPU time 93% in band | 2 | AMD rows still to come; K1's band needs Chiya's call |
-| GNN + GBDT beats GBDT alone | scoring now | with the GNN | |
-| Divergence warning: AUROC 0.85+, 100+ steps early | not started | with the classifier | |
-| RL rollout time within 20% | not started | 1 | Needs A's GRPO zoo script run |
+| GNN + GBDT beats GBDT alone | miss: the paired interval includes zero, so the GBDT is used | 0 | |
+| Divergence warning: AUROC 0.85+, 100+ steps early | the classifier is built; the sweep is running | with the classifier | |
+| RL rollout time within 20% | point 5.8% off between GRPO zoo runs 2 and 3; the zoo script is now calibration, so the row scores the unseen TRL script | 0.5 | Needs the Nov 2 unseen TRL run |
 | Serving tokens/sec within 15% | not started | 1 | Needs A's vLLM full runs |
 | Agent total cost inside the 90% interval | simulated on `main` (S6); no full run yet | 1 | |
 | Abstention: every query outside the probed range is flagged | `main` (automated tests) | 0 | |
 | Coverage self-test page (with C) | branch: corpus half (`calibration_summary`) | 0.5 | C renders it |
+| Validation scorer (fills this table from full runs) | branch: `scripts/score_validation.py`, tested on Oct 31's records | 0 | Run on Nov 2's manifest; the PM adds the README markers in round four |
 
 **Total: about 72 hours of B work left** (14.5 for the hero lenses, 46 for the rest of the engine, 12 for validation). Since the table was written, most engine items have landed on the branch, which leaves about 20 hours. Most of that waits on others: A's probes, the paid divergence and AMD runs, and the Nov 2 full runs. That is more than the time left before noon Sunday. I'll work through it in the order you gave, hero lenses first, so whatever you cut on Sunday comes off the end of the list.
 
