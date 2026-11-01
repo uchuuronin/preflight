@@ -25,7 +25,18 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, rl, serving, steptime
+from preflight.engine import (
+	agent_cost,
+	conformal,
+	divergence,
+	gpus,
+	knobs,
+	memory,
+	prices,
+	rl,
+	serving,
+	steptime,
+)
 from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
@@ -55,6 +66,7 @@ MODEL_ID_RUN_COST = "run-cost@0.1.0"
 _TARGETS = {
 	"memory.peak": ("bytes", "memory"),
 	"risk.oom": ("probability", "risk"),
+	"risk.divergence": ("probability", "risk"),
 	"time.step": ("s", None),
 	"time.total": ("s", "time"),
 	"cost.total": ("usd", "cost"),
@@ -78,7 +90,8 @@ _TARGETS = {
 FEATURES = {
 	"rl": False,
 	"serving": False,
-	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
+	"steptime_cross_gpu": True,
+	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row  # Chiya, Oct 31: on, with the rough band shown past +-50%
 }  # this dict is the switch until the runner sets it from flags.json (from-b.md, B -> A); keep the two the same
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
@@ -165,6 +178,8 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
 		if FEATURES["rl"] and record.job.lens == "rl":
 			ids += list(RL_TARGETS)
+		if FEATURES["divergence"]:
+			ids.append("risk.divergence")
 		if FEATURES["serving"] and record.job.lens == "serving":
 			ids += list(SERVING_TARGETS)
 		c = record.job.constraints
@@ -1734,6 +1749,8 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
 	if FEATURES["rl"] and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
+	if FEATURES["divergence"]:
+		out["risk.divergence"] = _divergence(record, values)
 	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))
 	return Prediction(out)
@@ -2419,7 +2436,41 @@ def _sensitivity(
 # ---------------------------------------------------------------- the whole predictions block
 
 
+def _divergence_model():
+	try:
+		from preflight.engine._divergence_model import MODEL
+	except ImportError:  # not fitted yet: the readout abstains and says so
+		return None
+	return MODEL
+
+
+def _divergence(record: FlightRecord, values: dict) -> Estimate:
+	"""P(the run diverges later), from the longest probe's stability series at the probe's settings."""
+	mid = divergence.MODEL_ID
+	if _off_probe(record, values, also_ok=frozenset({"grad_accum"})):
+		return _abstain(
+			"probability", mid, "the warning reads the probe's own steps; probe this setting to see it"
+		)
+	probes = [
+		p for p in record.probes if p.status in OK_PROBE and p.stability and p.stability.series.get("loss")
+	]
+	if not probes:
+		return _abstain("probability", mid, "no probe logged a loss series")
+	p = max(probes, key=lambda q: len(q.stability.series["loss"]))
+	cfg = {**{kv.id: kv.current for kv in record.knobs}, **p.knobs}
+	cfg.setdefault("precision", cfg.get("dtype"))
+	w = divergence.warn(_divergence_model(), p.stability.series, cfg)
+	if w["status"] == "abstain":
+		return _abstain("probability", mid, w["reason"])
+	return _est(w["point"], w["point"], w["point"], "probability", "predicted", mid, w["reason"])
+
+
 _CARDS = {
+	divergence.MODEL_ID: (
+		"classifier",
+		"logistic on the probe's loss, grad norm, logit growth and settings (Wortsman et al., ICLR 2024), trained on "
+		"the corpus's divergence sweep labelled by D9; a probability shows only where held-out runs verified it",
+	),
 	serving.MODEL_ID: (
 		"simulation",
 		"KV-cache capacity, prefill and decode rooflines and a continuous-batching scheduler (vLLM, Vidur); one scale "

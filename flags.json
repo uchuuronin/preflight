@@ -17,6 +17,7 @@
 	"engine.memory": false,
 	"engine.steptime_same_gpu": false,
 	"engine.steptime_cross_gpu": true,
+	"engine.divergence": false,
 	"engine.rl": false,
 	"engine.serving": false,
 	"corpus.sweep": false,
