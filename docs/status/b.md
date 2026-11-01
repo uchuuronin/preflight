@@ -173,6 +173,23 @@ D found that most `engine.*` flags switched nothing. Checked in the code on ws-b
 - Fixed on the way: a peak after a GPU move read "measured" (it's a prediction now), and the per-term split scaled every term to the peak, so a 494M-parameter model's weights read 9.9 GB; weights and gradients now read 1.98 GB each, as the probe measured, and activations take the rest.
 - C's 23.8 GB on the L4 fixture predates the measured context; the fixture reads 23.25 GB now.
 
+## Monday's validation runs: expected cost (for Chiya's one approval, Nov 1)
+
+Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixtures/validation/manifest_zoo_dryrun_nov1.json`; 2 runs scored, 8 "not measured yet", nothing crashes, predicted under production's flags). Each script needs a Preflight run (its record) and a full run (A's `ops_app.py::ground_truth`, which stops at its `--budget-min`). Rates: A10 $1.10/h, L4 $0.80/h (`engine/prices`). The A10 is suggested: the L4 queued 19 to 59 minutes on Nov 1, the A10 never did, and Modal bills no queue time either way, so the A10's cost is in the plan and the L4's is in waiting.
+
+| Run | Full-run basis | Expected (A10) | Cap |
+| --- | --- | --- | --- |
+| finetune_lora_hf | measured: 210 + 40 steps took 9.5 min of compute on an L4 (Oct 31) | about $0.20 | 35 min, $0.64 |
+| grpo_trl | measured: 3 + 50 steps took 25 min on an A10 (Nov 1) | about $0.50 | 46 min, $0.84 |
+| pretrain_nanogpt | no finished full run yet (Oct 28's hit its limit) | under $0.55 | 30 min, $0.55 |
+| gnn_pyg, retrieval_st, vision_timm, eval_sweep_reasoning, serving_vllm | no full run yet; small models | under $0.37 each | 20 min each, $1.85 |
+| torchtitan_debug | the debug model | under $0.28 | 15 min, $0.28 |
+| agent_eval_spark | the 500-task benchmark, priced by the engine from the 30-task sample: **Spark API, not GPU** | $7.15 (90%: $5.90 to $13.71) | the proxy's dollar cap; $14 covers the band |
+| 9 unseen scripts | unknown size: room left for 9 full runs | under $0.55 each | 30 min each, $4.95 |
+| 19 Preflight runs (the records) | measured: $0.086 GPU and $0.018 Muse Spark for the LoRA run (Oct 28) | about $0.11 each, $2.10 | |
+
+**Total:** GPU about $7 expected (the rows' expected figures, with the unknown runs at about half their caps), at most $11.20 by the caps; plus the agent benchmark's Spark API, about $7.15 and at most $14. **About $14 expected, at most $25.** The caps are each run's own time limit, so no run can pass its line.
+
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).
 - AMD: the account's verification hold.
