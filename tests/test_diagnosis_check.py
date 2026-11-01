@@ -1,6 +1,7 @@
 """Spark Open checks each diagnosis claim through a tool call (item 30): code decides what stands."""
 
 import json
+import time
 from pathlib import Path
 
 import httpx
@@ -222,7 +223,8 @@ def test_triage_reads_and_can_quote_the_probes_recorded_error_not_just_stdout():
 def test_a_reply_without_a_completion_is_still_a_logged_priced_call_with_its_reason():
 	# Glimmer's first triage (Nov 1): 150 s, no finding, and no call in provenance
 	def handler(request):
-		return httpx.Response(200, text="<html>cold start</html>")
+		time.sleep(0.01)
+		return httpx.Response(200, text="<html>cold start at https://secret-host.example/x</html>")
 
 	client = ModelClient(api_key="k", model="muse-glimmer", provider="modal-glimmer", usd_per_second=0.001,
 		transport=httpx.MockTransport(handler))  # fmt: skip
@@ -230,6 +232,7 @@ def test_a_reply_without_a_completion_is_still_a_logged_priced_call_with_its_rea
 		client.chat([{"role": "user", "content": "hi"}], purpose="triage")
 	assert len(client.calls) == 1 and not client.calls[0].ok
 	assert "HTTP 200 without a completion" in client.last_error and "cold start" in client.last_error
+	assert "secret-host" not in client.last_error and client.calls[0].cost_usd > 0  # priced by wall time
 
 	def denied(request):
 		return httpx.Response(401, json={"error": "bad Modal-Key"})
@@ -238,4 +241,14 @@ def test_a_reply_without_a_completion_is_still_a_logged_priced_call_with_its_rea
 		transport=httpx.MockTransport(denied))  # fmt: skip
 	with pytest.raises(httpx.HTTPStatusError):
 		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
-	assert c2.last_error.startswith("HTTP 401") and "secret-host" not in c2.last_error
+	assert c2.last_error.startswith("HTTP 401") and "bad Modal-Key" in c2.last_error
+
+	def down(request):
+		raise httpx.ConnectError("can't reach https://secret-host.example/v1/chat/completions")
+
+	c3 = ModelClient(
+		api_key="k", model="m", provider="modal-glimmer", retries=0, transport=httpx.MockTransport(down)
+	)
+	with pytest.raises(httpx.ConnectError):
+		c3.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert c3.last_error.startswith("ConnectError") and "secret-host" not in c3.last_error

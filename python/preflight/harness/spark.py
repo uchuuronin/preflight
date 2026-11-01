@@ -111,11 +111,15 @@ def estimate_tokens(messages: list[dict]) -> int:
 
 def _why(exc: Exception) -> str:
 	"""A failed call's reason for a log, without the endpoint's URL (a self-hosted base URL is ours)."""
+	if isinstance(exc, httpx.HTTPStatusError):
+		return f"HTTP {exc.response.status_code}: {_no_urls(exc.response.text)[:300]!r}"
+	return f"{type(exc).__name__}: " + _no_urls(str(exc))[:300]
+
+
+def _no_urls(text: str) -> str:
 	import re
 
-	if isinstance(exc, httpx.HTTPStatusError):
-		return f"HTTP {exc.response.status_code}: {exc.response.text[:300]!r}"
-	return f"{type(exc).__name__}: " + re.sub(r"https?://\S+", "<url>", str(exc))[:300]
+	return re.sub(r"https?://\S+", "<url>", text or "")
 
 
 class ModelClient:
@@ -338,9 +342,7 @@ class ModelClient:
 				False,
 				resp.headers.get("x-request-id"),
 			)
-			self.last_error = (
-				f"HTTP {resp.status_code} without a completion ({type(exc).__name__}): {resp.text[:300]!r}"
-			)
+			self.last_error = f"HTTP {resp.status_code} without a completion ({type(exc).__name__}): {_no_urls(resp.text)[:300]!r}"
 			raise ValueError(self.last_error) from exc
 		call = self._record(purpose, data, started, True, resp.headers.get("x-request-id") or data.get("id"))
 		return message, call
@@ -370,6 +372,7 @@ class ModelClient:
 				err = str(exc)[:2000]
 				self.calls[-1] = call.model_copy(update={"ok": False})
 				if attempt == 1:
+					self.last_error = f"{schema.__name__} output did not validate after a re-ask"
 					raise ValueError(
 						f"{schema.__name__} output did not validate after a re-ask: {err}"
 					) from exc
