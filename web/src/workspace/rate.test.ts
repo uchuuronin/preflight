@@ -115,7 +115,7 @@ describe("the visitor's rate", () => {
 
 	it("divides by the rate an estimate names (0.6.0 Estimate.rate), not the table's, for this GPU only", () => {
 		const k = currentKnobs(gpuRec);
-		const e = { point: 10, lo: 8, hi: 12, unit: "usd", status: "predicted", model_id: "m", source: "exact", rate: { quantity: 5, usd_per_unit: 2, unit: "gpu_hours" } } as never;
+		const e = { point: 10, lo: 8, hi: 12, unit: "usd", status: "predicted", model_id: "m", source: "exact", rate: { quantity: "cost.gpu_hours", usd_per_unit: 2, unit: "gpu_hours" } } as never;
 		// Priced at US$2/h; the visitor pays US$1/h: half.
 		expect(estimateFactor(gpuRec, k, e, { kind: "gpu", gpu: "L4", usdPerHour: 1 })).toBeCloseTo(0.5, 9);
 		// No rate on the estimate: the table's (US$0.80/h on L4).

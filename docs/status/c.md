@@ -9,6 +9,7 @@
 - Fixtures campaign-grid and grpo-l4 regenerated with their scripts at 0.6.0 (both validate). Neither carries the new fields yet: B's `to_campaign()` doesn't fill `start`, `lane_slots`, `slot`, `reason` or the per-run estimates, and the engine doesn't fill `Estimate.rate` (asked B).
 - Plain-words limits: the contradiction line is in the instructions (two limits that contradict each other both go to "not understood", in the person's words) and the output cap is 2,000 tokens. Live check after the push: `--only 4,6 --cap-usd 0.02` (the contradiction and the phrase the last run skipped). Worst case US$0.0142 for the first call and about US$0.011 for the second, so the cap may skip the second if the first runs long; expected about US$0.01.
 - D's audit 12 follow-up: Boarding clears its model tags when the job changes, so the last job's calls never tag the next.
+- Review of this batch (read-only), fixed: the stage's height came from the tallest column, so opening a node's detail or a longer guide resized the map and cut the focus glide short; the stage's height now comes from the window alone, and a resize during a glide re-fits after it. "Almost nothing" is only for a finite change that rounds to zero (an unbounded one said it). The visitor's rate re-prices an estimate on the same GPU whatever price row it carries, the same test the cost line uses. The limits check's example now names the 2,000-token cap's cost per call. Open: 0.6.0 reading is tested on synthetic records until B's code writes the fields.
 
 ## Sun Nov 1, round four (Chiya's order, 01:19)
 

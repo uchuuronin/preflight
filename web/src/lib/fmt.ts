@@ -186,7 +186,7 @@ export function fmtDelta(delta: number, unit: Unit | string): string {
 	if (delta === 0) return t("value.no_change");
 	const sign = delta > 0 ? "+" : "−";
 	const shown = fmt(Math.abs(delta), unit);
-	// A change too small to show at this precision reads "almost nothing", never "+US$0".
-	if (!/[1-9]/.test(shown)) return t("value.tiny_change");
+	// A finite change too small to show at this precision reads "almost nothing", never "+US$0".
+	if (Number.isFinite(delta) && shown === fmt(0, unit)) return t("value.tiny_change");
 	return `${sign}${shown}`;
 }

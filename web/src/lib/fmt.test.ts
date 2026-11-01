@@ -20,5 +20,7 @@ describe("fmtDelta", () => {
 		expect(fmtDelta(-0.001, "usd")).toBe("almost nothing");
 		expect(fmtDelta(2, "usd")).toMatch(/^\+US\$2/);
 		expect(fmtDelta(0, "usd")).toBe("No change");
+		// Unbounded isn't small (review, Nov 1).
+		expect(fmtDelta(Number.POSITIVE_INFINITY, "usd")).not.toBe("almost nothing");
 	});
 });

@@ -5,7 +5,11 @@ the record and text checks. Nothing runs on Modal: the entrypoint runs on the ca
 (a GitHub Actions runner via remote-run.yml, with the key in its environment, never printed).
 
 	modal run --env main api/limits_check_app.py::check
-	modal run --env main api/limits_check_app.py::check --only 0,1,4,5,6 --cap-usd 0.03
+	modal run --env main api/limits_check_app.py::check --only 4,6 --cap-usd 0.02
+
+At the 2,000-token output cap each call is reserved at about US$0.0142 before the first one shows
+the real input size, so a cap fits about one call per US$0.01 to US$0.014; size `--cap-usd` to the
+phrases picked.
 """
 
 from __future__ import annotations

@@ -937,9 +937,12 @@ a {
 }
 
 /* The orbit map */
-.pf-stage-wrap { grid-area: stage; align-self: stretch; min-width: 0; display: flex; flex-direction: column; }
-/* A size container: the view on the stage is as big as its box allows, at its own shape. */
-.pf-stage-fill { flex: 1; min-height: 540px; container-type: size; display: grid; place-items: center; }
+.pf-stage-wrap { grid-area: stage; min-width: 0; display: flex; flex-direction: column; }
+/* A size container: the view on the stage is as big as its box allows, at its own shape. Its
+   height comes from the window alone (less the header, the stage bar and the knob dock, about
+   400 px), never from the columns beside it: a longer guide or an opened node detail must not
+   resize the map under a knob move or a focus glide. */
+.pf-stage-fill { height: clamp(540px, calc(100dvh - 400px), 1400px); container-type: size; display: grid; place-items: center; }
 .pf-stage-fill > .pf-orbit,
 .pf-stage-fill > .pf-fit { width: min(100cqw, 100cqh * 600 / 560); }
 
@@ -1682,7 +1685,7 @@ a {
 	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 	.pf-dial-wrap { width: 106px; }
 	/* No height to fill on a phone: the stage is the screen's width. */
-	.pf-stage-fill { min-height: 0; container-type: normal; display: block; }
+	.pf-stage-fill { height: auto; container-type: normal; display: block; }
 	.pf-stage-fill > .pf-orbit,
 	.pf-stage-fill > .pf-fit { width: 100%; }
 	.pf-dock__row { border-radius: 24px; }

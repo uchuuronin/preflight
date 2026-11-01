@@ -299,6 +299,8 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 	focusRef.current = state.focus;
 	const layoutRef = useRef(layout);
 	layoutRef.current = layout;
+	// When the focus glide ends: a resize meanwhile re-fits after it, not over it.
+	const glideUntil = useRef(0);
 
 	// Focus: glide to the node; back out to the whole loop when focus clears.
 	useEffect(() => {
@@ -306,6 +308,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 		const duration = reduce ? 0 : 800;
 		const n = state.focus ? layout.nodes.find((m) => m.id === state.focus) : null;
 		const el = box.current;
+		glideUntil.current = performance.now() + duration;
 		if (n) void flow.setCenter(n.x, n.y, { zoom: el ? focusZoom(el.clientWidth, el.clientHeight) : 1.35, duration });
 		else void flow.fitView({ padding: 0.04, duration });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -318,6 +321,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 		const el = box.current;
 		if (!el || typeof ResizeObserver === "undefined") return;
 		let frame = 0;
+		let later = 0;
 		let last = "";
 		const ro = new ResizeObserver(([entry]) => {
 			const { width, height } = entry!.contentRect;
@@ -325,16 +329,24 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 			if (size === last || width === 0) return;
 			last = size;
 			cancelAnimationFrame(frame);
-			frame = requestAnimationFrame(() => {
+			clearTimeout(later);
+			const refit = () => {
+				const wait = glideUntil.current - performance.now();
+				if (wait > 0) {
+					later = window.setTimeout(refit, wait + 16);
+					return;
+				}
 				const f = focusRef.current;
 				const n = f ? layoutRef.current.nodes.find((m) => m.id === f) : null;
 				if (n) void flow.setCenter(n.x, n.y, { zoom: focusZoom(width, height), duration: 0 });
 				else void flow.fitView({ padding: 0.04, duration: 0 });
-			});
+			};
+			frame = requestAnimationFrame(refit);
 		});
 		ro.observe(el);
 		return () => {
 			cancelAnimationFrame(frame);
+			clearTimeout(later);
 			ro.disconnect();
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps

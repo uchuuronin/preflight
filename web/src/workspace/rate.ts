@@ -164,8 +164,9 @@ export function estimateFactor(record: LoadedRecord, knobs: Knobs, e: Estimate |
 	const r = (e as Estimate & { rate?: { usd_per_unit: number; unit: string; price_row?: string | null } | null }).rate;
 	if (r && o.kind === "gpu" && r.unit === "gpu_hours" && r.usd_per_unit > 0) {
 		const row = gpuRow(record, knobs);
-		// The visitor's rate is for one GPU: an estimate priced at another GPU's row keeps its own dollars.
-		if (!row || resolveGpu(o.gpu) !== row.gpu || (r.price_row && r.price_row !== row.id)) return 1;
+		// The visitor's rate is for one GPU (the same test as appliesHere): on that GPU, whichever price
+		// row the estimate was priced at, its dollars are its quantity at the visitor's rate.
+		if (!row || resolveGpu(o.gpu) !== row.gpu) return 1;
 		return o.usdPerHour / r.usd_per_unit;
 	}
 	return rateFactor(record, knobs, o);
