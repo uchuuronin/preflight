@@ -92,7 +92,7 @@ _CKPT = re.compile(r"(?:^|/)(checkpoint-\d+|checkpoints?|ckpt)/")
 _CACHE_EXT = re.compile(r"\.(pt|pth|pkl|pickle|npy|npz|arrow|parquet|feather|h5|cache|joblib)$")
 # a resume or pretrained weights loaded when present: not a cache
 _RESUME = re.compile(
-	r"(?i)(^|[_\-.])(ckpt|checkpoints?|last|resume|pretrained)([_\-.]|$)"
+	r"(?i)(^|[_\-.])(ckpt|checkpoints?|last|latest|resume|pretrained)([_\-.]|$)"
 )  # on the file's stem
 _RESUME_LOADERS = {"load_state_dict", "from_pretrained", "load_from_checkpoint"}
 _STATE_SUFFIXES = (".json", ".yaml", ".yml", ".toml", ".cfg")  # a checkpoint's state, not a README or script
@@ -212,10 +212,11 @@ def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:
 			path = _exists_arg(node.test, consts)
 			if path is None or not (path in written or _CACHE_EXT.search(path)):
 				continue
-			if _RESUME.search(path.rsplit("/", 1)[-1].rsplit(".", 1)[0]):  # the file's stem
-				continue
+			if _RESUME.search(path.rsplit("/", 1)[-1].rsplit(".", 1)[0]) or _CKPT.search(path):
+				continue  # named as a checkpoint (its stem), or kept in a checkpoint folder
+			loaded = _loaded_names(node.body, path, consts)
 			if any(
-				_feeds_weights(c, path, consts)
+				_feeds_weights(c, path, consts, loaded)
 				for b in node.body
 				for c in ast.walk(b)
 				if isinstance(c, ast.Call)
@@ -229,19 +230,35 @@ def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:
 	return hits[:3]
 
 
-def _feeds_weights(call, path: str, consts) -> bool:
-	"""A weights loader (load_state_dict, from_pretrained, ...) given this very path, or a load of it."""
+def _feeds_weights(call, path: str, consts, loaded: set[str]) -> bool:
+	"""A weights loader (load_state_dict, from_pretrained, ...) given this very path, a load of it,
+	or a name the if-body loaded it into (`sd = torch.load(P)`, then `load_state_dict(sd["model"])`)."""
 	import ast
 
 	if (getattr(call.func, "attr", None) or getattr(call.func, "id", None)) not in _RESUME_LOADERS:
 		return False
-	for c in [call, *(x for a in call.args for x in ast.walk(a))]:
-		for a in getattr(c, "args", []):
-			if (isinstance(a, ast.Constant) and a.value == path) or (
-				isinstance(a, ast.Name) and consts.get(a.id) == path
-			):
-				return True
+	given = [*call.args, *(k.value for k in call.keywords)]
+	for a in [x for g in given for x in ast.walk(g)]:
+		if isinstance(a, ast.Constant) and a.value == path:
+			return True
+		if isinstance(a, ast.Name) and (consts.get(a.id) == path or a.id in loaded):
+			return True
 	return False
+
+
+def _loaded_names(body, path: str, consts) -> set[str]:
+	"""Names assigned in the body from a call that takes the path (`sd = torch.load(P, ...)`)."""
+	import ast
+
+	out = set()
+	for b in body:
+		for n in ast.walk(b):
+			if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call):
+				args = [*n.value.args, *(k.value for k in n.value.keywords)]
+				if any((isinstance(a, ast.Constant) and a.value == path) or (isinstance(a, ast.Name)
+					and consts.get(a.id) == path) for a in args):  # fmt: skip
+					out |= {t.id for t in n.targets if isinstance(t, ast.Name)}
+	return out
 
 
 def _exists_arg(test, consts) -> str | None:

@@ -158,3 +158,15 @@ def test_caches_with_model_or_last_in_their_names_and_beside_a_weights_load_stil
 		], code
 	readme = {"train.py": "x = 1\n", "checkpoints/README.md": "download weights here\n"}
 	assert "hygiene.stale_checkpoint" not in [f.code for f in hygiene_findings(_gpu_rec(), readme)]
+
+
+def test_a_two_step_resume_and_a_keyword_load_are_not_caches():
+	two_step = ("import os, torch\nP = 'out/model.pt'\nif os.path.exists(P):\n    sd = torch.load(P, map_location='cpu')\n"
+		"    model.load_state_dict(sd['model'])\ntorch.save({'model': model.state_dict()}, P)\n")  # fmt: skip
+	in_folder = "import os, torch\nif os.path.exists('checkpoints/latest.pt'):\n    s = torch.load('checkpoints/latest.pt')\n"
+	keyword = ("import os\nif os.path.exists('enc.pt'):\n"
+		"    m = AutoModel.from_pretrained(pretrained_model_name_or_path='enc.pt')\n")  # fmt: skip
+	for code in (two_step, in_folder, keyword):
+		assert "hygiene.cache_not_keyed" not in [
+			f.code for f in hygiene_findings(_gpu_rec(), {"train.py": code})
+		], code

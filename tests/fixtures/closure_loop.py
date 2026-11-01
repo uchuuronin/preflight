@@ -8,7 +8,9 @@ from torch.utils.data import DataLoader, TensorDataset
 torch.manual_seed(0)
 model = nn.Sequential(nn.Embedding(512, 256), nn.Linear(256, 2048), nn.ReLU(), nn.Linear(2048, 512))
 opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
-for (x,) in DataLoader(TensorDataset(torch.randint(0, 512, (100000, 64))), batch_size=256):  # forward well above the step under load
+for (x,) in DataLoader(
+	TensorDataset(torch.randint(0, 512, (100000, 64))), batch_size=256
+):  # forward well above the step under load
 
 	def closure():
 		opt.zero_grad()
