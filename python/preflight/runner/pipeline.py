@@ -150,6 +150,10 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
+	if (
+		spec.generate_sample
+	):  # a serving probe's sample size decides what it measured; absent, keys stay as they were
+		body["generate_sample"] = spec.generate_sample
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
 

@@ -137,22 +137,32 @@ def _batch_stats(batch) -> tuple[int | None, int | None, int | None]:
 
 
 def _sample_prompts(args: tuple, kwargs: dict, n: int) -> tuple[tuple, dict]:
-	"""vLLM generate's prompts (and a per-prompt list of sampling params) cut to the first n, each
-	prompt kept whole and its reply at the length the script asked for."""
+	"""vLLM generate's prompts cut to the first n, each prompt kept whole and its reply at the
+	length the script asked for; per-prompt lists (sampling params, LoRA requests, priorities) are
+	cut to match. One prompt given as a flat list of token ids is one prompt, never cut."""
+
+	def many(v) -> bool:  # a batch of prompts, not one prompt's token ids
+		return isinstance(v, list | tuple) and len(v) > n and not all(isinstance(x, int) for x in v)
 
 	def cut(v):
 		return v[:n] if isinstance(v, list | tuple) and len(v) > n else v
 
 	args = list(args)
-	if args:
-		args[0] = cut(args[0])
+	batch = (args and many(args[0])) or any(
+		many(kwargs.get(k)) for k in ("prompts", "prompt_token_ids", "inputs")
+	)
+	if not batch:
+		return tuple(args), kwargs
+	if args and many(args[0]):
+		args[0] = args[0][:n]
 	if len(args) > 1:
 		args[1] = cut(args[1])
 	for k in ("prompts", "prompt_token_ids", "inputs"):
+		if many(kwargs.get(k)):
+			kwargs[k] = kwargs[k][:n]
+	for k in ("sampling_params", "lora_request", "priority", "prompt_adapter_request"):
 		if k in kwargs:
 			kwargs[k] = cut(kwargs[k])
-	if "sampling_params" in kwargs:
-		kwargs["sampling_params"] = cut(kwargs["sampling_params"])
 	return tuple(args), kwargs
 
 

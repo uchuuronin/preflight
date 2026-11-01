@@ -439,3 +439,8 @@ def test_a_serving_probe_keeps_the_first_prompts_whole_and_the_rest_of_the_call_
 	assert kw == {"prompts": ["a", "b", "c"], "sampling_params": [1, 2, 3]}
 	args, kw = _sample_prompts((["a"],), {}, 32)
 	assert args == (["a"],)  # fewer than the sample: untouched
+	ids = list(range(100))  # one prompt as token ids (review, Nov 1): never cut
+	args, kw = _sample_prompts((), {"prompt_token_ids": ids, "sampling_params": params}, 32)
+	assert kw["prompt_token_ids"] == ids
+	args, kw = _sample_prompts((list("abcd"),), {"lora_request": [1, 2, 3, 4], "priority": [0, 0, 1, 1]}, 2)
+	assert args == (["a", "b"],) and kw == {"lora_request": [1, 2], "priority": [0, 0]}

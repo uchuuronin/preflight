@@ -858,3 +858,17 @@ def test_a_triage_finding_names_the_node_only_when_its_probe_clearly_tested_one(
 	assert _tested_node(probe("p1", "oom"), nodes) is None  # a training-step OOM: not one node
 	assert _tested_node(probe("p1", "user_error"), nodes) is None
 	assert _tested_node(probe("p1-eval"), {"model"}) is None  # no eval node on this map
+
+
+def test_a_serving_probes_sample_size_is_in_its_cache_key_and_other_keys_are_unchanged():
+	from dataclasses import replace
+
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner.pipeline import cache_key
+
+	spec = ProbeSpec(probe_id="p1", files={"serve.py": "x = 1\n"}, entrypoint="serve.py", image="serving")
+	assert cache_key(spec, "L4", "img") == cache_key(replace(spec, generate_sample=0), "L4", "img")
+	assert cache_key(replace(spec, generate_sample=32), "L4", "img") != cache_key(spec, "L4", "img")
+	assert cache_key(replace(spec, generate_sample=32), "L4", "img") != cache_key(
+		replace(spec, generate_sample=64), "L4", "img"
+	)
