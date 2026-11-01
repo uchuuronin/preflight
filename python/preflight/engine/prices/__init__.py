@@ -13,11 +13,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-PRICE_TABLE_VERSION = "2026-11-01"  # Nov 1: three secondary rows checked on the providers' own pages
+PRICE_TABLE_VERSION = "2026-11-01b"  # Nov 1: three secondary rows checked; Glimmer self-hosted, measured
 DEFAULT_REGION = "us"
 
 Kind = Literal["on_demand", "spot", "own_cluster"]
-Confidence = Literal["provider", "secondary", "contract"]
+Confidence = Literal["provider", "secondary", "contract", "measured"]
 
 
 @dataclass(frozen=True)
@@ -146,6 +146,80 @@ TOKEN_RATES: tuple[TokenRate, ...] = (
 
 # ---------------------------------------------------------------- storage (dollars only where storage is paid)
 
+# ---------------------------------------------------------------- models we serve ourselves
+
+
+@dataclass(frozen=True)
+class SelfHostedRate:
+	"""A model Preflight serves itself, priced by the GPU time one call takes (Chiya, Nov 1): GPU-seconds per call
+	at the GPU's own rate row, and the cold start a call pays when the endpoint has scaled to zero."""
+
+	model: str
+	gpu: str  # a GPU_RATES name
+	gpu_seconds_per_call: float  # one call alone on the GPU, warm
+	cold_start_s: float  # asked for to ready, after scaling to zero (no queue)
+	call: str  # what one call was when it was measured
+	as_of: str
+	source: str
+	provider: str = "modal"
+	gpu_seconds_per_call_batched: float | None = None  # with several calls in flight
+	idle_s: float = 0.0  # what the endpoint idles after its last call before scaling to zero
+	confidence: Confidence = "measured"
+
+	@property
+	def id(self) -> str:
+		return f"selfhosted/{self.provider}/{self.model}/{self.gpu}"
+
+	def usd_per_gpu_second(self) -> float:
+		r = gpu_rate(self.gpu, self.provider)
+		if r is None:
+			raise KeyError(f"no {self.provider} rate for {self.gpu}")
+		return r.usd_per_hour / 3600
+
+	def usd_per_call(self, batched: bool = False) -> float:
+		s = (
+			self.gpu_seconds_per_call_batched
+			if batched and self.gpu_seconds_per_call_batched
+			else self.gpu_seconds_per_call
+		)
+		return s * self.usd_per_gpu_second()
+
+	def usd_cold(self) -> float:
+		"""What a call after the endpoint scaled to zero adds: the cold start, and the idle tail before it scales down."""
+		return (self.cold_start_s + self.idle_s) * self.usd_per_gpu_second()
+
+
+_GLIMMER_CALL = (
+	"one triage: 17,138 tokens in, about 300 out (reasoning low), the fixed prompt in glimmer/common.py"
+)
+SELF_HOSTED_RATES: tuple[SelfHostedRate, ...] = (
+	SelfHostedRate(
+		"muse-glimmer",
+		"A100-SXM-40GB",
+		12.8,
+		286.0,
+		_GLIMMER_CALL,
+		"2026-11",
+		"measured: remote-runs b-glimmer-smoke-a100 (GitHub run 41330014731, Nov 1): vLLM 0.28.0, FP8 copy of "
+		"meta-models/Muse-Glimmer-30B@cec94fcf; median of 5 calls alone 12.8 s (38 tokens/s decoding, 4.6 s to the "
+		"first token), 4 at once 27.7 s; cold start 286 s",
+		gpu_seconds_per_call_batched=6.9,
+		idle_s=120.0,
+	),
+	SelfHostedRate(
+		"muse-glimmer",
+		"L4",
+		43.7,
+		18.1,
+		_GLIMMER_CALL,
+		"2026-11",
+		"measured: remote-runs b-glimmer-smoke-l4 (GitHub run 41328764340, Nov 1): llama.cpp build 12030, Meta's "
+		"Q4_K_M GGUF@b44f1072; median of 5 calls 43.7 s (14.4 tokens/s decoding, 22.3 s to the first token); server "
+		"ready 18 s after the container started (the L4 itself took 19 min to schedule, not counted). The own-GPU proof, "
+		"not hosted",
+	),
+)
+
 STORAGE_RATES: tuple[StorageRate, ...] = ()  # shown in GB against the quota until a paid tier is added
 
 
@@ -189,5 +263,12 @@ def storage_rate(provider: str, region: str | None = None) -> StorageRate | None
 	return None
 
 
+def self_hosted_rate(model: str, gpu: str | None = None) -> SelfHostedRate | None:
+	for r in SELF_HOSTED_RATES:
+		if r.model == model and (gpu is None or r.gpu == gpu):
+			return r
+	return None
+
+
 def rows() -> list:
-	return [*GPU_RATES, *TOKEN_RATES, *STORAGE_RATES]
+	return [*GPU_RATES, *TOKEN_RATES, *STORAGE_RATES, *SELF_HOSTED_RATES]

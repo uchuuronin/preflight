@@ -224,3 +224,44 @@ def smoke(gpu: str = "a100", calls: int = 5, concurrent: int = 4):
 		}
 	)
 	_write(f"smoke_{gpu}", got)
+
+
+@app.local_entrypoint()
+def deploy_check():
+	"""After `modal deploy`: the endpoint's URL, that it refuses a call without a proxy token (Modal answers at its
+	edge, so this starts no container), and the containers the deployed app has running (0 when scaled to zero).
+	Starts no GPU."""
+	import urllib.error
+	import urllib.request
+
+	from preflight.glimmer.common import APP_NAME
+
+	cls = modal.Cls.from_name(APP_NAME, "Glimmer", environment_name="main")
+	url = cls().serve.get_web_url()
+	try:
+		with urllib.request.urlopen(f"{url}/v1/models", timeout=30) as r:
+			refused = {"status": r.status, "refused": False}
+	except urllib.error.HTTPError as exc:
+		refused = {"status": exc.code, "refused": exc.code in (401, 403)}
+	out = subprocess.run(
+		["modal", "container", "list", "--env", "main", "--json"], capture_output=True, text=True, timeout=120
+	)
+	try:
+		rows = json.loads(out.stdout or "[]")
+	except ValueError:
+		rows = None
+	mine = (
+		None
+		if rows is None
+		else [c for c in rows if APP_NAME in json.dumps(c) and "ops" not in json.dumps(c)]
+	)
+	_write(
+		"deploy_check",
+		{
+			"url": url,
+			"without_a_token": refused,
+			"containers_running": None if mine is None else len(mine),
+			"containers": mine,
+			"list_error": out.stderr[-400:] if rows is None else None,
+		},
+	)
