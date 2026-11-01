@@ -1,4 +1,4 @@
-"""The README draft's validation table is B's scorer output, written between two markers (Chiya, Nov 1).
+"""The final README's validation table is B's scorer output, written between two markers (Chiya, Nov 1).
 
 These keep that hook working: the markers are there once each and in order, and, once B's scorer is on the
 branch, writing a table through it changes only what is between them and the block starts with its header.
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-DRAFT = Path(__file__).resolve().parents[1] / "docs" / "readme-draft.md"
+DRAFT = Path(__file__).resolve().parents[1] / "docs" / "readme-final.md"
 START, END = "<!-- validation:start -->", "<!-- validation:end -->"
 SEED_STAMP = "Not scored yet: no full runs (seeded from the scorer with an empty manifest, Nov 1)."
 

@@ -102,8 +102,23 @@ describe("ExportsPanel", () => {
 	});
 
 	it("says a sample's numbers are illustrative", () => {
-		render(<Panel record={gold} knobs={knobsOf(gold)} estimates={gold.predictions.estimates} />);
+		// A sample is a record whose every model is a fixture's; built here, so the test holds whether
+		// the golden record carries fixture or engine estimates.
+		const fixtureId = "golden-fixture@0";
+		const sample = {
+			...gold,
+			predictions: {
+				...gold.predictions,
+				grids: gold.predictions.grids.map((g) => ({ ...g, model_id: fixtureId })),
+				estimates: Object.fromEntries(Object.entries(gold.predictions.estimates).map(([k, e]) => [k, e ? { ...e, model_id: fixtureId } : e])),
+			},
+		} as typeof gold;
+		render(<Panel record={sample} knobs={knobsOf(sample)} estimates={sample.predictions.estimates} />);
 		expect(screen.getByText(/This is a sample: its numbers are illustrative/)).toBeTruthy();
+		cleanup();
+		// A real run never says so.
+		render(<Panel record={real} knobs={knobsOf(real)} estimates={real.predictions.estimates} />);
+		expect(screen.queryByText(/This is a sample: its numbers are illustrative/)).toBeNull();
 	});
 
 	it("copies, and says so to screen readers; says what to do if copying fails", async () => {
