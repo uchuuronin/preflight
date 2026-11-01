@@ -1114,6 +1114,33 @@ a {
 .pf-finding--warn b::before { content: "▲ "; color: var(--pf-tight); font-size: 0.8em; }
 .pf-finding .pf-btn { align-self: flex-start; }
 
+/* The fix race: one lane per candidate Muse Code writes (fix/FixRace.tsx). */
+.pf-fix { display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; }
+.pf-fix p { margin: 0; }
+.pf-fix__plan { margin: 0; padding-left: 18px; }
+.pf-finding .pf-fix b::before { content: none; }
+.pf-fix__lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.pf-fix__lane { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 12px; border-radius: var(--pf-radius-sm); background: var(--pf-glass-hi); border-top: 3px solid var(--pf-stroke-strong); }
+.pf-fix__lane.is-patched { border-top-color: var(--pf-ok); }
+.pf-fix__lane.is-timeout,
+.pf-fix__lane.is-over_budget,
+.pf-fix__lane.is-failed,
+.pf-fix__lane.is-refused,
+.pf-fix__lane.is-leaked { border-top-color: var(--pf-fail); }
+.pf-fix__lane.is-no_change { border-top-color: var(--pf-tight); }
+.pf-fix__status { display: flex; align-items: center; gap: 8px; font-family: var(--pf-font-mono); font-size: 12px; }
+.pf-fix__bar { position: relative; flex: 0 0 36px; height: 4px; overflow: hidden; border-radius: 2px; background: var(--pf-stroke-strong); }
+.pf-fix__bar::after { content: ""; position: absolute; inset: 0; width: 40%; border-radius: 2px; background: var(--pf-accent); animation: pf-fix-run 1.2s ease-in-out infinite; }
+@keyframes pf-fix-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.pf-fix__said { color: var(--pf-fg-dim); }
+.pf-fix__diff summary { cursor: pointer; }
+.pf-fix__diff pre { max-height: 260px; overflow: auto; margin: 6px 0 0; padding: 8px; border-radius: var(--pf-radius-sm); background: var(--pf-glass); font-family: var(--pf-font-mono); font-size: 11.5px; white-space: pre; }
+.pf-fix__unverified { font-size: 12px; color: var(--pf-tight); }
+.pf-fix__error { color: var(--pf-fail); }
+@media (prefers-reduced-motion: reduce) {
+	.pf-fix__bar::after { animation: none; width: 100%; opacity: 0.5; }
+}
+
 .pf-guide { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: var(--pf-radius-lg); }
 .pf-guide__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .pf-guide__step { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }

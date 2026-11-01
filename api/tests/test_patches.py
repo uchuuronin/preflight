@@ -230,3 +230,23 @@ def test_run_race_reads_the_code_before_opening_a_box_and_reports_why_it_could_n
 		key="k",
 	)
 	assert out == {"error": "submission.record_unknown", "candidates": []} and opened == []
+
+
+def test_the_web_apps_copy_of_the_templates_matches():
+	from preflight_api.fix.templates import TEMPLATES
+
+	copy_ = json.loads((REPO / "web/src/fix/templates.json").read_text())
+	assert copy_["usd_per_candidate"] == run.USD_PER_CANDIDATE
+	web = copy_["templates"]
+	assert web == [
+		{
+			"id": t.id,
+			"title": t.title,
+			"lenses": list(t.lenses),
+			"knob": t.knob,
+			"metric": t.metric,
+			"needs_value": "{value}" in t.task,
+			"verifiable": t.verifiable,
+		}
+		for t in TEMPLATES.values()
+	]

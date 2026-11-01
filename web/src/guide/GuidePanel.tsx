@@ -12,6 +12,7 @@ import { LiveGuideSection } from "./LiveGuideSection";
 import { findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
+import { FixRace } from "../fix/FixRace";
 
 /** Muse Code writes a finding's fix only once the fix loop is on; until then the tour moves on. */
 const canFix = (f: Finding) => !!f.fix_template && flag("c.fix_loop");
@@ -40,6 +41,7 @@ export function GuidePanel() {
 	const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
 	const [taken, setTaken] = useState(0);
 	const [why, setWhy] = useState(false);
+	const [fixing, setFixing] = useState<string | null>(null);
 	const [fallback, setFallback] = useState<string | null>(null);
 	const [approvals, setApprovals] = useState<Array<{ id: number; name: string; args: Record<string, unknown>; run?: ToolRun; running?: boolean }>>([]);
 	const [cliff, setCliff] = useState<{ knobId: string; from: KnobValue } | null>(null);
@@ -228,8 +230,7 @@ export function GuidePanel() {
 		if (s.kind === "probe_offer") return { label: t("guide.measure_fix"), run: () => measure(s.move, "tight") };
 		if (s.kind === "finding" && s.finding) {
 			const f = s.finding;
-			if (canFix(f))
-				return { label: t("guide.fix_it"), run: () => runTool("propose_patch", { template_id: f.fix_template, finding_id: f.id, reason: f.code }, ctx()) };
+			if (canFix(f)) return { label: t("guide.fix_it"), run: () => setFixing(f.id) };
 			return { label: t("guide.next"), run: skipOffer };
 		}
 		if (s.kind === "sample_offer")
@@ -307,6 +308,7 @@ export function GuidePanel() {
 						) : null}
 					</div>
 					{why && active ? <p className="pf-guide__why">{t(active.step.whyKey, vars)}</p> : null}
+					{active?.step.kind === "finding" && active.step.finding && fixing === active.step.finding.id ? <FixRace finding={active.step.finding} /> : null}
 				</>
 			)}
 

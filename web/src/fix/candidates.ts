@@ -1,0 +1,87 @@
+/**
+ * Which fixes race for one finding: the finding's own template first, then, where verify can
+ * judge the winner, up to two others for the same kind of run that aim at the same number (an
+ * eval running out of memory: smaller eval batches, eval without gradients, gradient
+ * checkpointing). Each knob a fix sets takes a value the
+ * engine says fits; a fix whose value isn't known, or whose knob the person pinned, sits out.
+ *
+ * templates.json is the API's list (api/preflight_api/fix/templates.py), checked equal in
+ * api/tests/test_patches.py.
+ */
+import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
+import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
+import data from "./templates.json";
+
+export interface FixTemplate {
+	id: string;
+	title: string;
+	lenses: string[];
+	knob: string | null;
+	metric: string;
+	needs_value: boolean;
+	verifiable: boolean;
+}
+
+export interface Candidate {
+	template_id: string;
+	value?: KnobValue;
+}
+
+export const TEMPLATES: FixTemplate[] = data.templates;
+export const MAX_CANDIDATES = 3;
+/** What the API reserves for each candidate (fix/run.py USD_PER_CANDIDATE), shown before the click. */
+export const USD_PER_CANDIDATE: number = data.usd_per_candidate;
+
+/** Values for knobs a record doesn't carry (the fix is in the code only). */
+const CODE_ONLY_VALUES: Record<string, KnobValue> = {
+	// Source: guess, a small cap that still lets a flaky tool succeed on a second or third try;
+	// the visitor sees the value in the fix's diff.
+	"agent.cap_tool_retries": 3,
+};
+
+export function template(id: string | null | undefined): FixTemplate | undefined {
+	return id ? TEMPLATES.find((t) => t.id === id) : undefined;
+}
+
+interface Ctx {
+	record: LoadedRecord;
+	provider: PredictionProvider;
+	knobs: Record<string, KnobValue>;
+	pinned: ReadonlySet<string>;
+	objective: Objective;
+}
+
+function valueFor(t: FixTemplate, ctx: Ctx): { ok: boolean; value?: KnobValue } {
+	if (t.knob && ctx.pinned.has(t.knob)) return { ok: false };
+	const knob = t.knob ? ctx.record.knobs.find((k) => k.id === t.knob) : undefined;
+	// A switch already on has nothing to fix.
+	if (knob?.kind === "bool" && ctx.knobs[knob.id] === true) return { ok: false };
+	if (!t.needs_value) return { ok: true };
+	if (!knob) return t.id in CODE_ONLY_VALUES ? { ok: true, value: CODE_ONLY_VALUES[t.id] } : { ok: false };
+	if (knob.kind === "bool") return { ok: true, value: true };
+	const move = ctx.provider
+		.moves(ctx.record, ctx.objective, { pinned: ctx.pinned, knobs: ctx.knobs })
+		.find((m) => m.knobId === knob.id && m.fit === "fits");
+	return move ? { ok: true, value: move.to } : { ok: false };
+}
+
+export function candidatesFor(finding: Finding, ctx: Ctx): Candidate[] {
+	const first = template(finding.fix_template);
+	const lens = ctx.record.job.lens;
+	if (!first || !first.lenses.includes(lens)) return [];
+	// Other fixes race only where verify can pick the winner by measuring: an agent's fixes can't
+	// be verified yet, so its finding gets its own fix alone.
+	const others = first.verifiable ? TEMPLATES.filter((t) => t.id !== first.id && t.verifiable && t.metric === first.metric && t.lenses.includes(lens)) : [];
+	const pool = [first, ...others];
+	const out: Candidate[] = [];
+	for (const t of pool) {
+		const v = valueFor(t, ctx);
+		if (!v.ok) {
+			if (t === first) return []; // the finding's own fix can't be written: nothing races
+			continue;
+		}
+		out.push(v.value === undefined ? { template_id: t.id } : { template_id: t.id, value: v.value });
+		if (out.length === MAX_CANDIDATES) break;
+	}
+	return out;
+}
