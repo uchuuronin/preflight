@@ -152,3 +152,25 @@ def test_one_real_run_diagnoses_then_checks_inside_its_cap(rec):
 		tight["checked"][0]["code"] == "diagnosis.abstain" and "dollar cap" in tight["checked"][0]["detail"]
 	)
 	assert tight["usd"] <= 0.5
+
+
+def test_the_glimmer_client_sends_modals_proxy_headers_and_its_reasoning_strength(monkeypatch):
+	monkeypatch.setenv("GLIMMER_BASE_URL", "https://example.modal.run")
+	monkeypatch.setenv("GLIMMER_MODAL_KEY", "k1")
+	monkeypatch.setenv("GLIMMER_MODAL_SECRET", "s1")
+	seen = []
+
+	def handler(request):
+		seen.append((request.url, dict(request.headers), json.loads(request.content)))
+		return httpx.Response(200, json={"id": "g1", "choices": [{"message": {"content": "ok"}}],
+			"usage": {"prompt_tokens": 100, "completion_tokens": 10}})  # fmt: skip
+
+	assert ModelClient.glimmer_configured()
+	g = ModelClient.glimmer(transport=httpx.MockTransport(handler))
+	_, call = g.chat([{"role": "user", "content": "hi"}], purpose="triage", reasoning_effort="low")
+	url, headers, body = seen[0]
+	assert str(url) == "https://example.modal.run/v1/chat/completions"
+	assert headers["modal-key"] == "k1" and headers["modal-secret"] == "s1"
+	assert body["chat_template_kwargs"] == {"reasoning_strength": "low"} and "reasoning_effort" not in body
+	assert body["max_completion_tokens"] >= 1500 and body["model"] == "muse-glimmer"
+	assert call.provider == "modal-glimmer" and 0 <= call.cost_usd < 0.01  # GPU time, not tokens
