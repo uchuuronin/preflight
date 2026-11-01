@@ -35,6 +35,11 @@ Updated Sun Nov 1, 01:30 ET.
   script that samples subgraphs by hand, as zoo/gnn_pyg does, gets no graph counts, and with no
   loader the forward can't be told from the sampling, so both land in "other" (Nov 1 L4 probe:
   60% other). On the cut sheet (Chiya, Nov 1): count each conv layer's edges at SAGEConv/MessagePassing forward, about 1 hour.
+- Dataset size (`extras.train_dataset_len`, Nov 1): the training loader's sampler length, else its
+  dataset's. With `batch_size=None` a split sampler isn't seen, so validation rows are counted; a
+  Lightning `DistributedSamplerWrapper` over a split falls back to the whole dataset. A GNN script
+  that samples by hand (zoo/gnn_pyg) has no loader, so no size. The recorder side hasn't run on
+  torch in this workspace; the first GPU probe is its check.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
@@ -208,6 +213,8 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Nov 1 11:19 | `a-stop-main-12` ok; `a-agent-resample-30` (41301359530): D's agent eval on its plant-3 fix (run.py matching ws-d, sha256 8278748b), the first 30 MBPP tasks again. **Stall detection measured**: the script stopped 120 s after the last model call (script wall 257 s); 24 tasks ended on a tool call, up to 4 of them stuck (the script's 4 workers): 4 of 30 is 13% (Clopper-Pearson 95% 3.8–30.7%) if all four are, as the plant intends [measured / derived]. Turns 1–4, per-task wall median 4.5 s, max 10.0 s; the stuck tasks read `done` (no cut stop reason until schema 0.5.1). Sample in zoo/agent_eval_spark/sample_nov1_resample.json | none (CPU sandbox + worker) | about 5 | **$0.4155 of Muse Spark calls** [measured by the proxy]; per task $0.0053–0.0394 |
 | Nov 1 11:24 | `a-gt-grpo-50` (41301761572): the 50-step GRPO ground truth. **No measurement**: Modal queued the L4 function for 59 min (container up 12:24), and the workflow's 60-minute limit ended `modal run` a minute into the bare run (exit 137). `a-stop-ops-main-2` found the ops app already stopped. The queue's second half stopped here (torchtitan and 2×L4 not run) | L4, about 1 min | 60 (59 queued) | about $0.01 GPU (estimate); Actions minutes |
 | Nov 1 12:53 | `a-startup-check-14` (41308614408) ok; `a-deploy-main-14` (41308698051): **the production runner, deployed and left running** (ws-a 9e46c3c, main merged in, production flags; the job store about $0.19/day, C's approved deploy plan) | none | — | about $0.19/day (C's estimate) |
+| Nov 1 12:44 | `a-gt-grpo-50-b` (41307865340): **the 50-step GRPO ground truth, on an A10** (GPU list L4, A10; Modal gave the A10 within about 20 s). Bare 3 steps in 99 s; recorder 2 warmup + 50 timed steps ok in 1,415 s, p50 27.6 s a step. Phase split rollout 93.5%, backward 3.1%, forward 1.6%, reference 1.3%, optimizer 0.4%. Peak 22.29 GB allocated, 23.18 GB reserved, of the A10's 24 GB. Zero spread: 167 of 208 prompt groups (80%, Wilson 95% 74–85%), the `rl.zero_spread` finding on the record. Correct completions 63 of 1,664 (3.8%, 3.0–4.8%); 40 of 208 prompts had any. Truncation at the 512 cap: 22 of 1,664 (1.3%, 0.9–2.0%); p95 363 tokens. Recorder overhead: sync 1.05 (0.83–1.25, 24 pairs), hooks 1.06 (1 pair) [measured]. Record `zoo/grpo_trl/record_nov1_a10.json` (01M6BKQTWZQ8HSDE2CAV9JTWFP) | A10 | about 26 | **about $0.52 GPU at list** (estimate) |
+| Nov 1 13:10 | `a-torchtitan-check` (41309914515): startup check ok (torch 2.7.1, debug model), then the check **failed before the first step**: `KeyError: getpwuid(): uid not found: 61000`. The probe's uid has no passwd entry and the script asks for its user name. Fixed (the probe sets USER and LOGNAME, and the images get a passwd entry); not rerun, since the fix needs a push. Modal gave the A10 (the log's "on the L4" was a fixed label, fixed). The queue stopped here, so the 2× check didn't run | A10 | about 1 | about $0.01 GPU (estimate) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,
