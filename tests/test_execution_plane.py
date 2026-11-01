@@ -337,3 +337,37 @@ def test_the_wait_for_a_gpu_is_neither_probe_time_nor_cost_and_a_result_survives
 		assert r.probe.duration_s == 0.0 and run.queued_s == 900.0 and run.billed_usd(lambda g: 3.6) == 0.0
 	with SandboxRunner(lambda g: SlowCleanup(g)) as run:
 		assert run(spec(), "L4", should_stop=lambda: False).probe.status == "ok"
+
+
+def test_an_l4_that_wont_schedule_falls_back_to_an_a10_priced_as_an_a10(monkeypatch):
+	import time as _time
+
+	from preflight.runner import sandbox_runner
+
+	priced = []
+	real_timed = sandbox_runner._timed
+	monkeypatch.setattr(
+		sandbox_runner, "_timed", lambda r, s, sec: priced.append(s.gpu_usd_per_hour) or real_timed(r, s, sec)
+	)
+	from dataclasses import replace
+
+	class Stuck(FakeSandbox):  # Modal never finds an L4 in time
+		def exec(self, *args, timeout=None):
+			if args == ("true",) and self.gpu == "L4":
+				_time.sleep(1.0)
+			return super().exec(*args, timeout=timeout)
+
+	made = []
+
+	def create(gpu):
+		made.append(Stuck(gpu))
+		return made[-1]
+
+	prices = {"L4": 0.80, "A10": 1.10, "L40S": 1.95}
+	with SandboxRunner(create, price=prices.__getitem__, schedule_wait_s=0.1) as run:
+		r = run(replace(spec("p1"), gpu_usd_per_hour=0.80), "L4", should_stop=lambda: False)
+		run(spec("p2"), "L4", should_stop=lambda: False)  # the A10 keeps serving the job's L4 points
+	assert r.probe.status == "ok" and [s.gpu for s in made] == ["L4", "A10"]
+	assert made[0].terminated and run.unscheduled == ["L4"] and run.ran_on == ["A10", "A10"]
+	assert priced == [1.10, 1.10]  # each probe costed at the A10's list price, not the L4's
+	assert set(run.gpu_seconds) == {"A10"}

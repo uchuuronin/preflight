@@ -494,7 +494,10 @@ def run_worker() -> int:
 		# leaves the job to the reaper and a retry, and its sandbox billing until idle_timeout
 		if time.monotonic() - started > WORKER_TIMEOUT_S - (JOB_PROBE_WALL_S + 15 * 60):
 			return ran
-		with SandboxRunner(_sandbox_factory()) as runner:  # one sandbox per job, ended with the job
+		from preflight.probes.gpu_choice import usd_per_hour
+
+		# one sandbox per job, ended with the job; an L4 that won't schedule falls back to A10, L40S
+		with SandboxRunner(_sandbox_factory(), price=usd_per_hour) as runner:
 			deps = Deps(records=writer, runner=runner, spark=_spark_client(), cache=DictCache(cache_dict),
 				image=tag, blobs=blobs, reader=writer, install_requirements=True,
 				overhead_usd_per_h=SANDBOX_OVERHEAD_USD_PER_H)  # fmt: skip
