@@ -253,6 +253,10 @@ def deploy_check():
 	out = subprocess.run(
 		["modal", "container", "list", "--env", "main", "--json"], capture_output=True, text=True, timeout=120
 	)
+	if out.returncode != 0:  # review, Nov 1: a failed listing must not read as "scaled to zero"
+		found["containers_error"] = (out.stderr or out.stdout)[-400:]
+		_write("deploy_check", found)
+		return
 	try:
 		rows = json.loads(out.stdout or "[]")
 		mine = [

@@ -153,11 +153,24 @@ def prepare(store: str, divergence: str) -> None:
 				"peak_allocated_before_failing_bytes": (r.get("memory") or {}).get("peak_allocated"),
 				"n_params": r.get("n_params"),
 			}
-			items.append({"key": r["key"], "task": "oom", "evidence": evidence, "rule": _oom_rule(r)})
+			# review, Nov 1: the config key repeats across GPUs, so the row is the GPU and the key
+			items.append(
+				{
+					"row_id": f"{r.get('gpu')}/{r['key']}",
+					"task": "oom",
+					"evidence": evidence,
+					"rule": _oom_rule(r),
+				}
+			)
 	for r in _rows(f"{divergence}/*.jsonl.gz"):
 		if (r.get("label") or {}).get("diverged"):
 			items.append(
-				{"key": r["key"], "task": "divergence", "evidence": _div_evidence(r), "rule": _div_rule(r)}
+				{
+					"row_id": f"{r.get('gpu')}/{r['key']}",
+					"task": "divergence",
+					"evidence": _div_evidence(r),
+					"rule": _div_rule(r),
+				}
 			)
 	INPUTS.parent.mkdir(parents=True, exist_ok=True)
 	INPUTS.write_text("".join(json.dumps(i, sort_keys=True) + "\n" for i in items))
@@ -171,12 +184,12 @@ def prepare(store: str, divergence: str) -> None:
 
 
 def _schema(labels: tuple[str, ...]):
-	from pydantic import BaseModel, Field
+	from pydantic import BaseModel
 
 	class Label(BaseModel):
 		label: Literal[labels]  # type: ignore[valid-type]
 		confidence: Literal["low", "medium", "high"]
-		why: str = Field(max_length=300)
+		why: str  # review, Nov 1: no length cap (strict schemas drop it, and a long answer would fail); cut at 300 below
 
 	return Label
 
@@ -220,12 +233,12 @@ def label(out_dir: str) -> None:
 			before = len(client.calls)
 			try:
 				ans, _ = client.structured(_messages(item), schema, purpose="label", reasoning_effort="low")
-				got = {"label": ans.label, "confidence": ans.confidence, "why": ans.why}
+				got = {"label": ans.label, "confidence": ans.confidence, "why": ans.why[:300]}
 			except Exception as exc:  # a refusal or a schema miss: logged, and the row counts as unlabelled
 				got = {"label": None, "error": f"{type(exc).__name__}: {exc}"[:300]}
 			calls = [c.model_dump(mode="json") for c in client.calls[before:]]
 			spent += sum(c["cost_usd"] for c in calls)
-			row = {"key": item["key"], "task": item["task"], **got, "calls": calls}
+			row = {"row_id": item["row_id"], "task": item["task"], **got, "calls": calls}
 			fh.write(json.dumps(row) + "\n")
 			done.append(row)
 	with open(out / "spark_labels_calls.jsonl", "w") as fh:
@@ -246,7 +259,7 @@ def _wilson(k: int, n: int) -> tuple[float, float]:
 
 
 def score(labels_path: str, run: str) -> None:
-	items = {i["key"]: i for i in (json.loads(x) for x in INPUTS.read_text().splitlines())}
+	items = {i["row_id"]: i for i in (json.loads(x) for x in INPUTS.read_text().splitlines())}
 	got = [json.loads(x) for x in Path(labels_path).read_text().splitlines()]
 	calls = [c for r in got for c in r["calls"]]
 	rep: dict = {
@@ -257,7 +270,7 @@ def score(labels_path: str, run: str) -> None:
 		"answered": sum(1 for r in got if r.get("label")),
 	}
 	for task in ("oom", "divergence"):
-		pairs = [(items[r["key"]]["rule"], r.get("label")) for r in got if r["task"] == task]
+		pairs = [(items[r["row_id"]]["rule"], r.get("label")) for r in got if r["task"] == task]
 		comparable = [(a, b) for a, b in pairs if a is not None and b is not None]
 		k, n = sum(1 for a, b in comparable if a == b), len(comparable)
 		lo, hi = _wilson(k, n) if n else (None, None)
@@ -275,7 +288,7 @@ def score(labels_path: str, run: str) -> None:
 			"no_rule_label": sum(1 for a, _ in pairs if a is None),
 			"no_answer": sum(1 for _, b in pairs if b is None),
 		}
-	all_pairs = [(items[r["key"]]["rule"], r.get("label")) for r in got]
+	all_pairs = [(items[r["row_id"]]["rule"], r.get("label")) for r in got]
 	comp = [(a, b) for a, b in all_pairs if a is not None and b is not None]
 	k, n = sum(1 for a, b in comp if a == b), len(comp)
 	rep["overall"] = {
@@ -293,7 +306,11 @@ def score(labels_path: str, run: str) -> None:
 	REPORT.write_text(json.dumps(rep, indent=1) + "\n")
 	PROVENANCE.parent.mkdir(parents=True, exist_ok=True)
 	PROVENANCE.write_text(
-		"".join(json.dumps({"key": r["key"], "task": r["task"], **c}) + "\n" for r in got for c in r["calls"])
+		"".join(
+			json.dumps({"row_id": r["row_id"], "task": r["task"], **c}) + "\n"
+			for r in got
+			for c in r["calls"]
+		)
 	)
 	print(json.dumps(rep, indent=1))
 

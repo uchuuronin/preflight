@@ -20,3 +20,10 @@ def test_every_self_hosted_row_has_a_gpu_rate_and_a_unique_id():
 	for r in prices.SELF_HOSTED_RATES:
 		assert prices.gpu_rate(r.gpu, r.provider) is not None, r.id
 		assert r in prices.rows()
+
+
+def test_the_price_table_version_is_a_date():
+	"""CostBasis.as_of reads it (CI, Nov 1: a "2026-11-01b" version failed every cost basis)."""
+	from datetime import date
+
+	date.fromisoformat(prices.PRICE_TABLE_VERSION)

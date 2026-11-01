@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-PRICE_TABLE_VERSION = "2026-11-01b"  # Nov 1: three secondary rows checked; Glimmer self-hosted, measured
+PRICE_TABLE_VERSION = "2026-11-01"  # a date: CostBasis.as_of reads it. Nov 1: three secondary rows checked; Glimmer self-hosted, measured
 DEFAULT_REGION = "us"
 
 Kind = Literal["on_demand", "spot", "own_cluster"]
