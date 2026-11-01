@@ -4,7 +4,6 @@ triage call the smokes make. See app.py for what runs where and why."""
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -22,14 +21,17 @@ FP8_DIR = f"{WEIGHTS}/fp8-dynamic"
 GGUF_DIR = f"{WEIGHTS}/gguf"
 SOURCES = f"{WEIGHTS}/sources.json"  # repo, file, resolved revision and sizes of each download
 
-# cited: recipes.vllm.ai/meta-models/Muse-Glimmer-30B lists vLLM 0.28.0 and this image; the parsers are required
-VLLM_IMAGE = "vllm/vllm-openai:v0.28.0"
+# cited: recipes.vllm.ai/meta-models/Muse-Glimmer-30B lists vLLM 0.28.0; the parsers are required
+CUDA_BASE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"  # cited: Modal's vLLM example uses a CUDA 12.8 devel base
 # cited: Meta's GGUF page needs llama.cpp at or after commit 62bf73d (PR #26841); the build used is recorded per run
 LLAMA_IMAGE = "ghcr.io/ggml-org/llama.cpp:server-cuda"
 PINS = {
 	"huggingface_hub": "huggingface_hub[hf_xet]==2.4.0",
 	"llmcompressor": "llmcompressor==0.15.0",
-	"openai": "openai==2.8.1",  # the llama.cpp image has none; vLLM's image brings its own
+	"openai": "openai==2.8.1",  # the llama.cpp image has none; vLLM's wheel brings its own
+	"vllm": "vllm==0.28.0",
+	# llmcompressor 0.15.0 resolves to it too (startup check, Nov 1), and it has the muse_glimmer architecture
+	"transformers": "transformers==5.21.0",
 }
 MAX_MODEL_LEN = (
 	32768  # guess: room for a triage (about 8K in, 1K out) with KV to spare on 40 GB; measured per run
@@ -54,9 +56,12 @@ quant_image = (
 	.pip_install(PINS["llmcompressor"], PINS["huggingface_hub"])
 	.add_local_python_source("preflight")
 )
+# Nov 1: Modal can't read the Python version in vLLM's own image (startup check 41327084275), so this is Modal's
+# vLLM recipe: a CUDA base with Modal's Python and vLLM's wheel at the version the Glimmer recipe lists
 vllm_image = (
-	modal.Image.from_registry(VLLM_IMAGE)
+	modal.Image.from_registry(CUDA_BASE, add_python="3.12")
 	.entrypoint([])
+	.pip_install(PINS["vllm"], PINS["transformers"])
 	.env({"HF_HUB_OFFLINE": "1"})  # the weights come from the volume, never the hub at serve time
 	.add_local_python_source("preflight")
 )
@@ -85,9 +90,9 @@ QUANT_IGNORE = ["lm_head", "re:.*vision.*", "re:.*visual.*", "re:.*mm_proj.*", "
 # ---------------------------------------------------------------- the triage call both smokes make
 
 
-def triage_messages() -> list[dict]:
+def triage_messages(call: str = "") -> list[dict]:
 	"""One triage of a probe log, shaped like Preflight's (about 8K tokens in, a short JSON answer out). The log is
-	synthetic and fixed, so every run sends the same prompt."""
+	synthetic and fixed; `call` opens the prompt, so no call reuses another's cached prefix (review, Nov 1)."""
 	lines = [
 		"[preflight] probe p1: finetune_lora_hf, batch 8, seq_len 2048, bf16, gradient checkpointing off",
 		"[preflight] requirements: already installed for this job",
@@ -111,19 +116,19 @@ def triage_messages() -> list[dict]:
 		"22.05 GiB of which 1.87 GiB is free. Of the allocated memory 19.21 GiB is allocated by PyTorch.",
 	]
 	system = (
-		"You triage failed ML training probes for Preflight. Read the log and answer with JSON only: "
+		f"Triage request {call}. You triage failed ML training probes for Preflight. Read the log and answer with JSON only: "
 		'{"category": one of ["oom", "nan", "data", "install", "timeout", "other"], "line": the log line that '
 		'shows it, copied exactly, "why": one sentence, "fix": one sentence}.'
 	)
 	return [{"role": "system", "content": system}, {"role": "user", "content": "\n".join(lines)}]
 
 
-def _one_call(client, model: str, max_tokens: int) -> dict:
+def _one_call(client, model: str, max_tokens: int, call: str) -> dict:
 	t0 = time.monotonic()
 	first, text, usage, finish = None, [], None, None
 	stream = client.chat.completions.create(
 		model=model,
-		messages=triage_messages(),
+		messages=triage_messages(call),
 		max_tokens=max_tokens,
 		stream=True,
 		stream_options={"include_usage": True},
@@ -167,11 +172,11 @@ def _calls(base_url: str, model: str, calls: int, concurrent: int, max_tokens: i
 
 	from openai import OpenAI
 
-	client = OpenAI(base_url=base_url, api_key=os.environ.get("GLIMMER_API_KEY", "local"), timeout=600)
-	serial = [_one_call(client, model, max_tokens) for _ in range(calls)]
+	client = OpenAI(base_url=base_url, api_key="local", timeout=600)  # a local server, no key
+	serial = [_one_call(client, model, max_tokens, f"s{i}") for i in range(calls)]
 	t0 = time.monotonic()
-	with cf.ThreadPoolExecutor(concurrent) as ex:
-		together = list(ex.map(lambda _: _one_call(client, model, max_tokens), range(concurrent)))
+	with cf.ThreadPoolExecutor(max(1, concurrent)) as ex:
+		together = list(ex.map(lambda i: _one_call(client, model, max_tokens, f"c{i}"), range(concurrent)))
 	both = time.monotonic() - t0
 	toks = sum(c["completion_tokens"] or 0 for c in together)
 	return {
@@ -219,7 +224,8 @@ def _tail(path: str, keep: tuple[str, ...]) -> list[str]:
 	return [ln[-300:] for ln in lines if any(k in ln for k in keep)][-40:]
 
 
-def vllm_command(model_dir: str, api_key: bool) -> list[str]:
+def vllm_command(model_dir: str) -> list[str]:
+	"""No --api-key: vLLM logs its arguments at start (review, Nov 1); the endpoint is gated by Modal proxy auth."""
 	cmd = [
 		"vllm", "serve", model_dir,
 		"--served-model-name", MODEL_ID,
@@ -230,8 +236,6 @@ def vllm_command(model_dir: str, api_key: bool) -> list[str]:
 		"--enable-auto-tool-choice", "--tool-call-parser", "muse_glimmer", "--reasoning-parser", "muse_glimmer",
 		"--limit-mm-per-prompt", '{"image": 0, "video": 0}',  # text-only triage: no vision memory reserved
 	]  # fmt: skip
-	if api_key:
-		cmd += ["--api-key", os.environ["GLIMMER_API_KEY"]]
 	return cmd
 
 
@@ -244,7 +248,7 @@ def llama_command() -> list[str]:
 	]  # fmt: skip
 
 
-def run_smoke(kind: str, calls: int, concurrent: int) -> dict:
+def run_smoke(kind: str, calls: int, concurrent: int, ready_s: float) -> dict:
 	started = time.monotonic()
 	weights.reload()
 	src = _sources()
@@ -252,7 +256,7 @@ def run_smoke(kind: str, calls: int, concurrent: int) -> dict:
 	if kind == "vllm":
 		if "fp8" not in src:
 			raise RuntimeError("run quantize first: the FP8 copy isn't in the volume")
-		cmd, health = vllm_command(FP8_DIR, api_key=False), f"http://127.0.0.1:{PORT}/health"
+		cmd, health = vllm_command(FP8_DIR), f"http://127.0.0.1:{PORT}/health"
 		keep = ("KV cache", "Loading weights took", "Model loading took", "model weights took", "CUDA graph",
 			"Maximum concurrency", "Error", "error", "torch.compile")  # fmt: skip
 	else:
@@ -261,7 +265,13 @@ def run_smoke(kind: str, calls: int, concurrent: int) -> dict:
 	with open(log, "w") as fh:
 		proc = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT)
 	try:
-		load_s = _wait_ready(health, proc, 20 * 60)
+		try:
+			load_s = _wait_ready(health, proc, ready_s)
+		except (
+			RuntimeError,
+			TimeoutError,
+		) as exc:  # review, Nov 1: say why, so a failed run isn't paid for twice
+			raise RuntimeError(f"{exc}; server log tail: " + " | ".join(_tail(log, ("",))[-25:])) from exc
 		mem = _gpu_used()
 		res = _calls(f"http://127.0.0.1:{PORT}/v1", MODEL_ID, calls, concurrent)
 	finally:

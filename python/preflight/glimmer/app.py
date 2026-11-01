@@ -18,8 +18,9 @@ Runs (agents start these only through remote-run.yml; every one has its own time
     modal deploy --env main python/preflight/glimmer/app.py               # the endpoint, scales to zero
 
 Each `modal run` writes out/glimmer_<name>.json. The deployed endpoint is vLLM's OpenAI-compatible server behind
-Modal's web URL, at most one container, scaled to zero after 2 minutes idle, and it asks for the key in the
-`preflight-glimmer` secret (GLIMMER_API_KEY): an open URL would let anyone start an A100 on our bill.
+Modal's web URL, at most one container, scaled to zero after 2 minutes idle, behind Modal proxy auth: a caller
+sends Modal-Key and Modal-Secret headers (a workspace proxy auth token, kept in the `preflight-glimmer` secret for
+A's worker), and Modal refuses anything else before a container starts, so the URL alone can't start an A100.
 """
 
 from __future__ import annotations
@@ -50,7 +51,6 @@ app = modal.App(APP_NAME)
 	image=vllm_image,
 	gpu=GPUS["a100"],
 	volumes={WEIGHTS: weights},
-	secrets=[modal.Secret.from_name("preflight-glimmer", required_keys=["GLIMMER_API_KEY"])],
 	scaledown_window=IDLE_S,
 	min_containers=0,
 	max_containers=1,
@@ -58,6 +58,8 @@ app = modal.App(APP_NAME)
 )
 @modal.concurrent(max_inputs=16)
 class Glimmer:
-	@modal.web_server(port=PORT, startup_timeout=20 * 60)
+	# review, Nov 1: proxy auth refuses a request without Modal-Key and Modal-Secret headers at Modal's edge, before
+	# any container starts, so a stranger who finds the URL can't start the A100
+	@modal.web_server(port=PORT, startup_timeout=20 * 60, requires_proxy_auth=True)
 	def serve(self):
-		subprocess.Popen(vllm_command(FP8_DIR, api_key=True))
+		subprocess.Popen(vllm_command(FP8_DIR))

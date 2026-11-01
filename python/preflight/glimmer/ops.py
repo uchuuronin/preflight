@@ -101,7 +101,9 @@ def llama_version() -> dict:
 	return {"llama_server": (out.stdout + out.stderr).strip()[-400:]}
 
 
-@app.function(image=quant_image, volumes={WEIGHTS: weights}, timeout=60 * 60, cpu=8, memory=96 * 1024)
+@app.function(
+	image=quant_image, volumes={WEIGHTS: weights}, timeout=40 * 60, cpu=8, memory=96 * 1024
+)  # worst case about $0.77
 def make_fp8() -> dict:
 	"""The FP8 copy of Meta's bf16 checkpoint: FP8_DYNAMIC (per-channel weights, per-token activations), no
 	calibration data, so it's a pure function of the official weights. vLLM serves it on Ampere as FP8 weights
@@ -154,14 +156,15 @@ def make_fp8() -> dict:
 	return {"fp8": src["fp8"]}
 
 
-@app.function(image=vllm_image, gpu=GPUS["a100"], volumes={WEIGHTS: weights}, timeout=25 * 60)
+# worst cases: A100 20 min $0.70, L4 35 min $0.47; with quantize's $0.77, under Chiya's $2 (Nov 1)
+@app.function(image=vllm_image, gpu=GPUS["a100"], volumes={WEIGHTS: weights}, timeout=20 * 60)
 def smoke_a100(calls: int, concurrent: int) -> dict:
-	return run_smoke("vllm", calls, concurrent)
+	return run_smoke("vllm", calls, concurrent, ready_s=12 * 60)
 
 
-@app.function(image=llama_image, gpu=GPUS["l4"], volumes={WEIGHTS: weights}, timeout=20 * 60)
+@app.function(image=llama_image, gpu=GPUS["l4"], volumes={WEIGHTS: weights}, timeout=35 * 60)
 def smoke_l4(calls: int, concurrent: int) -> dict:
-	return run_smoke("llama", calls, concurrent)
+	return run_smoke("llama", calls, concurrent, ready_s=10 * 60)
 
 
 # ---------------------------------------------------------------- local entrypoints (write out/)
@@ -178,8 +181,11 @@ def startup_check():
 	"""CPU only: both downloads (once), their revisions and licence, the config, and the two serving images."""
 	t0 = time.monotonic()
 	got = fetch.remote()
-	got["vllm"] = vllm_version.remote()
-	got["llama_cpp"] = llama_version.remote()
+	for key, fn in (("vllm", vllm_version), ("llama_cpp", llama_version)):
+		try:
+			got[key] = fn.remote()
+		except Exception as exc:  # the downloads already landed: keep what's known
+			got[key] = {"error": f"{type(exc).__name__}: {exc}"[:600]}
 	got["wall_s"] = round(time.monotonic() - t0, 1)
 	_write("startup_check", got)
 
