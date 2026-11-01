@@ -893,5 +893,11 @@
 	"guide.unpin_ask.label": "The guide asks to release a pin",
 	"guide.unpin_ask.release": "Release it",
 	"guide.unpin_ask.keep": "Keep {value}",
-	"fix.error.limits_unsaved": "Your limits couldn't be saved, so Muse Code didn't start. Try again in a moment."
+	"fix.error.limits_unsaved": "Your limits couldn't be saved, so Muse Code didn't start. Try again in a moment.",
+	"dial.short.time": "Time",
+	"dial.short.cost": "Cost",
+	"dial.short.risk": "Risk",
+	"dial.delta_point": "{n} point",
+	"dial.delta_points": "{n} points",
+	"wake.empty": "What this changes shows here."
 }

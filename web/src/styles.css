@@ -887,7 +887,7 @@ a {
 	pointer-events: none;
 	opacity: 0;
 	transform: translate(-50%, 0);
-	animation: pf-wake 2600ms var(--pf-ease) forwards;
+	animation: pf-wake var(--pf-dur-wake) var(--pf-ease) forwards;
 }
 .pf-dial__wake.is-better { color: var(--pf-ok); }
 .pf-dial__wake.is-worse { color: var(--pf-tight); }
@@ -903,7 +903,9 @@ a {
 	100% { opacity: 0; }
 }
 /* The same wakes inside the open knob control, shown only where the dials are out of sight. */
-.pf-wakes { display: none; flex-wrap: wrap; gap: 6px; min-height: 24px; }
+/* Two rows high whether or not a wake is showing, so the control under the finger never jumps. */
+.pf-wakes { display: none; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 54px; }
+.pf-wakes__empty { font-size: 12px; line-height: 24px; color: var(--pf-fg-dim); }
 .pf-wakes__item {
 	padding: 2px 9px;
 	border-radius: var(--pf-radius-pill);
@@ -914,7 +916,7 @@ a {
 	line-height: 1.5;
 	font-variant-numeric: tabular-nums;
 	color: var(--pf-fg);
-	animation: pf-wake-still 2600ms var(--pf-ease) forwards;
+	animation: pf-wake-still var(--pf-dur-wake) var(--pf-ease) forwards;
 }
 .pf-wakes__item.is-better { color: var(--pf-ok); }
 .pf-wakes__item.is-worse { color: var(--pf-tight); }
@@ -933,7 +935,7 @@ a {
 .pf-orbit .react-flow { position: absolute; inset: 0; background: transparent; overflow: visible; }
 .pf-orbit .react-flow__pane { cursor: default; }
 .pf-orbit .react-flow__node { cursor: pointer; }
-.pf-orbit .react-flow__node-onode { transition: transform 0.8s var(--pf-ease-move); }
+.pf-orbit .react-flow__node-onode { transition: transform var(--pf-dur-move) var(--pf-ease-move); }
 .pf-orbit .react-flow__node-bg { cursor: default; }
 .pf-orbit .react-flow__node:focus-visible { outline: none; }
 
@@ -948,7 +950,7 @@ a {
 	stroke-linecap: round;
 	transform-box: view-box;
 	transform-origin: 300px 280px;
-	transition: stroke-dasharray 0.8s var(--pf-ease-move), transform 0.8s var(--pf-ease-move), stroke 0.3s ease, stroke-opacity 0.3s ease;
+	transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move), transform var(--pf-dur-move) var(--pf-ease-move), stroke 0.3s ease, stroke-opacity 0.3s ease;
 }
 .pf-arc.is-accent { stroke: var(--pf-accent); stroke-opacity: 1; }
 
@@ -980,7 +982,7 @@ a {
 	stroke-width: 16;
 	transform-box: view-box;
 	transform-origin: 300px 280px;
-	transition: stroke-dasharray 0.8s var(--pf-ease-move), transform 0.8s var(--pf-ease-move);
+	transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move), transform var(--pf-dur-move) var(--pf-ease-move);
 }
 .pf-mring--1 { stroke: var(--pf-term-1); }
 .pf-mring--2 { stroke: var(--pf-term-2); }
@@ -995,7 +997,7 @@ a {
 	stroke-width: 4;
 	stroke-linecap: round;
 	stroke-dasharray: 3 5;
-	transition: stroke-dasharray 0.8s var(--pf-ease-move);
+	transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move);
 }
 
 .pf-core {
@@ -1040,8 +1042,8 @@ a {
 		border-color 0.4s ease,
 		box-shadow 0.4s ease,
 		opacity 0.5s ease,
-		width 0.8s var(--pf-ease-move),
-		height 0.8s var(--pf-ease-move);
+		width var(--pf-dur-move) var(--pf-ease-move),
+		height var(--pf-dur-move) var(--pf-ease-move);
 }
 .pf-onode:hover { transform: scale(1.06); }
 .pf-onode:active { transform: scale(0.97); }

@@ -50,6 +50,10 @@ const shared = {
 	"dur-sheet": "450ms",
 	"dur-screen": "700ms",
 	"dur-sky": "1400ms",
+	// The map's glide (nodes, rings, arcs) and the core number travelling with it (lib/tween.ts).
+	"dur-move": "800ms",
+	// How long a move's wake stays on the readouts it changed (Dials.tsx).
+	"dur-wake": "2600ms",
 } as const;
 
 export const duskTokens = {

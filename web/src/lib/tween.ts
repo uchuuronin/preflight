@@ -11,8 +11,15 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 import { duskTokens } from "../theme/tokens";
 
-/** Source: tokens.ts `dur-value` (600ms), the dials' and memory ring's transition. */
-export const VALUE_MS = Number.parseFloat(duskTokens["dur-value"]);
+/** A CSS duration ("600ms" or "0.6s") in milliseconds. */
+export function durMs(css: string): number {
+	const n = Number.parseFloat(css);
+	if (!Number.isFinite(n)) return 0;
+	return /ms\s*$/.test(css) ? n : /s\s*$/.test(css) ? n * 1000 : n;
+}
+
+/** Source: tokens.ts `dur-value`, the dial arcs' transition. */
+export const VALUE_MS = durMs(duskTokens["dur-value"]);
 
 /** CSS cubic-bezier(x1, y1, x2, y2) as a function of progress 0..1 (Newton steps, then bisection). */
 export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
@@ -54,9 +61,10 @@ function parseBezier(css: string): (t: number) => number {
 
 /** Source: tokens.ts `ease`, the curve the dial arcs use. */
 export const valueEase = parseBezier(duskTokens.ease);
-/** Source: tokens.ts `ease-move` and the map's 0.8 s glide (styles.css .pf-mring, .react-flow__node-onode). */
+/** Source: tokens.ts `ease-move`, the map's glide (styles.css .pf-mring, .react-flow__node-onode). */
 export const moveEase = parseBezier(duskTokens["ease-move"]);
-export const MOVE_MS = 800;
+/** Source: tokens.ts `dur-move`, the same glide's duration. */
+export const MOVE_MS = durMs(duskTokens["dur-move"]);
 
 export function reducedMotion(): boolean {
 	return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -66,19 +74,28 @@ export function reducedMotion(): boolean {
  * Tween the text of `ref` from the number it last showed to `value`, formatted by `format`.
  * `value` null: nothing to tween (an abstaining readout); the element shows React's text.
  */
-export function useTweenedText(
-	ref: RefObject<HTMLElement | null>,
-	value: number | null,
-	format: (v: number) => string,
-	ms = VALUE_MS,
-	ease: (t: number) => number = valueEase,
-): void {
+export interface TweenOptions {
+	ms?: number;
+	ease?: (t: number) => number;
+	/**
+	 * The element's class for a given text, applied on every frame, for size classes chosen by
+	 * length: a frame between two values can be longer than either ("7 min 23 s" on the way from
+	 * 5 min to 10 min). Must match what React renders for the final text.
+	 */
+	classFor?: (text: string) => string | undefined;
+}
+
+export function useTweenedText(ref: RefObject<HTMLElement | null>, value: number | null, format: (v: number) => string, opts: TweenOptions = {}): void {
+	const ms = opts.ms ?? VALUE_MS;
+	const ease = opts.ease ?? valueEase;
 	const shown = useRef<number | null>(value);
 	const frame = useRef(0);
 	const fmtRef = useRef(format);
 	fmtRef.current = format;
 	const easeRef = useRef(ease);
 	easeRef.current = ease;
+	const classRef = useRef(opts.classFor);
+	classRef.current = opts.classFor;
 
 	useLayoutEffect(() => {
 		const el = ref.current;
@@ -93,7 +110,9 @@ export function useTweenedText(
 			const p = Math.min(1, (now - start) / ms);
 			const v = p >= 1 ? value : from + (value - from) * easeRef.current(p);
 			shown.current = v;
-			el.textContent = fmtRef.current(v);
+			const text = fmtRef.current(v);
+			el.textContent = text;
+			if (classRef.current) el.className = classRef.current(text) ?? "";
 			if (p < 1) frame.current = requestAnimationFrame(paint);
 		};
 		// First frame before paint, so the new value never flashes ahead of its arc.

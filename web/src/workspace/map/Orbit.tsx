@@ -45,7 +45,7 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 	const coreRef = useRef<HTMLSpanElement>(null);
 	const coreUnit = data.coreUnit;
 	const coreFormat = useMemo(() => (v: number) => fmt(v, coreUnit), [coreUnit]);
-	useTweenedText(coreRef, data.coreValue, coreFormat, MOVE_MS, moveEase);
+	useTweenedText(coreRef, data.coreValue, coreFormat, { ms: MOVE_MS, ease: moveEase });
 	const { memory } = layout;
 	// A full ring is this GPU's memory; what doesn't fit continues on the dashed outer ring.
 	const scale = memory.capacity ?? memory.total ?? 1;
