@@ -233,14 +233,17 @@ describe("the agent tour on A's measured run (Oct 31)", () => {
 });
 
 describe("the nodes a knob lights", () => {
-	it("reads the record's own affects first and keeps only nodes on its map", () => {
-		const nodes = dev.graph.nodes.map((n) => n.id);
-		const [first, second] = nodes.filter((n) => n !== "eval");
-		const record = { ...dev, knobs: dev.knobs.map((k) => (k.id === "eval_batch_size" ? { ...k, affects: [second, "not_on_this_map", first] } : k)) };
-		const lit = nodesForKnob(record as typeof dev, "eval_batch_size");
-		expect(lit.slice(0, 2)).toEqual([second, first]);
-		expect(lit).not.toContain("not_on_this_map");
-		// The table still fills in for what the record leaves out.
-		expect(lit).toContain("eval");
+	const withAffects = (affects: string[] | undefined) =>
+		({ ...dev, findings: [], knobs: dev.knobs.map((k) => (k.id === "eval_batch_size" ? { ...k, affects } : k)) }) as typeof dev;
+
+	it("uses the record's own affects, not the table, and keeps only nodes on its map", () => {
+		const [first, second] = dev.graph.nodes.map((n) => n.id).filter((n) => n !== "eval");
+		expect(nodesForKnob(withAffects([second, "not_on_this_map", first]), "eval_batch_size")).toEqual([second, first]);
+		// A knob the record says acts on nothing lights nothing.
+		expect(nodesForKnob(withAffects([]), "eval_batch_size")).toEqual([]);
+	});
+
+	it("falls back to the table for a record from before affects", () => {
+		expect(nodesForKnob(withAffects(undefined), "eval_batch_size")).toEqual(["eval"]);
 	});
 });
