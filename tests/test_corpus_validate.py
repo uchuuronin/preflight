@@ -159,3 +159,17 @@ def test_memory_is_scored_on_a_run_that_finished(tmp_path, monkeypatch):
 		s = V.score_run(run, tmp_path)
 		assert (s.memory is not None) is scored, ended
 		assert s.memory is (True if scored else None) and s.memory_inside is (True if scored else None)
+
+
+def test_a_run_that_calibrated_a_model_is_left_out_of_its_rows():
+	runs = [
+		V.Scored("grpo_trl", "zoo", rollout=True, rollout_inside=True),
+		V.Scored("trl_unseen", "unseen", rollout=False),
+	]
+	from unittest import mock
+
+	m = {"runs": [{"script": "grpo_trl", "calibrates": ["rollout"]}, {"script": "trl_unseen"}]}
+	with mock.patch.object(V, "score_run", side_effect=runs):
+		rows, _ = V.build(m, Path("."))
+	r = _row(rows, "Rollout time (RL)")
+	assert (r.hits, r.n) == (0, 1)  # only the unseen script, which missed

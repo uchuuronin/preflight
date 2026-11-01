@@ -20,7 +20,8 @@ Manifest (JSON):
 		"tokens_per_s": 1830.0,                      # serving: a full run's measured throughput
 		"agent_total_usd": 6.80,                     # agent: the full benchmark run's cost
 		"preflight_usd": 0.42, "preflight_s": 210,  # what this Preflight run itself cost and took
-		"used_for_tuning": false
+		"used_for_tuning": false,
+		"calibrates": ["rollout"]                    # rows it calibrated, which then don't score it (the GRPO zoo, Nov 1)
 	}],
 	"knob_ms": [41, 55, ...],                        # browser timings of knob moves (C)
 	"corpus": ["path/to/kernels/store", ...]         # for the cross-GPU row (leave-one-GPU-out)
@@ -299,8 +300,17 @@ def _with_full_runs(row: Row, flags: list[tuple[str, bool | None]]) -> Row:
 def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
 	runs = [score_run(r, base) for r in manifest.get("runs", [])]
 
+	calibrates = {r.get("script"): set(r.get("calibrates") or ()) for r in manifest.get("runs", [])}
+
 	def flags(attr, only=None):
-		return [(r.script, getattr(r, attr)) for r in runs if only is None or r.set == only]
+		row = attr.removesuffix(
+			"_inside"
+		)  # a run that calibrated a model is neither its point nor its band check
+		return [
+			(r.script, getattr(r, attr))
+			for r in runs
+			if (only is None or r.set == only) and row not in calibrates.get(r.script, set())
+		]
 
 	rows = [
 		_share_row(
@@ -356,7 +366,7 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		),
 		divergence_row(divergence),
 		_share_row(
-			"Rollout time (RL)", "Within 20%", "GRPO zoo script and an unseen TRL script", flags("rollout")
+			"Rollout time (RL)", "Within 20%", "An unseen TRL script (the GRPO zoo script calibrated it, Nov 1)", flags("rollout")
 		),
 		_share_row("Serving tokens/sec", "Within 15%", "vLLM full runs", flags("serving")),
 		_share_row(
@@ -371,6 +381,7 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		(f"{r.script}:{k}", getattr(r, k))
 		for r in runs
 		for k in ("memory_inside", "step_inside", "rollout_inside", "serving_inside", "agent_inside")
+		if k.removesuffix("_inside") not in calibrates.get(r.script, set())
 	]
 	rows.append(
 		_share_row(

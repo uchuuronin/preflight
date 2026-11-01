@@ -2173,6 +2173,10 @@ def _rl_targets(record: FlightRecord, values: dict) -> dict:
 		out["rl.zero_spread"] = _abstain("fraction", mid, "the probe recorded no per-prompt pass rates")
 	elif not g:
 		out["rl.zero_spread"] = _abstain("fraction", mid, "no group size: set the group_size knob")
+	elif len(p.rl.pass_rate_per_prompt) < rl.MIN_PROMPTS:
+		n = len(p.rl.pass_rate_per_prompt)
+		why = f"only {n} prompts with a pass rate; the share needs {rl.MIN_PROMPTS} to say anything about the rest"
+		out["rl.zero_spread"] = _abstain("fraction", mid, why)
 	else:
 		k = p.rl.group_size or (_probe_values(record, p).get("group_size"))
 		iv = rl.zero_spread(p.rl.pass_rate_per_prompt, int(g), int(k) if k else None)
