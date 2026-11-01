@@ -28,6 +28,8 @@ Pushed `09648e7`..`cbbfe73` with Chiya's yes (07:42). Chiya's calls: card render
 	- The README notes that a hero card is a snapshot of its record file, so it's re-rendered if that record gains estimates.
 	- The exports test also checks that a real run never says "illustrative".
 
+- **Finding 12, pre-checked on `ws-c` `fb30b3e`** (C's fix `5850bca`: Boarding clears its tags when the job changes): `model-tags.mjs` passes 12 of 12, the same-page case included [measured, Chromium, a scratch copy of `ws-c`]. It moves to Done once re-checked on `main`.
+
 Cloud runs: none. GPU minutes 0, dollars 0.
 
 ## Sun Nov 1, morning (Chiya's queue of 07:04: README, D2, licences, submission, D4)
