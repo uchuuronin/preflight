@@ -22,6 +22,12 @@ Updated Sun Nov 1, 01:30 ET.
   The proxy's refusals carry `x-should-retry: false`, which the OpenAI SDKs honour; other
   clients may back off on them. Side calls (judges, sub-agents) start tasks of their own.
 - In-flight mode: an eval or checkpoint pause inside a window can raise a false step-time alert.
+- GPU fallback (L4 to A10 to L40S after 2 min, Nov 1): a job's budget pre-check prices the next
+  point at the GPU asked for, so after a fallback a job can overspend by about one point; an A10
+  run is never stepped up from (the ladder starts at L4), and an A10 that fit doesn't prove an L4
+  would; a follow-up whose parent ran on an A10 asks for an A10, which has no fallback; an image
+  change waits the 2 minutes for an L4 again; up to two waiting threads per job can linger for
+  30 min; an L4 scheduled just after the cutoff runs a few uncounted seconds before it's ended.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
