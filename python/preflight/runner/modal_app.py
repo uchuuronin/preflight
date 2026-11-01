@@ -133,6 +133,12 @@ worker_image = (
 )
 if FLAG_OVERRIDE.is_file():
 	worker_image = worker_image.add_local_file(FLAG_OVERRIDE, f"{REMOTE_PKG}/flags.{FLAG_ENV}.json")
+# the probe uid's /etc/passwd entry (probes/local.py PROBE_USER), for code that calls pwd.getpwuid
+# directly; getpass.getuser() reads the USER the probe sets. A layer after the packages, so they stay cached
+PROBE_USER_CMD = (
+	"useradd --uid 61000 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin preflight-probe"
+)
+
 probe_image = (
 	_base.apt_install("git")
 	.pip_install(*PROBE_PACKAGES)
@@ -145,6 +151,7 @@ probe_image = (
 			"PREFLIGHT_PROBE_UID": "61000",
 		}
 	)
+	.run_commands(PROBE_USER_CMD)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 
@@ -174,6 +181,7 @@ serving_image = (
 			"PREFLIGHT_PROBE_UID": "61000",
 		}
 	)
+	.run_commands(PROBE_USER_CMD)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image}
@@ -199,6 +207,7 @@ TITAN_PACKAGES = [
 titan_image = (
 	_base.pip_install(*TITAN_PACKAGES)
 	.env({"HF_HOME": HF_HOME, "PREFLIGHT_SANDBOX_DIR": "/tmp", "PREFLIGHT_PROBE_UID": "61000"})
+	.run_commands(PROBE_USER_CMD)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 

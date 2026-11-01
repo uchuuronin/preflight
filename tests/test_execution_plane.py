@@ -447,3 +447,20 @@ def test_the_gpu_wait_cap_covers_the_whole_job_not_each_probe():
 		second = run(spec("p2"), "L4", should_stop=lambda: False)  # the cap is spent: no second wait
 		took = _time.monotonic() - t0
 	assert first.probe.error_code == second.probe.error_code == "gpu.unavailable" and took < 1.0
+
+
+def test_a_probe_uid_gets_a_user_name_so_getpass_works_without_a_passwd_entry():
+	# torchtitan raised KeyError getpwuid() on the hosted runner's uid 61000 (Nov 1): getpass.getuser()
+	# reads LOGNAME/USER before /etc/passwd, so the probe sets both whenever it drops to a uid
+	import getpass
+
+	from preflight.probes.local import PROBE_USER, _probe_user_env, scrubbed_env
+
+	assert _probe_user_env(None) == {}
+	env = scrubbed_env(Path("/tmp/h"), _probe_user_env(61000))
+	assert env["USER"] == env["LOGNAME"] == PROBE_USER
+	import os
+	from unittest import mock
+
+	with mock.patch.dict(os.environ, {"LOGNAME": env["LOGNAME"], "USER": env["USER"]}):
+		assert getpass.getuser() == PROBE_USER

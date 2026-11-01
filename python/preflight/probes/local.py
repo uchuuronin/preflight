@@ -360,6 +360,16 @@ def _probe_uid() -> int | None:
 	return 61_000 + (os.getpid() * 7 + next(_UIDS)) % 4_000
 
 
+PROBE_USER = "preflight-probe"  # the images' /etc/passwd name for PREFLIGHT_PROBE_UID (runner/modal_app.py)
+
+
+def _probe_user_env(uid: int | None) -> dict[str, str]:
+	"""A name for the probe's uid: getpass.getuser() (torch.compile's cache, torchtitan, many loggers)
+	reads USER/LOGNAME before /etc/passwd, where a fresh uid has no entry, and raised KeyError
+	without them (torchtitan on an A10, Nov 1)."""
+	return {} if uid is None else {"USER": PROBE_USER, "LOGNAME": PROBE_USER}
+
+
 def _extra_groups() -> list[int]:
 	"""GPU device groups (video, render) so an unprivileged uid can still open ROCm devices."""
 	import grp
@@ -749,7 +759,8 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	if uid is not None:
 		pkg_root = str(_package_for_probe(Path(pkg_root)))
 		python = _python_for_probe()
-	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", "")})
+	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", ""),
+		**_probe_user_env(uid)})  # fmt: skip
 	popen_kw = {"user": uid, "group": uid, "extra_groups": _extra_groups()} if uid is not None else {}
 
 	started = datetime.now(UTC).replace(microsecond=0)

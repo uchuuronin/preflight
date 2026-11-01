@@ -460,12 +460,25 @@ def startup_check_titan_image(files: dict) -> dict:
 	return out
 
 
+def _gpu_name() -> str:
+	"""The GPU Modal gave this function (from a list of several), as the device names it. NVML, not
+	torch.cuda: a CUDA context in this process would sit in the memory the probe measures."""
+	try:
+		import pynvml
+
+		pynvml.nvmlInit()
+		name = pynvml.nvmlDeviceGetName(pynvml.nvmlDeviceGetHandleByIndex(0))
+		return (name.decode() if isinstance(name, bytes) else name).removeprefix("NVIDIA ")
+	except Exception:
+		return "GPU"
+
+
 @ops.function(image=titan_image, gpu=["L4", "A10", "L40S"], timeout=TITAN_TIMEOUT_S)  # the first to schedule
 def titan_check_on_l4(files: dict, warmup: int = 3, timed: int = 10) -> dict:
 	"""torchtitan's trainer on its debug model under the recorder, one L4."""
 	from preflight.probes.local import ProbeSpec, run_probe
 
-	print("[titan] container up on the L4", flush=True)
+	print(f"[titan] container up on the {_gpu_name()}", flush=True)
 	r = run_probe(ProbeSpec(probe_id="titan", files=files, entrypoint="train.py", warmup=warmup, timed=timed,
 		timeout_s=600))  # fmt: skip
 	p = r.probe
