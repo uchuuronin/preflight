@@ -1,12 +1,3 @@
-<!--
-Final README by D, Sun Nov 1, for the PM to swap in for README.md. It combines C's README on
-`main` (the Validation intro, Develop, "Verify a fix in your own CI", Layout) with D's draft.
-The status columns are as of `main` `a52753f` (Nov 1): update them at the swap from the status
-files if anything has turned on since. Keep both `validation` markers: B's scorer rewrites what
-is between them. Placeholders to fill before Nov 4 are marked TODO(PM). Every number carries
-its source.
--->
-
 # Preflight
 
 <!-- TODO(PM): once the site is live and workers/ is in the deploy, uncomment the badge and
@@ -25,10 +16,9 @@ over from earlier work.
 
 ## Status
 
-As of `main` `a52753f` (Sun Nov 1). Every feature ships behind a flag that is off until its check
-passes (`flags.json`); `flags.production.json` turns on what the public site runs. TODO(PM): the
-public deploy isn't up yet, so "on in production" means "on once deployed"; update this line
-with the live link.
+As of Sun Nov 1 (round five). Every feature ships behind a flag that is off until its check
+passes (`flags.json`); `flags.production.json` turns on what the public site runs. The public site
+is live at <https://preflight-cqn.pages.dev>.
 
 **On in production**
 
@@ -37,6 +27,9 @@ with the live link.
 | Muse Spark reads each script (the script map) | Boarding's "Reading your script", and the cockpit's job map | `harness.spark_script_map`, on in `flags.production.json` (Chiya, Nov 1) |
 | Predictions with intervals and abstention: memory, step time, cost, risk | The cockpit's four readouts, the knobs and the flight plan | `engine.memory`, on in production (Chiya, Oct 30); it gates the whole prediction step (`runner/pipeline.py`) |
 | Campaign calendar | The campaign sample (illustrative numbers, B's planner on a 12-run grid) | `c.campaign_calendar`, on in production (Chiya, Nov 1) |
+| Fit map: which settings fit, with the out-of-memory frontier | The cockpit's Fit view: drag your run across the map | `c.fit_map`, on in production (Chiya, Nov 1) |
+| RL readouts: the share of prompt groups with no reward spread, rollout time | The GRPO lens | `engine.rl`, on in production (Chiya, Nov 1); calibrated on A's GRPO runs (L4 smoke runs and a 50-step run on an A10) |
+| Log triage by Muse Spark Open on Baseten | A probe that fails gets a finding quoting its log line, labelled "Found by Muse Spark Open triage" | `harness.spark_open_triage`, on in production with its data-use line (Chiya, Nov 1) |
 | GRPO lens on a measured run | The GRPO sample: reward spread, completion lengths, the tour | A's L4 run `a-gt-grpo-l4-3`; no flag |
 | Cost readout at your own rate | Every dollar readout: quantity x rate = total, with the price table's source and date | No flag |
 | Verify a fix in your own CI | A GitHub Action (below) | No flag; usable from other repositories once this one is public |
@@ -49,26 +42,25 @@ with the live link.
 | Checking in your own repo, script or notebook | `runner.queue` | Built on `main`; until it is on, the site opens samples and shared records only |
 | The guide (Muse Spark moves the knobs with tool calls) | `c.guide.live` | Smoke runs pass: GitHub run 41273350602, 5 rounds, all called tools [measured], US$0.019 [derived: reported tokens at list prices] |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
-| Log triage by Muse Spark Open on Baseten | `harness.spark_open_triage` | Wired into the pipeline on `main`; not yet run for real |
-| HOPs view, fit map, exports, the CLI re-check item | `c.hops`, `c.fit_map`, `c.exports`, `d.exports_cli` | Built on `main` |
+| HOPs view, exports, the CLI re-check item | `c.hops`, `c.exports`, `d.exports_cli` | Built on `main` |
 | The add-ons (detail level, currency, free GPUs, notebook) | `d.*` (below) | Built on `main`; checked in Chromium (`docs/audit/scripts/addons.mjs`) |
 
 **Not used, or not measured**
 
 | What | Why | Source |
 | --- | --- | --- |
-| Divergence classifier | Still misses after a refit on 720 runs, held out by settings family: AUROC 0.66 (0.56 to 0.76) against a 0.85 target, with a lead of 138 steps (3 to 269) [measured: B's fit report], so `risk.divergence` stays off and is not used; the warning comes from the threshold rules | B's fit report, [`divergence_nov1.json`](python/preflight/corpus/reports/divergence_nov1.json) (`1cfa689`; TODO(PM): the link, relative to the repository root, resolves once `1cfa689` is on `main`) |
+| Divergence classifier | Still misses after a refit on 720 runs, held out by settings family: AUROC 0.66 (0.56 to 0.76) against a 0.85 target, with a lead of 138 steps (3 to 269) [measured: B's fit report], so `risk.divergence` stays off and is not used; the warning comes from the threshold rules | B's fit report, [`divergence_nov1.json`](python/preflight/corpus/reports/divergence_nov1.json) (`1cfa689`) |
 | AMD | No AMD measurements: the AMD Developer Cloud account is on a verification hold, so every AMD figure says "not measured" | `docs/status/b.md`, `docs/status/a.md` |
 | GBDT correction for an unmeasured GPU | Fails held out (51% within 20%, against 60% for the analytical model [measured, corpus]), so it isn't used | `docs/status/b.md` |
 | Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20% [measured, corpus], under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |
-| RL rollout and serving models | Built, switched off in the engine until their validation rows pass | `python/preflight/engine/api.py` |
+| Serving model | Built, switched off (`engine.serving`) until its validation row passes | `python/preflight/engine/api.py` |
 | Claim check by Muse Spark Open | Module written, not wired in | `python/preflight/harness/claim_check.py` |
-| Muse Glimmer | Not hosted: stays deferred until its download terms and licence are confirmed in writing | `docs/decisions/glimmer-host.md` |
+| Muse Glimmer | Apache 2.0. B is hosting it on Preflight's own GPU for a private mode (`harness.glimmer_private`, off); not live yet | `docs/decisions/glimmer-host.md` |
 | Full-run validation | Scored on Mon Nov 2 (the table below) | B's scorer |
 
 ## Try it
 
-**In the browser, no install:** open TODO(PM): public link. Pick a sample to open it straight in
+**In the browser, no install:** open <https://preflight-cqn.pages.dev>. Pick a sample to open it straight in
 the cockpit (samples use illustrative numbers unless they say measured, and cost nothing), or open
 a shared record's link. Checking in your own repo or script opens with `runner.queue`.
 
@@ -152,9 +144,9 @@ owns which path are in [CONTRACT.md](CONTRACT.md).
 | **Muse Code** (headless) | Fix loop: candidate fixes raced in parallel worktrees inside a sandbox, edits only; the API key reaches Muse Code on stdin only, never in its environment or files; each fix is gated on Preflight's own re-probe and verify, not on Muse Code's exit code (`api/preflight_api/fix/`) | Behind `c.fix_loop`; in clean smoke run 41250977670 Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]; gating on the re-probe isn't wired end to end yet |
 | **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | Behind `harness.spark_open_triage`, off; not yet run for real. The claim check (`claim_check.py`) is written but not wired in |
 | **Muse Glimmer** | One of three models in the agent model sweep's price table (`python/preflight/engine/prices/`) | Not hosted (`docs/decisions/glimmer-host.md`) |
-| **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run so far (Oct 28 to Nov 1, `docs/status/a.md`); the runner is deployed for each run and stopped after; public deploy TODO(PM) |
+| **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run so far (Oct 28 to Nov 1, `docs/status/a.md`); the runner (job store), the API and the fix app are deployed in production and stay up since Nov 1 |
 | **AMD Developer Cloud** | ROCm probes through the CLI on an MI300X, and the AMD half of the corpus (`python/preflight/corpus/`, `.github/workflows/amd-run.yml`) | No AMD measurements: the account is on a verification hold |
-| **Cloudflare Pages** | The web app, the `/v1` edge function that forwards to the API with a shared secret and the visitor's address for quotas (`web/functions/`), and share cards (`workers/`) | Built; TODO(PM): live link |
+| **Cloudflare Pages** | The web app, the `/v1` edge function that forwards to the API with a shared secret and the visitor's address for quotas (`web/functions/`), and share cards (`workers/`) | Live at <https://preflight-cqn.pages.dev>; share cards wait on `workers/` joining the deploy |
 
 ## What a run costs to measure
 
@@ -198,11 +190,10 @@ A "within" target is a hit when at least 90% of runs are within it; intervals ar
 
 ## Add-ons
 
-Smaller features, each behind its own flag in `flags.json`, all off on `main` `a52753f`.
+Smaller features, each behind its own flag in `flags.json`, all off on `main` and in production (Nov 1).
 `docs/audit/scripts/addons.mjs` checks that each still renders where it belongs, with no errors,
 no accessibility violations inside it and nothing under 24 px, and that it is gone with its flag
-off: 20 of 20 states pass on `main` `c4b95d4` [measured, Chromium, Nov 1]. TODO(PM): mark the rows
-whose flags are on in production at the swap.
+off: 20 of 20 states pass on `main` `c4b95d4` [measured, Chromium, Nov 1].
 
 | Add-on | What a visitor gets | Flag |
 | --- | --- | --- |
