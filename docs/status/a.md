@@ -28,6 +28,10 @@ Updated Sun Nov 1, 16:55 ET.
 
 ## Known limits, on purpose
 
+- Structured replies (Muse Spark, Spark Open, Glimmer) are read leniently: the JSON object after
+  any reasoning, the last fenced one, else the outermost braces, validated in full. A reply whose
+  only object is one it quoted from the visitor's log is accepted as the answer; it can only
+  mislead that visitor's own job, within the schema's fixed categories (review, Nov 1).
 - A probe sandbox that outlives the probe's own time limit (the 18:06 serving run on an L4: 1,284 s
   against 600 s) is ended from outside and its log is lost, so its record says only "ended without
   a result". Not fixed yet; the serving cause itself is known (`a-serving-debug-1`, Nov 1).

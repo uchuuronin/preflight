@@ -349,6 +349,9 @@ def test_a_json_object_wrapped_in_reasoning_or_a_fence_is_still_read_and_still_v
 	assert _validate(T, '<think>it ran out</think>\n{"category": "oom"}').category == "oom"
 	assert _validate(T, 'Here it is:\n```json\n{"category": "oom"}\n```').category == "oom"
 	assert _validate(T, 'The answer: {"category": "oom"} as asked').category == "oom"
+	assert _validate(T, 'it saw {braces} then</think>{"category": "oom"}').category == "oom"  # unopened think
+	quoted = 'The log had\n```json\n{"category": "ok"}\n```\nMy answer:\n```json\n{"category": "oom"}\n```'
+	assert _validate(T, quoted).category == "oom"  # its own answer, after what it quoted
 	for bad in ("no json at all", '{"other": 1}', ""):
 		with pytest.raises((ValueError, ValidationError)):
 			_validate(T, bad)

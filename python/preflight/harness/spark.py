@@ -131,9 +131,10 @@ def _validate(schema, content: str):
 	try:
 		return schema.model_validate_json(content)
 	except (ValidationError, ValueError):
-		text = re.sub(r"<think>.*?</think>", "", content or "", flags=re.S)
-		fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S)
-		body = fenced.group(1) if fenced else text[text.find("{") : text.rfind("}") + 1]
+		text = (content or "").rsplit("</think>", 1)[-1]  # the answer follows the reasoning, opened or not
+		fenced = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S)
+		# the last fence: a model's own answer comes after anything it quoted (review, Nov 1)
+		body = fenced[-1] if fenced else text[text.find("{") : text.rfind("}") + 1]
 		if not body or body == content:
 			raise
 		return schema.model_validate_json(body)
@@ -410,7 +411,9 @@ class ModelClient:
 				msgs, purpose=purpose, reasoning_effort=reasoning_effort, response_format=fmt
 			)
 			try:
-				return _validate(schema, content), call
+				out = _validate(schema, content)
+				self.last_error = None  # a re-ask that worked leaves no error behind
+				return out, call
 			except (ValidationError, ValueError) as exc:
 				err = str(exc)[:2000]
 				self.last_error = f"{schema.__name__} didn't validate: {_no_urls(err)[:300]}"
