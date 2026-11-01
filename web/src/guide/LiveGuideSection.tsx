@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../lib/i18n";
 import type { KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
-import { bestCombo, comboVisit, comboWords } from "./combos";
+import { bestCombo, comboKeys, comboVisit, comboWords, singleClears } from "./combos";
 import { valueText } from "./GuidePanel";
 import { withinLimits, NO_LIMITS } from "./limits";
 import { isFailing } from "./ruleTour";
@@ -32,6 +32,10 @@ export function LiveGuideSection({
 	const [busy, setBusy] = useState(false);
 	const [ask, setAsk] = useState("");
 	const [unpinAsk, setUnpinAsk] = useState<string | null>(null);
+	// Combined moves turned down on the card: the guide's sensitivity doesn't offer them again.
+	const [turnedDown, setTurnedDown] = useState<ReadonlySet<string>>(new Set());
+	const declinedRef = useRef(turnedDown);
+	declinedRef.current = turnedDown;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 
 	const tourRef = useRef<LiveTour | null>(null);
@@ -48,6 +52,7 @@ export function LiveGuideSection({
 				objective: { kind: s.objective.kind ?? "min_time", ...(s.objective.target_id ? { target_id: s.objective.target_id } : {}) },
 				requestApproval: () => {},
 				requestUnpin: (id) => setUnpinAsk(id),
+				combosDeclined: declinedRef.current,
 				...(language ? { language } : {}),
 			};
 		};
@@ -108,14 +113,14 @@ export function LiveGuideSection({
 
 	// No single knob clears the failure, but a combined setting the record's predictions cover does:
 	// the guide is told (sensitivity's "combined") and the visitor applies it here, in one click.
-	const [turnedDown, setTurnedDown] = useState<ReadonlySet<string>>(new Set());
 	const combo = useMemo(() => {
-		if (!view || waitingOnMove || !isFailing({ record, provider, knobs: state.knobs })) return null;
+		// Never beside a move of the guide's still waiting: applying would put that knob back.
+		if (!view || proposal || !isFailing({ record, provider, knobs: state.knobs })) return null;
 		const lim = withinLimits(record, provider, state.limits ?? NO_LIMITS, state.knobs, { pinned: state.pinned });
 		const objective = { kind: state.objective.kind ?? "min_time" } as const;
-		if (provider.moves(record, objective, lim).some((m) => m.fit === "fits")) return null;
+		if (singleClears(record, provider, objective, lim)) return null;
 		return bestCombo(record, provider, state.knobs, objective, { pinned: lim.pinned ?? state.pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: turnedDown });
-	}, [view, waitingOnMove, record, provider, state.knobs, state.limits, state.pinned, state.objective.kind, turnedDown]);
+	}, [view, proposal, record, provider, state.knobs, state.limits, state.pinned, state.objective.kind, turnedDown]);
 	const words = combo ? comboWords(record, state.knobs, combo) : null;
 	const knob = proposal ? knobs.get(proposal.knobId) : undefined;
 
@@ -155,7 +160,7 @@ export function LiveGuideSection({
 			) : null}
 			{combo && words && !busy ? (
 				<div className="pf-guide__approval" role="group" aria-label={t("guide.combo.label")}>
-					<p>{t("guide.combo.line", words)}</p>
+					<p>{t(comboKeys(combo).textKey, words)}</p>
 					<div className="pf-guide__actions">
 						<button
 							type="button"

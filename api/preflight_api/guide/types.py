@@ -303,6 +303,10 @@ def check_result(out: Any, rec: RecordView) -> None:
 				raise InputError(
 					f"ranking names {r.knob_id}={r.best_value!r}, which the record doesn't allow"
 				)
+		for kid, v in (out.combined.knobs if out.combined else {}).items():
+			k = rec.knobs.get(kid)
+			if k is None or not k.allows(v):
+				raise InputError(f"combined move names {kid}={v!r}, which the record doesn't allow")
 	elif isinstance(out, SetKnobOut):
 		k = rec.knobs.get(out.knob_id)
 		if k is None:

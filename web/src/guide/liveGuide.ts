@@ -14,7 +14,7 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
-import { bestCombo } from "./combos";
+import { bestCombo, singleClears } from "./combos";
 import { breaksLimit, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } from "./limits";
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
@@ -185,10 +185,11 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 				.filter((m) => failing || !changesResults(m.knobId, record))
 				.slice(0, 8);
 			const top = Math.max(...moves.map((m) => Math.abs(m.relative ?? m.delta)), 1e-12);
+			// No single knob clears the failure, for the aim or for memory: a combined setting may.
 			const lim = withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned });
 			const combo =
-				failing && !moves.some((m) => m.fit === "fits")
-					? bestCombo(record, provider, knobs, { kind }, { pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}) })
+				failing && !singleClears(record, provider, { kind }, lim)
+					? bestCombo(record, provider, knobs, { kind }, { pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}), ...(ctx.combosDeclined ? { visited: ctx.combosDeclined } : {}) })
 					: null;
 			return {
 				tool: "sensitivity",

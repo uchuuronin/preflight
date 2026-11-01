@@ -60,6 +60,13 @@ describe("combined moves", () => {
 		expect(set).toMatchObject({ seq_len: 512, eval_no_grad: true });
 		expect(c!.risk).toBeLessThan(0.01);
 		expect(c!.peak).toBeLessThan(22 * GIB);
+		// Words in the grid's order (its axes, then what it holds), and a knob named as not
+		// enough alone only because its own change was predicted not to clear.
+		const ids = c!.changes.map((x) => x.knobId);
+		const order = ["eval_batch_size", "seq_len", "eval_no_grad"];
+		expect(ids).toEqual([...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
+		expect(c!.alone).not.toBeNull();
+		expect(fake.predict(r, { ...currentKnobs(r), [c!.alone!]: c!.changes.find((x) => x.knobId === c!.alone)!.to })["risk.oom"]!.point).toBeGreaterThanOrEqual(0.01);
 	});
 
 	it("is the tour's step when no single knob clears it, offered once", () => {

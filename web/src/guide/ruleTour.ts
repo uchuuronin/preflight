@@ -10,7 +10,7 @@ import type { Move, PredictionProvider } from "../workspace/provider/PredictionP
 import { costStraddlesBudget, failureTarget, objectiveTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
-import { bestCombo, type ComboMove } from "./combos";
+import { bestCombo, type ComboMove, comboKeys } from "./combos";
 import { type Limits, NO_LIMITS, withinLimits } from "./limits";
 
 /**
@@ -408,8 +408,7 @@ export function nextStep(ctx: TourContext): TourStep {
 				kind: "combo",
 				combo,
 				nodes: [...new Set(combo.changes.flatMap((c) => nodesForKnob(ctx.record, c.knobId)))],
-				textKey: "guide.combo.line",
-				whyKey: "guide.combo.why",
+				...comboKeys(combo),
 			};
 		}
 	}
