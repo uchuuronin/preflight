@@ -39,7 +39,17 @@ unchanged; the fix loop's runner image adds only pydantic, numpy and httpx, all 
   vendored unmodified under MPL-2.0 (its `LICENSE` beside it); MPL-2.0 is file-level copyleft, so
   those files stay MPL-2.0 and unmodified and nothing else changes licence. The fonts, Instrument
   Sans, Instrument Serif and JetBrains Mono (from `@expo-google-fonts`), are vendored unchanged
-  under the SIL Open Font License 1.1, each family with its `OFL-*.txt`. `workers/`' other
+  under the SIL Open Font License 1.1, each family with its `OFL-*.txt`. **Committed in the
+  repository (Nov 1)**: the OFL allows redistributing the fonts bundled with software, provided
+  each copy carries the copyright notice and the licence (condition 2), and the fonts aren't sold
+  on their own (condition 1). In the repository, each `OFL-*.txt` beside them carries both. The
+  deployed card function uses the fonts on the server only, to draw card images; it never serves
+  the font files, and the images are documents made with the fonts, which condition 5 leaves free
+  of the licence. None of the three declares a
+  Reserved Font Name (each copyright line names none), and the four files are byte-identical to
+  the packages' `.ttf` files [checked with `cmp`, Nov 1]; only the file extension is `.bin`, so
+  Wrangler bundles them as data. The root `.gitignore`'s `*.bin` had kept them out, so they're
+  force-added (`git add -f`). `workers/`' other
   dependencies are dev tools only (TypeScript, Vitest, Wrangler, `@types/node`), pinned in
   `workers/package.json`; nothing else from it is deployed. Scanned Nov 1: no GPL, AGPL or SSPL
   among them; Wrangler's image library brings libvips binaries under LGPL-3.0-or-later

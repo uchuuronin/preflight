@@ -32,6 +32,7 @@ Placeholders are marked TODO(PM).
 | 5 rounds | The guide calling tools in every round of its smoke run | measured | GitHub run 41273350602, `docs/status/c.md` |
 | 461 of 575 | Held-out step-time queries within 15% on the same GPU (corpus) | measured | `docs/status/b.md` |
 | 60% | Held-out step-time queries within 20% on a GPU the model never saw, under the 90% target | measured | `docs/status/b.md` (leave-one-GPU-out) |
+| 2,339 rows | The published corpus (corpus@0.3.0): 1,519 kernel configs, 100 Hugging Face jobs, 720 divergence runs; on Hugging Face, private until Nov 3 to 4 | cited (the datasheet) | `python/preflight/corpus/DATASHEET.md`; https://huggingface.co/datasets/chaoschia/preflight-corpus (commit `0aac218`) |
 | AUROC 0.66 (0.56 to 0.76) | The divergence classifier after a refit on 720 runs, held out by settings family, still under its 0.85 target, so it is off and not used (lead 138 steps, 3 to 269) | measured (B's fit report) | `python/preflight/corpus/reports/divergence_nov1.json` (`1cfa689`) |
 | 3,000 characters | How much of each probe's log Spark Open triage reads | cited (code) | `python/preflight/harness/triage.py`, `TAIL_CHARS` |
 | 8 characters | The shortest quoted log line code accepts from triage | cited (code) | `python/preflight/harness/triage.py` |

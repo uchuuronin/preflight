@@ -21,6 +21,7 @@ Indie Developer. Build for Your World.
 - Repository: https://github.com/uchuuronin/preflight (public at submission)
 - Demo video (3 minutes): TODO(PM)
 - X post (45 seconds): TODO(PM)
+- The corpus, with its datasheet: https://huggingface.co/datasets/chaoschia/preflight-corpus (public with the repository on Nov 3 to 4)
 
 ## Team
 
@@ -72,6 +73,11 @@ Preflight never measured lands within 20% for 60% of held-out queries, under the
 the divergence classifier, refitted on 720 runs, scores a held-out AUROC of 0.66 (0.56 to
 0.76) against a 0.85 target, so it is switched off. There are no
 AMD measurements yet, and every AMD figure says so.
+
+**The corpus published with a datasheet.** The 2,339 rows of GPU measurements behind the learned
+models and the held-out checks are a dataset on Hugging Face, public with the repository from
+Nov 3 to 4 (https://huggingface.co/datasets/chaoschia/preflight-corpus), with a datasheet that
+says how they were made, what they cover and where they are biased.
 
 **Built during the hackathon.** Everything in the repository was built Oct 26 to Nov 4, 2026; the
 first commit is `11a0ce9`, Oct 26, 22:25 ET.

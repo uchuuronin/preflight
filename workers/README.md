@@ -82,7 +82,9 @@ folder, `wrangler pages dev` served all three routes against a mock API, and the
 working beside them. `wrangler pages dev` doesn't enforce the CPU limit, so that check says nothing
 about the Free plan.
 
-`npm run vendor` re-copies the vendored files from `node_modules` (pinned versions only).
+`npm run vendor` re-copies the vendored files from `node_modules` (pinned versions only). Every
+vendored file, the fonts included, is committed (the fonts are force-added past the root
+`.gitignore`'s `*.bin`), so neither CI nor the deploy needs to run it.
 
 ## Licences of what is vendored
 

@@ -11,18 +11,40 @@ hesitates or gets stuck; every one of those places becomes an onboarding fix.
 | [observation-sheet.md](observation-sheet.md) | the observer | during the session, one copy per builder |
 | [form.md](form.md) | the builder | straight after the session |
 
+## Tonight's session (Sun Nov 1): ready to hand over
+
+- **Link:** <https://preflight-cqn.pages.dev> (already in the brief).
+- **What's on in production** (`flags.production.json`, Chiya, Nov 1): check-in (`runner.queue`)
+  with the Repo link and Upload tabs, and the live guide on Muse Spark (`c.guide.live`). The
+  Notebook tab is off (`d.notebook` isn't in production), so a builder with a notebook downloads it
+  as a `.py` and uploads that. Checked on a local build with the production flags, Nov 1: the
+  check-in desk shows exactly two tabs, Repo link and Upload.
+- **Demo limits, on `main` but not yet in the deployed runner** (A's last logged deploy, `8154268`
+  at 13:04 ET, predates them): 3 probe jobs per visitor per day, and a daily GPU spend cap for the
+  whole site, $10 a day through Nov 4 [cited: `python/preflight/runner/queue.py`]. Once deployed,
+  a builder past either sees "samples only until midnight ET"; when jobs in flight hold the day's
+  budget, the desk says the GPUs are busy and to retry in about 2 minutes. Either is outside the
+  builder's control: note it word for word and go on with a sample.
+- **Cost:** about $0.20 a check-in, a lower bound [derived: one measured run, Oct 28, A's status
+  file: $0.086 of GPU and $0.018 of Muse Spark [measured], plus about $0.10 of sandbox CPU and
+  memory [guess]]. The GPU cap counts the GPU only; the live guide has its own daily cap. One
+  builder with up to 3 check-ins is about $0.60 or more [derived].
+- **The guide is live tonight on Muse Spark** (it moves knobs with tool calls). The tasks don't
+  mention it, so the observer can see whether the builder finds it unprompted.
+- **Files to send:** the builder gets [brief.md](brief.md) the day before (or now), then
+  [tasks.md](tasks.md) at the start and [form.md](form.md) at the end. The observer keeps
+  [observation-sheet.md](observation-sheet.md).
+- **If no one can watch live:** ask the builder to record their screen and think aloud (only with
+  their yes); the observer fills the sheet from the recording, times from the recording's clock.
+
 ## Before the session
 
-- Fill in `{{PUBLIC_LINK}}` in the brief with the deployed URL.
-- Check on the deployed app that check-in is open and the Notebook tab is on (flags `runner.queue`
-  and `d.notebook`). If the Notebook tab is off, task 2 uses the Upload tab or a repo link instead.
-- Ask the builder to bring one training script they know: a public GitHub repo, a `.py` file or a
-  `.ipynb` notebook, up to 5 MB, loading data from Hugging Face. No keys or passwords in the code.
-- Each check-in runs a few minutes on a rented GPU. Ask Chiya before the sessions, as for any paid
-  run: number of builders, one check-in each, expected cost. For one measured run (Oct 28, A's status
-  file) the GPU came to $0.086 and Muse Spark to $0.018, both measured, and the sandbox's CPU and
-  memory to about $0.10, a guess until the bill is read: about $0.20 a check-in, and treat even that
-  as a lower bound.
+- Ask the builder to bring one training script they know: a public GitHub repo or a `.py` file (a
+  notebook downloaded as `.py` works), up to 5 MB, loading data from Hugging Face. No keys or
+  passwords in the code.
+- Open the link once yourself and check that the home page loads and New flight shows the desk.
+- Check whether A's runner redeploy with the demo limits has gone out (`docs/status/a.md`); if
+  not, the builder isn't limited, so watch that they don't run more than about 3 check-ins.
 
 ## During the session
 
@@ -33,6 +55,8 @@ hesitates or gets stuck; every one of those places becomes an onboarding fix.
 
 ## After the sessions
 
+- Send D the filled sheet and form, anonymised (B1, no names), in the chat or as files. D ranks
+  every stuck point and hesitation as an onboarding fix and files it.
 - Report counts, not percentages: with three builders, "2 of 3 reached a map without help".
 - Every hesitation or stuck point, with where it happened, becomes a request in
   `docs/requests/from-d.md` (to C for the app, to D for D's panels), ranked by how many builders it
