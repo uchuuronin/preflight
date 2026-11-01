@@ -355,54 +355,122 @@ GROUND_TRUTH_TIMEOUT_S = 50 * 60
 GROUND_TRUTH_GPUS = ["L4", "A10"]
 
 
-@ops.function(
-	image=probe_image,
-	gpu=GROUND_TRUTH_GPUS,
-	volumes={WEIGHTS_DIR: weights_vol},
-	timeout=GROUND_TRUTH_TIMEOUT_S,
-)
-def ground_truth_on_l4(
-	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict
-) -> dict:
-	"""recorder/ground_truth.py on an L4: a bare run, then a recorder run alternating clean and
-	synced steps, and the paired overhead. The AMD droplet runs the same module."""
+def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict,
+	entrypoint: str | None = None, args: tuple = (), install_requirements: bool = False,
+	generate_sample: int = 0) -> dict:  # fmt: skip
+	"""recorder/ground_truth.py on this function's GPU: a bare run (the full run), then a recorder
+	run alternating clean and synced steps, and the paired overhead. The AMD droplet runs the same."""
 	from preflight.probes import remote
-	from preflight.recorder.ground_truth import ZOO_SCRIPTS, measure
+	from preflight.recorder.ground_truth import measure
 
-	if script not in ZOO_SCRIPTS:
-		raise ValueError(f"unknown zoo script {script!r}")
-	print(f"[ground truth] container up on the GPU; {len(files)} files of {script}", flush=True)
+	print(f"[ground truth] container up on the {_gpu_name()}; {len(files)} files of {script}", flush=True)
 	remote.link_weights()
 	remote.deps_dir()
 	# the probe image has no zoo (Oct 31: "has no train.py"): the files come from the checkout
 	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
-		budget_s=budget_s, files=files)  # fmt: skip
+		budget_s=budget_s, files=files, entrypoint=entrypoint, args=tuple(args),
+		install_requirements=install_requirements, generate_sample=generate_sample)  # fmt: skip
+
+
+_GT = {"image": None, "volumes": {WEIGHTS_DIR: weights_vol}, "timeout": GROUND_TRUTH_TIMEOUT_S}
+
+
+@ops.function(**{**_GT, "image": probe_image}, gpu=GROUND_TRUTH_GPUS)
+def ground_truth_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": probe_image}, gpu=GROUND_TRUTH_GPUS[::-1])  # A10 first: the L4 queue
+def ground_truth_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": serving_image}, gpu=GROUND_TRUTH_GPUS)  # vLLM: its own image
+def ground_truth_serving_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": serving_image}, gpu=GROUND_TRUTH_GPUS[::-1])
+def ground_truth_serving_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": titan_image}, gpu=GROUND_TRUTH_GPUS)  # torchtitan: torch 2.7
+def ground_truth_titan_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": titan_image}, gpu=GROUND_TRUTH_GPUS[::-1])
+def ground_truth_titan_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+GT_FUNCTIONS = {
+	("probe", "L4"): ground_truth_on_l4, ("probe", "A10"): ground_truth_on_a10,
+	("serving", "L4"): ground_truth_serving_on_l4, ("serving", "A10"): ground_truth_serving_on_a10,
+	("titan", "L4"): ground_truth_titan_on_l4, ("titan", "A10"): ground_truth_titan_on_a10,
+}  # fmt: skip
 
 
 @ops.local_entrypoint()
 def ground_truth(
-	script: str, bare_steps: int, recorder_steps: int = 60, warmup: int = 5, budget_min: float = 40
+	script: str = "",
+	bare_steps: int = 200,
+	recorder_steps: int = 60,
+	warmup: int = 5,
+	budget_min: float = 40,
+	dir: str = "",
+	entrypoint: str = "",
+	args: str = "",
+	first_gpu: str = "L4",
+	install_requirements: bool = False,
 ):
-	"""modal run --env main python/preflight/runner/ops_app.py::ground_truth --script finetune_lora_hf --bare-steps 210
-	Writes out/ground_truth_<script>.json (step walls, peak memory, how the bare run ended, overhead).
-	budget_min: the whole measurement ends inside it; keep it under the run's own time limit."""
-	import json
+	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
-	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief
+	modal run --env main python/preflight/runner/ops_app.py::ground_truth --script vision_timm --bare-steps 300
+	modal run ... ::ground_truth --dir validation/unseen/s3 --entrypoint main.py --args "--epochs 1" \\
+		--install-requirements --first-gpu A10
+
+	--script: a zoo script; --dir: any directory in this checkout (Monday's unseen scripts, from the
+	validation-freeze tag). The entrypoint is the one named, else train.py, main.py, serve.py or
+	run.py. The image follows the script: vLLM scripts the serving image, torchtitan its own.
+	--first-gpu A10 tries the A10 before the L4 (the L4 queued 19 to 59 min on Nov 1); never an
+	L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
+	Writes out/ground_truth_<name>.json."""
+	import json
+	import shlex
+
+	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
 
-	if script not in ZOO_SCRIPTS:
-		raise SystemExit(f"unknown zoo script {script!r}")
-	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
-	if "train.py" not in files:
-		raise SystemExit(f"zoo/{script} has no train.py in this checkout")
-	print(
-		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4, else an A10 (Modal queues it)",
-		flush=True,
-	)
-	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60, files)
+	root = Path(__file__).resolve().parents[3]
+	if bool(script) == bool(dir):
+		raise SystemExit("name a zoo script (--script) or a directory in this checkout (--dir), not both")
+	if script:
+		if script not in ZOO_SCRIPTS:
+			raise SystemExit(
+				f"{script!r} isn't a GPU zoo script: {sorted(ZOO_SCRIPTS)} (agent_eval_spark: agent_sample)"
+			)
+		src = root / "zoo" / script
+	else:
+		src = (root / dir).resolve()
+		if root not in src.parents or not src.is_dir():
+			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
+	files = _read_tree(src)
+	p = plan(files, entrypoint or None)
+	if p["lens"] == "agent":
+		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
+	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
+	first = "A10" if first_gpu.upper() == "A10" else "L4"
+	fn = GT_FUNCTIONS[(image, first)]
+	name = script or src.name
+	print(f"[ground truth] {name}: {entry}, lens {p['lens']}, {image} image, {len(files)} files; "
+		f"waiting for an {first}, else the {'L4' if first == 'A10' else 'A10'} (Modal queues it)", flush=True)  # fmt: skip
+	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(shlex.split(args)),
+		install_requirements, sample)  # fmt: skip
+	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
-	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
+	Path(f"out/ground_truth_{name}.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(brief(res), indent=2), flush=True)
 
 
