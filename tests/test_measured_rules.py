@@ -194,6 +194,7 @@ def test_weights_reached_through_a_method_or_an_open_are_still_a_resume():
 def test_grpo_prompts_with_zero_reward_spread_are_a_measured_finding():
 	from preflight.schema import RLSignals
 
+	# the Nov 1 GRPO smoke: 15 of 20 groups with no spread in the summed reward ([correct, formatted])
 	rates = [
 		0.0,
 		0.375,
@@ -216,15 +217,18 @@ def test_grpo_prompts_with_zero_reward_spread_are_a_measured_finding():
 		0.0,
 		0.125,
 	]
-	rec = _gpu_rec(rl=RLSignals(pass_rate_per_prompt=rates, group_size=8, zero_spread_fraction=0.75))
-	f = next(
-		f for f in hygiene_findings(rec, {}) if f.code == "rl.zero_spread"
-	)  # the Nov 1 GRPO smoke's numbers
+	rl = RLSignals(pass_rate_per_prompt=rates, group_size=8, zero_spread_fraction=0.75)
+	counts = {"rl_groups": 20.0, "rl_zero_spread_groups": 15.0, "rl_reward_functions": 2.0}
+	f = next(f for f in hygiene_findings(_gpu_rec(rl=rl, extras=counts), {}) if f.code == "rl.zero_spread")
 	assert (
-		"15 of 20 prompts (15 all wrong)" in f.detail
-		and "53%–89%" in f.detail
-		and "160 completions" in f.detail
+		"15 of 20 prompt groups had" in f.detail and "53%–89%" in f.detail and "160 completions" in f.detail
 	)
+	assert "all wrong" not in f.detail  # two reward functions: the pass rates alone can't say which
 	assert f.evidence[0].value == 0.75
-	assert not [f for f in hygiene_findings(_gpu_rec(rl=RLSignals(pass_rate_per_prompt=[0.5, 0.25, 0.0], group_size=8)), {})
-		if f.code == "rl.zero_spread"]  # fmt: skip
+	# one reward function: the split is the pass rates'
+	f = next(f for f in hygiene_findings(_gpu_rec(rl=rl, extras={**counts, "rl_reward_functions": 1.0}), {})
+		if f.code == "rl.zero_spread")  # fmt: skip
+	assert "(15 all wrong)" in f.detail
+	# a varying second reward: no zero-spread groups by the sum, whatever the pass rates say
+	none = {"rl_groups": 20.0, "rl_zero_spread_groups": 0.0, "rl_reward_functions": 2.0}
+	assert not [f for f in hygiene_findings(_gpu_rec(rl=rl, extras=none), {}) if f.code == "rl.zero_spread"]

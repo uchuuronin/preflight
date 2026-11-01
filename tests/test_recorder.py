@@ -286,6 +286,10 @@ def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(t
 	assert rl.group_size == 4
 	assert rl.pass_rate_per_prompt and all(0 <= x <= 1 for x in rl.pass_rate_per_prompt)
 	assert rl.zero_spread_fraction is not None
+	ex = p.extras  # the counts behind the fraction, for the finding's Wilson interval
+	assert ex["rl_groups"] >= 1 and ex["rl_zero_spread_groups"] / ex["rl_groups"] == pytest.approx(
+		rl.zero_spread_fraction
+	)
 
 
 def test_a_closure_loop_keeps_its_forward_out_of_the_optimizer():

@@ -1764,7 +1764,9 @@ class Recorder:
 		):
 			if col(kind):
 				rl[name] = col(kind)
-		rl.update(reward_groups(self.reward_calls, self.group_size))
+		groups = reward_groups(self.reward_calls, self.group_size)
+		counts = groups.pop("_counts", {})
+		rl.update(groups)
 		if gen and gen["sequences"]:
 			rl["response_length"] = {
 				"mean": gen["new_tokens_mean"],
@@ -1776,7 +1778,9 @@ class Recorder:
 			m = col("len_mean")
 			mx = col("len_max") or m
 			rl["response_length"] = {"mean": statistics.fmean(m), "p95": max(mx), "max": max(mx), "n": len(m)}
-		return {"rl": rl} if rl else {}
+		return (
+			{"rl": rl} if rl else {}
+		) | counts  # counts: top-level extras (RLSignals has no field for them)
 
 
 def detect_env() -> dict:

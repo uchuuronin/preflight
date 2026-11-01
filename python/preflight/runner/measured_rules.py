@@ -176,30 +176,35 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 
 
 def _zero_spread(p, node_id, knob_id) -> list[Finding]:
-	"""GRPO: prompts whose group of completions all pass or all fail have zero reward spread, so
-	zero advantage and no gradient. From the probe's per-prompt pass rates, with a Wilson interval
-	over the prompts behind them."""
-	rl = p.rl
-	if rl is None or not rl.pass_rate_per_prompt or not rl.group_size:
-		return []
-	rates = rl.pass_rate_per_prompt
-	n = len(rates)
-	wrong, right = sum(r == 0 for r in rates), sum(r == 1 for r in rates)
-	k = wrong + right
-	if n < 2 or k / n <= ZERO_SPREAD_WARN:
+	"""GRPO: groups whose completions' summed rewards are all equal have zero advantage, so no
+	gradient. Counted by the recorder over the sum of every reward function (what GRPO's advantage
+	uses), with a Wilson interval over the groups; all wrong vs all right comes from the pass rates
+	only when the pass/fail function is the whole reward."""
+	rl, ex = p.rl, p.extras
+	n, k = int(ex.get("rl_groups", 0)), int(ex.get("rl_zero_spread_groups", 0))
+	if rl is None or n < 2 or not rl.group_size or k / n <= ZERO_SPREAD_WARN:
 		return []
 	lo, hi = _wilson(k, n)
 	g = rl.group_size
-	both = (
-		(f"{wrong} all wrong" if wrong else "")
-		+ (", " if wrong and right else "")
-		+ (f"{right} all right" if right else "")
-	)
+	split = ""
+	if ex.get("rl_reward_functions") == 1 and len(rl.pass_rate_per_prompt) == n:
+		wrong, right = (
+			sum(r == 0 for r in rl.pass_rate_per_prompt),
+			sum(r == 1 for r in rl.pass_rate_per_prompt),
+		)
+		split = (
+			" ("
+			+ ", ".join(
+				x for x in (f"{wrong} all wrong" if wrong else "", f"{right} all right" if right else "") if x
+			)
+			+ ")"
+		)
 	return [Finding(id=f"measured.rl.zero_spread.{p.id}", severity="warn", code="rl.zero_spread",
 		title=f"{k / n:.0%} of prompts teach nothing: every completion scored the same",
-		detail=f"{k} of {n} prompts ({both}) had all {g} completions score alike, so their advantage is zero "
-		f"and they add no gradient (95% interval {lo:.0%}–{hi:.0%}, {n * g} completions) [measured]. "
-		"Easier or harder prompts, a larger group, or a partial-credit reward give them spread.",
+		detail=f"{k} of {n} prompt groups{split} had all {g} completions score alike, summed over the reward "
+		f"functions, so their advantage is zero and they add no gradient (95% interval {lo:.0%}–{hi:.0%}, "
+		f"{n * g} completions) [measured]. Easier or harder prompts, a larger group, or a partial-credit "
+		"reward give them spread.",
 		node_id=node_id, source="rule", knob_id=knob_id,
 		evidence=[Evidence(metric="rl.zero_spread_fraction", value=k / n, probe_id=p.id, threshold=ZERO_SPREAD_WARN)])]  # fmt: skip
 
