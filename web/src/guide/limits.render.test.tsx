@@ -98,8 +98,8 @@ describe("limits and choices in the rule-based tour", () => {
 describe("limits in plain words", () => {
 	it("come back as chips that apply only once confirmed, and say what wasn't understood", async () => {
 		live = true;
-		const fetch = vi.fn(async () =>
-			new Response(
+		const fetch = vi.fn(async (url: string) =>
+			url.startsWith("/v1/guide/limits/state") ? new Response(JSON.stringify({ limits: null, saved: true }), { status: 200 }) : new Response(
 				JSON.stringify({
 					limits: [
 						{ kind: "allowed", knob_id: "gpu_type", values: ["A100-SXM-80GB"] },
@@ -116,12 +116,37 @@ describe("limits in plain words", () => {
 		await act(async () => {
 			fireEvent.click(screen.getByRole("button", { name: en["limits.words.read"] }));
 		});
-		expect(JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ record: "lora-7b", text: "must stay on A100, under $40, can't touch the dataset" });
+		const read = fetch.mock.calls.find((c) => (c as unknown[])[0] === "/v1/guide/limits") as unknown as [string, RequestInit];
+		expect(JSON.parse(read[1].body as string)).toEqual({ record: "lora-7b", text: "must stay on A100, under $40, can't touch the dataset" });
 		expect(screen.getByText(/^Under US\$40/)).toBeTruthy();
 		expect(r.ws!.state.limits.budgetUsd).toBeNull(); // nothing applies before it's confirmed
 		expect(screen.getByText(/^Not turned into a limit: "can't touch the dataset"/)).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: en["limits.confirm_all"] }));
 		expect(r.ws!.state.limits.budgetUsd).toBe(40);
 		expect(r.ws!.state.limits.allowed.gpu_type).toEqual(["A100-SXM-80GB"]);
+	});
+});
+
+describe("the server keeps this session's limits", () => {
+	it("saves each change and restores them on a reload", async () => {
+		const puts: unknown[] = [];
+		const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+			if (init?.method === "PUT") {
+				puts.push(JSON.parse(init.body as string));
+				return new Response(JSON.stringify({ saved: true }), { status: 200 });
+			}
+			return new Response(JSON.stringify({ limits: { frozen: ["packing"], allowed: {}, excluded: {}, declined: [] } }), { status: 200 });
+		});
+		vi.stubGlobal("fetch", fetch);
+		const r = mount();
+		await act(async () => {
+			await new Promise((res) => setTimeout(res, 20));
+		});
+		expect(r.ws!.state.limits.frozen).toEqual(["packing"]); // restored from the server
+		fireEvent.click(screen.getByRole("button", { name: "A100-SXM-80GB" }));
+		await act(async () => {
+			await new Promise((res) => setTimeout(res, 350));
+		});
+		expect(puts.at(-1)).toMatchObject({ record: "lora-7b", limits: { allowed: { gpu_type: ["A100-SXM-80GB"] }, frozen: ["packing"] } });
 	});
 });

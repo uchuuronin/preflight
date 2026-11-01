@@ -144,6 +144,21 @@ async def start_race(request: Request) -> dict:
 		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
 	view = RecordView.from_record(rec)
 	cands = _checked(body, view)
+	# The visitor's confirmed limits, from the server's copy (never this request's body).
+	held = await app.state.session_limits.get(visitor_of(request.state.session), view.key)
+	if held is not None:
+		for c in cands:
+			t = TEMPLATES[c["template_id"]]
+			k = view.knobs.get(t.knob) if t.knob else None
+			value = c.get("value")
+			if value is None and k is not None and k.kind == "bool":
+				value = True  # a switch fix turns it on
+			if t.knob and (t.knob in held.frozen or (value is not None and not held.allows(t.knob, value))):
+				raise ApiError(
+					422,
+					"outside_limits",
+					f"'{t.title}' would change a knob your limits rule out, so Muse Code won't write it.",
+				)
 	measured = _measured(rec, body.finding)
 	ref = _a_ref(body.record, rec, app.state.samples)
 	await _may_race(request, body.record, rec)

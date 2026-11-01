@@ -6,14 +6,14 @@
  * (record.job.constraints) are offered the same way. Confirmed limits are hard limits for both
  * tours (guide/limits.ts) and for the server (routes/guide.py).
  */
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { fmt } from "../lib/fmt";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
 import type { Knob, KnobValue, LoadedRecord } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { valueText } from "./GuidePanel";
-import type { Limits } from "./limits";
+import { type Limits, loadLimits, NO_LIMITS, saveLimits } from "./limits";
 
 export type Chip =
 	| { kind: "allowed"; knob_id: string; values: KnobValue[] }
@@ -121,6 +121,26 @@ export function LimitsPanel() {
 	const [notUnderstood, setNotUnderstood] = useState<string[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const live = flag("c.guide.live");
+
+	// The server keeps this session's limits (the fix route reads only its copy): load them once,
+	// so a reload keeps them, then save every change a moment after it settles.
+	const loaded = useRef(false);
+	useEffect(() => {
+		let gone = false;
+		void loadLimits(recordRef).then((held) => {
+			if (!gone && held && limits === NO_LIMITS) actions.setLimits(held);
+			loaded.current = true;
+		});
+		return () => {
+			gone = true;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [recordRef]);
+	useEffect(() => {
+		if (!loaded.current && limits === NO_LIMITS) return;
+		const id = setTimeout(() => void saveLimits(recordRef, limits), 250);
+		return () => clearTimeout(id);
+	}, [recordRef, limits]);
 
 	const proposedRef = useRef<HTMLDivElement>(null);
 	const confirm = (chip: Chip) => {

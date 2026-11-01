@@ -28,6 +28,8 @@ from ..errors import ApiError
 from ..flags import flag
 from ..guide import muse_spark
 from ..guide.record_view import RecordView
+from ..guide.types import InputError, Limits, check_limits
+from ..jobs import visitor_of
 from .guide import _record, view_of
 
 router = APIRouter(prefix="/v1")
@@ -256,3 +258,42 @@ async def read_limits(request: Request) -> dict:
 			"at": dt.datetime.now(dt.UTC).isoformat(),
 		},
 	}
+
+
+class LimitsStateIn(BaseModel):
+	model_config = ConfigDict(extra="forbid")
+	record: Annotated[str, Field(pattern=r"^[A-Za-z0-9_:-]{1,80}$")]
+	limits: Limits
+
+
+async def _view(ref: str, request: Request) -> RecordView:
+	raw = await _record(ref, request.app)
+	if raw is None:
+		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
+	return view_of(raw)
+
+
+@router.put("/guide/limits/state")
+async def put_limits(request: Request) -> dict:
+	"""The limits the visitor confirmed on this record, kept on the server (session_limits.py)."""
+	try:
+		body = LimitsStateIn.model_validate(await request.json())
+	except (ValidationError, ValueError) as e:
+		raise ApiError(422, "invalid_request", "The limits aren't in the expected shape.") from e
+	rec = await _view(body.record, request)
+	try:
+		check_limits(body.limits, rec)
+	except InputError as e:
+		raise ApiError(422, "invalid_request", str(e)) from e
+	await request.app.state.session_limits.put(visitor_of(request.state.session), rec.key, body.limits)
+	return {"saved": True}
+
+
+@router.get("/guide/limits/state")
+async def get_limits(record: str, request: Request) -> dict:
+	"""This session's limits on a record, so a reload keeps them."""
+	if not re.fullmatch(r"[A-Za-z0-9_:-]{1,80}", record):
+		raise ApiError(404, "record_not_found", "That flight record doesn't exist or has expired.")
+	rec = await _view(record, request)
+	got = await request.app.state.session_limits.get(visitor_of(request.state.session), rec.key)
+	return {"limits": got.model_dump() if got else None}

@@ -47,6 +47,7 @@ from ..guide.types import (
 	check_result,
 	check_setting,
 )
+from ..jobs import visitor_of
 from ..stores import StoreBusy, resolve_record
 
 log = logging.getLogger("preflight.guide")
@@ -148,6 +149,13 @@ def _unmoved_offer(state: GuideState) -> tuple[str, Any] | None:
 	return offer
 
 
+async def _held(request: Request, rec: RecordView, sent: Limits) -> Limits:
+	"""The browser's limits held to the server's copy for this session (whichever is stricter)."""
+	store = getattr(request.app.state, "session_limits", None)
+	held = await store.get(visitor_of(request.state.session), rec.key) if store else None
+	return sent.stricter(held) if held is not None else sent
+
+
 def _upper(r: Any) -> float | None:
 	"""The upper end of a reported readout's interval (its point without one), or None."""
 	if r is None or r.status == "abstain" or r.point is None:
@@ -239,7 +247,7 @@ async def guide_turn(request: Request) -> dict:
 	rec = view_of(rec_raw)
 	sid: str = request.state.session
 	pinned = set(body.setting.pinned)
-	limits = body.setting.limits
+	limits = await _held(request, rec, body.setting.limits)
 	try:
 		check_setting(body.setting, rec)
 		state = open_state(body.state, sid=sid, record_key=rec.key)
@@ -621,7 +629,9 @@ async def guide_tool(request: Request) -> dict:
 		k = rec.knobs.get(kid)
 		if k is None or (not k.allows(v) and v != k.current):
 			raise ApiError(422, "invalid_request", f"{kid} can't be {v!r}.")
-	if body.tool == "run_probe" and _guard_probe({"knobs": body.knobs}, body.limits, dict(body.setting)):
+	if body.tool == "run_probe" and _guard_probe(
+		{"knobs": body.knobs}, await _held(request, rec, body.limits), dict(body.setting)
+	):
 		raise ApiError(422, "outside_limits", "That setting is outside your limits, so it isn't measured.")
 	# The job store caps jobs per visitor; the ledger's IP bucket stops a visitor minting sessions
 	# to get round that (a zero-dollar reservation spends a turn and an IP token).

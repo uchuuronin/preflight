@@ -313,3 +313,33 @@ def test_an_approved_probe_from_the_rule_tour_respects_the_limits():
 		}
 		r = c.post("/v1/guide/tools", json=body)
 		assert r.status_code == 422 and r.json()["error"]["code"] == "outside_limits"
+
+
+def test_the_guide_holds_moves_to_the_servers_copy_even_when_the_browser_sends_none():
+	model = Model(
+		reply(calls=[("set_knob", {"knob_id": "gpu_type", "value": "H100-SXM-80GB", "why": "faster"})]),
+		reply(text="Your GPU stays."),
+	)
+	with client(model) as c:
+		c.put(
+			"/v1/guide/limits/state", json={"record": "lora-7b", "limits": {"allowed": {"gpu_type": [A100]}}}
+		)
+		r = turn(c, start=True).json()  # SETTING carries no limits
+		assert r["calls"] == []
+		outs = [
+			json.loads(i["output"])
+			for i in model.requests[1]["input"]
+			if i.get("type") == "function_call_output"
+		]
+		assert outs[0]["refused"] == "outside_limits"
+
+
+def test_stricter_takes_both_sets_of_limits():
+	from preflight_api.guide.types import Limits
+
+	a = Limits(allowed={"gpu_type": [A100, "L40S"]}, excluded={"batch_size": [8]}, budget_usd=50)
+	b = Limits(allowed={"gpu_type": [A100]}, excluded={"batch_size": [16]}, frozen=["packing"], budget_usd=40)
+	m = a.stricter(b)
+	assert m.allowed == {"gpu_type": [A100]}
+	assert m.excluded == {"batch_size": [8, 16]}
+	assert m.frozen == ["packing"] and m.budget_usd == 40

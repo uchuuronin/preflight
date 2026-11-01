@@ -25,6 +25,7 @@ describe("the fix race on screen", () => {
 		vi.useFakeTimers();
 		let asked: { candidates: Array<{ template_id: string }> } | null = null;
 		const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+			if (url.startsWith("/v1/guide/limits")) return new Response(JSON.stringify({ saved: true, limits: null }), { status: 200 });
 			if (url === "/v1/patches") {
 				asked = JSON.parse(init?.body as string);
 				return new Response(JSON.stringify({ patch_id: "fx_abcdefghijklmnopqr", status: "running", candidates: [], cap_usd: 0.39, candidates_asked: asked!.candidates }), { status: 202 });
@@ -54,7 +55,11 @@ describe("the fix race on screen", () => {
 		await act(async () => {
 			fireEvent.click(screen.getByRole("button", { name: en["fix.start"] }));
 		});
-		const body = JSON.parse(fetch.mock.calls[0]![1]!.body as string);
+		// The limits are saved to the server first; the fix request itself carries none.
+		expect(fetch.mock.calls[0]![0]).toBe("/v1/guide/limits/state");
+		const call = fetch.mock.calls.find((c) => c[0] === "/v1/patches")!;
+		const body = JSON.parse(call[1]!.body as string);
+		expect(body).not.toHaveProperty("limits");
 		expect(body).toMatchObject({ record: "lora-7b", finding: "f2" });
 		expect(body.candidates[0].template_id).toBe("eval.reduce_batch");
 		expect(screen.getAllByText(/Writing/).length).toBe(body.candidates.length);

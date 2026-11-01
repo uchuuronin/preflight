@@ -119,3 +119,50 @@ export function limitsForServer(limits: Limits): Record<string, unknown> {
 		...(limits.gpuHours !== null ? { gpu_hours: limits.gpuHours } : {}),
 	};
 }
+
+/** The server's copy of this session's limits on a record (api session_limits.py). */
+function fromServer(raw: Record<string, unknown>): Limits {
+	const num = (v: unknown) => (typeof v === "number" && v > 0 ? v : null);
+	return {
+		allowed: (raw.allowed as Limits["allowed"]) ?? {},
+		excluded: (raw.excluded as Limits["excluded"]) ?? {},
+		declined: (raw.declined as string[]) ?? [],
+		frozen: (raw.frozen as string[]) ?? [],
+		budgetUsd: num(raw.budget_usd),
+		deadlineS: num(raw.deadline_s),
+		gpuHours: num(raw.gpu_hours),
+	};
+}
+
+const saving = new Map<string, Promise<boolean>>();
+
+/** Keep the server's copy in step (the fix route reads only that). Resolves true once saved. */
+export function saveLimits(record: string, limits: Limits, put: typeof fetch = fetch): Promise<boolean> {
+	const p = put("/v1/guide/limits/state", {
+		method: "PUT",
+		credentials: "same-origin",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ record, limits: limitsForServer(limits) }),
+	})
+		.then((r) => r.ok)
+		.catch(() => false);
+	saving.set(record, p);
+	return p;
+}
+
+/** Wait for the last save of this record's limits (before a request the server judges by them). */
+export function limitsSaved(record: string): Promise<boolean> {
+	return saving.get(record) ?? Promise.resolve(true);
+}
+
+/** This session's limits on a record from the server, so a reload keeps them; null if none. */
+export async function loadLimits(record: string, get: typeof fetch = fetch): Promise<Limits | null> {
+	try {
+		const r = await get(`/v1/guide/limits/state?record=${encodeURIComponent(record)}`, { credentials: "same-origin" });
+		if (!r.ok) return null;
+		const body = (await r.json()) as { limits?: Record<string, unknown> | null };
+		return body.limits ? fromServer(body.limits) : null;
+	} catch {
+		return null;
+	}
+}

@@ -81,6 +81,29 @@ class Limits(Strict):
 			raise ValueError("at most 64 values per knob")
 		return v
 
+	def stricter(self, other: Limits) -> Limits:
+		"""Both sets of limits at once: allowed lists intersected, everything ruled out or frozen
+		joined, the lower of each number. Used where the server's copy meets the browser's."""
+		allowed = dict(self.allowed)
+		for kid, vs in other.allowed.items():
+			allowed[kid] = [v for v in allowed[kid] if v in vs] if kid in allowed else list(vs)
+		excluded = {k: list(v) for k, v in self.excluded.items()}
+		for kid, vs in other.excluded.items():
+			excluded[kid] = [*excluded.get(kid, []), *(v for v in vs if v not in excluded.get(kid, []))]
+
+		def low(a: float | None, b: float | None) -> float | None:
+			return b if a is None else a if b is None else min(a, b)
+
+		return Limits(
+			allowed=allowed,
+			excluded=excluded,
+			frozen=sorted({*self.frozen, *other.frozen}),
+			declined=sorted({*self.declined, *other.declined}),
+			budget_usd=low(self.budget_usd, other.budget_usd),
+			deadline_s=low(self.deadline_s, other.deadline_s),
+			gpu_hours=low(self.gpu_hours, other.gpu_hours),
+		)
+
 	def excluding(self, knob_id: str, value: Any) -> Limits:
 		"""These limits with one more value ruled out and its knob set aside ("Not this")."""
 		ex = dict(self.excluded)
@@ -218,6 +241,20 @@ class InputError(ValueError):
 	pass
 
 
+def check_limits(limits: Limits, rec: RecordView) -> None:
+	"""Every knob and value a set of limits names is one the record has."""
+	for kid in [*limits.frozen, *limits.declined]:
+		if kid not in rec.knobs:
+			raise InputError(f"unknown limited knob {kid}")
+	for kid, values in [*limits.allowed.items(), *limits.excluded.items()]:
+		k = rec.knobs.get(kid)
+		if k is None:
+			raise InputError(f"unknown limited knob {kid}")
+		for v in values:
+			if not k.allows(v) and v != k.current:
+				raise InputError(f"{kid} can't be {v!r}")
+
+
 def check_setting(s: Setting, rec: RecordView) -> None:
 	for kid, v in s.knobs.items():
 		k = rec.knobs.get(kid)
@@ -228,16 +265,7 @@ def check_setting(s: Setting, rec: RecordView) -> None:
 	for kid in s.pinned:
 		if kid not in rec.knobs:
 			raise InputError(f"unknown pinned knob {kid}")
-	for kid in [*s.limits.frozen, *s.limits.declined]:
-		if kid not in rec.knobs:
-			raise InputError(f"unknown limited knob {kid}")
-	for kid, values in [*s.limits.allowed.items(), *s.limits.excluded.items()]:
-		k = rec.knobs.get(kid)
-		if k is None:
-			raise InputError(f"unknown limited knob {kid}")
-		for v in values:
-			if not k.allows(v) and v != k.current:
-				raise InputError(f"{kid} can't be {v!r}")
+	check_limits(s.limits, rec)
 	if s.objective.target_id and s.objective.target_id not in rec.targets:
 		raise InputError(f"unknown objective target {s.objective.target_id}")
 

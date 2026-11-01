@@ -32,6 +32,7 @@ from .routes import jobs as jobs_routes
 from .routes import limits as limits_routes
 from .routes import patches as patch_routes
 from .routes import records as records_routes
+from .session_limits import SessionLimits, default_session_limits
 from .stores import LocalRecordStore, RecordStore, SampleStore
 
 log = logging.getLogger("preflight.api")
@@ -95,6 +96,7 @@ def create_app(
 	fixer: Fixer | None = None,
 	races: RaceStore | None = None,
 	owners: Owners | None = None,
+	session_limits: SessionLimits | None = None,
 	addons_dir: Path = ADDONS_DIR,
 ) -> FastAPI:
 	session._keys()  # fail at start-up, not on the first visitor, if production has no key
@@ -129,6 +131,8 @@ def create_app(
 	app.state.fixer = fixer if fixer is not None else d_fixer
 	app.state.races = races if races is not None else d_races
 	app.state.owners = owners if owners is not None else d_owners
+	# Each session's confirmed limits (session_limits.py): the fix route reads them from here.
+	app.state.session_limits = session_limits if session_limits is not None else default_session_limits()
 
 	errors.install(app)
 

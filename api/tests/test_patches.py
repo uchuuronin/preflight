@@ -335,3 +335,40 @@ def test_a_sandbox_that_will_not_start_or_breaks_is_reported_not_raised():
 		key="k",
 	)
 	assert out["error"] == "race_failed" and closed == [1]
+
+
+def test_a_fix_request_with_the_limits_stripped_out_is_still_held_to_the_sessions_limits(world):
+	c, fixer, *_ = world
+	# The visitor confirms "don't change gradient checkpointing" and rules out eval batch 8.
+	saved = c.put(
+		"/v1/guide/limits/state",
+		json={
+			"record": "lora-7b",
+			"limits": {"frozen": ["gradient_checkpointing"], "excluded": {"eval_batch_size": [8]}},
+		},
+	)
+	assert saved.status_code == 200, saved.text
+	# The fix request itself carries no limits at all (and the route takes none).
+	for cands in ([THREE[1]], [THREE[2]]):
+		r = c.post("/v1/patches", json={"record": "lora-7b", "candidates": cands})
+		assert r.status_code == 422 and r.json()["error"]["code"] == "outside_limits"
+	assert (
+		c.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE[:1], "limits": {}}).status_code
+		== 422
+	)
+	assert c.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE[:1]}).status_code == 202
+	assert len(fixer.started) == 1
+	# Another session's limits don't apply here, and this session's come back on reload.
+	other = TestClient(c.app, base_url="https://testserver")
+	assert other.post("/v1/patches", json={"record": "lora-7b", "candidates": [THREE[2]]}).status_code == 202
+	got = c.get("/v1/guide/limits/state", params={"record": "lora-7b"}).json()["limits"]
+	assert got["frozen"] == ["gradient_checkpointing"] and got["excluded"] == {"eval_batch_size": [8]}
+	assert other.get("/v1/guide/limits/state", params={"record": "lora-7b"}).json()["limits"] is None
+
+
+def test_stored_limits_name_only_what_the_record_has(world):
+	c, *_ = world
+	r = c.put(
+		"/v1/guide/limits/state", json={"record": "lora-7b", "limits": {"allowed": {"gpu_type": ["TPU-v9"]}}}
+	)
+	assert r.status_code == 422
