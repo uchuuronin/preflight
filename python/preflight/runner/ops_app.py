@@ -172,6 +172,41 @@ def startup_check_probe() -> dict:
 		"backend": r.env.backend if r.env else None, "log_tail": r.log_tail[-600:]}  # fmt: skip
 
 
+# the probe uid in each sandbox image, on a CPU (Chiya, Nov 1): its user and group names resolve and
+# the imports that read them load, as the probe would run them. torchtitan failed on a GPU for this
+PROBE_USER_IMPORTS = {
+	"probe": ("torch._dynamo",),
+	"serving": ("torch._dynamo", "vllm"),
+	"titan": ("torch._dynamo", "torchtitan.train"),
+}
+
+
+def _probe_user_ok(r: dict, image: str) -> bool:
+	return (r.get("exit") == 0 and r.get("uid") == 61000 and r.get("user") == r.get("passwd") == "preflight-probe"
+		and r.get("group") == "preflight-probe" and r.get("imported") == list(PROBE_USER_IMPORTS[image]))  # fmt: skip
+
+
+@ops.function(image=probe_image, timeout=600)
+def probe_user_check_probe_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["probe"])
+
+
+@ops.function(image=serving_image, timeout=600)
+def probe_user_check_serving_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["serving"])
+
+
+@ops.function(image=titan_image, timeout=600)
+def probe_user_check_titan_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["titan"])
+
+
 @ops.function(image=worker_image, timeout=600)
 def startup_check_sandbox() -> dict:
 	"""What run_worker does for every probe, on a CPU sandbox: the runner's own sandbox factory
@@ -227,6 +262,8 @@ def startup_check():
 		("worker", startup_check_worker),
 		("probe", startup_check_probe),
 		("sandbox", startup_check_sandbox),
+		("probe_user", probe_user_check_probe_image),
+		("serving_user", probe_user_check_serving_image),
 	)
 	for name, fn in checks:
 		try:
@@ -234,11 +271,14 @@ def startup_check():
 		except Exception as exc:  # the remote traceback is in the log above
 			result[name] = {"failed": f"{type(exc).__name__}: {exc}"[:2000]}
 	w, p, sb = result["worker"], result["probe"], result["sandbox"]
+	result["probe_user_ok"] = _probe_user_ok(result["probe_user"], "probe")
+	result["serving_user_ok"] = _probe_user_ok(result["serving_user"], "serving")
 	result["ok"] = bool(
 		"failed" not in w and w.get("lens") == "finetune" and w.get("knobs", 0) > 0 and w.get("saves", 0) >= 1
 		and w.get("job_store_would_claim_here") is False and "runner_loaded_as" in w
 		and "failed" not in p and p.get("status") == "ok" and p.get("steps", 0) > 0 and p.get("reachable_by_probe_uid")
 		and "failed" not in sb and sb.get("import_exit") == 0 and sb.get("probe_status") == "ok"
+		and result["probe_user_ok"] and result["serving_user_ok"]
 	)  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path("out/startup_check.json").write_text(json.dumps(result, indent=2))
@@ -499,6 +539,9 @@ def torchtitan_check():
 
 	files = _titan_files()
 	start = startup_check_titan_image.remote(files)
+	start["probe_user"] = probe_user_check_titan_image.remote()
+	if start.get("exit") == 0 and not _probe_user_ok(start["probe_user"], "titan"):
+		start["exit"] = "probe_user"  # the probe uid can't run here: no GPU for it
 	print(f"[titan] startup check: {json.dumps(start)}", flush=True)
 	res = {"startup": start}
 	if start.get("exit") == 0:
@@ -669,10 +712,12 @@ def startup_check_serving():
 	import sys
 
 	res = startup_check_serving_image.remote()
+	res["probe_user"] = probe_user_check_serving_image.remote()
 	res["ok"] = (
 		res.get("exit") == 0
 		and res.get("vllm") == "0.6.4.post1"
 		and str(res.get("torch", "")).startswith("2.5.1")
+		and _probe_user_ok(res["probe_user"], "serving")
 	)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/startup_check_serving.json").write_text(json.dumps(res, indent=2))

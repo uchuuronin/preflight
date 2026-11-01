@@ -370,6 +370,58 @@ def _probe_user_env(uid: int | None) -> dict[str, str]:
 	return {} if uid is None else {"USER": PROBE_USER, "LOGNAME": PROBE_USER}
 
 
+def _launch_as(uid: int | None, home: Path) -> tuple[str, dict[str, str], dict]:
+	"""How a probe starts: the interpreter, the scrubbed env (with the uid's user name) and the
+	Popen uid and groups. One place, so the startup check launches exactly as a probe does."""
+	pkg_root = str(Path(__file__).resolve().parents[2])
+	python = sys.executable
+	if uid is not None:
+		pkg_root = str(_package_for_probe(Path(pkg_root)))
+		python = _python_for_probe()
+	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", ""),
+		**_probe_user_env(uid)})  # fmt: skip
+	popen_kw = {"user": uid, "group": uid, "extra_groups": _extra_groups()} if uid is not None else {}
+	return python, env, popen_kw
+
+
+# what the startup check runs as the probe uid in each image (Chiya, Nov 1): the user and group
+# lookups visitor code makes, and the imports that read them, so an image bug costs cents on a CPU
+PROBE_USER_SCRIPT = """
+import getpass, grp, json, os, pwd, sys
+out = {"uid": os.getuid(), "gid": os.getgid(), "user": getpass.getuser(),
+	"passwd": pwd.getpwuid(os.getuid()).pw_name, "group": grp.getgrgid(os.getgid()).gr_name}
+for mod in sys.argv[1:]:
+	__import__(mod)
+	out.setdefault("imported", []).append(mod)
+print("PROBE_USER " + json.dumps(out))
+"""
+
+
+def probe_user_check(imports: tuple[str, ...] = ("torch._dynamo",), timeout_s: int = 300) -> dict:
+	"""Run PROBE_USER_SCRIPT as a probe would run (same uid, env and interpreter) and report what it
+	saw: {"exit", "uid", "user", "passwd", "group", "imported"}, or the stderr tail on failure."""
+	uid = _probe_uid()
+	box = Path(tempfile.mkdtemp(prefix="preflight-usercheck-"))
+	home = box / "home"
+	(home / "tmp").mkdir(parents=True)
+	try:
+		if uid is not None:
+			os.chmod(box, 0o711)
+			_chown_tree(home, uid)
+		python, env, popen_kw = _launch_as(uid, home)
+		p = subprocess.run([python, "-c", PROBE_USER_SCRIPT, *imports], cwd=home, env=env, capture_output=True,
+			text=True, timeout=timeout_s, **popen_kw)  # fmt: skip
+		out: dict = {"exit": p.returncode, "probe_uid": uid}
+		line = next((ln for ln in p.stdout.splitlines() if ln.startswith("PROBE_USER ")), None)
+		if p.returncode == 0 and line:
+			out.update(json.loads(line.removeprefix("PROBE_USER ")))
+		else:
+			out["stderr"] = p.stderr[-1500:]
+		return out
+	finally:
+		shutil.rmtree(box, ignore_errors=True)
+
+
 def _extra_groups() -> list[int]:
 	"""GPU device groups (video, render) so an unprivileged uid can still open ROCm devices."""
 	import grp
@@ -754,14 +806,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	_no_dumps()
 	subreaper = _become_subreaper()
 	before = _child_pids(os.getpid()) if subreaper else set()
-	pkg_root = str(Path(__file__).resolve().parents[2])
-	python = sys.executable
-	if uid is not None:
-		pkg_root = str(_package_for_probe(Path(pkg_root)))
-		python = _python_for_probe()
-	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", ""),
-		**_probe_user_env(uid)})  # fmt: skip
-	popen_kw = {"user": uid, "group": uid, "extra_groups": _extra_groups()} if uid is not None else {}
+	python, env, popen_kw = _launch_as(uid, home)
 
 	started = datetime.now(UTC).replace(microsecond=0)
 	t0 = time.monotonic()

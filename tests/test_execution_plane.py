@@ -4,7 +4,9 @@ Modal itself isn't imported here (it isn't installed in CI); the sandbox and the
 service are fakes with the same calls.
 """
 
+import contextlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -464,3 +466,27 @@ def test_a_probe_uid_gets_a_user_name_so_getpass_works_without_a_passwd_entry():
 
 	with mock.patch.dict(os.environ, {"LOGNAME": env["LOGNAME"], "USER": env["USER"]}):
 		assert getpass.getuser() == PROBE_USER
+
+
+def test_the_probe_user_check_reports_the_names_and_imports_it_ran_with(monkeypatch):
+	from preflight.probes import local
+
+	monkeypatch.setattr(local, "_probe_uid", lambda: None)  # as this process's own user
+	r = local.probe_user_check(("json",))
+	assert r["exit"] == 0 and r["imported"] == ["json"] and r["user"] == r["passwd"]
+
+
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() != 0, reason="drops to a uid: needs root")
+def test_the_probe_user_check_fails_where_the_probe_uid_has_no_passwd_entry(monkeypatch):
+	# the image bug torchtitan hit on a GPU (Nov 1), caught here on a CPU instead
+	import pwd
+
+	from preflight.probes import local
+
+	uid = 64_999
+	with contextlib.suppress(KeyError):
+		pwd.getpwuid(uid)
+		pytest.skip("uid 64999 has a passwd entry on this host")
+	monkeypatch.setattr(local, "_probe_uid", lambda: uid)
+	r = local.probe_user_check(())
+	assert r["exit"] != 0 and "getpwuid" in r["stderr"]
