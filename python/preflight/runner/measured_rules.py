@@ -236,7 +236,8 @@ _WEIGHTS_KW = {"state_dict", "pretrained_model_name_or_path", "checkpoint_path"}
 def _feeds_weights(call, path: str, consts, loaded: set[str]) -> bool:
 	"""A weights loader (load_state_dict, from_pretrained, ...) whose weights argument (the first
 	positional, or state_dict= / pretrained_model_name_or_path= / checkpoint_path=) is this path, a
-	load of it (`torch.load(P)`), or a name the if-body loaded it into (`sd`, `sd["model"]`). A
+	load of it (`torch.load(P)`), or a name the if-body loaded it into (`sd`, `sd["model"]`,
+	`sd.get("model", sd)`), found anywhere inside that argument. A
 	loaded name used only for a setting (`vocab_size=len(tokens)`) is not weights."""
 	import ast
 
@@ -249,14 +250,9 @@ def _feeds_weights(call, path: str, consts, loaded: set[str]) -> bool:
 		)
 
 	given = call.args[:1] + [k.value for k in call.keywords if k.arg in _WEIGHTS_KW]
-	for a in given:
-		while isinstance(a, ast.Subscript | ast.Attribute):
-			a = a.value
-		if is_path(a) or (isinstance(a, ast.Name) and a.id in loaded):
-			return True
-		if isinstance(a, ast.Call) and any(is_path(x) for x in a.args[:1]):  # load_state_dict(torch.load(P))
-			return True
-	return False
+	# anywhere inside the weights argument itself (ckpt.get("model", ckpt), torch.load(open(P, "rb"))),
+	# never in the loader's other arguments
+	return any(is_path(x) or (isinstance(x, ast.Name) and x.id in loaded) for a in given for x in ast.walk(a))
 
 
 def _loaded_names(body, path: str, consts) -> set[str]:

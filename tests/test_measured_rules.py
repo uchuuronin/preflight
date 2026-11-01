@@ -180,3 +180,12 @@ def test_a_cache_used_only_for_a_setting_of_a_weights_load_still_fires():
 	assert "hygiene.cache_not_keyed" not in [
 		f.code for f in hygiene_findings(_gpu_rec(), {"train.py": direct})
 	]
+
+
+def test_weights_reached_through_a_method_or_an_open_are_still_a_resume():
+	head = "import os, torch\nP = 'out/state.pt'\nif os.path.exists(P):\n"
+	for body in ("    ckpt = torch.load(P)\n    model.load_state_dict(ckpt.get('model', ckpt))\n",
+		"    model.load_state_dict(torch.load(P).get('model'))\n",
+		"    model.load_state_dict(torch.load(open(P, 'rb')))\n"):  # fmt: skip
+		codes = [f.code for f in hygiene_findings(_gpu_rec(), {"train.py": head + body})]
+		assert "hygiene.cache_not_keyed" not in codes, body
