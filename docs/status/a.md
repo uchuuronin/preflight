@@ -34,7 +34,7 @@ Updated Sun Nov 1, 01:30 ET.
 - GNN probes read graph sizes from loader batches (PyG's loaders, a DataLoader of Data objects): a
   script that samples subgraphs by hand, as zoo/gnn_pyg does, gets no graph counts, and with no
   loader the forward can't be told from the sampling, so both land in "other" (Nov 1 L4 probe:
-  60% other). Fix if wanted: count each conv layer's edges at SAGEConv/MessagePassing forward.
+  60% other). On the cut sheet (Chiya, Nov 1): count each conv layer's edges at SAGEConv/MessagePassing forward, about 1 hour.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
