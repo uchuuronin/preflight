@@ -840,7 +840,7 @@
 	"onboard.map.title": "Your job, as a map",
 	"onboard.map.body": "Each part of the run is drawn on the loop, sized by its share of a step. Click one for its numbers and anything Preflight found there.",
 	"onboard.readouts.title": "The readouts",
-	"onboard.readouts.body": "How long the run takes, what it costs and how likely it is to fail, each with the range Preflight expects. A hatched readout is one Preflight won't vouch for at this setting.",
+	"onboard.readouts.body": "The run's headline numbers, such as how long it takes, what it costs and how likely it is to fail, each with the range Preflight expects. A hatched readout is one Preflight won't vouch for at this setting.",
 	"onboard.knobs.title": "The knobs",
 	"onboard.knobs.body": "Your job's settings. Move one and the map and readouts follow. Pin a knob to keep it where it is.",
 	"onboard.guide.title": "The guide",

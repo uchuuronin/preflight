@@ -23,7 +23,7 @@ for CPU, or the CUDA/ROCm wheel on a GPU box.
 
 The verify GitHub Action fails a job unless a fix improved what it was for and left the
 training run's meaning alone: the same effective batch, tokens seen and learning-rate
-schedule, throughput no worse than 90% of before, and the same fixed-seed loss. It runs
+schedule, throughput no worse than 90% of before, and the same fixed-seed loss within a small tolerance. It runs
 Preflight's own verify code (`api/preflight_api/verify.py`) on two flight records, with
 Python's standard library only and no keys.
 

@@ -1,5 +1,5 @@
 /**
- * First visit to a cockpit: three short notes, one at a time, each lighting the part of the
+ * First visit to a cockpit: four short notes, one at a time, each lighting the part of the
  * screen it's about (the map, the four readouts, the knobs and the guide). Shown once per
  * browser; "Skip" or Escape ends it. The seen marker is a per-browser convenience in
  * localStorage, read and written inside try/catch, so a private window just sees it again.

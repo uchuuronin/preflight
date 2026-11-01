@@ -204,7 +204,10 @@ class LedgerCore:
 		with self._lock:
 			return {
 				"day": asdict(self._d),
-				"open": [asdict(r) for r in self._open.values()],
+				# A reservation's own ttl is kept beside the rows, not in them, so a ledger from
+				# before ttl existed can still restore this snapshot if the API is rolled back.
+				"open": [{k: v for k, v in asdict(r).items() if k != "ttl"} for r in self._open.values()],
+				"open_ttl": {r.id: r.ttl for r in self._open.values() if r.ttl is not None},
 				"bucket": {k: list(v) for k, v in self._bucket.items()},
 			}
 
@@ -219,7 +222,11 @@ class LedgerCore:
 			turns_ip=dict(day.get("turns_ip", {})),
 			run_usd=dict(day.get("run_usd", {})),
 		)
-		core._open = {r["id"]: Reservation(**r) for r in snap.get("open", [])}
+		ttls = snap.get("open_ttl") or {}
+		core._open = {
+			r["id"]: Reservation(**{**r, "ttl": ttls.get(r["id"], r.get("ttl"))})
+			for r in snap.get("open", [])
+		}
 		core._bucket = {k: (float(v[0]), float(v[1])) for k, v in (snap.get("bucket") or {}).items()}
 		return core
 
