@@ -205,7 +205,12 @@ def oom_pairs(rows: list[dict[str, Any]], scores: list[conformal.Score]) -> list
 			x = q.get("work_units") or p.get("batch", 1) * p.get("seq", 1)
 			pred = cal.correct(float(x), _analytical(q) or 0.0)
 			if cap and pred > 0:
-				out.append((oom.empirical_p_oom(cell.residuals, pred, float(cap)), q.get("status") == "oom"))
+				# the same P(OOM) the engine shows (Chiya, Nov 1): the context-free allocator prediction against the
+				# capacity less the context, not the whole capacity; corpus rows log no device use, so the guess
+				ctx = float(memory.DEFAULT_CONTEXT_BYTES)
+				out.append(
+					(oom.empirical_p_oom(cell.residuals, pred, float(cap) - ctx), q.get("status") == "oom")
+				)
 	return out
 
 

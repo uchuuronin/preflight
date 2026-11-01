@@ -3,6 +3,7 @@
 DATA = {
 	"built_from": "remote-runs b-corpus-export-3 and b-corpus-export-hf-2 (Oct 31): L4, A10, L40S, T4; A100 "
 	"held out, scored once (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, "
+	"A100-PCIe-40GB) (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, "
 	"A100-PCIe-40GB)",
 	"cells": [
 		{
@@ -1746,11 +1747,11 @@ DATA = {
 	},
 	"oom_bins": [
 		[0.0, 0.05, 587, True, 2],
-		[0.05, 0.3, 5, True, 1],
-		[0.3, 0.7, 6, True, 2],
-		[0.7, 0.95, 4, True, 4],
-		[0.95, 1.0, 10, False, 9],
+		[0.05, 0.3, 3, True, 1],
+		[0.3, 0.7, 4, True, 0],
+		[0.7, 0.95, 6, True, 4],
+		[0.95, 1.0, 12, False, 11],
 	],
 	"oom_reliable": True,
-	"version": "e92fbd0e7b",
+	"version": "67ab8edae6",
 }

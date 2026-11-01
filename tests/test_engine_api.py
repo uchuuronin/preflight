@@ -585,8 +585,8 @@ def test_the_summary_says_what_the_engine_shows():
 	assert middle and not any(b["shown_as_number"] for b in middle)
 	top = next(b for b in bins if b["lo"] >= 0.95 - 1e-9)
 	assert (
-		top["verified"] is False and top["ooms"] == 9 and top["n"] == 10
-	)  # shown as "9 of 10 similar runs did"
+		top["verified"] is False and top["ooms"] == 11 and top["n"] == 12
+	)  # shown as "11 of 12 similar runs did" (table 67ab8edae6: P(OOM) scored as the engine shows it, Nov 1)
 
 
 def test_one_threads_quiet_grid_doesnt_silence_another():
