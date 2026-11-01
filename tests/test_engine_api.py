@@ -875,3 +875,38 @@ def test_no_amd_measurements_on_every_engine_surface(ft):
 	assert "No AMD measurements" in card.notes
 	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
 	assert amd.status == "abstain" and amd.reason.startswith("no AMD measurements")
+
+
+def test_one_fit_uses_one_estimator():
+	# review, Nov 1: a probe without a step log beside ones with it once mixed the median and mean factors
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	no_log = lens.model_copy(
+		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
+	)
+	for p in no_log.probes:
+		if p.id in ("p1", "p3"):
+			assert api._length_factor(no_log, p, False) != api._length_factor(no_log, p, True)
+	# with one probe lacking a log, every probe takes the mean factor
+	timed = [p for p in no_log.probes if p.status in api.OK_PROBE and p.step_time and p.step_time.p50_s]
+	assert not all(api._probe_rows(p) for p in timed)
+
+
+def test_no_gpu_no_gpu_hours(ft):
+	cpu = ft.model_copy(update={"env": ft.env.model_copy(update={"gpu": None})})
+	assert api.predict(cpu).root["cost.gpu_hours"].status == "abstain"
+
+
+def test_a_missing_step_log_sends_every_probe_to_the_mean_factor():
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	one = lens.model_copy(
+		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
+	)
+	f_one = {
+		p.id: api._length_factor(
+			one, p, all(api._probe_rows(q) for q in one.probes if q.status in api.OK_PROBE)
+		)
+		for p in one.probes
+		if p.status in api.OK_PROBE
+	}
+	f_mean = {p.id: api._length_factor(lens, p, False) for p in lens.probes if p.status in api.OK_PROBE}
+	assert f_one == pytest.approx(f_mean)

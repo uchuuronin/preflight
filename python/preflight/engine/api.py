@@ -371,9 +371,15 @@ def _dataset_lengths(p) -> tuple[float, float] | None:
 	return (float(med), float(mean)) if med and mean else None
 
 
-def _length_factor(record: FlightRecord, p) -> float | None:
-	"""How much longer the full run's batches are than the ones this probe saw, mean against mean: the dataset's mean
-	padded length per row at the probe's own batch, seq_len and accumulation, over the probe's mean padded length
+def _probe_rows(p) -> list[float]:
+	"""Padded tokens per row on each of the probe's timed steps (its step log)."""
+	return [x.tokens / x.samples for x in (p.step_log or []) if x.kind == "timed" and x.tokens and x.samples]
+
+
+def _length_factor(record: FlightRecord, p, medians: bool | None = None) -> float | None:
+	"""How much longer the full run's batches are than the ones this probe saw: median against median from the
+	probe's step log, or mean against mean (`medians=False`, or no step log): the dataset's padded length per row
+	at the probe's own batch, seq_len and accumulation, over the probe's padded length
 	(tokens_per_sample_mean / (1 - padding_fraction)). Applied to the probe's forward and backward time before the
 	step model fits, so each probe carries its own padding and a knob move that lands on another probe doesn't jump
 	(review, Nov 1). Per-rank rows: the probe's tokens and timing are one rank's view. None when the dataset's
@@ -392,8 +398,8 @@ def _length_factor(record: FlightRecord, p) -> float | None:
 	# like with like (reviews, Nov 1): the probe's p50 is a median step, so the run's median padded length per row
 	# over the median of the probe's own timed steps (step_log: padded tokens over rows); without a step log, mean
 	# over mean, which is right when the probe's batches have the run's shape
-	timed = [s.tokens / s.samples for s in (p.step_log or []) if s.kind == "timed" and s.tokens and s.samples]
-	if timed:
+	timed = _probe_rows(p)
+	if timed and medians is not False:
 		return run_med / float(np.median(timed))
 	return run_mean / (float(data.tokens_per_sample_mean) / (1 - float(data.padding_fraction)))
 
@@ -1023,7 +1029,9 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	sprobes, current_probe = [], None
 	# every timed probe corrected, or none: a fit mixing corrected and uncorrected probes jumps between them
 	timed = [p for p in record.probes if p.status in OK_PROBE and p.step_time and p.step_time.p50_s]
-	factors = {p.id: _length_factor(record, p) for p in timed}
+	# and all with one estimator: medians only if every timed probe has a step log (review, Nov 1)
+	medians = all(_probe_rows(p) for p in timed)
+	factors = {p.id: _length_factor(record, p, medians) for p in timed}
 	if any(f is None for f in factors.values()):
 		factors = {}
 	for p in record.probes:
@@ -1392,6 +1400,10 @@ def _gpu_hours(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
 	own rate gives dollars in the browser from this alone (C, Nov 1)."""
 	if time.status == "abstain":
 		return _abstain("gpu_hours", MODEL_ID_COST, time.reason or "no run time to count GPU-hours from")
+	if _target_gpu(record, values) is None:  # a CPU or unknown device: no GPU-hours to price at any rate
+		return _abstain(
+			"gpu_hours", MODEL_ID_COST, "the run has no GPU the table knows, so there are no GPU-hours"
+		)
 	n = _n_gpus(values, record) / 3600.0
 	why = f"{_n_gpus(values, record)} GPU{'s' if _n_gpus(values, record) != 1 else ''} for the run's time"
 	return _est(time.point * n, time.lo * n, time.hi * n, "gpu_hours", time.status, MODEL_ID_COST, why)

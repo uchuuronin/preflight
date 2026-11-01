@@ -28,7 +28,9 @@ def main(argv: list[str] | None = None) -> int:
 	manifest = json.loads(args.manifest.read_text())
 	div = json.loads(args.divergence.read_text()) if args.divergence else None
 	rows, runs = validate.build(manifest, args.manifest.parent, div)
-	held = sum(1 for r in manifest.get("runs", []) if not r.get("calibrates"))
+	held = sum(
+		1 for r in manifest.get("runs", []) if "*" not in (r.get("calibrates") or ())
+	)  # some rows still score
 	models = validate.models_used(manifest.get("runs", []), args.manifest.parent)
 	stamp = (
 		f"Scored {datetime.now(UTC):%Y-%m-%d %H:%M} UTC from {args.manifest.name}: {len(runs)} runs, {held} held out. "
