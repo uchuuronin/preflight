@@ -1,0 +1,100 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-RYh6OnojkYpl6N4cmWWAeD
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+{
+  "worker": {
+    "module": "ops_app",
+    "file": "/root/ops_app.py",
+    "runner_loaded_as": "/mc-8nrw_npd/modal_app.py (module modal_app, tag probe-2473a3728b965ef7, PKG /opt/preflight/preflight, zoo /root/zoo)",
+    "zoo": "/root/zoo",
+    "zoo_samples": [
+      "README.md",
+      "agent_eval_spark",
+      "eval_sweep_reasoning",
+      "finetune_lora_hf",
+      "gnn_pyg",
+      "grpo_trl",
+      "pretrain_nanogpt",
+      "retrieval_st",
+      "serving_vllm",
+      "torchtitan_debug",
+      "vision_timm"
+    ],
+    "submitted": {
+      "job_id": "01M6BBXEJFM1ZW3QQ2GXWKJ2WK",
+      "created": true,
+      "position": 0
+    },
+    "saves": 1,
+    "lens": "finetune",
+    "knobs": 20,
+    "imported": [
+      "preflight.runner.pipeline",
+      "preflight.runner.records",
+      "preflight.runner.sandbox_runner",
+      "preflight.runner.worker",
+      "preflight.runner.wire",
+      "preflight.runner.record_jobs",
+      "preflight.harness.spark",
+      "preflight.harness.mapper",
+      "preflight.probes.gpu_choice",
+      "preflight.probes.plan"
+    ],
+    "container_environment": "main",
+    "flags": {
+      "root": "/opt/preflight",
+      "env": "production",
+      "engine.memory": true
+    },
+    "job_store_would_claim_here": false,
+    "guard": "preflight-runner in main isn't deployed; this container is app ap-RYh6OnojkYpl6N4cmWWAeD",
+    "image_tag": "probe-2473a3728b965ef7"
+  },
+  "probe": {
+    "pkg_root": "/opt/preflight",
+    "reachable_by_probe_uid": true,
+    "euid": 0,
+    "probe_uid": "61000",
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 9,
+    "backend": "cpu",
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n/opt/preflight/preflight/recorder/runtime.py:1258: FutureWarning: `torch.distributed.reduce_op` is deprecated, please use `torch.distributed.ReduceOp` instead\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\n"
+  },
+  "sandbox": {
+    "entry": [
+      "python",
+      "-m",
+      "preflight.probes.remote"
+    ],
+    "created": true,
+    "import_stdout": "IMPORT /opt/preflight/preflight/__init__.py 2.5.1+cu124\n",
+    "import_stderr": "",
+    "import_exit": 0,
+    "probe_status": "ok",
+    "probe_steps": 9,
+    "probe_error": null,
+    "probe_error_code": null
+  },
+  "ok": true
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-RYh6OnojkYpl6N4cmWWAeD
