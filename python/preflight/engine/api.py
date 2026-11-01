@@ -383,11 +383,15 @@ def _length_factor(record: FlightRecord, p) -> float | None:
 	):  # fmt: skip
 		return None
 	cap = pv.get("seq_len")
-	# mean against mean (review, Nov 1: the run's median over the probe's mean cut a probe that saw exactly the run's
-	# data by 16%); the probe's p50 is a median step of its own batches, so scaled by this it is the run's median step
-	_, run_mean, _ = _padded_step(
+	run_med, run_mean, _ = _padded_step(
 		*lens, float(cap) if cap else None, int(pv.get("batch_size") or 1), int(pv.get("grad_accum") or 1)
 	)
+	# like with like (reviews, Nov 1): the probe's p50 is a median step, so the run's median padded length per row
+	# over the median of the probe's own timed steps (step_log: padded tokens over rows); without a step log, mean
+	# over mean, which is right when the probe's batches have the run's shape
+	timed = [s.tokens / s.samples for s in (p.step_log or []) if s.kind == "timed" and s.tokens and s.samples]
+	if timed:
+		return run_med / float(np.median(timed))
 	return run_mean / (float(data.tokens_per_sample_mean) / (1 - float(data.padding_fraction)))
 
 
@@ -440,7 +444,10 @@ def _length_term(
 	run_med, run_mean, spread = _padded_step(*lens, float(cap) if cap else None, batch, accum)
 	phases = breakdown or st_.by_phase or {}  # the query's own step (its corrected phases), not the probe's
 	total_phase = sum(phases.values())
-	share = sum(phases.get(ph, 0.0) for ph in TOKEN_PHASES) / total_phase if total_phase > 0 else 1.0
+	# "step" is the whole step when the probe had no phase split, and the factor scaled it whole
+	share = (
+		sum(phases.get(ph, 0.0) for ph in (*TOKEN_PHASES, "step")) / total_phase if total_phase > 0 else 1.0
+	)
 	total_scale = (1 + share * (run_mean / run_med - 1)) if run_med > 0 else 1.0
 	why = (
 		f"batches vary in length: the run's median step follows the dataset's median padded length ({run_med:.0f} "

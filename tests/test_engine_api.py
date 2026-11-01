@@ -3,6 +3,7 @@
 import gzip
 import json
 import math
+import statistics
 import time
 from pathlib import Path
 
@@ -706,10 +707,11 @@ def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
 		p = next(q for q in lens.probes if q.id == pid)
 		pv = api._probe_values(lens, p)
 		f = api._length_factor(lens, p)
-		mean = api._padded_step(
+		med = api._padded_step(
 			200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
-		)[1]
-		assert f == pytest.approx(mean / (p.data.tokens_per_sample_mean / (1 - p.data.padding_fraction)))
+		)[0]
+		seen = [x.tokens / x.samples for x in p.step_log if x.kind == "timed" and x.tokens and x.samples]
+		assert f == pytest.approx(med / statistics.median(seen))  # medians: the probe's p50 is a median step
 		ph = api.steptime.phases_seconds(p.step_time.by_phase, p.step_time.p50_s)
 		want = sum(
 			v * f if k in api.TOKEN_PHASES else v for k, v in ph.items()
@@ -783,51 +785,67 @@ def test_rl_and_packed_rows_take_no_padding_term():
 	assert api._length_term(rl, {}, p) is None
 
 
-def test_a_probe_that_saw_the_runs_data_is_left_alone():
-	# review, Nov 1: a median-over-mean factor cut such a probe by 16%
-	rec = _lora()
+def _at_dataset(rec, med_tokens=200.0, mean_tokens=260.0, log=True):
+	"""Each probe's timed steps padded to exactly the run's median, so the probe saw the run's batches."""
 	probes = []
 	for p in rec.probes:
 		pv = api._probe_values(rec, p)
-		mean = api._padded_step(
-			200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
-		)[1]
-		pf = p.data.padding_fraction
-		data = p.data.model_copy(
-			update={"tokens_per_sample_mean": mean * (1 - pf)}
-		)  # padded mean = the run's
-		probes.append(
-			p.model_copy(
-				update={
-					"data": data,
-					"extras": {
-						**(p.extras or {}),
-						"dataset_median_tokens": 200.0,
-						"dataset_mean_tokens": 260.0,
-					},
-				}
-			)
+		run_med, run_mean, _ = api._padded_step(
+			med_tokens,
+			mean_tokens,
+			float(pv["seq_len"]),
+			int(pv["batch_size"]),
+			int(pv.get("grad_accum") or 1),
 		)
-	rec = rec.model_copy(update={"probes": probes})
-	for p in rec.probes:
-		assert api._length_factor(rec, p) == pytest.approx(1.0)
-	assert api.predict(rec).root["time.step"].point == pytest.approx(
-		api.predict(_lora()).root["time.step"].point
-	)
+		upd = {
+			"extras": {
+				**(p.extras or {}),
+				"dataset_median_tokens": med_tokens,
+				"dataset_mean_tokens": mean_tokens,
+			}
+		}
+		if log:
+			upd["step_log"] = [
+				x.model_copy(update={"tokens": round(run_med * x.samples)})
+				if x.kind == "timed" and x.samples
+				else x
+				for x in p.step_log
+			]
+		else:
+			upd["step_log"] = []
+			upd["data"] = p.data.model_copy(
+				update={"tokens_per_sample_mean": run_mean * (1 - p.data.padding_fraction)}
+			)
+		probes.append(p.model_copy(update=upd))
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_a_probe_that_saw_the_runs_data_is_left_alone():
+	# review, Nov 1: a median-over-mean factor cut such a probe by 16%
+	for log in (True, False):  # medians from the step log, or the mean-over-mean fallback without one
+		rec = _at_dataset(_lora(), log=log)
+		for p in rec.probes:
+			if p.status in api.OK_PROBE:
+				assert api._length_factor(rec, p) == pytest.approx(1.0, abs=0.01)
 
 
 def test_one_uncorrectable_probe_leaves_every_probe_uncorrected():
+	# review, Nov 1: break p2, query between the probes (batch 3), where a mixed fit would show
 	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
 	mixed = lens.model_copy(
 		update={
 			"probes": [
 				q.model_copy(update={"data": q.data.model_copy(update={"padding_fraction": None})})
-				if q.id == "p1"
+				if q.id == "p2"
 				else q
 				for q in lens.probes
 			]
 		}
 	)
-	assert api.predict(mixed).root["time.step"].point == pytest.approx(
-		api.predict(_lora()).root["time.step"].point
+	q = {"batch_size": 3}
+	assert api.predict(mixed, q).root["time.step"].point == pytest.approx(
+		api.predict(_lora(), q).root["time.step"].point
+	)
+	assert api.predict(lens, q).root["time.step"].point != pytest.approx(
+		api.predict(_lora(), q).root["time.step"].point
 	)
