@@ -99,3 +99,31 @@ def test_an_image_counts_as_an_image_not_its_base64_length():
 	msgs = [{"role": "user", "content": [{"type": "text", "text": "x" * 400},
 		{"type": "image_url", "image_url": {"url": "data:image/png;base64," + "A" * 400_000}}]}]  # fmt: skip
 	assert estimate_tokens(msgs) < 2_000
+
+
+def test_the_pipeline_diagnoses_only_with_its_flag_on(rec, tmp_path, monkeypatch):
+	from preflight.runner import flags
+	from preflight.runner.pipeline import Deps, _diagnose
+	from preflight.runner.records import LocalRecordWriter
+
+	nums = numbers(rec)
+	checks = [{"verdict": "consistent", "plot": "loss", "plot_region": "whole run",
+		"path": "probes[p1].stability.series.loss[3]", "value": nums["probes"]["p1"]["stability"]["series"]["loss"][3],
+		"detail": "agree"}]  # fmt: skip
+	seen = []
+	deps = Deps(records=LocalRecordWriter(tmp_path), spark=client_answering(checks, seen))
+	monkeypatch.delenv("PREFLIGHT_FLAGS", raising=False)
+	flags.reload()
+	assert _diagnose(rec, deps) is rec and seen == []  # harness.spark_diagnosis is off by default
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_diagnosis": True}))
+	flags.reload()
+	try:
+		out = _diagnose(rec, deps)
+		again = _diagnose(out, deps)
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+	assert len(seen) == 2
+	assert [f.code for f in out.findings if f.source == "spark_diagnosis"] == ["diagnosis.consistent"]
+	assert len([f for f in again.findings if f.source == "spark_diagnosis"]) == 1  # replaced, not stacked
+	assert [c.purpose for c in out.provenance][-1] == "diagnosis"

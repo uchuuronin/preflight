@@ -510,6 +510,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
+	if req.mode != "verify":  # a verify job's record answers one question; it isn't diagnosed again
+		out = _diagnose(out, deps)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
@@ -660,6 +662,26 @@ def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord,
 		if f is not None:
 			findings.append(f)
 	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
+
+
+def _diagnose(rec: FlightRecord, deps: Deps) -> FlightRecord:
+	"""Muse Spark checks the finished record's plots against its numbers (plan item 31): one call,
+	in the record's provenance; its findings replace any earlier diagnosis. Off unless
+	harness.spark_diagnosis is on and the Meta client is configured."""
+	from .flags import flag
+
+	if deps.spark is None or not flag("harness.spark_diagnosis"):
+		return rec
+	from preflight.harness.diagnosis import diagnose_record
+
+	try:
+		found, calls, stats = diagnose_record(deps.spark, rec)
+	except Exception:  # a diagnosis never costs the visitor their record
+		log.warning("job %s: diagnosis failed", rec.record_id, exc_info=True)
+		return rec
+	log.info("job %s: diagnosis %s", rec.record_id, stats)
+	keep = [f for f in rec.findings if f.source != "spark_diagnosis"]
+	return rec.model_copy(update={"findings": [*keep, *found], "provenance": [*rec.provenance, *calls]})
 
 
 def _measured_gpu(result) -> str | None:

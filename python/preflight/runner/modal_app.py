@@ -126,6 +126,7 @@ FLAG_OVERRIDE = FLAGS_SRC.parent / f"flags.{FLAG_ENV}.json"
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
+	.pip_install("matplotlib==3.9.2")  # harness/diagnosis.py renders the plots Muse Spark reads (item 31)
 	.env({"PREFLIGHT_ENV": FLAG_ENV})
 	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)

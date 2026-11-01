@@ -186,7 +186,11 @@ def diagnose_record(client, rec: FlightRecord) -> tuple[list[Finding], list, dic
 	if not _probes(rec):
 		return [], [], stats
 	nums = numbers(rec)
-	pngs = render(rec)
+	try:
+		pngs = render(rec)
+	except ImportError:  # no matplotlib where this runs: no plots, so no call
+		stats["no_renderer"] = 1
+		return [], [], stats
 	content = [{"type": "text", "text": "Raw probe numbers:\n" + json.dumps(nums, separators=(",", ":"))}]
 	for name, png in pngs.items():
 		content.append({"type": "text", "text": f"Plot: {name}"})
