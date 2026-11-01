@@ -1,0 +1,37 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Mjt3EquVaLmU6ujMpnjNL1
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+
+[1AFetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]
+[1AFetching 11 files:  64%|██████▎   | 7/11 [00:10<00:05,  1.43s/it]
+[1AFetching 11 files:  73%|███████▎  | 8/11 [00:26<00:09,  3.29s/it]
+[1AFetching 11 files:  82%|████████▏ | 9/11 [00:36<00:08,  4.03s/it]
+[1AFetching 11 files:  91%|█████████ | 10/11 [00:47<00:04,  4.78s/it]
+[1AFetching 11 files: 100%|██████████| 11/11 [00:52<00:00,  4.74s/it]
+[1AFetching 11 files: 100%|██████████| 11/11 [00:52<00:00,  4.74s/it]
+
+[1AFetching 3 files:   0%|          | 0/3 [00:00<?, ?it/s]
+[1AFetching 3 files:  33%|███▎      | 1/3 [00:00<00:00,  7.29it/s]
+[1AFetching 3 files: 100%|██████████| 3/3 [00:01<00:00,  1.89it/s]Fetching 3 files: 100%|██████████| 3/3 [00:01<00:00,  1.89it/s]
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Mjt3EquVaLmU6ujMpnjNL1

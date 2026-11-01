@@ -1,0 +1,11 @@
+{
+	"name": "20261101-160638-41324593868-a-prefetch-serving",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41324593868",
+	"ref": "ws-a",
+	"sha": "9afbf4c8834827ec6c36fc46e9e99756702c6e24",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::prefetch --models Qwen/Qwen2.5-7B-Instruct,dataset:databricks/databricks-dolly-15k",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T16:08:06Z"
+}
