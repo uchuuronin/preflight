@@ -2,6 +2,10 @@
 
 ## Sun Nov 1, morning (07:00 on)
 
+- **Production redeploy** (deploy run 41338351973, from main 6757667, 18:46 UTC): stranger gate passed, API startup check and deploy, fix app, Pages (84f6ce94.preflight-cqn.pages.dev). `/v1` on the live site now reaches the API (`/v1/jobs/<unknown>` answers `job_not_found`).
+- Live guide tour on the live site (PF102, Qwen 1.5B sample): Muse Spark answered and went to the eval problem after one question (highlighted eval and model, tried eval_batch_size 4, refused by the guard as "would_be_tight"), then said it would ask for a probe but put no probe card up. Its first turn chose min_time and lit block, optimizer, data. Known limit for now.
+- Data-use notice: uploads, records and probe results now say 30 days (A's retention.py runs in the deployed runner, 8154268, `cleanup` each day). Was "nothing deletes them yet".
+- CI: a `workers` job (D's request). `npm run vendor` comes first because `.gitignore`'s `*.bin` keeps the card fonts out of the repo; 18 tests, typecheck and hero-cards check pass locally after it. Asked D in from-c.md whether to force-add the fonts.
 - CI green on `057dd8e` (run 41336857883). Main's CI on 3c6699e is red on the stranger check "the guide offers a move on the sample" (run 41333285044), so the production redeploy waits on a merge of ws-c through 057dd8e; A's runner redeploy (18:04 UTC, ws-a 8154268, a-startup-check-18 ok) is done. Told the user 13:37 ET.
 - Rule-based tour: a knob lights the map nodes the record's own `knobs[].affects` names (A's harness/knob_meta.py writes it on every knob) plus the findings; the old table only for records without `affects`; nodes not on the record's map are dropped. Needed for the lens tours, whose node ids (sampler, kv_cache, images, pairs) the old table never had. Review (read-only): adding the table on top lit the whole `model` group beside A's precise nodes and an explicit `[]` couldn't light nothing; fixed. Tests in guide.test.ts.
 - Push under the standing yes, `057dd8e..` this commit, to ws-c: 54f13b3 and this commit (the affects change, its review fix, requests and status). No runs.

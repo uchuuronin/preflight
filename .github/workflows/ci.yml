@@ -126,6 +126,25 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
           npm run stranger
 
+  # D's Pages Functions (share pages, cards, badges). The fonts are .bin files, which .gitignore
+  # keeps out of the repo, so `vendor` copies them (and resvg) from the pinned node_modules first;
+  # without it the card tests can't load a font on a clean machine.
+  workers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - working-directory: workers
+        run: |
+          npm ci --no-audit --no-fund
+          npm run vendor
+          npm test
+          npm run typecheck
+          npm run hero-cards:check
+
   secrets:
     runs-on: ubuntu-latest
     timeout-minutes: 5
