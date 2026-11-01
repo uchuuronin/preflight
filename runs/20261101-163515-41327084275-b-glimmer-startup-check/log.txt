@@ -1,0 +1,604 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-GSJj0k2vrORNO9CpBdefcP
+Building image im-hR4C8XQW7UyqyZMBmQd5cQ
+
+=> Step 0: FROM vllm/vllm-openai:v0.28.0
+Building image im-nwylbmZN5e1099H4NCLpYD
+Building image im-jOxxnOyc9RHxU046hD28dV
+
+=> Step 0: FROM ghcr.io/ggml-org/llama.cpp:server-cuda
+Building image im-uxJE73KMbmn3CXRfv0oHz5
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install 'huggingface_hub[hf_xet]==2.4.0' llmcompressor==0.15.0
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install 'huggingface_hub[hf_xet]==2.4.0'
+Getting image source signatures
+Copying blob sha256:cf57d2112d8994ff0bb5f867ab8e776272e1d0bcfbb6e6d7f38fd7973b7140cf
+Copying blob sha256:271c54c18a104657bcbeb98db6c16031555e42a482d0af991e6b90b7b621c193
+Copying blob sha256:a4e56eda59b2cca8b9f41c7f5031791597c1c49429f1fb2ea5aa76780210deb6
+Copying blob sha256:591954b29afb67273858149cde1cbdf436e654ee4ac246b0f298f8e5fa582c11
+Copying blob sha256:0f9949557abfbb398b31eabc75da42aa07d5276f184084184a80c963109947e6
+Copying blob sha256:70f87b6ed43e1cbbe67ce74c7877fb771bf352b25d602a82ee4f840f2e265155
+Copying blob sha256:c567a87f21d2f8e46feb4f6c427eb5559d45a1a222f73d601352403d13af1ada
+Copying blob sha256:7e00c5c1cfdb9a8e86b7e0e71458374e0f9438a399b95ebe6280721dfeaf5d57
+Copying blob sha256:a8b9d0854147071663ceea0c3e59a1042d8149b2ae032bb49eaf1280f9cb34e2
+Copying blob sha256:271c54c18a104657bcbeb98db6c16031555e42a482d0af991e6b90b7b621c193
+Copying blob sha256:0b3b5bd928240da4156c41fcfb400c1f4f8674acd2faee0413ab5a032dfb5f76
+Copying blob sha256:4139e3f5aa7739c0b1f4110c50629f2ccced0dddc1665549881090cfbd3d2749
+Copying blob sha256:526d5438c009ab7178af1646fed10ff6f47a73f5a1ae7b9f49e63e4ade7e3ae6
+Copying blob sha256:ec78d3e2d4603022f190879d99937efd00b3af7a37b8eeca322b51a4ca2f6892
+Copying blob sha256:7798978251694b3a29eb3e4a1813440c41ba7fd643e069c9910f3f959f07cdcd
+Copying blob sha256:2aa4390c80f05ff538b5bcdc856ee585482721b1af1d5a9e1a2b1e7cbe3136b7
+Copying blob sha256:01e396ce3c8e445f456e0fcd6a419aba6c0c8ae1bacab31f1f09bbe9c702e0c3
+Copying blob sha256:ccef6ccbf2ce6d6bbcb6b6f8ed926c804ed4a81b839034389201d2b5f7518f11
+Getting image source signatures
+Copying blob sha256:cd634bc724c4411e0d3fc0d9bc49b5a7d8c9bcecf6c00009c0c36e2bd0af168d
+Copying blob sha256:a30bd33cff933e6dc9e1b66735c63b984c75c63819de90017055c34d35e2836e
+Copying blob sha256:0179fee5d74b8fb9b6d18b8a205371f77a55978f25bfd7cc3ed194b32f217e3c
+Copying blob sha256:d304482b62232a7cc6d6f66da6c94698ed3f03f1a935d62071c65894c29d642f
+Copying blob sha256:c9df31e9235d0e9531a2ce38a609a1180f911d3656a2d5c52797f4a35f49838c
+Copying blob sha256:3e10379f55562feae6d63a7bac57f006511fd0f04ecf15ae53b6b2089247a224
+Copying blob sha256:25647d2c0baebf86a4a4d973d3043479760acb28692617a7e727d7ff12914257
+Copying blob sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1
+Copying blob sha256:c697f234d1d9bf6e3d1527c07a84b0b87cd16aaa39280248a5f52aa52d9a503d
+Copying blob sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1
+Copying blob sha256:3d6ab8c799cda2f4c6a6277b0e24dd2231c5de83b0316968b7cce81156bb8be0
+Copying blob sha256:73389fbd088f5ed5d9fd258baced59de092978b4f483920ea6d074522a105119
+Copying blob sha256:c05c64db96124202ca2da54adbd996f47e1428777117c64f3af01efab2d48a68
+Copying blob sha256:398182656c471d6ecca3c2d6d30e97193b40ffc8028a94515093960322f3d64e
+Copying blob sha256:5a7813e071bfadf18aaa6ca8318be4824a9b6297b3240f2cc84c1db6f4113040
+Copying blob sha256:7209097bfb98d6f8b422984480f1fddead5ea62f8900ff6b6548e060b71aca76
+Copying blob sha256:cbb9175a9bc5f6553f8c0c5025ea9521898b8a3956ee24798dc35c24c6185053
+Copying blob sha256:0d1ec488286ac124f7a56fca76fea8bf03d042c59b79576260e0251ef8428c26
+Copying blob sha256:545a3ada5b6bc612a11c13a659775d67eeda5a61615e7f49c76ecd24adcad626
+Copying blob sha256:759eace5524cc23bbbe529078c7628b9c51820967aa08f95a129bc16ca7dd36d
+Copying blob sha256:a102f36d092c0e9e0bef8c97854f606af9156aa36ab408e6fa4b88e27124a7e6
+Copying blob sha256:05ec76e31584ec109785cc7045bd88df0240411233c2fcdad66b621c662034c0
+Copying blob sha256:67521fa22d50dace39e67a697d75a92bd2b42171c8b17a7c2845d0c916942360
+Copying blob sha256:f8ed8a100bf886af138725f044cc817c24efad2d6bc210c5c7b14cdd531d69b8
+Copying blob sha256:1ae900eb19dffddc6f7ea2e14705470168231128c010d806180bc4304c750a6d
+Copying blob sha256:f77426183f53a8f41cc56293873a4a395942050a07c8b7122ad26815229d2d1f
+Copying blob sha256:e2c6bed4fdc34a78e82b3c88a29629b0dcc8ccf2e08b0026fe2182d23fe2b829
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Collecting huggingface_hub==2.4.0 (from huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/huggingface-hub/huggingface_hub-2.4.0-py3-none-any.whl.metadata (16 kB)
+Collecting huggingface_hub==2.4.0 (from huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/huggingface-hub/huggingface_hub-2.4.0-py3-none-any.whl.metadata (16 kB)
+Collecting click<9.0.0,>=8.4.2 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+Collecting llmcompressor==0.15.0
+  Downloading http://pypi-mirror.modal.local:5555/simple/click/click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting filelock>=3.10.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/filelock/filelock-4.2.6-py3-none-any.whl.metadata (2.0 kB)
+Collecting fsspec>=2023.5.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/llmcompressor/llmcompressor-0.15.0-py3-none-any.whl.metadata (20 kB)
+Collecting click<9.0.0,>=8.4.2 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/click/click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting filelock>=3.10.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/filelock/filelock-4.2.6-py3-none-any.whl.metadata (2.0 kB)
+Collecting fsspec>=2023.5.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/fsspec/fsspec-2026.9.0-py3-none-any.whl.metadata (10 kB)
+  Downloading http://pypi-mirror.modal.local:5555/simple/fsspec/fsspec-2026.9.0-py3-none-any.whl.metadata (10 kB)
+Collecting hf-xet<2.0.0,>=1.6.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/hf-xet/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+Collecting httpx2<3,>=2.0.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpx2/httpx2-2.16.0-py3-none-any.whl.metadata (10 kB)
+Collecting packaging>=20.9 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting hf-xet<2.0.0,>=1.6.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/hf-xet/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+Collecting httpx2<3,>=2.0.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpx2/httpx2-2.16.0-py3-none-any.whl.metadata (10 kB)
+Collecting packaging>=20.9 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pyyaml>=5.1 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pyyaml/pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting tqdm>=4.42.1 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl.metadata (57 kB)
+Collecting pyyaml>=5.1 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pyyaml/pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting typing-extensions>=4.1.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting loguru>=0.7.2 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/loguru/loguru-0.7.3-py3-none-any.whl.metadata (22 kB)
+Collecting tqdm>=4.42.1 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl.metadata (57 kB)
+Collecting typing-extensions>=4.1.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting anyio>=4.10 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+Collecting httpcore2==2.16.0 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpcore2/httpcore2-2.16.0-py3-none-any.whl.metadata (27 kB)
+Collecting idna>=3.18 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting numpy>=2.0.0 (from llmcompressor==0.15.0)
+Collecting truststore>=0.10 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/truststore/truststore-0.10.5-py3-none-any.whl.metadata (4.5 kB)
+Collecting h11>=0.16 (from httpcore2==2.16.0->httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/huggingface-hub/huggingface_hub-2.4.0-py3-none-any.whl (857 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 857.0/857.0 kB 623.0 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/click/click-8.5.0-py3-none-any.whl (125 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/hf-xet/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.3 MB)
+  Downloading http://pypi-mirror.modal.local:5555/simple/numpy/numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+Collecting requests>=2.32.2 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/requests/requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.3/4.3 MB 347.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/httpx2/httpx2-2.16.0-py3-none-any.whl (97 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/httpcore2/httpcore2-2.16.0-py3-none-any.whl (85 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl (134 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/filelock/filelock-4.2.6-py3-none-any.whl (164 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/fsspec/fsspec-2026.9.0-py3-none-any.whl (221 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl (69 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl (129 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pyyaml/pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 608.3 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl (80 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/truststore/truststore-0.10.5-py3-none-any.whl (19 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Installing collected packages: typing-extensions, truststore, tqdm, pyyaml, packaging, idna, hf-xet, h11, fsspec, filelock, click, httpcore2, anyio, httpx2, huggingface_hub
+Collecting torch<=2.14.1,>=2.10.0 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/torch/torch-2.14.1-cp311-cp311-manylinux_2_28_x86_64.whl.metadata (37 kB)
+Collecting transformers<=5.21.0,>=5.15.0 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/transformers/transformers-5.21.0-py3-none-any.whl.metadata (31 kB)
+Collecting datasets>=4.8.4 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/datasets/datasets-5.1.0-py3-none-any.whl.metadata (24 kB)
+Collecting auto-round>=0.15.1 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/auto-round/auto_round-0.16.1-py3-none-any.whl.metadata (23 kB)
+Collecting accelerate>=1.15.0 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/accelerate/accelerate-1.15.0-py3-none-any.whl.metadata (19 kB)
+Collecting nvidia-ml-py>=12.560.30 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-ml-py/nvidia_ml_py-13.615.71-py3-none-any.whl.metadata (9.7 kB)
+Collecting pillow>=12.0.0 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pillow/pillow-13.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+Collecting compressed-tensors==0.20.1 (from llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/compressed-tensors/compressed_tensors-0.20.1-py3-none-any.whl.metadata (10.0 kB)
+Collecting pydantic>=2.0 (from compressed-tensors==0.20.1->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl.metadata (137 kB)
+Collecting psutil (from compressed-tensors==0.20.1->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/psutil/psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl.metadata (22 kB)
+Collecting anyio>=4.10 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+Collecting httpcore2==2.16.0 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpcore2/httpcore2-2.16.0-py3-none-any.whl.metadata (27 kB)
+Collecting idna>=3.18 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting truststore>=0.10 (from httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/truststore/truststore-0.10.5-py3-none-any.whl.metadata (4.5 kB)
+Collecting h11>=0.16 (from httpcore2==2.16.0->httpx2<3,>=2.0.0->huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting setuptools>=77.0.3 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/setuptools/setuptools-84.2.1-py3-none-any.whl.metadata (6.6 kB)
+Collecting sympy>=1.13.3 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/sympy/sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+Collecting networkx>=2.5.1 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/networkx/networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+Collecting jinja2 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/jinja2/jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting cuda-toolkit==13.0.3 (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/cuda-toolkit/cuda_toolkit-13.0.3.0-py2.py3-none-any.whl.metadata (17 kB)
+Collecting cuda-bindings<14,>=13.0.3 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/cuda-bindings/cuda_bindings-13.4.4-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting nvidia-cudnn-cu13==9.24.0.43 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cudnn-cu13/nvidia_cudnn_cu13-9.24.0.43-py3-none-manylinux_2_27_x86_64.whl.metadata (1.9 kB)
+Collecting nvidia-cusparselt-cu13==0.8.1 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusparselt-cu13/nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl.metadata (12 kB)
+Collecting nvidia-nccl-cu13==2.30.7 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nccl-cu13/nvidia_nccl_cu13-2.30.7-py3-none-manylinux_2_18_x86_64.whl.metadata (2.1 kB)
+
+Successfully installed anyio-4.16.0 click-8.5.0 filelock-4.2.6 fsspec-2026.9.0 h11-0.16.0 hf-xet-1.8.0 httpcore2-2.16.0 httpx2-2.16.0 huggingface_hub-2.4.0 idna-3.20 packaging-26.3 pyyaml-6.0.3 tqdm-4.70.1 truststore-0.10.5 typing-extensions-4.16.0
+Collecting nvidia-nvshmem-cu13==3.4.5 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvshmem-cu13/nvidia_nvshmem_cu13-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.1 kB)
+Collecting triton~=3.8.0 (from torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/triton/triton-3.8.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (978 bytes)
+Collecting nvidia-cublas==13.1.1.3.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+
+[notice] A new release of pip is available: 25.2 -> 26.2.2
+[notice] To update, run: pip install --upgrade pip
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cublas/nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-cuda-nvrtc==13.0.88.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cuda-runtime==13.0.96.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-runtime/nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cufft==12.0.0.61.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cufft/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-nvjitlink<14,>=13.0.88 (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvjitlink/nvidia_nvjitlink-13.4.92-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-cufile==1.15.1.6.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cufile/nvidia_cufile-1.15.1.6-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cuda-cupti==13.0.85.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-cupti/nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-curand==10.4.0.35.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-curand/nvidia_curand-10.4.0.35-py3-none-manylinux_2_27_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cusolver==12.0.4.66.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusolver/nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-cusparse==12.6.3.3.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusparse/nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-nvtx==13.0.85.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvtx/nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl.metadata (1.8 kB)
+Collecting cuda-pathfinder>=1.4.2 (from cuda-bindings<14,>=13.0.3->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/cuda-pathfinder/cuda_pathfinder-1.8.5-py3-none-any.whl.metadata (1.9 kB)
+Collecting regex>=2025.10.22 (from transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+Saving image...
+  Downloading http://pypi-mirror.modal.local:5555/simple/regex/regex-2026.9.29-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (40 kB)
+Collecting tokenizers<0.24.0,>=0.23.1 (from transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tokenizers/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (9.8 kB)
+Collecting typer (from transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typer/typer-0.27.3-py3-none-any.whl.metadata (16 kB)
+Collecting safetensors>=0.8.0 (from transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/safetensors/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.2 kB)
+Collecting py-cpuinfo (from auto-round>=0.15.1->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/py-cpuinfo/py_cpuinfo-9.0.0-py3-none-any.whl.metadata (794 bytes)
+Collecting pyarrow>=24.0.0 (from datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pyarrow/pyarrow-26.0.0-cp311-cp311-manylinux_2_28_x86_64.whl.metadata (3.0 kB)
+Collecting dill<0.4.2,>=0.3.0 (from datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/dill/dill-0.4.1-py3-none-any.whl.metadata (10 kB)
+Collecting pandas (from datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pandas/pandas-3.1.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (18 kB)
+Collecting xxhash (from datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/xxhash/xxhash-4.0.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (17 kB)
+Collecting multiprocess<0.70.20 (from datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/multiprocess/multiprocess-0.70.19-py311-none-any.whl.metadata (7.5 kB)
+Collecting fsspec>=2023.5.0 (from huggingface_hub==2.4.0->huggingface_hub[hf_xet]==2.4.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/fsspec/fsspec-2026.7.0-py3-none-any.whl.metadata (10 kB)
+Collecting aiohttp!=4.0.0a0,!=4.0.0a1 (from fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+Image saved, took 2.39s
+
+Built image im-jOxxnOyc9RHxU046hD28dV in 7.42s
+
+
+  Downloading http://pypi-mirror.modal.local:5555/simple/aiohttp/aiohttp-3.14.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+Collecting aiohappyeyeballs>=2.5.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/aiohappyeyeballs/aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+Collecting aiosignal>=1.4.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/aiosignal/aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+Collecting attrs>=17.3.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/attrs/attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+Collecting frozenlist>=1.1.1 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/frozenlist/frozenlist-1.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (20 kB)
+Collecting multidict<8.0,>=4.5 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/multidict/multidict-7.2.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (6.1 kB)
+Collecting propcache>=0.2.0 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/propcache/propcache-0.5.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (25 kB)
+Collecting yarl<2.0,>=1.25.1 (from aiohttp!=4.0.0a0,!=4.0.0a1->fsspec[http]<=2026.7.0,>=2023.1.0->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/yarl/yarl-1.25.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (111 kB)
+Collecting annotated-types>=0.6.0 (from pydantic>=2.0->compressed-tensors==0.20.1->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.50.2 (from pydantic>=2.0->compressed-tensors==0.20.1->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (6.5 kB)
+Collecting typing-inspection>=0.4.4 (from pydantic>=2.0->compressed-tensors==0.20.1->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting charset_normalizer<4,>=2 (from requests>=2.32.2->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/charset-normalizer/charset_normalizer-3.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+Collecting urllib3<3,>=1.26 (from requests>=2.32.2->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/urllib3/urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting certifi>=2023.5.7 (from requests>=2.32.2->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+Collecting mpmath<1.4,>=1.1.0 (from sympy>=1.13.3->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/mpmath/mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+Collecting MarkupSafe>=2.0 (from jinja2->torch<=2.14.1,>=2.10.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/markupsafe/markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+Collecting python-dateutil>=2.9.0 (from pandas->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/python-dateutil/python_dateutil-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+Collecting tzdata (from python-dateutil>=2.9.0->pandas->datasets>=4.8.4->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tzdata/tzdata-2026.6-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting shellingham>=1.3.0 (from typer->transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/shellingham/shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+Collecting rich>=13.8.0 (from typer->transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/rich/rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting annotated-doc>=0.0.2 (from typer->transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/annotated-doc/annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+Collecting markdown-it-py>=2.2.0 (from rich>=13.8.0->typer->transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/markdown-it-py/markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting pygments<3.0.0,>=2.13.0 (from rich>=13.8.0->typer->transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pygments/pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich>=13.8.0->typer->transformers<=5.21.0,>=5.15.0->llmcompressor==0.15.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/mdurl/mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/huggingface-hub/huggingface_hub-2.4.0-py3-none-any.whl (857 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 857.0/857.0 kB 218.6 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/llmcompressor/llmcompressor-0.15.0-py3-none-any.whl (433 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/compressed-tensors/compressed_tensors-0.20.1-py3-none-any.whl (260 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/click/click-8.5.0-py3-none-any.whl (125 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/hf-xet/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.3/4.3 MB 216.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/httpx2/httpx2-2.16.0-py3-none-any.whl (97 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/httpcore2/httpcore2-2.16.0-py3-none-any.whl (85 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/torch/torch-2.14.1-cp311-cp311-manylinux_2_28_x86_64.whl (554.6 MB)
+Copying config sha256:534af9cdeca6742df5d691f061722679f522f735ebb8c37fa0a5abb086d4fc7b
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 554.6/554.6 MB 39.0 MB/s  0:00:10
+Downloading http://pypi-mirror.modal.local:5555/simple/cuda-toolkit/cuda_toolkit-13.0.3.0-py2.py3-none-any.whl (2.5 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cudnn-cu13/nvidia_cudnn_cu13-9.24.0.43-py3-none-manylinux_2_27_x86_64.whl (553.1 MB)
+Copying config sha256:3002a50384b25dc67938da11a418cf8a151ae87a9fd5b7f778ad4ac7c71d47dd
+Writing manifest to image destination
+Unpacking OCI image
+   • unpacking rootfs ...     
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 553.1/553.1 MB 73.2 MB/s  0:00:08
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusparselt-cu13/nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl (170.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 170.1/170.1 MB 246.6 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nccl-cu13/nvidia_nccl_cu13-2.30.7-py3-none-manylinux_2_18_x86_64.whl (216.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 216.0/216.0 MB 214.3 MB/s  0:00:01
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvshmem-cu13/nvidia_nvshmem_cu13-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (60.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.4/60.4 MB 71.2 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/cuda-bindings/cuda_bindings-13.4.4-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (7.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.2/7.2 MB 259.4 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cublas/nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_x86_64.whl (423.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 423.1/423.1 MB 36.5 MB/s  0:00:10
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-cupti/nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_x86_64.whl (10.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.7/10.7 MB 50.6 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl (90.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.2/90.2 MB 51.5 MB/s  0:00:01
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-runtime/nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 51.5 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cufft/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (214.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 214.1/214.1 MB 53.9 MB/s  0:00:03
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cufile/nvidia_cufile-1.15.1.6-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 38.3 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-curand/nvidia_curand-10.4.0.35-py3-none-manylinux_2_27_x86_64.whl (59.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 59.5/59.5 MB 40.4 MB/s  0:00:01
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusolver/nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_x86_64.whl (200.9 MB)
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M6BZEQ83MFB8QM5HTDMFM1YB/registry-unpackJTTKGu
+Copied image in 2.29s
+
+=> Step 1: COPY /python/. /usr/local
+
+=> Step 2: RUN ln -s /usr/local/bin/python3 /usr/local/bin/python
+
+=> Step 3: ENV TERMINFO_DIRS=/etc/terminfo:/lib/terminfo:/usr/share/terminfo:/usr/lib/terminfo
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 200.9/200.9 MB 37.4 MB/s  0:00:05
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusparse/nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (145.9 MB)
+Saving image...
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 145.9/145.9 MB 52.0 MB/s  0:00:02
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvjitlink/nvidia_nvjitlink-13.4.92-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl (42.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 42.5/42.5 MB 274.5 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvtx/nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl (148 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/transformers/transformers-5.21.0-py3-none-any.whl (13.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.0/13.0 MB 56.2 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/tokenizers/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.4/3.4 MB 311.6 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/triton/triton-3.8.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (247.9 MB)
+Image saved, took 8.19s
+
+Built image im-nwylbmZN5e1099H4NCLpYD in 64.64s
+
+
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 247.9/247.9 MB 42.6 MB/s  0:00:05
+Downloading http://pypi-mirror.modal.local:5555/simple/accelerate/accelerate-1.15.0-py3-none-any.whl (394 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl (134 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/auto-round/auto_round-0.16.1-py3-none-any.whl (1.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.5/1.5 MB 67.5 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/cuda-pathfinder/cuda_pathfinder-1.8.5-py3-none-any.whl (62 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/datasets/datasets-5.1.0-py3-none-any.whl (604 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 604.4/604.4 kB 111.8 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/dill/dill-0.4.1-py3-none-any.whl (120 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/fsspec/fsspec-2026.7.0-py3-none-any.whl (206 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/multiprocess/multiprocess-0.70.19-py311-none-any.whl (144 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/aiohttp/aiohttp-3.14.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.9/1.9 MB 258.0 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/multidict/multidict-7.2.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (510 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/yarl/yarl-1.25.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (117 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/aiohappyeyeballs/aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/aiosignal/aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/attrs/attrs-26.1.0-py3-none-any.whl (67 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/filelock/filelock-4.2.6-py3-none-any.whl (164 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/frozenlist/frozenlist-1.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (231 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl (69 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/loguru/loguru-0.7.3-py3-none-any.whl (61 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/networkx/networkx-3.6.1-py3-none-any.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 252.9 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/numpy/numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.9/16.9 MB 217.5 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-ml-py/nvidia_ml_py-13.615.71-py3-none-any.whl (58 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl (129 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pillow/pillow-13.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.1/7.1 MB 242.2 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/propcache/propcache-0.5.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (235 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pyarrow/pyarrow-26.0.0-cp311-cp311-manylinux_2_28_x86_64.whl (53.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 53.9/53.9 MB 71.2 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl (490 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 287.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pyyaml/pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 321.5 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/regex/regex-2026.9.29-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (804 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 805.0/805.0 kB 434.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/requests/requests-2.34.2-py3-none-any.whl (73 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/charset-normalizer/charset_normalizer-3.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (269 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/urllib3/urllib3-2.8.0-py3-none-any.whl (135 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl (135 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/safetensors/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (516 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/setuptools/setuptools-84.2.1-py3-none-any.whl (876 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 876.3/876.3 kB 616.0 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/sympy/sympy-1.14.0-py3-none-any.whl (6.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 289.0 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/mpmath/mpmath-1.3.0-py3-none-any.whl (536 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 866.5 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl (80 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/truststore/truststore-0.10.5-py3-none-any.whl (19 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/jinja2/jinja2-3.1.6-py3-none-any.whl (134 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/markupsafe/markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pandas/pandas-3.1.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.3/12.3 MB 75.2 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/python-dateutil/python_dateutil-4.0.0-py3-none-any.whl (92 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/psutil/psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl (155 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/py-cpuinfo/py_cpuinfo-9.0.0-py3-none-any.whl (22 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typer/typer-0.27.3-py3-none-any.whl (123 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/annotated-doc/annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/rich/rich-15.0.0-py3-none-any.whl (310 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pygments/pygments-2.21.0-py3-none-any.whl (1.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 356.8 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/markdown-it-py/markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/mdurl/mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/shellingham/shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/tzdata/tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/xxhash/xxhash-4.0.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (260 kB)
+Building image im-J7lZc6zNkVMo79uYbHprYL
+
+=> Step 0: FROM base
+
+=> Step 1: ENTRYPOINT []
+Saving image...
+Installing collected packages: py-cpuinfo, nvidia-ml-py, nvidia-cusparselt-cu13, mpmath, cuda-toolkit, xxhash, urllib3, tzdata, typing-extensions, truststore, triton, tqdm, sympy, shellingham, setuptools, safetensors, regex, pyyaml, pygments, pyarrow, psutil, propcache, pillow, packaging, nvidia-nvtx, nvidia-nvshmem-cu13, nvidia-nvjitlink, nvidia-nccl-cu13, nvidia-curand, nvidia-cufile, nvidia-cuda-runtime, nvidia-cuda-nvrtc, nvidia-cuda-cupti, numpy, networkx, multidict, mdurl, MarkupSafe, loguru, idna, hf-xet, h11, fsspec, frozenlist, filelock, dill, cuda-pathfinder, click, charset_normalizer, certifi, attrs, annotated-types, annotated-doc, aiohappyeyeballs, yarl, typing-inspection, requests, python-dateutil, pydantic-core, nvidia-cusparse, nvidia-cufft, nvidia-cublas, multiprocess, markdown-it-py, jinja2, httpcore2, cuda-bindings, anyio, aiosignal, rich, pydantic, pandas, nvidia-cusolver, nvidia-cudnn-cu13, httpx2, aiohttp, typer, huggingface_hub, torch, tokenizers, datasets, transformers, accelerate, compressed-tensors, auto-round, llmcompressor
+Image saved, took 1.15s
+
+Built image im-J7lZc6zNkVMo79uYbHprYL in 3.80s
+
+
+Building image im-BbgRhkDVEEMXomgcw2C9B9
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install openai==2.8.1
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Collecting openai==2.8.1
+  Obtaining dependency information for openai==2.8.1 from http://pypi-mirror.modal.local:5555/simple/openai/openai-2.8.1-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/openai/openai-2.8.1-py3-none-any.whl.metadata (29 kB)
+Collecting anyio<5,>=3.5.0 (from openai==2.8.1)
+  Obtaining dependency information for anyio<5,>=3.5.0 from http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+Collecting distro<2,>=1.7.0 (from openai==2.8.1)
+  Obtaining dependency information for distro<2,>=1.7.0 from http://pypi-mirror.modal.local:5555/simple/distro/distro-1.9.0-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/distro/distro-1.9.0-py3-none-any.whl.metadata (6.8 kB)
+Collecting httpx<1,>=0.23.0 (from openai==2.8.1)
+  Obtaining dependency information for httpx<1,>=0.23.0 from http://pypi-mirror.modal.local:5555/simple/httpx/httpx-0.28.1-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpx/httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting jiter<1,>=0.10.0 (from openai==2.8.1)
+  Obtaining dependency information for jiter<1,>=0.10.0 from http://pypi-mirror.modal.local:5555/simple/jiter/jiter-0.18.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/jiter/jiter-0.18.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.2 kB)
+Collecting pydantic<3,>=1.9.0 (from openai==2.8.1)
+  Obtaining dependency information for pydantic<3,>=1.9.0 from http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl.metadata (137 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 137.6/137.6 kB 144.1 MB/s eta 0:00:00
+Collecting sniffio (from openai==2.8.1)
+  Obtaining dependency information for sniffio from http://pypi-mirror.modal.local:5555/simple/sniffio/sniffio-1.3.1-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/sniffio/sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+Collecting tqdm>4 (from openai==2.8.1)
+  Obtaining dependency information for tqdm>4 from http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl.metadata (57 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 57.4/57.4 kB 143.7 MB/s eta 0:00:00
+Collecting typing-extensions<5,>=4.11 (from openai==2.8.1)
+  Obtaining dependency information for typing-extensions<5,>=4.11 from http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting idna>=2.8 (from anyio<5,>=3.5.0->openai==2.8.1)
+  Obtaining dependency information for idna>=2.8 from http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting certifi (from httpx<1,>=0.23.0->openai==2.8.1)
+  Obtaining dependency information for certifi from http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+Collecting httpcore==1.* (from httpx<1,>=0.23.0->openai==2.8.1)
+  Obtaining dependency information for httpcore==1.* from http://pypi-mirror.modal.local:5555/simple/httpcore/httpcore-1.0.9-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpcore/httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting h11>=0.16 (from httpcore==1.*->httpx<1,>=0.23.0->openai==2.8.1)
+  Obtaining dependency information for h11>=0.16 from http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting annotated-types>=0.6.0 (from pydantic<3,>=1.9.0->openai==2.8.1)
+  Obtaining dependency information for annotated-types>=0.6.0 from http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.50.2 (from pydantic<3,>=1.9.0->openai==2.8.1)
+  Obtaining dependency information for pydantic-core==2.50.2 from http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (6.5 kB)
+Collecting typing-inspection>=0.4.4 (from pydantic<3,>=1.9.0->openai==2.8.1)
+  Obtaining dependency information for typing-inspection>=0.4.4 from http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/openai/openai-2.8.1-py3-none-any.whl (1.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 153.9 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl (134 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.5/134.5 kB 165.0 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/distro/distro-1.9.0-py3-none-any.whl (20 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/httpx/httpx-0.28.1-py3-none-any.whl (73 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 127.5 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/httpcore/httpcore-1.0.9-py3-none-any.whl (78 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 131.2 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/jiter/jiter-0.18.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (337 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 337.1/337.1 kB 146.7 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl (490 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 490.4/490.4 kB 164.5 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 153.1 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl (80 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80.2/80.2 kB 122.9 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 133.3 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/sniffio/sniffio-1.3.1-py3-none-any.whl (10 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl (69 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 147.2 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl (135 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.1/135.1 kB 159.2 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl (37 kB)
+Installing collected packages: typing-extensions, tqdm, sniffio, jiter, idna, h11, distro, certifi, annotated-types, typing-inspection, pydantic-core, httpcore, anyio, pydantic, httpx, openai
+Successfully installed annotated-types-0.8.0 anyio-4.16.0 certifi-2026.10.23 distro-1.9.0 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 idna-3.20 jiter-0.18.0 openai-2.8.1 pydantic-2.14.2 pydantic-core-2.50.2 sniffio-1.3.1 tqdm-4.70.1 typing-extensions-4.16.0 typing-inspection-0.4.4
+
+[notice] A new release of pip is available: 23.2.1 -> 26.2.2
+[notice] To update, run: pip install --upgrade pip
+Saving image...
+  Attempting uninstall: setuptools
+    Found existing installation: setuptools 65.5.1
+    Uninstalling setuptools-65.5.1:
+Image saved, took 881.32ms
+
+Built image im-BbgRhkDVEEMXomgcw2C9B9 in 7.60s
+
+
+      Successfully uninstalled setuptools-65.5.1
+   • ... done                 
+   • unpacked image rootfs: /tmp/task-data/ta-01M6BZEQ7GEMK4BT3BJPNFMKBB/registry-unpacka0HSPH
+Copied image in 7.86s
+Saving image...
+Image saved, took 10.43s
+
+Built image im-hR4C8XQW7UyqyZMBmQd5cQ in 117.38s
+
+
+Building image im-TzCrmRxUdrirxIGZUPxC2w
+
+=> Step 0: FROM base
+
+=> Step 1: ENTRYPOINT []
+Saving image...
+
+Image saved, took 1.45s
+Successfully installed MarkupSafe-3.0.4 accelerate-1.15.0 aiohappyeyeballs-2.7.1 aiohttp-3.14.5 aiosignal-1.4.0 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.16.0 attrs-26.1.0 auto-round-0.16.1 certifi-2026.10.23 charset_normalizer-3.5.2 click-8.5.0 compressed-tensors-0.20.1 cuda-bindings-13.4.4 cuda-pathfinder-1.8.5 cuda-toolkit-13.0.3.0 datasets-5.1.0 dill-0.4.1 filelock-4.2.6 frozenlist-1.8.0 fsspec-2026.7.0 h11-0.16.0 hf-xet-1.8.0 httpcore2-2.16.0 httpx2-2.16.0 huggingface_hub-2.4.0 idna-3.20 jinja2-3.1.6 llmcompressor-0.15.0 loguru-0.7.3 markdown-it-py-4.2.0 mdurl-0.1.2 mpmath-1.3.0 multidict-7.2.1 multiprocess-0.70.19 networkx-3.6.1 numpy-2.4.6 nvidia-cublas-13.1.1.3 nvidia-cuda-cupti-13.0.85 nvidia-cuda-nvrtc-13.0.88 nvidia-cuda-runtime-13.0.96 nvidia-cudnn-cu13-9.24.0.43 nvidia-cufft-12.0.0.61 nvidia-cufile-1.15.1.6 nvidia-curand-10.4.0.35 nvidia-cusolver-12.0.4.66 nvidia-cusparse-12.6.3.3 nvidia-cusparselt-cu13-0.8.1 nvidia-ml-py-13.615.71 nvidia-nccl-cu13-2.30.7 nvidia-nvjitlink-13.4.92 nvidia-nvshmem-cu13-3.4.5 nvidia-nvtx-13.0.85 packaging-26.3 pandas-3.1.0 pillow-13.0.0 propcache-0.5.4 psutil-7.2.2 py-cpuinfo-9.0.0 pyarrow-26.0.0 pydantic-2.14.2 pydantic-core-2.50.2 pygments-2.21.0 python-dateutil-4.0.0 pyyaml-6.0.3 regex-2026.9.29 requests-2.34.2 rich-15.0.0 safetensors-0.8.0 setuptools-84.2.1 shellingham-1.5.4 sympy-1.14.0 tokenizers-0.23.3 torch-2.14.1 tqdm-4.70.1 transformers-5.21.0 triton-3.8.0 truststore-0.10.5 typer-0.27.3 typing-extensions-4.16.0 typing-inspection-0.4.4 tzdata-2026.6 urllib3-2.8.0 xxhash-4.0.2 yarl-1.25.1
+
+[notice] A new release of pip is available: 25.2 -> 26.2.2
+[notice] To update, run: pip install --upgrade pip
+
+Built image im-TzCrmRxUdrirxIGZUPxC2w in 2.77s
+
+
+Building image im-10VPLrHDjeXPku0v9kqjZn
+
+=> Step 0: FROM base
+
+=> Step 1: ENV HF_HUB_OFFLINE=1
+Saving image...
+Saving image...
+Image saved, took 2.00s
+
+Built image im-10VPLrHDjeXPku0v9kqjZn in 3.66s
+
+
+Stopping app - uncaught exception raised locally: ConflictError('We were unable to determine the version of Python installed in the Image provided for the `vllm_version` Function (im-10VPLrHDjeXPku0v9kqjZn). Please contact Modal support for more assistance.').
+Image saved, took 6.70s
+
+Built image im-uxJE73KMbmn3CXRfv0oHz5 in 133.54s
+
+
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ We were unable to determine the version of Python installed in the Image     │
+│ provided for the `vllm_version` Function (im-10VPLrHDjeXPku0v9kqjZn). Please │
+│ contact Modal support for more assistance.                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯

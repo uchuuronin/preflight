@@ -1,0 +1,11 @@
+{
+	"name": "20261101-163515-41327084275-b-glimmer-startup-check",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41327084275",
+	"ref": "ws-b",
+	"sha": "a796818151bb4846ef11adb7384e09912c385677",
+	"cmd": "modal run --env main python/preflight/glimmer/ops.py::startup_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T16:37:51Z"
+}
