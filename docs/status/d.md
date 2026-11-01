@@ -8,6 +8,23 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 16:05 (the corpus on Hugging Face, linked)
+
+`ca58c59` CI green.
+
+- **The corpus** (Chiya, 15:57): https://huggingface.co/datasets/chaoschia/preflight-corpus, commit
+  `0aac218`, files `README.md`, `SHA256SUMS`, `preflight-corpus-0.3.0.jsonl.gz`; private until it
+  goes public with the repository on Nov 3 to 4. Linked under "The corpus published with a
+  datasheet": a new section in `readme-final.md` (before Validation), a paragraph and a link in
+  `portal.md`, and a row in the submission's numbers table. The counts (2,339 rows: 1,519 kernel
+  configs, 100 HF jobs, 720 divergence runs) and the licence (Apache 2.0) come from B's datasheet;
+  I can't open the private dataset from here, so the drafts don't restate its checksum.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): those three files and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 15:50 (check-in: A's first triage run; Glimmer deployed, no cost per call yet)
 
 `a15a173` CI green (all six jobs). `main` is still `6757667`; nothing to merge.

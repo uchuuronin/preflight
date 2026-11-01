@@ -157,6 +157,17 @@ and Muse Spark $0.0178 [derived: reported tokens at list prices]. The sandbox's 
 are not in that total yet; Modal's bill replaces the estimate.
 TODO(PM): replace with the validation table's "Cost of one Preflight run" row once scored.
 
+## The corpus published with a datasheet
+
+The measurements behind Preflight's learned models and its held-out checks are published as a
+dataset: [huggingface.co/datasets/chaoschia/preflight-corpus](https://huggingface.co/datasets/chaoschia/preflight-corpus) (Hugging Face commit `0aac218`). It holds
+`preflight-corpus-0.3.0.jsonl.gz` (corpus@0.3.0: 2,339 rows, 1,519 kernel configs, 100 Hugging
+Face jobs and 720 divergence runs [cited: the datasheet]), `SHA256SUMS` and a dataset card. The
+datasheet, after *Datasheets for Datasets*, says how it was made, what it covers and where it is
+biased: [`python/preflight/corpus/DATASHEET.md`](python/preflight/corpus/DATASHEET.md). The
+measurements are Apache 2.0, like the repository. **The dataset is private until it goes public
+with the repository on Nov 3 to 4.**
+
 ## Validation
 
 Predictions are checked against real full runs, hit or miss, starting with the runs scored on
