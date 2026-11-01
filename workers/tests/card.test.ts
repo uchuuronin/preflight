@@ -150,6 +150,19 @@ describe("routes", () => {
 		expect(existsSync(join(here, "..", "static", "cards", `${hero}.png`))).toBe(true);
 	});
 
+	it("never renders per request with card images off: a hero goes to its file, others are not served", async () => {
+		const off = { PREFLIGHT_API_ORIGIN: "https://api.example", PREFLIGHT_EDGE_SECRET: "s3cret" };
+		const png = vi.fn(async () => new Uint8Array(1));
+		const f = api(smoke);
+		const hero = [...HERO_CARDS][0] as string;
+		const toFile = await cardPng(req(`/card/${hero}`), off, hero, { png }, f);
+		expect(toFile.status).toBe(302);
+		expect(toFile.headers.get("location")).toBe(`https://preflight.example/cards/${hero}.png`);
+		expect((await cardPng(req(`/card/${TOKEN}`), off, TOKEN, { png }, f)).status).toBe(404);
+		expect(png).not.toHaveBeenCalled();
+		expect(f).not.toHaveBeenCalled();
+	});
+
 	it("says so when no record matches, with no image tag", async () => {
 		const res = await sharePage(req(`/s/${TOKEN}`), ENV, TOKEN, api(null, 404));
 		expect(res.status).toBe(404);

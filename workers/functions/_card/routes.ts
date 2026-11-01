@@ -80,6 +80,12 @@ ${image && got.ok ? `<meta property="og:image" content="${esc(image)}">\n<meta p
 }
 
 export async function cardPng(request: Request, env: CardEnv, token: string, renderer: Renderer, fetchImpl?: typeof fetch): Promise<Response> {
+	// Rendering per request is off unless the deploy turns it on (it passes the Free plan's CPU
+	// limit): a hero record goes to its pre-rendered file, anything else is not served.
+	if (env.PREFLIGHT_SHARE_CARD_IMAGES !== "on") {
+		if (TOKEN.test(token) && HERO_CARDS.has(token)) return Response.redirect(new URL(`/cards/${token}.png`, request.url).toString(), 302);
+		return new Response("Not found", { status: 404, headers: { "cache-control": CACHE } });
+	}
 	const { h, got } = await load(request, env, token, fetchImpl);
 	const png = await renderer.png(cardSvg(h, new URL(request.url).host));
 	const out = outcome(got);

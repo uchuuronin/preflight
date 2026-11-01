@@ -21,6 +21,12 @@ Pushed `09648e7`..`cbbfe73` with Chiya's yes (07:42). Chiya's calls: card render
 	- `npm run hero-cards:check` re-renders and fails on a stale card; I checked that it fails on a corrupted copy.
 	- The X post's link is that record's `/s/` page.
 	- C is asked to copy `static/cards` into the deployed site and run the check in CI.
+- **Read-only review of these two commits:** no blocking problems; every check passed on both golden sets. Hardened from it:
+	- With card rendering off, `/card/<token>` no longer renders on demand, which would have failed with Error 1102 on the Free plan. It redirects a hero record to its file and answers 404 otherwise.
+	- C's deploy step copies the functions and the cards in one step, and fails if a card didn't land. Otherwise a preview could name a card that isn't deployed and get the app's page back.
+	- The hero script refuses a card file with no entry in the list and a record path outside the repository, and creates its folder. Both guards were checked to fail on bad input.
+	- The README notes that a hero card is a snapshot of its record file, so it's re-rendered if that record gains estimates.
+	- The exports test also checks that a real run never says "illustrative".
 
 Cloud runs: none. GPU minutes 0, dollars 0.
 

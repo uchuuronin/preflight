@@ -115,6 +115,10 @@ describe("ExportsPanel", () => {
 		} as typeof gold;
 		render(<Panel record={sample} knobs={knobsOf(sample)} estimates={sample.predictions.estimates} />);
 		expect(screen.getByText(/This is a sample: its numbers are illustrative/)).toBeTruthy();
+		cleanup();
+		// A real run never says so.
+		render(<Panel record={real} knobs={knobsOf(real)} estimates={real.predictions.estimates} />);
+		expect(screen.queryByText(/This is a sample: its numbers are illustrative/)).toBeNull();
 	});
 
 	it("copies, and says so to screen readers; says what to do if copying fails", async () => {
