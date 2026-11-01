@@ -88,6 +88,10 @@ export const EXPERTISE_EN: Record<string, string> = {
 		// GNN
 		gnn_layers: ["How far to look", "num_layers"],
 		hidden_channels: ["Detail per node", "hidden_channels"],
+		"fanout.hop1": ["Neighbours, first step out", "num_neighbors[0]"],
+		"fanout.hop2": ["Neighbours, second step out", "num_neighbors[1]"],
+		"fanout.hop3": ["Neighbours, third step out", "num_neighbors[2]"],
+		"fanout.hop4": ["Neighbours, fourth step out", "num_neighbors[3]"],
 		// vision
 		image_size: ["Image size", "image_size"],
 		channels_last: ["Image memory layout", "channels_last"],

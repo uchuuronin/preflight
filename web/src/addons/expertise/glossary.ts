@@ -98,6 +98,10 @@ export const KNOB_TERMS: Readonly<Record<string, string>> = {
 	// GNN
 	fan_out: "fan_out",
 	num_neighbors: "fan_out",
+	"fanout.hop1": "fan_out",
+	"fanout.hop2": "fan_out",
+	"fanout.hop3": "fan_out",
+	"fanout.hop4": "fan_out",
 	gnn_layers: "gnn_layers",
 	hidden_channels: "hidden_channels",
 	// vision
