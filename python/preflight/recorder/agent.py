@@ -521,6 +521,13 @@ class AgentProxy:
 		with self._lock:
 			return sum(c.usd for t in self._tasks.values() for c in t.calls)
 
+	def last_finish(self, task_id: str) -> str | None:
+		"""The finish reason of a task's last answered call ("tool_calls", "stop", "length")."""
+		with self._lock:
+			t = self._tasks.get(task_id)
+			done = [c for c in (t.calls if t else []) if c.finish_reason]
+			return done[-1].finish_reason if done else None
+
 	def _rate_for(self, model: str | None):
 		if self._rate is None or not model:
 			return None

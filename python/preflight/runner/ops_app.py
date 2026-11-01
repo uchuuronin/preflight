@@ -532,16 +532,18 @@ def agent_sample_hosted(
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip
 	# tasks an earlier sample already has are refused before any model call, so k are new ones
+	ends: dict = {}
 	s = sample(
 		Fetched(files=files, entrypoint=entrypoint),
 		sm,
 		k=k,
 		skip_keys=tuple(skip_keys or ()),
 		run_id="s2" if skip_keys else "s1",
+		inspect=ends.update,  # how each task ended, for scoring the sweep (no content)
 	)
 	usd = round(sum(t.cost_usd or 0 for t in s.tasks), 4)
 	print(f"[agent] {len(s.tasks)} tasks, ${usd} of model calls; {s.selection}", flush=True)
-	return {"sample": s.model_dump(mode="json"), "usd": usd}
+	return {"sample": s.model_dump(mode="json"), "usd": usd, "task_ends": ends, "provider": provider}
 
 
 @ops.local_entrypoint()

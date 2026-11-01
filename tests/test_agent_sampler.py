@@ -485,3 +485,20 @@ def test_a_task_stopped_by_a_run_wide_cancel_is_cut_not_timed_out(proxy, tmp_pat
 		env=dict(os.environ), should_stop=lambda: time.monotonic() - t0 > 1.5)  # fmt: skip
 	assert len(out.tasks) == 1 and out.tasks[0].stop_reason == CUT and out.tasks[0].stop_reason != "timeout"
 	assert out.tasks[0].latency_s >= 1.0
+
+
+def test_an_ops_run_can_read_how_each_task_ended_without_its_content(proxy, tmp_path):
+	"""The Pareto sweep's scoring: each task's opening rank and its last call's finish reason."""
+	_prov, px = proxy
+	cmd = [sys.executable, str(FIX / "fake_agent.py")]
+	ends = {}
+	sample = run_sample(
+		cmd, cwd=tmp_path, proxy=px, population=100, k=30, env=dict(os.environ), inspect=ends.update
+	)
+	assert set(ends) == {t.task_id for t in sample.tasks}
+	assert sorted(e["opened_rank"] for e in ends.values()) == list(range(30))
+	assert {e["last_finish"] for e in ends.values()} <= {"stop", "tool_calls", None}
+	assert all(
+		set(e) == {"opened_rank", "last_finish", "waiting_on_tool", "in_flight_at_stop"}
+		for e in ends.values()
+	)

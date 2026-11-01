@@ -105,7 +105,7 @@ class _LocalProc:
 def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: int | None,
 	k: int = DEFAULT_SAMPLE, skip_keys=(), offered_first=(), run_id: str = "s1", timeout_s: float = TIMEOUT_S,
 	env: dict | None = None, should_stop=None, launch=None, base_url_var: str | None = None,
-	stall_s: float = STALL_S) -> AgentSample:  # fmt: skip
+	stall_s: float = STALL_S, inspect=None) -> AgentSample:  # fmt: skip
 	"""Run the script once through the proxy; the tasks it ran, as the record's agent_sample.
 
 	skip_keys: opening keys of tasks already sampled (agent.task_key of each first-sample task
@@ -196,6 +196,12 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	selection = "; ".join(parts)
 	if len(selection) > 200:
 		selection = selection[:197].rsplit(" ", 1)[0] + "..."
+	if inspect is not None:
+		# how each task ended, for an ops run's own scoring (counts and order only, never content): its
+		# opening rank, the last call's finish reason, and whether it ended waiting on a tool
+		order = sorted(ids, key=lambda t: (spans.get(t, (None,))[0] is None, spans.get(t, (0.0,))[0] or 0.0))
+		inspect({t: {"opened_rank": order.index(t), "last_finish": proxy.last_finish(t), "waiting_on_tool": t in waiting,
+			"in_flight_at_stop": t in in_flight} for t in ids})  # fmt: skip
 	return AgentSample(tasks=tasks, population=population, selection=selection)
 
 
