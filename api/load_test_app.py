@@ -4,16 +4,25 @@ never a GPU probe:
 
 1. open the home page and press "Open a sample flight" (time to the map);
 2. move the first knob in the dock with real key presses, 12 moves 250 ms apart, and read the
-   cockpit's own knob-to-readout timings (`window.__preflight.samples()`, the stranger test's meter);
-3. start the guide tour and take its first step;
-4. with `--ask`, ask the live guide one question (Muse Spark through the API; the only paid call).
+   cockpit's own knob-to-readout timings (`window.__preflight.samples()`, the stranger test's meter).
+   This is measured in each visitor's browser, without the stranger test's 4x CPU slowdown, so
+   server load can't move it; it shows the page stays quick with 20 people on it, not the 400 ms
+   contract number;
+3. the first `--guided` visitors (default 5), started 3 s apart, also start the guide tour, which in
+   production is the live guide (Muse Spark through the API, `c.guide.live` on), and ask it one
+   question. Each tour can make up to 8 model calls and the browser repeats a turn up to 7 times;
+   the API's ledger measured about US$0.033 a tour and US$0.115 at most (api/preflight_api/
+   guide/ledger.py), so 5 guided visitors cost about US$0.17, at most about US$0.6, out of the
+   guide's daily cap the tester shares. The others don't touch the guide.
 
-Every response from the site's `/v1/` (the API through Pages) is counted; a status of 500 or more,
-429, or a network failure is an API error. Each visitor is CPU only (2 cores, 2 GiB), so a run of
-20 costs cents; the live guide adds one Muse Spark turn per visitor (guide-smoke measured about
-US$0.004 a turn, run 41273350602).
+Every `/v1/` response is counted. A guide turn refused for the rate limit or the daily cap comes back
+as 503 with a rule-based fallback: counted as a fallback, not a server error. Anything else at 500 or
+more, 429, or a network failure while the page is open is an API error.
 
-	modal run --env main api/load_test_app.py::load --visitors 20 --ask
+How it stops: `modal run` makes an ephemeral app that ends when every visitor has returned; each
+visitor stops at its own 6-minute timeout at the latest, and nothing is deployed or left running.
+
+	modal run --env main api/load_test_app.py::load --visitors 20 --guided 5
 """
 
 from __future__ import annotations
@@ -34,29 +43,49 @@ image = (
 	.run_commands("playwright install --with-deps chromium")
 )
 
+# Source: the live site (Pages project preflight).
 BASE = "https://preflight-cqn.pages.dev"
+# Source: guess, room for Chromium (about 1 GiB) on two cores; a visitor's walk takes 1 to 2 minutes.
+CPU, MEMORY_MB, TIMEOUT_S = 2.0, 2048, 6 * 60
+# Source: derived, the guide's per-IP limit refills 0.5 calls a second (guide/ledger.py); 3 s apart
+# keeps 5 guided visitors from arriving as one burst if Modal containers share an address.
+GUIDED_GAP_S = 3.0
 # Source: guess, a question a visitor might ask first; short so the turn stays cheap.
 QUESTION = "What should I change first to stop the eval running out of memory?"
 # Source: the stranger test's walk (web/e2e/stranger.mjs): 12 key presses, 250 ms apart.
 KNOB_MOVES = 12
 
 
-@app.function(image=image, cpu=2.0, memory=2048, timeout=6 * 60, retries=0)
-def visitor(i: int, base: str, ask: bool) -> dict:
+@app.function(image=image, cpu=CPU, memory=MEMORY_MB, timeout=TIMEOUT_S, retries=0)
+def visitor(i: int, base: str, guided: bool) -> dict:
 	from playwright.sync_api import sync_playwright
 
-	out: dict = {"i": i, "api": [], "errors": []}
+	out: dict = {"i": i, "api": [], "errors": [], "guide": []}
 	with sync_playwright() as p:
 		browser = p.chromium.launch()
 		page = browser.new_page(viewport={"width": 1440, "height": 900})
-		page.add_init_script("localStorage.setItem('pf.onboarded', '1')")
+		page.add_init_script("localStorage.setItem('pf.onboarding.v1', '1')")
 
 		def on_response(r):
+			if "/v1/" not in r.url:
+				return
+			if "/v1/guide/turns" in r.url:
+				# A refusal for the rate limit or the cap is a 503 with a rule-based fallback.
+				fallback = False
+				if r.status == 503:
+					with contextlib.suppress(Exception):
+						fallback = (r.json().get("error") or {}).get("fallback") == "rule_based"
+				out["guide"].append("fallback" if fallback else r.status)
+				if fallback:
+					return
+			out["api"].append(r.status)
+
+		def on_failed(r):
 			if "/v1/" in r.url:
-				out["api"].append(r.status)
+				out["api"].append(0)
 
 		page.on("response", on_response)
-		page.on("requestfailed", lambda r: out["api"].append(0) if "/v1/" in r.url else None)
+		page.on("requestfailed", on_failed)
 		page.on("pageerror", lambda e: out["errors"].append(str(e)[:200]))
 		try:
 			page.goto(base + "/", wait_until="load", timeout=60_000)
@@ -82,32 +111,31 @@ def visitor(i: int, base: str, ask: bool) -> dict:
 			page.keyboard.press("Escape")
 			out["knob_ms"] = page.evaluate("window.__preflight?.samples?.() ?? []")
 
-			start = page.get_by_role("button", name="Start the tour")
-			if start.count():
+			if guided:
+				time.sleep(i * GUIDED_GAP_S)
 				t1 = time.monotonic()
-				start.first.click()
-				page.wait_for_timeout(1500)
-				out["tour_ms"] = round((time.monotonic() - t1) * 1000)
-				out["tour_text"] = (page.locator(".pf-guide").first.inner_text(timeout=5_000) or "")[:160]
-
-			if ask:
+				page.get_by_role("button", name="Start the tour").first.click()
+				# The live guide's ask box appears once its first turn has answered.
 				box = page.locator("#pf-guide-ask")
-				if box.count():
-					box.fill(QUESTION)
-					t2 = time.monotonic()
-					page.get_by_role("button", name="Ask the guide").click()
-					# Answered when "Thinking…" has come and gone.
-					thinking = page.get_by_text("Thinking…").first
-					with contextlib.suppress(Exception):  # a fast answer can skip the visible state
-						thinking.wait_for(state="visible", timeout=5_000)
-					thinking.wait_for(state="hidden", timeout=90_000)
-					out["ask_ms"] = round((time.monotonic() - t2) * 1000)
-				else:
-					out["ask_ms"] = None
-					out["errors"].append("no live guide box")
+				box.wait_for(timeout=60_000)
+				out["tour_ms"] = round((time.monotonic() - t1) * 1000)
+				before = len(out["guide"])
+				box.fill(QUESTION)
+				t2 = time.monotonic()
+				page.get_by_role("button", name="Ask the guide").click()
+				# Time to the first guide turn back for it (200), or a refusal with a fallback.
+				for _ in range(180):
+					if len(out["guide"]) > before:
+						break
+					page.wait_for_timeout(500)
+				done = out["guide"][before:]
+				out["ask_ms"] = round((time.monotonic() - t2) * 1000) if 200 in done else None
 		except Exception as e:  # a visitor that fails is a result, not a crash of the test
 			out["errors"].append(f"{type(e).__name__}: {str(e)[:200]}")
 		finally:
+			# Requests cut off by closing the browser aren't the site's errors.
+			page.remove_listener("response", on_response)
+			page.remove_listener("requestfailed", on_failed)
 			browser.close()
 	return out
 
@@ -120,24 +148,30 @@ def p95(xs: list[float]) -> float | None:
 
 
 @app.local_entrypoint()
-def load(visitors: int = 20, ask: bool = False, base: str = BASE) -> None:
+def load(visitors: int = 20, guided: int = 5, base: str = BASE) -> None:
 	t0 = time.monotonic()
-	runs = list(visitor.map(range(visitors), kwargs={"base": base, "ask": ask}))
+	runs = list(visitor.starmap([(i, base, i < guided) for i in range(visitors)]))
 	wall = time.monotonic() - t0
 	knobs = [x for r in runs for x in (r.get("knob_ms") or [])]
 	api = [s for r in runs for s in r["api"]]
 	bad = [s for s in api if s == 0 or s == 429 or s >= 500]
 	asks = [r["ask_ms"] for r in runs if r.get("ask_ms")]
+	turns = [g for r in runs for g in r["guide"]]
 	summary = {
 		"visitors": visitors,
 		"wall_s": round(wall, 1),
 		"map_ms_p95": p95([r["map_ms"] for r in runs if "map_ms" in r]),
+		"knob_note": "in each visitor's own browser, no CPU slowdown: page speed under load, not the 400 ms contract test",
 		"knob_samples": len(knobs),
 		"knob_ms_p50": round(statistics.median(knobs), 1) if knobs else None,
 		"knob_ms_p95": p95(knobs),
 		"api_calls": len(api),
 		"api_errors": len(bad),
 		"api_statuses": {str(s): api.count(s) for s in sorted(set(api))},
+		"guided": guided,
+		"tour_ms_p95": p95([r["tour_ms"] for r in runs if "tour_ms" in r]),
+		"guide_turns": len(turns),
+		"guide_fallbacks": turns.count("fallback"),
 		"ask_ms_p95": p95(asks),
 		"asks_answered": len(asks),
 		"visitors_with_errors": [{"i": r["i"], "errors": r["errors"][:3]} for r in runs if r["errors"]],
