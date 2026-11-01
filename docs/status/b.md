@@ -173,6 +173,23 @@ D found that most `engine.*` flags switched nothing. Checked in the code on ws-b
 - Fixed on the way: a peak after a GPU move read "measured" (it's a prediction now), and the per-term split scaled every term to the peak, so a 494M-parameter model's weights read 9.9 GB; weights and gradients now read 1.98 GB each, as the probe measured, and activations take the rest.
 - C's 23.8 GB on the L4 fixture predates the measured context; the fixture reads 23.25 GB now.
 
+## Monday's validation runs: expected cost (for Chiya's one approval, Nov 1)
+
+Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixtures/validation/manifest_zoo_dryrun_nov1.json`; 2 runs scored, 8 "not measured yet", nothing crashes, predicted under production's flags). Each script needs a Preflight run (its record) and a full run (A's `ops_app.py::ground_truth`). The full runs are on an **L4** at $0.80/h: `ground_truth_on_l4` has the GPU fixed (`ops_app.py:325`). The L4 queued 19 to 59 minutes on Nov 1, which Modal doesn't bill but which costs time; an A10 option (no queue seen) would be A's change. **Blocker for Monday:** `ground_truth` accepts only `finetune_lora_hf`, `pretrain_nanogpt` and `grpo_trl` (`recorder/ground_truth.py` `ZOO_SCRIPTS`), so the other 15 full runs can't run through it until A extends it (asked in `from-b.md`). `--budget-min` is a soft target; the hard limit is each full run's 50-minute timeout (`GROUND_TRUTH_TIMEOUT_S`), and the Preflight runs have no fixed cap.
+
+| Run | Full-run basis | Expected (L4) | At the run's budget | Hard ceiling (50 min) |
+| --- | --- | --- | --- | --- |
+| finetune_lora_hf | measured: 210 + 40 steps, 9.5 min of compute on an L4 (Oct 31) | about $0.15 | 35 min, $0.47 | $0.67 |
+| grpo_trl | measured on an A10: 3 + 50 steps in 25 min; slower on an L4, and it ran out of memory there twice before A's fix | about $0.45 | 46 min, $0.61 | $0.67 |
+| pretrain_nanogpt | no finished full run yet (Oct 28's hit its limit) | about $0.20 | 30 min, $0.40 | $0.67 |
+| gnn_pyg, retrieval_st, vision_timm, eval_sweep_reasoning, serving_vllm | no full run yet; small models | about $0.15 each | 20 min each, $1.33 | $3.33 |
+| torchtitan_debug | the debug model, in its own 15-minute container (`ops_app.py::torchtitan_check`) | about $0.10 | 15 min, $0.20 | $0.20 |
+| agent_eval_spark | the 500-task benchmark, priced by the engine from the 30-task sample: **Spark API, not GPU** | $7.15 (90%: $5.90 to $13.71) | a dollar cap to set: the agent recorder's `max_usd_total`; $14 covers the band | $14 if set |
+| 9 unseen scripts | unknown size: room left for 9 full runs | about $0.20 each | 30 min each, $3.60 | $6.00 |
+| 19 Preflight runs (the records) | measured: $0.086 GPU and $0.018 Muse Spark for the LoRA run (Oct 28) | about $0.10 each, $1.98 | no fixed cap | |
+
+**Total:** GPU and Spark for the records about $5.50 expected, $8.59 at every run's budget, about $13.50 if every full run hit its ceiling; plus the agent benchmark's Spark API, about $7.15, held to $14 if `max_usd_total` is set to it. **About $13 expected, about $27.50 at the ceilings.** The ceilings are estimates of the worst case, not hard bounds for the Preflight runs.
+
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).
 - AMD: the account's verification hold.
@@ -224,6 +241,11 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-divergence-sweep-3-a10` (GitHub run 41300145883, cap $2.41 for A10): 343 configs ok, a fresh draw (`--seed 1`), the board on every row; no queueing | A10 x 1-4 | about 70 (wall) | $2.10 by the driver's measure. Divergence total $11.55 of the $12.00 cap; no more divergence sweeps (Chiya, Nov 1) |
 | Nov 1 | `b-glimmer-startup-check` (GitHub run 41327084275, pre-approved, CPU only, 70 min limit): failed while building images (Modal can't read the Python version in vLLM's registry image); nothing downloaded or ran | CPU | about 3 (wall), image builds only | about $0.00 |
 | Nov 1 | `b-glimmer-startup-check-2` (GitHub run 41327585942, pre-approved, CPU only): both of Meta's downloads into the `preflight-glimmer-weights` volume (bf16 59.6 GB in 333 s, revision cec94fcf; GGUF Q4_K_M 16.8 GB in 124 s, revision b44f1072; both Apache 2.0, not gated); vLLM 0.28.0 and llama.cpp build 12030 (a91eab67d) images built; `vllm serve --help` failed on the CPU container, so the parser check read false there (the A100 smoke checks the parsers on a GPU) | CPU x 4 | about 10 (wall) | about $0.05 |
+| Nov 1 | `b-glimmer-quantize` (GitHub run 41328761634): the FP8 copy of Meta's bf16 checkpoint (revision cec94fcf), 34.4 GB, made in 224 s | CPU x 8, 96 GiB | about 5 (wall) | about $0.10 |
+| Nov 1 | `b-glimmer-smoke-l4` (GitHub run 41328764340): Meta's Q4_K_M GGUF on llama.cpp b12030; 5 triages, 43.7 s each (14.4 tokens/s), all valid JSON; the L4 took 19 min to schedule (not billed) | L4 x 1 | 248 container-s | about $0.06 |
+| Nov 1 | `b-glimmer-smoke-a100` (GitHub run 41330014731): the FP8 copy on vLLM 0.28.0 with the muse_glimmer parsers; cold start 286 s; 5 triages alone at 12.8 s (38 tokens/s), 4 at once in 27.7 s; all valid JSON | A100-40GB x 1 | 374 container-s | about $0.23. **Glimmer so far: about $0.44 of the $2** (startup checks, quantisation and both smokes) |
+| Nov 1 | `b-glimmer-deploy` (GitHub run 41331603537, pre-approved): `modal deploy` of `preflight-glimmer`; endpoint `https://shuureiyashi99--preflight-glimmer-glimmer-serve.us-east.modal.run`, proxy auth on, min 0 and max 1 containers, scaled to zero after 120 s idle; no container started by the deploy | none | 1 | $0.00. **Glimmer total about $0.44 of the $2** |
+| Nov 1 | `b-spark-open-labels` (GitHub run 41333478249, pre-approved up to $1): Muse Spark Open labelled 64 of 73 failed corpus rows (80 calls; 16 failed: 8 at the 8,192-token output cap, $0.28 of the spend, 6 timeouts at 20 s, 2 re-asks cut off); agreement with B's rule labels: out-of-memory rows 11 of 17, 65% (Wilson 41% to 83%), the real test; diverged runs 41 of 41 (a non-finite step is in the evidence); 52 of 58 in all | Baseten API | about 9 (wall) | $0.54 of the $1 (37,471 tokens in, 115,463 out) |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
@@ -241,6 +263,9 @@ Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking onc
 | Sun Nov 1, about 12:10 PM | e2a7457 Glimmer review fixes (proxy auth, a vLLM image Modal can run); 47e61fe GRPO peak and RL calibration on the 50-step A10 run; and this docs commit (Glimmer decision, status, requests) | none | read-only review of e2a7457 and 47e61fe: nothing blocks the CPU startup check; its CUDA 13 point is fixed and reviewed before the A100 smoke | clean, both scans |
 | Sun Nov 1, about 12:20 PM | e0775be Glimmer before the GPU runs (CUDA 13 base, CUDA versions in the startup check, 18-minute A100 cap); and this status commit | none | read-only review of e0775be: nothing blocking | clean, both scans |
 | Sun Nov 1, about 12:35 PM | the CI format fix for tests/test_engine_api.py (CI red on d2dc950: `ruff format --check .`), the Glimmer revisions and spend, the reply to C; this commit | none | read-only review: nothing blocking, wording fixes applied; locally ruff format and check clean, 1,339 no-torch tests pass | clean, both scans |
+| Sun Nov 1, about 12:30 PM | a10722a Glimmer measured (self-hosted price rows, deploy check, smoke numbers); d0ad37f its review fixes; fa7fbb7 the Spark Open corpus-labelling job and inputs; and this status commit | none | read-only reviews of a10722a, and of d0ad37f with fa7fbb7: nothing blocking | **not clean**: gitleaks flagged a corpus config key in fa7fbb7 (a false positive), and B's check piped its output through `tail`, so the push went ahead on a warning. CI went red: secrets (that finding) and python (the price version "2026-11-01b" isn't a date). B now gates every push on gitleaks' exit code |
+| Sun Nov 1, about 12:50 PM | 5ec50e7 the CI fix (price version a date, the false positive allowlisted, row ids unique); and this status commit | none | read-only review of 5ec50e7: nothing blocking; the PM signs off the new `.gitleaksignore` entry | clean, both scans, by exit code |
+| Sun Nov 1, about 2:10 PM | 5a1fd2c corpus export and datasheet; 5204042 the scorer's dry-run fixes; e319c8c Monday's cost; 1067d37 Spark Open's corpus labels; 74c745d and 9b4e0ae their review fixes; and this status commit | none | read-only reviews of 5a1fd2c, 5204042 and e319c8c (re-checked after 74c745d) and of 1067d37 (re-checked after its amend): nothing blocking | clean, both scans, by exit code |
 
 ## Contract requests
 In `docs/requests/from-b.md`.

@@ -48,7 +48,24 @@ A proposed a Modal L4 at 4 bits behind vLLM's OpenAI server, scaled to zero (`do
 - **Endpoint (8-bit, A100-40GB):** Meta publishes no 8-bit checkpoint; the FP8 builds on the Hub are third-party. So B makes one FP8 copy of Meta's bf16 checkpoint (llm-compressor FP8_DYNAMIC, data-free, so it depends on nothing but Meta's weights), and vLLM 0.28.0 serves it ([vLLM's Glimmer recipe](https://recipes.vllm.ai/meta-models/Muse-Glimmer-30B) for the version and parsers). Quantising at load isn't possible on 40 GB: vLLM loads the bf16 model first.
 - **Own GPU (4-bit, L4):** Meta's `Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf` (16.8 GB, "fits 24 GB VRAM") on llama.cpp, which is how Meta's page runs it locally. A smoke run proves it; it isn't hosted.
 - **Access:** Modal proxy auth on the endpoint, so a request without a proxy token never starts the A100.
-- **Code:** `python/preflight/glimmer/` (`app.py` the endpoint, `ops.py` the runs). Measured tokens/s, cold start and cost per triage go here after the smoke runs.
+- **Code:** `python/preflight/glimmer/` (`app.py` the endpoint, `ops.py` the runs).
+
+## Measured (Nov 1 smoke runs)
+
+One triage is the fixed prompt in `glimmer/common.py`: 17,138 tokens in (the earlier 8K guess was characters over 4, not tokens) and about 300 out, reasoning low. Every answer in both runs was valid JSON with the right category (oom), 14 of 14 (5 alone and 4 at once on the A100, 5 on the L4).
+
+| | A100-40GB, FP8, vLLM 0.28.0 (the endpoint) | L4, Q4_K_M, llama.cpp b12030 (own-GPU proof) |
+| --- | --- | --- |
+| GPU memory used after load | 36.0 of 40 GiB (36,821 MiB; 32K context) | 15.8 of 22.5 GiB (16,202 MiB; 32K context) |
+| Cold start, asked for to ready | 286 s (load 34 GB from the volume, CUDA graphs) | 18 s for the server, but the L4 took 19 min to schedule |
+| Time to first token | 4.6 s (about 3,700 prompt tokens/s) | 22.3 s (about 770 prompt tokens/s) |
+| Decoding, one call | 38 tokens/s | 14.4 tokens/s |
+| One triage, alone | 12.8 s (median of 5) | 43.7 s (median of 5) |
+| Four at once | 27.7 s for 4 (6.9 s each, 47 output tokens/s together) | not measured (one slot) |
+| Cost per triage, warm | $0.0075 alone, $0.004 with 4 in flight ($2.10/h) | $0.0097 ($0.80/h) |
+| A call after scaling to zero adds | $0.237 (286 s cold start plus the 120 s idle tail) | |
+
+Against the earlier simulated table (A100-40GB: 18 s and $0.010 a triage, about 90 s cold start): the warm triage is faster than simulated, and the cold start is about three times the guess. On a quiet demo the cold start dominates, as predicted: a lone triage after the endpoint has scaled to zero costs about $0.24, almost all of it the start. Price rows: `engine/prices` `SELF_HOSTED_RATES` (GPU-seconds per call, from these runs).
 
 ## Open questions for A
 

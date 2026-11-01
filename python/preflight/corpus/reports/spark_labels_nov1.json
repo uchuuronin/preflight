@@ -1,0 +1,67 @@
+{
+ "model": "meta-models/muse-spark-open-1026",
+ "effort": "low",
+ "run": "remote-runs b-spark-open-labels (GitHub run 41333478249, Nov 1)",
+ "rows": 73,
+ "answered": 64,
+ "oom": {
+  "rows": 29,
+  "compared": 17,
+  "agree": 11,
+  "rate": 0.6470588235294118,
+  "wilson_95": [
+   0.41300363485218694,
+   0.8269027960275627
+  ],
+  "rule_vs_spark": {
+   "logits": {
+    "activations": 3,
+    "logits": 4
+   },
+   "activations": {
+    "activations": 7,
+    "other": 1
+   },
+   "model_state": {
+    "activations": 2
+   }
+  },
+  "no_rule_label": 7,
+  "no_answer": 6
+ },
+ "divergence": {
+  "rows": 44,
+  "compared": 41,
+  "agree": 41,
+  "rate": 1.0,
+  "wilson_95": [
+   0.9143324298155681,
+   0.9999999999999999
+  ],
+  "rule_vs_spark": {
+   "non_finite": {
+    "non_finite": 35
+   },
+   "blow_up": {
+    "blow_up": 6
+   }
+  },
+  "no_rule_label": 0,
+  "no_answer": 3
+ },
+ "overall": {
+  "compared": 58,
+  "agree": 52,
+  "rate": 0.896551724137931,
+  "wilson_95": [
+   0.7921189700751577,
+   0.951718592576371
+  ]
+ },
+ "calls": 80,
+ "cost_usd": 0.5376,
+ "tokens": {
+  "input": 37471,
+  "output": 115463
+ }
+}

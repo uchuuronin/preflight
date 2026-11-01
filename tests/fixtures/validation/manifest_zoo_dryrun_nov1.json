@@ -1,0 +1,76 @@
+{
+ "$comment": "Dry run, Nov 1 (B): the zoo as it stands. Two runs have records (the Oct 31 LoRA run and the agent sample); the other eight zoo scripts have no full run yet, so their rows must say not measured. Zoo only: no unseen script.",
+ "runs": [
+  {
+   "script": "finetune_lora_hf",
+   "set": "zoo",
+   "job_type": "finetune",
+   "record": "../b-a-smoke-l4-main-4.record.json",
+   "ground_truth": "ground_truth_finetune_lora_hf.json",
+   "calibrates": [
+    "step",
+    "intervals"
+   ],
+   "$calibrates": "Chiya, Nov 1: the step band was widened after looking at this run (6a994eb), so it is used for calibration for step time and intervals; it stays in the OOM and planted-problems rows (the OOM was caught before it, and no memory rule changed after it)",
+   "planted": [
+    "eval.batch_large",
+    "eval.no_grad",
+    "data.no_packing"
+   ]
+  },
+  {
+   "script": "agent_eval_spark",
+   "set": "zoo",
+   "job_type": "agent",
+   "record": "agent_eval_spark_record_oct31.json"
+  },
+  {
+   "script": "grpo_trl",
+   "set": "zoo",
+   "job_type": "rl",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  },
+  {
+   "script": "pretrain_nanogpt",
+   "set": "zoo",
+   "job_type": "pretrain",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  },
+  {
+   "script": "gnn_pyg",
+   "set": "zoo",
+   "job_type": "gnn",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  },
+  {
+   "script": "retrieval_st",
+   "set": "zoo",
+   "job_type": "retrieval",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  },
+  {
+   "script": "vision_timm",
+   "set": "zoo",
+   "job_type": "vision",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  },
+  {
+   "script": "eval_sweep_reasoning",
+   "set": "zoo",
+   "job_type": "eval",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  },
+  {
+   "script": "serving_vllm",
+   "set": "zoo",
+   "job_type": "serving",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  },
+  {
+   "script": "torchtitan_debug",
+   "set": "zoo",
+   "job_type": "pretrain",
+   "$pending": "no full run yet: Monday's run fills record and ground_truth"
+  }
+ ]
+}
