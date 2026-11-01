@@ -396,6 +396,8 @@ export function GuidePanel() {
 		if (!active) return setAside ? { label: t("guide.carry_on"), run: carryOn } : { label: t("guide.start"), run: restart };
 		const s = active.step;
 		if (s.kind === "move") return { label: t("guide.apply_value", { knob: vars.knob, to: vars.to }), run: () => finish("apply") };
+		if (s.kind === "combo" && s.combo?.fit === "tight")
+			return { label: t("guide.combo.measure"), run: () => runTool("run_probe", { knobs: Object.fromEntries(s.combo!.changes.map((c) => [c.knobId, c.to])), reason: "combined_tight" }, ctx()) };
 		if (s.kind === "combo") return { label: t("guide.combo.apply", { n: vars.n ?? "" }), run: () => finishCombo(true) };
 		if (s.kind === "blocked_by_pin" && s.pinnedKnob)
 			return {
@@ -520,6 +522,11 @@ export function GuidePanel() {
 						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || (active?.step.kind === "finding" && !!active.step.finding && canFix(active.step.finding)) ? (
 							<button type="button" className="pf-btn pf-btn--small" onClick={skipOffer}>
 								{t("guide.skip")}
+							</button>
+						) : null}
+						{active?.step.kind === "combo" && active.step.combo?.fit === "tight" ? (
+							<button type="button" className="pf-btn pf-btn--small" onClick={() => finishCombo(true)}>
+								{t("guide.combo.apply", vars)}
 							</button>
 						) : null}
 						{active?.step.kind === "combo" ? (

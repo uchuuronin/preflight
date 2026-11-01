@@ -162,9 +162,14 @@ export function LiveGuideSection({
 				<div className="pf-guide__approval" role="group" aria-label={t("guide.combo.label")}>
 					<p>{t(comboKeys(combo).textKey, words)}</p>
 					<div className="pf-guide__actions">
+						{combo.fit === "tight" ? (
+							<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={() => void run((g) => g.ask(t("guide.combo.measure_ask", words)))}>
+								{t("guide.combo.measure")}
+							</button>
+						) : null}
 						<button
 							type="button"
-							className="pf-btn pf-btn--primary pf-btn--small"
+							className={`pf-btn pf-btn--small${combo.fit === "fits" ? " pf-btn--primary" : ""}`}
 							onClick={() => {
 								for (const c of combo.changes) actions.setKnob(c.knobId, c.to, "user");
 							}}
