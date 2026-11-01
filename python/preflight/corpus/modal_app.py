@@ -323,6 +323,7 @@ def main(
 	prior_usd: float = 0.0,  # money this GPU and kind already cost before container billing was recorded (Modal's bill)
 	max_minutes: float = 100.0,  # every wave's worst case must end inside this; set it under the workflow's timeout
 	deadline_s: float = 0.0,  # per-config deadline before any config has finished; 0 keeps the kind's default
+	exclude_keys: str = "",  # a file of config keys, one per line, never run (the Nov 1 top-up: the A100 holdout's)
 ) -> None:
 	from preflight.corpus import configs as cfgs
 	from preflight.corpus import sweep
@@ -337,6 +338,16 @@ def main(
 	if kind != "hf":
 		pinned = {k: v for k, v in pinned.items() if k in ("corpus", "torch")}
 	all_cfgs = [c.with_versions(pinned) for c in cfgs.configs_for(kind, n, seed)]
+	if exclude_keys:
+		from pathlib import Path
+
+		skip = {x.strip() for x in Path(exclude_keys).read_text().splitlines() if x.strip()}
+		print(
+			f"excluding {sum(c.key in skip for c in all_cfgs)} of {len(all_cfgs)} configs listed in {exclude_keys}"
+		)
+		all_cfgs = [c for c in all_cfgs if c.key not in skip]
+		if not all_cfgs:
+			raise SystemExit("every config is excluded")
 	per_gpu = {g: [c for c in all_cfgs if runs_on(c, g)] for g in plan}
 	store_kind = all_cfgs[0].kind  # grouped configs are kernels rows; the ledger reads that directory
 	rates = {}
