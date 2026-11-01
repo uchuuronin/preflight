@@ -1,0 +1,67 @@
+{
+ "n": 720,
+ "diverged": 44,
+ "families": 24,
+ "auroc": {
+  "point": 0.6571073157611619,
+  "lo": 0.5632857992041925,
+  "hi": 0.7648744854183123
+ },
+ "lead_steps": {
+  "point": 138.5,
+  "lo": 3.0,
+  "hi": 269.0
+ },
+ "bins": [
+  [
+   0.0,
+   0.05,
+   618,
+   0.002313727649831386,
+   0.025889967637540454
+  ],
+  [
+   0.05,
+   0.2,
+   43,
+   0.10627904348149292,
+   0.09302325581395349
+  ],
+  [
+   0.2,
+   0.5,
+   22,
+   0.33423976374731085,
+   0.18181818181818182
+  ],
+  [
+   0.5,
+   0.8,
+   21,
+   0.6763859813855702,
+   0.38095238095238093
+  ],
+  [
+   0.8,
+   0.95,
+   8,
+   0.8604658205134309,
+   0.5
+  ],
+  [
+   0.95,
+   1.0,
+   8,
+   0.9799164949625101,
+   1.0
+  ]
+ ],
+ "false_alarms": {
+  "stable": 676,
+  "alarms": 73
+ },
+ "enough": true,
+ "source": "scripts/fit_divergence.py on remote-runs b-divergence-export-2 (Nov 1): 720 runs, 377 on L4 and 343 on A10, the board on every row; folds and bootstrap by settings family (the sweep is one architecture)",
+ "verdict": "not used: the warning comes from the threshold rules (D6)",
+ "why": "37 of the 44 divergences are fp16 blow-ups and 15 of 44 come in the first 30 steps, before the classifier's 25-step window can say much; held-out AUROC 0.66 against the 0.85 target"
+}

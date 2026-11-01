@@ -188,3 +188,10 @@ def test_a_run_that_calibrated_a_model_is_left_out_of_its_rows():
 def test_an_unknown_calibration_name_is_refused(tmp_path):
 	with pytest.raises(ValueError, match="unknown 'calibrates'"):
 		V.build({"runs": [{"script": "x", "record": "r.json", "calibrates": ["interval"]}]}, tmp_path)
+
+
+def test_the_divergence_row_reads_the_final_report():
+	# Chiya, Nov 1: if it still misses, the row says so with the numbers
+	rep = json.loads((Path(V.__file__).parent / "reports" / "divergence_nov1.json").read_text())
+	r = V.divergence_row(rep)
+	assert r.hit is False and r.n == 720 and "not used: the warning comes from the threshold rules" in r.note

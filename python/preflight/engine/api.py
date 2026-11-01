@@ -2767,10 +2767,11 @@ def _divergence(record: FlightRecord, values: dict) -> Estimate:
 _CARDS = {
 	divergence.MODEL_ID: (
 		"classifier",
-		"logistic on the probe's loss, grad norm, logit growth and settings (Wortsman et al., ICLR 2024), trained on "
-		"the corpus's divergence sweep labelled by D9; a probability shows only where held-out runs verified it. Held "
-		"out by settings family (precision, qk-norm, init), not by architecture: every sweep run is the same small "
-		"GPT, so there is only one architecture to hold out",
+		"Not used: the warning comes from the threshold rules (D6). Held out on 720 corpus runs (377 on L4, 343 on "
+		"A10; 44 diverged): AUROC 0.66 (95% 0.56 to 0.76) against the 0.85 target, lead 138 steps (3 to 269), 73 of 676 "
+		"stable runs alarmed. Why: 37 of the 44 divergences are fp16 blow-ups, and 15 come in the first 30 steps, "
+		"before the 25-step window can say much. Held out by settings family (precision, qk-norm, init), not by "
+		"architecture: every sweep run is the same small GPT",
 	),
 	serving.MODEL_ID: (
 		"simulation",
@@ -2875,6 +2876,14 @@ def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]
 				h, n = (sum(v[i] for v in a100) for i in (0, 1))
 				if n:
 					notes += f" A100 holdout (same-GPU step time, scored once): {h} of {n} inside the band."
+		if mid == divergence.MODEL_ID:
+			# scored on held-out sweep runs and not used (Chiya, Nov 1); its card says so, not "simulated"
+			calib = "held_out, not used"
+			extra["training_data"] = (
+				"corpus divergence sweep, 720 runs on L4 and A10 (remote-runs b-divergence-export-2, Nov 1); "
+				"report: corpus/reports/divergence_nov1.json"
+			)
+			extra["heldout_error"] = {"auroc": 0.657, "lead_steps": 138.5, "false_alarm_rate": 73 / 676}
 		out.append(
 			ModelCard(
 				id=mid,

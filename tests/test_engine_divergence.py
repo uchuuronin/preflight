@@ -161,3 +161,14 @@ def test_settings_read_the_way_users_and_the_sweep_write_them():
 	assert D.config_features({"grad_clip": None})[8] is None  # a user's unset knob: unknown
 	assert D.config_features({"grad_clip": 0.0})[8] == 1.0  # the sweep's no clipping, as the fit writes it
 	assert D.config_features({"grad_clip": 1.0})[8] == 0.0
+
+
+def test_the_card_says_it_is_not_used_and_why():
+	from preflight.engine import api
+
+	(card,) = api._cards({D.MODEL_ID})
+	assert card.notes.startswith(
+		"calibration: held_out, not used. Not used: the warning comes from the threshold rules"
+	)
+	assert card.heldout_error["auroc"] == pytest.approx(0.657) and "720 runs" in card.training_data
+	assert "fp16" in card.notes and "first 30 steps" in card.notes and "AUROC 0.66" in card.notes
