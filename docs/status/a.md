@@ -1,96 +1,10 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Oct 27, evening ET.
+Updated Sun Nov 1, 01:30 ET.
 
-## Done
-
-- Contract v0.1: Pydantic schema, generated JSON Schema and TS types, TS grid decoder with a parity
-  test, golden records (fine-tune, pretrain, agent), `upgrade()` migrations, record size and
-  decompression caps.
-- Repo skeleton, CI (lint, format, schema drift, tests, CPU torch, gitleaks), deploy and zoo
-  workflows with actions pinned to commit SHAs. Ready to hand to C.
-- Job queue (gap 2, skeleton): idempotent submit, 60 s leases renewed every 20 s, fencing tokens,
-  reaper, transactional saves with rollback, per-visitor and global backpressure, fair dispatch
-  and honest queue positions, capped and batched events, archived finished jobs.
-- Worker loop: heartbeats, stops itself when it cannot renew, cancellation reaches the probe,
-  permanent vs internal errors, no internals shown to visitors.
-- Harness: static script reader covering every lens in the plan, Muse Spark client (structured
-  output, retries that can't double-bill, overall deadline, one re-ask, token caps, provenance per
-  attempt, no `-contributor` models for visitor code), mapper that reconciles Spark with the static
-  reader, skeleton record with a job map per lens, knob domains and read-time findings.
-- Recorder: global hooks for optimizer steps, backward, data loader, eval phases (capped at 2
-  batches), output head, SDPA attention logits, checkpoint saves, GradScaler, HF generate and vLLM,
-  TRL/HF trainer logs; host RSS and GPU power sampling; failures classified into stable codes.
-- Probe runner: validated submissions, scrubbed env and throwaway HOME, non-dumpable parent,
-  unprivileged per-probe uid when root, nothing survives the probe, capped logs, hard timeout,
-  cancellation, untrusted child output parsed defensively.
-- Probe plan from a Monte Carlo (docs/decisions/probe-plan.md): warmup 2, timed 5, median; three
-  memory probes; eval and checkpoint pulled into the current-settings probe.
-- B's requests: per-kernel table from the profiled probe (top 64 plus per-class tail), canonical
-  GPU names and peak FLOP/s from B's table, the five counts in `Probe.extras`, model shape from the
-  running model, a `gpu_type` knob, and the knobs B maps (LoRA alpha and dropout, quantization,
-  attention kernel, context limit). Checked on a scratch merge with ws-b: 561 tests pass and the
-  kernel table feeds `predict_cross_gpu`. The schema carries them (`Probe.kernels`, the
-  `ModelInfo` shape fields), added before the freeze with Chiya's approval.
-- Size-aware probe GPU (L4, L40S, A100-80GB, H200; after a GPU OOM one step up, or the whole
-  ladder when the size was unknown), from a Monte Carlo (K, G, L, U in docs/decisions/probe-plan.md).
-- Kernel tables and model shapes from the probe child are checked in the parent before use
-  (`probes/untrusted.py`); visitor-supplied names are bounded before any regex sees them.
-- Bug zoo: LoRA fine-tune (HF) and nanoGPT pretrain scripts.
-- Independent code review: all Critical and High findings fixed with tests; Medium and Low fixed
-  except the two noted below.
-
-- Execution plane, as code: the pipeline job function (fetch, map, skeleton before Muse Spark,
-  plan, probes, merge; a point that can't be set is skipped, eval OOM re-runs with eval off, a
-  per-job time and dollar budget, the content-hash probe cache), the Modal app (job-store
-  service, workers, one GPU sandbox per job with no secrets, an egress allowlist and read-only
-  weights), and a working `preflight map|run` CLI. One script runs end to end through the queue
-  on CPU in the tests.
-- Review fixes (Oct 27): `.eval()` before training no longer cuts the data loader; overrides
-  handle annotated fields, config classes and argparse flags (default and command line); timed
-  steps have no recorder sync points; every step is logged; eval memory per batch; chunked
-  attention-logit check; grad norms read after the step; visitor code runs under rlimits.
-- Second review pass (Oct 27): uploads live on a volume and the job state keeps a reference; a
-  retried job keeps its record id and share token; events are fenced by the lease token; each
-  sandbox runs as one pinned uid with its own HF cache; the store's owner is claimed before it
-  restores; workers stop leasing before their own timeout; probe time and cost are measured by
-  the worker, not reported by the sandbox; flags follow the script's own spelling and argparse
-  abbreviations; repos are read from git's object store with no checkout, big blobs never
-  downloaded and the clone deleted; malformed sources are visitor errors, not crashes.
-- Oct 27 evening: guide jobs on a record (`run_probe`, `run_verify`, `sample_more`) write a new
-  record derived from it; `Knob.affects` and `changes_results`, `ModelCard.fixture` and
-  `JobEvent.error_code` for C; the Spark client reads `META_API_BASE`; the upload format for D
-  (docs/decisions/upload-format.md) with requirements.txt installed in probes and notebook pip
-  lines turned into one; probes never above A100-80GB on the demo, and the job budget counts the
-  sandbox's CPU and memory; `python -m preflight.runner.stop_app` stops the deployed app through
-  remote-run; the smoke run writes its events and record to out/; Apache-2.0 LICENSE.
-- Found and fixed before any GPU run: Debian images keep /root at 0700, so the probe's
-  unprivileged uid couldn't reach the package there. The Modal image now keeps it in
-  /opt/preflight; elsewhere (the AMD checkout) probes import a read-only copy, and nothing on the
-  host has its permissions changed.
-- Independent review of the evening's work, all fixed with tests: the CLI as root gave probes a
-  cache shared across runs that root then chowned recursively (a planted link would have handed
-  over /etc), now a fresh per-run directory root never walks; requirements used pip --target,
-  which reinstalls torch under anything that needs it, now --prefix with public-version pins and
-  one install per job; verify passed a run whose loss went NaN; a stale volume view could feed a
-  follow-up an old parent; a visitor's own upload uri and changed code are refused; moving GPU
-  drops the parent's fits along with its probes; a mistyped GPU ceiling still caps.
-
-## Blocked
-
-- The first GPU work (deploy, `prefetch`, `smoke` on L4) waits for Chiya's yes on the costed plan;
-  runs go through `remote-run.yml`, so nothing here holds a key.
-- Hugging Face is not reachable from this sandbox, so the zoo scripts run only on Modal or AMD.
-
-## Next
-
-- First real run, once approved: deploy the Modal app, `prefetch` the zoo weights, `smoke` the LoRA
-  zoo script end to end on L4, then `stop_app`; log GPU, minutes and dollars below.
-- Ground truth: both zoo scripts on a GPU, step time with and without the recorder's sync points,
-  to replace the simulated probe-plan figures.
-- Measured-rule findings (loader wait, padding, MFU, eval OOM, truncation, retry loops).
-- Agent recorder: OTel GenAI proxy around OpenAI-compatible clients; RL phase timer.
-- Remaining zoo scripts.
+- **Now:** tonight's approved GPU queue: D's retrieval, GNN and vision probes; then the agent re-sample on D's plant-3 fix, 50-step GRPO, torchtitan and 2×L4. $3 ceiling, each run logged under Cloud runs.
+- **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning adapter checks, and the Muse Spark script-map gate; LoRA and GRPO ground truths on L4.
+- **Next:** Spark Open log triage on Baseten, a GPU fallback when an L4 won't schedule, the vLLM serving probe, the Muse Spark / Spark Open Pareto sweep; plan table below.
 
 ## Known limits, on purpose
 
@@ -214,7 +128,7 @@ included. Hero lenses first.
 | 51 | Rollout time within 20%: GRPO zoo script and an unseen TRL script | blocked on 11, 12 | 2 + paid runs |
 | 52 | Agent run total cost inside the 90% interval: a full benchmark vs the 30-task sample | blocked on 7 | 2 + API spend |
 | 53 | Planted problems caught (bug zoo) | LoRA eval OOM caught; nanoGPT not yet on a GPU | 1 + paid run |
-| 54 | Cost of one Preflight run under $1 and under 5 minutes | $0.10 GPU, but 6 min 45 s on Oct 28: over 5 min | 3 |
+| 54 | Cost of one Preflight run under $1 and under 5 minutes | **miss**: $0.10 GPU, but 6 min 45 s upload to record on Oct 28 (`a-smoke-l4-main-4`, measured), and later runs waited 14 to 26 min for an L4; the GPU fallback (next) addresses the wait | 3 |
 
 **Total left: about 113 hours of A's work (was 138 in this morning's first version) (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
 order the PM set (hero lenses, then the rest) is the order I work in; Chiya's cuts at noon Sunday
