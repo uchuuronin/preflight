@@ -8,6 +8,50 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 12:55 (round five merged; finding 12 fixed; triage finding visible; worker tests fixed)
+
+**CI rule (Chiya, 12:43):** after every push to `ws-d`, check its CI run; a red run is fixed
+before the next push, and a push isn't done until CI passes (a cancelled run means a newer push
+replaced it). Today's pushes: `b781a91`, `ead1b6c` and `dcda920` green; `f4cf04d` cancelled,
+replaced by `ead1b6c` (green).
+
+**Missing from the log: push of `dcda920`, 11:32** (gitleaks clean; reviewed read-only): the
+triage shot on A's production LoRA run and C's list, the Glimmer note. CI green.
+
+**Chiya, 11:42:** "same script" is right; the fine-tune shots stay on the Oct 28 record and its
+numbers. Only if A's production LoRA record runs on an L4 and catches the same eval OOM do I offer
+a version with both shots on that record, every spoken number re-taken from it; otherwise no
+change.
+
+Merged `main` `85fbf9a` (round five: contract 0.6.2, engine-filled goldens). Checked on it:
+- **Finding 12: fixed.** `model-tags.mjs` passes 12 of 12 in Chromium, desk and phone, the
+  same-page case included [measured]. Moved to Done.
+- **C's Findings band shows a triage finding.** In Chromium at 1440 x 900 and 390 x 844, with a
+  triage finding (info, no node) added to a copy of A's Oct 28 record: the cockpit shows a
+  "1 finding off the map" chip, and clicking it shows the title, the sentence, the quoted log line
+  and "Found by Muse Spark Open triage", with the page moved to the Findings band (screenshot)
+  [measured]. The storyboards now say to click the chip.
+  The shot waits only on A's production link (none yet).
+- **Two of my worker tests went red on the engine goldens, with CI green:** they pinned the
+  fixture golden's "8.3 to 10.1 GiB, illustrative". Now they mark a copy's models as fixtures and
+  check relations, so they hold on either golden set (18 of 18 on each [measured]), plus a new
+  test that the real golden is called illustrative only if its models are fixtures. CI never ran
+  `workers/`, so C is asked to add it.
+- **Add-on tests 251 of 251, typecheck clean, hero card up to date** [measured].
+- **The dial on main's engine goldens** [simulated: the golden probes are hand-made]: the same
+  counts as before (3 of 3 in the dock on each record; with C's worth-checking list, 2 of 3 and
+  1 of 3; all nine orders tie at 3 of 6), now with B's `run-cost@0.1.0` among the models. The
+  order stays frozen for Nov 2.
+- **B's report** is on `main`; the PM already linked it in `readme-final.md` (`3e47fe9`), and I
+  removed the TODO from the submission table's row.
+- **Not landed:** B's Glimmer endpoint with a measured cost per call (the Glimmer wording stays
+  as it is), and A's production triage share link.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; its CI result goes in
+the next entry): the merge of `main` `85fbf9a`, the worker test fix, and these doc updates.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 11:20 (standing yes; the Spark Open triage shot in both cuts; push log)
 
 **Standing yes (Chiya, 11:14):** pushes to `ws-d` go without asking once gitleaks is clean and one
