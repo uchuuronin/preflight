@@ -1,5 +1,10 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Sat Oct 31, night
+
+- Audit finding 4 fixed (`c28d664`): a failed or cancelled job's boarding screen marks the leg it stopped on ("Stopped here" / "Cancelled here", red route).
+- Agent tour on A's measured record (`5b297cc`), see the plan table.
+
 ## Sat Oct 31, evening: Muse Code smoke test (Chiya's yes, $1 cap, CPU only)
 
 | Run | What | Result | Cost |
@@ -27,7 +32,7 @@ read-only review, and exclude waiting on others.
 | Item | State | Hours | Waits on |
 | --- | --- | --- | --- |
 | Fine-tune lens: map, readouts, fit map with OOM frontier, memory stack, live and rule tour | On main (`c.fit_map` off) | 1 (turn flag on after the e2e run) | A's runner deploy |
-| Agent lens: map and tour on the golden record | On main (golden only; no real agent record yet) | 3 (tour checked on a real record, agent readouts) | A's first real agent record |
+| Agent lens: map and tour on the golden record | On ws-c (`5b297cc`): sample PF331 from A's measured Oct 31 record; the tour walks the retry-loop finding (lights Tools), never offers `n_tasks` or other result-changing knobs as savings. The context overflow isn't in the record and caching isn't priced (requests to A and B) | 0.5 (live Muse Spark tour check, paid) | Chiya's yes for the paid check |
 | GRPO lens: sample, tour, truncation and reward-spread views | Not started | 5 | A's GRPO zoo record; B's RL models |
 | Campaign lens: calendar with team lanes on B's planner | Not started | 6 | B's planner (only `campaign/__init__.py` exists on ws-b) |
 
