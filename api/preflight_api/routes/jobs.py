@@ -83,7 +83,7 @@ def _store_error(e: Exception) -> ApiError:
 		return ApiError(
 			429,
 			code,
-			message or "Today's limit is reached: samples only until midnight ET.",
+			message,
 			retryable=True,
 			retry_after=retry_after(e),
 		)

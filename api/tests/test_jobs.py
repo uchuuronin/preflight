@@ -249,7 +249,7 @@ def test_a_daily_limit_is_429_in_the_job_stores_own_words():
 	assert r.headers.get("Retry-After") == "3600"
 	err = r.json()["error"]
 	assert err["code"] == "limit.visitor_daily"
-	assert err["message"] == "You've run today's 3 probe jobs: samples only until midnight ET"
+	assert err["message"] == "You've run today's 3 probe jobs: samples only until midnight ET."
 	# A busy queue keeps its own code and wording.
 	assert (
 		client(Store(full=True)).post("/v1/jobs", json=BODY, headers=KEY).json()["error"]["code"]

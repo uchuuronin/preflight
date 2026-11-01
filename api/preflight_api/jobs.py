@@ -75,8 +75,12 @@ def limit_of(e: BaseException) -> tuple[str, str] | None:
 	code = getattr(e, "code", "")
 	if kind_of(e) != "QueueFull" or not isinstance(code, str) or not code.startswith("limit."):
 		return None
-	message = str(e.args[0]) if e.args and isinstance(e.args[0], str) else ""
-	return code, message[:200]
+	message = (str(e.args[0]) if e.args and isinstance(e.args[0], str) else "").strip()[:200]
+	if not message:
+		message = "Today's limit is reached: samples only until midnight ET."
+	elif message[-1] not in ".!?":
+		message += "."  # A's messages end without a full stop; ours follow with another sentence
+	return code, message
 
 
 def retry_after(e: BaseException, default: int = 60) -> int:
