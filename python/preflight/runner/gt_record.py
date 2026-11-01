@@ -43,7 +43,10 @@ def _env(gt: dict, probe):
 		if gt.get("gpu")
 		else None
 	)
-	return Env(backend=gt["backend"], provider=gt.get("provider") or "modal", gpu=gpu)
+	where = gt.get("provider") or (
+		"amd_devcloud" if gt["backend"] == "rocm" else "modal"
+	)  # the droplet runs ROCm
+	return Env(backend=gt["backend"], provider=where, gpu=gpu)
 
 
 def with_env(rec, env):

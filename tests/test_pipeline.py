@@ -806,6 +806,15 @@ def test_dataset_size_prefers_the_loaders_count_skips_patched_probes_and_keeps_a
 	assert n(with_probes([{"train_dataset_len": 400.0}], status="cached")) == 400
 	assert n(with_probes([{"train_dataset_len": 400.0}], status="oom")) == 400
 	assert n(with_probes([{"train_dataset_len": 400.0}], status="error")) is None
+	# an oom before its first step may have seen only an eval loader (a baseline evaluate)
+	r = with_probes([{"train_dataset_len": 400.0}], status="oom")
+	assert n(r.model_copy(update={"probes": [p.model_copy(update={"steps": 0}) for p in r.probes]})) is None
+	# an ok probe's count wins over an oom probe's, whatever the order
+	mixed = with_probes([{"train_dataset_len": 90.0}, {"train_dataset_len": 400.0}])
+	mixed = mixed.model_copy(
+		update={"probes": [mixed.probes[0].model_copy(update={"status": "oom", "steps": 3}), mixed.probes[1]]}
+	)
+	assert n(mixed) == 400
 
 
 def test_a_training_count_setting_in_the_script_is_the_dataset_size(tmp_path):

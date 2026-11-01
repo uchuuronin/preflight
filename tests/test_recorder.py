@@ -446,6 +446,7 @@ def test_a_ground_truth_record_names_the_gpu_it_ran_on():
 	assert out.env.gpu.name == "MI300X" and out.knob("gpu_type").current == "MI300X"
 	assert "MI300X" in out.knob("gpu_type").domain.values
 	assert with_env(bare, _env({}, rec.probes[0])).env is None  # nothing named: nothing guessed
+	assert _env({"gpu": "MI300X", "backend": "rocm"}, rec.probes[0]).provider == "amd_devcloud"
 	# the committed record carries both
 	assert rec.env.gpu.name == "A10" and knob.current == "A10"
 

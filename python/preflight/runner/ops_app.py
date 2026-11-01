@@ -802,9 +802,15 @@ def triage_hosted(record_json: str, probe_id: str, provider: str = "glimmer") ->
 	from preflight.schema import load_record
 
 	rec = load_record(record_json)
+	# our own zoo scripts only: a visitor's record holds their error text, which would land in the
+	# run log and out/ on the remote-runs branch, and a private one must never reach Baseten (review)
+	if rec.job.source.kind != "sample":
+		return {"error": "only a sample (zoo) record is triaged here"}
 	probe = next((p for p in rec.probes if p.id == probe_id), None)
 	if probe is None:
 		return {"error": f"no probe {probe_id!r}: {[p.id for p in rec.probes]}"}
+	if probe.status in ("ok", "cached") or not probe.error:
+		return {"error": f"probe {probe_id} finished or has no recorded error: nothing to triage"}
 	if provider == "glimmer":
 		if not ModelClient.glimmer_configured():
 			return {"error": "the preflight-glimmer secret has no GLIMMER_BASE_URL"}
