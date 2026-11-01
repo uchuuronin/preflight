@@ -627,7 +627,11 @@ def test_with_the_held_out_band_a_gpu_move_is_rough_with_a_probe_offer(ft, monke
 	# abstains only where it did: no bf16 path on T4, and another vendor until corpus rows from it exist
 	assert api.predict(ft, {"gpu_type": "T4"}).root["time.step"].status == "abstain"
 	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
-	assert amd.status == "abstain" and "another vendor" in amd.reason
+	assert (
+		amd.status == "abstain"
+		and amd.reason.startswith("no AMD measurements")
+		and "another vendor" in amd.reason
+	)
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
 	assert "Rough, no probe on this GPU" in card.notes and "26 of 28" in card.notes
 	assert card.coverage == pytest.approx(2130 / 2286)

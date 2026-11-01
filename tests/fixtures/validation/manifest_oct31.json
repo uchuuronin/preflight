@@ -1,0 +1,19 @@
+{
+	"$comment": "Oct 31 records (B): A's L4 LoRA probe record with its full run (a-gt-lora-l4-5, remote-runs), and A's agent sample (no full benchmark run yet). Zoo only: no unseen script has run.",
+	"runs": [
+		{
+			"script": "finetune_lora_hf",
+			"set": "zoo",
+			"job_type": "finetune",
+			"record": "../b-a-smoke-l4-main-4.record.json",
+			"ground_truth": "ground_truth_finetune_lora_hf.json",
+			"planted": ["eval.batch_large", "eval.no_grad", "data.no_packing"]
+		},
+		{
+			"script": "agent_eval_spark",
+			"set": "zoo",
+			"job_type": "agent",
+			"record": "agent_eval_spark_record_oct31.json"
+		}
+	]
+}

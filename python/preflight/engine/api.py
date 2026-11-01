@@ -914,9 +914,11 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			else None
 		)
 		if FEATURES["steptime_cross_gpu"] and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
+			# Chiya, Oct 31: abstain, labelled, until the AMD session measures; datasheets alone don't size the band
+			vendor = gpus.get_gpu(tgt_gpu).vendor
 			why = (
-				f"{tgt_gpu} is another vendor, and no corpus rows from it exist yet, so time across vendors isn't "
-				"measured; run a probe there"
+				f"no {vendor.upper() if len(vendor) <= 3 else vendor.title()} measurements: {tgt_gpu} is another "
+				"vendor, and the corpus has no rows from it yet, so time across vendors isn't measured; run a probe there"
 			)
 			return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), sigma)
 		if cross is not None and cross.status != "abstain":
@@ -2477,7 +2479,7 @@ _CARD_CAVEAT = {
 	steptime.MODEL_ID_CROSS: (
 		"Rough, no probe on this GPU: the band comes from corpus pairs, scored on GPUs left out, and is shown past "
 		"+-50% with a run-a-probe offer beside it. Calibrated on corpus models' op tables, not users' kernel tables; "
-		"checked on unseen scripts Nov 2. Another vendor abstains until corpus rows from it exist. The pairs share "
+		"checked on unseen scripts Nov 2. Another vendor abstains, labelled 'no AMD measurements', until corpus rows from it exist. The pairs share "
 		"architectures: clustered by architecture, the 95% interval on coverage is 90% to 96%."
 	),
 }
