@@ -1,0 +1,25 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-AFxBuMGEvP8keqxoCfApQA
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+submitted {'job_id': '01M6AT38RR3CKXAE4K0V0XX4SH', 'created': True, 'position': 0}
+{"job_id": "01M6AT38RR3CKXAE4K0V0XX4SH", "seq": 0, "at": "2026-11-01T05:42:40.664160Z", "stage": "queued", "queue_position": 0, "level": "info"}
+{"job_id": "01M6AT38RR3CKXAE4K0V0XX4SH", "seq": 1, "at": "2026-11-01T05:42:43.569208Z", "stage": "admitted", "message": "attempt 1", "level": "info"}
+{"job_id": "01M6AT38RR3CKXAE4K0V0XX4SH", "seq": 2, "at": "2026-11-01T05:42:43.667628Z", "stage": "fetching", "level": "info"}
+{"job_id": "01M6AT38RR3CKXAE4K0V0XX4SH", "seq": 3, "at": "2026-11-01T05:42:43.696532Z", "stage": "mapping", "level": "info"}
+{"job_id": "01M6AT38RR3CKXAE4K0V0XX4SH", "record_id": "01M6AT3BRA7PJANMW411AAFMC0", "share_token": "qjZCv5saQBE_WHSPIBZxsA", "seq": 4, "at": "2026-11-01T05:42:44.331070Z", "stage": "skeleton", "message": "skeleton from the static reader", "level": "info", "record_rev": 1}
+{"job_id": "01M6AT38RR3CKXAE4K0V0XX4SH", "record_id": "01M6AT3BRA7PJANMW411AAFMC0", "share_token": "qjZCv5saQBE_WHSPIBZxsA", "seq": 5, "at": "2026-11-01T05:42:44.357657Z", "stage": "harnessing", "level": "info", "record_rev": 1}
+{"job_id": "01M6AT38RR3CKXAE4K0V0XX4SH", "record_id": "01M6AT3BRA7PJANMW411AAFMC0", "share_token": "qjZCv5saQBE_WHSPIBZxsA", "seq": 6, "at": "2026-11-01T05:42:44.379961Z", "stage": "probing", "progress": 0.0, "level": "info", "probe_id": "p1", "record_rev": 1}
