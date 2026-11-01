@@ -784,6 +784,63 @@ def diagnose(share: str, max_usd: float = 0.5):
 	print(f"[diagnose] stats {res['stats']}; {len(res['calls'])} calls, ${res['usd']:.4f}", flush=True)
 
 
+# ---------------------------------------------------------------- triage of a stored probe (paid: ask first)
+
+
+@ops.function(
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-glimmer"), modal.Secret.from_name("preflight-baseten")],
+	timeout=10 * 60,  # Glimmer scales to zero: a cold start measured 286 s (B, Nov 1)
+)
+def triage_hosted(record_json: str, probe_id: str, provider: str = "glimmer") -> dict:
+	"""harness/triage.py on one probe of a stored record, as the pipeline would triage it: the
+	probe's recorded error (a stored record keeps no log tail). provider: glimmer or spark-open."""
+	import time
+
+	from preflight.harness.spark import ModelClient
+	from preflight.harness.triage import triage_probe
+	from preflight.schema import load_record
+
+	rec = load_record(record_json)
+	probe = next((p for p in rec.probes if p.id == probe_id), None)
+	if probe is None:
+		return {"error": f"no probe {probe_id!r}: {[p.id for p in rec.probes]}"}
+	if provider == "glimmer":
+		if not ModelClient.glimmer_configured():
+			return {"error": "the preflight-glimmer secret has no GLIMMER_BASE_URL"}
+		client = ModelClient.glimmer()
+	else:
+		client = ModelClient.baseten_spark_open()
+	t0 = time.monotonic()
+	f, calls = triage_probe(client, probe, "")
+	return {"record_id": rec.record_id, "probe": probe_id, "status": probe.status, "provider": client.provider,
+		"model": client.model, "wall_s": round(time.monotonic() - t0, 1),
+		"finding": f.model_dump(mode="json") if f else None,
+		"calls": [c.model_dump(mode="json") for c in calls], "usd": round(sum(c.cost_usd for c in calls), 6)}  # fmt: skip
+
+
+@ops.local_entrypoint()
+def triage(share: str, probe: str = "p1-eval", provider: str = "glimmer"):
+	"""modal run --env main python/preflight/runner/ops_app.py::triage --share <token> [--probe p1-eval]
+	[--provider glimmer|spark-open]. One triage call on a stored record's probe; writes out/triage.json."""
+	import re
+	import sys
+
+	if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", share) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,40}", probe):
+		print("[triage] a share token and a probe id, please", flush=True)
+		sys.exit(2)
+	data = b"".join(records_vol.read_file(f"{share}.json")).decode()
+	res = triage_hosted.remote(data, probe, provider)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/triage.json").write_text(json.dumps(res, indent=2))
+	f = res.get("finding")
+	print(f"[triage] {res.get('error') or (f and f['title'] + ' | ' + f['detail'])}", flush=True)
+	print(
+		f"[triage] {len(res.get('calls', []))} calls, ${res.get('usd', 0):.4f}, {res.get('wall_s')} s",
+		flush=True,
+	)
+
+
 # ---------------------------------------------------------------- serving image (CPU, before any serving probe)
 
 

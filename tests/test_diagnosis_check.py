@@ -211,3 +211,9 @@ def test_triage_reads_and_can_quote_the_probes_recorded_error_not_just_stdout():
 		and "CUDA out of memory" in f.detail
 		and "no log line quoted" not in f.detail
 	)
+	assert f.title.startswith("Spark Open on probe p1-eval")
+	# a private job's triage names the model that made it (Glimmer, 0.6.2)
+	glim = ModelClient(api_key="k", model="muse-glimmer", provider="modal-glimmer",
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	g, _ = triage_probe(glim, probe, "")
+	assert g.title.startswith("Muse Glimmer on probe p1-eval") and g.code == "triage.oom"

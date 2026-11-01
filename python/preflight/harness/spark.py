@@ -185,7 +185,7 @@ class ModelClient:
 			api_key="glimmer",  # the proxy headers authenticate; vLLM takes any key
 			model=os.environ.get("GLIMMER_MODEL", "muse-glimmer"),
 			provider="modal-glimmer",
-			timeout_s=180.0,  # scaled to zero: the first call waits for the container
+			timeout_s=330.0,  # scaled to zero: the first call waits for the container (B measured a 286 s cold start, Nov 1)
 			max_output_tokens=2_000,
 			headers={
 				"Modal-Key": os.environ.get("GLIMMER_MODAL_KEY", ""),

@@ -11,6 +11,7 @@ from preflight.probes.local import ProbeSpec, run_probe
 from preflight.recorder.runtime import PHASE_STEPS
 
 FIX = Path(__file__).resolve().parent / "fixtures"
+ROOT = Path(__file__).resolve().parents[1]
 # scripts that import transformers; CI's torch job installs it with accelerate
 needs_transformers = pytest.mark.skipif(
 	importlib.util.find_spec("transformers") is None, reason="transformers not installed"
@@ -426,6 +427,27 @@ def test_a_ground_truth_probe_becomes_a_record_with_its_measured_zero_spread():
 	ex = rec.probes[0].extras
 	share = ex["rl_zero_spread_groups"] / ex["rl_groups"]
 	assert bool(z) == (share > 0.5) and (not z or "95% interval" in z[0].detail)
+
+
+def test_a_ground_truth_record_names_the_gpu_it_ran_on():
+	# B, Nov 1: the A10 GRPO record had no env and the gpu_type knob at its L4 default, so the
+	# engine read it as an L4 with a guessed CUDA context
+	from preflight.runner.gt_record import _env, with_env
+	from preflight.schema import load_record
+
+	rec = load_record((ROOT / "zoo/grpo_trl/record_nov1_a10.json").read_text())
+	knob = rec.knob("gpu_type")
+	bare = rec.model_copy(update={"env": None, "knobs": [knob.model_copy(update={"current": "L4"}) if k.id == "gpu_type" else k for k in rec.knobs]})  # fmt: skip
+	out = with_env(bare, _env({"gpu": "A10", "backend": "cuda"}, rec.probes[0]))
+	assert out.env.gpu.name == "A10" and out.env.backend == "cuda" and out.knob("gpu_type").current == "A10"
+	# the recorder's own env wins when the ground truth carries it (runs since Nov 1)
+	env = {"backend": "rocm", "provider": "amd_devcloud", "gpu": {"name": "MI300X", "vendor": "amd"}}
+	out = with_env(bare, _env({"gpu": "A10", "backend": "cuda", "recorder": {"env": env}}, rec.probes[0]))
+	assert out.env.gpu.name == "MI300X" and out.knob("gpu_type").current == "MI300X"
+	assert "MI300X" in out.knob("gpu_type").domain.values
+	assert with_env(bare, _env({}, rec.probes[0])).env is None  # nothing named: nothing guessed
+	# the committed record carries both
+	assert rec.env.gpu.name == "A10" and knob.current == "A10"
 
 
 def test_a_serving_probe_keeps_the_first_prompts_whole_and_the_rest_of_the_call_as_is():

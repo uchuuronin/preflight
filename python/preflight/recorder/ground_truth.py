@@ -253,7 +253,8 @@ def measure(
 			"generation": r.probe.generation.model_dump(mode="json") if r.probe.generation else None,
 			"extras": r.probe.extras, "step_log": log, "log_tail": r.log_tail[-1500:],
 			# the whole probe, so a record can be built from the run (runner/gt_record.py)
-			"probe": r.probe.model_dump(mode="json", exclude={"kernels", "trace"})},
+			"probe": r.probe.model_dump(mode="json", exclude={"kernels", "trace"}),
+			"env": r.env.model_dump(mode="json", exclude_none=True) if r.env else None},
 		"overhead": over}  # fmt: skip
 
 

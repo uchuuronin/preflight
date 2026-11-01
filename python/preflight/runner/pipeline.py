@@ -669,7 +669,11 @@ def _with_dataset_size(rec: FlightRecord, files: dict[str, str] | None = None) -
 		return rec
 	# the script's own setting first: it says what one epoch trains on, where a loader's dataset
 	# may be the whole graph or table
-	ok = [p for p in rec.probes if p.status == "ok" and not p.extras.get("patched")]  # a patch may subsample
+	# the loader's size doesn't depend on how a probe ended: a cache hit (a second visitor on the
+	# same script, C's live LoRA record, Nov 1) or one that ran out at eval saw the same dataset
+	ok = [
+		p for p in rec.probes if p.status in ("ok", "cached", "oom") and not p.extras.get("patched")
+	]  # a patch may subsample
 	n = _train_count_setting(files) or next((p.extras["train_dataset_len"] for p in ok if p.extras.get("train_dataset_len")), None) or next(
 		(p.extras["dataset_rows_total"] for p in ok if p.extras.get("dataset_rows_total")), None)  # fmt: skip
 	if not n:

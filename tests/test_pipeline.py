@@ -776,12 +776,14 @@ def test_dataset_size_prefers_the_loaders_count_skips_patched_probes_and_keeps_a
 	)
 	sm = rec.job.script_map
 
-	def with_probes(extras, n_examples=None):
+	def with_probes(extras, n_examples=None, status=None):
 		data = sm.data.model_copy(update={"n_examples": n_examples})
 		job = rec.job.model_copy(update={"script_map": sm.model_copy(update={"data": data})})
 		base = rec.probes[0]
 		probes = [
-			base.model_copy(update={"id": f"x{i}", "extras": {**base.extras, **e}})
+			base.model_copy(
+				update={"id": f"x{i}", "extras": {**base.extras, **e}, "status": status or base.status}
+			)
 			for i, e in enumerate(extras)
 		]
 		return rec.model_copy(update={"job": job, "probes": probes})
@@ -799,6 +801,11 @@ def test_dataset_size_prefers_the_loaders_count_skips_patched_probes_and_keeps_a
 		n(with_probes([{"train_dataset_len": 400.0}], n_examples=1234)) == 1234
 	)  # the static reader's value stays
 	load_record(_with_dataset_size(with_probes([{"train_dataset_len": 400.0}])).model_dump(mode="json"))
+	# a cache hit (a second job on the same script, C's live LoRA record, Nov 1) and an eval OOM saw
+	# the same loader; a probe that errored before its loader existed has nothing to give
+	assert n(with_probes([{"train_dataset_len": 400.0}], status="cached")) == 400
+	assert n(with_probes([{"train_dataset_len": 400.0}], status="oom")) == 400
+	assert n(with_probes([{"train_dataset_len": 400.0}], status="error")) is None
 
 
 def test_a_training_count_setting_in_the_script_is_the_dataset_size(tmp_path):
