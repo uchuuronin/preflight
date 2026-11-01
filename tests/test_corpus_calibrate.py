@@ -237,3 +237,16 @@ def test_scores_are_grouped_by_architecture_not_by_config_group():
 	assert calibrate.arch_key(hf) == calibrate.arch_key(
 		{**hf, "params": {**hf["params"], "quantization": "none"}}
 	)
+
+
+def test_the_generator_writes_the_table_ruff_formatted(tmp_path):
+	from pathlib import Path
+
+	# PM, Oct 31: ruff reformatted the generated table during a merge; the generator now writes what ruff would
+	from preflight.engine import conformal
+
+	out = tmp_path / "_calibration_table.py"
+	calibrate.write_table(conformal.TABLE, out)
+	committed = Path(calibrate.__file__).resolve().parents[1] / "engine" / "_calibration_table.py"
+	assert out.read_text() == committed.read_text()
+	assert calibrate.ruff_formatted(out.read_text(), out) == out.read_text()

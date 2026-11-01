@@ -62,8 +62,8 @@ image = (
 	gpu="L4",
 	volumes={MOUNT: vol},
 	timeout=3 * 60 * 60,  # a batch of 8 configs, each capped by its own deadline in isolate.py
-	# no retries: a preempted batch is not re-run inside its wave (that would break the worst-case bound); its
-	# committed configs are kept and the rest go into a later, separately bounded wave
+	# no retries on failure; Modal may still restart a preempted input, which stops at the wave's end time (checked
+	# first in run_batch, and a watchdog ends the container there); sweep.worst_wave_seconds bills one restart
 	max_containers=4,
 	scaledown_window=30,
 	startup_timeout=180,  # matches sweep.STARTUP_S, so a slow start can't add to the per-wave timeout unbilled  # set, so the idle tail is known: sweep.SCALEDOWN_S bills it (a test checks they match)
@@ -104,11 +104,31 @@ class Sweeper:
 		timeout_s: float | None = None,
 		end_at: float | None = None,
 	) -> list[dict[str, Any]]:
+		import os
+		import threading
 		import time as _time
+
+		from preflight.corpus import sweep
+
+		# a warm container reused for the next wave must not carry the last wave's watchdog (review, Nov 1)
+		old = getattr(self, "_watchdog", None)
+		if old is not None:
+			old.cancel()
+			self._watchdog = None
+		# first, before any import or volume work: a restart after preemption that comes up past the end does nothing
+		if end_at is not None and _time.time() >= end_at:
+			return [{"status": "batch", "wall_s": 0.0, "reload_s": 0.0, "commit_s": 0.0, "late": True}]
+		if (
+			end_at is not None
+		):  # a hang anywhere (reload, a syscall) can't outlast the wave's end and its margin
+			left = end_at + sweep.END_MARGIN_S - _time.time()
+			dog = threading.Timer(max(1.0, left), lambda: os._exit(70))
+			dog.daemon = True  # never keeps an idle container alive at scale-down
+			dog.start()
+			self._watchdog = dog
 
 		import torch
 
-		from preflight.corpus import sweep
 		from preflight.corpus.configs import CorpusConfig
 		from preflight.corpus.isolate import run_isolated
 		from preflight.corpus.store import ResultStore
@@ -171,6 +191,9 @@ class Sweeper:
 				"commit_s": round(commit_s, 1),
 			}
 		)
+		if getattr(self, "_watchdog", None) is not None:  # the batch is done: no watchdog past it
+			self._watchdog.cancel()
+			self._watchdog = None
 		return out
 
 
@@ -387,7 +410,10 @@ def main(
 			args = [(gpu, [c.to_dict() for c in b], deadline, end_at) for b in chunk]
 			billing.remote(store_kind, gpu, {"wave": wave, "kind": "pending", "billed_s": round(worst, 1)})
 			w0 = time.monotonic()
-			results = list(sweeper.run_batch.starmap(args, return_exceptions=True))
+			# spawn, then wait with a wall-clock guard: starmap alone waits forever on a wave that never gets its GPUs
+			calls = [sweeper.run_batch.spawn(*a) for a in args]
+			wait_s = sweep.wave_wait_s(cap_s, minutes_left)
+			results, late = sweep.collect_wave(calls, wait_s, w0, time.monotonic)
 			wall = time.monotonic() - w0
 			measured = sweep.wave_billed_seconds(wall, len(args))
 			n_ran = sum(
@@ -410,7 +436,11 @@ def main(
 					print(f"[{gpu}] a batch failed: {type(res).__name__}: {res}")
 					continue
 				for r in res:
-					if r.get("status") == "batch":
+					if r.get("status") == "batch" and r.get("late"):
+						print(
+							f"[{gpu}] a batch started after the wave's end time (a restart after preemption?); it ran nothing"
+						)
+					elif r.get("status") == "batch":
 						print(
 							f"[{gpu}] batch: {r['wall_s']} s in the container, reload {r['reload_s']} s, commits {r['commit_s']} s"
 						)
@@ -425,6 +455,12 @@ def main(
 				bad = [r for r in res if r["gpu"] != gpu]
 				if bad:
 					print(f"[{gpu}] warning: ran on {bad[0]['gpu']}; rows filed under the actual GPU")
+			if late:
+				print(
+					f"[{gpu}] {late} of {len(calls)} batches gave nothing back in {wait_s:.0f} s (no {gpu} free, or a "
+					"hang past Modal's cut-off); cancelled them and stopping. Committed configs are kept; a rerun resumes."
+				)
+				return gpu
 			ran = [r for r in rows if r["status"] != "skipped"]
 			bugs = [r for r in ran if r.get("error_code") == "user_error"]
 			if ran and len(bugs) * 2 >= len(ran):

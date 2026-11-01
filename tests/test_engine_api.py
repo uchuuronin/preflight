@@ -3,6 +3,7 @@
 import gzip
 import json
 import math
+import statistics
 import time
 from pathlib import Path
 
@@ -69,11 +70,12 @@ def test_predict_is_pure_and_fast(ft):
 
 @pytest.fixture
 def no_cross_band(monkeypatch):
-	"""K1's own behaviour, without the held-out cross-GPU band, whose ±45% width makes every GPU move abstain."""
+	"""K1's own behaviour: engine.steptime_cross_gpu off and its held-out cross-GPU band gone."""
 	from dataclasses import replace as dc_replace
 
 	from preflight.engine import conformal
 
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
 	cells = {k: c for k, c in conformal.TABLE.cells.items() if k[0] != "time.step.cross"}
 	monkeypatch.setattr(conformal, "TABLE", dc_replace(conformal.TABLE, cells=cells))
 
@@ -179,7 +181,13 @@ def test_context_fill_follows_the_limit(ag):
 
 def test_grids_decode_back_to_predict(ft):
 	grids = api.build_grids(ft, ["batch_size", "seq_len"])
-	assert {g.target_id for g in grids} == {"memory.peak", "risk.oom", "time.total", "cost.total"}
+	assert {g.target_id for g in grids} == {
+		"memory.peak",
+		"risk.oom",
+		"time.total",
+		"cost.total",
+		"cost.gpu_hours",
+	}
 	g = next(g for g in grids if g.target_id == "time.total")
 	bs, sl = g.axes[0].values, g.axes[1].values
 	assert ft.knob("batch_size").current in bs and ft.knob("seq_len").current in sl
@@ -607,16 +615,298 @@ def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft, monkeyp
 	)
 
 
-def test_without_the_feature_a_gpu_move_keeps_k1s_own_band(ft):
+def test_without_the_feature_a_gpu_move_keeps_k1s_own_band(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
 	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
 	assert e.status != "abstain" and "held-out corpus pairs" not in (e.reason or "")
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
 	assert card.notes.startswith("calibration: simulated")
 
 
-def test_with_the_held_out_band_a_gpu_move_says_run_a_probe_there(ft, monkeypatch):
+def test_with_the_held_out_band_a_gpu_move_is_rough_with_a_probe_offer(ft, monkeypatch):
+	# Chiya, Oct 31 (option b): the calibrated band is shown past +-50%, labelled rough, with "run a probe here"
 	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
-	# Chiya, Oct 31: the honest cross-GPU band is about +-45%, past the +-50% abstention once the probe's own error
-	# is added, so moving the GPU dial asks for a probe on that GPU instead of showing a range
 	e = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
-	assert e.status == "abstain" and "run a probe here" in e.reason and "held-out corpus pairs" in e.reason
+	assert e.status == "extrapolated" and "rough, no probe on this GPU; run a probe here" in e.reason
+	assert math.log(e.hi / e.point) > math.log(1.5)  # past the usual +-50% abstention, on purpose
+	total = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.total"]
+	assert total.status != "abstain"
+	# abstains only where it did: no bf16 path on T4, and another vendor until corpus rows from it exist
+	assert api.predict(ft, {"gpu_type": "T4"}).root["time.step"].status == "abstain"
+	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
+	assert (
+		amd.status == "abstain"
+		and amd.reason.startswith("no AMD measurements")
+		and "another vendor" in amd.reason
+	)
+	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
+	assert "Rough, no probe on this GPU" in card.notes and "26 of 28" in card.notes
+	assert card.coverage == pytest.approx(2130 / 2286)
+
+
+def test_without_a_kernel_table_a_gpu_move_still_takes_the_held_out_band(ft, monkeypatch):
+	# review, Oct 31: the class-scaling fallback once kept a narrower band than the card's held_out claims
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", True)
+	bare = ft.model_copy(update={"probes": [p.model_copy(update={"kernels": None}) for p in ft.probes]})
+	e = api.predict(bare, {"gpu_type": "A100-SXM-80GB"}).root["time.step"]
+	cell = api.conformal.TABLE.lookup("time.step.cross", "A100-SXM-80GB", None)
+	assert e.status == "extrapolated" and "rough, no probe on this GPU" in e.reason
+	assert math.log(e.hi / e.point) >= cell.half_width * 0.999
+
+
+def test_with_the_feature_off_another_vendor_keeps_k1s_band(ft, monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
+	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
+	assert amd.status == "predicted" and "another vendor" not in (amd.reason or "")
+
+
+def test_the_step_band_covers_a_few_step_median_on_varying_batches():
+	# Chiya, Nov 1: the LoRA full run's median (1.87 s) sat outside a band built from the probe's 1.68 s; checked on
+	# that ground truth only (tests/fixtures/validation), never on the unseen scripts
+	from preflight.schema import load_record
+
+	rec = load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
+	gt = json.loads(
+		(Path(__file__).parent / "fixtures" / "validation" / "ground_truth_finetune_lora_hf.json").read_text()
+	)
+	from preflight.corpus.validate import steady_step_s
+
+	e = api.predict(rec).root["time.step"]
+	assert e.lo <= steady_step_s(gt) <= e.hi
+	assert "batches vary in length" in e.reason
+
+
+def test_the_vectorised_normal_quantile():
+	from statistics import NormalDist
+
+	import numpy as np
+
+	ps = np.asarray([1e-9, 0.001, 0.02, 0.3, 0.5, 0.9, 0.99, 1 - 1e-9])
+	assert np.allclose(api._norm_ppf(ps), [NormalDist().inv_cdf(x) for x in ps], atol=1e-7)
+
+
+def test_padded_step_follows_median_and_mean_and_stops_at_seq_len():
+	med, mean, spread = api._padded_step(150, 200, 1024, 4, 1)
+	assert med > 150 and mean > med and spread > 0  # each micro-batch pads to its longest row
+	assert api._padded_step(150, 200, 160, 4, 1)[2] < spread  # nearly every batch hits seq_len
+	assert api._padded_step(150, 150, None, 4, 1)[2] == 0.0  # every row the median: no spread
+	assert api._padded_step(150, 200, 1024, 4 * 8, 1)[0] > med  # 8 ranks: a step waits for the slowest
+	acc = api._padded_step(150, 200, 1024, 4, 4)[2]
+	assert acc == pytest.approx(spread / 2, rel=0.15)  # 4 micro-batches a step average out
+
+
+def _lora():
+	from preflight.schema import load_record
+
+	return load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
+
+
+def _with_lengths(rec, **extras):
+	probes = [p.model_copy(update={"extras": {**(p.extras or {}), **extras}}) for p in rec.probes]
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
+	# review, Nov 1: a factor taken from whichever probe matched jumped 4.5% when a knob moved onto another probe
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	for pid in ("p1", "p2", "p3"):
+		p = next(q for q in lens.probes if q.id == pid)
+		pv = api._probe_values(lens, p)
+		f = api._length_factor(lens, p)
+		med = api._padded_step(
+			200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
+		)[0]
+		seen = [x.tokens / x.samples for x in p.step_log if x.kind == "timed" and x.tokens and x.samples]
+		assert f == pytest.approx(med / statistics.median(seen))  # medians: the probe's p50 is a median step
+		ph = api.steptime.phases_seconds(p.step_time.by_phase, p.step_time.p50_s)
+		want = sum(
+			v * f if k in api.TOKEN_PHASES else v for k, v in ph.items()
+		)  # its token-bound phases corrected
+		got = api.predict(lens, {k: pv[k] for k in ("batch_size", "seq_len")}).root["time.step"]
+		assert got.point == pytest.approx(want, rel=1e-6) and got.status == "predicted"
+
+
+def test_a_knob_move_between_probes_doesnt_jump():
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	pts = [api.predict(lens, {"batch_size": b, "seq_len": 1024}).root["time.step"].point for b in (2, 3, 4)]
+	assert pts[0] < pts[1] < pts[2]  # the fit interpolates between the corrected probes
+
+
+def test_without_the_datasets_lengths_the_probes_spread_sets_both_terms():
+	rec = _lora()
+	p = next(q for q in rec.probes if q.id == "p1")
+	lt = api._length_term(rec, {}, p, 1000)
+	k = p.step_time.n_steps
+	seen = math.log(p.step_time.p95_s / p.step_time.p50_s) / api.steptime.Z90
+	assert lt.total_scale == 1.0
+	assert lt.step_sigma == pytest.approx(api.MEDIAN_SE * seen / math.sqrt(k))
+	assert lt.total_sigma == pytest.approx(seen / math.sqrt(k))
+
+
+def test_a_long_tail_moves_memory_not_time():
+	# Chiya, Nov 1: time follows the median and the mean; p99.9 and the longest row belong to peak memory
+	base = _with_lengths(_lora(), dataset_median_tokens=140.0, dataset_mean_tokens=152.0)
+	tail = _with_lengths(base, dataset_p999_tokens=1000.0, dataset_max_tokens=4000.0)
+	a, b = api.predict(base).root["time.step"], api.predict(tail).root["time.step"]
+	assert a.point == b.point and a.hi == b.hi
+	assert math.log(a.hi / a.point) < math.log(1.5)  # a long-tailed record doesn't push time to abstain
+
+
+def _lora_steps(n=1000):
+	rec = _lora()
+	sm = rec.job.script_map
+	sm = sm.model_copy(update={"training": sm.training.model_copy(update={"max_steps": n})})
+	return rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm})})
+
+
+def test_a_total_follows_the_mean_and_its_length_error_shrinks_with_the_steps():
+	rec = _with_lengths(_lora_steps(1000), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	p = next(q for q in rec.probes if q.id == "p1")
+	lt = api._length_term(rec, {}, p, 1000)
+	pv = api._probe_values(rec, p)
+	_, _, spread = api._padded_step(
+		200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
+	)
+	assert lt.total_sigma == pytest.approx(spread / math.sqrt(1000)) and lt.total_scale > 1
+	out = api.predict(rec).root
+	t, st = out["time.total"], out["time.step"]
+	assert t.point > 1000 * st.point  # the mean step is above the median step
+	assert math.log(t.hi / t.point) < math.log(st.hi / st.point)
+
+
+def test_the_cold_cost_doesnt_grow_with_accumulation():
+	import time
+
+	api._padded_step.cache_clear()
+	t0 = time.perf_counter()
+	api._padded_step(150.0, 200.0, 1024.0, 8, 1024)
+	assert time.perf_counter() - t0 < 0.5  # about 4,000 quantiles whatever the accumulation
+
+
+def test_rl_and_packed_rows_take_no_padding_term():
+	rec = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	p = next(q for q in rec.probes if q.id == "p1")
+	assert api._length_term(rec, {"packing": True}, p).total_scale == 1.0
+	rl = rec.model_copy(update={"job": rec.job.model_copy(update={"lens": "rl"})})
+	assert api._length_term(rl, {}, p) is None
+
+
+def _at_dataset(rec, med_tokens=200.0, mean_tokens=260.0, log=True):
+	"""Each probe's timed steps padded to exactly the run's median, so the probe saw the run's batches."""
+	probes = []
+	for p in rec.probes:
+		pv = api._probe_values(rec, p)
+		run_med, run_mean, _ = api._padded_step(
+			med_tokens,
+			mean_tokens,
+			float(pv["seq_len"]),
+			int(pv["batch_size"]),
+			int(pv.get("grad_accum") or 1),
+		)
+		upd = {
+			"extras": {
+				**(p.extras or {}),
+				"dataset_median_tokens": med_tokens,
+				"dataset_mean_tokens": mean_tokens,
+			}
+		}
+		if log:
+			upd["step_log"] = [
+				x.model_copy(update={"tokens": round(run_med * x.samples)})
+				if x.kind == "timed" and x.samples
+				else x
+				for x in p.step_log
+			]
+		else:
+			upd["step_log"] = []
+			upd["data"] = p.data.model_copy(
+				update={"tokens_per_sample_mean": run_mean * (1 - p.data.padding_fraction)}
+			)
+		probes.append(p.model_copy(update=upd))
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_a_probe_that_saw_the_runs_data_is_left_alone():
+	# review, Nov 1: a median-over-mean factor cut such a probe by 16%
+	for log in (True, False):  # medians from the step log, or the mean-over-mean fallback without one
+		rec = _at_dataset(_lora(), log=log)
+		for p in rec.probes:
+			if p.status in api.OK_PROBE:
+				assert api._length_factor(rec, p) == pytest.approx(1.0, abs=0.01)
+
+
+def test_one_uncorrectable_probe_leaves_every_probe_uncorrected():
+	# review, Nov 1: break p2, query between the probes (batch 3), where a mixed fit would show
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	mixed = lens.model_copy(
+		update={
+			"probes": [
+				q.model_copy(update={"data": q.data.model_copy(update={"padding_fraction": None})})
+				if q.id == "p2"
+				else q
+				for q in lens.probes
+			]
+		}
+	)
+	q = {"batch_size": 3}
+	assert api.predict(mixed, q).root["time.step"].point == pytest.approx(
+		api.predict(_lora(), q).root["time.step"].point
+	)
+	assert api.predict(lens, q).root["time.step"].point != pytest.approx(
+		api.predict(_lora(), q).root["time.step"].point
+	)
+
+
+def test_dollars_are_gpu_hours_times_the_rate_so_the_browser_can_recompute(ft):
+	# Chiya, Nov 1: C recomputes cost.total at a user's own rate; the interval is the quantity's
+	p = api.predict(ft).root
+	hours, usd = p["cost.gpu_hours"], p["cost.total"]
+	rate = gpus.price("L4", "modal").usd_per_hour
+	assert hours.unit == "gpu_hours"
+	for a, b in ((hours.point, usd.point), (hours.lo, usd.lo), (hours.hi, usd.hi)):
+		assert a * rate == pytest.approx(b)
+	assert "cost.gpu_hours" in {t.id for t in api.targets_for(ft)}
+
+
+def test_no_amd_measurements_on_every_engine_surface(ft):
+	# Chiya, Nov 1: the account is on a verification hold and the AMD slice is a config list
+	assert api.calibration_summary()["amd"] == "no AMD measurements"
+	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
+	assert "No AMD measurements" in card.notes
+	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
+	assert amd.status == "abstain" and amd.reason.startswith("no AMD measurements")
+
+
+def test_one_fit_uses_one_estimator():
+	# review, Nov 1: a probe without a step log beside ones with it once mixed the median and mean factors
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	no_log = lens.model_copy(
+		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
+	)
+	for p in no_log.probes:
+		if p.id in ("p1", "p3"):
+			assert api._length_factor(no_log, p, False) != api._length_factor(no_log, p, True)
+	# with one probe lacking a log, every probe takes the mean factor
+	timed = [p for p in no_log.probes if p.status in api.OK_PROBE and p.step_time and p.step_time.p50_s]
+	assert not all(api._probe_rows(p) for p in timed)
+
+
+def test_no_gpu_no_gpu_hours(ft):
+	cpu = ft.model_copy(update={"env": ft.env.model_copy(update={"gpu": None})})
+	assert api.predict(cpu).root["cost.gpu_hours"].status == "abstain"
+
+
+def test_a_missing_step_log_sends_every_probe_to_the_mean_factor():
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	one = lens.model_copy(
+		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
+	)
+	f_one = {
+		p.id: api._length_factor(
+			one, p, all(api._probe_rows(q) for q in one.probes if q.status in api.OK_PROBE)
+		)
+		for p in one.probes
+		if p.status in api.OK_PROBE
+	}
+	f_mean = {p.id: api._length_factor(lens, p, False) for p in lens.probes if p.status in api.OK_PROBE}
+	assert f_one == pytest.approx(f_mean)
