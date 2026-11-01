@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boardingState, type BoardingEvent, STAGES } from "./boarding";
+import { boardingState, type BoardingEvent, metaModelName, modelsRan, STAGES } from "./boarding";
 
 const ev = (seq: number, stage: BoardingEvent["stage"], more: Partial<BoardingEvent> = {}): BoardingEvent => ({
 	job_id: "01JOB",
@@ -78,5 +78,27 @@ describe("where a job stopped", () => {
 		expect(STAGES[boardingState([ev(0, "queued"), ev(1, "triage")]).at]?.key).toBe("boarding.stage.triage");
 		expect(boardingState([ev(0, "predicting"), ev(1, "done")]).at).toBe(STAGES.length - 1);
 		expect(boardingState([]).at).toBe(-1);
+	});
+});
+
+
+describe("model tags on the route (audit finding 12)", () => {
+	const read = STAGES.findIndex((s) => s.key === "boarding.stage.read");
+	const triage = STAGES.findIndex((s) => s.key === "boarding.stage.triage");
+
+	it("show a Meta model only where the record says it was called", () => {
+		// A real record from A's L4 run: Muse Spark mapped the script, no triage ran.
+		const ran = modelsRan([{ provider: "meta", model: "muse-spark-1.3", purpose: "script_map", ok: true }]);
+		expect(ran[read]).toEqual(["Muse Spark"]);
+		expect(ran[triage]).toEqual([]);
+		expect(ran.flat()).toEqual(["Muse Spark"]);
+	});
+
+	it("show nothing before the record says anything, for failed calls, or for other models", () => {
+		expect(modelsRan(undefined).flat()).toEqual([]);
+		expect(modelsRan([{ model: "muse-spark-1.3", purpose: "script_map", ok: false }]).flat()).toEqual([]);
+		expect(modelsRan([{ model: "gpt-x", purpose: "triage" }]).flat()).toEqual([]);
+		expect(modelsRan([{ model: "meta-models/muse-spark-open-1026", purpose: "claim_check" }])[triage]).toEqual(["Muse Spark Open"]);
+		expect(metaModelName("muse-spark-open-1026")).toBe("Muse Spark Open");
 	});
 });

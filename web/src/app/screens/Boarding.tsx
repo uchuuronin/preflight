@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { t } from "../../lib/i18n";
-import { type BoardingEvent, boardingState, STAGES } from "../boarding";
+import { type BoardingEvent, boardingState, type ModelCallSeen, modelsRan, STAGES } from "../boarding";
 import { go, href } from "../route";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
@@ -35,6 +35,25 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	}, [jobId]);
 
 	const { last, done, failed, cancelled, open, error, at: idx } = boardingState(events);
+
+	// A model's tag shows only once the record says it was called (its provenance), never just
+	// because the job reached that leg. Re-read when the record changes (record_rev).
+	const rev = events.reduce((n, e) => Math.max(n, e.record_rev ?? 0), 0);
+	const [calls, setCalls] = useState<ModelCallSeen[]>([]);
+	useEffect(() => {
+		if (!open) return;
+		let gone = false;
+		fetch(`${API_BASE}/v1/records/${encodeURIComponent(open)}`, { credentials: "same-origin" })
+			.then((r) => (r.ok ? r.json() : null))
+			.then((rec: { provenance?: ModelCallSeen[] } | null) => {
+				if (!gone && rec?.provenance) setCalls(rec.provenance);
+			})
+			.catch(() => {});
+		return () => {
+			gone = true;
+		};
+	}, [open, rev, done]);
+	const ran = modelsRan(calls);
 	const progress = done ? 100 : Math.max(0, idx) * 25;
 
 	return (
@@ -64,7 +83,11 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 						>
 							<span className="pf-stage__dot" aria-hidden="true" />
 							{t(s.key)}
-							{s.model ? <span className="pf-model">{s.model}</span> : null}
+							{ran[i]?.map((m) => (
+								<span key={m} className="pf-model">
+									{m}
+								</span>
+							))}
 							{i === idx && failed ? <span className="pf-stage__stopped">{t(cancelled ? "boarding.stage.cancelled_here" : "boarding.stage.stopped_here")}</span> : null}
 						</li>
 					))}
