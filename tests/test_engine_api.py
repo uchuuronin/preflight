@@ -1122,7 +1122,7 @@ def test_a_query_is_sized_by_the_dataset_s_longest_row_when_the_recorder_found_i
 
 
 def test_a_partial_scan_never_sizes_a_query_below_seq_len():
-	"""Review, Nov 1: 1,000 rows of 5M scanned, longest 520, read 'unlikely' for a run that may meet 1,024."""
+	"""Review, Nov 1: 1,000 rows of 5M scanned, longest 520, read P(OOM) 2.5% for a run that may meet 1,024."""
 	plain = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
 	part = {"dataset_max_tokens": 520, "dataset_rows_scanned": 1000, "dataset_rows_total": 5_000_000}
 	p = api.predict(_lora_l4(**part), {"eval_batch_size": 4}).root["memory.peak"]
@@ -1151,7 +1151,7 @@ def test_the_eval_wedge_carries_the_measured_context():
 
 def test_when_no_single_move_clears_an_oom_the_record_carries_grids_over_pairs_that_do():
 	"""Chiya, Nov 1: on the LoRA zoo record every single fix still read 0.97; eval batch 4 with seq_len 512 reads
-	17.5 GiB, unlikely. The guide reads such a combined move off a 2-D local grid."""
+	17.5 GiB, P(OOM) 2.5%, tight. The guide reads such a combined move off a 2-D local grid."""
 	from preflight.schema.encoding import decode_f16
 
 	rec = _lora_l4()
