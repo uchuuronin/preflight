@@ -297,16 +297,50 @@ def _with_full_runs(row: Row, flags: list[tuple[str, bool | None]]) -> Row:
 	return row
 
 
-def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
-	runs = [score_run(r, base) for r in manifest.get("runs", [])]
+# what a manifest's "calibrates" names, per Scored field: "step" covers same-GPU, other-GPU and the band
+_ROWS = {"memory": "memory", "step_same": "step", "step_other": "step", "rollout": "rollout", "serving": "serving",
+	"agent": "agent"}  # fmt: skip
 
-	# per run, not per script: two runs of one script can differ (review, Nov 1)
-	calibrates = [set(r.get("calibrates") or ()) for r in manifest.get("runs", [])]
+
+def _row_of(attr: str) -> str:
+	base = attr.removesuffix("_inside")
+	return _ROWS.get(base, base)
+
+
+def models_used(runs: list[dict], base: Path) -> list[str]:
+	"""Every model id and version the engine scored these runs with, and the calibration table's version, so the
+	table can show that nothing was retuned on the unseen scripts (Chiya, Nov 1: the engine is frozen at the
+	validation-freeze tag)."""
+	from preflight.engine import api, conformal
+
+	ids: set[str] = set()
+	for run in runs:
+		rec = _record(base / run["record"])
+		ids |= {e.model_id for e in api.predict(rec, run.get("values") or None).root.values() if e.model_id}
+	return [*sorted(ids), f"calibration table {conformal.TABLE.version}"]
+
+
+def calibration_note(manifest: dict) -> str:
+	"""The runs that calibrated a model, by name: they are 'used for calibration', never held out."""
+	used = [
+		f"{r.get('script')} ({'every row' if '*' in r['calibrates'] else ', '.join(r['calibrates'])})"
+		for r in manifest.get("runs", [])
+		if r.get("calibrates")
+	]
+	return f"Used for calibration, so not held out: {'; '.join(used)}." if used else ""
+
+
+def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
+	all_runs = [score_run(r, base) for r in manifest.get("runs", [])]
+	# per run, not per script: two runs of one script can differ (review, Nov 1). "*" is a run used for calibration
+	# altogether (Chiya, Nov 1: the Oct 31 LoRA run), which no held-out row scores
+	all_cal = [set(r.get("calibrates") or ()) for r in manifest.get("runs", [])]
+	keep = [i for i, cal in enumerate(all_cal) if "*" not in cal]
+	runs = [all_runs[i] for i in keep]
+	calibrates = [all_cal[i] for i in keep]
 
 	def flags(attr, only=None):
-		row = attr.removesuffix(
-			"_inside"
-		)  # a run that calibrated a model is neither its point nor its band check
+		row = _row_of(attr)  # a run that calibrated a model is neither its point nor its band check
 		return [
 			(r.script, getattr(r, attr))
 			for r, cal in zip(runs, calibrates, strict=True)
@@ -385,7 +419,7 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		(f"{r.script}:{k}", getattr(r, k))
 		for r, cal in zip(runs, calibrates, strict=True)
 		for k in ("memory_inside", "step_inside", "rollout_inside", "serving_inside", "agent_inside")
-		if k.removesuffix("_inside") not in cal
+		if _row_of(k) not in cal
 	]
 	rows.append(
 		_share_row(
@@ -451,7 +485,7 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 			share=1.0,
 		)
 	)
-	return rows, runs
+	return rows, all_runs
 
 
 def reliability(scored: list[Scored]) -> str:

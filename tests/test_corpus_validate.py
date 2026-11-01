@@ -30,15 +30,21 @@ def test_every_plan_target_has_a_row(today):
 	]  # fmt: skip
 
 
-def test_the_lora_full_run_on_oct_31(today):
+def test_the_lora_full_run_on_oct_31_is_calibration_not_held_out(today):
+	# Chiya, Nov 1: the step band was widened after looking at it, so only Monday's full runs are held out
 	rows, runs = today
 	(lora,) = [r for r in runs if r.script == "finetune_lora_hf"]
-	assert lora.oom_actual is True and lora.oom_p == 1.0  # the eval ran out, and the probe said so
-	assert lora.memory is None  # a run that ran out never showed its full need, so memory isn't scored on it
-	oom = _row(rows, "OOM prediction")
-	assert oom.hit and "missed: none" in oom.note
-	assert _row(rows, "Planted problems caught").hits == 3
-	assert _row(rows, "Step time, same GPU").hits == 1
+	assert lora.oom_actual is True and lora.oom_p == 1.0  # still scored, for the record
+	for m in ("OOM prediction", "Step time, same GPU", "Planted problems caught", "Interval coverage"):
+		assert _row(rows, m).cells()[3] == "not measured"
+	m = json.loads((FIX / "manifest_oct31.json").read_text())
+	assert "Used for calibration, so not held out: finetune_lora_hf (every row)" in V.calibration_note(m)
+
+
+def test_the_scorer_names_the_models_it_scored_with():
+	m = json.loads((FIX / "manifest_oct31.json").read_text())
+	used = V.models_used(m["runs"], FIX)
+	assert any(x.startswith("memory-analytical@") for x in used) and used[-1].startswith("calibration table ")
 
 
 def test_rows_with_nothing_to_score_say_not_measured(today):

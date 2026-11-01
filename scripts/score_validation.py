@@ -28,7 +28,12 @@ def main(argv: list[str] | None = None) -> int:
 	manifest = json.loads(args.manifest.read_text())
 	div = json.loads(args.divergence.read_text()) if args.divergence else None
 	rows, runs = validate.build(manifest, args.manifest.parent, div)
-	stamp = f"Scored {datetime.now(UTC):%Y-%m-%d %H:%M} UTC from {args.manifest.name}: {len(runs)} runs."
+	held = sum(1 for r in manifest.get("runs", []) if not r.get("calibrates"))
+	models = validate.models_used(manifest.get("runs", []), args.manifest.parent)
+	stamp = (
+		f"Scored {datetime.now(UTC):%Y-%m-%d %H:%M} UTC from {args.manifest.name}: {len(runs)} runs, {held} held out. "
+		f"{validate.calibration_note(manifest)} Models: {', '.join(models)}."
+	)
 	table = validate.markdown(rows, stamp)
 	if args.out:
 		args.out.write_text(table)
