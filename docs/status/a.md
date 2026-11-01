@@ -28,6 +28,13 @@ Updated Sun Nov 1, 16:55 ET.
 
 ## Known limits, on purpose
 
+- The Glimmer arm prices each call by its own wall time at the A100-40GB rate: calls sharing the
+  container are each charged in full and its cold start and idle time aren't, so the proxy's count
+  isn't Modal's bill. Each call reserves its longest possible time, so 4 calls in flight hold
+  about $0.93 at a 200 s timeout (review, Nov 1).
+- The serving probe's 1,024-token cap (a-serving-cap, 305b745) is held back from the Nov 1 night
+  deploy: B's serving simulation reads the probe's reply lengths as the real ones and doesn't read
+  `extras.serving_probe_max_tokens` yet, so it would under-predict long replies as measured.
 - Structured replies (Muse Spark, Spark Open, Glimmer) are read leniently: the JSON object after
   any reasoning, the last fenced one, else the outermost braces, validated in full. A reply whose
   only object is one it quoted from the visitor's log is accepted as the answer; it can only

@@ -537,7 +537,8 @@ def test_a_self_hosted_upstream_is_priced_by_gpu_time_with_its_own_headers_and_r
 		max_usd_total=1.0, timeout_s=10.0, transport=httpx.MockTransport(handler))  # fmt: skip
 	proxy.start()
 	try:
-		r = _chat(proxy, "g1")
+		r = httpx.post(f"{_url(proxy, 'g1')}/chat/completions", json={"model": "muse-spark-1.3",
+			"messages": [{"role": "user", "content": "hi"}]}, headers={"MODAL-KEY": "the-scripts"}, timeout=10)  # fmt: skip
 		assert r.status_code == 200
 		assert [s[0] for s in seen] == ["POST", "GET"] and all(s[2] == "mk" for s in seen)
 		assert all(s[3] == "Bearer glimmer" for s in seen)  # the visitor's key never goes upstream

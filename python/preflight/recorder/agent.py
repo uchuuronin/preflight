@@ -57,7 +57,8 @@ FORWARDED = {"chat/completions", "responses", "completions"}
 _PATH = re.compile(r"^/t/(?P<token>[A-Za-z0-9_-]{16,64})/v1/(?P<rest>[a-z/]{1,40})$")
 _TASK_ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}")
 _DROP_HEADERS = {"authorization", "host", "content-length", "connection", "transfer-encoding",
-	"accept-encoding", "x-api-key", "api-key", "openai-organization", "openai-project", "cookie"}  # fmt: skip
+	"accept-encoding", "x-api-key", "api-key", "openai-organization", "openai-project", "cookie",
+	"modal-key", "modal-secret"}  # fmt: skip  # a self-hosted upstream's auth is the proxy's alone
 _HOP = {"connection", "transfer-encoding", "content-length", "content-encoding", "keep-alive"}
 
 
