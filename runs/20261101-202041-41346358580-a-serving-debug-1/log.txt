@@ -1,0 +1,152 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-qzgGaNtxNehoBn5L4yUJIH
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+└── ✓ Created Function diagnose_hosted.
+[ground truth] serving_vllm: serve.py, lens serving, serving image, 2 files; waiting for an L4, else the A10 (Modal queues it)
+[ground truth] container up on the A10; 2 files of serving_vllm
+[ground truth 20:21:04] bare run of serving_vllm: 1 optimizer steps, at most 420 s
+[bare] running /tmp/gt-1uciabe7/serve.py for 1 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ql1pn1sa/hf/hub/datasets--databricks--databricks-dolly-15k/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ql1pn1sa/hf/hub/datasets--databricks--databricks-dolly-15k/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ql1pn1sa/hf/hub/datasets--databricks--databricks-dolly-15k/.no_exist'
+
+[1AGenerating train split:   0%|          | 0/15011 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 15011/15011 [00:00<00:00, 201601.97 examples/s]
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ql1pn1sa/hf/hub/models--Qwen--Qwen2.5-7B-Instruct/.no_exist'
+INFO 11-01 20:21:22 config.py:350] This model supports multiple tasks: {'embedding', 'generate'}. Defaulting to 'generate'.
+INFO 11-01 20:21:22 config.py:1136] Chunked prefill is enabled with max_num_batched_tokens=8192.
+INFO 11-01 20:21:22 llm_engine.py:249] Initializing an LLM engine (v0.6.4.post1) with config: model='Qwen/Qwen2.5-7B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-7B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=32768, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto, quantization_param_path=None, device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='outlines'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-7B-Instruct, num_scheduler_steps=1, chunked_prefill_enabled=True multi_step_stream_outputs=True, enable_prefix_caching=False, use_async_output_proc=True, use_cached_outputs=False, chat_template_text_format=string, mm_processor_kwargs=None, pooler_config=None)
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ql1pn1sa/hf/hub/models--Qwen--Qwen2.5-7B-Instruct/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ql1pn1sa/hf/hub/models--Qwen--Qwen2.5-7B-Instruct/.no_exist'
+INFO 11-01 20:21:23 selector.py:135] Using Flash Attention backend.
+INFO 11-01 20:21:23 model_runner.py:1072] Starting to load model Qwen/Qwen2.5-7B-Instruct...
+INFO 11-01 20:21:24 weight_utils.py:243] Using model weights format ['*.safetensors']
+Ignored error while writing commit hash to /tmp/gt-caches-ql1pn1sa/hf/hub/models--Qwen--Qwen2.5-7B-Instruct/refs/main: [Errno 30] Read-only file system: '/tmp/gt-caches-ql1pn1sa/hf/hub/models--Qwen--Qwen2.5-7B-Instruct/refs/main'.
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:01<00:04,  1.36s/it]
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:02<00:02,  1.39s/it]
+Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:04<00:01,  1.65s/it]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:06<00:00,  1.51s/it]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:06<00:00,  1.51s/it]
+
+INFO 11-01 20:21:30 model_runner.py:1077] Loading model weights took 14.2487 GB
+INFO 11-01 20:21:32 worker.py:232] Memory profiling results: total_gpu_memory=22.06GiB initial_memory_usage=14.57GiB peak_torch_memory=15.69GiB memory_usage_post_profile=14.59GiB non_torch_memory=0.33GiB kv_cache_size=3.83GiB gpu_memory_utilization=0.90
+INFO 11-01 20:21:32 gpu_executor.py:113] # GPU blocks: 4481, # CPU blocks: 4681
+INFO 11-01 20:21:32 gpu_executor.py:117] Maximum concurrency for 32768 tokens per request: 2.19x
+INFO 11-01 20:21:34 model_runner.py:1400] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI.
+INFO 11-01 20:21:34 model_runner.py:1404] If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
+INFO 11-01 20:21:49 model_runner.py:1518] Graph capturing finished in 15 secs, took 0.18 GiB
+
+[1AProcessed prompts:   0%|          | 0/1024 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]WARNING 11-01 20:22:14 scheduler.py:1481] Sequence group 255 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=1
+WARNING 11-01 20:22:20 scheduler.py:1481] Sequence group 205 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=51
+WARNING 11-01 20:22:30 scheduler.py:1481] Sequence group 155 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=101
+WARNING 11-01 20:22:45 scheduler.py:1481] Sequence group 105 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=151
+WARNING 11-01 20:23:18 scheduler.py:1481] Sequence group 55 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=201
+
+[1AProcessed prompts:   0%|          | 1/1024 [03:48<64:53:04, 228.33s/it, est. speed input: 0.64 toks/s, output: 17.94 toks/s]
+[1AProcessed prompts:   2%|▏         | 17/1024 [04:05<2:57:23, 10.57s/it, est. speed input: 11.53 toks/s, output: 284.20 toks/s]
+[1AProcessed prompts:   2%|▏         | 18/1024 [04:16<2:58:44, 10.66s/it, est. speed input: 11.17 toks/s, output: 287.18 toks/s]
+[1AProcessed prompts:   2%|▏         | 19/1024 [04:27<2:58:17, 10.64s/it, est. speed input: 11.30 toks/s, output: 291.22 toks/s]WARNING 11-01 20:26:23 scheduler.py:1481] Sequence group 42 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=251
+
+[1AProcessed prompts:   2%|▏         | 20/1024 [04:36<2:55:13, 10.47s/it, est. speed input: 11.08 toks/s, output: 296.26 toks/s]
+[1AProcessed prompts:   2%|▏         | 21/1024 [04:44<2:49:54, 10.16s/it, est. speed input: 10.90 toks/s, output: 301.84 toks/s]
+[1AProcessed prompts:   2%|▏         | 22/1024 [04:52<2:42:06,  9.71s/it, est. speed input: 10.77 toks/s, output: 307.98 toks/s]
+[1AProcessed prompts:   2%|▏         | 23/1024 [04:59<2:33:44,  9.22s/it, est. speed input: 10.64 toks/s, output: 314.15 toks/s]
+[1AProcessed prompts:   2%|▏         | 24/1024 [05:06<2:22:53,  8.57s/it, est. speed input: 10.54 toks/s, output: 320.99 toks/s]
+[1AProcessed prompts:   2%|▏         | 25/1024 [05:12<2:12:10,  7.94s/it, est. speed input: 10.45 toks/s, output: 327.97 toks/s]
+[1AProcessed prompts:   3%|▎         | 26/1024 [05:19<2:09:41,  7.80s/it, est. speed input: 13.83 toks/s, output: 333.21 toks/s]
+[1AProcessed prompts:   3%|▎         | 27/1024 [05:22<1:49:19,  6.58s/it, est. speed input: 13.90 toks/s, output: 342.51 toks/s]
+[1AProcessed prompts:   3%|▎         | 28/1024 [05:30<1:54:01,  6.87s/it, est. speed input: 13.72 toks/s, output: 347.01 toks/s]
+[1AProcessed prompts:   3%|▎         | 29/1024 [05:35<1:43:17,  6.23s/it, est. speed input: 13.86 toks/s, output: 354.45 toks/s]
+[1AProcessed prompts:   3%|▎         | 30/1024 [05:39<1:34:18,  5.69s/it, est. speed input: 13.80 toks/s, output: 361.95 toks/s]
+[1AProcessed prompts:   3%|▎         | 31/1024 [05:43<1:27:18,  5.28s/it, est. speed input: 13.73 toks/s, output: 369.37 toks/s]
+[1AProcessed prompts:   3%|▎         | 32/1024 [05:47<1:20:56,  4.90s/it, est. speed input: 13.69 toks/s, output: 376.92 toks/s]
+[1AProcessed prompts:   3%|▎         | 33/1024 [05:51<1:15:16,  4.56s/it, est. speed input: 13.66 toks/s, output: 384.55 toks/s]
+[1AProcessed prompts:   3%|▎         | 34/1024 [05:55<1:10:32,  4.27s/it, est. speed input: 13.61 toks/s, output: 392.18 toks/s]
+[1AProcessed prompts:   3%|▎         | 35/1024 [05:58<1:06:11,  4.02s/it, est. speed input: 13.58 toks/s, output: 399.87 toks/s]
+[1AProcessed prompts:   4%|▎         | 36/1024 [06:01<1:02:03,  3.77s/it, est. speed input: 13.57 toks/s, output: 407.67 toks/s]
+[1AProcessed prompts:   4%|▎         | 37/1024 [06:05<1:00:35,  3.68s/it, est. speed input: 14.15 toks/s, output: 415.00 toks/s]
+[1AProcessed prompts:   4%|▎         | 38/1024 [06:08<56:59,  3.47s/it, est. speed input: 14.14 toks/s, output: 422.79 toks/s]  
+[1AProcessed prompts:   4%|▍         | 39/1024 [06:11<55:22,  3.37s/it, est. speed input: 14.12 toks/s, output: 430.23 toks/s]
+[1AProcessed prompts:   4%|▍         | 40/1024 [06:14<52:28,  3.20s/it, est. speed input: 14.12 toks/s, output: 437.96 toks/s][ground truth 20:28:05] bare run ended (failed) after 421 s, None steps
+[ground truth 20:28:05] recorder run: 1 warmup + 3 timed steps, at most 359 s
+{
+  "script": "serving_vllm",
+  "entrypoint": "serve.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": {
+    "sync_overhead": null,
+    "hook_overhead": null,
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "serving",
+  "image": "serving",
+  "bare": {
+    "failed": "the bare run took longer than 420 s",
+    "tail": "t: 11.30 toks/s, output: 291.22 toks/s]WARNING 11-01 20:26:23 scheduler.py:1481] Sequence group 42 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=251\n\rProcessed prompts:   2%|\u258f         | 20/1024 [04:36<2:55:13, 10.47s/it, est. speed input: 11.08 toks/s, output: 296.26 toks/s]\rProcessed prompts:   2%|\u258f         | 21/1024 [04:44<2:49:54, 10.16s/it, est. speed input: 10.90 toks/s, output: 301.84 toks/s]\rProcessed prompts:   2%|\u258f         | 22/1024 [04:52<2:42:06,  9.71s/it, est. speed input: 10.77 toks/s, output: 307.98 toks/s]\rProcessed prompts:   2%|\u258f         | 23/1024 [04:59<2:33:44,  9.22s/it, est. speed input: 10.64 toks/s, output: 314.15 toks/s]\rProcessed prompts:   2%|\u258f         | 24/1024 [05:06<2:22:53,  8.57s/it, est. speed input: 10.54 toks/s, output: 320.99 toks/s]\rProcessed prompts:   2%|\u258f         | 25/1024 [05:12<2:12:10,  7.94s/it, est. speed input: 10.45 toks/s, output: 327.97 toks/s]\rProcessed prompts:   3%|\u258e         | 26/1024 [05:19<2:09:41,  7.80s/it, est. speed input: 13.83 toks/s, output: 333.21 toks/s]\rProcessed prompts:   3%|\u258e         | 27/1024 [05:22<1:49:19,  6.58s/it, est. speed input: 13.90 toks/s, output: 342.51 toks/s]\rProcessed prompts:   3%|\u258e         | 28/1024 [05:30<1:54:01,  6.87s/it, est. speed input: 13.72 toks/s, output: 347.01 toks/s]\rProcessed prompts:   3%|\u258e         | 29/1024 [05:35<1:43:17,  6.23s/it, est. speed input: 13.86 toks/s, output: 354.45 toks/s]\rProcessed prompts:   3%|\u258e         | 30/1024 [05:39<1:34:18,  5.69s/it, est. speed input: 13.80 toks/s, output: 361.95 toks/s]\rProcessed prompts:   3%|\u258e         | 31/1024 [05:43<1:27:18,  5.28s/it, est. speed input: 13.73 toks/s, output: 369.37 toks/s]\rProcessed prompts:   3%|\u258e         | 32/1024 [05:47<1:20:56,  4.90s/it, est. speed input: 13.69 toks/s, output: 376.92 toks/s]\rProcessed prompts:   3%|\u258e         | 33/1024 [05:51<1:15:16,  4.56s/it, est. speed input: 13.66 toks/s, output: 384.55 toks/s]\rProcessed prompts:   3%|\u258e         | 34/1024 [05:55<1:10:32,  4.27s/it, est. speed input: 13.61 toks/s, output: 392.18 toks/s]\rProcessed prompts:   3%|\u258e         | 35/1024 [05:58<1:06:11,  4.02s/it, est. speed input: 13.58 toks/s, output: 399.87 toks/s]\rProcessed prompts:   4%|\u258e         | 36/1024 [06:01<1:02:03,  3.77s/it, est. speed input: 13.57 toks/s, output: 407.67 toks/s]\rProcessed prompts:   4%|\u258e         | 37/1024 [06:05<1:00:35,  3.68s/it, est. speed input: 14.15 toks/s, output: 415.00 toks/s]\rProcessed prompts:   4%|\u258e         | 38/1024 [06:08<56:59,  3.47s/it, est. speed input: 14.14 toks/s, output: 422.79 toks/s]  \rProcessed prompts:   4%|\u258d         | 39/1024 [06:11<55:22,  3.37s/it, est. speed input: 14.12 toks/s, output: 430.23 toks/s]\rProcessed prompts:   4%|\u258d         | 40/1024 [06:14<52:28,  3.20s/it, est. speed input: 14.12 toks/s, output: 437.96 toks/s]",
+    "wall_s": 421.0
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 314.108,
+    "by_phase": {},
+    "generation": {
+      "calls": 1,
+      "seconds_total": 272.603725694,
+      "sequences": 32,
+      "new_tokens_mean": 4096.0,
+      "new_tokens_p95": 4096.0,
+      "new_tokens_max": 4096.0,
+      "max_new_tokens": 4096,
+      "truncation_rate": 1.0,
+      "backend": "vllm"
+    },
+    "extras": {
+      "host_rss_peak_bytes": 13253656576.0,
+      "generation_ending_known": 32.0
+    },
+    "rl": {
+      "group_size": null,
+      "prompts": 0,
+      "truncation_rate": 1.0,
+      "zero_spread_fraction": null
+    }
+  }
+}
+[ground truth 20:33:19] recorder run ended (ok) after 0 steps
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-qzgGaNtxNehoBn5L4yUJIH

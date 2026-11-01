@@ -1,0 +1,11 @@
+{
+	"name": "20261101-202041-41346358580-a-serving-debug-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41346358580",
+	"ref": "ws-a",
+	"sha": "d73b4e133495d457905dee7c71ababa6bfe1274d",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script serving_vllm --bare-steps 1 --recorder-steps 3 --warmup 1 --budget-min 14 --first-gpu L4",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T20:33:23Z"
+}
