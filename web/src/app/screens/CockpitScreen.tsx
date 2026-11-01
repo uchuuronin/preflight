@@ -17,7 +17,7 @@ import { ExportsSection } from "../../workspace/export/ExportsSection";
 import { CampaignCalendar } from "../../workspace/campaign/Calendar";
 import { planFromRecord } from "../../workspace/campaign/plan";
 import { currentKnobs } from "../../workspace/record/model";
-import { rateFactor } from "../../workspace/rate";
+import { estimateFactor } from "../../workspace/rate";
 import { Onboarding } from "../Onboarding";
 import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
 import { RlBand } from "../../workspace/cockpit/RlBand";
@@ -103,7 +103,7 @@ function Cockpit() {
 	const line = statusLine(record, estimates, state.knobs);
 	// A record that carries a campaign (B's to_campaign) draws its calendar; behind its flag.
 	const campaign = useMemo(
-		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k) => rateFactor(record, { ...currentKnobs(record), ...k }, state.rate)) : null),
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k, e) => estimateFactor(record, { ...currentKnobs(record), ...k }, e, state.rate)) : null),
 		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
 		[record, state.rate],
 	);
@@ -165,7 +165,8 @@ function Cockpit() {
 								) : null}
 								{fit ? null : mapKey}
 							</div>
-							{fit ? <FitMap /> : <Orbit />}
+							{/* Whichever view has the stage fills it: as wide and tall as the space between the dials and the side column allows. */}
+							<div className="pf-stage-fill">{fit ? <FitMap /> : <Orbit />}</div>
 						</div>
 						<div className="pf-side">
 							{fit ? (

@@ -809,15 +809,22 @@ a {
 
 .pf-deck {
 	flex: 1;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 20px;
+	display: grid;
+	/* Dials | the stage, which takes every pixel left over | the side column. */
+	grid-template-columns: auto minmax(0, 1fr) clamp(300px, 22vw, 380px);
+	grid-template-areas: "dials stage side";
+	gap: 24px;
 	align-items: center;
-	justify-content: center;
+}
+
+/* The cockpit (not the reading sections below it) breaks out of the page's 1240 px column on
+   a wide screen, so the stage can grow into it. */
+@media (min-width: 1300px) {
+	.pf-cockpit { margin-inline: calc(50% - min(840px, 50vw - 32px)); }
 }
 
 /* Dials */
-.pf-dials { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.pf-dials { grid-area: dials; display: flex; flex-direction: column; gap: 10px; }
 .pf-dial-wrap { width: 116px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .pf-dial {
 	position: relative;
@@ -930,7 +937,11 @@ a {
 }
 
 /* The orbit map */
-.pf-stage-wrap { flex: 1 1 480px; max-width: 600px; min-width: 0; }
+.pf-stage-wrap { grid-area: stage; align-self: stretch; min-width: 0; display: flex; flex-direction: column; }
+/* A size container: the view on the stage is as big as its box allows, at its own shape. */
+.pf-stage-fill { flex: 1; min-height: 540px; container-type: size; display: grid; place-items: center; }
+.pf-stage-fill > .pf-orbit,
+.pf-stage-fill > .pf-fit { width: min(100cqw, 100cqh * 600 / 560); }
 
 .pf-orbit { position: relative; width: 100%; aspect-ratio: 600 / 560; }
 .pf-orbit .react-flow { position: absolute; inset: 0; background: transparent; overflow: visible; }
@@ -1122,7 +1133,7 @@ a {
 .pf-key-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pf-fg); }
 
 /* Side column: node detail and the guide */
-.pf-side { position: relative; flex: 0 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.pf-side { grid-area: side; position: relative; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 
 .pf-detail {
 	display: flex;
@@ -1646,7 +1657,9 @@ a {
 /* ---------- Smaller screens ---------- */
 
 @media (max-width: 1100px) {
-	.pf-side { flex: 1 1 100%; max-width: 640px; }
+	/* The side column moves under the stage, which keeps the full width beside the dials. */
+	.pf-deck { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto; grid-template-areas: "dials stage" "side side"; }
+	.pf-side { justify-self: center; width: min(640px, 100%); }
 }
 
 @media (max-width: 760px) {
@@ -1665,10 +1678,13 @@ a {
 @media (max-width: 760px) {
 	.pf-cockpit { padding-block: 84px 16px; }
 	.pf-cockpit__head h1 { font-size: 28px; }
-	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; order: 2; width: 100%; }
+	.pf-deck { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "stage" "dials" "side"; gap: 20px; }
+	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 	.pf-dial-wrap { width: 106px; }
-	.pf-stage-wrap { order: 1; flex-basis: 100%; }
-	.pf-side { order: 3; }
+	/* No height to fill on a phone: the stage is the screen's width. */
+	.pf-stage-fill { min-height: 0; container-type: normal; display: block; }
+	.pf-stage-fill > .pf-orbit,
+	.pf-stage-fill > .pf-fit { width: 100%; }
 	.pf-dock__row { border-radius: 24px; }
 	.pf-knob { padding: 0 12px; }
 	.pf-core__num { font-size: 30px; }
