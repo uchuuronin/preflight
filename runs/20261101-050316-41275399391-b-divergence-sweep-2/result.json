@@ -1,0 +1,11 @@
+{
+	"name": "20261101-050316-41275399391-b-divergence-sweep-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41275399391",
+	"ref": "ws-b",
+	"sha": "6ce77300aa28ac32d3d36e98a34f3336fc4ec4d8",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::main --kind divergence --n 800 --budgets L4=12.00 --batch-size 16 --max-containers 4 --max-minutes 110 --deadline-s 120",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T06:52:20Z"
+}
