@@ -1095,3 +1095,44 @@ def test_a_skeleton_without_probes_gets_no_unrecorded_gpu_note():
 	p = api.predict(bare).root
 	assert p["memory.peak"].status != "abstain"  # review: so the note's own guard isn't what keeps it out
 	assert "isn't in the record" not in (p["memory.peak"].reason or "")
+
+
+def _lora_l4(**extras):
+	rec = load_record(
+		(Path(__file__).resolve().parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text()
+	)
+	if not extras:
+		return rec
+	probes = [
+		p.model_copy(update={"extras": {**(p.extras or {}), **extras}}) if p.id == "p1" else p
+		for p in rec.probes
+	]
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_a_query_is_sized_by_the_dataset_s_longest_row_when_the_recorder_found_it():
+	"""C, Nov 1: the LoRA zoo record read 30.7 GiB at eval batch 4, sized at seq_len 1,024 while its rows reached 517."""
+	plain = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
+	shorter = api.predict(
+		_lora_l4(dataset_max_tokens=700, dataset_rows_scanned=51760), {"eval_batch_size": 4}
+	).root
+	assert shorter["memory.peak"].point < 0.8 * plain.point
+	assert "longest row, 700 tokens (measured over 51,760 rows)" in shorter["memory.peak"].reason
+
+
+def test_without_the_longest_row_the_readout_says_it_sized_for_seq_len():
+	p = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
+	assert "sized for rows of 1024 tokens, the seq_len" in p.reason and "reached 517" in p.reason
+
+
+def test_rows_that_reach_the_probe_s_cut_keep_seq_len_and_say_so():
+	p = api.predict(_lora_l4(dataset_max_tokens=1024), {"eval_batch_size": 4}).root["memory.peak"]
+	assert p.point == pytest.approx(api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"].point)
+	assert "the dataset has rows that long" in p.reason
+
+
+def test_the_eval_wedge_carries_the_measured_context():
+	"""Nov 1: the eval moment's split took the 0.75 GiB guess while the point took the probes' 0.25 GiB."""
+	at8 = api.predict(_lora_l4(), {"eval_batch_size": 8}).root
+	at4 = api.predict(_lora_l4(), {"eval_batch_size": 4}).root
+	assert at8["memory.context"].point == pytest.approx(at4["memory.context"].point)

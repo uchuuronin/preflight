@@ -708,12 +708,64 @@ def _longest_seen(p) -> float | None:
 	return float(max(rows)) if rows else None
 
 
+def _dataset_longest(record: FlightRecord) -> tuple[float, float, int | None] | None:
+	"""The dataset's longest row as A's recorder measured it (Probe.extras dataset_max_tokens), with the seq_len it
+	was cut at and the rows scanned: from the probe that cut least, since each probe reads rows at its own knobs."""
+	best = None
+	for p in record.probes:
+		mx = (p.extras or {}).get("dataset_max_tokens") if p.status in OK_PROBE else None
+		if not mx:
+			continue
+		cut = float(_probe_values(record, p).get("seq_len") or 0)
+		rows = (p.extras or {}).get("dataset_rows_scanned")
+		if best is None or cut > best[1] or (cut == best[1] and float(mx) > best[0]):
+			best = (float(mx), cut, int(rows) if rows else None)
+	return best
+
+
+def _query_seq(record: FlightRecord, values: dict) -> tuple[float | None, str | None]:
+	"""The length a memory query is sized at, and a note saying why. A full run meets the dataset's longest row,
+	which a few probe batches don't see (review, Oct 30), so the tail sets peak memory (Chiya, Nov 1: p99.9 and max
+	belong to peak memory). With the longest row recorded, a query is sized at min(seq_len, longest row); without it,
+	at seq_len, and the readout says the probes' own rows were shorter (C, Nov 1: the LoRA zoo record's probes saw
+	517 tokens, a query was sized at 1,024, and no eval fix could clear the OOM that length implies)."""
+	if record.job.lens not in TOKEN_LENSES:
+		return None, None
+	q = float(values.get("seq_len") or 0)
+	known = _dataset_longest(record)
+	if known is not None:
+		mx, cut, rows = known
+		over = f" over {rows:,} rows" if rows else ""
+		if cut and mx >= cut:  # the probe's own cut hid the longest row: rows reach at least the cut
+			if q and q > cut:
+				return None, (
+					f"sized for rows of {q:.0f} tokens, the seq_len: rows reach at least {cut:.0f}{over}, and past "
+					"that isn't measured"
+				)
+			return (
+				None,
+				f"sized for rows of {q:.0f} tokens, the seq_len: the dataset has rows that long{over}",
+			)
+		seq = min(q, mx) if q else mx
+		return (
+			seq,
+			f"sized for the dataset's longest row, {seq:.0f} tokens (measured{over}), which a full run meets",
+		)
+	seen = [x for x in (_longest_seen(p) for p in record.probes if p.status in OK_PROBE) if x]
+	if q and seen and max(seen) < 0.9 * q:
+		return None, (
+			f"sized for rows of {q:.0f} tokens, the seq_len, as a full run may meet them: the probes' rows reached "
+			f"{max(seen):.0f}, and the dataset's longest row isn't recorded"
+		)
+	return None, None
+
+
 def _padded_seq(record: FlightRecord, values: dict, probe=None) -> float | None:
-	"""The sequence length activations were sized by, for fitting the memory model: a probe's longest padded row
-	(cut by its seq_len), from its step log. Queries keep their seq_len setting (None here): a full run meets the
-	dataset's longest row, which a few probe batches don't see, so sizing a query by the rows the probes saw could
-	say "fits" for a run that runs out of memory later (review, Oct 30)."""
-	if probe is None or record.job.lens not in TOKEN_LENSES:
+	"""The sequence length activations were sized by: a probe's longest padded row (cut by its seq_len), from its
+	step log; a query's from _query_seq (the dataset's longest row when it's recorded, else the seq_len setting)."""
+	if probe is None:
+		return _query_seq(record, values)[0]
+	if record.job.lens not in TOKEN_LENSES:
 		return None
 	longest = _longest_seen(probe)
 	sq = float(_probe_values(record, probe).get("seq_len") or 0)
@@ -827,10 +879,18 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		if est.breakdown.peak_moment == "eval":
 			# C's ring shows eval as its own wedge: the training moment's terms plus the eval spike
 			train = memory.breakdown(
-				arch, replace(setup, eval_batch=None), shape.batch, shape.seq, capacity_bytes=capacity
+				arch,
+				replace(setup, eval_batch=None),
+				shape.batch,
+				shape.seq,
+				context_bytes=ctx,  # Nov 1: the measured context, as the point has
+				capacity_bytes=capacity,
 			)
 			stack = {**train.stack, "eval_spike": est.breakdown.allocator_peak - train.allocator_peak}
 		res = replace(res, terms=_term_estimates(stack, res.peak))
+	_seq, seq_note = _query_seq(record, values)
+	if seq_note and res.peak.status != "abstain":
+		res = replace(res, peak=_with_note(res.peak, seq_note), oom=_with_note(res.oom, seq_note))
 	probed = any(
 		p.status in OK_PROBE for p in record.probes
 	)  # review: a skeleton has no GPU before any probe
