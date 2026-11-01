@@ -90,22 +90,26 @@ export function DetailSheet() {
 					})}
 				</dl>
 			) : null}
-			{findings.map((f) => (
-				<div key={f.id} className={`pf-finding pf-finding--${f.severity}`}>
-					<b>{f.title}</b>
-					{f.detail ? <p>{f.detail}</p> : null}
-					<p className="pf-dim">
-						{t(`finding.source.${f.source}`)}
-						{f.knob_id && knobs.get(f.knob_id) ? ` · ${t("detail.fix_with", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}` : ""}
-					</p>
-					{f.knob_id && knobs.has(f.knob_id) ? (
-						<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.openKnob(f.knob_id ?? null)}>
-							{t("detail.open_knob", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}
-						</button>
-					) : null}
-					<FixFinding finding={f} />
+			{findings.length ? (
+				<div className="pf-detail__findings">
+					{findings.map((f) => (
+						<div key={f.id} className={`pf-finding pf-finding--${f.severity}`}>
+							<b>{f.title}</b>
+							{f.detail ? <p>{f.detail}</p> : null}
+							<p className="pf-dim">
+								{t(`finding.source.${f.source}`)}
+								{f.knob_id && knobs.get(f.knob_id) ? ` · ${t("detail.fix_with", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}` : ""}
+							</p>
+							{f.knob_id && knobs.has(f.knob_id) ? (
+								<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.openKnob(f.knob_id ?? null)}>
+									{t("detail.open_knob", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}
+								</button>
+							) : null}
+							<FixFinding finding={f} />
+						</div>
+					))}
 				</div>
-			))}
+			) : null}
 			{drawer.map((p) => (
 				<AddonBoundary key={p.id} id={p.id}>
 					<p.component nodeId={node.id} record={record} knobs={state.knobs} estimates={estimates} />

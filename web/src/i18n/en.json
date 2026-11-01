@@ -638,6 +638,7 @@
 	"guide.run.submitted": "Queued: job {job}, position {position}. The result appears in this cockpit when it is measured.",
 	"guide.run.unavailable": "Measuring isn't open yet, so nothing ran and nothing was charged.",
 	"guide.run.queue_full": "The measuring queue is full right now. Try again in a little while.",
+	"guide.run.limit": "{message} Nothing ran and nothing was charged. The samples still work: open one from New flight.",
 	"guide.run.refused": "That can't run for this record.",
 	"guide.run.failed": "That didn't go through. Nothing was charged.",
 	"guide.run.running": "Starting…",

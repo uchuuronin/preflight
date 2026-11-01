@@ -845,6 +845,14 @@ a {
 	align-items: center;
 }
 
+@media (min-width: 1101px) {
+	.pf-deck.has-detail { grid-template-columns: auto minmax(0, 1fr) clamp(380px, 32vw, 560px); }
+}
+/* In a wide detail, a node's findings sit side by side. */
+/* No transition on the column: the focus glide reads the map's new size when it starts (review, Nov 1:
+   a sliding column shrank the map under the glide and it landed off centre, then jumped). */
+.pf-detail__findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 10px; align-items: start; }
+
 /* The cockpit (not the reading sections below it) breaks out of the page's 1240 px column on
    a wide screen, so the stage can grow into it. */
 @media (min-width: 1300px) {
@@ -980,6 +988,16 @@ a {
 .pf-stage-fill .pf-fit__body { align-items: stretch; }
 
 .pf-orbit { position: relative; width: 100%; aspect-ratio: 600 / 560; }
+/* Zoomed to a node, the loop runs past its box: its edges fade into the sky (32 px) instead of stopping
+   on a hard cut (Chiya, Nov 1). Masks don't animate, so the fade simply appears with the zoom. */
+.pf-orbit.is-zoomed {
+	-webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent), linear-gradient(to bottom, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+	-webkit-mask-composite: source-in;
+	mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent), linear-gradient(to bottom, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+	mask-composite: intersect;
+}
+/* A node with keyboard focus near the edge shows whole, ring and all. */
+.pf-orbit.is-zoomed:has(.pf-onode:focus-visible) { -webkit-mask-image: none; mask-image: none; }
 .pf-orbit .react-flow { position: absolute; inset: 0; background: transparent; overflow: visible; }
 .pf-orbit .react-flow__pane { cursor: default; }
 .pf-orbit .react-flow__node { cursor: pointer; }

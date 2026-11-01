@@ -71,6 +71,10 @@ export function GuidePanel() {
 	const [approvals, setApprovals] = useState<Array<{ id: number; name: string; args: Record<string, unknown>; run?: ToolRun; running?: boolean }>>([]);
 	const [cliff, setCliff] = useState<{ knobId: string; from: KnobValue } | null>(null);
 	const [liveStatus, setLiveStatus] = useState("ready");
+	// Whether the live guide has answered at least once, and whether a failed first press has already
+	// started the rule-based tour (it's started once, not again on a later failure).
+	const liveAnswered = useRef(false);
+	const autoStarted = useRef(false);
 	const live = flag("c.guide.live") && !fallback;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 	// The campaign plan the cockpit draws (same flag, same record), so the tour walks what's on screen.
@@ -452,7 +456,31 @@ export function GuidePanel() {
 			) : null}
 
 			{live ? (
-				<LiveGuideSection onFallback={setFallback} onStatus={setLiveStatus} />
+				<LiveGuideSection
+					onFallback={(message) => {
+						setFallback(message);
+						// The live guide failed before it ever answered (the visitor's first press): the
+						// rule-based tour starts in its place at once, rather than leaving a notice and a second
+						// button to press (the deploy's stranger gate, Nov 1: with the live guide on and no API,
+						// no move was offered). Only once, and not after the live guide has been talking: then
+						// the visitor's own moves and any suggestion on screen stay theirs to decide (review).
+						if (liveAnswered.current || autoStarted.current) return;
+						autoStarted.current = true;
+						restart();
+						// The pressed button is gone: focus the tour's first move, so a screen reader hears it.
+						requestAnimationFrame(() =>
+							requestAnimationFrame(() => {
+								const panel = document.querySelector<HTMLElement>(".pf-guide");
+								const next = [...(panel?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find((b) => b.textContent?.startsWith("Apply"));
+								(next ?? panel?.querySelector<HTMLButtonElement>("button"))?.focus();
+							}),
+						);
+					}}
+					onStatus={(s) => {
+						if (s !== "ready" && s !== "thinking") liveAnswered.current = true;
+						setLiveStatus(s);
+					}}
+				/>
 			) : (
 				<>
 					<p className="pf-guide__say">
@@ -495,7 +523,7 @@ export function GuidePanel() {
 
 			{approvals.map((a) => (
 				<div key={a.id} className="pf-guide__approval">
-					<p>{a.run ? t(`guide.run.${a.run.status}`, { job: a.run.job_id ?? "", position: a.run.queue_position ?? "" }) : t(`guide.approval.${a.name}`)}</p>
+					<p>{a.run ? t(`guide.run.${a.run.status}`, { job: a.run.job_id ?? "", position: a.run.queue_position ?? "", message: a.run.message ?? "" }) : t(`guide.approval.${a.name}`)}</p>
 					{a.run?.status === "submitted" && a.run.job_id ? (
 						<a className="pf-link" href={`#/boarding/${encodeURIComponent(a.run.job_id)}`}>
 							{t("guide.run.follow")}

@@ -407,3 +407,32 @@ def test_no_browser_tools_while_a_move_is_pending():
 	)
 	names = {t["name"] for t in build_tools(rec, set(), move_pending=True)}
 	assert names and names <= set(SERVER_TOOLS)
+
+
+def test_a_daily_limit_on_a_guide_probe_comes_back_in_the_job_stores_words():
+	"""A's demo limits (Nov 1): the guide's run_probe hears the limit, not 'the queue is full'."""
+
+	class Limited(Jobs):
+		async def submit(self, request, *, visitor, idempotency_key):
+			e = type("QueueFull", (RuntimeError,), {})(
+				"Preflight has used today's GPU budget: samples only until midnight ET"
+			)
+			e.code = "limit.daily_spend"
+			e.retry_after_s = 3600
+			raise e
+
+	with client(Model(), jobs=Limited()) as c:
+		res = c.post(
+			"/v1/guide/tools",
+			json={
+				"record": "lora-7b",
+				"tool": "run_probe",
+				"setting": SETTING["knobs"],
+				"knobs": {"eval_batch_size": 16},
+				"reason": "tight",
+			},
+			headers={"Idempotency-Key": "click-2"},
+		).json()
+	assert res["status"] == "limit"
+	assert res["code"] == "limit.daily_spend"
+	assert res["message"].startswith("Preflight has used today's GPU budget")
