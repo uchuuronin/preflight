@@ -57,7 +57,7 @@ The corpus was collected between Oct 28 and 31, 2026, on Modal, in a pinned imag
 ## Known biases and limits
 
 - **Small models.** Everything is sized for a single 24 GB card. Grouped models range from 0.9M to 667M parameters, with a median of 24M. The HF checkpoints range from 360M to 1.7B. Multi-GPU, FSDP, and models that need 80 GB aren't covered.
-- **GPU mix.** L4 and A10 dominate, L40S has a third of the configs and T4 a tenth. T4 has fp32 and fp16 groups only, because it has no bf16 path. AMD is planned (MI300X, the same groups as the NVIDIA GPUs).
+- **GPU mix.** L4 and A10 dominate, L40S has a third of the configs and T4 a tenth. T4 has fp32 and fp16 groups only, because it has no bf16 path. **No AMD measurements** yet: the MI300X session (the same groups as the NVIDIA GPUs) waits on the account's verification hold, and the AMD slice in the repo is a config list, not results.
 - **Modal picks the A100 board.** A request for an A100-80GB landed on PCIe or SXM. Rows are filed under the board they ran on.
 - **Short windows.** Five timed steps after two warm-up steps. Long-run effects (thermal throttling, allocator fragmentation, data-loader stalls) aren't in it.
 - **Op tables count device time three times.** The worker kept profiler ranges, aten ops and the CUDA kernels under them, each with its own self device time, and together they sum to about 2.6× the step. Use the `aten::` rows alone, which cover about 0.9 of the step (`scripts/fit_steptime_gbdt.py`). The next corpus version keeps one view.

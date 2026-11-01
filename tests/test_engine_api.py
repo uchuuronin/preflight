@@ -866,3 +866,12 @@ def test_dollars_are_gpu_hours_times_the_rate_so_the_browser_can_recompute(ft):
 	for a, b in ((hours.point, usd.point), (hours.lo, usd.lo), (hours.hi, usd.hi)):
 		assert a * rate == pytest.approx(b)
 	assert "cost.gpu_hours" in {t.id for t in api.targets_for(ft)}
+
+
+def test_no_amd_measurements_on_every_engine_surface(ft):
+	# Chiya, Nov 1: the account is on a verification hold and the AMD slice is a config list
+	assert api.calibration_summary()["amd"] == "no AMD measurements"
+	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
+	assert "No AMD measurements" in card.notes
+	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
+	assert amd.status == "abstain" and amd.reason.startswith("no AMD measurements")

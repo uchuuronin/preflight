@@ -2751,7 +2751,7 @@ _CARD_CAVEAT = {
 	steptime.MODEL_ID_CROSS: (
 		"Rough, no probe on this GPU: the band comes from corpus pairs, scored on GPUs left out, and is shown past "
 		"+-50% with a run-a-probe offer beside it. Calibrated on corpus models' op tables, not users' kernel tables; "
-		"checked on unseen scripts Nov 2. Another vendor abstains, labelled 'no AMD measurements', until corpus rows from it exist. The pairs share "
+		"checked on unseen scripts Nov 2. No AMD measurements: a move to another vendor's GPU abstains until corpus rows from it exist. The pairs share "
 		"architectures: clustered by architecture, the 95% interval on coverage is 90% to 96%."
 	),
 }
@@ -2838,6 +2838,13 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	)
 
 
+def _vendor(gpu: str) -> str | None:
+	try:
+		return gpus.get_gpu(gpu).vendor
+	except KeyError:
+		return None
+
+
 def calibration_summary() -> dict:
 	"""What the coverage self-test page shows from the corpus: each target's leave-one-architecture-out coverage and
 	the cross-GPU holdout, both with Wilson 95% intervals, and P(OOM)'s reliability bins. Plain data for C's page."""
@@ -2848,6 +2855,7 @@ def calibration_summary() -> dict:
 		return {"hits": hits, "n": n, "rate": hits / n if n else None, "wilson95": [lo, hi]}
 
 	targets = sorted({k[0] for k in t.cells} | set(t.coverage))
+	vendors = {v for k in t.cells if k[1] for v in [_vendor(k[1])] if v}
 	return {
 		"built_from": t.built_from,
 		"targets": {
@@ -2877,6 +2885,9 @@ def calibration_summary() -> dict:
 			for b in t.oom_bins
 		],
 		"oom_middle_verified": oom_model.middle_verified(t.oom_bins),
+		# Chiya, Nov 1: shown on every surface until AMD rows exist (the account is on a verification hold)
+		"vendors_measured": sorted(vendors),
+		"amd": None if "amd" in vendors else "no AMD measurements",
 	}
 
 

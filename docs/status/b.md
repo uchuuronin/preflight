@@ -152,11 +152,12 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 ## Blocked
 - The L4 runs that build the real calibration table (grouped and HF jobs) wait on Chiya's yes to the $45 corpus plan (ask before spending, Oct 27).
 
-## Next (Wed Oct 28)
-- NVIDIA corpus slice re-planned to $45 of Modal (corpus/README.md): about $24 estimated, $35.20 in hard caps, $9.80 reserve; waiting on Chiya's yes before phase 0.
-- AMD: `data/amd_grouped.jsonl` (the same 300 grouped configs as the NVIDIA GPUs) and its `amd-run` command are ready for Thursday's droplet session.
-- Real held-out calibration on the L4 once Modal access lands; model cards switch to `held_out` per target as the table covers it.
-- Agent cost from tokens when tasks lack `cost_usd`, once D's price table lands.
+## Next (Sun Nov 1)
+- Divergence sweep: re-price from this run's measured cost before the next slice, then fit the classifier on what landed and report its held-out AUROC and lead with the n it rests on.
+- Calibrate RL on A's 50-step GRPO run first (a hero lens), then retrieval, GNN and vision records as they land; serving once A's vLLM probes land.
+- Validation: the engine freezes at the `validation-freeze` tag after round four; Monday's full runs are scored with `scripts/score_validation.py`, which prints the model ids it used. The Oct 31 LoRA run is used for calibration, not held out.
+- AMD: no AMD measurements (the account is on a verification hold). If it lifts by Monday morning, the 300 paired configs (`data/amd_grouped.jsonl`) run first.
+- Contract 0.6.0 asks: `Campaign.start`, `CampaignCell.slot`, `Estimate.rate`; C has `cost.gpu_hours` for the editable rate now.
 
 ## Cloud runs and spend
 Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and dollars.
