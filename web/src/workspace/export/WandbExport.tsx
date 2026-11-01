@@ -43,7 +43,7 @@ export function WandbExport({ plan, illustrative = false }: { plan: ExportPlan; 
 					<details>
 						<summary>
 							<span className="pf-addon-exports__name">{name}</span>
-							<span className="pf-addon-exports__say">{t("exports.wandb.body", { file: WANDB_FILE })}</span>
+							<span className="pf-addon-exports__say">{t(plan.shareUrl ? "exports.wandb.body_link" : "exports.wandb.body", { file: WANDB_FILE })}</span>
 						</summary>
 						<pre className="pf-addon-exports__text" tabIndex={0} aria-label={name}>
 							{text}

@@ -188,6 +188,9 @@ describe("ranking combined moves (PM, Nov 1)", () => {
 		const c = bestCombo(r, near, currentKnobs(r), { kind: "min_cost" });
 		expect(Object.fromEntries(c!.changes.map((x) => [x.knobId, x.to]))).toEqual({ eval_batch_size: 4, seq_len: 1024 });
 		expect(c!.fit).toBe("tight");
+		// From a seq_len between the axis's values, the farther cell still counts farther.
+		const off = bestCombo(r, near, { ...currentKnobs(r), seq_len: 1536 }, { kind: "min_cost" });
+		expect(Object.fromEntries(off!.changes.map((x) => [x.knobId, x.to]))).toEqual({ eval_batch_size: 4, seq_len: 1024 });
 	});
 
 	it("says what the shorter sequence cuts, by the rows A measured", () => {
@@ -205,7 +208,9 @@ describe("ranking combined moves (PM, Nov 1)", () => {
 		expect(at(1900, { dataset_max_tokens: 1800 })?.kind).toBe("none");
 		// A 99.9th percentile at the probe's own length was cut there: it says nothing about the rows.
 		expect(at(1024, { dataset_p999_tokens: 2048 })).toBeNull();
+		// A scan that stopped early speaks only for the rows it read.
+		expect(at(1200, { dataset_rows_scanned: 30000 })).toBeNull();
 		expect(rowsCut({ ...r, probes: [] } as LoadedRecord, currentKnobs(r), [{ knobId: "seq_len", to: 1024 }])).toBeNull();
-		expect(rowsWords({ cut: at(1200) })).toBe("A sequence length of 1,200 cuts at most 1 row in 1,000 short (about 50 of 50,724): the 99.9th percentile row is 1,156 tokens.");
+		expect(rowsWords({ cut: at(1200) })).toBe("A sequence length of 1,200 cuts at most 1 row in 1,000 short (no more than 50 of 50,724): the 99.9th percentile row is 1,156 tokens.");
 	});
 });

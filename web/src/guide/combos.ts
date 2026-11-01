@@ -53,8 +53,8 @@ export interface RowsCut {
 	max: number;
 	p999: number;
 	p50: number;
-	/** Rows the percentiles are over, when every row was read; null when they were sampled. */
-	rows: number | null;
+	/** Rows the percentiles are over (every row was read, or there is no RowsCut). */
+	rows: number;
 }
 
 export interface ComboOptions {
@@ -166,9 +166,17 @@ export function bestCombo(
 		const stepsFor = (knobId: string, to: KnobValue) => {
 			const values = axisOf.get(knobId);
 			if (!values) return 1;
-			const from = values.findIndex((v) => same(v, knobs[knobId]));
+			const cur = knobs[knobId];
+			const from = values.findIndex((v) => same(v, cur));
 			const at = values.findIndex((v) => same(v, to));
-			return from < 0 || at < 0 ? 1 : Math.abs(at - from);
+			if (from >= 0 && at >= 0) return Math.abs(at - from);
+			// A current value between the axis's values (the visitor typed seq_len 1,536): the grid
+			// values passed on the way, plus one, so a farther cell still counts farther.
+			if (typeof cur === "number" && typeof to === "number") {
+				const [lo, hi] = cur < to ? [cur, to] : [to, cur];
+				return 1 + values.filter((v) => typeof v === "number" && v > lo && v < hi).length;
+			}
+			return 1;
 		};
 		for (const cell of cells(grid.axes)) {
 			const setting: Record<string, KnobValue> = { ...knobs, ...fixed, ...cell };
@@ -263,9 +271,11 @@ export function rowsCut(record: LoadedRecord, knobs: Readonly<Record<string, Kno
 	if (p999 >= cap || to >= cap) return null;
 	// A max at the probe's own length was cut there too, so it says only "at least this long".
 	const kind = to >= max && max < cap ? "none" : to >= p999 ? "few" : to >= p50 ? "some" : "most";
+	// Only a scan of every row speaks for the dataset: a sampled or timed-out one is the rows it read.
 	const scanned = num(measured.x.dataset_rows_scanned);
 	const total = num(measured.x.dataset_rows_total);
-	return { to, kind, max, p999, p50, rows: scanned !== null && total !== null && scanned >= total ? total : null };
+	if (scanned === null || total === null || scanned < total) return null;
+	return { to, kind, max, p999, p50, rows: total };
 }
 
 /** As GuidePanel's valueText, which this module can't import (GuidePanel imports it). */
@@ -290,14 +300,14 @@ export function rowsWords(c: Pick<ComboMove, "cut">): string {
 	const x = c.cut;
 	if (!x) return "";
 	const n = (v: number) => new Intl.NumberFormat("en-GB").format(Math.round(v));
-	const counted = x.kind === "few" && x.rows !== null;
-	return t(`guide.combo.rows.${x.kind}${counted ? "_n" : ""}`, {
+	return t(`guide.combo.rows.${x.kind}${x.kind === "few" ? "_n" : ""}`, {
 		to: n(x.to),
 		max: n(x.max),
 		p999: n(x.p999),
 		p50: n(x.p50),
-		rows: x.rows !== null ? n(x.rows) : "",
-		most: x.rows !== null ? n(Math.floor(x.rows / 1000)) : "",
+		rows: n(x.rows),
+		// Nearest-rank p99.9 (dataset_len.percentile): at most floor(N / 1,000) rows are longer.
+		most: n(Math.floor(x.rows / 1000)),
 	});
 }
 

@@ -3,8 +3,9 @@ guide ledger's Muse Spark total so far"). Reads only the snapshot the API's Spen
 the Modal Dict `preflight-ledger` after every change (api/app.py); writes nothing, starts no
 container of the API's, no GPU, no model call.
 
-The ledger keeps one day (US Eastern) and starts again at midnight, so this is the total since
-midnight ET. Run keys (api/preflight_api/routes): `<record key>:<session>` for the guide and the
+The ledger keeps one day (US Eastern) and starts again at midnight, so this is that day's total:
+`day_et` says which day (the snapshot rolls over only when the API next reserves, so a quiet
+morning still shows the day before). Run keys (api/preflight_api/routes): `<record key>:<session>` for the guide and the
 limits box (both Muse Spark), `jobs:<session>` for check-ins (always $0, a rate gate), and
 `fix:ip:<address>` for Muse Code fixes. No key, session, address or record is printed (the log
 goes to the remote-runs branch): only sums and counts.
@@ -32,7 +33,8 @@ def summarise(snap: dict) -> dict:
 		"day_et": day.get("day"),
 		"settled_usd_all": round(float(day.get("usd") or 0.0), 4),
 		"muse_spark_usd": round(sum(spark.values()), 4),
-		"muse_spark_sessions_on_records": len(spark),
+		# The guide's $0 tool gate shares the Spark key, so only runs that spent are counted.
+		"muse_spark_runs_that_spent": sum(1 for v in spark.values() if v > 0),
 		"muse_spark_most_on_one_run_usd": round(max(spark.values(), default=0.0), 4),
 		"muse_code_fix_usd": round(sum(fix.values()), 4),
 		"open_reservations": len(opened),
