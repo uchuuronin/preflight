@@ -143,6 +143,7 @@ class ModelClient:
 		extra_body: dict | None = None,
 		usd_per_second: float | None = None,
 		send_reasoning_effort: bool = True,
+		follow_redirects: int = 0,
 	):
 		if visitor_data and model.endswith("-contributor"):
 			raise ModelRefused(f"{model} lets the provider train on prompts; visitor code never goes to it")
@@ -163,11 +164,23 @@ class ModelClient:
 		self.last_error: str | None = None  # why the last failed call failed, for an ops run's report
 		self._deadline: float | None = None  # set by structured() so the re-ask shares one budget
 		key = api_key if api_key is not None else os.environ.get("MODEL_API_KEY", "")
+		home = httpx.URL(base_url).host
+
+		def same_host(request: httpx.Request) -> None:
+			# a redirect keeps our custom headers (Modal-Key, Modal-Secret): never to another host
+			if request.url.host != home:
+				raise httpx.UnsupportedProtocol(f"refused a redirect off {home}")
+
+		# follow_redirects: how many to follow (0: none). A Modal web endpoint answers a request
+		# that runs past 150 s with a 303 to poll for its result (Glimmer's cold start, Nov 1)
 		self._http = httpx.Client(
 			base_url=base_url.rstrip("/"),
 			timeout=httpx.Timeout(timeout_s, connect=10.0),
 			headers={"authorization": f"Bearer {key}", "content-type": "application/json", **(headers or {})},
 			transport=transport,
+			follow_redirects=follow_redirects > 0,
+			max_redirects=max(follow_redirects, 1),
+			event_hooks={"request": [same_host]},
 		)
 
 	@classmethod
@@ -208,6 +221,7 @@ class ModelClient:
 			extra_body={"chat_template_kwargs": {"reasoning_strength": "low"}},
 			usd_per_second=GLIMMER_USD_PER_S,
 			send_reasoning_effort=False,
+			follow_redirects=3,  # Modal's 303 after each 150 s: 3 more waits cover the cold start
 			**kw,
 		)
 

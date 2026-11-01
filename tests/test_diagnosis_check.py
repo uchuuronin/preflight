@@ -252,3 +252,42 @@ def test_a_reply_without_a_completion_is_still_a_logged_priced_call_with_its_rea
 	with pytest.raises(httpx.ConnectError):
 		c3.chat([{"role": "user", "content": "hi"}], purpose="triage")
 	assert c3.last_error.startswith("ConnectError") and "secret-host" not in c3.last_error
+
+
+def test_glimmer_follows_modals_303_to_its_result_on_the_same_host_only():
+	# a Modal web endpoint 303s a request that runs past 150 s to a URL that polls for its result
+	ok = {
+		"id": "g1",
+		"choices": [{"message": {"content": "hi"}}],
+		"usage": {"prompt_tokens": 5, "completion_tokens": 1},
+	}
+	seen = []
+
+	def handler(request):
+		seen.append((request.method, request.url.host, request.headers.get("modal-key")))
+		if request.method == "POST":
+			return httpx.Response(
+				303,
+				headers={
+					"location": "https://glimmer.example/v1/chat/completions?__modal_function_call_id=fc-1"
+				},
+			)
+		return httpx.Response(200, json=ok)
+
+	client = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="muse-glimmer", provider="modal-glimmer",
+		headers={"Modal-Key": "mk"}, follow_redirects=3, transport=httpx.MockTransport(handler))  # fmt: skip
+	text, call = client.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert text == "hi" and call.ok and [s[0] for s in seen] == ["POST", "GET"]
+
+	def elsewhere(request):
+		if request.url.host == "glimmer.example":
+			return httpx.Response(303, headers={"location": "https://other.example/steal"})
+		seen.append(("LEAKED", request.headers.get("modal-key")))
+		return httpx.Response(200, json=ok)
+
+	c2 = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer", retries=0,
+		headers={"Modal-Key": "mk"}, follow_redirects=3, transport=httpx.MockTransport(elsewhere))  # fmt: skip
+	with pytest.raises(httpx.HTTPError):
+		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert not any(s[0] == "LEAKED" for s in seen)
+	assert ModelClient.glimmer()._http.follow_redirects  # the Glimmer client follows them
