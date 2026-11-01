@@ -2,6 +2,7 @@
 
 ## Sat Oct 31, night
 
+- Guide limits (`4e555dc`, Chiya's gap from local testing): "Not this", "Keep <value>" beside "Pin <value>", Your limits (allowed GPUs, budget, must-finish-within, GPU-hours, don't change, ruled out; plain words read by Muse Spark into chips to confirm), hard limits in both tours and refused server-side, and the visitor's own move always wins. The live words reader makes one Muse Spark call per use (about US$0.003); not run live yet.
 - Audit finding 4 fixed (`c28d664`): a failed or cancelled job's boarding screen marks the leg it stopped on ("Stopped here" / "Cancelled here", red route).
 - Agent tour on A's measured record (`5b297cc`), see the plan table; review fixes in `f83b184`, `7c7c5fb`.
 - Fix loop: `/v1/patches`, `race_fix` and the race on screen (`c876e04`, `bf81087`), review fixes `481bbd3`, see the plan table.
