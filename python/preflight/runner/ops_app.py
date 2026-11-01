@@ -177,7 +177,7 @@ def startup_check_probe() -> dict:
 # "+compile": a tiny torch.compile, run (Chiya, Nov 1), not just imported
 PROBE_USER_IMPORTS = {
 	"probe": ("+compile",),
-	"serving": ("+compile", "vllm"),
+	"serving": ("+compile", "vllm", "datasets"),  # datasets: pyarrow against the image's numpy 1
 	"titan": ("+compile", "torchtitan.train"),
 }
 

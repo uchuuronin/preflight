@@ -142,3 +142,10 @@ def test_import_error_that_asks_for_a_package_names_it():
 		in_eval=False,
 	)
 	assert "accelerate" in c.message
+
+
+def test_a_package_at_the_wrong_version_says_so_rather_than_not_installed():
+	# the Nov 1 serving smoke: datasets' pyarrow wanted numpy 2 in an image pinned to numpy 1
+	c = classify(ImportError("pyarrow requires NumPy 2.0 or newer, found 1.26.4"), steps=0, in_eval=False)
+	assert c.code == "missing_package"
+	assert "2.0 or newer" in c.message and "1.26.4" in c.message and "not installed" not in c.message

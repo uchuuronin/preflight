@@ -169,6 +169,9 @@ SERVING_PACKAGES = [
 	"transformers==4.46.3",
 	"numpy<2",
 	"datasets==3.1.0",
+	# datasets 3.1 takes any pyarrow 15 or later, and the newest needs numpy 2; 17.0 runs on numpy 1
+	# (the serving smoke failed on it, Nov 1)
+	"pyarrow==17.0.0",
 	"psutil==6.1.0",
 	# what the recorder imports in the sandbox, pinned as in the probe image
 	"nvidia-ml-py==12.560.30",
