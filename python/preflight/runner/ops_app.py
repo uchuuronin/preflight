@@ -174,16 +174,19 @@ def startup_check_probe() -> dict:
 
 # the probe uid in each sandbox image, on a CPU (Chiya, Nov 1): its user and group names resolve and
 # the imports that read them load, as the probe would run them. torchtitan failed on a GPU for this
+# "+compile": a tiny torch.compile, run (Chiya, Nov 1), not just imported
 PROBE_USER_IMPORTS = {
-	"probe": ("torch._dynamo",),
-	"serving": ("torch._dynamo", "vllm"),
-	"titan": ("torch._dynamo", "torchtitan.train"),
+	"probe": ("+compile",),
+	"serving": ("+compile", "vllm"),
+	"titan": ("+compile", "torchtitan.train"),
 }
 
 
 def _probe_user_ok(r: dict, image: str) -> bool:
+	want = [m for m in PROBE_USER_IMPORTS[image] if m != "+compile"]
+	compiled = "+compile" not in PROBE_USER_IMPORTS[image] or r.get("compiled") is not None
 	return (r.get("exit") == 0 and r.get("uid") == 61000 and r.get("user") == r.get("passwd") == "preflight-probe"
-		and r.get("group") == "preflight-probe" and r.get("imported") == list(PROBE_USER_IMPORTS[image]))  # fmt: skip
+		and r.get("group") == "preflight-probe" and r.get("imported", []) == want and compiled)  # fmt: skip
 
 
 @ops.function(image=probe_image, timeout=600)

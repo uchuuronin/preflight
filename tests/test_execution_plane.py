@@ -490,3 +490,16 @@ def test_the_probe_user_check_fails_where_the_probe_uid_has_no_passwd_entry(monk
 	monkeypatch.setattr(local, "_probe_uid", lambda: uid)
 	r = local.probe_user_check(())
 	assert r["exit"] != 0 and "getpwuid" in r["stderr"]
+
+
+def test_the_deploy_gate_needs_the_names_the_imports_and_a_compile():
+	from preflight.runner.ops_app import _probe_user_ok
+
+	good = {"exit": 0, "uid": 61000, "user": "preflight-probe", "passwd": "preflight-probe",
+		"group": "preflight-probe", "imported": ["vllm"], "compiled": 4.0}  # fmt: skip
+	assert _probe_user_ok(good, "serving")
+	assert not _probe_user_ok({**good, "compiled": None}, "serving")  # torch.compile didn't run
+	assert not _probe_user_ok({**good, "imported": []}, "serving")  # vllm didn't import
+	assert not _probe_user_ok({**good, "group": "30002"}, "serving")
+	assert not _probe_user_ok({"failed": "TimeoutExpired"}, "probe")
+	assert _probe_user_ok({**good, "imported": []}, "probe")

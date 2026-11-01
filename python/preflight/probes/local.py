@@ -391,15 +391,22 @@ import getpass, grp, json, os, pwd, sys
 out = {"uid": os.getuid(), "gid": os.getgid(), "user": getpass.getuser(),
 	"passwd": pwd.getpwuid(os.getuid()).pw_name, "group": grp.getgrgid(os.getgid()).gr_name}
 for mod in sys.argv[1:]:
+	if mod == "+compile":  # a tiny torch.compile on the CPU: inductor's C++ build and its cache dir
+		import torch
+
+		f = torch.compile(lambda x: (x * 2).sin().sum())
+		out["compiled"] = float(f(torch.ones(8)))
+		continue
 	__import__(mod)
 	out.setdefault("imported", []).append(mod)
 print("PROBE_USER " + json.dumps(out))
 """
 
 
-def probe_user_check(imports: tuple[str, ...] = ("torch._dynamo",), timeout_s: int = 300) -> dict:
+def probe_user_check(imports: tuple[str, ...] = ("+compile",), timeout_s: int = 420) -> dict:
 	"""Run PROBE_USER_SCRIPT as a probe would run (same uid, env and interpreter) and report what it
-	saw: {"exit", "uid", "user", "passwd", "group", "imported"}, or the stderr tail on failure."""
+	saw: {"exit", "uid", "user", "passwd", "group", "imported", "compiled"}, or the stderr tail on
+	failure. "+compile" in imports runs a tiny torch.compile instead of an import."""
 	uid = _probe_uid()
 	box = Path(tempfile.mkdtemp(prefix="preflight-usercheck-"))
 	home = box / "home"
