@@ -20,6 +20,9 @@ Updated Sun Nov 1, 12:30 ET.
 | Nov 1 12:30 | 998704f..f46fad2 | RL entropy estimate and its limit (d9f969c, f2f2c5e); the warm-pool ask and status (e851890, b4480d3); main merged (round five, 0.6.2) | 1 read-only round each, 2 for the entropy change; the merge checked for damage in A's files | clean |
 | Nov 1 12:49 | f46fad2..8154268 | main's production flags only (3c6699e: runner.queue, c.guide.live), merged onto f46fad2 so the deploy carried nothing unreviewed | main's own (PM); the merge changed flags.production.json only | clean |
 | Nov 1 13:06 | 8154268..HEAD | the ops diagnosis run and its cap (1e40d5e, ec0b39a, aaaefa8, 16ee36f); Glimmer's client and private-job routing (ea1626a, bdd3c6f); the demo limits (9a2bb82, 5a78a60); requests and status (67dd9fc, eb8adbb, b54d854, this row) | 2 rounds each for the cap and the limits, 1 for Glimmer | clean |
+| Nov 1 13:12–13:43 | ..b300684..8da594b | the CI fix for the diagnosis-run test (ba2d9f5); triage reads the probe's recorded error (b300684); diagnosis at medium effort, 8,192 tokens, a 180 s timeout (79db248, 8da594b) | 1 read-only round each | clean |
+| Nov 1 14:00 | 8da594b..9566d23 | main merged (6757667); ground truth for any GPU script (7be9039, 0fba764); the judging warm pool, (a) and (c) (963bb9e, 9566d23); status (fbcac17) | 1 read-only round each, findings fixed | clean |
+| Nov 1 14:09 | 9566d23..243ace5 | eval probes measure two generate calls (fda1762) and count only the outermost (243ace5); status (aa84cd6) | 1 read-only round, its finding fixed | clean; CI green in every job |
 
 ## Known limits, on purpose
 
