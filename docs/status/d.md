@@ -8,6 +8,26 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, early (agent plant 3 made to fire)
+
+Pushed `372b60e` with Chiya's yes. On the remote, `ws-d` is at `ee55977`, a merge of `main` (`90fcc40`) into `ws-d` authored as Shreya at 00:29:56, a few seconds before Chiya's message reached this session. I didn't run that merge or push it in my turn; its content is only `main`'s commits. Reported to Chiya. The data-use gap is settled: A gates the Muse Spark call on `harness.spark_script_map`, C's notice follows the same flag, and the flag goes on for the demo.
+
+**Plant 3 now fires** (`zoo/agent_eval_spark/run.py`; this commit, not yet pushed). A ran 130 agent tasks and the retry loop never started, because MBPP's builds almost never fail. Now rows 26 to 29, the last 4 of the first 30 tasks, get a test fixture that imports a module that was never shipped (`from mbpp_fixtures import cases`). Their `run_tests` fails with the same `ModuleNotFoundError` on every call, whatever code the model writes, and `call_tool` retries it without end. The header says so as planted. Plants 1 (no caching) and 2 (overflow at turn 11) are unchanged in the code.
+
+Decisions, with bases and tests:
+1. **The last 4 rows, not a random 4.** A's sampler takes tasks in the script's order (the script doesn't read `PREFLIGHT_TASK_INDICES`) and stops the whole script once no model call has come through for its stall time: 120 s on `ws-a` (Chiya's 2 minutes), still 600 s on `main`. With 4 workers, the run stalls as soon as all 4 are stuck, and no later row starts. My first, seeded pick (rows 4, 10, 12, 20) would have stalled after row 20, cutting A's 30-task sample to 21 tasks and thinning plant 2's evidence; the reviewer caught it. With rows 26 to 29 all 30 tasks start first. Measured offline, against a local fake API on 30 MBPP-shaped tasks whose fake model always submits a correct solution: all 30 started, 26 passed, and exactly rows 26 to 29 looped, about 420 tries each in 15 s. Test: `test_agent_retry_loop_is_planted_on_the_rows_the_header_names`. It checks that the header's rows match the code, that `run_tests` uses the fixture for those tasks, and that the fixture, run as `run_tests` runs it (a temp file, no `-I`), fails with the same `ModuleNotFoundError` three runs out of three.
+2. **The file stays near the size A measured**, because the echo sets the context growth behind turn 11. I trimmed the header and three comments to pay for the new lines: 7,699 bytes against 7,641. What was dropped: "the probe needs both, and a route to that host", "500 tasks", "30 tasks" and "none ran past turn 4" (both still in my status), and "any other tool error loops the same way" (still true in the code). Derived, scaling A's measured growth by the echo's share: about 2,764 tokens a turn, so a typical task holds about 25,612 tokens at turn 10 (388 under 26,000; it was about 300 before this change, and 562 at A's exact size) and 28,376 at turn 11. A's re-sample measures it. Test: the size guard (within 300 bytes) and the replay (the script's own check still stops at turn 12).
+3. **Side effects, judged low:** each retry writes a temp file (`delete=False`), so a looping task leaves a few thousand files in the probe's temp folder before the 120 s stall stops it. And a model could in principle make the import succeed by writing `/tmp/mbpp_fixtures.py` through `run_python`, since the echoed header names the module. Neither changes what the probe sees.
+
+No paid runs: A re-samples once this is pushed.
+
+**Audit 7 to 12, pre-checked on C's branch** (`ws-c` `80d4217`, not yet in `main`; `docs/audit/nov1-wsc/README.md`), measured with the same scripts on an export served locally:
+- 12 (model tags) is not fixed: a job that ran out of memory while probing still shows "Muse Spark Open" on the triage stage;
+- 7, 10, 8 and 11 are not fixed (same axe states and targets);
+- 9 (phone route labels) and 4 (the stopped stage) are fixed there.
+
+Each moves to Done once re-checked on `main`. New and minor: the "Your limits" summary is 20 px tall; axe passes it on spacing.
+
 ## Sat Oct 31, late night (submission materials)
 
 Pushed `d93618a` with Chiya's yes. Chiya kept the batch time as it is: the predicted upper bound rounded up, plus the user's own start-up time, with no number of ours. Finding 4 is with C.

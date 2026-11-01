@@ -1,30 +1,29 @@
-"""Agent eval: a coding agent on MBPP, driven by Muse Spark through the Meta Model API.
+"""Agent eval: a coding agent on MBPP, driven by Muse Spark (Meta Model API).
 
 BUG ZOO: this script carries planted problems on purpose. Do not fix them;
-Preflight must catch every one from a few minutes of probing.
+Preflight must catch them from a few minutes of probing.
 
   1. No prompt caching: the system prompt starts with the current time, so its prefix changes
      on every call and the API can never reuse a cached prefix.
-  2. Context overflow at turn 11, measured on Muse Spark: every run_python result echoes this
-     harness's source "for traceability", so by Muse Spark's count the history starts near 730
-     tokens and grows about 2,745 a turn, passing CONTEXT_LIMIT, the agent's own 26,000-token
-     budget, at turn 11 for a typical task, 9 to 11 across the measured growth [derived from
-     A's per-turn counts, 30 tasks, Oct 31; none ran past turn 4, so not yet observed]. The
-     script's own check (characters / 4) stops the task a turn later, and the run fails it.
+  2. Context overflow at turn 11, measured on Muse Spark: run_python echoes this harness's
+     source "for traceability", so by Muse Spark's count the history starts near 730 tokens
+     and grows about 2,745 a turn, passing the 26,000-token CONTEXT_LIMIT at turn 11, 9 to 11
+     across tasks [derived from A's per-turn counts, Oct 31; not yet observed]. The script's
+     own check (characters / 4) stops the task a turn later.
   3. A tool that retries forever: run_tests raises when the tests fail, and call_tool retries
-     it in `while True` with `except: continue`, so a failing build is re-run without end and
-     never reported to the model. Any other tool error (a timeout, a missing argument) loops
-     the same way, and once all CONCURRENCY workers are stuck the whole run stops.
+     it in `while True` with `except: continue`, never telling the model. Rows 26 to 29, the
+     last 4 of the first 30 tasks, get a test fixture whose module was never shipped, so their
+     run_tests fails the same way every time and loops; once all CONCURRENCY workers are stuck
+     the whole run stops.
 
 Read from the code: agent.tool_retry_loop.
 Found by the probe: agent.no_prompt_caching (0 cached input tokens), agent.context_overflow
-(the turn where the history passes CONTEXT_LIMIT), and the runaway on the first failing build.
+(the turn where the history passes CONTEXT_LIMIT), and the stall on those 4 tasks.
 
-Ground truth: not measured yet. A's probe and full run fill it in.
+Ground truth: not measured yet; A's runs fill it in.
 
-Public data: MBPP (google-research-datasets/mbpp, config "full", test split, 500 tasks,
-CC BY 4.0). The model is Meta's hosted muse-spark-1.3, reached through META_API_BASE with
-META_API_KEY; the probe needs both, and a route to that host.
+Public data: MBPP (google-research-datasets/mbpp, "full", test split, CC BY 4.0). The model is
+Meta's hosted muse-spark-1.3, through META_API_BASE and META_API_KEY.
 """
 
 import json
@@ -44,12 +43,14 @@ MODEL = "muse-spark-1.3"
 N_TASKS = 500
 MAX_TURNS = 40
 CONCURRENCY = 4
-CONTEXT_LIMIT = 26_000  # tokens: the agent's own budget, below the model's window
+CONTEXT_LIMIT = 26_000  # tokens: the agent's own budget
 TEMPERATURE = 0.2
 MAX_TOKENS = 1024  # per reply
 TOOL_TIMEOUT_S = 20
+BROKEN_FIXTURE = "from mbpp_fixtures import cases"  # planted (3): never shipped
+broken: set[int] = set()  # task ids, chosen in main()
 
-client: OpenAI | None = None  # made in main(), so reading or importing the script needs no key
+client: OpenAI | None = None  # made in main(): importing needs no key
 HARNESS = Path(__file__).read_text()
 
 TOOLS = [
@@ -92,7 +93,7 @@ def run_python(code: str, task: dict) -> str:
 	with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
 		f.write(code)
 	proc = subprocess.run([sys.executable, f.name], capture_output=True, text=True, timeout=TOOL_TIMEOUT_S)
-	# Planted (2): the whole harness is echoed back on every call, "for traceability".
+	# Planted (2): the harness is echoed on every call, "for traceability".
 	return json.dumps(
 		{
 			"stdout": proc.stdout[-4000:],
@@ -104,7 +105,8 @@ def run_python(code: str, task: dict) -> str:
 
 
 def run_tests(code: str, task: dict) -> str:
-	program = "\n".join([task["test_setup_code"], code, *task["test_list"]])
+	setup = BROKEN_FIXTURE if task["task_id"] in broken else task["test_setup_code"]
+	program = "\n".join([setup, code, *task["test_list"]])
 	with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
 		f.write(program)
 	proc = subprocess.run([sys.executable, f.name], capture_output=True, text=True, timeout=TOOL_TIMEOUT_S)
@@ -117,7 +119,7 @@ IMPL = {"run_python": run_python, "run_tests": run_tests}
 
 
 def call_tool(name: str, args: dict, task: dict) -> str:
-	# Planted (3): a failing tool is retried forever and the failure never reaches the model.
+	# Planted (3): a failing tool is retried forever, unseen by the model.
 	while True:
 		try:
 			return IMPL[name](args["code"], task)
@@ -181,7 +183,7 @@ def safe_solve(task: dict) -> dict:
 	except ContextOverflow as e:
 		print(e, flush=True)
 		return {"task_id": task["task_id"], "passed": False, "overflow": True, **usage}
-	except Exception as e:  # an API error or a malformed tool call fails this task, not the run
+	except Exception as e:  # an API error or bad tool call fails this task, not the run
 		print(f"task {task['task_id']}: {type(e).__name__}: {e}", flush=True)
 		return {"task_id": task["task_id"], "passed": False, "error": type(e).__name__, **usage}
 
@@ -190,6 +192,7 @@ def main() -> None:
 	global client
 	client = OpenAI(base_url=os.environ["META_API_BASE"], api_key=os.environ["META_API_KEY"])
 	tasks = load_dataset("google-research-datasets/mbpp", "full", split="test").select(range(N_TASKS))
+	broken.update(t["task_id"] for t in tasks.select(range(26, 30)))
 	started = time.monotonic()
 	with ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
 		results = list(pool.map(safe_solve, tasks))

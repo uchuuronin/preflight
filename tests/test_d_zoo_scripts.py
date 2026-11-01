@@ -224,3 +224,32 @@ def test_agent_scripts_own_check_stops_at_turn_12_with_short_replies():
 		out = json.dumps({"stdout": "(4,)\n", "stderr": "", "harness": harness, "task": task["text"]})
 		messages.append({"role": "tool", "tool_call_id": call["id"], "content": out})
 	assert turn == 12
+
+
+def test_agent_retry_loop_is_planted_on_the_rows_the_header_names():
+	"""Plant 3 must fire: A's 130 tasks never failed a build, so the last 4 of the first 30 tasks
+	get a test fixture that can't import. Last, so all 30 tasks of A's sample start before every
+	worker is stuck. The header's rows must be the code's, run_tests must use the fixture for
+	them, and the fixture must fail the same way every time, run as run_tests runs it."""
+	import subprocess
+	import sys
+	import tempfile
+
+	path = ZOO / "agent_eval_spark/run.py"
+	src = path.read_text()
+	doc = " ".join((ast.get_docstring(ast.parse(src)) or "").split())
+	m = re.search(r"Rows (\d+) to (\d+), the last 4 of the first 30 tasks", doc)
+	assert m, "header names the planted rows"
+	lo, hi = int(m.group(1)), int(m.group(2))
+	assert (lo, hi) == (26, 29)
+	assert f"tasks.select(range({lo}, {hi + 1}))" in src
+	assert 'setup = BROKEN_FIXTURE if task["task_id"] in broken else task["test_setup_code"]' in src
+	assert "program = " in src and "[setup, code, *task[" in src
+	fixture = _consts(path)["BROKEN_FIXTURE"]
+	errs = set()
+	for _ in range(3):
+		with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
+			f.write(fixture + "\nprint('never reached')\n")
+		r = subprocess.run([sys.executable, f.name], capture_output=True, text=True)
+		errs.add(r.stderr.strip().splitlines()[-1])
+	assert len(errs) == 1 and next(iter(errs)).startswith("ModuleNotFoundError"), errs
