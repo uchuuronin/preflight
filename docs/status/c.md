@@ -4,7 +4,8 @@
 
 - Audit finding 4 fixed (`c28d664`): a failed or cancelled job's boarding screen marks the leg it stopped on ("Stopped here" / "Cancelled here", red route).
 - Agent tour on A's measured record (`5b297cc`), see the plan table; review fixes in `f83b184`, `7c7c5fb`.
-- Fix loop: `/v1/patches`, `race_fix` and the race on screen (`c876e04`, `bf81087`), see the plan table.
+- Fix loop: `/v1/patches`, `race_fix` and the race on screen (`c876e04`, `bf81087`), review fixes `481bbd3`, see the plan table.
+- W&B export (`6fdf4e0`), verify Action options and README (`7d33368`), reduced-motion pass (`481bbd3`).
 
 ## Sat Oct 31, evening: Muse Code smoke test (Chiya's yes, $1 cap, CPU only)
 
@@ -64,14 +65,14 @@ read-only review, and exclude waiting on others.
 | Autopilot scored over the bug zoo, Wilson intervals (adopted 7) | Not started | 3, plus a paid zoo run |
 | Exports: hook for D's panel | On ws-c (`f791589`) | 0 |
 | Exports: config, patch, sbatch, CLI command, share link (D builds the panel) | Plan data on ws-c (`ExportPlan`); D's panel not started | 0.5 |
-| GitHub Action: verify pass/fail | On main | 0 |
+| GitHub Action: verify pass/fail | On main; on ws-c (`7d33368`): per-fix options (may-change, keep-eval, no-grad) and a README section for using it from other repos (works from another repo once this one is public) | 0 |
 | GitHub Action: run Preflight from a workflow | Not started | 3 |
-| W&B export | Not started | 2 |
+| W&B export | On ws-c (`6fdf4e0`): `preflight_wandb.py` from the export plan, knobs as config, readouts with intervals in the summary; checked by running it against a stand-in run; shows with `c.exports` | 0 |
 | Every Meta model labelled on screen | Partial: Muse Spark, Spark Open and diagnosis labels on main; Muse Code arrives with the fix loop | 0.5 |
 | Template status line above the readouts (adopted 8) | On main | 0 |
 | Coverage (checks) page (adopted 2) | On main; round-three re-score on ws-c next | 1 |
 | Onboarding for first-time visitors | Not started | 3 |
-| Accessibility and reduced-motion pass (D's audit feeds it) | Partial: D's first four fixes on ws-c | 4 |
+| Accessibility and reduced-motion pass (D's audit feeds it) | Reduced motion done on ws-c (`481bbd3`): no endless animation with reduced motion on Home, New flight and two cockpits; audit findings 1 to 5 fixed; 6 to 12 open | 2 (audit 6 to 12) |
 | Load test at 20 concurrent visitors | Not started | 2, plus a small paid run |
 | Licence check of everything bundled (CI dependency scan is on main) | Partial | 1 |
 | Demo rehearsed on the public link; video draft | Not started | 3 |
