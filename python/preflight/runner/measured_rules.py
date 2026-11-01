@@ -86,6 +86,7 @@ def agent_findings(rec) -> list[Finding]:
 
 # ---------------------------------------------------------------- run hygiene (GPU lenses)
 
+ZERO_SPREAD_WARN = 0.5  # guess: past half the prompts teaching nothing, the batch is mostly wasted
 TRUNCATION_WARN = 0.10  # guess: a tenth of generations hitting the cap cuts answers often enough to matter
 _CKPT = re.compile(r"(?:^|/)(checkpoint-\d+|checkpoints?|ckpt)/")
 # a file a cache would be: data saved for reuse (a config.json or a model directory isn't one)
@@ -128,7 +129,11 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 		out.append(Finding(id=f"hygiene.cache_not_keyed.{len(out)}", severity="warn", code="hygiene.cache_not_keyed",
 			title="A cache is reused whatever produced it", detail=f"{where}: {detail}", node_id=data_node,
 			source="rule", fix_template="hygiene.key_the_cache"))  # fmt: skip
+	reward_node = next((n.id for n in rec.graph.nodes if n.id == "reward"), None)
 	for p in rec.probes:
+		out += _zero_spread(
+			p, reward_node, "group_size" if any(k.id == "group_size" for k in rec.knobs) else None
+		)
 		g = p.generation
 		if g is not None and g.truncation_rate is not None and g.sequences:
 			n = int(p.extras.get("generation_ending_known") or g.sequences)  # the rate's own total
@@ -168,6 +173,35 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 				evidence=[Evidence(metric="hygiene.outputs_identical", value=float(same), probe_id=p.id,
 					threshold=float(n))]))  # fmt: skip
 	return out
+
+
+def _zero_spread(p, node_id, knob_id) -> list[Finding]:
+	"""GRPO: prompts whose group of completions all pass or all fail have zero reward spread, so
+	zero advantage and no gradient. From the probe's per-prompt pass rates, with a Wilson interval
+	over the prompts behind them."""
+	rl = p.rl
+	if rl is None or not rl.pass_rate_per_prompt or not rl.group_size:
+		return []
+	rates = rl.pass_rate_per_prompt
+	n = len(rates)
+	wrong, right = sum(r == 0 for r in rates), sum(r == 1 for r in rates)
+	k = wrong + right
+	if n < 2 or k / n <= ZERO_SPREAD_WARN:
+		return []
+	lo, hi = _wilson(k, n)
+	g = rl.group_size
+	both = (
+		(f"{wrong} all wrong" if wrong else "")
+		+ (", " if wrong and right else "")
+		+ (f"{right} all right" if right else "")
+	)
+	return [Finding(id=f"measured.rl.zero_spread.{p.id}", severity="warn", code="rl.zero_spread",
+		title=f"{k / n:.0%} of prompts teach nothing: every completion scored the same",
+		detail=f"{k} of {n} prompts ({both}) had all {g} completions score alike, so their advantage is zero "
+		f"and they add no gradient (95% interval {lo:.0%}–{hi:.0%}, {n * g} completions) [measured]. "
+		"Easier or harder prompts, a larger group, or a partial-credit reward give them spread.",
+		node_id=node_id, source="rule", knob_id=knob_id,
+		evidence=[Evidence(metric="rl.zero_spread_fraction", value=k / n, probe_id=p.id, threshold=ZERO_SPREAD_WARN)])]  # fmt: skip
 
 
 def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:

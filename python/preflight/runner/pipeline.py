@@ -464,7 +464,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	# run hygiene, from the code the probes ran (a probe job's patch included, so a fix can clear
 	# its own finding; a verify job's base is the record's own code) and the probes so far
 	code = fixed.files if fixed is not None and req.mode == "probe" else fetched.files
-	keep = [f for f in out.findings if not f.id.startswith("hygiene.")]
+	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code)]})
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
