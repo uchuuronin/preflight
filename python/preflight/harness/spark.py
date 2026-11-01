@@ -164,12 +164,19 @@ class ModelClient:
 		self.last_error: str | None = None  # why the last failed call failed, for an ops run's report
 		self._deadline: float | None = None  # set by structured() so the re-ask shares one budget
 		key = api_key if api_key is not None else os.environ.get("MODEL_API_KEY", "")
-		home = httpx.URL(base_url).host
+		home = httpx.URL(base_url)
+		origin = (home.scheme, home.host, home.port)
+		hop_deadline: list[float] = []  # set per POST by _post: a redirect chain shares the call's deadline
 
 		def same_host(request: httpx.Request) -> None:
-			# a redirect keeps our custom headers (Modal-Key, Modal-Secret): never to another host
-			if request.url.host != home:
-				raise httpx.UnsupportedProtocol(f"refused a redirect off {home}")
+			# a redirect keeps our custom headers (Modal-Key, Modal-Secret): never to another origin,
+			# nor to plain http on this one
+			if (request.url.scheme, request.url.host, request.url.port) != origin:
+				raise httpx.UnsupportedProtocol(f"refused a redirect off {home.host}")
+			if hop_deadline and time.monotonic() >= hop_deadline[0]:
+				raise httpx.ReadTimeout(
+					"the call's deadline passed while following redirects", request=request
+				)
 
 		# follow_redirects: how many to follow (0: none). A Modal web endpoint answers a request
 		# that runs past 150 s with a 303 to poll for its result (Glimmer's cold start, Nov 1)
@@ -182,6 +189,7 @@ class ModelClient:
 			max_redirects=max(follow_redirects, 1),
 			event_hooks={"request": [same_host]},
 		)
+		self._hop_deadline = hop_deadline
 
 	@classmethod
 	def meta(cls, **kw) -> "ModelClient":
@@ -253,6 +261,7 @@ class ModelClient:
 			if remaining <= 0:
 				raise TimeoutError(f"{purpose}: no time left in the {self.deadline_s:.0f} s budget")
 			started = time.monotonic()
+			self._hop_deadline[:] = [deadline]
 			try:
 				resp = self._http.post("/chat/completions", json=body, timeout=min(self.timeout_s, remaining))
 			except RETRY_TRANSPORT:
@@ -260,7 +269,10 @@ class ModelClient:
 				if attempt >= self.retries:
 					raise
 				wait = None
-			except httpx.TransportError:
+			except (
+				httpx.TransportError,
+				httpx.TooManyRedirects,
+			):  # redirects: a RequestError, not a TransportError
 				self._record(purpose, None, started, False, None)
 				raise
 			else:

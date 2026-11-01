@@ -291,3 +291,47 @@ def test_glimmer_follows_modals_303_to_its_result_on_the_same_host_only():
 		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
 	assert not any(s[0] == "LEAKED" for s in seen)
 	assert ModelClient.glimmer()._http.follow_redirects  # the Glimmer client follows them
+
+
+def test_a_redirect_chain_that_never_ends_is_a_logged_call_and_no_downgrade_to_http():
+	def loop(request):
+		return httpx.Response(
+			303,
+			headers={"location": "https://glimmer.example/v1/chat/completions?__modal_function_call_id=fc"},
+		)
+
+	c = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer",
+		usd_per_second=0.001, follow_redirects=3, transport=httpx.MockTransport(loop))  # fmt: skip
+	with pytest.raises(httpx.TooManyRedirects):
+		c.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert len(c.calls) == 1 and not c.calls[0].ok  # billed GPU time is in provenance (review, Nov 1)
+
+	seen = []
+
+	def plain(request):
+		seen.append(request.url.scheme)
+		return httpx.Response(303, headers={"location": "http://glimmer.example/v1/x"})
+
+	c2 = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer",
+		headers={"Modal-Key": "mk"}, follow_redirects=3, transport=httpx.MockTransport(plain))  # fmt: skip
+	with pytest.raises(httpx.UnsupportedProtocol):
+		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert seen == ["https"]  # the Modal-Key never went out in plain http
+
+
+def test_redirect_hops_share_the_calls_deadline(monkeypatch):
+	clock = [1000.0]
+	monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+
+	def slow(request):
+		clock[0] += 150.0  # each hop: Modal's 150 s, then a 303
+		return httpx.Response(
+			303,
+			headers={"location": "https://glimmer.example/v1/chat/completions?__modal_function_call_id=fc"},
+		)
+
+	c = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer",
+		timeout_s=200.0, follow_redirects=10, transport=httpx.MockTransport(slow))  # fmt: skip
+	with pytest.raises(httpx.ReadTimeout):
+		c.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert clock[0] - 1000.0 <= c.deadline_s + 150.0  # stopped at the 300 s deadline, not after 10 hops
