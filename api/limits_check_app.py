@@ -1,5 +1,5 @@
 """Live check of the plain-words limits reader against real Muse Spark (approved Nov 1: at most
-10 calls, about US$0.03). Runs the reader's own code (preflight_api/guide/limits_reader.py) on
+10 calls; the re-test of five, at most US$0.03; every run takes a hard `--cap-usd`). Runs the reader's own code (preflight_api/guide/limits_reader.py) on
 the lora-7b sample, one call per phrase, and prints what the model returned and what survived
 the record and text checks. Nothing runs on Modal: the entrypoint runs on the caller's machine
 (a GitHub Actions runner via remote-run.yml, with the key in its environment, never printed).
@@ -78,28 +78,42 @@ def check(only: str = "", cap_usd: float = 0.05) -> None:
 
 	from preflight_api.guide.limits_reader import WORST_INPUT_TOKENS
 
-	picked = [PHRASES[int(i)] for i in only.split(",") if i.strip()] if only else PHRASES
+	idx = [int(i) for i in only.split(",") if i.strip()] if only else list(range(len(PHRASES)))
+	if any(i < 0 or i >= len(PHRASES) for i in idx) or len(set(idx)) != len(idx):
+		raise SystemExit(f"--only takes distinct indexes from 0 to {len(PHRASES) - 1}")
+	picked = [PHRASES[i] for i in idx]
+	# Source: muse_spark.py's note that the real bill ran 3% above these list prices; 5% covers it.
+	margin = 1.05
 
 	def worst(inputs: list[int]) -> float:
 		"""The most the next call can cost: the full output cap, and the reserved input until a call
 		has shown the real input size (then the largest seen, plus 10%)."""
-		tokens_in = int(max(inputs) * 1.1) if inputs else WORST_INPUT_TOKENS
-		return (tokens_in * muse_spark.PRICE_IN + MAX_OUTPUT_TOKENS * muse_spark.PRICE_OUT) / 1e6
+		seen = [i for i in inputs if i > 0]  # a response without usage says nothing about size
+		tokens_in = int(max(seen) * 1.1) if seen else WORST_INPUT_TOKENS
+		return margin * (tokens_in * muse_spark.PRICE_IN + MAX_OUTPUT_TOKENS * muse_spark.PRICE_OUT) / 1e6
 
 	async def run() -> list[dict]:
 		out: list[dict] = []
+		spent = 0.0
 		for t in picked[:MAX_CALLS]:
-			spent = sum(r.get("usd", 0) for r in out)
 			w = worst([r["tokens"][0] for r in out if "tokens" in r])
 			if spent + w > cap_usd:
 				out.append(
 					{"text": t, "skipped": f"a worst-case call (US${w:.4f}) would pass the US${cap_usd} cap"}
 				)
 				continue
-			out.append(await one(t))
+			r = await one(t)
+			out.append(r)
+			if "error" in r:
+				# It may have been billed though nothing came back: count the worst case and stop.
+				spent += w
+				out.append({"stopped": "a call failed; counted at its worst case and stopped"})
+				break
+			# A response without usage is counted at the worst case, not as free.
+			spent += r["usd"] if r.get("tokens", [0])[0] > 0 else w
 		return out
 
 	results = asyncio.run(run())
-	total = round(sum(r.get("usd", 0) for r in results), 4)
+	total = round(sum(r.get("usd", 0) for r in results), 4)  # what the API reported; the cap used worst cases
 	out = json.dumps({"calls": len(results), "usd": total, "results": results}, indent=1)
 	print(out.replace(key, "<key>") if len(key) >= 8 else out)

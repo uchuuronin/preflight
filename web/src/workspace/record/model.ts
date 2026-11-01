@@ -12,8 +12,15 @@ export function currentKnobs(record: LoadedRecord): Record<string, KnobValue> {
 	return out;
 }
 
+/**
+ * The target a readout shows. A readout can have more than one target (B gives `cost.gpu_hours`
+ * the cost readout beside `cost.total`, Nov 1), so the one in dollars wins for cost, and otherwise
+ * the record's first: the dials, limits and rate all mean the run's dollars by "cost".
+ */
 export function targetFor(record: LoadedRecord, readout: Readout): Target | undefined {
-	return record.predictions.targets.find((t) => t.readout === readout);
+	const all = record.predictions.targets.filter((t) => t.readout === readout);
+	if (readout === "cost") return all.find((t) => t.unit === "usd") ?? all[0];
+	return all[0];
 }
 
 export function target(record: LoadedRecord, id: string): Target | undefined {
