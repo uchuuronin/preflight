@@ -1,0 +1,11 @@
+{
+	"name": "20261101-110303-41300131134-a-smoke-vision-timm-l4",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41300131134",
+	"ref": "ws-a",
+	"sha": "011a1f74610196b7580d590d842394c142b1cf88",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/vision_timm --gpus L4,A10,L40S --max-minutes 15",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T11:17:59Z"
+}
