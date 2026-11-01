@@ -7,7 +7,7 @@ tokenised it, so the length is the script's tokenisation and truncation, not a g
 
 	dataset_max_tokens     the longest row, in tokens
 	dataset_p999_tokens    the 99.9th percentile, so one outlier row shows as one
-	dataset_p50_tokens     the median row, and
+	dataset_p50_tokens     the median row (the lower middle one for an even count), and
 	dataset_mean_tokens    the mean row: step and total time follow these, memory the max (B, Nov 1)
 	dataset_rows_scanned   how many rows these are over ("measured over N rows")
 	dataset_rows_total     how many rows the dataset has, when it knows
