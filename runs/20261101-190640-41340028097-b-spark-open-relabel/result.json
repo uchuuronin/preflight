@@ -1,0 +1,11 @@
+{
+	"name": "20261101-190640-41340028097-b-spark-open-relabel",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41340028097",
+	"ref": "ws-b",
+	"sha": "a0a7fed9441da95bac301babb810b0d8f1533c35",
+	"cmd": "python scripts/spark_label_corpus.py relabel --out out",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T19:08:13Z"
+}
