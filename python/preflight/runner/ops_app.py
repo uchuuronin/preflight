@@ -498,6 +498,25 @@ AGENT_MAX_USD = 3.0  # proposed to Chiya for one sample (the proxy stops at it);
 	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
 	timeout=AGENT_SAMPLE_TIMEOUT_S,
 )
+def _mbpp_row_keys(n: int) -> dict[str, int]:
+	"""zoo/agent_eval_spark's first n MBPP rows by their opening key (the proxy's hash of the first user
+	message, as run.py writes it), so a sweep can say which sampled task is which row, planted rows
+	included, without reading any content back. From the datasets-server's rows API."""
+	import httpx
+
+	from preflight.recorder.agent import _h, opening_key
+
+	r = httpx.get("https://datasets-server.huggingface.co/rows", params={"dataset": "google-research-datasets/mbpp",
+		"config": "full", "split": "test", "offset": 0, "length": n}, timeout=60)  # fmt: skip
+	r.raise_for_status()
+	keys = {}
+	for item in r.json()["rows"]:
+		row = item["row"]
+		content = f"{row['text']}\nYour code should pass these tests:\n" + "\n".join(row["test_list"])
+		keys[opening_key([_h({"role": "user", "content": content})])] = item["row_idx"]
+	return keys
+
+
 def agent_sample_hosted(
 	files: dict,
 	entrypoint: str,
@@ -505,6 +524,7 @@ def agent_sample_hosted(
 	max_usd: float,
 	skip_keys: list | None = None,
 	provider: str = "meta",
+	label_mbpp: int = 0,
 ) -> dict:
 	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
 	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
@@ -543,7 +563,22 @@ def agent_sample_hosted(
 	)
 	usd = round(sum(t.cost_usd or 0 for t in s.tasks), 4)
 	print(f"[agent] {len(s.tasks)} tasks, ${usd} of model calls; {s.selection}", flush=True)
-	return {"sample": s.model_dump(mode="json"), "usd": usd, "task_ends": ends, "provider": provider}
+	rows = {}
+	if label_mbpp:
+		from preflight.recorder.agent import task_key
+
+		try:
+			by_key = _mbpp_row_keys(label_mbpp)
+			rows = {t.task_id: by_key.get(task_key(t.task_id)) for t in s.tasks}
+		except Exception as exc:  # the labels are for scoring; the sample stands without them
+			print(f"[agent] couldn't label the rows: {type(exc).__name__}: {exc}", flush=True)
+	return {
+		"sample": s.model_dump(mode="json"),
+		"usd": usd,
+		"task_ends": ends,
+		"task_rows": rows,
+		"provider": provider,
+	}
 
 
 @ops.local_entrypoint()
@@ -553,6 +588,7 @@ def agent_sample(
 	max_usd: float = AGENT_MAX_USD,
 	skip_from: str = "",
 	provider: str = "meta",
+	label_mbpp: int = 0,
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
 	Writes out/agent_sample_<script>.json: the sampled tasks (counts and timings, no content).
@@ -576,7 +612,7 @@ def agent_sample(
 			print(f"[agent] {len(tasks) - len(skip)} task ids in {skip_from} have no key and may be sampled again",
 				flush=True)  # fmt: skip
 		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
-	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip, provider)
+	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip, provider, label_mbpp)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/agent_sample_{script}{'' if provider == 'meta' else '_' + provider}.json").write_text(
 		json.dumps(res, indent=2)
