@@ -56,6 +56,13 @@ describe("limits and choices in the rule-based tour", () => {
 		await frame();
 		expect(r.ws!.state.knobs.batch_size).toBe(4);
 		expect(r.ws!.state.limits.excluded.batch_size).toEqual([8]);
+		// The problems no move can show come once each (gradients kept in eval, padding waste), then
+		// nothing is left.
+		for (const said of [/Eval runs with gradients kept/, /38% of tokens are padding/]) {
+			expect(screen.getByText(said)).toBeTruthy();
+			fireEvent.click(screen.getByRole("button", { name: en["guide.next"] }));
+			await frame();
+		}
 		expect(screen.getByText(en["guide.done.limits"])).toBeTruthy();
 		expect(r.ws!.state.knobs.gpu_type).toBe("A100-SXM-80GB");
 	});

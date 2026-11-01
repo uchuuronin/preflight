@@ -4,11 +4,14 @@
  * approval runs the tool on the server and the guide hears the result), or ask it something.
  * Any failure hands over to the rule-based tour through `onFallback`.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../lib/i18n";
 import type { KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
+import { bestCombo, comboKeys, comboVisit, comboWords, singleClears } from "./combos";
 import { valueText } from "./GuidePanel";
+import { withinLimits, NO_LIMITS } from "./limits";
+import { isFailing } from "./ruleTour";
 import { GuideFallback, LiveTour, type LiveView, type TourContext } from "./liveGuide";
 import { MoveChoices } from "./MoveChoices";
 
@@ -29,6 +32,10 @@ export function LiveGuideSection({
 	const [busy, setBusy] = useState(false);
 	const [ask, setAsk] = useState("");
 	const [unpinAsk, setUnpinAsk] = useState<string | null>(null);
+	// Combined moves turned down on the card: the guide's sensitivity doesn't offer them again.
+	const [turnedDown, setTurnedDown] = useState<ReadonlySet<string>>(new Set());
+	const declinedRef = useRef(turnedDown);
+	declinedRef.current = turnedDown;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 
 	const tourRef = useRef<LiveTour | null>(null);
@@ -45,6 +52,7 @@ export function LiveGuideSection({
 				objective: { kind: s.objective.kind ?? "min_time", ...(s.objective.target_id ? { target_id: s.objective.target_id } : {}) },
 				requestApproval: () => {},
 				requestUnpin: (id) => setUnpinAsk(id),
+				combosDeclined: declinedRef.current,
 				...(language ? { language } : {}),
 			};
 		};
@@ -102,6 +110,18 @@ export function LiveGuideSection({
 	};
 
 	const waitingOnMove = view?.awaiting === "decision" && proposal;
+
+	// No single knob clears the failure, but a combined setting the record's predictions cover does:
+	// the guide is told (sensitivity's "combined") and the visitor applies it here, in one click.
+	const combo = useMemo(() => {
+		// Never beside a move of the guide's still waiting: applying would put that knob back.
+		if (!view || proposal || !isFailing({ record, provider, knobs: state.knobs })) return null;
+		const lim = withinLimits(record, provider, state.limits ?? NO_LIMITS, state.knobs, { pinned: state.pinned });
+		const objective = { kind: state.objective.kind ?? "min_time" } as const;
+		if (singleClears(record, provider, objective, lim)) return null;
+		return bestCombo(record, provider, state.knobs, objective, { pinned: lim.pinned ?? state.pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: turnedDown });
+	}, [view, proposal, record, provider, state.knobs, state.limits, state.pinned, state.objective.kind, turnedDown]);
+	const words = combo ? comboWords(record, state.knobs, combo) : null;
 	const knob = proposal ? knobs.get(proposal.knobId) : undefined;
 
 	return (
@@ -136,6 +156,25 @@ export function LiveGuideSection({
 						onKeep={() => decide("kept")}
 						onPin={() => decide("pinned")}
 					/>
+				</div>
+			) : null}
+			{combo && words && !busy ? (
+				<div className="pf-guide__approval" role="group" aria-label={t("guide.combo.label")}>
+					<p>{t(comboKeys(combo).textKey, words)}</p>
+					<div className="pf-guide__actions">
+						<button
+							type="button"
+							className="pf-btn pf-btn--primary pf-btn--small"
+							onClick={() => {
+								for (const c of combo.changes) actions.setKnob(c.knobId, c.to, "user");
+							}}
+						>
+							{t("guide.combo.apply", words)}
+						</button>
+						<button type="button" className="pf-btn pf-btn--small" onClick={() => setTurnedDown(new Set([...turnedDown, comboVisit(combo)]))}>
+							{t("guide.not_this")}
+						</button>
+					</div>
 				</div>
 			) : null}
 			{unpinAsk ? (

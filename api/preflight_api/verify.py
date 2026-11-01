@@ -225,7 +225,26 @@ def check(
 	checks.append(_check("effective_batch", None if eb is None or ea is None else eb == ea, eb, ea))
 
 	tb, ta = tokens_seen(before, pb), tokens_seen(after, pa)
-	checks.append(_check("tokens_seen", _same(tb, ta, TOKENS_TOLERANCE), tb, ta))
+	if tb is None and ta is None and total_steps(before) is None and total_steps(after) is None:
+		# A run sized by epochs, not max_steps: neither side's length is known, so compare tokens per
+		# step; lr_schedule below holds the run length (epochs, max_steps) to the same on both sides.
+		tb = (pb.get("extras") or {}).get("tokens_per_step")
+		ta = (pa.get("extras") or {}).get("tokens_per_step")
+		tb, ta = (
+			(float(tb) if isinstance(tb, int | float) else None),
+			(float(ta) if isinstance(ta, int | float) else None),
+		)
+		checks.append(
+			_check(
+				"tokens_seen",
+				_same(tb, ta, TOKENS_TOLERANCE),
+				tb,
+				ta,
+				"tokens per step; run length from lr_schedule",
+			)
+		)
+	else:
+		checks.append(_check("tokens_seen", _same(tb, ta, TOKENS_TOLERANCE), tb, ta))
 
 	trb, tra = _training(before), _training(after)
 	keys = ("lr", "warmup_steps", "max_steps", "epochs")

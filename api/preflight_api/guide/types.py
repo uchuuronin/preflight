@@ -153,10 +153,21 @@ class Ranked(Strict):
 	fit: Literal["fits", "tight"] = "fits"
 
 
+class Combined(Strict):
+	"""A setting that changes several knobs together and clears a failure no single knob clears,
+	from the record's multi-axis grids (web/src/guide/combos.ts). The person applies it with one
+	click on the guide's card; set_knob can't."""
+
+	knobs: dict[Id, Value] = Field(min_length=2, max_length=4)
+	risk: float = Field(ge=0, le=1)
+	peak_bytes: float | None = Field(default=None, ge=0)
+
+
 class SensitivityOut(Strict):
 	tool: Literal["sensitivity"]
 	call_id: Annotated[str, Field(max_length=80)]
 	ranked: list[Ranked] = Field(max_length=12)
+	combined: Combined | None = None
 
 
 class SetKnobOut(Strict):
@@ -292,6 +303,10 @@ def check_result(out: Any, rec: RecordView) -> None:
 				raise InputError(
 					f"ranking names {r.knob_id}={r.best_value!r}, which the record doesn't allow"
 				)
+		for kid, v in (out.combined.knobs if out.combined else {}).items():
+			k = rec.knobs.get(kid)
+			if k is None or not k.allows(v):
+				raise InputError(f"combined move names {kid}={v!r}, which the record doesn't allow")
 	elif isinstance(out, SetKnobOut):
 		k = rec.knobs.get(out.knob_id)
 		if k is None:

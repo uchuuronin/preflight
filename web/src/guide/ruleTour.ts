@@ -7,14 +7,15 @@ import { hasKey } from "../lib/i18n";
 import { type CampaignPlan, finishBand } from "../workspace/campaign/plan";
 import { probeCap, rlProbe, spreadCount } from "../workspace/rl";
 import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
-import { costStraddlesBudget, failureTarget } from "../workspace/record/model";
+import { costStraddlesBudget, failureTarget, objectiveTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
+import { bestCombo, type ComboMove, comboKeys } from "./combos";
 import { type Limits, NO_LIMITS, withinLimits } from "./limits";
 
 /**
- * Map nodes a knob acts on, by knob id. Requested as knobs[].affects (docs/requests.md);
- * until A's records carry it, this table and the record's findings decide.
+ * Map nodes a knob acts on, by knob id, for records from before A's `knobs[].affects`
+ * (harness/knob_meta.py). A knob with its own `affects` uses that and the record's findings only.
  */
 const KNOB_NODES: Record<string, string[]> = {
 	eval_batch_size: ["eval"],
@@ -104,9 +105,13 @@ export function changesResults(knobId: string, record?: LoadedRecord): boolean {
 }
 
 export function nodesForKnob(record: LoadedRecord, knobId: string): string[] {
+	// A record that says what a knob acts on (even nothing) is the answer; the table is only for
+	// records from before A wrote it, since its coarse ids ("model") would light a whole group.
+	const declared = record.knobs.find((k) => k.id === knobId)?.affects;
 	const fromFindings = record.findings.filter((f) => f.knob_id === knobId && f.node_id).map((f) => f.node_id as string);
 	const known = new Set(record.graph.nodes.map((n) => n.id));
-	return [...new Set([...fromFindings, ...(KNOB_NODES[knobId] ?? [])])].filter((n) => known.has(n));
+	const base = Array.isArray(declared) ? declared : (KNOB_NODES[knobId] ?? []);
+	return [...new Set([...base, ...fromFindings])].filter((n) => known.has(n));
 }
 
 export interface TourStep {
@@ -114,7 +119,9 @@ export interface TourStep {
 	 * move: apply a "fits" move. probe_offer: a "tight" setting would save enough to be worth
 	 * measuring first (the person's click). blocked_by_pin, nothing_safe, done: as named.
 	 */
-	kind: "move" | "probe_offer" | "sample_offer" | "finding" | "campaign" | "rl" | "blocked_by_pin" | "nothing_safe" | "done";
+	kind: "move" | "combo" | "probe_offer" | "sample_offer" | "finding" | "campaign" | "rl" | "blocked_by_pin" | "nothing_safe" | "done";
+	/** combo: a setting that changes several knobs at once, when no single one clears a failure. */
+	combo?: ComboMove;
 	/** campaign: which part of the record's campaign plan this step walks (the calendar lights up). */
 	campaignPart?: CampaignPart;
 	/** rl: which measured RL signal this step walks (the RL view lights up). */
@@ -244,13 +251,77 @@ function codeFindings(ctx: Pick<TourContext, "record" | "visited">): Finding[] {
 	);
 }
 
+/**
+ * A problem found on a real knob that no move on the dock can show: the knob has no move for the
+ * aim (its effect isn't predicted, as for a retrieval run's in-batch negatives or a vision run's
+ * CPU augmentation), so the tour points at the finding instead of staying silent about it.
+ */
+function knobFindings(ctx: TourContext): Finding[] {
+	const knobs = new Set(ctx.record.knobs.map((k) => k.id));
+	// Knobs the predictions can rank for the aim at all (tight moves and ones that change results
+	// included): a finding on one of those is the moves' to show, or deliberately held back.
+	const shown = new Set(ctx.provider.moves(ctx.record, ctx.objective, opts(ctx, ctx.pinned, { includeTight: true })).map((m) => m.knobId));
+	return ctx.record.findings.filter(
+		// A knob the tour already moved, offered or had turned down has been dealt with on the dock.
+		(f) =>
+			FINDING_SEVERITIES.has(f.severity) &&
+			!!f.knob_id &&
+			knobs.has(f.knob_id) &&
+			!shown.has(f.knob_id) &&
+			!ctx.visited.has(f.knob_id) &&
+			!ctx.visited.has(`probe:${f.knob_id}`) &&
+			!(ctx.limits?.declined ?? []).includes(f.knob_id) &&
+			!ctx.visited.has(findingVisit(f)),
+	);
+}
+
 function nextFinding(ctx: TourContext): Finding | undefined {
 	return codeFindings(ctx)[0];
 }
 
-/** Code findings the tour has still to show (each is a step of its own). */
+/**
+ * A finding on a knob comes once the moves are done, so it never pushes a saving aside, and waits
+ * only while the run likely fails: a "tight" run with no move to clear it still hears about it.
+ */
+function lastFinding(ctx: TourContext): Finding | undefined {
+	return likelyFails(ctx) ? undefined : knobFindings(ctx)[0];
+}
+
+function findingStep(ctx: TourContext, found: Finding): TourStep {
+	const onKnob = !!found.knob_id && ctx.record.knobs.some((k) => k.id === found.knob_id);
+	const nodes = found.node_id && ctx.record.graph.nodes.some((n) => n.id === found.node_id) ? [found.node_id] : [];
+	return {
+		kind: "finding",
+		finding: found,
+		nodes: onKnob ? [...new Set([...nodes, ...nodesForKnob(ctx.record, found.knob_id as string)])] : nodes,
+		textKey: onKnob ? "guide.finding.knob" : "guide.finding",
+		whyKey: onKnob ? "guide.finding.knob.why" : "guide.finding.why",
+	};
+}
+
+/** Findings the tour has still to show (each is a step of its own). */
 export function pendingFindings(ctx: TourContext): number {
-	return isFailing(ctx) ? 0 : codeFindings(ctx).length;
+	return (isFailing(ctx) ? 0 : codeFindings(ctx).length) + (likelyFails(ctx) ? 0 : knobFindings(ctx).length);
+}
+
+/**
+ * When the aim's own number isn't predicted (a run whose length the record doesn't know has no
+ * time or cost to rank), the measured memory still is: its moves, so the tour shows what the
+ * probes can answer for rather than ending at "done".
+ */
+function aimUnpredicted(ctx: TourContext): boolean {
+	const kind = ctx.objective.kind ?? "min_time";
+	if (kind === "fit_memory") return false;
+	const goal = objectiveTarget(ctx.record, kind, ctx.objective.target_id);
+	if (!goal) return true;
+	const e = ctx.provider.predict(ctx.record, ctx.knobs)[goal.id];
+	return !e || e.status === "abstain";
+}
+
+function memoryFallback(ctx: TourContext): Move | undefined {
+	if (!aimUnpredicted(ctx)) return undefined;
+	const mem: TourContext = { ...ctx, objective: { ...ctx.objective, kind: "fit_memory" } };
+	return candidates(mem, ctx.pinned)[0];
 }
 
 export function nextStep(ctx: TourContext): TourStep {
@@ -291,16 +362,10 @@ export function nextStep(ctx: TourContext): TourStep {
 	// A run that isn't failing: problems found in the code (a retry loop with no cap) come before
 	// savings, since no knob move shows them.
 	const found = failing ? undefined : nextFinding(ctx);
-	if (found) {
-		return {
-			kind: "finding",
-			finding: found,
-			nodes: found.node_id && ctx.record.graph.nodes.some((n) => n.id === found.node_id) ? [found.node_id] : [],
-			textKey: "guide.finding",
-			whyKey: "guide.finding.why",
-		};
-	}
-	const top = candidates(ctx, ctx.pinned)[0];
+	if (found) return findingStep(ctx, found);
+	// A failure comes first whatever the aim: when the aim ranks no move that fits, the moves
+	// ranked for memory are the ones that can clear it.
+	const top = candidates(ctx, ctx.pinned)[0] ?? (failing ? candidates({ ...ctx, objective: { ...ctx.objective, kind: "fit_memory" } }, ctx.pinned)[0] : undefined);
 	const offer = probeOffer(ctx, top);
 	if (offer) {
 		return {
@@ -309,6 +374,16 @@ export function nextStep(ctx: TourContext): TourStep {
 			nodes: nodesForKnob(ctx.record, offer.knobId),
 			textKey: "guide.probe_offer",
 			whyKey: "guide.probe_offer.why",
+		};
+	}
+	const fallback = top || failing ? undefined : memoryFallback(ctx);
+	if (fallback) {
+		return {
+			kind: "move",
+			move: fallback,
+			nodes: nodesForKnob(ctx.record, fallback.knobId),
+			textKey: "guide.rule.aim_unpredicted.line",
+			whyKey: "guide.rule.aim_unpredicted.why",
 		};
 	}
 	if (top) {
@@ -323,7 +398,24 @@ export function nextStep(ctx: TourContext): TourStep {
 			whyKey: specific ? keyFor(top.knobId, "why", fixing) : "guide.rule.generic.fix.why",
 		};
 	}
-	// Nothing movable helps. If a pin is in the way, say which one and what releasing it buys.
+	if (failing) {
+		// No single knob clears it: a setting that changes two or three together may, where the
+		// record's predictions cover the combination (B's multi-axis grids).
+		const o = opts(ctx, ctx.pinned);
+		const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { pinned: o.pinned, ...(o.allow ? { allow: o.allow } : {}), visited: ctx.visited });
+		if (combo) {
+			return {
+				kind: "combo",
+				combo,
+				nodes: [...new Set(combo.changes.flatMap((c) => nodesForKnob(ctx.record, c.knobId)))],
+				...comboKeys(combo),
+			};
+		}
+	}
+	// Nothing movable helps. A problem found on a knob no move could show comes first.
+	const last = lastFinding(ctx);
+	if (last) return findingStep(ctx, last);
+	// If a pin is in the way, say which one and what releasing it buys.
 	if (ctx.pinned.size) {
 		const blocker = candidates(ctx, new Set()).find((m) => ctx.pinned.has(m.knobId));
 		if (blocker) {
@@ -347,15 +439,19 @@ export function nextStep(ctx: TourContext): TourStep {
 			kind: "nothing_safe",
 			...(toMeasure ? { move: toMeasure } : {}),
 			nodes: [...new Set([...nodes, ...(toMeasure ? nodesForKnob(ctx.record, toMeasure.knobId) : [])])],
-			textKey: "guide.nothing_safe",
-			whyKey: "guide.nothing_safe.why",
+			// "likely to fail" only when it likely would; a small chance is said as one
+			textKey: likelyFails(ctx) ? "guide.nothing_safe" : "guide.nothing_safe.tight",
+			// the probe line only when there is a setting worth measuring
+			whyKey: toMeasure ? "guide.nothing_safe.why" : "guide.nothing_safe.none.why",
 		};
 	}
 	return { kind: "done", nodes: [], textKey: "guide.done", whyKey: "guide.done.why" };
 }
 
 export function plannedSteps(ctx: TourContext): number {
-	return candidates(ctx, ctx.pinned).length;
+	const n = candidates(ctx, ctx.pinned).length;
+	if (n || isFailing(ctx) || !aimUnpredicted(ctx)) return n;
+	return candidates({ ...ctx, objective: { ...ctx.objective, kind: "fit_memory" } }, ctx.pinned).length;
 }
 
 export const MAX_TOUR_STEPS = 5;

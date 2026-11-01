@@ -94,3 +94,15 @@ def test_the_command_line_takes_what_a_fix_may_change(tmp_path: Path):
 	# A fix that touches evaluation must show the same evaluation still ran: unmeasured is an error.
 	assert main([str(b), str(a), "--keep-eval"]) == 2
 	assert main([str(b), str(a), "--may-change", "throughput_floor, fixed_seed_loss"]) == 0
+
+
+def test_a_run_sized_by_epochs_compares_tokens_per_step():
+	# zoo/finetune_lora_hf: one epoch, no max_steps, so neither side's run length is known.
+	epochs = {"job": {"script_map": {"training": {"lr": 2e-4, "warmup_steps": 100, "epochs": 1}}}}
+	before, after = record(**copy.deepcopy(epochs)), fixed()
+	after["job"] = copy.deepcopy(epochs["job"])
+	res = check(before, after)
+	assert res["status"] == "passed", res["checks"]
+	more = fixed(extras={"samples_per_step": 4, "tokens_per_step": 4096})
+	more["job"] = copy.deepcopy(epochs["job"])
+	assert [c["id"] for c in check(before, more)["checks"] if c["ok"] is False] == ["tokens_seen"]

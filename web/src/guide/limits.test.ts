@@ -5,7 +5,7 @@ import { currentKnobs } from "../workspace/record/model";
 import { type FlightRecord, type KnobValue, normaliseRecord, type ObjectiveKind } from "../workspace/record/types";
 import { breaksLimit, type Limits, NO_LIMITS } from "./limits";
 import { guardSetKnob, runBrowserCall } from "./liveGuide";
-import { nextStep, type TourStep } from "./ruleTour";
+import { findingVisit, nextStep, type TourStep } from "./ruleTour";
 import { fakeActions } from "./testkit";
 import { executeTool } from "./tools";
 
@@ -57,7 +57,9 @@ describe("limits are hard limits for both tours", () => {
 	it("'Not this' on batch size moves to another lever, or says plainly that none is left", () => {
 		// Unconstrained, the tour runs eval batch, GPU, then batch size.
 		const free = tour("min_cost", NO_LIMITS).steps.map((s) => s.move?.knobId ?? s.kind);
-		expect(free).toEqual(["eval_batch_size", "gpu_type", "batch_size", "done"]);
+		// ...then the one problem left that no move can show: eval keeps its gradients (a code fix).
+		expect(free).toEqual(["eval_batch_size", "gpu_type", "batch_size", "finding"]);
+		expect(tour("min_cost", NO_LIMITS).steps.at(-1)?.finding?.code).toBe("eval.no_grad");
 		// Turned down at the GPU step, the next suggestion is a different lever: batch size.
 		const fixed = { ...currentKnobs(lora), eval_batch_size: 8 };
 		const declinedGpu: Limits = { ...NO_LIMITS, excluded: { gpu_type: ["H100-SXM-80GB"] }, declined: ["gpu_type"] };
@@ -70,7 +72,10 @@ describe("limits are hard limits for both tours", () => {
 		const declined: Limits = { ...a100Only, excluded: { batch_size: [8] }, declined: ["batch_size"] };
 		const next = nextStep({ record: lora, provider, knobs: fixed, pinned: new Set(), objective: { kind: "min_cost" }, visited: new Set(["sample:more", "eval_batch_size", "batch_size"]), limits: declined });
 		expect(next.move?.knobId).not.toBe("batch_size");
-		expect(next.kind).toBe("done");
+		expect(next.finding?.code).toBe("eval.no_grad");
+		// Past the record's findings (gradients kept in eval, then padding waste), nothing is left.
+		const read = new Set(["sample:more", "eval_batch_size", "batch_size", ...lora.findings.map(findingVisit)]);
+		expect(nextStep({ record: lora, provider, knobs: fixed, pinned: new Set(), objective: { kind: "min_cost" }, visited: read, limits: declined }).kind).toBe("done");
 		const c = liveCtx(declined, fixed);
 		const ranked = runBrowserCall({ call_id: "s", name: "sensitivity", arguments: { objective: "min_cost" }, runs_in: "browser" }, c, false);
 		expect(ranked.tool === "sensitivity" && ranked.ranked.map((r) => r.knob_id)).not.toContain("batch_size");

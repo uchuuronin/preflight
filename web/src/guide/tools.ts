@@ -169,6 +169,8 @@ export interface ToolContext {
 	requestUnpin?: (knobId: string) => void;
 	/** Money-spending tools land here for the person to approve. */
 	requestApproval: (name: string, args: Record<string, unknown>) => void;
+	/** Combined moves the visitor turned down on the live card (combos.ts comboVisit): not offered again. */
+	combosDeclined?: ReadonlySet<string>;
 }
 
 export type ToolResult = { ok: true; result: unknown } | { ok: false; error: string };

@@ -7,7 +7,7 @@ import { currentKnobs, knobChoices, targetFor } from "../workspace/record/model"
 import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
 import type { TraceEntry } from "../workspace/state";
 import { guardSetKnob, runBrowserCall } from "./liveGuide";
-import { findingVisit, nextStep, SAMPLE_VISIT } from "./ruleTour";
+import { findingVisit, nextStep, nodesForKnob, SAMPLE_VISIT } from "./ruleTour";
 import { fakeActions } from "./testkit";
 import { buildTools, executeTool, runTool, type ToolContext } from "./tools";
 
@@ -215,11 +215,19 @@ describe("the agent tour on A's measured run (Oct 31)", () => {
 	});
 
 	it("shows only findings no knob shows, critical ones included", () => {
-		// Every finding on the other samples names a knob of its record: the moves show those.
-		for (const r of [dev, golden, normaliseRecord(agentRaw as unknown as FlightRecord)]) {
+		// Every finding on the other samples names a knob of its record: where a move ranks that
+		// knob, the moves show it, so the tour opens with a move.
+		for (const r of [dev, golden]) {
 			const step = nextStep({ record: r, provider, knobs: currentKnobs(r), pinned: new Set(), objective: cost, visited: new Set() });
 			expect(step.kind).not.toBe("finding");
 		}
+		// The agent example ranks no move for cost, so its retry-loop finding (on a knob no move
+		// ranks) is said rather than ending the tour at "done" without it.
+		const agent = normaliseRecord(agentRaw as unknown as FlightRecord);
+		const said = nextStep({ record: agent, provider, knobs: currentKnobs(agent), pinned: new Set(), objective: cost, visited: new Set() });
+		expect(said.kind).toBe("finding");
+		expect(said.textKey).toBe("guide.finding.knob");
+		expect(said.finding?.knob_id).toBe("tool_retry_cap");
 		// A critical finding whose fix is in the code is shown like an error.
 		const crit = { ...real, findings: real.findings.map((f) => ({ ...f, severity: "critical" as const })) };
 		expect(nextStep({ ...base, record: crit, visited: new Set() }).kind).toBe("finding");
@@ -229,5 +237,21 @@ describe("the agent tour on A's measured run (Oct 31)", () => {
 		const c = ctx(real, new Set(["concurrency"]));
 		expect(executeTool("set_knob", { knob_id: "concurrency", value: 8, why: "x" }, c).ok).toBe(false);
 		expect(buildTools(real, new Set(["concurrency"])).find((x) => x.name === "set_knob")?.parameters.properties).toBeTruthy();
+	});
+});
+
+describe("the nodes a knob lights", () => {
+	const withAffects = (affects: string[] | undefined) =>
+		({ ...dev, findings: [], knobs: dev.knobs.map((k) => (k.id === "eval_batch_size" ? { ...k, affects } : k)) }) as typeof dev;
+
+	it("uses the record's own affects, not the table, and keeps only nodes on its map", () => {
+		const [first, second] = dev.graph.nodes.map((n) => n.id).filter((n) => n !== "eval");
+		expect(nodesForKnob(withAffects([second, "not_on_this_map", first]), "eval_batch_size")).toEqual([second, first]);
+		// A knob the record says acts on nothing lights nothing.
+		expect(nodesForKnob(withAffects([]), "eval_batch_size")).toEqual([]);
+	});
+
+	it("falls back to the table for a record from before affects", () => {
+		expect(nodesForKnob(withAffects(undefined), "eval_batch_size")).toEqual(["eval"]);
 	});
 });

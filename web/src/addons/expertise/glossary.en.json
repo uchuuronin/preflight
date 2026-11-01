@@ -492,6 +492,12 @@
 			"practitioner": "Input resolution; activation memory and time grow with pixels, so doubling the side roughly quadruples them.",
 			"expert": "For ViTs tokens = (side / patch)², and attention cost grows with the square of tokens."
 		},
+		"channels_last": {
+			"label": "Channels-last layout",
+			"new": "How each image's numbers are arranged in memory. One arrangement lets the GPU's fastest units do the convolutions.",
+			"practitioner": "NHWC instead of PyTorch's default NCHW; with bf16 autocast, convolutions can use tensor-core kernels.",
+			"expert": "memory_format=torch.channels_last on the model and inputs; cuDNN picks NHWC kernels, often faster for convnets under mixed precision."
+		},
 		"hnsw_links": {
 			"label": "HNSW links",
 			"new": "How many shortcuts each item keeps in the search index. More links, better recall and more memory.",

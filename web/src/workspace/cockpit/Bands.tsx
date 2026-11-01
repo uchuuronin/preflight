@@ -15,6 +15,7 @@ import { Info } from "../components/Info";
 import { Provenance } from "../components/StatusMark";
 import { bounds, likelyFails, trusted } from "../status";
 import { outcomes, useHops } from "../hops";
+import { abstainText } from "./abstain";
 
 const MAX_MARKS = 24;
 
@@ -235,7 +236,7 @@ export function MemoryBand() {
 			<div className="glass pf-band">
 				<div className="pf-band__head">
 					<b>{t("membar.title")}</b>
-					<span>{peak?.status === "abstain" ? t(`abstain.${peak.reason ?? "off_grid"}`) : t("membar.unknown")}</span>
+					<span>{peak?.status === "abstain" ? abstainText(peak.reason) : t("membar.unknown")}</span>
 				</div>
 			</div>
 		);

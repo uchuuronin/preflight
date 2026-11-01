@@ -16,9 +16,10 @@ import type { Estimate } from "../record/types";
 import { probeCap, rlProbe, spreadCount } from "../rl";
 import { useWorkspace } from "../state";
 import { trusted } from "../status";
+import { abstainText } from "./abstain";
 
 function est(e: Estimate | undefined): string {
-	if (!e || !trusted(e)) return e?.reason ? t("rl.not_predicted", { why: e.reason }) : t("value.none");
+	if (!e || !trusted(e)) return e?.reason ? abstainText(e.reason) : t("value.none");
 	return t("rl.estimate", { point: fmt(e.point, "probability"), range: fmtRange(e.lo ?? e.point, e.hi ?? e.point, "probability") });
 }
 

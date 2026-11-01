@@ -15,6 +15,7 @@ import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
+import { comboVisit, comboWords } from "./combos";
 import { campaignParts, campaignVisit, rlParts, rlVisit, findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
@@ -140,6 +141,12 @@ export function GuidePanel() {
 			return;
 		}
 		actions.propose(null);
+		if (step.kind === "combo" && step.combo) {
+			// Shown with its prediction; nothing moves until the visitor applies it.
+			runTool("predict", { knobs: Object.fromEntries(step.combo.changes.map((c) => [c.knobId, c.to])) }, ctx());
+			setActive({ step, n, of: Math.max(n, Math.min(cap, nextTaken + pendingFindings(tc) + plannedSteps(tc) + 1)) });
+			return;
+		}
 		if (step.kind === "finding") {
 			// A finding is a step of the tour: counted with the findings and moves still to come.
 			setActive({ step, n, of: Math.max(n, Math.min(cap, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
@@ -183,6 +190,18 @@ export function GuidePanel() {
 	 * keep: put it back and pin the visitor's own value. decline ("Not this"): put it back, exclude
 	 * that value for the session, and move on to another lever.
 	 */
+	/** A combined move: apply sets every knob it names (the visitor's own click); "Not this" moves on. */
+	const finishCombo = (apply: boolean) => {
+		const combo = active?.step.combo;
+		if (!combo) return;
+		if (apply) for (const c of combo.changes) actions.setKnob(c.knobId, c.to, "user");
+		const v = new Set(visited);
+		v.add(comboVisit(combo));
+		setVisited(v);
+		setTaken(taken + 1);
+		requestAnimationFrame(() => begin(v, taken + 1));
+	};
+
 	const finish = (outcome: "apply" | "revert" | "pin" | "keep" | "decline") => {
 		if (!active?.step.move) return;
 		const { move } = active.step;
@@ -352,8 +371,10 @@ export function GuidePanel() {
 			cap: cap ? fmt(cap, "bytes") : "",
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
+			...(step?.combo ? comboWords(record, state.knobs, step.combo) : {}),
 			title: step?.finding?.title ?? "",
-			detail: step?.finding?.detail ?? "",
+			// A's detail can end without a full stop; the line reads it as a sentence
+			detail: sentence(step?.finding?.detail ?? ""),
 			...campaignVars(),
 			...rlVars(),
 			...((): Record<string, string> => {
@@ -375,6 +396,7 @@ export function GuidePanel() {
 		if (!active) return setAside ? { label: t("guide.carry_on"), run: carryOn } : { label: t("guide.start"), run: restart };
 		const s = active.step;
 		if (s.kind === "move") return { label: t("guide.apply_value", { knob: vars.knob, to: vars.to }), run: () => finish("apply") };
+		if (s.kind === "combo") return { label: t("guide.combo.apply", { n: vars.n ?? "" }), run: () => finishCombo(true) };
 		if (s.kind === "blocked_by_pin" && s.pinnedKnob)
 			return {
 				label: t("guide.unpin_and_continue", { knob: vars.knob }),
@@ -500,6 +522,11 @@ export function GuidePanel() {
 								{t("guide.skip")}
 							</button>
 						) : null}
+						{active?.step.kind === "combo" ? (
+							<button type="button" className="pf-btn pf-btn--small" onClick={() => finishCombo(false)}>
+								{t("guide.not_this")}
+							</button>
+						) : null}
 						{active?.step.kind === "move" && active.step.move ? (
 							<MoveChoices
 								knob={knobs.get(active.step.move.knobId)}
@@ -562,4 +589,9 @@ export function GuidePanel() {
 			))}
 		</section>
 	);
+}
+
+function sentence(text: string): string {
+	const s = text.trim();
+	return !s || /[.!?)"'’”]$/.test(s) ? s : `${s}.`;
 }
