@@ -1,0 +1,201 @@
+{
+  "script": "grpo_trl",
+  "gpu": "L4",
+  "backend": "cuda",
+  "bare": {
+    "steps": 4,
+    "walls_s": [
+      null,
+      48.32559765625,
+      22.609736328125,
+      56.120828125
+    ],
+    "ended": "steps",
+    "error": null,
+    "seconds": 208.820578502,
+    "peak_allocated_bytes": 21623980032,
+    "peak_reserved_bytes": 22988980224,
+    "device": "NVIDIA L4",
+    "timing": "cuda_events",
+    "wall_s": 213.5
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 5,
+    "p50_s": 46.086923828125,
+    "peak_allocated_bytes": 21623983104,
+    "seconds": 294.014,
+    "by_phase": {
+      "data": 1.6800981191284483e-05,
+      "forward": 0.011848944575902054,
+      "backward": 0.023850515538645495,
+      "optimizer": 0.0020067074090394164,
+      "rollout": 0.9534427442774102,
+      "reference": 0.008187654172416226,
+      "reward": 4.7532274512155185e-06,
+      "other": 0.000641879817944111
+    },
+    "rl": {
+      "response_length": {
+        "mean": 91.5875,
+        "p95": 426.0,
+        "max": 512.0,
+        "n": 160
+      },
+      "truncation_rate": 0.0,
+      "zero_spread_fraction": 0.75,
+      "pass_rate_per_prompt": [
+        0.0,
+        0.375,
+        0.125,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.125,
+        0.0,
+        0.0,
+        0.0,
+        0.125,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.125
+      ],
+      "group_size": 8,
+      "entropy": [],
+      "kl": [
+        0.0,
+        0.001042836724082008,
+        0.0018208438123110682,
+        0.003431903140153736,
+        0.0034860952146118507
+      ],
+      "clip_fraction": [],
+      "reward_mean": [
+        0.125,
+        0.0,
+        0.03125,
+        0.03125,
+        0.03125
+      ]
+    },
+    "generation": {
+      "calls": 20,
+      "seconds_total": 257.9176805569999,
+      "sequences": 160,
+      "new_tokens_mean": 91.5875,
+      "new_tokens_p95": 426.0,
+      "new_tokens_max": 512.0,
+      "max_new_tokens": null,
+      "truncation_rate": 0.0,
+      "backend": "hf"
+    },
+    "extras": {
+      "params_total": 494032768.0,
+      "params_trainable": 494032768.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 4.0,
+      "host_rss_peak_bytes": 7908433920.0,
+      "train_loader_batches": 7473.0,
+      "epochs": 1.0,
+      "planned_steps": 1868.0
+    },
+    "step_log": [
+      {
+        "index": 1,
+        "kind": "warmup",
+        "wall_s": 64.22249628099999,
+        "tokens": null,
+        "real_tokens": null,
+        "samples": null,
+        "padded_len": null,
+        "micro_steps": 4,
+        "peak_allocated_bytes": 19796769280,
+        "peak_reserved_bytes": 21139292160,
+        "device_used_bytes": 21403533312
+      },
+      {
+        "index": 2,
+        "kind": "warmup",
+        "wall_s": 43.84312264599879,
+        "tokens": null,
+        "real_tokens": null,
+        "samples": null,
+        "padded_len": null,
+        "micro_steps": 4,
+        "peak_allocated_bytes": 21409733120,
+        "peak_reserved_bytes": 22756196352,
+        "device_used_bytes": 23020437504
+      },
+      {
+        "index": 3,
+        "kind": "timed",
+        "wall_s": 38.87717578125,
+        "tokens": null,
+        "real_tokens": null,
+        "samples": null,
+        "padded_len": null,
+        "micro_steps": 4,
+        "peak_allocated_bytes": 16235719168,
+        "peak_reserved_bytes": 22756196352,
+        "device_used_bytes": 23020437504
+      },
+      {
+        "index": 4,
+        "kind": "phase",
+        "wall_s": 65.5007578125,
+        "tokens": null,
+        "real_tokens": null,
+        "samples": null,
+        "padded_len": null,
+        "micro_steps": 4,
+        "peak_allocated_bytes": 21623983104,
+        "peak_reserved_bytes": 22965911552,
+        "device_used_bytes": 23230152704
+      },
+      {
+        "index": 5,
+        "kind": "timed",
+        "wall_s": 53.296671875,
+        "tokens": null,
+        "real_tokens": null,
+        "samples": null,
+        "padded_len": null,
+        "micro_steps": 4,
+        "peak_allocated_bytes": 21543642624,
+        "peak_reserved_bytes": 22991077376,
+        "device_used_bytes": 23255318528
+      }
+    ],
+    "log_tail": "lease use `torch.distributed.ReduceOp` instead\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\n{'loss': -0.0, 'grad_norm': 45.08237838745117, 'learning_rate': 9.994646680942183e-07, 'completion_length': 131.96875, 'rewards/correct': 0.125, 'rewards/formatted': 0.0, 'reward': 0.125, 'reward_std': 0.2177756354212761, 'kl': 0.0, 'epoch': 0.0005352602703064365}\n{'loss': 0.0, 'grad_norm': 0.8775216341018677, 'learning_rate': 9.989293361884369e-07, 'completion_length': 85.875, 'rewards/correct': 0.0, 'rewards/formatted': 0.0, 'reward': 0.0, 'reward_std': 0.0, 'kl': 0.001042836724082008, 'epoch': 0.001070520540612873}\n{'loss': 0.0001, 'grad_norm': 63.15953063964844, 'learning_rate': 9.983940042826552e-07, 'completion_length': 61.96875, 'rewards/correct': 0.03125, 'rewards/formatted': 0.0, 'reward': 0.03125, 'reward_std': 0.0883883461356163, 'kl': 0.0018208438123110682, 'epoch': 0.0016057808109193096}\n{'loss': 0.0001, 'grad_norm': 19.362384796142578, 'learning_rate': 9.978586723768736e-07, 'completion_length': 132.96875, 'rewards/correct': 0.03125, 'rewards/formatted': 0.0, 'reward': 0.03125, 'reward_std': 0.0883883461356163, 'kl': 0.003431903140153736, 'epoch': 0.002141041081225746}\n{'loss': 0.0001, 'grad_norm': 43.4069938659668, 'learning_rate': 9.97323340471092e-07, 'completion_length': 45.15625, 'rewards/correct': 0.03125, 'rewards/formatted': 0.0, 'reward': 0.03125, 'reward_std': 0.0883883461356163, 'kl': 0.0034860952146118507, 'epoch': 0.0026763013515321826}\n"
+  },
+  "overhead": {
+    "sync_overhead": {
+      "median": 1.42124,
+      "ci95": [
+        1.42124,
+        1.42124
+      ],
+      "pairs": 1,
+      "source": "measured"
+    },
+    "hook_overhead": {
+      "median": 1.71949,
+      "ci95": [
+        1.71949,
+        1.71949
+      ],
+      "pairs": 1,
+      "source": "measured"
+    },
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  }
+}
