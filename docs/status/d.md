@@ -8,11 +8,17 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, morning (pushed; dollar figures back in the cuts)
+
+Pushed `88a1c72` and `8588646` with Chiya's yes (05:59). Chiya's ruling: dollar figures go back into both video cuts, spoken and captioned "at list price" (e.g. "$0.042 of GPU at list price"), because the rubric asks for dollars and that wording is accurate. The README keeps tagging them derived.
+- Plan A's storyboard: $0.042 is back in shot 8 and in the 45-second cut's shot B, spoken and captioned. Shot B is now about 35 spoken words in 16 s, so the plan trims its first sentence to the caption if the take runs long. Both rule lines now name list-price dollars next to measured numbers. A narrow read-only review checked every dollar value and basis against A's status file; its five wording and count fixes are in.
+- Fallback cut: shot 4 carries $0.042. Shot 11 carries $0.43 for the 30-task sample on screen ($0.4289, `a-agent-sample-1`) and $1.67 for all 130 tasks ($0.4289 + $1.2371). The numbers table gives each one's basis. The end moves to about 2:58 to give shot 11 room.
+
 ## Sun Nov 1, small hours (Chiya's queue of 01:19)
 
 `613ae92` was already on `origin/ws-d` when the yes came, so there was nothing to push. `main` is still at `90fcc40`: the audit re-check (12 first, then 7 to 11) and the dial rerun wait for round four.
 
-- **Fallback 3-minute cut** (`docs/demo/fallback-cut.md`, linked from `storyboard.md`, which stays as plan A's fine-tune shots). 13 shots, about 2:55: the fine-tune's OOM at step 200, then the agent run. Every spoken number is measured and sourced: step 200, 189 s of probing, 20.4 of 22.06 GiB, 130 tasks in two runs, 0 of 905,739 input tokens cached, and 30 tasks in 49 s. Decisions, with bases:
+- **Fallback 3-minute cut** (`docs/demo/fallback-cut.md`, linked from `storyboard.md`, which stays as plan A's fine-tune shots). 13 shots, about 2:58: the fine-tune's OOM at step 200, then the agent run. Every spoken number is measured and sourced: step 200, 189 s of probing, 20.4 of 22.06 GiB, 130 tasks in two runs, 0 of 905,739 input tokens cached, and 30 tasks in 49 s. Decisions, with bases:
 	- The retry loop is shown only as "read from the code" (`run.py:121`). Basis: A measured 0 runaways in the 130 tasks (`a-agent-builds-1`), because they ran before plant 3 was moved to rows 26 to 29, and A hasn't re-sampled since. If a re-sample shows the stall before Tuesday, its numbers go in the table.
 	- The turn-11 overflow and the full-run cost aren't spoken. Basis: the first is derived and the second predicted; they may appear on screen under the app's own labels.
 	- The agent shots need the Oct 31 record published on the deploy with a real share link, since its token in the repo is now a placeholder (A, `e27d2fc`).
