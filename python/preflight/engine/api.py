@@ -831,7 +831,10 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 			)
 			stack = {**train.stack, "eval_spike": est.breakdown.allocator_peak - train.allocator_peak}
 		res = replace(res, terms=_term_estimates(stack, res.peak))
-	if _env_gpu(record) is None and res.peak.status != "abstain":
+	probed = any(
+		p.status in OK_PROBE for p in record.probes
+	)  # review: a skeleton has no GPU before any probe
+	if probed and _env_gpu(record) is None and res.peak.status != "abstain":
 		# Nov 1: A's A10 GRPO record carried no GPU, and the readout said "tight, 69%" for the knob's L4 unannounced
 		note = f"the probe's GPU isn't in the record, so this is for {gpu} from the GPU knob, with a guessed CUDA context"
 		res = replace(res, peak=_with_note(res.peak, note), oom=_with_note(res.oom, note))

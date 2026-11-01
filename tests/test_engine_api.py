@@ -1084,3 +1084,14 @@ def test_the_real_a10_grpo_record_reads_its_measured_peak_once_its_gpu_is_record
 	assert p["memory.peak"].point == pytest.approx(23.50e9, rel=0.005)
 	assert "isn't in the record" not in (p["memory.peak"].reason or "")
 	assert p["risk.oom"].reason.startswith("tight")
+
+
+def test_a_skeleton_without_probes_gets_no_unrecorded_gpu_note():
+	"""Review, Nov 1: before any probe runs a record has no env, and that isn't news."""
+	rec = _grpo_a10()
+	sm = rec.job.script_map
+	sized = sm.model_copy(update={"model": sm.model.model_copy(update={"param_count": 494_032_768})})
+	bare = rec.model_copy(update={"probes": [], "job": rec.job.model_copy(update={"script_map": sized})})
+	p = api.predict(bare).root
+	assert p["memory.peak"].status != "abstain"  # review: so the note's own guard isn't what keeps it out
+	assert "isn't in the record" not in (p["memory.peak"].reason or "")
