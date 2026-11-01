@@ -8,6 +8,54 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sat Oct 31, late night (submission materials)
+
+Pushed `d93618a` with Chiya's yes. Chiya kept the batch time as it is: the predicted upper bound rounded up, plus the user's own start-up time, with no number of ours. Finding 4 is with C.
+
+**README draft** (`docs/readme-draft.md`, for the PM to merge), following the plan's submission checklist:
+- what Preflight is in two lines; the one-command install; a quickstart with the CLI commands;
+- the architecture as Mermaid, drawn from the code on `main` rather than the plan's widget (whose image I can't read as text); also rendered to `docs/readme-assets/architecture.svg` and checked to parse with `mmdc`. What isn't running is dashed or labelled: the fix loop, Spark Open's claim check, and AMD (CLI only);
+- the built-during-the-hackathon statement, citing the first commit (`11a0ce9`, Oct 26, 22:25 ET);
+- the Meta models and partner tools with where each is used and its status on `main`, from A's, B's and C's status files and the code. The status column says what isn't live:
+  - Muse Code's fix loop isn't reachable from the app;
+  - Spark Open's claim check isn't wired;
+  - Glimmer is only in the price table;
+  - AMD has no MI300X result;
+  - the public deploy on Modal and Cloudflare is pending.
+  The PM updates these at merge;
+- one run's cost and time, each tagged: 6 min 45 s and 386 s of probes [measured, A, Oct 28], which is over the plan's 5-minute target; GPU $0.0858 and Muse Spark $0.0178 [derived: measured time and tokens at list prices];
+- the empty validation table with all 15 targets from the plan's "Validation targets", for B's scorer;
+- licences: the repo's, a link to the dependency table, and every zoo script's model and data.
+
+The `pip install git+...` line is checked only from this checkout [measured: three CPU probes ran and wrote a record]; Chiya will try the URL once the repo is public. Opening a CLI record in the web app isn't built (the app opens records by share link), and the draft says so. TODO(PM) marks the public link and the status column.
+
+**Licences** (`docs/licences.md`), 377 packages, a snapshot of Oct 31:
+- Sources: both `uv.lock` files walked into runtime, extras and dev; both `package-lock.json` files; and the four Modal images' pins resolved with `uv pip compile`. The images were built earlier, so their indirect versions can differ.
+- Each licence comes from PyPI's JSON API or the npm lock entry. Where that metadata is empty or vague, the row says so and names the source used instead. Our own `preflight` package is marked Apache-2.0 by hand, because the PyPI package of that name is someone else's.
+- No GPL, AGPL or SSPL anywhere, and all 26 packages that ship in the browser are permissive. CI already checks the Python environments and `web/node_modules`; the Modal images are what this adds.
+- Flagged and explained:
+  - NVIDIA's CUDA libraries (proprietary, or no licence in their metadata; never in the repo);
+  - weak copyleft we don't distribute: certifi, tqdm and lightningcss (MPL-2.0), pycountry (LGPL-2.1, serving image);
+  - three share-alike datasets the zoo downloads at run time: TinyStories, dolly-15k and Natural Questions.
+
+**The 45-second X cut** (`docs/demo/storyboard.md`), ready to record: four shots with timecodes, exact screens and actions, and burned-in captions, including the crash line, so it works with the sound off. Narration is 59 written words, about 66 spoken, so about 27 s of speech; the GiB figure is captioned, not spoken. It speaks only measured numbers. Step 200 is now also measured: A's full run of Oct 31 ran out of memory at step 200, at 22.13 GB (20.61 GiB). I dropped two claims about X (its length limit, and that most people watch muted) because I found no primary source for either.
+
+**Audit findings 7 to 12, ranked, to C** (`from-d.md`):
+1. 12, model tags shown whether or not the model ran (misleads judges; the Judging playbook asks for every Meta model labelled at the moment it works);
+2. 7, day-theme contrast (16 states);
+3. 10, focus rings;
+4. 8, eval-marker targets;
+5. 11, small targets;
+6. 9, phone route labels.
+
+Each request names its WCAG criterion and how it's re-checked: the sweep measures 7, 8, 10 and 11, and 9 and 12 are a look at the boarding screen. None is fixed on `main` or `ws-c` yet. The sweep and targeted-check scripts are now in `docs/audit/scripts/` (run with `NODE_PATH=web/node_modules`).
+
+**Found on the way, to C and A:** the data-use notice shows "Muse Spark reads the code" only when `harness.spark_script_map` is on (off everywhere). But the runner maps every job with Muse Spark whenever the Meta key is configured, with no flag check. So visitors aren't told their code goes to Meta's API. Request in `from-d.md`.
+
+A read-only review (git-free copy) found 15 issues in these materials; all are fixed above.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sat Oct 31, night (round three merged; agent overflow at turn 11)
 
 Merged `main` at `006bc57` (round three, contract 0.5.0) as a fast-forward. On it: Python passes 1177 with the `torch`-marked tests left out, `web` passes 396 in 55 files, and `tsc` is clean.
