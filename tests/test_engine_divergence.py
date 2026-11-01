@@ -7,8 +7,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from preflight.corpus.worker import label_divergence
 from preflight.engine import divergence as D
+
+# corpus.worker imports torch at module level, so these run in CI's torch job (PM, round four).
+pytestmark = pytest.mark.torch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -47,6 +49,10 @@ def _run(i: int, rng, diverge: bool, steps: int = 400) -> dict:
 		"beta2": 0.95,
 		"grad_clip": 1.0,
 	}
+	from preflight.corpus.worker import (
+		label_divergence,  # the worker imports torch, so only here (PM, round four)
+	)
+
 	return {"key": f"r{i}", "series": series, "label": label_divergence(series["loss"], 256), "cfg": cfg,
 		"family": (cfg["precision"], cfg["qk_norm"], cfg["init_std"])}  # fmt: skip
 

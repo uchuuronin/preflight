@@ -111,14 +111,14 @@
 			"usd_per_hour": 7.1
 		},
 		{
-			"as_of": "2026-10",
-			"confidence": "secondary",
+			"as_of": "2026-11",
+			"confidence": "provider",
 			"gpu": "A100-SXM-40GB",
 			"id": "gpu/modal/A100-SXM-40GB/us/on_demand",
 			"kind": "on_demand",
 			"provider": "modal",
 			"region": "us",
-			"source": "computeprices.com, updated Oct 26 2026 (lists it as PCIe; single-GPU specs are the same)",
+			"source": "modal.com/pricing, checked Nov 1 2026: 'Nvidia A100, 40 GB' at $0.000583/s ($2.10/h; the page doesn't say SXM or PCIe, and single-GPU specs are the same)",
 			"usd_per_hour": 2.1
 		},
 		{
@@ -144,32 +144,32 @@
 			"output_per_m": 4.25,
 			"provider": "meta",
 			"region": "us",
-			"source": "eesel.ai, Muse Spark 1.3 pricing (Sep 8 2026; standard xhigh endpoint, rates confirmed on Artificial Analysis); cached input is the stated 88% discount"
+			"source": "eesel.ai, Muse Spark 1.3 pricing (Sep 8 2026; standard xhigh endpoint, rates confirmed on Artificial Analysis); cached input is the stated 88% discount. Nov 1: Meta's own page (dev.meta.ai) couldn't be reached from here, so this row stays secondary"
 		},
 		{
-			"as_of": "2026-10",
-			"cached_input_per_m": null,
-			"confidence": "secondary",
+			"as_of": "2026-11",
+			"cached_input_per_m": 0.15,
+			"confidence": "provider",
 			"id": "tokens/baseten/muse-spark-open/us",
 			"input_per_m": 1.25,
 			"model": "muse-spark-open",
 			"output_per_m": 4.25,
 			"provider": "baseten",
 			"region": "us",
-			"source": "getmaxim.ai Bifrost cost calculator, Baseten, updated Oct 26 2026 (no cached rate listed)"
+			"source": "baseten.co/library/muse-spark-open, checked Nov 1 2026: $1.25 input, $4.25 output, $0.15 cached input per 1M"
 		},
 		{
 			"as_of": "2026-09",
 			"cached_input_per_m": 0.03,
-			"confidence": "secondary",
+			"confidence": "provider",
 			"id": "tokens/qubrid/muse-glimmer/us",
 			"input_per_m": 0.25,
 			"model": "muse-glimmer",
 			"output_per_m": 1.05,
 			"provider": "qubrid",
 			"region": "us",
-			"source": "qubrid.com, Muse Glimmer-30B pricing (Sep 3 2026)"
+			"source": "qubrid.com/blog/muse-glimmer-pricing-api-cost-per-1m-tokens (Sep 3 2026), checked Nov 1 2026: Qubrid's own rate card, $0.25 input, $1.05 output, $0.03 cached input per 1M"
 		}
 	],
-	"version": "2026-10-27"
+	"version": "2026-11-01"
 }

@@ -121,7 +121,7 @@ nothing in it is edited by hand.
 | Step time, unmeasured GPU | Within 20% | Train on 3 GPU types, test on the 4th | not measured |  |  | no corpus store given |
 | GNN + GBDT ensemble vs GBDT alone | Lower error on held-out architectures | Corpus holdout |  |  | miss | paired gain +4.8% (95% -1.4% to +11.6%); the interval includes zero, so the GBDT is used |
 | Divergence warning | AUROC 0.85+, 100+ steps early | Held-out short runs | not measured |  |  | the classifier's held-out report isn't in yet |
-| Rollout time (RL) | Within 20% | GRPO zoo script and an unseen TRL script | not measured |  |  | no full run scored yet |
+| Rollout time (RL) | Within 20% | An unseen TRL script (the GRPO zoo script calibrated it, Nov 1) | not measured |  |  | no full run scored yet |
 | Serving tokens/sec | Within 15% | vLLM full runs | not measured |  |  | no full run scored yet |
 | Agent run total cost | Inside the 90% interval | Full benchmark run vs the 30-task sample | not measured |  |  | no full run scored yet |
 | Interval coverage | 90% intervals cover at least 88% | All of the above | not measured |  |  | no full run scored yet |
