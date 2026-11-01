@@ -69,7 +69,8 @@ cluster's calendar.
 **Honest about what it doesn't know.** Predictions are checked against real full runs, hit or
 miss, in the README's validation table (scored Mon Nov 2). What misses is said: step time on a GPU
 Preflight never measured lands within 20% for 60% of held-out queries, under the 90% target, and
-the divergence classifier scores AUROC 0.58 on held-out runs, so it is switched off. There are no
+the divergence classifier, refitted on 720 runs, scores AUROC 0.66 (0.56 to 0.76) on held-out runs
+against a 0.85 target, so it is switched off. There are no
 AMD measurements yet, and every AMD figure says so.
 
 **Built during the hackathon.** Everything in the repository was built Oct 26 to Nov 4, 2026; the

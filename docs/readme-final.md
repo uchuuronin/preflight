@@ -57,7 +57,7 @@ with the live link.
 
 | What | Why | Source |
 | --- | --- | --- |
-| Divergence classifier | Misses on held-out runs: AUROC 0.58 [cited: Chiya, Nov 1] against a 0.85 target, so `risk.divergence` stays off | B's held-out run, as given by Chiya on Nov 1; TODO(PM): link B's report, which isn't in the repository yet |
+| Divergence classifier | Still misses after a refit on 720 runs: AUROC 0.66 (0.56 to 0.76) on held-out runs against a 0.85 target, with a warning lead of 138 steps (3 to 269) [cited: B's fit report, `1cfa689`], so `risk.divergence` stays off and is not used | B's fit report (`1cfa689`); TODO(PM): link the report's path once `1cfa689` is on `main` |
 | AMD | No AMD measurements: the AMD Developer Cloud account is on a verification hold, so every AMD figure says "not measured" | `docs/status/b.md`, `docs/status/a.md` |
 | GBDT correction for an unmeasured GPU | Fails held out (51% within 20%, against 60% for the analytical model [measured, corpus]), so it isn't used | `docs/status/b.md` |
 | Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20% [measured, corpus], under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |

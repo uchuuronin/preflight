@@ -13,7 +13,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 Pushed `adc9ca3`..`b781a91` with Chiya's yes (10:57).
 - **GNN run length:** `zoo/gnn_pyg/train.py` gains a plain top-level `N_TRAIN_NODES = 160_000`, used by the sampler in place of `int(0.8 * n)`. Basis: A's recorder can't count nodes when the script samples by hand, and B's engine needs a run length. It's 157 steps an epoch at batch 1,024, the same as before (0.8 x 200,494 = 160,395 also gives 157), so the run's length is unchanged, and an assert guards a smaller graph. The planted fan-out `[15, 25, 25]` is unchanged. A is asked to read it into `data.n_examples`.
 - **"C's one-line fix to build.test.ts":** not on GitHub yet (no branch changes that file), and not needed. My `adc9ca3` already makes that test hold on both golden sets. A's own flagged `make_golden.py` (`ws-a`) produces goldens byte-identical to the ones I tested.
-- **B's divergence report** (`1cfa689`, AUROC 0.66, 0.56 to 0.76; lead 138 steps, 3 to 269): not in any branch on GitHub yet. The README keeps 0.58 until I can read the report and link it; the check-in looks for it.
+- **B's divergence refit** (`1cfa689`): not in any branch on GitHub yet (fetched 11:05). The README draft, the submission table and the portal text now carry Chiya's numbers from it (AUROC 0.66, 0.56 to 0.76; lead 138 steps, 3 to 269; still a miss, not used), tagged `cited: B's fit report, 1cfa689`, with a TODO(PM) for the link path. Basis: Chiya's message gives the numbers and the commit; I couldn't read the report itself, so the check-in compares the numbers against it and adds the path when it lands.
 
 Cloud runs: none. GPU minutes 0, dollars 0.
 
