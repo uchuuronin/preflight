@@ -1,0 +1,136 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-fyGghaLvLBS7T5tHb6yPg5
+Building image im-CvsZkNud28uY3OTYwRCjg4
+Building image im-A4gf4R2h1wBmINB9lK6ph8
+
+=> Step 0: FROM base
+Building image im-33i2gYWFEU4cPvdKNqamCW
+
+=> Step 1: RUN groupadd --gid 61000 preflight-probe && useradd --uid 61000 --gid 61000 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin preflight-probe
+useradd warning: preflight-probe's uid 61000 outside of the UID_MIN 1000 and UID_MAX 60000 range.
+
+=> Step 0: FROM base
+
+=> Step 1: RUN groupadd --gid 61000 preflight-probe && useradd --uid 61000 --gid 61000 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin preflight-probe
+useradd warning: preflight-probe's uid 61000 outside of the UID_MIN 1000 and UID_MAX 60000 range.
+Saving image...
+Saving image...
+
+=> Step 0: FROM base
+
+=> Step 1: RUN groupadd --gid 61000 preflight-probe && useradd --uid 61000 --gid 61000 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin preflight-probe
+useradd warning: preflight-probe's uid 61000 outside of the UID_MIN 1000 and UID_MAX 60000 range.
+Saving image...
+Image saved, took 672.73ms
+
+Built image im-CvsZkNud28uY3OTYwRCjg4 in 1.45s
+
+
+Image saved, took 780.49ms
+
+Built image im-A4gf4R2h1wBmINB9lK6ph8 in 1.38s
+
+
+Image saved, took 1.86s
+
+Built image im-33i2gYWFEU4cPvdKNqamCW in 2.81s
+
+
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_titan_image.
+└── ✓ Created Function titan_check_on_l4.
+{
+  "worker": {
+    "module": "ops_app",
+    "file": "/root/ops_app.py",
+    "runner_loaded_as": "/mc-iatrentb/modal_app.py (module modal_app, tag probe-9ea636bb3fb4be1d, PKG /opt/preflight/preflight, zoo /root/zoo)",
+    "zoo": "/root/zoo",
+    "zoo_samples": [
+      "README.md",
+      "agent_eval_spark",
+      "eval_sweep_reasoning",
+      "finetune_lora_hf",
+      "gnn_pyg",
+      "grpo_trl",
+      "pretrain_nanogpt",
+      "retrieval_st",
+      "serving_vllm",
+      "torchtitan_debug",
+      "vision_timm"
+    ],
+    "submitted": {
+      "job_id": "01M6BXAPRA7V16QD94KTT8J8P8",
+      "created": true,
+      "position": 0
+    },
+    "saves": 1,
+    "lens": "finetune",
+    "knobs": 20,
+    "imported": [
+      "preflight.runner.pipeline",
+      "preflight.runner.records",
+      "preflight.runner.sandbox_runner",
+      "preflight.runner.worker",
+      "preflight.runner.wire",
+      "preflight.runner.record_jobs",
+      "preflight.harness.spark",
+      "preflight.harness.mapper",
+      "preflight.probes.gpu_choice",
+      "preflight.probes.plan"
+    ],
+    "container_environment": "main",
+    "flags": {
+      "root": "/opt/preflight",
+      "env": "production",
+      "engine.memory": true
+    },
+    "job_store_would_claim_here": false,
+    "guard": "this container is app ap-fyGghaLvLBS7T5tHb6yPg5, not the deployed preflight-runner in main (ap-G73jgQVsr3gQQodeFppJi2)",
+    "image_tag": "probe-9ea636bb3fb4be1d"
+  },
+  "probe": {
+    "pkg_root": "/opt/preflight",
+    "reachable_by_probe_uid": true,
+    "euid": 0,
+    "probe_uid": "61000",
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 9,
+    "backend": "cpu",
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n/opt/preflight/preflight/recorder/runtime.py:1279: FutureWarning: `torch.distributed.reduce_op` is deprecated, please use `torch.distributed.ReduceOp` instead\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\n"
+  },
+  "sandbox": {
+    "entry": [
+      "python",
+      "-m",
+      "preflight.probes.remote"
+    ],
+    "created": true,
+    "import_stdout": "IMPORT /opt/preflight/preflight/__init__.py 2.5.1+cu124\n",
+    "import_stderr": "",
+    "import_exit": 0,
+    "probe_status": "ok",
+    "probe_steps": 9,
+    "probe_error": null,
+    "probe_error_code": null
+  },
+  "ok": true
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-fyGghaLvLBS7T5tHb6yPg5
