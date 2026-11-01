@@ -1,0 +1,11 @@
+{
+	"name": "20261101-165515-41328761634-b-glimmer-quantize",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41328761634",
+	"ref": "ws-b",
+	"sha": "d2dc9502f83019aa412286db24d60f6ca06b2bb3",
+	"cmd": "modal run --env main python/preflight/glimmer/ops.py::quantize",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T17:05:16Z"
+}

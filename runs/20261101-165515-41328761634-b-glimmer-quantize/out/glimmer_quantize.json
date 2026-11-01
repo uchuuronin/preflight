@@ -1,0 +1,14 @@
+{
+ "fp8": {
+  "from_repo": "meta-models/Muse-Glimmer-30B",
+  "from_revision": "cec94fcfd6512f2cfe708138c32533b346ea4f69",
+  "scheme": "FP8_DYNAMIC (llmcompressor 0.15.0), ignore lm_head, re:.*vision.*, re:.*visual.*, re:.*mm_proj.*, re:.*multi_modal_projector.*",
+  "architectures": [
+   "MuseGlimmerForConditionalGeneration"
+  ],
+  "bytes": 34396206736,
+  "made_s": 224.3,
+  "at": "2026-11-01T17:04:08Z"
+ },
+ "wall_s": 307.9
+}
