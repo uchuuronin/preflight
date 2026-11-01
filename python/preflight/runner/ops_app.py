@@ -684,7 +684,11 @@ def _mbpp_row_keys(n: int) -> dict[str, int]:
 
 @ops.function(
 	image=worker_image,
-	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	secrets=[
+		modal.Secret.from_name("preflight-meta"),
+		modal.Secret.from_name("preflight-baseten"),
+		modal.Secret.from_name("preflight-glimmer"),
+	],
 	timeout=AGENT_SAMPLE_TIMEOUT_S,
 )
 def agent_sample_hosted(
@@ -705,6 +709,7 @@ def agent_sample_hosted(
 
 	owner = modal.App._get_container_app()
 	create = _sandbox_factory(owner)
+	extra: dict = {}
 	if (
 		provider == "baseten"
 	):  # the Pareto sweep: the same tasks on Spark Open, whatever model the script names
@@ -713,11 +718,20 @@ def agent_sample_hosted(
 			os.environ["BASETEN_API_KEY"],
 			os.environ.get("SPARK_OPEN_MODEL", "meta-models/muse-spark-open-1026"),
 		)
+	elif provider == "glimmer":  # the third arm: Muse Glimmer on Preflight's own Modal host (B's app)
+		from preflight.harness.spark import GLIMMER_USD_PER_S
+
+		base = os.environ["GLIMMER_BASE_URL"].rstrip("/")
+		upstream = base if base.endswith("/v1") else base + "/v1"
+		key, override = "glimmer", os.environ.get("GLIMMER_MODEL", "muse-glimmer")
+		extra = {"upstream_headers": {"Modal-Key": os.environ["GLIMMER_MODAL_KEY"],
+			"Modal-Secret": os.environ["GLIMMER_MODAL_SECRET"]}, "usd_per_second": GLIMMER_USD_PER_S,
+			"follow_redirects": 3, "timeout_s": 330.0}  # fmt: skip
 	else:
 		upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
 		key, override = os.environ["META_API_KEY"], None
 	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
-		key, max_usd_total=max_usd, model_override=override)  # fmt: skip
+		key, max_usd_total=max_usd, model_override=override, **extra)  # fmt: skip
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip

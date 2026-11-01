@@ -289,6 +289,9 @@ def _error_code(data) -> str | None:
 	return None
 
 
+_WALL_PRICED = object()  # the rate of a proxy priced by GPU time (usd_per_second): any model has one
+
+
 class AgentProxy:
 	def __init__(
 		self,
@@ -302,8 +305,22 @@ class AgentProxy:
 		timeout_s: float = 300.0,
 		transport: httpx.BaseTransport | None = None,
 		model_override: str | None = None,
+		upstream_headers: dict[str, str] | None = None,
+		usd_per_second: float | None = None,
+		follow_redirects: int = 0,
 	):
 		self.upstream = upstream.rstrip("/")
+		# a self-hosted upstream (Muse Glimmer on Modal, the Pareto's third arm): its own auth headers,
+		# priced by the wall time each call holds its GPU, and Modal's 303 (a request past 150 s polls
+		# for its result) followed on the same origin only, so its headers never go elsewhere
+		self._upstream_headers = dict(upstream_headers or {})
+		self.usd_per_second = usd_per_second
+		self._hops = max(0, follow_redirects)
+		# what one call can hold the GPU for: its timeout, which a redirect chain shares (a hop
+		# that starts in time can still run its own timeout, so one more for the last hop)
+		self._call_ceiling_s = timeout_s * (2 if self._hops else 1)
+		if usd_per_second is not None:
+			rate = lambda _model: _WALL_PRICED  # noqa: E731 - every model is priced, by time
 		# every call goes to this model instead of the one the script names (the Pareto sweep runs the
 		# same tasks on Spark Open); the call is logged under the model that served it
 		self.model_override = model_override
@@ -316,9 +333,20 @@ class AgentProxy:
 		# whether this thread's call left for the provider: the request hook fires as it is sent, so a
 		# call that failed before it (a header that won't encode, no free connection) is never billed
 		self._went = threading.local()
+		up = httpx.URL(self.upstream)
+		origin = (up.scheme, up.host, up.port)
+
+		def going_out(request: httpx.Request) -> None:
+			if (request.url.scheme, request.url.host, request.url.port) != origin:
+				raise httpx.UnsupportedProtocol(f"refused a redirect off {up.host}")
+			t0 = getattr(self._went, "t0", None)
+			if self._hops and t0 is not None and time.monotonic() - t0 >= timeout_s:
+				raise httpx.ReadTimeout("the call's time ran out while following redirects", request=request)
+			self._went.out = True
+
 		self._client = httpx.Client(timeout=httpx.Timeout(timeout_s, connect=10.0), transport=transport,
-			headers={"Accept-Encoding": "identity"},
-			event_hooks={"request": [lambda _r: setattr(self._went, "out", True)]})  # fmt: skip
+			headers={"Accept-Encoding": "identity"}, follow_redirects=self._hops > 0,
+			max_redirects=max(self._hops, 1), event_hooks={"request": [going_out]})  # fmt: skip
 		self._lock = threading.Lock()
 		self._settled = threading.Condition(self._lock)
 		self._tasks: dict[str, _Task] = {}
@@ -539,6 +567,8 @@ class AgentProxy:
 		return r
 
 	def _price(self, model: str | None, u: dict) -> float:
+		if self.usd_per_second is not None:  # the GPU time the call held, whatever its tokens
+			return float(u.get("seconds") or 0.0) * self.usd_per_second
 		r = self._rate_for(model)
 		if r is None:
 			return 0.0
@@ -550,6 +580,8 @@ class AgentProxy:
 		"""What the call can cost at most: its whole body as input, its max output for each of its n
 		(or best_of) choices, uncached. Not counted: images sent by URL (their tokens aren't in the
 		body); a call that bills more than this still counts in full once its usage arrives."""
+		if self.usd_per_second is not None:  # the longest a call can run, redirects followed
+			return self._call_ceiling_s * self.usd_per_second
 		cap = next((req[k] for k in ("max_tokens", "max_completion_tokens", "max_output_tokens")
 			if _int(req.get(k))), DEFAULT_MAX_OUTPUT_TOKENS)  # fmt: skip
 		choices = max(_int(req.get("n")) or 1, _int(req.get("best_of")) or 1)
@@ -673,6 +705,7 @@ class AgentProxy:
 		last: list = []  # the reply's last bytes (or the headers' end), sent once the call is logged
 		broke, never_sent, upstream_status, fail_reply = False, False, 0, False
 		self._went.out = False
+		self._went.t0 = time.monotonic()  # one deadline for the call, every redirect hop included
 		try:  # from here on the admitted call is always logged, so its slot and reservation are freed
 			opts = req.get("stream_options")
 			opts = opts if isinstance(opts, dict) else {}
@@ -684,7 +717,8 @@ class AgentProxy:
 			if inject:
 				body = json.dumps(req).encode()
 			headers = {k: v for k, v in h.headers.items() if k.lower() not in _DROP_HEADERS}
-			headers.update({"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})
+			headers.update({"Authorization": f"Bearer {self._key}", "Content-Type": "application/json",
+				**self._upstream_headers})  # fmt: skip
 			if stream:
 				self._relay_stream(
 					h, f"{self.upstream}/{rest}", headers, body, call, sent, last, drop_usage=inject
@@ -720,7 +754,8 @@ class AgentProxy:
 			# broken: billable unless it never reached the provider or its reply was an error (status 0:
 			# no reply began, so it may have run); answered: a 4xx or 5xx the provider sent isn't billed
 			billable = (not never_sent and upstream_status < 400) if broke else call.status < 400
-			uncosted = self._rate is not None and no_usage and billable
+			# priced by time, a call's cost is known without its usage
+			uncosted = self._rate is not None and no_usage and billable and self.usd_per_second is None
 			if uncosted:
 				call.usd = reserved
 			if run is not None and call.response_id:
