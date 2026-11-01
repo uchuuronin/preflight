@@ -5,6 +5,7 @@
  */
 import { hasKey } from "../lib/i18n";
 import { type CampaignPlan, finishBand } from "../workspace/campaign/plan";
+import { rlProbe, spreadCount } from "../workspace/rl";
 import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
 import { costStraddlesBudget, failureTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
@@ -113,9 +114,11 @@ export interface TourStep {
 	 * move: apply a "fits" move. probe_offer: a "tight" setting would save enough to be worth
 	 * measuring first (the person's click). blocked_by_pin, nothing_safe, done: as named.
 	 */
-	kind: "move" | "probe_offer" | "sample_offer" | "finding" | "campaign" | "blocked_by_pin" | "nothing_safe" | "done";
+	kind: "move" | "probe_offer" | "sample_offer" | "finding" | "campaign" | "rl" | "blocked_by_pin" | "nothing_safe" | "done";
 	/** campaign: which part of the record's campaign plan this step walks (the calendar lights up). */
 	campaignPart?: CampaignPart;
+	/** rl: which measured RL signal this step walks (the RL view lights up). */
+	rlPart?: RlPart;
 	/** finding: a problem A's harness or a diagnosis found in the code, with its fix template. */
 	finding?: Finding;
 	move?: Move;
@@ -136,6 +139,20 @@ export interface TourContext {
 	limits?: Limits;
 	/** The record's campaign plan when its calendar is on screen: the tour walks it first. */
 	campaign?: CampaignPlan | null;
+}
+
+export type RlPart = "spread" | "length";
+export const rlVisit = (part: RlPart) => `rl:${part}`;
+
+/** The measured RL signals the tour still has to walk: prompts with no reward spread, then completion length against the cap. */
+export function rlParts(ctx: Pick<TourContext, "record" | "visited">): RlPart[] {
+	if (ctx.record.job.lens !== "rl") return [];
+	const p = rlProbe(ctx.record);
+	if (!p?.rl) return [];
+	const parts: RlPart[] = [];
+	if (spreadCount(p)) parts.push("spread");
+	if (p.rl.response_length?.max !== undefined && p.rl.response_length?.max !== null) parts.push("length");
+	return parts.filter((x) => !ctx.visited.has(rlVisit(x)));
 }
 
 export type CampaignPart = "grid" | "cut" | "finish";
@@ -239,6 +256,21 @@ export function pendingFindings(ctx: TourContext): number {
 export function nextStep(ctx: TourContext): TourStep {
 	// A campaign record: the plan comes first (what the grid costs, what the budget cuts, when it
 	// ends), since no knob move shows it; then the run's own tour.
+	// An RL run: what the probe measured about the reward signal comes first, since no knob move
+	// shows a prompt that teaches nothing.
+	const rlPart = rlParts(ctx)[0];
+	if (rlPart) {
+		let textKey = `guide.rl.${rlPart}`;
+		if (rlPart === "length") {
+			const p = rlProbe(ctx.record);
+			const capKnob = ctx.knobs.max_completion_len;
+			const cap = typeof capKnob === "number" ? capKnob : p?.generation?.max_new_tokens;
+			const longest = p?.rl?.response_length?.max;
+			// "Reached the cap" only when the longest completion did.
+			if (!(typeof cap === "number" && typeof longest === "number" && longest >= cap)) textKey = "guide.rl.length_under";
+		}
+		return { kind: "rl", rlPart, nodes: [], textKey, whyKey: `guide.rl.${rlPart}.why` };
+	}
 	const part = campaignParts(ctx)[0];
 	if (part) {
 		const abstains = part === "finish" && (!ctx.campaign?.finish_s || ctx.campaign.finish_s.status === "abstain" || !finishBand(ctx.campaign));

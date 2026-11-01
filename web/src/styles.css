@@ -2045,3 +2045,24 @@ a {
 .pf-lchip:focus-visible, .pf-lchip__btn:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 2px; }
 .pf-lchip__btn { min-width: 24px; min-height: 24px; padding: 2px 8px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-accent); background: transparent; color: var(--pf-fg); font: inherit; font-size: 12px; cursor: pointer; }
 .pf-lchip__btn--quiet { border-color: var(--pf-stroke-strong); }
+
+/* The RL lens: reward spread per prompt and completion length against the cap (cockpit/RlBand.tsx). */
+.pf-rl { scroll-margin-top: 92px; }
+.pf-rl.is-guided { box-shadow: 0 0 0 2px var(--pf-accent), 0 0 32px var(--pf-accent-glow); transition: box-shadow var(--pf-dur-quick) var(--pf-ease); }
+.pf-rl__part { padding-top: 12px; border-top: 1px solid var(--pf-stroke); margin-top: 12px; }
+.pf-rl__part:first-of-type { border-top: 0; margin-top: 4px; }
+.pf-rl__h { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.pf-rl__lead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 10px; font-family: var(--pf-font-serif); font-size: var(--pf-text-xl, 22px); line-height: 1.25; max-width: 60ch; }
+.pf-rl__lead .pf-prov { font-family: var(--pf-font-sans); font-size: 11px; }
+.pf-rl__cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(22px, 1fr)); gap: 4px; max-width: 560px; margin: 0 0 10px; padding: 0; list-style: none; }
+/* Each cell fills from the bottom by its pass rate; a flat prompt (all wrong or all right) is hatched. */
+.pf-rl__cell { height: 28px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--pf-stroke-strong); background: linear-gradient(to top, var(--pf-ok) var(--pass), transparent var(--pass)); }
+.pf-rl__cell.is-flat { background: repeating-linear-gradient(135deg, transparent 0 4px, var(--pf-stroke-strong) 4px 5px); box-shadow: inset 0 0 0 1px var(--pf-fail); }
+.pf-rl__note { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: var(--pf-fg-dim); max-width: 72ch; }
+.pf-rl__pred { margin: 0; font-size: 13px; line-height: 1.5; max-width: 72ch; }
+.pf-rl__pred .pf-prov { margin-left: 8px; }
+.pf-rl__lengths { position: relative; height: 18px; max-width: 560px; margin: 8px 0 10px; border-radius: var(--pf-radius-pill); background: var(--pf-track); }
+.pf-rl__lenbar { position: absolute; left: 0; top: 0; bottom: 0; border-radius: var(--pf-radius-pill); background: var(--pf-term-1); }
+.pf-rl__mark { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--pf-fg); }
+.pf-rl__mark.is-max { background: var(--pf-tight); }
+.pf-rl__cap { position: absolute; top: -7px; bottom: -7px; width: 0; margin-left: -1px; border-left: 2px dashed var(--pf-fail); }

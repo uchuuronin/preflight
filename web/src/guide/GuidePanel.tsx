@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { finishBand, planFromRecord } from "../workspace/campaign/plan";
-import { fmt, fmtDelta } from "../lib/fmt";
+import { fmt, fmtDelta, fmtRange } from "../lib/fmt";
+import { wilson } from "../addons/_stats/wilson";
+import { rlProbe, spreadCount } from "../workspace/rl";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
 import { usePanels } from "../registry";
@@ -11,7 +13,7 @@ import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
-import { campaignParts, campaignVisit, findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
+import { campaignParts, campaignVisit, rlParts, rlVisit, findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
 import { FixRace } from "../fix/FixRace";
@@ -38,12 +40,20 @@ export function valueText(knob: Knob | undefined, v: KnobValue | undefined): str
 	return fmt(v, "count");
 }
 
-/** Light up the campaign calendar while the tour is on it, and bring it into view. */
-function guideCalendar(on: boolean): void {
-	const el = typeof document !== "undefined" ? document.getElementById("pf-campaign") : null;
-	if (!el) return;
-	el.classList.toggle("is-guided", on);
-	if (on) el.scrollIntoView?.({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+/** The view each band step lights up (below the cockpit), and where the step speaks inside it. */
+const BANDS = { campaign: "pf-campaign", rl: "pf-rl" } as const;
+type BandKind = keyof typeof BANDS;
+const isBand = (k: string | undefined): k is BandKind => k === "campaign" || k === "rl";
+
+/** Light up the view the tour is on (none: all off), and bring it into view. */
+function guideBand(on: BandKind | null): void {
+	if (typeof document === "undefined") return;
+	for (const [kind, id] of Object.entries(BANDS)) {
+		const el = document.getElementById(id);
+		if (!el) continue;
+		el.classList.toggle("is-guided", kind === on);
+		if (kind === on) el.scrollIntoView?.({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+	}
 }
 
 export function GuidePanel() {
@@ -85,12 +95,12 @@ export function GuidePanel() {
 		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited, limits: s.limits, campaign };
 		const step = nextStep(tc);
 		const n = nextTaken + 1;
-		guideCalendar(step.kind === "campaign");
-		if (step.kind === "campaign") {
+		guideBand(isBand(step.kind) ? step.kind : null);
+		if (isBand(step.kind)) {
 			setWhy(false);
 			actions.highlight([]);
 			actions.propose(null);
-			const left = campaignParts(tc).length - 1;
+			const left = rlParts(tc).length + campaignParts(tc).length - 1;
 			setActive({ step, n, of: Math.max(n, nextTaken + 1 + left + pendingFindings(tc) + Math.min(MAX_TOUR_STEPS, plannedSteps(tc))) });
 			return;
 		}
@@ -135,8 +145,8 @@ export function GuidePanel() {
 		const v = new Set(visited);
 		let next = taken;
 		if (active.step.kind === "sample_offer") v.add(SAMPLE_VISIT);
-		else if (active.step.kind === "campaign" && active.step.campaignPart) {
-			v.add(campaignVisit(active.step.campaignPart));
+		else if ((active.step.kind === "campaign" && active.step.campaignPart) || (active.step.kind === "rl" && active.step.rlPart)) {
+			v.add(active.step.campaignPart ? campaignVisit(active.step.campaignPart) : rlVisit(active.step.rlPart!));
 			next = taken + 1; // a part of the plan shown is a step taken
 			setTaken(next);
 		} else if (active.step.kind === "finding" && active.step.finding) {
@@ -243,6 +253,39 @@ export function GuidePanel() {
 
 	const vars = stepVars(active);
 
+	/** The RL steps' numbers: the probe's measurements (A's) and B's estimates, as the RL view shows them. */
+	function rlVars(): Record<string, string> {
+		const p = rlProbe(record);
+		const c = p ? spreadCount(p) : null;
+		if (!p?.rl) return {};
+		const w = c ? wilson(c.k, c.n) : null;
+		const rates = p.rl.pass_rate_per_prompt ?? [];
+		const len = p.rl.response_length;
+		const cap = typeof state.knobs.max_completion_len === "number" ? state.knobs.max_completion_len : p.generation?.max_new_tokens;
+		const e = (id: string) => {
+			const x = estimates[id];
+			return x && trusted(x) ? `${fmt(x.point, "probability")} (${fmtRange(x.lo ?? x.point, x.hi ?? x.point, "probability")})` : t("value.none");
+		};
+		return {
+			k: w ? fmt(w.k, "count") : "",
+			n: w ? fmt(w.n, "count") : "",
+			share: w ? fmt(w.p, "probability") : "",
+			lo: w ? fmt(w.lo, "probability") : "",
+			hi: w ? fmt(w.hi, "probability") : "",
+			never: fmt(rates.filter((r) => r <= 0).length, "count"),
+			g: fmt(Number(state.knobs.group_size ?? p.rl.group_size ?? 0), "count"),
+			pred: e("rl.zero_spread"),
+			trunc: e("rl.truncation"),
+			cap: typeof cap === "number" ? fmt(cap, "count") : t("value.none"),
+			p95: len?.p95 !== undefined && len?.p95 !== null ? fmt(len.p95, "count") : "",
+			longest: len?.max !== undefined && len?.max !== null ? fmt(len.max, "count") : "",
+			trunc_line:
+				typeof p.rl.truncation_rate === "number"
+					? t("guide.rl.trunc_measured", { share: fmt(p.rl.truncation_rate, "probability") })
+					: t("guide.rl.trunc_estimated", { trunc: e("rl.truncation") }),
+		};
+	}
+
 	/** The campaign steps' numbers, every one from the plan (B's), formatted as the calendar formats them. */
 	function campaignVars(): Record<string, string> {
 		const c = campaign;
@@ -295,6 +338,7 @@ export function GuidePanel() {
 			title: step?.finding?.title ?? "",
 			detail: step?.finding?.detail ?? "",
 			...campaignVars(),
+			...rlVars(),
 			...((): Record<string, string> => {
 				const st = costStraddlesBudget(record, estimates);
 				return st
@@ -328,7 +372,7 @@ export function GuidePanel() {
 			if (canFix(f)) return { label: t("guide.fix_it"), run: () => setFixing(f.id) };
 			return { label: t("guide.next"), run: skipOffer };
 		}
-		if (s.kind === "campaign") return { label: t("guide.next"), run: skipOffer };
+		if (isBand(s.kind)) return { label: t("guide.next"), run: skipOffer };
 		if (s.kind === "sample_offer")
 			return { label: t("guide.sample_more", { tasks: SAMPLE_MORE_TASKS }), run: () => runTool("sample_more", { reason: "budget_straddle" }, ctx()) };
 		if (s.kind === "nothing_safe") {
@@ -342,10 +386,10 @@ export function GuidePanel() {
 	// While the tour is on the calendar (below the cockpit), its step is repeated there, so the
 	// visitor reads it beside what it's about and moves on without scrolling back up.
 	const [calSlot, setCalSlot] = useState<HTMLElement | null>(null);
-	const onCalendar = !live && active?.step.kind === "campaign";
+	const onBand = !live && isBand(active?.step.kind) ? (active!.step.kind as BandKind) : null;
 	useEffect(() => {
-		setCalSlot(onCalendar ? document.getElementById("pf-campaign-guide") : null);
-	}, [onCalendar]);
+		setCalSlot(onBand ? document.getElementById(`${BANDS[onBand]}-guide`) : null);
+	}, [onBand]);
 
 	return (
 		<section className="glass pf-guide" aria-label={t("guide.label")}>
@@ -366,7 +410,7 @@ export function GuidePanel() {
 				<span className="pf-guide__step">
 					{live
 						? t(`guide.live.status.${liveStatus}`)
-						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || active?.step.kind === "finding" || active?.step.kind === "campaign"
+						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || active?.step.kind === "finding" || isBand(active?.step.kind)
 							? t("guide.step_of", { n: active.n, of: active.of })
 							: active
 								? t("guide.waiting")

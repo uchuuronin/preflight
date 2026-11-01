@@ -84,6 +84,17 @@ export const SAMPLES: Sample[] = [
 		numbers: "illustrative",
 		load: () => import("../fixtures/campaign-grid.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
+	{
+		// A's L4 smoke run of zoo/grpo_trl (Nov 1, GitHub run 41260610897) as a record: A's map and
+		// measured probe, B's predictions (web/scripts/make_grpo_sample.py). Measured, not illustrative.
+		id: "grpo",
+		code: "PF510",
+		titleKey: "sample.grpo_l4",
+		lens: "rl",
+		gpu: "L4",
+		numbers: "measured",
+		load: () => import("../fixtures/grpo-l4.record.json").then((m) => m.default as unknown as FlightRecord),
+	},
 ];
 
 export const DEFAULT_SAMPLE = "lora-7b";
