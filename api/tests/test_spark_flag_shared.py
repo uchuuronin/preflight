@@ -56,4 +56,11 @@ def test_the_notice_and_the_runner_read_the_same_triage_flag():
 				assert flags, f"{path.name}:{fn.group(1)} calls triage with no flag check"
 				gated.extend(flags)
 	assert gated, "no runner function calls triage; find its gate and check it here"
-	assert set(gated) == {m.group(1)}, f"the runner gates triage on {set(gated)}, the notice on {m.group(1)}"
+	# Round five (PM, Nov 1): A's Spark diagnosis also calls Spark Open (its claim check) under
+	# harness.spark_diagnosis. The rule is that production never sends a visitor's data under a flag
+	# the notice doesn't speak for: every gating flag has a notice line, or is off in production.
+	notice = set(re.findall(r'flag\("([a-z0-9_.]+)"\)\) lines\.push', src))
+	prod = json.loads((ROOT / "flags.production.json").read_text())
+	assert m.group(1) in gated, f"the triage notice reads {m.group(1)}, which no runner gate reads"
+	silent = {f for f in gated if f not in notice and prod.get(f) is True}
+	assert not silent, f"on in production without a data-use line: {silent}"

@@ -5,6 +5,8 @@
 	"probes.agent": false,
 	"harness.spark_script_map": false,
 	"harness.spark_open_triage": false,
+	"harness.spark_diagnosis": false,
+	"harness.glimmer_private": false,
 	"runner.queue": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
