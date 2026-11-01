@@ -1,0 +1,12 @@
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/glimmer/app.py
+├── ✓ Uploaded PythonPackage:preflight
+└── ✓ Created Function Glimmer.*.
+    └── Glimmer.serve -> 
+        https://shuureiyashi99--preflight-glimmer-glimmer-serve.us-east.modal.ru
+        n 🔑
+✓ App deployed in 1.416s! 🎉
+
+View Deployment: 
+https://modal.com/apps/shuureiyashi99/main/deployed/preflight-glimmer
