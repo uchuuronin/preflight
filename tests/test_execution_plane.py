@@ -4,7 +4,9 @@ Modal itself isn't imported here (it isn't installed in CI); the sandbox and the
 service are fakes with the same calls.
 """
 
+import contextlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -393,3 +395,126 @@ def test_fallbacks_respect_a_pinned_gpu_and_the_visitors_allowed_list():
 	assert _fallbacks("L4", None, True) == ()  # the guide asked for an L4
 	assert _fallbacks("L4", ["L4", "L40S"], False) == ("L40S",)
 	assert _fallbacks("A100-SXM-80GB", None, False) == ()
+
+
+def test_the_wait_for_a_gpu_is_logged_and_capped():
+	import time as _time
+
+	class Slow(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(0.3)  # Modal finding a GPU
+			return super().exec(*args, timeout=timeout)
+
+	with SandboxRunner(lambda g: Slow(g)) as run:
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+		again = run(spec("p2"), "L4", should_stop=lambda: False)  # the same sandbox: no wait
+	assert r.probe.extras["gpu_wait_s"] >= 0.2 and "gpu_wait_s" not in again.probe.extras
+
+	class Never(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(5)
+			return super().exec(*args, timeout=timeout)
+
+	from dataclasses import replace
+
+	with SandboxRunner(lambda g: Never(g), schedule_wait_s=0.1, wait_cap_s=0.3) as run:
+		r = run(replace(spec("p1"), gpu_fallback=("A10",)), "L4", should_stop=lambda: False)
+	assert r.probe.status == "error" and r.probe.error_code == "gpu.unavailable"
+	assert "L4 or A10" in r.probe.error and r.probe.cost.usd == 0 and run.unscheduled == ["L4", "A10"]
+
+
+def test_the_jobs_wall_budget_doesnt_count_the_gpu_wait():
+	from preflight.runner.pipeline import Budget
+
+	b = Budget(wall_s=60.0)
+	b.started -= 50.0  # 50 s since the job began...
+	b.waited = lambda: 45.0  # ...45 of them waiting for a GPU
+	assert 54.0 < b.left_s() <= 55.0
+
+
+def test_the_gpu_wait_cap_covers_the_whole_job_not_each_probe():
+	import time as _time
+
+	class Never(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(5)
+			return super().exec(*args, timeout=timeout)
+
+	with SandboxRunner(lambda g: Never(g), wait_cap_s=0.3) as run:
+		t0 = _time.monotonic()
+		first = run(spec("p1"), "L4", should_stop=lambda: False)
+		second = run(spec("p2"), "L4", should_stop=lambda: False)  # the cap is spent: no second wait
+		took = _time.monotonic() - t0
+	assert first.probe.error_code == second.probe.error_code == "gpu.unavailable" and took < 1.0
+
+
+def test_a_probe_uid_gets_a_user_name_so_getpass_works_without_a_passwd_entry():
+	# torchtitan raised KeyError getpwuid() on the hosted runner's uid 61000 (Nov 1): getpass.getuser()
+	# reads LOGNAME/USER before /etc/passwd, so the probe sets both whenever it drops to a uid
+	import getpass
+
+	from preflight.probes.local import PROBE_USER, _probe_user_env, scrubbed_env
+
+	assert _probe_user_env(None) == {}
+	env = scrubbed_env(Path("/tmp/h"), _probe_user_env(61000))
+	assert env["USER"] == env["LOGNAME"] == PROBE_USER
+	import os
+	from unittest import mock
+
+	with mock.patch.dict(os.environ, {"LOGNAME": env["LOGNAME"], "USER": env["USER"]}):
+		assert getpass.getuser() == PROBE_USER
+
+
+def test_the_probe_user_check_reports_the_names_and_imports_it_ran_with(monkeypatch):
+	from preflight.probes import local
+
+	monkeypatch.setattr(local, "_probe_uid", lambda: None)  # as this process's own user
+	r = local.probe_user_check(("json",))
+	assert r["exit"] == 0 and r["imported"] == ["json"] and r["user"] == r["passwd"]
+
+
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() != 0, reason="drops to a uid: needs root")
+def test_the_probe_user_check_fails_where_the_probe_uid_has_no_passwd_entry(monkeypatch):
+	# the image bug torchtitan hit on a GPU (Nov 1), caught here on a CPU instead
+	import pwd
+
+	from preflight.probes import local
+
+	uid = 64_999
+	with contextlib.suppress(KeyError):
+		pwd.getpwuid(uid)
+		pytest.skip("uid 64999 has a passwd entry on this host")
+	monkeypatch.setattr(local, "_probe_uid", lambda: uid)
+	r = local.probe_user_check(())
+	assert r["exit"] != 0 and "getpwuid" in r["stderr"]
+
+
+def test_the_deploy_gate_needs_the_names_the_imports_and_a_compile():
+	from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
+
+	good = {"exit": 0, "uid": 61000, "user": "preflight-probe", "passwd": "preflight-probe",
+		"group": "preflight-probe", "imported": ["vllm", "datasets"], "compiled": 4.0}  # fmt: skip
+	assert _probe_user_ok(good, "serving")
+	assert not _probe_user_ok({**good, "compiled": None}, "serving")  # torch.compile didn't run
+	assert not _probe_user_ok({**good, "imported": []}, "serving")  # vllm didn't import
+	assert not _probe_user_ok({**good, "group": "30002"}, "serving")
+	assert not _probe_user_ok({"failed": "TimeoutExpired"}, "probe")
+	assert _probe_user_ok({**good, "imported": []}, "probe")
+
+
+def test_the_cli_as_root_runs_probes_as_itself_when_a_fresh_uid_cant_reach_its_venv(tmp_path, monkeypatch):
+	# preflight demo as root with a venv under a 0700 folder: a dropped uid ran a Python without torch
+	from preflight.probes import local
+
+	hidden = tmp_path / "private"
+	(hidden / "venv" / "bin").mkdir(parents=True)
+	hidden.chmod(0o700)
+	monkeypatch.setattr(local.os, "geteuid", lambda: 0)
+	monkeypatch.delenv("PREFLIGHT_PROBE_UID", raising=False)
+	monkeypatch.setattr(local.sys, "executable", str(hidden / "venv" / "bin" / "python"))
+	assert local._probe_uid() is None
+	monkeypatch.setenv("PREFLIGHT_PROBE_UID", "61000")  # the hosted sandbox pins its uid: unchanged
+	assert local._probe_uid() == 61000

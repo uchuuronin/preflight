@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.6.0. Generated; do not edit.
+ * Preflight contract v0.6.2. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -915,6 +915,10 @@ export interface StepSample {
 	 * Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else
 	 */
 	device_used_bytes?: number | null;
+	/**
+	 * 0.6.1: the allocator's reserved memory read at the same instant as device_used_bytes, so device_used_bytes - reserved_bytes is the CUDA or ROCm context plus other processes
+	 */
+	reserved_bytes?: number | null;
 }
 /**
  * Top KERNEL_ROWS ops by device time, then the tail per class (probe-plan K: 100% within 20%).
@@ -1005,6 +1009,10 @@ export interface AgentSample {
 	 * 0.6.0: how the sampled run ended; stalled = no model call for the stall time (a tool stuck)
 	 */
 	ended?: ("finished" | "stalled" | "cancelled" | "timeout") | null;
+	/**
+	 * 0.6.1: tasks run at once (the script's workers); in a stalled run at most this many can be stuck
+	 */
+	concurrency?: number | null;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1032,7 +1040,7 @@ export interface AgentTask {
 	context_tokens_by_turn?: number[];
 	cost_usd?: number | null;
 	/**
-	 * cut (0.6.0): stopped with the whole run (cancel, stall, the run's limit), not by the task itself
+	 * cut (0.6.0): stopped with the whole run by a cancel or the run's time limit; never on a stall, where tasks in flight keep no stop reason (0.6.1)
 	 */
 	stop_reason?: ("done" | "max_turns" | "context_overflow" | "error" | "timeout" | "loop" | "cut") | null;
 	trace?: string | null;
@@ -1647,6 +1655,10 @@ export interface JobRequest {
 	 * 0.5.0: a unified diff applied to the record's code before a probe or verify job (C's fix loop); code fixes can't be passed as knob overrides
 	 */
 	patch?: string | null;
+	/**
+	 * 0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten
+	 */
+	private?: boolean;
 }
 /**
  * target_id -> Estimate, for one knob setting.
@@ -1683,4 +1695,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.6.0";
+export const SCHEMA_VERSION = "0.6.2";

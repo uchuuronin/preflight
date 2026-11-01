@@ -81,6 +81,18 @@ TRL_KEYS = {
 }
 
 
+def _step_has(field_name: str) -> bool:
+	try:
+		from preflight.schema.record import StepSample
+
+		return field_name in StepSample.model_fields
+	except Exception:
+		return False
+
+
+_STEP_HAS_RESERVED = _step_has("reserved_bytes")
+
+
 class StopProbe(BaseException):
 	pass
 
@@ -122,6 +134,36 @@ def _batch_stats(batch) -> tuple[int | None, int | None, int | None]:
 	tokens = int(ids.numel())
 	real = int(mask.sum().item()) if isinstance(mask, torch.Tensor) else tokens
 	return tokens, real, samples
+
+
+def _sample_prompts(args: tuple, kwargs: dict, n: int) -> tuple[tuple, dict]:
+	"""vLLM generate's prompts cut to the first n, each prompt kept whole and its reply at the
+	length the script asked for; per-prompt lists (sampling params, LoRA requests, priorities) are
+	cut to match. One prompt given as a flat list of token ids is one prompt, never cut."""
+
+	def many(v) -> bool:  # a batch of prompts, not one prompt's token ids
+		return isinstance(v, list | tuple) and len(v) > n and not all(isinstance(x, int) for x in v)
+
+	def cut(v):
+		return v[:n] if isinstance(v, list | tuple) and len(v) > n else v
+
+	args = list(args)
+	batch = (args and many(args[0])) or any(
+		many(kwargs.get(k)) for k in ("prompts", "prompt_token_ids", "inputs")
+	)
+	if not batch:
+		return tuple(args), kwargs
+	if args and many(args[0]):
+		args[0] = args[0][:n]
+	if len(args) > 1:
+		args[1] = cut(args[1])
+	for k in ("prompts", "prompt_token_ids", "inputs"):
+		if many(kwargs.get(k)):
+			kwargs[k] = kwargs[k][:n]
+	for k in ("sampling_params", "lora_request", "priority", "prompt_adapter_request"):
+		if k in kwargs:
+			kwargs[k] = cut(kwargs[k])
+	return tuple(args), kwargs
 
 
 def _lens_stats(batch) -> dict[str, float]:
@@ -281,6 +323,7 @@ class Recorder:
 		eval_batches: int = 2,
 		hf_overrides: bool = True,
 		alternate_sync: bool = False,
+		generate_sample: int = 0,
 	):
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
@@ -288,6 +331,7 @@ class Recorder:
 		# ground truth only (recorder/overhead.py): after warmup, clean and synced steps alternate,
 		# and every step is timed from its boundary events, so the two kinds compare like with like
 		self.alternate_sync = alternate_sync
+		self.generate_sample = generate_sample  # a serving probe: prompts kept per generate call
 		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
 		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
 		self.trace_path = trace_path
@@ -355,6 +399,7 @@ class Recorder:
 		self._retrieval_lock = threading.Lock()
 		self.lens_stats: list[dict] = []  # vision and graph batch shapes, the first training batches
 		self._train_dataset = None
+		self._train_sampler = None
 		self.run_length: dict = {}
 		self._scalers: weakref.WeakSet = weakref.WeakSet()
 		self._attn_calls = 0
@@ -564,6 +609,14 @@ class Recorder:
 					n = len(it)
 				rec.train_loader_batches = n if isinstance(n, int) and n > 0 else None
 				rec._train_dataset = getattr(it, "_dataset", None)  # its row lengths, read at the end
+				# what the loader draws per epoch: a SubsetRandomSampler over a train split, or a
+				# WeightedRandomSampler's num_samples, is fewer rows than the dataset (A review, Nov 1)
+				# a DistributedSampler's length is one rank's share: the dataset is the run's. Inside
+				# suppress: a custom sampler's property must never raise in the script's next()
+				rec._train_sampler = None
+				with suppress(Exception):
+					smp = getattr(getattr(it, "_index_sampler", None), "sampler", None)
+					rec._train_sampler = None if hasattr(smp, "num_replicas") else smp
 				rec._train_iter = id(it)
 			rec._maybe_stop()
 			rec._sync()
@@ -1006,6 +1059,8 @@ class Recorder:
 		def factory(orig):
 			def generate(self_, *args, **kwargs):
 				rec._maybe_stop()
+				if rec.generate_sample:
+					args, kwargs = _sample_prompts(args, kwargs, rec.generate_sample)
 				rec._sync()
 				t0 = rec._now()
 				outs = orig(self_, *args, **kwargs)
@@ -1024,6 +1079,8 @@ class Recorder:
 						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
 					)
 				rec.acc["generate"] += dt
+				if rec.generate_sample:
+					raise StopProbe  # the sampled call is the serving probe's measurement: done
 				return outs
 
 			return generate
@@ -1367,11 +1424,14 @@ class Recorder:
 		opt_state = _unique_bytes(
 			t for s in opt.state.values() for t in s.values() if isinstance(t, torch.Tensor)
 		)
-		peak = reserved = used = None
+		peak = reserved = used = reserved_now = None
 		if self.cuda and torch.cuda.is_initialized():
 			peak = max(torch.cuda.max_memory_allocated(), self._eval_peak_stash)
 			reserved = torch.cuda.max_memory_reserved()
 			with suppress(Exception):
+				# B (Nov 1): the allocator's reserve read at the same instant as the whole device, so
+				# what isn't PyTorch's (NCCL, cuBLAS workspaces, the CUDA context) is their difference
+				reserved_now = torch.cuda.memory_reserved()
 				free, total = torch.cuda.mem_get_info()
 				used = total - free  # the whole device: PyTorch, NCCL, cuBLAS workspaces, other processes
 			torch.cuda.reset_peak_memory_stats()
@@ -1420,6 +1480,7 @@ class Recorder:
 				"peak": peak,
 				"reserved": reserved,
 				"device_used": used,
+				"reserved_now": reserved_now,
 				"lr": float(lr)
 				if isinstance(lr, int | float) or (torch.is_tensor(lr) and not clean)
 				else None,
@@ -1542,6 +1603,15 @@ class Recorder:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
+		# the dataset the training loader draws from: examples, pairs, images, or a NodeLoader's input
+		# nodes per epoch, which B's engine divides by the batch for the run's length (D, Nov 1)
+		n = None
+		for src in (self._train_sampler, self._train_dataset):  # the sampler's draw, else the dataset
+			with suppress(Exception):
+				n = len(src) if src is not None else None
+			if isinstance(n, int) and n > 0:
+				out["train_dataset_len"] = float(n)
+				break
 		out.update(self._identical_outputs())
 		known = [t for g in self.gens for t in g["truncated"] if t is not None]
 		if self.gens and known:  # how many sequences truncation_rate is over (those whose ending is known)
@@ -1685,6 +1755,8 @@ class Recorder:
 				"peak_allocated_bytes": st["peak"],
 				"peak_reserved_bytes": st["reserved"],
 				"device_used_bytes": st["device_used"],
+				# until the schema has the field (asked of the PM), the step log leaves it out
+				**({"reserved_bytes": st.get("reserved_now")} if _STEP_HAS_RESERVED else {}),
 			}
 			for i, st in enumerate(steps, 1)
 		][:256]

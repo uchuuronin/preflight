@@ -30,15 +30,19 @@ def test_every_plan_target_has_a_row(today):
 	]  # fmt: skip
 
 
-def test_the_lora_full_run_on_oct_31_is_calibration_not_held_out(today):
-	# Chiya, Nov 1: the step band was widened after looking at it, so only Monday's full runs are held out
+def test_the_lora_full_run_on_oct_31_is_calibration_for_step_time_and_intervals(today):
+	# Chiya, Nov 1: the step band was widened after looking at it; the OOM was caught before it, and no memory rule
+	# changed after it, so it stays in the OOM and planted-problems rows
 	rows, runs = today
 	(lora,) = [r for r in runs if r.script == "finetune_lora_hf"]
-	assert lora.oom_actual is True and lora.oom_p == 1.0  # still scored, for the record
-	for m in ("OOM prediction", "Step time, same GPU", "Planted problems caught", "Interval coverage"):
+	assert lora.oom_actual is True and lora.oom_p == 1.0
+	oom = _row(rows, "OOM prediction")
+	assert oom.hit and "missed: none" in oom.note
+	assert _row(rows, "Planted problems caught").hits == 3
+	for m in ("Step time, same GPU", "Interval coverage"):
 		assert _row(rows, m).cells()[3] == "not measured"
 	m = json.loads((FIX / "manifest_oct31.json").read_text())
-	assert "Used for calibration, so not held out: finetune_lora_hf (every row)" in V.calibration_note(m)
+	assert "finetune_lora_hf (step, intervals)" in V.calibration_note(m)
 
 
 def test_the_scorer_names_the_models_it_scored_with():
@@ -179,3 +183,15 @@ def test_a_run_that_calibrated_a_model_is_left_out_of_its_rows():
 		rows, _ = V.build(m, Path("."))
 	r = _row(rows, "Rollout time (RL)")
 	assert (r.hits, r.n) == (0, 1)  # only the unseen script, which missed
+
+
+def test_an_unknown_calibration_name_is_refused(tmp_path):
+	with pytest.raises(ValueError, match="unknown 'calibrates'"):
+		V.build({"runs": [{"script": "x", "record": "r.json", "calibrates": ["interval"]}]}, tmp_path)
+
+
+def test_the_divergence_row_reads_the_final_report():
+	# Chiya, Nov 1: if it still misses, the row says so with the numbers
+	rep = json.loads((Path(V.__file__).parent / "reports" / "divergence_nov1.json").read_text())
+	r = V.divergence_row(rep)
+	assert r.hit is False and r.n == 720 and "not used: the warning comes from the threshold rules" in r.note

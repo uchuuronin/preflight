@@ -30,8 +30,8 @@ GOLDEN = ["finetune", "pretrain", "agent"]
 
 
 def test_schema_version_is_semver_0_x():
-	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch; 0.6.0 (Nov 1): campaign calendar fields, Estimate.rate, agent run endings. All additive over the 0.1.0 freeze
-	assert SCHEMA_VERSION == "0.6.0"
+	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch; 0.6.0 (Nov 1): campaign calendar fields, Estimate.rate, agent run endings; 0.6.1 (Nov 1): StepSample.reserved_bytes, AgentSample.concurrency; 0.6.2 (Nov 1): JobRequest.private. All additive over the 0.1.0 freeze
+	assert SCHEMA_VERSION == "0.6.2"
 
 
 def test_ulid_is_26_crockford_chars_and_sortable():
@@ -407,12 +407,12 @@ def _est(point, unit="usd", lo=None, hi=None):
 	}
 
 
-def test_a_0_5_0_record_loads_under_0_6_0():
+def test_a_0_5_0_record_loads_under_the_current_version():
 	from preflight.schema import load_record
 
 	raw = json.loads((EXAMPLES / "finetune.json").read_text())
 	raw["schema_version"] = "0.5.0"
-	assert load_record(json.dumps(raw)).schema_version == "0.6.0"
+	assert load_record(json.dumps(raw)).schema_version == SCHEMA_VERSION
 
 
 def test_campaign_calendar_fields_round_trip():
@@ -490,3 +490,27 @@ def test_agent_run_endings():
 	assert sample.tasks[0].stop_reason == "cut" and sample.ended == "stalled"
 	with pytest.raises(ValidationError):
 		AgentSample.model_validate({"tasks": [], "ended": "crashed"})
+
+
+def test_0_6_1_concurrency_and_reserved_bytes():
+	from preflight.schema import AgentSample
+
+	s = AgentSample.model_validate({"tasks": [], "ended": "stalled", "concurrency": 4})
+	assert s.concurrency == 4
+	with pytest.raises(ValidationError):
+		AgentSample.model_validate({"tasks": [], "concurrency": 0})
+	raw = json.loads((EXAMPLES / "finetune.json").read_text())
+	probe = next(p for p in raw["probes"] if p.get("step_log"))
+	probe["step_log"][0]["reserved_bytes"] = 1_000
+	again = FlightRecord.model_validate_json(
+		FlightRecord.model_validate(raw).model_dump_json(exclude_none=True)
+	)
+	assert next(p for p in again.probes if p.step_log).step_log[0].reserved_bytes == 1_000
+
+
+def test_0_6_2_private_mode_defaults_off():
+	from preflight.schema import JobRequest
+
+	rec = {"kind": "record", "record_ref": "sample:lora-7b"}
+	assert JobRequest(source=rec, mode="probe", knobs={"batch_size": 2}).private is False
+	assert JobRequest(source=rec, mode="probe", knobs={"batch_size": 2}, private=True).private is True

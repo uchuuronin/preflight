@@ -1,5 +1,5 @@
 {
-	"schema_version": "0.6.0",
+	"schema_version": "0.6.2",
 	"record_id": "01JBGOLDENPT0000000000000B",
 	"share_token": "golden-pretrain-share-tok",
 	"created_at": "2026-10-27T14:00:00Z",
@@ -253,6 +253,10 @@
 				"log": false
 			},
 			"current": 0,
+			"probed_range": {
+				"min": 0.0,
+				"max": 0.0
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "data",
@@ -321,6 +325,10 @@
 				"log": true
 			},
 			"current": 0.0006,
+			"probed_range": {
+				"min": 0.0006,
+				"max": 0.0006
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "model",
@@ -341,6 +349,10 @@
 				"log": true
 			},
 			"current": 20000,
+			"probed_range": {
+				"min": 20000.0,
+				"max": 20000.0
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "cluster",
@@ -361,6 +373,10 @@
 				"log": true
 			},
 			"current": 60000,
+			"probed_range": {
+				"min": 60000.0,
+				"max": 60000.0
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "cluster",
@@ -1039,8 +1055,50 @@
 				"readout": "cost"
 			},
 			{
+				"id": "cost.gpu_hours",
+				"label_key": "target.cost.gpu_hours",
+				"unit": "gpu_hours",
+				"readout": "cost"
+			},
+			{
 				"id": "risk.oom",
 				"label_key": "target.risk.oom",
+				"unit": "probability",
+				"readout": "risk"
+			},
+			{
+				"id": "time.step",
+				"label_key": "target.time.step",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.data",
+				"label_key": "target.time.phase.data",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.forward",
+				"label_key": "target.time.phase.forward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.backward",
+				"label_key": "target.time.phase.backward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.optimizer",
+				"label_key": "target.time.phase.optimizer",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.idle",
+				"label_key": "target.time.phase.idle",
+				"unit": "s"
+			},
+			{
+				"id": "risk.wall_cap",
+				"label_key": "target.risk.wall_cap",
 				"unit": "probability",
 				"readout": "risk"
 			},
@@ -1053,144 +1111,1841 @@
 		],
 		"estimates": {
 			"memory.peak": {
-				"point": 12960063815.68,
-				"lo": 12700862539.3664,
-				"hi": 13219265091.9936,
+				"point": 14248554004.0,
+				"lo": 12802691575.582811,
+				"hi": 15857703827.850151,
 				"unit": "bytes",
 				"status": "measured",
-				"model_id": "golden-fixture@0",
+				"model_id": "memory-analytical@0.3.1",
 				"source": "exact",
+				"reason": "fitted to the probes alone: the script map has no model shape",
 				"level": 0.9
 			},
 			"time.total": {
-				"point": 16145.194606993007,
-				"lo": 13723.415415944055,
-				"hi": 18566.973798041956,
+				"point": 16161.000000000002,
+				"lo": 13951.933945752036,
+				"hi": 18720.36366179055,
 				"unit": "s",
 				"status": "predicted",
-				"model_id": "golden-fixture@0",
-				"source": "grid",
+				"model_id": "time-total@0.1.0",
+				"source": "exact",
+				"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included; band from held-out runs: pretrain, merged across GPUs (n = 117)",
 				"level": 0.9
 			},
 			"cost.total": {
-				"point": 9.418030187412587,
-				"lo": 8.005325659300699,
-				"hi": 10.830734715524473,
+				"point": 9.427250000000003,
+				"lo": 8.138628135022023,
+				"hi": 10.920212136044489,
 				"unit": "usd",
 				"status": "predicted",
-				"model_id": "golden-fixture@0",
-				"source": "grid",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "A100-SXM-40GB at $2.10/h (modal, 2026-11)",
+				"level": 0.9,
+				"rate": {
+					"quantity": "cost.gpu_hours",
+					"usd_per_unit": 2.1,
+					"unit": "gpu_hours",
+					"price_row": "gpu/modal/A100-SXM-40GB/us/on_demand"
+				}
+			},
+			"cost.gpu_hours": {
+				"point": 4.489166666666667,
+				"lo": 3.8755372071533434,
+				"hi": 5.200101017164042,
+				"unit": "gpu_hours",
+				"status": "predicted",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "1 GPU for the run's time",
 				"level": 0.9
 			},
 			"risk.oom": {
-				"point": 0.0,
-				"lo": 0.0,
-				"hi": 0.01,
+				"point": 4.177687953625629e-63,
+				"lo": 4.177687953625629e-63,
+				"hi": 4.177687953625629e-63,
 				"unit": "probability",
 				"status": "predicted",
-				"model_id": "golden-fixture@0",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "fits: out of memory unlikely (simulated band)",
+				"level": 0.9
+			},
+			"time.step": {
+				"point": 0.269,
+				"lo": 0.23203795407448996,
+				"hi": 0.3118498449472207,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median",
+				"level": 0.9
+			},
+			"time.phase.data": {
+				"point": 0.09953000000000001,
+				"lo": 0.08585404300756129,
+				"hi": 0.11538444263047165,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
 				"source": "exact",
 				"level": 0.9
 			},
-			"risk.preemption_loss": {
-				"point": 3600.0,
-				"lo": 1800.0,
-				"hi": 5400.0,
+			"time.phase.forward": {
+				"point": 0.05380000000000001,
+				"lo": 0.046407590814897995,
+				"hi": 0.06236996898944414,
 				"unit": "s",
-				"status": "predicted",
-				"model_id": "golden-fixture@0",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
 				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.backward": {
+				"point": 0.09684000000000001,
+				"lo": 0.08353366346681639,
+				"hi": 0.11226594418099946,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.optimizer": {
+				"point": 0.013450000000000002,
+				"lo": 0.011601897703724499,
+				"hi": 0.015592492247361036,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.idle": {
+				"point": 0.00538,
+				"lo": 0.004640759081489799,
+				"hi": 0.0062369968989444136,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"risk.wall_cap": {
+				"point": 1.5755008689689487e-153,
+				"lo": 1.5755008689689487e-153,
+				"hi": 1.5755008689689487e-153,
+				"unit": "probability",
+				"status": "predicted",
+				"model_id": "time-total@0.1.0",
+				"source": "exact",
+				"reason": "P(the run outlasts the 48 h job limit) 0%",
+				"level": 0.9
+			},
+			"risk.preemption_loss": {
+				"point": null,
+				"lo": null,
+				"hi": null,
+				"unit": "s",
+				"status": "abstain",
+				"model_id": "preemption-poisson@0.2.0",
+				"source": "exact",
+				"reason": "Unity preempt partition: jobs may be requeued after 2 h: the cluster's interruption rate isn't known; set a mean time between interruptions",
 				"level": 0.9
 			}
 		},
 		"grids": [
 			{
-				"id": "g.time.bs_prec",
-				"target_id": "time.total",
-				"unit": "s",
-				"axes": [
-					{
-						"knob_id": "batch_size",
-						"values": [
-							4,
-							8,
-							12,
-							16,
-							24,
-							32,
-							48
-						],
-						"scale": "log"
-					},
-					{
-						"knob_id": "precision",
-						"values": [
-							"fp32",
-							"bf16"
-						],
-						"scale": "categorical"
-					}
-				],
-				"point": "4mM/XOJjP1ziYz9c4mM/XOJjP1ziYz9c4mM/XA==",
-				"lo": "s2I4W7NiOFuzYjhbs2I4W7NiOFuzYjhbs2I4Ww==",
-				"hi": "iGTiXIhk4lyIZOJciGTiXIhk4lyIZOJciGTiXA==",
-				"abstain": "ADw=",
-				"model_id": "golden-fixture@0",
-				"scale": 16.0,
-				"fixed": {
-					"seq_len": 1024,
-					"num_workers": 0
-				}
-			},
-			{
-				"id": "g.memory.bs_prec",
+				"id": "g.memory.peak.batch_size_seq_len",
 				"target_id": "memory.peak",
 				"unit": "bytes",
 				"axes": [
 					{
 						"knob_id": "batch_size",
 						"values": [
+							1,
+							2,
 							4,
 							8,
 							12,
 							16,
-							24,
 							32,
-							48
+							64,
+							128
 						],
 						"scale": "log"
 					},
 					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HVpUWsNan1usXGReVFrDWp9brFxkXupgw1qfW6xcZF7qYC1kn1usXGRe6mAtZAAAPVyIXQ5go2LmZQAArFxkXupgLWQAAAAAZF7qYC1kAAAAAAAA6mAtZAAAAAAAAAAALWQAAAAAAAAAAAAA",
+				"lo": "YFivWCxZB1qkW2hdr1gsWQdapFtoXU1gLFkHWqRbaF1NYE9jB1qkW2hda2BPYwAA11qdXP9e9mEpZQAApFtoXU1gT2MAAAAAaF1NYE9jAAAAAAAATWBPYwAAAAAAAAAAT2MAAAAAAAAAAAAA",
+				"hi": "6mDqYOpg6mDqYOpg6mDqYOpg6mDqYJ9h6mDqYOpg6mCfYcdk6mDqYOpgeGHHZAAA6mDqYOpgYmO+ZgAA6mDqYJ9hx2QAAAAA6mCfYcdkAAAAAAAAn2HHZAAAAAAAAAAAx2QAAAAAAAAAAAAA",
+				"abstain": "AACAIIzzPg==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.batch_size_seq_len",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							12,
+							16,
+							32,
+							64,
+							128
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAANNZAAAAAAAAAADTWVpdAAAAAAAA01laXR5hAAAAANNZQV0eYQAAAAAAACJc5F+PYwAAAADTWVpdHmEAAAAA01laXR5hAAAAAAAAWl0eYQAAAAAAAAAAHmEAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAOBXAAAAAAAAAADgV/5bAAAAAAAA4Ff+W6RfAAAAAOBXiVykXwAAAAAAAOxZ0F6kYQAAAADgV/5bpF8AAAAA4Ff+W6RfAAAAAAAA/lukXwAAAAAAAAAApF8AAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAE5cAAAAAAAAAABOXCxfAAAAAAAATlwsX9xiAAAAAE5cFl7cYgAAAAAAAMVdkmARZQAAAABOXCxf3GIAAAAATlwsX9xiAAAAAAAALF/cYgAAAAAAAAAA3GIAAAAAAAAAAAAA",
+				"abstain": "33OMY4zzPg==",
+				"model_id": "time-total@0.1.0",
+				"scale": 32.0,
+				"fixed": {
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.batch_size_seq_len",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							12,
+							16,
+							32,
+							64,
+							128
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAPVCAAAAAAAAAAD1QmVGAAAAAAAA9UJlRh1KAAAAAPVCR0YdSgAAAAAAAPBEt0iETAAAAAD1QmVGHUoAAAAA9UJlRh1KAAAAAAAAZUYdSgAAAAAAAAAAHUoAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAALRAAAAAAAAAAAC0QMZEAAAAAAAAtEDGRJBIAAAAALRAa0WQSAAAAAAAABNDEki+SgAAAAC0QMZEkEgAAAAAtEDGRJBIAAAAAAAAxkSQSAAAAAAAAAAAkEgAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAACVFAAAAAAAAAAAlRUlIAAAAAAAAJUVJSBlMAAAAACVFRkcZTAAAAAAAAORGdkkNTgAAAAAlRUlIGUwAAAAAJUVJSBlMAAAAAAAASUgZTAAAAAAAAAAAGUwAAAAAAAAAAAAA",
+				"abstain": "33OMY4zzPg==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.batch_size_seq_len",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							12,
+							16,
+							32,
+							64,
+							128
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAKA+AAAAAAAAAACgPhdCAAAAAAAAoD4XQtNFAAAAAKA++kHTRQAAAAAAALRAfURNSAAAAACgPhdC00UAAAAAoD4XQtNFAAAAAAAAF0LTRQAAAAAAAAAA00UAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAHs8AAAAAAAAAAB7PIxAAAAAAAAAezyMQFlEAAAAAHs8KUFZRAAAAAAAAL0+wENrRgAAAAB7PIxAWUQAAAAAezyMQFlEAAAAAAAAjEBZRAAAAAAAAAAAWUQAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAOZAAAAAAAAAAADmQBREAAAAAAAA5kAURM1HAAAAAOZA7ULNRwAAAAAAAJBCM0XDSQAAAADmQBREzUcAAAAA5kAURM1HAAAAAAAAFETNRwAAAAAAAAAAzUcAAAAAAAAAAAAA",
+				"abstain": "33OMY4zzPg==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.batch_size_seq_len",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							12,
+							16,
+							32,
+							64,
+							128
+						],
+						"scale": "log"
+					},
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAsZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"abstain": "AACAIIzzPg==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.1368683772161603e-13,
+				"fixed": {
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.batch_size",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "rFyIXQ5go2LmZQAAAAA=",
+				"lo": "pFudXP9e9mEpZQAAAAA=",
+				"hi": "6mDqYOpgYmO+ZgAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.batch_size",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAACJc5F+PYwAAAAA=",
+				"lo": "AAAAAOxZ0F6kYQAAAAA=",
+				"hi": "AAAAAMVdkmARZQAAAAA=",
+				"abstain": "Yw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 32.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.batch_size",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAPBEt0iETAAAAAA=",
+				"lo": "AAAAABNDEki+SgAAAAA=",
+				"hi": "AAAAAORGdkkNTgAAAAA=",
+				"abstain": "Yw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.batch_size",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAALRAfURNSAAAAAA=",
+				"lo": "AAAAAL0+wENrRgAAAAA=",
+				"hi": "AAAAAJBCM0XDSQAAAAA=",
+				"abstain": "Yw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.batch_size",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							2,
+							3,
+							6,
+							12,
+							24,
+							48,
+							96
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAsZQAAAAA=",
+				"lo": "AAAAAAAAAAAsZQAAAAA=",
+				"hi": "AAAAAAAAAAAsZQAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.1368683772161603e-13,
+				"fixed": {
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.seq_len",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "PVyIXQ5go2LmZQAA",
+				"lo": "11qdXP9e9mEpZQAA",
+				"hi": "6mDqYOpgYmO+ZgAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"batch_size": 12,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.seq_len",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAACJc5F+PYwAA",
+				"lo": "AAAAAOxZ0F6kYQAA",
+				"hi": "AAAAAMVdkmARZQAA",
+				"abstain": "Iw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 32.0,
+				"fixed": {
+					"batch_size": 12,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.seq_len",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAPBEt0iETAAA",
+				"lo": "AAAAABNDEki+SgAA",
+				"hi": "AAAAAORGdkkNTgAA",
+				"abstain": "Iw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.seq_len",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAALRAfURNSAAA",
+				"lo": "AAAAAL0+wENrRgAA",
+				"hi": "AAAAAJBCM0XDSQAA",
+				"abstain": "Iw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.seq_len",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "seq_len",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAsZQAA",
+				"lo": "AAAAAAAAAAAsZQAA",
+				"hi": "AAAAAAAAAAAsZQAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.1368683772161603e-13,
+				"fixed": {
+					"batch_size": 12,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.num_workers",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							3,
+							6,
+							10,
+							13,
+							16
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "o2ajZqNmo2ajZqNm",
+				"lo": "9mXOZc5lzmXOZc5l",
+				"hi": "YmeWZ5ZnlmeWZ5Zn",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 8388608.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.num_workers",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							3,
+							6,
+							10,
+							13,
+							16
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "5GPLY8tjy2PLY8tj",
+				"lo": "0GLSYdJh0mHSYdJh",
+				"hi": "kmQ5ZTllOWU5ZTll",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 16.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.num_workers",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							3,
+							6,
+							10,
+							13,
+							16
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "t0ioSKhIqEioSKhI",
+				"lo": "EkjzRvNG80bzRvNG",
+				"hi": "dkk9Sj1KPUo9Sj1K",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.num_workers",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							3,
+							6,
+							10,
+							13,
+							16
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "fURvRG9Eb0RvRG9E",
+				"lo": "wEOfQp9Cn0KfQp9C",
+				"hi": "M0XxRfFF8UXxRfFF",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.num_workers",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "num_workers",
+						"values": [
+							0,
+							3,
+							6,
+							10,
+							13,
+							16
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "AABAZEBkQGRAZEBk",
+				"lo": "AABAZEBkQGRAZEBk",
+				"hi": "AABAZEBkQGRAZEBk",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.484155085839415e-44,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.precision",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
 						"knob_id": "precision",
 						"values": [
-							"fp32",
-							"bf16"
+							"bf16",
+							"fp32"
 						],
 						"scale": "categorical"
 					}
 				],
-				"point": "WlmtV1tcsFkJXolbt1+xXIphil44YzJgSmULYg==",
-				"lo": "0VjpVtdbHlluXcha8l45XPxg411/Yoxfw2RwYQ==",
-				"hi": "41k5WMpcQVqjXiVcPmApXRdiMV/wY51g0WWlYg==",
-				"abstain": "ADw=",
-				"model_id": "golden-fixture@0",
-				"scale": 33554432.0,
+				"point": "AACjZg==",
+				"lo": "AAD2ZQ==",
+				"hi": "AABiZw==",
+				"abstain": "AQ==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 8388608.0,
 				"fixed": {
+					"batch_size": 12,
 					"seq_len": 1024,
-					"num_workers": 0
+					"num_workers": 0,
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.precision",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"bf16",
+							"fp32"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "zl/kYw==",
+				"lo": "fV3QYg==",
+				"hi": "jWGSZA==",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 16.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.precision",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"bf16",
+							"fp32"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "qkS3SA==",
+				"lo": "j0ISSA==",
+				"hi": "okZ2SQ==",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.precision",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"bf16",
+							"fp32"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "cUB9RA==",
+				"lo": "Pz7AQw==",
+				"hi": "UUIzRQ==",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.precision",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "precision",
+						"values": [
+							"bf16",
+							"fp32"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AADgZg==",
+				"lo": "AADgZg==",
+				"hi": "AADgZg==",
+				"abstain": "AQ==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 2.3738919364399497e-66,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.gpu_type",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAACjZgAAAAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAD2ZQAAAAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAABiZwAAAAAAAAAAAAAAAA==",
+				"abstain": "7wc=",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 8388608.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.gpu_type",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "c2A7WBZXB1TkU5NTrlIOUexQPlA5UA==",
+				"lo": "7lwQVS1Uf1DQUnBQ1E/tTcZN+kz0TA==",
+				"hi": "BWQSWwRaN1eSVHdWs1VQVDRUPVM1Uw==",
+				"abstain": "AAA=",
+				"model_id": "time-total@0.1.0",
+				"scale": 256.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.gpu_type",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "+k2zR29IeEi3SGNJwUmuSVxKi0tETA==",
+				"lo": "nkqbRDpF/UQSSFBGv0aoRnVHbEgBSQ==",
+				"hi": "ZVFwSodLAEx2SZlM6kzYTG1Nb05ITw==",
+				"abstain": "AAA=",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.gpu_type",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "EFHQSAhIlUR9RE9EmUPAQZpB1EDOQA==",
+				"lo": "m03CRcBEHkHAQw1BdEC+PpI+qT2jPQ==",
+				"hi": "k1QGTNhKG0gzRVtHfEboRMhEHkQaRA==",
+				"abstain": "AAA=",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.gpu_type",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAADgZgAAAAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAADgZgAAAAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAADgZgAAAAAAAAAAAAAAAA==",
+				"abstain": "7wc=",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 2.3738919364399497e-66,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"lr": 0.0006,
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.lr",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "o2ajZqNmo2ajZqNmo2Y=",
+				"lo": "9mX2ZfZl9mX2ZfZl9mU=",
+				"hi": "YmdiZ2JnYmdiZ2JnYmc=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 8388608.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.lr",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "5GPkY+Rj5GPkY+Rj5GM=",
+				"lo": "0GLQYtBi0GLQYtBi0GI=",
+				"hi": "kmSSZJJkkmSSZJJkkmQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 16.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.lr",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "t0i3SLdIt0i3SLdIt0g=",
+				"lo": "EkgSSBJIEkgSSBJIEkg=",
+				"hi": "dkl2SXZJdkl2SXZJdkk=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.lr",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "fUR9RH1EfUR9RH1EfUQ=",
+				"lo": "wEPAQ8BDwEPAQ8BDwEM=",
+				"hi": "M0UzRTNFM0UzRTNFM0U=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.lr",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							7.5e-05,
+							0.00015,
+							0.0003,
+							0.0006,
+							0.0012,
+							0.0024,
+							0.0048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4GbgZuBm4GbgZuBm4GY=",
+				"lo": "4GbgZuBm4GbgZuBm4GY=",
+				"hi": "4GbgZuBm4GbgZuBm4GY=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 2.3738919364399497e-66,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"checkpoint_every": 20000,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.checkpoint_every",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "o2ajZqNmo2ajZqNm",
+				"lo": "9mX2ZfZl9mX2ZfZl",
+				"hi": "YmdiZ2JnYmdiZ2Jn",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 8388608.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.time.total.checkpoint_every",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "5GPkY+Rj5GPkY+Rj",
+				"lo": "0GLQYtBi0GLQYtBi",
+				"hi": "kmSSZJJkkmSSZJJk",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 16.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.total.checkpoint_every",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "t0i3SLdIt0i3SLdI",
+				"lo": "EkgSSBJIEkgSSBJI",
+				"hi": "dkl2SXZJdkl2SXZJ",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.checkpoint_every",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "fUR9RH1EfUR9RH1E",
+				"lo": "wEPAQ8BDwEPAQ8BD",
+				"hi": "M0UzRTNFM0UzRTNF",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.risk.oom.checkpoint_every",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							2500,
+							5000,
+							10000,
+							20000,
+							40000,
+							80000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4GbgZuBm4GbgZuBm",
+				"lo": "4GbgZuBm4GbgZuBm",
+				"hi": "4GbgZuBm4GbgZuBm",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 2.3738919364399497e-66,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"max_steps": 60000
+				}
+			},
+			{
+				"id": "g.memory.peak.max_steps",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "o2ajZqNmo2ajZqNmo2Y=",
+				"lo": "9mX2ZfZl9mX2ZfZl9mU=",
+				"hi": "YmdiZ2JnYmdiZ2JnYmc=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 8388608.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000
+				}
+			},
+			{
+				"id": "g.time.total.max_steps",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "90vsT+dT5FfjW+Jf4mM=",
+				"lo": "4krYTtNS0FbPWs5ezmI=",
+				"hi": "m0yWUJNUkliRXJFgkWQ=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 128.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000
+				}
+			},
+			{
+				"id": "g.cost.total.max_steps",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "wjy7QLhEt0i2TLZQtVQ=",
+				"lo": "HTwWQBNEEkgRTBFQEFQ=",
+				"hi": "gT16QXdFdkl1TXVRdFU=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.max_steps",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "iDiCPH9AfUR8SHxMfFA=",
+				"lo": "1TfJO8M/wEO/R75Lvk8=",
+				"hi": "Pjk4PTVBM0UySTJNMlE=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000
+				}
+			},
+			{
+				"id": "g.risk.oom.max_steps",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "max_steps",
+						"values": [
+							7500,
+							15000,
+							30000,
+							60000,
+							120000,
+							240000,
+							480000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "4GbgZuBm4GbgZuBm4GY=",
+				"lo": "4GbgZuBm4GbgZuBm4GY=",
+				"hi": "4GbgZuBm4GbgZuBm4GY=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 2.3738919364399497e-66,
+				"fixed": {
+					"batch_size": 12,
+					"seq_len": 1024,
+					"num_workers": 0,
+					"precision": "fp32",
+					"gpu_type": "A100-SXM-40GB",
+					"lr": 0.0006,
+					"checkpoint_every": 20000
 				}
 			}
 		]
 	},
 	"models": [
 		{
-			"id": "golden-fixture@0",
+			"id": "cost-gpu-hours@0.1.0",
 			"kind": "rule",
-			"version": "0",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
 			"heldout_error": {},
 			"per_gpu_coverage": {},
-			"notes": "Hand-made fixture for UI work; not a real model",
-			"fixture": true
+			"notes": "calibration: simulated. GPU-hours x the dated price in engine/prices",
+			"fixture": false
+		},
+		{
+			"id": "memory-analytical@0.3.1",
+			"kind": "analytical",
+			"version": "0.3.1",
+			"training_data": "remote-runs b-corpus-export-3 and b-corpus-export-hf-2 (Oct 31): L4, A10, L40S, T4; A100 held out, scored once (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 67ab8edae6",
+			"heldout_error": {},
+			"coverage": 0.9014373716632443,
+			"per_gpu_coverage": {
+				"A100-PCIe-80GB": 0.6666666666666666,
+				"A100-SXM-80GB": 0.875
+			},
+			"notes": "calibration: held_out. Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d.  Own cells: L40S, pretrain (n = 16); L40S, retrieval (n = 16); L40S, vision (n = 29); A10, finetune (n = 19); A10, pretrain (n = 47); A10, retrieval (n = 46); A10, vision (n = 89); L4, finetune (n = 19); L4, pretrain (n = 47); L4, retrieval (n = 46); L4, vision (n = 89); T4, vision (n = 10); merged across GPUs and job types (n = 487); finetune, merged across GPUs (n = 38); pretrain, merged across GPUs (n = 117); retrieval, merged across GPUs (n = 115); vision, merged across GPUs (n = 217). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs, then all runs. Leave-one-architecture-out coverage 439 of 487 (Wilson 95% 87% to 92%). Holdout, never tuned on: A100-PCIe-80GB 8 of 12 inside the band (Wilson 95% 39% to 86%). Holdout, never tuned on: A100-SXM-80GB 14 of 16 inside the band (Wilson 95% 64% to 97%)",
+			"fixture": false
+		},
+		{
+			"id": "preemption-poisson@0.2.0",
+			"kind": "simulation",
+			"version": "0.2.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. Poisson interruptions, half a checkpoint interval redone each (Young/Daly)",
+			"fixture": false
+		},
+		{
+			"id": "run-cost@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+			"fixture": false
+		},
+		{
+			"id": "steptime-phases@0.2.0",
+			"kind": "analytical",
+			"version": "0.2.0",
+			"training_data": "remote-runs b-corpus-export-3 and b-corpus-export-hf-2 (Oct 31): L4, A10, L40S, T4; A100 held out, scored once (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 67ab8edae6",
+			"heldout_error": {},
+			"coverage": 0.8997772828507795,
+			"per_gpu_coverage": {
+				"A100-PCIe-80GB": 0.9166666666666666,
+				"A100-SXM-80GB": 0.9375
+			},
+			"notes": "calibration: held_out. per-phase linear fits on the probes; S4b below the smallest probe. Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2. Own cells: L40S, pretrain (n = 16); L40S, retrieval (n = 16); L40S, vision (n = 29); A10, pretrain (n = 47); A10, retrieval (n = 46); A10, vision (n = 89); L4, pretrain (n = 47); L4, retrieval (n = 46); L4, vision (n = 89); T4, vision (n = 10); pretrain, merged across GPUs (n = 117); retrieval, merged across GPUs (n = 115); vision, merged across GPUs (n = 217). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs. A job type with no cell keeps the simulated band. Leave-one-architecture-out coverage 404 of 449 (Wilson 95% 87% to 92%). Holdout, never tuned on: A100-PCIe-80GB 11 of 12 inside the band (Wilson 95% 65% to 99%). Holdout, never tuned on: A100-SXM-80GB 15 of 16 inside the band (Wilson 95% 72% to 99%)",
+			"fixture": false
+		},
+		{
+			"id": "time-total@0.1.0",
+			"kind": "analytical",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. steps x step time plus measured checkpoint and eval overheads",
+			"fixture": false
 		}
 	],
 	"findings": [
@@ -1272,6 +3027,110 @@
 		"llm_usd": 0.0,
 		"breakdown": {
 			"probes": 0.0782
+		}
+	},
+	"cost_basis": {
+		"price_table": "prices@2026-11-01",
+		"as_of": "2026-11-01",
+		"provider": "modal",
+		"billing": "on_demand",
+		"currency": "USD",
+		"includes": [
+			"gpu",
+			"tokens"
+		]
+	},
+	"job_cost": {
+		"lines": [
+			{
+				"kind": "gpu",
+				"label_key": "cost.line.gpu",
+				"quantity": {
+					"point": 4.489166666666667,
+					"lo": 3.8755372071533434,
+					"hi": 5.200101017164042,
+					"unit": "gpu_hours",
+					"status": "predicted",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "1 x A100-SXM-40GB; batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; checkpoint time not measured, so not included",
+					"level": 0.9
+				},
+				"rate_usd": 2.1,
+				"usd": {
+					"point": 9.42725,
+					"lo": 8.13862813502202,
+					"hi": 10.920212136044489,
+					"unit": "usd",
+					"status": "predicted",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "A100-SXM-40GB at $2.10/h (modal, 2026-11)",
+					"level": 0.9,
+					"rate": {
+						"quantity": "line.quantity",
+						"usd_per_unit": 2.1,
+						"unit": "gpu_hours",
+						"price_row": "gpu/modal/A100-SXM-40GB/us/on_demand"
+					}
+				},
+				"price_row": "gpu/modal/A100-SXM-40GB/us/on_demand"
+			}
+		],
+		"total_usd": {
+			"point": 9.42725,
+			"lo": 8.13862813502202,
+			"hi": 10.920212136044489,
+			"unit": "usd",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "A100-SXM-40GB at $2.10/h (modal, 2026-11)",
+			"level": 0.9,
+			"rate": {
+				"quantity": "job_cost.gpu_hours",
+				"usd_per_unit": 2.1,
+				"unit": "gpu_hours",
+				"price_row": "gpu/modal/A100-SXM-40GB/us/on_demand"
+			}
+		},
+		"gpu_hours": {
+			"point": 4.489166666666667,
+			"lo": 3.8755372071533434,
+			"hi": 5.200101017164042,
+			"unit": "gpu_hours",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"level": 0.9
+		},
+		"at_risk_gpu_hours": {
+			"point": 2.4682012523795414e-65,
+			"lo": 0.0,
+			"hi": 0.00029599791451315584,
+			"unit": "gpu_hours",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "P(out of memory) unlikely x the cost up to the first step; 1 x A100-SXM-40GB",
+			"level": 0.9
+		},
+		"at_risk_usd": {
+			"point": 5.183222629997038e-65,
+			"lo": 0.0,
+			"hi": 0.0006215956204776275,
+			"unit": "usd",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "P(out of memory) unlikely x the cost up to the first step; A100-SXM-40GB at $2.10/h (modal, 2026-11)",
+			"level": 0.9,
+			"rate": {
+				"quantity": "job_cost.at_risk_gpu_hours",
+				"usd_per_unit": 2.1,
+				"unit": "gpu_hours",
+				"price_row": "gpu/modal/A100-SXM-40GB/us/on_demand"
+			}
 		}
 	}
 }

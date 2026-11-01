@@ -97,9 +97,12 @@ class Budget:
 	gpu_usd: float = 0.0  # GPU at measured probe time, every attempt
 	overhead_usd: float = 0.0  # the sandbox CPU and memory estimate alone
 	started: float = field(default_factory=time.monotonic)
+	# time spent waiting for a GPU to schedule: not the job's probe time (Chiya, Nov 1: the wall
+	# counts from when a probe starts on its GPU; the wait has its own cap, in the runner)
+	waited: Callable[[], float] = field(default=lambda: 0.0)
 
 	def left_s(self) -> float:
-		return self.wall_s - (time.monotonic() - self.started)
+		return self.wall_s - (time.monotonic() - self.started - self.waited())
 
 	def allows(self, est_usd: float, est_s: float) -> bool:
 		return self.spent_usd + est_usd <= self.usd and est_s <= self.left_s()
@@ -147,6 +150,10 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
+	if (
+		spec.generate_sample
+	):  # a serving probe's sample size decides what it measured; absent, keys stay as they were
+		body["generate_sample"] = spec.generate_sample
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
 
@@ -157,7 +164,7 @@ class Deps:
 	runner: ProbeRunner = local_runner
 	spark: object | None = None  # harness.spark.ModelClient
 	triage: object | None = (
-		None  # Spark Open on Baseten (harness/triage.py), with harness.spark_open_triage on
+		None  # Spark Open on Baseten: triage (harness/triage.py) and the diagnosis check (diagnosis_check.py)
 	)
 	cache: ProbeCache | None = None
 	image: str = "local"  # probe image tag, part of the cache key
@@ -234,6 +241,10 @@ def _skipped(p: PlannedProbe, why: str) -> Probe:
 # guess: a generation-bound probe (an eval's or a GRPO step's long completions, a serving batch)
 # passes few of its own boundaries per minute; the Nov 1 eval sweep probe ran out at 360 s
 GENERATION_LENSES = ("eval", "rl", "serving")
+# a serving probe's one measured generate call: more prompts than a 24 GB card's KV cache holds at
+# once (about 16 to 21 at 4,096 tokens for a 7B model), so preemption shows, and few enough to finish
+# well inside the probe's time limit on an L4 (32 x 4,096 tokens) [guess: the next probe replaces it]
+SERVING_PROBE_PROMPTS = 32
 GENERATION_PROBE_TIMEOUT_S = 10 * 60
 
 
@@ -281,6 +292,7 @@ def _spec(
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
+		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 	)
 
 
@@ -453,6 +465,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip
 		gpu = cap
 	budget = deps.budget()
+	budget.waited = lambda: float(getattr(deps.runner, "queued_s", 0.0) or 0.0)
 	patched_for: dict = {}
 	if fixed is not None:
 		# C's fix loop: probe runs the patched code; verify runs the setting on it and the base
@@ -491,6 +504,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		dropped = {p.id for p in rec.probes}
 		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
 		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
+	# a probe that didn't finish names its step and the way past it by hand (item 43)
+	probes = [_with_step(q, fetched.entrypoint) for q in probes]
 	if patched_for:
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
 		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
@@ -502,9 +517,12 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	# run hygiene, from the code the probes ran (a probe job's patch included, so a fix can clear
 	# its own finding; a verify job's base is the record's own code) and the probes so far
 	code = fixed.files if fixed is not None and req.mode == "probe" else fetched.files
+	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
+	if req.mode != "verify":  # a verify job's record answers one question; it isn't diagnosed again
+		out = _diagnose(out, deps)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
@@ -594,6 +612,50 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	return plan
 
 
+# N_TRAIN_NODES, NUM_TRAIN_SAMPLES, N_TRAIN: counts of training rows only, never NUM_TRAIN_EPOCHS or
+# N_TRAIN_STEPS (a run length, not a dataset size)
+_TRAIN_COUNT = re.compile(r"^N(?:UM)?_TRAIN(?:_(?:NODES|SAMPLES|EXAMPLES|ROWS|PAIRS|IMAGES|EDGES|DOCS))?$")
+
+
+def _train_count_setting(files: dict[str, str] | None) -> int | None:
+	"""A training-set size the script states as a plain module-level setting (zoo/gnn_pyg's
+	N_TRAIN_NODES, D, Nov 1): a script that samples its graph by hand has no loader to measure."""
+	import ast
+
+	for name, text in sorted((files or {}).items()):
+		if not name.endswith(".py"):
+			continue
+		try:
+			tree = ast.parse(text)
+		except (SyntaxError, ValueError):
+			continue
+		for node in tree.body:
+			if (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+				and _TRAIN_COUNT.match(node.targets[0].id) and isinstance(node.value, ast.Constant)
+				and type(node.value.value) is int and node.value.value > 0):  # fmt: skip
+				return node.value.value
+	return None
+
+
+def _with_dataset_size(rec: FlightRecord, files: dict[str, str] | None = None) -> FlightRecord:
+	"""The dataset size the static reader couldn't see, from the unpatched probes: the rows the
+	training loader's sampler draws per epoch (extras.train_dataset_len), else the token-row scan's total. B's engine divides
+	it by the batch for the run's length, so time.total and cost.total don't abstain (D, Nov 1)."""
+	sm = rec.job.script_map
+	if sm is None or sm.data is None or sm.data.n_examples:
+		return rec
+	# the script's own setting first: it says what one epoch trains on, where a loader's dataset
+	# may be the whole graph or table
+	ok = [p for p in rec.probes if p.status == "ok" and not p.extras.get("patched")]  # a patch may subsample
+	n = _train_count_setting(files) or next((p.extras["train_dataset_len"] for p in ok if p.extras.get("train_dataset_len")), None) or next(
+		(p.extras["dataset_rows_total"] for p in ok if p.extras.get("dataset_rows_total")), None)  # fmt: skip
+	if not n:
+		return rec
+	data = sm.data.model_copy(update={"n_examples": int(n)})
+	job = rec.job.model_copy(update={"script_map": sm.model_copy(update={"data": data})})
+	return rec.model_copy(update={"job": job})
+
+
 def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord, list]:
 	"""Spark Open reads each fresh probe's log (plan item 29): one call per probe, every call in the
 	record's provenance (so its cost is in the record's), a finding for a probe that didn't finish.
@@ -605,14 +667,70 @@ def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord,
 	from preflight.harness.triage import triage_probe
 
 	findings, calls = [], []
+	nodes = {n.id for n in rec.graph.nodes} if rec.graph else set()
 	for r in results:
 		if not isinstance(r, ProbeResult):
 			continue
-		f, cs = triage_probe(deps.triage, r.probe, r.log_tail)
+		f, cs = triage_probe(deps.triage, r.probe, r.log_tail, node_id=_tested_node(r.probe, nodes))
 		calls += cs
 		if f is not None:
 			findings.append(f)
 	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
+
+
+def _with_step(probe, entrypoint: str | None):
+	if probe.status in ("ok", "cached") or not probe.error:
+		return probe
+	from .failures import with_step
+
+	return probe.model_copy(update={"error": with_step(probe.error, probe.error_code, entrypoint=entrypoint)})
+
+
+def _tested_node(probe, nodes: set[str]) -> str | None:
+	"""The one job-map node a probe clearly tested, else None (C lists those findings apart): the
+	eval probe, or an eval-pass OOM, tested the eval node."""
+	is_eval = probe.id.endswith("-eval") or (probe.error_code or "").startswith("oom.eval")
+	return "eval" if is_eval and "eval" in nodes else None
+
+
+def _diagnose(rec: FlightRecord, deps: Deps) -> FlightRecord:
+	"""Muse Spark checks the finished record's plots against its numbers (plan item 31): one call,
+	in the record's provenance; its findings replace any earlier diagnosis. Off unless
+	harness.spark_diagnosis is on and the Meta client is configured."""
+	from .flags import flag
+
+	if deps.spark is None or not flag("harness.spark_diagnosis"):
+		return rec
+	from preflight.harness.diagnosis import diagnose_record
+
+	try:
+		found, calls, stats = diagnose_record(deps.spark, rec)
+	except Exception:  # a diagnosis never costs the visitor their record
+		log.warning("job %s: diagnosis failed", rec.record_id, exc_info=True)
+		return rec
+	log.info("job %s: diagnosis %s", rec.record_id, stats)
+	if found and deps.triage is not None:
+		# Spark Open checks each claim against the probe numbers through a tool call (item 30);
+		# without it the claims stand as Muse Spark made them, citations checked by code
+		from preflight.harness.diagnosis_check import check_diagnosis
+
+		try:
+			found, checks = check_diagnosis(deps.triage, rec, found)
+			calls = [*calls, *checks]
+		except Exception:  # the check never costs the visitor their record; its calls are lost with it
+			log.warning("job %s: diagnosis check failed", rec.record_id, exc_info=True)
+	keep = [f for f in rec.findings if f.source != "spark_diagnosis"]
+	# after _merge priced the record: these calls go into its model-call cost too
+	added = round(sum(c.cost_usd for c in calls), 6)
+	breakdown = dict(rec.costs.breakdown or {})
+	if added:
+		breakdown["model_calls"] = round(breakdown.get("model_calls", 0) + added, 6)
+	costs = rec.costs.model_copy(
+		update={"llm_usd": round((rec.costs.llm_usd or 0) + added, 6), "breakdown": breakdown}
+	)
+	return rec.model_copy(
+		update={"findings": [*keep, *found], "provenance": [*rec.provenance, *calls], "costs": costs}
+	)
 
 
 def _measured_gpu(result) -> str | None:
@@ -660,6 +778,11 @@ def _probe_points(
 	for i, p in enumerate(plan):
 		ctx.check()
 		_emit(ctx, "probing", rec, rev, probe_id=p.probe_id, progress=round(i / len(plan), 3))
+		if any(q.error_code == "gpu.unavailable" for q in probes):
+			# no GPU could be scheduled within the job's wait cap: the next point would wait for nothing
+			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
+				error="skipped: no GPU could be scheduled (see the first probe)", error_code="gpu.unavailable"))  # fmt: skip
+			continue
 		if any(q.error_code == "missing_package.install" for q in probes):
 			# the same requirements fail the same way at every point: don't pay for it again
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
@@ -898,8 +1021,13 @@ def with_predictions(
 
 	def fill() -> None:
 		try:
+			from preflight.engine import api
 			from preflight.engine.api import fill_predictions
 
+			# the engine reads no files: its switches come from the engine.* flags (from-b.md, B -> A)
+			api.FEATURES.update(
+				{k: flag(f"engine.{k}") for k in ("rl", "serving", "steptime_cross_gpu", "divergence")}
+			)
 			# the engine returns a copy without re-validating: store-and-load it exactly as C's API
 			# will (nulls dropped, then parsed), and fail here rather than in the reader;
 			# dump_record also enforces the 1 MB gzipped budget

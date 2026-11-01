@@ -5,7 +5,9 @@
  * downloads fits the cap. Picked over four other rules by a simulation whose "true" times were
  * drawn from the same intervals, so its figures are calibration: simulated, never quoted
  * (docs/decisions/freetier-one-session.md). The real check replaces it: one-session verdicts
- * against measured wall-clock on the zoo's full runs, with Wilson intervals, once A has them.
+ * against measured wall-clock on the zoo's full runs, with Wilson intervals. Tried on A's L4
+ * records on Nov 1: none can score it yet (the engine abstains on their run time), so
+ * check.realruns.test.ts checks only that D4 never claims a session count without a trusted time.
  * Memory is judged against the free GPU's usable capacity from B's table [cited: engine/gpus.py,
  * via the generated gpus.json]. Time is only judged when predicted for a GPU the tier offers.
  */

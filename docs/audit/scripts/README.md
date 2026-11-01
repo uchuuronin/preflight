@@ -50,12 +50,25 @@ NODE_PATH=web/node_modules node docs/audit/scripts/addons.mjs http://localhost:5
 
 On `ws-d` at `613ae92` (`main` `90fcc40` plus D's commits; Nov 1) [measured, Chromium]: 14 of
 20 states pass. The 6 failures are day-theme colour contrast in D1 (3 nodes at each size), D4
-(24 desk, 12 phone) and exports (1 at each size): all 44 failing nodes are #3B5F70 text on #9EBAE0 at 3.45:1, the shared
-`--pf-fg-dim` token on the day sky, which is audit finding 7 with C. No other colour pair fails.
-Whether C's fix clears them depends on the new value; the check says so when it lands.
+(24 desk, 12 phone) and exports (1 at each size): all 44 failing nodes are #3B5F70 text on
+#9EBAE0 at 3.45:1, the shared `--pf-fg-dim` token on the day sky, which is audit finding 7 with C.
+No other colour pair fails.
+
+On `main` at `c4b95d4` (round four, Nov 1) [measured, Chromium]: **20 of 20 pass.** With no API
+behind the dev server, the cockpit's `/v1/guide/limits/state` request gets a 502 from Vite's proxy;
+the check prints that one path as a warning, and fails on any other console error, a 502 on any
+other `/v1` path included.
 
 It also warns on 6 nodes axe couldn't measure, which I measured from screenshots with the text
 hidden [measured, Nov 1]: D3's currency select (axe saw the drawn arrow's gradient) is at least
 8.89:1 across its text area in all four states; D5's code blocks (see-through background,
-scrolling sideways on phone) are at least 5.88:1 at every sampled pixel. Both pass 4.5:1.
+scrolling sideways on phone) are at least 5.88:1 at every sampled pixel. Both pass 4.5:1, and
+both still do on `main` `c4b95d4` (re-measured the same way).
 
+**Model tags (audit finding 12):** mocks jobs' events and records at desk and phone size and
+compares each Boarding leg's model tags with what the record allows, including a job that ran triage
+followed, in the same page, by one that failed before any call. Exits 1 on any mismatch.
+
+```bash
+NODE_PATH=web/node_modules node docs/audit/scripts/model-tags.mjs http://localhost:5185 out
+```

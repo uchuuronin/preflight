@@ -97,7 +97,16 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 		forward = modal.forward
 
 	def sample(
-		fetched, sm, *, k, skip_keys=(), offered_first=(), run_id="s1", timeout_s=None, should_stop=None
+		fetched,
+		sm,
+		*,
+		k,
+		skip_keys=(),
+		offered_first=(),
+		run_id="s1",
+		timeout_s=None,
+		should_stop=None,
+		inspect=None,
 	):
 		from urllib.parse import urlparse
 
@@ -119,7 +128,7 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 				return run_sample(None, cwd=None, proxy=proxy, population=getattr(agent, "n_tasks", None), k=k,
 					skip_keys=skip_keys, offered_first=tuple(offered_first), run_id=run_id, timeout_s=limit,
 					env={}, should_stop=should_stop, launch=launch,
-					base_url_var=getattr(agent, "base_url_var", None))  # fmt: skip
+					base_url_var=getattr(agent, "base_url_var", None), inspect=inspect)  # fmt: skip
 		finally:
 			if sb is not None:
 				with contextlib.suppress(Exception):

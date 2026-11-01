@@ -745,3 +745,130 @@ def test_an_eval_oom_point_triages_each_attempt_under_its_own_id(tmp_path, monke
 	ids = [f.id for f in rec.findings if f.source == "spark_open_triage"]
 	assert len(ids) == len(set(ids)) and {"triage.p1-eval", "triage.p1"} <= set(ids)
 	assert {p.id for p in rec.probes} >= {"p1-eval", "p1"}
+
+
+def test_after_no_gpu_could_be_scheduled_the_jobs_other_points_are_skipped(tmp_path):
+	runner = FakeRunner(outcomes={"p1": ("error", "gpu.unavailable")})
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, runner)
+	)
+	assert len(runner.calls) == 1 and all(p.error_code == "gpu.unavailable" for p in rec.probes)
+
+
+def test_the_probes_dataset_size_fills_the_records_n_examples(tmp_path):
+	class Sized(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			r = super().__call__(spec, gpu, should_stop=should_stop)
+			r.probe = r.probe.model_copy(update={"extras": {**r.probe.extras, "train_dataset_len": 98231.0}})
+			return r
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, Sized())
+	)
+	assert rec.job.script_map.data.n_examples == 98231
+
+
+def test_dataset_size_prefers_the_loaders_count_skips_patched_probes_and_keeps_a_static_value(tmp_path):
+	from preflight.runner.pipeline import _with_dataset_size
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	sm = rec.job.script_map
+
+	def with_probes(extras, n_examples=None):
+		data = sm.data.model_copy(update={"n_examples": n_examples})
+		job = rec.job.model_copy(update={"script_map": sm.model_copy(update={"data": data})})
+		base = rec.probes[0]
+		probes = [
+			base.model_copy(update={"id": f"x{i}", "extras": {**base.extras, **e}})
+			for i, e in enumerate(extras)
+		]
+		return rec.model_copy(update={"job": job, "probes": probes})
+
+	def n(r):
+		return _with_dataset_size(r).job.script_map.data.n_examples
+
+	# the token scan's total on the first probe loses to the loader's count on the second
+	assert n(with_probes([{"dataset_rows_total": 500.0}, {"train_dataset_len": 400.0}])) == 400
+	assert n(with_probes([{"dataset_rows_total": 500.0}])) == 500  # the scan's total when that's all there is
+	# a probe measured on patched code (which may subsample the data) is left out
+	assert n(with_probes([{"train_dataset_len": 10.0, "patched": 1.0}, {"train_dataset_len": 400.0}])) == 400
+	assert n(with_probes([{"train_dataset_len": 10.0, "patched": 1.0}])) is None
+	assert (
+		n(with_probes([{"train_dataset_len": 400.0}], n_examples=1234)) == 1234
+	)  # the static reader's value stays
+	load_record(_with_dataset_size(with_probes([{"train_dataset_len": 400.0}])).model_dump(mode="json"))
+
+
+def test_a_training_count_setting_in_the_script_is_the_dataset_size(tmp_path):
+	# zoo/gnn_pyg samples its graph by hand and states N_TRAIN_NODES (D, Nov 1)
+	from preflight.runner.pipeline import _train_count_setting, _with_dataset_size
+
+	gnn = "import torch\n# 160k seed nodes an epoch\nN_TRAIN_NODES = 160_000\nBATCH_SIZE = 1024\n"
+	assert _train_count_setting({"train.py": gnn}) == 160_000
+	assert _train_count_setting({"train.py": "NUM_TRAIN_SAMPLES = 5000\n"}) == 5000
+	assert _train_count_setting({"train.py": "N_TRAIN_NODES = int(1e5)\n"}) is None  # not a plain setting
+	assert _train_count_setting({"train.py": "def f():\n    N_TRAIN = 9\n"}) is None  # not module-level
+	assert _train_count_setting({"train.py": "N_TRAINER = 2\nN_TRAIN_NODES = True\n"}) is None
+	# a run length, never a dataset size (review, Nov 1)
+	for name in ("NUM_TRAIN_EPOCHS", "N_TRAIN_STEPS", "NUM_TRAIN_TIMESTEPS", "N_TRAIN_ITERS"):
+		assert _train_count_setting({"train.py": f"{name} = 3\n"}) is None
+	assert _train_count_setting({"notes.txt": "N_TRAIN = 3\n", "train.py": "x = (\n"}) is None
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	sm = rec.job.script_map
+	bare = rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm.model_copy(
+		update={"data": sm.data.model_copy(update={"n_examples": None})})})})  # fmt: skip
+	assert _with_dataset_size(bare, {"train.py": gnn}).job.script_map.data.n_examples == 160_000
+
+
+def test_the_engine_flags_reach_the_engine_before_it_fills_predictions(tmp_path, monkeypatch):
+	from preflight.engine import api
+	from preflight.runner import flags
+	from preflight.runner.pipeline import with_predictions
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	before = dict(api.FEATURES)
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"engine.rl": True, "engine.steptime_cross_gpu": False}))
+	flags.reload()
+	try:
+		with_predictions(rec, _Ctx(), enabled=True)
+		assert api.FEATURES["rl"] is True and api.FEATURES["steptime_cross_gpu"] is False
+	finally:
+		api.FEATURES.update(before)
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+
+
+def test_a_triage_finding_names_the_node_only_when_its_probe_clearly_tested_one():
+	from preflight.runner.pipeline import _tested_node
+	from preflight.schema import Probe
+
+	def probe(pid, code=None):
+		return Probe.model_construct(id=pid, error_code=code)
+
+	nodes = {"model", "data", "eval", "optimizer"}
+	assert _tested_node(probe("p1-eval", "oom.eval"), nodes) == "eval"
+	assert _tested_node(probe("p2", "oom.eval"), nodes) == "eval"
+	assert _tested_node(probe("p1", "oom"), nodes) is None  # a training-step OOM: not one node
+	assert _tested_node(probe("p1", "user_error"), nodes) is None
+	assert _tested_node(probe("p1-eval"), {"model"}) is None  # no eval node on this map
+
+
+def test_a_serving_probes_sample_size_is_in_its_cache_key_and_other_keys_are_unchanged():
+	from dataclasses import replace
+
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner.pipeline import cache_key
+
+	spec = ProbeSpec(probe_id="p1", files={"serve.py": "x = 1\n"}, entrypoint="serve.py", image="serving")
+	assert cache_key(spec, "L4", "img") == cache_key(replace(spec, generate_sample=0), "L4", "img")
+	assert cache_key(replace(spec, generate_sample=32), "L4", "img") != cache_key(spec, "L4", "img")
+	assert cache_key(replace(spec, generate_sample=32), "L4", "img") != cache_key(
+		replace(spec, generate_sample=64), "L4", "img"
+	)

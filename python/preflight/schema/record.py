@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.6.0"
+SCHEMA_VERSION = "0.6.2"
 
 
 def _now() -> datetime:
@@ -291,6 +291,12 @@ class StepSample(Strict):
 		ge=0,
 		description="Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else",
 	)
+	reserved_bytes: int | None = Field(
+		default=None,
+		ge=0,
+		description="0.6.1: the allocator's reserved memory read at the same instant as device_used_bytes, so "
+		"device_used_bytes - reserved_bytes is the CUDA or ROCm context plus other processes",
+	)
 
 
 class Throughput(Strict):
@@ -505,7 +511,7 @@ class AgentTask(Strict):
 		Literal["done", "max_turns", "context_overflow", "error", "timeout", "loop", "cut"] | None
 	) = Field(
 		default=None,
-		description="cut (0.6.0): stopped with the whole run (cancel, stall, the run's limit), not by the task itself",
+		description="cut (0.6.0): stopped with the whole run by a cancel or the run's time limit; never on a stall, where tasks in flight keep no stop reason (0.6.1)",
 	)
 	trace: BlobRef | None = None
 
@@ -521,6 +527,11 @@ class AgentSample(Strict):
 	ended: Literal["finished", "stalled", "cancelled", "timeout"] | None = Field(
 		default=None,
 		description="0.6.0: how the sampled run ended; stalled = no model call for the stall time (a tool stuck)",
+	)
+	concurrency: int | None = Field(
+		default=None,
+		ge=1,
+		description="0.6.1: tasks run at once (the script's workers); in a stalled run at most this many can be stuck",
 	)
 
 

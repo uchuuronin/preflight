@@ -46,7 +46,9 @@ The HF jobs are 10 groups of five on real Hugging Face checkpoints, LoRA in bf16
 - **Cross-GPU holdout:** every A100 row, never calibrated on and scored once (`docs/decisions/calibration-l4-phase1.md`).
 - **Not in calibration:** the synthetic `lora` family (lens `finetune_synthetic`). Its scores are reported, but users send real models.
 
-**Data inside the jobs.** None. Every job trains on random token ids or random images, so the corpus holds measurements of compute, not of any text or image dataset. The `divergence` kind, not yet run, would train on Tiny Shakespeare (public domain).
+**Data inside the jobs.** The `kernels` and `hf` kinds train on random token ids or random images, so they hold measurements of compute, not of any text or image dataset. The `divergence` kind trains a small GPT (4 layers, d256, 600 steps) on Tiny Shakespeare (public domain) and keeps each run's loss, grad-norm, logit and update series with its D9 label.
+
+**Divergence runs** (measured, Nov 1): 720 runs, 377 on L4 and 343 on A10 (two draws of the same sampler, the board on every row), 44 diverged: 37 of them in fp16, 15 in the first 30 steps. They score the divergence classifier, which is not used: held-out AUROC 0.66 (95% 0.56 to 0.76) against a 0.85 target (`corpus/reports/divergence_nov1.json`).
 
 **Personal or sensitive data.** None.
 

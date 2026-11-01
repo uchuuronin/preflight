@@ -105,7 +105,7 @@ class _LocalProc:
 def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: int | None,
 	k: int = DEFAULT_SAMPLE, skip_keys=(), offered_first=(), run_id: str = "s1", timeout_s: float = TIMEOUT_S,
 	env: dict | None = None, should_stop=None, launch=None, base_url_var: str | None = None,
-	stall_s: float = STALL_S) -> AgentSample:  # fmt: skip
+	stall_s: float = STALL_S, inspect=None) -> AgentSample:  # fmt: skip
 	"""Run the script once through the proxy; the tasks it ran, as the record's agent_sample.
 
 	skip_keys: opening keys of tasks already sampled (agent.task_key of each first-sample task
@@ -170,8 +170,11 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 			return None
 		return round(max(0.0, (end if end is not None and t not in in_flight else ended_at) - opened), 3)
 
-	# a task stopped with the whole run (cancel, stall, the run's own limit) is "cut", not a timeout
-	tasks = [proxy.task(t, wall_s=task_wall(t), cut=t in in_flight) for t in ids]
+	# a task stopped with the whole run by a cancel or the run's time limit is "cut", not a timeout; on a
+	# stall, the tasks still waiting on a tool get no stop reason (possibly stuck: the planted runaways)
+	cut_tasks = in_flight if cut in ("cancelled", "timeout") else set()
+	open_tasks = (waiting | in_flight) if cut == "stalled" else set()
+	tasks = [proxy.task(t, wall_s=task_wall(t), cut=t in cut_tasks, open_end=t in open_tasks) for t in ids]
 	st = proxy.run_stats(run_id)
 	parts = [f"the first {len(ids)} tasks the script started"]
 	if st.get("skipped"):
@@ -196,7 +199,38 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	selection = "; ".join(parts)
 	if len(selection) > 200:
 		selection = selection[:197].rsplit(" ", 1)[0] + "..."
-	return AgentSample(tasks=tasks, population=population, selection=selection)
+	if inspect is not None:
+		# how each task ended, for an ops run's own scoring (counts and order only, never content): its
+		# opening rank, the last call's finish reason, and whether it ended waiting on a tool
+		order = sorted(ids, key=lambda t: (spans.get(t, (None,))[0] is None, spans.get(t, (0.0,))[0] or 0.0))
+		inspect({t: {"opened_rank": order.index(t), "last_finish": proxy.last_finish(t), "waiting_on_tool": t in waiting,
+			"in_flight_at_stop": t in in_flight} for t in ids})  # fmt: skip
+	# 0.6.0: how the sampled run ended (a lost sandbox is none of these)
+	how = {"stalled": "stalled", "cancelled": "cancelled", "timeout": "timeout", None: "finished"}.get(cut)
+	# 0.6.1: the script's workers, so the engine caps how many tasks of a stalled run can be stuck.
+	# The proxy's peak of calls in flight misses workers busy in a tool between calls, so also the
+	# most task spans (first call to last call's end; one still in flight, to the end) that overlap.
+	# A task that ended on a tool call ends at that call: most of them finished, and which are
+	# stuck can't be told, so their tool time after it isn't counted (a lower bound still)
+	workers = max((at_cut or st).get("peak_concurrent") or 0, _max_overlap(spans)) or None
+	return AgentSample(tasks=tasks, population=population, selection=selection, ended=how,
+		concurrency=int(workers) if workers else None)  # fmt: skip
+
+
+def _max_overlap(spans: dict) -> int:
+	"""The most task spans open at once; a span with no end (a call in flight) stays open to the end."""
+	edges = []
+	for opened, end in spans.values():
+		if opened is None:
+			continue
+		edges.append((opened, 1))
+		if end is not None:
+			edges.append((end, -1))
+	most = cur = 0
+	for _, d in sorted(edges, key=lambda e: (e[0], e[1])):  # an end before a start at the same instant
+		cur += d
+		most = max(most, cur)
+	return most
 
 
 class _quiet:

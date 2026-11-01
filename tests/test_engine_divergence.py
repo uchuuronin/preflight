@@ -7,10 +7,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from preflight.corpus.labels import label_divergence
 from preflight.engine import divergence as D
-
-# corpus.worker imports torch at module level, so these run in CI's torch job (PM, round four).
-pytestmark = pytest.mark.torch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -49,10 +47,6 @@ def _run(i: int, rng, diverge: bool, steps: int = 400) -> dict:
 		"beta2": 0.95,
 		"grad_clip": 1.0,
 	}
-	from preflight.corpus.worker import (
-		label_divergence,  # the worker imports torch, so only here (PM, round four)
-	)
-
 	return {"key": f"r{i}", "series": series, "label": label_divergence(series["loss"], 256), "cfg": cfg,
 		"family": (cfg["precision"], cfg["qk_norm"], cfg["init_std"])}  # fmt: skip
 
@@ -167,3 +161,30 @@ def test_settings_read_the_way_users_and_the_sweep_write_them():
 	assert D.config_features({"grad_clip": None})[8] is None  # a user's unset knob: unknown
 	assert D.config_features({"grad_clip": 0.0})[8] == 1.0  # the sweep's no clipping, as the fit writes it
 	assert D.config_features({"grad_clip": 1.0})[8] == 0.0
+
+
+def test_the_card_says_it_is_not_used_and_why():
+	from preflight.engine import api
+
+	(card,) = api._cards({D.MODEL_ID})
+	assert card.notes.startswith(
+		"calibration: held_out, not used. Not used: the warning comes from the threshold rules"
+	)
+	assert card.heldout_error["auroc"] == pytest.approx(0.657) and "720 runs" in card.training_data
+	assert "fp16" in card.notes and "first 30 steps" in card.notes and "AUROC 0.66" in card.notes
+
+
+def test_without_a_model_the_readout_gives_the_verdict():
+	w = D.warn(None, {"loss": [1.0] * 50}, {})
+	assert w["status"] == "abstain" and w["reason"].startswith(
+		"not used: the warning comes from the threshold rules"
+	)
+
+
+def test_the_report_writes_its_own_verdict(sweep):
+	fd = _fit_script()
+	rep = fd.summarise(fd.evaluate(sweep))
+	v = fd.verdict(rep, sweep)
+	assert v["verdict"] == "used" and v["why"] == ""  # the synthetic sweep meets the row
+	bad = {**rep, "auroc": {**rep["auroc"], "point": 0.6}}
+	assert fd.verdict(bad, sweep)["verdict"].startswith("not used")

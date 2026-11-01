@@ -343,6 +343,12 @@
 			"default": null,
 			"description": "0.5.0: a unified diff applied to the record's code before a probe or verify job (C's fix loop); code fixes can't be passed as knob overrides",
 			"title": "Patch"
+		},
+		"private": {
+			"default": false,
+			"description": "0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten",
+			"title": "Private",
+			"type": "boolean"
 		}
 	},
 	"required": [
@@ -351,5 +357,5 @@
 	"title": "JobRequest",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.0/JobRequest"
+	"$id": "https://preflight.dev/schema/0.6.2/JobRequest"
 }

@@ -1,0 +1,10 @@
+{
+	"$comment": "Records whose share links preview with a pre-rendered card image on the Workers Free plan (Chiya, Nov 1): the LoRA OOM, and whichever record the X post links. Each card is rendered from the record file named here by `npm run hero-cards` and committed as static/cards/<token>.png. To add one, add its share token as link_id and a copy of its record in the repository.",
+	"cards": [
+		{
+			"link_id": "ICDYrfHQ2nBNbv3mlRHHMg",
+			"record": "api/tests/fixtures/a-smoke-l4-main-4.record.json",
+			"what": "A's Oct 28 L4 run of the LoRA zoo script (a-smoke-l4-main-4): the planted eval OOM caught by probe p1-eval. The file is A's copy of that record with its share token replaced; docs/status/a.md gives the same probe figures."
+		}
+	]
+}

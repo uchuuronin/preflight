@@ -43,6 +43,9 @@ NUM_CLASSES = 47
 BATCH_SIZE = 1024
 EPOCHS = 3
 LR = 3e-3
+# Seed nodes the sampler draws batches from, each epoch: the run's length is
+# ceil(N_TRAIN_NODES / BATCH_SIZE) = 157 steps an epoch, 471 in all [derived].
+N_TRAIN_NODES = 160_000
 
 
 def csr(edge_index: torch.Tensor, n: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -112,7 +115,8 @@ def main() -> None:
 	x, y = data.x.cuda(), data.y.cuda()
 	model = SAGE().cuda()
 	opt = torch.optim.Adam(model.parameters(), lr=LR)
-	train_nodes = torch.randperm(n, device="cuda")[: int(0.8 * n)]
+	assert n >= N_TRAIN_NODES, f"the graph has {n} nodes, fewer than N_TRAIN_NODES"
+	train_nodes = torch.randperm(n, device="cuda")[:N_TRAIN_NODES]
 	started = time.monotonic()
 	for epoch in range(EPOCHS):
 		perm = train_nodes[torch.randperm(len(train_nodes), device="cuda")]

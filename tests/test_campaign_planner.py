@@ -291,8 +291,10 @@ def test_the_record_block_carries_the_plans_intervals_and_each_runs_start(ft):
 	)
 	block = pl.to_campaign()
 	FlightRecord.model_validate(ft.model_copy(update={"campaign": block}).model_dump())
-	assert block.usd == pl.usd and block.gpu_hours == pl.gpu_hours and block.finish_s == pl.finish_s
-	assert block.grid_usd == pl.grid_usd and block.grid_gpu_hours == pl.grid_gpu_hours
+	assert block.usd.model_copy(update={"rate": None}) == pl.usd.model_copy(update={"rate": None})
+	assert block.gpu_hours == pl.gpu_hours and block.finish_s == pl.finish_s
+	assert block.grid_usd.model_copy(update={"rate": None}) == pl.grid_usd.model_copy(update={"rate": None})
+	assert block.grid_gpu_hours == pl.grid_gpu_hours
 	assert block.quota.needed_bytes == pl.quota.needed_bytes and block.asha.rungs
 	by_id = {c.id: c for c in pl.cells}
 	assert all(c.start_s == by_id[c.id].start_s and c.time == by_id[c.id].time for c in block.cells)
@@ -314,3 +316,29 @@ def test_runs_that_cant_be_dated_have_a_slot_and_an_abstaining_start(ft):
 	cl = P.Cluster(slots=1, mtti_s=220, checkpoint_interval_s=1e9, budget_usd=1e9)
 	pl = P.plan(ft, {"seed": [0, 1, 2]}, cl, start=START)
 	assert all(c.slot == 0 and c.start_s.status == "abstain" and c.start is None for c in pl.cells)
+
+
+def test_the_record_block_fills_contract_0_6_0(ft):
+	# Chiya, Nov 1: start, p_by_deadline, checkpoint_interval, lane_slots; slot, reason, the two estimates; rates
+	pl = P.plan(
+		ft, {"batch_size": [2], "seed": list(range(4))}, P.Cluster(lanes={"ana": 1, "ben": 2}), start=START
+	)
+	block = pl.to_campaign()
+	FlightRecord.model_validate(ft.model_copy(update={"campaign": block}).model_dump())
+	assert block.start == START and block.lane_slots == {"ana": 1, "ben": 2}
+	assert block.checkpoint_interval == pl.checkpoint_interval and block.p_by_deadline == pl.p_by_deadline
+	by_id = {c.id: c for c in pl.cells}
+	for c in block.cells:
+		assert c.slot == by_id[c.id].slot and c.gpu_hours_estimate == by_id[c.id].gpu_hours
+		u, h = c.usd_estimate, c.gpu_hours_estimate
+		assert u.rate.quantity == "gpu_hours_estimate" and u.rate.unit == "gpu_hours"
+		assert u.point == pytest.approx(h.point * u.rate.usd_per_unit) and u.rate.price_row
+	assert block.usd.rate is not None and block.usd.point == pytest.approx(
+		block.gpu_hours.point * block.usd.rate.usd_per_unit
+	)
+
+
+def test_a_cut_run_says_why(ft):
+	pl = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2]}, P.Cluster(slots=1, budget_usd=1e-9), start=START)
+	cut = [c for c in pl.to_campaign().cells if c.cut]
+	assert cut and all("budget" in c.reason for c in cut)

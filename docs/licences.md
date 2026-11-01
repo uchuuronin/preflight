@@ -1,6 +1,6 @@
 # Licences of everything bundled
 
-By D, Sat Oct 31, 2026, at `main` `006bc57`. Every package Preflight ships or installs, with its licence, from:
+By D, Sat Oct 31, 2026, at `main` `006bc57`; re-checked Sun Nov 1 at `main` `a52753f` after round four (next section). Every package Preflight ships or installs, with its licence, from:
 
 - `uv.lock` (the `preflight` package) and `api/uv.lock` (the API), split into runtime, optional extras and dev tools by walking each lockfile's dependency graph;
 - `web/package-lock.json` (the web app; `dev` entries are build and test tools, the rest ship in the browser bundle) and the root `package-lock.json` (schema codegen, dev only);
@@ -19,6 +19,37 @@ No GPL, AGPL or SSPL anywhere. Everything is permissive except the rows under "F
 | Modal images (installed at deploy, not in the repo) | 146 | 120 | 26 |
 | Optional extras (pip install preflight[probe] / [modal]) | 32 | 17 | 15 |
 | Build and test tools only (not shipped) | 155 | 143 | 12 |
+| Modal torchtitan image (Nov 1; an ops check only, no visitor job uses it) | 90 | 75 | 15 |
+
+## Re-check after round four (Sun Nov 1, `main` `a52753f`)
+
+What changed since `006bc57`, and nothing else did: `uv.lock`, `api/uv.lock`, both
+`package-lock.json` files and both `pyproject.toml` files are unchanged, so there are no new engine,
+API or web dependencies. The probe, serving (vLLM 0.6.4.post1) and corpus images' pins are
+unchanged; the fix loop's runner image adds only pydantic, numpy and httpx, all already listed.
+
+- **New Modal image: torchtitan** (`TITAN_PACKAGES` in `python/preflight/runner/modal_app.py`,
+  for A's torchtitan adapter check; no visitor job uses it). Its 14 pins resolve to 90 packages
+  (`uv pip compile` for Python 3.11 on Linux, Nov 1), 38 of them not in the Oct 31 table; every
+  one is listed under "Every package" below. 75 are permissive. The other 15 are flagged in the
+  section after this: 12 NVIDIA CUDA libraries pulled in by torch 2.7.1, and three MPL-2.0
+  packages (shtab, which is new, and certifi and tqdm, already flagged for the other images).
+- **New files bundled in the repository: D2's share cards (`workers/functions/_card/`).** The
+  card renderer, resvg-wasm 2.6.2 (`@resvg/resvg-wasm`, source github.com/yisibl/resvg-js), is
+  vendored unmodified under MPL-2.0 (its `LICENSE` beside it); MPL-2.0 is file-level copyleft, so
+  those files stay MPL-2.0 and unmodified and nothing else changes licence. The fonts, Instrument
+  Sans, Instrument Serif and JetBrains Mono (from `@expo-google-fonts`), are vendored unchanged
+  under the SIL Open Font License 1.1, each family with its `OFL-*.txt`. `workers/`' other
+  dependencies are dev tools only (TypeScript, Vitest, Wrangler, `@types/node`), pinned in
+  `workers/package.json`; nothing else from it is deployed. Scanned Nov 1: no GPL, AGPL or SSPL
+  among them; Wrangler's image library brings libvips binaries under LGPL-3.0-or-later
+  (`@img/sharp-libvips-*`, `@img/sharp-wasm32`), used only by the local dev server.
+- **New files bundled in the repository: `zoo/torchtitan_debug/`.** The debug config, the test
+  tokenizer and the `c4_test` slice are torchtitan's own, copied from its v0.1.0 tag, under its
+  BSD-3-Clause licence (kept beside them as `LICENSE.txt`, as BSD-3 asks). The `c4_test` slice is
+  text from C4, which AllenAI releases under ODC-BY 1.0, with Common Crawl's terms of use applying
+  to its content (the allenai/c4 dataset card); ODC-BY asks for attribution, given here and in the
+  README's licence section.
 
 ## Flagged, and why each is fine to use as we do
 
@@ -27,6 +58,7 @@ No GPL, AGPL or SSPL anywhere. Everything is permissive except the rows under "F
 | Where | Packages |
 | --- | --- |
 | python package (extra:probe) | cuda-toolkit 13.0.3.0, nvidia-cublas 13.1.1.3, nvidia-cuda-cupti 13.0.85, nvidia-cuda-nvrtc 13.0.88, nvidia-cuda-runtime 13.0.96, nvidia-cudnn-cu13 9.24.0.43, nvidia-cufft 12.0.0.61, nvidia-cufile 1.15.1.6, nvidia-curand 10.4.0.35, nvidia-cusolver 12.0.4.66, nvidia-cusparse 12.6.3.3, nvidia-cusparselt-cu13 0.8.1, nvidia-nccl-cu13 2.30.7, nvidia-nvjitlink 13.4.92, nvidia-nvshmem-cu13 3.4.5 |
+| torchtitan image | nvidia-cublas-cu12 12.6.4.1, nvidia-cuda-cupti-cu12 12.6.80, nvidia-cuda-nvrtc-cu12 12.6.77, nvidia-cuda-runtime-cu12 12.6.77, nvidia-cudnn-cu12 9.5.1.17, nvidia-cufft-cu12 11.3.0.4, nvidia-cufile-cu12 1.11.1.6, nvidia-curand-cu12 10.3.7.77, nvidia-cusolver-cu12 11.7.1.2, nvidia-cusparse-cu12 12.5.4.2, nvidia-cusparselt-cu12 0.6.3, nvidia-nvjitlink-cu12 12.6.85 |
 | probe image; serving image | nvidia-cublas-cu12 12.4.5.8, nvidia-cuda-cupti-cu12 12.4.127, nvidia-cuda-nvrtc-cu12 12.4.127, nvidia-cuda-runtime-cu12 12.4.127, nvidia-cudnn-cu12 9.1.0.70, nvidia-cufft-cu12 11.2.1.3, nvidia-curand-cu12 10.3.5.147, nvidia-cusolver-cu12 11.6.1.9, nvidia-cusparse-cu12 12.3.1.170, nvidia-nccl-cu12 2.21.5, nvidia-nvjitlink-cu12 12.4.127, nvidia-nvtx-cu12 12.4.127 |
 | corpus image | nvidia-cublas-cu12 12.8.4.1, nvidia-cuda-cupti-cu12 12.8.90, nvidia-cuda-nvrtc-cu12 12.8.93, nvidia-cuda-runtime-cu12 12.8.90, nvidia-cudnn-cu12 9.10.2.21, nvidia-cufft-cu12 11.3.3.83, nvidia-cufile-cu12 1.13.1.3, nvidia-curand-cu12 10.3.9.90, nvidia-cusolver-cu12 11.7.3.90, nvidia-cusparse-cu12 12.5.8.93, nvidia-cusparselt-cu12 0.7.1, nvidia-nvjitlink-cu12 12.8.93 |
 
@@ -34,7 +66,7 @@ No GPL, AGPL or SSPL anywhere. Everything is permissive except the rows under "F
 
 | Package | Version | Licence | Where |
 | --- | --- | --- | --- |
-| certifi | 2026.10.23 | MPL-2.0 | API (runtime); API image; probe image; python package (runtime); serving image |
+| certifi | 2026.10.23 | MPL-2.0 | API (runtime); API image; probe image; python package (runtime); serving image; torchtitan image |
 | lightningcss | 1.33.0 | MPL-2.0 | web (dev) |
 | lightningcss-android-arm64 | 1.33.0 | MPL-2.0 | web (dev) |
 | lightningcss-darwin-arm64 | 1.33.0 | MPL-2.0 | web (dev) |
@@ -48,11 +80,12 @@ No GPL, AGPL or SSPL anywhere. Everything is permissive except the rows under "F
 | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 | web (dev) |
 | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | web (dev) |
 | pycountry | 26.2.16 | LGPL-2.1-only | serving image |
-| tqdm | 4.70.1 | MPL-2.0 AND MIT | corpus image; probe image; serving image |
+| shtab | 1.13.0 | MPL-2.0 | torchtitan image |
+| tqdm | 4.70.1 | MPL-2.0 AND MIT | corpus image; probe image; serving image; torchtitan image |
 
 Not from a package index: the fix loop's image installs **Muse Code** with Meta's own installer (`curl -fsSL https://dev.meta.ai/install.sh | bash`, `api/fix_app.py`); it is Meta's command-line tool, used under Meta's terms, and nothing of it is in this repository.
 
-Models and data the bug-zoo scripts download at run time are listed with their licences in the README draft (`docs/readme-draft.md`, Licences); none is bundled. Three are share-alike: `roneneldan/TinyStories` (CDLA-Sharing 1.0, `zoo/pretrain_nanogpt`, which can also run on random tokens), `databricks/databricks-dolly-15k` (CC BY-SA 3.0, `zoo/serving_vllm`) and `sentence-transformers/natural-questions` (CC BY-SA 3.0, `zoo/retrieval_st`).
+Models and data the bug-zoo scripts download at run time are listed with their licences in the README (`docs/readme-final.md`, Licences); none is bundled, apart from the torchtitan test files above. Three are share-alike: `roneneldan/TinyStories` (CDLA-Sharing 1.0, `zoo/pretrain_nanogpt`, which can also run on random tokens), `databricks/databricks-dolly-15k` (CC BY-SA 3.0, `zoo/serving_vllm`) and `sentence-transformers/natural-questions` (CC BY-SA 3.0, `zoo/retrieval_st`).
 
 ## Every package
 
@@ -260,6 +293,101 @@ Models and data the bug-zoo scripts download at run time are listed with their l
 | xxhash | 4.0.2 | BSD-2-Clause |
 | yarl | 1.25.1 | Apache-2.0 |
 | zipp | 4.1.2 | MIT |
+
+### Modal torchtitan image (ops check only, Nov 1) (90)
+
+| Package | Version | Licence |
+| --- | --- | --- |
+| absl-py | 2.5.1 | Apache-2.0 |
+| aiohappyeyeballs | 2.7.1 | PSF-2.0 |
+| aiohttp | 3.14.5 | Apache-2.0 AND MIT |
+| aiosignal | 1.4.0 | Apache 2.0 |
+| annotated-types | 0.8.0 | MIT |
+| anyio | 4.16.0 | MIT |
+| attrs | 26.1.0 | MIT |
+| blobfile | 3.0.0 | Public Domain |
+| certifi | 2026.10.23 | MPL-2.0 |
+| charset-normalizer | 3.5.2 | MIT |
+| click | 8.5.0 | BSD-3-Clause |
+| datasets | 3.6.0 | Apache 2.0 |
+| dill | 0.3.8 | BSD-3-Clause |
+| docstring-parser | 0.18.0 | MIT |
+| filelock | 4.2.6 | MIT |
+| frozenlist | 1.8.0 | Apache-2.0 |
+| fsspec | 2025.3.0 | BSD License |
+| grpcio | 1.85.1 | Apache-2.0 |
+| h11 | 0.16.0 | MIT |
+| hf-xet | 1.8.0 | Apache-2.0 |
+| httpcore | 1.0.9 | BSD-3-Clause |
+| httpcore2 | 2.16.0 | BSD-3-Clause |
+| httpx | 0.28.1 | BSD-3-Clause |
+| httpx2 | 2.16.0 | BSD-3-Clause |
+| huggingface-hub | 2.4.0 | Apache-2.0 |
+| idna | 3.20 | BSD-3-Clause |
+| jinja2 | 3.1.6 | BSD License |
+| lxml | 6.1.3 | BSD-3-Clause |
+| markdown | 3.11.2 | BSD-3-Clause |
+| markdown-it-py | 4.2.0 | MIT License |
+| markupsafe | 3.0.4 | BSD-3-Clause |
+| mdurl | 0.1.2 | MIT License |
+| mpmath | 1.3.0 | BSD |
+| multidict | 7.2.1 | Apache-2.0 |
+| multiprocess | 0.70.16 | BSD-3-Clause |
+| networkx | 3.6.1 | BSD-3-Clause |
+| numpy | 2.2.6 | BSD License |
+| nvidia-cublas-cu12 | 12.6.4.1 | NVIDIA Proprietary Software |
+| nvidia-cuda-cupti-cu12 | 12.6.80 | NVIDIA Proprietary Software |
+| nvidia-cuda-nvrtc-cu12 | 12.6.77 | NVIDIA Proprietary Software |
+| nvidia-cuda-runtime-cu12 | 12.6.77 | NVIDIA Proprietary Software |
+| nvidia-cudnn-cu12 | 9.5.1.17 | NVIDIA Proprietary Software |
+| nvidia-cufft-cu12 | 11.3.0.4 | NVIDIA Proprietary Software |
+| nvidia-cufile-cu12 | 1.11.1.6 | NVIDIA Proprietary Software |
+| nvidia-curand-cu12 | 10.3.7.77 | NVIDIA Proprietary Software |
+| nvidia-cusolver-cu12 | 11.7.1.2 | NVIDIA Proprietary Software |
+| nvidia-cusparse-cu12 | 12.5.4.2 | NVIDIA Proprietary Software |
+| nvidia-cusparselt-cu12 | 0.6.3 | NVIDIA Proprietary Software |
+| nvidia-ml-py | 12.560.30 | BSD |
+| nvidia-nccl-cu12 | 2.26.2 | BSD-3-Clause |
+| nvidia-nvjitlink-cu12 | 12.6.85 | NVIDIA Proprietary Software |
+| nvidia-nvtx-cu12 | 12.6.77 | Apache 2.0 |
+| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause |
+| pandas | 3.1.0 | BSD-3-Clause |
+| propcache | 0.5.4 | Apache-2.0 |
+| protobuf | 7.36.2 | 3-Clause BSD License |
+| psutil | 6.1.0 | BSD-3-Clause |
+| pyarrow | 26.0.0 | Apache-2.0 |
+| pycryptodomex | 3.24.1 | BSD, Public Domain |
+| pydantic | 2.14.2 | MIT |
+| pydantic-core | 2.50.2 | MIT |
+| pygments | 2.21.0 | BSD-2-Clause |
+| python-dateutil | 4.0.0 | BSD-3-Clause |
+| pyyaml | 6.0.3 | MIT |
+| regex | 2026.9.29 | Apache-2.0 AND CNRI-Python |
+| requests | 2.34.2 | Apache-2.0 |
+| rich | 15.0.0 | MIT |
+| setuptools | 84.2.1 | MIT |
+| shtab | 1.13.0 | MPL-2.0 |
+| six | 1.17.0 | MIT |
+| sympy | 1.14.0 | BSD |
+| tensorboard | 2.19.0 | Apache 2.0 |
+| tensorboard-data-server | 0.7.2 | Apache 2.0 |
+| tiktoken | 0.9.0 | MIT License (licence text in metadata) |
+| tomli | 2.2.1 | MIT License |
+| torch | 2.7.1 | BSD-3-Clause |
+| torchdata | 0.11.0 | BSD |
+| torchtitan | 0.1.0 | BSD 3-Clause License (licence text in metadata) |
+| tqdm | 4.70.1 | MPL-2.0 AND MIT |
+| triton | 3.3.1 | MIT License |
+| truststore | 0.10.5 | MIT |
+| typeguard | 4.6.0 | MIT |
+| typing-extensions | 4.16.0 | PSF-2.0 |
+| typing-inspection | 0.4.4 | MIT |
+| tyro | 0.9.24 | MIT |
+| tzdata | 2026.6 | Apache-2.0 |
+| urllib3 | 2.8.0 | MIT |
+| werkzeug | 3.1.9 | BSD-3-Clause |
+| xxhash | 4.0.2 | BSD-2-Clause |
+| yarl | 1.25.1 | Apache-2.0 |
 
 ### Optional extras (pip install preflight[probe] / [modal]) (32)
 

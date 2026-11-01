@@ -29,9 +29,9 @@ META_BASE_URL = "https://api.meta.ai/v1"
 PRICES: dict[str, tuple[float, float, float]] = {
 	"muse-spark-1.3": (1.25, 0.15, 4.25),
 	"muse-spark-1.1": (1.25, 0.15, 4.25),
-	"muse-glimmer-30b": (0.30, 0.30, 1.20),
-	# Spark Open on Baseten: engine/prices' rate (getmaxim.ai Bifrost, Oct 26 2026; no cached rate listed)
-	"meta-models/muse-spark-open-1026": (1.25, 1.25, 4.25),
+	"muse-glimmer-30b": (0.25, 0.03, 1.05),  # B's figures from Qubrid (Nov 1)
+	# Spark Open on Baseten: the rate B confirmed on Baseten's own page (Nov 1), $0.15 cached
+	"meta-models/muse-spark-open-1026": (1.25, 0.15, 4.25),
 }
 T = TypeVar("T", bound=BaseModel)
 # Retry only where a repeat can't double-bill: rate limits and gateway errors before generation.
@@ -91,8 +91,21 @@ def strict_schema(model: type[BaseModel]) -> dict:
 	return _strictify(copy.deepcopy(model.model_json_schema()))
 
 
+IMAGE_TOKENS = 1_600  # an image part, whatever its base64 length (a chart at 80 dpi is about this)
+
+
+def _content_chars_and_images(content) -> tuple[int, int]:
+	if isinstance(content, list):  # text and image parts
+		text = sum(
+			len(str(p.get("text", ""))) for p in content if isinstance(p, dict) and p.get("type") == "text"
+		)
+		return text, sum(1 for p in content if isinstance(p, dict) and p.get("type") == "image_url")
+	return len(str(content or "")), 0
+
+
 def estimate_tokens(messages: list[dict]) -> int:
-	return sum(len(str(m.get("content", ""))) for m in messages) // 4 + 8 * len(messages)
+	parts = [_content_chars_and_images(m.get("content", "")) for m in messages]
+	return sum(c for c, _ in parts) // 4 + IMAGE_TOKENS * sum(n for _, n in parts) + 8 * len(messages)
 
 
 class ModelClient:
@@ -230,6 +243,15 @@ class ModelClient:
 	def chat(
 		self, messages: list[dict], *, purpose: str, reasoning_effort: str | None = None, **extra
 	) -> tuple[str, ModelCall]:
+		message, call = self.chat_message(
+			messages, purpose=purpose, reasoning_effort=reasoning_effort, **extra
+		)
+		return message.get("content") or "", call
+
+	def chat_message(
+		self, messages: list[dict], *, purpose: str, reasoning_effort: str | None = None, **extra
+	) -> tuple[dict, ModelCall]:
+		"""The assistant message as the API returns it (content, and tool_calls when tools are given)."""
 		if estimate_tokens(messages) > self.max_input_tokens:
 			raise TokenCapExceeded(
 				f"prompt is about {estimate_tokens(messages)} tokens; cap is {self.max_input_tokens}"
@@ -246,9 +268,9 @@ class ModelClient:
 		started = time.monotonic()
 		resp = self._post(body, purpose, deadline)
 		data = resp.json()
-		content = data["choices"][0]["message"].get("content") or ""
+		message = data["choices"][0]["message"]
 		call = self._record(purpose, data, started, True, resp.headers.get("x-request-id") or data.get("id"))
-		return content, call
+		return message, call
 
 	def structured(
 		self, messages: list[dict], schema: type[T], *, purpose: str, reasoning_effort: str | None = None

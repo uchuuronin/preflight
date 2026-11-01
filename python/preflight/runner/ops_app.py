@@ -33,6 +33,8 @@ from preflight.runner.modal_app import (
 	weights_vol,
 	worker_image,
 )
+from preflight.runner.probe_user import PROBE_USER_IMPORTS
+from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
 
 ops = modal.App(APP_NAME + "-ops")
 
@@ -172,6 +174,27 @@ def startup_check_probe() -> dict:
 		"backend": r.env.backend if r.env else None, "log_tail": r.log_tail[-600:]}  # fmt: skip
 
 
+@ops.function(image=probe_image, timeout=600)
+def probe_user_check_probe_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["probe"])
+
+
+@ops.function(image=serving_image, timeout=600)
+def probe_user_check_serving_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["serving"])
+
+
+@ops.function(image=titan_image, timeout=600)
+def probe_user_check_titan_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["titan"])
+
+
 @ops.function(image=worker_image, timeout=600)
 def startup_check_sandbox() -> dict:
 	"""What run_worker does for every probe, on a CPU sandbox: the runner's own sandbox factory
@@ -227,6 +250,8 @@ def startup_check():
 		("worker", startup_check_worker),
 		("probe", startup_check_probe),
 		("sandbox", startup_check_sandbox),
+		("probe_user", probe_user_check_probe_image),
+		("serving_user", probe_user_check_serving_image),
 	)
 	for name, fn in checks:
 		try:
@@ -234,11 +259,14 @@ def startup_check():
 		except Exception as exc:  # the remote traceback is in the log above
 			result[name] = {"failed": f"{type(exc).__name__}: {exc}"[:2000]}
 	w, p, sb = result["worker"], result["probe"], result["sandbox"]
+	result["probe_user_ok"] = _probe_user_ok(result["probe_user"], "probe")
+	result["serving_user_ok"] = _probe_user_ok(result["serving_user"], "serving")
 	result["ok"] = bool(
 		"failed" not in w and w.get("lens") == "finetune" and w.get("knobs", 0) > 0 and w.get("saves", 0) >= 1
 		and w.get("job_store_would_claim_here") is False and "runner_loaded_as" in w
 		and "failed" not in p and p.get("status") == "ok" and p.get("steps", 0) > 0 and p.get("reachable_by_probe_uid")
 		and "failed" not in sb and sb.get("import_exit") == 0 and sb.get("probe_status") == "ok"
+		and result["probe_user_ok"] and result["serving_user_ok"]
 	)  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path("out/startup_check.json").write_text(json.dumps(result, indent=2))
@@ -322,7 +350,17 @@ def smoke(
 GROUND_TRUTH_TIMEOUT_S = 50 * 60
 
 
-@ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=GROUND_TRUTH_TIMEOUT_S)
+# Modal tries these in order (L4 queues of up to 59 min seen, Nov 1); no L40S: B's reading needs a
+# 24 GB card (Chiya, Nov 1). The result's "gpu" says which one ran
+GROUND_TRUTH_GPUS = ["L4", "A10"]
+
+
+@ops.function(
+	image=probe_image,
+	gpu=GROUND_TRUTH_GPUS,
+	volumes={WEIGHTS_DIR: weights_vol},
+	timeout=GROUND_TRUTH_TIMEOUT_S,
+)
 def ground_truth_on_l4(
 	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict
 ) -> dict:
@@ -359,7 +397,8 @@ def ground_truth(
 	if "train.py" not in files:
 		raise SystemExit(f"zoo/{script} has no train.py in this checkout")
 	print(
-		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4 (Modal queues it)", flush=True
+		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4, else an A10 (Modal queues it)",
+		flush=True,
 	)
 	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60, files)
 	Path("out").mkdir(exist_ok=True)
@@ -372,7 +411,7 @@ def ground_truth(
 MULTI_GPU_TIMEOUT_S = 20 * 60  # the container's own end, whatever the probes do
 
 
-@ops.function(image=probe_image, gpu="L4:2", timeout=MULTI_GPU_TIMEOUT_S)
+@ops.function(image=probe_image, gpu=["L4:2", "A10:2"], timeout=MULTI_GPU_TIMEOUT_S)  # L4s, else A10s
 def multi_gpu_on_l4x2(files: dict, warmup: int = 3, timed: int = 10) -> dict:
 	"""DDP and FSDP probes on one node of two L4s, one recorder per rank under torchrun."""
 	from preflight.probes.local import ProbeSpec, run_probe
@@ -400,7 +439,7 @@ def multi_gpu():
 
 	root = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "multi_gpu"
 	files = {f.name: f.read_text() for f in root.glob("*.py")}
-	print("[multi-gpu] waiting for a node with 2 x L4 (Modal queues it)", flush=True)
+	print("[multi-gpu] waiting for 2 x L4, else 2 x A10 (Modal queues it)", flush=True)
 	res = multi_gpu_on_l4x2.remote(files)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/multi_gpu.json").write_text(json.dumps(res, indent=2))
@@ -449,12 +488,25 @@ def startup_check_titan_image(files: dict) -> dict:
 	return out
 
 
-@ops.function(image=titan_image, gpu="L4", timeout=TITAN_TIMEOUT_S)
+def _gpu_name() -> str:
+	"""The GPU Modal gave this function (from a list of several), as the device names it. NVML, not
+	torch.cuda: a CUDA context in this process would sit in the memory the probe measures."""
+	try:
+		import pynvml
+
+		pynvml.nvmlInit()
+		name = pynvml.nvmlDeviceGetName(pynvml.nvmlDeviceGetHandleByIndex(0))
+		return (name.decode() if isinstance(name, bytes) else name).removeprefix("NVIDIA ")
+	except Exception:
+		return "GPU"
+
+
+@ops.function(image=titan_image, gpu=["L4", "A10", "L40S"], timeout=TITAN_TIMEOUT_S)  # the first to schedule
 def titan_check_on_l4(files: dict, warmup: int = 3, timed: int = 10) -> dict:
 	"""torchtitan's trainer on its debug model under the recorder, one L4."""
 	from preflight.probes.local import ProbeSpec, run_probe
 
-	print("[titan] container up on the L4", flush=True)
+	print(f"[titan] container up on the {_gpu_name()}", flush=True)
 	r = run_probe(ProbeSpec(probe_id="titan", files=files, entrypoint="train.py", warmup=warmup, timed=timed,
 		timeout_s=600))  # fmt: skip
 	p = r.probe
@@ -475,10 +527,13 @@ def torchtitan_check():
 
 	files = _titan_files()
 	start = startup_check_titan_image.remote(files)
+	start["probe_user"] = probe_user_check_titan_image.remote()
+	if start.get("exit") == 0 and not _probe_user_ok(start["probe_user"], "titan"):
+		start["exit"] = "probe_user"  # the probe uid can't run here: no GPU for it
 	print(f"[titan] startup check: {json.dumps(start)}", flush=True)
 	res = {"startup": start}
 	if start.get("exit") == 0:
-		print("[titan] waiting for an L4 (Modal queues it)", flush=True)
+		print("[titan] waiting for an L4, else an A10 or an L40S (Modal queues it)", flush=True)
 		res["probe"] = titan_check_on_l4.remote(files)
 		print(json.dumps({k: v for k, v in res["probe"].items() if k != "log_tail"}, indent=2), flush=True)
 	Path("out").mkdir(exist_ok=True)
@@ -493,11 +548,38 @@ AGENT_SAMPLE_TIMEOUT_S = 45 * 60  # the container's own end: the sample's 30 min
 AGENT_MAX_USD = 3.0  # proposed to Chiya for one sample (the proxy stops at it); her yes sets it
 
 
+def _mbpp_row_keys(n: int) -> dict[str, int]:
+	"""zoo/agent_eval_spark's first n MBPP rows by their opening key (the proxy's hash of the first user
+	message, as run.py writes it), so a sweep can say which sampled task is which row, planted rows
+	included, without reading any content back. From the datasets-server's rows API."""
+	import httpx
+
+	from preflight.recorder.agent import _h, opening_key
+
+	r = httpx.get("https://datasets-server.huggingface.co/rows", params={"dataset": "google-research-datasets/mbpp",
+		"config": "full", "split": "test", "offset": 0, "length": n}, timeout=60)  # fmt: skip
+	r.raise_for_status()
+	keys = {}
+	for item in r.json()["rows"]:
+		row = item["row"]
+		content = f"{row['text']}\nYour code should pass these tests:\n" + "\n".join(row["test_list"])
+		keys[opening_key([_h({"role": "user", "content": content})])] = item["row_idx"]
+	return keys
+
+
 @ops.function(
-	image=worker_image, secrets=[modal.Secret.from_name("preflight-meta")], timeout=AGENT_SAMPLE_TIMEOUT_S
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	timeout=AGENT_SAMPLE_TIMEOUT_S,
 )
 def agent_sample_hosted(
-	files: dict, entrypoint: str, k: int, max_usd: float, skip_keys: list | None = None
+	files: dict,
+	entrypoint: str,
+	k: int,
+	max_usd: float,
+	skip_keys: list | None = None,
+	provider: str = "meta",
+	label_mbpp: int = 0,
 ) -> dict:
 	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
 	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
@@ -508,29 +590,60 @@ def agent_sample_hosted(
 
 	owner = modal.App._get_container_app()
 	create = _sandbox_factory(owner)
-	upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
+	if (
+		provider == "baseten"
+	):  # the Pareto sweep: the same tasks on Spark Open, whatever model the script names
+		upstream = os.environ.get("BASETEN_BASE_URL") or "https://inference.baseten.co/v1"
+		key, override = (
+			os.environ["BASETEN_API_KEY"],
+			os.environ.get("SPARK_OPEN_MODEL", "meta-models/muse-spark-open-1026"),
+		)
+	else:
+		upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
+		key, override = os.environ["META_API_KEY"], None
 	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
-		os.environ["META_API_KEY"],
-		max_usd_total=max_usd)  # fmt: skip
+		key, max_usd_total=max_usd, model_override=override)  # fmt: skip
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip
 	# tasks an earlier sample already has are refused before any model call, so k are new ones
+	ends: dict = {}
 	s = sample(
 		Fetched(files=files, entrypoint=entrypoint),
 		sm,
 		k=k,
 		skip_keys=tuple(skip_keys or ()),
 		run_id="s2" if skip_keys else "s1",
+		inspect=ends.update,  # how each task ended, for scoring the sweep (no content)
 	)
 	usd = round(sum(t.cost_usd or 0 for t in s.tasks), 4)
 	print(f"[agent] {len(s.tasks)} tasks, ${usd} of model calls; {s.selection}", flush=True)
-	return {"sample": s.model_dump(mode="json"), "usd": usd}
+	rows = {}
+	if label_mbpp:
+		from preflight.recorder.agent import task_key
+
+		try:
+			by_key = _mbpp_row_keys(label_mbpp)
+			rows = {t.task_id: by_key.get(task_key(t.task_id)) for t in s.tasks}
+		except Exception as exc:  # the labels are for scoring; the sample stands without them
+			print(f"[agent] couldn't label the rows: {type(exc).__name__}: {exc}", flush=True)
+	return {
+		"sample": s.model_dump(mode="json"),
+		"usd": usd,
+		"task_ends": ends,
+		"task_rows": rows,
+		"provider": provider,
+	}
 
 
 @ops.local_entrypoint()
 def agent_sample(
-	script: str = "agent_eval_spark", k: int = 30, max_usd: float = AGENT_MAX_USD, skip_from: str = ""
+	script: str = "agent_eval_spark",
+	k: int = 30,
+	max_usd: float = AGENT_MAX_USD,
+	skip_from: str = "",
+	provider: str = "meta",
+	label_mbpp: int = 0,
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
 	Writes out/agent_sample_<script>.json: the sampled tasks (counts and timings, no content).
@@ -554,9 +667,11 @@ def agent_sample(
 			print(f"[agent] {len(tasks) - len(skip)} task ids in {skip_from} have no key and may be sampled again",
 				flush=True)  # fmt: skip
 		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
-	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip)
+	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip, provider, label_mbpp)
 	Path("out").mkdir(exist_ok=True)
-	Path(f"out/agent_sample_{script}.json").write_text(json.dumps(res, indent=2))
+	Path(f"out/agent_sample_{script}{'' if provider == 'meta' else '_' + provider}.json").write_text(
+		json.dumps(res, indent=2)
+	)
 
 
 # ---------------------------------------------------------------- serving image (CPU, before any serving probe)
@@ -585,10 +700,12 @@ def startup_check_serving():
 	import sys
 
 	res = startup_check_serving_image.remote()
+	res["probe_user"] = probe_user_check_serving_image.remote()
 	res["ok"] = (
 		res.get("exit") == 0
 		and res.get("vllm") == "0.6.4.post1"
 		and str(res.get("torch", "")).startswith("2.5.1")
+		and _probe_user_ok(res["probe_user"], "serving")
 	)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/startup_check_serving.json").write_text(json.dumps(res, indent=2))

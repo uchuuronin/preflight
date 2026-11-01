@@ -8,11 +8,162 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 11:20 (standing yes; the Spark Open triage shot in both cuts; push log)
+
+**Standing yes (Chiya, 11:14):** pushes to `ws-d` go without asking once gitleaks is clean and one
+read-only review has checked the change; runs under $1 on a T4, L4 or A10, up to $5 a day, without
+asking. Still asked first: anything past those, A100 or H100, a new kind of run, deploys or
+anything that keeps billing, anything to `main`, production flags, contract changes.
+
+- **Spark Open triage shot** (Chiya: one shot in both video cuts, labelled on screen, on a real
+  production record; A posts the link today; no link by Tue Nov 3, noon ET, and it's dropped, not
+  faked):
+  `storyboard.md` 12b (3-minute plan A) and E (45-second cut), `fallback-cut.md` 11b (plan B).
+  Each holds on the triage finding, where the app writes "Found by Muse Spark Open triage"
+  (`finding.source.spark_open_triage` in `en.json`), with a burned-in caption naming the model.
+  No number is spoken in it, and the line says only what the code does: when a probe fails, Spark
+  Open reads the end of its log and quotes the line.
+- **Blocker, found in review: no screen shows a triage finding.** Triage's finding is info with
+  no node; on `main` the detail sheet shows only findings with a node, the map skips info and
+  node-less ones, and the tour takes only findings with a fix. So the shot can't be filmed today,
+  even with A's link. Asked A (tie the finding to its probe's node: the smaller change) or C (list
+  node-less findings), for Chiya's next batch. The storyboards say so in the shot's row.
+  **11:30, Chiya:** C adds the cockpit list; A's production triage run is the LoRA zoo script, so
+  the failed probe is the eval probe's out-of-memory and the shot sits on the same script as the
+  fine-tune story. The room-making trade-offs stand. Storyboards and `from-d.md` updated.
+- **Glimmer (Chiya, 11:30):** back in, hosted by B on our own Modal GPU (Apache 2.0). The README
+  draft and the submission (`readme-final.md` lines on Muse Glimmer; `meta-and-partners.md`;
+  `portal.md`) keep today's wording until B's endpoint is live, then say "private mode: hosted
+  on Preflight's own GPU, behind its flag" with its measured cost per call. Watching for it.
+- **Decision: what makes room.** The 3-minute video has a hard 3-minute limit (Judging playbook)
+  and both 3-minute cuts already end near 2:55 to 2:58. Plan A drops shot 7 (Boarding's "Checking
+  the logs" tag), which says the same thing with a label that shows whether or not the model ran
+  (finding 12); plan B drops shot 10 (the tank and cost readouts, the shot with no measured
+  number). The 45-second cut takes 4 s from shot C and 3 s from the end card. Each comes back as
+  before if the triage shot is dropped. Chiya can swap which shot gives way.
+- **Asked A** (`from-d.md`): triage makes a finding only for a probe that didn't finish, so the
+  record needs a failed probe whose finding quotes a log line; post the link.
+- **Open:** the submission's Spark Open lines (`meta-and-partners.md`: "not yet run on a real
+  job"; `portal.md`) change once A's record exists; I'll update them when the link lands.
+
+**Push to `origin/ws-d`, 11:25** (gitleaks clean; reviewed read-only: the first three at 11:00,
+the rest below):
+- `9c55415` GNN zoo script: `N_TRAIN_NODES` as a plain top-level setting.
+- `ea4bbf2` README draft and submission: the divergence refit numbers (0.66, lead 138).
+- `8b94541` Review fixes for those two.
+- This commit: the triage shot in both cuts, the request to A, and this entry.
+
+**11:30: B's report landed** (`1cfa689` on `ws-b`, `python/preflight/corpus/reports/divergence_nov1.json`).
+It agrees with Chiya's numbers: AUROC 0.657 (0.563 to 0.765), lead 138.5 steps (3 to 269), 720
+runs, held out by settings family [measured: B's report]. The README draft, the submission table and the portal now
+link it, tagged measured as B's status does, and say "held out" again. The validation block's
+divergence row is the scorer's to fill (B: it reads the saved report). Merged `main` `f017010`
+(contract 0.6.1): add-on tests 251 of 251, worker tests 17 of 17 [measured, Nov 1].
+
+**Push to `origin/ws-d`, 11:22** (gitleaks clean; reviewed read-only): the merge of `main`
+`f017010`, and the README and submission link to B's report with this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, 11:00 (pushed; GNN run length; waiting on B's report)
+
+Pushed `adc9ca3`..`b781a91` with Chiya's yes (10:57).
+- **GNN run length:** `zoo/gnn_pyg/train.py` gains a plain top-level `N_TRAIN_NODES = 160_000`, used by the sampler in place of `int(0.8 * n)`. Basis: A's recorder can't count nodes when the script samples by hand, and B's engine needs a run length. It's 157 steps an epoch at batch 1,024, the same as before (0.8 x 200,494 = 160,395 also gives 157), so the run's length in steps is unchanged [derived]; each epoch trains on 395 fewer seed nodes, all in the last, partial batch, so peak memory is unchanged and wall time falls slightly. An assert guards a smaller graph. The planted fan-out `[15, 25, 25]` is unchanged. A is asked to read it into `data.n_examples`.
+- **"C's one-line fix to build.test.ts":** not on GitHub yet (no branch changes that file), and not needed. My `adc9ca3` already makes that test hold on both golden sets. A's own flagged `make_golden.py` (`ws-a`) produces goldens byte-identical to the ones I tested.
+- **B's divergence refit** (`1cfa689`): not in any branch on GitHub yet (fetched 11:00). The README draft, the submission table and the portal text now carry Chiya's numbers from it (AUROC 0.66, 0.56 to 0.76; lead 138 steps, 3 to 269; still a miss, not used), tagged `cited: B's fit report 1cfa689, via Chiya, Nov 1`, with a TODO(PM) for the link path. Basis: Chiya's message gives the numbers and the commit; I couldn't read the report itself, so the check-in compares the numbers against it and adds the path when it lands.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, 08:00 (pushed; tests that pass on both golden sets; hero cards; the dial)
+
+Pushed `09648e7`..`cbbfe73` with Chiya's yes (07:42). Chiya's calls: card rendering per request stays off; the hero records get pre-rendered cards; B will commit its divergence fit report, which I'll link when it lands.
+
+- **Golden-record tests.** A's `make_golden.py` with `PREFLIGHT_GOLDEN_ENGINE=1` isn't on any branch yet. So I applied B's exact call (`from-b.md`: `fill_predictions` after `model_validate`) to a scratch copy, which reproduces the committed goldens byte for byte without the flag. I regenerated both sets into the scratch folder and swapped each in to test.
+	- The whole web suite on the engine goldens: 12 failures. 2 are in my files (`addons/exports`); 10 are in C's (`guide/`, `workspace/provider`, `workspace/rate`, `workspace/record/samples`).
+	- My 2 now assert relations, not fixture figures. The plan names the abstained and missing readouts, and every number it gives is the record's own. The "sample" test builds its own all-fixture copy of the golden record.
+	- D's add-on suite passes on both sets, 251 of 251 each. The goldens themselves aren't committed; the PM regenerates them at the next merge.
+- **The dial on the engine goldens** (`make_golden.py`'s path, B's real models) [simulated: the golden probes are hand-made]: identical to the fixture set and to my Oct 31 scratch run. Every planted knob is in the dock on screen today (3 of 3 on each record). With C's list, fine-tune has 2 of 3 in the dock and pretrain 1 of 3. All nine orders tie at 3 of 6. Decision: the order stays frozen for the Nov 2 held-out run, which remains the real test.
+- **Hero cards.** The LoRA OOM record's card (`ICDYrfHQ2nBNbv3mlRHHMg`) is pre-rendered with the same card code from A's copy of that record (`api/tests/fixtures/a-smoke-l4-main-4.record.json`). It's committed as `workers/static/cards/<token>.png`, and the share page points that token's preview at it, so its links preview with an image on the Free plan; every other record previews as text.
+	- `npm run hero-cards:check` re-renders and fails on a stale card; I checked that it fails on a corrupted copy.
+	- The X post's link is that record's `/s/` page.
+	- C is asked to copy `static/cards` into the deployed site and run the check in CI.
+- **Read-only review of these two commits:** no blocking problems; every check passed on both golden sets. Hardened from it:
+	- With card rendering off, `/card/<token>` no longer renders on demand, which would have failed with Error 1102 on the Free plan. It redirects a hero record to its file and answers 404 otherwise.
+	- C's deploy step copies the functions and the cards in one step, and fails if a card didn't land. Otherwise a preview could name a card that isn't deployed and get the app's page back.
+	- The hero script refuses a card file with no entry in the list and a record path outside the repository, and creates its folder. Both guards were checked to fail on bad input.
+	- The README notes that a hero card is a snapshot of its record file, so it's re-rendered if that record gains estimates.
+	- The exports test also checks that a real run never says "illustrative".
+
+- **Finding 12, pre-checked on `ws-c` `fb30b3e`** (C's fix `5850bca`: Boarding clears its tags when the job changes): `model-tags.mjs` passes 12 of 12, the same-page case included [measured, Chromium, a scratch copy of `ws-c`]. It moves to Done once re-checked on `main`.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, morning (Chiya's queue of 07:04: README, D2, licences, submission, D4)
+
+1. **Final README:** `docs/readme-final.md`, for the PM to swap in for `README.md`. It combines C's README on `main` with my draft, which it replaces; the test now guards the final file. A new Status section, from `main` `a52753f`, says what's on in production, what's behind a flag, and what's not used or not measured. A read-only research agent compiled it from every status file and the code, with sources.
+	- Decision: the divergence classifier's "AUROC 0.58 on held-out runs" is cited as given by Chiya, with a TODO for B's report. Basis: the number isn't in any branch or doc in the repo.
+	- Decision: the flags that gate nothing (most `engine.*`, `campaign.planner`, `corpus.sweep`, `probes.*`) aren't presented as switches. The README names what each really does: the engine's own switch in `engine/api.py`, and `engine.memory` gating every prediction.
+	- Decision: every dollar figure is tagged derived (tokens or time at list or standard prices), as the README already tagged its own costs.
+2. **D2 share cards** (`workers/`): `/s/<token>` (link-preview page, then on to the cockpit), `/card/<token>` (1200 x 630 PNG) and `/badge/<token>` (SVG). Every number comes from the record, with the app's status word. Checked three ways:
+	- 15 tests;
+	- the Workers runtime (`wrangler pages dev` with C's functions, against a mock API);
+	- four rendered cards, looked at.
+	- Decision: resvg-wasm and the fonts are vendored unmodified, so C's deploy only copies files. Basis: a Pages Function bundles from `web/`, so imports from `workers/node_modules` wouldn't resolve after the copy. The bundle is 1.1 MB gzipped [measured].
+	- Decision: responses are cached for 2 minutes. Basis: the API marks records no-cache because a running job revises them.
+	- Asked C to copy `workers/` in at deploy and run its tests in CI.
+3. **Licences after round four:** one new image (torchtitan: 90 packages, 75 permissive; 12 NVIDIA libraries and 3 MPL-2.0 flagged). The repository now bundles torchtitan's own files (BSD-3-Clause) and a C4 slice (ODC-BY 1.0; attribution in the README), plus D2's vendored resvg (MPL-2.0) and fonts (OFL-1.1). No new engine, API or web dependencies.
+4. **Submission drafts** (`docs/submission/`): portal answers, the gallery blurb, the Meta models and partner tools table, and the X post. Every number is in one table with its source; dollar figures say "at list price".
+	- Spark Open triage is described as it runs now: wired in behind `harness.spark_open_triage` (off), not yet run on a real job. There's a TODO to add the first real run before submitting, since the prize needs the partner to verify real calls.
+5. **D4 against real runs:** not possible yet (`docs/decisions/freetier-one-session.md`). On A's L4 records for retrieval, GNN and vision, the engine abstains on `time.total` because the script maps leave `data.n_examples` empty. The LoRA record has no estimates, and no run was timed to the end.
+	- The simulation stays, labelled simulated.
+	- A new `check.realruns.test.ts` checks D4 on those four real records: no session count without a trusted time, memory judged on the record's own peak, and abstains where it should.
+	- Asked A to fill `n_examples`. That also unblocks time and cost on those three lenses.
+
+**Independent read-only review of the batch,** and what changed from it. It checked the README's status against the code, the share-card code and its injection safety, the licence counts, every submission number against A's records, and D4's fixture. Fixed:
+- **Planted bugs presented as discoveries.** The submission copy presented the fine-tune, agent and GRPO problems as discoveries. They were planted in our own test scripts, and the copy now says so everywhere.
+- **The fix loop's 19 s.** It sat next to "lands only when the re-probe verifies it". Gating on the re-probe isn't wired end to end yet (C's status), so the README, portal and tools table now say Muse Code produced the correct patch in 19 s, and that gating isn't wired yet.
+- **The share card under-read peak memory.** It took the train steps' 14.6 GiB, not the eval pass's 20.4 GiB, on the record the badge uses. It now reads both peaks, and the OOM line names the eval pass and its batch size (`error_code` `oom.eval`).
+- **API outages.** A 502 or 503 was cached as a generic card for 2 minutes. It's now `no-store` with its real status.
+- **The CPU limit.** A card render takes about 140 ms of CPU (88 to 284 ms) [measured, Node], against the Workers Free plan's 10 ms a request (Error 1102 past it; Pages Functions are billed as Workers). So card images are off by default behind `PREFLIGHT_SHARE_CARD_IMAGES`; the share page then gives text previews and the badge still works. **Decision for Chiya:** the Workers Paid plan, from $5 a month, to turn card images on.
+- **README.** The badge is commented out until `workers/` is deployed. Check-in, the guide, exports and the fix loop's re-probe are drawn as behind a flag or not wired. The scorer command gets its manifest argument. The diagram SVG is on white, which GitHub's dark mode needs.
+- **Tags.** The AUROC is now cited (Chiya), not measured. The corpus figures are tagged, the dollar figures are tagged derived in the submission table too, and four portal numbers that had no row now have one.
+- **D4.** The GNN's peak is 5.0 GiB (4.5 to 5.6), not "6.0 GB", which was the interval's top in decimal units.
+
+Seen, not yet confirmed: A's agent re-sample (GitHub run 41301359530 on `origin/remote-runs`) stopped after 120 s with no model calls, "up to 4 may be stuck". That fits plant 3 firing. Once A logs it, the fallback cut can carry the measured stall.
+
+Cloud runs: none. GPU minutes 0, dollars 0. A local `wrangler pages dev` and a mock API only.
+
+## Sun Nov 1, 07:00 (pushed; waiting on C's fix for 12 and A's goldens)
+
+Pushed `0683d27`, `868195d` and `b2f14f0` with Chiya's yes (06:59). `ws-d` now has `main` `a52753f` (round four and contract 0.6.0) merged in. Contract 0.6.0 needs nothing from D: every field is optional, D's 247 add-on tests and the typecheck pass, and so do D's Python tests. C has the fix for finding 12; it isn't on `main` or `ws-c` yet. Once it lands I re-run `model-tags.mjs` on `main`, and a check-in is scheduled for 09:00. The dial rerun waits on A's `make_golden.py` change (Chiya has asked A).
+
+## Sun Nov 1, morning (round four: audit re-check on `main`)
+
+Pushed `ae32870` with Chiya's yes ("push it all", 06:13). `main` had moved to `c4b95d4` (round four), so I merged it locally as `0683d27`. There were no conflicts and gitleaks is clean, and D's tests pass, 36, the README hook test included: it now runs against B's real scorer. That merge came after the yes, so it waits for one of its own.
+
+**Audit re-check on `main` `c4b95d4`**, 12 first, as planned, then an independent read-only review (`docs/audit/nov1-main/README.md`) [measured, Chromium]:
+- **12 partly fixed, still open.** Each job's tags now come from its record, and the five single-job cases pass at both sizes (new `docs/audit/scripts/model-tags.mjs`). But the read-only review found that tags carry over to the next job in the same page: after a triaged job, one that fails before any call shows both tags. I reproduced it, and tested a one-line fix (`useEffect(() => setCalls([]), [jobId, open])`) on a scratch copy, C's file untouched there: 12 of 12 pass, against 10 of 12 without it, and the typecheck and C's 41 app tests pass. Sent to C with that fix. The check now has the same-page case and exits 1 on a mismatch.
+- **7, 10, 8, 11, 9 and 4 fixed** (the review re-ran or spot-checked each):
+	- 40-state sweep: no axe violation in any state, no element without a visible focus ring, no overflow, no app console errors;
+	- the "About ..." buttons are 24 px;
+	- Boarding after a failure shows "Stopped here", and the route labels show whole.
+	- These moved to Done in `from-d.md`.
+- **6 not fixed** (the job map on phones): at 390 px the share lines render at 5.5 px and the names at about 6.6 px. It stays open with C.
+- **Minor, not failures** (axe passes both on spacing): "Your limits" is 20 px tall, and the "Got it" label is 22 px. Sent to C as a note.
+- **Add-on check: 20 of 20 now** (from 14). The six nodes axe can't measure still pass by pixels, at 5.88:1 or better.
+	- Decision: the check warns only on the dev server's 502 for `/v1/guide/limits/state`, the cockpit's own limits request, and still fails on any other `/v1` 502, an add-on's included (checked both ways). Basis: that request needs the API, which the dev server doesn't run, so the 502 comes from the test setup, not an add-on. A first version warned on any `/v1` path; the review found that too broad.
+
+## Sun Nov 1, morning (pushed; dollar figures back in the cuts)
+
+Pushed `88a1c72` and `8588646` with Chiya's yes (05:59). Chiya's ruling: dollar figures go back into both video cuts, spoken and captioned "at list price" (e.g. "$0.042 of GPU at list price"), because the rubric asks for dollars and that wording is accurate. The README keeps tagging them derived.
+- Plan A's storyboard: $0.042 is back in shot 8 and in the 45-second cut's shot B, spoken and captioned. Shot B is now about 35 spoken words in 16 s, so the plan trims its first sentence to the caption if the take runs long. Both rule lines now name list-price dollars next to measured numbers. A narrow read-only review checked every dollar value and basis against A's status file; its five wording and count fixes are in.
+- Fallback cut: shot 4 carries $0.042. Shot 11 carries $0.43 for the 30-task sample on screen ($0.4289, `a-agent-sample-1`) and $1.67 for all 130 tasks ($0.4289 + $1.2371). The numbers table gives each one's basis. The end moves to about 2:58 to give shot 11 room.
+
 ## Sun Nov 1, small hours (Chiya's queue of 01:19)
 
 `613ae92` was already on `origin/ws-d` when the yes came, so there was nothing to push. `main` is still at `90fcc40`: the audit re-check (12 first, then 7 to 11) and the dial rerun wait for round four.
 
-- **Fallback 3-minute cut** (`docs/demo/fallback-cut.md`, linked from `storyboard.md`, which stays as plan A's fine-tune shots). 13 shots, about 2:55: the fine-tune's OOM at step 200, then the agent run. Every spoken number is measured and sourced: step 200, 189 s of probing, 20.4 of 22.06 GiB, 130 tasks in two runs, 0 of 905,739 input tokens cached, and 30 tasks in 49 s. Decisions, with bases:
+- **Fallback 3-minute cut** (`docs/demo/fallback-cut.md`, linked from `storyboard.md`, which stays as plan A's fine-tune shots). 13 shots, about 2:58: the fine-tune's OOM at step 200, then the agent run. Every spoken number is measured and sourced: step 200, 189 s of probing, 20.4 of 22.06 GiB, 130 tasks in two runs, 0 of 905,739 input tokens cached, and 30 tasks in 49 s. Decisions, with bases:
 	- The retry loop is shown only as "read from the code" (`run.py:121`). Basis: A measured 0 runaways in the 130 tasks (`a-agent-builds-1`), because they ran before plant 3 was moved to rows 26 to 29, and A hasn't re-sampled since. If a re-sample shows the stall before Tuesday, its numbers go in the table.
 	- The turn-11 overflow and the full-run cost aren't spoken. Basis: the first is derived and the second predicted; they may appear on screen under the app's own labels.
 	- The agent shots need the Oct 31 record published on the deploy with a real share link, since its token in the repo is now a placeholder (A, `e27d2fc`).
