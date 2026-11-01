@@ -489,7 +489,7 @@ def torchtitan_check():
 	print(f"[titan] startup check: {json.dumps(start)}", flush=True)
 	res = {"startup": start}
 	if start.get("exit") == 0:
-		print("[titan] waiting for an L4, else an A10 (Modal queues it)", flush=True)
+		print("[titan] waiting for an L4, else an A10 or an L40S (Modal queues it)", flush=True)
 		res["probe"] = titan_check_on_l4.remote(files)
 		print(json.dumps({k: v for k, v in res["probe"].items() if k != "log_tail"}, indent=2), flush=True)
 	Path("out").mkdir(exist_ok=True)
