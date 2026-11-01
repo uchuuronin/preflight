@@ -1181,3 +1181,25 @@ def test_no_pair_grids_when_the_run_already_fits():
 	assert all(
 		len(g.axes) == 1 for g in api.fill_predictions(fits).predictions.grids if g.target_id == "risk.oom"
 	)
+
+
+def test_a_gpu_swap_doesn_t_stop_the_pair_search():
+	"""Review, Nov 1: Nov 1 records offer every GPU, and a B200 'cleared' the LoRA run, so no pair was searched."""
+	rec = _lora_l4()
+	many = ["L4", "A10", "L40S", "A100-SXM-40GB", "A100-SXM-80GB", "H100-SXM-80GB", "B200"]
+	knobs_ = [
+		k.model_copy(update={"domain": k.domain.model_copy(update={"values": many})})
+		if k.id == "gpu_type"
+		else k
+		for k in rec.knobs
+	]
+	pairs = api.clearing_pairs(rec.model_copy(update={"knobs": knobs_}))
+	assert ("eval_batch_size", "seq_len") in pairs
+	assert all("gpu" not in a and "gpu" not in b for a, b in pairs)
+
+
+def test_pair_grids_are_named_apart_from_a_record_s_own_2d_grids():
+	grids = api.fill_predictions(_lora_l4()).predictions.grids
+	two = [g for g in grids if len(g.axes) == 2]
+	assert two and all(g.id.endswith(api.CLEARING_GRID_SUFFIX) for g in two)
+	assert len({g.id for g in grids}) == len(grids)

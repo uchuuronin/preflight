@@ -3070,6 +3070,10 @@ CLEARS_P_OOM = oom_model.UNCERTAIN[0]  # cited: the "unlikely" end of the shown 
 MAX_CLEARING_PAIRS = 3  # guess: enough for the guide to offer a choice; each pair adds one local 2-D grid
 # moves that can only add memory are never tried; bools are tried at the value that saves memory
 _SAVES_AT = {"eval_no_grad": True, "gradient_checkpointing": True, "packing": False}
+# review, Nov 1: the guide offers GPUs on their own, and a GPU swap "clears" any run (a B200 did on the LoRA record,
+# so no pair was ever searched); eval_every doesn't move the peak; parallelism saves memory going up, not tried
+_NOT_A_CLEARING_KNOB = {"gpu_type", "gpus", "eval_every", "tensor_parallel", "pipeline_parallel"}
+CLEARING_GRID_SUFFIX = ".clears"  # pair grids' ids end with this, apart from a record's own 2-D grids
 
 
 def _saving_values(k: Knob) -> list:
@@ -3099,7 +3103,10 @@ def clearing_pairs(record: FlightRecord, max_pairs: int = MAX_CLEARING_PAIRS) ->
 	mem = [
 		k
 		for k in record.knobs
-		if k.id not in WORKLOAD_KNOBS and "memory" in knobs.knob_spec(k.id).affects and _saving_values(k)
+		if k.id not in WORKLOAD_KNOBS
+		and k.id not in _NOT_A_CLEARING_KNOB
+		and "memory" in knobs.knob_spec(k.id).affects
+		and _saving_values(k)
 	]
 	singles = {k.id: _saving_values(k) for k in mem}
 	for k in mem:
@@ -3136,7 +3143,10 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	# Chiya, Nov 1: when no single move clears the risk of running out of memory, local 2-D grids over the pairs
 	# that do, so the guide can offer a combined move it reads off the record (agreed with C in from-b.md)
 	for a, b in clearing_pairs(record):
-		grids += build_grids(record, [a, b], local=True)
+		grids += [
+			g.model_copy(update={"id": g.id + CLEARING_GRID_SUFFIX})
+			for g in build_grids(record, [a, b], local=True)
+		]
 	return Predictions(
 		targets=targets, estimates={t.id: est[t.id] for t in targets if t.id in est}, grids=grids
 	)
