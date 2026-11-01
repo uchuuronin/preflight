@@ -761,7 +761,10 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	if match is not None and mprobes:
 		# a probe at these knobs measured the peak only if it saw the moment that sets it
 		moment = memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=capacity).peak_moment
-		measured = moment == "train" or (moment == "eval" and probe_ran_eval(match))
+		# review, Nov 1: and only on the probe's own GPU; a GPU move is a prediction, whatever the knobs match
+		measured = gpu == _env_gpu(record) and (
+			moment == "train" or (moment == "eval" and probe_ran_eval(match))
+		)
 	est = memory.predict_peak(
 		arch,
 		setup,
@@ -814,20 +817,38 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	return res
 
 
+# the terms that grow with batch and length absorb what the model misses; the rest are set by the model's size
+FLEXIBLE_TERMS = ("activations", "logits", "eval_spike")
+
+
 def _term_estimates(stack: dict, peak: Estimate) -> dict:
-	"""memory.<term> at the peak, scaled so the terms add up to the calibrated peak, with its relative band."""
-	total = sum(max(0.0, v) for v in stack.values())
+	"""memory.<term> at the peak, adding up to the calibrated peak, with its relative band.
+
+	C, Nov 1: scaling every term to the peak made a GRPO run's weights read 9.9 GB for a 494M-parameter model (5x),
+	when the probe measured 2.0 GB. Weights, gradients, optimizer state, the context and the other size-set terms
+	keep their modelled values; activations, logits and the eval spike take the rest of the peak, in proportion,
+	or activations alone when the model has none. Only when the size-set terms already exceed the peak are all of
+	them scaled down together."""
+	vals = {t: max(0.0, stack.get(t, 0.0)) for t in MEMORY_TERMS}
+	total = sum(vals.values())
 	if not total or peak.status == "abstain":
 		return {}
-	scale = peak.point / total
 	lo_f, hi_f = peak.lo / peak.point, peak.hi / peak.point
 	status = "predicted" if peak.status == "measured" else peak.status  # the split is modelled, not measured
-	why = "split by the analytical model, scaled to the calibrated peak"
-	out = {}
-	for t in MEMORY_TERMS:
-		v = max(0.0, stack.get(t, 0.0)) * scale
-		out[f"memory.{t}"] = _est(v, v * lo_f, v * hi_f, "bytes", status, memory.MODEL_ID, why)
-	return out
+	fixed = sum(v for t, v in vals.items() if t not in FLEXIBLE_TERMS)
+	flex = sum(vals[t] for t in FLEXIBLE_TERMS)
+	rest = peak.point - fixed
+	if rest >= 0:
+		why = "weights, gradients and optimizer as the model sizes them; activations take the rest of the calibrated peak"
+		for t in FLEXIBLE_TERMS:
+			vals[t] = rest * vals[t] / flex if flex else (rest if t == "activations" else 0.0)
+	else:
+		why = "split by the analytical model, scaled down to the calibrated peak"
+		vals = {t: v * peak.point / total for t, v in vals.items()}
+	return {
+		f"memory.{t}": _est(v, v * lo_f, v * hi_f, "bytes", status, memory.MODEL_ID, why)
+		for t, v in vals.items()
+	}
 
 
 def _from_memory_estimate(
@@ -902,7 +923,7 @@ def _empirical_memory(
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	cal = memory.Calibration.fit(pts)
 	x = knobs.work_units(lens, _sized(knobs.Shape(), values, _padded_seq(record, values))[1])
-	measured = _matching_probe(record, values) is not None
+	measured = _matching_probe(record, values) is not None and _target_gpu(record, values) == _env_gpu(record)
 	cell = conformal.TABLE.lookup("memory.peak", _target_gpu(record, values), lens)
 	h = (
 		memory.HALF_WIDTH_CALIBRATED

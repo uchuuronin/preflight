@@ -14,7 +14,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | --- | --- | --- | --- |
 | Fine-tune lens: memory, P(OOM), step time, cost, money at risk | `main`; phase 2 table and fixes on branch | 1 | Today: step-time bands for vision, retrieval and pretrain, and P(OOM) shown "uncertain (5–95%)" in the middle |
 | Agent lens: per-task bootstrap, context growth, cache prices, rate-limit wall clock, runaway rate | `main` | 0.5 | Tokens-only cost when tasks lack `cost_usd`, now that the price table is in |
-| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | Calibrated Nov 1 on A's GRPO zoo runs 2 and 3: length drift 0.16, zero-spread abstains below 8 prompts |
+| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | Calibrated Nov 1 on A's GRPO zoo runs 2 and 3 (L4) and A's 50-step run (A10, a-gt-grpo-50-b): length drift 0.21; the zero-spread band spans the Jeffreys and the measured rates (from 8 to 80 of the 50-step run's prompts it covered the rest, 7 of 7; the Jeffreys band alone missed 5 of 7, reading 0.13 to 0.18 low); abstains below 8 prompts. All three runs are calibration, so the RL rows score only the unseen TRL script |
 | Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`; the view is behind C's `c.campaign_calendar`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
 
 **The other lenses and engine features**
@@ -167,8 +167,13 @@ D found that most `engine.*` flags switched nothing. Checked in the code on ws-b
 
 **Removed:** three B flags that nothing read. `engine.steptime_same_gpu` (same-GPU step time is always on, behind `engine.memory`), `corpus.sweep` (an offline tool; Chiya's yes per run is its gate) and `campaign.planner` (the planner runs only in C's sample script; the campaign view is behind C's `c.campaign_calendar`).
 
+## GRPO peak check (Nov 1, A's 50-step run on an A10)
+
+- The engine reads the run's peak as **measured 23.50 GB** (band 21.11 to 26.15), and the device's own most-used was 23.50 GB over 52 steps: it matches. `risk.oom` reads **tight, 34%**: the run fitted with 0.21 GB to spare on the A10's 23.71 GB (99.1% used), inside the ±10% held-out band. That's the honest reading of a run this close, not a bug.
+- Fixed on the way: a peak after a GPU move read "measured" (it's a prediction now), and the per-term split scaled every term to the peak, so a 494M-parameter model's weights read 9.9 GB; weights and gradients now read 1.98 GB each, as the probe measured, and activations take the rest.
+- C's 23.8 GB on the L4 fixture predates the measured context; the fixture reads 23.25 GB now.
+
 ## Blocked
-- A's 50-step GRPO record (with `device_used_bytes` per step) to verify the GRPO peak fix and calibrate RL.
 - A wiring the engine flags into the runner (one line, `from-b.md`).
 - AMD: the account's verification hold.
 

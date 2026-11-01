@@ -1023,3 +1023,26 @@ def test_a_stalled_sample_reaches_the_runaway_readout(ag):
 		"stalled"
 		not in api.predict(rec.model_copy(update={"agent_sample": finished})).root["risk.runaway"].reason
 	)
+
+
+def _grpo_l4():
+	return load_record((Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/grpo-l4.record.json").read_text())
+
+
+def test_a_gpu_move_from_the_probes_settings_is_predicted_not_measured():
+	"""Review, Nov 1: the probe's own peak is measured only on the probe's own GPU."""
+	rec = _grpo_l4()
+	here = api.predict(rec).root["memory.peak"]
+	assert here.status == "measured"
+	moved = api.predict(rec, {"gpu_type": "A10"}).root["memory.peak"]
+	assert moved.status != "measured"
+
+
+def test_size_set_terms_keep_their_modelled_values():
+	"""C, Nov 1: a 494M-parameter GRPO model's weights read 9.9 GB when every term was scaled to the peak."""
+	rec = _grpo_l4()
+	p = api.predict(rec).root
+	terms = {k.split(".")[1]: v.point for k, v in p.items() if k.startswith("memory.") and k != "memory.peak"}
+	assert sum(terms.values()) == pytest.approx(p["memory.peak"].point)
+	assert terms["weights"] < 2.5e9 and terms["gradients"] < 2.5e9  # fp32 494M params: about 1.98 GB each
+	assert terms["activations"] > terms["weights"]  # the rest of the measured peak

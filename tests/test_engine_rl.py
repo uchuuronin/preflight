@@ -31,8 +31,9 @@ def test_a_prompt_seen_passing_4_of_4_isnt_certain_to_pass_16_of_16():
 	# Jeffreys Beta(4.5, 0.5): E[p^16] exactly, by the Beta-function identity
 	exact = math.exp(math.lgamma(20.5) + math.lgamma(5.0) - math.lgamma(4.5) - math.lgamma(21.0))
 	exact += math.exp(math.lgamma(16.5) + math.lgamma(5.0) - math.lgamma(0.5) - math.lgamma(21.0))
-	assert posterior.point == pytest.approx(exact, rel=1e-9)
-	assert posterior.lo < posterior.point < posterior.hi < 1.0
+	# Nov 1: the point sits between the Jeffreys moment and the measured rates, and the band spans both
+	assert posterior.point == pytest.approx((exact + plug_in) / 2, rel=1e-9)
+	assert posterior.lo <= exact < posterior.point < posterior.hi <= 1.0
 
 
 def test_bigger_groups_waste_fewer_prompts():

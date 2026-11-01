@@ -33,8 +33,11 @@ N_DRIFT_PER_DOUBLING = 0.10
 # fitted on one pair of GRPO runs, until the unseen TRL script tests it on Nov 2. Response lengths differ from the probe's sample (other prompts, drift as RL training goes on). A's
 # GRPO zoo runs 2 and 3, same settings and different prompts, differ by 0.155 in log rollout time per call while
 # their expected longest responses predict run 3 from run 2 within 6%; 0.16 covers that gap (was a 0.10 guess). One
-# pair of runs, so the GRPO zoo script is calibration for the rollout row, not its validation
-LENGTH_DRIFT = 0.16
+# pair of runs, so the GRPO zoo script is calibration for the rollout row, not its validation.
+# Nov 1, A's 50-step GRPO run on an A10 (a-gt-grpo-50-b; rollout is 94% of the step): its first 5 timed steps
+# averaged 33.3 s against 26.9 s over all 25, 0.21 in log. 0.21 covers both
+# runs; still two observations, both calibration
+LENGTH_DRIFT = 0.21
 # checked, Nov 1, once: from run 2's 3 prompts the zero-spread band (0.06 to 0.71) missed run 3's 17 new prompts
 # (0.82); from 8 prompts it covered the other 9. Fewer prompts than this and the readout abstains
 MIN_PROMPTS = 8
@@ -68,18 +71,30 @@ def zero_spread(
 		raise ValueError("group size must be at least 1")
 	rng = np.random.default_rng(seed)
 	idx = rng.integers(0, rates.size, size=(draws, rates.size))  # prompts resampled
+	plug = rates[idx]
+	plug_point = float(np.mean(rates**group_size + (1 - rates) ** group_size))
+	plug_frac = np.mean(plug**group_size + (1 - plug) ** group_size, axis=1)
 	if samples:
 		s = np.rint(rates * samples)
 		a, b = s + 0.5, samples - s + 0.5
 		p = rng.beta(a[idx], b[idx])
-		point = float(np.mean(_beta_moment(a, b, group_size)))
-		how = f"each prompt's rate from {samples} responses, with its uncertainty"
+		post_point = float(np.mean(_beta_moment(a, b, group_size)))
+		post_frac = np.mean(p**group_size + (1 - p) ** group_size, axis=1)
+		# checked, Nov 1, on A's 50-step GRPO run (A10, 208 prompts): from its first 8 to 80 prompts, the Jeffreys
+		# posterior read 0.13 to 0.18 below the rest of the run (it lifts a prompt that failed 8 of 8 off zero) and
+		# the measured rates 0.06 to 0.12 above it; the span of the two covered the rest every time. The prior on a
+		# prompt's rate is what a short probe can't pin down, so the band is both, and the point is between them
+		point = (post_point + plug_point) / 2
+		lo = min(float(np.quantile(post_frac, 0.05)), float(np.quantile(plug_frac, 0.05)))
+		hi = max(float(np.quantile(post_frac, 0.95)), float(np.quantile(plug_frac, 0.95)))
+		how = (
+			f"each prompt's rate from {samples} responses; the range spans a Jeffreys prior on each rate and the "
+			"rates as measured"
+		)
 	else:
-		p = rates[idx]
-		point = float(np.mean(rates**group_size + (1 - rates) ** group_size))
+		point = plug_point
+		lo, hi = (float(x) for x in np.quantile(plug_frac, [0.05, 0.95]))
 		how = "the measured rates taken as exact (the probe didn't say how many responses each came from)"
-	frac = np.mean(p**group_size + (1 - p) ** group_size, axis=1)
-	lo, hi = (float(x) for x in np.quantile(frac, [0.05, 0.95]))
 	why = (
 		f"{point:.0%} of groups of {group_size} would all pass or all fail, from {rates.size} prompts; {how}"
 	)
