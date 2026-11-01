@@ -7,7 +7,8 @@
  *   GET /card/<token>   the 1200 x 630 PNG card
  *   GET /badge/<token>  the README badge (SVG)
  *
- * A running job revises its record, so responses are cached for two minutes only.
+ * A running job revises its record, so responses are cached for two minutes only, and an API outage
+ * is never cached (no-store), so no link preview keeps a generic card.
  */
 import { headline, type Headline } from "./headline";
 import { type CardEnv, type Fetched, fetchRecord, TOKEN } from "./record";
@@ -18,6 +19,14 @@ export interface Renderer {
 }
 
 const CACHE = "public, max-age=120";
+
+/** The response status and caching for what the API answered: a record or a 404 is cached for two
+ * minutes; an API outage (502, 503) is never cached, so no link preview keeps a generic card. */
+function outcome(got: Fetched): { status: number; cache: string } {
+	if (got.ok) return { status: 200, cache: CACHE };
+	if (got.status === 404) return { status: 404, cache: CACHE };
+	return { status: got.status, cache: "no-store" };
+}
 
 const NONE: Headline = { title: "A Preflight flight record", subtitle: "", lines: [], illustrative: false };
 
@@ -37,9 +46,10 @@ export async function sharePage(request: Request, env: CardEnv, token: string, f
 	const { h, got } = await load(request, env, token, fetchImpl);
 	const cockpit = safe ? `${origin}/#/cockpit/${safe}` : `${origin}/`;
 	const missing = !got.ok && got.status === 404;
+	const out = outcome(got);
 	const title = missing ? "No flight record matches this link" : `${h.title} · Preflight`;
 	const desc = missing ? "Check the link, or open a sample in Preflight." : describe(h);
-	const image = safe ? `${origin}/card/${safe}` : "";
+	const image = safe && env.PREFLIGHT_SHARE_CARD_IMAGES === "on" ? `${origin}/card/${safe}` : "";
 	const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -52,7 +62,7 @@ export async function sharePage(request: Request, env: CardEnv, token: string, f
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(`${origin}/s/${safe}`)}">
-${image && !missing ? `<meta property="og:image" content="${esc(image)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta property="og:image:alt" content="${esc(desc)}">\n<meta name="twitter:card" content="summary_large_image">` : '<meta name="twitter:card" content="summary">'}
+${image && got.ok ? `<meta property="og:image" content="${esc(image)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta property="og:image:alt" content="${esc(desc)}">\n<meta name="twitter:card" content="summary_large_image">` : '<meta name="twitter:card" content="summary">'}
 <meta http-equiv="refresh" content="0; url=${esc(cockpit)}">
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0E2634;color:#FFF5D1;font:16px/1.5 system-ui,sans-serif;padding:16px}a{color:#FFF5D1}</style>
 </head>
@@ -61,26 +71,22 @@ ${image && !missing ? `<meta property="og:image" content="${esc(image)}">\n<meta
 </body>
 </html>`;
 	return new Response(html, {
-		status: missing ? 404 : 200,
-		headers: { "content-type": "text/html; charset=utf-8", "cache-control": CACHE, "x-robots-tag": missing ? "noindex" : "all" },
+		status: out.status,
+		headers: { "content-type": "text/html; charset=utf-8", "cache-control": out.cache, "x-robots-tag": got.ok ? "all" : "noindex" },
 	});
 }
 
 export async function cardPng(request: Request, env: CardEnv, token: string, renderer: Renderer, fetchImpl?: typeof fetch): Promise<Response> {
 	const { h, got } = await load(request, env, token, fetchImpl);
 	const png = await renderer.png(cardSvg(h, new URL(request.url).host));
-	return new Response(png, {
-		status: got.ok ? 200 : got.status === 404 ? 404 : 200,
-		headers: { "content-type": "image/png", "cache-control": CACHE },
-	});
+	const out = outcome(got);
+	return new Response(png, { status: out.status, headers: { "content-type": "image/png", "cache-control": out.cache } });
 }
 
 export async function badge(request: Request, env: CardEnv, token: string, fetchImpl?: typeof fetch): Promise<Response> {
 	const { h, got } = await load(request, env, token, fetchImpl);
-	return new Response(badgeSvg(h), {
-		status: got.ok || got.status !== 404 ? 200 : 404,
-		headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": CACHE },
-	});
+	const out = outcome(got);
+	return new Response(badgeSvg(h), { status: out.status, headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": out.cache } });
 }
 
 export { CARD_W };

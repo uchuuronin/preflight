@@ -64,8 +64,9 @@ LoRA smoke record. None can score a one-session verdict:
 
 So the simulation stays, labelled as it is. What the records do check, now in
 `check.realruns.test.ts`: on real input D4 never claims one session or a session count without a
-trusted time, judges memory on the record's own peak (the GNN's measured 6.0 GB fits every free
-tier's GPU) and abstains where the engine gave no trusted memory (vision) or no estimates (LoRA).
+trusted time, judges memory on the record's own peak (the GNN's measured 5.0 GiB, 4.5 to 5.6, fits
+every free tier's GPU) and abstains where the engine gave no trusted memory (vision) or no
+estimates (LoRA).
 
 What would make the real check possible: (1) the harness filling `data.n_examples` (A, asked in
 `docs/requests/from-d.md`), so the engine predicts `time.total`; (2) a zoo script run to the end

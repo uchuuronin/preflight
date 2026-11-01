@@ -35,7 +35,10 @@ interface Probe {
 	id?: string;
 	status?: string;
 	knobs?: Record<string, unknown>;
+	error_code?: string | null;
 	memory?: { peak_allocated_bytes?: number | null } | null;
+	/** The eval pass's own peak and batch size (an eval OOM peaks here, not in the train steps). */
+	eval?: { peak_allocated_bytes?: number | null; batch_size?: number | null } | null;
 	step_time?: { p50_s?: number | null } | null;
 }
 
@@ -78,6 +81,7 @@ function num(x: unknown): x is number {
 
 function sig(x: number): string {
 	if (x >= 100) return x.toFixed(0);
+	if (x > 0 && x < 0.01) return x.toPrecision(1);
 	if (x >= 10) return x.toFixed(1).replace(/\.0$/, "");
 	return x.toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
 }
@@ -100,6 +104,7 @@ export function formatValue(x: number, unit: string | undefined): string {
 }
 
 export function duration(s: number): string {
+	if (s < 1) return `${sig(s * 1000)} ms`;
 	if (s < 60) return `${sig(s)} s`;
 	const m = Math.round(s / 60);
 	if (m < 60) return `${m} min`;
@@ -168,15 +173,20 @@ export function headline(rec: RecordLike): Headline {
 	if (!lines.length) {
 		const probes = rec.probes ?? [];
 		const oom = probes.find((p) => p.status === "oom");
-		if (oom) lines.push({ label: "Ran out of memory while probing", value: knobText(oom.knobs) || "yes", status: "Measured" });
-		let peak: Probe | null = null;
-		for (const p of probes) {
-			const b = p.memory?.peak_allocated_bytes;
-			if (num(b) && (!peak || b > (peak.memory?.peak_allocated_bytes ?? 0))) peak = p;
+		if (oom) {
+			// An eval OOM (error code oom.eval) happened in the eval pass, at the eval batch size.
+			const inEval = oom.error_code === "oom.eval";
+			const evalBatch = oom.eval?.batch_size;
+			const value = inEval && num(evalBatch) ? `eval batch size ${evalBatch}` : knobText(oom.knobs) || "yes";
+			lines.push({ label: inEval ? "Ran out of memory in the evaluation pass" : "Ran out of memory while probing", value, status: "Measured" });
 		}
-		const peakBytes = peak?.memory?.peak_allocated_bytes;
-		if (num(peakBytes)) {
-			const of = num(gpu?.memory_bytes) ? ` of ${sig(gpu.memory_bytes / GIB)}` : "";
+		// The largest measured peak, train steps or eval pass.
+		let peakBytes: number | null = null;
+		for (const p of probes) {
+			for (const b of [p.memory?.peak_allocated_bytes, p.eval?.peak_allocated_bytes]) if (num(b) && (peakBytes === null || b > peakBytes)) peakBytes = b;
+		}
+		if (peakBytes !== null) {
+			const of = num(gpu?.memory_bytes) ? ` of ${(gpu.memory_bytes / GIB).toFixed(2)}` : "";
 			lines.push({ label: "Peak memory in a probe", value: `${sig(peakBytes / GIB)}${of} GiB`, status: "Measured" });
 		}
 		const ok = probes.find((p) => p.status === "ok" && num(p.step_time?.p50_s));

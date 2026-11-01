@@ -9,9 +9,11 @@ its source.
 
 # Preflight
 
+<!-- TODO(PM): once the site is live and workers/ is in the deploy, uncomment the badge and
+replace TODO-PM-HOST with the live host. It reads A's Oct 28 record (a-smoke-l4-main-4) and shows
+its first headline number with its status word; until then it would be a broken image.
 [![Preflight flight record: the LoRA fine-tune, measured on an L4](https://TODO-PM-HOST/badge/ICDYrfHQ2nBNbv3mlRHHMg)](https://TODO-PM-HOST/s/ICDYrfHQ2nBNbv3mlRHHMg)
-<!-- TODO(PM): replace TODO-PM-HOST with the live host. The badge reads A's Oct 28 record
-(a-smoke-l4-main-4) and shows its first headline number with its status word. -->
+-->
 
 **A flight simulator for ML jobs.** Preflight measures a few minutes of your real training,
 evaluation, serving or agent job, builds a model of how it behaves, and lets you fly the whole
@@ -46,7 +48,7 @@ with the live link.
 | --- | --- | --- |
 | Checking in your own repo, script or notebook | `runner.queue` | Built on `main`; until it is on, the site opens samples and shared records only |
 | The guide (Muse Spark moves the knobs with tool calls) | `c.guide.live` | Smoke runs pass: GitHub run 41273350602, 5 rounds, all called tools [measured], US$0.019 [derived: reported tokens at list prices] |
-| The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; a clean smoke run (41250977670) landed a fix in 19 s [measured], US$0.09 [derived: reported tokens at standard prices] |
+| The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
 | Log triage by Muse Spark Open on Baseten | `harness.spark_open_triage` | Wired into the pipeline on `main`; not yet run for real |
 | HOPs view, fit map, exports, the CLI re-check item | `c.hops`, `c.fit_map`, `c.exports`, `d.exports_cli` | Built on `main` |
 | The add-ons (detail level, currency, free GPUs, notebook) | `d.*` (below) | Built on `main`; checked in Chromium (`docs/audit/scripts/addons.mjs`) |
@@ -55,10 +57,10 @@ with the live link.
 
 | What | Why | Source |
 | --- | --- | --- |
-| Divergence classifier | Misses on held-out runs: AUROC 0.58 against a 0.85 target, so `risk.divergence` stays off | B's held-out run, as given by Chiya on Nov 1; TODO(PM): link B's report, which isn't in the repository yet |
+| Divergence classifier | Misses on held-out runs: AUROC 0.58 [cited: Chiya, Nov 1] against a 0.85 target, so `risk.divergence` stays off | B's held-out run, as given by Chiya on Nov 1; TODO(PM): link B's report, which isn't in the repository yet |
 | AMD | No AMD measurements: the AMD Developer Cloud account is on a verification hold, so every AMD figure says "not measured" | `docs/status/b.md`, `docs/status/a.md` |
-| GBDT correction for an unmeasured GPU | Fails held out (51% within 20%, against 60% for the analytical model), so it isn't used | `docs/status/b.md` |
-| Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20%, under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |
+| GBDT correction for an unmeasured GPU | Fails held out (51% within 20%, against 60% for the analytical model [measured, corpus]), so it isn't used | `docs/status/b.md` |
+| Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20% [measured, corpus], under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |
 | RL rollout and serving models | Built, switched off in the engine until their validation rows pass | `python/preflight/engine/api.py` |
 | Claim check by Muse Spark Open | Module written, not wired in | `python/preflight/harness/claim_check.py` |
 | Muse Glimmer | Not hosted: stays deferred until its download terms and licence are confirmed in writing | `docs/decisions/glimmer-host.md` |
@@ -70,9 +72,11 @@ with the live link.
 the cockpit (samples use illustrative numbers unless they say measured, and cost nothing), or open
 a shared record's link. Checking in your own repo or script opens with `runner.queue`.
 
-**Share a flight:** post `https://TODO-PM-HOST/s/<share token>`. Link previews show a card with
-the record's headline numbers, each with its status word (Measured, Predicted, Extrapolated, Not
-trusted or Illustrative), and the link opens the flight in the cockpit. For a README badge:
+**Share a flight** (once `workers/` is in the deploy; TODO(PM)): post
+`https://TODO-PM-HOST/s/<share token>`. Link previews show the record's headline numbers, each with
+its status word (Measured, Predicted, Extrapolated, Not trusted or Illustrative), as text, or as a
+card image where the deploy turns card images on, and the link opens the flight in the cockpit.
+For a README badge:
 `[![Preflight](https://TODO-PM-HOST/badge/<share token>)](https://TODO-PM-HOST/s/<share token>)`
 (`workers/README.md`).
 
@@ -111,7 +115,7 @@ visitor explores afterwards is computed in the browser from the flight record.
 ```mermaid
 flowchart TB
 	IN["Your job: a sample, a GitHub repo link,<br/>an uploaded script or a notebook"]
-	CLI["preflight CLI on your own GPU<br/>(NVIDIA, or AMD ROCm)"]
+	CLI["preflight CLI on your own GPU<br/>(NVIDIA, or AMD ROCm)<br/>probes run on your machine"]
 	CK["Check-in desk<br/>(browser, Cloudflare Pages)"]
 	API["API and job store<br/>(Modal)"]
 	MAP["Script map<br/>(Muse Spark)"]
@@ -125,12 +129,14 @@ flowchart TB
 	FIX["Fix loop: candidate fixes raced in parallel<br/>(Muse Code, in a Modal sandbox)"]
 	TRI["Log triage<br/>(Muse Spark Open on Baseten)"]
 
-	IN --> CK --> API --> MAP --> PRB --> ENG --> REC --> COCK
+	IN --> CK
+	CK -.->|"check-in: behind a flag"| API
+	API --> MAP --> PRB --> ENG --> REC --> COCK
 	COCK -.->|"behind a flag"| EXP
-	CLI --> PRB
+	CLI -->|"writes"| REC
 	CORPUS --> ENG
 	COCK <-.->|"behind a flag"| GUIDE
-	COCK -.->|"behind a flag"| FIX -.->|"verify by re-probe"| PRB
+	COCK -.->|"behind a flag"| FIX -.->|"verify by re-probe, not wired yet"| PRB
 	PRB -.->|"behind a flag"| TRI -.-> REC
 ```
 
@@ -142,7 +148,7 @@ owns which path are in [CONTRACT.md](CONTRACT.md).
 | Tool | Where it is used | Status on `main` `a52753f` |
 | --- | --- | --- |
 | **Muse Spark** (`muse-spark-1.3`, Meta Model API) | Maps each script with structured output (`python/preflight/harness/`); runs the guide through the Responses API with tool calls on the live cockpit (`api/preflight_api/guide/`); the model behind the agent bug-zoo script (`zoo/agent_eval_spark/`) | Script map on in production (Oct 28 runs, before the flag: US$0.0178 and US$0.0200 a job [derived: reported tokens at list prices]); guide behind `c.guide.live` |
-| **Muse Code** (headless) | Fix loop: candidate fixes raced in parallel worktrees inside a sandbox, edits only; the API key reaches Muse Code on stdin only, never in its environment or files; each fix is gated on Preflight's own re-probe and verify, not on Muse Code's exit code (`api/preflight_api/fix/`) | Behind `c.fix_loop`; clean smoke run 41250977670: a fix in 19 s [measured], US$0.09 [derived: reported tokens at standard prices] |
+| **Muse Code** (headless) | Fix loop: candidate fixes raced in parallel worktrees inside a sandbox, edits only; the API key reaches Muse Code on stdin only, never in its environment or files; each fix is gated on Preflight's own re-probe and verify, not on Muse Code's exit code (`api/preflight_api/fix/`) | Behind `c.fix_loop`; in clean smoke run 41250977670 Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]; gating on the re-probe isn't wired end to end yet |
 | **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | Behind `harness.spark_open_triage`, off; not yet run for real. The claim check (`claim_check.py`) is written but not wired in |
 | **Muse Glimmer** | One of three models in the agent model sweep's price table (`python/preflight/engine/prices/`) | Not hosted (`docs/decisions/glimmer-host.md`) |
 | **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run so far (Oct 28 to Nov 1, `docs/status/a.md`); the runner is deployed for each run and stopped after; public deploy TODO(PM) |
@@ -160,9 +166,11 @@ TODO(PM): replace with the validation table's "Cost of one Preflight run" row on
 
 ## Validation
 
-Every prediction is checked against real full runs, hit or miss. The table between the markers below scores each validation target, hit or miss, and says so when
-a row has nothing to score yet. It is written by `scripts/score_validation.py --readme README.md`
-from one manifest of full runs; edit the manifest, not the table. The knob response row's timings
+Predictions are checked against real full runs, hit or miss, starting with the runs scored on
+Mon Nov 2. The table between the markers below scores each validation target and says so when a
+row has nothing to score yet. It is written by
+`scripts/score_validation.py <manifest.json> --readme README.md` from one manifest of full runs;
+edit the manifest, not the table. The knob response row's timings
 come from a stranger test run at 4x CPU slowdown (`KNOB_MS_OUT=out/knob_ms.json node
 web/e2e/stranger.mjs`), copied into the manifest's `knob_ms` list.
 

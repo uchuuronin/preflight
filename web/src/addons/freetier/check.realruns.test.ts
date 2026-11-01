@@ -32,7 +32,7 @@ describe("free-tier verdicts on A's real L4 records", () => {
 		}
 	});
 
-	it("judges memory on the record's own peak: the GNN's measured 6.0 GB fits every free GPU", () => {
+	it("judges memory on the record's own peak: the GNN's measured 5.0 GiB (4.5 to 5.6) fits every free GPU", () => {
 		const gnn = runs.find((r) => r.lens === "gnn") as Run;
 		const peak = gnn.estimates["memory.peak"] as Estimate;
 		expect(peak.status).toBe("measured");

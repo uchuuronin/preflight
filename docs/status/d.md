@@ -15,7 +15,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 	- Decision: the flags that gate nothing (most `engine.*`, `campaign.planner`, `corpus.sweep`, `probes.*`) aren't presented as switches. The README names what each really does: the engine's own switch in `engine/api.py`, and `engine.memory` gating every prediction.
 	- Decision: every dollar figure is tagged derived (tokens or time at list or standard prices), as the README already tagged its own costs.
 2. **D2 share cards** (`workers/`): `/s/<token>` (link-preview page, then on to the cockpit), `/card/<token>` (1200 x 630 PNG) and `/badge/<token>` (SVG). Every number comes from the record, with the app's status word. Checked three ways:
-	- 13 tests;
+	- 15 tests;
 	- the Workers runtime (`wrangler pages dev` with C's functions, against a mock API);
 	- four rendered cards, looked at.
 	- Decision: resvg-wasm and the fonts are vendored unmodified, so C's deploy only copies files. Basis: a Pages Function bundles from `web/`, so imports from `workers/node_modules` wouldn't resolve after the copy. The bundle is 1.1 MB gzipped [measured].
@@ -28,6 +28,16 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 	- The simulation stays, labelled simulated.
 	- A new `check.realruns.test.ts` checks D4 on those four real records: no session count without a trusted time, memory judged on the record's own peak, and abstains where it should.
 	- Asked A to fill `n_examples`. That also unblocks time and cost on those three lenses.
+
+**Independent read-only review of the batch,** and what changed from it. It checked the README's status against the code, the share-card code and its injection safety, the licence counts, every submission number against A's records, and D4's fixture. Fixed:
+- **Planted bugs presented as discoveries.** The submission copy presented the fine-tune, agent and GRPO problems as discoveries. They were planted in our own test scripts, and the copy now says so everywhere.
+- **The fix loop's 19 s.** It sat next to "lands only when the re-probe verifies it". Gating on the re-probe isn't wired end to end yet (C's status), so the README, portal and tools table now say Muse Code produced the correct patch in 19 s, and that gating isn't wired yet.
+- **The share card under-read peak memory.** It took the train steps' 14.6 GiB, not the eval pass's 20.4 GiB, on the record the badge uses. It now reads both peaks, and the OOM line names the eval pass and its batch size (`error_code` `oom.eval`).
+- **API outages.** A 502 or 503 was cached as a generic card for 2 minutes. It's now `no-store` with its real status.
+- **The CPU limit.** A card render takes about 140 ms of CPU (88 to 284 ms) [measured, Node], against the Workers Free plan's 10 ms a request (Error 1102 past it; Pages Functions are billed as Workers). So card images are off by default behind `PREFLIGHT_SHARE_CARD_IMAGES`; the share page then gives text previews and the badge still works. **Decision for Chiya:** the Workers Paid plan, from $5 a month, to turn card images on.
+- **README.** The badge is commented out until `workers/` is deployed. Check-in, the guide, exports and the fix loop's re-probe are drawn as behind a flag or not wired. The scorer command gets its manifest argument. The diagram SVG is on white, which GitHub's dark mode needs.
+- **Tags.** The AUROC is now cited (Chiya), not measured. The corpus figures are tagged, the dollar figures are tagged derived in the submission table too, and four portal numbers that had no row now have one.
+- **D4.** The GNN's peak is 5.0 GiB (4.5 to 5.6), not "6.0 GB", which was the interval's top in decimal units.
 
 Seen, not yet confirmed: A's agent re-sample (GitHub run 41301359530 on `origin/remote-runs`) stopped after 120 s with no model calls, "up to 4 may be stuck". That fits plant 3 firing. Once A logs it, the fallback cut can carry the measured stall.
 

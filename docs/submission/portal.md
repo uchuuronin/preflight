@@ -26,12 +26,12 @@ Indie Developer. Build for Your World.
 
 TODO(PM): every team member, as on the registration.
 
-## Short description (307 characters)
+## Short description (332 characters)
 
 Preflight runs a few minutes of your real training, evaluation, serving or agent job, measures
 it, and lets you fly the whole run in the browser first: memory, time, cost and risk, each with a
-range and a word for how it was made. It caught a fine-tune's out-of-memory at step 200 in 189
-seconds of probing.
+range and a word for how it was made. On a fine-tune with a planted bug, it caught the
+out-of-memory at step 200 in 189 seconds of probing.
 
 ## Full description
 
@@ -40,22 +40,25 @@ its first evaluation, a reward that never varies, an agent that re-pays its whol
 turn. You find out after the GPU hours or API dollars are spent. Students with one assigned GPU
 and labs planning a grid of runs both lose time this way.
 
-**What Preflight does.** You point it at your script. It reads the code, runs a few real steps
-in a GPU sandbox, and builds a model of how the job behaves. Then you fly the run in the browser:
+**What Preflight does.** It reads your script, runs a few real steps in a GPU sandbox, and
+builds a model of how the job behaves. Then you fly the run in the browser:
 your job drawn as a map, four readouts (memory, time, cost, risk) with ranges, and knobs that move
 everything at once. Every number says how it was made: Measured, Predicted, Extrapolated, or Not
-trusted when Preflight is too far from anything it measured to give one. You leave with a plan
-you can run: the settings, an edit script, a Slurm batch file and the command.
+trusted when Preflight is too far from anything it measured to give one. TODO(PM): at
+submission, say what the live app offers: checking in your own script needs `runner.queue`, and
+the plan to take away (settings, an edit script, a Slurm batch file, the command) needs
+`c.exports`; until those are on, the site opens samples and shared records.
 
-**What it found on real runs.**
-- A LoRA fine-tune that looks fine runs out of memory at step 200, its first evaluation (a real
-  full run on an L4). Preflight's probe caught it in 189 seconds, for $0.042 of GPU at list price:
-  the evaluation reaches 20.4 of the card's 22.06 GiB.
-- An agent evaluation on Muse Spark: across 130 tasks, $1.67 of Muse Spark calls at list price,
-  not one of 905,739 input tokens came from the cache. The prompt starts with the current time,
-  so its beginning changes on every call.
-- A GRPO run on an L4: 15 of 20 prompts had no reward spread at all, so they teach nothing, and
-  95.3% of each step went to generating rollouts.
+**What it caught in our test scripts.** We wrote one script per job type with problems planted
+on purpose, and ran them for real:
+- A LoRA fine-tune with a planted evaluation batch that is too large: the real full run on an L4
+  ran out of memory at step 200, its first evaluation. Preflight's probe caught it in 189 seconds,
+  for $0.042 of GPU at list price: the evaluation reaches 20.4 of the card's 22.06 GiB.
+- An agent evaluation on Muse Spark with planted uncached prompts (the prompt starts with the
+  current time, so its beginning changes on every call): across 130 tasks, $1.67 of Muse Spark
+  calls at list price, not one of 905,739 input tokens came from the cache.
+- A GRPO run on an L4 with a planted group setting: 15 of 20 prompts had no reward spread at all,
+  so they teach nothing, and 95.3% of each step went to generating rollouts.
 
 **How it works.** Probes run in Modal GPU sandboxes; an agent proxy counts every model call's
 tokens. A prediction engine (analytical models, learned corrections, conformal intervals and
@@ -78,17 +81,19 @@ first commit is `11a0ce9`, Oct 26, 22:25 ET.
   that moves the cockpit's knobs through tool calls (the Responses API); and it is the model inside
   the agent evaluation Preflight measured.
 - **Muse Code**, headless, is the fix loop: it races candidate fixes in parallel sandboxed
-  worktrees, edits only, and each fix lands only when Preflight's own re-probe verifies it, never
-  on Muse Code's exit code. In a clean smoke run a fix landed in 19 seconds.
-- **Muse Spark Open** on Baseten triages each probe's log (next section).
+  worktrees, edits only, and a fix is meant to land only when Preflight's own re-probe verifies
+  it, never on Muse Code's exit code. In a clean smoke run Muse Code produced the correct patch in
+  19 seconds; gating on the re-probe isn't wired end to end yet.
+- **Muse Spark Open** on Baseten is built to triage each probe's log (next section); it hasn't
+  run on a real job yet.
 
 TODO(PM): at submission, say which of these are on in the live app (the guide is behind
 `c.guide.live`, the fix loop behind `c.fix_loop`; see the README's Status section).
 
 ## Best Build on Meta Open Weight Models
 
-**Muse Spark Open (`meta-models/muse-spark-open-1026` on Baseten) triages each probe's log.**
-After a job's probes, Preflight sends Spark Open the last 3,000 characters of each probe's output
+**Muse Spark Open (`meta-models/muse-spark-open-1026` on Baseten) is built to triage each
+probe's log.** After a job's probes, Preflight sends Spark Open the last 3,000 characters of each probe's output
 with its status. Spark Open answers with structured output, at low reasoning effort: a category
 from a fixed list (out of memory, missing package, data error, NaN or divergence, timeout, script
 error, infrastructure, unclear), one plain sentence, and the log line it rests on, copied exactly.
@@ -107,8 +112,9 @@ the partner to verify real calls), or keep this paragraph as it is.
 The guide is an agent operating a real tool: Muse Spark calls the same actions a visitor has
 (set a knob, highlight a part of the map, compare, propose a fix) and walks a tour of the levers
 that matter for the visitor's goal, one move at a time, waiting for Apply, Revert or Pin. In
-smoke runs it called tools in all 5 rounds. The fix loop is the other agent: Muse Code races
-fixes, and Preflight's own re-probe picks the winner by measurement. TODO(PM): say which is live.
+smoke run it called tools in all 5 rounds. The fix loop is the other agent: Muse Code races
+fixes, and Preflight's own re-probe is to pick the winner by measurement (not wired end to end
+yet). TODO(PM): say which is live.
 
 ## Challenges
 

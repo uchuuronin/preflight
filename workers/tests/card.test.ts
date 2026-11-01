@@ -18,7 +18,7 @@ const golden = read("schema/examples/finetune.json");
 const agent = read("web/src/workspace/fixtures/agent-eval-oct31.record.json");
 const grpo = read("web/src/workspace/fixtures/grpo-l4.record.json");
 
-const ENV = { PREFLIGHT_API_ORIGIN: "https://api.example", PREFLIGHT_EDGE_SECRET: "s3cret" };
+const ENV = { PREFLIGHT_API_ORIGIN: "https://api.example", PREFLIGHT_EDGE_SECRET: "s3cret", PREFLIGHT_SHARE_CARD_IMAGES: "on" };
 const TOKEN = "test-share-token-0001";
 
 function api(record: RecordLike | null, status = 200) {
@@ -31,9 +31,10 @@ describe("headline", () => {
 	it("uses the probes' own measurements when a record has no estimates", () => {
 		const h = headline(smoke);
 		expect(h.lines.every((l) => l.status === "Measured")).toBe(true);
-		expect(h.lines[0]).toEqual({ label: "Ran out of memory while probing", value: "batch size 4, seq len 1024", status: "Measured" });
-		const peak = Math.max(...(smoke.probes ?? []).map((p) => p.memory?.peak_allocated_bytes ?? 0));
-		expect(h.lines[1]?.value).toBe(`${(peak / 1024 ** 3).toFixed(1)} of 22.1 GiB`);
+		// The eval OOM: the line says where, at the eval batch size, and the peak is the eval pass's
+		// own (21,902,642,688 bytes), not the train steps' 14.6 GiB.
+		expect(h.lines[0]).toEqual({ label: "Ran out of memory in the evaluation pass", value: "eval batch size 32", status: "Measured" });
+		expect(h.lines[1]?.value).toBe("20.4 of 22.06 GiB");
 		expect(h.lines[2]?.label).toBe("Step time at batch size 4, seq len 1024");
 		expect(h.subtitle).toMatch(/^L4/);
 		expect(h.illustrative).toBe(false);
@@ -86,6 +87,8 @@ describe("headline", () => {
 
 	it("formats units the way the card shows them", () => {
 		expect(duration(1.68)).toBe("1.68 s");
+		expect(duration(0.041)).toBe("41 ms");
+		expect(duration(0.0042)).toBe("4.2 ms");
 		expect(duration(405)).toBe("7 min");
 		expect(duration(4399.6)).toBe("1 h 13 min");
 		expect(formatValue(0.9777, "usd")).toBe("US$0.98");
@@ -129,6 +132,14 @@ describe("routes", () => {
 		expect(new Headers(init?.headers).get("X-Preflight-Client-IP")).toBe("203.0.113.7");
 	});
 
+	it("points previews at the card only when the deploy turns card images on", async () => {
+		const off = { PREFLIGHT_API_ORIGIN: "https://api.example", PREFLIGHT_EDGE_SECRET: "s3cret" };
+		const html = await (await sharePage(req(`/s/${TOKEN}`), off, TOKEN, api(smoke))).text();
+		expect(html).not.toContain("og:image");
+		expect(html).toContain('<meta name="twitter:card" content="summary">');
+		expect(html).toContain("(measured)");
+	});
+
 	it("says so when no record matches, with no image tag", async () => {
 		const res = await sharePage(req(`/s/${TOKEN}`), ENV, TOKEN, api(null, 404));
 		expect(res.status).toBe(404);
@@ -143,8 +154,19 @@ describe("routes", () => {
 		expect((await badge(req("/badge/x"), ENV, "../../etc", f)).status).toBe(404);
 		expect(f).not.toHaveBeenCalled();
 		const res = await sharePage(req(`/s/${TOKEN}`), {}, TOKEN, f);
-		expect(res.status).toBe(200);
-		expect(await res.text()).toContain("Open this flight in Preflight");
+		expect(res.status).toBe(503);
+		expect(res.headers.get("cache-control")).toBe("no-store");
+		const html = await res.text();
+		expect(html).toContain("Open this flight in Preflight");
+		expect(html).not.toContain("og:image");
+	});
+
+	it("never caches an API outage, so link previews don't keep a generic card", async () => {
+		for (const status of [500, 502, 503]) {
+			const res = await badge(req(`/badge/${TOKEN}`), ENV, TOKEN, api(null, status));
+			expect(res.status).toBe(502);
+			expect(res.headers.get("cache-control")).toBe("no-store");
+		}
 	});
 
 	it("keeps responses for two minutes only, since a running job revises its record", async () => {

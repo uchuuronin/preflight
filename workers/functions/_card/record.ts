@@ -8,6 +8,12 @@ import type { RecordLike } from "./headline";
 export interface CardEnv {
 	PREFLIGHT_API_ORIGIN?: string;
 	PREFLIGHT_EDGE_SECRET?: string;
+	/**
+	 * "on" lets the share page point link previews at /card/<token>. Off by default: a card takes
+	 * about 140 ms of CPU to render [measured, Node, Nov 1], over the Workers Free plan's 10 ms per
+	 * request, so it needs the Workers Paid plan (Chiya's call). Off, previews show text only.
+	 */
+	PREFLIGHT_SHARE_CARD_IMAGES?: string;
 }
 
 /** Share tokens are URL-safe base64 (22 characters today); anything else is refused before a fetch. */
