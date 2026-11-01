@@ -1,0 +1,11 @@
+{
+	"name": "20261101-122223-41306167071-b-divergence-export-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41306167071",
+	"ref": "ws-b",
+	"sha": "f42a30ab9f56847a3b1de54b581f6426bb976fe9",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::export --kind divergence",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T12:23:44Z"
+}
