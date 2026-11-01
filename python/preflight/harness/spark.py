@@ -34,6 +34,7 @@ PRICES: dict[str, tuple[float, float, float]] = {
 	"meta-models/muse-spark-open-1026": (1.25, 0.15, 4.25),
 }
 T = TypeVar("T", bound=BaseModel)
+GLIMMER_USD_PER_S = 2.10 / 3600  # A100-40GB at Modal's list rate (engine/gpus.py, 2026-07)
 # Retry only where a repeat can't double-bill: rate limits and gateway errors before generation.
 RETRY_STATUS = {429, 500, 502, 503, 504}
 # Transport errors before the request reached the provider. Read and write timeouts are not here:
@@ -125,6 +126,10 @@ class ModelClient:
 		prices: dict[str, tuple[float, float, float]] | None = None,
 		visitor_data: bool = True,
 		transport: httpx.BaseTransport | None = None,
+		headers: dict[str, str] | None = None,
+		extra_body: dict | None = None,
+		usd_per_second: float | None = None,
+		send_reasoning_effort: bool = True,
 	):
 		if visitor_data and model.endswith("-contributor"):
 			raise ModelRefused(f"{model} lets the provider train on prompts; visitor code never goes to it")
@@ -138,13 +143,16 @@ class ModelClient:
 		self.max_input_tokens = max_input_tokens
 		self.max_output_tokens = max_output_tokens
 		self.prices = PRICES if prices is None else prices
+		self.extra_body = dict(extra_body or {})
+		self.usd_per_second = usd_per_second
+		self.send_reasoning_effort = send_reasoning_effort
 		self.calls: list[ModelCall] = []
 		self._deadline: float | None = None  # set by structured() so the re-ask shares one budget
 		key = api_key if api_key is not None else os.environ.get("MODEL_API_KEY", "")
 		self._http = httpx.Client(
 			base_url=base_url.rstrip("/"),
 			timeout=httpx.Timeout(timeout_s, connect=10.0),
-			headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
+			headers={"authorization": f"Bearer {key}", "content-type": "application/json", **(headers or {})},
 			transport=transport,
 		)
 
@@ -163,6 +171,38 @@ class ModelClient:
 	@staticmethod
 	def meta_configured() -> bool:
 		return bool(os.environ.get("META_API_KEY") or os.environ.get("MODEL_API_KEY"))
+
+	@classmethod
+	def glimmer(cls, **kw) -> "ModelClient":
+		"""Muse Glimmer on Preflight's own Modal host (B's preflight-glimmer app, vLLM's OpenAI server)
+		for private mode: Modal proxy auth from the preflight-glimmer secret, low reasoning strength
+		through the chat template, and at least 1,500 output tokens (a tight cap returns empty
+		content, B, Nov 1). Priced by its GPU time, not tokens: the call's wall time at the A100-40GB
+		list rate [derived; B's measured cost per triage replaces it]."""
+		base = os.environ.get("GLIMMER_BASE_URL", "").rstrip("/")
+		return cls(
+			base_url=base if base.endswith("/v1") else base + "/v1",
+			api_key="glimmer",  # the proxy headers authenticate; vLLM takes any key
+			model=os.environ.get("GLIMMER_MODEL", "muse-glimmer"),
+			provider="modal-glimmer",
+			timeout_s=180.0,  # scaled to zero: the first call waits for the container
+			max_output_tokens=2_000,
+			headers={
+				"Modal-Key": os.environ.get("GLIMMER_MODAL_KEY", ""),
+				"Modal-Secret": os.environ.get("GLIMMER_MODAL_SECRET", ""),
+			},
+			extra_body={"chat_template_kwargs": {"reasoning_strength": "low"}},
+			usd_per_second=GLIMMER_USD_PER_S,
+			send_reasoning_effort=False,
+			**kw,
+		)
+
+	@staticmethod
+	def glimmer_configured() -> bool:
+		env = os.environ
+		return bool(
+			env.get("GLIMMER_BASE_URL") and env.get("GLIMMER_MODAL_KEY") and env.get("GLIMMER_MODAL_SECRET")
+		)
 
 	@classmethod
 	def baseten_spark_open(cls, **kw) -> "ModelClient":
@@ -222,6 +262,8 @@ class ModelClient:
 		cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0))
 		p_in, p_cached, p_out = self.prices.get(self.model, (0.0, 0.0, 0.0))
 		cost = ((inp - cached) * p_in + cached * p_cached + out * p_out) / 1e6
+		if self.usd_per_second is not None:  # self-hosted: what the call held the GPU for
+			cost = (time.monotonic() - started) * self.usd_per_second
 		call = ModelCall(
 			provider=self.provider,
 			model=self.model,
@@ -257,12 +299,13 @@ class ModelClient:
 				f"prompt is about {estimate_tokens(messages)} tokens; cap is {self.max_input_tokens}"
 			)
 		body = {
+			**self.extra_body,
 			"model": self.model,
 			"messages": messages,
 			"max_completion_tokens": self.max_output_tokens,
 			**extra,
 		}
-		if reasoning_effort:
+		if reasoning_effort and self.send_reasoning_effort:
 			body["reasoning_effort"] = reasoning_effort
 		deadline = self._deadline if self._deadline is not None else time.monotonic() + self.deadline_s
 		started = time.monotonic()
