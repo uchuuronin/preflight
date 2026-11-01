@@ -355,3 +355,11 @@ def test_a_json_object_wrapped_in_reasoning_or_a_fence_is_still_read_and_still_v
 	for bad in ("no json at all", '{"other": 1}', ""):
 		with pytest.raises((ValueError, ValidationError)):
 			_validate(T, bad)
+
+
+def test_the_triage_prompt_spells_out_the_answers_shape_for_a_model_without_guided_decoding():
+	from typing import get_args
+
+	from preflight.harness.triage import ANSWER, Category
+
+	assert all(f'"{c}"' in ANSWER for c in get_args(Category)) and '"evidence_line"' in ANSWER
