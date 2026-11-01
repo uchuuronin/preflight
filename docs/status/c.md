@@ -1,5 +1,15 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Sun Nov 1, early
+
+- Pushed `c28d664..80d4217` (Chiya's yes). The push changed the guide's prompt and tools, so guide-smoke ran on its own (run 41273350602): 5 rounds, US$0.019, all called tools, p50 4.9 s.
+- Limits kept on the server per session; the fix route reads only that copy (`1bf39ee`), tested with the limits stripped.
+- Plain-words reader live check ready (`9e8164c`, api/limits_check_app.py, 10 phrases); waits on a push to run.
+- Data-use line on `harness.spark_script_map` (`b17b600`); shared-flag test passes once merged with A's f50999d.
+- Moves wait for the saved limits before animating; the guide's unpin only asks (`d322d0a`).
+- D's audit 12 (model tags only where the model ran, `adf1876`) and 7 to 11 (`98853d4`): D's sweep shows colour contrast 0 (was 16), target size 0, no focus without a ring.
+- Agent tour re-walked in Chromium with a limit set (Don't change the model): finding step, then Concurrency 4 to 32 on the time aim; no errors, no overflow. GRPO waits on A's rerun; pretrain has no real record yet.
+
 ## Sat Oct 31, night
 
 - Guide limits (`4e555dc`, Chiya's gap from local testing): "Not this", "Keep <value>" beside "Pin <value>", Your limits (allowed GPUs, budget, must-finish-within, GPU-hours, don't change, ruled out; plain words read by Muse Spark into chips to confirm), hard limits in both tours and refused server-side, and the visitor's own move always wins. The live words reader makes one Muse Spark call per use (about US$0.003); not run live yet.
