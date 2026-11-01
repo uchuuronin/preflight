@@ -8,6 +8,104 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 16:05 (the corpus on Hugging Face, linked)
+
+`ca58c59` CI green.
+
+- **The corpus** (Chiya, 15:57): https://huggingface.co/datasets/chaoschia/preflight-corpus, commit
+  `0aac218`, files `README.md`, `SHA256SUMS`, `preflight-corpus-0.3.0.jsonl.gz`; private until it
+  goes public with the repository on Nov 3 to 4. Linked under "The corpus published with a
+  datasheet": a new section in `readme-final.md` (before Validation), a paragraph and a link in
+  `portal.md`, and a row in the submission's numbers table. The counts (2,339 rows: 1,519 kernel
+  configs, 100 HF jobs, 720 divergence runs) and the licence (Apache 2.0) come from B's datasheet;
+  I can't open the private dataset from here, so the drafts don't restate its checksum.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): those three files and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, 15:50 (check-in: A's first triage run; Glimmer deployed, no cost per call yet)
+
+`a15a173` CI green (all six jobs). `main` is still `6757667`; nothing to merge.
+
+- **A's production triage run** (`a-triage-lora-prod`, share `jgk05gwUgV-Bo78sErzKFQ`, A's status on
+  `ws-a`): L4, the planted eval OOM caught (530 MiB asked, 486 MiB free of 22.06 GiB [measured,
+  A]). Not filmable yet: the eval probe's triage said "unclear" and quoted no line (A's fix
+  `b300684` is live at A's next deploy), and the shot needs a quoted line. Its finding sits on node
+  `eval`; checked in Chromium (desk and phone) with such a finding added to a copy of the Oct 28
+  record, it shows in the Eval loop node's detail sheet, below the rule checks' findings, the
+  quoted line inline. The storyboards now film it there.
+  Asked A (`from-d.md`) to re-run after the deploy and commit a copy of the record. Noted in both
+  storyboards' dependency rows.
+- **The one-record version:** A's record meets Chiya's condition (L4, the same eval OOM), so I'll
+  offer it, but every spoken number has to come from the record, and the record isn't in the repo
+  or reachable from my workspace. I'll draft it once A commits the copy (better from the re-run).
+- **Glimmer:** B deployed the endpoint (`b-glimmer-deploy`, scaled to zero, proxy auth), with smoke
+  latencies, but no measured cost per call from it yet, so the README and submission wording waits.
+- Also: re-wrapped `vendor.mjs`'s header comment, which my last edit had run together, and added
+  that CI and the deploy don't need to run it (as told to C).
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the storyboard notes, the request to A, the comment wrap and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, 15:25 (card fonts committed)
+
+`749edd4` CI green (all six jobs). The kit is with Chiya; she sends me the sheet and form after the
+session to rank.
+
+- **My bug, caught by C:** the card's four fonts were never in the repo. The root `.gitignore`'s
+  `*.bin` kept them out, so a clean checkout couldn't run the card tests, and D2's deploy copy
+  would have shipped a bundle importing missing fonts. Chiya: commit them only if the licence
+  allows redistribution. It does: the OFL 1.1 allows bundling with software when each copy carries
+  the copyright notice and licence (both in the `OFL-*.txt` files beside them) and the fonts
+  aren't sold alone; none declares a Reserved Font Name. The files are byte-identical to the
+  packages' `.ttf` [checked with `cmp`]. Force-added; basis in `docs/licences.md`.
+- `vendor.mjs` takes the MPL-2.0 text from `workers/node_modules/lightningcss` (the same file as
+  web's), so it no longer needs web's packages. Re-running it on a clean copy changes nothing.
+- **Checked on a clean copy of the repo** (`git checkout-index`, `npm ci`, no vendor step): 18 of 18
+  tests, typecheck clean, hero card up to date [measured]. Told C to drop `npm run vendor` from the
+  CI job and the deploy step.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the four fonts, `vendor.mjs`, the licence note, the workers README line, the reply to C.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, 14:10 (README: check-in and the guide on in production; builder kit ready)
+
+`f7e4306` CI green (all six jobs). `main` is `6757667`, which already holds `ws-d`; nothing to merge.
+
+- **Found: the demo limits aren't in the deployed runner.** They're on `main` (`9a2bb82`,
+  `5a78a60`), but A's last logged runner deploy (`a-deploy-main-18`, from `8154268`, 13:04 ET)
+  predates them, so with `runner.queue` on, a visitor isn't limited yet. The README row has a
+  TODO(PM) to keep the limits sentence only once A redeploys; the kit tells the observer to check.
+- **README draft** (`readme-final.md`, for the PM's 8 PM swap): `runner.queue` (check-in) and
+  `c.guide.live` (the guide) move to "On in production" (Chiya, Nov 1; both true in
+  `flags.production.json`). The check-in row carries the demo limits: 3 probe jobs per visitor per
+  day and the site's daily GPU spend cap, $10 a day through Nov 4 and $30 from Nov 5 (cited:
+  `runner/queue.py`); past either, samples only until midnight ET. The guide row keeps its smoke
+  run and gains its spend limits from `api/preflight_api/ledger.py` ($0.40 a tour, derived; $10 a
+  day, the code's value pending Chiya's answer), and says the rule-based tour starts if the live
+  guide fails before answering (`GuidePanel.tsx`). The Notebook tab is off in production, so the
+  rows say repo or script. "Try it" and the
+  diagram no longer say check-in is behind a flag.
+- **Builder kit** (`docs/builders/`), ready for Chiya to hand over tonight: the live link in the
+  brief; the brief's data-use summary now follows the desk's notice as the local production build shows
+  it (Spark Open reads the last 3,000 characters of each probe's log, the live guide, uploads kept); a "limits on the public site" note so a limit refusal isn't
+  read as the builder's fault; the Notebook tab is off in production, so notebooks go in as a `.py`
+  upload. Checked on a local build with `--mode production`: home, New flight, two tabs (Repo link,
+  Upload), the three goals, "Got it", the samples. The live site can't be reached from my
+  workspace, so Chiya opens it once before the session. The sheet gains "opened the guide?". The
+  results come back to me to rank as onboarding fixes.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the README draft's status rows and the builder kit.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 12:55 (round five merged; finding 12 fixed; triage finding visible; worker tests fixed)
 
 **CI rule (Chiya, 12:43):** after every push to `ws-d`, check its CI run; a red run is fixed

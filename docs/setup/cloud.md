@@ -11,7 +11,7 @@ appear in a chat, a commit or a flight record.
 | Baseten | Muse Spark Open (triage, labelling) | GitHub secret `BASETEN_API_KEY`, copied into Modal secret `preflight-baseten` | $100 credits |
 | Meta Model API | Muse Spark (script map, guide), Muse Code, Muse Glimmer | GitHub secrets `META_API_KEY`, `META_API_BASE`, copied into Modal secret `preflight-meta` | $150 credits |
 | The API's own keys | Signing session cookies; proving traffic came through the Cloudflare site | GitHub secrets `PREFLIGHT_SESSION_KEYS`, `PREFLIGHT_EDGE_SECRET`, copied into Modal secret `preflight-api` | none |
-| AMD Developer Cloud | ROCm probes, the AMD corpus slice, the AMD holdout | GitHub secrets `AMD_SSH_KEY`, optional `DO_API_TOKEN` | $40, about 15 MI300X-hours at $2.59 |
+| AMD Developer Cloud | ROCm probes, the AMD corpus slice, the AMD holdout | GitHub secrets `AMD_SSH_KEY`, optional `DO_API_TOKEN` | $40, about 20 MI300X-hours at $1.99 (the droplet page, Nov 1) |
 
 Probe containers never mount `preflight-meta` or `preflight-baseten` (gap 6). Only the API and the
 pipeline's own functions do.

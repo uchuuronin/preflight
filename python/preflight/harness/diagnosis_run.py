@@ -10,7 +10,9 @@ from preflight.harness.diagnosis_check import check_diagnosis
 from preflight.harness.spark import IMAGE_TOKENS
 from preflight.schema import FlightRecord
 
-DIAGNOSIS_OUTPUT_TOKENS = 4_000  # the diagnosis call's output cap here: eight findings fit in far less
+DIAGNOSIS_OUTPUT_TOKENS = (
+	8_192  # the diagnosis call's output cap, reasoning tokens included (4,000 cut both Nov 1 calls off)
+)
 MARGIN = 1.5  # [guess] characters per token is an estimate, not a ceiling
 REASK_EXTRA_TOKENS = (
 	1_500  # the re-ask carries up to 4,000 characters of the first answer and a 2,000-character error

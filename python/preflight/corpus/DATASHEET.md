@@ -2,7 +2,7 @@
 
 Following *Datasheets for Datasets* (Gebru et al.). Version: corpus@0.3.0, exported Oct 31, 2026 (`remote-runs` folders `b-corpus-export-3` and `b-corpus-export-hf-2`), with the divergence runs of Nov 1 (`b-divergence-export-2`). Owner: workstream B.
 
-**Published file** (gap 16): `preflight-corpus-0.3.0.jsonl.gz`, 2,339 rows (1,519 kernels, 100 HF jobs, 720 divergence runs), 18,462,637 bytes, sha256 `b7cf58d13c291759b8ef23004d87ae0f6b6e42290a7a7e71c998f805a04feb20`, built by `python scripts/export_corpus.py` (the same rows give the same bytes). It ships with `SHA256SUMS` and a dataset card (`README.md`) for a Hugging Face dataset or a release asset.
+**Published file** (gap 16): `preflight-corpus-0.3.0.jsonl.gz`, 2,339 rows (1,519 kernels, 100 HF jobs, 720 divergence runs), 18,462,637 bytes, sha256 `b7cf58d13c291759b8ef23004d87ae0f6b6e42290a7a7e71c998f805a04feb20`, built by `python scripts/export_corpus.py` (the same rows give the same bytes). It ships with `SHA256SUMS` and a dataset card (`README.md`). **Published on Hugging Face:** [huggingface.co/datasets/chaoschia/preflight-corpus](https://huggingface.co/datasets/chaoschia/preflight-corpus) (all three files, commit `0aac218`). It is private until the repository goes public on Nov 3 to 4.
 
 ## Motivation
 
@@ -63,11 +63,11 @@ The HF jobs are 10 groups of five on real Hugging Face checkpoints, LoRA in bf16
 
 | Task | Compared | Agree | Rate (Wilson 95%) | Where they differ |
 | --- | --- | --- | --- | --- |
-| Diverged runs | 41 | 41 | 100% (91% to 100%) | nowhere; 35 non-finite and 6 blow-ups, which the numbers show plainly (a non-finite step is in the evidence) |
-| Out-of-memory rows | 17 | 11 | 65% (41% to 83%) | the rule says logits for 7 rows, Spark Open activations for 3 of them; the rule says model state for 2, Spark Open activations; the rule says activations for 8, Spark Open "other" for 1 |
-| All | 58 | 52 | 90% (79% to 95%) | the diverged runs carry most of this; the out-of-memory rows, 65%, are the real test |
+| Out-of-memory rows | 21 | 15 | 71% (50% to 86%) | the rule says logits for 9 rows, Spark Open activations for 3 of them; the rule says model state for 2, Spark Open activations; the rule says activations for 10, Spark Open "other" for 1. This is the real test |
+| Diverged runs | 44 | 44 | 100% (92% to 100%) | nowhere; 37 non-finite and 7 blow-ups, which the numbers show plainly (a non-finite step is in the evidence) |
+| All | 65 | 59 | 91% (81% to 96%) | the diverged runs carry most of this |
 
-7 out-of-memory rows have no rule label (5 CNN rows have no analytical model, and 2 HF rows didn't record their model shape when they failed), and 9 rows got no answer; one row is both, so 15 of the 73 aren't compared. Of the 16 failed calls, 8 ran into the 8,192-token output cap (an answer that never closed its JSON: $0.28, about half the spend), 6 timed out at 20 s, and 2 re-asks were cut off when the row's 30 s ran out. 80 calls, 37,471 input and 115,463 output tokens, $0.54 of the $1 approved. Every call, failed or not, is in `corpus/provenance/spark_open_labels_nov1.jsonl` with its tokens and cost; the report is `corpus/reports/spark_labels_nov1.json`. A timed-out call is logged at $0, though Baseten may have billed it.
+Two passes (Chiya, Nov 1). The first answered 64 of 73 rows: of its 16 failed calls, 8 ran into the 8,192-token output cap (an answer that never closed its JSON), 6 timed out at 20 s, and 2 re-asks were cut off when the row's 30 s ran out. The second asked only those 9 rows again with a 16,384-token cap and 90 s, and answered 8; one row ran past the cap on both tries and stays unanswered. 7 out-of-memory rows have no rule label (5 CNN rows have no analytical model, and 2 HF rows didn't record their model shape when they failed), so 65 of the 73 rows are compared. 90 calls in all, 42,454 input and 153,953 output tokens, $0.70 ($0.538 for the first pass and $0.167 for the second, under its $0.50). Every call, failed or not, is in `corpus/provenance/spark_open_labels_nov1.jsonl` with its tokens and cost; each row's label and reason are in `corpus/reports/spark_labels_nov1_rows.jsonl` and the agreement in `corpus/reports/spark_labels_nov1.json`. A timed-out call is logged at $0, though Baseten may have billed it.
 
 **Personal or sensitive data.** None.
 

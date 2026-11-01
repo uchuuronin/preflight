@@ -109,6 +109,37 @@ def estimate_tokens(messages: list[dict]) -> int:
 	return sum(c for c, _ in parts) // 4 + IMAGE_TOKENS * sum(n for _, n in parts) + 8 * len(messages)
 
 
+def _why(exc: Exception) -> str:
+	"""A failed call's reason for a log, without the endpoint's URL (a self-hosted base URL is ours)."""
+	if isinstance(exc, httpx.HTTPStatusError):
+		return f"HTTP {exc.response.status_code}: {_no_urls(exc.response.text)[:300]!r}"
+	return f"{type(exc).__name__}: " + _no_urls(str(exc))[:300]
+
+
+def _no_urls(text: str) -> str:
+	import re
+
+	return re.sub(r"https?://\S+", "<url>", text or "")
+
+
+def _validate(schema, content: str):
+	"""The schema from the reply: as it is, else the JSON object inside it. A model may put its
+	reasoning, a <think> block or a code fence around the object (Glimmer's first answers, Nov 1);
+	what's taken is still validated against the schema in full."""
+	import re
+
+	try:
+		return schema.model_validate_json(content)
+	except (ValidationError, ValueError):
+		text = (content or "").rsplit("</think>", 1)[-1]  # the answer follows the reasoning, opened or not
+		fenced = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S)
+		# the last fence: a model's own answer comes after anything it quoted (review, Nov 1)
+		body = fenced[-1] if fenced else text[text.find("{") : text.rfind("}") + 1]
+		if not body or body == content:
+			raise
+		return schema.model_validate_json(body)
+
+
 class ModelClient:
 	def __init__(
 		self,
@@ -130,6 +161,7 @@ class ModelClient:
 		extra_body: dict | None = None,
 		usd_per_second: float | None = None,
 		send_reasoning_effort: bool = True,
+		follow_redirects: int = 0,
 	):
 		if visitor_data and model.endswith("-contributor"):
 			raise ModelRefused(f"{model} lets the provider train on prompts; visitor code never goes to it")
@@ -147,14 +179,35 @@ class ModelClient:
 		self.usd_per_second = usd_per_second
 		self.send_reasoning_effort = send_reasoning_effort
 		self.calls: list[ModelCall] = []
+		self.last_error: str | None = None  # why the last failed call failed, for an ops run's report
 		self._deadline: float | None = None  # set by structured() so the re-ask shares one budget
 		key = api_key if api_key is not None else os.environ.get("MODEL_API_KEY", "")
+		home = httpx.URL(base_url)
+		origin = (home.scheme, home.host, home.port)
+		hop_deadline: list[float] = []  # set per POST by _post: a redirect chain shares the call's deadline
+
+		def same_host(request: httpx.Request) -> None:
+			# a redirect keeps our custom headers (Modal-Key, Modal-Secret): never to another origin,
+			# nor to plain http on this one
+			if (request.url.scheme, request.url.host, request.url.port) != origin:
+				raise httpx.UnsupportedProtocol(f"refused a redirect off {home.host}")
+			if hop_deadline and time.monotonic() >= hop_deadline[0]:
+				raise httpx.ReadTimeout(
+					"the call's deadline passed while following redirects", request=request
+				)
+
+		# follow_redirects: how many to follow (0: none). A Modal web endpoint answers a request
+		# that runs past 150 s with a 303 to poll for its result (Glimmer's cold start, Nov 1)
 		self._http = httpx.Client(
 			base_url=base_url.rstrip("/"),
 			timeout=httpx.Timeout(timeout_s, connect=10.0),
 			headers={"authorization": f"Bearer {key}", "content-type": "application/json", **(headers or {})},
 			transport=transport,
+			follow_redirects=follow_redirects > 0,
+			max_redirects=max(follow_redirects, 1),
+			event_hooks={"request": [same_host]},
 		)
+		self._hop_deadline = hop_deadline
 
 	@classmethod
 	def meta(cls, **kw) -> "ModelClient":
@@ -185,7 +238,7 @@ class ModelClient:
 			api_key="glimmer",  # the proxy headers authenticate; vLLM takes any key
 			model=os.environ.get("GLIMMER_MODEL", "muse-glimmer"),
 			provider="modal-glimmer",
-			timeout_s=180.0,  # scaled to zero: the first call waits for the container
+			timeout_s=330.0,  # scaled to zero: the first call waits for the container (B measured a 286 s cold start, Nov 1)
 			max_output_tokens=2_000,
 			headers={
 				"Modal-Key": os.environ.get("GLIMMER_MODAL_KEY", ""),
@@ -194,6 +247,7 @@ class ModelClient:
 			extra_body={"chat_template_kwargs": {"reasoning_strength": "low"}},
 			usd_per_second=GLIMMER_USD_PER_S,
 			send_reasoning_effort=False,
+			follow_redirects=3,  # Modal's 303 after each 150 s: 3 more waits cover the cold start
 			**kw,
 		)
 
@@ -225,6 +279,7 @@ class ModelClient:
 			if remaining <= 0:
 				raise TimeoutError(f"{purpose}: no time left in the {self.deadline_s:.0f} s budget")
 			started = time.monotonic()
+			self._hop_deadline[:] = [deadline]
 			try:
 				resp = self._http.post("/chat/completions", json=body, timeout=min(self.timeout_s, remaining))
 			except RETRY_TRANSPORT:
@@ -232,7 +287,10 @@ class ModelClient:
 				if attempt >= self.retries:
 					raise
 				wait = None
-			except httpx.TransportError:
+			except (
+				httpx.TransportError,
+				httpx.TooManyRedirects,
+			):  # redirects: a RequestError, not a TransportError
 				self._record(purpose, None, started, False, None)
 				raise
 			else:
@@ -309,9 +367,27 @@ class ModelClient:
 			body["reasoning_effort"] = reasoning_effort
 		deadline = self._deadline if self._deadline is not None else time.monotonic() + self.deadline_s
 		started = time.monotonic()
-		resp = self._post(body, purpose, deadline)
-		data = resp.json()
-		message = data["choices"][0]["message"]
+		try:
+			resp = self._post(body, purpose, deadline)
+		except Exception as exc:
+			self.last_error = _why(exc)
+			raise
+		data = None
+		try:
+			data = resp.json()
+			message = data["choices"][0]["message"]
+		except (ValueError, KeyError, IndexError, TypeError) as exc:
+			# a 200 that isn't a completion (a proxy's page, an error object): still a call, in
+			# provenance and priced (Glimmer's first call on Nov 1 left none), and its reason kept
+			self._record(
+				purpose,
+				data if isinstance(data, dict) else None,
+				started,
+				False,
+				resp.headers.get("x-request-id"),
+			)
+			self.last_error = f"HTTP {resp.status_code} without a completion ({type(exc).__name__}): {_no_urls(resp.text)[:300]!r}"
+			raise ValueError(self.last_error) from exc
 		call = self._record(purpose, data, started, True, resp.headers.get("x-request-id") or data.get("id"))
 		return message, call
 
@@ -335,11 +411,17 @@ class ModelClient:
 				msgs, purpose=purpose, reasoning_effort=reasoning_effort, response_format=fmt
 			)
 			try:
-				return schema.model_validate_json(content), call
+				out = _validate(schema, content)
+				self.last_error = None  # a re-ask that worked leaves no error behind
+				return out, call
 			except (ValidationError, ValueError) as exc:
 				err = str(exc)[:2000]
+				self.last_error = f"{schema.__name__} didn't validate: {_no_urls(err)[:300]}"
 				self.calls[-1] = call.model_copy(update={"ok": False})
 				if attempt == 1:
+					self.last_error = (
+						f"{schema.__name__} output did not validate after a re-ask: {_no_urls(err)[:300]}"
+					)
 					raise ValueError(
 						f"{schema.__name__} output did not validate after a re-ask: {err}"
 					) from exc

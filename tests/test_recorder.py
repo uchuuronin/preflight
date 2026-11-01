@@ -11,6 +11,7 @@ from preflight.probes.local import ProbeSpec, run_probe
 from preflight.recorder.runtime import PHASE_STEPS
 
 FIX = Path(__file__).resolve().parent / "fixtures"
+ROOT = Path(__file__).resolve().parents[1]
 # scripts that import transformers; CI's torch job installs it with accelerate
 needs_transformers = pytest.mark.skipif(
 	importlib.util.find_spec("transformers") is None, reason="transformers not installed"
@@ -428,6 +429,28 @@ def test_a_ground_truth_probe_becomes_a_record_with_its_measured_zero_spread():
 	assert bool(z) == (share > 0.5) and (not z or "95% interval" in z[0].detail)
 
 
+def test_a_ground_truth_record_names_the_gpu_it_ran_on():
+	# B, Nov 1: the A10 GRPO record had no env and the gpu_type knob at its L4 default, so the
+	# engine read it as an L4 with a guessed CUDA context
+	from preflight.runner.gt_record import _env, with_env
+	from preflight.schema import load_record
+
+	rec = load_record((ROOT / "zoo/grpo_trl/record_nov1_a10.json").read_text())
+	knob = rec.knob("gpu_type")
+	bare = rec.model_copy(update={"env": None, "knobs": [knob.model_copy(update={"current": "L4"}) if k.id == "gpu_type" else k for k in rec.knobs]})  # fmt: skip
+	out = with_env(bare, _env({"gpu": "A10", "backend": "cuda"}, rec.probes[0]))
+	assert out.env.gpu.name == "A10" and out.env.backend == "cuda" and out.knob("gpu_type").current == "A10"
+	# the recorder's own env wins when the ground truth carries it (runs since Nov 1)
+	env = {"backend": "rocm", "provider": "amd_devcloud", "gpu": {"name": "MI300X", "vendor": "amd"}}
+	out = with_env(bare, _env({"gpu": "A10", "backend": "cuda", "recorder": {"env": env}}, rec.probes[0]))
+	assert out.env.gpu.name == "MI300X" and out.knob("gpu_type").current == "MI300X"
+	assert "MI300X" in out.knob("gpu_type").domain.values
+	assert with_env(bare, _env({}, rec.probes[0])).env is None  # nothing named: nothing guessed
+	assert _env({"gpu": "MI300X", "backend": "rocm"}, rec.probes[0]).provider == "amd_devcloud"
+	# the committed record carries both
+	assert rec.env.gpu.name == "A10" and knob.current == "A10"
+
+
 def test_a_serving_probe_keeps_the_first_prompts_whole_and_the_rest_of_the_call_as_is():
 	# the serving smoke timed out on a 1,024 x 4,096-token burst (Nov 1): a probe measures a sample
 	from preflight.recorder.runtime import _sample_prompts
@@ -460,3 +483,28 @@ def test_grpo_entropy_is_the_policys_mean_negative_log_prob_over_completion_toke
 	step, t = r._entropy_mc[0]
 	want = -sum(torch.log(torch.tensor(p)) for p in (0.5, 0.25, 0.1, 0.2, 0.3)) / 5
 	assert step == 0 and abs(float(t) - float(want)) < 1e-6
+
+
+def test_an_eval_probe_counts_outer_generate_calls_and_stops_as_the_next_one_starts():
+	# review, Nov 1: assisted decoding nests generate; only the outermost calls count
+	import types
+
+	import torch
+
+	from preflight.recorder.runtime import Recorder, StopProbe
+
+	rec = Recorder(generate_calls=2)
+
+	class GenerationMixin:
+		def generate(self, input_ids=None, nested=False, **kw):
+			if nested:
+				self.generate(input_ids=input_ids)
+			return torch.cat([input_ids, torch.ones(input_ids.shape[0], 4, dtype=torch.long)], 1)
+
+	rec._hook_hf_generate(types.SimpleNamespace(GenerationMixin=GenerationMixin))
+	m, x = GenerationMixin(), torch.zeros(2, 3, dtype=torch.long)
+	m.generate(input_ids=x, nested=True)
+	m.generate(input_ids=x, nested=True)
+	assert rec._gen_calls_done == 2
+	with pytest.raises(StopProbe):
+		m.generate(input_ids=x)

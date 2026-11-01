@@ -105,7 +105,14 @@ GPU_RATES: tuple[GpuRate, ...] = (
 		"or PCIe, and single-GPU specs are the same)",
 		preemptible=True,
 	),
-	GpuRate("MI300X", "amd_devcloud", 2.59, "2026-10", "Preflight contract, gap 8", confidence="contract"),
+	GpuRate(
+		"MI300X",
+		"amd_devcloud",
+		1.99,
+		"2026-11",
+		"Chiya, Nov 1: the team's AMD droplet bills $1.99/h for its whole uptime (was the contract's $2.59, gap 8)",
+		confidence="provider",
+	),
 )
 
 # ---------------------------------------------------------------- LLM and API tokens

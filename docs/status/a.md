@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Sun Nov 1, 12:30 ET.
+Updated Sun Nov 1, 16:55 ET.
 
 - **Now:** the Pareto sweep (Muse Spark arm, then Spark Open, on its own $1 ledger); the redeploy gated on the new probe-user startup check (a tiny torch.compile and the vLLM and datasets imports as uid 61000), then the serving probe again on the fixed image.
 - **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning/torchtitan adapter checks, the Muse Spark script-map gate; LoRA ground truth on L4, GRPO 50-step ground truth on A10, DDP and FSDP on 2 × A10; the production runner deployed and left running.
@@ -20,9 +20,23 @@ Updated Sun Nov 1, 12:30 ET.
 | Nov 1 12:30 | 998704f..f46fad2 | RL entropy estimate and its limit (d9f969c, f2f2c5e); the warm-pool ask and status (e851890, b4480d3); main merged (round five, 0.6.2) | 1 read-only round each, 2 for the entropy change; the merge checked for damage in A's files | clean |
 | Nov 1 12:49 | f46fad2..8154268 | main's production flags only (3c6699e: runner.queue, c.guide.live), merged onto f46fad2 so the deploy carried nothing unreviewed | main's own (PM); the merge changed flags.production.json only | clean |
 | Nov 1 13:06 | 8154268..HEAD | the ops diagnosis run and its cap (1e40d5e, ec0b39a, aaaefa8, 16ee36f); Glimmer's client and private-job routing (ea1626a, bdd3c6f); the demo limits (9a2bb82, 5a78a60); requests and status (67dd9fc, eb8adbb, b54d854, this row) | 2 rounds each for the cap and the limits, 1 for Glimmer | clean |
+| Nov 1 13:12–13:43 | ..b300684..8da594b | the CI fix for the diagnosis-run test (ba2d9f5); triage reads the probe's recorded error (b300684); diagnosis at medium effort, 8,192 tokens, a 180 s timeout (79db248, 8da594b) | 1 read-only round each | clean |
+| Nov 1 14:00 | 8da594b..9566d23 | main merged (6757667); ground truth for any GPU script (7be9039, 0fba764); the judging warm pool, (a) and (c) (963bb9e, 9566d23); status (fbcac17) | 1 read-only round each, findings fixed | clean |
+| Nov 1 14:09 | 9566d23..243ace5 | eval probes measure two generate calls (fda1762) and count only the outermost (243ace5); status (aa84cd6) | 1 read-only round, its finding fixed | clean; CI green in every job |
+| Nov 1 16:05 | 243ace5..d73b4e1 | status for the 13:06 pushes (8040297); the retrieval, GNN and vision zoo records for C, share tokens as placeholders (576f6b6); the AMD startup check `python -m preflight.probes.user_check` and the Nov 1 AMD plan (62fac50); its review fixes: psutil reported if the probe Python lacks it, a ROCm torch required where /dev/kfd exists, a launch error still prints its line, gate tests for a missing passwd/group entry | 1 read-only round, its 4 findings fixed | clean (tree and commits); CI: python job failed once on a flaky agent-proxy test (connection refused), green on rerun |
+| Nov 1 16:45 | d73b4e1..(this) | the agent-proxy test flake fix (22d9a79); the GRPO record names its A10 (env.gpu and the gpu_type knob), ground truths carry env, dataset size from cached and eval-OOM probes, Glimmer 330 s timeout and `ops_app.py::triage` (0874c0f); its review fixes (6190ec7); the verify eval pull (88c8387) and its revert (3be3ed4, the review found it unsafe); status | 2 read-only rounds (one per change); the first's findings fixed, the second's change reverted | clean (tree and commits) |
 
 ## Known limits, on purpose
 
+- Structured replies (Muse Spark, Spark Open, Glimmer) are read leniently: the JSON object after
+  any reasoning, the last fenced one, else the outermost braces, validated in full. A reply whose
+  only object is one it quoted from the visitor's log is accepted as the answer; it can only
+  mislead that visitor's own job, within the schema's fixed categories (review, Nov 1).
+- A probe sandbox that outlives the probe's own time limit (the 18:06 serving run on an L4: 1,284 s
+  against 600 s) is ended from outside and its log is lost, so its record says only "ended without
+  a result". Not fixed yet; the serving cause itself is known (`a-serving-debug-1`, Nov 1).
+- Verify jobs don't run the eval inside their window, so eval fixes can't be verified yet (the
+  first attempt was reverted after review; the design is with C, Nov 1).
 - Timed steps carry no recorder sync points, but `by_phase` comes from two synchronised phase
   steps after them, so phase splits lose CPU/GPU overlap. B scales the fractions to `p50_s`.
 - The queue saves under its lock. At 8 GPUs and a few visitors that is tens of saves a minute;
@@ -56,6 +70,13 @@ Updated Sun Nov 1, 12:30 ET.
 - Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
   its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
   lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
+- Judging window (Nov 5–8, judging.py): a job starts on the A10 only when its GPU wasn't asked for
+  or inherited; its first point's eval-off rerun may still fall back to the L4; if point 0 is
+  skipped, the first point that runs has no L4 fallback; with the GPU ceiling at L4 the A10 is
+  capped back with a misleading cross-GPU warning.
+- Ground truth for any script (Nov 1): `--bare-steps` means nothing for a script with no optimizer
+  (serving, eval, retrieval): its bare run is the whole script, capped at 20 min; two `--dir`s with
+  the same last folder name write the same out file.
 - Demo limits (Nov 1): the spend cap counts what jobs report (GPU at measured probe time plus the
   sandbox estimate), so sandbox start-up and idle time aren't in it, and one job can pass its $0.60
   between probe checks; a retried job is charged for its first attempt and reserves again. A worker
@@ -76,6 +97,35 @@ Updated Sun Nov 1, 12:30 ET.
   that samples by hand (zoo/gnn_pyg) has no loader, so no size; D is to expose its training-node
   count as a plain setting (Chiya, Nov 1), which A reads once it lands. The recorder side hasn't run on
   torch in this workspace; the first GPU probe is its check.
+
+## AMD session (Nov 1 plan, for today's code): A's amd-run.yml calls
+
+Each is one `amd-run.yml` dispatch with `-f host=<droplet IP> -f port=22 -f ref=REF`, run in this
+order, one at a time. REF is the ws-a commit named in the reply to the PM (the head that passed
+CI). Nothing starts before the PM posts the droplet's IP. Only the last call passes
+`destroy_droplet_id`, and only if B has said B is done.
+
+| # | name | `cmd` | timeout | Expected | What it gives |
+| --- | --- | --- | --- | --- | --- |
+| 0 | `a-amd-usercheck` | `python -m preflight.probes.user_check --uid 61000 --gpu` | 15 | 5 min | the startup check: uid 61000 as a probe launches it, the video/render groups, /dev/kfd opened, a GPU matmul, torch.compile on the CPU and on the GPU (ROCm Triton), the probe child's imports |
+| 1 | `a-amd-lora-record` | `python -m preflight.cli.main run zoo/finetune_lora_hf --out out/records --install-requirements --require-gpu` | 45 | 15 min | the LoRA zoo record on ROCm |
+| 2 | `a-amd-lora-gt` | `python -m preflight.recorder.ground_truth zoo/finetune_lora_hf out/gt_lora_mi300x.json --bare-steps 120 --recorder-steps 40 --install-requirements --budget-min 30` | 40 | 15 min | the LoRA ground truth: bare vs recorder step times |
+| 3 | `a-amd-nanogpt-record` | `python -m preflight.cli.main run zoo/pretrain_nanogpt --out out/records --install-requirements --require-gpu` | 45 | 15 min | the nanoGPT record |
+| 4 | `a-amd-nanogpt-gt` | `python -m preflight.recorder.ground_truth zoo/pretrain_nanogpt out/gt_nanogpt_mi300x.json --bare-steps 300 --recorder-steps 100 --install-requirements --budget-min 30` | 40 | 20 min | the nanoGPT ground truth |
+
+About 70 minutes of runs plus about 2 minutes of setup per call (rsync, venv, `pip install -e .`):
+**about 80 minutes expected [guess], about 1 h 40 min with one retry, 2 h at most; $3.50 to $5.20
+of droplet time at $2.59/h** (the Oct 29 rate; B's hours are B's own).
+
+What changed since Oct 29:
+- Step 0 is new. On the droplet the checkout and `.venv-amd` sit under /root, which a fresh uid
+  can't enter, so `preflight.cli.main run` there runs its probes as root (the Nov 1 quickstart
+  fix, `uid_can_run_this_python`). Steps 1 to 4 therefore don't exercise the probe user; step 0
+  pins uid 61000 and launches exactly as a probe does. Measurements don't depend on the uid.
+- A failed step 0 doesn't block steps 1 to 4: it means a root `preflight run` on ROCm with a
+  reachable Python would fail, which goes in known limits with its error.
+- The droplet has no passwd entry for 61000: the check reports the name as missing rather than
+  crashing (the Modal gate still fails an image without one).
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
@@ -262,6 +312,16 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Nov 1 16:27 | `a-smoke-serving-vllm-2` (41326407788): the vLLM serving probe on the redeployed runner, record 01M6BZ0C74ZZYJ6579G8Z91SQW: **timeout at 600 s before any measurement**, on an L40S (by its price). Cause, from the code: the recorder timed vLLM's generate whole, and zoo/serving_vllm's one call is 1,024 prompts x 4,096 tokens (about half an hour), and a probe with no optimizer steps ended as too_few_steps anyway. Fixed in ws-a 16d5cd6 (a serving probe measures one sampled call of 32 prompts and ends there), checked through a fresh install with a stand-in vLLM; not rerun (needs the redeploy) | L40S | about 11 | **$0.4986** by the record ($0.3256 GPU, $0.1586 sandbox, $0.0145 model calls) |
 | Nov 1 11:47 ET | Quickstart check (local, no GPU): wheel built, a fresh 3.11 venv, `pip install preflight[probe]` (torch from PyPI, 9 min), then `preflight demo` in an empty folder: 3 probes ok on the CPU in 31 s (batch 64 / 32 / 16, p50 14 / 12 / 11 ms) [measured]. Found and fixed: as root, probes dropped to a uid that couldn't reach the venv and ran without torch | none | — | $0 |
 | Nov 1 17:36–18:04 | `a-startup-check-17` (41332365957) and `a-startup-check-serving-3` (41332579612) ok on f46fad2, deploy held for the flag decision; `a-startup-check-18` (41334281206), `a-startup-check-serving-4` (41334482001) ok on 8154268; `a-deploy-main-18` (41334637660): **the production runner redeployed** from ws-a 8154268 (round five, runner.queue and c.guide.live on, triage on, the serving-probe and CI fixes). Left running; C told | none (CPU) | about 12 | about $0.10 CPU (estimate); the job store about $0.19/day |
+| Nov 1 18:06 | `a-smoke-serving-vllm-3` (41334716223): the serving rerun on the redeployed runner, record 01M6C4K2PZKQKPV894ZPHYN4Y7, L4 (GPU list L4, A10): **failed**, the probe sandbox ended without a result after 1,284 s (past the probe's 600 s, so the sandbox itself was ended); the record has no log, so the cause isn't known. Triage (Spark Open) called it unclear, $0.0024 | L4 | about 21 | **about $0.64** by the record ($0.2854 GPU, $0.3389 sandbox estimate, $0.0195 model calls) |
+| Nov 1 18:28 | `a-triage-lora-prod` (41336726935): **the production triage run**, finetune_lora_hf, record 01M6C5WRVEM3RTRRBDRPAAPEGT (share jgk05gwUgV-Bo78sErzKFQ): p1, p2, p3 ok; p1-eval oom.eval as planted (530 MiB asked, 486 MiB free of 22.06 GiB). 4 Spark Open triage calls on Baseten, all ok, $0.0184 in all; the eval probe's finding names node eval. It said "unclear" instead of quoting the OOM line (the OOM is in the probe's recorded error, not stdout): fixed in b300684, live at the next deploy | L4 (228 s GPU wait) | about 10 | **$0.2077** by the record ($0.0788 GPU, $0.0926 sandbox estimate, $0.0363 model calls) |
+| Nov 1 18:40 | `a-diagnose-lora` (41337801746): Spark diagnosis of that record, ops app: both Muse Spark calls cut off at 4,000 output tokens (high effort's reasoning used them up), no findings | none (CPU) | about 1 | **$0.0416** of Muse Spark |
+| Nov 1 18:44 | `a-diagnose-lora-2` (41338042440): again at medium effort, 8,192 tokens: one finding, consistent (the loss plot's p1 peak at steps 8–10 is loss[9] = 1.563, the series' maximum, checked against the record); Spark Open's check fetched the path and agreed. The first call still ran to 8,192 tokens and the re-ask answered | none (CPU) | about 1 | **$0.0685** ($0.0593 Muse Spark, $0.0091 Spark Open) |
+| Nov 1 18:53 | `a-smoke-eval-sweep-2` (41338293000): the eval-sweep probe, record 01M6C6YPNC7BZAZ82TAY4B9MSD: **timeout at 600 s, nothing kept** (492 s GPU wait first). The log shows batch after batch of generate set up: a generation-only probe had nothing to stop it and the recorder's stats are written at the end. Fixed in fda1762 (an eval probe measures two generate calls and ends as the third starts), checked with a stand-in; rerun after the next deploy | L4 or A10 | about 18 | **$0.3163** by the record ($0.1336 GPU, $0.1587 sandbox estimate, $0.0240 model calls) |
+| Nov 1 20:16 | `a-startup-check-19` (41346004770), `a-startup-check-serving-5` (41346187791), then `a-deploy-main-19` (41346314893): **the gated redeploy, from ws-a d73b4e1 (main's 6757667 in it)**, after C's production deploy. Worker, probe, sandbox, the probe user in all three images (torch.compile and the vLLM import as uid 61000) ok; deployed 20:20 UTC with the demo limits, the eval and serving probe stops, the warm pool off until Nov 5 | none (CPU) | about 4 | about $0.03 CPU (estimate) |
+| Nov 1 20:20 | `a-serving-debug-1` (41346358580): the serving debug run, `ops_app.py::ground_truth --script serving_vllm` (Chiya's yes), printing vLLM's log. Modal gave the A10. The sampled probe ran ok in 314 s: weights 14.25 GB loaded in 6 s, graphs 15 s, then **32 prompts x 4,096 new tokens each (all truncated, about 131k tokens) at about 480 tokens/s = 272 s**, with KV-cache preemption (the cache fits 2.19x of a 32k request) [measured]. On an L4 (about half the bandwidth) that decode is about 550 s [estimate], past the probe's 600 s with startup: the cause of the L4 failure at 18:06. Fix options (a) cap the probe's new tokens at 1,024, (b) 8 prompts: posted to Chiya, asked of B in from-a.md. The bare run (the full 1,024-prompt burst) stopped at its 420 s share, as planned | A10 | about 13 | about $0.25 (estimate) |
+| Nov 1 20:45 | `a-triage-glimmer-1` (41348458748): the first Glimmer triage, `ops_app.py::triage` on the production LoRA record's p1-eval (oom.eval): **no finding and no call in provenance** after 150 s. The client logged nothing because a reply that isn't a completion (not JSON, or no choices) was raised before it was recorded; fixed (such a reply is now a logged, priced call, and the run reports why). Rerun next | Glimmer's A100-40GB (B's app) | about 2.5 | about $0.25 (estimate: B's cold start; the client recorded $0) |
+| Nov 1 20:59 | `a-triage-glimmer-2` (41349583805): the rerun, with the call now logged: **HTTP 303 after 150 s**, empty body. Modal's web endpoints answer a request that runs past 150 s with a 303 to poll for its result, and the client didn't follow redirects. Fixed: the Glimmer client follows up to 3, on the same host only (its Modal-Key and Modal-Secret headers never go elsewhere) | Glimmer's A100-40GB (B's app) | about 2.5 | **$0.0876** recorded (150 s at the A100-40GB rate) |
+| Nov 1 21:10 | `a-triage-glimmer-3` (41350601567): with redirects followed, **Glimmer answered** (371 output tokens after a 459 s cold start) but the reply didn't validate against the Triage schema, nor the re-ask's (6 s, warm): no finding. Next: take the JSON object out of the reply, keep the schema error in the report; one more try on Nov 2's budget | Glimmer's A100-40GB (B's app) | about 8 | **$0.2717** recorded (2 calls) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,

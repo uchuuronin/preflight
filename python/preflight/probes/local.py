@@ -204,6 +204,9 @@ class ProbeSpec:
 	# a serving probe: the prompts one vLLM generate call keeps (0: all of them), and the probe ends
 	# once that call is measured; a load test's whole burst would outrun the probe's time limit
 	generate_sample: int = 0
+	# an eval probe: the generate calls it measures; the probe ends as the next one starts, so what the
+	# script does with each batch (decode, score, dump activations) runs and is measured too
+	generate_calls: int = 0
 
 
 @dataclass
@@ -404,14 +407,39 @@ def _launch_as(uid: int | None, home: Path) -> tuple[str, dict[str, str], dict]:
 # lookups visitor code makes, and the imports that read them, so an image bug costs cents on a CPU
 PROBE_USER_SCRIPT = """
 import getpass, grp, json, os, pwd, sys
-out = {"uid": os.getuid(), "gid": os.getgid(), "user": getpass.getuser(),
-	"passwd": pwd.getpwuid(os.getuid()).pw_name, "group": grp.getgrgid(os.getgid()).gr_name}
+def name(lookup, i):  # None when the uid has no entry (a fresh uid on a plain host, not in an image)
+	try:
+		return lookup(i)[0]
+	except KeyError:
+		return None
+
+
+out = {"uid": os.getuid(), "gid": os.getgid(), "user": getpass.getuser(), "groups": sorted(os.getgroups()),
+	"passwd": name(pwd.getpwuid, os.getuid()), "group": name(grp.getgrgid, os.getgid())}
 for mod in sys.argv[1:]:
 	if mod == "+compile":  # a tiny torch.compile on the CPU: inductor's C++ build and its cache dir
 		import torch
 
 		f = torch.compile(lambda x: (x * 2).sin().sum())
 		out["compiled"] = float(f(torch.ones(8)))
+		continue
+	if mod == "+gpu":  # the GPU as the probe uid: device nodes (ROCm's /dev/kfd), a matmul, a GPU compile
+		import torch
+
+		if os.path.exists("/dev/kfd"):
+			os.close(os.open("/dev/kfd", os.O_RDWR))
+			out["kfd"] = True
+		x = torch.ones(64, 64, device="cuda")
+		out["gpu"] = {"name": torch.cuda.get_device_name(0), "hip": torch.version.hip,
+			"cuda": torch.version.cuda, "matmul": float((x @ x).sum())}
+		g = torch.compile(lambda x: (x * 2).sin().sum())
+		out["gpu_compiled"] = float(g(x))
+		continue
+	if mod.startswith("?"):  # optional: the probe runs without it, but records less (psutil: no RSS)
+		try:
+			__import__(mod[1:])
+		except ImportError:
+			out.setdefault("missing", []).append(mod[1:])
 		continue
 	__import__(mod)
 	out.setdefault("imported", []).append(mod)
@@ -816,6 +844,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"seed_force": spec.seed_force,
 				"alternate_sync": spec.alternate_sync,
 				"generate_sample": spec.generate_sample,
+				"generate_calls": spec.generate_calls,
 				"install_requirements": spec.install_requirements,
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,

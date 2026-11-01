@@ -155,6 +155,8 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		spec.generate_sample
 	):  # a serving probe's sample size decides what it measured; absent, keys stay as they were
 		body["generate_sample"] = spec.generate_sample
+	if spec.generate_calls:  # an eval probe's measured calls, likewise
+		body["generate_calls"] = spec.generate_calls
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
 
@@ -247,6 +249,10 @@ GENERATION_LENSES = ("eval", "rl", "serving")
 # once (about 16 to 21 at 4,096 tokens for a 7B model), so preemption shows, and few enough to finish
 # well inside the probe's time limit on an L4 (32 x 4,096 tokens) [guess: the next probe replaces it]
 SERVING_PROBE_PROMPTS = 32
+# an eval probe's measured generate calls: two batches give a per-batch time, the truncation share
+# and the bytes a batch writes; the Nov 1 eval smoke ran batch after batch to its 600 s timeout and
+# kept nothing [guess: two]
+EVAL_PROBE_CALLS = 2
 GENERATION_PROBE_TIMEOUT_S = 10 * 60
 
 
@@ -295,6 +301,7 @@ def _spec(
 		install_requirements=deps.install_requirements,
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
+		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
 	)
 
 
@@ -327,6 +334,8 @@ def _run_point(spec: ProbeSpec, gpu: str, deps: Deps, ctx) -> tuple[ProbeResult 
 
 # Chiya, Nov 1: an L4 that won't schedule in 2 minutes gives way to an A10, then an L40S
 GPU_FALLBACK = {"L4": ("A10", "L40S")}
+# during judging a job may start on the A10 (judging.py); only its first point may fall back to the
+# L4, before any point has run: after that the job's points stay on the GPU they started on
 
 
 def _fallbacks(gpu: str, allowed: list[str] | None, pinned: bool) -> tuple[str, ...]:
@@ -458,9 +467,16 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if "gpu_type" in knobs:
 			request = {**request, "gpu": knobs["gpu_type"]}
 			pinned = True
+	from .judging import judging_gpu
+
 	gpu = _requested_gpu(request, allowed) or (
 		_parent_gpu(rec) if followup and origin.parent is not None else None
-	) or choose_probe_gpu(need, allowed)  # fmt: skip
+	)  # fmt: skip
+	judged = False
+	if gpu is None:
+		chosen = choose_probe_gpu(need, allowed)
+		gpu = judging_gpu(chosen, allowed, time.time())
+		judged = gpu != chosen
 	cap = gpu_ceiling()
 	if not under_ceiling(gpu, cap):
 		_emit(ctx, "harnessing", rec, rev, level="warn",
@@ -494,6 +510,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		allowed=allowed,
 		need=need,
 		pinned=pinned,
+		judged=judged,
 		patched_for=patched_for,
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
@@ -652,7 +669,13 @@ def _with_dataset_size(rec: FlightRecord, files: dict[str, str] | None = None) -
 		return rec
 	# the script's own setting first: it says what one epoch trains on, where a loader's dataset
 	# may be the whole graph or table
-	ok = [p for p in rec.probes if p.status == "ok" and not p.extras.get("patched")]  # a patch may subsample
+	# the loader's size doesn't depend on how a probe ended: a cache hit (a second visitor on the
+	# same script, C's live LoRA record, Nov 1) or one that ran out at eval saw the same dataset. An
+	# oom probe counts only past its first step: before the first backward the latest loader may be
+	# an eval one (a baseline evaluate, eval_on_start; review, Nov 1). ok first, then cached, then oom
+	rank = {"ok": 0, "cached": 1, "oom": 2}
+	ok = sorted((p for p in rec.probes if p.status in rank and not p.extras.get("patched")  # a patch may subsample
+		and (p.status != "oom" or (p.steps or 0) >= 1)), key=lambda p: rank[p.status])  # fmt: skip
 	n = _train_count_setting(files) or next((p.extras["train_dataset_len"] for p in ok if p.extras.get("train_dataset_len")), None) or next(
 		(p.extras["dataset_rows_total"] for p in ok if p.extras.get("dataset_rows_total")), None)  # fmt: skip
 	if not n:
@@ -789,6 +812,7 @@ def _probe_points(
 	need: float,
 	pinned: bool = False,
 	patched_for: dict | None = None,
+	judged: bool = False,  # judging started the job on the A10 (judging.py)
 ) -> tuple[list[Probe], list[ProbeResult], str, float]:
 	"""Run the planned points in order; returns their probes, fresh results, the GPU they settled on
 	and what discarded attempts cost."""
@@ -827,10 +851,11 @@ def _probe_points(
 			continue
 		attempts: list = []
 
-		def run(g, spec=spec, attempts=attempts, over=over):
-			result, cached = _run_point(
-				replace(spec, gpu_fallback=_fallbacks(g, allowed, pinned)), g, deps, ctx
-			)
+		def run(g, spec=spec, attempts=attempts, over=over, first=not probes):
+			fb = _fallbacks(g, allowed, pinned)
+			if judged and first and g == "A10" and (allowed is None or "L4" in allowed):
+				fb = ("L4",)  # judging's A10 start, before any point ran (GPU_FALLBACK's note)
+			result, cached = _run_point(replace(spec, gpu_fallback=fb), g, deps, ctx)
 			out = result if result is not None else _CachedResult(cached)
 			if result is not None:
 				# every attempt counts, kept or not, with the sandbox's CPU and memory beside the GPU

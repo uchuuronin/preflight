@@ -27,6 +27,8 @@ is live at <https://preflight-cqn.pages.dev>.
 | Muse Spark reads each script (the script map) | Boarding's "Reading your script", and the cockpit's job map | `harness.spark_script_map`, on in `flags.production.json` (Chiya, Nov 1) |
 | Predictions with intervals and abstention: memory, step time, cost, risk | The cockpit's four readouts, the knobs and the flight plan | `engine.memory`, on in production (Chiya, Oct 30); it gates the whole prediction step (`runner/pipeline.py`) |
 | Campaign calendar | The campaign sample (illustrative numbers, B's planner on a 12-run grid) | `c.campaign_calendar`, on in production (Chiya, Nov 1) |
+| Checking in your own repo or script | New flight's Repo link and Upload tabs: Preflight runs a few probe steps of your job on a rented GPU, sandboxed, and opens the record in the cockpit (the Notebook tab, `d.notebook`, is off in production) | `runner.queue`, on in production (Chiya, Nov 1). Demo limits: 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site, US$10 a day through Nov 4 and US$30 a day for judging from Nov 5 [cited: `python/preflight/runner/queue.py`]. Past either, the site opens samples and shared records only until midnight ET. TODO(PM): the limits are on `main` (`9a2bb82`, `5a78a60`) but not in the runner A last deployed (`8154268`, Nov 1, 13:04 ET); keep this sentence only once A's redeploy includes them |
+| The guide (Muse Spark moves the knobs with tool calls) | The cockpit's guide panel | `c.guide.live`, on in production (Chiya, Nov 1). Smoke runs pass: GitHub run 41273350602, 5 rounds, all called tools [measured], US$0.019 [derived: reported tokens at list prices]. Its spend limits: US$0.40 a tour [derived], and US$10 a day for the whole site [guess: the code's value, pending Chiya's answer], with round limits per visitor and per address (`api/preflight_api/ledger.py`). If the live guide fails before it answers, the rule-based tour starts in its place (`web/src/guide/GuidePanel.tsx`) |
 | Fit map: which settings fit, with the out-of-memory frontier | The cockpit's Fit view: drag your run across the map | `c.fit_map`, on in production (Chiya, Nov 1) |
 | RL readouts: the share of prompt groups with no reward spread, rollout time | The GRPO lens | `engine.rl`, on in production (Chiya, Nov 1); calibrated on A's GRPO runs (L4 smoke runs and a 50-step run on an A10) |
 | Log triage by Muse Spark Open on Baseten | A probe that fails gets a finding quoting its log line, labelled "Found by Muse Spark Open triage" | `harness.spark_open_triage`, on in production with its data-use line (Chiya, Nov 1) |
@@ -39,8 +41,6 @@ is live at <https://preflight-cqn.pages.dev>.
 
 | What | Flag | Where it stands |
 | --- | --- | --- |
-| Checking in your own repo, script or notebook | `runner.queue` | Built on `main`; until it is on, the site opens samples and shared records only |
-| The guide (Muse Spark moves the knobs with tool calls) | `c.guide.live` | Smoke runs pass: GitHub run 41273350602, 5 rounds, all called tools [measured], US$0.019 [derived: reported tokens at list prices] |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
 | HOPs view, exports, the CLI re-check item | `c.hops`, `c.exports`, `d.exports_cli` | Built on `main` |
 | The add-ons (detail level, currency, free GPUs, notebook) | `d.*` (below) | Built on `main`; checked in Chromium (`docs/audit/scripts/addons.mjs`) |
@@ -62,7 +62,7 @@ is live at <https://preflight-cqn.pages.dev>.
 
 **In the browser, no install:** open <https://preflight-cqn.pages.dev>. Pick a sample to open it straight in
 the cockpit (samples use illustrative numbers unless they say measured, and cost nothing), or open
-a shared record's link. Checking in your own repo or script opens with `runner.queue`.
+a shared record's link. Or check in your own repo or script under New flight.
 
 **Share a flight** (once `workers/` is in the deploy; TODO(PM)): post
 `https://TODO-PM-HOST/s/<share token>`. Link previews show the record's headline numbers, each with
@@ -123,7 +123,7 @@ flowchart TB
 	TRI["Log triage<br/>(Muse Spark Open on Baseten)"]
 
 	IN --> CK
-	CK -.->|"check-in: behind a flag"| API
+	CK -->|"check-in"| API
 	API --> MAP --> PRB --> ENG --> REC --> COCK
 	COCK -.->|"behind a flag"| EXP
 	CLI -->|"writes"| REC
@@ -156,6 +156,17 @@ over the plan's 5-minute target. GPU $0.0858 [derived: measured probe time at th
 and Muse Spark $0.0178 [derived: reported tokens at list prices]. The sandbox's CPU and memory
 are not in that total yet; Modal's bill replaces the estimate.
 TODO(PM): replace with the validation table's "Cost of one Preflight run" row once scored.
+
+## The corpus published with a datasheet
+
+The measurements behind Preflight's learned models and its held-out checks are published as a
+dataset: [huggingface.co/datasets/chaoschia/preflight-corpus](https://huggingface.co/datasets/chaoschia/preflight-corpus) (Hugging Face commit `0aac218`). It holds
+`preflight-corpus-0.3.0.jsonl.gz` (corpus@0.3.0: 2,339 rows, 1,519 kernel configs, 100 Hugging
+Face jobs and 720 divergence runs [cited: the datasheet]), `SHA256SUMS` and a dataset card. The
+datasheet, after *Datasheets for Datasets*, says how it was made, what it covers and where it is
+biased: [`python/preflight/corpus/DATASHEET.md`](python/preflight/corpus/DATASHEET.md). The
+measurements are Apache 2.0, like the repository. **The dataset is private until it goes public
+with the repository on Nov 3 to 4.**
 
 ## Validation
 

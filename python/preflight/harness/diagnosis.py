@@ -31,6 +31,9 @@ MAX_STEPS = 200  # step_log rows per probe in the numbers
 MAX_LOSS = 400  # loss points per probe in the numbers
 REL_TOL = 0.01  # a quoted value matches the record's within 1%
 MAX_CHECKS = 8  # findings kept from one diagnosis
+# medium, not high: reasoning tokens count against the output cap, and at high they used all 4,000
+# of them before the JSON was written (Nov 1, the LoRA triage record, both calls cut off)
+REASONING_EFFORT = "medium"
 GB = 1e9
 
 SYSTEM = """You check a training run's plots against the numbers they were drawn from.
@@ -203,7 +206,7 @@ def diagnose_record(client, rec: FlightRecord) -> tuple[list[Finding], list, dic
 	msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": content}]
 	before = len(client.calls)
 	try:
-		d, _ = client.structured(msgs, Diagnosis, purpose="diagnosis", reasoning_effort="high")
+		d, _ = client.structured(msgs, Diagnosis, purpose="diagnosis", reasoning_effort=REASONING_EFFORT)
 	except Exception:
 		return [], client.calls[before:], stats  # failed attempts stay in provenance
 	findings = []

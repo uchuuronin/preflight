@@ -24,7 +24,7 @@ The NVIDIA slice is re-planned to $45 of Modal (PM, Oct 27): grouped probe-like 
 
 | Slice | Configs | Where | Budget |
 |---|---|---|---|
-| Grouped, AMD | 300 (`data/amd_grouped.jsonl`), the NVIDIA groups | MI300X droplet, Thursday | about 5 droplet-hours, $13 |
+| Grouped, AMD | 300 (`data/amd_grouped.jsonl`), the NVIDIA groups | MI300X droplet, Nov 1 | at most 6.5 droplet-hours at $1.99/h under the $13 cap, A's runs included |
 | Kernels and graphs, AMD (earlier plan) | 500 (`data/amd_kernels_slice.jsonl`) | MI300X droplet | $16, superseded by the grouped slice |
 | Divergence short runs | 800 small-GPT runs | Modal L4 | not in the $45; only if Chiya adds money after G1 |
 

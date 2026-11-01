@@ -310,7 +310,7 @@ def _checkpoint_bytes(record: FlightRecord, knob_values: dict) -> Estimate:
 			return _est(b, b, b, "bytes", "measured", "measured by a probe's checkpoint save")
 	pred = api.predict(record, knob_values).root
 	try:
-		_, setup, _ = knobs.setup_from(record.job.script_map, api._values(record, knob_values))
+		_, setup, _ = knobs.setup_from(api._script_map(record), api._values(record, knob_values))
 		adapters = setup.method in ("lora", "qlora")
 	except (ValueError, AttributeError):
 		adapters = False

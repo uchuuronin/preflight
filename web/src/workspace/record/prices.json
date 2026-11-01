@@ -122,15 +122,15 @@
 			"usd_per_hour": 2.1
 		},
 		{
-			"as_of": "2026-10",
-			"confidence": "contract",
+			"as_of": "2026-11",
+			"confidence": "provider",
 			"gpu": "MI300X",
 			"id": "gpu/amd_devcloud/MI300X/us/on_demand",
 			"kind": "on_demand",
 			"provider": "amd_devcloud",
 			"region": "us",
-			"source": "Preflight contract, gap 8",
-			"usd_per_hour": 2.59
+			"source": "Chiya, Nov 1: the team's AMD droplet bills $1.99/h for its whole uptime (was the contract's $2.59, gap 8)",
+			"usd_per_hour": 1.99
 		}
 	],
 	"tokens": [

@@ -1048,3 +1048,160 @@ def test_size_set_terms_keep_their_modelled_values():
 	assert sum(terms.values()) == pytest.approx(p["memory.peak"].point)
 	assert terms["weights"] < 2.5e9 and terms["gradients"] < 2.5e9  # fp32 494M params: about 1.98 GB each
 	assert terms["activations"] > terms["weights"]  # the rest of the measured peak
+
+
+def _grpo_a10():
+	return load_record(
+		(Path(__file__).resolve().parents[1] / "zoo/grpo_trl/record_nov1_a10.json").read_text()
+	)
+
+
+def test_a_probe_s_parameter_count_stands_in_when_the_script_map_has_none():
+	"""Nov 1: A's A10 GRPO record names Qwen2.5-0.5B-Instruct with no size; its probe counted 494,032,768."""
+	rec = _grpo_a10()
+	assert rec.job.script_map.model.param_count is None
+	p = api.predict(rec).root
+	assert p["memory.peak"].status != "abstain"
+	assert p["memory.weights"].point == pytest.approx(494_032_768 * 4, rel=0.01)  # fp32 weights, as measured
+
+
+def test_a_record_without_its_gpu_says_which_gpu_it_assumed():
+	# A's record names its A10 since round six (0874c0f), so the no-GPU case is built here (PM, Nov 1)
+	rec = _grpo_a10()
+	knob_gpu = next(k.current for k in rec.knobs if k.id == "gpu_type")
+	rec = rec.model_copy(update={"env": None})
+	p = api.predict(rec).root
+	assert "isn't in the record" in p["memory.peak"].reason and str(knob_gpu) in p["memory.peak"].reason
+
+
+def test_the_real_a10_grpo_record_reads_its_measured_peak_once_its_gpu_is_recorded():
+	"""The video's opening lens: the run fitted at 23.18 GB reserved plus a 0.30 GB measured context on the A10."""
+	rec = _grpo_a10()
+	env = _grpo_l4().env.model_copy(
+		update={"gpu": _grpo_l4().env.gpu.model_copy(update={"name": "A10", "memory_bytes": None})}
+	)
+	knobs = [k.model_copy(update={"current": "A10"}) if k.id == "gpu_type" else k for k in rec.knobs]
+	p = api.predict(rec.model_copy(update={"env": env, "knobs": knobs})).root
+	assert p["memory.peak"].status == "measured"
+	assert p["memory.peak"].point == pytest.approx(23.50e9, rel=0.005)
+	assert "isn't in the record" not in (p["memory.peak"].reason or "")
+	assert p["risk.oom"].reason.startswith("tight")
+
+
+def test_a_skeleton_without_probes_gets_no_unrecorded_gpu_note():
+	"""Review, Nov 1: before any probe runs a record has no env, and that isn't news."""
+	rec = _grpo_a10()
+	sm = rec.job.script_map
+	sized = sm.model_copy(update={"model": sm.model.model_copy(update={"param_count": 494_032_768})})
+	bare = rec.model_copy(update={"probes": [], "job": rec.job.model_copy(update={"script_map": sized})})
+	p = api.predict(bare).root
+	assert p["memory.peak"].status != "abstain"  # review: so the note's own guard isn't what keeps it out
+	assert "isn't in the record" not in (p["memory.peak"].reason or "")
+
+
+def _lora_l4(**extras):
+	rec = load_record(
+		(Path(__file__).resolve().parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text()
+	)
+	if not extras:
+		return rec
+	probes = [
+		p.model_copy(update={"extras": {**(p.extras or {}), **extras}}) if p.id == "p1" else p
+		for p in rec.probes
+	]
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_a_query_is_sized_by_the_dataset_s_longest_row_when_the_recorder_found_it():
+	"""C, Nov 1: the LoRA zoo record read 30.7 GiB at eval batch 4, sized at seq_len 1,024 while its rows reached 517."""
+	plain = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
+	whole = {"dataset_max_tokens": 700, "dataset_rows_scanned": 51760, "dataset_rows_total": 51760}
+	shorter = api.predict(_lora_l4(**whole), {"eval_batch_size": 4}).root
+	assert shorter["memory.peak"].point < 0.8 * plain.point
+	assert "longest row, 700 tokens (measured over all 51,760 training rows)" in shorter["memory.peak"].reason
+
+
+def test_a_partial_scan_never_sizes_a_query_below_seq_len():
+	"""Review, Nov 1: 1,000 rows of 5M scanned, longest 520, read 'unlikely' for a run that may meet 1,024."""
+	plain = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
+	part = {"dataset_max_tokens": 520, "dataset_rows_scanned": 1000, "dataset_rows_total": 5_000_000}
+	p = api.predict(_lora_l4(**part), {"eval_batch_size": 4}).root["memory.peak"]
+	assert p.point == pytest.approx(plain.point)
+	assert "scanned 1,000 of 5,000,000 training rows" in p.reason
+
+
+def test_without_the_longest_row_the_readout_says_it_sized_for_seq_len():
+	p = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
+	assert "sized for rows of 1,024 tokens, the seq_len" in p.reason and "reached 517" in p.reason
+
+
+def test_rows_that_reach_the_probe_s_cut_keep_seq_len_and_say_so():
+	whole = {"dataset_max_tokens": 1024, "dataset_rows_scanned": 51760, "dataset_rows_total": 51760}
+	p = api.predict(_lora_l4(**whole), {"eval_batch_size": 4}).root["memory.peak"]
+	assert p.point == pytest.approx(api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"].point)
+	assert "the training set has rows that long" in p.reason
+
+
+def test_the_eval_wedge_carries_the_measured_context():
+	"""Nov 1: the eval moment's split took the 0.75 GiB guess while the point took the probes' 0.25 GiB."""
+	at8 = api.predict(_lora_l4(), {"eval_batch_size": 8}).root
+	at4 = api.predict(_lora_l4(), {"eval_batch_size": 4}).root
+	assert at8["memory.context"].point == pytest.approx(at4["memory.context"].point)
+
+
+def test_when_no_single_move_clears_an_oom_the_record_carries_grids_over_pairs_that_do():
+	"""Chiya, Nov 1: on the LoRA zoo record every single fix still read 0.97; eval batch 4 with seq_len 512 reads
+	17.5 GiB, unlikely. The guide reads such a combined move off a 2-D local grid."""
+	from preflight.schema.encoding import decode_f16
+
+	rec = _lora_l4()
+	pairs = api.clearing_pairs(rec)
+	assert ("eval_batch_size", "seq_len") in pairs and len(pairs) <= api.MAX_CLEARING_PAIRS
+	grids = api.fill_predictions(rec).predictions.grids
+	g = next(
+		g
+		for g in grids
+		if g.target_id == "risk.oom" and [a.knob_id for a in g.axes] == ["eval_batch_size", "seq_len"]
+	)
+	ev, sq = (a.values for a in g.axes)
+	cell = ev.index(4) * len(sq) + sq.index(512)
+	p = decode_f16(g.point, len(ev) * len(sq))[cell] * g.scale
+	assert p <= api.CLEARS_P_OOM
+
+
+def test_no_pair_grids_when_the_run_already_fits():
+	rec = _lora_l4()
+	fixed = [
+		k.model_copy(update={"current": {"eval_batch_size": 4, "seq_len": 512}[k.id]})
+		if k.id in ("eval_batch_size", "seq_len")
+		else k
+		for k in rec.knobs
+	]
+	fits = rec.model_copy(update={"knobs": fixed})
+	assert api.predict(fits).root["risk.oom"].point <= api.CLEARS_P_OOM
+	assert api.clearing_pairs(fits) == []
+	assert all(
+		len(g.axes) == 1 for g in api.fill_predictions(fits).predictions.grids if g.target_id == "risk.oom"
+	)
+
+
+def test_a_gpu_swap_doesn_t_stop_the_pair_search():
+	"""Review, Nov 1: Nov 1 records offer every GPU, and a B200 'cleared' the LoRA run, so no pair was searched."""
+	rec = _lora_l4()
+	many = ["L4", "A10", "L40S", "A100-SXM-40GB", "A100-SXM-80GB", "H100-SXM-80GB", "B200"]
+	knobs_ = [
+		k.model_copy(update={"domain": k.domain.model_copy(update={"values": many})})
+		if k.id == "gpu_type"
+		else k
+		for k in rec.knobs
+	]
+	pairs = api.clearing_pairs(rec.model_copy(update={"knobs": knobs_}))
+	assert ("eval_batch_size", "seq_len") in pairs
+	assert all("gpu" not in a and "gpu" not in b for a, b in pairs)
+
+
+def test_pair_grids_are_named_apart_from_a_record_s_own_2d_grids():
+	grids = api.fill_predictions(_lora_l4()).predictions.grids
+	two = [g for g in grids if len(g.axes) == 2]
+	assert two and all(g.id.endswith(api.CLEARING_GRID_SUFFIX) for g in two)
+	assert len({g.id for g in grids}) == len(grids)

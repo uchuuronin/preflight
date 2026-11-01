@@ -20,12 +20,14 @@ finish soonest or most headroom) and the GPU you'd use. Wait for it to finish an
 
 **Done when** the map of the builder's own job is on screen.
 
-**Observer watches:** which tab they choose (Repo link, Upload or Notebook); the data-use notice
+**Observer watches:** which tab they choose (Repo link or Upload; tonight there is no Notebook
+tab); the data-use notice
 and the "Got it" tick; any error on the desk, word for word; what they do while it measures; the
 time from pressing "Check in" to their map.
 
-If check-in fails for a reason outside the builder's control (a probe error, the queue full), note
-the message and move to task 3 with a sample.
+If check-in fails for a reason outside the builder's control (a probe error, the queue full, or
+a demo limit: GPUs busy, or "samples only until midnight ET"), note the message word for word and move to
+task 3 with a sample.
 
 ## Task 3: act on one finding
 
@@ -34,6 +36,7 @@ and tell us whether the change did what you expected.
 
 **Done when** the builder has changed the setting a finding points to and looked at what moved.
 
-**Observer watches:** where they look for findings (the map, the detail sheet, the guide, the
-dock); whether they understand why it was flagged; whether they trust the number that changed;
+**Observer watches:** where they look for findings (the map, the detail sheet, the "finding off
+the map" chip, the guide, the dock); whether they open the guide, and what happens when they do;
+whether they understand why it was flagged; whether they trust the number that changed;
 whether they'd change their real run because of it.
