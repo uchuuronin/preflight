@@ -1,0 +1,11 @@
+{
+	"name": "",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41278502598",
+	"ref": "ws-a",
+	"sha": null,
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/retrieval_st --gpus L4 --max-minutes 15",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T05:51:15Z"
+}
