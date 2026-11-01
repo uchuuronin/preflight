@@ -57,6 +57,16 @@ The HF jobs are 10 groups of five on real Hugging Face checkpoints, LoRA in bf16
 
 **Divergence runs** (measured, Nov 1): 720 runs, 377 on L4 and 343 on A10 (two draws of the same sampler, the board on every row), 44 diverged: 37 of them in fp16, 15 in the first 30 steps. They score the divergence classifier, which is not used: held-out AUROC 0.66 (95% 0.56 to 0.76) against a 0.85 target (`corpus/reports/divergence_nov1.json`).
 
+**Failure labels by Muse Spark Open** (Nov 1; contract item, the second logged Spark Open job). Every row that ran out of memory (29) and every diverged run (44) was sent, with its own numbers, to Muse Spark Open on Baseten (`meta-models/muse-spark-open-1026`, effort low, structured output; `scripts/spark_label_corpus.py`) to name its failure mode, and the answers were compared with B's rule labels, which were never in the prompt: the engine's largest memory term at the row's settings for an out-of-memory row, the D9 reason for a diverged run.
+
+| Task | Compared | Agree | Rate (Wilson 95%) | Where they differ |
+| --- | --- | --- | --- | --- |
+| Diverged runs | 41 | 41 | 100% (91% to 100%) | nowhere; 35 non-finite and 6 blow-ups, which the numbers show plainly (a non-finite step is in the evidence) |
+| Out-of-memory rows | 17 | 11 | 65% (41% to 83%) | the rule says logits for 7 rows, Spark Open activations for 3 of them; the rule says model state for 2, Spark Open activations; the rule says activations for 8, Spark Open "other" for 1 |
+| All | 58 | 52 | 90% (79% to 95%) | the diverged runs carry most of this; the out-of-memory rows, 65%, are the real test |
+
+7 out-of-memory rows have no rule label (5 CNN rows have no analytical model, and 2 HF rows didn't record their model shape when they failed), and 9 rows got no answer; one row is both, so 15 of the 73 aren't compared. Of the 16 failed calls, 8 ran into the 8,192-token output cap (an answer that never closed its JSON: $0.28, about half the spend), 6 timed out at 20 s, and 2 re-asks were cut off when the row's 30 s ran out. 80 calls, 37,471 input and 115,463 output tokens, $0.54 of the $1 approved. Every call, failed or not, is in `corpus/provenance/spark_open_labels_nov1.jsonl` with its tokens and cost; the report is `corpus/reports/spark_labels_nov1.json`. A timed-out call is logged at $0, though Baseten may have billed it.
+
 **Personal or sensitive data.** None.
 
 ## Collection
