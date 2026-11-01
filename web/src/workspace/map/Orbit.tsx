@@ -363,7 +363,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 	}, [flow]);
 
 	return (
-		<div ref={box} className={`pf-orbit${compact ? " pf-orbit--compact" : ""}`} role="region" aria-label={t("map.label")}>
+		<div ref={box} className={`pf-orbit${compact ? " pf-orbit--compact" : ""}${state.focus && !compact ? " is-zoomed" : ""}`} role="region" aria-label={t("map.label")}>
 			<ReactFlow
 				nodes={nodes}
 				edges={[]}

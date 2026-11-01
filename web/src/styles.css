@@ -840,10 +840,17 @@ a {
 	display: grid;
 	/* Dials | the stage, which takes every pixel left over | the side column. */
 	grid-template-columns: auto minmax(0, 1fr) clamp(300px, 22vw, 380px);
+	transition: grid-template-columns var(--pf-dur-sheet) var(--pf-ease-move);
 	grid-template-areas: "dials stage side";
 	gap: 24px;
 	align-items: center;
 }
+
+@media (min-width: 1101px) {
+	.pf-deck.has-detail { grid-template-columns: auto minmax(0, 1fr) clamp(380px, 32vw, 560px); }
+}
+/* In a wide detail, a node's findings sit side by side. */
+.pf-detail__findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; align-items: start; }
 
 /* The cockpit (not the reading sections below it) breaks out of the page's 1240 px column on
    a wide screen, so the stage can grow into it. */
@@ -980,6 +987,14 @@ a {
 .pf-stage-fill .pf-fit__body { align-items: stretch; }
 
 .pf-orbit { position: relative; width: 100%; aspect-ratio: 600 / 560; }
+/* Zoomed to a node, the loop runs past its box: its edges fade into the sky instead of stopping
+   on a hard cut (Chiya, Nov 1). Masks don't animate, so the fade simply appears with the zoom. */
+.pf-orbit.is-zoomed {
+	-webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent), linear-gradient(to bottom, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+	-webkit-mask-composite: source-in;
+	mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent), linear-gradient(to bottom, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+	mask-composite: intersect;
+}
 .pf-orbit .react-flow { position: absolute; inset: 0; background: transparent; overflow: visible; }
 .pf-orbit .react-flow__pane { cursor: default; }
 .pf-orbit .react-flow__node { cursor: pointer; }
