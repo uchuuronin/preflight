@@ -109,6 +109,15 @@ def estimate_tokens(messages: list[dict]) -> int:
 	return sum(c for c, _ in parts) // 4 + IMAGE_TOKENS * sum(n for _, n in parts) + 8 * len(messages)
 
 
+def _why(exc: Exception) -> str:
+	"""A failed call's reason for a log, without the endpoint's URL (a self-hosted base URL is ours)."""
+	import re
+
+	if isinstance(exc, httpx.HTTPStatusError):
+		return f"HTTP {exc.response.status_code}: {exc.response.text[:300]!r}"
+	return f"{type(exc).__name__}: " + re.sub(r"https?://\S+", "<url>", str(exc))[:300]
+
+
 class ModelClient:
 	def __init__(
 		self,
@@ -147,6 +156,7 @@ class ModelClient:
 		self.usd_per_second = usd_per_second
 		self.send_reasoning_effort = send_reasoning_effort
 		self.calls: list[ModelCall] = []
+		self.last_error: str | None = None  # why the last failed call failed, for an ops run's report
 		self._deadline: float | None = None  # set by structured() so the re-ask shares one budget
 		key = api_key if api_key is not None else os.environ.get("MODEL_API_KEY", "")
 		self._http = httpx.Client(
@@ -309,9 +319,29 @@ class ModelClient:
 			body["reasoning_effort"] = reasoning_effort
 		deadline = self._deadline if self._deadline is not None else time.monotonic() + self.deadline_s
 		started = time.monotonic()
-		resp = self._post(body, purpose, deadline)
-		data = resp.json()
-		message = data["choices"][0]["message"]
+		try:
+			resp = self._post(body, purpose, deadline)
+		except Exception as exc:
+			self.last_error = _why(exc)
+			raise
+		data = None
+		try:
+			data = resp.json()
+			message = data["choices"][0]["message"]
+		except (ValueError, KeyError, IndexError, TypeError) as exc:
+			# a 200 that isn't a completion (a proxy's page, an error object): still a call, in
+			# provenance and priced (Glimmer's first call on Nov 1 left none), and its reason kept
+			self._record(
+				purpose,
+				data if isinstance(data, dict) else None,
+				started,
+				False,
+				resp.headers.get("x-request-id"),
+			)
+			self.last_error = (
+				f"HTTP {resp.status_code} without a completion ({type(exc).__name__}): {resp.text[:300]!r}"
+			)
+			raise ValueError(self.last_error) from exc
 		call = self._record(purpose, data, started, True, resp.headers.get("x-request-id") or data.get("id"))
 		return message, call
 

@@ -824,7 +824,7 @@ def triage_hosted(record_json: str, probe_id: str, provider: str = "glimmer") ->
 	f, calls = triage_probe(client, probe, "")
 	return {"record_id": rec.record_id, "probe": probe_id, "status": probe.status, "provider": client.provider,
 		"model": client.model, "wall_s": round(time.monotonic() - t0, 1),
-		"finding": f.model_dump(mode="json") if f else None,
+		"finding": f.model_dump(mode="json") if f else None, "last_error": client.last_error,
 		"calls": [c.model_dump(mode="json") for c in calls], "usd": round(sum(c.cost_usd for c in calls), 6)}  # fmt: skip
 
 
@@ -843,7 +843,10 @@ def triage(share: str, probe: str = "p1-eval", provider: str = "glimmer"):
 	Path("out").mkdir(exist_ok=True)
 	Path("out/triage.json").write_text(json.dumps(res, indent=2))
 	f = res.get("finding")
-	print(f"[triage] {res.get('error') or (f and f['title'] + ' | ' + f['detail'])}", flush=True)
+	print(
+		f"[triage] {res.get('error') or (f and f['title'] + ' | ' + f['detail']) or 'no finding: ' + str(res.get('last_error'))}",
+		flush=True,
+	)
 	print(
 		f"[triage] {len(res.get('calls', []))} calls, ${res.get('usd', 0):.4f}, {res.get('wall_s')} s",
 		flush=True,

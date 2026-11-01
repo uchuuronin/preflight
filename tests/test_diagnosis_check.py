@@ -217,3 +217,25 @@ def test_triage_reads_and_can_quote_the_probes_recorded_error_not_just_stdout():
 		transport=httpx.MockTransport(handler))  # fmt: skip
 	g, _ = triage_probe(glim, probe, "")
 	assert g.title.startswith("Muse Glimmer on probe p1-eval") and g.code == "triage.oom"
+
+
+def test_a_reply_without_a_completion_is_still_a_logged_priced_call_with_its_reason():
+	# Glimmer's first triage (Nov 1): 150 s, no finding, and no call in provenance
+	def handler(request):
+		return httpx.Response(200, text="<html>cold start</html>")
+
+	client = ModelClient(api_key="k", model="muse-glimmer", provider="modal-glimmer", usd_per_second=0.001,
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	with pytest.raises(ValueError):
+		client.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert len(client.calls) == 1 and not client.calls[0].ok
+	assert "HTTP 200 without a completion" in client.last_error and "cold start" in client.last_error
+
+	def denied(request):
+		return httpx.Response(401, json={"error": "bad Modal-Key"})
+
+	c2 = ModelClient(api_key="k", base_url="https://secret-host.example/v1", model="m", provider="modal-glimmer",
+		transport=httpx.MockTransport(denied))  # fmt: skip
+	with pytest.raises(httpx.HTTPStatusError):
+		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert c2.last_error.startswith("HTTP 401") and "secret-host" not in c2.last_error
