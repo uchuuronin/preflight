@@ -409,7 +409,7 @@ def probe_user_check(imports: tuple[str, ...] = ("torch._dynamo",), timeout_s: i
 			os.chmod(box, 0o711)
 			_chown_tree(home, uid)
 		python, env, popen_kw = _launch_as(uid, home)
-		p = subprocess.run([python, "-c", PROBE_USER_SCRIPT, *imports], cwd=home, env=env, capture_output=True,
+		p = subprocess.run([python, "-c", PROBE_USER_SCRIPT, *imports], cwd=home, env=env, stdin=subprocess.DEVNULL, capture_output=True,
 			text=True, timeout=timeout_s, **popen_kw)  # fmt: skip
 		out: dict = {"exit": p.returncode, "probe_uid": uid}
 		line = next((ln for ln in p.stdout.splitlines() if ln.startswith("PROBE_USER ")), None)

@@ -35,6 +35,9 @@ Updated Sun Nov 1, 01:30 ET.
   script that samples subgraphs by hand, as zoo/gnn_pyg does, gets no graph counts, and with no
   loader the forward can't be told from the sampling, so both land in "other" (Nov 1 L4 probe:
   60% other). On the cut sheet (Chiya, Nov 1): count each conv layer's edges at SAGEConv/MessagePassing forward, about 1 hour.
+- Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
+  its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
+  lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
 - Dataset size (`extras.train_dataset_len`, Nov 1): the training loader's sampler length, else its
   dataset's. With `batch_size=None` a split sampler isn't seen, so validation rows are counted; a
   Lightning `DistributedSamplerWrapper` over a split falls back to the whole dataset. A GNN script
