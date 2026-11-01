@@ -648,9 +648,15 @@ def tick() -> dict:
 		from preflight.runner.judging import warm_workers
 
 		want = warm_workers(time.time())
-		if deployed_here()[0] is True and jobs_dict.get("warm_workers") != want:
-			run_worker.update_autoscaler(min_containers=want)
-			jobs_dict["warm_workers"] = want
+		# keyed on the deploy too: a redeploy resets the worker to its decorator's settings (Modal)
+		key = f"{want}:{image_tag()}"
+		if jobs_dict.get("warm_workers") != key and deployed_here()[0] is True:
+			scaler = getattr(run_worker, "autoscaler", None)
+			if scaler is not None and hasattr(scaler, "update"):
+				scaler.update(min_containers=want)
+			else:
+				run_worker.update_autoscaler(min_containers=want)
+			jobs_dict["warm_workers"] = key
 			warm = want
 	except Exception as exc:
 		print(f"warm-pool update failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)

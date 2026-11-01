@@ -56,6 +56,13 @@ Updated Sun Nov 1, 12:30 ET.
 - Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
   its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
   lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
+- Judging window (Nov 5–8, judging.py): a job starts on the A10 only when its GPU wasn't asked for
+  or inherited; its first point's eval-off rerun may still fall back to the L4; if point 0 is
+  skipped, the first point that runs has no L4 fallback; with the GPU ceiling at L4 the A10 is
+  capped back with a misleading cross-GPU warning.
+- Ground truth for any script (Nov 1): `--bare-steps` means nothing for a script with no optimizer
+  (serving, eval, retrieval): its bare run is the whole script, capped at 20 min; two `--dir`s with
+  the same last folder name write the same out file.
 - Demo limits (Nov 1): the spend cap counts what jobs report (GPU at measured probe time plus the
   sandbox estimate), so sandbox start-up and idle time aren't in it, and one job can pass its $0.60
   between probe checks; a retried job is charged for its first attempt and reserves again. A worker
