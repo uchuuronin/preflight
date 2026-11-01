@@ -1,0 +1,138 @@
+{
+  "submitted": {
+    "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+    "status": "done",
+    "position": null,
+    "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+    "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 11
+  },
+  "events": [
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "seq": 0,
+      "at": "2026-11-01T11:00:54.025235Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "seq": 1,
+      "at": "2026-11-01T11:00:54.474056Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "seq": 2,
+      "at": "2026-11-01T11:00:54.930094Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "seq": 3,
+      "at": "2026-11-01T11:00:55.121225Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+      "seq": 4,
+      "at": "2026-11-01T11:00:57.217201Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+      "seq": 5,
+      "at": "2026-11-01T11:00:57.610962Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+      "seq": 6,
+      "at": "2026-11-01T11:00:57.794970Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+      "seq": 7,
+      "at": "2026-11-01T11:01:40.503325Z",
+      "stage": "probing",
+      "progress": 0.333,
+      "level": "info",
+      "probe_id": "p2",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+      "seq": 8,
+      "at": "2026-11-01T11:02:01.828320Z",
+      "stage": "probing",
+      "progress": 0.667,
+      "level": "info",
+      "probe_id": "p3",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+      "seq": 9,
+      "at": "2026-11-01T11:02:17.750172Z",
+      "stage": "predicting",
+      "message": "measured; predicting",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "share_token": "pRgVqeKaIl7OTpZQ1y1edw",
+      "seq": 10,
+      "at": "2026-11-01T11:02:20.045295Z",
+      "stage": "predicting",
+      "message": "predicted",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6BC9YM9FXDBA6QRRE2CZ69F",
+      "record_id": "01M6BC9ZSFCS72Y4AQ11EBFYTK",
+      "seq": 11,
+      "at": "2026-11-01T11:02:20.445425Z",
+      "stage": "done",
+      "progress": 1.0,
+      "level": "info"
+    }
+  ],
+  "error": null
+}
