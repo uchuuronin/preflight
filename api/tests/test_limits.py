@@ -155,7 +155,7 @@ def test_numbers_in_the_visitors_words(text, expect):
 
 
 def test_frozen_and_declined_knobs_are_refused_and_never_offered():
-	limits = {"frozen": ["gpu_type"], "declined": ["batch_size"]}
+	limits = {"frozen": ["gpu_type", "seq_len"], "declined": ["batch_size"]}
 	model = Model(
 		reply(
 			calls=[
@@ -171,7 +171,7 @@ def test_frozen_and_declined_knobs_are_refused_and_never_offered():
 		enum = next(t for t in model.requests[0]["tools"] if t["name"] == "set_knob")["parameters"][
 			"properties"
 		]["knob_id"]["enum"]
-		assert "gpu_type" not in enum and "batch_size" not in enum
+		assert "gpu_type" not in enum and "batch_size" not in enum and "seq_len" not in enum
 		assert r["calls"] == []  # nothing reached the browser or an approval card
 		outs = [
 			json.loads(i["output"])

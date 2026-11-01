@@ -39,6 +39,8 @@ def _fn(name: str, description: str, properties: dict, required: list[str]) -> d
 def _left(rec: RecordView, kid: str, limits: Limits) -> bool:
 	"""A knob still has a value to move to inside the limits (a categorical one is checked value by
 	value; a numeric one has a range, so it stays unless its allowed list leaves only where it is)."""
+	if kid in limits.frozen:
+		return False
 	k = rec.knobs[kid]
 	allow = limits.allowed.get(kid)
 	if allow:

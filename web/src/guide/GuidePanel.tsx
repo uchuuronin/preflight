@@ -101,7 +101,7 @@ export function GuidePanel() {
 		// With limits set or a suggestion turned down, "done" says what it means: nothing else
 		// inside the visitor's limits helps.
 		const l = s.limits;
-		const limited = l.declined.length > 0 || Object.keys(l.allowed).length > 0 || l.budgetUsd !== null || l.deadlineS !== null || l.gpuHours !== null;
+		const limited = l.declined.length > 0 || l.frozen.length > 0 || Object.keys(l.excluded).length > 0 || Object.keys(l.allowed).length > 0 || l.budgetUsd !== null || l.deadlineS !== null || l.gpuHours !== null;
 		const doneKey = limited ? "guide.done.limits" : "guide.done";
 		const shown =
 			step.kind === "move" || step.kind === "done" ? { ...step, kind: "done" as const, textKey: doneKey, whyKey: limited ? "guide.done.limits.why" : "guide.done.why" } : step;

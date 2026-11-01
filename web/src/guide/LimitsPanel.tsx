@@ -281,7 +281,7 @@ export function LimitsPanel() {
 					label={t("limits.deadline")}
 					unit={t("limits.hours")}
 					value={limits.deadlineS === null ? null : Math.round((limits.deadlineS / 3600) * 100) / 100}
-					onChange={(v) => setNumber("deadline_s", v === null ? null : v * 3600)}
+					onChange={(v) => setNumber("deadline_s", v === null ? null : Math.min(v * 3600, 1e9))}
 				/>
 				<NumberLimit key={`q${limits.gpuHours}`} id={`${uid}-quota`} label={t("limits.quota")} unit={t("limits.gpu_hours")} value={limits.gpuHours} onChange={(v) => setNumber("gpu_hours", v)} />
 			</div>
