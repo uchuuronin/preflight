@@ -821,5 +821,11 @@
 	"fix.error.fixes_unavailable": "Muse Code couldn't start; nothing was spent.",
 	"fix.error.lost": "The fixes never came back; the cost cap was counted.",
 	"fix.error.cancelled": "Stopped.",
-	"fix.error.unreachable": "Preflight's server didn't answer; try again in a moment."
+	"fix.error.unreachable": "Preflight's server didn't answer; try again in a moment.",
+	"exports.wandb.title": "Weights & Biases",
+	"exports.wandb.body": "Add {file} next to your script and call attach(run) after wandb.init(): the run gets this plan's knobs as its config and each prediction with its 90% interval in its summary, beside what it measures.",
+	"exports.wandb.download": "Download {file}",
+	"exports.wandb.copy": "Copy",
+	"exports.wandb.copied": "Copied.",
+	"exports.wandb.copy_failed": "Couldn't copy here; use the download instead."
 }

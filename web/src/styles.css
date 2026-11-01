@@ -1884,3 +1884,6 @@ a {
 .pf-cal__notes { margin: 14px 0 0; padding-left: 18px; font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
 .pf-departures__numbers { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-stroke-strong); font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fg-dim); vertical-align: 1px; }
 .pf-departures__numbers.is-measured { border-color: var(--pf-ok); color: var(--pf-fg); }
+
+.pf-exports__wandb { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: var(--pf-radius-sm); }
+.pf-exports__wandb p { margin: 0; font-size: 13px; line-height: 1.5; }
