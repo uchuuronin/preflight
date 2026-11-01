@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 from preflight.campaign import planner
 from preflight.schema.record import FlightRecord
@@ -33,9 +34,9 @@ START = datetime(2026, 11, 2, 9, 0, tzinfo=UTC)
 
 
 def main(engine_record: str, branch_record: str, out_path: str) -> None:
-	rec = FlightRecord.model_validate(json.loads(open(engine_record).read()))
+	rec = FlightRecord.model_validate(json.loads(Path(engine_record).read_text()))
 	plan = planner.plan(rec, GRID, CLUSTER, start=START)
-	out = json.loads(open(branch_record).read())
+	out = json.loads(Path(branch_record).read_text())
 	out["campaign"] = plan.to_campaign().model_dump(mode="json", exclude_none=True)
 	card = plan.card.model_dump(mode="json", exclude_none=True)
 	out["models"] = [m for m in out.get("models", []) if m.get("id") != card["id"]] + [card]
