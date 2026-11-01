@@ -1026,7 +1026,9 @@ def test_a_stalled_sample_reaches_the_runaway_readout(ag):
 
 
 def _grpo_l4():
-	return load_record((Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/grpo-l4.record.json").read_text())
+	return load_record(
+		(Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/grpo-l4.record.json").read_text()
+	)
 
 
 def test_a_gpu_move_from_the_probes_settings_is_predicted_not_measured():

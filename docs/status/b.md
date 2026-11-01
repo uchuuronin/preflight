@@ -223,6 +223,7 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-divergence-sweep-3-l4` (GitHub run 41300143834, cap $9.59 for L4): 48 configs ok (377 on L4 in all); the second wave's 2 containers waited 2,640 s for L4s and ran nothing | L4 x 2-3 | 65 (wall), 9,241 container-s by the driver | $2.26 by the driver's measure ($9.45 on L4 so far) |
 | Nov 1 | `b-divergence-sweep-3-a10` (GitHub run 41300145883, cap $2.41 for A10): 343 configs ok, a fresh draw (`--seed 1`), the board on every row; no queueing | A10 x 1-4 | about 70 (wall) | $2.10 by the driver's measure. Divergence total $11.55 of the $12.00 cap; no more divergence sweeps (Chiya, Nov 1) |
 | Nov 1 | `b-glimmer-startup-check` (GitHub run 41327084275, pre-approved, CPU only, 70 min limit): failed while building images (Modal can't read the Python version in vLLM's registry image); nothing downloaded or ran | CPU | about 3 (wall), image builds only | about $0.00 |
+| Nov 1 | `b-glimmer-startup-check-2` (GitHub run 41327585942, pre-approved, CPU only): both of Meta's downloads into the `preflight-glimmer-weights` volume (bf16 59.6 GB in 333 s, revision cec94fcf; GGUF Q4_K_M 16.8 GB in 124 s, revision b44f1072; both Apache 2.0, not gated); vLLM 0.28.0 and llama.cpp build 12030 (a91eab67d) images built; `vllm serve --help` failed on the CPU container, so the parser check read false there (the A100 smoke checks the parsers on a GPU) | CPU x 4 | about 10 (wall) | about $0.05 |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
@@ -239,6 +240,7 @@ Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking onc
 | Sun Nov 1, about 11:50 AM | 9789338 Glimmer Modal app (startup check, quantize, smokes, endpoint); and this status commit | none | read-only review of 9789338: nothing blocks the startup check; its deploy and smoke findings are fixed in the next commit, reviewed before any GPU run | clean, both scans |
 | Sun Nov 1, about 12:10 PM | e2a7457 Glimmer review fixes (proxy auth, a vLLM image Modal can run); 47e61fe GRPO peak and RL calibration on the 50-step A10 run; and this docs commit (Glimmer decision, status, requests) | none | read-only review of e2a7457 and 47e61fe: nothing blocks the CPU startup check; its CUDA 13 point is fixed and reviewed before the A100 smoke | clean, both scans |
 | Sun Nov 1, about 12:20 PM | e0775be Glimmer before the GPU runs (CUDA 13 base, CUDA versions in the startup check, 18-minute A100 cap); and this status commit | none | read-only review of e0775be: nothing blocking | clean, both scans |
+| Sun Nov 1, about 12:35 PM | the CI format fix for tests/test_engine_api.py (CI red on d2dc950: `ruff format --check .`), the Glimmer revisions and spend, the reply to C; this commit | none | read-only review: nothing blocking, wording fixes applied; locally ruff format and check clean, 1,339 no-torch tests pass | clean, both scans |
 
 ## Contract requests
 In `docs/requests/from-b.md`.
