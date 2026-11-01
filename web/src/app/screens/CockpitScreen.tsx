@@ -30,6 +30,7 @@ import { Dials } from "../../workspace/cockpit/Dials";
 import { Dock } from "../../workspace/cockpit/Dock";
 import { Orbit, useOrbitLayout } from "../../workspace/map/Orbit";
 import { OrbitGlance } from "../../workspace/map/OrbitGlance";
+import { FindingsBand, FindingsChip } from "../../workspace/cockpit/Findings";
 import { GridProvider } from "../../workspace/provider/GridProvider";
 import { loadRecord } from "../../workspace/record/load";
 import { isFixture, targetFor } from "../../workspace/record/model";
@@ -149,6 +150,7 @@ function Cockpit() {
 							{line.text}
 						</p>
 						<CostLine />
+						<FindingsChip />
 						<ProbeHere />
 					</header>
 					<div className={`pf-deck${fit ? " is-fit" : ""}`}>
@@ -185,6 +187,7 @@ function Cockpit() {
 				</section>
 				<section className="pf-below" aria-label={t("below.label")}>
 					<h2 className="pf-h2">{t("below.title")}</h2>
+					<FindingsBand />
 					<FlightPlanBand />
 					<MemoryBand />
 					<AddonBoundary id="rl-band">
