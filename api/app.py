@@ -52,6 +52,8 @@ image = (
 			# A's job store (python/preflight/runner/modal_app.py), for /v1/jobs and approved guide jobs
 			"PREFLIGHT_JOBSTORE_APP": "preflight-runner",
 			"PREFLIGHT_JOBSTORE_CLS": "JobStoreService",
+			# The fix loop's race (api/fix_app.py race_fix); answers only while c.fix_loop is on.
+			"PREFLIGHT_FIX": "modal",
 		}
 	)
 	.add_local_file(ROOT / "flags.json", "/root/repo/flags.json")
