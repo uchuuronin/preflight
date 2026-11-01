@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from ..flags import flag
-from ..jobs import JobsClient, visitor_of
+from ..jobs import JobsClient, limit_of, visitor_of
 from .record_view import RecordView
 from .tools import SAMPLE_MORE_TASKS
 
@@ -100,6 +100,15 @@ async def execute(name: str, args: dict, ctx: ExecContext, jobs: Executor | None
 			)
 		except Exception as e:
 			code = type(e).__name__
+			lim = limit_of(e)
+			if lim:
+				# A daily limit (A, Nov 1): say so in A's words, and point to the samples.
+				return {
+					"status": "limit",
+					"code": lim[0],
+					"message": lim[1],
+					"retry_after_s": getattr(e, "retry_after_s", None),
+				}
 			if code == "QueueFull":
 				return {"status": "queue_full", "retry_after_s": getattr(e, "retry_after_s", None)}
 			log.exception("guide tool %s failed to submit", name)

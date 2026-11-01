@@ -1,6 +1,8 @@
 # Preflight corpus: datasheet
 
-Following *Datasheets for Datasets* (Gebru et al.). Version: corpus@0.3.0, exported Oct 31, 2026 (`remote-runs` folders `b-corpus-export-3` and `b-corpus-export-hf-2`). Owner: workstream B.
+Following *Datasheets for Datasets* (Gebru et al.). Version: corpus@0.3.0, exported Oct 31, 2026 (`remote-runs` folders `b-corpus-export-3` and `b-corpus-export-hf-2`), with the divergence runs of Nov 1 (`b-divergence-export-2`). Owner: workstream B.
+
+**Published file** (gap 16): `preflight-corpus-0.3.0.jsonl.gz`, 2,339 rows (1,519 kernels, 100 HF jobs, 720 divergence runs), 18,462,637 bytes, sha256 `b7cf58d13c291759b8ef23004d87ae0f6b6e42290a7a7e71c998f805a04feb20`, built by `python scripts/export_corpus.py` (the same rows give the same bytes). It ships with `SHA256SUMS` and a dataset card (`README.md`) for a Hugging Face dataset or a release asset.
 
 ## Motivation
 
@@ -21,6 +23,10 @@ Following *Datasheets for Datasets* (Gebru et al.). Version: corpus@0.3.0, expor
 - `graph`: the FX module graph with shapes, for grouped configs;
 - `n_params`, `n_trainable`, `work_units` and `gpu_seconds` (billed).
 
+A divergence row has `config`, `key`, `gpu` and `status` too, and instead of timings: `series` (per step: loss, grad norm, the largest attention logit, the output logit norm, the update-to-weight ratio per layer, non-finite gradients, the loss scale), `label` (the D9 hindsight label: diverged, the onset step, the reason), `steps_run`, `stopped_early` and `data`.
+
+The published file adds three fields to every row: `kind` (`kernels`, `hf` or `divergence`), `split` (below) and `source_file`.
+
 **How many** (measured):
 
 | GPU | Grouped configs | OOM | HF jobs | OOM |
@@ -32,6 +38,8 @@ Following *Datasheets for Datasets* (Gebru et al.). Version: corpus@0.3.0, expor
 | A100-PCIe-80GB | 42 | 0 | 0 | 0 |
 | A100-SXM-80GB | 53 | 0 | 0 | 0 |
 
+Plus 720 divergence runs: 377 on L4 and 343 on A10 (below).
+
 **Families.** The grouped configs come in groups of five points: three probe-like points and two queries per architecture. 111 distinct groups ran in all. The architectures are small models built in the corpus code:
 - `gpt`: decoder-only transformers;
 - `encoder`: BERT-style;
@@ -41,20 +49,31 @@ Following *Datasheets for Datasets* (Gebru et al.). Version: corpus@0.3.0, expor
 
 The HF jobs are 10 groups of five on real Hugging Face checkpoints, LoRA in bf16 and QLoRA in nf4. The checkpoints are Qwen/Qwen2.5-0.5B, Qwen/Qwen2.5-1.5B, HuggingFaceTB/SmolLM2-360M, HuggingFaceTB/SmolLM2-1.7B and TinyLlama/TinyLlama-1.1B-Chat-v1.0.
 
-**Splits.**
+**Splits** (the `split` field).
 - **Calibration:** every non-A100 row, used leave-one-architecture-out for coverage.
 - **Cross-GPU holdout:** every A100 row, never calibrated on and scored once (`docs/decisions/calibration-l4-phase1.md`).
 - **Not in calibration:** the synthetic `lora` family (lens `finetune_synthetic`). Its scores are reported, but users send real models.
+- **Divergence:** the 720 divergence runs, which score the divergence classifier only.
 
 **Data inside the jobs.** The `kernels` and `hf` kinds train on random token ids or random images, so they hold measurements of compute, not of any text or image dataset. The `divergence` kind trains a small GPT (4 layers, d256, 600 steps) on Tiny Shakespeare (public domain) and keeps each run's loss, grad-norm, logit and update series with its D9 label.
 
 **Divergence runs** (measured, Nov 1): 720 runs, 377 on L4 and 343 on A10 (two draws of the same sampler, the board on every row), 44 diverged: 37 of them in fp16, 15 in the first 30 steps. They score the divergence classifier, which is not used: held-out AUROC 0.66 (95% 0.56 to 0.76) against a 0.85 target (`corpus/reports/divergence_nov1.json`).
 
+**Failure labels by Muse Spark Open** (Nov 1; contract item, the second logged Spark Open job). Every row that ran out of memory (29) and every diverged run (44) was sent, with its own numbers, to Muse Spark Open on Baseten (`meta-models/muse-spark-open-1026`, effort low, structured output; `scripts/spark_label_corpus.py`) to name its failure mode, and the answers were compared with B's rule labels, which were never in the prompt: the engine's largest memory term at the row's settings for an out-of-memory row, the D9 reason for a diverged run.
+
+| Task | Compared | Agree | Rate (Wilson 95%) | Where they differ |
+| --- | --- | --- | --- | --- |
+| Diverged runs | 41 | 41 | 100% (91% to 100%) | nowhere; 35 non-finite and 6 blow-ups, which the numbers show plainly (a non-finite step is in the evidence) |
+| Out-of-memory rows | 17 | 11 | 65% (41% to 83%) | the rule says logits for 7 rows, Spark Open activations for 3 of them; the rule says model state for 2, Spark Open activations; the rule says activations for 8, Spark Open "other" for 1 |
+| All | 58 | 52 | 90% (79% to 95%) | the diverged runs carry most of this; the out-of-memory rows, 65%, are the real test |
+
+7 out-of-memory rows have no rule label (5 CNN rows have no analytical model, and 2 HF rows didn't record their model shape when they failed), and 9 rows got no answer; one row is both, so 15 of the 73 aren't compared. Of the 16 failed calls, 8 ran into the 8,192-token output cap (an answer that never closed its JSON: $0.28, about half the spend), 6 timed out at 20 s, and 2 re-asks were cut off when the row's 30 s ran out. 80 calls, 37,471 input and 115,463 output tokens, $0.54 of the $1 approved. Every call, failed or not, is in `corpus/provenance/spark_open_labels_nov1.jsonl` with its tokens and cost; the report is `corpus/reports/spark_labels_nov1.json`. A timed-out call is logged at $0, though Baseten may have billed it.
+
 **Personal or sensitive data.** None.
 
 ## Collection
 
-The corpus was collected between Oct 28 and 31, 2026, on Modal, in a pinned image (torch 2.8.0, plus pinned transformers, peft and bitsandbytes for the HF jobs). Each config ran in its own process with a deadline, so a hang became a `timeout` row and a kernel fault couldn't poison the next config. Sweeps were capped by a worst-case container-time bound and approved phase by phase. Every run's GPU, minutes and dollars are in `docs/status/b.md`.
+The corpus was collected between Oct 28 and Nov 1, 2026 (the divergence runs on Nov 1), on Modal, in a pinned image (torch 2.8.0, plus pinned transformers, peft and bitsandbytes for the HF jobs). Each config ran in its own process with a deadline, so a hang became a `timeout` row and a kernel fault couldn't poison the next config. Sweeps were capped by a worst-case container-time bound and approved phase by phase. Every run's GPU, minutes and dollars are in `docs/status/b.md`.
 
 ## Known biases and limits
 
@@ -73,8 +92,12 @@ The corpus was collected between Oct 28 and 31, 2026, on Modal, in a pinned imag
 
 ## Distribution and licence
 
-- **Measurements:** published with the Preflight repository under its licence (see `LICENSE`).
-- **HF checkpoints:** the corpus contains no weights from them, only timings and memory of training them. Qwen2.5-0.5B, Qwen2.5-1.5B, the SmolLM2 models and TinyLlama are released under Apache 2.0 by their authors.
+- **Measurements:** Apache 2.0, the Preflight repository's licence (`LICENSE`); the dataset card says so (`license: apache-2.0`). Chiya uploads the file: a Hugging Face dataset or a GitHub release asset.
+- **Sources:**
+  - the configs: generated by `python/preflight/corpus` (sweep plans and the sampler's seeds are in the rows);
+  - the HF jobs: Qwen/Qwen2.5-0.5B, Qwen/Qwen2.5-1.5B, HuggingFaceTB/SmolLM2-360M, HuggingFaceTB/SmolLM2-1.7B and TinyLlama/TinyLlama-1.1B-Chat-v1.0, all Apache 2.0 from their authors. The corpus holds no weights from them, only the timings and memory of training them;
+  - the divergence runs: trained on Tiny Shakespeare (`karpathy/char-rnn`, `data/tinyshakespeare/input.txt`; Shakespeare's text is in the public domain). The rows hold training curves, not text.
+- **Checked before publishing:** no hostnames, container or account ids, user names or emails in any row (scanned Nov 1), and gitleaks finds nothing in the file.
 
 ## Maintenance
 

@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from preflight.corpus import validate
+from preflight.engine import api
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -37,14 +38,23 @@ def main(argv: list[str] | None = None) -> int:
 	args = ap.parse_args(argv)
 	manifest = json.loads(args.manifest.read_text())
 	div = json.loads(args.divergence.read_text()) if args.divergence else None
-	rows, runs = validate.build(manifest, args.manifest.parent, div)
+	# Nov 1: Monday's runs are predicted under production's switches (engine.rl goes on there in round five)
+	flags = validate.production_flags(Path(__file__).resolve().parents[1])
+	rows, runs = validate.build(manifest, args.manifest.parent, div, flags)
 	held = sum(
 		1 for r in manifest.get("runs", []) if "*" not in (r.get("calibrates") or ())
 	)  # some rows still score
-	models = validate.models_used(manifest.get("runs", []), args.manifest.parent)
+	models = validate.models_used(manifest.get("runs", []), args.manifest.parent, flags)
+	# the engine features these flags switch (engine.memory gates the runner's fill, not the scoring)
+	on = sorted(k for k in api.FLAG_OF.values() if flags.get(k)) or ["none"]
+	waiting = [r.script for r in runs if any(": not measured, no " in n for n in r.notes)]
+	scored = f"{len(runs) - len(waiting)} runs scored" + (
+		f"; not measured yet: {', '.join(waiting)} ({len(waiting)})" if waiting else ""
+	)
 	stamp = (
-		f"Scored {datetime.now(UTC):%Y-%m-%d %H:%M} UTC from {args.manifest.name}: {len(runs)} runs, {held} held out. "
-		f"{validate.calibration_note(manifest)} Models: {', '.join(models)}."
+		f"Scored {datetime.now(UTC):%Y-%m-%d %H:%M} UTC from {args.manifest.name}: {scored}; {held} of {len(manifest.get('runs', []))} runs held out of at least one row. "
+		f"{validate.calibration_note(manifest)} Engine flags on (flags.json with flags.production.json): "
+		f"{', '.join(on)}. Models: {', '.join(models)}."
 	)
 	table = validate.markdown(rows, stamp)
 	if args.out:

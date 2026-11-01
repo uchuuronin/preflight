@@ -13,11 +13,21 @@ const repo = join(here, "..", "..");
 const read = (p: string) => JSON.parse(readFileSync(join(repo, p), "utf8")) as RecordLike;
 
 // Real records: A's Oct 28 L4 smoke (measured probes, no engine estimates) and A's Oct 31 agent
-// sample; the golden fine-tune (estimates from a fixture model); C's GRPO sample from A's L4 run.
+// sample; the golden fine-tune (estimates from fixture models or, since round five, B's engine); C's GRPO sample from A's L4 run.
 const smoke = read("api/tests/fixtures/a-smoke-l4-main-4.record.json");
 const golden = read("schema/examples/finetune.json");
 const agent = read("web/src/workspace/fixtures/agent-eval-oct31.record.json");
 const grpo = read("web/src/workspace/fixtures/grpo-l4.record.json");
+
+// The golden records are filled by the fixture models or, since round five, by B's engine, so the
+// tests that need illustrative numbers mark every model in a copy as a fixture, and the rest
+// assert relations rather than pinned values: they hold on either set.
+function asFixture(rec: RecordLike): RecordLike {
+	const ests = Object.values(rec.predictions?.estimates ?? {});
+	const ids = new Set(ests.map((e) => e?.model_id).filter((x): x is string => !!x));
+	return { ...rec, models: [...ids].map((id) => ({ id, fixture: true })) };
+}
+const goldenPeak = golden.predictions?.estimates?.["memory.peak"];
 
 const ENV = { PREFLIGHT_API_ORIGIN: "https://api.example", PREFLIGHT_EDGE_SECRET: "s3cret", PREFLIGHT_SHARE_CARD_IMAGES: "on" };
 const TOKEN = "test-share-token-0001";
@@ -42,12 +52,24 @@ describe("headline", () => {
 	});
 
 	it("calls a fixture model's numbers illustrative, never predicted", () => {
-		const h = headline(golden);
+		const h = headline(asFixture(golden));
 		expect(h.title).toBe("LoRA fine-tune of Qwen2.5-1.5B on Alpaca");
 		expect(h.lines.map((l) => l.label)).toEqual(["Peak memory", "Time to finish", "Run cost", "Chance of running out of memory"]);
 		expect(h.lines.every((l) => l.status === "Illustrative")).toBe(true);
 		expect(h.illustrative).toBe(true);
-		expect(h.lines[0]?.value).toBe("8.3 to 10.1 GiB");
+		// The number is the record's own, converted: its upper end in GiB.
+		expect(typeof goldenPeak?.hi).toBe("number");
+		expect(h.lines[0]?.value).toContain(formatValue(goldenPeak?.hi as number, "bytes"));
+		expect(h.lines[0]?.value).toMatch(/ to /);
+	});
+
+	it("never calls the golden record's numbers illustrative unless its models are fixtures", () => {
+		const fixtures = new Set((golden.models ?? []).filter((m) => m.fixture).map((m) => m.id));
+		const h = headline(golden);
+		// Only the four estimates the card shows decide it.
+		const shown = ["memory.peak", "time.total", "cost.total", "risk.oom"].map((k) => golden.predictions?.estimates?.[k]);
+		const fromFixture = shown.some((e) => e?.point != null && !!e.model_id && fixtures.has(e.model_id));
+		expect(h.illustrative).toBe(fromFixture);
 	});
 
 	it("maps each estimate status to the app's word, and gives no number where it abstains", () => {
@@ -109,8 +131,10 @@ describe("svg", () => {
 	});
 
 	it("labels the badge for screen readers with its number and status", () => {
-		const svg = badgeSvg(headline(golden));
-		expect(svg).toContain('aria-label="preflight: peak memory 8.3 to 10.1 GiB · illustrative"');
+		const h = headline(asFixture(golden));
+		const svg = badgeSvg(h);
+		expect(svg).toContain(`aria-label="preflight: peak memory ${h.lines[0]?.value} · illustrative"`);
+		expect(h.lines[0]?.value).toMatch(/GiB$/);
 	});
 });
 

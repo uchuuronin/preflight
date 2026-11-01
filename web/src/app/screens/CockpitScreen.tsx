@@ -153,7 +153,8 @@ function Cockpit() {
 						<FindingsChip />
 						<ProbeHere />
 					</header>
-					<div className={`pf-deck${fit ? " is-fit" : ""}`}>
+					{/* A node's detail widens the side column, so its text runs wide instead of long. */}
+					<div className={`pf-deck${fit ? " is-fit" : ""}${state.focus ? " has-detail" : ""}`}>
 						<Dials />
 						<div className="pf-stage-wrap">
 							<div className="pf-stage-bar">

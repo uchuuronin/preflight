@@ -318,9 +318,22 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 		const duration = reduce ? 0 : 800;
 		const n = state.focus ? layout.nodes.find((m) => m.id === state.focus) : null;
 		const el = box.current;
-		glideUntil.current = performance.now() + duration;
-		if (n) void flow.setCenter(n.x, n.y, { zoom: el ? focusZoom(el.clientWidth, el.clientHeight) : 1.35, duration });
-		else void flow.fitView({ padding: 0.04, duration });
+		// Opening or closing a node's detail resizes the stage (the side column widens): wait two
+		// frames so React Flow has measured the new box before the glide is aimed (review, Nov 1:
+		// aimed at the old box, it landed off centre and then snapped).
+		glideUntil.current = performance.now() + duration + 40;
+		let raf2 = 0;
+		const raf1 = requestAnimationFrame(() => {
+			raf2 = requestAnimationFrame(() => {
+				glideUntil.current = performance.now() + duration;
+				if (n) void flow.setCenter(n.x, n.y, { zoom: el ? focusZoom(el.clientWidth, el.clientHeight) : 1.35, duration });
+				else void flow.fitView({ padding: 0.04, duration });
+			});
+		});
+		return () => {
+			cancelAnimationFrame(raf1);
+			cancelAnimationFrame(raf2);
+		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [state.focus]);
 
@@ -363,7 +376,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 	}, [flow]);
 
 	return (
-		<div ref={box} className={`pf-orbit${compact ? " pf-orbit--compact" : ""}`} role="region" aria-label={t("map.label")}>
+		<div ref={box} className={`pf-orbit${compact ? " pf-orbit--compact" : ""}${state.focus && !compact ? " is-zoomed" : ""}`} role="region" aria-label={t("map.label")}>
 			<ReactFlow
 				nodes={nodes}
 				edges={[]}

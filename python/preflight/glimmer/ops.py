@@ -224,3 +224,46 @@ def smoke(gpu: str = "a100", calls: int = 5, concurrent: int = 4):
 		}
 	)
 	_write(f"smoke_{gpu}", got)
+
+
+@app.local_entrypoint()
+def deploy_check():
+	"""After `modal deploy`: the endpoint's URL, that it refuses a call without a proxy token (Modal's proxy answers
+	401 before the app's code runs), and the containers the deployed app has running (0 when scaled to zero).
+	Starts no GPU. Writes what it found even when a step fails."""
+	import urllib.error
+	import urllib.request
+
+	from preflight.glimmer.common import APP_NAME
+
+	found: dict = {}
+	try:
+		cls = modal.Cls.from_name(APP_NAME, "Glimmer", environment_name="main")
+		found["url"] = cls().serve.get_web_url()
+	except Exception as exc:
+		found["url_error"] = f"{type(exc).__name__}: {exc}"[:400]
+	if found.get("url"):
+		try:
+			with urllib.request.urlopen(f"{found['url']}/v1/models", timeout=30) as r:
+				found["without_a_token"] = {"status": r.status, "refused": False}
+		except urllib.error.HTTPError as exc:
+			found["without_a_token"] = {"status": exc.code, "refused": exc.code in (401, 403)}
+		except OSError as exc:
+			found["without_a_token"] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
+	out = subprocess.run(
+		["modal", "container", "list", "--env", "main", "--json"], capture_output=True, text=True, timeout=120
+	)
+	if out.returncode != 0:  # review, Nov 1: a failed listing must not read as "scaled to zero"
+		found["containers_error"] = (out.stderr or out.stdout)[-400:]
+		_write("deploy_check", found)
+		return
+	try:
+		rows = json.loads(out.stdout or "[]")
+		mine = [
+			c for c in rows if isinstance(c, dict) and c.get("app_name") == APP_NAME
+		]  # review: exact match
+		found["containers_running"] = len(mine)
+		found["containers"] = mine
+	except ValueError:
+		found["containers_error"] = (out.stderr or out.stdout)[-400:]
+	_write("deploy_check", found)

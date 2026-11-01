@@ -195,3 +195,63 @@ def test_the_divergence_row_reads_the_final_report():
 	rep = json.loads((Path(V.__file__).parent / "reports" / "divergence_nov1.json").read_text())
 	r = V.divergence_row(rep)
 	assert r.hit is False and r.n == 720 and "not used: the warning comes from the threshold rules" in r.note
+
+
+def test_a_run_without_its_files_is_not_measured_and_the_others_still_score(tmp_path):
+	"""Dry run, Nov 1: a run whose record hasn't landed crashed the whole scorer."""
+	import json
+	from pathlib import Path
+
+	from preflight.corpus import validate as V
+
+	base = Path(__file__).resolve().parent / "fixtures" / "validation"
+	m = json.loads((base / "manifest_oct31.json").read_text())
+	m["runs"].append({"script": "gnn_pyg", "set": "zoo", "job_type": "gnn"})
+	m["runs"].append({"script": "vision_timm", "set": "zoo", "job_type": "vision", "record": "nowhere.json"})
+	lora = dict(m["runs"][0], script="finetune_lora_hf_2", ground_truth="not_yet.json")
+	m["runs"].append(lora)
+	rows, runs = V.build(m, base)
+	waiting = {r.script: r.notes for r in runs if any("not measured" in n for n in r.notes)}
+	assert set(waiting) == {"gnn_pyg", "vision_timm"}  # the agent sample has a record and still scores
+	late = next(r for r in runs if r.script == "finetune_lora_hf_2")
+	assert (
+		late.memory is None and any("no ground truth yet" in n for n in late.notes) and late.planted == (3, 3)
+	)
+	assert any(r.cells()[3] == "1 of 1" for r in rows)  # the LoRA run's OOM row still scores
+	assert V.models_used(m["runs"], base)  # and the model ids come from the runs that have records
+
+
+def test_production_flags_lay_the_production_file_over_flags_json(tmp_path):
+	import json
+
+	from preflight.corpus import validate as V
+
+	(tmp_path / "flags.json").write_text(
+		json.dumps({"engine.rl": False, "engine.memory": False, "$comment": "x"})
+	)
+	(tmp_path / "flags.production.json").write_text(json.dumps({"engine.rl": True}))
+	assert V.production_flags(tmp_path) == {"engine.rl": True, "engine.memory": False}
+
+
+def test_the_scorer_predicts_under_the_flags_it_is_given():
+	import json
+	from pathlib import Path
+
+	from preflight.corpus import validate as V
+	from preflight.engine import api
+
+	base = Path(__file__).resolve().parent / "fixtures" / "validation"
+	m = json.loads((base / "manifest_oct31.json").read_text())
+	seen = []
+	orig = api.predict
+
+	def spy(rec, values=None):
+		seen.append(api.feature("rl"))
+		return orig(rec, values)
+
+	api.predict, before = spy, api.feature("rl")
+	try:
+		V.build(m, base, flags={"engine.rl": True})
+	finally:
+		api.predict = orig
+	assert seen and all(seen) and api.feature("rl") == before  # on for the scoring only
