@@ -9,7 +9,7 @@ import { exportPlan } from "./export/plan";
 import { GridProvider } from "./provider/GridProvider";
 import { currentKnobs, targetFor } from "./record/model";
 import { type FlightRecord, normaliseRecord } from "./record/types";
-import { appliesHere, loadRate, rateFactor, saveRate, tableRate, withRate } from "./rate";
+import { appliesHere, estimateFactor, loadRate, rateFactor, saveRate, tableRate, withRate } from "./rate";
 
 const gpuRec = normaliseRecord(goldenRaw as unknown as FlightRecord);
 const apiRec = normaliseRecord(agentRaw as unknown as FlightRecord);
@@ -111,6 +111,19 @@ describe("the visitor's rate", () => {
 		const half = planFromRecord(rec.campaign!, rec.models, () => 0.5)!;
 		expect(half.usd.point).toBeCloseTo(plain.usd.point! / 2, 9);
 		expect(half.gpu_hours).toEqual(plain.gpu_hours);
+	});
+
+	it("divides by the rate an estimate names (0.6.0 Estimate.rate), not the table's, for this GPU only", () => {
+		const k = currentKnobs(gpuRec);
+		const e = { point: 10, lo: 8, hi: 12, unit: "usd", status: "predicted", model_id: "m", source: "exact", rate: { quantity: 5, usd_per_unit: 2, unit: "gpu_hours" } } as never;
+		// Priced at US$2/h; the visitor pays US$1/h: half.
+		expect(estimateFactor(gpuRec, k, e, { kind: "gpu", gpu: "L4", usdPerHour: 1 })).toBeCloseTo(0.5, 9);
+		// No rate on the estimate: the table's (US$0.80/h on L4).
+		const plain = { point: 10, lo: 8, hi: 12, unit: "usd", status: "predicted", model_id: "m", source: "exact" } as never;
+		expect(estimateFactor(gpuRec, k, plain, { kind: "gpu", gpu: "L4", usdPerHour: 1.6 })).toBeCloseTo(2, 9);
+		// A rate for another GPU leaves the estimate's dollars alone; no visitor rate, no change.
+		expect(estimateFactor(gpuRec, k, e, { kind: "gpu", gpu: "H100", usdPerHour: 1 })).toBe(1);
+		expect(estimateFactor(gpuRec, k, e, null)).toBe(1);
 	});
 
 	it("is kept per job in this browser, and a malformed entry is ignored", () => {

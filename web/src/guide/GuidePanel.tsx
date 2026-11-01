@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { finishBand, planFromRecord } from "../workspace/campaign/plan";
 import { currentKnobs } from "../workspace/record/model";
-import { rateFactor } from "../workspace/rate";
+import { estimateFactor } from "../workspace/rate";
 import { fmt, fmtDelta, fmtRange } from "../lib/fmt";
 import { wilson } from "../addons/_stats/wilson";
 import { probeCap, rlProbe, spreadCount } from "../workspace/rl";
@@ -77,7 +77,7 @@ export function GuidePanel() {
 	// B's plan at the table's rates it was made at: the budget cut is judged there, whatever rate the visitor types.
 	const campaignTable = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
 	const campaign = useMemo(
-		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k) => rateFactor(record, { ...currentKnobs(record), ...k }, state.rate)) : null),
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k, e) => estimateFactor(record, { ...currentKnobs(record), ...k }, e, state.rate)) : null),
 		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
 		[record, state.rate],
 	);

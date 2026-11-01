@@ -154,12 +154,28 @@ function scaled(e: Estimate | undefined, f: number): Estimate | undefined {
 	return { ...e, point: m(e.point) ?? null, lo: m(e.lo) ?? null, hi: m(e.hi) ?? null } as Estimate;
 }
 
+/**
+ * Visitor / the rate an estimate was priced at. Contract 0.6.0 `Estimate.rate` names that rate
+ * (quantity x usd_per_unit, with its price row), so where an estimate carries it, it is the
+ * denominator, not the browser's lookup of the table; otherwise the table's rate at this setting.
+ */
+export function estimateFactor(record: LoadedRecord, knobs: Knobs, e: Estimate | null | undefined, o: RateOverride | null): number {
+	if (!o || !e) return 1;
+	const r = (e as Estimate & { rate?: { usd_per_unit: number; unit: string; price_row?: string | null } | null }).rate;
+	if (r && o.kind === "gpu" && r.unit === "gpu_hours" && r.usd_per_unit > 0) {
+		const row = gpuRow(record, knobs);
+		// The visitor's rate is for one GPU: an estimate priced at another GPU's row keeps its own dollars.
+		if (!row || resolveGpu(o.gpu) !== row.gpu || (r.price_row && r.price_row !== row.id)) return 1;
+		return o.usdPerHour / r.usd_per_unit;
+	}
+	return rateFactor(record, knobs, o);
+}
+
 /** Every dollar estimate in a prediction at the visitor's rate. */
 export function priced(record: LoadedRecord, knobs: Knobs, p: Prediction, o: RateOverride | null): Prediction {
-	const f = rateFactor(record, knobs, o);
-	if (f === 1) return p;
+	if (!o) return p;
 	const out: Prediction = {};
-	for (const [id, e] of Object.entries(p)) out[id] = scaled(e, f);
+	for (const [id, e] of Object.entries(p)) out[id] = scaled(e, estimateFactor(record, knobs, e, o));
 	return out;
 }
 
