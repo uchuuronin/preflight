@@ -94,8 +94,16 @@ def _answer(text: str) -> dict | None:
 	return d if isinstance(d, dict) else None
 
 
+def _worst_call_usd(client, msgs: list[dict]) -> float:
+	"""What one more call could cost at most: its input as estimated, the client's full output cap."""
+	from preflight.harness.spark import estimate_tokens
+
+	p_in, _, p_out = client.prices.get(client.model, (0.0, 0.0, 0.0))
+	return (estimate_tokens(msgs) * p_in + client.max_output_tokens * p_out) / 1e6
+
+
 def check_claim(
-	client, nums: dict, finding: Finding, deadline: float | None = None
+	client, nums: dict, finding: Finding, deadline: float | None = None, room=None
 ) -> tuple[str, str | None, str, list]:
 	"""(verdict "supported" or "abstain", the supporting path, the reason, the calls made)."""
 	msgs = [
@@ -111,6 +119,8 @@ def check_claim(
 		for _ in range(MAX_ROUNDS):
 			if deadline is not None and time.monotonic() >= deadline:
 				return "abstain", None, "the check ran out of time", client.calls[before:]
+			if room is not None and _worst_call_usd(client, msgs) > room():
+				return "abstain", None, "the check's dollar cap was reached", client.calls[before:]
 			msg, _call = client.chat_message(
 				msgs, purpose="diagnosis_check", reasoning_effort="low", tools=[TOOL]
 			)
@@ -149,14 +159,24 @@ def check_claim(
 	return "supported", path, reason, calls
 
 
-def check_diagnosis(client, rec: FlightRecord, findings: list[Finding]) -> tuple[list[Finding], list]:
-	"""The diagnosis findings with Spark Open's check applied, and every call made."""
+def check_diagnosis(
+	client, rec: FlightRecord, findings: list[Finding], budget_usd: float | None = None
+) -> tuple[list[Finding], list]:
+	"""The diagnosis findings with Spark Open's check applied, and every call made. With budget_usd,
+	no call starts whose worst case would take the check's spend past it."""
 	nums = numbers(rec)
 	out, calls = [], []
 	deadline = time.monotonic() + DEADLINE_S
+	start = len(client.calls)
+
+	def room() -> float:
+		return budget_usd - sum(c.cost_usd for c in client.calls[start:])
+
 	for i, f in enumerate(findings):
 		if i < MAX_CLAIMS:
-			verdict, path, reason, cs = check_claim(client, nums, f, deadline)
+			verdict, path, reason, cs = check_claim(
+				client, nums, f, deadline, room if budget_usd is not None else None
+			)
 		else:
 			verdict, path, reason, cs = "abstain", None, f"not checked (only the first {MAX_CLAIMS} are)", []
 		calls += cs

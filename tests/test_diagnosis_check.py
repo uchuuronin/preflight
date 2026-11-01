@@ -139,5 +139,16 @@ def test_one_real_run_diagnoses_then_checks_inside_its_cap(rec):
 	assert [f["code"] for f in out["checked"]] == ["diagnosis.consistent"]
 	assert [c["purpose"] for c in out["calls"]] == ["diagnosis", "diagnosis_check", "diagnosis_check"]
 	assert out["usd"] == round(sum(c["cost_usd"] for c in out["calls"]), 6) and out["usd"] < 0.5
-	skipped = run_once(rec, client_answering(diag, []), spark_open([], []), 0.0)  # no room left for the check
-	assert skipped["checked"] is None and skipped["check_skipped"] == "not enough of the cap left"
+	# the cap holds (review, Nov 1): a diagnosis whose worst case passes it never starts
+	seen = []
+	skipped = run_once(rec, client_answering(diag, seen), spark_open([], []), 0.001)
+	assert seen == [] and skipped["usd"] == 0 and "over the $0.00 cap" in skipped["skipped"]
+	# and a check call whose worst case won't fit what's left never starts
+	pricey = spark_open([fetch(PATH), answer("supported", PATH)], [])
+	pricey.prices = {pricey.model: (1_000.0, 1_000.0, 1_000.0)}  # one call's worst case is dollars
+	tight = run_once(rec, client_answering(diag, []), pricey, 0.5)
+	assert [c["purpose"] for c in tight["calls"]] == ["diagnosis"]
+	assert (
+		tight["checked"][0]["code"] == "diagnosis.abstain" and "dollar cap" in tight["checked"][0]["detail"]
+	)
+	assert tight["usd"] <= 0.5

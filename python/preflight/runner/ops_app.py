@@ -696,6 +696,12 @@ def diagnose_hosted(record_json: str, max_usd: float = 0.5) -> dict:
 def diagnose(share: str, max_usd: float = 0.5):
 	"""modal run --env main python/preflight/runner/ops_app.py::diagnose --share <token> [--max-usd 0.5]
 	Reads the stored record, runs the diagnosis and its check once, writes out/diagnose.json."""
+	import re
+	import sys
+
+	if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", share):
+		print(f"[diagnose] {share!r} isn't a share token", flush=True)
+		sys.exit(2)
 	data = b"".join(records_vol.read_file(f"{share}.json")).decode()
 	res = diagnose_hosted.remote(data, max_usd)
 	Path("out").mkdir(exist_ok=True)
