@@ -485,7 +485,7 @@ def run_worker() -> int:
 	from preflight.runner.pipeline import JOB_PROBE_WALL_S, Deps, run_job
 	from preflight.runner.records import LocalRecordWriter
 	from preflight.runner.remote_store import DirBlobs, RemoteJobStore
-	from preflight.runner.sandbox_runner import SandboxRunner
+	from preflight.runner.sandbox_runner import WAIT_CAP_S, SandboxRunner
 	from preflight.runner.worker import run_one
 
 	svc = JobStoreService()
@@ -499,7 +499,8 @@ def run_worker() -> int:
 	while True:
 		# never lease a job this container can't finish before its own timeout: a killed worker
 		# leaves the job to the reaper and a retry, and its sandbox billing until idle_timeout
-		if time.monotonic() - started > WORKER_TIMEOUT_S - (JOB_PROBE_WALL_S + 15 * 60):
+		# a job's worst case: its GPU wait (capped), its probe wall, and the rest of the job
+		if time.monotonic() - started > WORKER_TIMEOUT_S - (WAIT_CAP_S + JOB_PROBE_WALL_S + 15 * 60):
 			return ran
 		from preflight.probes.gpu_choice import usd_per_hour
 

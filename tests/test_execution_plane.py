@@ -430,3 +430,20 @@ def test_the_jobs_wall_budget_doesnt_count_the_gpu_wait():
 	b.started -= 50.0  # 50 s since the job began...
 	b.waited = lambda: 45.0  # ...45 of them waiting for a GPU
 	assert 54.0 < b.left_s() <= 55.0
+
+
+def test_the_gpu_wait_cap_covers_the_whole_job_not_each_probe():
+	import time as _time
+
+	class Never(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(5)
+			return super().exec(*args, timeout=timeout)
+
+	with SandboxRunner(lambda g: Never(g), wait_cap_s=0.3) as run:
+		t0 = _time.monotonic()
+		first = run(spec("p1"), "L4", should_stop=lambda: False)
+		second = run(spec("p2"), "L4", should_stop=lambda: False)  # the cap is spent: no second wait
+		took = _time.monotonic() - t0
+	assert first.probe.error_code == second.probe.error_code == "gpu.unavailable" and took < 1.0

@@ -103,7 +103,8 @@ class SandboxRunner:
 			# the probe image by its old one-argument call; another image (serving) by name
 			sb = self._create(g) if image == "probe" else self._create(g, image=image)
 			last = i == len(options) - 1
-			left = max(0.0, self._wait_cap_s - (self._clock() - t))
+			# the cap covers the whole job's waiting, earlier sandboxes' included
+			left = max(0.0, self._wait_cap_s - self.queued_s - (self._clock() - t))
 			# wait out the GPU queue before any clock starts: neither the probe's time limit nor its
 			# cost counts the minutes Modal spent finding a GPU (no container runs, nothing is billed)
 			if self._ready(sb, left if last else min(self._schedule_wait_s, left)):

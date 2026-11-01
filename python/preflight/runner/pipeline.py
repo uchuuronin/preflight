@@ -664,6 +664,11 @@ def _probe_points(
 	for i, p in enumerate(plan):
 		ctx.check()
 		_emit(ctx, "probing", rec, rev, probe_id=p.probe_id, progress=round(i / len(plan), 3))
+		if any(q.error_code == "gpu.unavailable" for q in probes):
+			# no GPU could be scheduled within the job's wait cap: the next point would wait for nothing
+			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
+				error="skipped: no GPU could be scheduled (see the first probe)", error_code="gpu.unavailable"))  # fmt: skip
+			continue
 		if any(q.error_code == "missing_package.install" for q in probes):
 			# the same requirements fail the same way at every point: don't pay for it again
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,

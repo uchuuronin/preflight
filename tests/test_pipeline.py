@@ -745,3 +745,11 @@ def test_an_eval_oom_point_triages_each_attempt_under_its_own_id(tmp_path, monke
 	ids = [f.id for f in rec.findings if f.source == "spark_open_triage"]
 	assert len(ids) == len(set(ids)) and {"triage.p1-eval", "triage.p1"} <= set(ids)
 	assert {p.id for p in rec.probes} >= {"p1-eval", "p1"}
+
+
+def test_after_no_gpu_could_be_scheduled_the_jobs_other_points_are_skipped(tmp_path):
+	runner = FakeRunner(outcomes={"p1": ("error", "gpu.unavailable")})
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, runner)
+	)
+	assert len(runner.calls) == 1 and all(p.error_code == "gpu.unavailable" for p in rec.probes)
