@@ -1,0 +1,13 @@
+{
+  "app": "preflight-runner",
+  "env": "main",
+  "before": [
+    "deployed"
+  ],
+  "after": [
+    "stopped"
+  ],
+  "stop_exit": 0,
+  "stop_output": "preflight-runner: ",
+  "stopped": true
+}
