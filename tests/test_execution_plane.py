@@ -477,7 +477,7 @@ def test_the_probe_user_check_reports_the_names_and_imports_it_ran_with(monkeypa
 
 
 @pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() != 0, reason="drops to a uid: needs root")
-def test_the_probe_user_check_fails_where_the_probe_uid_has_no_passwd_entry(monkeypatch):
+def test_the_probe_user_check_reports_a_missing_passwd_entry_and_the_gate_fails_it(monkeypatch):
 	# the image bug torchtitan hit on a GPU (Nov 1), caught here on a CPU instead
 	import pwd
 
@@ -507,6 +507,8 @@ def test_the_deploy_gate_needs_the_names_the_imports_and_a_compile():
 	assert _probe_user_ok(good, "serving")
 	assert not _probe_user_ok({**good, "compiled": None}, "serving")  # torch.compile didn't run
 	assert not _probe_user_ok({**good, "imported": []}, "serving")  # vllm didn't import
+	assert not _probe_user_ok({**good, "passwd": None}, "serving")  # the image has no passwd entry
+	assert not _probe_user_ok({**good, "group": None}, "serving")  # nor a group entry
 	assert not _probe_user_ok({**good, "group": "30002"}, "serving")
 	assert not _probe_user_ok({"failed": "TimeoutExpired"}, "probe")
 	assert _probe_user_ok({**good, "imported": []}, "probe")

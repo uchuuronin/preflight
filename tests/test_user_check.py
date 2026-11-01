@@ -1,5 +1,8 @@
 """The droplet's probe-user startup check: what passes and what fails (probes/user_check.py)."""
 
+import pytest
+
+from preflight.probes import user_check
 from preflight.probes.user_check import CHILD_IMPORTS, verdict
 
 OK = {"exit": 0, "uid": 61000, "user": "preflight-probe", "groups": [44, 109], "compiled": 7.27,
@@ -29,3 +32,29 @@ def test_a_crash_reports_its_stderr():
 
 def test_not_root_skips_the_uid_checks():
 	assert verdict({**OK, "uid": 1000, "user": "me", "groups": []}, None, False, [44]) == []
+
+
+def test_a_cuda_torch_fails_the_gpu_check_where_rocm_devices_exist(monkeypatch):
+	monkeypatch.setattr(user_check.os.path, "exists", lambda p: p == "/dev/kfd")
+	assert "not a ROCm torch" in verdict({**OK, "gpu": {"hip": None, "cuda": "12.4"}}, 61000, True, [])
+	assert "/dev/kfd not opened" in verdict({**OK, "kfd": None}, 61000, True, [])
+	assert verdict(OK, 61000, True, [44, 109]) == []
+
+
+def test_a_wrong_user_name_fails():
+	assert "user name 'root'" in verdict({**OK, "user": "root"}, 61000, False, [])
+
+
+def test_a_check_that_cant_launch_still_prints_its_line(monkeypatch, capsys):
+	def boom(*a, **k):
+		raise PermissionError("setgroups")
+
+	monkeypatch.setattr(user_check, "probe_user_check", boom)
+	assert user_check.main(["--uid", "61000"]) == 1
+	out = capsys.readouterr().out
+	assert out.startswith("USER_CHECK ") and "PermissionError: setgroups" in out
+
+
+def test_the_uid_must_be_unprivileged():
+	with pytest.raises(SystemExit):
+		user_check.main(["--uid", "0"])

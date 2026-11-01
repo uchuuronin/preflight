@@ -435,6 +435,12 @@ for mod in sys.argv[1:]:
 		g = torch.compile(lambda x: (x * 2).sin().sum())
 		out["gpu_compiled"] = float(g(x))
 		continue
+	if mod.startswith("?"):  # optional: the probe runs without it, but records less (psutil: no RSS)
+		try:
+			__import__(mod[1:])
+		except ImportError:
+			out.setdefault("missing", []).append(mod[1:])
+		continue
 	__import__(mod)
 	out.setdefault("imported", []).append(mod)
 print("PROBE_USER " + json.dumps(out))
