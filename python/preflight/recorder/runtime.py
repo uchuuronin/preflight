@@ -1558,6 +1558,12 @@ class Recorder:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
+		# the dataset the training loader draws from: examples, pairs, images, or a NodeLoader's input
+		# nodes per epoch, which B's engine divides by the batch for the run's length (D, Nov 1)
+		with suppress(Exception):
+			n = len(self._train_dataset) if self._train_dataset is not None else None
+			if isinstance(n, int) and n > 0:
+				out["train_dataset_len"] = float(n)
 		out.update(self._identical_outputs())
 		known = [t for g in self.gens for t in g["truncated"] if t is not None]
 		if self.gens and known:  # how many sequences truncation_rate is over (those whose ending is known)

@@ -753,3 +753,16 @@ def test_after_no_gpu_could_be_scheduled_the_jobs_other_points_are_skipped(tmp_p
 		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, runner)
 	)
 	assert len(runner.calls) == 1 and all(p.error_code == "gpu.unavailable" for p in rec.probes)
+
+
+def test_the_probes_dataset_size_fills_the_records_n_examples(tmp_path):
+	class Sized(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			r = super().__call__(spec, gpu, should_stop=should_stop)
+			r.probe = r.probe.model_copy(update={"extras": {**r.probe.extras, "train_dataset_len": 98231.0}})
+			return r
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, Sized())
+	)
+	assert rec.job.script_map.data.n_examples == 98231

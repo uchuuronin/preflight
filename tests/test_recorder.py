@@ -149,6 +149,7 @@ def test_extras_carry_the_counts_b_reads_by_name(loop_result):
 		== x["dataset_mean_tokens"]
 	)
 	assert 0 < x["dataset_rows_scanned"] <= 100_000 == x["dataset_rows_total"]
+	assert x["train_dataset_len"] == 100_000  # the training loader's dataset, for the run's length (D, Nov 1)
 	assert x["samples_per_step"] == 4
 	assert x["micro_steps_per_step"] == 1
 

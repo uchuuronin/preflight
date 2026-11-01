@@ -117,6 +117,7 @@ EXTRAS_KEYS = (
 	"planned_steps",
 	# the training set's row lengths in tokens, as the script tokenised them (B, Oct 30), over
 	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
+	"train_dataset_len",  # rows of the training loader's dataset (examples, pairs, images, input nodes)
 	"dataset_max_tokens",
 	"dataset_p999_tokens",
 	"dataset_p50_tokens",  # step and total time follow the median and mean; memory the max (B, Nov 1)

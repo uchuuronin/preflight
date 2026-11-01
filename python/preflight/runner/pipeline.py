@@ -503,6 +503,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	from .measured_rules import hygiene_findings
 
+	out = _with_dataset_size(out)
+
 	# run hygiene, from the code the probes ran (a probe job's patch included, so a fix can clear
 	# its own finding; a verify job's base is the record's own code) and the probes so far
 	code = fixed.files if fixed is not None and req.mode == "probe" else fetched.files
@@ -596,6 +598,22 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 		p.seed = record_jobs.VERIFY_SEED_2 if p.role == "verify_seed" else record_jobs.VERIFY_SEED
 		p.seed_force = True
 	return plan
+
+
+def _with_dataset_size(rec: FlightRecord) -> FlightRecord:
+	"""The dataset size the static reader couldn't see, from the probes: the rows of the training
+	loader's dataset (extras.train_dataset_len), else the token-row scan's total. B's engine divides
+	it by the batch for the run's length, so time.total and cost.total don't abstain (D, Nov 1)."""
+	sm = rec.job.script_map
+	if sm is None or sm.data is None or sm.data.n_examples:
+		return rec
+	n = next((p.extras.get("train_dataset_len") or p.extras.get("dataset_rows_total") for p in rec.probes
+		if p.status == "ok" and (p.extras.get("train_dataset_len") or p.extras.get("dataset_rows_total"))), None)  # fmt: skip
+	if not n:
+		return rec
+	data = sm.data.model_copy(update={"n_examples": int(n)})
+	job = rec.job.model_copy(update={"script_map": sm.model_copy(update={"data": data})})
+	return rec.model_copy(update={"job": job})
 
 
 def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord, list]:
