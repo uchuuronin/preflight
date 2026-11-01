@@ -1,0 +1,11 @@
+{
+	"name": "20261101-130956-41309914515-a-torchtitan-check",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41309914515",
+	"ref": "ws-a",
+	"sha": "9e46c3c0d0c97dbbe776b7c65a86a4a82d5bba75",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::torchtitan_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T13:10:53Z"
+}

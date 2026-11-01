@@ -1,0 +1,26 @@
+{
+  "startup": {
+    "exit": 0,
+    "stderr_tail": "",
+    "torch": "2.7.1+cu126",
+    "flavor": "debugmodel",
+    "steps": 40,
+    "vocab": 2256,
+    "docs": 300
+  },
+  "probe": {
+    "status": "error",
+    "error": "KeyError: 'getpwuid(): uid not found: 61000'. KeyError: 'getpwuid(): uid not found: 61000' at <frozen runpy>:112, before the first optimizer step (stage: running script)",
+    "error_code": "user_error",
+    "steps": 0,
+    "p50_s": null,
+    "by_phase": null,
+    "peak_allocated_bytes": null,
+    "extras": {
+      "host_rss_peak_bytes": 4067311616.0
+    },
+    "gpu": "A10",
+    "seconds": 6.629,
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n"
+  }
+}

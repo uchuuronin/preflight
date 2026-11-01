@@ -1,0 +1,37 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-QAA5YseUSy5yK1kIedQk9q
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+[titan] startup check: {"exit": 0, "stderr_tail": "", "torch": "2.7.1+cu126", "flavor": "debugmodel", "steps": 40, "vocab": 2256, "docs": 300}
+[titan] waiting for an L4, else an A10 or an L40S (Modal queues it)
+[titan] container up on the L4
+{
+  "status": "error",
+  "error": "KeyError: 'getpwuid(): uid not found: 61000'. KeyError: 'getpwuid(): uid not found: 61000' at <frozen runpy>:112, before the first optimizer step (stage: running script)",
+  "error_code": "user_error",
+  "steps": 0,
+  "p50_s": null,
+  "by_phase": null,
+  "peak_allocated_bytes": null,
+  "extras": {
+    "host_rss_peak_bytes": 4067311616.0
+  },
+  "gpu": "A10",
+  "seconds": 6.629
+}
+Stopping app - uncaught exception raised locally: SystemExit(1).
