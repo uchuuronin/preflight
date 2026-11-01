@@ -492,6 +492,9 @@ def test_a_serving_probe_caps_new_tokens_on_copies_and_says_the_scripts_own_cap(
 	# under the cap, or no params (vLLM's 16-token default): left as they are
 	assert _cap_new_tokens((["a"],), {"sampling_params": SP(512)}, 1024)[2:] == (None, None)
 	assert _cap_new_tokens((["a"],), {}, 1024)[2:] == (None, None)
+	# max_tokens None: to the context length, the longest of all; capped, and the script's cap unknown
+	args, kw, script, probe = _cap_new_tokens((["a"],), {"sampling_params": SP(None)}, 1024)
+	assert kw["sampling_params"].max_tokens == 1024 and (script, probe) == (None, 1024)
 
 
 FAKE_VLLM = """
@@ -541,6 +544,7 @@ def test_a_serving_probe_records_its_token_cap_beside_the_scripts():
 	assert r.probe.extras["serving_probe_max_tokens"] == 1024.0
 	# the replies cut at the probe's cap have no known ending; those that stopped on their own do
 	assert g.truncation_rate == 0.0 and r.probe.extras["generation_ending_known"] == 16.0
+	assert r.probe.extras["serving_probe_capped_fraction"] == 0.5
 
 
 def test_grpo_entropy_is_the_policys_mean_negative_log_prob_over_completion_tokens():

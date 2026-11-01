@@ -185,11 +185,15 @@ def _cap_new_tokens(args: tuple, kwargs: dict, cap: int) -> tuple[tuple, dict, i
 	many = isinstance(sp, list | tuple)
 	items = list(sp) if many else [sp]
 	asked = [getattr(x, "max_tokens", None) for x in items]
-	if not any(isinstance(a, int) and a > cap for a in asked):
+
+	def over(a) -> bool:  # None: vLLM decodes to the model's context length, the longest of all
+		return a is None or (isinstance(a, int) and a > cap)
+
+	if not any(over(a) for a in asked):
 		return tuple(args), kwargs, None, None
 	out = []
 	for x, a in zip(items, asked, strict=True):
-		if isinstance(a, int) and a > cap:
+		if over(a):
 			x = x.clone() if hasattr(x, "clone") else copy.copy(x)
 			x.max_tokens = cap
 		out.append(x)
@@ -198,7 +202,9 @@ def _cap_new_tokens(args: tuple, kwargs: dict, cap: int) -> tuple[tuple, dict, i
 		kwargs = {**kwargs, "sampling_params": new}
 	else:
 		args[1] = new
-	return tuple(args), kwargs, max(a for a in asked if isinstance(a, int)), cap
+	# the script's own cap: None when any prompt had none (to the context length)
+	script = None if any(a is None for a in asked) else max(a for a in asked if isinstance(a, int))
+	return tuple(args), kwargs, script, cap
 
 
 def _lens_stats(batch) -> dict[str, float]:
@@ -1678,6 +1684,12 @@ class Recorder:
 		probe_caps = [g["probe_cap"] for g in self.gens if g.get("probe_cap")]
 		if probe_caps:  # the serving probe stopped each reply at this many tokens, not the script's cap
 			out["serving_probe_max_tokens"] = float(max(probe_caps))
+			capped = [g for g in self.gens if g.get("probe_cap")]
+			n = sum(len(g["truncated"]) for g in capped)
+			# the share of replies still running at the cap, for B's extrapolation past it
+			cut = sum(1 for g in capped for t in g["truncated"] if t is None)
+			if n:
+				out["serving_probe_capped_fraction"] = cut / n
 		if self.checkpoints.get("saves"):
 			ck = self.checkpoints
 			out["checkpoint_saves_seen"] = ck["saves"]
