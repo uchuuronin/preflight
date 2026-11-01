@@ -690,7 +690,7 @@
 	"datause.fix": "Fixes are written by Meta’s Muse Code from your script.",
 	"datause.record": "Results become a flight record anyone with its link can open.",
 	"datause.retention.repo": "A repo's code is deleted once read; its record keeps only the repo link and commit.",
-	"datause.retention.uploads": "Uploaded files and notebooks are deleted about {days} days after the last job that used them, and never before its record.",
+	"datause.retention.uploads": "Uploaded files and notebooks are deleted about {days} days after the last job that used them, and never before their record.",
 	"datause.retention.uploads_kept": "Uploaded files and notebooks are kept as sent, even after their record is deleted, so the guide can re-run them; nothing deletes them yet.",
 	"datause.retention.records": "Flight records are deleted about {days} days after they are made.",
 	"datause.retention.probe_errors": "Probe results are kept for reuse, error messages included, which can quote your code.",

@@ -128,7 +128,9 @@ jobs:
 
   # D's Pages Functions (share pages, cards, badges). The fonts are .bin files, which .gitignore
   # keeps out of the repo, so `vendor` copies them (and resvg) from the pinned node_modules first;
-  # without it the card tests can't load a font on a clean machine.
+  # without it the card tests can't load a font on a clean machine. `vendor` also reads one licence
+  # from web/node_modules, so web's packages are installed too; the diff check fails if the
+  # committed vendored files no longer match what the pinned packages give.
   workers:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -139,8 +141,10 @@ jobs:
           node-version: "22"
       - working-directory: workers
         run: |
+          npm ci --no-audit --no-fund --prefix ../web
           npm ci --no-audit --no-fund
           npm run vendor
+          git diff --exit-code -- functions/_card
           npm test
           npm run typecheck
           npm run hero-cards:check
