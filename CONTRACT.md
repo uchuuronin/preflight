@@ -1,4 +1,4 @@
-# Preflight contract v0.6.0
+# Preflight contract v0.6.1
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,10 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.1 (Nov 1, additive; A's and B's requests, approved by Chiya): `StepSample.reserved_bytes` (the
+  allocator's reserved memory read at the same instant as `device_used_bytes`, so their gap is the
+  context plus other processes) and `AgentSample.concurrency` (tasks run at once; when `ended` is
+  "stalled", at most this many tasks with no stop reason can be stuck). 0.6.0 records load unchanged.
 - 0.6.0 (Nov 1, additive; B's, C's and A's requests, approved by Chiya): a shared record draws the same
   campaign calendar as B's live plan. `Campaign` gains `start` (when the campaign clock starts; `start_s`
   and `finish_s` count from it), `p_by_deadline`, `checkpoint_interval` (`Estimate`, beside the

@@ -172,6 +172,20 @@
 					"default": null,
 					"description": "0.6.0: how the sampled run ended; stalled = no model call for the stall time (a tool stuck)",
 					"title": "Ended"
+				},
+				"concurrency": {
+					"anyOf": [
+						{
+							"minimum": 1,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.1: tasks run at once (the script's workers); in a stalled run at most this many can be stuck",
+					"title": "Concurrency"
 				}
 			},
 			"title": "AgentSample",
@@ -298,7 +312,7 @@
 						}
 					],
 					"default": null,
-					"description": "cut (0.6.0): stopped with the whole run (cancel, stall, the run's limit), not by the task itself",
+					"description": "cut (0.6.0): stopped with the whole run by a cancel or the run's time limit; never on a stall, where tasks in flight keep no stop reason (0.6.1)",
 					"title": "Stop Reason"
 				},
 				"trace": {
@@ -4984,6 +4998,20 @@
 					"default": null,
 					"description": "Whole-device use at the boundary (cudaMemGetInfo): PyTorch plus everything else",
 					"title": "Device Used Bytes"
+				},
+				"reserved_bytes": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.1: the allocator's reserved memory read at the same instant as device_used_bytes, so device_used_bytes - reserved_bytes is the CUDA or ROCm context plus other processes",
+					"title": "Reserved Bytes"
 				}
 			},
 			"required": [
@@ -5422,7 +5450,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.6.0",
+			"default": "0.6.1",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -5574,5 +5602,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.0/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.6.1/FlightRecord"
 }
