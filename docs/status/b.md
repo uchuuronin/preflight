@@ -222,6 +222,14 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 
 Total so far: ledger $1.21 plus about $0.03 today; billed estimate $4.80 to $6.70 until Modal's usage page gives the real figure. **The ledger under-counts container time.** It sums each config's own seconds, but containers are also billed for start-up, the per-batch volume reload, a volume commit after every config, and the waits between waves. That overhead was small in phase 0's single container and dominant in phase 1 (about 80 container-seconds per config against about 9 counted). So the $6 cap was enforced on the wrong measure. Phase 2 is on hold until the budget counts container wall time. Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
 
+## Pushes to `ws-b`
+
+Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking once gitleaks is clean (`git` over the pushed range and `dir`) and one read-only review has checked the change; each push is listed here. Anything for `main`, production flags or the contract is still asked first.
+
+| When (ET) | Commits sent (oldest first) | Merges | Review | gitleaks |
+| --- | --- | --- | --- | --- |
+| Sun Nov 1, about 11:30 AM | 977d5ef contract 0.6.0 fields; 7c803b8 P(OOM) scored as shown, table 67ab8edae6; 1cfa689 divergence not used; 0143b6a small fixes; 6b388f0 engine flags wired, stalled-run cap, both fit reports; ab72de6 review fixes; and this status commit | none (f42a30a went out with the earlier push) | read-only reviews of 977d5ef to 1cfa689 (earlier), of 0143b6a and 6b388f0, and of ab72de6; 0143b6a also on Chiya's yes (11:04 AM) | clean, both scans |
+
 ## Contract requests
 In `docs/requests/from-b.md`.
 - **Open from B to A:**
