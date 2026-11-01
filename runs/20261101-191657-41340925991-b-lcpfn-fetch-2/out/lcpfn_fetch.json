@@ -1,0 +1,127 @@
+{
+ "package": "lcpfn==0.1.3",
+ "torch": "1.11.0+cu102",
+ "models": {
+  "pfn_EPOCH1000_EMSIZE512_NLAYERS12_NBUCKETS1000": {
+   "url": "https://ml.informatik.uni-freiburg.de/research-artifacts/lcpfn/pfn_EPOCH1000_EMSIZE512_NLAYERS12_NBUCKETS1000.pt.gz",
+   "sha256_gz": "c6611e7d30bb305761b33194cd124e7ee879c1fbe34cba0a41c5fd58b6223128",
+   "sha256_pt": "195df6bafff54addf3535ceb15944d1f6d48924221911f7b48517dab2e0e7b84",
+   "bytes_gz": 99421403,
+   "download_s": null,
+   "class": "transformer.TransformerModel",
+   "ninp": 512,
+   "nhead": 4,
+   "nhid": 1024,
+   "nlayers": 12,
+   "n_out": 1000,
+   "activation": "gelu",
+   "pre_norm": false,
+   "reference": {
+    "x_seen": 30,
+    "y_train": [
+     0.877483,
+     0.683078,
+     0.607692,
+     0.545337,
+     0.529367,
+     0.494557,
+     0.449148,
+     0.392367,
+     0.423562,
+     0.376749,
+     0.395825,
+     0.383326,
+     0.36914,
+     0.382106,
+     0.371163,
+     0.336091,
+     0.306823,
+     0.293345,
+     0.332461,
+     0.331285,
+     0.322051,
+     0.273965,
+     0.29353,
+     0.332976,
+     0.306722,
+     0.276031,
+     0.280497,
+     0.284043,
+     0.304738,
+     0.305411
+    ],
+    "qs": [
+     0.05,
+     0.5,
+     0.95
+    ],
+    "quantiles_at_100": [
+     0.226429,
+     0.291818,
+     0.356435
+    ]
+   }
+  },
+  "pfn_EPOCH1000_EMSIZE512_NLAYERS6_NBUCKETS1000": {
+   "url": "https://ml.informatik.uni-freiburg.de/research-artifacts/lcpfn/pfn_EPOCH1000_EMSIZE512_NLAYERS6_NBUCKETS1000.pt.gz",
+   "sha256_gz": "bc8a4d84932aa281108f5de165d05f7aceb0e2dab5e2c0522e18d8c3cc0b230a",
+   "sha256_pt": "b2507722c8f1ccd05782d58cf4e60b0c25f6a54cc381159fb560a932cccfc07f",
+   "bytes_gz": 52572308,
+   "download_s": null,
+   "class": "transformer.TransformerModel",
+   "ninp": 512,
+   "nhead": 4,
+   "nhid": 1024,
+   "nlayers": 6,
+   "n_out": 1000,
+   "activation": "gelu",
+   "pre_norm": false,
+   "reference": {
+    "x_seen": 30,
+    "y_train": [
+     0.877483,
+     0.683078,
+     0.607692,
+     0.545337,
+     0.529367,
+     0.494557,
+     0.449148,
+     0.392367,
+     0.423562,
+     0.376749,
+     0.395825,
+     0.383326,
+     0.36914,
+     0.382106,
+     0.371163,
+     0.336091,
+     0.306823,
+     0.293345,
+     0.332461,
+     0.331285,
+     0.322051,
+     0.273965,
+     0.29353,
+     0.332976,
+     0.306722,
+     0.276031,
+     0.280497,
+     0.284043,
+     0.304738,
+     0.305411
+    ],
+    "qs": [
+     0.05,
+     0.5,
+     0.95
+    ],
+    "quantiles_at_100": [
+     0.240587,
+     0.305911,
+     0.379193
+    ]
+   }
+  }
+ },
+ "wall_s": 11.9
+}

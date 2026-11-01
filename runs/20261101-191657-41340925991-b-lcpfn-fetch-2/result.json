@@ -1,0 +1,11 @@
+{
+	"name": "20261101-191657-41340925991-b-lcpfn-fetch-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41340925991",
+	"ref": "ws-b",
+	"sha": "dd8b68c95d3085c6cfb25980feebc71668c8a366",
+	"cmd": "modal run --env main python/preflight/corpus/lcpfn_app.py::fetch",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T19:17:29Z"
+}
