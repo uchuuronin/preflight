@@ -1,0 +1,143 @@
+{
+ "kind": "llama",
+ "command": [
+  "/app/llama-server",
+  "-m",
+  "/weights/gguf/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+  "-a",
+  "muse-glimmer",
+  "-ngl",
+  "99",
+  "-c",
+  "32768",
+  "-np",
+  "1",
+  "-fa",
+  "on",
+  "--jinja",
+  "--temp",
+  "1.0",
+  "--top-p",
+  "0.95",
+  "--top-k",
+  "64",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8000"
+ ],
+ "sources": {
+  "bf16": {
+   "repo": "meta-models/Muse-Glimmer-30B",
+   "revision": "cec94fcfd6512f2cfe708138c32533b346ea4f69",
+   "files": {
+    ".eval_results/mmi.yaml": 1285,
+    ".gitattributes": 1570,
+    "LICENSE": 11358,
+    "README.md": 17266,
+    "USAGE_POLICY.md": 5230,
+    "chat_template.jinja": 9992,
+    "config.json": 5109,
+    "generation_config.json": 202,
+    "model-00001-of-00002.safetensors": 49950112952,
+    "model-00002-of-00002.safetensors": 9603322320,
+    "model.safetensors.index.json": 132674,
+    "processor_config.json": 1084,
+    "tokenizer.json": 28129897,
+    "tokenizer_config.json": 79936
+   },
+   "bytes": 59581830875,
+   "license": "apache-2.0",
+   "gated": false,
+   "downloaded_s": 333.2,
+   "at": "2026-11-01T16:50:49Z"
+  },
+  "gguf": {
+   "repo": "meta-models/Muse-Glimmer-30B-GGUF",
+   "revision": "b44f1072cf75e918a1b82a3a17b45c4389b076e7",
+   "files": {
+    "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf": 16756683904
+   },
+   "bytes": 16756683904,
+   "license": "apache-2.0",
+   "gated": false,
+   "downloaded_s": 123.5,
+   "at": "2026-11-01T16:53:37Z"
+  },
+  "fp8": {
+   "from_repo": "meta-models/Muse-Glimmer-30B",
+   "from_revision": "cec94fcfd6512f2cfe708138c32533b346ea4f69",
+   "scheme": "FP8_DYNAMIC (llmcompressor 0.15.0), ignore lm_head, re:.*vision.*, re:.*visual.*, re:.*mm_proj.*, re:.*multi_modal_projector.*",
+   "architectures": [
+    "MuseGlimmerForConditionalGeneration"
+   ],
+   "bytes": 34396206736,
+   "made_s": 224.3,
+   "at": "2026-11-01T17:04:08Z"
+  }
+ },
+ "server_ready_s": 18.1,
+ "gpu_memory_after_load": "NVIDIA L4, 16202 MiB, 23034 MiB",
+ "server_log": [
+  "0.17.191.657 I srv  server_run_i: model loaded"
+ ],
+ "container_s": 248.5,
+ "serial": [
+  {
+   "wall_s": 51.01,
+   "ttft_s": 22.78,
+   "prompt_tokens": 17138,
+   "completion_tokens": 407,
+   "decode_tokens_per_s": 14.4,
+   "finish": "stop",
+   "answer_json": true,
+   "category": "oom"
+  },
+  {
+   "wall_s": 42.72,
+   "ttft_s": 22.48,
+   "prompt_tokens": 17138,
+   "completion_tokens": 293,
+   "decode_tokens_per_s": 14.5,
+   "finish": "stop",
+   "answer_json": true,
+   "category": "oom"
+  },
+  {
+   "wall_s": 49.27,
+   "ttft_s": 22.21,
+   "prompt_tokens": 17138,
+   "completion_tokens": 390,
+   "decode_tokens_per_s": 14.4,
+   "finish": "stop",
+   "answer_json": true,
+   "category": "oom"
+  },
+  {
+   "wall_s": 42.27,
+   "ttft_s": 22.32,
+   "prompt_tokens": 17138,
+   "completion_tokens": 289,
+   "decode_tokens_per_s": 14.5,
+   "finish": "stop",
+   "answer_json": true,
+   "category": "oom"
+  },
+  {
+   "wall_s": 43.68,
+   "ttft_s": 22.28,
+   "prompt_tokens": 17138,
+   "completion_tokens": 309,
+   "decode_tokens_per_s": 14.4,
+   "finish": "stop",
+   "answer_json": true,
+   "category": "oom"
+  }
+ ],
+ "concurrent": null,
+ "gpu": "L4",
+ "client_wall_s": 1418.6,
+ "cold_start_s": 1188.2,
+ "usd_upper": 0.315,
+ "usd_container": 0.055
+}
