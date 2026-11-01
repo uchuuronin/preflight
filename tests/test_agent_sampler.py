@@ -378,9 +378,9 @@ def test_tasks_told_apart_only_by_their_system_prompt_can_be_topped_up(proxy):
 	assert codes == [429, 429, 429, 200, 200, 200] and len(px.run_tasks("s2")) == 3
 
 
-def test_a_task_stuck_in_its_tools_is_a_loop_while_the_others_go_on(proxy, tmp_path):
+def test_a_task_stuck_in_its_tools_stalls_the_run_once_the_others_stop(proxy, tmp_path):
 	"""D's plant 3: one worker's tool retries forever after the model asked for it; the other
-	worker keeps calling the model. The stuck task is marked a loop at the 2-minute cutoff (2 s here)."""
+	worker keeps calling, then stops. The run is stopped as stalled at the cutoff (2 s here)."""
 	prov, px = proxy
 	prov.delay_s = 0.3  # the two workers' calls overlap, as a real model's do
 	script = tmp_path / "two.py"
@@ -403,13 +403,17 @@ def test_a_task_stuck_in_its_tools_is_a_loop_while_the_others_go_on(proxy, tmp_p
 	)
 	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=20,
 		env=dict(os.environ), stall_s=2.0)  # fmt: skip
-	assert "stalled on their tools" in out.selection
-	assert sum(t.stop_reason == "loop" for t in out.tasks) == 1  # the busy worker's tasks finished
+	assert "no model calls" in out.selection and "left waiting on their tools" in out.selection
+	# which task is stuck can't be told at the proxy: it counts as cut, never as done
+	assert sum(t.stop_reason == "timeout" for t in out.tasks) >= 1 and not any(
+		t.stop_reason == "loop" for t in out.tasks
+	)
 
 
-def test_one_stuck_worker_of_four_is_the_one_loop(tmp_path):
+def test_one_stuck_worker_of_four_stalls_the_run_and_its_task_is_cut(tmp_path):
 	"""Review, Oct 31: four workers whose tasks end on a tool call; one gets stuck in its tool, the
-	others go on until the sample is full and their next tasks are refused. Only the stuck one is a loop."""
+	others go on until the sample is full and their next tasks are refused. The run stops as
+	stalled; the stuck task is among those counted as cut (which one is stuck can't be told)."""
 	prov = Provider()  # its streamed answers end asking for a tool
 	prov.delay_s = 0.3  # calls that overlap, as a real model's do, so the workers show as workers
 	px = AgentProxy(prov.url, "our-key", rate=token_rate)
@@ -440,7 +444,8 @@ def test_one_stuck_worker_of_four_is_the_one_loop(tmp_path):
 	finally:
 		px.stop()
 		prov.server.shutdown()
-	assert len(out.tasks) == 8 and [t.stop_reason for t in out.tasks].count("loop") == 1
+	assert len(out.tasks) == 8 and "no model calls" in out.selection
+	assert [t.stop_reason for t in out.tasks].count("timeout") >= 1  # the stuck one is among the cut
 
 
 def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):

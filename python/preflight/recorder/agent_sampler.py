@@ -151,12 +151,12 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	# the tasks open when the script was stopped: those with a call in flight, and those whose
 	# worker never called again after their last answer asked for a tool (agent._stuck)
 	in_flight = set(at_cut.get("in_flight", []))
-	waiting = list(at_cut.get("stuck", []))  # longest wait first
-	# a stalled run: the task that has waited longest on its tool is the stuck one, a loop. Which
-	# of the others were stuck too can't be told apart from finished ones that ended on a tool, so
-	# they count as cut (timeout), never as done and never as loops
-	stalled_tasks = set(waiting[:1]) if cut == "stalled" else set()
-	in_flight |= set(waiting) - stalled_tasks
+	# tasks whose worker never called again after an answer that asked for a tool. At the proxy a
+	# task stuck in its tool looks like one that finished on a tool call (a submit), so none is
+	# called a loop: on a stalled run they count as cut, and selection says the run stalled
+	waiting = set(at_cut.get("stuck", []))
+	stalled_tasks: set[str] = set()
+	in_flight |= waiting
 	proc.kill()
 	wall = time.monotonic() - t0
 	ids = proxy.run_tasks(run_id)
@@ -172,8 +172,8 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		parts.append(f"{len(withheld)} other provider keys withheld")
 	if st.get("single_call") and len(ids) and st["single_call"] * 2 > len(ids):
 		parts.append(f"{st['single_call']} one-call tasks (side calls may split tasks)")
-	if stalled_tasks:
-		parts.append(f"{len(stalled_tasks)} tasks stalled on their tools for {stall_s:.0f} s")
+	if cut == "stalled" and waiting:
+		parts.append(f"{len(waiting)} tasks left waiting on their tools (one may be stuck)")
 	if st.get("budget_hit"):
 		parts.append("dollar cap reached")
 	ended = (getattr(proc, "report", None) or {}).get("ended")

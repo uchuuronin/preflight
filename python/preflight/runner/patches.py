@@ -95,25 +95,37 @@ def apply_patch(files: dict[str, str], diff: str) -> dict[str, str]:
 
 def relocate_knobs(sm, before: dict[str, str], after: dict[str, str]):
 	"""The record's own script map (static and Muse Spark knobs alike) with each knob's line moved to
-	where its expression now sits in the patched files. A knob whose line the patch edited, or
-	whose expression no longer appears once, keeps its line (the override then says it can't set it)."""
+	where it sits in the patched files: an unchanged line by the diff's alignment; a line the patch
+	edited, to the one new line in that hunk that still holds the knob's expression. A knob that
+	can't be placed that way loses its line, so its override says it can't set it rather than
+	landing on another literal."""
 	import difflib
 
-	moved = {}
+	maps: dict[str, dict[int, int | None]] = {}
 	for f in {k.location.file for k in sm.knobs if k.location is not None and k.location.line}:
 		if f not in after or f not in before or after[f] == before[f]:
 			continue
 		a, b = before[f].splitlines(), after[f].splitlines()
-		m = {}
-		for tag, i1, i2, j1, _j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
-			if tag == "equal":
-				for k in range(i2 - i1):
-					m[i1 + k + 1] = j1 + k + 1  # 1-based lines
-		moved[f] = m
+		m: dict[int, int | None] = {}
+		for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
+			for k in range(i1, i2):
+				m[k + 1] = (j1 + (k - i1) + 1) if tag == "equal" else None
+			if tag == "replace":
+				m.update({("hunk", k + 1): (j1, j2) for k in range(i1, i2)})
+		maps[f] = m
 	knobs = []
 	for k in sm.knobs:
 		loc = k.location
-		if loc is not None and loc.line and loc.file in moved and loc.line in moved[loc.file]:
-			k = k.model_copy(update={"location": loc.model_copy(update={"line": moved[loc.file][loc.line]})})
+		if loc is not None and loc.line and loc.file in maps:
+			m = maps[loc.file]
+			new = m.get(loc.line)
+			lines = after[loc.file].splitlines()
+			if new is None and ("hunk", loc.line) in m and loc.expr:
+				j1, j2 = m[("hunk", loc.line)]
+				hits = [j + 1 for j in range(j1, j2) if loc.expr.split("=")[0].strip() in lines[j]]
+				new = hits[0] if len(hits) == 1 else None
+			if new is not None and loc.expr and loc.expr.split("=")[0].strip() not in lines[new - 1]:
+				new = None  # the line moved but no longer holds the knob
+			k = k.model_copy(update={"location": loc.model_copy(update={"line": new})})
 		knobs.append(k)
 	return sm.model_copy(update={"knobs": knobs})

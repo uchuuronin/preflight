@@ -559,3 +559,21 @@ def test_a_patch_that_moves_lines_still_sets_the_knobs_and_its_probes_are_marked
 	assert "import os" in src and "batch_size = 4" in src
 	new = [p for p in rec.probes if p.id not in {q.id for q in parent.probes}]
 	assert new and all(p.status == "ok" and p.extras.get("patched") == 1.0 for p in new)
+
+
+def test_a_knob_on_a_line_the_patch_edits_still_lands_on_its_own_literal():
+	"""Review, Oct 31: an edited knob line kept its old number and the override hit another loader."""
+	from preflight.harness.static import map_static
+	from preflight.recorder.overrides import apply_overrides
+	from preflight.runner.patches import apply_patch, relocate_knobs
+
+	src = ("import os\nimport sys\nfrom torch.utils.data import DataLoader\n"
+		"train = DataLoader(ds_train, batch_size=32)\nval = DataLoader(ds_val, batch_size=64)\n")  # fmt: skip
+	diff = ("--- a/train.py\n+++ b/train.py\n@@ -1,5 +1,4 @@\n import os\n-import sys\n"
+		" from torch.utils.data import DataLoader\n-train = DataLoader(ds_train, batch_size=32)\n"
+		"+train = DataLoader(ds_train, batch_size=32, num_workers=4)\n val = DataLoader(ds_val, batch_size=64)\n")  # fmt: skip
+	files = {"train.py": src}
+	sm = map_static(files, entrypoint="train.py")
+	patched = apply_patch(files, diff)
+	out = apply_overrides(patched, relocate_knobs(sm, files, patched), {"batch_size": 7})["train.py"]
+	assert "train = DataLoader(ds_train, batch_size=7, num_workers=4)" in out and "batch_size=64" in out
