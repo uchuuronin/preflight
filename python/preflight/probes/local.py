@@ -348,6 +348,13 @@ def _kill_descendants(root: int, keep: set[int]) -> None:
 				)  # only our own (reparented) children; others raise and are skipped
 
 
+def uid_can_run_this_python() -> bool:
+	"""Whether a fresh unprivileged uid can run this interpreter with its packages. Not when it sits
+	somewhere that uid can't enter (a venv in a Docker image's /root, a 0700 home): the uid would
+	run the base Python without the venv's torch, so probes there run as the invoking user."""
+	return _others_can_reach(Path(sys.executable).parent)
+
+
 def _probe_uid() -> int | None:
 	"""A fresh unprivileged uid per probe when running as root. PREFLIGHT_PROBE_UID pins one uid for
 	every probe in this process: in a per-job sandbox the sandbox is the isolation boundary, and
@@ -357,6 +364,11 @@ def _probe_uid() -> int | None:
 	pinned = os.environ.get("PREFLIGHT_PROBE_UID")
 	if pinned and pinned.isdigit() and int(pinned) >= 1000:
 		return int(pinned)
+	if not uid_can_run_this_python():
+		log.warning(
+			"running probes as this user: a fresh uid can't reach %s and its packages", sys.executable
+		)
+		return None
 	return 61_000 + (os.getpid() * 7 + next(_UIDS)) % 4_000
 
 

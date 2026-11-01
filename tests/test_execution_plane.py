@@ -503,3 +503,18 @@ def test_the_deploy_gate_needs_the_names_the_imports_and_a_compile():
 	assert not _probe_user_ok({**good, "group": "30002"}, "serving")
 	assert not _probe_user_ok({"failed": "TimeoutExpired"}, "probe")
 	assert _probe_user_ok({**good, "imported": []}, "probe")
+
+
+def test_the_cli_as_root_runs_probes_as_itself_when_a_fresh_uid_cant_reach_its_venv(tmp_path, monkeypatch):
+	# preflight demo as root with a venv under a 0700 folder: a dropped uid ran a Python without torch
+	from preflight.probes import local
+
+	hidden = tmp_path / "private"
+	(hidden / "venv" / "bin").mkdir(parents=True)
+	hidden.chmod(0o700)
+	monkeypatch.setattr(local.os, "geteuid", lambda: 0)
+	monkeypatch.delenv("PREFLIGHT_PROBE_UID", raising=False)
+	monkeypatch.setattr(local.sys, "executable", str(hidden / "venv" / "bin" / "python"))
+	assert local._probe_uid() is None
+	monkeypatch.setenv("PREFLIGHT_PROBE_UID", "61000")  # the hosted sandbox pins its uid: unchanged
+	assert local._probe_uid() == 61000

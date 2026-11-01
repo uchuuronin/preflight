@@ -75,6 +75,8 @@ def _write_demo(where: Path) -> Path:
 	"""The demo script in its own folder (made if missing); an existing train.py there is kept."""
 	where.mkdir(parents=True, exist_ok=True)
 	script = where / "train.py"
+	if script.is_symlink():
+		raise InvalidSubmission(f"{script} is a link; the demo writes only a plain file")
 	if not script.exists():
 		script.write_text(DEMO_SCRIPT, encoding="utf-8")
 	return script
@@ -123,10 +125,21 @@ def main(argv: list[str] | None = None) -> int:
 	script_args = argv[argv.index("--") + 1 :] if "--" in argv else []
 	ns = ap.parse_args(argv[: argv.index("--")] if "--" in argv else argv)
 	if ns.cmd == "demo":
-		script = _write_demo(ns.dir)
+		try:
+			import torch  # noqa: F401
+		except ImportError:
+			print('preflight: the demo trains with PyTorch: pip install "preflight[probe]" (or torch), then '
+				"`preflight demo` again", file=sys.stderr)  # fmt: skip
+			return 2
+		fresh = not (ns.dir / "train.py").exists()
+		try:
+			script = _write_demo(ns.dir)
+		except InvalidSubmission as exc:
+			print(f"preflight: {exc}", file=sys.stderr)
+			return 2
+		what = "the demo script" if fresh else "the train.py already there"
 		print(
-			f"preflight: probing the demo script {script} on this machine (about a minute on a CPU)",
-			file=sys.stderr,
+			f"preflight: probing {what}, {script}, on this machine (about a minute on a CPU)", file=sys.stderr
 		)
 		ns = argparse.Namespace(cmd="run", path=script, entrypoint=None, out=ns.dir / "records",
 			install_requirements=False, require_gpu=False, agent_max_usd=None, demo=True)  # fmt: skip
@@ -214,6 +227,12 @@ def _run_caches_when_root() -> Path | None:
 	have planted links or poisoned files), and root never walks or chowns anything a probe wrote.
 	Returns the run's directory, which the caller removes when the run ends."""
 	if os.geteuid() != 0:
+		return None
+	from preflight.probes.local import uid_can_run_this_python
+
+	if not uid_can_run_this_python():
+		print(f"preflight: running probes as root: an unprivileged uid can't reach {sys.executable} and its "
+			"packages (install Preflight where other users can read it to probe as one)", file=sys.stderr)  # fmt: skip
 		return None
 	import secrets
 	import tempfile
