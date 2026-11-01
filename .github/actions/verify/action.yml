@@ -20,6 +20,15 @@ inputs:
   metric:
     description: Target the fix was for (memory.peak, time.step, throughput.tokens_per_s, ...)
     default: memory.peak
+  may-change:
+    description: Comma-separated checks the fix is allowed to move (e.g. throughput_floor for gradient checkpointing)
+    default: ""
+  keep-eval:
+    description: "true when the fix touches evaluation: the same evaluation must still run"
+    default: "false"
+  no-grad:
+    description: "true when the fix runs evaluation without gradients"
+    default: "false"
 outputs:
   status:
     description: passed, failed, or error (a check couldn't be measured)
@@ -33,10 +42,16 @@ runs:
         BEFORE: ${{ inputs.before }}
         AFTER: ${{ inputs.after }}
         METRIC: ${{ inputs.metric }}
+        MAY_CHANGE: ${{ inputs.may-change }}
+        KEEP_EVAL: ${{ inputs.keep-eval }}
+        NO_GRAD: ${{ inputs.no-grad }}
         SCRIPT: ${{ github.action_path }}/../../../api/preflight_api/verify.py
       run: |
         set +e
-        python3 -I "$SCRIPT" "$BEFORE" "$AFTER" --metric "$METRIC" | tee verify.txt
+        extra=(--may-change "$MAY_CHANGE")
+        [ "$KEEP_EVAL" = "true" ] && extra+=(--keep-eval)
+        [ "$NO_GRAD" = "true" ] && extra+=(--no-grad)
+        python3 -I "$SCRIPT" "$BEFORE" "$AFTER" --metric "$METRIC" "${extra[@]}" | tee verify.txt
         code=${PIPESTATUS[0]}
         case $code in 0) s=passed;; 1) s=failed;; *) s=error;; esac
         echo "status=$s" >> "$GITHUB_OUTPUT"
