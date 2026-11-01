@@ -197,6 +197,10 @@
 				"log": false
 			},
 			"current": 40,
+			"probed_range": {
+				"min": 40.0,
+				"max": 40.0
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "agent",
@@ -218,6 +222,10 @@
 				"log": true
 			},
 			"current": 32768,
+			"probed_range": {
+				"min": 32768.0,
+				"max": 32768.0
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "agent",
@@ -238,6 +246,10 @@
 				"log": false
 			},
 			"current": 4,
+			"probed_range": {
+				"min": 4.0,
+				"max": 4.0
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "agent",
@@ -259,6 +271,10 @@
 				"log": false
 			},
 			"current": 500,
+			"probed_range": {
+				"min": 500.0,
+				"max": 500.0
+			},
 			"gridded": false,
 			"needs_code": false,
 			"group": "agent",
@@ -278,6 +294,10 @@
 				"log": false
 			},
 			"current": 1000,
+			"probed_range": {
+				"min": 1000.0,
+				"max": 1000.0
+			},
 			"gridded": false,
 			"needs_code": true,
 			"patch_template": "agent.cap_tool_retries",
@@ -539,62 +559,1223 @@
 				"label_key": "target.risk.runaway",
 				"unit": "probability",
 				"readout": "risk"
+			},
+			{
+				"id": "tokens.total",
+				"label_key": "target.tokens.total",
+				"unit": "tokens"
 			}
 		],
 		"estimates": {
 			"cost.total": {
-				"point": 83.67,
-				"lo": 46.02,
-				"hi": 158.98,
+				"point": null,
+				"lo": null,
+				"hi": null,
 				"unit": "usd",
-				"status": "predicted",
-				"model_id": "golden-fixture@0",
+				"status": "abstain",
+				"model_id": "agent-bootstrap-cp@0.1.0",
 				"source": "exact",
-				"reason": "6 tasks may under-sample rare runaway tasks; upper bound uses the 95th percentile",
+				"reason": "only 6 tasks measured; run at least 10 for a total",
 				"level": 0.9
 			},
 			"time.total": {
-				"point": 14325.0,
-				"lo": 8595.0,
-				"hi": 20055.0,
+				"point": null,
+				"lo": null,
+				"hi": null,
 				"unit": "s",
-				"status": "predicted",
-				"model_id": "golden-fixture@0",
+				"status": "abstain",
+				"model_id": "agent-time-concurrency@0.1.0",
 				"source": "exact",
+				"reason": "only 6 tasks measured; run at least 10 for a total",
 				"level": 0.9
 			},
 			"memory.context_fill": {
-				"point": 0.84,
-				"lo": 0.714,
-				"hi": 0.9659999999999999,
+				"point": 1.0,
+				"lo": 0.993377685546875,
+				"hi": 1.0,
 				"unit": "fraction",
-				"status": "predicted",
-				"model_id": "golden-fixture@0",
+				"status": "extrapolated",
+				"model_id": "agent-context-fill@0.1.0",
 				"source": "exact",
+				"reason": "1 sampled task hit the limit, so their real need is higher",
 				"level": 0.9
 			},
 			"risk.runaway": {
-				"point": 0.17,
-				"lo": 0.068,
-				"hi": 0.272,
+				"point": null,
+				"lo": null,
+				"hi": null,
 				"unit": "probability",
-				"status": "predicted",
-				"model_id": "golden-fixture@0",
+				"status": "abstain",
+				"model_id": "agent-bootstrap-cp@0.1.0",
 				"source": "exact",
+				"reason": "only 6 tasks measured; run at least 10",
+				"level": 0.9
+			},
+			"tokens.total": {
+				"point": null,
+				"lo": null,
+				"hi": null,
+				"unit": "tokens",
+				"status": "abstain",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"source": "exact",
+				"reason": "only 6 tasks measured; run at least 10 for a total",
 				"level": 0.9
 			}
 		},
-		"grids": []
+		"grids": [
+			{
+				"id": "g.cost.total.model",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "model",
+						"values": [
+							"muse-spark",
+							"muse-spark-open",
+							"muse-glimmer"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAA",
+				"lo": "AAAAAAAA",
+				"hi": "AAAAAAAA",
+				"abstain": "Bw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.time.total.model",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "model",
+						"values": [
+							"muse-spark",
+							"muse-spark-open",
+							"muse-glimmer"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAA",
+				"lo": "AAAAAAAA",
+				"hi": "AAAAAAAA",
+				"abstain": "Bw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.memory.context_fill.model",
+				"target_id": "memory.context_fill",
+				"unit": "fraction",
+				"axes": [
+					{
+						"knob_id": "model",
+						"values": [
+							"muse-spark",
+							"muse-spark-open",
+							"muse-glimmer"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "ADwAAAAA",
+				"lo": "8jsAAAAA",
+				"hi": "ADwAAAAA",
+				"abstain": "Bg==",
+				"model_id": "agent-context-fill@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.risk.runaway.model",
+				"target_id": "risk.runaway",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "model",
+						"values": [
+							"muse-spark",
+							"muse-spark-open",
+							"muse-glimmer"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAA",
+				"lo": "AAAAAAAA",
+				"hi": "AAAAAAAA",
+				"abstain": "Bw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.tokens.total.model",
+				"target_id": "tokens.total",
+				"unit": "tokens",
+				"axes": [
+					{
+						"knob_id": "model",
+						"values": [
+							"muse-spark",
+							"muse-spark-open",
+							"muse-glimmer"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAA",
+				"lo": "AAAAAAAA",
+				"hi": "AAAAAAAA",
+				"abstain": "Bw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.cost.total.prompt_caching",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "prompt_caching",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAA==",
+				"lo": "AAAAAA==",
+				"hi": "AAAAAA==",
+				"abstain": "Aw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.time.total.prompt_caching",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "prompt_caching",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAA==",
+				"lo": "AAAAAA==",
+				"hi": "AAAAAA==",
+				"abstain": "Aw==",
+				"model_id": "agent-time-concurrency@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.memory.context_fill.prompt_caching",
+				"target_id": "memory.context_fill",
+				"unit": "fraction",
+				"axes": [
+					{
+						"knob_id": "prompt_caching",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "ADwAPA==",
+				"lo": "8jvyOw==",
+				"hi": "ADwAPA==",
+				"abstain": "AA==",
+				"model_id": "agent-context-fill@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.risk.runaway.prompt_caching",
+				"target_id": "risk.runaway",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "prompt_caching",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAA==",
+				"lo": "AAAAAA==",
+				"hi": "AAAAAA==",
+				"abstain": "Aw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.tokens.total.prompt_caching",
+				"target_id": "tokens.total",
+				"unit": "tokens",
+				"axes": [
+					{
+						"knob_id": "prompt_caching",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAA==",
+				"lo": "AAAAAA==",
+				"hi": "AAAAAA==",
+				"abstain": "Aw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.cost.total.max_turns",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "max_turns",
+						"values": [
+							5,
+							10,
+							20,
+							40,
+							80
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.time.total.max_turns",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "max_turns",
+						"values": [
+							5,
+							10,
+							20,
+							40,
+							80
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "agent-time-concurrency@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.memory.context_fill.max_turns",
+				"target_id": "memory.context_fill",
+				"unit": "fraction",
+				"axes": [
+					{
+						"knob_id": "max_turns",
+						"values": [
+							5,
+							10,
+							20,
+							40,
+							80
+						],
+						"scale": "log"
+					}
+				],
+				"point": "jDjyOwA8ADwAPA==",
+				"lo": "9jfYOhk78jvyOw==",
+				"hi": "lzgAPAA8ADwAPA==",
+				"abstain": "AA==",
+				"model_id": "agent-context-fill@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.risk.runaway.max_turns",
+				"target_id": "risk.runaway",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "max_turns",
+						"values": [
+							5,
+							10,
+							20,
+							40,
+							80
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.tokens.total.max_turns",
+				"target_id": "tokens.total",
+				"unit": "tokens",
+				"axes": [
+					{
+						"knob_id": "max_turns",
+						"values": [
+							5,
+							10,
+							20,
+							40,
+							80
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.cost.total.context_limit",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "context_limit",
+						"values": [
+							8192,
+							16384,
+							32768,
+							65536,
+							131072,
+							262144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.time.total.context_limit",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "context_limit",
+						"values": [
+							8192,
+							16384,
+							32768,
+							65536,
+							131072,
+							262144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-time-concurrency@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.memory.context_fill.context_limit",
+				"target_id": "memory.context_fill",
+				"unit": "fraction",
+				"axes": [
+					{
+						"knob_id": "context_limit",
+						"values": [
+							8192,
+							16384,
+							32768,
+							65536,
+							131072,
+							262144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAA8ADgANAAw",
+				"lo": "AAAAAPI78jfyM/Iv",
+				"hi": "AAAAAAA8ADgANAAw",
+				"abstain": "Aw==",
+				"model_id": "agent-context-fill@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.risk.runaway.context_limit",
+				"target_id": "risk.runaway",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "context_limit",
+						"values": [
+							8192,
+							16384,
+							32768,
+							65536,
+							131072,
+							262144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.tokens.total.context_limit",
+				"target_id": "tokens.total",
+				"unit": "tokens",
+				"axes": [
+					{
+						"knob_id": "context_limit",
+						"values": [
+							8192,
+							16384,
+							32768,
+							65536,
+							131072,
+							262144
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"concurrency": 4,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.cost.total.concurrency",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "concurrency",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.time.total.concurrency",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "concurrency",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-time-concurrency@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.memory.context_fill.concurrency",
+				"target_id": "memory.context_fill",
+				"unit": "fraction",
+				"axes": [
+					{
+						"knob_id": "concurrency",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "ADwAPAA8ADwAPAA8",
+				"lo": "8jvyO/I78jvyO/I7",
+				"hi": "ADwAPAA8ADwAPAA8",
+				"abstain": "AA==",
+				"model_id": "agent-context-fill@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.risk.runaway.concurrency",
+				"target_id": "risk.runaway",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "concurrency",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.tokens.total.concurrency",
+				"target_id": "tokens.total",
+				"unit": "tokens",
+				"axes": [
+					{
+						"knob_id": "concurrency",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"n_tasks": 500,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.cost.total.n_tasks",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "n_tasks",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.time.total.n_tasks",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "n_tasks",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "agent-time-concurrency@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.memory.context_fill.n_tasks",
+				"target_id": "memory.context_fill",
+				"unit": "fraction",
+				"axes": [
+					{
+						"knob_id": "n_tasks",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "ADwAPAA8ADwAPAA8ADw=",
+				"lo": "8jvyO/I78jvyO/I78js=",
+				"hi": "ADwAPAA8ADwAPAA8ADw=",
+				"abstain": "AA==",
+				"model_id": "agent-context-fill@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.risk.runaway.n_tasks",
+				"target_id": "risk.runaway",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "n_tasks",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.tokens.total.n_tasks",
+				"target_id": "tokens.total",
+				"unit": "tokens",
+				"axes": [
+					{
+						"knob_id": "n_tasks",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"tool_retry_cap": 1000
+				}
+			},
+			{
+				"id": "g.cost.total.tool_retry_cap",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "tool_retry_cap",
+						"values": [
+							125,
+							250,
+							500,
+							1000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAA=",
+				"abstain": "Dw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500
+				}
+			},
+			{
+				"id": "g.time.total.tool_retry_cap",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "tool_retry_cap",
+						"values": [
+							125,
+							250,
+							500,
+							1000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAA=",
+				"abstain": "Dw==",
+				"model_id": "agent-time-concurrency@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500
+				}
+			},
+			{
+				"id": "g.memory.context_fill.tool_retry_cap",
+				"target_id": "memory.context_fill",
+				"unit": "fraction",
+				"axes": [
+					{
+						"knob_id": "tool_retry_cap",
+						"values": [
+							125,
+							250,
+							500,
+							1000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "ADwAPAA8ADw=",
+				"lo": "8jvyO/I78js=",
+				"hi": "ADwAPAA8ADw=",
+				"abstain": "AA==",
+				"model_id": "agent-context-fill@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500
+				}
+			},
+			{
+				"id": "g.risk.runaway.tool_retry_cap",
+				"target_id": "risk.runaway",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "tool_retry_cap",
+						"values": [
+							125,
+							250,
+							500,
+							1000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAA=",
+				"abstain": "Dw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500
+				}
+			},
+			{
+				"id": "g.tokens.total.tool_retry_cap",
+				"target_id": "tokens.total",
+				"unit": "tokens",
+				"axes": [
+					{
+						"knob_id": "tool_retry_cap",
+						"values": [
+							125,
+							250,
+							500,
+							1000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAA=",
+				"abstain": "Dw==",
+				"model_id": "agent-bootstrap-cp@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"model": "muse-spark",
+					"prompt_caching": false,
+					"max_turns": 40,
+					"context_limit": 32768,
+					"concurrency": 4,
+					"n_tasks": 500
+				}
+			}
+		]
 	},
 	"models": [
 		{
-			"id": "golden-fixture@0",
-			"kind": "rule",
-			"version": "0",
+			"id": "agent-bootstrap-cp@0.1.0",
+			"kind": "bootstrap",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
 			"heldout_error": {},
 			"per_gpu_coverage": {},
-			"notes": "Hand-made fixture for UI work; not a real model",
-			"fixture": true
+			"notes": "calibration: simulated. bootstrap plus Clopper-Pearson runaway margin; S6, S6b",
+			"fixture": false
+		},
+		{
+			"id": "agent-context-fill@0.1.0",
+			"kind": "bootstrap",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. 95th percentile of each task's peak context over the limit",
+			"fixture": false
+		},
+		{
+			"id": "agent-time-concurrency@0.1.0",
+			"kind": "bootstrap",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. task-seconds over concurrency, or the rate limits",
+			"fixture": false
+		},
+		{
+			"id": "run-cost@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+			"fixture": false
 		}
 	],
 	"findings": [
@@ -670,6 +1851,59 @@
 		"llm_usd": 1.0041,
 		"breakdown": {
 			"agent_sample": 1.0041
+		}
+	},
+	"cost_basis": {
+		"price_table": "prices@2026-11-01",
+		"as_of": "2026-11-01",
+		"provider": "api",
+		"billing": "on_demand",
+		"currency": "USD",
+		"includes": [
+			"gpu",
+			"tokens"
+		]
+	},
+	"job_cost": {
+		"lines": [
+			{
+				"kind": "tokens",
+				"label_key": "cost.line.tokens",
+				"quantity": {
+					"point": null,
+					"lo": null,
+					"hi": null,
+					"unit": "tokens",
+					"status": "abstain",
+					"model_id": "agent-bootstrap-cp@0.1.0",
+					"source": "exact",
+					"reason": "only 6 tasks measured; run at least 10 for a total",
+					"level": 0.9
+				},
+				"usd": {
+					"point": null,
+					"lo": null,
+					"hi": null,
+					"unit": "usd",
+					"status": "abstain",
+					"model_id": "agent-bootstrap-cp@0.1.0",
+					"source": "exact",
+					"reason": "only 6 tasks measured; run at least 10 for a total",
+					"level": 0.9
+				},
+				"price_row": "tokens/meta/muse-spark/us"
+			}
+		],
+		"total_usd": {
+			"point": null,
+			"lo": null,
+			"hi": null,
+			"unit": "usd",
+			"status": "abstain",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "only 6 tasks measured; run at least 10 for a total",
+			"level": 0.9
 		}
 	}
 }

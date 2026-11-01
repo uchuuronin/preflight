@@ -1381,6 +1381,8 @@ def agent() -> dict:
 
 
 def main() -> None:
+	from preflight.engine.api import fill_predictions
+
 	OUT.mkdir(parents=True, exist_ok=True)
 	for name, fn in [("finetune", finetune), ("pretrain", pretrain), ("agent", agent)]:
 		raw = fn()
@@ -1388,6 +1390,8 @@ def main() -> None:
 		# what each knob acts on and whether it changes results, as the skeleton writes them
 		rec = rec.model_copy(update={"knobs": annotate(rec.knobs, rec.graph)})
 		rec = FlightRecord.model_validate(rec.model_dump())
+		# B's engine fills predictions, models, probed ranges, cost basis and job cost (B, Oct 27)
+		rec = fill_predictions(rec)
 		# write the canonical serialisation so the round-trip test is exact
 		canonical = json.loads(rec.model_dump_json(exclude_none=True))
 		(OUT / f"{name}.json").write_text(json.dumps(canonical, indent="\t", ensure_ascii=False) + "\n")
