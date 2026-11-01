@@ -17,6 +17,7 @@ Updated Sun Nov 1, 12:30 ET.
 | Nov 1 11:06 | 4cc6f57..9afbf4c | the probe-user startup step (47f68ed, 88cd732); the C note on the redeploy (cf96ea5); status and B notes (ead63bb, 17582b7, 9afbf4c) | 1 read-only round | clean |
 | Nov 1 11:20 | 9afbf4c..20ebb7a | the torch.compile startup step and gcc/g++ in the sandbox images (b86b72a); pyarrow 17 in the serving image and its datasets import check, the wrong-version message (0771c5f, 20ebb7a); a comment order (bdcebd6); status (53c392c, 107ce3e) | 1 read-only round each | clean |
 | Nov 1 12:10 | 20ebb7a..998704f | main merged (0.6.1, f017010); Spark diagnosis (485df08, ace3a06, 97a458a, 7a55eb7) and Spark Open's check (202666f), both behind harness.spark_diagnosis; 0.6.1 concurrency and the review fix (fde2e68, 549a5f5); engine flags and N_TRAIN_* (913e2b6); `preflight demo` and the root/venv probe fix (eb5e5e5, 060ec5f); failures name their step (ab74a70); triage's eval node (30b0224); the serving probe's sampled generate (16d5cd6, 998704f); the CI fix, the deploy gate's rule out of ops_app (26b134b); requests and status (3f58945, 579cd23, 179c8ad, 390f778, 40fed56) | 2 rounds for diagnosis, 0.6.1 and the engine/N_TRAIN change; 1 round for the rest | clean |
+| Nov 1 12:30 | 998704f..f46fad2 | RL entropy estimate and its limit (d9f969c, f2f2c5e); the warm-pool ask and status (e851890, b4480d3); main merged (round five, 0.6.2) | 1 read-only round each, 2 for the entropy change; the merge checked for damage in A's files | clean |
 
 ## Known limits, on purpose
 
