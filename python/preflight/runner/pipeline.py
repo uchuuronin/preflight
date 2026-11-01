@@ -327,6 +327,8 @@ def _run_point(spec: ProbeSpec, gpu: str, deps: Deps, ctx) -> tuple[ProbeResult 
 
 # Chiya, Nov 1: an L4 that won't schedule in 2 minutes gives way to an A10, then an L40S
 GPU_FALLBACK = {"L4": ("A10", "L40S")}
+# during judging a job may start on the A10 (judging.py); only its first point may fall back to the
+# L4, before any point has run: after that the job's points stay on the GPU they started on
 
 
 def _fallbacks(gpu: str, allowed: list[str] | None, pinned: bool) -> tuple[str, ...]:
@@ -458,9 +460,16 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if "gpu_type" in knobs:
 			request = {**request, "gpu": knobs["gpu_type"]}
 			pinned = True
+	from .judging import judging_gpu
+
 	gpu = _requested_gpu(request, allowed) or (
 		_parent_gpu(rec) if followup and origin.parent is not None else None
-	) or choose_probe_gpu(need, allowed)  # fmt: skip
+	)  # fmt: skip
+	judged = False
+	if gpu is None:
+		chosen = choose_probe_gpu(need, allowed)
+		gpu = judging_gpu(chosen, allowed, time.time())
+		judged = gpu != chosen
 	cap = gpu_ceiling()
 	if not under_ceiling(gpu, cap):
 		_emit(ctx, "harnessing", rec, rev, level="warn",
@@ -494,6 +503,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		allowed=allowed,
 		need=need,
 		pinned=pinned,
+		judged=judged,
 		patched_for=patched_for,
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
@@ -789,6 +799,7 @@ def _probe_points(
 	need: float,
 	pinned: bool = False,
 	patched_for: dict | None = None,
+	judged: bool = False,  # judging started the job on the A10 (judging.py)
 ) -> tuple[list[Probe], list[ProbeResult], str, float]:
 	"""Run the planned points in order; returns their probes, fresh results, the GPU they settled on
 	and what discarded attempts cost."""
@@ -827,10 +838,11 @@ def _probe_points(
 			continue
 		attempts: list = []
 
-		def run(g, spec=spec, attempts=attempts, over=over):
-			result, cached = _run_point(
-				replace(spec, gpu_fallback=_fallbacks(g, allowed, pinned)), g, deps, ctx
-			)
+		def run(g, spec=spec, attempts=attempts, over=over, first=not probes):
+			fb = _fallbacks(g, allowed, pinned)
+			if judged and first and g == "A10" and (allowed is None or "L4" in allowed):
+				fb = ("L4",)  # judging's A10 start, before any point ran (GPU_FALLBACK's note)
+			result, cached = _run_point(replace(spec, gpu_fallback=fb), g, deps, ctx)
 			out = result if result is not None else _CachedResult(cached)
 			if result is not None:
 				# every attempt counts, kept or not, with the sandbox's CPU and memory beside the GPU

@@ -643,6 +643,17 @@ def tick() -> dict:
 			cleaning = True
 	except Exception as exc:
 		print(f"cleanup start failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
+	warm = None
+	try:  # judging's warm worker (runner/judging.py, option (a)): set once when the wanted count changes
+		from preflight.runner.judging import warm_workers
+
+		want = warm_workers(time.time())
+		if deployed_here()[0] is True and jobs_dict.get("warm_workers") != want:
+			run_worker.update_autoscaler(min_containers=want)
+			jobs_dict["warm_workers"] = want
+			warm = want
+	except Exception as exc:
+		print(f"warm-pool update failed: {type(exc).__name__}: {str(exc)[:300]}", flush=True)
 	svc = JobStoreService()
 	reaped = svc.reap.remote()
 	d = svc.demand.remote()
@@ -650,4 +661,4 @@ def tick() -> dict:
 		run_worker.spawn()
 	if d["oldest_queued_s"] > 600:
 		print(f"ALERT backlog: oldest queued job has waited {d['oldest_queued_s']:.0f} s", flush=True)
-	return {"reaped": reaped, "cleanup_started": cleaning, **d}
+	return {"reaped": reaped, "cleanup_started": cleaning, "warm_workers_set": warm, **d}

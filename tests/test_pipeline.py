@@ -896,3 +896,26 @@ def test_a_private_job_is_triaged_on_glimmer_only_with_its_flag_and_never_sent_t
 	finally:
 		monkeypatch.delenv("PREFLIGHT_FLAGS")
 		flags.reload()
+
+
+def test_during_judging_a_job_starts_on_the_a10_and_only_its_first_point_may_fall_back(tmp_path, monkeypatch):
+	import time as _t
+
+	from preflight.runner.queue import et_day
+
+	today = et_day(_t.time())
+	monkeypatch.setenv("PREFLIGHT_JUDGING_FROM", today)
+	monkeypatch.setenv("PREFLIGHT_JUDGING_TO", today)
+	seen = []
+
+	class Watch(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			seen.append((gpu, spec.gpu_fallback))
+			return super().__call__(spec, gpu, should_stop=should_stop)
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, Watch())
+	)
+	assert seen and all(g == "A10" for g, _ in seen)
+	assert seen[0][1] == ("L4",) and all(fb == () for _, fb in seen[1:])
+	assert rec.env.gpu.name == "A10" or rec.env.gpu.name is None
