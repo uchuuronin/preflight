@@ -655,6 +655,7 @@
 	"fitmap.up": "Up",
 	"fitmap.help": "Each square is this run at one pair of settings, with every other knob as it is on the dials. Its fill is the predicted peak memory as a share of the GPU's; its colour and mark are the chance of running out of memory: under {fits} fits, {fits} to {fails} is tight, over {fails} fails, and hatched means the prediction isn't trusted there. The solid edge is where fits ends and the dashed one where fails begins, placed from memory predicted between the squares. Move any knob, or the GPU, and the map redraws. Point at a square to preview it, press it to fly there, or drag your run's square.",
 	"fitmap.gpu": "On",
+	"fitmap.gpu_label": "GPU",
 	"fitmap.here_short": "Here",
 	"fitmap.readout.peak": "peaks at {peak}, {share} of the GPU",
 	"fitmap.hint.fly": "Press to fly there",

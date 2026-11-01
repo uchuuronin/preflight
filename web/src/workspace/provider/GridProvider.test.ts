@@ -38,6 +38,8 @@ describe("GridProvider on the golden fine-tune", () => {
 		const [p2, p3, p4] = [peak(2), peak(3), peak(4)];
 		expect(p2).toBeGreaterThan(0);
 		expect(p4).toBeGreaterThan(0);
+		// The two grid points differ enough that log and linear interpolation can be told apart.
+		expect(Math.abs(p4 - p2) / p3).toBeGreaterThan(0.02);
 		// Between grid points 2 and 4, at log(3) on the log axis (not halfway, as a linear axis would be).
 		// Not "rises with batch": B's engine has the eval spike dominate this peak, so it needn't.
 		expect(p3).toBeGreaterThanOrEqual(Math.min(p2, p4));

@@ -23,7 +23,7 @@ import { knobChoices, targetFor } from "../record/model";
 import { chosenGpu, FAILS_AT, FITS_BELOW, GPU_KNOBS } from "../record/terms";
 import { useWorkspace } from "../state";
 
-/** Grid gap between squares, px (styles.css .pf-fitmap__frame); the puck steps by a square plus this. */
+/** Grid gap between squares, px, set inline on the frame (it overrides the stylesheet's); the puck steps by a square plus this. */
 const GAP_PX = 4;
 
 function statusWord(s: CellStatus): string {
@@ -87,7 +87,20 @@ export function FitMap() {
 	const [axes, setAxes] = useState<[string, string] | null>(initial);
 	const data = useMemo(() => (axes ? fitMap(record, provider, knobs, axes[0], axes[1]) : null), [record, provider, knobs, axes]);
 	// The square being pointed at or focused: previewed in the readout, nothing changes yet.
-	const [peek, setPeek] = useState<{ xi: number; ri: number } | null>(null);
+	// Pointer and keyboard keep their own preview, so leaving the map with the mouse doesn't clear
+	// the square the keyboard is on; the pointer's wins while it's over a square.
+	const [hover, setHover] = useState<{ xi: number; ri: number } | null>(null);
+	const [focused, setFocused] = useState<{ xi: number; ri: number } | null>(null);
+	const readoutId = useId();
+	// A preview is of a square on this grid: new axes (or a new grid size) drop it.
+	const shape = data ? `${axes?.join("|")}:${data.xs.length}x${data.ys.length}` : "";
+	const [lastShape, setLastShape] = useState(shape);
+	if (shape !== lastShape) {
+		setLastShape(shape);
+		setHover(null);
+		setFocused(null);
+	}
+	const peek = hover ?? focused;
 	const drag = useRef<{ pointer: number; last: string } | null>(null);
 	const frame = useRef<HTMLDivElement>(null);
 
@@ -113,9 +126,24 @@ export function FitMap() {
 		const other = axes[which === 0 ? 1 : 0];
 		setAxes(which === 0 ? [value, value === other ? axes[0] : other] : [value === other ? axes[1] : other, value]);
 	};
+	/**
+	 * Both axes, the one that changes the verdict last: the guide's "you crossed into fails" offer
+	 * undoes the last knob moved, so that should be the cause. Only knobs that change are set.
+	 */
 	const fly = (c: FitCell) => {
-		actions.setKnob(data.x.id, c.x, "user");
-		actions.setKnob(data.y.id, c.y, "user");
+		const now = hereAt ? data.rows[rowsTopDown[hereAt.r]!]?.[hereAt.xi] : undefined;
+		const xi = data.xs.indexOf(c.x);
+		const ri = data.ys.indexOf(c.y);
+		const moves: Array<[string, typeof c.x]> = [];
+		if (!now || now.x !== c.x) moves.push([data.x.id, c.x]);
+		if (!now || now.y !== c.y) moves.push([data.y.id, c.y]);
+		if (moves.length === 2 && now) {
+			// Moving across alone already reaches the new verdict and moving up alone doesn't: across is the cause.
+			const acrossOnly = data.rows[data.ys.indexOf(now.y)]?.[xi]?.status;
+			const upOnly = data.rows[ri]?.[data.xs.indexOf(now.x)]?.status;
+			if (acrossOnly === c.status && upOnly !== c.status) moves.reverse();
+		}
+		for (const [k, v] of moves) actions.setKnob(k, v, "user");
 	};
 	const cellAt = (clientX: number, clientY: number): { xi: number; ri: number } | null => {
 		const el = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>("[data-xi]");
@@ -166,8 +194,8 @@ export function FitMap() {
 				</span>
 				{gpuKnob && gpuChoices.length > 1 && gpu ? (
 					<label className="pf-fit__gpu">
-						<span>{t("fitmap.gpu")}</span>
-						<select value={gpu} onChange={(e) => actions.setKnob(gpuKnob.id, e.currentTarget.value, "user")}>
+						<span aria-hidden="true">{t("fitmap.gpu")}</span>
+						<select aria-label={t("fitmap.gpu_label")} value={gpu} onChange={(e) => actions.setKnob(gpuKnob.id, e.currentTarget.value, "user")}>
 							{gpuChoices.map((g) => (
 								<option key={g} value={g}>
 									{g}
@@ -183,7 +211,7 @@ export function FitMap() {
 					{t("fitmap.help", { fits: fmt(FITS_BELOW, "probability"), fails: fmt(FAILS_AT, "probability") })}
 				</Info>
 			</div>
-			<p className={`pf-fit__readout${peek ? " is-peek" : ""}`}>
+			<p id={readoutId} className={`pf-fit__readout${peek ? " is-peek" : ""}`}>
 				{shown ? (
 					<>
 						<span className="pf-fit__where">
@@ -223,20 +251,22 @@ export function FitMap() {
 					ref={frame}
 					className="pf-fitmap__frame"
 					style={{ gridTemplateColumns: `auto repeat(${cols}, minmax(0, 1fr))`, gap: GAP_PX, "--rows": rows } as CSSProperties}
-					onPointerLeave={() => (drag.current ? null : setPeek(null))}
+					onPointerLeave={() => (drag.current ? null : setHover(null))}
 					onPointerMove={(e) => {
 						const at = cellAt(e.clientX, e.clientY);
 						if (!drag.current) {
-							if (at && (at.xi !== peek?.xi || at.ri !== peek?.ri)) setPeek(at);
+							if (!at) setHover(null);
+							else if (at.xi !== hover?.xi || at.ri !== hover?.ri) setHover(at);
 							return;
 						}
-						if (!at) return;
+						// Only the pointer that picked the run up moves it (a second finger or a hovering pen doesn't).
+						if (e.pointerId !== drag.current.pointer || !at) return;
 						const key = `${at.xi}:${at.ri}`;
 						if (key === drag.current.last) return;
 						drag.current.last = key;
 						const c = data.rows[at.ri]?.[at.xi];
 						if (c) fly(c);
-						setPeek(null);
+						setHover(null);
 					}}
 					onPointerUp={(e) => {
 						if (drag.current?.pointer === e.pointerId) drag.current = null;
@@ -273,14 +303,15 @@ export function FitMap() {
 										style={{ gridRow: r + 1, gridColumn: xi + 2, "--fill": f === null ? 0 : Math.min(1, f) } as CSSProperties}
 										aria-label={cellLabel(data, c)}
 										aria-pressed={c.here}
-										onFocus={() => setPeek({ xi, ri })}
-										onBlur={() => setPeek(null)}
+										aria-describedby={readoutId}
+										onFocus={() => setFocused({ xi, ri })}
+										onBlur={() => setFocused(null)}
 										onPointerDown={(e) => {
 											if (e.button !== 0) return;
 											// The run's own square is the puck: dragging from it moves the run across the map.
-											if (c.here) {
+											if (c.here && !drag.current) {
 												drag.current = { pointer: e.pointerId, last: `${xi}:${ri}` };
-												frame.current?.setPointerCapture(e.pointerId);
+												frame.current?.setPointerCapture?.(e.pointerId);
 											}
 										}}
 										onClick={() => (c.here ? null : fly(c))}

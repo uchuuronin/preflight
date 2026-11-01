@@ -39,7 +39,7 @@ export function OrbitGlance() {
 					{layout.arcs.map((a) => (
 						<circle key={a.phase} className="pf-glance__arc" cx={G.c} cy={G.c} r={G.band} strokeDasharray={arcDash(a.sweepDeg, G.band)} transform={rot(a.startDeg)} />
 					))}
-					<circle className="pf-mem-track" cx={G.c} cy={G.c} r={G.mem} />
+					<circle className="pf-glance__track" cx={G.c} cy={G.c} r={G.mem} />
 					{segs.map((s) => (
 						<circle key={s.key} className={`pf-glance__mring pf-mring--${s.slot}`} cx={G.c} cy={G.c} r={G.mem} strokeDasharray={s.dash} transform={rot(s.rot)} />
 					))}

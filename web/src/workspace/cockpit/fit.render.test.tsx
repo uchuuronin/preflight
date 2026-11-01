@@ -52,6 +52,29 @@ describe("the fit map moves the run, it isn't a table to read", () => {
 		expect(getByTestId("knobs").textContent).not.toBe(before);
 	});
 
+	it("drags the run's square across the map, and only the pointer that picked it up moves it", () => {
+		const { container, getByTestId } = open(<FitMap />);
+		const here = container.querySelector<HTMLElement>(".pf-fitcell.is-here")!;
+		const target = container.querySelector<HTMLElement>(".pf-fitcell[data-xi]:not(.is-here)")!;
+		const frame = container.querySelector<HTMLElement>(".pf-fitmap__frame")!;
+		const before = getByTestId("knobs").textContent;
+		// jsdom has no layout: the square under the pointer is the target.
+		const efp = document.elementFromPoint;
+		document.elementFromPoint = () => target;
+		try {
+			fireEvent.pointerDown(here, { pointerId: 1, button: 0 });
+			fireEvent.pointerMove(frame, { pointerId: 2, clientX: 5, clientY: 5 });
+			expect(getByTestId("knobs").textContent).toBe(before);
+			fireEvent.pointerMove(frame, { pointerId: 1, clientX: 5, clientY: 5 });
+			fireEvent.pointerUp(frame, { pointerId: 1 });
+		} finally {
+			document.elementFromPoint = efp;
+		}
+		const k = JSON.parse(getByTestId("knobs").textContent!);
+		const dev0 = JSON.parse(before!);
+		expect(k).not.toEqual(dev0);
+	});
+
 	it("moves focus between squares with the arrow keys", () => {
 		const { container } = open(<FitMap />);
 		const first = container.querySelector<HTMLElement>('.pf-fitcell[data-xi="0"]')!;

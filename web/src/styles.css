@@ -1514,7 +1514,7 @@ a {
 .pf-stack__off { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--pf-fail); }
 .pf-mring-untrusted { fill: none; stroke: var(--pf-stroke-strong); stroke-width: 16; opacity: 0.9; transform-box: view-box; transform-origin: 300px 280px; }
 /* Fit map (cockpit/FitMap.tsx) */
-.pf-fitmap__frame { position: relative; display: grid; gap: 3px; align-items: center; min-width: 0; }
+.pf-fitmap__frame { position: relative; display: grid; gap: 4px; align-items: center; min-width: 0; }
 /* Fit map squares: status colour underneath, the memory fill rising from the bottom over it. */
 .pf-fitcell { position: relative; overflow: hidden; isolation: isolate; transition: background-color 240ms ease, border-color 240ms ease; }
 .pf-fitcell__fill {
@@ -1562,7 +1562,6 @@ a {
 .pf-fitcell--fails { background: color-mix(in srgb, var(--pf-fail) 30%, transparent); border-color: color-mix(in srgb, var(--pf-fail) 45%, transparent); }
 .pf-fitcell--unknown { background: var(--pf-track); }
 .pf-fitcell--abstain { background: repeating-linear-gradient(135deg, var(--pf-track) 0 4px, var(--pf-stroke-strong) 4px 6px); }
-.pf-fitcell.is-here { box-shadow: 0 0 0 2px var(--pf-fg); }
 .pf-fitcell .pf-status span:empty { display: none; }
 .pf-fitmap__lines { width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .pf-fitmap__line { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
@@ -1735,6 +1734,8 @@ a {
 	.pf-stage-fill .pf-fit__body .pf-fitmap__frame { height: auto; grid-template-rows: none; }
 	.pf-stage-fill .pf-fitmap__frame .pf-fitcell { aspect-ratio: 1.25; height: auto; }
 	.pf-fitcell__pct { display: none; }
+	/* No hover on a phone, so no jump to guard against: the readout grows to fit its lines. */
+	.pf-fit .pf-fit__readout { height: auto; min-height: 66px; overflow: visible; }
 	.pf-dock__row { border-radius: 24px; }
 	.pf-knob { padding: 0 12px; }
 	.pf-core__num { font-size: 30px; }
@@ -1894,7 +1895,7 @@ a {
 .pf-fit__gpu { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--pf-fg-dim); }
 .pf-fit__gpu select { padding: 4px 10px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-stroke-strong); background: var(--pf-glass); color: var(--pf-fg); font: inherit; font-family: var(--pf-font-mono); font-size: 12px; }
 .pf-fit__cap { font-family: var(--pf-font-mono); font-size: 12px; }
-.pf-fit__readout { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 40px; margin: 0; padding: 8px 14px; border-radius: 14px; background: var(--pf-glass); border: 1px solid var(--pf-stroke); font-size: 13px; transition: border-color 160ms ease; }
+.pf-fit__readout { display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: 4px 14px; height: 66px; overflow: hidden; margin: 0; padding: 8px 14px; border-radius: 14px; background: var(--pf-glass); border: 1px solid var(--pf-stroke); font-size: 13px; transition: border-color 160ms ease; }
 .pf-fit__readout.is-peek { border-color: var(--pf-stroke-strong); }
 .pf-fit__readout b { font-family: var(--pf-font-mono); font-weight: 500; font-size: 12.5px; }
 .pf-fit__readout small { font-family: var(--pf-font-mono); font-size: 11.5px; color: var(--pf-fg-dim); }
@@ -1915,6 +1916,7 @@ a {
 .pf-glance__dial { position: relative; width: min(100%, 240px); aspect-ratio: 1; margin: 0 auto; }
 .pf-glance__dial > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .pf-glance__arc { fill: none; stroke: var(--pf-fg); stroke-opacity: 0.3; stroke-width: 7; stroke-linecap: round; transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move); }
+.pf-glance__track { fill: none; stroke: var(--pf-track); stroke-width: 11; }
 .pf-glance__untrusted { fill: none; stroke: var(--pf-stroke-strong); stroke-width: 11; opacity: 0.9; }
 .pf-glance__mring { fill: none; stroke-width: 11; transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move); }
 .pf-glance__core { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; pointer-events: none; }
@@ -2000,7 +2002,8 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
 	.pf-drawer, .pf-info__pop { transition: opacity 0.15s ease; }
-	.pf-fitmap__puck, .pf-fitcell__fill, .pf-fitmap__line { transition: none; }
+	.pf-fitmap__puck, .pf-fitcell__fill, .pf-fitmap__line, .pf-glance__arc, .pf-glance__mring, .pf-glance__phase i { transition: none; }
+	.pf-fitcell:active:not(.is-here) { transform: none; }
 }
 .pf-fitcell .pf-status { padding: 0; border: 0; background: none; box-shadow: none; }
 
