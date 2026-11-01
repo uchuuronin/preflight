@@ -56,6 +56,7 @@ PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zo
 PRETRAIN_EVAL_CAP = 8
 # synchronised steps after the timed ones, for the phase split (data/forward/backward/optimizer):
 # timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
+OUTPUT_WATCH = 64  # derived: generate calls watched for identical outputs; each costs one small read
 LENS_STATS_BATCHES = 64  # derived: enough batches to average a sampler's varying graph sizes
 PHASE_STEPS = (
 	2  # guess: two synchronised steps for the phase split; compare with the profiled window on zoo runs
@@ -334,6 +335,9 @@ class Recorder:
 		# io, generation, logs, scalers, sampler
 		self._io_depth = 0
 		self.gens: list[dict] = []
+		self._outputs: dict[int, dict] = {}  # input row hash -> {weights mark: output hash}
+		self.checkpoints: dict = {}  # what the script's training checkpoints hold (_inspect_save)
+		self._output_watch_calls = 0
 		self.trainer_logs: list[dict] = []
 		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
 		# be read without trusting the trainer's own logs; the group size from the trainer
@@ -599,6 +603,8 @@ class Recorder:
 				rec._depth.n = depth
 
 		def save(obj, f, *args, **kwargs):
+			with suppress(Exception):
+				rec._inspect_save(obj, f)
 			return rec._timed_io(o["save"], f, obj, f, *args, **kwargs)
 
 		def sdpa(q, k, v, *args, **kwargs):
@@ -805,11 +811,19 @@ class Recorder:
 	def _record_hf_generation(self, model, args, kwargs, out, dt):
 		seqs = getattr(out, "sequences", out)
 		inputs = kwargs.get("input_ids", kwargs.get("inputs", args[0] if args else None))
-		cfg = getattr(model, "generation_config", None)
-		cap = kwargs.get("max_new_tokens") or (cfg.max_new_tokens if cfg is not None else None)
-		eos = kwargs.get("eos_token_id", getattr(cfg, "eos_token_id", None))
+		# TRL passes its settings as generation_config=; the model's own config is the fallback
+		given = kwargs.get("generation_config")
+		cfgs = [c for c in (given, getattr(model, "generation_config", None)) if c is not None]
+
+		def setting(name):
+			if kwargs.get(name) is not None:
+				return kwargs[name]
+			return next((getattr(c, name) for c in cfgs if getattr(c, name, None) is not None), None)
+
+		cap = setting("max_new_tokens")
+		eos = setting("eos_token_id")
 		eos = set(eos if isinstance(eos, list | tuple) else [eos] if eos is not None else [])
-		pad = kwargs.get("pad_token_id", getattr(cfg, "pad_token_id", None))
+		pad = setting("pad_token_id")
 		in_len = (
 			inputs.shape[-1] if isinstance(inputs, torch.Tensor) and seqs.shape[-1] >= inputs.shape[-1] else 0
 		)
@@ -823,6 +837,79 @@ class Recorder:
 		self.gens.append(
 			{"seconds": dt, "lengths": lengths, "truncated": truncated, "cap": cap, "backend": "hf"}
 		)
+		with suppress(Exception):
+			self._watch_outputs(model, inputs, gen)
+
+	def _inspect_save(self, obj, f) -> None:
+		"""Hygiene: what a training checkpoint holds, so a resume that can't match is found before
+		it happens. A torch.save of a dict holding model weights, read for optimizer state (a dict
+		with 'state' and 'param_groups'), a scheduler, RNG state and a step count. HF Trainer saves
+		these in separate files (optimizer.pt, scheduler.pt, rng_state.pth), read by name."""
+		name = str(getattr(f, "name", f)).rsplit("/", 1)[-1]
+		ck = self.checkpoints
+		if name in ("optimizer.pt", "scheduler.pt") or name.startswith("rng_state"):
+			ck[{"optimizer.pt": "optimizer", "scheduler.pt": "scheduler"}.get(name, "rng")] = True
+			return
+		if not isinstance(obj, dict):
+			return
+
+		def is_weights(v):
+			return (
+				isinstance(v, dict) and v and all(isinstance(x, torch.Tensor) for x in list(v.values())[:8])
+			)
+
+		def is_optim(v):
+			return isinstance(v, dict) and "state" in v and "param_groups" in v
+
+		vals = list(obj.values())
+		if is_weights(obj) or any(is_weights(v) for v in vals):
+			ck["saves"] = ck.get("saves", 0) + 1
+			ck["optimizer"] = ck.get("optimizer", False) or any(is_optim(v) for v in vals)
+			keys = " ".join(str(k).lower() for k in obj)
+			ck["scheduler"] = ck.get("scheduler", False) or "sched" in keys
+			ck["rng"] = ck.get("rng", False) or "rng" in keys or "random" in keys or "seed" in keys
+			ck["step"] = ck.get("step", False) or any(w in keys for w in ("step", "epoch", "iter"))
+
+	def _weights_mark(self, model) -> tuple:
+		"""Which weights generated: the model object, its active adapter(s), and a fingerprint of a
+		few of its trainable (else first) parameters. One small read; at most OUTPUT_WATCH calls."""
+		adapter = getattr(model, "active_adapter", None)
+		adapter = adapter() if callable(adapter) else adapter
+		params = [p for p in model.parameters() if p.requires_grad][:4] or list(model.parameters())[:4]
+		with torch.no_grad():
+			fp = sum(float(p.detach().reshape(-1)[:256].float().sum()) for p in params)
+		return id(model), str(adapter), fp
+
+	def _watch_outputs(self, model, inputs, gen):
+		"""Hygiene (case study, Oct 28): different weights generating identical outputs for the same
+		inputs (a cache, or the adapter not switched). Keeps, per input row, what each set of weights
+		generated."""
+		if self._output_watch_calls >= OUTPUT_WATCH or not isinstance(inputs, torch.Tensor):
+			return
+		self._output_watch_calls += 1
+		mark = self._weights_mark(model)
+		for row_in, row_out in zip(inputs.tolist(), gen, strict=False):
+			key = hash(tuple(row_in))
+			seen = self._outputs.setdefault(key, {})
+			if len(seen) < 8:
+				seen[mark] = hash(tuple(row_out))
+
+	def _identical_outputs(self) -> dict:
+		"""Inputs generated by two sets of weights that differ (another adapter or model, or
+		weights more than 0.1% apart by fingerprint) with the very same output."""
+		same = differ = 0
+		for seen in self._outputs.values():
+			marks = list(seen.items())
+			for i in range(len(marks)):
+				for j in range(i + 1, len(marks)):
+					(m1, o1), (m2, o2) = marks[i], marks[j]
+					weights_differ = m1[:2] != m2[:2] or abs(m1[2] - m2[2]) > 1e-3 * max(
+						abs(m1[2]), abs(m2[2]), 1e-12
+					)
+					if weights_differ:
+						differ += 1
+						same += o1 == o2
+		return {"outputs_compared": differ, "outputs_identical": same} if differ else {}
 
 	def _retrieval_timed(self, kind: str, fn, count):
 		"""A retrieval stage (encode, index add, index train, search), timed with a sync either side,
@@ -1399,6 +1486,16 @@ class Recorder:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
+		out.update(self._identical_outputs())
+		if self.checkpoints.get("saves"):
+			ck = self.checkpoints
+			out["checkpoint_saves_seen"] = ck["saves"]
+			out.update(
+				{
+					f"checkpoint_has_{k}": float(bool(ck.get(k)))
+					for k in ("optimizer", "scheduler", "rng", "step")
+				}
+			)
 		for kind, st in self.retrieval.items():
 			out[f"{kind}_items"] = st["items"]
 			out[f"{kind}_seconds"] = st["seconds"]
@@ -1576,7 +1673,8 @@ class Recorder:
 				"new_tokens_p95": _quantile(lengths, 0.95) if lengths else None,
 				"new_tokens_max": max(lengths) if lengths else None,
 				"max_new_tokens": int(max(caps)) if caps else None,
-				"truncation_rate": sum(trunc) / len(trunc) if trunc else None,
+				# with no cap seen, nothing can be called cut off: unknown, not 0
+				"truncation_rate": sum(trunc) / len(trunc) if trunc and caps else None,
 				"backend": self.gens[-1]["backend"],
 			}
 		}

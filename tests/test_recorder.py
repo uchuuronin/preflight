@@ -342,3 +342,31 @@ def test_a_profiled_ddp_probe_keeps_every_rank_in_step():
 	r = run_probe(spec("ddp_loop.py", warmup=1, timed=2, nproc=2, profile=True, timeout_s=240))
 	assert r.probe.status == "ok", (r.probe.error, r.log_tail[-2000:])
 	assert r.probe.extras["ranks_reported"] == 2
+
+
+@needs_transformers
+def test_different_weights_with_identical_outputs_are_counted():
+	r = run_probe(spec("identical_outputs.py", warmup=1, timed=3))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["outputs_compared"] >= 2 and ex["outputs_identical"] == ex["outputs_compared"]
+
+
+def test_checkpoint_contents_are_read_for_a_resume():
+	r = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert (
+		ex["checkpoint_saves_seen"] >= 1
+		and ex["checkpoint_has_optimizer"] == 0
+		and ex["checkpoint_has_step"] == 0
+	)
+	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--full"])).probe.extras
+	assert all(ex[f"checkpoint_has_{k}"] == 1 for k in ("optimizer", "scheduler", "rng", "step"))
+
+
+def test_a_cap_given_in_a_generation_config_is_seen():
+	r = run_probe(spec("gen_config_cap.py", warmup=1, timed=3))
+	assert r.probe.status == "ok", r.probe.error
+	g = r.probe.generation
+	assert g.max_new_tokens == 4 and g.truncation_rate is not None and g.truncation_rate > 0

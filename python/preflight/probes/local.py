@@ -144,6 +144,15 @@ EXTRAS_KEYS = (
 	),
 	# torchrun (nproc > 1): ranks on the node, how many wrote a result, the largest rank peak and
 	# the slowest rank's median step
+	# hygiene: generations by different weights on the same inputs, and how many came out identical
+	"outputs_compared",
+	"outputs_identical",
+	# hygiene: what the script's own checkpoints hold, for a resume that matches
+	"checkpoint_saves_seen",
+	"checkpoint_has_optimizer",
+	"checkpoint_has_scheduler",
+	"checkpoint_has_rng",
+	"checkpoint_has_step",
 	"world_size",
 	"ranks_reported",
 	"rank_peak_allocated_max_bytes",

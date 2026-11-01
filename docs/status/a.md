@@ -174,14 +174,14 @@ included. Hero lenses first.
 | **Other lenses** | | | |
 | 16 | LM pretraining: throughput, MFU, loader probe, stability signals (lens) | main | 0 |
 | 17 | LR range test (lens, contract) | not started | 3 |
-| 18 | Checkpoint resume exact-match (lens, contract, hygiene) | not started | 3 |
+| 18 | Checkpoint resume exact-match (lens, contract, hygiene) | local: what the script's torch.save is given (weights with or without optimizer state, LR schedule, RNG, step; HF Trainer's optimizer.pt / scheduler.pt / rng_state by name) becomes `hygiene.resume_mismatch`. A content check, not a resumed run replayed step for step | 3 |
 | 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
 | 20 | Serving probes on vLLM for B's model (contract) | hooks on main; local: the serving image (vLLM 0.6.4.post1, its own torch) and routing; startup check and first probe wait for a yes | 3 + paid run |
 | 21 | Retrieval probes through an adapter (lens) | local: encode, faiss add/train/search timed with items a second; a stage after training isn't reached by a probe | 3 |
 | 22 | GNN probes through an adapter (lens) | local: nodes, edges, seeds, nodes per hop, largest batch; sampling time is the data phase; needs a PyG script on a GPU | 3 |
 | 23 | Vision probes through an adapter (lens) | local: images per batch, resolution, channels-last; images/s from samples; needs a vision script on a GPU | 2 |
 | 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
-| 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | not started | 3 |
+| 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | local: findings `hygiene.stale_checkpoint` (checkpoint dirs sent with the code), `hygiene.cache_not_keyed` (a fixed-path `if exists: load`), `generation.truncated` (over 10%, Wilson interval), `hygiene.identical_outputs` (two weight states, same tokens on every compared input). Not yet on a GPU run | 3 |
 | 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
 | 27 | In-flight collector (feature, contract) | local (`recorder/inflight.py`, `preflight watch`); getting the live record to the guide waits on C | 1 |
 | 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | partial | 4 |
@@ -264,6 +264,7 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Oct 31 21:26 | `a-gt-grpo-l4` (41243558415): GRPO smoke, OOM before the first step in both runs (20.91 GiB allocated, asked 2.32 GiB more); fp32 policy and reference with 16 completions x 152k vocab, likely [inference] | L4 | about 2.5 on the L4 | about $0.03 GPU (estimate) |
 | Oct 31 23:02 | `a-agent-sample-1` (41250821790): D's agent eval, 30 of 500 tasks through the proxy (our key outside the sandbox), all 30 done in 1–4 turns, 0 cached input tokens, 470 calls refused past the sample, script wall 49 s | none (CPU sandbox + worker) | about 3 | **$0.4289 of Muse Spark calls** [measured by the proxy at the price table's rate]; CPU under $0.02 (estimate) |
 | Nov 1 01:04 | `a-gt-grpo-l4-2` (41259481848): GRPO smoke at 1 prompt (8 completions), fp32 weights, Adafactor: OOM again before the first step in both runs: 16.36 GiB allocated plus 3.95 GiB reserved but unallocated (fragmentation), asking 2.00 GiB more; peak allocated 19.88 GB (18.5 GiB) [measured] | L4 | about 3.5 on the L4 | about $0.05 GPU (estimate) |
+| Nov 1 01:19 | `a-gt-grpo-l4-3` (41260610897): GRPO smoke **fits** with expandable_segments: 4 bare + 5 recorder steps ok, peak 21.62 GB (20.14 GiB) allocated, 22.99 GB (21.41 GiB) reserved. Phase split rollout 95.3%, backward 2.4%, forward 1.2%, reference 0.8%, optimizer 0.2% [measured]. Per-prompt pass: 7 of 160 completions correct, 4.4% (Wilson 95% 2.1–8.8%); 5 of 20 prompts had any correct answer; 15 of 20 (75%, 53–89%) had zero reward spread, all of them all-wrong [measured]. Truncation not measured: TRL passes the 512 cap in generation_config, which the recorder didn't read (fixed, a test added); longest completion 512, p95 426. No overhead figure (3 steps) | L4 | about 17 queued, 9 on the L4 | about $0.12 GPU at list (estimate) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,
