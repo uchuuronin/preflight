@@ -832,5 +832,17 @@
 	"fix.error.rate_limited": "Too many requests from here; try again shortly.",
 	"fix.error.race_failed": "The fixes didn't finish.",
 	"fix.error.sandbox_failed": "Muse Code's sandbox didn't start; nothing was spent.",
-	"fix.error.expired": "This race finished too long ago to show again."
+	"fix.error.expired": "This race finished too long ago to show again.",
+	"onboard.step": "{n} of {of}",
+	"onboard.next": "Next",
+	"onboard.skip": "Skip",
+	"onboard.done": "Got it",
+	"onboard.map.title": "Your job, as a map",
+	"onboard.map.body": "Each part of the run is drawn on the loop, sized by its share of a step. Click one for its numbers and anything Preflight found there.",
+	"onboard.readouts.title": "The readouts",
+	"onboard.readouts.body": "How long the run takes, what it costs and how likely it is to fail, each with the range Preflight expects. A hatched readout is one Preflight won't vouch for at this setting.",
+	"onboard.knobs.title": "The knobs",
+	"onboard.knobs.body": "Your job's settings. Move one and the map and readouts follow. Pin a knob to keep it where it is.",
+	"onboard.guide.title": "The guide",
+	"onboard.guide.body": "Not sure where to start? The guide walks you through the knobs that matter most for your aim, one move at a time, and you decide whether to keep each."
 }

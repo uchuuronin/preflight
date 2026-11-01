@@ -1891,3 +1891,11 @@ a {
 
 .pf-exports__wandb { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: var(--pf-radius-sm); }
 .pf-exports__wandb p { margin: 0; font-size: 13px; line-height: 1.5; }
+
+/* First-visit notes (app/Onboarding.tsx): a card at the foot of the screen, the part it's about lit. */
+.pf-onboard { position: fixed; z-index: 40; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(420px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; border-radius: var(--pf-radius-lg); font-size: 13.5px; line-height: 1.5; animation: pf-rise 0.3s var(--pf-ease); }
+.pf-onboard p { margin: 0; }
+.pf-onboard:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 2px; }
+.pf-onboard__step { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
+.pf-onboard-lit { scroll-margin-top: 96px; outline: 2px solid var(--pf-accent); outline-offset: 4px; border-radius: var(--pf-radius-sm); box-shadow: 0 0 0 8px var(--pf-accent-glow); }
+@media (prefers-reduced-motion: reduce) { .pf-onboard { animation: none; } }

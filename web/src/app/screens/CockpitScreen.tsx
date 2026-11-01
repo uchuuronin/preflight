@@ -14,6 +14,7 @@ import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { usePanels } from "../../registry";
 import { ExportsSection } from "../../workspace/export/ExportsSection";
+import { Onboarding } from "../Onboarding";
 import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
 import { FitMap } from "../../workspace/cockpit/FitMap";
 import { flag } from "../../lib/flags";
@@ -164,6 +165,7 @@ function Cockpit() {
 						</div>
 					</div>
 					<Dock />
+					<Onboarding />
 				</section>
 				<section className="pf-below" aria-label={t("below.label")}>
 					<h2 className="pf-h2">{t("below.title")}</h2>

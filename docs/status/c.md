@@ -71,7 +71,7 @@ read-only review, and exclude waiting on others.
 | Every Meta model labelled on screen | Partial: Muse Spark, Spark Open and diagnosis labels on main; Muse Code arrives with the fix loop | 0.5 |
 | Template status line above the readouts (adopted 8) | On main | 0 |
 | Coverage (checks) page (adopted 2) | On main; round-three re-score on ws-c next | 1 |
-| Onboarding for first-time visitors | Not started | 3 |
+| Onboarding for first-time visitors | On ws-c: four first-visit notes in the cockpit (`c.onboarding`, flag requested from Chiya) | 0 |
 | Accessibility and reduced-motion pass (D's audit feeds it) | Reduced motion done on ws-c (`481bbd3`): no endless animation with reduced motion on Home, New flight and two cockpits; audit findings 1 to 5 fixed; 6 to 12 open | 2 (audit 6 to 12) |
 | Load test at 20 concurrent visitors | Not started | 2, plus a small paid run |
 | Licence check of everything bundled (CI dependency scan is on main) | Partial | 1 |
