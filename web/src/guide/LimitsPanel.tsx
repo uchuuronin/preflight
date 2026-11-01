@@ -125,10 +125,13 @@ export function LimitsPanel() {
 	// The server keeps this session's limits (the fix route reads only its copy): load them once,
 	// so a reload keeps them, then save every change a moment after it settles.
 	const loaded = useRef(false);
+	const current = useRef(limits);
+	current.current = limits;
 	useEffect(() => {
 		let gone = false;
 		void loadLimits(recordRef).then((held) => {
-			if (!gone && held && limits === NO_LIMITS) actions.setLimits(held);
+			// The server's copy only fills an untouched panel: an edit made while it loaded stands.
+			if (!gone && held && current.current === NO_LIMITS) actions.setLimits(held);
 			loaded.current = true;
 		});
 		return () => {

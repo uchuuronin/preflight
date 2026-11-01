@@ -343,3 +343,17 @@ def test_stricter_takes_both_sets_of_limits():
 	assert m.allowed == {"gpu_type": [A100]}
 	assert m.excluded == {"batch_size": [8, 16]}
 	assert m.frozen == ["packing"] and m.budget_usd == 40
+
+
+def test_two_sets_of_limits_with_no_value_in_common_allow_none():
+	from preflight_api.guide.types import Limits
+
+	m = Limits(allowed={"gpu_type": [A100]}).stricter(Limits(allowed={"gpu_type": ["H100-SXM-80GB"]}))
+	assert m.allowed == {"gpu_type": []}
+	assert not m.allows("gpu_type", A100) and not m.allows("gpu_type", "H100-SXM-80GB")
+	assert m.allows("batch_size", 8)
+	# Ruled-out values merged past 64 are capped, not a server error.
+	big = Limits(excluded={"batch_size": list(range(1, 60))}).stricter(
+		Limits(excluded={"batch_size": list(range(60, 120))})
+	)
+	assert len(big.excluded["batch_size"]) == 64

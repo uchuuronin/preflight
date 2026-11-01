@@ -135,6 +135,12 @@ function fromServer(raw: Record<string, unknown>): Limits {
 }
 
 const saving = new Map<string, Promise<boolean>>();
+/** Records whose server copy this tab has read (or found empty), so a save can't blank it unseen. */
+const loaded = new Set<string>();
+
+function isEmpty(l: Limits): boolean {
+	return !Object.keys(l.allowed).length && !Object.keys(l.excluded).length && !l.declined.length && !l.frozen.length && l.budgetUsd === null && l.deadlineS === null && l.gpuHours === null;
+}
 
 /** Keep the server's copy in step (the fix route reads only that). Resolves true once saved. */
 export function saveLimits(record: string, limits: Limits, put: typeof fetch = fetch): Promise<boolean> {
@@ -161,8 +167,28 @@ export async function loadLimits(record: string, get: typeof fetch = fetch): Pro
 		const r = await get(`/v1/guide/limits/state?record=${encodeURIComponent(record)}`, { credentials: "same-origin" });
 		if (!r.ok) return null;
 		const body = (await r.json()) as { limits?: Record<string, unknown> | null };
+		loaded.add(record);
 		return body.limits ? fromServer(body.limits) : null;
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Before a request the server judges by its copy (a fix): make sure that copy is this tab's. If
+ * the tab never read the server's copy, read it first; if the server holds limits and this tab
+ * has none yet, the server's stand (never blanked by an empty save). False when it can't tell.
+ */
+export async function ensureSaved(record: string, limits: Limits, io: typeof fetch = fetch): Promise<boolean> {
+	if (!loaded.has(record)) {
+		const held = await loadLimits(record, io);
+		if (!loaded.has(record)) return false;
+		if (held && isEmpty(limits)) return true;
+	}
+	return saveLimits(record, limits, io);
+}
+
+/** Tests only: forget which records were read. */
+export function _resetLoaded(): void {
+	loaded.clear();
 }

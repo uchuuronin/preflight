@@ -1331,7 +1331,7 @@ a {
 	cursor: pointer;
 	transition: background 0.4s ease, opacity 0.4s ease, transform var(--pf-dur-press) var(--pf-ease);
 }
-.pf-pmark::after { content: ""; position: absolute; inset: -10px; }
+/* No hit area past the 24 px box: a wider one reached over the marks and the playhead knob. */
 .pf-pmark:hover { transform: translate(-50%, -50%) scale(1.25); }
 /* The diamond is drawn by ::before, so the 24 px box itself isn't rotated and doesn't reach up
    over the eval marks above it (a rotated box's corners did: axe "partially obscured"). */

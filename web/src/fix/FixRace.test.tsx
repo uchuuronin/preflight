@@ -56,7 +56,7 @@ describe("the fix race on screen", () => {
 			fireEvent.click(screen.getByRole("button", { name: en["fix.start"] }));
 		});
 		// The limits are saved to the server first; the fix request itself carries none.
-		expect(fetch.mock.calls[0]![0]).toBe("/v1/guide/limits/state");
+		expect(fetch.mock.calls.some((c) => c[0] === "/v1/guide/limits/state" && c[1]?.method === "PUT")).toBe(true);
 		const call = fetch.mock.calls.find((c) => c[0] === "/v1/patches")!;
 		const body = JSON.parse(call[1]!.body as string);
 		expect(body).not.toHaveProperty("limits");
@@ -79,5 +79,23 @@ describe("the fix race on screen", () => {
 			</WorkspaceProvider>,
 		);
 		expect(screen.queryByRole("button", { name: en["guide.fix_it"] })).toBeNull();
+	});
+});
+
+describe("the fix waits for the limits to be saved", () => {
+	it("doesn't start when the server's copy can't be read or saved, and never blanks it", async () => {
+		const { _resetLoaded, ensureSaved, NO_LIMITS } = await import("../guide/limits");
+		_resetLoaded();
+		const down = vi.fn(async () => new Response("", { status: 503 })) as unknown as typeof fetch;
+		expect(await ensureSaved("lora-7b", NO_LIMITS, down)).toBe(false);
+		_resetLoaded();
+		const puts: string[] = [];
+		const held = vi.fn(async (_url: string, init?: RequestInit) => {
+			if (init?.method === "PUT") puts.push(init.body as string);
+			return new Response(JSON.stringify({ limits: { frozen: ["packing"] }, saved: true }), { status: 200 });
+		}) as unknown as typeof fetch;
+		// The server holds limits and this tab has none yet: the server's copy stands.
+		expect(await ensureSaved("lora-7b", NO_LIMITS, held)).toBe(true);
+		expect(puts).toEqual([]);
 	});
 });

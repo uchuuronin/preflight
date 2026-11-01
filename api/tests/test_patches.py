@@ -372,3 +372,36 @@ def test_stored_limits_name_only_what_the_record_has(world):
 		"/v1/guide/limits/state", json={"record": "lora-7b", "limits": {"allowed": {"gpu_type": ["TPU-v9"]}}}
 	)
 	assert r.status_code == 422
+
+
+def test_a_fix_is_judged_by_what_it_really_sets_not_the_value_a_client_sends(world):
+	c, fixer, *_ = world
+	c.put(
+		"/v1/guide/limits/state",
+		json={
+			"record": "lora-7b",
+			"limits": {"excluded": {"eval_no_grad": [True]}, "allowed": {"precision": ["fp32"]}},
+		},
+	)
+	# "Turn no_grad on", claimed as false: still refused, and the false value itself is refused.
+	lie = c.post(
+		"/v1/patches",
+		json={"record": "lora-7b", "candidates": [{"template_id": "eval.wrap_no_grad", "value": False}]},
+	)
+	assert lie.status_code == 422
+	honest = c.post(
+		"/v1/patches", json={"record": "lora-7b", "candidates": [{"template_id": "eval.wrap_no_grad"}]}
+	)
+	assert honest.status_code == 422 and honest.json()["error"]["code"] == "outside_limits"
+	# bf16 autocast sets precision to bf16, which the limits don't allow.
+	bf16 = c.post(
+		"/v1/patches", json={"record": "lora-7b", "candidates": [{"template_id": "precision.bf16_autocast"}]}
+	)
+	assert bf16.status_code == 422 and bf16.json()["error"]["code"] == "outside_limits"
+	assert fixer.started == []
+
+
+def test_every_template_without_a_value_says_what_it_sets():
+	from preflight_api.fix.templates import APPLIES, TEMPLATES
+
+	assert {t.id for t in TEMPLATES.values() if "{value}" not in t.task} == set(APPLIES)

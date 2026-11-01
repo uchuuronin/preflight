@@ -27,7 +27,7 @@ from .. import edge
 from ..errors import ApiError
 from ..fix import run
 from ..fix.service import Race, new_patch_id, now, public
-from ..fix.templates import TEMPLATES, task_for
+from ..fix.templates import TEMPLATES, applied_value, task_for
 from ..flags import flag
 from ..guide.record_view import RecordView
 from ..jobs import visitor_of
@@ -108,6 +108,7 @@ def _checked(body: PatchIn, view: RecordView) -> list[dict]:
 			raise ApiError(422, "invalid_request", f"{t.knob} can't be {c.value!r}.")
 		try:
 			task_for(c.template_id, c.value)
+			applied_value(c.template_id, c.value)
 		except (KeyError, ValueError) as e:
 			raise ApiError(422, "invalid_request", f"{c.template_id}: {e}") from e
 		pair = (c.template_id, repr(c.value))
@@ -149,10 +150,7 @@ async def start_race(request: Request) -> dict:
 	if held is not None:
 		for c in cands:
 			t = TEMPLATES[c["template_id"]]
-			k = view.knobs.get(t.knob) if t.knob else None
-			value = c.get("value")
-			if value is None and k is not None and k.kind == "bool":
-				value = True  # a switch fix turns it on
+			value = applied_value(c["template_id"], c.get("value"))  # what the fix really sets
 			if t.knob and (t.knob in held.frozen or (value is not None and not held.allows(t.knob, value))):
 				raise ApiError(
 					422,

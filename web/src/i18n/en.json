@@ -892,5 +892,6 @@
 	"guide.unpin_ask": "The guide asks to release {knob}, which you pinned at {value}.",
 	"guide.unpin_ask.label": "The guide asks to release a pin",
 	"guide.unpin_ask.release": "Release it",
-	"guide.unpin_ask.keep": "Keep {value}"
+	"guide.unpin_ask.keep": "Keep {value}",
+	"fix.error.limits_unsaved": "Your limits couldn't be saved, so Muse Code didn't start. Try again in a moment."
 }

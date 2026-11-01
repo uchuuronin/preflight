@@ -43,7 +43,7 @@ def _left(rec: RecordView, kid: str, limits: Limits) -> bool:
 		return False
 	k = rec.knobs[kid]
 	allow = limits.allowed.get(kid)
-	if allow:
+	if allow is not None:
 		return any(v != k.current and limits.allows(kid, v) for v in allow)
 	if k.kind in ("categorical", "bool"):
 		values = k.values if k.kind == "categorical" else (True, False)

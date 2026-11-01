@@ -10,7 +10,7 @@ import { fmt } from "../lib/fmt";
 import { hasKey, t } from "../lib/i18n";
 import type { Finding } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
-import { saveLimits } from "../guide/limits";
+import { ensureSaved } from "../guide/limits";
 import { candidatesFor, template, USD_PER_CANDIDATE } from "./candidates";
 import { cancelRace, getRace, POLL_MS, type RaceCandidate, type RaceView, startRace } from "./race";
 
@@ -98,8 +98,13 @@ export function FixRace({ finding }: { finding: Finding }) {
 	const begin = async () => {
 		setBusy(true);
 		setError(null);
-		// The server judges a fix by its own copy of the limits: make sure it has the latest.
-		await saveLimits(recordRef, state.limits);
+		// The server judges a fix by its own copy of the limits: make sure it has the latest, and
+		// don't start if that can't be done.
+		if (!(await ensureSaved(recordRef, state.limits))) {
+			setBusy(false);
+			setError({ code: "limits_unsaved", message: "" });
+			return;
+		}
 		const out = await startRace(recordRef, finding.id, cands);
 		setBusy(false);
 		if (!out.ok) {
