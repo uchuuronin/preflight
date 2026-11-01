@@ -5,6 +5,7 @@
 	preflight run path/to/project --entrypoint train.py --out records/
 	OPENAI_API_KEY=... preflight run agent_eval.py --agent-max-usd 5   # 30 of its tasks, your key
 	preflight watch records/<share>.json train.py -- --epochs 3   # the real run, against its bands
+	preflight demo                              # a 60-second first run: a tiny script, probed here
 
 `run` uses the same pipeline as the hosted app, with probes on the local device
 and no GPU bill; the record lands in --out as <share_token>.json.
@@ -33,6 +34,50 @@ def _files(path: Path, entrypoint: str | None) -> tuple[dict[str, str], str]:
 			raise InvalidSubmission("say which file to run with --entrypoint")
 		return files, entry
 	raise InvalidSubmission(f"{path} does not exist")
+
+
+# `preflight demo`: a small real training loop with knobs worth turning (batch size, learning rate,
+# loader workers), quick on a CPU and on any GPU, so a fresh install has something to probe at once
+DEMO_SCRIPT = """\"\"\"Preflight's demo: a small MLP on synthetic data. Probe it with `preflight run train.py`.\"\"\"
+import argparse
+
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
+p = argparse.ArgumentParser()
+p.add_argument("--batch_size", type=int, default=64)
+p.add_argument("--lr", type=float, default=1e-3)
+p.add_argument("--epochs", type=int, default=3)
+args = p.parse_args()
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+torch.manual_seed(0)
+x = torch.randn(20_000, 256)
+y = (x[:, :8].sum(dim=1, keepdim=True) > 0).float()
+loader = DataLoader(TensorDataset(x, y), batch_size=args.batch_size, shuffle=True, num_workers=0)
+model = torch.nn.Sequential(
+	torch.nn.Linear(256, 1024), torch.nn.GELU(), torch.nn.Linear(1024, 1024), torch.nn.GELU(), torch.nn.Linear(1024, 1)
+).to(device)
+opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
+loss_fn = torch.nn.BCEWithLogitsLoss()
+for epoch in range(args.epochs):
+	for xb, yb in loader:
+		xb, yb = xb.to(device), yb.to(device)
+		loss = loss_fn(model(xb), yb)
+		opt.zero_grad()
+		loss.backward()
+		opt.step()
+	print(f"epoch {epoch}: loss {loss.item():.4f}")
+"""
+
+
+def _write_demo(where: Path) -> Path:
+	"""The demo script in its own folder (made if missing); an existing train.py there is kept."""
+	where.mkdir(parents=True, exist_ok=True)
+	script = where / "train.py"
+	if not script.exists():
+		script.write_text(DEMO_SCRIPT, encoding="utf-8")
+	return script
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -70,9 +115,21 @@ def main(argv: list[str] | None = None) -> int:
 		"--total-steps", type=int, help="optimizer steps in the whole run, for the time.total check"
 	)
 	w.add_argument("--window", type=int, help="steps per update (default 20)")
+	dm = sub.add_parser(
+		"demo", help="write a small training script and probe it here: a first run in about a minute"
+	)
+	dm.add_argument("--dir", type=Path, default=Path("preflight-demo"), help="where the script and record go")
 	argv = list(sys.argv[1:] if argv is None else argv)
 	script_args = argv[argv.index("--") + 1 :] if "--" in argv else []
 	ns = ap.parse_args(argv[: argv.index("--")] if "--" in argv else argv)
+	if ns.cmd == "demo":
+		script = _write_demo(ns.dir)
+		print(
+			f"preflight: probing the demo script {script} on this machine (about a minute on a CPU)",
+			file=sys.stderr,
+		)
+		ns = argparse.Namespace(cmd="run", path=script, entrypoint=None, out=ns.dir / "records",
+			install_requirements=False, require_gpu=False, agent_max_usd=None, demo=True)  # fmt: skip
 	if ns.cmd == "watch":
 		from preflight.recorder import inflight
 
@@ -119,6 +176,9 @@ def main(argv: list[str] | None = None) -> int:
 		out["agent_tasks"] = len(rec.agent_sample.tasks)
 		out["agent_sample_usd"] = round(sum(t.cost_usd or 0 for t in rec.agent_sample.tasks), 4)
 	print(json.dumps(out, indent=2))
+	if getattr(ns, "demo", False):
+		print(f"preflight: the flight record is {out['record']}. Open it in Preflight's workspace to fly the "
+			"whole run; probe your own script with `preflight run train.py`.", file=sys.stderr)  # fmt: skip
 	if rec.job.lens == "agent":
 		if rec.agent_sample is None:
 			print("preflight: an agent run; add --agent-max-usd 5 (and OPENAI_API_KEY) to sample 30 of its "
