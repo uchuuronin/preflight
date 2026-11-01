@@ -16,7 +16,10 @@ Preflight ran a few real steps on one L4 and caught it in 189 seconds, for $0.04
 Fly your ML job before you pay for it: TODO(PM) link
 ```
 
-TODO(PM): the hackathon's hashtag and handles, if the rules ask for them; check the count after.
+TODO(PM): the link is the LoRA record's share page, `https://<live host>/s/ICDYrfHQ2nBNbv3mlRHHMg`:
+its card is pre-rendered (`workers/hero-cards.json`), so the post previews with an image. If the post
+links another record, add it to `hero-cards.json` first. Add the hackathon's hashtag and handles if
+the rules ask for them, and check the count after.
 
 ## Video alt text
 

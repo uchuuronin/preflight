@@ -74,8 +74,9 @@ a shared record's link. Checking in your own repo or script opens with `runner.q
 
 **Share a flight** (once `workers/` is in the deploy; TODO(PM)): post
 `https://TODO-PM-HOST/s/<share token>`. Link previews show the record's headline numbers, each with
-its status word (Measured, Predicted, Extrapolated, Not trusted or Illustrative), as text, or as a
-card image where the deploy turns card images on, and the link opens the flight in the cockpit.
+its status word (Measured, Predicted, Extrapolated, Not trusted or Illustrative), as text, with a
+card image for the records whose card is pre-rendered, and the link opens the flight in the
+cockpit.
 For a README badge:
 `[![Preflight](https://TODO-PM-HOST/badge/<share token>)](https://TODO-PM-HOST/s/<share token>)`
 (`workers/README.md`).

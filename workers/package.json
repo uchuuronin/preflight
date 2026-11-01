@@ -6,7 +6,9 @@
 	"scripts": {
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit -p .",
-		"vendor": "node scripts/vendor.mjs"
+		"vendor": "node scripts/vendor.mjs",
+		"hero-cards": "node scripts/hero-cards.mjs",
+		"hero-cards:check": "node scripts/hero-cards.mjs --check"
 	},
 	"devDependencies": {
 		"@expo-google-fonts/instrument-sans": "0.4.2",

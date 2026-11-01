@@ -1,8 +1,9 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { duration, formatValue, headline, type RecordLike } from "../functions/_card/headline";
+import { HERO_CARDS } from "../functions/_card/hero";
 import { renderPng } from "../functions/_card/render";
 import { badge, cardPng, sharePage } from "../functions/_card/routes";
 import { badgeSvg, CARD_H, CARD_W, cardSvg, wrap } from "../functions/_card/svg";
@@ -138,6 +139,15 @@ describe("routes", () => {
 		expect(html).not.toContain("og:image");
 		expect(html).toContain('<meta name="twitter:card" content="summary">');
 		expect(html).toContain("(measured)");
+	});
+
+	it("points a hero record's preview at its pre-rendered card, with card images off", async () => {
+		const off = { PREFLIGHT_API_ORIGIN: "https://api.example", PREFLIGHT_EDGE_SECRET: "s3cret" };
+		const hero = [...HERO_CARDS][0] as string;
+		const html = await (await sharePage(req(`/s/${hero}`), off, hero, api(smoke))).text();
+		expect(html).toContain(`<meta property="og:image" content="https://preflight.example/cards/${hero}.png">`);
+		expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+		expect(existsSync(join(here, "..", "static", "cards", `${hero}.png`))).toBe(true);
 	});
 
 	it("says so when no record matches, with no image tag", async () => {

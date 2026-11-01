@@ -8,6 +8,22 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 08:00 (pushed; tests that pass on both golden sets; hero cards; the dial)
+
+Pushed `09648e7`..`cbbfe73` with Chiya's yes (07:42). Chiya's calls: card rendering per request stays off; the hero records get pre-rendered cards; B will commit its divergence fit report, which I'll link when it lands.
+
+- **Golden-record tests.** A's `make_golden.py` with `PREFLIGHT_GOLDEN_ENGINE=1` isn't on any branch yet. So I applied B's exact call (`from-b.md`: `fill_predictions` after `model_validate`) to a scratch copy, which reproduces the committed goldens byte for byte without the flag. I regenerated both sets into the scratch folder and swapped each in to test.
+	- The whole web suite on the engine goldens: 12 failures. 2 are in my files (`addons/exports`); 10 are in C's (`guide/`, `workspace/provider`, `workspace/rate`, `workspace/record/samples`).
+	- My 2 now assert relations, not fixture figures. The plan names the abstained and missing readouts, and every number it gives is the record's own. The "sample" test builds its own all-fixture copy of the golden record.
+	- D's add-on suite passes on both sets, 251 of 251 each. The goldens themselves aren't committed; the PM regenerates them at the next merge.
+- **The dial on the engine goldens** (`make_golden.py`'s path, B's real models) [simulated: the golden probes are hand-made]: identical to the fixture set and to my Oct 31 scratch run. Every planted knob is in the dock on screen today (3 of 3 on each record). With C's list, fine-tune has 2 of 3 in the dock and pretrain 1 of 3. All nine orders tie at 3 of 6. Decision: the order stays frozen for the Nov 2 held-out run, which remains the real test.
+- **Hero cards.** The LoRA OOM record's card (`ICDYrfHQ2nBNbv3mlRHHMg`) is pre-rendered with the same card code from A's copy of that record (`api/tests/fixtures/a-smoke-l4-main-4.record.json`). It's committed as `workers/static/cards/<token>.png`, and the share page points that token's preview at it, so its links preview with an image on the Free plan; every other record previews as text.
+	- `npm run hero-cards:check` re-renders and fails on a stale card; I checked that it fails on a corrupted copy.
+	- The X post's link is that record's `/s/` page.
+	- C is asked to copy `static/cards` into the deployed site and run the check in CI.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, morning (Chiya's queue of 07:04: README, D2, licences, submission, D4)
 
 1. **Final README:** `docs/readme-final.md`, for the PM to swap in for `README.md`. It combines C's README on `main` with my draft, which it replaces; the test now guards the final file. A new Status section, from `main` `a52753f`, says what's on in production, what's behind a flag, and what's not used or not measured. A read-only research agent compiled it from every status file and the code, with sources.

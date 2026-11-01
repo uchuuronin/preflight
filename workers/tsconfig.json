@@ -3,12 +3,22 @@
 		"target": "ES2022",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
-		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"lib": [
+			"ES2022",
+			"DOM",
+			"DOM.Iterable"
+		],
 		"strict": true,
 		"noUncheckedIndexedAccess": true,
 		"noEmit": true,
 		"skipLibCheck": true,
-		"types": ["node"]
+		"types": [
+			"node"
+		]
 	},
-	"include": ["functions/**/*.ts", "tests/**/*.ts"]
+	"include": [
+		"functions/**/*.ts",
+		"tests/**/*.ts",
+		"scripts/**/*.ts"
+	]
 }

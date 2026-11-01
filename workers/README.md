@@ -29,18 +29,24 @@ slowest) [measured in Node, Nov 1, on the golden fine-tune record]. The Workers 
 Workers. The Paid plan allows 30 s by default, for a minimum of $5 a month with 30 million CPU
 milliseconds included [cited: Cloudflare's Workers limits and pricing pages, read Nov 1].
 
-So the share page points link previews at the card only when the deploy sets
-`PREFLIGHT_SHARE_CARD_IMAGES=on`, off by default (Chiya's call, since it means the Paid plan).
-Off, `/s/<token>` still gives previews a title and a description with every number and its
-status word, and the badge works: neither renders an image.
+So rendering per request stays off (`PREFLIGHT_SHARE_CARD_IMAGES`, Chiya, Nov 1), and the hero
+records get cards pre-rendered ahead of time instead, served as plain files (`/cards/<token>.png`):
+the LoRA OOM, and whichever record the X post links (`hero-cards.json`). Their share links preview
+with an image on the Free plan. Every other record's `/s/<token>` previews as text, a title and a
+description with every number and its status word, and the badge works: neither renders an image.
+
+To add a hero card: put the token and a copy of its record in `hero-cards.json`, run
+`npm run hero-cards`, and commit `static/cards/<token>.png` and `functions/_card/hero.ts`.
+`npm run hero-cards:check` re-renders them and fails if a committed card is out of date.
 
 ## Deploy (C)
 
-Not in the deploy yet: C is asked to add this step (`docs/requests/from-d.md`). The Pages deploy
-publishes `web/dist` with `web/functions`. Before `pages deploy`, copy these in:
+Not in the deploy yet: C is asked to add these steps (`docs/requests/from-d.md`). The Pages deploy
+publishes `web/dist` with `web/functions`. After the web build and before `pages deploy`:
 
 ```bash
 cp -r workers/functions/. web/functions/
+mkdir -p web/dist/cards && cp workers/static/cards/*.png web/dist/cards/
 ```
 
 Nothing to install: the renderer (resvg, WebAssembly) and the fonts are vendored in
@@ -57,6 +63,7 @@ cd workers
 npm ci
 npm test            # headlines from real records, the routes against a mocked API, PNG renders
 npm run typecheck
+npm run hero-cards:check   # the committed hero cards match a fresh render
 CARD_OUT=out npm test   # also writes the rendered cards to out/ to look at
 ```
 

@@ -11,6 +11,7 @@
  * is never cached (no-store), so no link preview keeps a generic card.
  */
 import { headline, type Headline } from "./headline";
+import { HERO_CARDS } from "./hero";
 import { type CardEnv, type Fetched, fetchRecord, TOKEN } from "./record";
 import { badgeSvg, CARD_W, cardSvg, esc } from "./svg";
 
@@ -49,7 +50,9 @@ export async function sharePage(request: Request, env: CardEnv, token: string, f
 	const out = outcome(got);
 	const title = missing ? "No flight record matches this link" : `${h.title} · Preflight`;
 	const desc = missing ? "Check the link, or open a sample in Preflight." : describe(h);
-	const image = safe && env.PREFLIGHT_SHARE_CARD_IMAGES === "on" ? `${origin}/card/${safe}` : "";
+	// A hero record has a card pre-rendered as a plain file (scripts/hero-cards.ts), which previews
+	// with an image on the Free plan; others get the rendered card only where the deploy allows it.
+	const image = !safe ? "" : HERO_CARDS.has(safe) ? `${origin}/cards/${safe}.png` : env.PREFLIGHT_SHARE_CARD_IMAGES === "on" ? `${origin}/card/${safe}` : "";
 	const html = `<!doctype html>
 <html lang="en">
 <head>
