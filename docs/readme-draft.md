@@ -128,6 +128,21 @@ Mon Nov 2 from the bug zoo's and the unseen scripts' full runs; the policy is fr
 Proportions are reported as counts with Wilson 95% intervals; no number here was tuned on the
 data it is checked against.
 
+## Add-ons
+
+Smaller features, each behind its own flag in `flags.json` (all off until Chiya turns them on).
+`docs/audit/scripts/addons.mjs` checks that each still renders where it belongs, with no errors,
+no accessibility violations inside it and nothing under 24 px, and that it is gone with its flag
+off. TODO(PM): keep only the rows whose flags are on in production.
+
+| Add-on | What a visitor gets | Flag |
+| --- | --- | --- |
+| Detail level (D1) | "New to this" shows the few knobs that matter most for the goal, in plain words, with a glossary card in each knob's control; knobs that a warning names stay in view | `d.expertise` |
+| Show costs in (D3) | Dollar figures in one of 30 currencies at the European Central Bank's dated reference rates, picked from the browser's region or set in the Logbook; regions without a rate stay in US dollars | `d.currency` |
+| Free GPUs (D4) | Whether the plan finishes inside one free session on Google Colab, Kaggle, Modal's starter credit or Lightning AI, and how often to save a checkpoint if not | `d.freetier` |
+| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run; checking it in opens with live runs | `d.notebook` |
+| Take it with you | The plan, an edit script for the changed settings, a Slurm batch file and the run command, built from the settings on screen, and the record's link once it has one | `c.exports`; the "Check it again on your machine" item also needs `d.exports_cli` |
+
 ## Develop
 
 ```bash
