@@ -352,8 +352,22 @@ def test_two_sets_of_limits_with_no_value_in_common_allow_none():
 	assert m.allowed == {"gpu_type": []}
 	assert not m.allows("gpu_type", A100) and not m.allows("gpu_type", "H100-SXM-80GB")
 	assert m.allows("batch_size", 8)
-	# Ruled-out values merged past 64 are capped, not a server error.
-	big = Limits(excluded={"batch_size": list(range(1, 60))}).stricter(
-		Limits(excluded={"batch_size": list(range(60, 120))})
-	)
-	assert len(big.excluded["batch_size"]) == 64
+	# Ruled-out values merged past 64 are refused, never cut (a cut value would be allowed again).
+	with pytest.raises(ValueError):
+		Limits(excluded={"batch_size": list(range(1, 60))}).stricter(
+			Limits(excluded={"batch_size": list(range(60, 120))})
+		)
+	with pytest.raises(ValueError):
+		Limits(excluded={"batch_size": list(range(1, 65))}).excluding("batch_size", 99)
+
+
+def test_a_merge_past_64_ruled_out_values_is_refused_not_cut():
+	model = Model()
+	with client(model) as c:
+		c.put(
+			"/v1/guide/limits/state", json={"record": "lora-7b", "limits": {"excluded": {"batch_size": [16]}}}
+		)
+		sent = {**SETTING, "limits": {"excluded": {"batch_size": list(range(17, 81))}}}
+		r = turn(c, start=True, setting=sent)
+		assert r.status_code == 422 and r.json()["error"]["code"] == "too_many_limits"
+		assert model.requests == []

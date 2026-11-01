@@ -13,7 +13,7 @@ import { hasKey, t } from "../lib/i18n";
 import type { Knob, KnobValue, LoadedRecord } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { valueText } from "./GuidePanel";
-import { type Limits, loadLimits, NO_LIMITS, saveLimits } from "./limits";
+import { type Limits, limitsLoaded, loadLimits, NO_LIMITS, saveLimits } from "./limits";
 
 export type Chip =
 	| { kind: "allowed"; knob_id: string; values: KnobValue[] }
@@ -132,7 +132,9 @@ export function LimitsPanel() {
 		void loadLimits(recordRef).then((held) => {
 			// The server's copy only fills an untouched panel: an edit made while it loaded stands.
 			if (!gone && held && current.current === NO_LIMITS) actions.setLimits(held);
-			loaded.current = true;
+			// Only a successful read lets edits save: a failed one must not let an edit replace a
+			// server copy this tab never saw (a fix still reads it first, through ensureSaved).
+			loaded.current = limitsLoaded(recordRef);
 		});
 		return () => {
 			gone = true;
@@ -140,7 +142,7 @@ export function LimitsPanel() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [recordRef]);
 	useEffect(() => {
-		if (!loaded.current && limits === NO_LIMITS) return;
+		if (!loaded.current) return;
 		const id = setTimeout(() => void saveLimits(recordRef, limits), 250);
 		return () => clearTimeout(id);
 	}, [recordRef, limits]);

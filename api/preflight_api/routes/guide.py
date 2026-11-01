@@ -153,7 +153,14 @@ async def _held(request: Request, rec: RecordView, sent: Limits) -> Limits:
 	"""The browser's limits held to the server's copy for this session (whichever is stricter)."""
 	store = getattr(request.app.state, "session_limits", None)
 	held = await store.get(visitor_of(request.state.session), rec.key) if store else None
-	return sent.stricter(held) if held is not None else sent
+	try:
+		return sent.stricter(held) if held is not None else sent
+	except ValueError as e:
+		raise ApiError(
+			422,
+			"too_many_limits",
+			"Too many values are ruled out on one knob; pick the allowed ones instead.",
+		) from e
 
 
 def _upper(r: Any) -> float | None:
@@ -337,7 +344,14 @@ async def guide_turn(request: Request) -> dict:
 		state.seen = []
 		if d.action == "declined" and d.value is not None:
 			# Ruled out here too, whatever the browser's setting says yet.
-			limits = limits.excluding(d.knob_id, d.value)
+			try:
+				limits = limits.excluding(d.knob_id, d.value)
+			except ValueError as e:
+				raise ApiError(
+					422,
+					"too_many_limits",
+					"Too many values are ruled out on one knob; pick the allowed ones instead.",
+				) from e
 		if d.action == "declined":
 			state.add(
 				_event(

@@ -89,8 +89,10 @@ class Limits(Strict):
 			allowed[kid] = [v for v in allowed[kid] if v in vs] if kid in allowed else list(vs)
 		excluded = {k: list(v) for k, v in self.excluded.items()}
 		for kid, vs in other.excluded.items():
-			# Capped at the 64 a knob may list: past that, its allowed list is the tool to use.
-			excluded[kid] = [*excluded.get(kid, []), *(v for v in vs if v not in excluded.get(kid, []))][:64]
+			excluded[kid] = [*excluded.get(kid, []), *(v for v in vs if v not in excluded.get(kid, []))]
+			# Never cut: dropping a value would allow it again. Past 64, the allowed list is the tool.
+			if len(excluded[kid]) > 64:
+				raise ValueError(f"more than 64 values ruled out on {kid}")
 
 		def low(a: float | None, b: float | None) -> float | None:
 			return b if a is None else a if b is None else min(a, b)
@@ -108,9 +110,9 @@ class Limits(Strict):
 	def excluding(self, knob_id: str, value: Any) -> Limits:
 		"""These limits with one more value ruled out and its knob set aside ("Not this")."""
 		ex = dict(self.excluded)
-		ex[knob_id] = ([*ex.get(knob_id, []), value] if value not in ex.get(knob_id, []) else ex[knob_id])[
-			-64:
-		]
+		ex[knob_id] = [*ex.get(knob_id, []), value] if value not in ex.get(knob_id, []) else ex[knob_id]
+		if len(ex[knob_id]) > 64:
+			raise ValueError(f"more than 64 values ruled out on {knob_id}")
 		dec = self.declined if knob_id in self.declined else [*self.declined, knob_id]
 		return self.model_copy(update={"excluded": ex, "declined": dec})
 

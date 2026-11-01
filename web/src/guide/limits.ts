@@ -40,7 +40,8 @@ const same = (a: KnobValue | undefined, b: KnobValue | undefined) => a === b || 
 export function valueAllowed(limits: Limits, knobId: string, value: KnobValue): boolean {
 	if (limits.frozen.includes(knobId)) return false;
 	const allow = limits.allowed[knobId];
-	if (allow && allow.length && !allow.some((v) => same(v, value))) return false;
+	// A knob listed with no values allows none, as on the server.
+	if (allow && !allow.some((v) => same(v, value))) return false;
 	return !(limits.excluded[knobId] ?? []).some((v) => same(v, value));
 }
 
@@ -191,4 +192,9 @@ export async function ensureSaved(record: string, limits: Limits, io: typeof fet
 /** Tests only: forget which records were read. */
 export function _resetLoaded(): void {
 	loaded.clear();
+}
+
+/** True once this tab has read the server's copy for the record (found or empty). */
+export function limitsLoaded(record: string): boolean {
+	return loaded.has(record);
 }
