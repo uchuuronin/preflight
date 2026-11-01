@@ -28,6 +28,9 @@ Updated Sun Nov 1, 01:30 ET.
   would; a follow-up whose parent ran on an A10 asks for an A10, which has no fallback; an image
   change waits the 2 minutes for an L4 again; up to two waiting threads per job can linger for
   30 min; an L4 scheduled just after the cutoff runs a few uncounted seconds before it's ended.
+- Spark Open triage (item 29, behind harness.spark_open_triage): calls run one after another
+  after the probes, up to 30 s each, outside the job's probe time budget and with no cancel check;
+  the quote check only asks that the quoted line (8 characters or more) appears in the log tail.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
