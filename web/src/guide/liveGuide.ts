@@ -14,6 +14,7 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
+import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
@@ -49,7 +50,14 @@ export type Decision = { knob_id: string; action: "applied" | "reverted" | "pinn
 
 type Readout = { point: number | null; lo: number | null; hi: number | null; unit: string; status: string; reason?: string };
 
-export type SetKnobRefusal = "pinned" | "not_in_domain" | "would_be_tight" | "would_fail" | "not_trusted" | "one_per_round";
+export type SetKnobRefusal =
+	| "pinned"
+	| "not_in_domain"
+	| "changes_results"
+	| "would_be_tight"
+	| "would_fail"
+	| "not_trusted"
+	| "one_per_round";
 
 export type ToolOut =
 	| { tool: "predict"; call_id: string; readouts: Record<string, Readout> }
@@ -129,6 +137,9 @@ export function guardSetKnob(ctx: ToolContext, knobId: string, value: unknown): 
 	if (!knob) return "not_in_domain";
 	if (pinned.has(knobId)) return "pinned";
 	if (!knobChoices(record, knob).some((v) => v === value)) return "not_in_domain";
+	// A knob that changes what the run produces or measures (sequence length, an eval's task
+	// count) is a trade-off to put to the person, never a saving; only a failing run may move it.
+	if (changesResults(knobId, record) && !isFailing({ record, provider, knobs })) return "changes_results";
 	const next = { ...knobs, [knobId]: value as KnobValue };
 	const p = provider.predict(record, next);
 	const mem = targetFor(record, "memory");
@@ -152,7 +163,12 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 		}
 		case "sensitivity": {
 			const kind = (a.objective as Setting["objective"]["kind"]) ?? "min_time";
-			const moves = provider.moves(record, { kind }, { pinned, knobs, includeTight: true }).slice(0, 8);
+			// Result-changing knobs are left out unless the run is failing, as in the rule tour.
+			const failing = isFailing({ record, provider, knobs });
+			const moves = provider
+				.moves(record, { kind }, { pinned, knobs, includeTight: true })
+				.filter((m) => failing || !changesResults(m.knobId, record))
+				.slice(0, 8);
 			const top = Math.max(...moves.map((m) => Math.abs(m.relative ?? m.delta)), 1e-12);
 			return {
 				tool: "sensitivity",

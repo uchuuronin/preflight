@@ -4,14 +4,17 @@ import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
 import { usePanels } from "../registry";
 import { capacityBytes, costStraddlesBudget, failureTarget, objectiveTarget, SAMPLE_MORE_TASKS, target, targetFor } from "../workspace/record/model";
-import type { Knob, KnobValue } from "../workspace/record/types";
+import type { Finding, Knob, KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
-import { findingVisit, MAX_TOUR_STEPS, nextStep, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
+import { findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
+
+/** Muse Code writes a finding's fix only once the fix loop is on; until then the tour moves on. */
+const canFix = (f: Finding) => !!f.fix_template && flag("c.fix_loop");
 
 interface Active {
 	step: TourStep;
@@ -84,6 +87,11 @@ export function GuidePanel() {
 			return;
 		}
 		actions.propose(null);
+		if (step.kind === "finding") {
+			// A finding is a step of the tour: counted with the findings and moves still to come.
+			setActive({ step, n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
+			return;
+		}
 		const shown = step.kind === "move" ? { ...step, kind: "done" as const, textKey: "guide.done", whyKey: "guide.done.why" } : step;
 		setActive({ step: shown, n, of: n });
 	};
@@ -92,12 +100,16 @@ export function GuidePanel() {
 	const skipOffer = () => {
 		if (!active) return;
 		const v = new Set(visited);
+		let next = taken;
 		if (active.step.kind === "sample_offer") v.add(SAMPLE_VISIT);
-		else if (active.step.kind === "finding" && active.step.finding) v.add(findingVisit(active.step.finding));
-		else if (active.step.move) v.add(`probe:${active.step.move.knobId}`);
+		else if (active.step.kind === "finding" && active.step.finding) {
+			v.add(findingVisit(active.step.finding));
+			next = taken + 1; // a finding shown is a step taken, so the counter moves on
+			setTaken(next);
+		} else if (active.step.move) v.add(`probe:${active.step.move.knobId}`);
 		else return;
 		setVisited(v);
-		requestAnimationFrame(() => begin(v, taken));
+		requestAnimationFrame(() => begin(v, next));
 	};
 
 	const measure = (move: { knobId: string; to: KnobValue } | undefined, reason: string) =>
@@ -216,8 +228,7 @@ export function GuidePanel() {
 		if (s.kind === "probe_offer") return { label: t("guide.measure_fix"), run: () => measure(s.move, "tight") };
 		if (s.kind === "finding" && s.finding) {
 			const f = s.finding;
-			// Muse Code writes the fix only once the fix loop is on; until then the tour moves on.
-			if (f.fix_template && flag("c.fix_loop"))
+			if (canFix(f))
 				return { label: t("guide.fix_it"), run: () => runTool("propose_patch", { template_id: f.fix_template, finding_id: f.id, reason: f.code }, ctx()) };
 			return { label: t("guide.next"), run: skipOffer };
 		}
@@ -274,7 +285,7 @@ export function GuidePanel() {
 						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
 							{primary.label}
 						</button>
-						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || (active?.step.kind === "finding" && primary.label !== t("guide.next")) ? (
+						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || (active?.step.kind === "finding" && !!active.step.finding && canFix(active.step.finding)) ? (
 							<button type="button" className="pf-btn pf-btn--small" onClick={skipOffer}>
 								{t("guide.skip")}
 							</button>

@@ -788,5 +788,5 @@
 	"guide.next": "Next",
 	"guide.fix_it": "Fix it with Muse Code",
 	"guide.finding": "Found in the code: {title}. {detail}",
-	"guide.finding.why": "Preflight found this by reading the script, not by measuring it, so no knob shows it: it's fixed in the code."
+	"guide.finding.why": "Preflight found this by reading the script, not by measuring it, so no knob shows it: the fix goes in the code."
 }

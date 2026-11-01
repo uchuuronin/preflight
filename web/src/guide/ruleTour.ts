@@ -183,11 +183,31 @@ export const SAMPLE_VISIT = "sample:more";
 /** Visited marker for a finding the tour has shown. */
 export const findingVisit = (f: Finding) => `finding:${f.id}`;
 
-/** The next problem found in the code to show: an error or warning with a fix, not yet shown. */
-function nextFinding(ctx: TourContext): Finding | undefined {
-	return ctx.record.findings.find(
-		(f) => (f.severity === "error" || f.severity === "warn") && (f.fix_template || f.knob_id) && !ctx.visited.has(findingVisit(f)),
+const FINDING_SEVERITIES = new Set(["critical", "error", "warn"]);
+
+/**
+ * The next problem found in the code that no knob on the dock shows: one with a fix template whose
+ * knob, if it names one, isn't a knob of this record (a retry loop's cap is in the code, not a
+ * setting). Findings tied to a real knob are the moves' to show, so they never come here.
+ */
+function codeFindings(ctx: Pick<TourContext, "record" | "visited">): Finding[] {
+	const knobs = new Set(ctx.record.knobs.map((k) => k.id));
+	return ctx.record.findings.filter(
+		(f) =>
+			FINDING_SEVERITIES.has(f.severity) &&
+			!!f.fix_template &&
+			!(f.knob_id && knobs.has(f.knob_id)) &&
+			!ctx.visited.has(findingVisit(f)),
 	);
+}
+
+function nextFinding(ctx: TourContext): Finding | undefined {
+	return codeFindings(ctx)[0];
+}
+
+/** Code findings the tour has still to show (each is a step of its own). */
+export function pendingFindings(ctx: TourContext): number {
+	return isFailing(ctx) ? 0 : codeFindings(ctx).length;
 }
 
 export function nextStep(ctx: TourContext): TourStep {

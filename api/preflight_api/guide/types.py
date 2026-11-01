@@ -93,7 +93,15 @@ class SetKnobOut(Strict):
 	to_value: Value | None = None
 	readouts: dict[Id, Readout] = Field(default_factory=dict, max_length=24)
 	refused: (
-		Literal["pinned", "not_in_domain", "would_be_tight", "would_fail", "not_trusted", "one_per_round"]
+		Literal[
+			"pinned",
+			"not_in_domain",
+			"changes_results",
+			"would_be_tight",
+			"would_fail",
+			"not_trusted",
+			"one_per_round",
+		]
 		| None
 	) = None
 

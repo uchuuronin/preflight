@@ -3,9 +3,10 @@ import agentRaw from "../../../schema/examples/agent.json";
 import goldenRaw from "../../../schema/examples/finetune.json";
 import devRaw from "../workspace/fixtures/dev-finetune.record.json";
 import { GridProvider } from "../workspace/provider/GridProvider";
-import { currentKnobs } from "../workspace/record/model";
+import { currentKnobs, knobChoices } from "../workspace/record/model";
 import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
 import type { TraceEntry } from "../workspace/state";
+import { guardSetKnob, runBrowserCall } from "./liveGuide";
 import { findingVisit, nextStep, SAMPLE_VISIT } from "./ruleTour";
 import { fakeActions } from "./testkit";
 import { buildTools, executeTool, runTool, type ToolContext } from "./tools";
@@ -106,16 +107,14 @@ describe("measure-first offers (tight settings)", () => {
 		sensitivity: () => [],
 		moves: (_r: unknown, _o: unknown, opts?: { includeTight?: boolean }) => (opts?.includeTight ? [tightMove, fitsMove] : [fitsMove]) as never,
 	});
-	// The record's own findings come first when the run fits (their own test is below); these
-	// tests are about what follows them.
-	const shown = dev.findings.map(findingVisit);
+	// Every dev finding names a knob of the record, so none is a finding step: these run unseeded.
 	const ctxFor = (risk: number, visited = new Set<string>()) => ({
 		record: dev,
 		provider: stub(risk),
 		knobs: currentKnobs(dev),
 		pinned: new Set<string>(),
 		objective: cost,
-		visited: new Set([...shown, ...visited]),
+		visited,
 	});
 
 	it("offers to measure a tight setting that saves 10% more than the best fitting move", () => {
@@ -188,12 +187,30 @@ describe("the agent tour on A's measured run (Oct 31)", () => {
 		const after = nextStep({ ...base, visited: new Set(real.findings.map(findingVisit)) });
 		expect(after.move?.knobId).not.toBe("n_tasks");
 		expect(after.kind).toBe("done");
-		// The live guide is held to the same rule.
+		// The rule tour's tools are held to the same rule...
 		const c = ctx(real);
 		const res = executeTool("set_knob", { knob_id: "n_tasks", value: 62, why: "cheaper" }, c);
 		expect(res.ok).toBe(false);
 		const ranked = executeTool("sensitivity", { objective: "min_cost" }, c);
 		expect(ranked.ok && (ranked.result as Array<{ knob_id: string; changes_results: boolean }>).find((k) => k.knob_id === "n_tasks")?.changes_results).toBe(true);
+		// ...and so is the live guide, whose browser half runs its own set_knob and sensitivity.
+		const choices = knobChoices(real, real.knobs.find((k) => k.id === "n_tasks")!);
+		const fewer = choices.find((v) => typeof v === "number" && v < 500);
+		expect(fewer).toBeDefined();
+		expect(guardSetKnob(c, "n_tasks", fewer)).toBe("changes_results");
+		const live = runBrowserCall({ call_id: "s", name: "sensitivity", arguments: { objective: "min_cost" }, runs_in: "browser" }, c, false);
+		expect(live.tool === "sensitivity" && live.ranked.map((r) => r.knob_id)).not.toContain("n_tasks");
+	});
+
+	it("shows only findings no knob shows, critical ones included", () => {
+		// Every finding on the other samples names a knob of its record: the moves show those.
+		for (const r of [dev, golden, normaliseRecord(agentRaw as unknown as FlightRecord)]) {
+			const step = nextStep({ record: r, provider, knobs: currentKnobs(r), pinned: new Set(), objective: cost, visited: new Set() });
+			expect(step.kind).not.toBe("finding");
+		}
+		// A critical finding whose fix is in the code is shown like an error.
+		const crit = { ...real, findings: real.findings.map((f) => ({ ...f, severity: "critical" as const })) };
+		expect(nextStep({ ...base, record: crit, visited: new Set() }).kind).toBe("finding");
 	});
 
 	it("respects a pin on the knob a fix would need", () => {
