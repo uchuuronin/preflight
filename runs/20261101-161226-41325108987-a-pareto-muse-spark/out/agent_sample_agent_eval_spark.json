@@ -1,0 +1,869 @@
+{
+  "sample": {
+    "tasks": [
+      {
+        "task_id": "s1-008d13b25a1e",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10956,
+        "output_tokens": 664,
+        "reasoning_tokens": 240,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 3.106,
+        "success": null,
+        "context_tokens_by_turn": [
+          847,
+          3619,
+          6490
+        ],
+        "cost_usd": 0.016517,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-22fa07b1483d",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 11878,
+        "output_tokens": 1179,
+        "reasoning_tokens": 547,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 4.372,
+        "success": null,
+        "context_tokens_by_turn": [
+          871,
+          4051,
+          6956
+        ],
+        "cost_usd": 0.019858,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-db740dd9a478",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4255,
+        "output_tokens": 701,
+        "reasoning_tokens": 436,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.003,
+        "success": null,
+        "context_tokens_by_turn": [
+          721,
+          3534
+        ],
+        "cost_usd": 0.008298,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-ae84c9ed3d02",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10578,
+        "output_tokens": 1024,
+        "reasoning_tokens": 571,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 5.599,
+        "success": null,
+        "context_tokens_by_turn": [
+          721,
+          3500,
+          6357
+        ],
+        "cost_usd": 0.017574,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-db307a0099b2",
+        "model": "muse-spark-1.3",
+        "turns": 1,
+        "input_tokens": 745,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1022,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.804,
+        "success": null,
+        "context_tokens_by_turn": [
+          745
+        ],
+        "cost_usd": 0.005283,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-c0f3c241cfc4",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4308,
+        "output_tokens": 833,
+        "reasoning_tokens": 547,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.57,
+        "success": null,
+        "context_tokens_by_turn": [
+          728,
+          3580
+        ],
+        "cost_usd": 0.008925,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-5c376034137c",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4116,
+        "output_tokens": 359,
+        "reasoning_tokens": 188,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 1.947,
+        "success": null,
+        "context_tokens_by_turn": [
+          698,
+          3418
+        ],
+        "cost_usd": 0.006671,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-8100fd42a73e",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4242,
+        "output_tokens": 978,
+        "reasoning_tokens": 739,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.812,
+        "success": null,
+        "context_tokens_by_turn": [
+          733,
+          3509
+        ],
+        "cost_usd": 0.009459,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-ecdb9d9cbf3e",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10551,
+        "output_tokens": 629,
+        "reasoning_tokens": 311,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 2.83,
+        "success": null,
+        "context_tokens_by_turn": [
+          739,
+          3522,
+          6290
+        ],
+        "cost_usd": 0.015862,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-aaa4150ddcb1",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10592,
+        "output_tokens": 1227,
+        "reasoning_tokens": 720,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 4.498,
+        "success": null,
+        "context_tokens_by_turn": [
+          708,
+          3502,
+          6382
+        ],
+        "cost_usd": 0.018455,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-765e9963f2c0",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10589,
+        "output_tokens": 710,
+        "reasoning_tokens": 357,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 2.874,
+        "success": null,
+        "context_tokens_by_turn": [
+          733,
+          3545,
+          6311
+        ],
+        "cost_usd": 0.016254,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-e26d4cd1b703",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4293,
+        "output_tokens": 855,
+        "reasoning_tokens": 598,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.159,
+        "success": null,
+        "context_tokens_by_turn": [
+          751,
+          3542
+        ],
+        "cost_usd": 0.009,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-f17d1a14e1f0",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10836,
+        "output_tokens": 784,
+        "reasoning_tokens": 378,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 3.521,
+        "success": null,
+        "context_tokens_by_turn": [
+          778,
+          3626,
+          6432
+        ],
+        "cost_usd": 0.016877,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-6e5aea81b5d4",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4186,
+        "output_tokens": 540,
+        "reasoning_tokens": 330,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.184,
+        "success": null,
+        "context_tokens_by_turn": [
+          710,
+          3476
+        ],
+        "cost_usd": 0.007527,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-ec41e5f80442",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10589,
+        "output_tokens": 1542,
+        "reasoning_tokens": 1134,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 6.738,
+        "success": null,
+        "context_tokens_by_turn": [
+          736,
+          3514,
+          6339
+        ],
+        "cost_usd": 0.01979,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-b3005cc534ce",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10636,
+        "output_tokens": 1232,
+        "reasoning_tokens": 841,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 4.159,
+        "success": null,
+        "context_tokens_by_turn": [
+          776,
+          3516,
+          6344
+        ],
+        "cost_usd": 0.018531,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-71f990afc4a3",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4270,
+        "output_tokens": 476,
+        "reasoning_tokens": 270,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 2.029,
+        "success": null,
+        "context_tokens_by_turn": [
+          745,
+          3525
+        ],
+        "cost_usd": 0.007361,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-ec0773d47127",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10440,
+        "output_tokens": 684,
+        "reasoning_tokens": 278,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 2.708,
+        "success": null,
+        "context_tokens_by_turn": [
+          709,
+          3465,
+          6266
+        ],
+        "cost_usd": 0.015957,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-d73401e5e077",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 11791,
+        "output_tokens": 829,
+        "reasoning_tokens": 354,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 3.34,
+        "success": null,
+        "context_tokens_by_turn": [
+          770,
+          4081,
+          6940
+        ],
+        "cost_usd": 0.018262,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-2524207ae799",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10501,
+        "output_tokens": 639,
+        "reasoning_tokens": 277,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 2.74,
+        "success": null,
+        "context_tokens_by_turn": [
+          726,
+          3499,
+          6276
+        ],
+        "cost_usd": 0.015842,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-afc01d55c3ca",
+        "model": "muse-spark-1.3",
+        "turns": 1,
+        "input_tokens": 942,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1022,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 2.806,
+        "success": null,
+        "context_tokens_by_turn": [
+          942
+        ],
+        "cost_usd": 0.005529,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-23779ab1f336",
+        "model": "muse-spark-1.3",
+        "turns": 2,
+        "input_tokens": 4300,
+        "output_tokens": 863,
+        "reasoning_tokens": 448,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 2.88,
+        "success": null,
+        "context_tokens_by_turn": [
+          714,
+          3586
+        ],
+        "cost_usd": 0.009043,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-8468117a3b8a",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10549,
+        "output_tokens": 606,
+        "reasoning_tokens": 247,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 2.591,
+        "success": null,
+        "context_tokens_by_turn": [
+          711,
+          3543,
+          6295
+        ],
+        "cost_usd": 0.015762,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-2e5e971a5ac7",
+        "model": "muse-spark-1.3",
+        "turns": 1,
+        "input_tokens": 732,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1022,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 4.037,
+        "success": null,
+        "context_tokens_by_turn": [
+          732
+        ],
+        "cost_usd": 0.005267,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-0629188c54a5",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10487,
+        "output_tokens": 693,
+        "reasoning_tokens": 372,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 3.036,
+        "success": null,
+        "context_tokens_by_turn": [
+          704,
+          3524,
+          6259
+        ],
+        "cost_usd": 0.016054,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-35507e84e040",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10529,
+        "output_tokens": 1028,
+        "reasoning_tokens": 594,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 4.472,
+        "success": null,
+        "context_tokens_by_turn": [
+          729,
+          3471,
+          6329
+        ],
+        "cost_usd": 0.01753,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-ebea6001cc5d",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 10906,
+        "output_tokens": 742,
+        "reasoning_tokens": 324,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 3.409,
+        "success": null,
+        "context_tokens_by_turn": [
+          834,
+          3626,
+          6446
+        ],
+        "cost_usd": 0.016786,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-be1c42cbd955",
+        "model": "muse-spark-1.3",
+        "turns": 1,
+        "input_tokens": 751,
+        "output_tokens": 1024,
+        "reasoning_tokens": 841,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.591,
+        "success": null,
+        "context_tokens_by_turn": [
+          751
+        ],
+        "cost_usd": 0.005291,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-baf76ad977ed",
+        "model": "muse-spark-1.3",
+        "turns": 1,
+        "input_tokens": 725,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1022,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.717,
+        "success": null,
+        "context_tokens_by_turn": [
+          725
+        ],
+        "cost_usd": 0.005258,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-167f4fa4003c",
+        "model": "muse-spark-1.3",
+        "turns": 3,
+        "input_tokens": 11623,
+        "output_tokens": 1005,
+        "reasoning_tokens": 369,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 3.825,
+        "success": null,
+        "context_tokens_by_turn": [
+          946,
+          3714,
+          6963
+        ],
+        "cost_usd": 0.0188,
+        "stop_reason": null,
+        "trace": null
+      }
+    ],
+    "population": 500,
+    "selection": "the first 30 tasks the script started; script wall 164 s, stopped after 120 s with no model calls; 25 ended on a tool call, up to 4 may be stuck; 470 calls refused past the sample",
+    "rate_limit_rpm": null,
+    "rate_limit_tpm": null,
+    "ended": "stalled"
+  },
+  "usd": 0.3876,
+  "task_ends": {
+    "s1-008d13b25a1e": {
+      "opened_rank": 0,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-22fa07b1483d": {
+      "opened_rank": 1,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-db740dd9a478": {
+      "opened_rank": 2,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-ae84c9ed3d02": {
+      "opened_rank": 3,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-db307a0099b2": {
+      "opened_rank": 4,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-c0f3c241cfc4": {
+      "opened_rank": 5,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-5c376034137c": {
+      "opened_rank": 6,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-8100fd42a73e": {
+      "opened_rank": 7,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-ecdb9d9cbf3e": {
+      "opened_rank": 8,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-aaa4150ddcb1": {
+      "opened_rank": 9,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-765e9963f2c0": {
+      "opened_rank": 10,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-e26d4cd1b703": {
+      "opened_rank": 11,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-f17d1a14e1f0": {
+      "opened_rank": 12,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-6e5aea81b5d4": {
+      "opened_rank": 13,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-ec41e5f80442": {
+      "opened_rank": 14,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-b3005cc534ce": {
+      "opened_rank": 15,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-71f990afc4a3": {
+      "opened_rank": 16,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-ec0773d47127": {
+      "opened_rank": 17,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-d73401e5e077": {
+      "opened_rank": 18,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-2524207ae799": {
+      "opened_rank": 19,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-afc01d55c3ca": {
+      "opened_rank": 20,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-23779ab1f336": {
+      "opened_rank": 21,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-8468117a3b8a": {
+      "opened_rank": 22,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-2e5e971a5ac7": {
+      "opened_rank": 23,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-0629188c54a5": {
+      "opened_rank": 24,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-35507e84e040": {
+      "opened_rank": 25,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-ebea6001cc5d": {
+      "opened_rank": 26,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-be1c42cbd955": {
+      "opened_rank": 27,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-baf76ad977ed": {
+      "opened_rank": 28,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-167f4fa4003c": {
+      "opened_rank": 29,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    }
+  },
+  "task_rows": {
+    "s1-008d13b25a1e": 1,
+    "s1-22fa07b1483d": 2,
+    "s1-db740dd9a478": 3,
+    "s1-ae84c9ed3d02": 0,
+    "s1-db307a0099b2": 4,
+    "s1-c0f3c241cfc4": 5,
+    "s1-5c376034137c": 6,
+    "s1-8100fd42a73e": 7,
+    "s1-ecdb9d9cbf3e": 8,
+    "s1-aaa4150ddcb1": 9,
+    "s1-765e9963f2c0": 10,
+    "s1-e26d4cd1b703": 11,
+    "s1-f17d1a14e1f0": 12,
+    "s1-6e5aea81b5d4": 13,
+    "s1-ec41e5f80442": 14,
+    "s1-b3005cc534ce": 15,
+    "s1-71f990afc4a3": 16,
+    "s1-ec0773d47127": 17,
+    "s1-d73401e5e077": 18,
+    "s1-2524207ae799": 19,
+    "s1-afc01d55c3ca": 20,
+    "s1-23779ab1f336": 21,
+    "s1-8468117a3b8a": 22,
+    "s1-2e5e971a5ac7": 23,
+    "s1-0629188c54a5": 24,
+    "s1-35507e84e040": 25,
+    "s1-ebea6001cc5d": 26,
+    "s1-be1c42cbd955": 27,
+    "s1-baf76ad977ed": 28,
+    "s1-167f4fa4003c": 29
+  },
+  "provider": "meta"
+}
