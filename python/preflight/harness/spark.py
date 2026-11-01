@@ -122,6 +122,23 @@ def _no_urls(text: str) -> str:
 	return re.sub(r"https?://\S+", "<url>", text or "")
 
 
+def _validate(schema, content: str):
+	"""The schema from the reply: as it is, else the JSON object inside it. A model may put its
+	reasoning, a <think> block or a code fence around the object (Glimmer's first answers, Nov 1);
+	what's taken is still validated against the schema in full."""
+	import re
+
+	try:
+		return schema.model_validate_json(content)
+	except (ValidationError, ValueError):
+		text = re.sub(r"<think>.*?</think>", "", content or "", flags=re.S)
+		fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S)
+		body = fenced.group(1) if fenced else text[text.find("{") : text.rfind("}") + 1]
+		if not body or body == content:
+			raise
+		return schema.model_validate_json(body)
+
+
 class ModelClient:
 	def __init__(
 		self,
@@ -393,12 +410,15 @@ class ModelClient:
 				msgs, purpose=purpose, reasoning_effort=reasoning_effort, response_format=fmt
 			)
 			try:
-				return schema.model_validate_json(content), call
+				return _validate(schema, content), call
 			except (ValidationError, ValueError) as exc:
 				err = str(exc)[:2000]
+				self.last_error = f"{schema.__name__} didn't validate: {_no_urls(err)[:300]}"
 				self.calls[-1] = call.model_copy(update={"ok": False})
 				if attempt == 1:
-					self.last_error = f"{schema.__name__} output did not validate after a re-ask"
+					self.last_error = (
+						f"{schema.__name__} output did not validate after a re-ask: {_no_urls(err)[:300]}"
+					)
 					raise ValueError(
 						f"{schema.__name__} output did not validate after a re-ask: {err}"
 					) from exc

@@ -335,3 +335,20 @@ def test_redirect_hops_share_the_calls_deadline(monkeypatch):
 	with pytest.raises(httpx.ReadTimeout):
 		c.chat([{"role": "user", "content": "hi"}], purpose="triage")
 	assert clock[0] - 1000.0 <= c.deadline_s + 150.0  # stopped at the 300 s deadline, not after 10 hops
+
+
+def test_a_json_object_wrapped_in_reasoning_or_a_fence_is_still_read_and_still_validated():
+	from pydantic import BaseModel, ValidationError
+
+	from preflight.harness.spark import _validate
+
+	class T(BaseModel):
+		category: str
+
+	assert _validate(T, '{"category": "oom"}').category == "oom"
+	assert _validate(T, '<think>it ran out</think>\n{"category": "oom"}').category == "oom"
+	assert _validate(T, 'Here it is:\n```json\n{"category": "oom"}\n```').category == "oom"
+	assert _validate(T, 'The answer: {"category": "oom"} as asked').category == "oom"
+	for bad in ("no json at all", '{"other": 1}', ""):
+		with pytest.raises((ValueError, ValidationError)):
+			_validate(T, bad)
