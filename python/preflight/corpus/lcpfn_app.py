@@ -92,7 +92,10 @@ def fetch_weights() -> dict:
 		torch.save(state, Path(MOUNT) / f"{stem}.state.pt")
 		(Path(MOUNT) / f"{stem}.meta.json").write_text(json.dumps(meta, indent=1))
 		# the package's own predictions on a fixed curve, for checking the port
-		pfn = lcpfn.LCPFN(model_name=str(raw))
+		# review, Nov 1: LCPFN() reloads the pickle without map_location; reuse the model already loaded onto the CPU
+		pfn = object.__new__(lcpfn.LCPFN)
+		torch.nn.Module.__init__(pfn)
+		pfn.model = model
 		x = torch.arange(1, REFERENCE_STEPS + 1, dtype=torch.float32).unsqueeze(1)
 		g = torch.Generator().manual_seed(0)
 		y = (0.9 * x.squeeze(1) ** -0.35 + 0.02 * torch.randn(REFERENCE_STEPS, generator=g)).clamp(0, 1)

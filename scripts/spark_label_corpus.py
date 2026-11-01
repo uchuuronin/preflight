@@ -252,10 +252,13 @@ def relabel(first: str, out_dir: str) -> None:
 			except Exception as exc:
 				got = {"label": None, "error": f"{type(exc).__name__}: {exc}"[:300]}
 			calls = [c.model_dump(mode="json") for c in client.calls[before:]]
-			spent += sum(c["cost_usd"] for c in calls)
+			# review, Nov 1: a call that timed out records $0, though the provider may have run and billed it; the
+			# guard counts it at half a row's worst case, so the $0.50 holds whatever happened
+			spent += sum(c["cost_usd"] if c["ok"] or c["output_tokens"] else worst_row / 2 for c in calls)
 			row = {"row_id": item["row_id"], "task": item["task"], **got, "calls": calls, "relabel": True}
 			fh.write(json.dumps(row) + "\n")
-	print(f"relabelled {len(items)} rows; {len(client.calls)} calls; ${spent:.4f}")
+	tried = len((out / "spark_relabels.jsonl").read_text().splitlines())
+	print(f"tried {tried} of {len(items)} rows; {len(client.calls)} calls; ${spent:.4f} counted")
 
 
 def merge(first: str, second: str, out: str) -> None:
