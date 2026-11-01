@@ -40,16 +40,15 @@ function phaseLabel(phase: string): string {
 	return hasKey(`phase.${phase}`) ? t(`phase.${phase}`) : phase;
 }
 
-const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<BgData>>) {
-	const { layout, highlightPhases, fit, evalStalled } = data;
-	const coreRef = useRef<HTMLSpanElement>(null);
-	const coreUnit = data.coreUnit;
-	const coreFormat = useMemo(() => (v: number) => fmt(v, coreUnit), [coreUnit]);
-	useTweenedText(coreRef, data.coreValue, coreFormat, { ms: MOVE_MS, ease: moveEase });
-	const { memory } = layout;
+/**
+ * The memory ring's parts: each group's arc (a full ring is this GPU's memory), the hatched part
+ * past the peak's angle when the parts add up to more than the peak, and how far past the GPU the
+ * peak goes (the dashed outer ring). Shared by the orbit and its glance in the side column.
+ */
+export function memoryRings(memory: OrbitLayout["memory"], rMem: number = R_MEM, rOver: number = R_OVER) {
 	// A full ring is this GPU's memory; what doesn't fit continues on the dashed outer ring.
 	const scale = memory.capacity ?? memory.total ?? 1;
-	const cMem = 2 * Math.PI * R_MEM;
+	const cMem = 2 * Math.PI * rMem;
 	let acc = -90;
 	const segs = memory.segments.flatMap((s) => {
 		const room = 270 - acc;
@@ -74,7 +73,18 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 		return { rot: start, dash: `${dashes.join(" ")} 0 ${cMem.toFixed(1)}` };
 	})();
 	const over = memory.total && memory.capacity && memory.total > memory.capacity ? Math.min(1, (memory.total - memory.capacity) / memory.capacity) : 0;
-	const cOver = 2 * Math.PI * R_OVER;
+	const cOver = 2 * Math.PI * rOver;
+	return { segs, untrustedArc, over, cMem, cOver };
+}
+
+const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<BgData>>) {
+	const { layout, highlightPhases, fit, evalStalled } = data;
+	const coreRef = useRef<HTMLSpanElement>(null);
+	const coreUnit = data.coreUnit;
+	const coreFormat = useMemo(() => (v: number) => fmt(v, coreUnit), [coreUnit]);
+	useTweenedText(coreRef, data.coreValue, coreFormat, { ms: MOVE_MS, ease: moveEase });
+	const { memory } = layout;
+	const { segs, untrustedArc, over, cMem, cOver } = memoryRings(memory);
 	// One lap of dots takes less time when the job moves more tokens per second.
 	const lap = layout.tokensPerSecond ? Math.max(0.6, Math.min(8, 7000 / layout.tokensPerSecond)) : 3.2;
 	return (

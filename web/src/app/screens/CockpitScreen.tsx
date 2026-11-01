@@ -29,6 +29,7 @@ import { DetailSheet } from "../../workspace/cockpit/DetailSheet";
 import { Dials } from "../../workspace/cockpit/Dials";
 import { Dock } from "../../workspace/cockpit/Dock";
 import { Orbit, useOrbitLayout } from "../../workspace/map/Orbit";
+import { OrbitGlance } from "../../workspace/map/OrbitGlance";
 import { GridProvider } from "../../workspace/provider/GridProvider";
 import { loadRecord } from "../../workspace/record/load";
 import { isFixture, targetFor } from "../../workspace/record/model";
@@ -171,7 +172,7 @@ function Cockpit() {
 						<div className="pf-side">
 							{fit ? (
 								<div className="glass pf-mini-orbit">
-									<Orbit compact />
+									<OrbitGlance />
 									<button type="button" className="pf-mini-orbit__back" aria-label={t("stage.back_to_map")} title={t("stage.back_to_map")} onClick={() => setView("map")} />
 								</div>
 							) : null}

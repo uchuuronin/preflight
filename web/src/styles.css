@@ -945,6 +945,11 @@ a {
 .pf-stage-fill { height: clamp(540px, calc(100dvh - 400px), 1400px); container-type: size; display: grid; place-items: center; }
 .pf-stage-fill > .pf-orbit,
 .pf-stage-fill > .pf-fit { width: min(100cqw, 100cqh * 600 / 560); }
+/* The fit map takes the whole stage: its rows share the height, its columns the width. */
+.pf-stage-fill > .pf-fit:not(.pf-fit--empty) { width: 100%; height: 100%; aspect-ratio: auto; }
+.pf-stage-fill .pf-fit__body .pf-fitmap__frame { height: 100%; grid-template-rows: repeat(var(--rows), minmax(30px, 1fr)) auto; }
+.pf-stage-fill .pf-fitmap__frame .pf-fitcell { aspect-ratio: auto; height: 100%; }
+.pf-stage-fill .pf-fit__body { align-items: stretch; }
 
 .pf-orbit { position: relative; width: 100%; aspect-ratio: 600 / 560; }
 .pf-orbit .react-flow { position: absolute; inset: 0; background: transparent; overflow: visible; }
@@ -1510,6 +1515,44 @@ a {
 .pf-mring-untrusted { fill: none; stroke: var(--pf-stroke-strong); stroke-width: 16; opacity: 0.9; transform-box: view-box; transform-origin: 300px 280px; }
 /* Fit map (cockpit/FitMap.tsx) */
 .pf-fitmap__frame { position: relative; display: grid; gap: 3px; align-items: center; min-width: 0; }
+/* Fit map squares: status colour underneath, the memory fill rising from the bottom over it. */
+.pf-fitcell { position: relative; overflow: hidden; isolation: isolate; transition: background-color 240ms ease, border-color 240ms ease; }
+.pf-fitcell__fill {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: currentColor;
+	opacity: 0.16;
+	transform: scaleY(var(--fill, 0));
+	transform-origin: 50% 100%;
+	transition: transform 260ms var(--pf-ease-move);
+	pointer-events: none;
+}
+.pf-fitcell--fits { color: var(--pf-ok); }
+.pf-fitcell--tight { color: var(--pf-tight); }
+.pf-fitcell--fails { color: var(--pf-fail); }
+.pf-fitcell--abstain .pf-fitcell__fill { display: none; }
+/* Past the GPU's memory: the fill is full and its top edge turns into a dashed overflow line. */
+.pf-fitcell.is-over::after { content: ""; position: absolute; inset: 3px 6px auto; border-top: 2px dashed var(--pf-fail); opacity: 0.9; }
+.pf-fitcell__pct { position: absolute; left: 7px; bottom: 5px; font-family: var(--pf-font-mono); font-size: 10.5px; line-height: 1; color: var(--pf-fg-dim); font-variant-numeric: tabular-nums; pointer-events: none; }
+.pf-fitcell .pf-status { color: inherit; }
+@media (hover: hover) and (pointer: fine) {
+	.pf-fitcell:not(.is-here):hover { border-color: var(--pf-stroke-strong); }
+}
+.pf-fitcell:active:not(.is-here) { transform: scale(0.97); transition: transform 120ms ease-out; }
+.pf-fitcell.is-here { cursor: grab; touch-action: none; box-shadow: none; }
+.pf-fitcell.is-here:active { cursor: grabbing; }
+/* The run's square as a puck that glides to wherever the knobs put it, and a ghost on the square pointed at. */
+.pf-fitmap__overlay { position: relative; align-self: stretch; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.pf-fitmap__overlay > .pf-fitmap__lines { position: absolute; inset: 0; }
+.pf-fitmap__puck,
+.pf-fitmap__ghost { position: absolute; left: 0; top: 0; border-radius: 8px; pointer-events: none; }
+.pf-fitmap__puck {
+	box-shadow: 0 0 0 2px var(--pf-fg), 0 0 0 6px color-mix(in srgb, var(--pf-fg) 14%, transparent), 0 8px 24px -8px rgb(0 0 0 / 0.5);
+	transition: transform 260ms var(--pf-ease-move), width 260ms var(--pf-ease-move), height 260ms var(--pf-ease-move);
+}
+.pf-fitmap__ghost { outline: 2px dashed var(--pf-fg); outline-offset: -2px; opacity: 0.75; }
+.pf-fitmap__line { transition: d 260ms var(--pf-ease-move); }
 .pf-fitmap__tick { font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fg-dim); text-align: center; }
 .pf-fitmap__tick--y { padding-right: 6px; text-align: right; }
 .pf-fitcell { display: grid; place-items: center; min-height: 26px; aspect-ratio: 1.25; padding: 0; border: 1px solid var(--pf-stroke); border-radius: 7px; cursor: pointer; }
@@ -1521,7 +1564,7 @@ a {
 .pf-fitcell--abstain { background: repeating-linear-gradient(135deg, var(--pf-track) 0 4px, var(--pf-stroke-strong) 4px 6px); }
 .pf-fitcell.is-here { box-shadow: 0 0 0 2px var(--pf-fg); }
 .pf-fitcell .pf-status span:empty { display: none; }
-.pf-fitmap__lines { position: relative; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 1; }
+.pf-fitmap__lines { width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .pf-fitmap__line { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
 .pf-fitmap__line--fits { stroke: var(--pf-fg); }
 .pf-fitmap__line--fails { stroke: var(--pf-fail); stroke-dasharray: 5 4; }
@@ -1688,6 +1731,10 @@ a {
 	.pf-stage-fill { height: auto; container-type: normal; display: block; }
 	.pf-stage-fill > .pf-orbit,
 	.pf-stage-fill > .pf-fit { width: 100%; }
+	.pf-stage-fill > .pf-fit:not(.pf-fit--empty) { height: auto; }
+	.pf-stage-fill .pf-fit__body .pf-fitmap__frame { height: auto; grid-template-rows: none; }
+	.pf-stage-fill .pf-fitmap__frame .pf-fitcell { aspect-ratio: 1.25; height: auto; }
+	.pf-fitcell__pct { display: none; }
 	.pf-dock__row { border-radius: 24px; }
 	.pf-knob { padding: 0 12px; }
 	.pf-core__num { font-size: 30px; }
@@ -1844,6 +1891,17 @@ a {
 	font-size: 12.5px;
 }
 .pf-fit__body { display: flex; flex: 1; min-height: 0; align-items: center; }
+.pf-fit__gpu { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--pf-fg-dim); }
+.pf-fit__gpu select { padding: 4px 10px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-stroke-strong); background: var(--pf-glass); color: var(--pf-fg); font: inherit; font-family: var(--pf-font-mono); font-size: 12px; }
+.pf-fit__cap { font-family: var(--pf-font-mono); font-size: 12px; }
+.pf-fit__readout { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 40px; margin: 0; padding: 8px 14px; border-radius: 14px; background: var(--pf-glass); border: 1px solid var(--pf-stroke); font-size: 13px; transition: border-color 160ms ease; }
+.pf-fit__readout.is-peek { border-color: var(--pf-stroke-strong); }
+.pf-fit__readout b { font-family: var(--pf-font-mono); font-weight: 500; font-size: 12.5px; }
+.pf-fit__readout small { font-family: var(--pf-font-mono); font-size: 11.5px; color: var(--pf-fg-dim); }
+.pf-fit__where .pf-fit__herechip { margin-right: 6px; }
+.pf-fit__herechip { padding: 1px 7px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-fg); font-size: 11px; font-weight: 600; }
+.pf-fit__hint { margin-left: auto; font-size: 12px; color: var(--pf-fg-dim); }
+.pf-fit__key .pf-fitmap__key.pf-fitmap__key--fill { width: 12px; height: 12px; border: 1px solid var(--pf-stroke-strong); border-top: 0; border-radius: 3px; background: linear-gradient(to top, color-mix(in srgb, var(--pf-fg) 30%, transparent) 60%, transparent 60%); }
 .pf-fit__body .pf-fitmap__frame { flex: 1; }
 .pf-fit__key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 11.5px; color: var(--pf-fg-dim); }
 .pf-fit__key li { display: inline-flex; align-items: center; gap: 6px; }
@@ -1851,7 +1909,22 @@ a {
 .pf-fit__key .pf-fitmap__key--fails { border-top: 2.5px dashed var(--pf-fail); }
 .pf-fit__key .pf-fitmap__swatch { width: 16px; height: 10px; min-height: 0; aspect-ratio: auto; border-radius: 3px; }
 
-.pf-mini-orbit { position: relative; border-radius: 28px; padding: 6px; }
+.pf-mini-orbit { position: relative; border-radius: 28px; padding: 14px 16px 16px; }
+/* The orbit at a glance (map/OrbitGlance.tsx): the whole loop, simplified, sized to the column. */
+.pf-glance { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.pf-glance__dial { position: relative; width: min(100%, 240px); aspect-ratio: 1; margin: 0 auto; }
+.pf-glance__dial > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.pf-glance__arc { fill: none; stroke: var(--pf-fg); stroke-opacity: 0.3; stroke-width: 7; stroke-linecap: round; transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move); }
+.pf-glance__untrusted { fill: none; stroke: var(--pf-stroke-strong); stroke-width: 11; opacity: 0.9; }
+.pf-glance__mring { fill: none; stroke-width: 11; transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move); }
+.pf-glance__core { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; pointer-events: none; }
+.pf-glance__num { font-family: var(--pf-font-serif); font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.pf-glance__cap { max-width: 52%; font-size: 11px; line-height: 1.25; color: var(--pf-fg-dim); }
+.pf-glance__phases { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--pf-fg-dim); }
+.pf-glance__phase { position: relative; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 8px; isolation: isolate; }
+.pf-glance__phase i { position: absolute; inset: 0 auto 0 0; z-index: -1; border-radius: inherit; background: color-mix(in srgb, var(--pf-fg) 10%, transparent); transition: width var(--pf-dur-move) var(--pf-ease-move); }
+.pf-glance__phase b { margin-left: auto; font-family: var(--pf-font-mono); font-weight: 500; color: var(--pf-fg); font-variant-numeric: tabular-nums; }
+.pf-mini-orbit:has(.pf-mini-orbit__back:hover) { border-color: var(--pf-stroke-strong); }
 .pf-orbit--compact { aspect-ratio: 600 / 560; }
 .pf-orbit--compact .pf-onode__chip { display: none; }
 .pf-mini-orbit__back { position: absolute; inset: 0; z-index: 5; border: 0; border-radius: inherit; background: transparent; cursor: zoom-in; }
@@ -1917,7 +1990,7 @@ a {
 .pf-chips__key { margin: 0; font-family: var(--pf-font-mono); font-size: 11px; }
 
 @media (max-width: 1100px) {
-	.pf-deck.is-fit .pf-mini-orbit { max-width: 260px; }
+	.pf-deck.is-fit .pf-mini-orbit { width: 100%; }
 }
 @media (max-width: 760px) {
 	.pf-statusline { font-size: 14px; }
@@ -1927,6 +2000,7 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
 	.pf-drawer, .pf-info__pop { transition: opacity 0.15s ease; }
+	.pf-fitmap__puck, .pf-fitcell__fill, .pf-fitmap__line { transition: none; }
 }
 .pf-fitcell .pf-status { padding: 0; border: 0; background: none; box-shadow: none; }
 
