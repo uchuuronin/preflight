@@ -220,7 +220,7 @@ def targets_for(record: FlightRecord) -> list[Target]:
 
 def _has_shape(record: FlightRecord) -> bool:
 	try:
-		knobs.setup_from(record.job.script_map, _current(record))
+		knobs.setup_from(_script_map(record), _current(record))
 	except (ValueError, AttributeError):
 		return False
 	return True
@@ -600,6 +600,23 @@ def _capacity(record: FlightRecord, gpu: str) -> int:
 	return gpus.get_gpu(gpu).capacity_bytes()
 
 
+def _script_map(record: FlightRecord):
+	"""The script map, with the parameter count a probe measured when the map itself doesn't give one (Nov 1: A's
+	A10 GRPO record names Qwen2.5-0.5B-Instruct but no size, while its probe counted 494,032,768 parameters)."""
+	sm = record.job.script_map
+	model = getattr(sm, "model", None)
+	if sm is None or model is None or getattr(model, "param_count", None):
+		return sm
+	counted = [
+		float(p.extras["params_total"])
+		for p in record.probes
+		if p.status in OK_PROBE and p.extras and p.extras.get("params_total")
+	]
+	if not counted:
+		return sm
+	return sm.model_copy(update={"model": model.model_copy(update={"param_count": int(max(counted))})})
+
+
 def _env_gpu(record: FlightRecord) -> str | None:
 	"""The probe's GPU: a table name, or an unlisted fallback built from the probe's own memory and SM count."""
 	if record.env and record.env.gpu and record.env.gpu.name:
@@ -731,7 +748,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	if moves:
 		why = f"{', '.join(moves)} changes memory in a way the engine doesn't model yet; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
-	sm = record.job.script_map
+	sm = _script_map(record)
 	lens = record.job.lens
 	try:
 		arch, setup, shape = knobs.setup_from(sm, values)
@@ -814,6 +831,10 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 			)
 			stack = {**train.stack, "eval_spike": est.breakdown.allocator_peak - train.allocator_peak}
 		res = replace(res, terms=_term_estimates(stack, res.peak))
+	if _env_gpu(record) is None and res.peak.status != "abstain":
+		# Nov 1: A's A10 GRPO record carried no GPU, and the readout said "tight, 69%" for the knob's L4 unannounced
+		note = f"the probe's GPU isn't in the record, so this is for {gpu} from the GPU knob, with a guessed CUDA context"
+		res = replace(res, peak=_with_note(res.peak, note), oom=_with_note(res.oom, note))
 	return res
 
 
@@ -1351,7 +1372,7 @@ def _grad_bytes(record: FlightRecord, values: dict) -> float | None:
 			break
 	if n is None:
 		try:
-			arch, setup, _ = knobs.setup_from(record.job.script_map, values)
+			arch, setup, _ = knobs.setup_from(_script_map(record), values)
 			n = memory.static_terms(arch, setup)["gradients"] / memory.dtype_bytes(setup.compute_dtype)
 		except (ValueError, AttributeError, KeyError):
 			return None
@@ -1829,7 +1850,7 @@ def _peak_moment(record: FlightRecord, values: dict, mem: _MemoryResult) -> str:
 		return mem.detail.breakdown.peak_moment
 	gpu = _target_gpu(record, values)
 	try:
-		arch, setup, shape = knobs.setup_from(record.job.script_map, values)
+		arch, setup, shape = knobs.setup_from(_script_map(record), values)
 		shape, _ = _sized(shape, values, _padded_seq(record, values))
 		cap = _capacity(record, gpu) if gpu else None
 		return memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap).peak_moment
@@ -2144,7 +2165,7 @@ def _serve_probe(record: FlightRecord, values: dict | None = None):
 
 def _serve_setup(record: FlightRecord, values: dict) -> tuple[serving.ServeSetup | None, str]:
 	try:
-		arch, setup, _ = knobs.setup_from(record.job.script_map, values)
+		arch, setup, _ = knobs.setup_from(_script_map(record), values)
 	except (ValueError, AttributeError) as exc:
 		return None, f"no model shape to size the KV cache: {exc}"
 	if not isinstance(arch, memory.TransformerArch):

@@ -1048,3 +1048,39 @@ def test_size_set_terms_keep_their_modelled_values():
 	assert sum(terms.values()) == pytest.approx(p["memory.peak"].point)
 	assert terms["weights"] < 2.5e9 and terms["gradients"] < 2.5e9  # fp32 494M params: about 1.98 GB each
 	assert terms["activations"] > terms["weights"]  # the rest of the measured peak
+
+
+def _grpo_a10():
+	return load_record(
+		(Path(__file__).resolve().parents[1] / "zoo/grpo_trl/record_nov1_a10.json").read_text()
+	)
+
+
+def test_a_probe_s_parameter_count_stands_in_when_the_script_map_has_none():
+	"""Nov 1: A's A10 GRPO record names Qwen2.5-0.5B-Instruct with no size; its probe counted 494,032,768."""
+	rec = _grpo_a10()
+	assert rec.job.script_map.model.param_count is None
+	p = api.predict(rec).root
+	assert p["memory.peak"].status != "abstain"
+	assert p["memory.weights"].point == pytest.approx(494_032_768 * 4, rel=0.01)  # fp32 weights, as measured
+
+
+def test_a_record_without_its_gpu_says_which_gpu_it_assumed():
+	rec = _grpo_a10()
+	assert rec.env is None
+	p = api.predict(rec).root
+	assert "isn't in the record" in p["memory.peak"].reason and "L4" in p["memory.peak"].reason
+
+
+def test_the_real_a10_grpo_record_reads_its_measured_peak_once_its_gpu_is_recorded():
+	"""The video's opening lens: the run fitted at 23.18 GB reserved plus a 0.30 GB measured context on the A10."""
+	rec = _grpo_a10()
+	env = _grpo_l4().env.model_copy(
+		update={"gpu": _grpo_l4().env.gpu.model_copy(update={"name": "A10", "memory_bytes": None})}
+	)
+	knobs = [k.model_copy(update={"current": "A10"}) if k.id == "gpu_type" else k for k in rec.knobs]
+	p = api.predict(rec.model_copy(update={"env": env, "knobs": knobs})).root
+	assert p["memory.peak"].status == "measured"
+	assert p["memory.peak"].point == pytest.approx(23.50e9, rel=0.005)
+	assert "isn't in the record" not in (p["memory.peak"].reason or "")
+	assert p["risk.oom"].reason.startswith("tight")
