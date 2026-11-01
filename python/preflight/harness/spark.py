@@ -30,6 +30,8 @@ PRICES: dict[str, tuple[float, float, float]] = {
 	"muse-spark-1.3": (1.25, 0.15, 4.25),
 	"muse-spark-1.1": (1.25, 0.15, 4.25),
 	"muse-glimmer-30b": (0.30, 0.30, 1.20),
+	# Spark Open on Baseten: engine/prices' rate (getmaxim.ai Bifrost, Oct 26 2026; no cached rate listed)
+	"meta-models/muse-spark-open-1026": (1.25, 1.25, 4.25),
 }
 T = TypeVar("T", bound=BaseModel)
 # Retry only where a repeat can't double-bill: rate limits and gateway errors before generation.

@@ -8,6 +8,157 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, small hours (Chiya's queue of 01:19)
+
+`613ae92` was already on `origin/ws-d` when the yes came, so there was nothing to push. `main` is still at `90fcc40`: the audit re-check (12 first, then 7 to 11) and the dial rerun wait for round four.
+
+- **Fallback 3-minute cut** (`docs/demo/fallback-cut.md`, linked from `storyboard.md`, which stays as plan A's fine-tune shots). 13 shots, about 2:55: the fine-tune's OOM at step 200, then the agent run. Every spoken number is measured and sourced: step 200, 189 s of probing, 20.4 of 22.06 GiB, 130 tasks in two runs, 0 of 905,739 input tokens cached, and 30 tasks in 49 s. Decisions, with bases:
+	- The retry loop is shown only as "read from the code" (`run.py:121`). Basis: A measured 0 runaways in the 130 tasks (`a-agent-builds-1`), because they ran before plant 3 was moved to rows 26 to 29, and A hasn't re-sampled since. If a re-sample shows the stall before Tuesday, its numbers go in the table.
+	- The turn-11 overflow and the full-run cost aren't spoken. Basis: the first is derived and the second predicted; they may appear on screen under the app's own labels.
+	- The agent shots need the Oct 31 record published on the deploy with a real share link, since its token in the repo is now a placeholder (A, `e27d2fc`).
+- **Validation table hook.** B's scorer (`scripts/score_validation.py --readme`, `ws-b` `6ce7730`) already writes between `<!-- validation:start -->` and `<!-- validation:end -->`. The README draft now holds those markers around the scorer's own output on an empty manifest, so Monday's run replaces only that block.
+	- End to end: B's script with B's fixture manifest, run on a copy of the draft, filled the block and left every line outside it unchanged.
+	- `tests/test_d_readme_validation.py` checks the markers now, and the round trip through B's `into_readme` once B's module is on the branch. It passed against B's module from a `ws-b` copy.
+	- Two strings are B's, so I asked B for them: "not measured" becomes "not measured yet" (Chiya's wording), and a blank line goes before the footnote. Without it, GitHub's Markdown renders the footnote as a table row (checked with marked 14.1.4).
+- **Pretraining-grid sample.** Nothing in the repo mirrors the lab project. The campaign fixtures already use batch size × sequence length × seed, and no branch has a language × filter grid. The "3 languages × 6 filters × 3 data sizes" row is only in the plan PDF's bug-zoo table (page 16), which I can't edit, so it's back to Chiya with a replacement row.
+
+- **Read-only review of this batch,** and what changed from it. No number lacked a source, and the sums, the retry-loop treatment, the seeded block and the GFM claim checked out. Fixed:
+	- **Dollar figures.** The cut spoke $0.042 and $1.67 as measured, but they are measured time and tokens priced at list rates, which is how the README draft already tags its own costs: derived. Decision: no dollar figure is spoken or captioned in either cut. Plan A's storyboard is corrected too (its 45-second cut said "about four cents"). If Chiya rules that a list-price cost may be captioned with a "derived" tag, they can go back as captions.
+	- **Overclaims fixed:**
+		- shot 4 now says "189 seconds of probing";
+		- shot 7's caption separates the record's 30 tasks from the 130 in two runs;
+		- shot 8 states the timestamp as a fact in the code, not a measured cause;
+		- shot 11 now says the screen came from a 30-task sample in 49 s, not "130 tasks and $1.67";
+		- the full run's cost on screen is the record's $7.15, "Predicted", not A's $6.4.
+	- **Dependencies.** The dev-server fallback is gone (the cut is recorded on the deploy or not at all). Shot 12 lists B's Monday scorer run as a dependency. The retry-loop line notes that `run.py:121` is the line in the script as the record read it.
+	- **Test.** It now asserts that the seeded block is exactly the scorer's output, and it fails on a one-word hand edit, which I checked. A third string went to B: the GNN row's "+4.8%" is percentage points.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, night (add-ons "done means"; correction pushed)
+
+Pushed `613ae92` (the status correction) with Chiya's yes. `main` is still at `90fcc40`, so none of C's audit fixes have landed; the re-check on `main` starts with 12 (model tags) once they do.
+
+I read the PM's new project doc `unseen-scripts.md` (the held-out validation set, private to Chiya until the validation runs). It stays out of the repo, and nothing I build or tune uses it. The dial's order stays frozen for the Nov 2 test.
+
+**"Done means" for D1 to D5**, the plan item no other agent's work was holding up:
+- A README line for each add-on, with its flag: a new "Add-ons" section in `docs/readme-draft.md`, covering D1 detail level, D3 currency, D4 free GPUs, D5 notebook and exports.
+- A render check, `docs/audit/scripts/addons.mjs`, for each add-on in desk and phone, dusk and day. With its flag on, it must render on its host screen, with no page or console errors, no axe violations inside it and nothing under 24 px; it also opens D1's glossary card and loads a real notebook into D5 so the preview is checked. With its flag explicitly off, the host screen must load without errors and the add-on must be absent (for D5, no Notebook tab). It prints each axe node's colours and exits 1 on any failure.
+- Result on `ws-d` `613ae92` (`main` `90fcc40` plus D's commits) [measured, Chromium, Nov 1]: 14 of 20 states pass. All add-ons render where they belong and are absent with their flags off, with no errors and no targets under 24 px. The 6 failures are day-theme colour contrast in D1, D4 and exports: all 44 failing nodes are #3B5F70 on #9EBAE0 at 3.45:1, the shared `--pf-fg-dim` token on the sky (audit finding 7, with C). No other pair fails, D4's chips included. My Oct 30 note that D's panels had no axe violations didn't hold for the day theme. Asked C to run the check nightly (CI is C's).
+- Independent read-only review of the check and the README rows, and what changed from it:
+	- the check now proves the colour pair instead of me asserting it;
+	- the flag-off half waits for the host screen, fails on errors, and uses `?flags=-<flag>`; I confirmed that it can tell (Notebook tabs: 1 on, 0 off);
+	- it covers the glossary card and the notebook preview, which it hadn't;
+	- the console filter is narrowed to the tunnel and the font host;
+	- it says dev server only, since preview builds ignore URL flags;
+	- the README rows now say only what ships: D5 previews but checks nothing in while `runner.queue` is off; D3 covers 30 ECB currencies; D1's warnings rule waits on C's findings list; and the exports CLI item and link name are corrected.
+	- A second read-only review found the D1 flag-off half opened no knob, so it couldn't fail for the glossary card, and the notebook's "What will run" stayed closed. Both are now opened. The check also warns on text axe can't measure. It warned on 6 nodes, which I measured from screenshots with the text hidden: D3's select is at least 8.89:1 and D5's code blocks at least 5.88:1, so both pass [measured, Nov 1]. Results are labelled `ws-d` `613ae92`, the tree they ran on.
+	- Decision: not claiming that C's token fix turns the check green. That depends on the value C picks, and the check will show it.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, early (agent plant 3 made to fire)
+
+Pushed `372b60e` with Chiya's yes, as `ee55977` (my merge of `main` `90fcc40` on top, then the push, at 00:29:56 and 00:29:58). **Correction, Nov 1, 01:35:** I first reported that something else had made that merge and push. It was my own turn, answering Chiya's yes. That turn was interrupted and the message re-sent, and after the restart I couldn't see the first attempt, so my second push found nothing to do. The record shows it: this session's transcript (my command at 04:29:49 UTC) and `origin/ws-d`'s ref log ("update by push" at 00:29:58). No background agent, process or hook pushed: none is running (ListAgents, `ps`), the stop hook only reads git, and the environment manager holds only signing config. Then `6215d1b` was pushed with Chiya's yes at 01:33. The data-use gap is settled: A gates the Muse Spark call on `harness.spark_script_map`, C's notice follows the same flag, and the flag goes on for the demo.
+
+**Plant 3 now fires** (`zoo/agent_eval_spark/run.py`; this commit, not yet pushed). A ran 130 agent tasks and the retry loop never started, because MBPP's builds almost never fail. Now rows 26 to 29, the last 4 of the first 30 tasks, get a test fixture that imports a module that was never shipped (`from mbpp_fixtures import cases`). Their `run_tests` fails with the same `ModuleNotFoundError` on every call, whatever code the model writes, and `call_tool` retries it without end. The header says so as planted. Plants 1 (no caching) and 2 (overflow at turn 11) are unchanged in the code.
+
+Decisions, with bases and tests:
+1. **The last 4 rows, not a random 4.** A's sampler takes tasks in the script's order (the script doesn't read `PREFLIGHT_TASK_INDICES`) and stops the whole script once no model call has come through for its stall time: 120 s on `ws-a` (Chiya's 2 minutes), still 600 s on `main`. With 4 workers, the run stalls as soon as all 4 are stuck, and no later row starts. My first, seeded pick (rows 4, 10, 12, 20) would have stalled after row 20, cutting A's 30-task sample to 21 tasks and thinning plant 2's evidence; the reviewer caught it. With rows 26 to 29 all 30 tasks start first. Measured offline, against a local fake API on 30 MBPP-shaped tasks whose fake model always submits a correct solution: all 30 started, 26 passed, and exactly rows 26 to 29 looped, about 420 tries each in 15 s. Test: `test_agent_retry_loop_is_planted_on_the_rows_the_header_names`. It checks that the header's rows match the code, that `run_tests` uses the fixture for those tasks, and that the fixture, run as `run_tests` runs it (a temp file, no `-I`), fails with the same `ModuleNotFoundError` three runs out of three.
+2. **The file stays near the size A measured**, because the echo sets the context growth behind turn 11. I trimmed the header and three comments to pay for the new lines: 7,699 bytes against 7,641. What was dropped: "the probe needs both, and a route to that host", "500 tasks", "30 tasks" and "none ran past turn 4" (both still in my status), and "any other tool error loops the same way" (still true in the code). Derived, scaling A's measured growth by the echo's share: about 2,764 tokens a turn, so a typical task holds about 25,612 tokens at turn 10 (388 under 26,000; it was about 300 before this change, and 562 at A's exact size) and 28,376 at turn 11. A's re-sample measures it. Test: the size guard (within 300 bytes) and the replay (the script's own check still stops at turn 12).
+3. **Side effects, judged low:** each retry writes a temp file (`delete=False`), so a looping task leaves a few thousand files in the probe's temp folder before the 120 s stall stops it. And a model could in principle make the import succeed by writing `/tmp/mbpp_fixtures.py` through `run_python`, since the echoed header names the module. Neither changes what the probe sees.
+
+No paid runs: A re-samples once this is pushed.
+
+**Audit 7 to 12, pre-checked on C's branch** (`ws-c` `80d4217`, not yet in `main`; `docs/audit/nov1-wsc/README.md`), measured with the same scripts on an export served locally:
+- 12 (model tags) is not fixed: a job that ran out of memory while probing still shows "Muse Spark Open" on the triage stage;
+- 7, 10, 8 and 11 are not fixed (same axe states and targets);
+- 9 (phone route labels) and 4 (the stopped stage) are fixed there.
+
+Each moves to Done once re-checked on `main`. New and minor: the "Your limits" summary is 20 px tall; axe passes it on spacing.
+
+## Sat Oct 31, late night (submission materials)
+
+Pushed `d93618a` with Chiya's yes. Chiya kept the batch time as it is: the predicted upper bound rounded up, plus the user's own start-up time, with no number of ours. Finding 4 is with C.
+
+**README draft** (`docs/readme-draft.md`, for the PM to merge), following the plan's submission checklist:
+- what Preflight is in two lines; the one-command install; a quickstart with the CLI commands;
+- the architecture as Mermaid, drawn from the code on `main` rather than the plan's widget (whose image I can't read as text); also rendered to `docs/readme-assets/architecture.svg` and checked to parse with `mmdc`. What isn't running is dashed or labelled: the fix loop, Spark Open's claim check, and AMD (CLI only);
+- the built-during-the-hackathon statement, citing the first commit (`11a0ce9`, Oct 26, 22:25 ET);
+- the Meta models and partner tools with where each is used and its status on `main`, from A's, B's and C's status files and the code. The status column says what isn't live:
+  - Muse Code's fix loop isn't reachable from the app;
+  - Spark Open's claim check isn't wired;
+  - Glimmer is only in the price table;
+  - AMD has no MI300X result;
+  - the public deploy on Modal and Cloudflare is pending.
+  The PM updates these at merge;
+- one run's cost and time, each tagged: 6 min 45 s and 386 s of probes [measured, A, Oct 28], which is over the plan's 5-minute target; GPU $0.0858 and Muse Spark $0.0178 [derived: measured time and tokens at list prices];
+- the empty validation table with all 15 targets from the plan's "Validation targets", for B's scorer;
+- licences: the repo's, a link to the dependency table, and every zoo script's model and data.
+
+The `pip install git+...` line is checked only from this checkout [measured: three CPU probes ran and wrote a record]; Chiya will try the URL once the repo is public. Opening a CLI record in the web app isn't built (the app opens records by share link), and the draft says so. TODO(PM) marks the public link and the status column.
+
+**Licences** (`docs/licences.md`), 377 packages, a snapshot of Oct 31:
+- Sources: both `uv.lock` files walked into runtime, extras and dev; both `package-lock.json` files; and the four Modal images' pins resolved with `uv pip compile`. The images were built earlier, so their indirect versions can differ.
+- Each licence comes from PyPI's JSON API or the npm lock entry. Where that metadata is empty or vague, the row says so and names the source used instead. Our own `preflight` package is marked Apache-2.0 by hand, because the PyPI package of that name is someone else's.
+- No GPL, AGPL or SSPL anywhere, and all 26 packages that ship in the browser are permissive. CI already checks the Python environments and `web/node_modules`; the Modal images are what this adds.
+- Flagged and explained:
+  - NVIDIA's CUDA libraries (proprietary, or no licence in their metadata; never in the repo);
+  - weak copyleft we don't distribute: certifi, tqdm and lightningcss (MPL-2.0), pycountry (LGPL-2.1, serving image);
+  - three share-alike datasets the zoo downloads at run time: TinyStories, dolly-15k and Natural Questions.
+
+**The 45-second X cut** (`docs/demo/storyboard.md`), ready to record: four shots with timecodes, exact screens and actions, and burned-in captions, including the crash line, so it works with the sound off. Narration is 59 written words, about 66 spoken, so about 27 s of speech; the GiB figure is captioned, not spoken. It speaks only measured numbers. Step 200 is now also measured: A's full run of Oct 31 ran out of memory at step 200, at 22.13 GB (20.61 GiB). I dropped two claims about X (its length limit, and that most people watch muted) because I found no primary source for either.
+
+**Audit findings 7 to 12, ranked, to C** (`from-d.md`):
+1. 12, model tags shown whether or not the model ran (misleads judges; the Judging playbook asks for every Meta model labelled at the moment it works);
+2. 7, day-theme contrast (16 states);
+3. 10, focus rings;
+4. 8, eval-marker targets;
+5. 11, small targets;
+6. 9, phone route labels.
+
+Each request names its WCAG criterion and how it's re-checked: the sweep measures 7, 8, 10 and 11, and 9 and 12 are a look at the boarding screen. None is fixed on `main` or `ws-c` yet. The sweep and targeted-check scripts are now in `docs/audit/scripts/` (run with `NODE_PATH=web/node_modules`).
+
+**Found on the way, to C and A:** the data-use notice shows "Muse Spark reads the code" only when `harness.spark_script_map` is on (off everywhere). But the runner maps every job with Muse Spark whenever the Meta key is configured, with no flag check. So visitors aren't told their code goes to Meta's API. Request in `from-d.md`.
+
+A read-only review (git-free copy) found 15 issues in these materials; all are fixed above.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sat Oct 31, night (round three merged; agent overflow at turn 11)
+
+Merged `main` at `006bc57` (round three, contract 0.5.0) as a fast-forward. On it: Python passes 1177 with the `torch`-marked tests left out, `web` passes 396 in 55 files, and `tsc` is clean.
+
+**Agent overflow is at turn 11 by Muse Spark's count (correction from A), derived from A's measured growth.** A's run of 30 of the 500 MBPP tasks on muse-spark-1.3 (Oct 31, run 41250821790; `zoo/agent_eval_spark/record_oct31.json` on ws-a) grew the history by 2,745 tokens a turn by the provider's count (median of 43 turn pairs, 2,653 to 4,013). My header used characters / 4, about 2,450 a turn. Turn 11 is derived, not observed: no task in the sample went past turn 4 (largest context 10,862 tokens). From the record's per-turn counts (`context_tokens_by_turn`), a typical task starts at 733 tokens (698 to 946) and grows 2,745 a turn, so it holds 25,438 tokens at turn 10 and 28,183 at turn 11, passing 26,000 at turn 11; across the middle 80% of the measured growth (2,676 to 3,187 a turn) that's turn 9 to 11. A reviewer's turn-10 estimate assumed a 2,627-token start, but the record's first turns are 698 to 946. The header now gives turn 11 with that tag and range. The header now says turn 11, and that the script's own character-based check stops the task a turn later. I kept the header short so the script stays near the size A measured, because it echoes its own source every turn: 7,728 bytes against 7,641, about 30 tokens a turn more, which still leaves turn 10 under the limit. Test: `test_agent_script_stays_the_size_a_measured` (within 300 bytes of the measured version, about 4% of the growth; a bigger change needs A to measure again) and `test_agent_scripts_own_check_stops_at_turn_12_with_short_replies` (the script's own check).
+
+**Audit re-check on round three** (`docs/audit/oct31/README.md`, screenshots there). Findings 1 (the bad-link message), 2 (the phone hint to "Got it"), 3 (honest sample labels) and 5 (the measured check-in time) are fixed, each checked in Chromium. Finding 4 is not fixed: a failed job's boarding screen marks no stage, and nothing says "Stopped here". The whole 40-state sweep matches Oct 30: no overflow, no console errors, colour contrast in the same 16 day-theme states, eval markers under 24 px, the same two job-map nodes with no focus ring. Findings 4 and 6 to 12 stay open with C, which lists them as next.
+
+**Dial on B's engine output.** B's `make_golden.py` hasn't run on the golden records yet (B: it waits on A's 30-task agent top-up), so I ran B's `engine.api.fill_predictions` on copies of the three golden records in my scratch folder (CPU, no cost) and ran `dial.zoo.test.ts` once against them, unchanged except for where it reads records. The dial counts only records whose script has written ground truth (fine-tune and pretrain); the agent record has none in the dial's table, so it's read but not counted. Simulated: B's models on the golden records' hand-made probes, not on measurements. In-sample, 2 records, 6 planted problems:
+- On screen today, both records have 3 of 3 planted knobs in the dock (Wilson 95%: 44 to 100%).
+- In the design check with C's list, all 3 are visible on both; in the dock, finetune has 2 of 3 and pretrain 1 of 3.
+- Every one of the nine order variants ties at 3 of 6 (19 to 81%), so nothing can beat today's order and it stays frozen.
+
+That is identical, count for count, to the fixture predictions. The engine output is B's real models (memory-analytical@0.3.1, time-total@0.1.0, cost-gpu-hours@0.1.0, steptime-phases@0.2.0 and others), but the records' probes are still the hand-made golden ones, so this is not yet a run on real measurements. The real test stays the held-out Nov 2 run, with the policy frozen. Nothing from the scratch run is committed. Test: the dial test itself; rerun it when `make_golden.py` writes engine output into `schema/examples/`.
+
+**Exports moved onto C's hook.** Round three brings `registerExportsPanel`. Its "Take it with you" section hands each panel C's `ExportPlan`, and C asks exports to format only, with no numbers of their own, and to say "not verified" when `codeChangesVerified` is false. The panel now registers there instead of the general `below` slot, sits under C's heading, and formats the plan: changes with A's code locations, GPU, launch line, readouts (null where the cockpit abstains), `wallTimeHiS`, patches and the share link.
+- The batch time is the plan's upper time, rounded up to 5 minutes. I dropped my 15 minutes of setup, which was a number of my own; the file now says to add the cluster's start-up time if it counts. The time limit still caps it.
+- "Not verified" shows on screen, in the plan JSON, in the edit script and in the batch file whenever a code change lacks a passed patch.
+- The edit script's safety work is unchanged.
+
+A read-only review (git-free copy) found these, all fixed and tested:
+- A GPU count the script sets on its launch line (`--nproc_per_node`) was treated as launch-only, so Slurm got 8 GPUs while the script ran on 4. It is now an edit.
+- Rounding up to 5 minutes could pass the time limit; the ask is now held to the limit.
+- A template-only change was listed as a code change that C's `codeChangesVerified` doesn't count, so it never showed "not verified". Only what C counts is listed as code now.
+- GPUs per node was a number of my own; the file now asks `--gpus=<the plan's count>` for the whole job.
+
+Checked in Chromium on `lora-7b` with `c.exports` on: one panel, inside C's section, and the panel and file agree (4 h 55 min, `--time=04:55:00`). Test: `build.test.ts` and both panel test files now run on C's own `exportPlan` (49 tests), and the registration test checks it's in `exportsPanels` and not in `panels`.
+
+**Notebook intake now calls C's `checkinBytes`**, as asked on Oct 30, so the panel and the desk can't measure differently. Test: the notebook suite (50 pass).
+
+Test runs: `web` 55 files, 402 tests pass, and `tsc` is clean. Python passes 1178 with the `torch`-marked tests left out. The audit's 16 contrast states are the same states as on Oct 30, checked state by state.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sat Oct 31, evening (pushed; the exports CLI item)
 
 Pushed `ws-d` with Chiya's yes (`895633b..129bfb1`: 3590fa7, 59acc38, 4ff522e, 129bfb1), as a normal push after merging `main` (no change, still 3c243b5).
@@ -98,7 +249,7 @@ Sources: the Contracts tab (Contract D, the Oct 27 review, the competitive revie
 | D10 Command palette | deferred | 0 | |
 | D11 Phone view and dark theme | dark theme done by C; phone view not started | 2.5 | C's share route |
 | D12 Alerts outside the app | dropped | 0 | |
-| "Done means" for D1 to D5: a README line each and a nightly check that each still renders | not started | 2 | flags on in production are Chiya's call |
+| "Done means" for D1 to D5: a README line each and a nightly check that each still renders | written (README draft's "Add-ons"; `docs/audit/scripts/addons.mjs`, 14 of 20 pass, the rest are finding 7) | 0 | C runs it nightly; flags on in production are Chiya's call |
 | **Follow-ups and support** | | | |
 | Builder kit (competitive review item 10) | on ws-d | 0 | Chiya schedules the sessions (paid check-ins) |
 | Stranger-path audit, 12 findings to C | on ws-d | 1 | re-check the top four when C's fixes land |

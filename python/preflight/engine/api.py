@@ -17,6 +17,7 @@ A's scripts/make_golden.py makes to replace the golden fixtures.
 from __future__ import annotations
 
 import contextvars
+import functools
 import itertools
 import math
 import statistics
@@ -25,7 +26,18 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from preflight.engine import agent_cost, conformal, gpus, knobs, memory, prices, rl, serving, steptime
+from preflight.engine import (
+	agent_cost,
+	conformal,
+	divergence,
+	gpus,
+	knobs,
+	memory,
+	prices,
+	rl,
+	serving,
+	steptime,
+)
 from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
@@ -55,9 +67,13 @@ MODEL_ID_RUN_COST = "run-cost@0.1.0"
 _TARGETS = {
 	"memory.peak": ("bytes", "memory"),
 	"risk.oom": ("probability", "risk"),
+	"risk.divergence": ("probability", "risk"),
 	"time.step": ("s", None),
 	"time.total": ("s", "time"),
 	"cost.total": ("usd", "cost"),
+	# Chiya, Nov 1: the quantity the dollars come from, so the browser recomputes cost.total at a user's own rate with
+	# no round trip; the interval is the quantity's, and a user's rate has none of its own
+	"cost.gpu_hours": ("gpu_hours", "cost"),
 	"risk.wall_cap": ("probability", "risk"),
 	"risk.preemption_loss": ("s", "risk"),
 	"tokens.total": ("tokens", None),
@@ -78,8 +94,9 @@ _TARGETS = {
 FEATURES = {
 	"rl": False,
 	"serving": False,
-	"steptime_cross_gpu": False,
-}  # + flags.json engine.steptime_cross_gpu
+	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
+	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
+}  # this dict is the switch until the runner sets it from flags.json (from-b.md, B -> A); keep the two the same
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
 
@@ -159,12 +176,14 @@ def targets_for(record: FlightRecord) -> list[Target]:
 	if _api_lens(record):
 		ids = ["cost.total", "time.total", "memory.context_fill", "risk.runaway", "tokens.total"]
 	else:
-		ids = ["memory.peak", "time.total", "cost.total", "risk.oom", "time.step"]
+		ids = ["memory.peak", "time.total", "cost.total", "cost.gpu_hours", "risk.oom", "time.step"]
 		if _has_shape(record):  # the per-term split needs the analytical model
 			ids += [f"memory.{t}" for t in MEMORY_TERMS]
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
 		if FEATURES["rl"] and record.job.lens == "rl":
 			ids += list(RL_TARGETS)
+		if FEATURES["divergence"] and record.job.lens != "serving":  # training runs have a loss to watch
+			ids.append("risk.divergence")
 		if FEATURES["serving"] and record.job.lens == "serving":
 			ids += list(SERVING_TARGETS)
 		c = record.job.constraints
@@ -268,6 +287,184 @@ _MATCH_IGNORES = frozenset(
 		"seed",
 	}
 )
+
+
+MEDIAN_SE = math.sqrt(math.pi / 2)  # cited: a sample median's standard error is sqrt(pi/2) x sigma / sqrt(k)
+LENGTH_DRAWS = 4000  # derived: 4,000 simulated steps put the padded-length summaries within about 1%
+TOKEN_PHASES = (
+	"forward",
+	"backward",
+)  # the phases whose time follows the tokens in a batch; the rest stay fixed
+_PPF_A = (
+	-3.969683028665376e01,
+	2.209460984245205e02,
+	-2.759285104469687e02,
+	1.383577518672690e02,
+	-3.066479806614716e01,
+	2.506628277459239e00,
+)
+_PPF_B = (
+	-5.447609879822406e01,
+	1.615858368580409e02,
+	-1.556989798598866e02,
+	6.680131188771972e01,
+	-1.328068155288572e01,
+)
+_PPF_C = (
+	-7.784894002430293e-03,
+	-3.223964580411365e-01,
+	-2.400758277161838e00,
+	-2.549732539343734e00,
+	4.374664141464968e00,
+	2.938163982698783e00,
+)
+_PPF_D = (7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00)
+
+
+def _poly(coef, x):
+	out = np.zeros_like(x)
+	for c in coef:
+		out = out * x + c
+	return out
+
+
+def _norm_ppf(p: np.ndarray) -> np.ndarray:
+	"""The normal quantile, vectorised (cited: Acklam's rational approximation, relative error about 1e-9)."""
+	p = np.clip(np.asarray(p, dtype=float), 1e-15, 1 - 1e-15)
+	out = np.empty_like(p)
+	lo, hi = p < 0.02425, p > 1 - 0.02425
+	mid = ~(lo | hi)
+	q = np.sqrt(-2 * np.log(p[lo]))
+	out[lo] = _poly(_PPF_C, q) / (_poly(_PPF_D, q) * q + 1)
+	q = np.sqrt(-2 * np.log(1 - p[hi]))
+	out[hi] = -_poly(_PPF_C, q) / (_poly(_PPF_D, q) * q + 1)
+	q = p[mid] - 0.5
+	r = q * q
+	out[mid] = _poly(_PPF_A, r) * q / (_poly(_PPF_B, r) * r + 1)
+	return out
+
+
+@functools.lru_cache(maxsize=256)
+def _padded_step(
+	median: float, mean: float, cap: float | None, rows: int, accum: int
+) -> tuple[float, float, float]:
+	"""(median, mean, log spread) of a step's padded tokens per row, when every micro-batch of `rows` rows (all ranks
+	together: a step waits for the slowest) pads to its longest row and a step sums `accum` micro-batches. Rows are
+	log-normal with the dataset's own median and mean (Chiya, Nov 1: time follows the median and the mean, not the
+	tail, which sizes peak memory), cut at seq_len. A micro-batch's longest row is drawn from the quantile of
+	U^(1/rows), so the cost doesn't grow with the batch; the result is cached for knob moves."""
+	s = math.sqrt(2 * math.log(mean / median)) if mean > median > 0 else 0.0
+	n = max(
+		200, LENGTH_DRAWS // max(1, accum)
+	)  # about LENGTH_DRAWS quantiles in all, whatever the accumulation
+	u = np.random.default_rng(0).random((n, max(1, accum)))
+	logs = math.log(median) + s * _norm_ppf(u ** (1.0 / max(1, rows)))
+	if cap:
+		logs = np.minimum(logs, math.log(cap))
+	step = np.exp(logs).mean(axis=1)  # tokens per row, over the step's micro-batches
+	return float(np.median(step)), float(np.mean(step)), float(np.std(np.log(step)))
+
+
+def _dataset_lengths(p) -> tuple[float, float] | None:
+	ex = p.extras or {}
+	med, mean = ex.get("dataset_median_tokens"), ex.get("dataset_mean_tokens")
+	return (float(med), float(mean)) if med and mean else None
+
+
+def _probe_rows(p) -> list[float]:
+	"""Padded tokens per row on each of the probe's timed steps (its step log)."""
+	return [x.tokens / x.samples for x in (p.step_log or []) if x.kind == "timed" and x.tokens and x.samples]
+
+
+def _length_factor(record: FlightRecord, p, medians: bool | None = None) -> float | None:
+	"""How much longer the full run's batches are than the ones this probe saw: median against median from the
+	probe's step log, or mean against mean (`medians=False`, or no step log): the dataset's padded length per row
+	at the probe's own batch, seq_len and accumulation, over the probe's padded length
+	(tokens_per_sample_mean / (1 - padding_fraction)). Applied to the probe's forward and backward time before the
+	step model fits, so each probe carries its own padding and a knob move that lands on another probe doesn't jump
+	(review, Nov 1). Per-rank rows: the probe's tokens and timing are one rank's view. None when the dataset's
+	lengths or the probe's padding aren't known, or the rows are packed."""
+	data, lens = p.data, _dataset_lengths(p)
+	pv = _probe_values(record, p)
+	if (
+		lens is None or not data or not data.tokens_per_sample_mean or data.padding_fraction is None
+		or data.padding_fraction >= 1 or data.packing or pv.get("packing") or record.job.lens == "rl"
+	):  # fmt: skip
+		return None
+	cap = pv.get("seq_len")
+	run_med, run_mean, _ = _padded_step(
+		*lens, float(cap) if cap else None, int(pv.get("batch_size") or 1), int(pv.get("grad_accum") or 1)
+	)
+	# like with like (reviews, Nov 1): the probe's p50 is a median step, so the run's median padded length per row
+	# over the median of the probe's own timed steps (step_log: padded tokens over rows); without a step log, mean
+	# over mean, which is right when the probe's batches have the run's shape
+	timed = _probe_rows(p)
+	if timed and medians is not False:
+		return run_med / float(np.median(timed))
+	return run_mean / (float(data.tokens_per_sample_mean) / (1 - float(data.padding_fraction)))
+
+
+@dataclass(frozen=True)
+class _LengthTerm:
+	total_scale: float  # the run's mean step against its median step (1 without them)
+	step_sigma: float  # added to the step's log sigma: the probe's few-step median against the run's median
+	total_sigma: float  # replaces it for a total, a sum over many steps
+	reason: str
+	intact: bool = (
+		True  # False once later terms rescale the step's sigma; the total then keeps the step's band
+	)
+
+
+def _length_term(
+	record: FlightRecord,
+	values: dict,
+	match,
+	steps_hint: float | None = None,
+	breakdown: dict | None = None,
+	corrected: bool = True,
+) -> _LengthTerm | None:
+	"""Batches that vary in length, as time sees them (Chiya, Nov 1). The run's median step follows the median padded
+	length (each probe's own correction, _length_factor, before the step model fits) and its total the mean: the
+	total scales by the mean step over the median at the query's own batch, seq_len and accumulation. The probe's
+	p50 is the median of k steps, so its sampling error, sqrt(pi/2) x the probe's own step spread / sqrt(k), stays on
+	the step. A total sums many steps: with the dataset's lengths known its length error is the per-step spread /
+	sqrt(steps); without them the run's mean comes from the probe's k steps (spread / sqrt(k)). The 99.9th
+	percentile and the longest row stay out of time. RL rollouts have their own length model (engine/rl.py), and
+	packed rows don't pad."""
+	if record.job.lens == "rl":
+		return None
+	probes = [p for p in record.probes if p.status in OK_PROBE and p.step_time and p.step_time.p50_s]
+	p = match if match in probes else (probes[0] if probes else None)
+	if p is None or not p.step_time.n_steps:
+		return None
+	st_, k = p.step_time, p.step_time.n_steps
+	seen = math.log(st_.p95_s / st_.p50_s) / steptime.Z90 if st_.p95_s and st_.p95_s > st_.p50_s else 0.0
+	lens = _dataset_lengths(p)
+	pv = _probe_values(record, p)
+	packed = bool(values.get("packing")) or bool(pv.get("packing")) or bool(p.data and p.data.packing)
+	if lens is None or packed or not corrected or _length_factor(record, p) is None:
+		if seen <= 0:
+			return None
+		why = f"batches vary in length (the probe's {k} timed steps), so a full run's median step can differ from the probe's {k}-step median"
+		return _LengthTerm(1.0, MEDIAN_SE * seen / math.sqrt(k), seen / math.sqrt(k), why)
+	cap = values.get("seq_len") or pv.get("seq_len")
+	batch = int(values.get("batch_size") or pv.get("batch_size") or 1)
+	accum = int(values.get("grad_accum") or pv.get("grad_accum") or 1)
+	run_med, run_mean, spread = _padded_step(*lens, float(cap) if cap else None, batch, accum)
+	phases = breakdown or st_.by_phase or {}  # the query's own step (its corrected phases), not the probe's
+	total_phase = sum(phases.values())
+	# "step" is the whole step when the probe had no phase split, and the factor scaled it whole
+	share = (
+		sum(phases.get(ph, 0.0) for ph in (*TOKEN_PHASES, "step")) / total_phase if total_phase > 0 else 1.0
+	)
+	total_scale = (1 + share * (run_mean / run_med - 1)) if run_med > 0 else 1.0
+	why = (
+		f"batches vary in length: the run's median step follows the dataset's median padded length ({run_med:.0f} "
+		f"tokens a row here) and its total the mean ({run_mean:.0f})"
+	)
+	return _LengthTerm(
+		total_scale, MEDIAN_SE * seen / math.sqrt(k), spread / math.sqrt(steps_hint or 1.0), why
+	)
 
 
 def _matching_probe(record: FlightRecord, values: dict, ok=OK_PROBE):
@@ -689,6 +886,9 @@ class _StepResult:
 	sigma: float  # log sigma of the step time, for totals and tail probabilities
 	first_extra_s: float = 0.0  # compile and warm-up, paid once
 	phases: dict | None = None  # seconds per phase, scaled to the step's point
+	length: _LengthTerm | None = (
+		None  # varying batch lengths: the total uses the mean, with its own length error
+	)
 
 
 def _step_x(lens: str, values: dict) -> float:
@@ -827,11 +1027,21 @@ def _dtype_ratio(
 def _step(record: FlightRecord, values: dict) -> _StepResult:
 	lens = record.job.lens
 	sprobes, current_probe = [], None
+	# every timed probe corrected, or none: a fit mixing corrected and uncorrected probes jumps between them
+	timed = [p for p in record.probes if p.status in OK_PROBE and p.step_time and p.step_time.p50_s]
+	# and all with one estimator: medians only if every timed probe has a step log (review, Nov 1)
+	medians = all(_probe_rows(p) for p in timed)
+	factors = {p.id: _length_factor(record, p, medians) for p in timed}
+	if any(f is None for f in factors.values()):
+		factors = {}
 	for p in record.probes:
 		st_ = p.step_time
 		if p.status not in OK_PROBE or not st_ or not st_.p50_s:
 			continue
 		phases = steptime.phases_seconds(st_.by_phase, st_.p50_s) or {"step": st_.p50_s}
+		f = factors.get(p.id)
+		if f is not None:  # the run's batches, not the probe's: on the phases that follow the tokens
+			phases = {k: v * f if k in TOKEN_PHASES or k == "step" else v for k, v in phases.items()}
 		sprobes.append(steptime.StepProbe(_probe_work(record, p), phases, p.id))
 		if p.kernels and current_probe is None:
 			current_probe = p
@@ -864,6 +1074,15 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	if est.status == "abstain":
 		return _StepResult(_abstain("s", mid, est.reason), est.sigma_log)
 	point, sigma, status, reasons = est.point, est.sigma_log, est.status, [est.reason] if est.reason else []
+	lt = _length_term(record, values, match, _total_steps(record, values)[0], est.breakdown, bool(factors))
+	if lt is not None:
+		sigma = math.hypot(sigma, lt.step_sigma)
+		reasons.append(lt.reason)
+		f = factors.get(match.id) if match is not None else None
+		if (
+			status == "measured" and f is not None and abs(f - 1) > 0.01
+		):  # the run's batches aren't the probe's
+			status = "predicted"
 
 	# precision moved away from what the probes ran
 	q_prec = _precision(values)
@@ -899,20 +1118,31 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		mid = steptime.MODEL_ID_CROSS
 
 	# another GPU than the probes ran on
+	rough = False
 	if not same_gpu:
 		cross = None
 		if current_probe is not None and current_probe.step_time and current_probe.step_time.p50_s:
 			cross = steptime.predict_cross_gpu_from_probe(
 				current_probe.kernels, current_probe.step_time.p50_s, src_gpu, tgt_gpu
 			)
-		# Chiya, Oct 31: the held-out cross-GPU band, only with engine.steptime_cross_gpu on (it makes GPU moves abstain)
+		# Chiya, Oct 31 (option b): with engine.steptime_cross_gpu on, a GPU move takes the held-out cross-GPU band,
+		# shown past +-50% as rough; off, K1's simulated band and the usual abstain
 		xcell = (
 			conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
 			if FEATURES["steptime_cross_gpu"]
 			else None
 		)
+		if FEATURES["steptime_cross_gpu"] and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
+			# Chiya, Oct 31: abstain, labelled, until the AMD session measures; datasheets alone don't size the band
+			vendor = gpus.get_gpu(tgt_gpu).vendor
+			why = (
+				f"no {vendor.upper() if len(vendor) <= 3 else vendor.title()} measurements: {tgt_gpu} is another "
+				"vendor, and the corpus has no rows from it yet, so time across vendors isn't measured; run a probe there"
+			)
+			return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), sigma)
 		if cross is not None and cross.status != "abstain":
 			ratio = cross.point / current_probe.step_time.p50_s
+			rough = bool(xcell)
 			# Chiya, Oct 31: K1's band from held-out corpus pairs, never narrower than the simulated one
 			cross_sigma = max(cross.sigma_log, xcell.half_width / steptime.Z90) if xcell else cross.sigma_log
 			sigma = math.hypot(sigma, cross_sigma)
@@ -931,7 +1161,12 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			except ValueError as exc:
 				return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, str(exc)), sigma)
 			ratio = sum(scaled.values()) / max(sum(phases.values()), 1e-12)
-			sigma = math.hypot(sigma, steptime.cross_sigma(src_gpu, tgt_gpu) * steptime.SIGMA_SECONDARY_SPECS)
+			class_sigma = steptime.cross_sigma(src_gpu, tgt_gpu) * steptime.SIGMA_SECONDARY_SPECS
+			# review, Oct 31: never narrower than the held-out band either, since the card says held_out
+			rough = bool(xcell)
+			sigma = math.hypot(
+				sigma, max(class_sigma, xcell.half_width / steptime.Z90) if xcell else class_sigma
+			)
 			status = "extrapolated"
 			reasons.append("no kernel table on the probe, so phases are scaled by class")
 		point *= ratio
@@ -970,6 +1205,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		# each part keeps its own error: the measured step its sigma, the estimated all-reduce its own
 		comm = multi.breakdown.get("comm_exposed", 0.0)
 		sigma = math.hypot(point * sigma, comm * comm_sigma) / multi.point
+		lt = replace(lt, intact=False) if lt is not None else None
 		point, status, mid = multi.point, "extrapolated", steptime.MODEL_ID_COMM
 		reasons.append(
 			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
@@ -987,10 +1223,15 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	moves = [m for m in _unmodelled_moves(record, values, "time") if m != "gpus"]
 	if moves:
 		sigma *= UNMODELLED_WIDEN
+		lt = replace(lt, intact=False) if lt is not None else None
 		status = "extrapolated" if status != "abstain" else status
 		reasons.append(f"{', '.join(moves)} isn't modelled for time yet; held at its probed effect")
 	h = memory.Z90 * sigma
-	if h > memory.ABSTAIN_HALF_WIDTH:
+	if rough and h > memory.ABSTAIN_HALF_WIDTH:
+		# Chiya, Oct 31 (option b): the held-out cross-GPU band is shown past +-50%, labelled, beside the probe offer
+		reasons.append("rough, no probe on this GPU; run a probe here")
+		status = "extrapolated"
+	elif h > memory.ABSTAIN_HALF_WIDTH:
 		why = "; ".join([*reasons, "the range would be wider than +-50%; run a probe here"])
 		return _StepResult(_abstain("s", mid, why), sigma)
 	first = 0.0
@@ -1005,6 +1246,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		sigma,
 		first,
 		phases,
+		lt,
 	)
 
 
@@ -1112,8 +1354,13 @@ def _time(record: FlightRecord, values: dict) -> _TimeResult:
 		return _TimeResult(_abstain("s", MODEL_ID_TOTAL, why), step.est, step.sigma)
 	extra, notes = _overheads(record, values, steps)
 	fixed = extra + step.first_extra_s
-	h = memory.Z90 * step.sigma
-	pt = steps * step.est.point
+	lt = step.length
+	tsig = step.sigma
+	# a sum over many steps: the length error of a total, not of a median (only while nothing rescaled the sigma)
+	if lt is not None and lt.intact:
+		tsig = math.sqrt(max(0.0, step.sigma**2 - lt.step_sigma**2) + lt.total_sigma**2)
+	h = memory.Z90 * tsig
+	pt = steps * step.est.point * (lt.total_scale if lt is not None else 1.0)
 	reason = "; ".join(x for x in [step.est.reason, *notes] if x) or None
 	total = _est(
 		pt + fixed,
@@ -1146,6 +1393,20 @@ def _cost(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
 	rate = pr.usd_per_hour * _n_gpus(values, record) / 3600.0
 	why = f"{gpu} at ${pr.usd_per_hour:.2f}/h ({pr.provider}, {pr.as_of})"
 	return _est(time.point * rate, time.lo * rate, time.hi * rate, "usd", time.status, MODEL_ID_COST, why)
+
+
+def _gpu_hours(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
+	"""GPU-hours of the run: time.total x the GPUs it holds. cost.total is this x the table's $/GPU-hour, so a user's
+	own rate gives dollars in the browser from this alone (C, Nov 1)."""
+	if time.status == "abstain":
+		return _abstain("gpu_hours", MODEL_ID_COST, time.reason or "no run time to count GPU-hours from")
+	if _target_gpu(record, values) is None:  # a CPU or unknown device: no GPU-hours to price at any rate
+		return _abstain(
+			"gpu_hours", MODEL_ID_COST, "the run has no GPU the table knows, so there are no GPU-hours"
+		)
+	n = _n_gpus(values, record) / 3600.0
+	why = f"{_n_gpus(values, record)} GPU{'s' if _n_gpus(values, record) != 1 else ''} for the run's time"
+	return _est(time.point * n, time.lo * n, time.hi * n, "gpu_hours", time.status, MODEL_ID_COST, why)
 
 
 def _tail_prob(time: Estimate, sigma: float, limit: float) -> float:
@@ -1295,9 +1556,13 @@ def _agent(record: FlightRecord, values: dict) -> dict[str, Estimate]:
 		why = f"no sampled task ran on {model}; sample it first"
 		return {t: _abstain(_meta(t)[0], agent_cost.MODEL_ID, why) for t in ids}
 	pop = int(values.get("n_tasks") or s.population or 0) or None
-	tasks, cut, hit = _cap_turns(tasks, values.get("max_turns"))
+	cap = values.get("max_turns")
+	capped = frozenset(
+		t.task_id for t in tasks if cap and t.turns > cap
+	)  # stopped by the what-if, not the recorder
+	tasks, cut, hit = _cap_turns(tasks, cap)
 	sub = s.model_copy(update={"tasks": tasks})
-	tot = agent_cost.agent_totals(sub, population=pop)
+	tot = agent_cost.agent_totals(sub, population=pop, capped_ids=capped)
 	out = {}
 	cost = tot["cost.total"]
 	if "prompt_caching" in values and _sampled_differs(record, "prompt_caching", values["prompt_caching"]):
@@ -1690,6 +1955,7 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		"time.step": tm.step,
 		"time.total": tm.total,
 		"cost.total": _cost(record, values, tm.total),
+		"cost.gpu_hours": _gpu_hours(record, values, tm.total),
 	}
 	out.update(mem.terms or {})
 	if tm.phases and tm.step.status != "abstain":
@@ -1710,6 +1976,8 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
 	if FEATURES["rl"] and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
+	if FEATURES["divergence"] and record.job.lens != "serving":
+		out["risk.divergence"] = _divergence(record, values)
 	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))
 	return Prediction(out)
@@ -2069,6 +2337,10 @@ def _rl_targets(record: FlightRecord, values: dict) -> dict:
 		out["rl.zero_spread"] = _abstain("fraction", mid, "the probe recorded no per-prompt pass rates")
 	elif not g:
 		out["rl.zero_spread"] = _abstain("fraction", mid, "no group size: set the group_size knob")
+	elif len(p.rl.pass_rate_per_prompt) < rl.MIN_PROMPTS:
+		n = len(p.rl.pass_rate_per_prompt)
+		why = f"only {n} prompts with a pass rate; the share needs {rl.MIN_PROMPTS} to say anything about the rest"
+		out["rl.zero_spread"] = _abstain("fraction", mid, why)
 	else:
 		k = p.rl.group_size or (_probe_values(record, p).get("group_size"))
 		iv = rl.zero_spread(p.rl.pass_rate_per_prompt, int(g), int(k) if k else None)
@@ -2142,7 +2414,7 @@ def axis_values(knob: Knob, n: int = 6) -> list:
 	return vals
 
 
-_GRID_TARGETS = ("memory.peak", "risk.oom", "time.total", "cost.total")
+_GRID_TARGETS = ("memory.peak", "risk.oom", "time.total", "cost.total", "cost.gpu_hours")
 _AGENT_GRID_TARGETS = ("cost.total", "time.total", "memory.context_fill", "risk.runaway", "tokens.total")
 # derived: three halvings and doublings around the current value, the span A's probes cover
 LOCAL_FACTORS = (0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0)  # fmt: skip
@@ -2395,7 +2667,43 @@ def _sensitivity(
 # ---------------------------------------------------------------- the whole predictions block
 
 
+def _divergence_model():
+	try:
+		from preflight.engine._divergence_model import MODEL
+	except ImportError:  # not fitted yet: the readout abstains and says so
+		return None
+	return MODEL
+
+
+def _divergence(record: FlightRecord, values: dict) -> Estimate:
+	"""P(the run diverges later), from the longest probe's stability series at the probe's settings."""
+	mid = divergence.MODEL_ID
+	if _off_probe(record, values, also_ok=frozenset({"grad_accum"})):
+		return _abstain(
+			"probability", mid, "the warning reads the probe's own steps; probe this setting to see it"
+		)
+	probes = [
+		p for p in record.probes if p.status in OK_PROBE and p.stability and p.stability.series.get("loss")
+	]
+	if not probes:
+		return _abstain("probability", mid, "no probe logged a loss series")
+	p = max(probes, key=lambda q: len(q.stability.series["loss"]))
+	cfg = {**{kv.id: kv.current for kv in record.knobs}, **p.knobs}
+	cfg.setdefault("precision", cfg.get("dtype"))
+	w = divergence.warn(_divergence_model(), p.stability.series, cfg)
+	if w["status"] == "abstain":
+		return _abstain("probability", mid, w["reason"])
+	return _est(w["point"], w["point"], w["point"], "probability", "predicted", mid, w["reason"])
+
+
 _CARDS = {
+	divergence.MODEL_ID: (
+		"classifier",
+		"logistic on the probe's loss, grad norm, logit growth and settings (Wortsman et al., ICLR 2024), trained on "
+		"the corpus's divergence sweep labelled by D9; a probability shows only where held-out runs verified it. Held "
+		"out by settings family (precision, qk-norm, init), not by architecture: every sweep run is the same small "
+		"GPT, so there is only one architecture to hold out",
+	),
 	serving.MODEL_ID: (
 		"simulation",
 		"KV-cache capacity, prefill and decode rooflines and a continuous-batching scheduler (vLLM, Vidur); one scale "
@@ -2453,8 +2761,10 @@ _CARD_SCORED = frozenset({memory.MODEL_ID, steptime.MODEL_ID_SAME, steptime.MODE
 _CARD_CAVEAT = {
 	steptime.MODEL_ID_SAME: "Calibrated on corpus models, not users' scripts; checked on unseen scripts Nov 2.",
 	steptime.MODEL_ID_CROSS: (
-		"Band from corpus pairs, scored on GPUs left out; calibrated on corpus models' op tables, not users' "
-		"kernel tables; checked on the AMD rows and unseen scripts Nov 2."
+		"Rough, no probe on this GPU: the band comes from corpus pairs, scored on GPUs left out, and is shown past "
+		"+-50% with a run-a-probe offer beside it. Calibrated on corpus models' op tables, not users' kernel tables; "
+		"checked on unseen scripts Nov 2. No AMD measurements: a move to another vendor's GPU abstains until corpus rows from it exist. The pairs share "
+		"architectures: clustered by architecture, the 95% interval on coverage is 90% to 96%."
 	),
 }
 
@@ -2491,6 +2801,12 @@ def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]
 				extra["coverage"] = h / n
 			extra["per_gpu_coverage"] = {g: h / n for g, (h, n) in t.holdout.get(target, {}).items() if n}
 			notes = f"{notes or ''}. {_CARD_CAVEAT.get(mid, '')} {t.describe(target)}".strip(". ")
+			if mid == steptime.MODEL_ID_CROSS:
+				# Chiya, Oct 31: the A100 holdout on the card too; it scored same-GPU step time, and the card says so
+				a100 = [v for g, v in t.holdout.get("time.step", {}).items() if g.upper().startswith("A100")]
+				h, n = (sum(v[i] for v in a100) for i in (0, 1))
+				if n:
+					notes += f" A100 holdout (same-GPU step time, scored once): {h} of {n} inside the band."
 		out.append(
 			ModelCard(
 				id=mid,
@@ -2534,6 +2850,13 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	)
 
 
+def _vendor(gpu: str) -> str | None:
+	try:
+		return gpus.get_gpu(gpu).vendor
+	except KeyError:
+		return None
+
+
 def calibration_summary() -> dict:
 	"""What the coverage self-test page shows from the corpus: each target's leave-one-architecture-out coverage and
 	the cross-GPU holdout, both with Wilson 95% intervals, and P(OOM)'s reliability bins. Plain data for C's page."""
@@ -2544,6 +2867,7 @@ def calibration_summary() -> dict:
 		return {"hits": hits, "n": n, "rate": hits / n if n else None, "wilson95": [lo, hi]}
 
 	targets = sorted({k[0] for k in t.cells} | set(t.coverage))
+	vendors = {v for k in t.cells if k[1] for v in [_vendor(k[1])] if v}
 	return {
 		"built_from": t.built_from,
 		"targets": {
@@ -2573,6 +2897,9 @@ def calibration_summary() -> dict:
 			for b in t.oom_bins
 		],
 		"oom_middle_verified": oom_model.middle_verified(t.oom_bins),
+		# Chiya, Nov 1: shown on every surface until AMD rows exist (the account is on a verification hold)
+		"vendors_measured": sorted(vendors),
+		"amd": None if "amd" in vendors else "no AMD measurements",
 	}
 
 

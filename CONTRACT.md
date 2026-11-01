@@ -1,4 +1,4 @@
-# Preflight contract v0.5.0
+# Preflight contract v0.6.0
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,16 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.0 (Nov 1, additive; B's, C's and A's requests, approved by Chiya): a shared record draws the same
+  campaign calendar as B's live plan. `Campaign` gains `start` (when the campaign clock starts; `start_s`
+  and `finish_s` count from it), `p_by_deadline`, `checkpoint_interval` (`Estimate`, beside the
+  `checkpoint_interval_s` point) and `lane_slots`; `CampaignCell` gains `slot` (0-based, within its
+  lane), `reason` (why a run is cut or undated) and `gpu_hours_estimate` and `usd_estimate`
+  (`Estimate`, beside the `gpu_hours` and `usd` points). `Estimate.rate` (`EstimateRate`: `quantity`,
+  `usd_per_unit`, `unit`, `price_row`) splits a cost estimate into quantity × rate, so the browser
+  re-prices it at the visitor's own rate. `AgentTask.stop_reason` gains "cut" (stopped with the whole
+  run, never a runaway), and `AgentSample.ended` says how the sampled run ended (finished, stalled,
+  cancelled, timeout). 0.5.0 records load unchanged.
 - 0.5.0 (Oct 31, additive): `Campaign` gains the planner's intervals (B's request): `gpu_hours`, `usd`
   and `finish_s` as `Estimate` for the runs that go ahead, `grid_gpu_hours` and `grid_usd` for the whole
   grid before budget cuts, `quota` (`CampaignQuota`), `asha` (`CampaignAsha` with `AshaRung`s) and

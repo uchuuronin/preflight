@@ -343,7 +343,41 @@ def test_cache_hits_carry_this_points_labels_not_the_cached_runs(tmp_path):
 	assert rec.probes[1].knobs == {"batch_size": 4, "seq_len": 64}
 
 
-def test_the_records_model_calls_count_in_its_cost(tmp_path):
+@pytest.fixture
+def spark_map_flag(monkeypatch):
+	"""harness.spark_script_map on (off by default), restored for the tests after."""
+	from preflight.runner import flags
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_script_map": True}))
+	flags.reload()
+	yield
+	monkeypatch.delenv("PREFLIGHT_FLAGS")
+	flags.reload()
+
+
+@pytest.mark.parametrize("on", [False, True])
+def test_job_code_goes_to_muse_spark_only_with_the_script_map_flag(tmp_path, monkeypatch, on):
+	import preflight.runner.pipeline as pl
+	from preflight.runner import flags
+
+	sent = []
+
+	def fake_map(files, *, entrypoint, client):
+		sent.append(sorted(files))
+		return pl.map_static(files, entrypoint=entrypoint), []
+
+	monkeypatch.setattr(pl, "map_script", fake_map)
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_script_map": on}))
+	flags.reload()
+	try:
+		run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(),
+			deps(tmp_path, FakeRunner(), spark=object()))  # a client is there, as when the Meta key is set  # fmt: skip
+	finally:
+		flags.reload()
+	assert sent == ([["train.py"]] if on else [])
+
+
+def test_the_records_model_calls_count_in_its_cost(tmp_path, spark_map_flag):
 	import preflight.runner.pipeline as pl
 	from preflight.schema import ModelCall
 
@@ -583,3 +617,131 @@ def test_the_worker_reads_the_same_flag_files_as_the_api():
 		assert f'"{name}"' in api or f"/ {name!r}" in api.replace('"', "'"), f"api/app.py doesn't ship {name}"
 	assert 'FLAG_ENV = "production"' in runner and '"PREFLIGHT_ENV": FLAG_ENV' in runner
 	assert '"PREFLIGHT_ENV": "production"' in api
+
+
+def test_generation_bound_lenses_get_a_longer_probe_time_limit():
+	from preflight.harness.static import map_static
+	from preflight.runner.pipeline import GENERATION_PROBE_TIMEOUT_S, _probe_timeout
+
+	sm = map_static({"train.py": SCRIPT}, entrypoint="train.py")
+	assert _probe_timeout(sm, 360) == 360
+	assert _probe_timeout(sm.model_copy(update={"lens": "eval"}), 360) == GENERATION_PROBE_TIMEOUT_S
+	assert _probe_timeout(sm.model_copy(update={"lens": "eval"}), 900) == 900  # never shorter than asked
+
+
+def test_a_probe_run_on_a_fallback_gpu_is_not_cached_as_the_gpu_asked_for(tmp_path):
+	class FellBack(FakeRunner):  # every point ran on an A10 when an L4 was asked for
+		last_ran = "A10"
+
+		def __call__(self, spec, gpu, *, should_stop):
+			# the pipeline allowed these for the L4; after the fallback the job asks for the A10 itself
+			assert spec.gpu_fallback == (("A10", "L40S") if gpu == "L4" else ())
+			r = super().__call__(spec, "A10", should_stop=should_stop)
+			return r
+
+	cache = MemoryCache()
+	req = {"source": {"kind": "upload", "files": {"train.py": SCRIPT}}, "gpu": "L4"}
+	rec = run_pipeline(req, _Ctx(), deps(tmp_path, FellBack(), cache=cache))
+	# the point that fell back isn't stored under the L4 key; the rest asked for the A10 and are its
+	assert rec.probes[0].cache_key is None and len(cache._d) == len(rec.probes) - 1
+	assert rec.env.gpu.name == "A10"
+
+
+def test_after_a_fallback_the_job_stays_on_that_gpu_and_drops_cache_hits_from_the_other(tmp_path):
+	cache = MemoryCache()
+	req = {"source": {"kind": "upload", "files": {"train.py": SCRIPT}}, "gpu": "L4"}
+	first = run_pipeline(req, _Ctx(), deps(tmp_path / "a", FakeRunner(outcomes={"p2": ("error", "x"), "p3": ("error", "x")}),
+		cache=cache))  # fmt: skip
+	assert [p.status for p in first.probes][:1] == ["ok"] and len(cache._d) == 1  # only p1 cached, on an L4
+
+	class FellBack(FakeRunner):
+		last_ran = None
+
+		def __call__(self, spec, gpu, *, should_stop):
+			self.last_ran = "A10"
+			return super().__call__(spec, "A10", should_stop=should_stop)
+
+	runner = FellBack()
+	rec = run_pipeline(req, _Ctx(), deps(tmp_path / "b", runner, cache=cache))
+	assert rec.probes[0].status == "error" and rec.probes[0].error_code == "gpu.fallback"
+	assert [g for _, g, *_ in runner.calls] == ["A10"] * len(runner.calls)
+	asked = [c for c in runner.calls]
+	assert len(asked) >= 2 and rec.env.gpu.name == "A10"
+
+
+class _FakeTriageClient:
+	"""Stands in for Spark Open: answers each probe's log with a category and a quoted line."""
+
+	def __init__(self):
+		from datetime import UTC, datetime
+
+		from preflight.schema import ModelCall
+
+		self.calls, self._now, self._call = [], datetime.now(UTC), ModelCall
+		self.seen = []
+
+	def structured(self, msgs, schema, *, purpose, reasoning_effort=None):
+		self.seen.append((purpose, reasoning_effort, msgs[-1]["content"]))
+		call = self._call(provider="baseten", model="meta-models/muse-spark-open-1026", purpose=purpose,
+			input_tokens=900, output_tokens=120, cost_usd=0.001635, at=self._now)  # fmt: skip
+		self.calls.append(call)
+		return schema(category="oom", summary="The forward pass ran out of GPU memory.",
+			evidence_line="CUDA out of memory"), call  # fmt: skip
+
+
+@pytest.mark.parametrize("on", [False, True])
+def test_spark_open_triages_each_probe_log_only_with_its_flag(tmp_path, monkeypatch, on):
+	from preflight.runner import flags
+
+	class LoggedRunner(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			r = super().__call__(spec, gpu, should_stop=should_stop)
+			r.log_tail = "step 1\ntorch.OutOfMemoryError: CUDA out of memory\n"
+			return r
+
+	client = _FakeTriageClient()
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_open_triage": on}))
+	flags.reload()
+	try:
+		d = deps(tmp_path, LoggedRunner(outcomes={"p2": ("oom", "oom.train")}))
+		d.triage = client
+		rec = run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), d)
+	finally:
+		flags.reload()
+	triage_calls = [c for c in rec.provenance if c.purpose == "triage"]
+	if not on:
+		assert not client.seen and not triage_calls
+		return
+	assert len(triage_calls) == len(client.seen) == len(rec.probes)  # one call per probe, all in provenance
+	assert all(effort == "low" for _, effort, _ in client.seen)
+	f = [f for f in rec.findings if f.source == "spark_open_triage"]
+	assert [x.id for x in f] == ["triage.p2"] and 'log: "CUDA out of memory"' in f[
+		0
+	].detail  # only the probe that didn't finish
+	assert rec.costs.llm_usd == pytest.approx(0.001635 * len(triage_calls))
+
+
+def test_an_eval_oom_point_triages_each_attempt_under_its_own_id(tmp_path, monkeypatch):
+	from preflight.runner import flags
+
+	class EvalOOM(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			r = super().__call__(spec, gpu, should_stop=should_stop)
+			if spec.probe_id == "p1" and spec.eval_batches:  # the eval batch runs out; eval off, it fails
+				r.probe = r.probe.model_copy(update={"status": "oom", "error_code": "oom.eval"})
+			elif spec.probe_id == "p1":
+				r.probe = r.probe.model_copy(update={"status": "error", "error_code": "script.error"})
+			r.log_tail = "torch.OutOfMemoryError: CUDA out of memory\n"
+			return r
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_open_triage": True}))
+	flags.reload()
+	try:
+		d = deps(tmp_path, EvalOOM())
+		d.triage = _FakeTriageClient()
+		rec = run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), d)
+	finally:
+		flags.reload()
+	ids = [f.id for f in rec.findings if f.source == "spark_open_triage"]
+	assert len(ids) == len(set(ids)) and {"triage.p1-eval", "triage.p1"} <= set(ids)
+	assert {p.id for p in rec.probes} >= {"p1-eval", "p1"}

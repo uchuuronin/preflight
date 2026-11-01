@@ -158,12 +158,16 @@ def _pick_entrypoint(files: dict[str, str], wanted) -> str:
 	raise InvalidSubmission("say which file to run: more than one Python file and none is called train.py")
 
 
+# zoo scripts for ops checks only: they need an image the runner doesn't have (torchtitan: torch 2.7)
+OPS_ONLY_SAMPLES = frozenset({"torchtitan_debug"})
+
+
 def _sample(uri: str) -> Path:
 	name = uri.removeprefix("sample://").removeprefix("zoo/").strip("/")
 	if not re.fullmatch(r"[a-z0-9_\-]+", name):
 		raise InvalidSubmission(f"unknown sample {uri!r}")
 	path = ZOO / name
-	if not path.is_dir():
+	if not path.is_dir() or name in OPS_ONLY_SAMPLES:
 		raise InvalidSubmission(f"unknown sample {uri!r}")
 	return path
 

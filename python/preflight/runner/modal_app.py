@@ -98,7 +98,11 @@ PROBE_PACKAGES = [
 	"numpy>=1.26,<2.2",
 	"httpx>=0.27",
 ]
-ZOO_MODELS = ["Qwen/Qwen2.5-1.5B", "gpt2"]
+# "dataset:" marks a dataset repo. D's eval, retrieval and vision scripts' weights and data, so a
+# probe's time limit isn't spent downloading them (the Nov 1 eval sweep probe ran out inside it)
+ZOO_MODELS = ["Qwen/Qwen2.5-1.5B", "gpt2", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+	"sentence-transformers/all-MiniLM-L6-v2", "timm/resnet50.a1_in1k", "dataset:openai/gsm8k",
+	"dataset:sentence-transformers/natural-questions", "dataset:AI-Lab-Makerere/beans"]  # fmt: skip
 WORKER_TIMEOUT_S = 3600
 
 app = modal.App(APP_NAME)
@@ -173,6 +177,30 @@ serving_image = (
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image}
+
+# the torchtitan adapter check only (zoo/torchtitan_debug, an ops run): torchtitan 0.1.0 targets
+# torch 2.7, which the probe image's 2.5.1 isn't, so its own pins; no visitor job uses this image
+TITAN_PACKAGES = [
+	"torch==2.7.1",
+	"torchtitan==0.1.0",
+	"torchdata==0.11.0",
+	"datasets==3.6.0",
+	"tiktoken==0.9.0",
+	"blobfile==3.0.0",
+	"tomli==2.2.1",
+	"tyro==0.9.24",
+	"tensorboard==2.19.0",
+	"psutil==6.1.0",
+	"nvidia-ml-py==12.560.30",
+	"pydantic>=2.8,<3",
+	"numpy>=1.26,<2.3",
+	"httpx>=0.27",
+]
+titan_image = (
+	_base.pip_install(*TITAN_PACKAGES)
+	.env({"HF_HOME": HF_HOME, "PREFLIGHT_SANDBOX_DIR": "/tmp", "PREFLIGHT_PROBE_UID": "61000"})
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+)
 
 jobs_dict = modal.Dict.from_name("preflight-jobs", create_if_missing=True)
 cache_dict = modal.Dict.from_name("preflight-probe-cache", create_if_missing=True)
@@ -436,9 +464,16 @@ def _spark_client():
 	return ModelClient.meta() if ModelClient.meta_configured() else None
 
 
+def _triage_client():
+	"""Spark Open on Baseten for probe-log triage, when the preflight-baseten secret is mounted."""
+	from preflight.harness.spark import ModelClient
+
+	return ModelClient.baseten_spark_open() if os.environ.get("BASETEN_API_KEY") else None
+
+
 @app.function(
 	image=worker_image,
-	secrets=[modal.Secret.from_name("preflight-meta")],
+	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
 	volumes={RECORDS_DIR: records_vol, UPLOADS_DIR: _read_only(uploads_vol)},
 	timeout=WORKER_TIMEOUT_S,
 	max_containers=MAX_RUNNING,
@@ -466,8 +501,12 @@ def run_worker() -> int:
 		# leaves the job to the reaper and a retry, and its sandbox billing until idle_timeout
 		if time.monotonic() - started > WORKER_TIMEOUT_S - (JOB_PROBE_WALL_S + 15 * 60):
 			return ran
-		with SandboxRunner(_sandbox_factory()) as runner:  # one sandbox per job, ended with the job
-			deps = Deps(records=writer, runner=runner, spark=_spark_client(), cache=DictCache(cache_dict),
+		from preflight.probes.gpu_choice import usd_per_hour
+
+		# one sandbox per job, ended with the job; an L4 that won't schedule falls back to A10, L40S
+		with SandboxRunner(_sandbox_factory(), price=usd_per_hour) as runner:
+			deps = Deps(records=writer, runner=runner, spark=_spark_client(), triage=_triage_client(),
+				cache=DictCache(cache_dict),
 				image=tag, blobs=blobs, reader=writer, install_requirements=True,
 				overhead_usd_per_h=SANDBOX_OVERHEAD_USD_PER_H)  # fmt: skip
 			if not run_one(store, name, lambda lease, ctx, deps=deps: run_job(lease, ctx, deps=deps)):

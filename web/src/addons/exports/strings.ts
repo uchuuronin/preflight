@@ -4,6 +4,7 @@ import { registerStrings } from "../../lib/i18n";
 export const EXPORTS_EN: Record<string, string> = {
 	"addon.exports.title": "Take this plan with you",
 	"addon.exports.lede": "Built from this record and the settings on screen, so they change as you move the knobs.",
+	"addon.exports.not_verified": "Not verified: a code change here has no Muse Code patch that passed its verify run yet.",
 	"addon.exports.illustrative": "This is a sample: its numbers are illustrative, and the files say so.",
 	"addon.exports.copy": "Copy",
 	"addon.exports.download": "Download",
@@ -34,12 +35,12 @@ export const EXPORTS_EN: Record<string, string> = {
 	"addon.exports.patch.pending": "Not verified yet",
 
 	"addon.exports.sbatch.name": "Slurm batch file",
-	"addon.exports.sbatch.say": "Asks for {gpus} and {time}: the slow end of the predicted range plus 15 minutes to set up.",
-	"addon.exports.sbatch.say_api": "Asks for no GPU and {time}: the slow end of the predicted range plus 15 minutes to set up.",
-	"addon.exports.sbatch.say_capped": "Asks for {gpus} and {time}, your time limit. The plan needs about {need}, so save checkpoints and resubmit to finish.",
-	"addon.exports.sbatch.say_api_capped": "Asks for no GPU and {time}, your time limit. The plan needs about {need}, so save checkpoints and resubmit to finish.",
-	"addon.exports.sbatch.say_api_untimed": "Asks for no GPU. Preflight has no time estimate at these settings, so set the time limit yourself.",
-	"addon.exports.sbatch.say_untimed": "Asks for {gpus}. Preflight has no time estimate at these settings, so set the time limit yourself.",
+	"addon.exports.sbatch.say": "Asks for {gpus} and {time}: the upper end of the predicted time, rounded up to 5 minutes.",
+	"addon.exports.sbatch.say_api": "Asks for no GPU and {time}: the upper end of the predicted time, rounded up to 5 minutes.",
+	"addon.exports.sbatch.say_capped": "Asks for {gpus} and {time}, your time limit. The plan may need up to {need}, so save checkpoints and resubmit to finish.",
+	"addon.exports.sbatch.say_api_capped": "Asks for no GPU and {time}, your time limit. The plan may need up to {need}, so save checkpoints and resubmit to finish.",
+	"addon.exports.sbatch.say_api_untimed": "Asks for no GPU. Preflight has no trusted time at these settings, so set the time limit yourself.",
+	"addon.exports.sbatch.say_untimed": "Asks for {gpus}. Preflight has no trusted time at these settings, so set the time limit yourself.",
 
 	"addon.exports.command.name": "Command",
 	"addon.exports.command.say": "Runs the job as the record found it, from your project's top folder. Make the edits first if you changed any settings.",
@@ -48,7 +49,7 @@ export const EXPORTS_EN: Record<string, string> = {
 	"addon.exports.recheck.say": "Installs Preflight's command-line tool and measures a few steps of the edited job on your machine, on its GPU if it has one, for a new flight record.",
 
 	"addon.exports.link.name": "Link to this record",
-	"addon.exports.link.say": "Opens this record at its own settings. Your changes travel in the plan file.",
+	"addon.exports.link.say": "Opens this record read-only, at its own settings. Your changes travel in the plan file.",
 };
 
 export function registerExportsStrings(): void {

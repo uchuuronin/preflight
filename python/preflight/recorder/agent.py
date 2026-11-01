@@ -77,6 +77,8 @@ class Call:
 	usd: float = 0.0
 	stream: bool = False
 	response_id: str | None = None  # responses API: the next turn names it as previous_response_id
+	end_mono: float = 0.0  # time.monotonic() when it was logged, for the wait since
+	start_mono: float = 0.0  # time.monotonic() when the proxy took it
 	span_id: str = field(default_factory=lambda: secrets.token_hex(8))
 
 
@@ -95,6 +97,8 @@ class _Run:
 	system: dict[str, str | None] = field(default_factory=dict)  # task -> its last system prompt hash
 	last_call_at: float | None = None  # monotonic: any call through the run, refused ones too
 	budget_hit: bool = False  # a task was refused because the proxy's dollar cap was reached
+	peak_concurrent: int = 0  # the most tasks with a call in flight at once: the script's workers
+	opened_at: dict[str, float] = field(default_factory=dict)  # task -> monotonic time its first call came
 
 
 def _h(x) -> str:
@@ -410,6 +414,14 @@ class AgentProxy:
 				"in_flight": [tid for tid, t in ts.items() if t.in_flight > 0],
 				# a task whose last answer asked for a tool was mid-task (running the tool) if cut now
 				"mid_tool": [tid for tid, t in ts.items() if t.calls and t.calls[-1].finish_reason == "tool_calls"],
+				# a task whose last answer asked for a tool: seconds since that answer was logged
+				"tool_wait_s": {tid: time.monotonic() - t.calls[-1].end_mono for tid, t in ts.items()
+					if t.calls and not t.in_flight and t.calls[-1].finish_reason == "tool_calls"},
+				"peak_concurrent": run.peak_concurrent,
+				# each task's span as the proxy saw it: from its first call to its last call's end
+				# (None while a call is in flight), tool time between turns included
+				"span": {tid: (run.opened_at.get(tid), None if t.in_flight or not t.calls else t.calls[-1].end_mono)
+					for tid, t in ts.items()},
 				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1),
 				"budget_hit": run.budget_hit,
 				# since the last call started or ended; never idle while a call is in flight
@@ -486,6 +498,7 @@ class AgentProxy:
 			run.keys[key] = n
 			tid = f"{run.run_id}-{key}" + (f".{n}" if n > 1 else "")
 			run.order.append(tid)
+			run.opened_at[tid] = time.monotonic()
 			run.last[tid] = msgs
 			run.system[tid] = sys_h
 			self._tasks.setdefault(tid, _Task())
@@ -554,6 +567,9 @@ class AgentProxy:
 			if t.stopped:
 				return t.stopped, 0.0
 			t.in_flight += 1
+			for run in (r for r in self._tokens.values() if isinstance(r, _Run) and task_id in r.last):
+				run.peak_concurrent = max(run.peak_concurrent,
+					sum(1 for tid in run.order if self._tasks.get(tid, _Task()).in_flight > 0))  # fmt: skip
 			t.reserved_usd += reserve
 			return None, reserve
 
@@ -561,7 +577,7 @@ class AgentProxy:
 		with self._lock:
 			t = self._tasks.setdefault(task_id, _Task())
 			t.in_flight -= 1
-			self._last_activity = time.monotonic()
+			call.end_mono = self._last_activity = time.monotonic()
 			with contextlib.suppress(ValueError):
 				t.open.remove(call)
 			t.reserved_usd = max(0.0, t.reserved_usd - reserved)
@@ -629,6 +645,7 @@ class AgentProxy:
 		stream = req.get("stream") is True
 		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
 		with self._lock:
+			call.start_mono = time.monotonic()
 			self._tasks.setdefault(task_id, _Task()).open.append(call)
 		sent = [False]  # this request's reply has started: a failure now can only close the connection
 		last: list = []  # the reply's last bytes (or the headers' end), sent once the call is logged
@@ -781,7 +798,7 @@ class AgentProxy:
 			return list(self._tasks.get(task_id, _Task()).calls)
 
 	def task(self, task_id: str, *, success: bool | None = None, wall_s: float | None = None,
-		timed_out: bool = False) -> AgentTask:  # fmt: skip
+		timed_out: bool = False, cut: bool = False) -> AgentTask:  # fmt: skip
 		"""The task as the record's AgentTask: turns are the calls the provider answered. Waits (up
 		to SETTLE_S) for calls still in flight, so a script that exits at [DONE] is counted whole."""
 		with self._lock:
@@ -794,6 +811,8 @@ class AgentProxy:
 			reason = stopped
 		elif stopped == "budget":
 			reason = "max_turns"  # the record's closest word: stopped for running on, not for failing
+		elif cut:
+			reason = CUT  # stopped with the whole run (cancel, stall, the run's limit), not on its own
 		elif timed_out:
 			reason = "timeout"
 		elif any(c.error and "context" in c.error for c in calls) or (
@@ -857,6 +876,21 @@ class AgentProxy:
 				"attributes": {k: v for k, v in attrs.items() if v is not None},
 			})  # fmt: skip
 		return out
+
+
+def _cut_reason():
+	"""B (Oct 31): a task stopped because the whole run was is not one that timed out on its own.
+	Until the schema has a value for it (asked of the PM), such a task has no stop reason rather than
+	"timeout", so healthy tasks in flight at a cancel don't count as runaways."""
+	import typing
+
+	from preflight.schema.record import AgentTask as _T
+
+	args = typing.get_args(typing.get_args(_T.model_fields["stop_reason"].annotation)[0])
+	return "cut" if "cut" in args else None
+
+
+CUT = _cut_reason()
 
 
 # the OpenAI SDKs retry a 429 unless the server says not to (x-should-retry: false); a refusal

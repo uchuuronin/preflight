@@ -1,30 +1,28 @@
 /**
- * Exports (moved to D, Oct 31): what a visitor takes away from the cockpit, built from the record
- * and the knob values on screen. Pure: no React, no network, no clock, so every file is the same
- * for the same record and settings.
+ * Exports (moved to D, Oct 31): what a visitor takes away from the cockpit. Everything comes from
+ * C's ExportPlan (web/src/workspace/export/plan.ts), which holds the settings on screen and the
+ * cockpit's own estimates, so an export prints no number the cockpit wouldn't; this file only
+ * formats. Pure: no React, no network, no clock.
  *
- * Five things:
- * - config: the plan as JSON (settings, what changed, the predicted readouts with their intervals)
+ * - config: the plan as JSON (settings, what changed, the trusted readouts with their ranges)
  * - edits: each changed setting at its line in the script; where the record names the exact
- *   expression, a shell script that makes that one edit and refuses if the line has moved
- * - sbatch: a Slurm batch file sized from the slow end of the predicted time
+ *   expression, a shell script that checks every line first and then makes the edits
+ * - sbatch: a Slurm batch file asking for the upper end of the predicted time
  * - command: the command that runs the job
- * - link: the cockpit's own address for this record
+ * - link: the record's read-only link
+ * - recheck: install Preflight's CLI and measure again (behind d.exports_cli)
  *
  * A true unified diff needs the script's text, which the browser never has; Muse Code's patches
  * are listed by title and verify status until their diffs can be fetched (requests in from-d.md).
  */
-import type { Estimate, KnobValue, LoadedRecord } from "../../workspace/record/types";
-
-/** Setup time added to the slow end of the predicted time, as the free-tier band does (D4). */
-export const SETUP_S = 15 * 60;
+import type { ExportPlan } from "../../registry";
+import type { KnobValue, LoadedRecord } from "../../workspace/record/types";
 
 export interface ExportInput {
+	/** C's plan for the settings on screen. */
+	plan: ExportPlan;
+	/** The record, for what the plan doesn't carry: nodes, the backend, the time limit. */
 	record: LoadedRecord;
-	knobs: Readonly<Record<string, KnobValue>>;
-	estimates: Readonly<Record<string, Estimate | undefined>>;
-	/** The cockpit's address for this record, e.g. https://host/#/cockpit/<token>. */
-	link: string;
 	/** True for sample records with illustrative numbers (C's isFixture). */
 	illustrative: boolean;
 }
@@ -45,8 +43,8 @@ export interface Change {
 	how: "exact" | "by_hand" | "code" | "launch";
 }
 
-/** Settings that aren't in the script: where the job runs. They go into sbatch and the config. */
-const LAUNCH_KNOBS = new Set(["gpu_type", "gpu_count"]);
+/** Settings about where the job runs (C's plan reads gpu_type, gpu and gpus); launch-only when the script doesn't set them. */
+const LAUNCH_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
 
 /**
  * Text from the record (an uploaded script's names, expressions, values) on one line, for
@@ -96,46 +94,30 @@ function newExpression(expr: string, from: KnobValue | null, to: KnobValue): str
 	return `${lhs}${lit}`;
 }
 
-export function changes(input: Pick<ExportInput, "record" | "knobs">): Change[] {
-	const { record, knobs } = input;
-	const located = new Map((record.job.script_map?.knobs ?? []).map((k) => [k.id, k]));
-	const out: Change[] = [];
-	for (const k of record.knobs) {
-		if (!(k.id in knobs)) continue;
-		const to = knobs[k.id];
-		const from = (k.current ?? null) as KnobValue | null;
-		if (to === from) continue;
-		const loc = located.get(k.id)?.location ?? null;
+export function changes(input: Pick<ExportInput, "plan">): Change[] {
+	return input.plan.changes.map((c) => {
+		const loc = c.location;
 		const base = {
-			id: k.id,
-			from,
-			to,
+			id: c.knobId,
+			from: c.from,
+			to: c.to,
 			file: loc?.file ?? null,
 			line: loc?.line ?? null,
 			expr: loc?.expr ?? null,
-			template: k.patch_template ?? null,
+			template: c.patchTemplate,
 		};
-		if (LAUNCH_KNOBS.has(k.id)) {
-			out.push({ ...base, newExpr: null, how: "launch" });
-		} else if (k.needs_code || (!loc && k.patch_template)) {
-			out.push({ ...base, newExpr: null, how: "code" });
-		} else {
-			const newExpr = loc?.expr && loc.file && loc.line ? newExpression(loc.expr, from, to) : null;
-			out.push({ ...base, newExpr, how: newExpr ? "exact" : "by_hand" });
-		}
-	}
-	return out;
+		// Where it runs, unless the script itself sets it (e.g. torchrun --nproc_per_node on the launch line).
+		if (LAUNCH_KNOBS.has(c.knobId) && !loc) return { ...base, newExpr: null, how: "launch" as const };
+		// Only what C counts as a code change, so "not verified" covers every one listed as such.
+		if (c.needsCode) return { ...base, newExpr: null, how: "code" as const };
+		const newExpr = loc?.expr && loc.file && loc.line ? newExpression(loc.expr, c.from, c.to) : null;
+		return { ...base, newExpr, how: newExpr ? ("exact" as const) : ("by_hand" as const) };
+	});
 }
 
-export function gpu(input: Pick<ExportInput, "record" | "knobs">): { name: string | null; count: number } {
-	const { record, knobs } = input;
-	const name = typeof knobs.gpu_type === "string" ? knobs.gpu_type : (record.env?.gpu?.name ?? null);
-	const count = typeof knobs.gpu_count === "number" ? knobs.gpu_count : (record.env?.gpu?.count ?? 1);
+export function gpu(input: Pick<ExportInput, "plan">): { name: string | null; count: number } {
+	const { name, count } = input.plan.gpu;
 	return { name, count: Math.max(1, Math.round(count)) };
-}
-
-function usable(e: Estimate | undefined): e is Estimate {
-	return !!e && e.status !== "abstain" && Number.isFinite(e.point);
 }
 
 function finite(x: number | null | undefined): x is number {
@@ -143,70 +125,58 @@ function finite(x: number | null | undefined): x is number {
 }
 
 /**
- * The wall time to ask for, in seconds: the slow end of the predicted range (or the point) plus
- * setup, rounded up to whole 5 minutes as the batch file asks for it; null with no estimate.
+ * What the batch file asks for: the upper end of the predicted time (C's wallTimeHiS), and the
+ * record's time limit when that is shorter (Slurm won't start a job asking for more than the
+ * limit). Null when the cockpit doesn't trust a time.
  */
-export function wallTime(e: Estimate | undefined): number | null {
-	const point = e?.point;
-	if (!usable(e) || !finite(point)) return null;
-	return Math.ceil(((finite(e.hi) ? e.hi : point) + SETUP_S) / 300) * 300;
-}
-
-/**
- * What the batch file asks for: the wall time it needs, and the limit when that is shorter (Slurm
- * won't start a job asking for more than the limit). Null with no time estimate.
- */
-export function askedTime(input: Pick<ExportInput, "record" | "estimates">): { need: number; ask: number; capped: boolean } | null {
-	const need = wallTime(input.estimates["time.total"]);
-	if (need === null) return null;
+export function askedTime(input: Pick<ExportInput, "plan" | "record">): { need: number; ask: number; capped: boolean } | null {
+	const need = input.plan.wallTimeHiS;
+	if (!finite(need) || need <= 0) return null;
 	const cap = input.record.job.constraints?.wall_time_cap_s;
-	if (finite(cap) && cap > 0 && need > cap) return { need, ask: Math.floor(cap / 60) * 60, capped: true };
-	return { need, ask: need, capped: false };
+	const rounded = Math.ceil(need / 300) * 300; // whole 5 minutes
+	if (finite(cap) && cap > 0 && rounded > cap) return { need, ask: Math.floor(cap / 60) * 60, capped: need > cap }; // never past the limit
+	return { need, ask: rounded, capped: false };
 }
 
-/** The plan as JSON. Values not predicted at these settings are left out, not guessed. */
+/** Whether every code change has a verified Muse Code patch (C's plan); true with none. */
+export function verified(input: Pick<ExportInput, "plan">): boolean {
+	return input.plan.codeChangesVerified;
+}
+
+/** The plan as JSON. Readouts the cockpit doesn't trust are named, never given a number. */
 export function configText(input: ExportInput): string {
-	const { record, knobs, estimates } = input;
-	const settings: Record<string, KnobValue> = {};
-	for (const k of record.knobs) {
-		const v = k.id in knobs ? knobs[k.id] : k.current;
-		if (v !== null && v !== undefined) settings[k.id] = v as KnobValue;
-	}
+	const { plan } = input;
 	const changed: Record<string, { from: KnobValue | null; to: KnobValue }> = {};
-	for (const c of changes(input)) changed[c.id] = { from: c.from, to: c.to };
+	for (const c of plan.changes) changed[c.knobId] = { from: c.from, to: c.to };
 	const predicted: Record<string, unknown> = {};
 	const unpredicted: string[] = [];
-	for (const target of record.predictions.targets) {
-		const e = estimates[target.id];
-		if (!usable(e)) {
-			unpredicted.push(target.id);
+	for (const r of plan.readouts) {
+		if (!finite(r.point)) {
+			unpredicted.push(r.targetId);
 			continue;
 		}
-		predicted[target.id] = {
-			point: e.point,
-			...(finite(e.lo) && finite(e.hi) ? { lo: e.lo, hi: e.hi, level: e.level ?? null } : {}),
-			unit: e.unit,
-			status: e.status,
+		predicted[r.targetId] = {
+			point: r.point,
+			...(finite(r.lo) && finite(r.hi) ? { lo: r.lo, hi: r.hi } : {}),
+			unit: r.unit,
+			status: r.status,
 		};
 	}
 	const g = gpu(input);
-	const plan = {
+	const out = {
 		preflight: "plan",
-		link: input.link,
+		...(plan.shareUrl ? { link: plan.shareUrl } : {}),
 		...(input.illustrative ? { note: "Sample record: the numbers are illustrative, not measured." } : {}),
-		job: {
-			title: record.job.title ?? null,
-			lens: record.job.lens,
-			entrypoint: record.job.source?.entrypoint ?? record.job.script_map?.entrypoint ?? null,
-			command: commandText(input),
-		},
+		job: { title: plan.title, lens: plan.lens, entrypoint: plan.source.entrypoint ?? null, command: commandText(input) },
 		gpu: { type: g.name, count: g.count },
-		settings,
+		settings: plan.config,
 		changed,
+		...(plan.changes.some((c) => c.needsCode) ? { code_changes_verified: plan.codeChangesVerified } : {}),
+		...(plan.codeChangesVerified ? {} : { not_verified: "A code change here has no Muse Code patch that passed its verify run yet." }),
 		predicted,
 		...(unpredicted.length ? { not_predicted: unpredicted } : {}),
 	};
-	return `${JSON.stringify(plan, null, "\t")}\n`;
+	return `${JSON.stringify(out, null, "\t")}\n`;
 }
 
 /** POSIX shell single quotes. */
@@ -215,24 +185,24 @@ export function shq(s: string): string {
 }
 
 /**
- * The record's script arguments, shell-quoted; null when any holds a control character (a
+ * The plan's script arguments, shell-quoted; null when any holds a control character (a
  * carriage return or escape sequence can hide what a pasted command really says).
  */
-function quotedArgs(record: LoadedRecord): string[] | null {
-	const args = record.job.source?.args ?? [];
+function quotedArgs(plan: ExportPlan): string[] | null {
+	const args = plan.source.args ?? [];
 	return args.every((a) => oneLine(a) === a) ? args.map(shq) : null;
 }
 
 const ARGS_LEFT_OUT = "# The record's script arguments hold control characters, so they are left out: add them yourself.";
 
-/** The command line that runs the job, from the record. */
-export function commandText(input: Pick<ExportInput, "record">): string {
-	const { record } = input;
-	const entry = record.job.source?.entrypoint ?? record.job.script_map?.entrypoint ?? "train.py";
-	const launch = oneLine(record.job.script_map?.launch ?? "").trim();
+/** The command line that runs the job, from the plan. */
+export function commandText(input: Pick<ExportInput, "plan">): string {
+	const { plan } = input;
+	const entry = plan.source.entrypoint ?? "train.py";
+	const launch = oneLine(plan.launch ?? "").trim();
 	// A's reader writes "python <entrypoint>" unquoted; quote the path so spaces survive.
 	const head = !launch || launch === `python ${entry}` ? `python ${shq(entry)}` : launch;
-	const args = quotedArgs(record);
+	const args = quotedArgs(plan);
 	return args ? [head, ...args].join(" ") : `${ARGS_LEFT_OUT}\n${head}`;
 }
 
@@ -281,6 +251,7 @@ export function editsText(input: ExportInput): string {
 		}
 	}
 	lines.push("", ...notes);
+	if (!verified(input)) lines.push("# Not verified: a code change here has no Muse Code patch that passed its verify run yet.");
 	if (exact.length) {
 		lines.push("", ...HELPERS, "", "# Check every edit first; nothing changes unless all of them still hold.");
 		for (const c of exact) lines.push(`check ${(editArgs(c) as string[]).slice(0, 3).join(" ")}`);
@@ -291,9 +262,10 @@ export function editsText(input: ExportInput): string {
 }
 
 /** Slurm's time format, D-HH:MM:SS from one day up and HH:MM:SS below, in whole minutes. */
-export function slurmTime(seconds: number, round: "up" | "down" = "up"): string {
-	const step = round === "up" ? 300 : 60; // asks round up to 5 minutes; a stated limit only drops its seconds
-	const total = round === "up" ? Math.ceil(seconds / step) * step : Math.floor(seconds / step) * step;
+export function slurmTime(seconds: number, round: "up" | "down" | "minute" = "up"): string {
+	// "up": an ask, up to whole 5 minutes; "down": a limit, seconds dropped; "minute": a figure, up to the minute
+	const step = round === "up" ? 300 : 60;
+	const total = round === "down" ? Math.floor(seconds / step) * step : Math.ceil(seconds / step) * step;
 	const d = Math.floor(total / 86400);
 	const h = Math.floor((total % 86400) / 3600);
 	const m = Math.floor((total % 3600) / 60);
@@ -315,14 +287,19 @@ function slug(s: string): string {
 /** Installs Preflight's command-line tool from the public repo (shown once the repo is public). */
 export const CLI_INSTALL = "pip install git+https://github.com/uchuuronin/preflight";
 
+/** Whether the job calls APIs rather than running on a GPU. */
+export function isApi(input: Pick<ExportInput, "plan" | "record">): boolean {
+	return input.record.env?.backend === "api" || input.plan.lens === "agent";
+}
+
 /**
  * Whether the CLI can measure this job again on the visitor's machine: not an API run (the CLI
  * measures nothing for those), and not a sample or a notebook (no project folder of theirs holds
  * the script the record ran).
  */
-export function canRecheck(record: LoadedRecord): boolean {
-	const kind = record.job.source?.kind;
-	return !isApi(record) && kind !== "sample" && kind !== "notebook";
+export function canRecheck(input: Pick<ExportInput, "plan" | "record">): boolean {
+	const kind = input.plan.source.kind;
+	return !isApi(input) && kind !== "sample" && kind !== "notebook";
 }
 
 /**
@@ -331,11 +308,11 @@ export function canRecheck(record: LoadedRecord): boolean {
  * user's own torch runs `preflight run` (Python 3.11 or 3.12; torch is not installed by it).
  * Records go to a dot-folder, which the CLI skips when it reads the project next time.
  */
-export function recheckText(input: Pick<ExportInput, "record">): string | null {
-	const { record } = input;
-	if (!canRecheck(record)) return null;
-	const entry = record.job.source?.entrypoint ?? record.job.script_map?.entrypoint ?? "train.py";
-	const args = quotedArgs(record);
+export function recheckText(input: Pick<ExportInput, "plan" | "record">): string | null {
+	if (!canRecheck(input)) return null;
+	const { plan } = input;
+	const entry = plan.source.entrypoint ?? "train.py";
+	const args = quotedArgs(plan);
 	const run = ["preflight run .", `--entrypoint=${shq(entry)}`, "--out .preflight/records", ...(args?.length ? ["--", ...args] : [])].join(" ");
 	return [
 		"# Preflight's command-line tool (Python 3.11 or 3.12, in the environment that has your torch):",
@@ -348,35 +325,29 @@ export function recheckText(input: Pick<ExportInput, "record">): string | null {
 	].join("\n");
 }
 
-/** Whether the job calls APIs rather than running on a GPU. */
-export function isApi(record: LoadedRecord): boolean {
-	return record.env?.backend === "api" || record.job.lens === "agent";
-}
-
-/** A Slurm batch file: GPUs from the plan, time from the slow end of the predicted range. */
+/** A Slurm batch file: GPUs from the plan, time from the upper end of the predicted time. */
 export function sbatchText(input: ExportInput): string {
-	const { record, estimates } = input;
+	const { plan, record } = input;
 	const g = gpu(input);
 	const nodes = Math.max(1, Math.round(record.env?.nodes ?? 1));
-	const perNode = Math.ceil(g.count / nodes); // --gres counts GPUs per node
-	const time = estimates["time.total"];
-	const lines = ["#!/bin/bash", `#SBATCH --job-name=${slug(record.job.title ?? record.job.lens)}`, `#SBATCH --nodes=${nodes}`];
-	if (!isApi(record)) {
-		lines.push(`#SBATCH --gres=gpu:${perNode}`);
-		if (g.name) lines.push(oneLine(`# Planned on ${g.count} x ${g.name}. If your cluster names GPU types, add it: --gres=gpu:<type>:${perNode}`));
+	const lines = ["#!/bin/bash", `#SBATCH --job-name=${slug(plan.title ?? plan.lens)}`, `#SBATCH --nodes=${nodes}`];
+	if (!isApi(input)) {
+		// --gpus is the job's total, the plan's own count, however Slurm spreads it over the nodes.
+		lines.push(`#SBATCH --gpus=${g.count}`);
+		if (g.name) lines.push(oneLine(`# Planned on ${g.count} x ${g.name}. If your cluster names GPU types, add it: --gpus=<type>:${g.count}`));
 	}
 	const asked = askedTime(input);
-	if (asked && time) {
-		const range = finite(time.hi) ? (finite(time.level) ? `${Math.round(time.level * 100)}% range` : "range") : "estimate";
-		if (asked.capped) {
-			lines.push(`#SBATCH --time=${slurmTime(asked.ask, "down")}`);
-			lines.push(`# Your limit. The plan needs about ${slurmTime(asked.need)} (the slow end of Preflight's ${range} plus 15 minutes to set up): save checkpoints and resubmit to resume.`);
-		} else {
-			lines.push(`#SBATCH --time=${slurmTime(asked.ask)}`);
-			lines.push(`# Time: the slow end of Preflight's ${range} plus 15 minutes to set up.`);
-		}
+	if (asked?.capped) {
+		lines.push(`#SBATCH --time=${slurmTime(asked.ask, "down")}`);
+		lines.push(`# Your limit. The plan may need up to ${slurmTime(asked.need, "minute")} (the upper end of Preflight's predicted time): save checkpoints and resubmit to resume.`);
+	} else if (asked && asked.ask < Math.ceil(asked.need / 300) * 300) {
+		lines.push(`#SBATCH --time=${slurmTime(asked.ask, "down")}`);
+		lines.push("# Time: the upper end of Preflight's predicted time, held to your limit. Add your cluster's start-up time if it counts.");
+	} else if (asked) {
+		lines.push(`#SBATCH --time=${slurmTime(asked.ask)}`);
+		lines.push("# Time: the upper end of Preflight's predicted time, rounded up to 5 minutes. Add your cluster's start-up time if it counts.");
 	} else {
-		lines.push("# Preflight has no time estimate at these settings: set --time yourself.");
+		lines.push("# Preflight has no trusted time at these settings: set --time yourself.");
 	}
 	lines.push("#SBATCH --output=%x-%j.out", "", "set -euo pipefail");
 	const cs = changes(input).filter((c) => c.how !== "launch");
@@ -384,6 +355,7 @@ export function sbatchText(input: ExportInput): string {
 	const rest = cs.length - scripted;
 	if (scripted) lines.push("# Run 'sh preflight-edits.sh' once before submitting: it makes the setting changes it can.");
 	if (rest) lines.push(`# ${rest} more change${rest === 1 ? "" : "s"} to make by hand or with Muse Code: see preflight-edits.sh.`);
+	if (!verified(input)) lines.push("# Not verified: a code change here has no Muse Code patch that passed its verify run yet.");
 	if (input.illustrative) lines.push("# Sample record: sized from illustrative numbers, not a measurement.");
 	lines.push(commandText(input));
 	return `${lines.join("\n")}\n`;

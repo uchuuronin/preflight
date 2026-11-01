@@ -19,6 +19,7 @@ class Provider:
 	def __init__(self):
 		self.seen: list[dict] = []
 		self.status = 200
+		self.delay_s = 0.0  # each answer takes this long
 		provider = self
 
 		class H(BaseHTTPRequestHandler):
@@ -29,6 +30,8 @@ class Provider:
 
 			def do_POST(self):
 				body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+				if provider.delay_s:
+					time.sleep(provider.delay_s)
 				provider.seen.append({"path": self.path, "auth": self.headers.get("Authorization"),
 					"cookie": self.headers.get("Cookie"), "body": body})  # fmt: skip
 				if provider.status != 200:
@@ -174,7 +177,12 @@ def test_call_and_dollar_caps_stop_a_runaway(setup):
 	body = {"model": "muse-spark-1.3", "messages": [{"role": "user", "content": "do it"}], **small}
 	one = probe._worst_case_usd(body, json.dumps(body).encode())
 	probe.stop()
-	proxy = AgentProxy(prov.url, "k", rate=token_rate, max_usd_total=one * 1.5)
+	proxy = AgentProxy(
+		prov.url,
+		"k",
+		rate=token_rate,  # gitleaks:allow (no key: a dollar cap)
+		max_usd_total=one * 1.5,
+	)
 	proxy.start()
 	try:
 		assert _chat(proxy, "a", **small).status_code == 200

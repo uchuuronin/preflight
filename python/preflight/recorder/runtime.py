@@ -34,6 +34,7 @@ import itertools
 import json
 import math
 import os
+import re
 import statistics
 import sys
 import threading
@@ -56,6 +57,7 @@ PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zo
 PRETRAIN_EVAL_CAP = 8
 # synchronised steps after the timed ones, for the phase split (data/forward/backward/optimizer):
 # timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
+OUTPUT_WATCH = 64  # derived: generate calls watched for identical outputs; each costs one small read
 LENS_STATS_BATCHES = 64  # derived: enough batches to average a sampler's varying graph sizes
 PHASE_STEPS = (
 	2  # guess: two synchronised steps for the phase split; compare with the profiled window on zoo runs
@@ -334,6 +336,11 @@ class Recorder:
 		# io, generation, logs, scalers, sampler
 		self._io_depth = 0
 		self.gens: list[dict] = []
+		self._outputs: dict[int, dict] = {}  # input row hash -> {weights mark: output hash}
+		self.checkpoints: dict = {}  # what the script's training checkpoints hold (_inspect_save)
+		self._any_opt_steps = 0
+		self._all_opts: weakref.WeakSet = weakref.WeakSet()
+		self._output_watch_calls = 0
 		self.trainer_logs: list[dict] = []
 		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
 		# be read without trusting the trainer's own logs; the group size from the trainer
@@ -599,6 +606,8 @@ class Recorder:
 				rec._depth.n = depth
 
 		def save(obj, f, *args, **kwargs):
+			with suppress(Exception):
+				rec._inspect_save(obj, f)
 			return rec._timed_io(o["save"], f, obj, f, *args, **kwargs)
 
 		def sdpa(q, k, v, *args, **kwargs):
@@ -633,6 +642,8 @@ class Recorder:
 		self._importer.on("transformers.generation.utils", self._hook_hf_generate)
 		self._importer.on("transformers.trainer", self._hook_trainer)
 		self._importer.on("trl.trainer.grpo_trainer", self._hook_grpo)
+		for name in ("lightning.pytorch.trainer.trainer", "pytorch_lightning.trainer.trainer"):
+			self._importer.on(name, self._hook_lightning)
 		if self.hf_overrides:
 			self._importer.on("transformers.training_args", self._hook_training_args)
 		self._importer.on("vllm.entrypoints.llm", self._hook_vllm)
@@ -805,11 +816,19 @@ class Recorder:
 	def _record_hf_generation(self, model, args, kwargs, out, dt):
 		seqs = getattr(out, "sequences", out)
 		inputs = kwargs.get("input_ids", kwargs.get("inputs", args[0] if args else None))
-		cfg = getattr(model, "generation_config", None)
-		cap = kwargs.get("max_new_tokens") or (cfg.max_new_tokens if cfg is not None else None)
-		eos = kwargs.get("eos_token_id", getattr(cfg, "eos_token_id", None))
+		# TRL passes its settings as generation_config=; the model's own config is the fallback
+		given = kwargs.get("generation_config")
+		cfgs = [c for c in (given, getattr(model, "generation_config", None)) if c is not None]
+
+		def setting(name):
+			if kwargs.get(name) is not None:
+				return kwargs[name]
+			return next((getattr(c, name) for c in cfgs if getattr(c, name, None) is not None), None)
+
+		cap = setting("max_new_tokens")
+		eos = setting("eos_token_id")
 		eos = set(eos if isinstance(eos, list | tuple) else [eos] if eos is not None else [])
-		pad = kwargs.get("pad_token_id", getattr(cfg, "pad_token_id", None))
+		pad = setting("pad_token_id")
 		in_len = (
 			inputs.shape[-1] if isinstance(inputs, torch.Tensor) and seqs.shape[-1] >= inputs.shape[-1] else 0
 		)
@@ -819,10 +838,99 @@ class Recorder:
 			end = next((i + 1 for i, t in enumerate(row) if t in eos), None)
 			n = end if end is not None else sum(1 for t in row if t != pad or pad in eos)
 			lengths.append(n)
-			truncated.append(end is None and cap is not None and n >= cap)
+			truncated.append((end is None and n >= cap) if cap is not None else None)  # no cap: unknown
 		self.gens.append(
 			{"seconds": dt, "lengths": lengths, "truncated": truncated, "cap": cap, "backend": "hf"}
 		)
+		with suppress(Exception):
+			self._watch_outputs(model, inputs, gen)
+
+	def _inspect_save(self, obj, f) -> None:
+		"""Hygiene: what a training checkpoint holds, so a resume that can't match is found before
+		it happens. A torch.save of a dict holding the trained parameters themselves (tensors sharing
+		storage with the optimizer's), read for optimizer state (a dict with 'state' and
+		'param_groups', or a list of them as Lightning keeps), a scheduler, RNG state and a step
+		count. A save named as a final or best export is skipped: weights alone are its purpose. HF
+		Trainer saves optimizer.pt, scheduler.pt and rng_state.pth beside the weights, read by name."""
+		name = str(getattr(f, "name", f)).rsplit("/", 1)[-1].lower()
+		ck = self.checkpoints
+		if name in ("optimizer.pt", "scheduler.pt") or name.startswith("rng_state"):
+			ck[{"optimizer.pt": "optimizer", "scheduler.pt": "scheduler"}.get(name, "rng")] = True
+			return
+		if not isinstance(obj, dict) or not self._all_opts or re.search(r"final|best|export|inference", name):
+			return
+		# every optimizer's parameters; 0 is an empty or ZeRO-3 placeholder tensor, which matches anything
+		params = {p.data_ptr() for o in list(self._all_opts) for g in o.param_groups for p in g["params"]} - {
+			0
+		}
+
+		def holds_params(v):
+			if isinstance(v, torch.Tensor):
+				return v.data_ptr() in params
+			# every entry: a probe or late-layer LoRA trains only tensors far down the dict
+			return isinstance(v, dict) and any(isinstance(x, torch.Tensor) and x.data_ptr() in params
+				for x in v.values())  # fmt: skip
+
+		def is_optim(v):
+			if isinstance(v, list | tuple):
+				return any(is_optim(x) for x in v)
+			return isinstance(v, dict) and "state" in v and "param_groups" in v
+
+		vals = list(obj.values())
+		if holds_params(obj) or any(holds_params(v) for v in vals):
+			ck["saves"] = ck.get("saves", 0) + 1
+			ck["optimizer"] = ck.get("optimizer", False) or any(is_optim(v) for v in vals)
+			keys = " ".join(str(k).lower() for k in obj)
+			ck["scheduler"] = ck.get("scheduler", False) or "sched" in keys
+			ck["rng"] = ck.get("rng", False) or "rng" in keys or "random" in keys or "seed" in keys
+			ck["step"] = ck.get("step", False) or any(w in keys for w in ("step", "epoch", "iter"))
+
+	def _weights_mark(self, model) -> tuple:
+		"""Which weights generated: the active adapter(s), a fingerprint of a few trainable (else
+		first) parameters, and how many optimizer steps had run (generations with training between
+		them are not compared: a few small steps can leave greedy outputs the same). Not the model
+		object: two loads of one checkpoint are the same weights. At most OUTPUT_WATCH calls."""
+		adapter = None
+		with suppress(Exception):  # transformers 4.x: active_adapter() raises with no adapter loaded
+			if getattr(model, "_hf_peft_config_loaded", False):
+				adapter = model.active_adapters()
+			elif not callable(getattr(type(model), "active_adapter", None)):
+				adapter = getattr(model, "active_adapter", None)  # PEFT's PeftModel: a property
+		params = [p for p in model.parameters() if p.requires_grad][:4] or list(model.parameters())[:4]
+		with torch.no_grad():
+			fp = sum(float(p.detach().reshape(-1)[:256].float().sum()) for p in params)
+		return str(adapter), fp, self._any_opt_steps
+
+	def _watch_outputs(self, model, inputs, gen):
+		"""Hygiene (case study, Oct 28): different weights generating identical outputs for the same
+		inputs (a cache, or the adapter not switched). Keeps, per input row, what each set of weights
+		generated."""
+		if self._output_watch_calls >= OUTPUT_WATCH or not isinstance(inputs, torch.Tensor):
+			return
+		self._output_watch_calls += 1
+		mark = self._weights_mark(model)
+		for row_in, row_out in zip(inputs.tolist(), gen, strict=False):
+			key = hash(tuple(row_in))
+			seen = self._outputs.setdefault(key, {})
+			if len(seen) < 8:
+				seen[mark] = hash(tuple(row_out))
+
+	def _identical_outputs(self) -> dict:
+		"""Inputs generated by two sets of weights that differ (another adapter, or weights loaded
+		more than 0.1% apart by fingerprint, with no training step between) with the same output."""
+		same = differ = 0
+		for seen in self._outputs.values():
+			marks = list(seen.items())
+			for i in range(len(marks)):
+				for j in range(i + 1, len(marks)):
+					(m1, o1), (m2, o2) = marks[i], marks[j]
+					weights_differ = m1[2] == m2[2] and (
+						m1[0] != m2[0] or abs(m1[1] - m2[1]) > 1e-3 * max(abs(m1[1]), abs(m2[1]), 1e-12)
+					)
+					if weights_differ:
+						differ += 1
+						same += o1 == o2
+		return {"outputs_compared": differ, "outputs_identical": same} if differ else {}
 
 	def _retrieval_timed(self, kind: str, fn, count):
 		"""A retrieval stage (encode, index add, index train, search), timed with a sync either side,
@@ -910,7 +1018,8 @@ class Recorder:
 					for o in outs:
 						for c in o.outputs:
 							lengths.append(len(c.token_ids))
-							trunc.append(getattr(c, "finish_reason", None) == "length")
+							reason = getattr(c, "finish_reason", None)  # needs no cap to read
+							trunc.append(reason == "length" if reason is not None else None)
 					rec.gens.append(
 						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
 					)
@@ -955,6 +1064,37 @@ class Recorder:
 
 		if hasattr(tr, "create_scheduler"):
 			self._patch(tr, "create_scheduler", plan_factory)
+
+	def _hook_lightning(self, mod):
+		"""Lightning's Trainer: the run's length, as HF's create_scheduler gives it (max_steps, or
+		max_epochs for the loader's batches to multiply)."""
+		rec = self
+		tr = getattr(mod, "Trainer", None)
+		if tr is None:
+			return
+
+		def factory(orig):
+			def fit(self_, *args, **kwargs):
+				with suppress(Exception):
+					steps, epochs = getattr(self_, "max_steps", -1), getattr(self_, "max_epochs", None)
+					# Lightning's default with neither set is 1000 epochs, and an early stop or a time
+					# limit ends the run before its plan: no planned length then, rather than a wrong one
+					stops_early = any(
+						k.__name__ in ("EarlyStopping", "Timer")
+						for c in getattr(self_, "callbacks", [])
+						for k in type(c).__mro__
+					)  # fmt: skip (a subclass counts)
+					if stops_early:
+						rec.run_length = {}  # the plan is a ceiling, not the run's length
+					elif steps and steps > 0:
+						rec.run_length = {"planned_steps": int(steps), "epochs": None}
+					elif epochs and epochs > 0 and epochs != 1000:
+						rec.run_length = {"planned_steps": None, "epochs": float(epochs)}
+				return orig(self_, *args, **kwargs)
+
+			return fit
+
+		self._patch(tr, "fit", factory)
 
 	def _hook_grpo(self, mod):
 		"""TRL's GRPOTrainer: the reference model's log-probs (computed with no gradient) and the
@@ -1165,6 +1305,8 @@ class Recorder:
 	# ------------------------------------------------------------- optimizer hooks
 
 	def _pre(self, opt, args, kwargs):
+		with suppress(TypeError):
+			self._all_opts.add(opt)  # every optimizer, for what a checkpoint holds (a GAN's G and D)
 		if self.opt is None:
 			self.opt = opt
 			self._discover(opt)
@@ -1199,6 +1341,7 @@ class Recorder:
 		return total, _unique_bytes(grads)
 
 	def _post(self, opt, args, kwargs):
+		self._any_opt_steps += 1  # any optimizer: training between two generations (_identical_outputs)
 		if opt is not self.opt:
 			return
 		clean, kind = self._clean, self._kind()
@@ -1399,6 +1542,19 @@ class Recorder:
 			phased = [s for s in steps if s["kind"] == "warmup"][1:]
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
+		out.update(self._identical_outputs())
+		known = [t for g in self.gens for t in g["truncated"] if t is not None]
+		if self.gens and known:  # how many sequences truncation_rate is over (those whose ending is known)
+			out["generation_ending_known"] = float(len(known))
+		if self.checkpoints.get("saves"):
+			ck = self.checkpoints
+			out["checkpoint_saves_seen"] = ck["saves"]
+			out.update(
+				{
+					f"checkpoint_has_{k}": float(bool(ck.get(k)))
+					for k in ("optimizer", "scheduler", "rng", "step")
+				}
+			)
 		for kind, st in self.retrieval.items():
 			out[f"{kind}_items"] = st["items"]
 			out[f"{kind}_seconds"] = st["seconds"]
@@ -1565,7 +1721,7 @@ class Recorder:
 		if not self.gens:
 			return {}
 		lengths = [n for g in self.gens for n in g["lengths"]]
-		trunc = [t for g in self.gens for t in g["truncated"]]
+		trunc = [t for g in self.gens for t in g["truncated"] if t is not None]
 		caps = [g["cap"] for g in self.gens if g["cap"]]
 		return {
 			"generation": {
@@ -1576,6 +1732,7 @@ class Recorder:
 				"new_tokens_p95": _quantile(lengths, 0.95) if lengths else None,
 				"new_tokens_max": max(lengths) if lengths else None,
 				"max_new_tokens": int(max(caps)) if caps else None,
+				# over the sequences whose ending is known (a cap seen, or vLLM's finish_reason)
 				"truncation_rate": sum(trunc) / len(trunc) if trunc else None,
 				"backend": self.gens[-1]["backend"],
 			}
@@ -1607,7 +1764,9 @@ class Recorder:
 		):
 			if col(kind):
 				rl[name] = col(kind)
-		rl.update(reward_groups(self.reward_calls, self.group_size))
+		groups = reward_groups(self.reward_calls, self.group_size)
+		counts = groups.pop("_counts", {})
+		rl.update(groups)
 		if gen and gen["sequences"]:
 			rl["response_length"] = {
 				"mean": gen["new_tokens_mean"],
@@ -1619,7 +1778,9 @@ class Recorder:
 			m = col("len_mean")
 			mx = col("len_max") or m
 			rl["response_length"] = {"mean": statistics.fmean(m), "p95": max(mx), "max": max(mx), "n": len(m)}
-		return {"rl": rl} if rl else {}
+		return (
+			{"rl": rl} if rl else {}
+		) | counts  # counts: top-level extras (RLSignals has no field for them)
 
 
 def detect_env() -> dict:

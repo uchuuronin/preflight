@@ -29,6 +29,18 @@ import numpy as np
 MODEL_ID = "agent-bootstrap-cp@0.1.0"
 LEVEL = 0.9  # cited: contract, 90% intervals
 RUNAWAY_FACTOR = 8.0  # simulated: A's D3, a task above 8x the sample median is a runaway
+# guess: the cost rule's 8x carried over to wall time, until D's planted tool loop is measured against it. A tool
+# loop makes no model calls, so the cost rule can't see it; its wall time can (Chiya, Oct 31)
+# Checked Nov 1 on A's failing-builds sample (zoo/agent_eval_spark/sample_nov1_builds.json, 100 healthy tasks, wall
+# time with tools): the slowest took 2.26x the median, so 8x raised no false alarms (0 of 100). No task in either
+# sample hit D's tool loop (0 of 130), so whether 8x catches it is unchecked: still a guess
+TIME_RUNAWAY_FACTOR = 8.0
+# measured: the recorder stopped the task itself, which the time rule counts. max_turns is also the recorder's
+# dollar cap ("stopped for running on", recorder/agent.py); context_overflow is a failure, not a runaway
+RUNAWAY_STOPS = ("timeout", "loop", "max_turns")
+TIME_RUNAWAY_FLOOR_S = (
+	30.0  # guess: below this no task counts as running away by time, however short the median
+)
 UNSEEN_RUNAWAY_MULT = 20.0  # simulated: A's D3, a runaway nobody saw is priced at 20x the median
 RUNAWAY_BOUND = 0.80  # simulated: A's D3 rerun and S6; a full benchmark run against its sample replaces it
 N_BOOT = 2000  # derived: 2,000 resamples put the 5th and 95th percentiles within about 1% of their limit
@@ -253,6 +265,69 @@ def runaway_rate(
 	)
 
 
+def time_runaways(
+	latencies: list[float | None], stops: list[str | None], factor: float = TIME_RUNAWAY_FACTOR
+):
+	"""Per task: did it run away by time? Its wall time is above `factor` x the sample's median, or the recorder
+	stopped it for a timeout or a loop. A task with no wall time counts only by its stop."""
+	s, _ = _clean(latencies)
+	cut = max(runaway_threshold(s, factor), TIME_RUNAWAY_FLOOR_S) if s.size else math.inf
+	return [
+		(v is not None and math.isfinite(v) and v > cut) or (stop in RUNAWAY_STOPS)
+		for v, stop in zip(latencies, stops, strict=True)
+	]
+
+
+def runaway_rate_by_cost_and_time(
+	values: list[float | None],
+	latencies: list[float | None],
+	stops: list[str | None],
+	level: float = LEVEL,
+	min_sample: int = MIN_SAMPLE,
+	runaway_factor: float = RUNAWAY_FACTOR,
+	time_factor: float = TIME_RUNAWAY_FACTOR,
+	measure: str = "cost",
+) -> TotalEstimate:
+	"""Share of tasks that run away by cost (or tokens) or by time, with a two-sided Clopper-Pearson interval.
+	Each rule's own count and bound are in `detail` and the reason (Chiya, Oct 31). `values` must be known for
+	every task: agent_totals passes tokens when any task is unpriced, so both rules count the same tasks."""
+	n = len(values)
+	if n < min_sample:
+		return _abstain("probability", f"only {n} tasks measured; run at least {min_sample}", n=n)
+	s, dropped = _clean(values)
+	if dropped:
+		return _abstain("probability", f"{dropped} of {n} tasks have no cost or token count", n=n)
+	cut = runaway_threshold(s, runaway_factor) if s.size else math.inf
+	by_cost = [v is not None and math.isfinite(v) and v > cut for v in values]
+	by_time = time_runaways(latencies, stops, time_factor)
+	either = [a or b for a, b in zip(by_cost, by_time, strict=True)]
+	side = (1 + level) / 2
+	xc, xt, x = sum(by_cost), sum(by_time), sum(either)
+
+	def bound(k: int) -> dict:
+		return {"runaways": k, "lo": cp_lower(k, n, side), "hi": cp_upper(k, n, side)}
+
+	rules = {"cost": bound(xc), "time": bound(xt)}
+	pct = round(level * 100)
+	why = (
+		f"by {measure}: {xc} of {n} (up to {rules['cost']['hi']:.0%}); by time: {xt} of {n} (up to "
+		f"{rules['time']['hi']:.0%}), a task over {time_factor:g}x the median wall time (and {TIME_RUNAWAY_FLOOR_S:g} s) "
+		f"or stopped by the recorder for a timeout, a loop or its call or dollar cap; {pct}% Clopper-Pearson"
+	)
+	if not x:
+		why = f"none of {n} sampled tasks ran away; the upper end is what {n} tasks can rule out. {why}"
+	return TotalEstimate(
+		x / n,
+		cp_lower(x, n, side),
+		cp_upper(x, n, side),
+		"probability",
+		"predicted",
+		reason=why,
+		level=level,
+		detail={"n": n, "runaways": x, "dropped": dropped, "by_rule": rules},
+	)
+
+
 # ---------------------------------------------------------------- from A's AgentSample
 
 
@@ -281,14 +356,24 @@ def agent_totals(
 	costs = [t.cost_usd if t.cost_usd is not None else (price(t) if price else None) for t in tasks]
 	tokens = [_tokens(t) for t in tasks]
 	topped = "top-up" in (getattr(sample, "selection", None) or "")
+	# the time rule's alone; estimate_total has no use for it
+	time_factor = kw.pop("time_factor", TIME_RUNAWAY_FACTOR)
+	# tasks a what-if cap stopped: the cap bounds them, so their stop isn't the recorder's and isn't a runaway
+	capped = kw.pop("capped_ids", frozenset())
+	priced = all(c is not None for c in costs)
 	out = {
 		"cost.total": _flag(estimate_total(costs, pop, "usd", **kw), topped),
 		"tokens.total": _flag(estimate_total(tokens, pop, "tokens", **kw), topped),
-		"risk.runaway": runaway_rate(
-			costs if any(c is not None for c in costs) else tokens,
+		# review, Oct 31: by cost only when every task is priced, so an unpriced task isn't counted as no runaway
+		"risk.runaway": runaway_rate_by_cost_and_time(
+			costs if priced else tokens,
+			[t.latency_s for t in tasks],
+			[None if t.task_id in capped else t.stop_reason for t in tasks],
 			level=kw.get("level", LEVEL),
 			min_sample=kw.get("min_sample", MIN_SAMPLE),
 			runaway_factor=kw.get("runaway_factor", RUNAWAY_FACTOR),
+			time_factor=time_factor,
+			measure="cost" if priced else "tokens",
 		),
 	}
 	return out

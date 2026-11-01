@@ -420,7 +420,9 @@ def test_wave_billing_is_an_upper_bound_on_container_time():
 	# 4 containers for a 10-minute wave, each with its 30 s idle tail: 4 x 630 s
 	assert sw.wave_billed_seconds(600.0, 4) == pytest.approx(4 * (600.0 + sw.SCALEDOWN_S))
 	# Modal cuts each container off at its timeout, so the worst case is bounded however a container hangs
-	assert sw.worst_wave_seconds(4, 8, 120.0) == 4 * (sw.container_timeout_s(8, 120.0) + sw.SCALEDOWN_S)
+	assert sw.worst_wave_seconds(4, 8, 120.0) == 4 * (
+		sw.container_timeout_s(8, 120.0) + sw.QUEUE_S + sw.STARTUP_S + 2 * sw.SCALEDOWN_S
+	)
 	assert sw.wave_billed_seconds(600.0, 0) == 0.0
 	# phase 1's shape: 32 configs in an 11-minute wave cost far more than their 9 s each
 	per = sw.wave_billed_seconds(660.0, 4) / 32
@@ -620,8 +622,71 @@ def test_a_late_starting_container_still_runs_what_its_bill_covers():
 	assert sw.may_start_config(
 		dispatched + sw.STARTUP_S, deadline, end_at
 	)  # up to the start-up the bill assumed
-	assert not sw.may_start_config(dispatched + sw.STARTUP_S + 1.0, deadline, end_at)
-	# and Modal's own cut-off comes after the last config could end, with the margin, all inside the bill
+	# Oct 31: a container that waited for a GPU past the start-up allowance still runs, up to the driver's wait
+	assert sw.may_start_config(dispatched + sw.STARTUP_S + sw.QUEUE_S, deadline, end_at)
+	assert not sw.may_start_config(dispatched + sw.STARTUP_S + sw.QUEUE_S + 1.0, deadline, end_at)
+	# the wave ends with the driver's wait, all inside the bill
 	cap = sw.container_timeout_s(1, deadline)
-	assert end_at - dispatched + sw.END_MARGIN_S == cap
-	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.SCALEDOWN_S)
+	assert end_at - dispatched + sw.END_MARGIN_S == cap + sw.QUEUE_S == sw.wave_wait_s(cap, 60)
+	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.QUEUE_S + sw.STARTUP_S + 2 * sw.SCALEDOWN_S)
+
+
+def test_the_driver_gives_up_on_a_wave_with_nothing_back():
+	from preflight.corpus import sweep
+
+	# Oct 31: a smoke wave sat about 13 minutes past its 540 s cap until the workflow killed the run
+	cap = sweep.container_timeout_s(2, 120)
+	assert sweep.wave_wait_s(cap, 20) == cap + sweep.QUEUE_S
+	assert sweep.wave_wait_s(cap, 5) == 300  # never past the sweep's own time left
+	assert sweep.wave_wait_s(cap, -1) == 0
+
+
+class _Call:
+	def __init__(self, out=None, exc=None, hang=False):
+		self.out, self.exc, self.hang, self.cancelled = out, exc, hang, False
+
+	def get(self, timeout):
+		if self.hang:
+			raise TimeoutError
+		if self.exc:
+			raise self.exc
+		return self.out
+
+	def cancel(self, terminate_containers=False):
+		self.cancelled = terminate_containers
+
+
+def test_a_wave_keeps_each_batchs_result_and_cancels_only_the_late_ones():
+	from preflight.corpus import sweep
+
+	class FunctionTimeoutError(Exception):  # Modal's own: a container hit its cut-off, not the driver's wait
+		pass
+
+	ok, died, late = (
+		_Call(out=[{"status": "ok"}]),
+		_Call(exc=FunctionTimeoutError("cut off")),
+		_Call(hang=True),
+	)
+	results, n_late = sweep.collect_wave([ok, died, late], 100.0, 0.0, lambda: 1.0)
+	assert results[0] == [{"status": "ok"}] and isinstance(results[1], FunctionTimeoutError)
+	assert n_late == 1 and late.cancelled and not died.cancelled
+
+
+def test_past_the_wait_every_call_left_is_cancelled_unread():
+	from preflight.corpus import sweep
+
+	calls = [_Call(out=[]), _Call(out=[])]
+	_, n_late = sweep.collect_wave(calls, 10.0, 0.0, lambda: 50.0)
+	assert n_late == 2 and all(c.cancelled for c in calls)
+
+
+def test_a_planned_wave_fits_the_time_left_with_the_drivers_wait():
+	# review, Nov 1: the time check once left out the driver's wait for a GPU and the end margin
+	from preflight.corpus import sweep as sw
+
+	for minutes in (12, 25, 45, 110):
+		for deadline in (120.0, 180.0, 600.0):
+			c, b = sw.plan_wave(800, 100.0, minutes, deadline, 0.8, 4, 16)
+			if c:
+				longest = sw.wave_wait_s(sw.container_timeout_s(b, deadline), 10**6) + sw.SCALEDOWN_S
+				assert longest <= minutes * 60, (minutes, deadline, b)

@@ -30,8 +30,14 @@ DRAWS = 2000  # guess: enough for a stable 90% interval of a mean over prompts; 
 # guess: seconds per decoding step drift as the batch grows (memory-bound until it isn't); 0.1 in log per doubling
 # of the sequences per call away from the probe's, revisited with A's GRPO probes at several group sizes
 N_DRIFT_PER_DOUBLING = 0.10
-# guess: response lengths drift during RL training (they often grow); the probe sees the first steps only
-LENGTH_DRIFT = 0.10
+# fitted on one pair of GRPO runs, until the unseen TRL script tests it on Nov 2. Response lengths differ from the probe's sample (other prompts, drift as RL training goes on). A's
+# GRPO zoo runs 2 and 3, same settings and different prompts, differ by 0.155 in log rollout time per call while
+# their expected longest responses predict run 3 from run 2 within 6%; 0.16 covers that gap (was a 0.10 guess). One
+# pair of runs, so the GRPO zoo script is calibration for the rollout row, not its validation
+LENGTH_DRIFT = 0.16
+# checked, Nov 1, once: from run 2's 3 prompts the zero-spread band (0.06 to 0.71) missed run 3's 17 new prompts
+# (0.82); from 8 prompts it covered the other 9. Fewer prompts than this and the readout abstains
+MIN_PROMPTS = 8
 
 
 @dataclass(frozen=True)

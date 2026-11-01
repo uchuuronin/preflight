@@ -119,6 +119,8 @@ EXTRAS_KEYS = (
 	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
 	"dataset_max_tokens",
 	"dataset_p999_tokens",
+	"dataset_p50_tokens",  # step and total time follow the median and mean; memory the max (B, Nov 1)
+	"dataset_mean_tokens",
 	"dataset_rows_scanned",
 	"dataset_rows_total",
 	# vision: the batch's images (mean over the first training batches)
@@ -144,6 +146,19 @@ EXTRAS_KEYS = (
 	),
 	# torchrun (nproc > 1): ranks on the node, how many wrote a result, the largest rank peak and
 	# the slowest rank's median step
+	# hygiene: generations by different weights on the same inputs, and how many came out identical
+	"outputs_compared",
+	"outputs_identical",
+	"generation_ending_known",  # the sequences generation.truncation_rate is over
+	"rl_zero_spread_groups",  # GRPO groups whose summed rewards were all equal, of rl_groups
+	"rl_groups",
+	"rl_reward_functions",
+	# hygiene: what the script's own checkpoints hold, for a resume that matches
+	"checkpoint_saves_seen",
+	"checkpoint_has_optimizer",
+	"checkpoint_has_scheduler",
+	"checkpoint_has_rng",
+	"checkpoint_has_step",
 	"world_size",
 	"ranks_reported",
 	"rank_peak_allocated_max_bytes",
@@ -178,6 +193,8 @@ class ProbeSpec:
 	seed_force: bool = False  # override the script's own seeding (verify's seed-to-seed spread)
 	alternate_sync: bool = False  # ground truth only: alternate clean and synced steps (recorder/overhead.py)
 	install_requirements: bool = False  # pip-install requirements.txt in the probe (hosted probes only)
+	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
+	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
 	gpu_usd_per_hour: float = 0.0
 	nproc: int = 1  # processes on this node, one per GPU, under torchrun (DDP, FSDP)
@@ -647,6 +664,37 @@ def _rank_extras(out: Path, nproc: int, summary: dict) -> dict:
 	return res
 
 
+# A sandbox entry (probes/remote.py) sets this, prints its result, then calls finish_cleanup():
+# a probe that wrote many GB (an activation dump) is not lost to a slow delete before the result.
+DEFER_CLEANUP = False
+_DISCARDED: list[Path] = []
+
+
+def _discard(path: Path) -> None:
+	if not DEFER_CLEANUP:
+		shutil.rmtree(path, ignore_errors=True)
+		return
+	gone = path.with_name(path.name + ".discard")
+	try:
+		path.rename(gone)  # out of the way at once; deleted after the result is out
+	except OSError:
+		gone = path
+	_DISCARDED.append(gone)
+
+
+def finish_cleanup(*, background: bool = False) -> None:
+	"""Delete what _discard set aside; background=True hands it to a detached `rm -rf`, so the
+	sandbox entry can exit at once (the sandbox ends with the job, and the delete with it)."""
+	while _DISCARDED:
+		path = _DISCARDED.pop()
+		if background:
+			with contextlib.suppress(OSError):
+				subprocess.Popen(["rm", "-rf", "--", str(path)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+					stderr=subprocess.DEVNULL, start_new_session=True)  # fmt: skip
+				continue
+		shutil.rmtree(path, ignore_errors=True)
+
+
 def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None) -> ProbeResult:
 	validate_files(spec.files, entrypoint=spec.entrypoint)
 	# where the caller keeps artifacts (log, trace); wiped of any earlier attempt first
@@ -803,7 +851,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		final = root / f"{spec.probe_id}.trace.json"
 		shutil.move(str(trace), final)
 	# uploaded code is not kept on the box after the probe (24 h retention lives in the object store)
-	shutil.rmtree(sandbox, ignore_errors=True)
+	_discard(sandbox)
 	kernels, kernels_error = untrusted.kernel_table(summary.get("kernels"))
 	if kernels is not None and probe.error_code != "recorder":  # not on a probe whose numbers were unreadable
 		probe = probe.model_copy(update={"kernels": kernels})

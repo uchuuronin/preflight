@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-PRICE_TABLE_VERSION = "2026-10-27"
+PRICE_TABLE_VERSION = "2026-11-01"  # Nov 1: three secondary rows checked on the providers' own pages
 DEFAULT_REGION = "us"
 
 Kind = Literal["on_demand", "spot", "own_cluster"]
@@ -100,10 +100,10 @@ GPU_RATES: tuple[GpuRate, ...] = (
 		"A100-SXM-40GB",
 		"modal",
 		2.10,
-		"2026-10",
-		"computeprices.com, updated Oct 26 2026 (lists it as PCIe; single-GPU specs are the same)",
+		"2026-11",
+		"modal.com/pricing, checked Nov 1 2026: 'Nvidia A100, 40 GB' at $0.000583/s ($2.10/h; the page doesn't say SXM "
+		"or PCIe, and single-GPU specs are the same)",
 		preemptible=True,
-		confidence="secondary",
 	),
 	GpuRate("MI300X", "amd_devcloud", 2.59, "2026-10", "Preflight contract, gap 8", confidence="contract"),
 )
@@ -118,7 +118,8 @@ TOKEN_RATES: tuple[TokenRate, ...] = (
 		4.25,
 		"2026-09",
 		"eesel.ai, Muse Spark 1.3 pricing (Sep 8 2026; standard xhigh endpoint, rates confirmed on Artificial "
-		"Analysis); cached input is the stated 88% discount",
+		"Analysis); cached input is the stated 88% discount. Nov 1: Meta's own page (dev.meta.ai) couldn't be reached "
+		"from here, so this row stays secondary",
 		cached_input_per_m=0.15,
 		confidence="secondary",
 	),
@@ -127,9 +128,9 @@ TOKEN_RATES: tuple[TokenRate, ...] = (
 		"baseten",
 		1.25,
 		4.25,
-		"2026-10",
-		"getmaxim.ai Bifrost cost calculator, Baseten, updated Oct 26 2026 (no cached rate listed)",
-		confidence="secondary",
+		"2026-11",
+		"baseten.co/library/muse-spark-open, checked Nov 1 2026: $1.25 input, $4.25 output, $0.15 cached input per 1M",
+		cached_input_per_m=0.15,
 	),
 	TokenRate(
 		"muse-glimmer",
@@ -137,9 +138,9 @@ TOKEN_RATES: tuple[TokenRate, ...] = (
 		0.25,
 		1.05,
 		"2026-09",
-		"qubrid.com, Muse Glimmer-30B pricing (Sep 3 2026)",
+		"qubrid.com/blog/muse-glimmer-pricing-api-cost-per-1m-tokens (Sep 3 2026), checked Nov 1 2026: Qubrid's own rate "
+		"card, $0.25 input, $1.05 output, $0.03 cached input per 1M",
 		cached_input_per_m=0.03,
-		confidence="secondary",
 	),
 )
 

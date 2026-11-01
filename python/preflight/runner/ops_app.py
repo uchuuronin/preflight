@@ -21,6 +21,7 @@ import modal
 
 from preflight.runner.modal_app import (
 	APP_NAME,
+	REMOTE_PKG,
 	SERVICE_NAME,
 	WEIGHTS_DIR,
 	ZOO_MODELS,
@@ -28,6 +29,7 @@ from preflight.runner.modal_app import (
 	probe_image,
 	records_vol,
 	serving_image,
+	titan_image,
 	weights_vol,
 	worker_image,
 )
@@ -44,11 +46,16 @@ def prefetch(models: str = "") -> list[str]:
 
 	done = []
 	for repo in [m.strip() for m in models.split(",") if m.strip()] or ZOO_MODELS:
-		snapshot_download(
-			repo,
-			cache_dir=f"{WEIGHTS_DIR}/hf/hub",
-			allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "tokenizer*", "*.tiktoken"],
-		)
+		if repo.startswith("dataset:"):  # a dataset repo: all its files (the zoo's are small)
+			snapshot_download(
+				repo.removeprefix("dataset:"), repo_type="dataset", cache_dir=f"{WEIGHTS_DIR}/hf/hub"
+			)
+		else:
+			snapshot_download(
+				repo,
+				cache_dir=f"{WEIGHTS_DIR}/hf/hub",
+				allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "tokenizer*", "*.tiktoken"],
+			)
 		done.append(repo)
 	weights_vol.commit()
 	return done
@@ -401,6 +408,85 @@ def multi_gpu():
 		flush=True)  # fmt: skip
 
 
+# ---------------------------------------------------------------- torchtitan adapter check (L4, paid: ask first)
+
+TITAN_TIMEOUT_S = 15 * 60  # the container's own end, whatever the probe does
+
+
+def _titan_files() -> dict:
+	from preflight.runner.sources import _read_tree
+
+	return _read_tree(Path(__file__).resolve().parents[3] / "zoo" / "torchtitan_debug")
+
+
+@ops.function(image=titan_image, timeout=600)
+def startup_check_titan_image(files: dict) -> dict:
+	"""CPU, before the L4: the titan image imports torch, torchtitan's trainer and the recorder, and
+	torchtitan parses the zoo config. A failure here costs no GPU."""
+	import json
+	import os
+	import subprocess
+	import sys
+	import tempfile
+
+	work = Path(tempfile.mkdtemp())
+	for rel, text in files.items():
+		(work / rel).parent.mkdir(parents=True, exist_ok=True)
+		(work / rel).write_text(text)
+	cmd = ("import json, torch, torchtitan.train, preflight.recorder.runtime; "
+		"from torchtitan.config_manager import ConfigManager; "
+		"c = ConfigManager().parse_args(['--job.config_file', 'debug_model.toml']); "
+		"from torchtitan.datasets.tokenizer.tiktoken import TikTokenizer; "
+		"tok = TikTokenizer(c.model.tokenizer_path); "
+		"from datasets import load_dataset; ds = load_dataset('tests/assets/c4_test', split='train'); "
+		"print(json.dumps({'torch': torch.__version__, 'flavor': c.model.flavor, 'steps': c.training.steps, "
+		"'vocab': tok.n_words, 'docs': len(ds)}))")  # fmt: skip
+	p = subprocess.run([sys.executable, "-c", cmd], cwd=work, capture_output=True, text=True, timeout=300,
+		env={**os.environ, "PYTHONPATH": REMOTE_PKG})  # fmt: skip
+	out = {"exit": p.returncode, "stderr_tail": p.stderr[-1500:] if p.returncode else ""}
+	if p.returncode == 0:
+		out.update(json.loads(p.stdout.strip().splitlines()[-1]))
+	return out
+
+
+@ops.function(image=titan_image, gpu="L4", timeout=TITAN_TIMEOUT_S)
+def titan_check_on_l4(files: dict, warmup: int = 3, timed: int = 10) -> dict:
+	"""torchtitan's trainer on its debug model under the recorder, one L4."""
+	from preflight.probes.local import ProbeSpec, run_probe
+
+	print("[titan] container up on the L4", flush=True)
+	r = run_probe(ProbeSpec(probe_id="titan", files=files, entrypoint="train.py", warmup=warmup, timed=timed,
+		timeout_s=600))  # fmt: skip
+	p = r.probe
+	return {"status": p.status, "error": p.error, "error_code": p.error_code, "steps": p.steps,
+		"p50_s": p.step_time.p50_s if p.step_time else None,
+		"by_phase": p.step_time.by_phase if p.step_time else None,
+		"peak_allocated_bytes": p.memory.peak_allocated_bytes if p.memory else None,
+		"extras": p.extras, "gpu": r.env.gpu.name if r.env and r.env.gpu else None,
+		"seconds": p.duration_s, "log_tail": r.log_tail[-1500:] if p.status != "ok" else ""}  # fmt: skip
+
+
+@ops.local_entrypoint()
+def torchtitan_check():
+	"""modal run --env main python/preflight/runner/ops_app.py::torchtitan_check
+	The CPU startup check first; the L4 only if it passes. Writes out/torchtitan_check.json."""
+	import json
+	import sys
+
+	files = _titan_files()
+	start = startup_check_titan_image.remote(files)
+	print(f"[titan] startup check: {json.dumps(start)}", flush=True)
+	res = {"startup": start}
+	if start.get("exit") == 0:
+		print("[titan] waiting for an L4 (Modal queues it)", flush=True)
+		res["probe"] = titan_check_on_l4.remote(files)
+		print(json.dumps({k: v for k, v in res["probe"].items() if k != "log_tail"}, indent=2), flush=True)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/torchtitan_check.json").write_text(json.dumps(res, indent=2))
+	if start.get("exit") != 0 or res["probe"].get("status") != "ok":
+		sys.exit(1)
+
+
 # ---------------------------------------------------------------- agent sample (Meta API, paid: ask first)
 
 AGENT_SAMPLE_TIMEOUT_S = 45 * 60  # the container's own end: the sample's 30 min plus installs and tasks
@@ -410,7 +496,9 @@ AGENT_MAX_USD = 3.0  # proposed to Chiya for one sample (the proxy stops at it);
 @ops.function(
 	image=worker_image, secrets=[modal.Secret.from_name("preflight-meta")], timeout=AGENT_SAMPLE_TIMEOUT_S
 )
-def agent_sample_hosted(files: dict, entrypoint: str, k: int, max_usd: float) -> dict:
+def agent_sample_hosted(
+	files: dict, entrypoint: str, k: int, max_usd: float, skip_keys: list | None = None
+) -> dict:
 	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
 	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
 	from preflight.harness.static import map_static
@@ -427,25 +515,46 @@ def agent_sample_hosted(files: dict, entrypoint: str, k: int, max_usd: float) ->
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip
-	s = sample(Fetched(files=files, entrypoint=entrypoint), sm, k=k)
+	# tasks an earlier sample already has are refused before any model call, so k are new ones
+	s = sample(
+		Fetched(files=files, entrypoint=entrypoint),
+		sm,
+		k=k,
+		skip_keys=tuple(skip_keys or ()),
+		run_id="s2" if skip_keys else "s1",
+	)
 	usd = round(sum(t.cost_usd or 0 for t in s.tasks), 4)
 	print(f"[agent] {len(s.tasks)} tasks, ${usd} of model calls; {s.selection}", flush=True)
 	return {"sample": s.model_dump(mode="json"), "usd": usd}
 
 
 @ops.local_entrypoint()
-def agent_sample(script: str = "agent_eval_spark", k: int = 30, max_usd: float = AGENT_MAX_USD):
+def agent_sample(
+	script: str = "agent_eval_spark", k: int = 30, max_usd: float = AGENT_MAX_USD, skip_from: str = ""
+):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
-	Writes out/agent_sample_<script>.json: the sampled tasks (counts and timings, no content)."""
+	Writes out/agent_sample_<script>.json: the sampled tasks (counts and timings, no content).
+	--skip-from zoo/<script>/<record>.json: sample tasks that record's agent sample doesn't hold."""
 	import json
 
+	from preflight.recorder.agent import task_key
 	from preflight.runner.sources import _read_tree
 
 	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
 	entry = next((e for e in ("run.py", "train.py") if e in files), None)
 	if entry is None:
 		raise SystemExit(f"zoo/{script} has no run.py or train.py in this checkout")
-	res = agent_sample_hosted.remote(files, entry, k, max_usd)
+	skip = []
+	if skip_from:
+		prior = json.loads((Path(__file__).resolve().parents[3] / skip_from).read_text())
+		tasks = (prior.get("agent_sample") or {}).get("tasks", [])
+		# a list, not a set: a key twice skips two tasks opened the same way (open_run counts them)
+		skip = [key for t in tasks if (key := task_key(t["task_id"]))]
+		if len(skip) < len(tasks):
+			print(f"[agent] {len(tasks) - len(skip)} task ids in {skip_from} have no key and may be sampled again",
+				flush=True)  # fmt: skip
+		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
+	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/agent_sample_{script}.json").write_text(json.dumps(res, indent=2))
 
