@@ -1,4 +1,6 @@
 {
-	"$comment": "Overrides where PREFLIGHT_ENV=production (the API's and the runner's images). engine.memory on: Chiya, Oct 30.",
-	"engine.memory": true
+	"$comment": "Overrides where PREFLIGHT_ENV=production (the API's and the runner's images). engine.memory on: Chiya, Oct 30. harness.spark_script_map on with C's data-use line, and c.campaign_calendar on: Chiya, Nov 1 (round four).",
+	"engine.memory": true,
+	"harness.spark_script_map": true,
+	"c.campaign_calendar": true
 }
