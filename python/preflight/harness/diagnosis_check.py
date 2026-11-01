@@ -98,8 +98,13 @@ def _worst_call_usd(client, msgs: list[dict]) -> float:
 	"""What one more call could cost at most: its input as estimated, the client's full output cap."""
 	from preflight.harness.spark import estimate_tokens
 
-	p_in, _, p_out = client.prices.get(client.model, (0.0, 0.0, 0.0))
-	return (estimate_tokens(msgs) * p_in + client.max_output_tokens * p_out) / 1e6
+	if client.model not in client.prices:
+		return float("inf")  # an unpriced model has no bound
+	p_in, _, p_out = client.prices[client.model]
+	tool = len(json.dumps(TOOL)) // 4
+	return (
+		1.5 * ((estimate_tokens(msgs) + tool) * p_in + client.max_output_tokens * p_out) / 1e6
+	)  # [guess] margin
 
 
 def check_claim(
@@ -119,8 +124,11 @@ def check_claim(
 		for _ in range(MAX_ROUNDS):
 			if deadline is not None and time.monotonic() >= deadline:
 				return "abstain", None, "the check ran out of time", client.calls[before:]
-			if room is not None and _worst_call_usd(client, msgs) > room():
-				return "abstain", None, "the check's dollar cap was reached", client.calls[before:]
+			if room is not None:
+				w = _worst_call_usd(client, msgs)
+				room.worst[0] = max(room.worst[0], w)
+				if w > room():
+					return "abstain", None, "the check's dollar cap was reached", client.calls[before:]
 			msg, _call = client.chat_message(
 				msgs, purpose="diagnosis_check", reasoning_effort="low", tools=[TOOL]
 			)
@@ -169,9 +177,17 @@ def check_diagnosis(
 	deadline = time.monotonic() + DEADLINE_S
 	start = len(client.calls)
 
-	def room() -> float:
-		return budget_usd - sum(c.cost_usd for c in client.calls[start:])
+	worst_seen = [0.0]  # the largest per-call worst case so far, what a failed (unpriced) call is charged
 
+	def room() -> float:
+		made = client.calls[start:]
+		return (
+			budget_usd
+			- sum(c.cost_usd for c in made)
+			- worst_seen[0] * sum(1 for c in made if not c.ok and not c.cost_usd)
+		)
+
+	room.worst = worst_seen
 	for i, f in enumerate(findings):
 		if i < MAX_CLAIMS:
 			verdict, path, reason, cs = check_claim(

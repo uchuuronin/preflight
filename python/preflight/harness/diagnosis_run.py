@@ -11,15 +11,22 @@ from preflight.harness.spark import IMAGE_TOKENS
 from preflight.schema import FlightRecord
 
 DIAGNOSIS_OUTPUT_TOKENS = 4_000  # the diagnosis call's output cap here: eight findings fit in far less
+MARGIN = 1.5  # [guess] characters per token is an estimate, not a ceiling
+REASK_EXTRA_TOKENS = (
+	1_500  # the re-ask carries up to 4,000 characters of the first answer and a 2,000-character error
+)
 CHECK_OUTPUT_TOKENS = 1_500  # each Spark Open check call's output cap
 
 
 def _diagnosis_worst_usd(client, rec: FlightRecord) -> float:
 	"""The diagnosis at its worst: two calls (the first and a re-ask), each the numbers, two plots
 	and the system prompt in, the output cap out."""
-	p_in, _, p_out = client.prices.get(client.model, (0.0, 0.0, 0.0))
+	if client.model not in client.prices:
+		return float("inf")  # an unpriced model has no bound
+	p_in, _, p_out = client.prices[client.model]
 	inp = (len(json.dumps(numbers(rec), separators=(",", ":"))) + len(SYSTEM)) // 4 + 2 * IMAGE_TOKENS
-	return 2 * (inp * p_in + client.max_output_tokens * p_out) / 1e6
+	one = inp * p_in + client.max_output_tokens * p_out
+	return MARGIN * (2 * one + REASK_EXTRA_TOKENS * p_in) / 1e6
 
 
 def run_once(rec: FlightRecord, spark, spark_open, max_usd: float = 0.5) -> dict:
@@ -32,7 +39,8 @@ def run_once(rec: FlightRecord, spark, spark_open, max_usd: float = 0.5) -> dict
 		return {**out, "skipped": f"the diagnosis could cost up to ${worst:.2f}, over the ${max_usd:.2f} cap",
 			"stats": {}, "diagnosis": [], "checked": None, "calls": [], "usd": 0.0}  # fmt: skip
 	found, calls, stats = diagnose_record(spark, rec)
-	spent = sum(c.cost_usd for c in calls)
+	# a call that failed may still have been billed (a read timeout records no usage): count it at its worst
+	spent = sum(c.cost_usd for c in calls) + sum(worst / 2 for c in calls if not c.ok and not c.cost_usd)
 	out.update(stats=stats, diagnosis=[f.model_dump(mode="json") for f in found])
 	if not found:
 		out["checked"] = None

@@ -522,7 +522,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
-	if req.mode != "verify":  # a verify job's record answers one question; it isn't diagnosed again
+	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
+	# or Baseten for a diagnosis (private mode, contract 0.6.2)
+	if req.mode != "verify" and not req.private:
 		out = _diagnose(out, deps)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
