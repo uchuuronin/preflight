@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { finishBand, planFromRecord } from "../workspace/campaign/plan";
 import { fmt, fmtDelta } from "../lib/fmt";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
@@ -9,7 +11,7 @@ import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
-import { findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
+import { campaignParts, campaignVisit, findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
 import { FixRace } from "../fix/FixRace";
@@ -36,6 +38,14 @@ export function valueText(knob: Knob | undefined, v: KnobValue | undefined): str
 	return fmt(v, "count");
 }
 
+/** Light up the campaign calendar while the tour is on it, and bring it into view. */
+function guideCalendar(on: boolean): void {
+	const el = typeof document !== "undefined" ? document.getElementById("pf-campaign") : null;
+	if (!el) return;
+	el.classList.toggle("is-guided", on);
+	if (on) el.scrollIntoView?.({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+}
+
 export function GuidePanel() {
 	const ws = useWorkspace();
 	const { record, recordRef, provider, state, actions, estimates } = ws;
@@ -51,6 +61,8 @@ export function GuidePanel() {
 	const [liveStatus, setLiveStatus] = useState("ready");
 	const live = flag("c.guide.live") && !fallback;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
+	// The campaign plan the cockpit draws (same flag, same record), so the tour walks what's on screen.
+	const campaign = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
 
 	const latest = useRef(ws);
 	latest.current = ws;
@@ -70,9 +82,18 @@ export function GuidePanel() {
 
 	const begin = (nextVisited: ReadonlySet<string>, nextTaken: number) => {
 		const { state: s } = latest.current;
-		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited, limits: s.limits };
+		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited, limits: s.limits, campaign };
 		const step = nextStep(tc);
 		const n = nextTaken + 1;
+		guideCalendar(step.kind === "campaign");
+		if (step.kind === "campaign") {
+			setWhy(false);
+			actions.highlight([]);
+			actions.propose(null);
+			const left = campaignParts(tc).length - 1;
+			setActive({ step, n, of: Math.max(n, nextTaken + 1 + left + pendingFindings(tc) + Math.min(MAX_TOUR_STEPS, plannedSteps(tc))) });
+			return;
+		}
 		if (step.kind === "probe_offer" && step.move) {
 			if (step.nodes.length) runTool("highlight", { nodes: step.nodes }, ctx());
 			runTool("predict", { knobs: { [step.move.knobId]: step.move.to } }, ctx());
@@ -114,7 +135,11 @@ export function GuidePanel() {
 		const v = new Set(visited);
 		let next = taken;
 		if (active.step.kind === "sample_offer") v.add(SAMPLE_VISIT);
-		else if (active.step.kind === "finding" && active.step.finding) {
+		else if (active.step.kind === "campaign" && active.step.campaignPart) {
+			v.add(campaignVisit(active.step.campaignPart));
+			next = taken + 1; // a part of the plan shown is a step taken
+			setTaken(next);
+		} else if (active.step.kind === "finding" && active.step.finding) {
 			v.add(findingVisit(active.step.finding));
 			next = taken + 1; // a finding shown is a step taken, so the counter moves on
 			setTaken(next);
@@ -218,6 +243,34 @@ export function GuidePanel() {
 
 	const vars = stepVars(active);
 
+	/** The campaign steps' numbers, every one from the plan (B's), formatted as the calendar formats them. */
+	function campaignVars(): Record<string, string> {
+		const c = campaign;
+		if (!c) return {};
+		const usd = (e: { point: number | null; lo?: number | null; hi?: number | null; status: string } | null | undefined, k: "point" | "lo" | "hi") =>
+			e && e.status !== "abstain" && typeof e[k] === "number" ? fmt(e[k] as number, "usd") : t("value.none");
+		const placed = c.cells.filter((x) => !x.cut).length;
+		const day = (iso: string | undefined) =>
+			iso ? new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(iso)) : "";
+		const budget = record.job.constraints?.budget_usd;
+		return {
+			runs: fmt(c.cells.length, "count"),
+			placed: fmt(placed, "count"),
+			cut: fmt(c.cut_list.length, "count"),
+			lanes: fmt(c.lanes.length, "count"),
+			people: c.lanes.join(", "),
+			usd: usd(c.usd, "point"),
+			lo: usd(c.usd, "lo"),
+			hi: usd(c.usd, "hi"),
+			grid_hi: usd(c.grid_usd, "hi"),
+			budget: typeof budget === "number" ? fmt(budget, "usd") : t("value.none"),
+			p10: day(c.completion.p10),
+			p50: day(c.completion.p50),
+			p90: day(c.completion.p90),
+			finish_why: c.finish_s?.reason ?? (finishBand(c) ? "" : t("value.none")),
+		};
+	}
+
 	function stepVars(a: Active | null): Record<string, string> {
 		const step = a?.step;
 		const knobId = step?.move?.knobId ?? step?.pinnedKnob;
@@ -241,6 +294,7 @@ export function GuidePanel() {
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
 			title: step?.finding?.title ?? "",
 			detail: step?.finding?.detail ?? "",
+			...campaignVars(),
 			...((): Record<string, string> => {
 				const st = costStraddlesBudget(record, estimates);
 				return st
@@ -274,6 +328,7 @@ export function GuidePanel() {
 			if (canFix(f)) return { label: t("guide.fix_it"), run: () => setFixing(f.id) };
 			return { label: t("guide.next"), run: skipOffer };
 		}
+		if (s.kind === "campaign") return { label: t("guide.next"), run: skipOffer };
 		if (s.kind === "sample_offer")
 			return { label: t("guide.sample_more", { tasks: SAMPLE_MORE_TASKS }), run: () => runTool("sample_more", { reason: "budget_straddle" }, ctx()) };
 		if (s.kind === "nothing_safe") {
@@ -284,14 +339,34 @@ export function GuidePanel() {
 		return { label: t("guide.restart"), run: restart };
 	})();
 
+	// While the tour is on the calendar (below the cockpit), its step is repeated there, so the
+	// visitor reads it beside what it's about and moves on without scrolling back up.
+	const [calSlot, setCalSlot] = useState<HTMLElement | null>(null);
+	const onCalendar = !live && active?.step.kind === "campaign";
+	useEffect(() => {
+		setCalSlot(onCalendar ? document.getElementById("pf-campaign-guide") : null);
+	}, [onCalendar]);
+
 	return (
 		<section className="glass pf-guide" aria-label={t("guide.label")}>
+			{calSlot && active
+				? createPortal(
+						<div className="pf-cal__guide" role="status">
+							<span className="pf-model pf-model--quiet">{t("guide.step_of", { n: active.n, of: active.of })}</span>
+							<p>{t(active.step.textKey, vars)}</p>
+							<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
+								{primary.label}
+							</button>
+						</div>,
+						calSlot,
+					)
+				: null}
 			<div className="pf-guide__head">
 				<span className={live ? "pf-model" : "pf-model pf-model--quiet"}>{live ? t("guide.model.muse_spark") : t("guide.model.rule_based")}</span>
 				<span className="pf-guide__step">
 					{live
 						? t(`guide.live.status.${liveStatus}`)
-						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || active?.step.kind === "finding"
+						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || active?.step.kind === "finding" || active?.step.kind === "campaign"
 							? t("guide.step_of", { n: active.n, of: active.of })
 							: active
 								? t("guide.waiting")

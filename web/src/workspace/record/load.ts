@@ -73,6 +73,17 @@ export const SAMPLES: Sample[] = [
 		numbers: "measured",
 		load: () => import("../fixtures/agent-eval-oct31.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
+	{
+		// The pretrain golden record with a campaign block from B's planner on a 12-run research
+		// grid (web/scripts/make_campaign_sample.py): illustrative numbers, every one B's.
+		id: "campaign-grid",
+		code: "PF420",
+		titleKey: "sample.campaign_grid",
+		lens: "pretrain",
+		gpu: "A100",
+		numbers: "illustrative",
+		load: () => import("../fixtures/campaign-grid.record.json").then((m) => m.default as unknown as FlightRecord),
+	},
 ];
 
 export const DEFAULT_SAMPLE = "lora-7b";

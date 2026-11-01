@@ -165,3 +165,18 @@ export function planFromRecord(c: Campaign, models: readonly ModelCard[] = []): 
 		card: { id: modelId, notes: card?.notes ?? null },
 	};
 }
+
+/**
+ * When the last run ends, on the calendar's own axis (seconds after the campaign starts): B's p10,
+ * p50 and p90 dates less the start. The start is derived, not stored (0.6.0 asks for it): B dates
+ * p50 as the start plus `finish_s.point`, so the start is p50 less that. Null unless all of it holds.
+ */
+export function finishBand(plan: CampaignPlan): { p10: number; p50: number; p90: number } | null {
+	const f = plan.finish_s;
+	if (!f || f.status === "abstain" || typeof f.point !== "number") return null;
+	const d = (k: string) => Date.parse(plan.completion[k] ?? "");
+	const [p10, p50, p90] = [d("p10"), d("p50"), d("p90")];
+	if (![p10, p50, p90].every(Number.isFinite) || !(p10 <= p50 && p50 <= p90)) return null;
+	const start = p50 - f.point * 1000;
+	return { p10: (p10 - start) / 1000, p50: f.point, p90: (p90 - start) / 1000 };
+}

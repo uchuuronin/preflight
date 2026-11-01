@@ -899,5 +899,14 @@
 	"dial.short.risk": "Risk",
 	"dial.delta_point": "{n} point",
 	"dial.delta_points": "{n} points",
-	"wake.empty": "What this changes shows here."
+	"wake.empty": "What this changes shows here.",
+	"campaign.finish_row": "Last run ends",
+	"guide.campaign.grid": "This plan prices a whole research grid: {runs} runs, shared across {lanes} lanes ({people}). The runs that go ahead cost {usd}, likely between {lo} and {hi}.",
+	"guide.campaign.grid.why": "Each run's time and cost come from this record's predictions with their 90% ranges. The planner adds what a shared cluster does on top: splitting runs at the job time limit, interruptions and resubmits. It never adds accuracy the predictions don't have.",
+	"guide.campaign.cut": "{cut} of the {runs} runs don't fit. The whole grid could cost up to {grid_hi}, over the {budget} budget, so the dearest runs are cut; they're listed under Not scheduled. The runs left cost at most {hi} at the top of their range.",
+	"guide.campaign.cut.why": "The planner assumes the runs err together (the same script and the same model), so the grid's range is as wide as it can honestly be, and it cuts against the high end of that range rather than the middle.",
+	"guide.campaign.finish": "The last run most likely ends {p50} UTC; in 80% of the simulated campaigns it ends between {p10} and {p90}. That's the band under the lanes.",
+	"guide.campaign.finish.why": "A finish date isn't one number: the planner runs the campaign thousands of times, each run's time drawn from its range and interruptions at the cluster's rate, and reports when the last run ends.",
+	"guide.campaign.finish_abstain": "The planner doesn't give a finish date for this grid: {finish_why}.",
+	"sample.campaign_grid": "Research grid: 12 pretraining runs for three people"
 }

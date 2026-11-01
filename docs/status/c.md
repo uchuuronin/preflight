@@ -4,7 +4,7 @@
 
 | # | Item | State | Hours | Waits on |
 | --- | --- | --- | --- | --- |
-| 1 | Campaign lens: a sample with B's planner output for a grid, and a tour on the calendar to the completion-date distribution (video 2:25) | Starting now. Not waiting on B: `campaign/planner.py` on ws-b since Sat evening, 0.5.0's fields on main | 4 | |
+| 1 | Campaign lens: a sample with B's planner output for a grid, and a tour on the calendar to the completion-date distribution (video 2:25) | Built on ws-c: sample PF420 (B's planner from ws-b 6ce7730 on a 12-run grid, three lanes, US$60 budget; `web/scripts/make_campaign_sample.py`), a three-step tour (cost with range, the 5 runs cut, the finish p10 to p90) that lights the calendar and speaks inside it, and the finish band under the lanes. Needs `c.campaign_calendar` on (asked Chiya) | 0 | Chiya's flag |
 | 2 | GRPO lens: sample, tour, truncation and reward-spread views on A's L4 smoke record; zero-spread share measured with its Wilson interval (the video opens on it); swap in the 50-step record when A posts it | Next | 5 | A's 50-step record for the swap only |
 | 3 | Cost frontier (Pareto) for A's model sweep (video 2:05) | After 2 | 3 | A's sweep record |
 | 4 | Editable rate in the cost readout: quantity x rate = total, an edit box ($/GPU-hour, or $/M input and $/M output tokens) with the table's source and date in small text, $0 allowed, a "your rate" tag with reset, every dollar readout, the timeline and campaign totals within 400 ms, per job, carried in the export plan | After 3 | 5 | |

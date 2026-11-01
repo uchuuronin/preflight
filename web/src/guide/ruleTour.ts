@@ -4,6 +4,7 @@
  * re-plans after every Apply, Revert or Pin, so a step never goes stale.
  */
 import { hasKey } from "../lib/i18n";
+import { type CampaignPlan, finishBand } from "../workspace/campaign/plan";
 import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
 import { costStraddlesBudget, failureTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
@@ -112,7 +113,9 @@ export interface TourStep {
 	 * move: apply a "fits" move. probe_offer: a "tight" setting would save enough to be worth
 	 * measuring first (the person's click). blocked_by_pin, nothing_safe, done: as named.
 	 */
-	kind: "move" | "probe_offer" | "sample_offer" | "finding" | "blocked_by_pin" | "nothing_safe" | "done";
+	kind: "move" | "probe_offer" | "sample_offer" | "finding" | "campaign" | "blocked_by_pin" | "nothing_safe" | "done";
+	/** campaign: which part of the record's campaign plan this step walks (the calendar lights up). */
+	campaignPart?: CampaignPart;
 	/** finding: a problem A's harness or a diagnosis found in the code, with its fix template. */
 	finding?: Finding;
 	move?: Move;
@@ -131,6 +134,21 @@ export interface TourContext {
 	visited: ReadonlySet<string>;
 	/** The visitor's limits: no step ever suggests a value outside them. */
 	limits?: Limits;
+	/** The record's campaign plan when its calendar is on screen: the tour walks it first. */
+	campaign?: CampaignPlan | null;
+}
+
+export type CampaignPart = "grid" | "cut" | "finish";
+export const campaignVisit = (part: CampaignPart) => `campaign:${part}`;
+
+/** The parts of the campaign plan the tour still has to walk, in order: what it costs, what the budget cuts, when it ends. */
+export function campaignParts(ctx: Pick<TourContext, "campaign" | "visited">): CampaignPart[] {
+	const c = ctx.campaign;
+	if (!c || !c.cells.length) return [];
+	const parts: CampaignPart[] = ["grid"];
+	if (c.cut_list.length) parts.push("cut");
+	parts.push("finish");
+	return parts.filter((p) => !ctx.visited.has(campaignVisit(p)));
 }
 
 /** Provider options for this tour: the pins given, the visitor's limits, declined knobs skipped. */
@@ -219,6 +237,19 @@ export function pendingFindings(ctx: TourContext): number {
 }
 
 export function nextStep(ctx: TourContext): TourStep {
+	// A campaign record: the plan comes first (what the grid costs, what the budget cuts, when it
+	// ends), since no knob move shows it; then the run's own tour.
+	const part = campaignParts(ctx)[0];
+	if (part) {
+		const abstains = part === "finish" && (!ctx.campaign?.finish_s || ctx.campaign.finish_s.status === "abstain" || !finishBand(ctx.campaign));
+		return {
+			kind: "campaign",
+			campaignPart: part,
+			nodes: [],
+			textKey: abstains ? "guide.campaign.finish_abstain" : `guide.campaign.${part}`,
+			whyKey: `guide.campaign.${part}.why`,
+		};
+	}
 	// An agent run whose cost range straddles the budget: whether it fits depends on where the
 	// real cost lands, so measuring more tasks comes before any saving (sample_more, a click).
 	if (!ctx.visited.has(SAMPLE_VISIT) && costStraddlesBudget(ctx.record, ctx.provider.predict(ctx.record, ctx.knobs))) {
