@@ -151,6 +151,7 @@ EXTRAS_KEYS = (
 	"outputs_compared",
 	"outputs_identical",
 	"generation_ending_known",  # the sequences generation.truncation_rate is over
+	"serving_probe_max_tokens",  # a serving probe stopped each reply here; max_new_tokens is the script's
 	"rl_zero_spread_groups",  # GRPO groups whose summed rewards were all equal, of rl_groups
 	"rl_groups",
 	"rl_reward_functions",

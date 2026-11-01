@@ -469,6 +469,80 @@ def test_a_serving_probe_keeps_the_first_prompts_whole_and_the_rest_of_the_call_
 	assert args == (["a", "b"],) and kw == {"lora_request": [1, 2], "priority": [0, 0]}
 
 
+def test_a_serving_probe_caps_new_tokens_on_copies_and_says_the_scripts_own_cap():
+	# Chiya, Nov 1: 32 prompts x 4,096 tokens ran past the probe's 600 s on an L4
+	from preflight.recorder.runtime import _cap_new_tokens
+
+	class SP:
+		def __init__(self, n):
+			self.max_tokens = n
+
+		def clone(self):
+			return SP(self.max_tokens)
+
+	mine = SP(4096)
+	args, kw, script, probe = _cap_new_tokens((["a", "b"],), {"sampling_params": mine}, 1024)
+	assert (
+		kw["sampling_params"].max_tokens == 1024 and mine.max_tokens == 4096
+	)  # the script's object untouched
+	assert (script, probe) == (4096, 1024)
+	per = [SP(4096), SP(256)]
+	args, kw, script, probe = _cap_new_tokens((["a", "b"], per), {}, 1024)
+	assert [x.max_tokens for x in args[1]] == [1024, 256] and per[0].max_tokens == 4096 and script == 4096
+	# under the cap, or no params (vLLM's 16-token default): left as they are
+	assert _cap_new_tokens((["a"],), {"sampling_params": SP(512)}, 1024)[2:] == (None, None)
+	assert _cap_new_tokens((["a"],), {}, 1024)[2:] == (None, None)
+
+
+FAKE_VLLM = """
+class SamplingParams:
+	def __init__(self, max_tokens=16):
+		self.max_tokens = max_tokens
+
+	def clone(self):
+		return SamplingParams(self.max_tokens)
+
+
+class _C:
+	def __init__(self, n, reason):
+		self.token_ids, self.finish_reason = list(range(n)), reason
+
+
+class _O:
+	def __init__(self, n, reason):
+		self.outputs = [_C(n, reason)]
+
+
+class LLM:
+	def __init__(self, model=None, **kw):
+		pass
+
+	def generate(self, prompts, sampling_params=None):
+		cap = sampling_params.max_tokens
+		return [_O(cap if i % 2 else 7, "length" if i % 2 else "stop") for i, _ in enumerate(prompts)]
+"""
+
+FAKE_SERVE = """
+from vllm import LLM, SamplingParams
+
+llm = LLM(model="x")
+outs = llm.generate([f"q{i}" for i in range(64)], SamplingParams(max_tokens=4096))
+print("served", len(outs))
+"""
+
+
+def test_a_serving_probe_records_its_token_cap_beside_the_scripts():
+	r = run_probe(ProbeSpec(probe_id="s", files={"serve.py": FAKE_SERVE, "vllm/__init__.py": "from .entrypoints.llm import LLM, SamplingParams\n",
+		"vllm/entrypoints/__init__.py": "", "vllm/entrypoints/llm.py": FAKE_VLLM},
+		entrypoint="serve.py", warmup=1, timed=2, timeout_s=120, generate_sample=32))  # fmt: skip
+	assert r.probe.status == "ok", r.probe.error
+	g = r.probe.generation
+	assert g.sequences == 32 and g.max_new_tokens == 4096 and g.new_tokens_max == 1024
+	assert r.probe.extras["serving_probe_max_tokens"] == 1024.0
+	# the replies cut at the probe's cap have no known ending; those that stopped on their own do
+	assert g.truncation_rate == 0.0 and r.probe.extras["generation_ending_known"] == 16.0
+
+
 def test_grpo_entropy_is_the_policys_mean_negative_log_prob_over_completion_tokens():
 	# TRL 0.14 logs no entropy (item 14): the policy's own log-probs on sampled tokens estimate it
 	import torch
