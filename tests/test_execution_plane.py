@@ -477,7 +477,7 @@ def test_the_probe_user_check_reports_the_names_and_imports_it_ran_with(monkeypa
 
 
 @pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() != 0, reason="drops to a uid: needs root")
-def test_the_probe_user_check_fails_where_the_probe_uid_has_no_passwd_entry(monkeypatch):
+def test_the_probe_user_check_reports_a_missing_passwd_entry_and_the_gate_fails_it(monkeypatch):
 	# the image bug torchtitan hit on a GPU (Nov 1), caught here on a CPU instead
 	import pwd
 
@@ -489,7 +489,14 @@ def test_the_probe_user_check_fails_where_the_probe_uid_has_no_passwd_entry(monk
 		pytest.skip("uid 64999 has a passwd entry on this host")
 	monkeypatch.setattr(local, "_probe_uid", lambda: uid)
 	r = local.probe_user_check(())
-	assert r["exit"] != 0 and "getpwuid" in r["stderr"]
+	# the script reports the missing entry (a plain host has none: the AMD droplet's check) and the
+	# deploy gate fails it, where the image needs one
+	from preflight.runner.probe_user import probe_user_ok
+
+	assert r["exit"] == 0 and r["passwd"] is None and r["group"] is None
+	fine = {**r, "uid": 61000, "user": "preflight-probe", "imported": [], "compiled": 1.0}
+	assert probe_user_ok({**fine, "passwd": "preflight-probe", "group": "preflight-probe"}, "probe")
+	assert not probe_user_ok(fine, "probe")
 
 
 def test_the_deploy_gate_needs_the_names_the_imports_and_a_compile():
@@ -500,6 +507,8 @@ def test_the_deploy_gate_needs_the_names_the_imports_and_a_compile():
 	assert _probe_user_ok(good, "serving")
 	assert not _probe_user_ok({**good, "compiled": None}, "serving")  # torch.compile didn't run
 	assert not _probe_user_ok({**good, "imported": []}, "serving")  # vllm didn't import
+	assert not _probe_user_ok({**good, "passwd": None}, "serving")  # the image has no passwd entry
+	assert not _probe_user_ok({**good, "group": None}, "serving")  # nor a group entry
 	assert not _probe_user_ok({**good, "group": "30002"}, "serving")
 	assert not _probe_user_ok({"failed": "TimeoutExpired"}, "probe")
 	assert _probe_user_ok({**good, "imported": []}, "probe")

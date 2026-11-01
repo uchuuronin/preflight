@@ -25,6 +25,7 @@ from preflight.runner.modal_app import (
 	SERVICE_NAME,
 	WEIGHTS_DIR,
 	ZOO_MODELS,
+	_read_only,
 	image_tag,
 	probe_image,
 	records_vol,
@@ -355,54 +356,125 @@ GROUND_TRUTH_TIMEOUT_S = 50 * 60
 GROUND_TRUTH_GPUS = ["L4", "A10"]
 
 
-@ops.function(
-	image=probe_image,
-	gpu=GROUND_TRUTH_GPUS,
-	volumes={WEIGHTS_DIR: weights_vol},
-	timeout=GROUND_TRUTH_TIMEOUT_S,
-)
-def ground_truth_on_l4(
-	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict
-) -> dict:
-	"""recorder/ground_truth.py on an L4: a bare run, then a recorder run alternating clean and
-	synced steps, and the paired overhead. The AMD droplet runs the same module."""
+def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict,
+	entrypoint: str | None = None, args: tuple = (), install_requirements: bool = False,
+	generate_sample: int = 0, generate_calls: int = 0) -> dict:  # fmt: skip
+	"""recorder/ground_truth.py on this function's GPU: a bare run (the full run), then a recorder
+	run alternating clean and synced steps, and the paired overhead. The AMD droplet runs the same."""
 	from preflight.probes import remote
-	from preflight.recorder.ground_truth import ZOO_SCRIPTS, measure
+	from preflight.recorder.ground_truth import measure
 
-	if script not in ZOO_SCRIPTS:
-		raise ValueError(f"unknown zoo script {script!r}")
-	print(f"[ground truth] container up on the GPU; {len(files)} files of {script}", flush=True)
+	print(f"[ground truth] container up on the {_gpu_name()}; {len(files)} files of {script}", flush=True)
 	remote.link_weights()
 	remote.deps_dir()
 	# the probe image has no zoo (Oct 31: "has no train.py"): the files come from the checkout
 	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
-		budget_s=budget_s, files=files)  # fmt: skip
+		budget_s=budget_s, files=files, entrypoint=entrypoint, args=tuple(args),
+		install_requirements=install_requirements, generate_sample=generate_sample,
+		generate_calls=generate_calls)  # fmt: skip
+
+
+# weights read-only: an unseen third-party script runs as root in the bare run, and must not be
+# able to change the shared weights production probes read (review, Nov 1)
+_GT = {"image": None, "volumes": {WEIGHTS_DIR: _read_only(weights_vol)}, "timeout": GROUND_TRUTH_TIMEOUT_S}
+
+
+@ops.function(**{**_GT, "image": probe_image}, gpu=GROUND_TRUTH_GPUS)
+def ground_truth_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": probe_image}, gpu=GROUND_TRUTH_GPUS[::-1])  # A10 first: the L4 queue
+def ground_truth_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": serving_image}, gpu=GROUND_TRUTH_GPUS)  # vLLM: its own image
+def ground_truth_serving_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": serving_image}, gpu=GROUND_TRUTH_GPUS[::-1])
+def ground_truth_serving_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": titan_image}, gpu=GROUND_TRUTH_GPUS)  # torchtitan: torch 2.7
+def ground_truth_titan_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": titan_image}, gpu=GROUND_TRUTH_GPUS[::-1])
+def ground_truth_titan_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+GT_FUNCTIONS = {
+	("probe", "L4"): ground_truth_on_l4, ("probe", "A10"): ground_truth_on_a10,
+	("serving", "L4"): ground_truth_serving_on_l4, ("serving", "A10"): ground_truth_serving_on_a10,
+	("titan", "L4"): ground_truth_titan_on_l4, ("titan", "A10"): ground_truth_titan_on_a10,
+}  # fmt: skip
 
 
 @ops.local_entrypoint()
 def ground_truth(
-	script: str, bare_steps: int, recorder_steps: int = 60, warmup: int = 5, budget_min: float = 40
+	script: str = "",
+	bare_steps: int = 200,
+	recorder_steps: int = 60,
+	warmup: int = 5,
+	budget_min: float = 40,
+	dir: str = "",
+	entrypoint: str = "",
+	args: str = "",
+	first_gpu: str = "L4",
+	install_requirements: bool = False,
 ):
-	"""modal run --env main python/preflight/runner/ops_app.py::ground_truth --script finetune_lora_hf --bare-steps 210
-	Writes out/ground_truth_<script>.json (step walls, peak memory, how the bare run ended, overhead).
-	budget_min: the whole measurement ends inside it; keep it under the run's own time limit."""
-	import json
+	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
-	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief
+	modal run --env main python/preflight/runner/ops_app.py::ground_truth --script vision_timm --bare-steps 300
+	modal run ... ::ground_truth --dir validation/unseen/s3 --entrypoint main.py --args "--epochs 1" \\
+		--install-requirements --first-gpu A10
+
+	--script: a zoo script; --dir: any directory in this checkout (Monday's unseen scripts, from the
+	validation-freeze tag). The entrypoint is the one named, else train.py, main.py, serve.py or
+	run.py. The image follows the script: vLLM scripts the serving image, torchtitan its own.
+	--first-gpu A10 tries the A10 before the L4 (the L4 queued 19 to 59 min on Nov 1); never an
+	L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
+	Writes out/ground_truth_<name>.json."""
+	import json
+	import shlex
+
+	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
 
-	if script not in ZOO_SCRIPTS:
-		raise SystemExit(f"unknown zoo script {script!r}")
-	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
-	if "train.py" not in files:
-		raise SystemExit(f"zoo/{script} has no train.py in this checkout")
-	print(
-		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4, else an A10 (Modal queues it)",
-		flush=True,
-	)
-	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60, files)
+	root = Path(__file__).resolve().parents[3]
+	if bool(script) == bool(dir):
+		raise SystemExit("name a zoo script (--script) or a directory in this checkout (--dir), not both")
+	if script:
+		if script not in ZOO_SCRIPTS:
+			raise SystemExit(
+				f"{script!r} isn't a GPU zoo script: {sorted(ZOO_SCRIPTS)} (agent_eval_spark: agent_sample)"
+			)
+		src = root / "zoo" / script
+	else:
+		src = (root / dir).resolve()
+		if root not in src.parents or not src.is_dir():
+			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
+	files = _read_tree(src)
+	p = plan(files, entrypoint or None)
+	if p["lens"] == "agent":
+		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
+	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
+	first = "A10" if first_gpu.upper() == "A10" else "L4"
+	fn = GT_FUNCTIONS[(image, first)]
+	name = script or src.name
+	print(f"[ground truth] {name}: {entry}, lens {p['lens']}, {image} image, {len(files)} files; "
+		f"waiting for an {first}, else the {'L4' if first == 'A10' else 'A10'} (Modal queues it)", flush=True)  # fmt: skip
+	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(shlex.split(args)),
+		install_requirements, sample, p["generate_calls"])  # fmt: skip
+	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
-	Path(f"out/ground_truth_{script}.json").write_text(json.dumps(res, indent=2))
+	Path(f"out/ground_truth_{name}.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(brief(res), indent=2), flush=True)
 
 
@@ -689,7 +761,8 @@ def diagnose_hosted(record_json: str, max_usd: float = 0.5) -> dict:
 	from preflight.schema import load_record
 
 	spark_open = ModelClient.baseten_spark_open() if os.environ.get("BASETEN_API_KEY") else None
-	return run_once(load_record(record_json), ModelClient.meta(), spark_open, max_usd)
+	# 180 s: up to 8,192 output tokens, reasoning included, outlast the client's default 60 s
+	return run_once(load_record(record_json), ModelClient.meta(timeout_s=180.0), spark_open, max_usd)
 
 
 @ops.local_entrypoint()
@@ -709,6 +782,75 @@ def diagnose(share: str, max_usd: float = 0.5):
 	for f in res["checked"] or res["diagnosis"]:
 		print(f"[diagnose] {f['code']}: {f['title']} | {f['detail']}", flush=True)
 	print(f"[diagnose] stats {res['stats']}; {len(res['calls'])} calls, ${res['usd']:.4f}", flush=True)
+
+
+# ---------------------------------------------------------------- triage of a stored probe (paid: ask first)
+
+
+@ops.function(
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-glimmer"), modal.Secret.from_name("preflight-baseten")],
+	timeout=10 * 60,  # Glimmer scales to zero: a cold start measured 286 s (B, Nov 1)
+)
+def triage_hosted(record_json: str, probe_id: str, provider: str = "glimmer") -> dict:
+	"""harness/triage.py on one probe of a stored record, as the pipeline would triage it: the
+	probe's recorded error (a stored record keeps no log tail). provider: glimmer or spark-open."""
+	import time
+
+	from preflight.harness.spark import ModelClient
+	from preflight.harness.triage import triage_probe
+	from preflight.runner.flags import flag
+	from preflight.schema import load_record
+
+	if not flag("harness.spark_open_triage"):  # the pipeline's own gate (and the data-use notice's)
+		return {"error": "harness.spark_open_triage is off here"}
+	rec = load_record(record_json)
+	# our own zoo scripts only: a visitor's record holds their error text, which would land in the
+	# run log and out/ on the remote-runs branch, and a private one must never reach Baseten (review)
+	if rec.job.source.kind != "sample":
+		return {"error": "only a sample (zoo) record is triaged here"}
+	probe = next((p for p in rec.probes if p.id == probe_id), None)
+	if probe is None:
+		return {"error": f"no probe {probe_id!r}: {[p.id for p in rec.probes]}"}
+	if probe.status in ("ok", "cached") or not probe.error:
+		return {"error": f"probe {probe_id} finished or has no recorded error: nothing to triage"}
+	if provider == "glimmer":
+		if not ModelClient.glimmer_configured():
+			return {"error": "the preflight-glimmer secret has no GLIMMER_BASE_URL"}
+		client = ModelClient.glimmer()
+	else:
+		client = ModelClient.baseten_spark_open()
+	t0 = time.monotonic()
+	f, calls = triage_probe(client, probe, "")
+	return {"record_id": rec.record_id, "probe": probe_id, "status": probe.status, "provider": client.provider,
+		"model": client.model, "wall_s": round(time.monotonic() - t0, 1),
+		"finding": f.model_dump(mode="json") if f else None, "last_error": client.last_error,
+		"calls": [c.model_dump(mode="json") for c in calls], "usd": round(sum(c.cost_usd for c in calls), 6)}  # fmt: skip
+
+
+@ops.local_entrypoint()
+def triage(share: str, probe: str = "p1-eval", provider: str = "glimmer"):
+	"""modal run --env main python/preflight/runner/ops_app.py::triage --share <token> [--probe p1-eval]
+	[--provider glimmer|spark-open]. One triage call on a stored record's probe; writes out/triage.json."""
+	import re
+	import sys
+
+	if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", share) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,40}", probe):
+		print("[triage] a share token and a probe id, please", flush=True)
+		sys.exit(2)
+	data = b"".join(records_vol.read_file(f"{share}.json")).decode()
+	res = triage_hosted.remote(data, probe, provider)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/triage.json").write_text(json.dumps(res, indent=2))
+	f = res.get("finding")
+	print(
+		f"[triage] {res.get('error') or (f and f['title'] + ' | ' + f['detail']) or 'no finding: ' + str(res.get('last_error'))}",
+		flush=True,
+	)
+	print(
+		f"[triage] {len(res.get('calls', []))} calls, ${res.get('usd', 0):.4f}, {res.get('wall_s')} s",
+		flush=True,
+	)
 
 
 # ---------------------------------------------------------------- serving image (CPU, before any serving probe)

@@ -7,9 +7,12 @@ from pathlib import Path
 from preflight.recorder import ground_truth as gt
 
 
-def test_only_the_zoo_scripts_are_measured(tmp_path, capsys):
+def test_a_dir_with_nothing_to_run_is_refused_before_any_gpu_time(tmp_path, capsys):
+	# any script dir is measured now (Monday's unseen scripts), but it needs an entrypoint
 	(tmp_path / "mine").mkdir()
+	(tmp_path / "mine" / "util.py").write_text("x = 1\n")
 	assert gt.main([str(tmp_path / "mine"), str(tmp_path / "o.json"), "--bare-steps", "3"]) == 2
+	assert gt.main([str(tmp_path / "nope"), str(tmp_path / "o.json"), "--bare-steps", "3"]) == 2
 	assert not (tmp_path / "o.json").exists()
 
 
@@ -164,3 +167,30 @@ def test_the_log_line_summarises_the_rl_lists():
 		"truncation_rate": None,
 		"zero_spread_fraction": 0.2,
 	}
+
+
+def test_a_full_run_takes_any_gpu_script_with_its_entrypoint_and_image():
+	# Monday's cost table (B, Nov 1): every zoo script, and any script by directory
+	from pathlib import Path
+
+	from preflight.recorder.ground_truth import ZOO_SCRIPTS, entrypoint_of, plan
+	from preflight.runner.sources import _read_tree
+
+	zoo = Path(__file__).resolve().parents[1] / "zoo"
+	want = {"serving_vllm": ("serve.py", "serving", "serving"), "eval_sweep_reasoning": ("run.py", "eval", "probe"),
+		"torchtitan_debug": ("train.py", "pretrain", "titan"), "finetune_lora_hf": ("train.py", "finetune", "probe")}  # fmt: skip
+	assert len(ZOO_SCRIPTS) == 9 and "agent_eval_spark" not in ZOO_SCRIPTS
+	for name in ZOO_SCRIPTS:
+		p = plan(_read_tree(zoo / name))
+		if name in want:
+			assert (p["entrypoint"], p["lens"], p["image"]) == want[name], name
+		assert p["generate_sample"] == (32 if p["lens"] == "serving" else 0)
+	assert plan(_read_tree(zoo / "agent_eval_spark"))["lens"] == "agent"
+	assert entrypoint_of({"main.py": "", "util.py": ""}) == "main.py"
+	assert plan({"a.py": "# about torchtitan\nimport torch\n", "main.py": "import a\n"})["image"] == "probe"
+	import pytest
+
+	with pytest.raises(ValueError):
+		entrypoint_of({"util.py": ""})
+	with pytest.raises(ValueError):
+		entrypoint_of({"train.py": ""}, "missing.py")

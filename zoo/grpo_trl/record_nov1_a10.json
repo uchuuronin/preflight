@@ -1,5 +1,5 @@
 {
- "schema_version": "0.6.0",
+ "schema_version": "0.6.2",
  "record_id": "01M6BKQTWZQ8HSDE2CAV9JTWFP",
  "share_token": "zoo-grpo-share-token-00",
  "created_at": "2026-11-01T13:10:48Z",
@@ -217,6 +217,17 @@
     "kind": "none"
    }
   }
+ },
+ "env": {
+  "backend": "cuda",
+  "provider": "modal",
+  "gpu": {
+   "name": "A10",
+   "count": 1,
+   "vendor": "nvidia"
+  },
+  "nodes": 1,
+  "libraries": {}
  },
  "graph": {
   "nodes": [
@@ -476,7 +487,7 @@
     ],
     "log": false
    },
-   "current": "L4",
+   "current": "A10",
    "gridded": false,
    "needs_code": false,
    "group": "cluster",

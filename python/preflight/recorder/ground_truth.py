@@ -3,6 +3,8 @@
 	python -m preflight.recorder.ground_truth zoo/finetune_lora_hf out/gt.json --bare-steps 210
 	python -m preflight.recorder.ground_truth zoo/pretrain_nanogpt out/gt.json --bare-steps 1000 \\
 		--recorder-steps 200 --install-requirements
+	python -m preflight.recorder.ground_truth unseen/s3 out/gt.json --bare-steps 500 --entrypoint main.py \\
+		--install-requirements -- --epochs 1
 
 The bare run (recorder/bare.py) has a CUDA event at each optimizer step and nothing else, so it
 shows how the script really runs and where it really fails (the LoRA script's eval OOM included).
@@ -10,7 +12,9 @@ The recorder run is a probe that alternates clean and synced steps (Recorder alt
 recorder/overhead.py pairs the two into the recorder's overhead. The same code runs on Modal's L4
 (runner/ops_app.py::ground_truth) and on the AMD droplet (amd-run.yml), so the two are comparable.
 
-Our own zoo scripts on our own GPUs, never visitor code. As root (a cloud box) the bare run gets
+The zoo scripts, and Monday's unseen validation scripts (third-party code, run as ops on our own
+GPUs, never through the visitor path; on Modal the weights volume is mounted read-only for them).
+As root (a cloud box) the bare run gets
 its own root-owned caches, and the probe drops to its unprivileged uid with its own, as the CLI's
 probes do; nothing either writes is read by the other.
 """
@@ -29,7 +33,44 @@ import tempfile
 import time
 from pathlib import Path
 
-ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt", "grpo_trl"}
+# every zoo script that runs on a GPU (agent_eval_spark is an API run: its full run is the ops
+# agent_sample with a larger cap); any other script comes by directory with its entrypoint
+ZOO_SCRIPTS = {"finetune_lora_hf", "pretrain_nanogpt", "grpo_trl", "eval_sweep_reasoning", "gnn_pyg",
+	"retrieval_st", "serving_vllm", "vision_timm", "torchtitan_debug"}  # fmt: skip
+ENTRYPOINTS = ("train.py", "main.py", "serve.py", "run.py")  # what a script dir runs, first found
+
+
+def plan(files: dict[str, str], entrypoint: str | None = None) -> dict:
+	"""What a full run of these files needs: its entrypoint, lens, sandbox image ("probe", "serving"
+	for vLLM, "titan" for torchtitan's torch) and a serving probe's sample size. An agent run has no
+	GPU ground truth (its full run is the ops agent_sample)."""
+	import re
+
+	from preflight.harness.static import map_static
+	from preflight.runner.pipeline import EVAL_PROBE_CALLS, SERVING_PROBE_PROMPTS, _uses_vllm
+
+	entry = entrypoint_of(files, entrypoint)
+	sm = map_static(files, entrypoint=entry)
+	titan_re = re.compile(r"^\s*(from|import)\s+torchtitan\b|run_module\(\s*[\"']torchtitan\b", re.M)
+	titan = any(titan_re.search(t) for k, t in files.items() if k.endswith(".py"))
+	image = "serving" if _uses_vllm(sm, files) else "titan" if titan else "probe"
+	return {"entrypoint": entry, "lens": sm.lens, "image": image,
+		"generate_sample": SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
+		"generate_calls": EVAL_PROBE_CALLS if sm.lens == "eval" else 0}  # fmt: skip
+
+
+def entrypoint_of(files: dict[str, str], wanted: str | None = None) -> str:
+	"""The file a ground truth runs: the one named, else the first of ENTRYPOINTS present."""
+	if wanted:
+		if wanted not in files:
+			raise ValueError(f"the entrypoint {wanted!r} is not among the script's files")
+		return wanted
+	hit = next((e for e in ENTRYPOINTS if e in files), None)
+	if hit is None:
+		raise ValueError(f"no {', '.join(ENTRYPOINTS)} among the script's files: name the entrypoint")
+	return hit
+
+
 # derived: the whole measurement must end, and write its result, inside the run's own time limit
 # (remote-run.yml's timeout); Oct 28's first try ran into that limit with nothing written
 BUDGET_S = 40 * 60
@@ -85,8 +126,9 @@ def _stream(cmd: list[str], *, env: dict, cwd: Path, timeout_s: float) -> tuple[
 
 
 def _bare(
-	work: Path, bare_steps: int, *, install_requirements: bool, caches: Path, env: dict, timeout_s: float
-) -> dict:
+	work: Path, bare_steps: int, *, install_requirements: bool, caches: Path, env: dict, timeout_s: float,
+	entrypoint: str = "train.py", args: tuple[str, ...] = (),
+) -> dict:  # fmt: skip
 	env = {**os.environ, **env}
 	if install_requirements:
 		from preflight.recorder.requirements import install
@@ -108,10 +150,11 @@ def _bare(
 		sys.executable,
 		"-m",
 		"preflight.recorder.bare",
-		str(work / "train.py"),
+		str(work / entrypoint),
 		str(out),
 		"--steps",
 		str(bare_steps),
+		*(["--", *args] if args else []),
 	]
 	code, tail = _stream(cmd, env=env, cwd=work, timeout_s=timeout_s)
 	if out.exists():  # bare.py writes its result last, so a file here is a whole result
@@ -152,6 +195,10 @@ def measure(
 	budget_s: float = BUDGET_S,
 	bare_env: dict | None = None,
 	files: dict[str, str] | None = None,
+	entrypoint: str | None = None,
+	args: tuple[str, ...] = (),
+	generate_sample: int = 0,
+	generate_calls: int = 0,
 ) -> dict:
 	"""Both runs and the paired overhead, as one dict (what out/ground_truth_<script>.json holds).
 	bare_env: environment overrides for the bare run only (its own caches on a root box).
@@ -162,8 +209,8 @@ def measure(
 	from preflight.runner.sources import _read_tree
 
 	files = _read_tree(script_dir) if files is None else files
-	if "train.py" not in files:
-		raise ValueError(f"{script_dir} has no train.py")
+	entrypoint = entrypoint_of(files, entrypoint)
+	args = tuple(args)
 	caches = Path(tempfile.mkdtemp(prefix="gt-caches-"))
 	work = Path(tempfile.mkdtemp(prefix="gt-"))
 	try:
@@ -175,23 +222,27 @@ def measure(
 			f"bare run of {script_dir.name}: {bare_steps} optimizer steps, at most {budget_s * BARE_SHARE:.0f} s"
 		)
 		bare = _bare(work, bare_steps, install_requirements=install_requirements, caches=caches,
-			env={**_bare_hf_home(caches), **(bare_env or {})}, timeout_s=budget_s * BARE_SHARE)  # fmt: skip
+			env={**_bare_hf_home(caches), **(bare_env or {})}, timeout_s=budget_s * BARE_SHARE,
+			entrypoint=entrypoint, args=args)  # fmt: skip
 		bare_wall = time.monotonic() - t0
 		_say(
 			f"bare run ended ({bare.get('ended') or 'failed'}) after {bare_wall:.0f} s, {bare.get('steps')} steps"
 		)
 		left = max(120.0, budget_s - bare_wall - 60)  # a minute kept for writing the result
 		_say(f"recorder run: {warmup} warmup + {recorder_steps} timed steps, at most {left:.0f} s")
-		r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint="train.py", warmup=warmup,
-			timed=recorder_steps, timeout_s=left, alternate_sync=True,
-			install_requirements=install_requirements))  # fmt: skip
+		# the recorder run is the probe the pipeline would run: a serving script's sampled generate call
+		r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint=entrypoint, args=list(args), warmup=warmup,
+			timed=recorder_steps, timeout_s=left, alternate_sync=not (generate_sample or generate_calls),
+			install_requirements=install_requirements, generate_sample=generate_sample,
+			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:
 		shutil.rmtree(work, ignore_errors=True)
 		shutil.rmtree(caches, ignore_errors=True)
 	log = [s.model_dump() for s in r.probe.step_log]
 	over = report(log, bare.get("walls_s") or [], warmup=warmup) if r.probe.status == "ok" else None
-	return {"script": script_dir.name, "gpu": r.env.gpu.name if r.env and r.env.gpu else None,
+	return {"script": script_dir.name, "entrypoint": entrypoint, "args": list(args),
+		"gpu": r.env.gpu.name if r.env and r.env.gpu else None,
 		"backend": r.env.backend if r.env else None, "bare": {**bare, "wall_s": round(bare_wall, 1)},
 		"recorder": {"status": r.probe.status, "error": r.probe.error, "error_code": r.probe.error_code,
 			"steps": r.probe.steps, "p50_s": r.probe.step_time.p50_s if r.probe.step_time else None,
@@ -202,7 +253,8 @@ def measure(
 			"generation": r.probe.generation.model_dump(mode="json") if r.probe.generation else None,
 			"extras": r.probe.extras, "step_log": log, "log_tail": r.log_tail[-1500:],
 			# the whole probe, so a record can be built from the run (runner/gt_record.py)
-			"probe": r.probe.model_dump(mode="json", exclude={"kernels", "trace"})},
+			"probe": r.probe.model_dump(mode="json", exclude={"kernels", "trace"}),
+			"env": r.env.model_dump(mode="json", exclude_none=True) if r.env else None},
 		"overhead": over}  # fmt: skip
 
 
@@ -232,9 +284,25 @@ def main(argv: list[str] | None = None) -> int:
 	ap.add_argument(
 		"--budget-min", type=float, default=BUDGET_S / 60, help="the whole measurement's time limit"
 	)
-	ns = ap.parse_args(argv)
-	if ns.script_dir.name not in ZOO_SCRIPTS:
-		print(f"ground truth is for the zoo scripts {sorted(ZOO_SCRIPTS)}", file=sys.stderr)
+	ap.add_argument("--entrypoint", help=f"the file to run (default: the first of {', '.join(ENTRYPOINTS)})")
+	ap.add_argument(
+		"--generate-sample", type=int, default=0, help="a serving script: prompts its probe keeps"
+	)
+	argv = list(sys.argv[1:] if argv is None else argv)
+	script_args = argv[argv.index("--") + 1 :] if "--" in argv else []
+	ns = ap.parse_args(argv[: argv.index("--")] if "--" in argv else argv)
+	if not ns.script_dir.is_dir():
+		print(f"{ns.script_dir} is not a directory", file=sys.stderr)
+		return 2
+	from preflight.runner.sources import _read_tree
+
+	try:
+		p = plan(_read_tree(ns.script_dir), ns.entrypoint)
+		if not ns.generate_sample:  # a serving script's probe samples, as on Modal
+			ns.generate_sample = p["generate_sample"]
+		generate_calls = p["generate_calls"]
+	except ValueError as exc:
+		print(f"{ns.script_dir}: {exc}", file=sys.stderr)
 		return 2
 	from preflight.cli.main import _run_caches_when_root
 
@@ -244,7 +312,8 @@ def main(argv: list[str] | None = None) -> int:
 	try:
 		res = measure(ns.script_dir, bare_steps=ns.bare_steps, recorder_steps=ns.recorder_steps,
 			warmup=ns.warmup, install_requirements=ns.install_requirements, bare_env=bare_env,
-			budget_s=ns.budget_min * 60)  # fmt: skip
+			budget_s=ns.budget_min * 60, entrypoint=ns.entrypoint, args=tuple(script_args),
+			generate_sample=ns.generate_sample, generate_calls=generate_calls)  # fmt: skip
 	finally:
 		for d in (own, run):
 			if d is not None:

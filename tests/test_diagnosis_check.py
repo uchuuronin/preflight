@@ -1,6 +1,7 @@
 """Spark Open checks each diagnosis claim through a tool call (item 30): code decides what stands."""
 
 import json
+import time
 from pathlib import Path
 
 import httpx
@@ -183,3 +184,174 @@ def test_an_unpriced_check_model_is_never_called_under_a_cap(rec):
 	so.prices = {}
 	(f,), calls = check_diagnosis(so, rec, [claim()], budget_usd=0.5)
 	assert seen == [] and calls == [] and f.code == "diagnosis.abstain" and "no price" in f.detail
+
+
+def test_triage_reads_and_can_quote_the_probes_recorded_error_not_just_stdout():
+	# Nov 1 production run: the eval OOM was caught by the recorder, so stdout had no traceback
+	from preflight.harness.triage import triage_probe
+	from preflight.schema import Probe
+
+	oom = "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB."
+	probe = Probe.model_construct(id="p1-eval", status="oom", error_code="oom.eval", steps=3, error=oom)
+	seen = []
+
+	def handler(request):
+		seen.append(json.loads(request.content))
+		ans = {"category": "oom", "summary": "the eval pass ran out of GPU memory",
+			"evidence_line": "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB."}  # fmt: skip
+		return httpx.Response(200, json={"id": "t1", "choices": [{"message": {"content": json.dumps(ans)}}],
+			"usage": {"prompt_tokens": 300, "completion_tokens": 50}})  # fmt: skip
+
+	client = ModelClient(api_key="k", model="meta-models/muse-spark-open-1026", provider="baseten",
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	f, _calls = triage_probe(client, probe, "{'loss': 1.5, 'epoch': 0.0003}\n", node_id="eval")
+	assert "CUDA out of memory" in seen[0]["messages"][1]["content"]
+	assert (
+		f.code == "triage.oom"
+		and f.node_id == "eval"
+		and "CUDA out of memory" in f.detail
+		and "no log line quoted" not in f.detail
+	)
+	assert f.title.startswith("Spark Open on probe p1-eval")
+	# a private job's triage names the model that made it (Glimmer, 0.6.2)
+	glim = ModelClient(api_key="k", model="muse-glimmer", provider="modal-glimmer",
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	g, _ = triage_probe(glim, probe, "")
+	assert g.title.startswith("Muse Glimmer on probe p1-eval") and g.code == "triage.oom"
+
+
+def test_a_reply_without_a_completion_is_still_a_logged_priced_call_with_its_reason():
+	# Glimmer's first triage (Nov 1): 150 s, no finding, and no call in provenance
+	def handler(request):
+		time.sleep(0.01)
+		return httpx.Response(200, text="<html>cold start at https://secret-host.example/x</html>")
+
+	client = ModelClient(api_key="k", model="muse-glimmer", provider="modal-glimmer", usd_per_second=0.001,
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	with pytest.raises(ValueError):
+		client.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert len(client.calls) == 1 and not client.calls[0].ok
+	assert "HTTP 200 without a completion" in client.last_error and "cold start" in client.last_error
+	assert "secret-host" not in client.last_error and client.calls[0].cost_usd > 0  # priced by wall time
+
+	def denied(request):
+		return httpx.Response(401, json={"error": "bad Modal-Key"})
+
+	c2 = ModelClient(api_key="k", base_url="https://secret-host.example/v1", model="m", provider="modal-glimmer",
+		transport=httpx.MockTransport(denied))  # fmt: skip
+	with pytest.raises(httpx.HTTPStatusError):
+		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert c2.last_error.startswith("HTTP 401") and "bad Modal-Key" in c2.last_error
+
+	def down(request):
+		raise httpx.ConnectError("can't reach https://secret-host.example/v1/chat/completions")
+
+	c3 = ModelClient(
+		api_key="k", model="m", provider="modal-glimmer", retries=0, transport=httpx.MockTransport(down)
+	)
+	with pytest.raises(httpx.ConnectError):
+		c3.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert c3.last_error.startswith("ConnectError") and "secret-host" not in c3.last_error
+
+
+def test_glimmer_follows_modals_303_to_its_result_on_the_same_host_only():
+	# a Modal web endpoint 303s a request that runs past 150 s to a URL that polls for its result
+	ok = {
+		"id": "g1",
+		"choices": [{"message": {"content": "hi"}}],
+		"usage": {"prompt_tokens": 5, "completion_tokens": 1},
+	}
+	seen = []
+
+	def handler(request):
+		seen.append((request.method, request.url.host, request.headers.get("modal-key")))
+		if request.method == "POST":
+			return httpx.Response(
+				303,
+				headers={
+					"location": "https://glimmer.example/v1/chat/completions?__modal_function_call_id=fc-1"
+				},
+			)
+		return httpx.Response(200, json=ok)
+
+	client = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="muse-glimmer", provider="modal-glimmer",
+		headers={"Modal-Key": "mk"}, follow_redirects=3, transport=httpx.MockTransport(handler))  # fmt: skip
+	text, call = client.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert text == "hi" and call.ok and [s[0] for s in seen] == ["POST", "GET"]
+
+	def elsewhere(request):
+		if request.url.host == "glimmer.example":
+			return httpx.Response(303, headers={"location": "https://other.example/steal"})
+		seen.append(("LEAKED", request.headers.get("modal-key")))
+		return httpx.Response(200, json=ok)
+
+	c2 = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer", retries=0,
+		headers={"Modal-Key": "mk"}, follow_redirects=3, transport=httpx.MockTransport(elsewhere))  # fmt: skip
+	with pytest.raises(httpx.HTTPError):
+		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert not any(s[0] == "LEAKED" for s in seen)
+	assert ModelClient.glimmer()._http.follow_redirects  # the Glimmer client follows them
+
+
+def test_a_redirect_chain_that_never_ends_is_a_logged_call_and_no_downgrade_to_http():
+	def loop(request):
+		return httpx.Response(
+			303,
+			headers={"location": "https://glimmer.example/v1/chat/completions?__modal_function_call_id=fc"},
+		)
+
+	c = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer",
+		usd_per_second=0.001, follow_redirects=3, transport=httpx.MockTransport(loop))  # fmt: skip
+	with pytest.raises(httpx.TooManyRedirects):
+		c.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert len(c.calls) == 1 and not c.calls[0].ok  # billed GPU time is in provenance (review, Nov 1)
+
+	seen = []
+
+	def plain(request):
+		seen.append(request.url.scheme)
+		return httpx.Response(303, headers={"location": "http://glimmer.example/v1/x"})
+
+	c2 = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer",
+		headers={"Modal-Key": "mk"}, follow_redirects=3, transport=httpx.MockTransport(plain))  # fmt: skip
+	with pytest.raises(httpx.UnsupportedProtocol):
+		c2.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert seen == ["https"]  # the Modal-Key never went out in plain http
+
+
+def test_redirect_hops_share_the_calls_deadline(monkeypatch):
+	clock = [1000.0]
+	monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+
+	def slow(request):
+		clock[0] += 150.0  # each hop: Modal's 150 s, then a 303
+		return httpx.Response(
+			303,
+			headers={"location": "https://glimmer.example/v1/chat/completions?__modal_function_call_id=fc"},
+		)
+
+	c = ModelClient(base_url="https://glimmer.example/v1", api_key="k", model="m", provider="modal-glimmer",
+		timeout_s=200.0, follow_redirects=10, transport=httpx.MockTransport(slow))  # fmt: skip
+	with pytest.raises(httpx.ReadTimeout):
+		c.chat([{"role": "user", "content": "hi"}], purpose="triage")
+	assert clock[0] - 1000.0 <= c.deadline_s + 150.0  # stopped at the 300 s deadline, not after 10 hops
+
+
+def test_a_json_object_wrapped_in_reasoning_or_a_fence_is_still_read_and_still_validated():
+	from pydantic import BaseModel, ValidationError
+
+	from preflight.harness.spark import _validate
+
+	class T(BaseModel):
+		category: str
+
+	assert _validate(T, '{"category": "oom"}').category == "oom"
+	assert _validate(T, '<think>it ran out</think>\n{"category": "oom"}').category == "oom"
+	assert _validate(T, 'Here it is:\n```json\n{"category": "oom"}\n```').category == "oom"
+	assert _validate(T, 'The answer: {"category": "oom"} as asked').category == "oom"
+	assert _validate(T, 'it saw {braces} then</think>{"category": "oom"}').category == "oom"  # unopened think
+	quoted = 'The log had\n```json\n{"category": "ok"}\n```\nMy answer:\n```json\n{"category": "oom"}\n```'
+	assert _validate(T, quoted).category == "oom"  # its own answer, after what it quoted
+	for bad in ("no json at all", '{"other": 1}', ""):
+		with pytest.raises((ValueError, ValidationError)):
+			_validate(T, bad)
