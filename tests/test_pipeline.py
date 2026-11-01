@@ -799,3 +799,44 @@ def test_dataset_size_prefers_the_loaders_count_skips_patched_probes_and_keeps_a
 		n(with_probes([{"train_dataset_len": 400.0}], n_examples=1234)) == 1234
 	)  # the static reader's value stays
 	load_record(_with_dataset_size(with_probes([{"train_dataset_len": 400.0}])).model_dump(mode="json"))
+
+
+def test_a_training_count_setting_in_the_script_is_the_dataset_size(tmp_path):
+	# zoo/gnn_pyg samples its graph by hand and states N_TRAIN_NODES (D, Nov 1)
+	from preflight.runner.pipeline import _train_count_setting, _with_dataset_size
+
+	gnn = "import torch\n# 160k seed nodes an epoch\nN_TRAIN_NODES = 160_000\nBATCH_SIZE = 1024\n"
+	assert _train_count_setting({"train.py": gnn}) == 160_000
+	assert _train_count_setting({"train.py": "NUM_TRAIN_SAMPLES = 5000\n"}) == 5000
+	assert _train_count_setting({"train.py": "N_TRAIN_NODES = int(1e5)\n"}) is None  # not a plain setting
+	assert _train_count_setting({"train.py": "def f():\n    N_TRAIN = 9\n"}) is None  # not module-level
+	assert _train_count_setting({"train.py": "N_TRAINER = 2\nN_TRAIN_NODES = True\n"}) is None
+	assert _train_count_setting({"notes.txt": "N_TRAIN = 3\n", "train.py": "x = (\n"}) is None
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	sm = rec.job.script_map
+	bare = rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm.model_copy(
+		update={"data": sm.data.model_copy(update={"n_examples": None})})})})  # fmt: skip
+	assert _with_dataset_size(bare, {"train.py": gnn}).job.script_map.data.n_examples == 160_000
+
+
+def test_the_engine_flags_reach_the_engine_before_it_fills_predictions(tmp_path, monkeypatch):
+	from preflight.engine import api
+	from preflight.runner import flags
+	from preflight.runner.pipeline import with_predictions
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	before = dict(api.FEATURES)
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"engine.rl": True, "engine.steptime_cross_gpu": False}))
+	flags.reload()
+	try:
+		with_predictions(rec, _Ctx(), enabled=True)
+		assert api.FEATURES["rl"] is True and api.FEATURES["steptime_cross_gpu"] is False
+	finally:
+		api.FEATURES.update(before)
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()

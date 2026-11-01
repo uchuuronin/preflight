@@ -503,11 +503,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	from .measured_rules import hygiene_findings
 
-	out = _with_dataset_size(out)
-
 	# run hygiene, from the code the probes ran (a probe job's patch included, so a fix can clear
 	# its own finding; a verify job's base is the record's own code) and the probes so far
 	code = fixed.files if fixed is not None and req.mode == "probe" else fetched.files
+	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
@@ -600,15 +599,40 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	return plan
 
 
-def _with_dataset_size(rec: FlightRecord) -> FlightRecord:
+_TRAIN_COUNT = re.compile(r"^N(?:UM)?_TRAIN(?:_[A-Z]+)?$")  # N_TRAIN_NODES, NUM_TRAIN_SAMPLES, N_TRAIN
+
+
+def _train_count_setting(files: dict[str, str] | None) -> int | None:
+	"""A training-set size the script states as a plain module-level setting (zoo/gnn_pyg's
+	N_TRAIN_NODES, D, Nov 1): a script that samples its graph by hand has no loader to measure."""
+	import ast
+
+	for name, text in sorted((files or {}).items()):
+		if not name.endswith(".py"):
+			continue
+		try:
+			tree = ast.parse(text)
+		except (SyntaxError, ValueError):
+			continue
+		for node in tree.body:
+			if (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+				and _TRAIN_COUNT.match(node.targets[0].id) and isinstance(node.value, ast.Constant)
+				and type(node.value.value) is int and node.value.value > 0):  # fmt: skip
+				return node.value.value
+	return None
+
+
+def _with_dataset_size(rec: FlightRecord, files: dict[str, str] | None = None) -> FlightRecord:
 	"""The dataset size the static reader couldn't see, from the unpatched probes: the rows the
 	training loader's sampler draws per epoch (extras.train_dataset_len), else the token-row scan's total. B's engine divides
 	it by the batch for the run's length, so time.total and cost.total don't abstain (D, Nov 1)."""
 	sm = rec.job.script_map
 	if sm is None or sm.data is None or sm.data.n_examples:
 		return rec
+	# the script's own setting first: it says what one epoch trains on, where a loader's dataset
+	# may be the whole graph or table
 	ok = [p for p in rec.probes if p.status == "ok" and not p.extras.get("patched")]  # a patch may subsample
-	n = next((p.extras["train_dataset_len"] for p in ok if p.extras.get("train_dataset_len")), None) or next(
+	n = _train_count_setting(files) or next((p.extras["train_dataset_len"] for p in ok if p.extras.get("train_dataset_len")), None) or next(
 		(p.extras["dataset_rows_total"] for p in ok if p.extras.get("dataset_rows_total")), None)  # fmt: skip
 	if not n:
 		return rec
@@ -926,8 +950,13 @@ def with_predictions(
 
 	def fill() -> None:
 		try:
+			from preflight.engine import api
 			from preflight.engine.api import fill_predictions
 
+			# the engine reads no files: its switches come from the engine.* flags (from-b.md, B -> A)
+			api.FEATURES.update(
+				{k: flag(f"engine.{k}") for k in ("rl", "serving", "steptime_cross_gpu", "divergence")}
+			)
 			# the engine returns a copy without re-validating: store-and-load it exactly as C's API
 			# will (nulls dropped, then parsed), and fail here rather than in the reader;
 			# dump_record also enforces the 1 MB gzipped budget
