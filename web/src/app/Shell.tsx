@@ -3,6 +3,7 @@
  * capsule, and five stacked screens that rise and un-blur into place (D's design). Only the
  * active screen is interactive; the others are hidden from assistive tech.
  */
+import { flushSync } from "react-dom";
 import { useEffect, useState } from "react";
 import { t } from "../lib/i18n";
 import { useAppPanels } from "../registry";
@@ -52,7 +53,13 @@ export function Shell() {
 	};
 	const toggleSky = () => {
 		const next = currentTokenSet() === "dusk" ? "day" : "dusk";
-		setTheme(applyTokenSet(next));
+		const swap = () => flushSync(() => setTheme(applyTokenSet(next)));
+		// One cross-fade from dawn to dusk (the View Transitions API, where the browser has it and
+		// motion is allowed), instead of every colour snapping at once.
+		const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+		const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+		if (doc.startViewTransition && !still) doc.startViewTransition(swap);
+		else swap();
 		try {
 			localStorage.setItem(THEME_KEY, next);
 		} catch {
@@ -72,6 +79,10 @@ export function Shell() {
 				<div className="pf-cloud pf-cloud--3" />
 				<div className="pf-cloud pf-cloud--4" />
 				<div className="pf-cloud pf-cloud--5" />
+				<div className="pf-streak pf-streak--1" />
+				<div className="pf-streak pf-streak--2" />
+				<div className="pf-streak pf-streak--3" />
+				<div className="pf-streak pf-streak--4" />
 				<div className="pf-trail" />
 			</div>
 
