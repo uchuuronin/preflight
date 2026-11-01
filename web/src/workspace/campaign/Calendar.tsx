@@ -11,7 +11,7 @@ import { hasKey, t } from "../../lib/i18n";
 import { Info } from "../components/Info";
 import type { Estimate } from "../record/types";
 import { trusted } from "../status";
-import { type CampaignPlan, hasSchedule, lanesOf, type PlanCell, startOf, unitOf } from "./plan";
+import { type CampaignPlan, hasSchedule, lanesOf, type PlanCell, slotsOf, startOf, unitOf } from "./plan";
 
 function said(e: Estimate | null | undefined): string {
 	if (!e || !trusted(e)) return e?.reason ? t("campaign.abstain", { why: e.reason }) : t("value.none");
@@ -77,11 +77,16 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 						{r.cells.length === 0 ? (
 							<span className="pf-dim">{t("campaign.lane_empty")}</span>
 						) : timed ? (
-							<div className="pf-cal__track" role="list">
-								{r.cells.map((c) => (
-									<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
-										<i className="pf-cal__whisker" style={{ width: `${(((c.time.hi ?? 0) - (c.time.point ?? 0)) / Math.max(1, c.time.point ?? 1)) * 100}%` }} />
-										<span>{cellLabel(c)}</span>
+							<div className="pf-cal__slots">
+								{/* One track per slot the lane holds, so runs going at once sit on their own rows. */}
+								{slotsOf(r.cells).map((slot, i) => (
+									<div key={i} className="pf-cal__track" role="list">
+										{slot.map((c) => (
+											<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
+												<i className="pf-cal__whisker" style={{ width: `${(((c.time.hi ?? 0) - (c.time.point ?? 0)) / Math.max(1, c.time.point ?? 1)) * 100}%` }} />
+												<span>{cellLabel(c)}</span>
+											</div>
+										))}
 									</div>
 								))}
 							</div>

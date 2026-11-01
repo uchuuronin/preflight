@@ -14,6 +14,8 @@ import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { usePanels } from "../../registry";
 import { ExportsSection } from "../../workspace/export/ExportsSection";
+import { CampaignCalendar } from "../../workspace/campaign/Calendar";
+import { planFromRecord } from "../../workspace/campaign/plan";
 import { Onboarding } from "../Onboarding";
 import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
 import { FitMap } from "../../workspace/cockpit/FitMap";
@@ -94,6 +96,8 @@ function Cockpit() {
 	const [view, setView] = useState<"map" | "fit">("map");
 	const fit = canFit && view === "fit";
 	const line = statusLine(record, estimates, state.knobs);
+	// A record that carries a campaign (B's to_campaign) draws its calendar; behind its flag.
+	const campaign = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
 	const mapKey = (
 		<Info label={t("map.label")} align="start">
 			<span className="pf-map-key">
@@ -171,6 +175,7 @@ function Cockpit() {
 					<h2 className="pf-h2">{t("below.title")}</h2>
 					<FlightPlanBand />
 					<MemoryBand />
+					{campaign ? <CampaignCalendar plan={campaign} /> : null}
 					{below.map((p) => (
 						<AddonBoundary key={p.id} id={p.id}>
 							<p.component record={record} knobs={state.knobs} estimates={estimates} />

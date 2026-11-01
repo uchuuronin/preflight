@@ -6,6 +6,17 @@ whole campaign of runs, before you spend real GPU hours or API dollars.
 
 Built during the Meta Global AI Developer Hackathon (Oct 27 to Nov 4, 2026).
 
+## Validation
+
+Every prediction is checked against real full runs, hit or miss. The table between the markers
+below is written by `scripts/score_validation.py --readme README.md` from one manifest of full
+runs; edit the manifest, not the table. The knob response row takes its browser timings from the
+stranger test (`KNOB_MS_OUT=out/knob_ms.json node web/e2e/stranger.mjs`, at 4x CPU slowdown).
+
+<!-- validation:start -->
+Not scored yet: the full runs are scored on Mon Nov 2.
+<!-- validation:end -->
+
 ## Develop
 
 ```bash

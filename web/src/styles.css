@@ -1980,6 +1980,7 @@ a {
 .pf-cal__runs li.is-abstain, .pf-cal__runs li.is-cut { padding: 2px 6px; border-radius: 6px; background: repeating-linear-gradient(135deg, transparent 0 6px, var(--pf-stroke) 6px 7px); }
 .pf-cal__run { font-family: var(--pf-font-mono); }
 .pf-cal__abstain { color: var(--pf-tight); }
+.pf-cal__slots { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .pf-cal__track { position: relative; min-height: 28px; }
 .pf-cal__bar { position: absolute; top: 0; height: 24px; border-radius: 6px; background: var(--pf-accent-glow); border: 1px solid var(--pf-accent); overflow: visible; font-size: 10.5px; white-space: nowrap; }
 .pf-cal__bar span { position: relative; padding: 0 6px; line-height: 22px; }
