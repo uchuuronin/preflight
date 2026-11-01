@@ -69,7 +69,8 @@ try {
 	check("a status line says where the run stands", /memory|Fits|finishes|Not trusted/.test(status), { status });
 
 	// What was measured: a capsule opens a drawer of probe chips, Escape closes it.
-	const measured = page.locator(".pf-tag--button");
+	// The capsule is the tag that opens a drawer (aria-controls); the outcomes toggle (c.hops) shares its look.
+	const measured = page.locator(".pf-tag--button[aria-controls]").first();
 	if (await measured.count()) {
 		await measured.click();
 		const chips = await page.locator(".pf-drawer.is-open .pf-chip").count();
