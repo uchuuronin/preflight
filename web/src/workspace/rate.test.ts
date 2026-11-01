@@ -104,6 +104,17 @@ describe("the visitor's rate", () => {
 		expect(after).toBeCloseTo(before * 2, 6);
 	});
 
+	it("scales an API run's per-token prices, never a rate field, which B doesn't write for token costs (Nov 1)", () => {
+		const k = currentKnobs(apiRec);
+		const c = targetFor(apiRec, "cost")!.id;
+		const o = { kind: "tokens" as const, model: "muse-spark-1.3", inputPerM: 2.5, outputPerM: 8.5 };
+		const plain = base.predict(apiRec, k)[c]!;
+		// Even if an estimate carried a rate, the token path is the per-token ratio.
+		const withField = { ...plain, rate: { quantity: "tokens.total", usd_per_unit: 99, unit: "tokens" } } as never;
+		expect(estimateFactor(apiRec, k, withField, o)).toBeCloseTo(rateFactor(apiRec, k, o), 12);
+		expect(rateFactor(apiRec, k, o)).toBeCloseTo(2, 6);
+	});
+
 	it("goes with the export plan, so a config or sbatch file quotes the same rate", () => {
 		const k = currentKnobs(gpuRec);
 		expect(exportPlan(gpuRec, k, {}, null, null).rate).toMatchObject({ kind: "gpu", usdPerHour: 0.8, source: "table" });

@@ -155,9 +155,12 @@ function scaled(e: Estimate | undefined, f: number): Estimate | undefined {
 }
 
 /**
- * Visitor / the rate an estimate was priced at. Contract 0.6.0 `Estimate.rate` names that rate
- * (quantity x usd_per_unit, with its price row), so where an estimate carries it, it is the
- * denominator, not the browser's lookup of the table; otherwise the table's rate at this setting.
+ * Visitor / the rate an estimate was priced at. For a GPU run, contract 0.6.0 `Estimate.rate` names
+ * that rate (quantity x usd_per_unit, with its price row), so where an estimate carries it, it is the
+ * denominator, not the browser's lookup of the table. An agent or API run carries no single rate (B,
+ * Nov 1: its cost is priced per token from the measured tasks), so the visitor's $/M input and
+ * output scale the table's per-token prices, mixed as the sampled tasks mixed them, whatever rate
+ * field an estimate might carry.
  */
 export function estimateFactor(record: LoadedRecord, knobs: Knobs, e: Estimate | null | undefined, o: RateOverride | null): number {
 	if (!o || !e) return 1;
