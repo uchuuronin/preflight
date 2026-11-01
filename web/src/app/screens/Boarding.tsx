@@ -40,6 +40,8 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	// because the job reached that leg. Re-read when the record changes (record_rev).
 	const rev = events.reduce((n, e) => Math.max(n, e.record_rev ?? 0), 0);
 	const [calls, setCalls] = useState<ModelCallSeen[]>([]);
+	// A new job starts with no tags: the last job's model calls aren't this one's (D's audit 12).
+	useEffect(() => setCalls([]), [jobId]);
 	useEffect(() => {
 		if (!open) return;
 		let gone = false;

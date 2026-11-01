@@ -243,6 +243,7 @@
 	"value.unbounded": "Unbounded",
 	"value.range": "{lo} to {hi}",
 	"value.no_change": "No change",
+	"value.tiny_change": "almost nothing",
 	"unit.tib": "{n} TiB",
 	"unit.gib": "{n} GiB",
 	"unit.mib": "{n} MiB",

@@ -185,5 +185,8 @@ export function fmtRange(lo: number, hi: number, unit: Unit | string): string {
 export function fmtDelta(delta: number, unit: Unit | string): string {
 	if (delta === 0) return t("value.no_change");
 	const sign = delta > 0 ? "+" : "−";
-	return `${sign}${fmt(Math.abs(delta), unit)}`;
+	const shown = fmt(Math.abs(delta), unit);
+	// A change too small to show at this precision reads "almost nothing", never "+US$0".
+	if (!/[1-9]/.test(shown)) return t("value.tiny_change");
+	return `${sign}${shown}`;
 }
