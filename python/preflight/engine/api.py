@@ -708,54 +708,64 @@ def _longest_seen(p) -> float | None:
 	return float(max(rows)) if rows else None
 
 
-def _dataset_longest(record: FlightRecord) -> tuple[float, float, int | None] | None:
-	"""The dataset's longest row as A's recorder measured it (Probe.extras dataset_max_tokens), with the seq_len it
-	was cut at and the rows scanned: from the probe that cut least, since each probe reads rows at its own knobs."""
+def _dataset_longest(record: FlightRecord) -> tuple[float, float, int | None, int | None] | None:
+	"""The training set's longest row as A's recorder measured it (Probe.extras dataset_max_tokens), with the seq_len
+	it was cut at, the rows scanned and the rows in the set: from the probe that cut least, since each probe reads
+	rows at its own knobs."""
 	best = None
 	for p in record.probes:
-		mx = (p.extras or {}).get("dataset_max_tokens") if p.status in OK_PROBE else None
+		ex = p.extras or {}
+		mx = ex.get("dataset_max_tokens") if p.status in OK_PROBE else None
 		if not mx:
 			continue
 		cut = float(_probe_values(record, p).get("seq_len") or 0)
-		rows = (p.extras or {}).get("dataset_rows_scanned")
+		rows, total = ex.get("dataset_rows_scanned"), ex.get("dataset_rows_total")
 		if best is None or cut > best[1] or (cut == best[1] and float(mx) > best[0]):
-			best = (float(mx), cut, int(rows) if rows else None)
+			best = (float(mx), cut, int(rows) if rows else None, int(total) if total else None)
 	return best
 
 
 def _query_seq(record: FlightRecord, values: dict) -> tuple[float | None, str | None]:
-	"""The length a memory query is sized at, and a note saying why. A full run meets the dataset's longest row,
-	which a few probe batches don't see (review, Oct 30), so the tail sets peak memory (Chiya, Nov 1: p99.9 and max
-	belong to peak memory). With the longest row recorded, a query is sized at min(seq_len, longest row); without it,
-	at seq_len, and the readout says the probes' own rows were shorter (C, Nov 1: the LoRA zoo record's probes saw
-	517 tokens, a query was sized at 1,024, and no eval fix could clear the OOM that length implies)."""
+	"""The length a memory query is sized at, and a note saying why. A full run meets the training set's longest
+	row, which a few probe batches don't see (review, Oct 30), so the tail sets peak memory (Chiya, Nov 1: p99.9 and
+	max belong to peak memory). Only a scan of every row sizes a query below seq_len, at min(seq_len, longest row);
+	otherwise it's sized at seq_len, and the readout says why (C, Nov 1: the LoRA zoo record's probes saw 517
+	tokens, a query was sized at 1,024, and no eval fix could clear the OOM that length implies)."""
 	if record.job.lens not in TOKEN_LENSES:
 		return None, None
 	q = float(values.get("seq_len") or 0)
 	known = _dataset_longest(record)
 	if known is not None:
-		mx, cut, rows = known
-		over = f" over {rows:,} rows" if rows else ""
+		mx, cut, rows, total = known
+		if not (rows and total and rows >= total):
+			# review, Nov 1: the recorder scans at most 200,000 rows and stops after 10 s, so a partial scan's longest
+			# row may not be the set's
+			scanned = f"{rows:,} of {total:,}" if rows and total else "part of the"
+			return None, (
+				f"sized for rows of {q:,.0f} tokens, the seq_len: the recorder scanned {scanned} training rows, so "
+				"the set's longest row isn't known"
+			)
+		over = f" over all {rows:,} training rows"
 		if cut and mx >= cut:  # the probe's own cut hid the longest row: rows reach at least the cut
 			if q and q > cut:
 				return None, (
-					f"sized for rows of {q:.0f} tokens, the seq_len: rows reach at least {cut:.0f}{over}, and past "
+					f"sized for rows of {q:,.0f} tokens, the seq_len: rows reach at least {cut:,.0f}{over}, and past "
 					"that isn't measured"
 				)
 			return (
 				None,
-				f"sized for rows of {q:.0f} tokens, the seq_len: the dataset has rows that long{over}",
+				f"sized for rows of {q:,.0f} tokens, the seq_len: the training set has rows that long{over}",
 			)
 		seq = min(q, mx) if q else mx
-		return (
-			seq,
-			f"sized for the dataset's longest row, {seq:.0f} tokens (measured{over}), which a full run meets",
+		return seq, (
+			f"sized for the training set's longest row, {seq:,.0f} tokens (measured{over}), which a full run meets; "
+			"an eval set's rows aren't measured, so eval is sized the same"
 		)
 	seen = [x for x in (_longest_seen(p) for p in record.probes if p.status in OK_PROBE) if x]
 	if q and seen and max(seen) < 0.9 * q:
 		return None, (
-			f"sized for rows of {q:.0f} tokens, the seq_len, as a full run may meet them: the probes' rows reached "
-			f"{max(seen):.0f}, and the dataset's longest row isn't recorded"
+			f"sized for rows of {q:,.0f} tokens, the seq_len, as a full run may meet them: the probes' rows reached "
+			f"{max(seen):,.0f}, and the dataset's longest row isn't recorded"
 		)
 	return None, None
 
@@ -805,7 +815,11 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	try:
 		arch, setup, shape = knobs.setup_from(sm, values)
 	except (ValueError, AttributeError) as exc:
-		return _empirical_memory(record, values, capacity, str(exc))
+		res = _empirical_memory(record, values, capacity, str(exc))
+		_seq, seq_note = _query_seq(record, values)  # review, Nov 1: the no-shape path is sized the same way
+		if seq_note and res.peak.status != "abstain":
+			res = replace(res, peak=_with_note(res.peak, seq_note), oom=_with_note(res.oom, seq_note))
+		return res
 	shape, sized_values = _sized(shape, values, _padded_seq(record, values))
 	if eval_off:
 		setup = replace(setup, eval_batch=None)  # predict_as_run: the probe ran this point without eval

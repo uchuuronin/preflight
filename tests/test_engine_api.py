@@ -1113,22 +1113,31 @@ def _lora_l4(**extras):
 def test_a_query_is_sized_by_the_dataset_s_longest_row_when_the_recorder_found_it():
 	"""C, Nov 1: the LoRA zoo record read 30.7 GiB at eval batch 4, sized at seq_len 1,024 while its rows reached 517."""
 	plain = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
-	shorter = api.predict(
-		_lora_l4(dataset_max_tokens=700, dataset_rows_scanned=51760), {"eval_batch_size": 4}
-	).root
+	whole = {"dataset_max_tokens": 700, "dataset_rows_scanned": 51760, "dataset_rows_total": 51760}
+	shorter = api.predict(_lora_l4(**whole), {"eval_batch_size": 4}).root
 	assert shorter["memory.peak"].point < 0.8 * plain.point
-	assert "longest row, 700 tokens (measured over 51,760 rows)" in shorter["memory.peak"].reason
+	assert "longest row, 700 tokens (measured over all 51,760 training rows)" in shorter["memory.peak"].reason
+
+
+def test_a_partial_scan_never_sizes_a_query_below_seq_len():
+	"""Review, Nov 1: 1,000 rows of 5M scanned, longest 520, read 'unlikely' for a run that may meet 1,024."""
+	plain = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
+	part = {"dataset_max_tokens": 520, "dataset_rows_scanned": 1000, "dataset_rows_total": 5_000_000}
+	p = api.predict(_lora_l4(**part), {"eval_batch_size": 4}).root["memory.peak"]
+	assert p.point == pytest.approx(plain.point)
+	assert "scanned 1,000 of 5,000,000 training rows" in p.reason
 
 
 def test_without_the_longest_row_the_readout_says_it_sized_for_seq_len():
 	p = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
-	assert "sized for rows of 1024 tokens, the seq_len" in p.reason and "reached 517" in p.reason
+	assert "sized for rows of 1,024 tokens, the seq_len" in p.reason and "reached 517" in p.reason
 
 
 def test_rows_that_reach_the_probe_s_cut_keep_seq_len_and_say_so():
-	p = api.predict(_lora_l4(dataset_max_tokens=1024), {"eval_batch_size": 4}).root["memory.peak"]
+	whole = {"dataset_max_tokens": 1024, "dataset_rows_scanned": 51760, "dataset_rows_total": 51760}
+	p = api.predict(_lora_l4(**whole), {"eval_batch_size": 4}).root["memory.peak"]
 	assert p.point == pytest.approx(api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"].point)
-	assert "the dataset has rows that long" in p.reason
+	assert "the training set has rows that long" in p.reason
 
 
 def test_the_eval_wedge_carries_the_measured_context():
