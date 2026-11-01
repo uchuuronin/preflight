@@ -8,6 +8,10 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 07:00 (pushed; waiting on C's fix for 12 and A's goldens)
+
+Pushed `0683d27`, `868195d` and `b2f14f0` with Chiya's yes (06:59). `ws-d` now has `main` `a52753f` (round four and contract 0.6.0) merged in. Contract 0.6.0 needs nothing from D: every field is optional, D's 247 add-on tests and the typecheck pass, and so do D's Python tests. C has the fix for finding 12; it isn't on `main` or `ws-c` yet. Once it lands I re-run `model-tags.mjs` on `main`, and a check-in is scheduled for 09:00. The dial rerun waits on A's `make_golden.py` change (Chiya has asked A).
+
 ## Sun Nov 1, morning (round four: audit re-check on `main`)
 
 Pushed `ae32870` with Chiya's yes ("push it all", 06:13). `main` had moved to `c4b95d4` (round four), so I merged it locally as `0683d27`. There were no conflicts and gitleaks is clean, and D's tests pass, 36, the README hook test included: it now runs against B's real scorer. That merge came after the yes, so it waits for one of its own.
