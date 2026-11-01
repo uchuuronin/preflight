@@ -1,0 +1,8 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-ZcyvPvlcxkZSYJSDmPQbVt
+✓ Created objects.
+scanned 2 of 15 records
+wrote out/lora-live-nov1.record.json (166333 bytes), share token replaced
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-ZcyvPvlcxkZSYJSDmPQbVt
