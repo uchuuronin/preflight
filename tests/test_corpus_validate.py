@@ -119,3 +119,43 @@ def test_a_classifier_verdict_shows_its_runs_not_a_made_up_proportion():
 	}
 	c = V.divergence_row(rep).cells()
 	assert c[3] == "40 runs" and c[4] == "" and c[5] == "miss"
+
+
+def test_a_hit_is_confident_only_when_the_wilson_lower_end_reaches_90():
+	# Chiya, Nov 1
+	few = V._share_row("m", "t", "o", [(str(i), True) for i in range(5)])
+	assert few.cells()[5] == "hit, few runs"  # 5 of 5: Wilson 57% to 100%
+	many = V._share_row("m", "t", "o", [(str(i), True) for i in range(40)])
+	assert many.cells()[5] == "hit, confident"  # 40 of 40: Wilson 91% to 100%
+	assert V._share_row("m", "t", "o", [("a", False)] * 5).cells()[5] == "miss"
+
+
+def test_memory_is_scored_on_a_run_that_finished(tmp_path, monkeypatch):
+	# review, Nov 1: the bare run says "finished" or "steps", never "ok", so memory was never scored
+	import shutil
+
+	from preflight.engine import api
+	from preflight.schema.prediction import Estimate
+
+	gt = json.loads((FIX / "ground_truth_finetune_lora_hf.json").read_text())
+	shutil.copy(FIX.parent / "b-a-smoke-l4-main-4.record.json", tmp_path / "r.json")
+	peak = gt["bare"]["peak_reserved_bytes"]
+	est = Estimate(
+		point=peak * 1.05,
+		lo=peak * 0.9,
+		hi=peak * 1.2,
+		unit="bytes",
+		status="predicted",
+		model_id="m",
+		source="exact",
+	)
+	monkeypatch.setattr(
+		api, "predict", lambda rec, values=None: type("P", (), {"root": {"memory.peak": est}})()
+	)
+	run = {"script": "lora", "set": "zoo", "record": "r.json", "ground_truth": "gt.json"}
+	for ended, scored in (("finished", True), ("steps", True), ("oom", False), ("RuntimeError", False)):
+		gt["bare"]["ended"] = ended
+		(tmp_path / "gt.json").write_text(json.dumps(gt))
+		s = V.score_run(run, tmp_path)
+		assert (s.memory is not None) is scored, ended
+		assert s.memory is (True if scored else None) and s.memory_inside is (True if scored else None)

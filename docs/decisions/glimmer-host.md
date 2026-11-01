@@ -40,9 +40,12 @@ A proposed a Modal L4 at 4 bits behind vLLM's OpenAI server, scaled to zero (`do
   - At most 1 container, and at most 3 private triages per visitor.
   - A $3 daily cap, shared with the probe budget's cap.
   - The page says plainly that visitors' code reaches our Modal container, not Meta or Baseten.
-- **One smoke run, with Chiya's yes, measures both:** a cold start plus 5 triages on an L4 and the same on an A100-40GB. That's about $0.20 by the table above, capped at $0.50. It calibrates the serving model on Glimmer and measures the cold start, which is a guess today (about 90 s).
+- **One smoke run measures both, and only once the weights' terms are confirmed** (Chiya, Nov 1: no test run until the download terms and the licence are confirmed in writing, with the link here): a cold start plus 5 triages on an L4 and the same on an A100-40GB. That's about $0.20 by the table above, capped at $0.50. It calibrates the serving model on Glimmer and measures the cold start, which is a guess today (about 90 s).
 
-**What blocks shipping either path:** whether Glimmer's weights can be downloaded, and under what licence. Neither the playbook nor the plan says so. If they can't be downloaded, private mode can't ship as planned, and the readout should say so instead of offering it.
+**What blocks shipping either path:** whether Glimmer's weights can be downloaded, and under what licence. Neither the playbook nor the plan says so.
+- **Download terms:** not yet confirmed (link goes here).
+- **Licence:** not yet confirmed (link goes here).
+- **Until both are confirmed in writing, Glimmer stays "deferred: no host"** (Chiya, Nov 1), and the readout says that instead of offering private mode. If the terms don't allow self-hosting, it stays deferred.
 
 ## Open questions for A
 

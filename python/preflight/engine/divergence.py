@@ -102,7 +102,7 @@ def config_features(cfg: dict) -> list[float | None]:
 	def has(k):
 		return k in c and c[k] is not None
 
-	prec = str(c["precision"]).lower() if has("precision") else None
+	prec = str(c["precision"]).lower().removeprefix("torch.") if has("precision") else None
 	lr = _f(c.get("lr")) if has("lr") else None
 	init = _f(c.get("init_std")) if has("init_std") else None
 	return [
@@ -115,7 +115,7 @@ def config_features(cfg: dict) -> list[float | None]:
 		(1.0 if (_f(c["z_loss"]) or 0.0) > 0 else 0.0) if has("z_loss") else None,
 		(1.0 if (_f(c["beta2"]) or 0.0) > 0.99 else 0.0) if has("beta2") else None,
 		# the sweep writes grad_clip None for no clipping; a probe without the knob doesn't say
-		(1.0 if c["grad_clip"] in (None, 0, 0.0) else 0.0) if "grad_clip" in c else None,
+		(1.0 if c["grad_clip"] in (0, 0.0, "none", "None") else 0.0) if has("grad_clip") else None,
 	]
 
 

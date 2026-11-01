@@ -47,7 +47,9 @@ def runs_of(rows: list[dict]) -> list[dict]:
 		series, label = res.get("series"), res.get("label")
 		if not series or not label or label.get("reason") == "too short to label":
 			continue
-		p = r["config"]["params"]
+		p = dict(r["config"]["params"])
+		if p.get("grad_clip") is None:  # the sweep writes None for no clipping; a user's None means not known
+			p["grad_clip"] = 0.0
 		fam = (p.get("precision"), bool(p.get("qk_norm")), p.get("init_std"))
 		out.append({"key": r.get("key"), "series": series, "label": label, "cfg": p, "family": fam})
 	return out

@@ -153,3 +153,11 @@ def test_the_report_gives_held_out_false_alarms(sweep):
 	rep = fd.summarise(fd.evaluate(sweep))
 	fa = rep["false_alarms"]
 	assert fa["stable"] == 80 and 0 <= fa["alarms"] <= fa["stable"]
+
+
+def test_settings_read_the_way_users_and_the_sweep_write_them():
+	# review, Nov 1
+	assert D.config_features({"precision": "torch.bfloat16"})[4] == 1.0
+	assert D.config_features({"grad_clip": None})[8] is None  # a user's unset knob: unknown
+	assert D.config_features({"grad_clip": 0.0})[8] == 1.0  # the sweep's no clipping, as the fit writes it
+	assert D.config_features({"grad_clip": 1.0})[8] == 0.0

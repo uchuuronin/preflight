@@ -651,3 +651,28 @@ def test_with_the_feature_off_another_vendor_keeps_k1s_band(ft, monkeypatch):
 	monkeypatch.setitem(api.FEATURES, "steptime_cross_gpu", False)
 	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
 	assert amd.status == "predicted" and "another vendor" not in (amd.reason or "")
+
+
+def test_the_step_band_covers_a_few_step_median_on_varying_batches():
+	# Chiya, Nov 1: the LoRA full run's median (1.87 s) sat outside a band built from the probe's 1.68 s; checked on
+	# that ground truth only (tests/fixtures/validation), never on the unseen scripts
+	from preflight.schema import load_record
+
+	rec = load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
+	gt = json.loads(
+		(Path(__file__).parent / "fixtures" / "validation" / "ground_truth_finetune_lora_hf.json").read_text()
+	)
+	from preflight.corpus.validate import steady_step_s
+
+	e = api.predict(rec).root["time.step"]
+	assert e.lo <= steady_step_s(gt) <= e.hi
+	assert "batches vary in length" in e.reason
+
+
+def test_length_spread_grows_with_the_tail_and_stops_at_seq_len():
+	narrow = api._length_spread(150, 300, 400, 1024, 4)
+	wide = api._length_spread(150, 900, 1000, 1024, 4)
+	assert 0 < narrow < wide
+	capped = api._length_spread(150, 900, 1000, 160, 4)
+	assert capped < narrow  # every batch hits seq_len, so steps barely vary
+	assert api._length_spread(150, 150, 150, None, 4) < 0.05

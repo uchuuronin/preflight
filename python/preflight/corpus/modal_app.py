@@ -110,6 +110,11 @@ class Sweeper:
 
 		from preflight.corpus import sweep
 
+		# a warm container reused for the next wave must not carry the last wave's watchdog (review, Nov 1)
+		old = getattr(self, "_watchdog", None)
+		if old is not None:
+			old.cancel()
+			self._watchdog = None
 		# first, before any import or volume work: a restart after preemption that comes up past the end does nothing
 		if end_at is not None and _time.time() >= end_at:
 			return [{"status": "batch", "wall_s": 0.0, "reload_s": 0.0, "commit_s": 0.0, "late": True}]
@@ -117,7 +122,10 @@ class Sweeper:
 			end_at is not None
 		):  # a hang anywhere (reload, a syscall) can't outlast the wave's end and its margin
 			left = end_at + sweep.END_MARGIN_S - _time.time()
-			threading.Timer(max(1.0, left), lambda: os._exit(70)).start()
+			dog = threading.Timer(max(1.0, left), lambda: os._exit(70))
+			dog.daemon = True  # never keeps an idle container alive at scale-down
+			dog.start()
+			self._watchdog = dog
 
 		import torch
 
@@ -183,6 +191,9 @@ class Sweeper:
 				"commit_s": round(commit_s, 1),
 			}
 		)
+		if getattr(self, "_watchdog", None) is not None:  # the batch is done: no watchdog past it
+			self._watchdog.cancel()
+			self._watchdog = None
 		return out
 
 
@@ -425,7 +436,11 @@ def main(
 					print(f"[{gpu}] a batch failed: {type(res).__name__}: {res}")
 					continue
 				for r in res:
-					if r.get("status") == "batch":
+					if r.get("status") == "batch" and r.get("late"):
+						print(
+							f"[{gpu}] a batch started after the wave's end time (a restart after preemption?); it ran nothing"
+						)
+					elif r.get("status") == "batch":
 						print(
 							f"[{gpu}] batch: {r['wall_s']} s in the container, reload {r['reload_s']} s, commits {r['commit_s']} s"
 						)

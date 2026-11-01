@@ -37,9 +37,12 @@ from pathlib import Path
 
 from preflight.engine import conformal
 
-WITHIN_SHARE = (
-	0.9  # decision (B, Oct 31; Chiya to confirm): a "within X%" target is a hit when 90% of runs are
-)
+# cited: Chiya, Nov 1: a "within X%" target is a hit when at least 90% of runs are within it, and the hit is
+# "confident" only when the Wilson 95% lower bound is at least 90% ("hit, few runs" otherwise)
+WITHIN_SHARE = 0.9
+CONFIDENT = 0.9
+# cited: recorder/bare.py, a bare run that ran to its end ("finished") or its step budget ("steps"); review, Nov 1
+FINISHED = ("finished", "steps")
 WARMUP_STEPS = 3  # guess: the bare run's first steps compile and warm caches; the steady step comes after
 OOM_ALARM = 0.5  # decision: P(OOM) at or above this is an alarm; below it, a run that ran out is a miss
 COVERAGE_TARGET = 0.88  # cited: plan, "90% intervals cover at least 88%"
@@ -88,9 +91,16 @@ class Row:
 			self.measured_on,
 			counts,
 			f"{lo:.0%} to {hi:.0%}" if self.n else "",
-			"hit" if self.hit else "miss",
+			verdict(self.hit, lo),
 			self.note,
 		]
+
+
+def verdict(hit: bool, wilson_lo: float) -> str:
+	"""A miss, a hit whose Wilson lower end reaches CONFIDENT, or a hit on too few runs to say so."""
+	if not hit:
+		return "miss"
+	return "hit, confident" if wilson_lo >= CONFIDENT else "hit, few runs"
 
 
 # ---------------------------------------------------------------- reading
@@ -182,7 +192,7 @@ def score_run(run: dict, base: Path) -> Scored:
 	mem = pred.get("memory.peak")
 	s.oom_actual = ran_out(gt)
 	# only a run that finished showed its full need: one that ran out, errored or timed out stopped short of it
-	if bare.get("ended") == "ok" and peak:
+	if bare.get("ended") in FINISHED and peak:
 		s.memory = _within(mem.point if mem and mem.status != "abstain" else None, peak, 0.10)
 		s.memory_inside = _inside(mem, peak)
 	oom = pred.get("risk.oom")
@@ -484,7 +494,8 @@ def markdown(rows: list[Row], stamp: str = "") -> str:
 		lines.append("| " + " | ".join(esc(x) for x in c) + " |")
 	foot = (
 		f'\nA "within" target is a hit when at least {WITHIN_SHARE:.0%} of runs are within it; intervals are Wilson '
-		"95% on the proportion. Unseen scripts are never tuned on."
+		f'95% on the proportion, and a hit is "confident" only when its lower end is at least {CONFIDENT:.0%} '
+		'("hit, few runs" otherwise). Unseen scripts are never tuned on.'
 	)
 	return "\n".join(lines) + foot + (f" {stamp}" if stamp else "") + "\n"
 
