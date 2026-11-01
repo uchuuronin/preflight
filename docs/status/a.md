@@ -31,6 +31,10 @@ Updated Sun Nov 1, 01:30 ET.
 - Spark Open triage (item 29, behind harness.spark_open_triage): calls run one after another
   after the probes, up to 30 s each, outside the job's probe time budget and with no cancel check;
   the quote check only asks that the quoted line (8 characters or more) appears in the log tail.
+- GNN probes read graph sizes from loader batches (PyG's loaders, a DataLoader of Data objects): a
+  script that samples subgraphs by hand, as zoo/gnn_pyg does, gets no graph counts, and with no
+  loader the forward can't be told from the sampling, so both land in "other" (Nov 1 L4 probe:
+  60% other). Fix if wanted: count each conv layer's edges at SAGEConv/MessagePassing forward.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
