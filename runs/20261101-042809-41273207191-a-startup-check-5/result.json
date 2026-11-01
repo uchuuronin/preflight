@@ -1,0 +1,11 @@
+{
+	"name": "20261101-042809-41273207191-a-startup-check-5",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41273207191",
+	"ref": "ws-a",
+	"sha": "5344a9bc94a0c22988a022244a7ff7e04b500e64",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::startup_check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T04:29:02Z"
+}
