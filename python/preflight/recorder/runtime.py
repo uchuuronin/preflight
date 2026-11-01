@@ -386,6 +386,8 @@ class Recorder:
 		self._all_opts: weakref.WeakSet = weakref.WeakSet()
 		self._output_watch_calls = 0
 		self.trainer_logs: list[dict] = []
+		self._entropy_mc: list = []  # (optimizer steps so far, the policy's mean -log p as a device scalar)
+		self.rl_entropy_estimated = False
 		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
 		# be read without trusting the trainer's own logs; the group size from the trainer
 		self.reward_calls: list[dict] = []
@@ -1189,7 +1191,9 @@ class Recorder:
 			# log-probs (num_iterations > 1) go through it too, with the policy as the model
 			def logps(self_, *args, **kwargs):
 				if not no_grad_call():
-					return orig(self_, *args, **kwargs)  # the policy's own forward: part of the update
+					out = orig(self_, *args, **kwargs)  # the policy's own forward: part of the update
+					rec._note_entropy(out, args[2] if len(args) > 2 else kwargs.get("attention_mask"))
+					return out
 				ref = getattr(self_, "ref_model", None)
 				model = args[0] if args else kwargs.get("model")
 				if ref is not None:
@@ -1810,6 +1814,19 @@ class Recorder:
 			}
 		}
 
+	def _note_entropy(self, logps, attention_mask) -> None:
+		"""The policy's mean -log p over the completion tokens it was trained on: on sampled tokens a
+		Monte Carlo estimate of its entropy (biased when sampling ran at a temperature other than 1).
+		Kept on the device, so the step gains no sync; read at the end."""
+		with suppress(Exception), torch.no_grad():
+			lp = logps.detach()
+			mask = (
+				attention_mask[:, -lp.shape[1] :].to(lp.dtype)
+				if attention_mask is not None
+				else torch.ones_like(lp)
+			)
+			self._entropy_mc.append((len(self.steps), -(lp * mask).sum() / mask.sum().clamp(min=1)))
+
 	def _rl_summary(self) -> dict:
 		logs = self.trainer_logs
 		gen = self._gen_summary().get("generation")
@@ -1836,6 +1853,17 @@ class Recorder:
 		):
 			if col(kind):
 				rl[name] = col(kind)
+		if "entropy" not in rl and self._entropy_mc:
+			# TRL 0.14 logs no entropy: the estimate from the policy's own log-probs, one per optimizer step
+			by_step: dict[int, list[float]] = {}
+			with suppress(Exception):
+				for step, t in self._entropy_mc:
+					v = float(t)
+					if math.isfinite(v):
+						by_step.setdefault(step, []).append(v)
+			if by_step:
+				rl["entropy"] = [statistics.fmean(v) for _, v in sorted(by_step.items())]
+				self.rl_entropy_estimated = True
 		groups = reward_groups(self.reward_calls, self.group_size)
 		counts = groups.pop("_counts", {})
 		rl.update(groups)
@@ -1850,6 +1878,8 @@ class Recorder:
 			m = col("len_mean")
 			mx = col("len_max") or m
 			rl["response_length"] = {"mean": statistics.fmean(m), "p95": max(mx), "max": max(mx), "n": len(m)}
+		if self.rl_entropy_estimated:
+			counts = {**counts, "rl_entropy_estimated": 1.0}  # rl.entropy is the Monte Carlo estimate
 		return (
 			{"rl": rl} if rl else {}
 		) | counts  # counts: top-level extras (RLSignals has no field for them)
