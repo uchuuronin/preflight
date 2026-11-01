@@ -61,6 +61,26 @@ describe("the visitor's rate", () => {
 		}
 	});
 
+	it("keeps risk-lowering moves on a failing run with nothing that clears it, priced at the visitor's rate", () => {
+		const fail = "risk.oom";
+		const costId = targetFor(gpuRec, "cost")!.id;
+		const k = currentKnobs(gpuRec);
+		const est = (point: number, unit: string) => ({ point, lo: point, hi: point, unit, status: "predicted", model_id: "m", source: "exact" }) as never;
+		// A stub engine: the run is failing (90%), and the only move lowers the risk but costs more.
+		const stub = {
+			name: "grid" as const,
+			ready: () => true,
+			predict: (_r: unknown, kn: Record<string, unknown>) => ({ [costId]: est(kn.batch_size === 1 ? 2 : 1, "usd"), [fail]: est(kn.batch_size === 1 ? 0.5 : 0.9, "probability") }),
+			sensitivity: () => [],
+			moves: () => [{ knobId: "batch_size", to: 1, targetId: costId, delta: 1, clearsFailure: false, fit: "tight" as const, risk: 0.5, relative: 1 }],
+		};
+		const rec = { ...gpuRec, predictions: { ...gpuRec.predictions, targets: [...gpuRec.predictions.targets.filter((t) => t.id !== fail), { id: fail, label_key: "x", unit: "probability", readout: "risk" } as never] } };
+		const got = withRate(stub as never, { kind: "gpu", gpu: "L4", usdPerHour: 1.6 }).moves(rec, { kind: "min_cost" }, { knobs: k });
+		expect(got.map((m) => m.knobId)).toEqual(["batch_size"]);
+		// Its cost change at the visitor's rate (twice the table's): 2 x (2 - 1).
+		expect(got[0]!.delta).toBeCloseTo(2, 9);
+	});
+
 	it("leaves another GPU at the table's rate", () => {
 		const o = { kind: "gpu" as const, gpu: "L4", usdPerHour: 0 };
 		const gpuKnob = gpuRec.knobs.find((k) => k.id === "gpu_type");

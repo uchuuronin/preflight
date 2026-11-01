@@ -99,7 +99,8 @@ export function CostLine() {
 					</button>
 				</span>
 			) : null}{" "}
-			<span aria-hidden="true">=</span> <b title={tr.kind === "tokens" ? t("cost.line.tokens_note") : undefined}>{total}</b>
+			<span aria-hidden="true">=</span> <b>{total}</b>
+			{tr.kind === "tokens" ? <small className="pf-costline__note">{t("cost.line.tokens_note_short")}</small> : null}
 			{open ? (
 				<RateBox
 					id={id}

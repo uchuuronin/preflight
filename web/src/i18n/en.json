@@ -972,8 +972,8 @@
 	"cost.box.save": "Use this rate",
 	"cost.line.gpu_hours_one": "{n} GPU-hours",
 	"cost.line.tokens_one": "{n} tokens",
-	"cost.line.tokens_note": "The range also allows for tasks that could run away, so it can be wider than tokens times the rate.",
 	"rl.length.cap_moved": "You've set the cap to {now}; these lengths were measured at {was}.",
 	"frontier.point_on": "On the frontier.",
-	"frontier.point_off": "Another model is both cheaper and more often right."
+	"frontier.point_off": "Another model is both cheaper and more often right.",
+	"cost.line.tokens_note_short": "The range also allows for tasks that could run away, so it can be wider than tokens times the rate."
 }

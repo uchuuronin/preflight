@@ -13,7 +13,8 @@
  */
 import table from "./record/prices.json";
 import type { Move, PredictionProvider, SensitivityOptions } from "./provider/PredictionProvider";
-import { targetFor } from "./record/model";
+import { failureTarget, targetFor } from "./record/model";
+import { FAILS_AT } from "./record/terms";
 import { chosenGpu, resolveGpu } from "./record/terms";
 import type { Estimate, KnobValue, LoadedRecord, Objective, Prediction } from "./record/types";
 
@@ -185,23 +186,29 @@ export function withRate(base: PredictionProvider, o: RateOverride | null): Pred
 			if (!costId || !ms.some((m) => m.targetId === costId)) return ms;
 			const knobs = opts?.knobs ?? {};
 			const before = priced(record, knobs, base.predict(record, knobs), o)[costId]?.point;
-			// Moves that clear a predicted failure stay, in the engine's order and first: a run that
-			// would crash needs them whatever they cost. Review, Nov 1: filtering them dropped the OOM fix.
-			const clearing = ms.filter((m) => m.clearsFailure);
-			const rest: Move[] = [];
-			for (const m of ms) {
-				if (m.clearsFailure) continue;
-				if (m.targetId !== costId || typeof before !== "number") {
-					rest.push(m);
-					continue;
-				}
+			// On a run predicted to fail, moves that clear the failure or lower its risk stay, in the
+			// engine's order and first, whatever they cost: a run that would crash needs them. Their cost
+			// change is quoted at the visitor's rate. Review, Nov 1: filtering them dropped the OOM fix.
+			const fail = failureTarget(record);
+			const riskNow = fail ? base.predict(record, knobs)[fail]?.point : null;
+			const failing = typeof riskNow === "number" && riskNow >= FAILS_AT;
+			const keeps = (m: Move) => m.clearsFailure || (failing && m.risk !== null && m.risk < (riskNow as number));
+			const repriced = (m: Move): Move | null => {
+				if (m.targetId !== costId || typeof before !== "number") return m;
 				const next = { ...knobs, [m.knobId]: m.to };
 				const after = priced(record, next, base.predict(record, next), o)[costId]?.point;
-				if (typeof after !== "number") continue;
+				if (typeof after !== "number") return null;
 				const delta = after - before;
+				return { ...m, delta, relative: before !== 0 ? delta / Math.abs(before) : null };
+			};
+			const clearing = ms.filter(keeps).map((m) => repriced(m) ?? m);
+			const rest: Move[] = [];
+			for (const m of ms) {
+				if (keeps(m)) continue;
+				const r = repriced(m);
 				// At the visitor's rate a "saving" that saves nothing isn't offered.
-				if (delta >= 0) continue;
-				rest.push({ ...m, delta, relative: before !== 0 ? delta / Math.abs(before) : null });
+				if (!r || (r.targetId === costId && r.delta >= 0)) continue;
+				rest.push(r);
 			}
 			const costMoves = rest.filter((m) => m.targetId === costId).sort((a, b) => a.delta - b.delta);
 			return [...clearing, ...costMoves, ...rest.filter((m) => m.targetId !== costId)];

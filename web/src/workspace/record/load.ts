@@ -3,6 +3,7 @@
  * and cost nothing to open; anything else is read from the API by its share token. A share
  * link never carries the record's ULID, because a ULID leaks its creation time.
  */
+import { flag } from "../../lib/flags";
 import { t } from "../../lib/i18n";
 import type { FlightRecord, Lens, LoadedRecord } from "./types";
 import { normaliseRecord } from "./types";
@@ -103,7 +104,8 @@ export const SAMPLES: Sample[] = [
 export const DEFAULT_SAMPLE = "lora-7b";
 
 export async function loadRecord(ref: string): Promise<LoadedRecord> {
-	const sample = SAMPLES.find((s) => s.id === ref);
+	// A sample listed only behind a flag opens only with it on.
+	const sample = SAMPLES.find((s) => s.id === ref && (!s.flag || flag(s.flag)));
 	if (sample) return normaliseRecord(await sample.load());
 	const url = `${API_BASE}/v1/records/${encodeURIComponent(ref)}`;
 	let res = await fetch(url, { credentials: "same-origin" });
