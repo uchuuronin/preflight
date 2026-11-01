@@ -136,3 +136,20 @@ def test_the_engine_target_is_behind_its_flag(monkeypatch):
 	assert e.status == "abstain" and e.unit == "probability"  # no fitted model yet, or no loss series
 	(card,) = api._cards({D.MODEL_ID})
 	assert card.kind == "classifier"
+
+
+def test_user_knob_ids_reach_the_settings_and_unknowns_sit_at_the_average():
+	# review, Nov 1: inference once read none of the user's knob ids, so every probe looked unwarmed and unclipped
+	assert D.config_features({"warmup_steps": 100})[1] == 0.0
+	assert D.config_features({"dtype": "bf16"})[4] == 1.0
+	assert all(v is None for v in D.config_features({}))
+	n = len(D.FEATURES)
+	m = D.Model(tuple(float(i) for i in range(n)), (1.0,) * n, (1.0,) * n, 0.0)
+	assert m.prob([None] * n) == 0.5  # every unknown at its mean: no push either way
+
+
+def test_the_report_gives_held_out_false_alarms(sweep):
+	fd = _fit_script()
+	rep = fd.summarise(fd.evaluate(sweep))
+	fa = rep["false_alarms"]
+	assert fa["stable"] == 80 and 0 <= fa["alarms"] <= fa["stable"]

@@ -8,7 +8,10 @@ sweep is the same small GPT, so "grouped by architecture" can only mean grouped 
   step it could score, when the onset comes sooner); a stable run's score is the highest P over the whole run.
 - Lead: the warning line is set on the training folds for at most 10% false alarms on stable runs; a diverged
   run's lead is onset minus the first step at or above it (0 when it never warns). Median over diverged runs.
-Both with a 95% bootstrap interval over families. Hyperparameters are fixed here, before any fold is scored.
+Both with a 95% bootstrap interval over families. The warning line comes from inner folds inside the training
+runs, and the report gives its held-out false-alarm rate. The shipped reliability bins are the out-of-fold ones
+(held-out runs), while the shipped model is fitted on every run. Hyperparameters are fixed here, before any fold
+is scored.
 """
 
 from __future__ import annotations
@@ -70,28 +73,62 @@ def auroc(pos: list[float], neg: list[float]) -> float:
 	return wins / (len(pos) * len(neg))
 
 
-def evaluate(runs: list[dict]) -> dict:
-	fams = sorted({r["family"] for r in runs}, key=str)
-	rng = np.random.default_rng(SEED)
-	order = list(rng.permutation(len(fams)))
-	fold_of = {fams[i]: k % FOLDS for k, i in enumerate(order)}
+def _matrix(rows: list[list[float | None]]) -> np.ndarray:
+	"""Feature rows as floats; an unknown setting gets its column's mean, as the model reads it at inference."""
+	x = np.asarray([[math.nan if v is None else v for v in r] for r in rows], dtype=float)
+	if x.size:
+		col = np.nanmean(np.where(np.isnan(x), np.nan, x), axis=0)
+		col = np.where(np.isnan(col), 0.0, col)
+		x = np.where(np.isnan(x), col, x)
+	return x
+
+
+def _fit_model(runs, feats, idx) -> D.Model | None:
+	x = _matrix([f for i in idx for f in feats[i][1]])
+	y = np.asarray([float(runs[i]["label"]["diverged"]) for i in idx for _ in feats[i][1]])
+	if len(set(y)) < 2:
+		return None
+	mean, scale, coef, b = D.fit(x, y)
+	return D.Model(tuple(mean), tuple(scale), tuple(coef), b)
+
+
+def _folds(runs, idx, k, seed):
+	fams = sorted({runs[i]["family"] for i in idx}, key=str)
+	order = list(np.random.default_rng(seed).permutation(len(fams)))
+	fold_of = {fams[o]: n % k for n, o in enumerate(order)}
+	return [
+		(
+			[i for i in idx if fold_of[runs[i]["family"]] != f],
+			[i for i in idx if fold_of[runs[i]["family"]] == f],
+		)
+		for f in range(k)
+	]
+
+
+def warning_line(runs, feats, idx) -> float:
+	"""The line for at most FALSE_ALARM false alarms, from stable runs the model didn't train on: inner folds by
+	family inside the training runs (review, Nov 1: the training fit's own scores set it too low)."""
+	stable = []
+	for tr, te in _folds(runs, idx, FOLDS - 1, SEED + 1):
+		m = _fit_model(runs, feats, tr)
+		if m is None:
+			continue
+		stable += [
+			max((m.prob(f) for f in feats[i][1]), default=0.0) for i in te if not runs[i]["label"]["diverged"]
+		]
+	return float(np.quantile(stable, 1 - FALSE_ALARM)) if stable else 0.5
+
+
+def evaluate(runs: list[dict]) -> list[dict]:
 	feats = [samples(r) for r in runs]
 	oof: list[dict] = []
-	for k in range(FOLDS):
-		tr = [i for i, r in enumerate(runs) if fold_of[r["family"]] != k]
-		te = [i for i, r in enumerate(runs) if fold_of[r["family"]] == k]
+	for tr, te in _folds(runs, list(range(len(runs))), FOLDS, SEED):
 		if not te or not tr:
 			continue
-		x = np.asarray([f for i in tr for f in feats[i][1]])
-		y = np.asarray([float(runs[i]["label"]["diverged"]) for i in tr for _ in feats[i][1]])
-		if len(set(y)) < 2:
+		m = _fit_model(runs, feats, tr)
+		if m is None:
 			continue
-		mean, scale, coef, b = D.fit(x, y)
-		m = D.Model(tuple(mean), tuple(scale), tuple(coef), b)
-		stable_max = [
-			max((m.prob(f) for f in feats[i][1]), default=0.0) for i in tr if not runs[i]["label"]["diverged"]
-		]
-		tau = float(np.quantile(stable_max, 1 - FALSE_ALARM)) if stable_max else 0.5
+		tau = warning_line(runs, feats, tr)
 		for i in te:
 			ts, xs = feats[i]
 			ps = [m.prob(f) for f in xs]
@@ -110,6 +147,7 @@ def evaluate(runs: list[dict]) -> dict:
 					"score": max(early, default=0.0),
 					"lead": lead,
 					"p_max": max(ps, default=0.0),
+					"alarm": max(ps, default=0.0) >= tau,
 				}
 			)
 	return oof
@@ -153,6 +191,11 @@ def summarise(oof: list[dict]) -> dict:
 		"auroc": {"point": a, "lo": float(lo_a), "hi": float(hi_a)},
 		"lead_steps": {"point": lead, "lo": float(lo_l), "hi": float(hi_l)},
 		"bins": bins,
+		# the held-out false-alarm rate at the warning line, which the training folds aimed at FALSE_ALARM
+		"false_alarms": {
+			"stable": sum(1 for r in oof if not r["y"]),
+			"alarms": sum(1 for r in oof if not r["y"] and r["alarm"]),
+		},
 		"enough": len(oof) >= MIN_RUNS,
 	}
 
@@ -184,21 +227,15 @@ def main(argv: list[str] | None = None) -> int:
 	print(
 		f"held out: AUROC {a['point']:.3f} ({a['lo']:.3f} to {a['hi']:.3f}); lead {s['point']:.0f} steps ({s['lo']:.0f} to {s['hi']:.0f}); {rep['families']} families"
 	)
+	fa = rep["false_alarms"]
+	print(f"held-out false alarms at the warning line: {fa['alarms']} of {fa['stable']} stable runs")
 	if not rep["enough"]:
 		print(f"only {rep['n']} runs: below {MIN_RUNS}, the numbers are noise")
 	feats = [samples(r) for r in runs]
-	x = np.asarray([f for _, xs in feats for f in xs])
-	y = np.asarray(
-		[float(r["label"]["diverged"]) for r, (_, xs) in zip(runs, feats, strict=True) for _ in xs]
-	)
-	mean, scale, coef, b = D.fit(x, y)
-	m0 = D.Model(tuple(mean), tuple(scale), tuple(coef), b)
-	stable = [
-		max((m0.prob(f) for f in xs), default=0.0)
-		for r, (_, xs) in zip(runs, feats, strict=True)
-		if not r["label"]["diverged"]
-	]
-	tau = float(np.quantile(stable, 1 - FALSE_ALARM)) if stable else 0.5
+	everyone = list(range(len(runs)))
+	m0 = _fit_model(runs, feats, everyone)
+	mean, scale, coef, b = m0.mean, m0.scale, m0.coef, m0.intercept
+	tau = warning_line(runs, feats, everyone)
 	note = f"held out: AUROC {a['point']:.2f}, lead {s['point']:.0f} steps, {rep['n']} runs, {rep['families']} families"
 	model = D.Model(
 		tuple(float(v) for v in mean), tuple(float(v) for v in scale), tuple(float(v) for v in coef), float(b),

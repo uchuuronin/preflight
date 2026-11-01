@@ -8,8 +8,8 @@ settings (learning rate, warmup, init, precision, qk-norm, z-loss, beta2, clippi
 P(the run diverges later). Pure numpy, so it runs in Pyodide.
 
 Probabilities are calibrated on held-out runs (scripts/fit_divergence.py). A probability is shown only where its
-reliability bin verified on held-out runs (at least MIN_BIN runs, and the bin's observed rate inside its Wilson
-interval around the predicted mean); elsewhere the readout abstains with "uncertain", and the threshold rules
+reliability bin verified on held-out runs (at least MIN_BIN runs, and the shown P inside the Wilson interval of the
+bin's observed rate); elsewhere the readout abstains with "uncertain", and the threshold rules
 (D6, docs/decisions/engine-settings.md) keep warning. With fewer than WINDOW steps it abstains.
 """
 
@@ -39,7 +39,6 @@ FEATURES = (
 	"update_ratio",
 	"nonfinite",
 	"scale_drops",
-	"log_step",
 	"log_lr",
 	"no_warmup",
 	"log_init_std",
@@ -81,18 +80,42 @@ def _log(v: float | None, floor: float = 1e-8) -> float:
 	return math.log(max(v, floor)) if v is not None else 0.0
 
 
-def config_features(cfg: dict) -> list[float]:
-	prec = str(cfg.get("precision") or cfg.get("dtype") or "fp32").lower()
+# the user's knob ids for the sweep's settings (engine/knobs.py); review, Nov 1: inference once read none of them
+KNOB_NAMES = {
+	"warmup_steps": "warmup",
+	"learning_rate": "lr",
+	"max_grad_norm": "grad_clip",
+	"adam_beta2": "beta2",
+	"dtype": "precision",
+	"torch_dtype": "precision",
+	"ptdtype": "precision",
+}
+
+
+def config_features(cfg: dict) -> list[float | None]:
+	"""The run's settings; None where a setting isn't known, which the model reads as the training average."""
+	c = dict(cfg)
+	for k, v in cfg.items():
+		if k in KNOB_NAMES and c.get(KNOB_NAMES[k]) is None:
+			c[KNOB_NAMES[k]] = v
+
+	def has(k):
+		return k in c and c[k] is not None
+
+	prec = str(c["precision"]).lower() if has("precision") else None
+	lr = _f(c.get("lr")) if has("lr") else None
+	init = _f(c.get("init_std")) if has("init_std") else None
 	return [
-		_log(_f(cfg.get("lr")) or 1e-3),
-		1.0 if not cfg.get("warmup") else 0.0,
-		_log(_f(cfg.get("init_std")) or 0.02),
-		1.0 if prec in ("fp16", "float16") else 0.0,
-		1.0 if prec in ("bf16", "bfloat16") else 0.0,
-		1.0 if cfg.get("qk_norm") else 0.0,
-		1.0 if (_f(cfg.get("z_loss")) or 0.0) > 0 else 0.0,
-		1.0 if (_f(cfg.get("beta2")) or 0.999) > 0.99 else 0.0,
-		1.0 if cfg.get("grad_clip") in (None, 0, 0.0) else 0.0,
+		_log(lr) if lr else None,
+		(0.0 if c["warmup"] else 1.0) if has("warmup") else None,
+		_log(init) if init else None,
+		(1.0 if prec in ("fp16", "float16") else 0.0) if prec else None,
+		(1.0 if prec in ("bf16", "bfloat16") else 0.0) if prec else None,
+		(1.0 if c["qk_norm"] else 0.0) if has("qk_norm") else None,
+		(1.0 if (_f(c["z_loss"]) or 0.0) > 0 else 0.0) if has("z_loss") else None,
+		(1.0 if (_f(c["beta2"]) or 0.0) > 0.99 else 0.0) if has("beta2") else None,
+		# the sweep writes grad_clip None for no clipping; a probe without the knob doesn't say
+		(1.0 if c["grad_clip"] in (None, 0, 0.0) else 0.0) if "grad_clip" in c else None,
 	]
 
 
@@ -157,7 +180,6 @@ def features_at(ctx: Context, t: int, cfg: dict) -> list[float] | None:
 		_log(ctx.last("update_ratio", t)),
 		math.log1p(upto(ctx.missing) + upto(ctx.nonfinite)),
 		math.log1p(upto(ctx.drops)),
-		math.log(t + 1),
 		*config_features(cfg),
 	]
 
@@ -176,14 +198,16 @@ class Model:
 	scale: tuple[float, ...]
 	coef: tuple[float, ...]
 	intercept: float
-	# held-out reliability: (lo, hi, n, predicted_mean, observed) per bin; a bin verifies when it has MIN_BIN runs
-	# and its observed rate falls inside the Wilson interval around the predicted mean
+	# held-out reliability: (lo, hi, n, predicted_mean, observed) per bin, from out-of-fold runs; a bin verifies
+	# when it has MIN_BIN runs and the shown P falls inside the Wilson interval of the bin's observed rate
 	bins: tuple[tuple[float, float, int, float, float], ...] = ()
 	threshold: float = 0.5  # the warning line, set on training folds for at most 10% false alarms
 	report: str = ""
 
-	def prob(self, x: list[float]) -> float:
-		z = (np.asarray(x) - np.asarray(self.mean)) / np.asarray(self.scale)
+	def prob(self, x: list[float | None]) -> float:
+		# an unknown setting sits at the training average, so it moves P neither way
+		filled = [m if v is None else v for v, m in zip(x, self.mean, strict=True)]
+		z = (np.asarray(filled, dtype=float) - np.asarray(self.mean)) / np.asarray(self.scale)
 		return float(1.0 / (1.0 + math.exp(-(float(z @ np.asarray(self.coef)) + self.intercept))))
 
 	def verified(self, p: float) -> bool:

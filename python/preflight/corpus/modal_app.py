@@ -62,8 +62,8 @@ image = (
 	gpu="L4",
 	volumes={MOUNT: vol},
 	timeout=3 * 60 * 60,  # a batch of 8 configs, each capped by its own deadline in isolate.py
-	# no retries: a preempted batch is not re-run inside its wave (that would break the worst-case bound); its
-	# committed configs are kept and the rest go into a later, separately bounded wave
+	# no retries on failure; Modal may still restart a preempted input, which stops at the wave's end time (checked
+	# first in run_batch, and a watchdog ends the container there); sweep.worst_wave_seconds bills one restart
 	max_containers=4,
 	scaledown_window=30,
 	startup_timeout=180,  # matches sweep.STARTUP_S, so a slow start can't add to the per-wave timeout unbilled  # set, so the idle tail is known: sweep.SCALEDOWN_S bills it (a test checks they match)
@@ -104,11 +104,23 @@ class Sweeper:
 		timeout_s: float | None = None,
 		end_at: float | None = None,
 	) -> list[dict[str, Any]]:
+		import os
+		import threading
 		import time as _time
+
+		from preflight.corpus import sweep
+
+		# first, before any import or volume work: a restart after preemption that comes up past the end does nothing
+		if end_at is not None and _time.time() >= end_at:
+			return [{"status": "batch", "wall_s": 0.0, "reload_s": 0.0, "commit_s": 0.0, "late": True}]
+		if (
+			end_at is not None
+		):  # a hang anywhere (reload, a syscall) can't outlast the wave's end and its margin
+			left = end_at + sweep.END_MARGIN_S - _time.time()
+			threading.Timer(max(1.0, left), lambda: os._exit(70)).start()
 
 		import torch
 
-		from preflight.corpus import sweep
 		from preflight.corpus.configs import CorpusConfig
 		from preflight.corpus.isolate import run_isolated
 		from preflight.corpus.store import ResultStore

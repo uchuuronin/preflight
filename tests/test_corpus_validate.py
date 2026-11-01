@@ -108,3 +108,14 @@ def test_the_cli_writes_the_table(tmp_path):
 	finally:
 		sys.argv = argv
 	assert e.value.code == 0 and out.read_text().startswith("| Metric |")
+
+
+def test_a_classifier_verdict_shows_its_runs_not_a_made_up_proportion():
+	# review, Nov 1: it once printed "None of 40" with a Wilson interval
+	rep = {
+		"auroc": {"point": 0.7, "lo": 0.6, "hi": 0.8},
+		"lead_steps": {"point": 50, "lo": 20, "hi": 90},
+		"n": 40,
+	}
+	c = V.divergence_row(rep).cells()
+	assert c[3] == "40 runs" and c[4] == "" and c[5] == "miss"

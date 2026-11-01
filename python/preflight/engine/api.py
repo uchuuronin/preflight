@@ -90,8 +90,8 @@ _TARGETS = {
 FEATURES = {
 	"rl": False,
 	"serving": False,
-	"steptime_cross_gpu": True,
-	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row  # Chiya, Oct 31: on, with the rough band shown past +-50%
+	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
+	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
 }  # this dict is the switch until the runner sets it from flags.json (from-b.md, B -> A); keep the two the same
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
@@ -178,7 +178,7 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
 		if FEATURES["rl"] and record.job.lens == "rl":
 			ids += list(RL_TARGETS)
-		if FEATURES["divergence"]:
+		if FEATURES["divergence"] and record.job.lens != "serving":  # training runs have a loss to watch
 			ids.append("risk.divergence")
 		if FEATURES["serving"] and record.job.lens == "serving":
 			ids += list(SERVING_TARGETS)
@@ -1749,7 +1749,7 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
 	if FEATURES["rl"] and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
-	if FEATURES["divergence"]:
+	if FEATURES["divergence"] and record.job.lens != "serving":
 		out["risk.divergence"] = _divergence(record, values)
 	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))

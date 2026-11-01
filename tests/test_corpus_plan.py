@@ -421,7 +421,7 @@ def test_wave_billing_is_an_upper_bound_on_container_time():
 	assert sw.wave_billed_seconds(600.0, 4) == pytest.approx(4 * (600.0 + sw.SCALEDOWN_S))
 	# Modal cuts each container off at its timeout, so the worst case is bounded however a container hangs
 	assert sw.worst_wave_seconds(4, 8, 120.0) == 4 * (
-		sw.container_timeout_s(8, 120.0) + sw.QUEUE_S + sw.SCALEDOWN_S
+		sw.container_timeout_s(8, 120.0) + sw.QUEUE_S + sw.STARTUP_S + 2 * sw.SCALEDOWN_S
 	)
 	assert sw.wave_billed_seconds(600.0, 0) == 0.0
 	# phase 1's shape: 32 configs in an 11-minute wave cost far more than their 9 s each
@@ -628,7 +628,7 @@ def test_a_late_starting_container_still_runs_what_its_bill_covers():
 	# the wave ends with the driver's wait, all inside the bill
 	cap = sw.container_timeout_s(1, deadline)
 	assert end_at - dispatched + sw.END_MARGIN_S == cap + sw.QUEUE_S == sw.wave_wait_s(cap, 60)
-	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.QUEUE_S + sw.SCALEDOWN_S)
+	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.QUEUE_S + sw.STARTUP_S + 2 * sw.SCALEDOWN_S)
 
 
 def test_the_driver_gives_up_on_a_wave_with_nothing_back():
@@ -652,8 +652,8 @@ class _Call:
 			raise self.exc
 		return self.out
 
-	def cancel(self):
-		self.cancelled = True
+	def cancel(self, terminate_containers=False):
+		self.cancelled = terminate_containers
 
 
 def test_a_wave_keeps_each_batchs_result_and_cancels_only_the_late_ones():
@@ -678,3 +678,15 @@ def test_past_the_wait_every_call_left_is_cancelled_unread():
 	calls = [_Call(out=[]), _Call(out=[])]
 	_, n_late = sweep.collect_wave(calls, 10.0, 0.0, lambda: 50.0)
 	assert n_late == 2 and all(c.cancelled for c in calls)
+
+
+def test_a_planned_wave_fits_the_time_left_with_the_drivers_wait():
+	# review, Nov 1: the time check once left out the driver's wait for a GPU and the end margin
+	from preflight.corpus import sweep as sw
+
+	for minutes in (12, 25, 45, 110):
+		for deadline in (120.0, 180.0, 600.0):
+			c, b = sw.plan_wave(800, 100.0, minutes, deadline, 0.8, 4, 16)
+			if c:
+				longest = sw.wave_wait_s(sw.container_timeout_s(b, deadline), 10**6) + sw.SCALEDOWN_S
+				assert longest <= minutes * 60, (minutes, deadline, b)

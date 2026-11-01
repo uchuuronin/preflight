@@ -67,7 +67,20 @@ class Row:
 	def cells(self) -> list[str]:
 		if self.n is None or self.hit is None:
 			return [self.metric, self.target, self.measured_on, "not measured", "", "", self.note]
-		lo, hi = conformal.wilson(self.hits or 0, self.n)
+		if (
+			self.hits is None
+		):  # a verdict with its own interval in the note (a classifier's AUROC, a paired gain)
+			runs = f"{self.n} runs" if self.n else ""
+			return [
+				self.metric,
+				self.target,
+				self.measured_on,
+				runs,
+				"",
+				"hit" if self.hit else "miss",
+				self.note,
+			]
+		lo, hi = conformal.wilson(self.hits, self.n)
 		counts = f"{self.hits} of {self.n}" if self.n else "0"
 		return [
 			self.metric,
@@ -168,7 +181,8 @@ def score_run(run: dict, base: Path) -> Scored:
 	peak = bare.get("peak_reserved_bytes")
 	mem = pred.get("memory.peak")
 	s.oom_actual = ran_out(gt)
-	if s.oom_actual is False and peak:  # a run that ran out never showed its full need
+	# only a run that finished showed its full need: one that ran out, errored or timed out stopped short of it
+	if bare.get("ended") == "ok" and peak:
 		s.memory = _within(mem.point if mem and mem.status != "abstain" else None, peak, 0.10)
 		s.memory_inside = _inside(mem, peak)
 	oom = pred.get("risk.oom")
@@ -179,8 +193,12 @@ def score_run(run: dict, base: Path) -> Scored:
 	actual_step = steady_step_s(gt)
 	probe_gpu = api._env_gpu(rec)
 	run_gpu = (run.get("values") or {}).get("gpu_type") or gt.get("gpu")
-	same = probe_gpu is None or run_gpu is None or _same_gpu(probe_gpu, run_gpu)
-	if step is not None and step.status != "abstain" and actual_step:
+	same = None if probe_gpu is None or run_gpu is None else _same_gpu(probe_gpu, run_gpu)
+	if same is None:
+		s.notes.append(
+			f"{s.script}: the probe's or the full run's GPU isn't known, so its step time isn't scored"
+		)
+	if same is not None and step is not None and step.status != "abstain" and actual_step:
 		ok = _within(step.point, actual_step, 0.15 if same else 0.20)
 		if same:
 			s.step_same = ok
@@ -259,6 +277,15 @@ def cross_gpu_row(stores: list[Path]) -> Row:
 	)
 
 
+def _with_full_runs(row: Row, flags: list[tuple[str, bool | None]]) -> Row:
+	"""Full runs on a GPU the probes didn't run on, added to the corpus row's note (the corpus sets the count)."""
+	got = [f for _, f in flags if f is not None]
+	if got:
+		extra = f"full runs on another GPU: {sum(got)} of {len(got)} within 20%"
+		row.note = f"{row.note}; {extra}" if row.note else extra
+	return row
+
+
 def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
 	runs = [score_run(r, base) for r in manifest.get("runs", [])]
 
@@ -302,7 +329,7 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		)
 	rows += [
 		_share_row("Step time, same GPU", "Within 15%", "Full runs", flags("step_same")),
-		cross_gpu_row([base / p for p in manifest.get("corpus", [])]),
+		_with_full_runs(cross_gpu_row([base / p for p in manifest.get("corpus", [])]), flags("step_other")),
 		Row(
 			"GNN + GBDT ensemble vs GBDT alone",
 			"Lower error on held-out architectures",
@@ -435,7 +462,7 @@ def divergence_row(d: dict | None) -> Row:
 		d.get("n", 0),
 		hit,
 		f"AUROC {a['point']:.2f} ({a['lo']:.2f} to {a['hi']:.2f}); warns {s['point']:.0f} steps early "
-		f"({s['lo']:.0f} to {s['hi']:.0f}); bootstrap grouped by architecture",
+		f"({s['lo']:.0f} to {s['hi']:.0f}); bootstrap over settings families (the sweep is one architecture)",
 	)
 
 

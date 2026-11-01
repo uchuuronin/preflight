@@ -137,7 +137,7 @@ def collect_wave(calls, wait_s: float, started: float, clock) -> tuple[list, int
 			if type(exc) is not TimeoutError:  # a subclass is the call's own failure, not the wait
 				results.append(exc)
 				continue
-			fc.cancel()
+			fc.cancel(terminate_containers=True)  # a container stuck in a syscall stops too
 			results.append(exc)
 			late += 1
 		except Exception as exc:
@@ -147,12 +147,13 @@ def collect_wave(calls, wait_s: float, started: float, clock) -> tuple[list, int
 
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
 	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
-	at its deadline, and idles out. A container that Modal restarts after preemption stops at the wave's end time,
-	which allows QUEUE_S for a GPU to free up, so one container's execution is at most its cut-off plus QUEUE_S."""
+	at its deadline, and idles out. Every attempt, a restart after preemption included, ends by the wave's end time
+	plus the end margin (a watchdog in run_batch), and that is the dispatch plus the cut-off plus QUEUE_S. One
+	restart adds its own start-up (Modal's startup_timeout) and idle tail."""
 	if containers <= 0 or batch <= 0:
 		return 0.0
-	# each container is cut off at container_timeout_s by Modal, and the driver cancels the wave QUEUE_S later
-	return containers * (container_timeout_s(batch, deadline_s) + QUEUE_S + SCALEDOWN_S)
+	span = container_timeout_s(batch, deadline_s) + QUEUE_S
+	return containers * (span + STARTUP_S + 2 * SCALEDOWN_S)
 
 
 def plan_wave(
