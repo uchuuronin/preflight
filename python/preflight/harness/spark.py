@@ -91,8 +91,21 @@ def strict_schema(model: type[BaseModel]) -> dict:
 	return _strictify(copy.deepcopy(model.model_json_schema()))
 
 
+IMAGE_TOKENS = 1_600  # an image part, whatever its base64 length (a chart at 80 dpi is about this)
+
+
+def _content_chars_and_images(content) -> tuple[int, int]:
+	if isinstance(content, list):  # text and image parts
+		text = sum(
+			len(str(p.get("text", ""))) for p in content if isinstance(p, dict) and p.get("type") == "text"
+		)
+		return text, sum(1 for p in content if isinstance(p, dict) and p.get("type") == "image_url")
+	return len(str(content or "")), 0
+
+
 def estimate_tokens(messages: list[dict]) -> int:
-	return sum(len(str(m.get("content", ""))) for m in messages) // 4 + 8 * len(messages)
+	parts = [_content_chars_and_images(m.get("content", "")) for m in messages]
+	return sum(c for c, _ in parts) // 4 + IMAGE_TOKENS * sum(n for _, n in parts) + 8 * len(messages)
 
 
 class ModelClient:
