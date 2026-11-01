@@ -178,8 +178,11 @@ def test_call_and_dollar_caps_stop_a_runaway(setup):
 	one = probe._worst_case_usd(body, json.dumps(body).encode())
 	probe.stop()
 	proxy = AgentProxy(
-		prov.url, "k", rate=token_rate, max_usd_total=one * 1.5
-	)  # gitleaks:allow (no key: a cap)
+		prov.url,
+		"k",
+		rate=token_rate,  # gitleaks:allow (no key: a dollar cap)
+		max_usd_total=one * 1.5,
+	)
 	proxy.start()
 	try:
 		assert _chat(proxy, "a", **small).status_code == 200
