@@ -978,3 +978,18 @@ def test_another_gpu_takes_the_guess():
 	rec = _lora()
 	assert api._context_bytes(rec, "H100-SXM-80GB") == api.memory.DEFAULT_CONTEXT_BYTES
 	assert api._context_bytes(rec, api._env_gpu(rec)) < api.memory.DEFAULT_CONTEXT_BYTES
+
+
+def test_every_engine_cost_estimate_carries_its_rate(ft):
+	# contract 0.6.0: quantity x rate, so the browser re-prices at the visitor's rate
+	p = api.predict(ft).root
+	r = p["cost.total"].rate
+	assert r.quantity == "cost.gpu_hours" and r.unit == "gpu_hours" and r.price_row.startswith("gpu/")
+	assert p["cost.total"].point == pytest.approx(p["cost.gpu_hours"].point * r.usd_per_unit)
+	_, jc = api.run_cost(ft) if hasattr(api, "run_cost") else (None, None)
+	if jc is not None and jc.total_usd is not None:
+		assert jc.total_usd.rate.quantity == "job_cost.gpu_hours"
+		assert jc.total_usd.point == pytest.approx(jc.gpu_hours.point * jc.total_usd.rate.usd_per_unit)
+		for line in jc.lines:
+			if line.usd is not None and line.usd.status != "abstain":
+				assert line.usd.rate.price_row == line.price_row

@@ -42,6 +42,7 @@ from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
 	Estimate,
+	EstimateRate,
 	Grid,
 	GridAxis,
 	KnobImpact,
@@ -1431,7 +1432,25 @@ def _cost(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
 		return _abstain("usd", MODEL_ID_COST, f"no price for {gpu or 'this GPU'} in the table")
 	rate = pr.usd_per_hour * _n_gpus(values, record) / 3600.0
 	why = f"{gpu} at ${pr.usd_per_hour:.2f}/h ({pr.provider}, {pr.as_of})"
-	return _est(time.point * rate, time.lo * rate, time.hi * rate, "usd", time.status, MODEL_ID_COST, why)
+	est = _est(time.point * rate, time.lo * rate, time.hi * rate, "usd", time.status, MODEL_ID_COST, why)
+	row = prices.gpu_rate(gpu, pr.provider) or prices.market_reference(gpu)
+	return _rated(est, "cost.gpu_hours", pr.usd_per_hour, row.id if row else None)
+
+
+def _rated(
+	est: Estimate | None, quantity: str, usd_per_unit: float | None, row: str | None, unit: str = "gpu_hours"
+):
+	"""Contract 0.6.0: a cost estimate says the quantity and rate it is, so a client re-prices it at the visitor's own
+	rate without parsing the reason. Abstentions and unpriced estimates carry none."""
+	if est is None or est.status == "abstain" or usd_per_unit is None:
+		return est
+	return est.model_copy(
+		update={
+			"rate": EstimateRate(
+				quantity=quantity, usd_per_unit=float(usd_per_unit), unit=unit, price_row=row
+			)
+		}
+	)
 
 
 def _gpu_hours(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
@@ -1911,7 +1930,9 @@ def run_cost(
 		)
 		billed = not own and row is not None
 		if billed:
-			usd = _scale(hours, row.usd_per_hour, "usd", why=why_rate)
+			usd = _rated(
+				_scale(hours, row.usd_per_hour, "usd", why=why_rate), "quantity", row.usd_per_hour, row.id
+			)
 		elif not own:  # billed in dollars, but this GPU has no price: say so on the line, not just the total
 			usd = _abstain("usd", MODEL_ID_RUN_COST, why_rate)
 		else:
@@ -1934,12 +1955,20 @@ def run_cost(
 	if own:
 		total = None
 		market = (
-			_scale(hours, row.usd_per_hour, "usd", why=why_rate)
+			_rated(
+				_scale(hours, row.usd_per_hour, "usd", why=why_rate),
+				"job_cost.gpu_hours",
+				row.usd_per_hour,
+				row.id,
+			)
 			if row
 			else _abstain("usd", MODEL_ID_RUN_COST, why_rate)
 		)
 	else:
 		total = _sum([x.usd for x in lines if x.usd is not None], "usd", why_rate)
+		total = _rated(
+			total, "job_cost.gpu_hours", row.usd_per_hour if row else None, row.id if row else None
+		)
 		market = None
 	if not own and basis.billing == "spot" and len(lines) == 1:
 		why_spot = (

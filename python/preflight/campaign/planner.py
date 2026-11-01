@@ -24,7 +24,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 
 from preflight.engine import api, knobs
-from preflight.schema.prediction import Estimate
+from preflight.schema.prediction import Estimate, EstimateRate
 from preflight.schema.record import (
 	AshaRung,
 	Campaign,
@@ -130,6 +130,8 @@ class CampaignPlan:
 	notes: tuple[str, ...] = ()
 	grid_gpu_hours: Estimate | None = None  # every cell, before any cut
 	grid_usd: Estimate | None = None
+	start: datetime | None = None  # 0.6.0: when the campaign clock starts; start_s and finish_s count from it
+	lane_slots: dict[str, int] | None = None  # 0.6.0: slots per lane
 	card: ModelCard = field(
 		default_factory=lambda: ModelCard(
 			id=MODEL_ID,
@@ -141,7 +143,13 @@ class CampaignPlan:
 	)
 
 	def to_campaign(self) -> Campaign:
-		"""The record's Campaign block (contract), from this plan."""
+		"""The record's Campaign block (contract 0.6.0), from this plan."""
+		rates = {r for c in self.cells if not c.cut for r in [_rate_of(c.usd, c.gpu_hours)] if r is not None}
+		one = (
+			next(iter(rates)) if len(rates) == 1 else None
+		)  # one rate for the campaign only when every run shares it
+		all_rates = {r for c in self.cells for r in [_rate_of(c.usd, c.gpu_hours)] if r is not None}
+		grid_one = next(iter(all_rates)) if len(all_rates) == 1 else None
 		return Campaign(
 			cells=[
 				CampaignCell(
@@ -155,6 +163,10 @@ class CampaignPlan:
 					cut=c.cut,
 					time=c.time,
 					start_s=c.start_s,
+					slot=c.slot,
+					reason=c.reason or None,
+					gpu_hours_estimate=c.gpu_hours,
+					usd_estimate=_with_rate(c.usd, "gpu_hours_estimate", _rate_of(c.usd, c.gpu_hours)),
 				)
 				for c in self.cells
 			],
@@ -164,10 +176,10 @@ class CampaignPlan:
 			checkpoint_interval_s=self.checkpoint_interval.point,
 			# 0.5.0: the intervals, not only the points
 			gpu_hours=self.gpu_hours,
-			usd=self.usd,
+			usd=_with_rate(self.usd, "gpu_hours", one),
 			finish_s=self.finish_s,
 			grid_gpu_hours=self.grid_gpu_hours,
-			grid_usd=self.grid_usd,
+			grid_usd=_with_rate(self.grid_usd, "grid_gpu_hours", grid_one),
 			quota=CampaignQuota(
 				needed_bytes=self.quota.needed_bytes,
 				quota_bytes=self.quota.quota_bytes,
@@ -183,7 +195,34 @@ class CampaignPlan:
 			if self.asha
 			else None,
 			notes=list(self.notes),
+			# 0.6.0: what a shared record needs to draw the same calendar as the live plan
+			start=self.start,
+			p_by_deadline=self.p_by_deadline,
+			checkpoint_interval=self.checkpoint_interval,
+			lane_slots=dict(self.lane_slots) if self.lane_slots else None,
 		)
+
+
+def _rate_of(usd: Estimate | None, hours: Estimate | None) -> tuple[float, str | None] | None:
+	"""A run's $/GPU-hour and its price row: from the engine's own rate when it carries one, else dollars over
+	GPU-hours (the planner scales both by the same redone work, so the ratio is the rate)."""
+	if usd is None or usd.status == "abstain" or usd.point is None:
+		return None
+	if usd.rate is not None:
+		return (round(usd.rate.usd_per_unit, 9), usd.rate.price_row)
+	if hours is not None and hours.status != "abstain" and hours.point:
+		return (round(usd.point / hours.point, 9), None)
+	return None
+
+
+def _with_rate(est: Estimate | None, quantity: str, rate: tuple[float, str | None] | None) -> Estimate | None:
+	if est is None or est.status == "abstain" or rate is None:
+		return est
+	return est.model_copy(
+		update={
+			"rate": EstimateRate(quantity=quantity, usd_per_unit=rate[0], unit="gpu_hours", price_row=rate[1])
+		}
+	)
 
 
 # ---------------------------------------------------------------- small helpers
@@ -417,7 +456,8 @@ def _grown(e: Estimate | None, f: float) -> Estimate | None:
 	why = (
 		e.reason + "; " if e.reason else ""
 	) + f"plus {f - 1:.0%} redone after interruptions and job limits"
-	return _est(e.point * f, e.lo * f, e.hi * f, e.unit, e.status, why)
+	# redone work is billed at the same rate, so a dollar estimate keeps its rate and price row
+	return _est(e.point * f, e.lo * f, e.hi * f, e.unit, e.status, why).model_copy(update={"rate": e.rate})
 
 
 def _replace(c: CellPlan, **kw) -> CellPlan:
@@ -599,7 +639,11 @@ def plan(
 				break
 			cut.append(c.id)
 			left -= c.usd.hi if _ok(c.usd) else 0.0
-		cells = [_replace(c, cut=c.id in cut) for c in cells]
+		why_cut = f"cut to fit the ${budget:,.2f} budget: among the dearest runs at the high end of its cost"
+		cells = [
+			_replace(c, cut=True, reason="; ".join(x for x in (c.reason, why_cut) if x)) if c.id in cut else c
+			for c in cells
+		]
 		notes.append(
 			f"the grid's high end (${grid_usd.hi:,.2f}) is over the ${budget:,.2f} budget: {len(cut)} dearest runs cut"
 		)
@@ -776,4 +820,6 @@ def plan(
 		notes=tuple(notes),
 		grid_gpu_hours=grid_hours,
 		grid_usd=grid_usd,
+		start=start,
+		lane_slots=dict(lane_slots),
 	)
