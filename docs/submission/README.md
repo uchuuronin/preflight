@@ -32,7 +32,7 @@ Placeholders are marked TODO(PM).
 | 5 rounds | The guide calling tools in every round of its smoke run | measured | GitHub run 41273350602, `docs/status/c.md` |
 | 461 of 575 | Held-out step-time queries within 15% on the same GPU (corpus) | measured | `docs/status/b.md` |
 | 60% | Held-out step-time queries within 20% on a GPU the model never saw, under the 90% target | measured | `docs/status/b.md` (leave-one-GPU-out) |
-| AUROC 0.66 (0.56 to 0.76) | The divergence classifier on held-out runs after a refit on 720 runs, still under its 0.85 target, so it is off and not used (lead 138 steps, 3 to 269) | cited (B's fit report, `1cfa689`) | TODO(PM): link the report's path once `1cfa689` is on `main` |
+| AUROC 0.66 (0.56 to 0.76) | The divergence classifier after a refit on 720 runs, still under its 0.85 target, so it is off and not used (lead 138 steps, 3 to 269) | cited (B's fit report `1cfa689`, via Chiya, Nov 1) | TODO(PM): link the report's path once `1cfa689` is on `main` |
 | 3,000 characters | How much of each probe's log Spark Open triage reads | cited (code) | `python/preflight/harness/triage.py`, `TAIL_CHARS` |
 | 8 characters | The shortest quoted log line code accepts from triage | cited (code) | `python/preflight/harness/triage.py` |
 | 30 seconds | The longest each triage call may take | cited (A's status) | `docs/status/a.md`, known limits |

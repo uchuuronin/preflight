@@ -44,7 +44,7 @@ BATCH_SIZE = 1024
 EPOCHS = 3
 LR = 3e-3
 # Seed nodes the sampler draws batches from, each epoch: the run's length is
-# ceil(N_TRAIN_NODES / BATCH_SIZE) = 157 steps an epoch, 471 in all.
+# ceil(N_TRAIN_NODES / BATCH_SIZE) = 157 steps an epoch, 471 in all [derived].
 N_TRAIN_NODES = 160_000
 
 
