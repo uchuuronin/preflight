@@ -94,9 +94,11 @@ def container_timeout_s(batch: int, deadline_s: float) -> int:
 
 
 def wave_end_at(dispatched_at: float, batch: int, deadline_s: float) -> float:
-	"""The latest moment a wave's last config may end: Modal's cut-off less the margin for the final commit. The
-	container's start-up counts against it, as it does against the bill (Oct 30: measured from dispatch)."""
-	return dispatched_at + container_timeout_s(batch, deadline_s) - END_MARGIN_S
+	"""The latest moment a wave's last config may end: Modal's cut-off less the margin for the final commit, plus the
+	QUEUE_S the driver waits for a GPU (Oct 31: in the divergence sweep a wave's containers waited past their
+	start-up allowance for an L4 and ran nothing). Measured from dispatch, so a restart after preemption can't
+	extend it; the worst case counts the allowance as billed."""
+	return dispatched_at + container_timeout_s(batch, deadline_s) + QUEUE_S - END_MARGIN_S
 
 
 def may_start_config(now: float, deadline_s: float, end_at: float) -> bool:
@@ -145,11 +147,12 @@ def collect_wave(calls, wait_s: float, started: float, clock) -> tuple[list, int
 
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
 	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
-	at its deadline, and idles out. Retries are off, so a preempted batch is not re-run inside the wave."""
+	at its deadline, and idles out. A container that Modal restarts after preemption stops at the wave's end time,
+	which allows QUEUE_S for a GPU to free up, so one container's execution is at most its cut-off plus QUEUE_S."""
 	if containers <= 0 or batch <= 0:
 		return 0.0
-	# each container is cut off at container_timeout_s by Modal, then idles out
-	return containers * (container_timeout_s(batch, deadline_s) + SCALEDOWN_S)
+	# each container is cut off at container_timeout_s by Modal, and the driver cancels the wave QUEUE_S later
+	return containers * (container_timeout_s(batch, deadline_s) + QUEUE_S + SCALEDOWN_S)
 
 
 def plan_wave(
@@ -166,7 +169,8 @@ def plan_wave(
 	from preflight.corpus.isolate import KILL_GRACE_S
 
 	rate = usd_per_hour * RATE_OVERHEAD / 3600
-	room_s = minutes_left * 60 - STARTUP_S - SCALEDOWN_S
+	# a wave can last Modal's cut-off (start-up, the batch, the end margin) plus the driver's wait for a GPU
+	room_s = minutes_left * 60 - STARTUP_S - END_MARGIN_S - QUEUE_S - SCALEDOWN_S
 	per = deadline_s + KILL_GRACE_S
 	batch = min(max_batch, int(room_s // per) if per > 0 else max_batch, max(1, n_todo))
 	best = (0, 0)

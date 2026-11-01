@@ -420,7 +420,9 @@ def test_wave_billing_is_an_upper_bound_on_container_time():
 	# 4 containers for a 10-minute wave, each with its 30 s idle tail: 4 x 630 s
 	assert sw.wave_billed_seconds(600.0, 4) == pytest.approx(4 * (600.0 + sw.SCALEDOWN_S))
 	# Modal cuts each container off at its timeout, so the worst case is bounded however a container hangs
-	assert sw.worst_wave_seconds(4, 8, 120.0) == 4 * (sw.container_timeout_s(8, 120.0) + sw.SCALEDOWN_S)
+	assert sw.worst_wave_seconds(4, 8, 120.0) == 4 * (
+		sw.container_timeout_s(8, 120.0) + sw.QUEUE_S + sw.SCALEDOWN_S
+	)
 	assert sw.wave_billed_seconds(600.0, 0) == 0.0
 	# phase 1's shape: 32 configs in an 11-minute wave cost far more than their 9 s each
 	per = sw.wave_billed_seconds(660.0, 4) / 32
@@ -620,11 +622,13 @@ def test_a_late_starting_container_still_runs_what_its_bill_covers():
 	assert sw.may_start_config(
 		dispatched + sw.STARTUP_S, deadline, end_at
 	)  # up to the start-up the bill assumed
-	assert not sw.may_start_config(dispatched + sw.STARTUP_S + 1.0, deadline, end_at)
-	# and Modal's own cut-off comes after the last config could end, with the margin, all inside the bill
+	# Oct 31: a container that waited for a GPU past the start-up allowance still runs, up to the driver's wait
+	assert sw.may_start_config(dispatched + sw.STARTUP_S + sw.QUEUE_S, deadline, end_at)
+	assert not sw.may_start_config(dispatched + sw.STARTUP_S + sw.QUEUE_S + 1.0, deadline, end_at)
+	# the wave ends with the driver's wait, all inside the bill
 	cap = sw.container_timeout_s(1, deadline)
-	assert end_at - dispatched + sw.END_MARGIN_S == cap
-	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.SCALEDOWN_S)
+	assert end_at - dispatched + sw.END_MARGIN_S == cap + sw.QUEUE_S == sw.wave_wait_s(cap, 60)
+	assert sw.worst_wave_seconds(3, 1, deadline) == 3 * (cap + sw.QUEUE_S + sw.SCALEDOWN_S)
 
 
 def test_the_driver_gives_up_on_a_wave_with_nothing_back():
