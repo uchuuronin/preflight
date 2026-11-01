@@ -243,6 +243,15 @@ class ModelClient:
 	def chat(
 		self, messages: list[dict], *, purpose: str, reasoning_effort: str | None = None, **extra
 	) -> tuple[str, ModelCall]:
+		message, call = self.chat_message(
+			messages, purpose=purpose, reasoning_effort=reasoning_effort, **extra
+		)
+		return message.get("content") or "", call
+
+	def chat_message(
+		self, messages: list[dict], *, purpose: str, reasoning_effort: str | None = None, **extra
+	) -> tuple[dict, ModelCall]:
+		"""The assistant message as the API returns it (content, and tool_calls when tools are given)."""
 		if estimate_tokens(messages) > self.max_input_tokens:
 			raise TokenCapExceeded(
 				f"prompt is about {estimate_tokens(messages)} tokens; cap is {self.max_input_tokens}"
@@ -259,9 +268,9 @@ class ModelClient:
 		started = time.monotonic()
 		resp = self._post(body, purpose, deadline)
 		data = resp.json()
-		content = data["choices"][0]["message"].get("content") or ""
+		message = data["choices"][0]["message"]
 		call = self._record(purpose, data, started, True, resp.headers.get("x-request-id") or data.get("id"))
-		return content, call
+		return message, call
 
 	def structured(
 		self, messages: list[dict], schema: type[T], *, purpose: str, reasoning_effort: str | None = None
