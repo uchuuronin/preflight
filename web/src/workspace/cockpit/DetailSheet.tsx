@@ -15,6 +15,7 @@ import { bounds, trusted } from "../status";
 import { Provenance } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { FixFinding } from "../../fix/FixFinding";
+import { abstainText } from "./abstain";
 
 export function DetailSheet() {
 	const { record, estimates, state, actions } = useWorkspace();
@@ -82,7 +83,7 @@ export function DetailSheet() {
 											) : null}
 										</>
 									) : (
-										<span className="pf-dim">{est?.status === "abstain" ? t(`abstain.${est.reason ?? "off_grid"}`) : t("detail.no_value")}</span>
+										<span className="pf-dim">{est?.status === "abstain" ? abstainText(est.reason) : t("detail.no_value")}</span>
 									)}
 								</dd>
 							</div>
