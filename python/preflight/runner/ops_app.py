@@ -322,7 +322,17 @@ def smoke(
 GROUND_TRUTH_TIMEOUT_S = 50 * 60
 
 
-@ops.function(image=probe_image, gpu="L4", volumes={WEIGHTS_DIR: weights_vol}, timeout=GROUND_TRUTH_TIMEOUT_S)
+# Modal tries these in order (L4 queues of up to 59 min seen, Nov 1); no L40S: B's reading needs a
+# 24 GB card (Chiya, Nov 1). The result's "gpu" says which one ran
+GROUND_TRUTH_GPUS = ["L4", "A10"]
+
+
+@ops.function(
+	image=probe_image,
+	gpu=GROUND_TRUTH_GPUS,
+	volumes={WEIGHTS_DIR: weights_vol},
+	timeout=GROUND_TRUTH_TIMEOUT_S,
+)
 def ground_truth_on_l4(
 	script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict
 ) -> dict:
@@ -359,7 +369,8 @@ def ground_truth(
 	if "train.py" not in files:
 		raise SystemExit(f"zoo/{script} has no train.py in this checkout")
 	print(
-		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4 (Modal queues it)", flush=True
+		f"[ground truth] {script}: {len(files)} files sent; waiting for an L4, else an A10 (Modal queues it)",
+		flush=True,
 	)
 	res = ground_truth_on_l4.remote(script, bare_steps, recorder_steps, warmup, budget_min * 60, files)
 	Path("out").mkdir(exist_ok=True)
@@ -372,7 +383,7 @@ def ground_truth(
 MULTI_GPU_TIMEOUT_S = 20 * 60  # the container's own end, whatever the probes do
 
 
-@ops.function(image=probe_image, gpu="L4:2", timeout=MULTI_GPU_TIMEOUT_S)
+@ops.function(image=probe_image, gpu=["L4:2", "A10:2"], timeout=MULTI_GPU_TIMEOUT_S)  # L4s, else A10s
 def multi_gpu_on_l4x2(files: dict, warmup: int = 3, timed: int = 10) -> dict:
 	"""DDP and FSDP probes on one node of two L4s, one recorder per rank under torchrun."""
 	from preflight.probes.local import ProbeSpec, run_probe
@@ -400,7 +411,7 @@ def multi_gpu():
 
 	root = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "multi_gpu"
 	files = {f.name: f.read_text() for f in root.glob("*.py")}
-	print("[multi-gpu] waiting for a node with 2 x L4 (Modal queues it)", flush=True)
+	print("[multi-gpu] waiting for 2 x L4, else 2 x A10 (Modal queues it)", flush=True)
 	res = multi_gpu_on_l4x2.remote(files)
 	Path("out").mkdir(exist_ok=True)
 	Path("out/multi_gpu.json").write_text(json.dumps(res, indent=2))
@@ -449,7 +460,7 @@ def startup_check_titan_image(files: dict) -> dict:
 	return out
 
 
-@ops.function(image=titan_image, gpu="L4", timeout=TITAN_TIMEOUT_S)
+@ops.function(image=titan_image, gpu=["L4", "A10", "L40S"], timeout=TITAN_TIMEOUT_S)  # the first to schedule
 def titan_check_on_l4(files: dict, warmup: int = 3, timed: int = 10) -> dict:
 	"""torchtitan's trainer on its debug model under the recorder, one L4."""
 	from preflight.probes.local import ProbeSpec, run_probe
@@ -478,7 +489,7 @@ def torchtitan_check():
 	print(f"[titan] startup check: {json.dumps(start)}", flush=True)
 	res = {"startup": start}
 	if start.get("exit") == 0:
-		print("[titan] waiting for an L4 (Modal queues it)", flush=True)
+		print("[titan] waiting for an L4, else an A10 (Modal queues it)", flush=True)
 		res["probe"] = titan_check_on_l4.remote(files)
 		print(json.dumps({k: v for k, v in res["probe"].items() if k != "log_tail"}, indent=2), flush=True)
 	Path("out").mkdir(exist_ok=True)
