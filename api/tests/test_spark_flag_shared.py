@@ -35,3 +35,15 @@ def test_the_notice_and_the_runner_read_the_same_flag():
 
 def test_the_flag_exists():
 	assert "harness.spark_script_map" in json.loads((ROOT / "flags.json").read_text())
+
+
+def test_the_notice_and_the_runner_read_the_same_triage_flag():
+	"""Spark Open triage of probe logs (A, 2d7cabd): the notice's line and A's gate, one flag."""
+	src = (ROOT / "web/src/app/DataUse.tsx").read_text()
+	m = re.search(r'flag\("([a-z0-9_.]+)"\)\) lines\.push\(t\("datause\.triage"\)\)', src)
+	assert m, "the notice no longer gates its triage line on a flag"
+	pipeline = (ROOT / "python/preflight/runner/pipeline.py").read_text()
+	used = set(re.findall(r'flag\("(harness\.spark_open_triage)"\)', pipeline))
+	if "triage" not in pipeline:
+		pytest.skip("waits on A's triage (2d7cabd on ws-a): no triage in this branch's runner yet")
+	assert used == {m.group(1)}, f"the runner gates triage on {used or 'nothing'}, the notice on {m.group(1)}"
