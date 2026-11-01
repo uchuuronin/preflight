@@ -1,0 +1,51 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Kiev94dmGUaS1xvEn4twqc
+✓ Created objects.
+{
+ "calls": 2,
+ "usd": 0.0139,
+ "results": [
+  {
+   "text": "must use H100 but also must stay on A100",
+   "model_returned": {
+    "allowed": [],
+    "budget_usd": null,
+    "deadline_hours": null,
+    "gpu_hours": null,
+    "keep": [],
+    "not_understood": [
+     "must use H100",
+     "must stay on A100"
+    ]
+   },
+   "model_text": "Your conflicting GPU limits can't be merged, so I'll record them for clarification.",
+   "kept": {
+    "limits": [],
+    "not_understood": [
+     "must use H100",
+     "must stay on A100"
+    ],
+    "dropped": []
+   },
+   "usd": 0.00395,
+   "tokens": [
+    1185,
+    581
+   ]
+  },
+  {
+   "text": "sequence length has to stay 2048, batch size at most 8",
+   "model_returned": null,
+   "model_text": null,
+   "kept": null,
+   "usd": 0.00999,
+   "tokens": [
+    1189,
+    2000
+   ]
+  }
+ ]
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Kiev94dmGUaS1xvEn4twqc

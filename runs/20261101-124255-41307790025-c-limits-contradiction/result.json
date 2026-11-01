@@ -1,0 +1,11 @@
+{
+	"name": "20261101-124255-41307790025-c-limits-contradiction",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41307790025",
+	"ref": "ws-c",
+	"sha": "fb30b3edd6ab913f4d80e29bb061f828022fe9ec",
+	"cmd": "modal run api/limits_check_app.py::check --only 4,6 --cap-usd 0.02",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T12:43:24Z"
+}
