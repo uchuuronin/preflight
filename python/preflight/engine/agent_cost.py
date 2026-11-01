@@ -330,17 +330,21 @@ def runaway_rate_by_cost_and_time(
 	)
 	if opened:
 		rules["stalled"] = {**bound(stuck), "open": opened, "workers": workers}
-		limit = (
-			f"at most one per worker ({workers}) can be stuck"
-			if workers and workers > 0
-			else "the worker count isn't recorded, and a stall means at least one is stuck"
+		# review, Nov 1: plain for one task, no run-on clauses, and 0 workers is recorded, not missing
+		if workers is None:
+			limit = "the worker count isn't recorded, and a stall means at least one task is stuck"
+		elif workers > 0:
+			limit = f"at most one per worker ({workers}) can be stuck"
+		else:
+			limit = "the recorded worker count is 0, so the limit is one"
+		waiting = (
+			"1 task waiting on a tool, possibly stuck"
+			if opened == 1
+			else (f"{opened} tasks waiting on a tool, each only possibly stuck")
 		)
-		tasks_ = "1 task" if opened == 1 else f"{opened} tasks"
-		already = f", {flagged_open} already counted above" if flagged_open else ""
-		why += (
-			f"; the run stalled with {tasks_} waiting on a tool, each only possibly stuck: {limit}{already}, "
-			f"so {stuck} more counted as runaways"
-		)
+		already = f"; {flagged_open} of them already flagged by the rules above" if flagged_open else ""
+		counted = "1 more counted as a runaway" if stuck == 1 else f"{stuck} more counted as runaways"
+		why += f"; the run stalled with {waiting} ({limit}{already}), so {counted}"
 	why += f"; {pct}% Clopper-Pearson"
 	if not x:
 		why = f"none of {n} sampled tasks ran away; the upper end is what {n} tasks can rule out. {why}"

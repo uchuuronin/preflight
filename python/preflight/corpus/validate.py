@@ -530,7 +530,12 @@ def divergence_row(d: dict | None) -> Row:
 		hit,
 		f"AUROC {a['point']:.2f} ({a['lo']:.2f} to {a['hi']:.2f}); warns {s['point']:.0f} steps early "
 		f"({s['lo']:.0f} to {s['hi']:.0f}"
-		+ ("; the point estimate clears 100, the interval doesn't" if s["point"] >= 100 > s["lo"] else "")
+		# the report's own reason says it when the row misses (review, Nov 1: once, not twice)
+		+ (
+			"; the point estimate clears 100, the interval doesn't"
+			if s["point"] >= 100 > s["lo"] and (hit or not d.get("verdict"))
+			else ""
+		)
 		+ "); bootstrap over settings families (the sweep is one architecture)"
 		+ (f"; {d.get('diverged')} of {d.get('n')} runs diverged" if d.get("diverged") is not None else "")
 		+ (f"; {d['verdict']}: {d['why']}" if d.get("verdict") and not hit else ""),

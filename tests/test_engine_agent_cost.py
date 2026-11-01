@@ -317,7 +317,7 @@ def test_fewer_open_tasks_than_workers_counts_them_all_and_flagged_ones_once():
 	r = ac.agent_totals(s)["risk.runaway"]
 	# review, Nov 1: the flagged open task holds one of the 2 workers, so only 1 more counts
 	assert r.detail["by_rule"]["time"]["runaways"] == 1 and r.detail["by_rule"]["stalled"]["runaways"] == 1
-	assert r.point == pytest.approx(2 / 30) and "1 already counted above" in r.reason
+	assert r.point == pytest.approx(2 / 30) and "1 of them already flagged by the rules above" in r.reason
 
 
 def test_no_stop_reason_in_a_finished_run_isnt_possibly_stuck():
@@ -336,4 +336,15 @@ def test_one_open_task_already_flagged_reads_plainly_without_a_worker_count():
 	s.tasks[0] = s.tasks[0].model_copy(update={"latency_s": 900.0})
 	r = ac.agent_totals(s)["risk.runaway"]
 	assert r.point == pytest.approx(1 / 30)
-	assert "with 1 task waiting" in r.reason and "so 0 more counted" in r.reason and "so one" not in r.reason
+	assert "with 1 task waiting on a tool, possibly stuck" in r.reason and "so 0 more counted" in r.reason
+	assert "1 of them already flagged" in r.reason and "each" not in r.reason.split("stalled")[1]
+
+
+def test_a_recorded_worker_count_of_zero_isnt_called_missing():
+	from types import SimpleNamespace
+
+	s = _stalled(3, 27, None)
+	z = SimpleNamespace(tasks=s.tasks, population=500, selection=None, ended="stalled", concurrency=0)
+	r = ac.agent_totals(z)["risk.runaway"]
+	assert r.point == pytest.approx(1 / 30) and "count is 0" in r.reason and "isn't recorded" not in r.reason
+	assert "1 more counted as a runaway" in r.reason

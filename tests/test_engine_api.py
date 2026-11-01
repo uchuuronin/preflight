@@ -1007,12 +1007,17 @@ def test_a_stalled_sample_reaches_the_runaway_readout(ag):
 	"""Chiya, Nov 1: the readout counts a stalled run's open tasks up to the worker limit, through predict."""
 	rec = _agent_with(ag, 30)
 	tasks = [
-		t.model_copy(update={"stop_reason": None if i < 24 else "done"})
+		t.model_copy(update={"stop_reason": None if i < 24 else "done", "cost_usd": 0.01, "latency_s": 20.0})
 		for i, t in enumerate(rec.agent_sample.tasks)
 	]
 	sample = rec.agent_sample.model_copy(update={"tasks": tasks, "ended": "stalled"})
 	r = api.predict(rec.model_copy(update={"agent_sample": sample})).root["risk.runaway"]
 	assert r.status != "abstain" and "stalled with 24 tasks waiting on a tool" in r.reason
+	# uniform tasks, so no other rule flags any; no worker count before contract 0.6.1: the limit is one
+	plain = api.predict(
+		rec.model_copy(update={"agent_sample": sample.model_copy(update={"ended": None})})
+	).root
+	assert r.point == pytest.approx(plain["risk.runaway"].point + 1 / 30)
 	finished = sample.model_copy(update={"ended": "finished"})
 	assert (
 		"stalled"
