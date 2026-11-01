@@ -436,7 +436,11 @@ def startup_check_titan_image(files: dict) -> dict:
 	cmd = ("import json, torch, torchtitan.train, preflight.recorder.runtime; "
 		"from torchtitan.config_manager import ConfigManager; "
 		"c = ConfigManager().parse_args(['--job.config_file', 'debug_model.toml']); "
-		"print(json.dumps({'torch': torch.__version__, 'flavor': c.model.flavor, 'steps': c.training.steps}))")  # fmt: skip
+		"from torchtitan.datasets.tokenizer.tiktoken import TikTokenizer; "
+		"tok = TikTokenizer(c.model.tokenizer_path); "
+		"from datasets import load_dataset; ds = load_dataset('tests/assets/c4_test', split='train'); "
+		"print(json.dumps({'torch': torch.__version__, 'flavor': c.model.flavor, 'steps': c.training.steps, "
+		"'vocab': tok.n_words, 'docs': len(ds)}))")  # fmt: skip
 	p = subprocess.run([sys.executable, "-c", cmd], cwd=work, capture_output=True, text=True, timeout=300,
 		env={**os.environ, "PYTHONPATH": REMOTE_PKG})  # fmt: skip
 	out = {"exit": p.returncode, "stderr_tail": p.stderr[-1500:] if p.returncode else ""}
