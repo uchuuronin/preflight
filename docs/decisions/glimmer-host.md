@@ -52,11 +52,11 @@ A proposed a Modal L4 at 4 bits behind vLLM's OpenAI server, scaled to zero (`do
 
 ## Measured (Nov 1 smoke runs)
 
-One triage is the fixed prompt in `glimmer/common.py`: 17,138 tokens in (the earlier 8K guess was characters over 4, not tokens) and about 300 out, reasoning low. Every answer in both runs was valid JSON with the right category (oom), 10 of 10.
+One triage is the fixed prompt in `glimmer/common.py`: 17,138 tokens in (the earlier 8K guess was characters over 4, not tokens) and about 300 out, reasoning low. Every answer in both runs was valid JSON with the right category (oom), 14 of 14 (5 alone and 4 at once on the A100, 5 on the L4).
 
 | | A100-40GB, FP8, vLLM 0.28.0 (the endpoint) | L4, Q4_K_M, llama.cpp b12030 (own-GPU proof) |
 | --- | --- | --- |
-| Weights on the GPU | 36.8 of 40 GiB used after load (32K context) | 16.2 of 23 GB used after load (32K context) |
+| GPU memory used after load | 36.0 of 40 GiB (36,821 MiB; 32K context) | 15.8 of 22.5 GiB (16,202 MiB; 32K context) |
 | Cold start, asked for to ready | 286 s (load 34 GB from the volume, CUDA graphs) | 18 s for the server, but the L4 took 19 min to schedule |
 | Time to first token | 4.6 s (about 3,700 prompt tokens/s) | 22.3 s (about 770 prompt tokens/s) |
 | Decoding, one call | 38 tokens/s | 14.4 tokens/s |

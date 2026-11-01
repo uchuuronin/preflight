@@ -228,40 +228,38 @@ def smoke(gpu: str = "a100", calls: int = 5, concurrent: int = 4):
 
 @app.local_entrypoint()
 def deploy_check():
-	"""After `modal deploy`: the endpoint's URL, that it refuses a call without a proxy token (Modal answers at its
-	edge, so this starts no container), and the containers the deployed app has running (0 when scaled to zero).
-	Starts no GPU."""
+	"""After `modal deploy`: the endpoint's URL, that it refuses a call without a proxy token (Modal's proxy answers
+	401 before the app's code runs), and the containers the deployed app has running (0 when scaled to zero).
+	Starts no GPU. Writes what it found even when a step fails."""
 	import urllib.error
 	import urllib.request
 
 	from preflight.glimmer.common import APP_NAME
 
-	cls = modal.Cls.from_name(APP_NAME, "Glimmer", environment_name="main")
-	url = cls().serve.get_web_url()
+	found: dict = {}
 	try:
-		with urllib.request.urlopen(f"{url}/v1/models", timeout=30) as r:
-			refused = {"status": r.status, "refused": False}
-	except urllib.error.HTTPError as exc:
-		refused = {"status": exc.code, "refused": exc.code in (401, 403)}
+		cls = modal.Cls.from_name(APP_NAME, "Glimmer", environment_name="main")
+		found["url"] = cls().serve.get_web_url()
+	except Exception as exc:
+		found["url_error"] = f"{type(exc).__name__}: {exc}"[:400]
+	if found.get("url"):
+		try:
+			with urllib.request.urlopen(f"{found['url']}/v1/models", timeout=30) as r:
+				found["without_a_token"] = {"status": r.status, "refused": False}
+		except urllib.error.HTTPError as exc:
+			found["without_a_token"] = {"status": exc.code, "refused": exc.code in (401, 403)}
+		except OSError as exc:
+			found["without_a_token"] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
 	out = subprocess.run(
 		["modal", "container", "list", "--env", "main", "--json"], capture_output=True, text=True, timeout=120
 	)
 	try:
 		rows = json.loads(out.stdout or "[]")
+		mine = [
+			c for c in rows if isinstance(c, dict) and c.get("app_name") == APP_NAME
+		]  # review: exact match
+		found["containers_running"] = len(mine)
+		found["containers"] = mine
 	except ValueError:
-		rows = None
-	mine = (
-		None
-		if rows is None
-		else [c for c in rows if APP_NAME in json.dumps(c) and "ops" not in json.dumps(c)]
-	)
-	_write(
-		"deploy_check",
-		{
-			"url": url,
-			"without_a_token": refused,
-			"containers_running": None if mine is None else len(mine),
-			"containers": mine,
-			"list_error": out.stderr[-400:] if rows is None else None,
-		},
-	)
+		found["containers_error"] = (out.stderr or out.stdout)[-400:]
+	_write("deploy_check", found)
