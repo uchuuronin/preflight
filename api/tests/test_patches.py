@@ -250,3 +250,71 @@ def test_the_web_apps_copy_of_the_templates_matches():
 		}
 		for t in TEMPLATES.values()
 	]
+
+
+def test_one_address_gets_one_capped_race_per_record_however_many_sessions_it_makes(world):
+	c, *_ = world
+	assert c.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE}).status_code == 202
+	fresh = TestClient(c.app, base_url="https://testserver")  # a new session, the same address
+	r = fresh.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE})
+	assert r.status_code == 429 and r.json()["error"]["code"] == "fix_limit"
+
+
+def test_spend_past_the_cap_is_counted_as_reported(world):
+	c, fixer, ledger, _ = world
+	pid = c.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE[:1]}).json()["patch_id"]
+	fixer.result = {"usd_from_reported_tokens": 0.2, "candidates": []}
+	c.get(f"/v1/patches/{pid}")
+	assert ledger.core.spent_today() == pytest.approx(0.2)
+
+
+def test_a_fixer_that_errors_leaves_the_race_running_until_it_is_lost(world, monkeypatch):
+	c, fixer, *_ = world
+	pid = c.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE[:1]}).json()["patch_id"]
+
+	async def broken(call_id):
+		raise RuntimeError("modal unreachable")
+
+	fixer.poll = broken
+	assert c.get(f"/v1/patches/{pid}").json()["status"] == "running"
+	t0 = patches.now()
+	monkeypatch.setattr(patches, "now", lambda: t0 + patches.RACE_LOST_S + 1)
+	assert c.get(f"/v1/patches/{pid}").json()["error"] == "lost"
+
+
+def test_a_sandbox_that_will_not_start_or_breaks_is_reported_not_raised():
+	def no_box():
+		raise RuntimeError("no capacity")
+
+	reader = type("R", (), {"get": lambda self, t: None})()
+	out = run.run_race(
+		"sample:lora-7b",
+		[{"template_id": "eval.wrap_no_grad"}],
+		None,
+		reader=reader,
+		blobs=None,
+		open_box=no_box,
+		key="k",
+	)
+	assert out == {"error": "sandbox_failed", "candidates": []}
+	closed = []
+
+	class Box:
+		spent = 0.0
+
+		def write(self, path, text):
+			raise OSError("disk full")
+
+		def run(self, argv, **kw):
+			raise OSError("disk full")
+
+	out = run.run_race(
+		"sample:lora-7b",
+		[{"template_id": "eval.wrap_no_grad"}],
+		None,
+		reader=reader,
+		blobs=None,
+		open_box=lambda: (Box(), lambda: closed.append(1)),
+		key="k",
+	)
+	assert out["error"] == "race_failed" and closed == [1]

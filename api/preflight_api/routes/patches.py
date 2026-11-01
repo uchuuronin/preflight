@@ -10,8 +10,10 @@ Who may race: anyone on a sample with a script (A's SAMPLE_REFS) or a record of 
 a record derived from another (a probe on a shared link would otherwise hand its code out).
 
 Spend: the race's whole cap (run.stop_usd) is reserved in the ledger before anything starts,
-against the same per-day and per-record caps as the guide, and settled with what Muse Code
-reported once the race ends. Behind `c.fix_loop`.
+against the guide's day cap and a per-record cap per address, and settled with what Muse Code
+reported once the race ends. A race outlives the ledger's reservation time, so the reservation
+usually closes at the cap first and the race is counted at its cap: the ledger over-counts,
+never under. Behind `c.fix_loop`.
 """
 
 from __future__ import annotations
@@ -146,15 +148,17 @@ async def start_race(request: Request) -> dict:
 
 	sid: str = request.state.session
 	cap = run.stop_usd(len(cands))
-	gate = await app.state.ledger.reserve(
-		visitor=sid, run=f"fix:{view.key}:{sid}", ip=edge.ip_key(edge.client_ip(request)), usd=cap
-	)
+	ip = edge.ip_key(edge.client_ip(request))
+	# The per-record cap is per address, not per session: sessions are free to mint, so a run key
+	# per session would let one address spend the whole day's cap on one sample.
+	gate = await app.state.ledger.reserve(visitor=sid, run=f"fix:{view.key}:ip:{ip}", ip=ip, usd=cap)
 	if not gate.ok:
+		today = gate.reason in ("daily_cap", "run_cap")
 		raise ApiError(
 			429,
-			"fix_limit",
+			"fix_limit" if today else "rate_limited",
 			"Muse Code has done as many fixes as it can here today; try again tomorrow."
-			if gate.reason in ("daily_cap", "run_cap")
+			if today
 			else "Too many requests from here; try again shortly.",
 			extra={"reason": gate.reason, "retry_after_s": gate.retry_after_s},
 		)
@@ -188,7 +192,9 @@ async def _race(request: Request, patch_id: str) -> Race:
 async def _settle(request: Request, race: Race, result: dict[str, Any]) -> None:
 	race.result, race.settled = result, True
 	spent = result.get("usd_from_reported_tokens")
-	usd = race.worst_usd if not isinstance(spent, (int, float)) else min(race.worst_usd, max(0.0, spent))
+	# What Muse Code reported, even past the cap (calls already in flight when the box stops are
+	# still billed); the cap only when nothing was reported.
+	usd = race.worst_usd if not isinstance(spent, (int, float)) else max(0.0, spent)
 	if race.reservation:
 		await request.app.state.ledger.settle(race.reservation, usd)
 	await request.app.state.races.put(race)
@@ -199,7 +205,10 @@ async def get_race(patch_id: str, request: Request) -> dict:
 	fixer = _fixer(request)
 	race = await _race(request, patch_id)
 	if not race.settled:
-		res = await fixer.poll(race.call_id)
+		try:
+			res = await fixer.poll(race.call_id)
+		except Exception:  # a fixer that can't be asked is the same as no answer yet
+			res = None
 		if res is None and now() - race.started > RACE_LOST_S:
 			res = {"error": "lost", "candidates": []}
 		if res is not None:

@@ -5,7 +5,7 @@
  * Nothing here calls a fix verified: verify runs through A's job store once its runner applies a
  * patch, and until then every lane says the fix hasn't been run.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { fmt } from "../lib/fmt";
 import { hasKey, t } from "../lib/i18n";
 import type { Finding } from "../workspace/record/types";
@@ -38,7 +38,7 @@ function Lane({ c, running, elapsed }: { c: { template_id: string; value?: unkno
 			{!running && c.status === "patched" ? (
 				<>
 					{c.files?.length ? <p className="pf-dim">{t("fix.files", { files: c.files.join(", ") })}</p> : null}
-					{c.final ? <p className="pf-fix__said">{c.final}</p> : null}
+					{c.final ? <p className="pf-fix__said">{t("fix.said", { text: c.final })}</p> : null}
 					<details className="pf-fix__diff">
 						<summary>{t("fix.diff")}</summary>
 						<pre>{c.diff}</pre>
@@ -50,28 +50,47 @@ function Lane({ c, running, elapsed }: { c: { template_id: string; value?: unkno
 	);
 }
 
+// Source: derived, the API calls a race lost after 13 minutes (routes/patches.py RACE_LOST_S); a
+// minute more and the tab stops asking.
+const GIVE_UP_MS = 14 * 60 * 1000;
+
+/** Races started in this tab, by record and finding: closing the panel and opening it again
+ * picks the race up where it is, instead of losing it (and its cost) behind a new click. */
+const started = new Map<string, { race: RaceView; at: number }>();
+
 export function FixRace({ finding }: { finding: Finding }) {
 	const { record, recordRef, provider, state } = useWorkspace();
-	const [race, setRace] = useState<RaceView | null>(null);
+	const slot = `${recordRef}|${finding.id}`;
+	const [race, setRaceState] = useState<RaceView | null>(() => started.get(slot)?.race ?? null);
+	const setRace = (next: RaceView | null | ((r: RaceView | null) => RaceView | null)) =>
+		setRaceState((r) => {
+			const v = typeof next === "function" ? next(r) : next;
+			if (v) started.set(slot, { race: v, at: started.get(slot)?.at ?? Date.now() });
+			return v;
+		});
 	const [error, setError] = useState<{ code: string; message: string } | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
-	const started = useRef(0);
 	const cands = candidatesFor(finding, { record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective });
 	const running = race?.status === "running";
 
 	useEffect(() => {
 		if (!race || race.status !== "running") return;
-		const tick = setInterval(() => setElapsed(Math.round((Date.now() - started.current) / 1000)), 1000);
+		const at = started.get(slot)?.at ?? Date.now();
+		const tick = setInterval(() => setElapsed(Math.round((Date.now() - at) / 1000)), 1000);
 		const poll = setInterval(async () => {
+			if (Date.now() - at > GIVE_UP_MS) {
+				setRace((r) => (r ? { ...r, status: "failed", error: "lost" } : r));
+				return;
+			}
 			const next = await getRace(race.patch_id);
-			if (next && next.status !== "running") setRace((r) => ({ ...r, ...next }));
+			if (next && next.status !== "running") setRace((r) => (r ? { ...r, ...next } : next));
 		}, POLL_MS);
 		return () => {
 			clearInterval(tick);
 			clearInterval(poll);
 		};
-	}, [race]);
+	}, [race, slot]);
 
 	if (!cands.length) return <p className="pf-dim">{t("fix.none")}</p>;
 
@@ -84,7 +103,7 @@ export function FixRace({ finding }: { finding: Finding }) {
 			setError({ code: out.code, message: out.message });
 			return;
 		}
-		started.current = Date.now();
+		started.set(slot, { race: out.race, at: Date.now() });
 		setElapsed(0);
 		setRace(out.race);
 	};

@@ -790,8 +790,8 @@
 	"guide.finding": "Found in the code: {title}. {detail}",
 	"guide.finding.why": "Preflight found this by reading the script, not by measuring it, so no knob shows it: the fix goes in the code.",
 	"fix.title": "Fix it with Muse Code",
-	"fix.offer": "Muse Code writes {n} fixes side by side from your script. Each comes back as a change you can read.",
-	"fix.offer.one": "Muse Code writes a fix from your script. It comes back as a change you can read.",
+	"fix.offer": "Muse Code writes {n} fixes side by side from the script. Each comes back as a change you can read.",
+	"fix.offer.one": "Muse Code writes a fix from the script. It comes back as a change you can read.",
 	"fix.start": "Write the fixes",
 	"fix.start.one": "Write the fix",
 	"fix.by": "Written by Muse Code (Meta), which reads and edits your files and can't run them",
@@ -827,5 +827,10 @@
 	"exports.wandb.download": "Download {file}",
 	"exports.wandb.copy": "Copy",
 	"exports.wandb.copied": "Copied.",
-	"exports.wandb.copy_failed": "Couldn't copy here; use the download instead."
+	"exports.wandb.copy_failed": "Couldn't copy here; use the download instead.",
+	"fix.said": "Muse Code says: {text}",
+	"fix.error.rate_limited": "Too many requests from here; try again shortly.",
+	"fix.error.race_failed": "The fixes didn't finish.",
+	"fix.error.sandbox_failed": "Muse Code's sandbox didn't start; nothing was spent.",
+	"fix.error.expired": "This race finished too long ago to show again."
 }

@@ -56,7 +56,10 @@ def run_race(
 		files = source_files(record_ref, reader=reader, blobs=blobs)
 	except Exception as e:  # A's InvalidSubmission carries a visitor-safe code
 		return {"error": getattr(e, "code", None) or "source_unreadable", "candidates": []}
-	box, close = open_box()
+	try:
+		box, close = open_box()
+	except Exception:
+		return {"error": "sandbox_failed", "candidates": []}
 	try:
 		cands = race_mod.race(
 			box,
@@ -70,6 +73,12 @@ def run_race(
 		return {"error": "gate_not_seen", "candidates": []}
 	except race_mod.BadUpload:
 		return {"error": "nothing_to_fix", "candidates": []}
+	except Exception:  # git or a write failing in the sandbox: the race is lost, reported as such
+		return {
+			"error": "race_failed",
+			"usd_from_reported_tokens": round(getattr(box, "spent", 0.0), 4),
+			"candidates": [],
+		}
 	finally:
 		close()
 	return {

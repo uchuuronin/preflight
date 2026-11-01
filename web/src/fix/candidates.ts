@@ -28,6 +28,7 @@ export interface Candidate {
 }
 
 export const TEMPLATES: FixTemplate[] = data.templates;
+// Source: derived, the API's limit (fix/race.py MAX_CANDIDATES: the plan's race shows three fixes).
 export const MAX_CANDIDATES = 3;
 /** What the API reserves for each candidate (fix/run.py USD_PER_CANDIDATE), shown before the click. */
 export const USD_PER_CANDIDATE: number = data.usd_per_candidate;
