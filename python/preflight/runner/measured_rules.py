@@ -91,8 +91,11 @@ _CKPT = re.compile(r"(?:^|/)(checkpoint-\d+|checkpoints?|ckpt)/")
 # a file a cache would be: data saved for reuse (a config.json or a model directory isn't one)
 _CACHE_EXT = re.compile(r"\.(pt|pth|pkl|pickle|npy|npz|arrow|parquet|feather|h5|cache|joblib)$")
 # a resume or pretrained weights loaded when present: not a cache
-_RESUME = re.compile(r"(?i)ckpt|checkpoint|last|resume|weights|pretrained|model")
+_RESUME = re.compile(
+	r"(?i)(^|[_\-.])(ckpt|checkpoints?|last|resume|pretrained)([_\-.]|$)"
+)  # on the file's stem
 _RESUME_LOADERS = {"load_state_dict", "from_pretrained", "load_from_checkpoint"}
+_STATE_SUFFIXES = (".json", ".yaml", ".yml", ".toml", ".cfg")  # a checkpoint's state, not a README or script
 _WRITERS = {"save", "save_to_disk", "dump", "to_parquet", "to_feather", "savez", "write_bytes"}
 _LOADERS = {"load", "load_from_disk", "load_state_dict", "from_pretrained", "load_dataset"}
 
@@ -109,7 +112,7 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 	out: list[Finding] = []
 	# files holds the text files sent (weights aren't among them): a checkpoint folder's state,
 	# config or hparams, not code in a package named ckpt/
-	ckpts = sorted({m.group(0).strip("/") for f in files if not f.endswith((".py", ".pyi"))
+	ckpts = sorted({m.group(0).strip("/") for f in files if f.endswith(_STATE_SUFFIXES)
 		for m in [_CKPT.search(f)] if m})  # fmt: skip
 	if ckpts:
 		out.append(Finding(id="hygiene.stale_checkpoint", severity="warn", code="hygiene.stale_checkpoint",
@@ -207,17 +210,38 @@ def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:
 			if not isinstance(node, ast.If):
 				continue
 			path = _exists_arg(node.test, consts)
-			if path is None or not (path in written or _CACHE_EXT.search(path)) or _RESUME.search(path):
+			if path is None or not (path in written or _CACHE_EXT.search(path)):
 				continue
-			if any((getattr(c.func, "attr", None) or getattr(c.func, "id", None)) in _RESUME_LOADERS
-				for b in node.body for c in ast.walk(b) if isinstance(c, ast.Call)):  # fmt: skip
-				continue  # a resume or pretrained weights, not a cache
+			if _RESUME.search(path.rsplit("/", 1)[-1].rsplit(".", 1)[0]):  # the file's stem
+				continue
+			if any(
+				_feeds_weights(c, path, consts)
+				for b in node.body
+				for c in ast.walk(b)
+				if isinstance(c, ast.Call)
+			):
+				continue  # the file is loaded into the model: a resume or pretrained weights, not a cache
 			loads = [c for b in node.body for c in ast.walk(b) if isinstance(c, ast.Call)
 				and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) in _LOADERS]  # fmt: skip
 			if loads:
 				hits.append((f"{name}:{node.lineno}", f"loads {path!r} when it exists, and the path doesn't change "
 					"with the model, tokenizer or settings that produced it"))  # fmt: skip
 	return hits[:3]
+
+
+def _feeds_weights(call, path: str, consts) -> bool:
+	"""A weights loader (load_state_dict, from_pretrained, ...) given this very path, or a load of it."""
+	import ast
+
+	if (getattr(call.func, "attr", None) or getattr(call.func, "id", None)) not in _RESUME_LOADERS:
+		return False
+	for c in [call, *(x for a in call.args for x in ast.walk(a))]:
+		for a in getattr(c, "args", []):
+			if (isinstance(a, ast.Constant) and a.value == path) or (
+				isinstance(a, ast.Name) and consts.get(a.id) == path
+			):
+				return True
+	return False
 
 
 def _exists_arg(test, consts) -> str | None:

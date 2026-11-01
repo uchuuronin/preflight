@@ -1080,12 +1080,15 @@ class Recorder:
 					# Lightning's default with neither set is 1000 epochs, and an early stop or a time
 					# limit ends the run before its plan: no planned length then, rather than a wrong one
 					stops_early = any(
-						type(c).__name__ in ("EarlyStopping", "Timer")
+						k.__name__ in ("EarlyStopping", "Timer")
 						for c in getattr(self_, "callbacks", [])
-					)
-					if steps and steps > 0:
+						for k in type(c).__mro__
+					)  # fmt: skip (a subclass counts)
+					if stops_early:
+						rec.run_length = {}  # the plan is a ceiling, not the run's length
+					elif steps and steps > 0:
 						rec.run_length = {"planned_steps": int(steps), "epochs": None}
-					elif epochs and epochs > 0 and epochs != 1000 and not stops_early:
+					elif epochs and epochs > 0 and epochs != 1000:
 						rec.run_length = {"planned_steps": None, "epochs": float(epochs)}
 				return orig(self_, *args, **kwargs)
 

@@ -147,3 +147,14 @@ def test_truncation_counts_only_the_sequences_whose_ending_is_known():
 	rec = _gpu_rec(generation=g, extras={"generation_ending_known": 2.0})
 	f = next(f for f in hygiene_findings(rec, {}) if f.code == "generation.truncated")
 	assert "2 of 2" in f.detail
+
+
+def test_caches_with_model_or_last_in_their_names_and_beside_a_weights_load_still_fire():
+	for code in ("import os, torch\nif os.path.exists('model_embeddings_cache.pt'):\n    e = torch.load('model_embeddings_cache.pt')\n",
+		"import os, pickle\nif os.path.exists('cache/elastic_index.pkl'):\n    i = pickle.load(open('cache/elastic_index.pkl', 'rb'))\n",
+		"import os, torch\nif os.path.exists('feats.pt'):\n    f = torch.load('feats.pt')\n    model.load_state_dict(torch.load('init.pt'))\n"):  # fmt: skip
+		assert "hygiene.cache_not_keyed" in [
+			f.code for f in hygiene_findings(_gpu_rec(), {"train.py": code})
+		], code
+	readme = {"train.py": "x = 1\n", "checkpoints/README.md": "download weights here\n"}
+	assert "hygiene.stale_checkpoint" not in [f.code for f in hygiene_findings(_gpu_rec(), readme)]
