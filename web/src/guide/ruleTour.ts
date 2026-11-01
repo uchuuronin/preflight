@@ -259,7 +259,16 @@ function knobFindings(ctx: TourContext): Finding[] {
 	// included): a finding on one of those is the moves' to show, or deliberately held back.
 	const shown = new Set(ctx.provider.moves(ctx.record, ctx.objective, opts(ctx, ctx.pinned, { includeTight: true })).map((m) => m.knobId));
 	return ctx.record.findings.filter(
-		(f) => FINDING_SEVERITIES.has(f.severity) && !!f.knob_id && knobs.has(f.knob_id) && !shown.has(f.knob_id) && !ctx.visited.has(findingVisit(f)),
+		// A knob the tour already moved, offered or had turned down has been dealt with on the dock.
+		(f) =>
+			FINDING_SEVERITIES.has(f.severity) &&
+			!!f.knob_id &&
+			knobs.has(f.knob_id) &&
+			!shown.has(f.knob_id) &&
+			!ctx.visited.has(f.knob_id) &&
+			!ctx.visited.has(`probe:${f.knob_id}`) &&
+			!(ctx.limits?.declined ?? []).includes(f.knob_id) &&
+			!ctx.visited.has(findingVisit(f)),
 	);
 }
 
@@ -351,7 +360,9 @@ export function nextStep(ctx: TourContext): TourStep {
 	// savings, since no knob move shows them.
 	const found = failing ? undefined : nextFinding(ctx);
 	if (found) return findingStep(ctx, found);
-	const top = candidates(ctx, ctx.pinned)[0];
+	// A failure comes first whatever the aim: when the aim ranks no move that fits, the moves
+	// ranked for memory are the ones that can clear it.
+	const top = candidates(ctx, ctx.pinned)[0] ?? (failing ? candidates({ ...ctx, objective: { ...ctx.objective, kind: "fit_memory" } }, ctx.pinned)[0] : undefined);
 	const offer = probeOffer(ctx, top);
 	if (offer) {
 		return {
@@ -413,14 +424,17 @@ export function nextStep(ctx: TourContext): TourStep {
 			nodes: [...new Set([...nodes, ...(toMeasure ? nodesForKnob(ctx.record, toMeasure.knobId) : [])])],
 			// "likely to fail" only when it likely would; a small chance is said as one
 			textKey: likelyFails(ctx) ? "guide.nothing_safe" : "guide.nothing_safe.tight",
-			whyKey: "guide.nothing_safe.why",
+			// the probe line only when there is a setting worth measuring
+			whyKey: toMeasure ? "guide.nothing_safe.why" : "guide.nothing_safe.none.why",
 		};
 	}
 	return { kind: "done", nodes: [], textKey: "guide.done", whyKey: "guide.done.why" };
 }
 
 export function plannedSteps(ctx: TourContext): number {
-	return candidates(ctx, ctx.pinned).length;
+	const n = candidates(ctx, ctx.pinned).length;
+	if (n || isFailing(ctx) || !aimUnpredicted(ctx)) return n;
+	return candidates({ ...ctx, objective: { ...ctx.objective, kind: "fit_memory" } }, ctx.pinned).length;
 }
 
 export const MAX_TOUR_STEPS = 5;

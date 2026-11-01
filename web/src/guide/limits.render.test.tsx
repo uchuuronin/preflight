@@ -56,8 +56,10 @@ describe("limits and choices in the rule-based tour", () => {
 		await frame();
 		expect(r.ws!.state.knobs.batch_size).toBe(4);
 		expect(r.ws!.state.limits.excluded.batch_size).toEqual([8]);
-		// Any problem found on a knob no move ranks is said first; past it, nothing is left.
-		for (let i = 0; i < 3 && screen.queryByRole("button", { name: en["guide.next"] }); i++) {
+		// The problems no move can show come once each (gradients kept in eval, padding waste), then
+		// nothing is left.
+		for (const said of [/Eval runs with gradients kept/, /38% of tokens are padding/]) {
+			expect(screen.getByText(said)).toBeTruthy();
 			fireEvent.click(screen.getByRole("button", { name: en["guide.next"] }));
 			await frame();
 		}
