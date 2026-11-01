@@ -1,0 +1,39 @@
+{
+  "record_id": "01M6C5WRVEM3RTRRBDRPAAPEGT",
+  "probe": "p1-eval",
+  "status": "oom",
+  "provider": "modal-glimmer",
+  "model": "muse-glimmer",
+  "wall_s": 335.1,
+  "finding": null,
+  "last_error": "Triage output did not validate after a re-ask: 3 validation errors for Triage\ncategory\n  Input should be 'ok', 'oom', 'missing_package', 'data_error', 'nan_or_divergence', 'timeout', 'script_error', 'infrastructure' or 'unclear' [type=literal_error, input_value='oom.eval', input_type=str]\n    For further information visit <url>\nsummary\n  Field r",
+  "calls": [
+    {
+      "provider": "modal-glimmer",
+      "model": "muse-glimmer",
+      "purpose": "triage",
+      "input_tokens": 325,
+      "output_tokens": 246,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.192597,
+      "request_id": "chatcmpl-b4c2414b9cc5daef",
+      "at": "2026-11-01T23:49:03Z",
+      "latency_s": 330.167,
+      "ok": false
+    },
+    {
+      "provider": "modal-glimmer",
+      "model": "muse-glimmer",
+      "purpose": "triage",
+      "input_tokens": 450,
+      "output_tokens": 190,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.00287,
+      "request_id": "chatcmpl-85dd73fe4725495d",
+      "at": "2026-11-01T23:49:08Z",
+      "latency_s": 4.92,
+      "ok": false
+    }
+  ],
+  "usd": 0.195467
+}

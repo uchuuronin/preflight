@@ -1,0 +1,39 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-UhhK5hsCV2z734OMgxYacg
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function diagnose_hosted.
+└── ✓ Created Function triage_hosted.
+[triage] no finding: Triage output did not validate after a re-ask: 3 validation errors for Triage
+category
+  Input should be 'ok', 'oom', 'missing_package', 'data_error', 'nan_or_divergence', 'timeout', 'script_error', 'infrastructure' or 'unclear' [type=literal_error, input_value='oom.eval', input_type=str]
+    For further information visit <url>
+summary
+  Field r
+[triage] 2 calls, $0.1955, 335.1 s
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-UhhK5hsCV2z734OMgxYacg
