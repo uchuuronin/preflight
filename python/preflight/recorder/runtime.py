@@ -325,6 +325,7 @@ class Recorder:
 		hf_overrides: bool = True,
 		alternate_sync: bool = False,
 		generate_sample: int = 0,
+		generate_calls: int = 0,
 	):
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
@@ -333,6 +334,8 @@ class Recorder:
 		# and every step is timed from its boundary events, so the two kinds compare like with like
 		self.alternate_sync = alternate_sync
 		self.generate_sample = generate_sample  # a serving probe: prompts kept per generate call
+		self.generate_calls = generate_calls  # an eval probe: generate calls measured before it ends
+		self._gen_calls_done = 0
 		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
 		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
 		self.trace_path = trace_path
@@ -851,6 +854,7 @@ class Recorder:
 		def factory(orig):
 			def generate(model, *args, **kwargs):
 				rec._maybe_stop()
+				rec._gen_call_starts()
 				rec._sync()
 				t0 = rec._now()
 				rec._generating += 1
@@ -863,6 +867,7 @@ class Recorder:
 				with suppress(Exception):
 					rec._record_hf_generation(model, args, kwargs, out, dt)
 				rec.acc["generate"] += dt
+				rec._gen_calls_done += 1
 				return out
 
 			return generate
@@ -1062,6 +1067,7 @@ class Recorder:
 		def factory(orig):
 			def generate(self_, *args, **kwargs):
 				rec._maybe_stop()
+				rec._gen_call_starts()
 				if rec.generate_sample:
 					args, kwargs = _sample_prompts(args, kwargs, rec.generate_sample)
 				rec._sync()
@@ -1082,6 +1088,7 @@ class Recorder:
 						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
 					)
 				rec.acc["generate"] += dt
+				rec._gen_calls_done += 1
 				if rec.generate_sample:
 					raise StopProbe  # the sampled call is the serving probe's measurement: done
 				return outs
@@ -1814,6 +1821,12 @@ class Recorder:
 				"backend": self.gens[-1]["backend"],
 			}
 		}
+
+	def _gen_call_starts(self) -> None:
+		"""An eval probe ends as a generate call starts once it has measured generate_calls of them:
+		the script's work on the last batch is done and measured, the next batch isn't started."""
+		if self.generate_calls and self._gen_calls_done >= self.generate_calls and not self._generating:
+			raise StopProbe
 
 	def _note_entropy(self, logps, attention_mask) -> None:
 		"""The policy's mean -log p over the completion tokens it was trained on: on sampled tokens a

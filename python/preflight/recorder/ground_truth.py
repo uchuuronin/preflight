@@ -47,7 +47,7 @@ def plan(files: dict[str, str], entrypoint: str | None = None) -> dict:
 	import re
 
 	from preflight.harness.static import map_static
-	from preflight.runner.pipeline import SERVING_PROBE_PROMPTS, _uses_vllm
+	from preflight.runner.pipeline import EVAL_PROBE_CALLS, SERVING_PROBE_PROMPTS, _uses_vllm
 
 	entry = entrypoint_of(files, entrypoint)
 	sm = map_static(files, entrypoint=entry)
@@ -55,7 +55,8 @@ def plan(files: dict[str, str], entrypoint: str | None = None) -> dict:
 	titan = any(titan_re.search(t) for k, t in files.items() if k.endswith(".py"))
 	image = "serving" if _uses_vllm(sm, files) else "titan" if titan else "probe"
 	return {"entrypoint": entry, "lens": sm.lens, "image": image,
-		"generate_sample": SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0}  # fmt: skip
+		"generate_sample": SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
+		"generate_calls": EVAL_PROBE_CALLS if sm.lens == "eval" else 0}  # fmt: skip
 
 
 def entrypoint_of(files: dict[str, str], wanted: str | None = None) -> str:
@@ -197,6 +198,7 @@ def measure(
 	entrypoint: str | None = None,
 	args: tuple[str, ...] = (),
 	generate_sample: int = 0,
+	generate_calls: int = 0,
 ) -> dict:
 	"""Both runs and the paired overhead, as one dict (what out/ground_truth_<script>.json holds).
 	bare_env: environment overrides for the bare run only (its own caches on a root box).
@@ -230,8 +232,9 @@ def measure(
 		_say(f"recorder run: {warmup} warmup + {recorder_steps} timed steps, at most {left:.0f} s")
 		# the recorder run is the probe the pipeline would run: a serving script's sampled generate call
 		r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint=entrypoint, args=list(args), warmup=warmup,
-			timed=recorder_steps, timeout_s=left, alternate_sync=not generate_sample,
-			install_requirements=install_requirements, generate_sample=generate_sample))  # fmt: skip
+			timed=recorder_steps, timeout_s=left, alternate_sync=not (generate_sample or generate_calls),
+			install_requirements=install_requirements, generate_sample=generate_sample,
+			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:
 		shutil.rmtree(work, ignore_errors=True)
@@ -296,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
 		p = plan(_read_tree(ns.script_dir), ns.entrypoint)
 		if not ns.generate_sample:  # a serving script's probe samples, as on Modal
 			ns.generate_sample = p["generate_sample"]
+		generate_calls = p["generate_calls"]
 	except ValueError as exc:
 		print(f"{ns.script_dir}: {exc}", file=sys.stderr)
 		return 2
@@ -308,7 +312,7 @@ def main(argv: list[str] | None = None) -> int:
 		res = measure(ns.script_dir, bare_steps=ns.bare_steps, recorder_steps=ns.recorder_steps,
 			warmup=ns.warmup, install_requirements=ns.install_requirements, bare_env=bare_env,
 			budget_s=ns.budget_min * 60, entrypoint=ns.entrypoint, args=tuple(script_args),
-			generate_sample=ns.generate_sample)  # fmt: skip
+			generate_sample=ns.generate_sample, generate_calls=generate_calls)  # fmt: skip
 	finally:
 		for d in (own, run):
 			if d is not None:

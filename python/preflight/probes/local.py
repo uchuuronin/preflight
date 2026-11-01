@@ -204,6 +204,9 @@ class ProbeSpec:
 	# a serving probe: the prompts one vLLM generate call keeps (0: all of them), and the probe ends
 	# once that call is measured; a load test's whole burst would outrun the probe's time limit
 	generate_sample: int = 0
+	# an eval probe: the generate calls it measures; the probe ends as the next one starts, so what the
+	# script does with each batch (decode, score, dump activations) runs and is measured too
+	generate_calls: int = 0
 
 
 @dataclass
@@ -816,6 +819,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"seed_force": spec.seed_force,
 				"alternate_sync": spec.alternate_sync,
 				"generate_sample": spec.generate_sample,
+				"generate_calls": spec.generate_calls,
 				"install_requirements": spec.install_requirements,
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,

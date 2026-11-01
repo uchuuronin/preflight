@@ -155,6 +155,8 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		spec.generate_sample
 	):  # a serving probe's sample size decides what it measured; absent, keys stay as they were
 		body["generate_sample"] = spec.generate_sample
+	if spec.generate_calls:  # an eval probe's measured calls, likewise
+		body["generate_calls"] = spec.generate_calls
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
 
@@ -247,6 +249,10 @@ GENERATION_LENSES = ("eval", "rl", "serving")
 # once (about 16 to 21 at 4,096 tokens for a 7B model), so preemption shows, and few enough to finish
 # well inside the probe's time limit on an L4 (32 x 4,096 tokens) [guess: the next probe replaces it]
 SERVING_PROBE_PROMPTS = 32
+# an eval probe's measured generate calls: two batches give a per-batch time, the truncation share
+# and the bytes a batch writes; the Nov 1 eval smoke ran batch after batch to its 600 s timeout and
+# kept nothing [guess: two]
+EVAL_PROBE_CALLS = 2
 GENERATION_PROBE_TIMEOUT_S = 10 * 60
 
 
@@ -295,6 +301,7 @@ def _spec(
 		install_requirements=deps.install_requirements,
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
+		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
 	)
 
 
