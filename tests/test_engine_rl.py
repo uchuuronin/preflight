@@ -283,3 +283,31 @@ def test_rollout_band_covers_the_gap_between_two_grpo_runs():
 	s2 = rl.LengthSample(mean=131.97, p95=440.0, max=512.0, n=32)
 	iv = rl.rollout_seconds(60.28 / 4, s2, 8, 512, 8, 512)
 	assert iv.lo <= 257.92 / 20 <= iv.hi
+
+
+def test_the_callers_flags_decide_a_fill_and_feature_falls_back_to_features(monkeypatch):
+	"""D, Nov 1: engine.rl in flags.json switched nothing. The runner passes its flag reader now."""
+	rec = _rl_record()
+	monkeypatch.setitem(api.FEATURES, "rl", False)
+	on = api.fill_predictions(rec, flags=lambda k: k == "engine.rl")
+	assert "rl.zero_spread" in on.predictions.estimates
+	off = api.fill_predictions(rec, flags=lambda k: False)
+	assert "rl.zero_spread" not in off.predictions.estimates
+	assert "rl.zero_spread" not in api.fill_predictions(rec).predictions.estimates  # FEATURES again
+	assert api.feature("rl") is False  # the fill's flags don't outlive it
+
+
+def test_every_engine_feature_has_its_key_in_flags_json():
+	import json
+	from pathlib import Path
+
+	flags = json.loads((Path(__file__).resolve().parents[1] / "flags.json").read_text())
+	assert set(api.FLAG_OF) == set(api.FEATURES)
+	for name, key in api.FLAG_OF.items():
+		assert key in flags, key
+		assert flags[key] == api.FEATURES[name], f"{key}: flags.json and FEATURES disagree"
+	engine_keys = {k for k in flags if k.startswith("engine.")}
+	assert engine_keys == {
+		*api.FLAG_OF.values(),
+		"engine.memory",
+	}  # engine.memory: the runner's gate on every fill

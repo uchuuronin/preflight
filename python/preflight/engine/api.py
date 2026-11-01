@@ -97,7 +97,30 @@ FEATURES = {
 	"serving": False,
 	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
 	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
-}  # this dict is the switch until the runner sets it from flags.json (from-b.md, B -> A); keep the two the same
+}  # the defaults when the caller passes no flags (scripts, tests); keep them the same as flags.json
+# the flags.json key for each feature: fill_predictions(record, flags=flag) reads them for that call
+FLAG_OF = {
+	"rl": "engine.rl",
+	"serving": "engine.serving",
+	"steptime_cross_gpu": "engine.steptime_cross_gpu",
+	"divergence": "engine.divergence",
+}
+_FEATURES_NOW: contextvars.ContextVar[dict[str, bool] | None] = contextvars.ContextVar(
+	"preflight_features", default=None
+)
+
+
+def feature(name: str) -> bool:
+	"""Whether a feature is on: the caller's flags for this fill, else FEATURES."""
+	now = _FEATURES_NOW.get()
+	return (now if now is not None else FEATURES)[name]
+
+
+def features_from(flag: Callable[[str], bool]) -> dict[str, bool]:
+	"""Every feature from the caller's flag reader (a missing flag reads as off)."""
+	return {name: bool(flag(key)) for name, key in FLAG_OF.items()}
+
+
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
 
@@ -181,11 +204,11 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		if _has_shape(record):  # the per-term split needs the analytical model
 			ids += [f"memory.{t}" for t in MEMORY_TERMS]
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
-		if FEATURES["rl"] and record.job.lens == "rl":
+		if feature("rl") and record.job.lens == "rl":
 			ids += list(RL_TARGETS)
-		if FEATURES["divergence"] and record.job.lens != "serving":  # training runs have a loss to watch
+		if feature("divergence") and record.job.lens != "serving":  # training runs have a loss to watch
 			ids.append("risk.divergence")
-		if FEATURES["serving"] and record.job.lens == "serving":
+		if feature("serving") and record.job.lens == "serving":
 			ids += list(SERVING_TARGETS)
 		c = record.job.constraints
 		if c.wall_time_cap_s:
@@ -1169,10 +1192,10 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		# shown past +-50% as rough; off, K1's simulated band and the usual abstain
 		xcell = (
 			conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
-			if FEATURES["steptime_cross_gpu"]
+			if feature("steptime_cross_gpu")
 			else None
 		)
-		if FEATURES["steptime_cross_gpu"] and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
+		if feature("steptime_cross_gpu") and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
 			# Chiya, Oct 31: abstain, labelled, until the AMD session measures; datasheets alone don't size the band
 			vendor = gpus.get_gpu(tgt_gpu).vendor
 			why = (
@@ -1385,7 +1408,7 @@ class _TimeResult:
 
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
 	step = _step(record, values)
-	if FEATURES["rl"] and record.job.lens == "rl" and step.est.status != "abstain":
+	if feature("rl") and record.job.lens == "rl" and step.est.status != "abstain":
 		step = _with_rollout(record, values, step)
 	if step.est.status == "abstain":
 		return _TimeResult(_abstain("s", MODEL_ID_TOTAL, step.est.reason), step.est, step.sigma)
@@ -2047,11 +2070,11 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.wall_cap"] = _wall_cap(record, tm)
 	if c.preemption.kind != "none":
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
-	if FEATURES["rl"] and record.job.lens == "rl":
+	if feature("rl") and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
-	if FEATURES["divergence"] and record.job.lens != "serving":
+	if feature("divergence") and record.job.lens != "serving":
 		out["risk.divergence"] = _divergence(record, values)
-	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET.get():
+	if feature("serving") and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))
 	return Prediction(out)
 
@@ -2849,7 +2872,7 @@ def _calibration(mid: str, record: FlightRecord | None = None) -> tuple[str, flo
 	target = _CARD_TARGET.get(mid)
 	if not target:
 		return CALIBRATION, None
-	if mid == steptime.MODEL_ID_CROSS and not FEATURES["steptime_cross_gpu"]:
+	if mid == steptime.MODEL_ID_CROSS and not feature("steptime_cross_gpu"):
 		return CALIBRATION, None  # the held-out band is installed but not switched on
 	if record is not None:
 		cell = conformal.TABLE.lookup(target, _env_gpu(record), record.job.lens)
@@ -3032,11 +3055,19 @@ def stale_models(record: FlightRecord) -> list[tuple[str, str]]:
 	return out
 
 
-def fill_predictions(record: FlightRecord) -> FlightRecord:
+def fill_predictions(record: FlightRecord, *, flags: Callable[[str], bool] | None = None) -> FlightRecord:
 	"""The record with B's parts filled: predictions, model cards, knobs' probed ranges. Returns a copy.
 
+	`flags` is the caller's flag reader (the runner's `flag`): with it, engine.rl, engine.serving,
+	engine.steptime_cross_gpu and engine.divergence decide this fill; without it, FEATURES does.
 	This is the call scripts/make_golden.py makes in place of the fixture predictions.
 	"""
+	if flags is not None:
+		token = _FEATURES_NOW.set(features_from(flags))
+		try:
+			return fill_predictions(record)
+		finally:
+			_FEATURES_NOW.reset(token)
 	preds = predictions_for(record)
 	used = {e.model_id for e in preds.estimates.values()} | {g.model_id for g in preds.grids}
 	used.discard("none")

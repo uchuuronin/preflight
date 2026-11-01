@@ -16,13 +16,10 @@
 	"d.expertise": false,
 	"d.currency": false,
 	"engine.memory": false,
-	"engine.steptime_same_gpu": false,
 	"engine.steptime_cross_gpu": true,
 	"engine.divergence": false,
 	"engine.rl": false,
 	"engine.serving": false,
-	"corpus.sweep": false,
-	"campaign.planner": false,
 	"d.freetier": false,
 	"d.notebook": false,
 	"d.exports_cli": false

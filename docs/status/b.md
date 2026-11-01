@@ -1,6 +1,8 @@
 # Status · B (prediction engine and corpus)
 
-Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; from now on merges, not rebases).
+Updated Sun Nov 1, 11 AM ET, on `ws-b` (merges, not rebases, for pushed commits).
+
+**Unseen scripts:** B has not opened `unseen-scripts.md` in the Project, and won't before Monday's scoring.
 
 ## Plan items B owns (updated Sun Nov 1, 1 AM ET)
 
@@ -108,7 +110,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 - **Chiya's decisions applied:**
   - **Below the smallest probe:** an "extrapolated" estimate with a growing band and a probe offer. Memory widens 25% per halving (S2d); step time widens 0.1 per halving and abstains about 2.7 halvings down (S4b).
   - **Agent sample:** 30 tasks, plus a 20-task top-up offered when the cost range straddles the budget (S6b: 88.2% final coverage).
-  - **Flags:** B's four flags are in `flags.json`, off.
+  - **Flags:** see "What each `engine.*` flag gates" below.
 - **`engine/api.py`:** `predict`, `build_grids`, `sensitivity`, plus `targets_for` and `fill_predictions` (the call `make_golden.py` makes).
   - Every lens gets its readouts: GPU lenses get memory, OOM risk, step and total time, cost, the wall-cap risk and preemption loss; API lenses get cost, tokens, wall clock under concurrency and rate limits, context fill and runaway rate.
   - Knob moves the models don't capture widen the band or abstain, and "measured" means a probe really saw the peak.
@@ -149,15 +151,34 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 - **Measured L4 (PM's Modal smoke run):** usable memory is 23,689,363,456 bytes (22.06 GiB, was 21.45), and the engine prefers a probe's reported total over the table for the probe's own GPU.
 - Tests live in root `tests/`; 798 pass across the repo (all agents' tests included), ruff clean with the repo config.
 
+## What each `engine.*` flag gates (Nov 1, for the README)
+
+D found that most `engine.*` flags switched nothing. Checked in the code on ws-b:
+
+| Flag | `flags.json` | Production | What it gates |
+| --- | --- | --- | --- |
+| `engine.memory` | off | on | **Every prediction**, not only memory. The runner fills the record's predictions (memory, time, cost, risk, the grids and the model cards) only with it on (`runner/pipeline.py::with_predictions`); off, the record keeps its measurements and has no predictions. |
+| `engine.steptime_cross_gpu` | on | on (from `flags.json`) | Moving to a GPU with no probe: on, step time takes the held-out cross-GPU band (about ±45%) and shows it past ±50%, labelled rough; another vendor abstains with "no AMD measurements". Off, the usual abstain. |
+| `engine.rl` | off | off | The RL lens's three extra readouts: zero-spread groups, rollout time and truncation. Memory, step time and cost on the RL lens don't depend on it. |
+| `engine.serving` | off | off | The serving lens's readouts: throughput, time to first token (p95), time per token and KV capacity. |
+| `engine.divergence` | off | off | The `risk.divergence` readout from the classifier. It stays off: the classifier missed its target ([report](../../python/preflight/corpus/reports/README.md)), and the threshold rules (D6) give the warning either way. |
+
+**Wired:** until now the last four were constants in `engine/api.py` (`FEATURES`), so changing them in `flags.json` did nothing. `fill_predictions(record, flags=flag)` now reads them from the caller's flag reader for that fill (`FLAG_OF` maps each to its key; a test holds `flags.json` and `FEATURES` to the same values). The runner has to pass its reader: one line in A's `pipeline.py`, requested in `from-b.md`. Until A lands it, the `FEATURES` defaults decide, and they equal `flags.json` today, so nothing shown changes.
+
+**Removed:** three B flags that nothing read. `engine.steptime_same_gpu` (same-GPU step time is always on, behind `engine.memory`), `corpus.sweep` (an offline tool; Chiya's yes per run is its gate) and `campaign.planner` (the planner runs only in C's sample script; the campaign view is behind C's `c.campaign_calendar`).
+
 ## Blocked
-- The L4 runs that build the real calibration table (grouped and HF jobs) wait on Chiya's yes to the $45 corpus plan (ask before spending, Oct 27).
+- A's 50-step GRPO record (with `device_used_bytes` per step) to verify the GRPO peak fix and calibrate RL.
+- A wiring the engine flags into the runner (one line, `from-b.md`).
+- AMD: the account's verification hold.
 
 ## Next (Sun Nov 1)
-- Divergence sweep: re-price from this run's measured cost before the next slice, then fit the classifier on what landed and report its held-out AUROC and lead with the n it rests on.
+- Divergence: done. The final fit on 720 runs misses (AUROC 0.66, lead 138 steps); not used. Both fit reports are committed under `corpus/reports/`. No more divergence spend.
+- Agent runaways: a stalled run's tasks with no stop reason are possibly stuck; at most one per worker counts (`AgentSample.concurrency`, 0.6.1), and one when the worker count isn't recorded.
 - Calibrate RL on A's 50-step GRPO run first (a hero lens), then retrieval, GNN and vision records as they land; serving once A's vLLM probes land.
 - Validation: the engine freezes at the `validation-freeze` tag after round four; Monday's full runs are scored with `scripts/score_validation.py`, which prints the model ids it used. The Oct 31 LoRA run is used for calibration, not held out.
 - AMD: no AMD measurements (the account is on a verification hold). If it lifts by Monday morning, the 300 paired configs (`data/amd_grouped.jsonl`) run first.
-- Contract 0.6.0 asks: `Campaign.start`, `CampaignCell.slot`, `Estimate.rate`; C has `cost.gpu_hours` for the editable rate now.
+- Contract 0.6.0: filled (campaign calendar fields, `Estimate.rate` on every cost estimate).
 
 ## Cloud runs and spend
 Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and dollars.

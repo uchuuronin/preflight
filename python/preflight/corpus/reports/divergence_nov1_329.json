@@ -1,0 +1,67 @@
+{
+ "n": 329,
+ "diverged": 21,
+ "families": 24,
+ "auroc": {
+  "point": 0.579004329004329,
+  "lo": 0.4073413297987093,
+  "hi": 0.7375030430320532
+ },
+ "lead_steps": {
+  "point": 3.0,
+  "lo": 0.0,
+  "hi": 243.0
+ },
+ "bins": [
+  [
+   0.0,
+   0.05,
+   280,
+   0.0023655202902294423,
+   0.04285714285714286
+  ],
+  [
+   0.05,
+   0.2,
+   13,
+   0.10487915679959643,
+   0.07692307692307693
+  ],
+  [
+   0.2,
+   0.5,
+   9,
+   0.34726734883509425,
+   0.0
+  ],
+  [
+   0.5,
+   0.8,
+   9,
+   0.7038772600964696,
+   0.3333333333333333
+  ],
+  [
+   0.8,
+   0.95,
+   9,
+   0.8709257124467359,
+   0.2222222222222222
+  ],
+  [
+   0.95,
+   1.0,
+   9,
+   0.98522491919389,
+   0.3333333333333333
+  ]
+ ],
+ "false_alarms": {
+  "stable": 308,
+  "alarms": 38
+ },
+ "enough": true,
+ "verdict": "superseded by divergence_nov1.json (720 runs, AUROC 0.66): this first fit, on the L4 runs alone, missed too",
+ "why": "AUROC 0.58 (95% 0.41 to 0.74) against a target of 0.85; median lead 3 steps (0 to 243) against 100; 38 of 308 stable runs alarmed",
+ "source": "scripts/fit_divergence.py on remote-runs b-divergence-export-1 (Nov 1): 329 runs on L4; folds and bootstrap by settings family (the sweep is one architecture)"
+}
