@@ -175,7 +175,7 @@ D found that most `engine.*` flags switched nothing. Checked in the code on ws-b
 
 ## Monday's validation runs: expected cost (for Chiya's one approval, Nov 1)
 
-Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixtures/validation/manifest_zoo_dryrun_nov1.json`; 2 runs scored, 8 "not measured yet", nothing crashes, predicted under production's flags). Each script needs a Preflight run (its record) and a full run (A's `ops_app.py::ground_truth`). The full runs are on an **L4** at $0.80/h: `ground_truth_on_l4` has the GPU fixed (`ops_app.py:325`). The L4 queued 19 to 59 minutes on Nov 1, which Modal doesn't bill but which costs time; an A10 option (no queue seen) would be A's change. `--budget-min` is a soft target; the hard limit is each full run's 50-minute timeout (`GROUND_TRUTH_TIMEOUT_S`), and the Preflight runs have no fixed cap.
+Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixtures/validation/manifest_zoo_dryrun_nov1.json`; 2 runs scored, 8 "not measured yet", nothing crashes, predicted under production's flags). Each script needs a Preflight run (its record) and a full run (A's `ops_app.py::ground_truth`). The full runs are on an **L4** at $0.80/h: `ground_truth_on_l4` has the GPU fixed (`ops_app.py:325`). The L4 queued 19 to 59 minutes on Nov 1, which Modal doesn't bill but which costs time; an A10 option (no queue seen) would be A's change. **Blocker for Monday:** `ground_truth` accepts only `finetune_lora_hf`, `pretrain_nanogpt` and `grpo_trl` (`recorder/ground_truth.py` `ZOO_SCRIPTS`), so the other 15 full runs can't run through it until A extends it (asked in `from-b.md`). `--budget-min` is a soft target; the hard limit is each full run's 50-minute timeout (`GROUND_TRUTH_TIMEOUT_S`), and the Preflight runs have no fixed cap.
 
 | Run | Full-run basis | Expected (L4) | At the run's budget | Hard ceiling (50 min) |
 | --- | --- | --- | --- | --- |
@@ -183,12 +183,12 @@ Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixt
 | grpo_trl | measured on an A10: 3 + 50 steps in 25 min; slower on an L4, and it ran out of memory there twice before A's fix | about $0.45 | 46 min, $0.61 | $0.67 |
 | pretrain_nanogpt | no finished full run yet (Oct 28's hit its limit) | about $0.20 | 30 min, $0.40 | $0.67 |
 | gnn_pyg, retrieval_st, vision_timm, eval_sweep_reasoning, serving_vllm | no full run yet; small models | about $0.15 each | 20 min each, $1.33 | $3.33 |
-| torchtitan_debug | the debug model | about $0.10 | 15 min, $0.20 | $0.67 |
-| agent_eval_spark | the 500-task benchmark, priced by the engine from the 30-task sample: **Spark API, not GPU** | $7.15 (90%: $5.90 to $13.71) | the proxy's dollar cap; $14 covers the band | $14 |
+| torchtitan_debug | the debug model, in its own 15-minute container (`ops_app.py::torchtitan_check`) | about $0.10 | 15 min, $0.20 | $0.20 |
+| agent_eval_spark | the 500-task benchmark, priced by the engine from the 30-task sample: **Spark API, not GPU** | $7.15 (90%: $5.90 to $13.71) | a dollar cap to set: the agent recorder's `max_usd_total`; $14 covers the band | $14 if set |
 | 9 unseen scripts | unknown size: room left for 9 full runs | about $0.20 each | 30 min each, $3.60 | $6.00 |
 | 19 Preflight runs (the records) | measured: $0.086 GPU and $0.018 Muse Spark for the LoRA run (Oct 28) | about $0.10 each, $1.98 | no fixed cap | |
 
-**Total:** GPU and Spark for the records about $5.50 expected, $8.59 at every run's budget, about $14 if every full run hit its 50-minute ceiling; plus the agent benchmark's Spark API, about $7.15 and capped at $14 by the proxy. **About $13 expected, about $28 at the ceilings.** The ceilings are estimates of the worst case, not hard bounds for the Preflight runs.
+**Total:** GPU and Spark for the records about $5.50 expected, $8.59 at every run's budget, about $13.50 if every full run hit its ceiling; plus the agent benchmark's Spark API, about $7.15, held to $14 if `max_usd_total` is set to it. **About $13 expected, about $27.50 at the ceilings.** The ceilings are estimates of the worst case, not hard bounds for the Preflight runs.
 
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).
