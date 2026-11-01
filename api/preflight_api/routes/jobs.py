@@ -27,7 +27,7 @@ from pydantic import ValidationError
 from .. import edge, repos
 from ..errors import ApiError
 from ..flags import flag
-from ..jobs import kind_of, retry_after, visitor_of
+from ..jobs import kind_of, limit_of, retry_after, visitor_of
 
 router = APIRouter(prefix="/v1")
 
@@ -76,6 +76,17 @@ def _job_id(job_id: str) -> str:
 
 def _store_error(e: Exception) -> ApiError:
 	k = kind_of(e)
+	lim = limit_of(e)
+	if lim:
+		# A's daily limits: its own words ("samples only until midnight ET"), retry at midnight.
+		code, message = lim
+		return ApiError(
+			429,
+			code,
+			message or "Today's limit is reached: samples only until midnight ET.",
+			retryable=True,
+			retry_after=retry_after(e),
+		)
 	if k == "QueueFull":
 		s = retry_after(e)
 		return ApiError(

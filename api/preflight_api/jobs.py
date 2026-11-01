@@ -68,6 +68,17 @@ def kind_of(e: BaseException) -> str:
 	return type(e).__name__
 
 
+def limit_of(e: BaseException) -> tuple[str, str] | None:
+	"""A demo limit A's job store refused with (Nov 1): `QueueFull` with a `code` starting `limit.`
+	(`limit.visitor_daily`, `limit.daily_spend`) and its own message for the visitor. None for a
+	plain busy queue (`queue_full`)."""
+	code = getattr(e, "code", "")
+	if kind_of(e) != "QueueFull" or not isinstance(code, str) or not code.startswith("limit."):
+		return None
+	message = str(e.args[0]) if e.args and isinstance(e.args[0], str) else ""
+	return code, message[:200]
+
+
 def retry_after(e: BaseException, default: int = 60) -> int:
 	value: Any = getattr(e, "retry_after_s", None)
 	return int(value) if isinstance(value, int | float) and value > 0 else default

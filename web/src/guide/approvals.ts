@@ -9,8 +9,10 @@ import type { KnobValue } from "../workspace/record/types";
 export type SpendTool = "run_probe" | "run_verify" | "sample_more" | "propose_patch";
 
 export interface ToolRun {
-	status: "submitted" | "unavailable" | "queue_full" | "refused" | "failed";
+	status: "submitted" | "unavailable" | "queue_full" | "limit" | "refused" | "failed";
 	job_id?: string;
+	/** A daily limit's own words from the job store (status "limit"; A, Nov 1). */
+	message?: string;
 	queue_position?: number | null;
 	reason?: string;
 	retry_after_s?: number | null;

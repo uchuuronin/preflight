@@ -231,3 +231,27 @@ def test_run_a_probe_here_takes_one_setting_of_a_real_record_only():
 	):
 		assert c.post("/v1/jobs", json=bad, headers=other).status_code == 422, bad
 	assert len(store.jobs) == 1
+
+
+def test_a_daily_limit_is_429_in_the_job_stores_own_words():
+	"""A's demo limits (Nov 1): QueueFull with a `limit.` code and its message for the visitor."""
+
+	class Limited(Store):
+		async def submit(self, request, *, visitor, idempotency_key):
+			e = QueueFull(
+				"You've run today's 3 probe jobs: samples only until midnight ET", retry_after_s=3600
+			)
+			e.code = "limit.visitor_daily"
+			raise e
+
+	r = client(Limited()).post("/v1/jobs", json=BODY, headers=KEY)
+	assert r.status_code == 429
+	assert r.headers.get("Retry-After") == "3600"
+	err = r.json()["error"]
+	assert err["code"] == "limit.visitor_daily"
+	assert err["message"] == "You've run today's 3 probe jobs: samples only until midnight ET"
+	# A busy queue keeps its own code and wording.
+	assert (
+		client(Store(full=True)).post("/v1/jobs", json=BODY, headers=KEY).json()["error"]["code"]
+		== "queue_full"
+	)

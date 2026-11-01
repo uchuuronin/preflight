@@ -523,7 +523,7 @@ export function GuidePanel() {
 
 			{approvals.map((a) => (
 				<div key={a.id} className="pf-guide__approval">
-					<p>{a.run ? t(`guide.run.${a.run.status}`, { job: a.run.job_id ?? "", position: a.run.queue_position ?? "" }) : t(`guide.approval.${a.name}`)}</p>
+					<p>{a.run ? t(`guide.run.${a.run.status}`, { job: a.run.job_id ?? "", position: a.run.queue_position ?? "", message: a.run.message ?? "" }) : t(`guide.approval.${a.name}`)}</p>
 					{a.run?.status === "submitted" && a.run.job_id ? (
 						<a className="pf-link" href={`#/boarding/${encodeURIComponent(a.run.job_id)}`}>
 							{t("guide.run.follow")}
