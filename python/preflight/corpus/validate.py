@@ -300,7 +300,8 @@ def _with_full_runs(row: Row, flags: list[tuple[str, bool | None]]) -> Row:
 def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
 	runs = [score_run(r, base) for r in manifest.get("runs", [])]
 
-	calibrates = {r.get("script"): set(r.get("calibrates") or ()) for r in manifest.get("runs", [])}
+	# per run, not per script: two runs of one script can differ (review, Nov 1)
+	calibrates = [set(r.get("calibrates") or ()) for r in manifest.get("runs", [])]
 
 	def flags(attr, only=None):
 		row = attr.removesuffix(
@@ -308,8 +309,8 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		)  # a run that calibrated a model is neither its point nor its band check
 		return [
 			(r.script, getattr(r, attr))
-			for r in runs
-			if (only is None or r.set == only) and row not in calibrates.get(r.script, set())
+			for r, cal in zip(runs, calibrates, strict=True)
+			if (only is None or r.set == only) and row not in cal
 		]
 
 	rows = [
@@ -382,9 +383,9 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 	]
 	inside = [
 		(f"{r.script}:{k}", getattr(r, k))
-		for r in runs
+		for r, cal in zip(runs, calibrates, strict=True)
 		for k in ("memory_inside", "step_inside", "rollout_inside", "serving_inside", "agent_inside")
-		if k.removesuffix("_inside") not in calibrates.get(r.script, set())
+		if k.removesuffix("_inside") not in cal
 	]
 	rows.append(
 		_share_row(
