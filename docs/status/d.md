@@ -8,6 +8,38 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 14:10 (README: check-in and the guide on in production; builder kit ready)
+
+`f7e4306` CI green (all six jobs). `main` is `6757667`, which already holds `ws-d`; nothing to merge.
+
+- **Found: the demo limits aren't in the deployed runner.** They're on `main` (`9a2bb82`,
+  `5a78a60`), but A's last logged runner deploy (`a-deploy-main-18`, from `8154268`, 13:04 ET)
+  predates them, so with `runner.queue` on, a visitor isn't limited yet. The README row has a
+  TODO(PM) to keep the limits sentence only once A redeploys; the kit tells the observer to check.
+- **README draft** (`readme-final.md`, for the PM's 8 PM swap): `runner.queue` (check-in) and
+  `c.guide.live` (the guide) move to "On in production" (Chiya, Nov 1; both true in
+  `flags.production.json`). The check-in row carries the demo limits: 3 probe jobs per visitor per
+  day and the site's daily GPU spend cap, $10 a day through Nov 4 and $30 from Nov 5 (cited:
+  `runner/queue.py`); past either, samples only until midnight ET. The guide row keeps its smoke
+  run and gains its spend limits from `api/preflight_api/ledger.py` ($0.40 a tour, derived; $10 a
+  day, the code's value pending Chiya's answer), and says the rule-based tour starts if the live
+  guide fails before answering (`GuidePanel.tsx`). The Notebook tab is off in production, so the
+  rows say repo or script. "Try it" and the
+  diagram no longer say check-in is behind a flag.
+- **Builder kit** (`docs/builders/`), ready for Chiya to hand over tonight: the live link in the
+  brief; the brief's data-use summary now follows the desk's notice as the local production build shows
+  it (Spark Open reads the last 3,000 characters of each probe's log, the live guide, uploads kept); a "limits on the public site" note so a limit refusal isn't
+  read as the builder's fault; the Notebook tab is off in production, so notebooks go in as a `.py`
+  upload. Checked on a local build with `--mode production`: home, New flight, two tabs (Repo link,
+  Upload), the three goals, "Got it", the samples. The live site can't be reached from my
+  workspace, so Chiya opens it once before the session. The sheet gains "opened the guide?". The
+  results come back to me to rank as onboarding fixes.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the README draft's status rows and the builder kit.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 12:55 (round five merged; finding 12 fixed; triage finding visible; worker tests fixed)
 
 **CI rule (Chiya, 12:43):** after every push to `ws-d`, check its CI run; a red run is fixed

@@ -21,7 +21,7 @@ hint and mark it.
 A hesitation is a pause of about 5 seconds or more, a wrong click, or "where is…?". Stuck means
 they couldn't go on without a hint.
 
-| # | Clock | Screen and spot (e.g. check-in, Notebook tab, error line) | What happened (their words if possible) | Hesitated / stuck / needed hint |
+| # | Clock | Screen and spot (e.g. check-in, Upload tab, error line) | What happened (their words if possible) | Hesitated / stuck / needed hint |
 | --- | --- | --- | --- | --- |
 | 1 | | | | |
 | 2 | | | | |
@@ -34,10 +34,12 @@ they couldn't go on without a hint.
 | Task | Done? | Without help? | Notes |
 | --- | --- | --- | --- |
 | 1 Open a sample | yes / no | yes / no | |
-| 2 Check in own job | yes / no / failed outside their control | yes / no | tab used: repo / upload / notebook |
+| 2 Check in own job | yes / no / failed outside their control | yes / no | tab used: repo / upload |
 | 3 Act on a finding | yes / no | yes / no | finding: ______ |
 
 **Acted on a finding?** yes / no  **Said they'd change their real run because of it?** yes / no / unsure
+
+**Opened the guide?** yes / no  **Did it help?** yes / no / unsure  **What it did** (their words): ______________
 
 **Any number they said looked wrong** (which, and why): ________________________________
 
@@ -53,6 +55,8 @@ Counts only, never percentages.
 | Checked in their own job without help | __ of __ |
 | Acted on a finding | __ of __ |
 | Would change their real run because of a finding | __ of __ |
+| Opened the guide | __ of __ |
+| Said the guide helped | __ of __ |
 | Time to first map, each builder | __, __, __ |
 | Check-in to own map, each builder | __, __, __ |
 
