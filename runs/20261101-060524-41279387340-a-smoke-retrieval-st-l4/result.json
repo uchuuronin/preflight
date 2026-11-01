@@ -1,0 +1,11 @@
+{
+	"name": "20261101-060524-41279387340-a-smoke-retrieval-st-l4",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41279387340",
+	"ref": "ws-a",
+	"sha": "da805248beb8c82798df5809a2971f67b9eb9c65",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/retrieval_st --gpus L4 --max-minutes 15",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T06:20:53Z"
+}
