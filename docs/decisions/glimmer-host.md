@@ -42,14 +42,16 @@ A proposed a Modal L4 at 4 bits behind vLLM's OpenAI server, scaled to zero (`do
   - The page says plainly that visitors' code reaches our Modal container, not Meta or Baseten.
 - **One smoke run measures both, and only once the weights' terms are confirmed** (Chiya, Nov 1: no test run until the download terms and the licence are confirmed in writing, with the link here): a cold start plus 5 triages on an L4 and the same on an A100-40GB. That's about $0.20 by the table above, capped at $0.50. It calibrates the serving model on Glimmer and measures the cold start, which is a guess today (about 90 s).
 
-**What blocks shipping either path:** whether Glimmer's weights can be downloaded, and under what licence. Neither the playbook nor the plan says so.
-- **Download terms:** not yet confirmed (link goes here).
-- **Licence:** not yet confirmed (link goes here).
-- **Until both are confirmed in writing, Glimmer stays "deferred: no host"** (Chiya, Nov 1), and the readout says that instead of offering private mode. If the terms don't allow self-hosting, it stays deferred.
+**Settled (Chiya, Nov 1, 11:18 AM ET): hosted.** Glimmer is Apache 2.0 and published by Meta, so the licence hold is dropped.
+- **Licence:** Apache 2.0 ([Meta's model page](https://dev.meta.ai/docs/muse-glimmer); [Meta's Hugging Face release post](https://huggingface.co/blog/muse-glimmer)).
+- **Download:** Meta's own repos on Hugging Face, org `meta-models`: `meta-models/Muse-Glimmer-30B` (bf16, about 59.6 GB) and `meta-models/Muse-Glimmer-30B-GGUF`. The startup check records the exact revision of each.
+- **Endpoint (8-bit, A100-40GB):** Meta publishes no 8-bit checkpoint; the FP8 builds on the Hub are third-party. So B makes one FP8 copy of Meta's bf16 checkpoint (llm-compressor FP8_DYNAMIC, data-free, so it depends on nothing but Meta's weights), and vLLM 0.28.0 serves it ([vLLM's Glimmer recipe](https://recipes.vllm.ai/meta-models/Muse-Glimmer-30B) for the version and parsers). Quantising at load isn't possible on 40 GB: vLLM loads the bf16 model first.
+- **Own GPU (4-bit, L4):** Meta's `Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf` (16.8 GB, "fits 24 GB VRAM") on llama.cpp, which is how Meta's page runs it locally. A smoke run proves it; it isn't hosted.
+- **Access:** Modal proxy auth on the endpoint, so a request without a proxy token never starts the A100.
+- **Code:** `python/preflight/glimmer/` (`app.py` the endpoint, `ops.py` the runs). Measured tokens/s, cold start and cost per triage go here after the smoke runs.
 
 ## Open questions for A
 
-- Can the weights be downloaded, and under what licence?
 - Which quantised checkpoint (AWQ, GPTQ or GGUF) and which tokenizer?
 - Is triage's prompt shape as assumed: about 8K tokens in, 800 out, with tools?
 - Does Glimmer's tool calling work through vLLM's OpenAI-compatible server?

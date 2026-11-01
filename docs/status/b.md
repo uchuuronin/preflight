@@ -38,7 +38,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Run cost and its basis (gap 21) | `main` | 0 | |
 | Corpus sweep: resumable, keyed, halts at budget (gap 13) | `main`; A100 board fix on branch | 0 | |
 | Versioned model cards pinned in records (gap 15) | branch: `stale_models`, `current_models` | 0 | C shows it |
-| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: settled with A (`docs/decisions/glimmer-host.md`) | 0 | Deferred: no host until the weights' download terms and licence are confirmed in writing (Chiya, Nov 1) |
+| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: hosting now (`python/preflight/glimmer/`, `docs/decisions/glimmer-host.md`) | 0.5 | Chiya, Nov 1: Apache 2.0 from Meta, hold lifted. FP8 copy of Meta's bf16 checkpoint on an A100-40GB behind Modal proxy auth; Meta's Q4_K_M GGUF on an L4 for the own-GPU claim. Startup check, smokes ($2 cap) and the deploy in progress |
 | Corpus published with its datasheet (gap 16) | branch (`corpus/DATASHEET.md`) | 0.5 | Publishing the rows themselves |
 
 **Validation rows (README table)**
@@ -222,6 +222,7 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-divergence-export-1` (GitHub run 41299862454): the 329 divergence rows back, for the fit | CPU | about 2 | about $0.01 |
 | Nov 1 | `b-divergence-sweep-3-l4` (GitHub run 41300143834, cap $9.59 for L4): 48 configs ok (377 on L4 in all); the second wave's 2 containers waited 2,640 s for L4s and ran nothing | L4 x 2-3 | 65 (wall), 9,241 container-s by the driver | $2.26 by the driver's measure ($9.45 on L4 so far) |
 | Nov 1 | `b-divergence-sweep-3-a10` (GitHub run 41300145883, cap $2.41 for A10): 343 configs ok, a fresh draw (`--seed 1`), the board on every row; no queueing | A10 x 1-4 | about 70 (wall) | $2.10 by the driver's measure. Divergence total $11.55 of the $12.00 cap; no more divergence sweeps (Chiya, Nov 1) |
+| Nov 1 | `b-glimmer-startup-check` (GitHub run 41327084275, pre-approved, CPU only, 70 min limit): failed while building images (Modal can't read the Python version in vLLM's registry image); nothing downloaded or ran | CPU | about 3 (wall), image builds only | about $0.00 |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
@@ -236,6 +237,7 @@ Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking onc
 | Sun Nov 1, about 11:30 AM | 977d5ef contract 0.6.0 fields; 7c803b8 P(OOM) scored as shown, table 67ab8edae6; 1cfa689 divergence not used; 0143b6a small fixes; 6b388f0 engine flags wired, stalled-run cap, both fit reports; ab72de6 review fixes; and this status commit | none (f42a30a went out with the earlier push) | read-only reviews of 977d5ef to 1cfa689 (earlier), of 0143b6a and 6b388f0, and of ab72de6; 0143b6a also on Chiya's yes (11:04 AM) | clean, both scans |
 | Sun Nov 1, about 11:45 AM | 285afc5 review minors (stalled-run reason wording, the scorer says the lead once, the API test checks the count); and this status commit | none | read-only review of 285afc5: nothing blocking | clean, both scans |
 | Sun Nov 1, about 11:50 AM | 9789338 Glimmer Modal app (startup check, quantize, smokes, endpoint); and this status commit | none | read-only review of 9789338: nothing blocks the startup check; its deploy and smoke findings are fixed in the next commit, reviewed before any GPU run | clean, both scans |
+| Sun Nov 1, about 12:10 PM | e2a7457 Glimmer review fixes (proxy auth, a vLLM image Modal can run); 47e61fe GRPO peak and RL calibration on the 50-step A10 run; and this docs commit (Glimmer decision, status, requests) | none | read-only review of e2a7457 and 47e61fe: nothing blocks the CPU startup check; its CUDA 13 point is fixed and reviewed before the A100 smoke | clean, both scans |
 
 ## Contract requests
 In `docs/requests/from-b.md`.
