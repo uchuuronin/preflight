@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from preflight.schema import Finding
+from preflight.schema import Evidence, Finding
 
 TAIL_CHARS = 3000  # the end of the log: where a traceback or the last progress line is
 Category = Literal["ok", "oom", "missing_package", "data_error", "nan_or_divergence", "timeout", "script_error",
@@ -48,8 +48,10 @@ def triage_probe(client, probe, log_tail: str) -> tuple[Finding | None, list]:
 	if probe.status in ("ok", "cached"):
 		return None, calls
 	line = t.evidence_line.strip()
-	quoted = line and line in tail  # code checks the quote is really in the log
+	quoted = len(line) >= 8 and line in tail  # code checks the quote is really in the log, and is a line
 	detail = t.summary.strip()[:200] + (f' (log: "{line[:160]}")' if quoted else " (no log line quoted)")
 	return Finding(id=f"triage.{probe.id}", severity="info", code=f"triage.{t.category}",
 		title=f"Spark Open on probe {probe.id}: {t.category.replace('_', ' ')}", detail=detail,
-		node_id=None, source="spark_open_triage"), calls  # fmt: skip
+		node_id=None, source="spark_open_triage",
+		# tied to its probe, so a follow-up that drops the probe (another GPU) drops this too
+		evidence=[Evidence(metric="triage", value=1.0, probe_id=probe.id)]), calls  # fmt: skip

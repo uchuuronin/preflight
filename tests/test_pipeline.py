@@ -719,3 +719,29 @@ def test_spark_open_triages_each_probe_log_only_with_its_flag(tmp_path, monkeypa
 		0
 	].detail  # only the probe that didn't finish
 	assert rec.costs.llm_usd == pytest.approx(0.001635 * len(triage_calls))
+
+
+def test_an_eval_oom_point_triages_each_attempt_under_its_own_id(tmp_path, monkeypatch):
+	from preflight.runner import flags
+
+	class EvalOOM(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			r = super().__call__(spec, gpu, should_stop=should_stop)
+			if spec.probe_id == "p1" and spec.eval_batches:  # the eval batch runs out; eval off, it fails
+				r.probe = r.probe.model_copy(update={"status": "oom", "error_code": "oom.eval"})
+			elif spec.probe_id == "p1":
+				r.probe = r.probe.model_copy(update={"status": "error", "error_code": "script.error"})
+			r.log_tail = "torch.OutOfMemoryError: CUDA out of memory\n"
+			return r
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_open_triage": True}))
+	flags.reload()
+	try:
+		d = deps(tmp_path, EvalOOM())
+		d.triage = _FakeTriageClient()
+		rec = run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), d)
+	finally:
+		flags.reload()
+	ids = [f.id for f in rec.findings if f.source == "spark_open_triage"]
+	assert len(ids) == len(set(ids)) and {"triage.p1-eval", "triage.p1"} <= set(ids)
+	assert {p.id for p in rec.probes} >= {"p1-eval", "p1"}

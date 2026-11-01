@@ -719,6 +719,8 @@ def _probe_points(
 				again = run(ladder.tried[-1], spec=_spec(fetched, sm, p, deps, eval_off=True))
 				probes.append(out.probe.model_copy(update={"id": f"{p.probe_id}-eval"}))
 				if isinstance(out, ProbeResult):
+					# its own id, as in the record: the eval-off re-run below is the point's p-id
+					out.probe = out.probe.model_copy(update={"id": f"{p.probe_id}-eval"})
 					results.append(out)
 				out = _marked_eval_off(again, rec)
 			except OverrideError:
