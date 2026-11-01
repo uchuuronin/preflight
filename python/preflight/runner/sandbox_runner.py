@@ -6,6 +6,7 @@ visitor code itself; it only starts the sandbox, feeds it a spec and reads
 one result line back (runner/wire.py).
 """
 
+import contextlib
 import logging
 import threading
 import time
@@ -20,6 +21,12 @@ log = logging.getLogger("preflight.sandbox")
 
 ENTRY = ("python", "-m", "preflight.probes.remote")
 EXEC_SLACK_S = 90  # over the probe's own cap: model download is inside it, process start is not
+READY = ("true",)  # a no-op run first: returns once the container is up, after any wait for a GPU
+READY_TIMEOUT_S = 30 * 60  # Modal's queue for a GPU can be long (L4: 14 to 25 min seen, Oct 31 to Nov 1)
+
+
+def suppress_all():
+	return contextlib.suppress(Exception)  # a failed no-op shows itself on the probe's own exec
 
 
 class SandboxRunner:
@@ -33,6 +40,7 @@ class SandboxRunner:
 		self._image: str = "probe"
 		self._started = 0.0
 		self.gpu_seconds: dict[str, float] = {}  # sandbox lifetime per GPU: what Modal bills
+		self.queued_s = 0.0  # time spent waiting for a GPU before any sandbox started
 
 	def __enter__(self):
 		return self
@@ -46,7 +54,14 @@ class SandboxRunner:
 		self.close()
 		# the probe image by its old one-argument call; another image (serving) by name
 		self._sb = self._create(gpu) if image == "probe" else self._create(gpu, image=image)
-		self._gpu, self._image, self._started = gpu, image, self._clock()
+		self._gpu, self._image = gpu, image
+		# wait out the GPU queue before any clock starts: neither the probe's time limit nor its cost
+		# counts the minutes Modal spent finding a GPU (no container runs, nothing is billed, then)
+		t = self._clock()
+		with suppress_all():
+			self._sb.exec(*READY, timeout=READY_TIMEOUT_S).wait()
+		self.queued_s += self._clock() - t
+		self._started = self._clock()
 		return self._sb
 
 	def close(self) -> None:
@@ -70,6 +85,7 @@ class SandboxRunner:
 		t0 = self._clock()
 		try:
 			sb = self._sandbox(gpu, spec.image)
+			t0 = self._clock()  # after the container is up: the queue for a GPU is neither time nor cost
 			proc = sb.exec(*ENTRY, timeout=int(spec.timeout_s + EXEC_SLACK_S))
 		except Exception:
 			log.warning("probe %s: no sandbox on %s", spec.probe_id, gpu, exc_info=True)
@@ -91,11 +107,16 @@ class SandboxRunner:
 			proc.stdin.write_eof()
 			proc.stdin.drain()
 			out = proc.stdout.read()
-			proc.wait()
 		except Exception:
 			log.warning("probe %s: sandbox exec failed", spec.probe_id, exc_info=True)
 			out = ""
 			self.close()  # a broken sandbox is not reused
+		try:
+			if out:
+				proc.wait()  # the result is read: a slow cleanup after it (or a wait error) doesn't lose it
+		except Exception:
+			log.warning("probe %s: sandbox exec ended badly after its result", spec.probe_id, exc_info=True)
+			self.close()
 		finally:
 			done.set()
 			watcher.join(timeout=2)

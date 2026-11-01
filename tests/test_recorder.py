@@ -380,3 +380,18 @@ def test_a_cap_given_in_a_generation_config_is_seen():
 	assert r.probe.status == "ok", r.probe.error
 	g = r.probe.generation
 	assert g.max_new_tokens == 4 and g.truncation_rate is not None and g.truncation_rate > 0
+
+
+def test_a_sandbox_entry_gets_its_result_before_the_probes_files_are_deleted(tmp_path, monkeypatch):
+	from preflight.probes import local
+
+	monkeypatch.setattr(local, "DEFER_CLEANUP", True)
+	monkeypatch.setattr(local, "_DISCARDED", [])
+	r = run_probe(spec("tiny_loop.py", warmup=1, timed=2))
+	assert r.probe.status == "ok", r.probe.error
+	pending = list(local._DISCARDED)
+	assert pending and all(
+		p.name.endswith(".discard") and p.exists() for p in pending
+	)  # set aside, not yet gone
+	local.finish_cleanup()
+	assert not any(p.exists() for p in pending)

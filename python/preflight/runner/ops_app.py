@@ -44,11 +44,16 @@ def prefetch(models: str = "") -> list[str]:
 
 	done = []
 	for repo in [m.strip() for m in models.split(",") if m.strip()] or ZOO_MODELS:
-		snapshot_download(
-			repo,
-			cache_dir=f"{WEIGHTS_DIR}/hf/hub",
-			allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "tokenizer*", "*.tiktoken"],
-		)
+		if repo.startswith("dataset:"):  # a dataset repo: all its files (the zoo's are small)
+			snapshot_download(
+				repo.removeprefix("dataset:"), repo_type="dataset", cache_dir=f"{WEIGHTS_DIR}/hf/hub"
+			)
+		else:
+			snapshot_download(
+				repo,
+				cache_dir=f"{WEIGHTS_DIR}/hf/hub",
+				allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "tokenizer*", "*.tiktoken"],
+			)
 		done.append(repo)
 	weights_vol.commit()
 	return done

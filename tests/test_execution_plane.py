@@ -102,9 +102,12 @@ class FakeProc:
 
 class FakeSandbox:
 	def __init__(self, gpu, fail=False):
-		self.gpu, self.fail, self.terminated, self.execs = gpu, fail, False, 0
+		self.gpu, self.fail, self.terminated, self.execs, self.ready = gpu, fail, False, 0, 0
 
 	def exec(self, *args, timeout=None):
+		if args == ("true",):  # the runner's wait for the container (and its GPU)
+			self.ready += 1
+			return FakeProc(self)
 		assert args == ("python", "-m", "preflight.probes.remote") and timeout > 0
 		self.execs += 1
 		return FakeProc(self)
@@ -211,7 +214,9 @@ def test_duration_and_cost_are_measured_by_the_worker_not_reported_by_the_sandbo
 
 	class Slow(FakeSandbox):
 		def exec(self, *args, timeout=None):
-			t[0] += 120.0  # two minutes on the worker's clock
+			t[0] += (
+				600.0 if args == ("true",) else 120.0
+			)  # ten minutes' wait for a GPU, then a 2-minute probe
 			return super().exec(*args, timeout=timeout)
 
 	from dataclasses import replace
@@ -307,3 +312,28 @@ def test_a_serving_scripts_probes_ask_for_the_serving_image_and_key_the_cache_ap
 	)
 	assert s.image == "serving"
 	assert cache_key(s, "L4", "t") != cache_key(replace(s, image="probe"), "L4", "t")
+
+
+def test_the_wait_for_a_gpu_is_neither_probe_time_nor_cost_and_a_result_survives_a_bad_wait():
+	t = [0.0]
+
+	class Queued(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				t[0] += 900.0  # fifteen minutes in Modal's queue for an L4
+			return super().exec(*args, timeout=timeout)
+
+	class BadWait(FakeProc):
+		def wait(self):
+			raise TimeoutError("exec limit while deleting a big dump")
+
+	class SlowCleanup(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			p = super().exec(*args, timeout=timeout)
+			return p if args == ("true",) else BadWait(self)
+
+	with SandboxRunner(lambda g: Queued(g), clock=lambda: t[0]) as run:
+		r = run(spec(), "L4", should_stop=lambda: False)
+		assert r.probe.duration_s == 0.0 and run.queued_s == 900.0 and run.billed_usd(lambda g: 3.6) == 0.0
+	with SandboxRunner(lambda g: SlowCleanup(g)) as run:
+		assert run(spec(), "L4", should_stop=lambda: False).probe.status == "ok"

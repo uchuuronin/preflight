@@ -98,7 +98,11 @@ PROBE_PACKAGES = [
 	"numpy>=1.26,<2.2",
 	"httpx>=0.27",
 ]
-ZOO_MODELS = ["Qwen/Qwen2.5-1.5B", "gpt2"]
+# "dataset:" marks a dataset repo. D's eval, retrieval and vision scripts' weights and data, so a
+# probe's time limit isn't spent downloading them (the Nov 1 eval sweep probe ran out inside it)
+ZOO_MODELS = ["Qwen/Qwen2.5-1.5B", "gpt2", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+	"sentence-transformers/all-MiniLM-L6-v2", "timm/resnet50.a1_in1k", "dataset:openai/gsm8k",
+	"dataset:sentence-transformers/natural-questions", "dataset:AI-Lab-Makerere/beans"]  # fmt: skip
 WORKER_TIMEOUT_S = 3600
 
 app = modal.App(APP_NAME)

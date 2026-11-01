@@ -657,6 +657,37 @@ def _rank_extras(out: Path, nproc: int, summary: dict) -> dict:
 	return res
 
 
+# A sandbox entry (probes/remote.py) sets this, prints its result, then calls finish_cleanup():
+# a probe that wrote many GB (an activation dump) is not lost to a slow delete before the result.
+DEFER_CLEANUP = False
+_DISCARDED: list[Path] = []
+
+
+def _discard(path: Path) -> None:
+	if not DEFER_CLEANUP:
+		shutil.rmtree(path, ignore_errors=True)
+		return
+	gone = path.with_name(path.name + ".discard")
+	try:
+		path.rename(gone)  # out of the way at once; deleted after the result is out
+	except OSError:
+		gone = path
+	_DISCARDED.append(gone)
+
+
+def finish_cleanup(*, background: bool = False) -> None:
+	"""Delete what _discard set aside; background=True hands it to a detached `rm -rf`, so the
+	sandbox entry can exit at once (the sandbox ends with the job, and the delete with it)."""
+	while _DISCARDED:
+		path = _DISCARDED.pop()
+		if background:
+			with contextlib.suppress(OSError):
+				subprocess.Popen(["rm", "-rf", "--", str(path)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+					stderr=subprocess.DEVNULL, start_new_session=True)  # fmt: skip
+				continue
+		shutil.rmtree(path, ignore_errors=True)
+
+
 def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None) -> ProbeResult:
 	validate_files(spec.files, entrypoint=spec.entrypoint)
 	# where the caller keeps artifacts (log, trace); wiped of any earlier attempt first
@@ -813,7 +844,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		final = root / f"{spec.probe_id}.trace.json"
 		shutil.move(str(trace), final)
 	# uploaded code is not kept on the box after the probe (24 h retention lives in the object store)
-	shutil.rmtree(sandbox, ignore_errors=True)
+	_discard(sandbox)
 	kernels, kernels_error = untrusted.kernel_table(summary.get("kernels"))
 	if kernels is not None and probe.error_code != "recorder":  # not on a probe whose numbers were unreadable
 		probe = probe.model_copy(update={"kernels": kernels})

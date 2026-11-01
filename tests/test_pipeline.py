@@ -617,3 +617,13 @@ def test_the_worker_reads_the_same_flag_files_as_the_api():
 		assert f'"{name}"' in api or f"/ {name!r}" in api.replace('"', "'"), f"api/app.py doesn't ship {name}"
 	assert 'FLAG_ENV = "production"' in runner and '"PREFLIGHT_ENV": FLAG_ENV' in runner
 	assert '"PREFLIGHT_ENV": "production"' in api
+
+
+def test_generation_bound_lenses_get_a_longer_probe_time_limit():
+	from preflight.harness.static import map_static
+	from preflight.runner.pipeline import GENERATION_PROBE_TIMEOUT_S, _probe_timeout
+
+	sm = map_static({"train.py": SCRIPT}, entrypoint="train.py")
+	assert _probe_timeout(sm, 360) == 360
+	assert _probe_timeout(sm.model_copy(update={"lens": "eval"}), 360) == GENERATION_PROBE_TIMEOUT_S
+	assert _probe_timeout(sm.model_copy(update={"lens": "eval"}), 900) == 900  # never shorter than asked

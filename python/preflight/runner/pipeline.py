@@ -228,6 +228,19 @@ def _skipped(p: PlannedProbe, why: str) -> Probe:
 	)
 
 
+# guess: a generation-bound probe (an eval's or a GRPO step's long completions, a serving batch)
+# passes few of its own boundaries per minute; the Nov 1 eval sweep probe ran out at 360 s
+GENERATION_LENSES = ("eval", "rl", "serving")
+GENERATION_PROBE_TIMEOUT_S = 10 * 60
+
+
+def _probe_timeout(sm: ScriptMap, base: float) -> float:
+	"""The probe's time limit: longer for generation-bound lenses, within the job's probe wall."""
+	if sm.lens in GENERATION_LENSES:
+		return max(base, min(GENERATION_PROBE_TIMEOUT_S, JOB_PROBE_WALL_S - 60))
+	return base
+
+
 _VLLM_IMPORT = re.compile(r"^\s*(?:from\s+vllm\b|import\s+vllm\b)", re.M)
 
 
@@ -260,7 +273,7 @@ def _spec(
 		timed=p.timed,
 		eval_batches=eval_batches if eval_batches else 0,
 		profile=p.profile,
-		timeout_s=deps.probe_timeout_s,
+		timeout_s=_probe_timeout(sm, deps.probe_timeout_s),
 		seed=p.seed,
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
