@@ -1,0 +1,127 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sq71I2YNAIoPWESfFTqi0R
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/glimmer/ops.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function fetch.
+├── ✓ Created Function make_fp8.
+├── ✓ Created Function vllm_version.
+├── ✓ Created Function smoke_a100.
+├── ✓ Created Function llama_version.
+└── ✓ Created Function smoke_l4.
+{
+ "kind": "vllm",
+ "command": [
+  "vllm",
+  "serve",
+  "/weights/fp8-dynamic",
+  "--served-model-name",
+  "muse-glimmer",
+  "--host",
+  "0.0.0.0",
+  "--port",
+  "8000",
+  "--max-model-len",
+  "32768",
+  "--gpu-memory-utilization",
+  "0.92",
+  "--generation-config",
+  "auto",
+  "--enable-auto-tool-choice",
+  "--tool-call-parser",
+  "muse_glimmer",
+  "--reasoning-parser",
+  "muse_glimmer",
+  "--limit-mm-per-prompt",
+  "{\"image\": 0, \"video\": 0}"
+ ],
+ "sources": {
+  "bf16": {
+   "repo": "meta-models/Muse-Glimmer-30B",
+   "revision": "cec94fcfd6512f2cfe708138c32533b346ea4f69",
+   "files": {
+    ".eval_results/mmi.yaml": 1285,
+    ".gitattributes": 1570,
+    "LICENSE": 11358,
+    "README.md": 17266,
+    "USAGE_POLICY.md": 5230,
+    "chat_template.jinja": 9992,
+    "config.json": 5109,
+    "generation_config.json": 202,
+    "model-00001-of-00002.safetensors": 49950112952,
+    "model-00002-of-00002.safetensors": 9603322320,
+    "model.safetensors.index.json": 132674,
+    "processor_config.json": 1084,
+    "tokenizer.json": 28129897,
+    "tokenizer_config.json": 79936
+   },
+   "bytes": 59581830875,
+   "license": "apache-2.0",
+   "gated": false,
+   "downloaded_s": 333.2,
+   "at": "2026-11-01T16:50:49Z"
+  },
+  "gguf": {
+   "repo": "meta-models/Muse-Glimmer-30B-GGUF",
+   "revision": "b44f1072cf75e918a1b82a3a17b45c4389b076e7",
+   "files": {
+    "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf": 16756683904
+   },
+   "bytes": 16756683904,
+   "license": "apache-2.0",
+   "gated": false,
+   "downloaded_s": 123.5,
+   "at": "2026-11-01T16:53:37Z"
+  },
+  "fp8": {
+   "from_repo": "meta-models/Muse-Glimmer-30B",
+   "from_revision": "cec94fcfd6512f2cfe708138c32533b346ea4f69",
+   "scheme": "FP8_DYNAMIC (llmcompressor 0.15.0), ignore lm_head, re:.*vision.*, re:.*visual.*, re:.*mm_proj.*, re:.*multi_modal_projector.*",
+   "architectures": [
+    "MuseGlimmerForConditionalGeneration"
+   ],
+   "bytes": 34396206736,
+   "made_s": 224.3,
+   "at": "2026-11-01T17:04:08Z"
+  }
+ },
+ "server_ready_s": 281.4,
+ "gpu_memory_after_load": "NVIDIA A100-SXM4-40GB, 36821 MiB, 40960 MiB",
+ "server_log": [
+  "Capturing CUDA graphs (PIECEWISE):  90%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 | 46/51 [00:08<00:00,  8.28it/s]",
+  "Capturing CUDA graphs (PIECEWISE):  92%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258f| 47/51 [00:08<00:00,  8.56it/s]",
+  "Capturing CUDA graphs (PIECEWISE):  94%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258d| 48/51 [00:08<00:00,  8.56it/s]",
+  "Capturing CUDA graphs (PIECEWISE):  96%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258c| 49/51 [00:08<00:00,  8.44it/s]",
+  "Capturing CUDA graphs (PIECEWISE):  98%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 50/51 [00:08<00:00,  8.64it/s]",
+  "Capturing CUDA graphs (PIECEWISE): 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 51/51 [00:08<00:00,  8.63it/s]",
+  "Capturing CUDA graphs (PIECEWISE): 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 51/51 [00:08<00:00,  5.82it/s]",
+  "Capturing CUDA graphs (FULL):   0%|          | 0/35 [00:00<?, ?it/s]",
+  "Capturing CUDA graphs (FULL):   3%|\u258e         | 1/35 [00:00<00:04,  7.03it/s]",
+  "Capturing CUDA graphs (FULL):   6%|\u258c         | 2/35 [00:00<00:04,  7.86it/s]",
+  "Capturing CUDA graphs (FULL):   9%|\u258a         | 3/35 [00:00<00:04,  7.74it/s]",
+  "Capturing CUDA graphs (FULL):  11%|\u2588\u258f        | 4/35 [00:00<00:03,  8.06it/s]",
+  "Capturing CUDA graphs (FULL):  14%|\u2588\u258d        | 5/35 [00:00<00:03,  8.39it/s]",
+  "Capturing CUDA graphs (FULL):  17%|\u2588\u258b        | 6/35 [00:00<00:03,  8.61it/s]",
+  "Capturing CUDA graphs (FULL):  20%|\u2588\u2588        | 7/35 [00:00<00:03,  8.78it/s]",
+  "Capturing CUDA graphs (FULL):  23%|\u2588\u2588\u258e       | 8/35 [00:00<00:03,  8.90it/s]",
+  "Capturing CUDA graphs (FULL):  29%|\u2588\u2588\u258a       | 10/35 [00:01<00:02,  9.39it/s]",
+  "Capturing CUDA graphs (FULL):  34%|\u2588\u2588\u2588\u258d      | 12/35 [00:01<00:02,  9.68it/s]",
+  "Capturing CUDA graphs (FULL):  37%|\u2588\u2588\u2588\u258b      | 13/35 [00:01<00:02,  9.72it/s]",
+  "Capturing CUDA graphs (FULL):  43%|\u2588\u2588\u2588\u2588\u258e     | 15/35 [00:01<00:02,  9.98it/s]",
+  "Capturing CUDA graphs (FULL):  46%|\u2588\u2588\u2588\u2588\u258c     | 16/35 [00:01<00:01,  9.96it/s]",
+  "Capturing CUDA graphs (FULL):  51%|\u2588\u2588\u2588\u2588\u2588\u258f    | 18/35 [00:01<00:01, 10.76it/s]",
+  "Capturing CUDA graphs (FULL):  57%|\u2588\u2588\u2588\u2588\u2588\u258b    | 20/35 [00:02<00:01, 11.34it/s]",
+  "Capturing CUDA graphs (FULL):  63%|\u2588\u2588\u2588\u2588\u2588\u2588\u258e   | 22/35 [00:02<00:01, 11.95it/s]",
+  "Capturing CUDA graphs (FULL):  69%|\u2588\u2588\u2588\u2588\u2588\u2588\u258a   | 24/35 [00:02<00:00, 12.31it/s]",
+  "Capturing CUDA graphs (FULL):  74%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258d  | 26/35 [00:02<00:00, 12.97it/s]",
+  "Capturing CUDA graphs (FULL):  80%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  | 28/35 [00:02<00:00, 13.14it/s]",
+  "Capturing CUDA graphs (FULL):  86%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258c | 30/35 [00:02<00:00, 13.59it/s]",
+  "Capturing CUDA graphs (FULL):  91%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258f| 32/35 [00:02<00:00, 13.90it/s]",
+  "Capturing CUDA graphs (FULL):  97%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258b| 34/35 [00:03<00:00, 13.34it/s]",
+  "Capturing CUDA graphs (FULL): 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 35/35 [00:03<00:00, 11.12it/s]",
+  "(APIServer pid=4) INFO 11-01 17:14:50 [loggers.py:310] Engine 000: Avg prompt throughput: 1368.7 tokens/s, Avg generation throughput: 13.3 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 6.1%, Prefix cache hit rate: 0.0%",
+  "(APIServer pid=4) INFO 11-01 17:15:00 [loggers.py:310] Engine 000: Avg prompt throughput: 1713.5 tokens/s, Avg generation throughput: 20.7 tokens/
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sq71I2YNAIoPWESfFTqi0R

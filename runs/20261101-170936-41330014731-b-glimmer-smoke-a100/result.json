@@ -1,0 +1,11 @@
+{
+	"name": "20261101-170936-41330014731-b-glimmer-smoke-a100",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41330014731",
+	"ref": "ws-b",
+	"sha": "d2dc9502f83019aa412286db24d60f6ca06b2bb3",
+	"cmd": "modal run --env main python/preflight/glimmer/ops.py::smoke --gpu a100 --calls 5 --concurrent 4",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T17:16:19Z"
+}
