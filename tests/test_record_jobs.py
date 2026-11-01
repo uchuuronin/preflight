@@ -601,29 +601,3 @@ def test_a_knob_whose_line_loses_it_never_lands_on_a_sibling_with_the_same_liter
 	patched = apply_patch(files, diff)
 	with _pytest.raises(OverrideError):
 		apply_overrides(patched, relocate_knobs(sm, files, patched), {"batch_size": 7})
-
-
-def test_every_side_of_a_verify_runs_the_eval_inside_its_window():
-	# C, Nov 1: a 22-step verify of zoo/finetune_lora_hf (eval every 200) never reached its eval,
-	# so the race's eval fixes would read "failed" when they weren't tested
-	from preflight.harness.skeleton import skeleton_record
-	from preflight.harness.static import map_static
-	from preflight.probes.plan import EVAL_BATCHES
-	from preflight.runner.pipeline import _followup_plan
-	from preflight.runner.sources import _read_tree
-	from preflight.schema import Source
-
-	files = _read_tree(Path(__file__).resolve().parents[1] / "zoo" / "finetune_lora_hf")
-	rec = skeleton_record(
-		map_static(files, entrypoint="train.py"), Source(kind="sample", uri="sample://lora")
-	)
-	cur = {k.id: k.current for k in rec.knobs}
-	assert cur.get("eval_every")  # the script evals on a cadence
-	plan = _followup_plan(rec, "verify", {"batch_size": cur["batch_size"]}, {}, cur, patched=True)
-	assert [p.role for p in plan] == ["verify", "verify_base", "verify_seed"]
-	for p in plan:
-		assert p.overrides["eval_every"] == p.warmup + 1 and p.eval_batches == EVAL_BATCHES
-	# a script without an eval gets nothing pulled
-	no_eval = rec.model_copy(update={"knobs": [k for k in rec.knobs if not k.id.startswith("eval")]})
-	(v,) = _followup_plan(no_eval, "verify", {}, {}, {})
-	assert "eval_every" not in v.overrides and not v.eval_batches

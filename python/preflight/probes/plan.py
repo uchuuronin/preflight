@@ -98,22 +98,15 @@ def _pull_cadence(rec: FlightRecord, p: PlannedProbe) -> None:
 	"""Profile the point and pull the first eval and one checkpoint inside its window."""
 	p.profile = True
 	end = p.warmup + p.timed
-	pull_eval(rec, p)
-	if _int_knob(rec, "checkpoint_every") is not None:
-		# two steps before the end, so it lands inside the probe whether the script counts from 0 or 1;
-		# the recorder takes save time out of the step timings
-		p.overrides["checkpoint_every"] = end - 2
-
-
-def pull_eval(rec: FlightRecord, p: PlannedProbe) -> None:
-	"""Pull the first eval inside a verify probe's window, as _pull_cadence does for the plan's
-	current point: a 22-step verify of a script that evals every 200 steps never reached its eval,
-	so an eval fix (eval batch, eval in no_grad) couldn't move memory there (C, Nov 1)."""
 	if _int_knob(rec, "eval_every") is not None:
 		p.overrides["eval_every"] = p.warmup + 1
 		p.eval_batches = EVAL_BATCHES
 	elif any(k.id in ("eval_batch_size", "eval_no_grad") for k in rec.knobs):
 		p.eval_batches = EVAL_BATCHES
+	if _int_knob(rec, "checkpoint_every") is not None:
+		# two steps before the end, so it lands inside the probe whether the script counts from 0 or 1;
+		# the recorder takes save time out of the step timings
+		p.overrides["checkpoint_every"] = end - 2
 
 
 def next_probe_id(rec: FlightRecord, prefix: str = "p") -> str:
