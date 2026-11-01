@@ -225,6 +225,13 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 			const rank = { critical: 3, error: 2, warn: 1, info: 0 } as const;
 			if (!prev || rank[f.severity] > rank[prev.severity as keyof typeof rank]) findingsByNode.set(f.node_id, f);
 		}
+		const drawn = new Set(layout.nodes.map((n) => n.graphId).filter((x): x is string => x !== null));
+		const hiddenParents = new Set(
+			state.highlight
+				.filter((h) => !drawn.has(h))
+				.map((h) => record.graph.nodes.find((g) => g.id === h)?.parent)
+				.filter((x): x is string => !!x),
+		);
 		const pfNodes: Node<NodeData>[] = layout.nodes.map((n) => {
 			const share = n.share !== null ? t("map.node.share", { share: fmt(n.share, "fraction") }) : "";
 			const evalSpike = n.phase === "eval" ? memoryTermBytes(estimates, "eval_spike") : 0;
@@ -244,7 +251,11 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 					node: n,
 					title,
 					meta,
-					accent: state.highlight.includes(n.id) || (n.graphId !== null && state.highlight.includes(n.graphId)),
+					accent:
+						state.highlight.includes(n.id) ||
+						(n.graphId !== null && state.highlight.includes(n.graphId)) ||
+						// A highlighted node the map doesn't draw (a group's child) lights its parent.
+						(n.graphId !== null && hiddenParents.has(n.graphId)),
 					dim: !!state.focus && state.focus !== n.id,
 					fails: n.phase === "eval" && failing,
 					finding: finding ? finding.title : null,

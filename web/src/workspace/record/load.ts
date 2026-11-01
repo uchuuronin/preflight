@@ -20,6 +20,8 @@ export interface Sample {
 	titleKey: string;
 	lens: Lens;
 	gpu: string;
+	/** What the sample's numbers are: a fixture's illustrative ones, or a real run's (tested against isFixture). */
+	numbers: "illustrative" | "measured";
 	load: () => Promise<FlightRecord>;
 }
 
@@ -30,6 +32,7 @@ export const SAMPLES: Sample[] = [
 		titleKey: "sample.lora_7b",
 		lens: "finetune",
 		gpu: "A100",
+		numbers: "illustrative",
 		load: () => import("../fixtures/dev-finetune.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
@@ -38,6 +41,7 @@ export const SAMPLES: Sample[] = [
 		titleKey: "sample.lora_qwen",
 		lens: "finetune",
 		gpu: "L4",
+		numbers: "illustrative",
 		load: () => import("../../../../schema/examples/finetune.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
@@ -46,6 +50,7 @@ export const SAMPLES: Sample[] = [
 		titleKey: "sample.pretrain",
 		lens: "pretrain",
 		gpu: "L4",
+		numbers: "illustrative",
 		load: () => import("../../../../schema/examples/pretrain.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
@@ -54,7 +59,19 @@ export const SAMPLES: Sample[] = [
 		titleKey: "sample.agent",
 		lens: "agent",
 		gpu: "API",
+		numbers: "illustrative",
 		load: () => import("../../../../schema/examples/agent.json").then((m) => m.default as unknown as FlightRecord),
+	},
+	{
+		// A's real run of zoo/agent_eval_spark on Muse Spark (Oct 31, 30 of 500 tasks sampled), with
+		// its share token removed: measured numbers, not illustrative ones.
+		id: "agent-eval",
+		code: "PF331",
+		titleKey: "sample.agent_eval",
+		lens: "agent",
+		gpu: "API",
+		numbers: "measured",
+		load: () => import("../fixtures/agent-eval-oct31.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 ];
 

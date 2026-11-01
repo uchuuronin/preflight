@@ -29,7 +29,7 @@
 	"home.how": "How it works",
 	"home.step": "Step {n}",
 	"home.probe.title": "Probe",
-	"home.probe.body": "Minutes of real steps on a real GPU. A live flight's numbers start from a measurement; samples use illustrative ones.",
+	"home.probe.body": "Minutes of real steps on a real GPU. A live flight's numbers start from a measurement; each sample says whether its numbers are illustrative or measured.",
 	"home.simulate.title": "Simulate",
 	"home.simulate.body": "Move a knob and the map, memory and cost answer in under 400 ms, computed in your browser.",
 	"home.simulate.model": "Guided by Muse Spark",
@@ -81,7 +81,7 @@
 	"newflight.error.offline": "Preflight's server can't be reached right now. Samples still work.",
 	"newflight.samples": "Sample flights",
 	"newflight.departures": "Departures",
-	"newflight.departures.sub": "Samples with illustrative numbers",
+	"newflight.departures.sub": "Each says whether its numbers are illustrative or measured",
 	"newflight.col.flight": "Flight",
 	"newflight.col.job": "Job",
 	"newflight.col.gpu": "GPU",
@@ -781,5 +781,12 @@
 	"checks.sized_for_seq_len": "sized for seq_len; longest row not yet recorded (rows up to {longest} tokens, seq_len {seq}), not scored",
 	"checks.sized_for_seq_len_n": "{n} sized for seq_len, not scored",
 	"boarding.stage.stopped_here": "Stopped here",
-	"boarding.stage.cancelled_here": "Cancelled here"
+	"boarding.stage.cancelled_here": "Cancelled here",
+	"sample.agent_eval": "Agent eval on Muse Spark, measured 31 Oct",
+	"newflight.numbers.illustrative": "Illustrative",
+	"newflight.numbers.measured": "Measured",
+	"guide.next": "Next",
+	"guide.fix_it": "Fix it with Muse Code",
+	"guide.finding": "Found in the code: {title}. {detail}",
+	"guide.finding.why": "Preflight found this by reading the script, not by measuring it, so no knob shows it: it's fixed in the code."
 }

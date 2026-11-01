@@ -95,7 +95,7 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 				) : null}
 			</svg>
 			<span className="pf-dial__text">
-				<b className={value.length > 10 ? "is-long" : undefined}>{value}</b>
+				<b className={value.length > 9 ? "is-longer" : value.length > 6 ? "is-long" : undefined}>{value}</b>
 				<small>{spec.unit}</small>
 			</span>
 		</>

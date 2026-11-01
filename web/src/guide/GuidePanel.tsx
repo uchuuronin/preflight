@@ -9,7 +9,7 @@ import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
-import { MAX_TOUR_STEPS, nextStep, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
+import { findingVisit, MAX_TOUR_STEPS, nextStep, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
 
@@ -93,6 +93,7 @@ export function GuidePanel() {
 		if (!active) return;
 		const v = new Set(visited);
 		if (active.step.kind === "sample_offer") v.add(SAMPLE_VISIT);
+		else if (active.step.kind === "finding" && active.step.finding) v.add(findingVisit(active.step.finding));
 		else if (active.step.move) v.add(`probe:${active.step.move.knobId}`);
 		else return;
 		setVisited(v);
@@ -183,6 +184,8 @@ export function GuidePanel() {
 			cap: cap ? fmt(cap, "bytes") : "",
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
+			title: step?.finding?.title ?? "",
+			detail: step?.finding?.detail ?? "",
 			...((): Record<string, string> => {
 				const st = costStraddlesBudget(record, estimates);
 				return st
@@ -211,6 +214,13 @@ export function GuidePanel() {
 				},
 			};
 		if (s.kind === "probe_offer") return { label: t("guide.measure_fix"), run: () => measure(s.move, "tight") };
+		if (s.kind === "finding" && s.finding) {
+			const f = s.finding;
+			// Muse Code writes the fix only once the fix loop is on; until then the tour moves on.
+			if (f.fix_template && flag("c.fix_loop"))
+				return { label: t("guide.fix_it"), run: () => runTool("propose_patch", { template_id: f.fix_template, finding_id: f.id, reason: f.code }, ctx()) };
+			return { label: t("guide.next"), run: skipOffer };
+		}
 		if (s.kind === "sample_offer")
 			return { label: t("guide.sample_more", { tasks: SAMPLE_MORE_TASKS }), run: () => runTool("sample_more", { reason: "budget_straddle" }, ctx()) };
 		if (s.kind === "nothing_safe") {
@@ -228,7 +238,7 @@ export function GuidePanel() {
 				<span className="pf-guide__step">
 					{live
 						? t(`guide.live.status.${liveStatus}`)
-						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer"
+						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || active?.step.kind === "finding"
 							? t("guide.step_of", { n: active.n, of: active.of })
 							: active
 								? t("guide.waiting")
@@ -264,7 +274,7 @@ export function GuidePanel() {
 						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
 							{primary.label}
 						</button>
-						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" ? (
+						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || (active?.step.kind === "finding" && primary.label !== t("guide.next")) ? (
 							<button type="button" className="pf-btn pf-btn--small" onClick={skipOffer}>
 								{t("guide.skip")}
 							</button>

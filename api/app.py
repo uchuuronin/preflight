@@ -36,6 +36,7 @@ SAMPLE_FILES = [
 	"schema/examples/finetune.json",
 	"schema/examples/pretrain.json",
 	"schema/examples/agent.json",
+	"web/src/workspace/fixtures/agent-eval-oct31.record.json",
 ]
 
 image = (

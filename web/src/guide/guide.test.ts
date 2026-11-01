@@ -6,7 +6,7 @@ import { GridProvider } from "../workspace/provider/GridProvider";
 import { currentKnobs } from "../workspace/record/model";
 import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
 import type { TraceEntry } from "../workspace/state";
-import { nextStep, SAMPLE_VISIT } from "./ruleTour";
+import { findingVisit, nextStep, SAMPLE_VISIT } from "./ruleTour";
 import { fakeActions } from "./testkit";
 import { buildTools, executeTool, runTool, type ToolContext } from "./tools";
 
@@ -106,13 +106,16 @@ describe("measure-first offers (tight settings)", () => {
 		sensitivity: () => [],
 		moves: (_r: unknown, _o: unknown, opts?: { includeTight?: boolean }) => (opts?.includeTight ? [tightMove, fitsMove] : [fitsMove]) as never,
 	});
+	// The record's own findings come first when the run fits (their own test is below); these
+	// tests are about what follows them.
+	const shown = dev.findings.map(findingVisit);
 	const ctxFor = (risk: number, visited = new Set<string>()) => ({
 		record: dev,
 		provider: stub(risk),
 		knobs: currentKnobs(dev),
 		pinned: new Set<string>(),
 		objective: cost,
-		visited,
+		visited: new Set([...shown, ...visited]),
 	});
 
 	it("offers to measure a tight setting that saves 10% more than the best fitting move", () => {
@@ -164,5 +167,38 @@ describe("sample_more (agent runs whose cost range straddles the budget)", () =>
 		const base = { record: agent, provider, knobs: currentKnobs(agent), pinned: new Set<string>(), objective: cost };
 		expect(nextStep({ ...base, visited: new Set() }).kind).toBe("sample_offer");
 		expect(nextStep({ ...base, visited: new Set([SAMPLE_VISIT]) }).kind).not.toBe("sample_offer");
+	});
+});
+
+import agentEvalRaw from "../workspace/fixtures/agent-eval-oct31.record.json";
+
+describe("the agent tour on A's measured run (Oct 31)", () => {
+	const real = normaliseRecord(agentEvalRaw as unknown as FlightRecord);
+	const base = { record: real, provider, knobs: currentKnobs(real), pinned: new Set<string>(), objective: cost };
+
+	it("opens on the retry loop found in the code and lights the tools node", () => {
+		const step = nextStep({ ...base, visited: new Set() });
+		expect(step.kind).toBe("finding");
+		expect(step.finding?.code).toBe("agent.tool_retry_loop");
+		expect(step.finding?.fix_template).toBe("agent.cap_tool_retries");
+		expect(step.nodes).toEqual(["tools"]);
+	});
+
+	it("never offers running fewer tasks as a saving: an eval's tasks are its result", () => {
+		const after = nextStep({ ...base, visited: new Set(real.findings.map(findingVisit)) });
+		expect(after.move?.knobId).not.toBe("n_tasks");
+		expect(after.kind).toBe("done");
+		// The live guide is held to the same rule.
+		const c = ctx(real);
+		const res = executeTool("set_knob", { knob_id: "n_tasks", value: 62, why: "cheaper" }, c);
+		expect(res.ok).toBe(false);
+		const ranked = executeTool("sensitivity", { objective: "min_cost" }, c);
+		expect(ranked.ok && (ranked.result as Array<{ knob_id: string; changes_results: boolean }>).find((k) => k.knob_id === "n_tasks")?.changes_results).toBe(true);
+	});
+
+	it("respects a pin on the knob a fix would need", () => {
+		const c = ctx(real, new Set(["concurrency"]));
+		expect(executeTool("set_knob", { knob_id: "concurrency", value: 8, why: "x" }, c).ok).toBe(false);
+		expect(buildTools(real, new Set(["concurrency"])).find((x) => x.name === "set_knob")?.parameters.properties).toBeTruthy();
 	});
 });

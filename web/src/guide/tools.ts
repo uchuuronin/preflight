@@ -16,6 +16,7 @@ import type { PredictionProvider } from "../workspace/provider/PredictionProvide
 import { costStraddlesBudget, SAMPLE_MORE_TASKS, samplesTasks } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, ObjectiveKind, Prediction } from "../workspace/record/types";
 import type { WorkspaceActions } from "../workspace/state";
+import { changesResults, isFailing } from "./ruleTour";
 
 export interface ToolDef {
 	type: "function";
@@ -195,7 +196,15 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 		}
 		case "sensitivity": {
 			const kind = (args.objective as ObjectiveKind | undefined) ?? record.job.objective?.kind ?? "min_time";
-			return { ok: true, result: provider.sensitivity(record, { kind }, { pinned, knobs }).slice(0, 6) };
+			// Each knob says whether moving it changes what the run produces or measures (seq_len, an
+			// eval's task count): those are trade-offs to put to the person, not savings to take.
+			return {
+				ok: true,
+				result: provider
+					.sensitivity(record, { kind }, { pinned, knobs })
+					.slice(0, 6)
+					.map((k) => ({ ...k, changes_results: changesResults(k.knob_id, record) })),
+			};
 		}
 		case "set_knob": {
 			const id = String(args.knob_id);
@@ -203,6 +212,9 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 			const from = knobs[id];
 			const to = args.value as KnobValue;
 			if (from === undefined) return { ok: false, error: `unknown knob ${id}` };
+			if (changesResults(id, record) && !isFailing({ record, provider, knobs })) {
+				return { ok: false, error: `${id} changes what the run produces or measures; put it to the person as a trade-off instead of moving it` };
+			}
 			if (!actions.setKnob(id, to, "guide")) return { ok: false, error: `could not move ${id}` };
 			actions.propose({ knobId: id, from, to });
 			actions.openKnob(id);

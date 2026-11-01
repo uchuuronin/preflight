@@ -7,7 +7,7 @@ import { hasKey } from "../lib/i18n";
 import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
 import { costStraddlesBudget, failureTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
-import type { KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
+import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
 
 /**
  * Map nodes a knob acts on, by knob id. Requested as knobs[].affects (docs/requests.md);
@@ -90,9 +90,13 @@ const CHANGES_RESULTS = new Set([
 	"clip_high",
 	"loss_type",
 	"max_turns",
+	// what an eval measures: its tasks are its result, so running fewer is a different eval
+	"n_tasks",
 ]);
 
-export function changesResults(knobId: string): boolean {
+/** A's `Knob.changes_results` when the record says so, else this table. */
+export function changesResults(knobId: string, record?: LoadedRecord): boolean {
+	if (record?.knobs.find((k) => k.id === knobId)?.changes_results) return true;
 	return CHANGES_RESULTS.has(knobId);
 }
 
@@ -107,7 +111,9 @@ export interface TourStep {
 	 * move: apply a "fits" move. probe_offer: a "tight" setting would save enough to be worth
 	 * measuring first (the person's click). blocked_by_pin, nothing_safe, done: as named.
 	 */
-	kind: "move" | "probe_offer" | "sample_offer" | "blocked_by_pin" | "nothing_safe" | "done";
+	kind: "move" | "probe_offer" | "sample_offer" | "finding" | "blocked_by_pin" | "nothing_safe" | "done";
+	/** finding: a problem A's harness or a diagnosis found in the code, with its fix template. */
+	finding?: Finding;
 	move?: Move;
 	pinnedKnob?: string;
 	nodes: string[];
@@ -155,7 +161,7 @@ function candidates(ctx: TourContext, pinned: ReadonlySet<string>): Move[] {
 		.moves(ctx.record, ctx.objective, { pinned, knobs: ctx.knobs })
 		.filter((m) => m.fit === "fits")
 		.filter((m) => !ctx.visited.has(m.knobId))
-		.filter((m) => failing || !changesResults(m.knobId));
+		.filter((m) => failing || !changesResults(m.knobId, ctx.record));
 }
 
 /** The best "tight" setting worth measuring: beats the best "fits" move by PROBE_WORTH. */
@@ -165,7 +171,7 @@ function probeOffer(ctx: TourContext, bestFits: Move | undefined): Move | undefi
 	const offers = ctx.provider
 		.moves(ctx.record, ctx.objective, { pinned: ctx.pinned, knobs: ctx.knobs, includeTight: true })
 		.filter((m) => m.fit === "tight" && !ctx.visited.has(`probe:${m.knobId}`) && !ctx.visited.has(m.knobId))
-		.filter((m) => !changesResults(m.knobId));
+		.filter((m) => !changesResults(m.knobId, ctx.record));
 	// moves() returns only improvements here, so |relative| is the share the aim improves by.
 	const base = Math.abs(bestFits?.relative ?? 0);
 	return offers.find((m) => Math.abs(m.relative ?? 0) - base >= PROBE_WORTH);
@@ -174,6 +180,16 @@ function probeOffer(ctx: TourContext, bestFits: Move | undefined): Move | undefi
 /** Visited marker for the sample offer, so Skip moves on. */
 export const SAMPLE_VISIT = "sample:more";
 
+/** Visited marker for a finding the tour has shown. */
+export const findingVisit = (f: Finding) => `finding:${f.id}`;
+
+/** The next problem found in the code to show: an error or warning with a fix, not yet shown. */
+function nextFinding(ctx: TourContext): Finding | undefined {
+	return ctx.record.findings.find(
+		(f) => (f.severity === "error" || f.severity === "warn") && (f.fix_template || f.knob_id) && !ctx.visited.has(findingVisit(f)),
+	);
+}
+
 export function nextStep(ctx: TourContext): TourStep {
 	// An agent run whose cost range straddles the budget: whether it fits depends on where the
 	// real cost lands, so measuring more tasks comes before any saving (sample_more, a click).
@@ -181,6 +197,18 @@ export function nextStep(ctx: TourContext): TourStep {
 		return { kind: "sample_offer", nodes: [], textKey: "guide.sample_offer", whyKey: "guide.sample_offer.why" };
 	}
 	const failing = isFailing(ctx);
+	// A run that isn't failing: problems found in the code (a retry loop with no cap) come before
+	// savings, since no knob move shows them.
+	const found = failing ? undefined : nextFinding(ctx);
+	if (found) {
+		return {
+			kind: "finding",
+			finding: found,
+			nodes: found.node_id && ctx.record.graph.nodes.some((n) => n.id === found.node_id) ? [found.node_id] : [],
+			textKey: "guide.finding",
+			whyKey: "guide.finding.why",
+		};
+	}
 	const top = candidates(ctx, ctx.pinned)[0];
 	const offer = probeOffer(ctx, top);
 	if (offer) {

@@ -120,7 +120,9 @@ try {
 	await step.waitFor({ timeout: 10_000 });
 	const said = (await step.textContent())?.trim() ?? "";
 	check("the guide says something", said.length > 0, { said: said.slice(0, 160) });
-	if (await apply.count()) {
+	// Counted when the step is shown: after Apply the tour moves on, possibly to a step with no move.
+	const offered = await apply.count();
+	if (offered) {
 		const knobsBefore = await page.locator(".pf-dock__row").textContent();
 		await apply.first().click();
 		await page.waitForTimeout(500);
@@ -129,7 +131,7 @@ try {
 			changed: knobsBefore !== knobsAfter,
 		});
 	}
-	check("the guide offers a move on the sample", (await apply.count()) > 0);
+	check("the guide offers a move on the sample", offered > 0);
 
 	// ---------- check-in: the data-use notice comes first
 	await page.goto(`${BASE}/#/new`, { waitUntil: "load" });
