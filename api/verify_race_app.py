@@ -8,11 +8,17 @@ script's own settings. A verify job runs the patched setting and the current one
 fixed seeds (A's pipeline._followup_plan: v, v-base, v-seed), so each record answers "did the fix
 help, and did nothing else change?" on its own.
 
-Spend: the jobs run one at a time, and the next is submitted only while the records' own costs
-so far stay under the cap with room for one more like the dearest so far. GPUs: L4, or an A10 if
-an L4 won't schedule (both under the standing yes), never anything dearer.
+Spend: the jobs run one at a time, and the next is submitted only while what's spent so far plus
+A's per-job cap (US$0.60, the job store's spend check) stays under the cap; a job whose record has
+no final costs counts at that cap. Any job still running when the script stops, for any reason, is
+cancelled. GPU: the L4, pinned by the settings' gpu_type, so the fallback ladder doesn't apply.
 
-Share tokens are never printed: the log is published to the remote-runs branch.
+Nothing that reaches a record is printed: the log is published to the remote-runs branch, and a
+job id opens its record (GET /v1/jobs/{id}). Record ids are safe (records answer by token only).
+
+Eval fixes need the eval inside the verify window: A's verify probes run without the eval cadence
+(pipeline._followup_plan, cadence False), so c1 and c2 can't move memory there until A pulls the
+eval into both sides. Run them with `--only c1,c2` once that's on the runner.
 
 	modal run --env main api/verify_race_app.py::verify_race
 """
@@ -31,7 +37,9 @@ app = modal.App("preflight-verify-race")
 
 # Source: Chiya, Nov 1 (three L4 verify jobs, under US$1).
 CAP_USD = 1.0
-# Source: guess, a job waits up to 20 min for a GPU (A's fallback ladder) and runs three short probes.
+# Source: A's job store, the most one job may spend before it is stopped (demo limits, Nov 1).
+JOB_CAP_USD = 0.60
+# Source: guess; an L4 queued up to 59 min on Oct 31 and Nov 1 (A's status). Past this the job is cancelled.
 JOB_TIMEOUT_S = 40 * 60
 POLL_S = 15
 RACE = ROOT / "api" / "preflight_api" / "fix" / "races" / "nov1_lora.json"
@@ -69,7 +77,7 @@ def _pair(rec: dict) -> tuple[str | None, str | None]:
 
 
 @app.local_entrypoint()
-def verify_race(only: str = "") -> None:
+def verify_race(only: str = "", attempt: str = "a") -> None:
 	sys.path.insert(0, str(ROOT / "api"))
 	from preflight_api import verify
 	from preflight_api.fix.templates import verify_options
@@ -78,9 +86,9 @@ def verify_race(only: str = "") -> None:
 	cands = [c for c in race["candidates"] if not only or c["id"] in only.split(",")]
 	svc = modal.Cls.from_name("preflight-runner", "JobStoreService", environment_name="main")()
 	vol = modal.Volume.from_name("preflight-records", environment_name="main")
-	spent, dearest, results = 0.0, 0.0, []
+	spent, results = 0.0, []
 	for c in cands:
-		if spent + max(dearest, 0.0) >= CAP_USD:
+		if spent + JOB_CAP_USD > CAP_USD:
 			results.append({"id": c["id"], "status": "not_run", "why": f"cap: US${spent:.4f} spent"})
 			continue
 		req = {
@@ -93,30 +101,43 @@ def verify_race(only: str = "") -> None:
 			"purpose": "c.fix_verify",
 		}
 		t0 = time.monotonic()
+		# the job store allows a visitor 3 jobs a day: one visitor per attempt
+		visitor = f"c.fix_verify.nov1.{attempt}"
 		try:
-			job = svc.submit.remote(req, "c.fix_verify.nov1", f"c-fix-verify-{c['id']}-nov1-b")
+			job = svc.submit.remote(req, visitor, f"c-fix-verify-{c['id']}-nov1-{attempt}")
 		except Exception as e:
 			results.append({"id": c["id"], "status": "refused", "why": f"{type(e).__name__}: {str(e)[:300]}"})
 			continue
 		jid = job.get("job_id")
-		print(f"{c['id']} ({c['template_id']}): job {jid} submitted", flush=True)
+		print(f"{c['id']} ({c['template_id']}): submitted", flush=True)
 		st: dict = {}
-		while time.monotonic() - t0 < JOB_TIMEOUT_S:
-			st = svc.status.remote(jid)
-			if st.get("status") in ("done", "failed", "cancelled"):
-				break
-			time.sleep(POLL_S)
-		else:
-			svc.cancel.remote(jid)
-			st = {**st, "status": "timed_out"}
-		out = {"id": c["id"], "template_id": c["template_id"], "job_id": jid, "job_status": st.get("status"),
+		finished = False
+		try:
+			while time.monotonic() - t0 < JOB_TIMEOUT_S:
+				st = svc.status.remote(jid)
+				if st.get("status") in ("done", "failed", "cancelled"):
+					finished = True
+					break
+				time.sleep(POLL_S)
+			else:
+				st = {**st, "status": "timed_out"}
+		finally:
+			if not finished:  # a timeout, an error polling, or the run being stopped: never leave it running
+				try:
+					svc.cancel.remote(jid)
+				except Exception as e:
+					print(
+						f"{c['id']}: cancel failed ({type(e).__name__}); A's job caps still apply", flush=True
+					)
+		out = {"id": c["id"], "template_id": c["template_id"], "job_status": st.get("status"),
 			"record_id": st.get("record_id"), "error_code": st.get("error_code"), "error": (st.get("error") or "")[:300],
 			"minutes": round((time.monotonic() - t0) / 60, 1)}  # fmt: skip
 		rec = _read_record(vol, st["share_token"]) if st.get("share_token") else None
+		final = rec is not None and st.get("status") == "done"
+		cost = _record_cost(rec) if final else JOB_CAP_USD  # unknown spend counts at A's cap
+		spent += cost
+		out["usd"] = round(cost, 4) if final else f"unknown, counted at {JOB_CAP_USD}"
 		if rec is not None:
-			cost = _record_cost(rec)
-			spent += cost
-			dearest = max(dearest, cost)
 			vid, base = _pair(rec)
 			opts = verify_options(c["template_id"])
 			res = verify.check(rec, rec, before_probe=base, after_probe=vid, **opts) if vid and base else None
@@ -126,7 +147,7 @@ def verify_race(only: str = "") -> None:
 			finding = next(
 				(f for f in rec.get("findings") or [] if f.get("id", "").startswith("verify")), None
 			)
-			out |= {"usd": round(cost, 4), "gpu": (rec.get("env") or {}).get("gpu", {}).get("name"), "probes": probes,
+			out |= {"gpu": ((rec.get("env") or {}).get("gpu") or {}).get("name"), "probes": probes,
 				"verify": res and {k: res[k] for k in ("status", "metric", "before", "after", "fixed_seed_loss_delta")},
 				"checks": res and [(x["id"], x["ok"], x.get("allowed", False)) for x in res["checks"]],
 				"a_finding": finding and {k: finding.get(k) for k in ("code", "severity", "title")}}  # fmt: skip
