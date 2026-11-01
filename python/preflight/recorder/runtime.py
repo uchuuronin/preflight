@@ -67,6 +67,7 @@ ATTN_CALLS_PER_STEP = 2  # guess: two attention layers sampled per step bound th
 ATTN_QUERY_SAMPLE = 128  # guess: query rows sampled for the max-logit check
 ATTN_KEY_CHUNK = 4096  # keys per matmul in the attention-logit check: bounds its extra memory
 SAMPLE_EVERY_S = 0.25  # guess: host RSS and GPU power sampling period
+ENTROPY_MC_MAX = 4096  # policy forwards kept for the entropy estimate (one device scalar each)
 
 # TRL / HF log keys -> what they mean for Preflight's RL lens
 TRL_KEYS = {
@@ -1816,8 +1817,12 @@ class Recorder:
 
 	def _note_entropy(self, logps, attention_mask) -> None:
 		"""The policy's mean -log p over the completion tokens it was trained on: on sampled tokens a
-		Monte Carlo estimate of its entropy (biased when sampling ran at a temperature other than 1).
-		Kept on the device, so the step gains no sync; read at the end."""
+		Monte Carlo estimate of its entropy, biased by the sampling temperature (TRL's default 0.9),
+		top-p/top-k and the EOS cut. Kept on the device, so the step gains no sync; read at the end.
+		Only TRL versions with a _get_per_token_logps method reach it: in TRL 0.14 (the probe image's)
+		that's a closure inside compute_loss, so a 0.14 run has no entropy (known limit)."""
+		if len(self._entropy_mc) >= ENTROPY_MC_MAX:
+			return
 		with suppress(Exception), torch.no_grad():
 			lp = logps.detach()
 			mask = (
@@ -1854,7 +1859,7 @@ class Recorder:
 			if col(kind):
 				rl[name] = col(kind)
 		if "entropy" not in rl and self._entropy_mc:
-			# TRL 0.14 logs no entropy: the estimate from the policy's own log-probs, one per optimizer step
+			# TRL logged no entropy: the estimate from the policy's own log-probs, one per optimizer step
 			by_step: dict[int, list[float]] = {}
 			with suppress(Exception):
 				for step, t in self._entropy_mc:

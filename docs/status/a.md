@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Sun Nov 1, 11:30 ET.
+Updated Sun Nov 1, 12:30 ET.
 
 - **Now:** the Pareto sweep (Muse Spark arm, then Spark Open, on its own $1 ledger); the redeploy gated on the new probe-user startup check (a tiny torch.compile and the vLLM and datasets imports as uid 61000), then the serving probe again on the fixed image.
 - **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning/torchtitan adapter checks, the Muse Spark script-map gate; LoRA ground truth on L4, GRPO 50-step ground truth on A10, DDP and FSDP on 2 × A10; the production runner deployed and left running.
@@ -53,6 +53,13 @@ Updated Sun Nov 1, 11:30 ET.
 - Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
   its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
   lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
+- RL entropy (Nov 1, item 14): rl.kl is recorded from TRL's logs; rl.entropy is TRL's own where it
+  logs one, else a Monte Carlo estimate (mean -log p of sampled completion tokens, biased by the
+  temperature, top-p/top-k and the EOS cut, flagged by extras.rl_entropy_estimated) on TRL versions
+  with a `_get_per_token_logps` method. **TRL 0.14, the probe image's, gets no entropy**: its
+  log-probs are a closure inside compute_loss. On the cut sheet: exact entropy from the policy's
+  logits in a chunked forward hook (about 1.5 h; extra vocab-wide memory on a GRPO run already at
+  22 of 24 GB, so it needs a GPU check).
 - Serving probe sample (Nov 1): the first generate call is the measurement, so a warmup call
   before the real one becomes it; prompts and per-prompt lists are cut only when passed as the first
   argument or by keyword, not prompt_token_ids, lora_request or priority by position.
