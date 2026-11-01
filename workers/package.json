@@ -1,0 +1,21 @@
+{
+	"name": "preflight-workers",
+	"private": true,
+	"type": "module",
+	"description": "D's Pages Functions: share pages, preview cards and README badges for flight records. Copied into web/functions at deploy.",
+	"scripts": {
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit -p .",
+		"vendor": "node scripts/vendor.mjs"
+	},
+	"devDependencies": {
+		"@expo-google-fonts/instrument-sans": "0.4.2",
+		"@expo-google-fonts/instrument-serif": "0.4.1",
+		"@expo-google-fonts/jetbrains-mono": "0.4.1",
+		"@resvg/resvg-wasm": "2.6.2",
+		"@types/node": "22.20.5",
+		"typescript": "7.0.2",
+		"vitest": "5.0.5",
+		"wrangler": "4.151.0"
+	}
+}
