@@ -30,8 +30,8 @@ GOLDEN = ["finetune", "pretrain", "agent"]
 
 
 def test_schema_version_is_semver_0_x():
-	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch. All additive over the 0.1.0 freeze
-	assert SCHEMA_VERSION == "0.5.0"
+	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch; 0.6.0 (Nov 1): campaign calendar fields, Estimate.rate, agent run endings. All additive over the 0.1.0 freeze
+	assert SCHEMA_VERSION == "0.6.0"
 
 
 def test_ulid_is_26_crockford_chars_and_sortable():
@@ -390,3 +390,103 @@ def test_campaign_takes_the_planners_intervals():
 		quota={"needed_bytes": {**est, "unit": "B"}, "quota_bytes": 1e12},
 	)
 	assert c.asha.rungs[0].runs == 8 and c.cells[0].start_s.hi == 13.0
+
+
+# ---------------------------------------------------------------- contract 0.6.0 (Nov 1)
+
+
+def _est(point, unit="usd", lo=None, hi=None):
+	return {
+		"point": point,
+		"lo": lo,
+		"hi": hi,
+		"unit": unit,
+		"status": "predicted",
+		"model_id": "m",
+		"source": "exact",
+	}
+
+
+def test_a_0_5_0_record_loads_under_0_6_0():
+	from preflight.schema import load_record
+
+	raw = json.loads((EXAMPLES / "finetune.json").read_text())
+	raw["schema_version"] = "0.5.0"
+	assert load_record(json.dumps(raw)).schema_version == "0.6.0"
+
+
+def test_campaign_calendar_fields_round_trip():
+	raw = json.loads((EXAMPLES / "finetune.json").read_text())
+	raw["campaign"] = {
+		"cells": [
+			{
+				"id": "c0",
+				"knobs": {},
+				"lane": "a",
+				"slot": 1,
+				"reason": "cut: over budget",
+				"gpu_hours_estimate": _est(1.2, "gpu_h", 1.0, 1.5),
+				"usd_estimate": _est(0.96, "usd", 0.8, 1.2),
+			}
+		],
+		"lanes": ["a"],
+		"start": "2026-11-09T09:00:00Z",
+		"p_by_deadline": 0.8,
+		"checkpoint_interval": _est(1800.0, "s", 1500.0, 2100.0),
+		"lane_slots": {"a": 2},
+	}
+	rec = FlightRecord.model_validate(raw)
+	again = FlightRecord.model_validate_json(rec.model_dump_json(exclude_none=True))
+	assert again.campaign.cells[0].slot == 1 and again.campaign.lane_slots == {"a": 2}
+	assert again.campaign.start.isoformat().startswith("2026-11-09T09:00")
+	with pytest.raises(ValidationError):
+		FlightRecord.model_validate({**raw, "campaign": {**raw["campaign"], "p_by_deadline": 1.5}})
+	bad_cell = {**raw["campaign"]["cells"][0], "slot": -1}
+	with pytest.raises(ValidationError):
+		FlightRecord.model_validate({**raw, "campaign": {**raw["campaign"], "cells": [bad_cell]}})
+
+
+def test_estimate_rate_survives_exclude_none():
+	est = Estimate.model_validate(
+		{
+			**_est(0.96, "usd", 0.8, 1.2),
+			"rate": {
+				"quantity": "cost.gpu_hours",
+				"usd_per_unit": 0.8,
+				"unit": "gpu_hours",
+				"price_row": None,
+			},
+		}
+	)
+	out = json.loads(est.model_dump_json(exclude_none=True))
+	assert out["rate"] == {"quantity": "cost.gpu_hours", "usd_per_unit": 0.8, "unit": "gpu_hours"}
+	assert Estimate.model_validate(out).rate.usd_per_unit == 0.8
+	plain = json.loads(
+		Estimate.model_validate(
+			_est(None, lo=None) | {"status": "abstain", "reason": "no GPU"}
+		).model_dump_json(exclude_none=True)
+	)
+	assert "rate" not in plain and plain["point"] is None
+
+
+def test_agent_run_endings():
+	from preflight.schema import AgentSample
+
+	sample = AgentSample.model_validate(
+		{
+			"tasks": [
+				{
+					"task_id": "t",
+					"turns": 1,
+					"input_tokens": 1,
+					"output_tokens": 1,
+					"latency_s": 1.0,
+					"stop_reason": "cut",
+				}
+			],
+			"ended": "stalled",
+		}
+	)
+	assert sample.tasks[0].stop_reason == "cut" and sample.ended == "stalled"
+	with pytest.raises(ValidationError):
+		AgentSample.model_validate({"tasks": [], "ended": "crashed"})

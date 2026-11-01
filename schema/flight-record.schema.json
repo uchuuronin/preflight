@@ -153,6 +153,25 @@
 					],
 					"default": null,
 					"title": "Rate Limit Tpm"
+				},
+				"ended": {
+					"anyOf": [
+						{
+							"enum": [
+								"finished",
+								"stalled",
+								"cancelled",
+								"timeout"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: how the sampled run ended; stalled = no model call for the stall time (a tool stuck)",
+					"title": "Ended"
 				}
 			},
 			"title": "AgentSample",
@@ -269,7 +288,8 @@
 								"context_overflow",
 								"error",
 								"timeout",
-								"loop"
+								"loop",
+								"cut"
 							],
 							"type": "string"
 						},
@@ -278,6 +298,7 @@
 						}
 					],
 					"default": null,
+					"description": "cut (0.6.0): stopped with the whole run (cancel, stall, the run's limit), not by the task itself",
 					"title": "Stop Reason"
 				},
 				"trace": {
@@ -531,6 +552,63 @@
 					},
 					"title": "Notes",
 					"type": "array"
+				},
+				"start": {
+					"anyOf": [
+						{
+							"format": "date-time",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: when the campaign clock starts; start_s and finish_s count from it",
+					"title": "Start"
+				},
+				"p_by_deadline": {
+					"anyOf": [
+						{
+							"maximum": 1,
+							"minimum": 0,
+							"type": "number"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: probability every run finishes by job.constraints.deadline",
+					"title": "P By Deadline"
+				},
+				"checkpoint_interval": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: the checkpoint interval with its interval; checkpoint_interval_s stays the point"
+				},
+				"lane_slots": {
+					"anyOf": [
+						{
+							"additionalProperties": {
+								"type": "integer"
+							},
+							"type": "object"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: slots per lane",
+					"title": "Lane Slots"
 				}
 			},
 			"title": "Campaign",
@@ -701,6 +779,57 @@
 					],
 					"default": null,
 					"description": "0.5.0: when this run starts, in seconds after the campaign starts, in its lane's slot order"
+				},
+				"slot": {
+					"anyOf": [
+						{
+							"minimum": 0,
+							"type": "integer"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: which of its lane's slots runs it, 0-based",
+					"title": "Slot"
+				},
+				"reason": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: why the run is cut or undated, in words",
+					"title": "Reason"
+				},
+				"gpu_hours_estimate": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: this run's GPU-hours with its interval; gpu_hours stays the point"
+				},
+				"usd_estimate": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/Estimate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: this run's dollars with its interval; usd stays the point"
 				}
 			},
 			"required": [
@@ -1575,6 +1704,18 @@
 					"exclusiveMinimum": 0,
 					"title": "Level",
 					"type": "number"
+				},
+				"rate": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/EstimateRate"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.0: cost estimates only, quantity x rate"
 				}
 			},
 			"required": [
@@ -1587,6 +1728,47 @@
 				"source"
 			],
 			"title": "Estimate",
+			"type": "object"
+		},
+		"EstimateRate": {
+			"additionalProperties": false,
+			"description": "0.6.0 (B, Nov 1): how a cost estimate splits into a quantity times a rate, so a client can\nre-price it at the visitor's own rate without parsing the reason.",
+			"properties": {
+				"quantity": {
+					"description": "The target holding the quantity, e.g. cost.gpu_hours",
+					"title": "Quantity",
+					"type": "string"
+				},
+				"usd_per_unit": {
+					"minimum": 0,
+					"title": "Usd Per Unit",
+					"type": "number"
+				},
+				"unit": {
+					"description": "The quantity's unit, e.g. gpu_hours",
+					"title": "Unit",
+					"type": "string"
+				},
+				"price_row": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The price-table row id the rate came from",
+					"title": "Price Row"
+				}
+			},
+			"required": [
+				"quantity",
+				"usd_per_unit",
+				"unit"
+			],
+			"title": "EstimateRate",
 			"type": "object"
 		},
 		"EvalStats": {
@@ -5240,7 +5422,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.5.0",
+			"default": "0.6.0",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -5392,5 +5574,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.5.0/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.6.0/FlightRecord"
 }

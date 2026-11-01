@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.5.0. Generated; do not edit.
+ * Preflight contract v0.6.0. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -1001,6 +1001,10 @@ export interface AgentSample {
 	selection?: string | null;
 	rate_limit_rpm?: number | null;
 	rate_limit_tpm?: number | null;
+	/**
+	 * 0.6.0: how the sampled run ended; stalled = no model call for the stall time (a tool stuck)
+	 */
+	ended?: ("finished" | "stalled" | "cancelled" | "timeout") | null;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1027,7 +1031,10 @@ export interface AgentTask {
 	success?: boolean | null;
 	context_tokens_by_turn?: number[];
 	cost_usd?: number | null;
-	stop_reason?: ("done" | "max_turns" | "context_overflow" | "error" | "timeout" | "loop") | null;
+	/**
+	 * cut (0.6.0): stopped with the whole run (cancel, stall, the run's limit), not by the task itself
+	 */
+	stop_reason?: ("done" | "max_turns" | "context_overflow" | "error" | "timeout" | "loop" | "cut") | null;
 	trace?: string | null;
 }
 /**
@@ -1084,6 +1091,32 @@ export interface Estimate {
 	 * Nominal coverage of [lo, hi]
 	 */
 	level?: number;
+	/**
+	 * 0.6.0: cost estimates only, quantity x rate
+	 */
+	rate?: EstimateRate | null;
+}
+/**
+ * 0.6.0 (B, Nov 1): how a cost estimate splits into a quantity times a rate, so a client can
+ * re-price it at the visitor's own rate without parsing the reason.
+ *
+ * This interface was referenced by `PreflightContract`'s JSON-Schema
+ * via the `definition` "EstimateRate".
+ */
+export interface EstimateRate {
+	/**
+	 * The target holding the quantity, e.g. cost.gpu_hours
+	 */
+	quantity: string;
+	usd_per_unit: number;
+	/**
+	 * The quantity's unit, e.g. gpu_hours
+	 */
+	unit: string;
+	/**
+	 * The price-table row id the rate came from
+	 */
+	price_row?: string | null;
 }
 /**
  * Predictions precomputed over a knob grid, row-major over `axes`.
@@ -1273,6 +1306,24 @@ export interface Campaign {
 	quota?: CampaignQuota | null;
 	asha?: CampaignAsha | null;
 	notes?: string[];
+	/**
+	 * 0.6.0: when the campaign clock starts; start_s and finish_s count from it
+	 */
+	start?: string | null;
+	/**
+	 * 0.6.0: probability every run finishes by job.constraints.deadline
+	 */
+	p_by_deadline?: number | null;
+	/**
+	 * 0.6.0: the checkpoint interval with its interval; checkpoint_interval_s stays the point
+	 */
+	checkpoint_interval?: Estimate | undefined | null;
+	/**
+	 * 0.6.0: slots per lane
+	 */
+	lane_slots?: {
+		[k: string]: number | undefined;
+	} | null;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1300,6 +1351,22 @@ export interface CampaignCell {
 	 * 0.5.0: when this run starts, in seconds after the campaign starts, in its lane's slot order
 	 */
 	start_s?: Estimate | undefined | null;
+	/**
+	 * 0.6.0: which of its lane's slots runs it, 0-based
+	 */
+	slot?: number | null;
+	/**
+	 * 0.6.0: why the run is cut or undated, in words
+	 */
+	reason?: string | null;
+	/**
+	 * 0.6.0: this run's GPU-hours with its interval; gpu_hours stays the point
+	 */
+	gpu_hours_estimate?: Estimate | undefined | null;
+	/**
+	 * 0.6.0: this run's dollars with its interval; usd stays the point
+	 */
+	usd_estimate?: Estimate | undefined | null;
 }
 /**
  * 0.5.0: whether the campaign's checkpoints and outputs fit the storage quota.
@@ -1473,6 +1540,10 @@ export interface Estimate1 {
 	 * Nominal coverage of [lo, hi]
 	 */
 	level?: number;
+	/**
+	 * 0.6.0: cost estimates only, quantity x rate
+	 */
+	rate?: EstimateRate | null;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -1612,4 +1683,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.5.0";
+export const SCHEMA_VERSION = "0.6.0";
