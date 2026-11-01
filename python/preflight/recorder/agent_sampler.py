@@ -170,8 +170,11 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 			return None
 		return round(max(0.0, (end if end is not None and t not in in_flight else ended_at) - opened), 3)
 
-	# a task stopped with the whole run (cancel, stall, the run's own limit) is "cut", not a timeout
-	tasks = [proxy.task(t, wall_s=task_wall(t), cut=t in in_flight) for t in ids]
+	# a task stopped with the whole run by a cancel or the run's time limit is "cut", not a timeout; on a
+	# stall, the tasks still waiting on a tool get no stop reason (possibly stuck: the planted runaways)
+	cut_tasks = in_flight if cut in ("cancelled", "timeout") else set()
+	open_tasks = (waiting | in_flight) if cut == "stalled" else set()
+	tasks = [proxy.task(t, wall_s=task_wall(t), cut=t in cut_tasks, open_end=t in open_tasks) for t in ids]
 	st = proxy.run_stats(run_id)
 	parts = [f"the first {len(ids)} tasks the script started"]
 	if st.get("skipped"):
@@ -202,7 +205,9 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		order = sorted(ids, key=lambda t: (spans.get(t, (None,))[0] is None, spans.get(t, (0.0,))[0] or 0.0))
 		inspect({t: {"opened_rank": order.index(t), "last_finish": proxy.last_finish(t), "waiting_on_tool": t in waiting,
 			"in_flight_at_stop": t in in_flight} for t in ids})  # fmt: skip
-	return AgentSample(tasks=tasks, population=population, selection=selection)
+	# 0.6.0: how the sampled run ended (a lost sandbox is none of these)
+	how = {"stalled": "stalled", "cancelled": "cancelled", "timeout": "timeout", None: "finished"}.get(cut)
+	return AgentSample(tasks=tasks, population=population, selection=selection, ended=how)
 
 
 class _quiet:

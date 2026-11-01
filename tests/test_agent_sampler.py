@@ -407,10 +407,10 @@ def test_a_task_stuck_in_its_tools_stalls_the_run_once_the_others_stop(proxy, tm
 	assert not any(t.stop_reason == "loop" for t in out.tasks)  # which task is stuck can't be told
 
 
-def test_one_stuck_worker_of_four_stalls_the_run_and_its_task_is_cut(tmp_path):
+def test_one_stuck_worker_of_four_stalls_the_run_and_its_task_is_left_open(tmp_path):
 	"""Review, Oct 31: four workers whose tasks end on a tool call; one gets stuck in its tool, the
 	others go on until the sample is full and their next tasks are refused. The run stops as
-	stalled; the stuck task is among those counted as cut (which one is stuck can't be told)."""
+	stalled; the stuck task is among those left with no stop reason (which one is stuck can't be told)."""
 	prov = Provider()  # its streamed answers end asking for a tool
 	prov.delay_s = 0.3  # calls that overlap, as a real model's do, so the workers show as workers
 	px = AgentProxy(prov.url, "our-key", rate=token_rate)
@@ -442,6 +442,10 @@ def test_one_stuck_worker_of_four_stalls_the_run_and_its_task_is_cut(tmp_path):
 		px.stop()
 		prov.server.shutdown()
 	assert len(out.tasks) == 8 and "no model calls" in out.selection and "may be stuck" in out.selection
+	# 0.6.0 (Chiya, Nov 1): a stalled run says so, and the tasks still waiting on a tool keep no stop
+	# reason (possibly stuck), never "cut", which would hide the runaway
+	assert out.ended == "stalled" and all(t.stop_reason != "cut" for t in out.tasks)
+	assert any(t.stop_reason is None for t in out.tasks)
 
 
 def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):
@@ -461,7 +465,9 @@ def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):
 	)
 	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=5,
 		env=dict(os.environ), stall_s=5.0)  # fmt: skip
-	assert [t.stop_reason for t in out.tasks] == ["done"] and out.tasks[0].turns == 2
+	assert (
+		[t.stop_reason for t in out.tasks] == ["done"] and out.tasks[0].turns == 2 and out.ended == "finished"
+	)
 	assert out.tasks[0].latency_s >= 3.0  # B: the task's own wall, its tool time between turns included
 
 
@@ -483,7 +489,7 @@ def test_a_task_stopped_by_a_run_wide_cancel_is_cut_not_timed_out(proxy, tmp_pat
 	t0 = time.monotonic()
 	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=3,
 		env=dict(os.environ), should_stop=lambda: time.monotonic() - t0 > 1.5)  # fmt: skip
-	assert len(out.tasks) == 1 and out.tasks[0].stop_reason == CUT and out.tasks[0].stop_reason != "timeout"
+	assert len(out.tasks) == 1 and out.tasks[0].stop_reason == CUT == "cut" and out.ended == "cancelled"
 	assert out.tasks[0].latency_s >= 1.0
 
 

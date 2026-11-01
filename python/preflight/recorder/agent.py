@@ -821,7 +821,7 @@ class AgentProxy:
 			return list(self._tasks.get(task_id, _Task()).calls)
 
 	def task(self, task_id: str, *, success: bool | None = None, wall_s: float | None = None,
-		timed_out: bool = False, cut: bool = False) -> AgentTask:  # fmt: skip
+		timed_out: bool = False, cut: bool = False, open_end: bool = False) -> AgentTask:  # fmt: skip
 		"""The task as the record's AgentTask: turns are the calls the provider answered. Waits (up
 		to SETTLE_S) for calls still in flight, so a script that exits at [DONE] is counted whole."""
 		with self._lock:
@@ -835,7 +835,11 @@ class AgentProxy:
 		elif stopped == "budget":
 			reason = "max_turns"  # the record's closest word: stopped for running on, not for failing
 		elif cut:
-			reason = CUT  # stopped with the whole run (cancel, stall, the run's limit), not on its own
+			reason = CUT  # stopped with the whole run (a cancel or the run's time limit), not on its own
+		elif open_end:
+			# the run stalled while this task waited on a tool: finished, or stuck in it, can't be told
+			# at the proxy, so no stop reason, and the engine counts it as possibly stuck (Chiya, Nov 1)
+			reason = None
 		elif timed_out:
 			reason = "timeout"
 		elif any(c.error and "context" in c.error for c in calls) or (
