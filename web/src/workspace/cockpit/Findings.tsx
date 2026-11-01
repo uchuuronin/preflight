@@ -7,7 +7,7 @@
  * A's code has already checked is a real line of the log), and who found it.
  */
 import { fmt } from "../../lib/fmt";
-import { t } from "../../lib/i18n";
+import { hasKey, t } from "../../lib/i18n";
 import { FixFinding } from "../../fix/FixFinding";
 import { useOrbitLayout } from "../map/Orbit";
 import type { LoadedRecord } from "../record/types";
@@ -35,15 +35,18 @@ export function splitQuote(detail: string | null | undefined): { text: string; q
 	return { text: d, quote: null, unquoted: false };
 }
 
-/** Evidence worth a line: a quoted string, or a number against its threshold (triage's own marker isn't). */
+/**
+ * Evidence worth a line: only metrics with a name a visitor can read (an i18n label), never a raw
+ * metric id; triage's own marker isn't evidence. Quotes in British single marks.
+ */
 function evidenceLines(f: Finding): string[] {
 	return (f.evidence ?? [])
-		.filter((e) => e.metric !== "triage" && e.value !== null && e.value !== undefined)
+		.filter((e) => e.metric !== "triage" && e.value !== null && e.value !== undefined && hasKey(`metric.${e.metric}`))
 		.map((e) => {
 			const where = e.probe_id ? t("findings.at_probe", { probe: e.probe_id }) : "";
-			const value = typeof e.value === "number" ? fmt(e.value, "number") : `“${e.value}”`;
+			const value = typeof e.value === "number" ? fmt(e.value, "number") : `‘${e.value}’`;
 			const limit = typeof e.threshold === "number" ? t("findings.threshold", { threshold: fmt(e.threshold, "number") }) : "";
-			return `${e.metric}: ${value}${limit}${where}`;
+			return `${t(`metric.${e.metric}`)}: ${value}${limit}${where}`;
 		});
 }
 
@@ -59,18 +62,17 @@ export function FindingsChip() {
 	const loose = useLooseFindings();
 	if (!loose.length) return null;
 	return (
-		<a
+		<button
+			type="button"
 			className="pf-tag pf-tag--button pf-findings-chip"
-			href="#pf-findings"
-			onClick={(e) => {
-				e.preventDefault();
+			onClick={() => {
 				const el = document.getElementById("pf-findings");
 				el?.scrollIntoView({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 				el?.focus({ preventScroll: true });
 			}}
 		>
 			{t(loose.length === 1 ? "findings.chip_one" : "findings.chip", { n: loose.length })}
-		</a>
+		</button>
 	);
 }
 
@@ -101,8 +103,8 @@ export function FindingsBand() {
 							) : null}
 							{lines.length ? (
 								<ul className="pf-findings__evidence" aria-label={t("findings.evidence")}>
-									{lines.map((l) => (
-										<li key={l}>{l}</li>
+									{lines.map((l, i) => (
+										<li key={i}>{l}</li>
 									))}
 								</ul>
 							) : null}

@@ -1227,16 +1227,19 @@ a {
 .pf-finding--warn b::before { content: "▲ "; color: var(--pf-tight); font-size: 0.8em; }
 .pf-finding .pf-btn { align-self: flex-start; }
 /* Findings with no place on the map (cockpit/Findings.tsx). */
+.pf-findings { scroll-margin-top: 92px; }
 .pf-findings:focus { outline: none; }
+/* The severity pill carries the mark; the title doesn't repeat it. Marks are visual only. */
+.pf-findings .pf-finding b::before { content: none; }
 .pf-findings:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 3px; }
 .pf-findings__list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .pf-findings .pf-finding p { margin: 0; font-size: 13.5px; line-height: 1.5; }
 .pf-findings__sev { align-self: flex-start; padding: 1px 8px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-stroke-strong); font-size: 11.5px; font-weight: 600; }
 .pf-findings__sev.is-critical, .pf-findings__sev.is-error { border-color: var(--pf-fail); color: var(--pf-fail); }
-.pf-findings__sev.is-critical::before, .pf-findings__sev.is-error::before { content: "✕ "; }
+.pf-findings__sev.is-critical::before, .pf-findings__sev.is-error::before { content: "✕ " / ""; }
 .pf-findings__sev.is-warn { border-color: var(--pf-tight); color: var(--pf-tight); }
-.pf-findings__sev.is-warn::before { content: "▲ "; font-size: 0.85em; }
-.pf-findings__sev.is-info::before { content: "i "; font-style: italic; font-family: var(--pf-font-serif); }
+.pf-findings__sev.is-warn::before { content: "▲ " / ""; font-size: 0.85em; }
+.pf-findings__sev.is-info::before { content: "i " / ""; font-style: italic; font-family: var(--pf-font-serif); }
 .pf-findings__quote { margin: 0; padding: 8px 12px; border-radius: var(--pf-radius-sm); background: var(--pf-glass-solid); border-left: 3px solid var(--pf-accent); overflow-x: auto; }
 .pf-findings__quote code { font-family: var(--pf-font-mono); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .pf-findings__evidence { margin: 0; padding-left: 18px; font-size: 12.5px; }

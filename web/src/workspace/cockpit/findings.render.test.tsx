@@ -54,7 +54,8 @@ describe("findings with no place on the map", () => {
 		expect(row.textContent).toContain("Found by Muse Spark Open triage");
 		// The triage marker isn't evidence a reader needs.
 		expect(row.querySelector(".pf-findings__evidence")).toBeNull();
-		expect(container.querySelector(".pf-findings-chip")!.textContent).toMatch(/finding/);
+		expect(container.querySelector(".pf-findings-chip")!.textContent).toBe("1 finding off the map");
+		expect(container.querySelector(".pf-findings-chip")!.tagName).toBe("BUTTON");
 	});
 
 	it("leaves a finding on a drawn node to that node's sheet", () => {
