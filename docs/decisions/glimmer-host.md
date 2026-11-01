@@ -1,6 +1,6 @@
-# Glimmer private mode: where it runs, and what it costs (B's draft, with A; due Sun Nov 1)
+# Glimmer private mode: where it runs, and what it costs (B with A; due Sun Nov 1)
 
-Contract: private mode is "deferred until it has a host (not on Meta's API or Baseten); A and B propose a host, likely a Modal endpoint, with its cost". The plan's goal is triage that runs where the code is, so code never leaves the user's machine. This draft covers two places Glimmer can run and prices both. **A to add:** how triage calls it, whether the weights can be downloaded and under what licence, and the quantised checkpoint to use.
+Contract: private mode is "deferred until it has a host (not on Meta's API or Baseten); A and B propose a host, likely a Modal endpoint, with its cost". The plan's goal is triage that runs where the code is, so code never leaves the user's machine. This covers two places Glimmer can run, prices both, and settles the host with A's proposal. Still open: whether the weights can be downloaded and under what licence, and the quantised checkpoint to use.
 
 ## What Glimmer needs
 
@@ -30,14 +30,19 @@ None of them keeps up with one triage every 5 seconds (160 output tokens per sec
 
 **Cold starts dominate a demo with sparse traffic.** Loading 17 GB from a Modal volume and starting vLLM takes on the order of 90 s (guess; A's first run will measure it). That is about $0.05 on an A100-40GB, more than five triages. Scaling to zero after 2 minutes idle keeps a quiet day near $0, and a busy hour under $2.50.
 
-## Proposal
+## Proposal (settled with A's reply, Oct 31)
 
-- **Hosted demo:** an A100-40GB on Modal, with an L40S fallback. It's the cheapest per triage, about 18 s per answer, and has room for 128K-token logs.
+A proposed a Modal L4 at 4 bits behind vLLM's OpenAI server, scaled to zero (`docs/requests/from-a.md`, Oct 31): it's the GPU a student has, so private mode and the hosted demo run on the same thing, and it plugs into the agent proxy as an OpenAI-compatible upstream with no new code. B's table agrees on cost (an L4 triage is about $0.016, an A100-40GB one $0.010, both simulated and uncalibrated) and differs on speed: about 74 s an answer on the L4 against 18 s on the A100-40GB, and the L4's KV cache holds about 21K tokens, not 128K. Both are right about different things, so:
+
+- **Private mode targets the L4-class card.** The CLI runs Glimmer at 4 bits on the user's own 24 GB GPU, with the same prompt and tools as the hosted path. Its limits go on the page: about 21K tokens of context and about a minute an answer.
+- **The hosted demo runs on an A100-40GB**, with an L40S fallback. A stranger shouldn't wait over a minute, and long logs fit.
   - Scale to zero after 2 minutes.
   - At most 1 container, and at most 3 private triages per visitor.
   - A $3 daily cap, shared with the probe budget's cap.
-- **Real private mode:** the CLI on the user's GPU, with the same prompt and tools, so the two answer alike.
-- **Before either ships:** one paid smoke run, with Chiya's yes: a cold start plus 10 triages on an A100-40GB, under $0.50. It calibrates the serving model and measures the cold start.
+  - The page says plainly that visitors' code reaches our Modal container, not Meta or Baseten.
+- **One smoke run, with Chiya's yes, measures both:** a cold start plus 5 triages on an L4 and the same on an A100-40GB. That's about $0.20 by the table above, capped at $0.50. It calibrates the serving model on Glimmer and measures the cold start, which is a guess today (about 90 s).
+
+**What blocks shipping either path:** whether Glimmer's weights can be downloaded, and under what licence. Neither the playbook nor the plan says so. If they can't be downloaded, private mode can't ship as planned, and the readout should say so instead of offering it.
 
 ## Open questions for A
 
