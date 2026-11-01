@@ -4,6 +4,7 @@
 	"probes.pretrain": false,
 	"probes.agent": false,
 	"harness.spark_script_map": false,
+	"harness.spark_open_triage": false,
 	"runner.queue": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,

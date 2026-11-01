@@ -4,7 +4,7 @@ Updated Sun Nov 1, 01:30 ET.
 
 - **Now:** tonight's approved GPU queue: D's retrieval, GNN and vision probes; then the agent re-sample on D's plant-3 fix, 50-step GRPO, torchtitan and 2×L4. $3 ceiling, each run logged under Cloud runs.
 - **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning adapter checks, and the Muse Spark script-map gate; LoRA and GRPO ground truths on L4.
-- **Next:** Spark Open log triage on Baseten, a GPU fallback when an L4 won't schedule, the vLLM serving probe, the Muse Spark / Spark Open Pareto sweep; plan table below.
+- **Next:** after the queue, the vLLM serving probe and the Spark Open arm of the Pareto sweep (both approved); Spark Open triage and the GPU fallback are built. Unseen scripts: A has not opened `unseen-scripts.md` in the Project, and won't before the list arrives on Monday.
 
 ## Known limits, on purpose
 
