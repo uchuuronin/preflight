@@ -493,7 +493,7 @@ def test_the_probe_user_check_fails_where_the_probe_uid_has_no_passwd_entry(monk
 
 
 def test_the_deploy_gate_needs_the_names_the_imports_and_a_compile():
-	from preflight.runner.ops_app import _probe_user_ok
+	from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
 
 	good = {"exit": 0, "uid": 61000, "user": "preflight-probe", "passwd": "preflight-probe",
 		"group": "preflight-probe", "imported": ["vllm", "datasets"], "compiled": 4.0}  # fmt: skip

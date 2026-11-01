@@ -33,6 +33,8 @@ from preflight.runner.modal_app import (
 	weights_vol,
 	worker_image,
 )
+from preflight.runner.probe_user import PROBE_USER_IMPORTS
+from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
 
 ops = modal.App(APP_NAME + "-ops")
 
@@ -170,23 +172,6 @@ def startup_check_probe() -> dict:
 		"probe_uid": os.environ.get("PREFLIGHT_PROBE_UID"), "status": r.probe.status, "error": r.probe.error,
 		"error_code": r.probe.error_code, "steps": r.probe.steps,
 		"backend": r.env.backend if r.env else None, "log_tail": r.log_tail[-600:]}  # fmt: skip
-
-
-# the probe uid in each sandbox image, on a CPU (Chiya, Nov 1): its user and group names resolve and
-# the imports that read them load, as the probe would run them. torchtitan failed on a GPU for this
-# "+compile": a tiny torch.compile, run (Chiya, Nov 1), not just imported
-PROBE_USER_IMPORTS = {
-	"probe": ("+compile",),
-	"serving": ("+compile", "vllm", "datasets"),  # datasets: pyarrow against the image's numpy 1
-	"titan": ("+compile", "torchtitan.train"),
-}
-
-
-def _probe_user_ok(r: dict, image: str) -> bool:
-	want = [m for m in PROBE_USER_IMPORTS[image] if m != "+compile"]
-	compiled = "+compile" not in PROBE_USER_IMPORTS[image] or r.get("compiled") is not None
-	return (r.get("exit") == 0 and r.get("uid") == 61000 and r.get("user") == r.get("passwd") == "preflight-probe"
-		and r.get("group") == "preflight-probe" and r.get("imported", []) == want and compiled)  # fmt: skip
 
 
 @ops.function(image=probe_image, timeout=600)
