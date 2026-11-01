@@ -1,9 +1,11 @@
 {
-	"$comment": "Overrides where PREFLIGHT_ENV=production (the API's and the runner's images). engine.memory on: Chiya, Oct 30. harness.spark_script_map on with C's data-use line, and c.campaign_calendar on: Chiya, Nov 1 (round four). harness.spark_open_triage (with C's data-use line), c.fit_map and engine.rl on: Chiya, Nov 1 (round five).",
+	"$comment": "Overrides where PREFLIGHT_ENV=production (the API's and the runner's images). engine.memory on: Chiya, Oct 30. harness.spark_script_map on with C's data-use line, and c.campaign_calendar on: Chiya, Nov 1 (round four). harness.spark_open_triage (with C's data-use line), c.fit_map and engine.rl on: Chiya, Nov 1 (round five). runner.queue and c.guide.live on for the outside tester: Chiya, Nov 1, 12:46 (a daily GPU dollar cap and per-visitor daily job limit to land before the link is shared publicly).",
 	"engine.memory": true,
 	"harness.spark_script_map": true,
 	"c.campaign_calendar": true,
 	"harness.spark_open_triage": true,
 	"c.fit_map": true,
-	"engine.rl": true
+	"engine.rl": true,
+	"runner.queue": true,
+	"c.guide.live": true
 }
