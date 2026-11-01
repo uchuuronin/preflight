@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from preflight.corpus import validate
+from preflight.engine import api
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -44,13 +45,14 @@ def main(argv: list[str] | None = None) -> int:
 		1 for r in manifest.get("runs", []) if "*" not in (r.get("calibrates") or ())
 	)  # some rows still score
 	models = validate.models_used(manifest.get("runs", []), args.manifest.parent, flags)
-	on = sorted(k for k, v in flags.items() if k.startswith("engine.") and v) or ["none"]
+	# the engine features these flags switch (engine.memory gates the runner's fill, not the scoring)
+	on = sorted(k for k in api.FLAG_OF.values() if flags.get(k)) or ["none"]
 	waiting = [r.script for r in runs if any(": not measured, no " in n for n in r.notes)]
 	scored = f"{len(runs) - len(waiting)} runs scored" + (
 		f"; not measured yet: {', '.join(waiting)} ({len(waiting)})" if waiting else ""
 	)
 	stamp = (
-		f"Scored {datetime.now(UTC):%Y-%m-%d %H:%M} UTC from {args.manifest.name}: {scored}; {held} of {len(manifest.get('runs', []))} runs held out. "
+		f"Scored {datetime.now(UTC):%Y-%m-%d %H:%M} UTC from {args.manifest.name}: {scored}; {held} of {len(manifest.get('runs', []))} runs held out of at least one row. "
 		f"{validate.calibration_note(manifest)} Engine flags on (flags.json with flags.production.json): "
 		f"{', '.join(on)}. Models: {', '.join(models)}."
 	)

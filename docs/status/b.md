@@ -175,20 +175,20 @@ D found that most `engine.*` flags switched nothing. Checked in the code on ws-b
 
 ## Monday's validation runs: expected cost (for Chiya's one approval, Nov 1)
 
-Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixtures/validation/manifest_zoo_dryrun_nov1.json`; 2 runs scored, 8 "not measured yet", nothing crashes, predicted under production's flags). Each script needs a Preflight run (its record) and a full run (A's `ops_app.py::ground_truth`, which stops at its `--budget-min`). Rates: A10 $1.10/h, L4 $0.80/h (`engine/prices`). The A10 is suggested: the L4 queued 19 to 59 minutes on Nov 1, the A10 never did, and Modal bills no queue time either way, so the A10's cost is in the plan and the L4's is in waiting.
+Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixtures/validation/manifest_zoo_dryrun_nov1.json`; 2 runs scored, 8 "not measured yet", nothing crashes, predicted under production's flags). Each script needs a Preflight run (its record) and a full run (A's `ops_app.py::ground_truth`). The full runs are on an **L4** at $0.80/h: `ground_truth_on_l4` has the GPU fixed (`ops_app.py:325`). The L4 queued 19 to 59 minutes on Nov 1, which Modal doesn't bill but which costs time; an A10 option (no queue seen) would be A's change. `--budget-min` is a soft target; the hard limit is each full run's 50-minute timeout (`GROUND_TRUTH_TIMEOUT_S`), and the Preflight runs have no fixed cap.
 
-| Run | Full-run basis | Expected (A10) | Cap |
-| --- | --- | --- | --- |
-| finetune_lora_hf | measured: 210 + 40 steps took 9.5 min of compute on an L4 (Oct 31) | about $0.20 | 35 min, $0.64 |
-| grpo_trl | measured: 3 + 50 steps took 25 min on an A10 (Nov 1) | about $0.50 | 46 min, $0.84 |
-| pretrain_nanogpt | no finished full run yet (Oct 28's hit its limit) | under $0.55 | 30 min, $0.55 |
-| gnn_pyg, retrieval_st, vision_timm, eval_sweep_reasoning, serving_vllm | no full run yet; small models | under $0.37 each | 20 min each, $1.85 |
-| torchtitan_debug | the debug model | under $0.28 | 15 min, $0.28 |
-| agent_eval_spark | the 500-task benchmark, priced by the engine from the 30-task sample: **Spark API, not GPU** | $7.15 (90%: $5.90 to $13.71) | the proxy's dollar cap; $14 covers the band |
-| 9 unseen scripts | unknown size: room left for 9 full runs | under $0.55 each | 30 min each, $4.95 |
-| 19 Preflight runs (the records) | measured: $0.086 GPU and $0.018 Muse Spark for the LoRA run (Oct 28) | about $0.11 each, $2.10 | |
+| Run | Full-run basis | Expected (L4) | At the run's budget | Hard ceiling (50 min) |
+| --- | --- | --- | --- | --- |
+| finetune_lora_hf | measured: 210 + 40 steps, 9.5 min of compute on an L4 (Oct 31) | about $0.15 | 35 min, $0.47 | $0.67 |
+| grpo_trl | measured on an A10: 3 + 50 steps in 25 min; slower on an L4, and it ran out of memory there twice before A's fix | about $0.45 | 46 min, $0.61 | $0.67 |
+| pretrain_nanogpt | no finished full run yet (Oct 28's hit its limit) | about $0.20 | 30 min, $0.40 | $0.67 |
+| gnn_pyg, retrieval_st, vision_timm, eval_sweep_reasoning, serving_vllm | no full run yet; small models | about $0.15 each | 20 min each, $1.33 | $3.33 |
+| torchtitan_debug | the debug model | about $0.10 | 15 min, $0.20 | $0.67 |
+| agent_eval_spark | the 500-task benchmark, priced by the engine from the 30-task sample: **Spark API, not GPU** | $7.15 (90%: $5.90 to $13.71) | the proxy's dollar cap; $14 covers the band | $14 |
+| 9 unseen scripts | unknown size: room left for 9 full runs | about $0.20 each | 30 min each, $3.60 | $6.00 |
+| 19 Preflight runs (the records) | measured: $0.086 GPU and $0.018 Muse Spark for the LoRA run (Oct 28) | about $0.10 each, $1.98 | no fixed cap | |
 
-**Total:** GPU about $7 expected (the rows' expected figures, with the unknown runs at about half their caps), at most $11.20 by the caps; plus the agent benchmark's Spark API, about $7.15 and at most $14. **About $14 expected, at most $25.** The caps are each run's own time limit, so no run can pass its line.
+**Total:** GPU and Spark for the records about $5.50 expected, $8.59 at every run's budget, about $14 if every full run hit its 50-minute ceiling; plus the agent benchmark's Spark API, about $7.15 and capped at $14 by the proxy. **About $13 expected, about $28 at the ceilings.** The ceilings are estimates of the worst case, not hard bounds for the Preflight runs.
 
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).

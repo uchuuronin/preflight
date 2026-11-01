@@ -38,6 +38,8 @@ The published file adds three fields to every row: `kind` (`kernels`, `hf` or `d
 | A100-PCIe-80GB | 42 | 0 | 0 | 0 |
 | A100-SXM-80GB | 53 | 0 | 0 | 0 |
 
+Plus 720 divergence runs: 377 on L4 and 343 on A10 (below).
+
 **Families.** The grouped configs come in groups of five points: three probe-like points and two queries per architecture. 111 distinct groups ran in all. The architectures are small models built in the corpus code:
 - `gpt`: decoder-only transformers;
 - `encoder`: BERT-style;
@@ -71,7 +73,7 @@ The HF jobs are 10 groups of five on real Hugging Face checkpoints, LoRA in bf16
 
 ## Collection
 
-The corpus was collected between Oct 28 and 31, 2026, on Modal, in a pinned image (torch 2.8.0, plus pinned transformers, peft and bitsandbytes for the HF jobs). Each config ran in its own process with a deadline, so a hang became a `timeout` row and a kernel fault couldn't poison the next config. Sweeps were capped by a worst-case container-time bound and approved phase by phase. Every run's GPU, minutes and dollars are in `docs/status/b.md`.
+The corpus was collected between Oct 28 and Nov 1, 2026 (the divergence runs on Nov 1), on Modal, in a pinned image (torch 2.8.0, plus pinned transformers, peft and bitsandbytes for the HF jobs). Each config ran in its own process with a deadline, so a hang became a `timeout` row and a kernel fault couldn't poison the next config. Sweeps were capped by a worst-case container-time bound and approved phase by phase. Every run's GPU, minutes and dollars are in `docs/status/b.md`.
 
 ## Known biases and limits
 

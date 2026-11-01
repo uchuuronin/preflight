@@ -225,7 +225,7 @@ def score_run(run: dict, base: Path) -> Scored:
 	probe_gpu = api._env_gpu(rec)
 	run_gpu = (run.get("values") or {}).get("gpu_type") or gt.get("gpu")
 	same = None if probe_gpu is None or run_gpu is None else _same_gpu(probe_gpu, run_gpu)
-	if same is None:
+	if same is None and gt:  # review: a missing ground truth already says why, not "the GPU isn't known"
 		s.notes.append(
 			f"{s.script}: the probe's or the full run's GPU isn't known, so its step time isn't scored"
 		)
