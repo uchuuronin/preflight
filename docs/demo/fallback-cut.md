@@ -22,6 +22,9 @@ fine-tune and the agent eval on Muse Spark. Nothing in it needs a beat that isn'
 - **Nothing from Chiya's ongoing research.**
 - **Record on the deployed app with the real records,** never a sample (samples say
   "Illustrative").
+- **The Spark Open triage shot (11b) is a real production record or nothing** (Chiya, Nov 1).
+  A posts its share link on Sun Nov 1. If it isn't there by Tue Nov 3 at noon ET, the shot is
+  dropped, not faked.
 
 ## Numbers this cut may use
 
@@ -70,13 +73,18 @@ About 2:58. Narration at about 2.5 words a second; every line is also a caption.
 | 7 | 1:28 | Same cockpit, the caching finding open | Hold on "0 of 246,463 input tokens were served from cache" | "Preflight sent its calls through a proxy and counted their tokens. Across 130 tasks in two runs, not one input token came from the cache." | "On screen: 0 of 246,463, the 30-task sample · all 130 tasks, two runs: 0 of 905,739" |
 | 8 | 1:45 | The finding's detail ("A prefix that changes every call ... defeats the provider's cache"), then `run.py`'s `system_prompt()` in the editor | Zoom to `f"Current time: {now}\n"` | "In the code, the prompt starts with the current time, so its beginning is different on every call." | "From the script: `run.py`, `system_prompt()`" |
 | 9 | 1:55 | Same cockpit, the retry-loop finding (red) | Open it; the detail shows `run.py:121: while True / except: continue` | "It also reads the code: one tool retries forever, out of the model's sight." | "Read from the code" |
-| 10 | 2:07 | Same cockpit, the context tank and cost readouts | The tank's line and the cost readout's band; no narration over the numbers | "And it shows how fast the history grows, and what the whole run would cost, with its range." | the app's "derived" and "Predicted" labels, as they are |
-| 11 | 2:20 | A plain card over the cockpit, dimmed | Two lines fade in | "Everything on this screen came from a 30-task sample that ran in under a minute, for 43 cents of Muse Spark calls at list price. All 130 tasks, in two runs, cost a dollar sixty-seven at list price." | "30 tasks · 49 s · $0.43 of Muse Spark calls at list price (`a-agent-sample-1`) · all 130 tasks, two runs: $1.67 at list price" |
+| ~~10~~ | | Same cockpit, the context tank and cost readouts | Cut for 11b's time; back only if 11b is dropped (below) | | |
+| 11 | 2:07 | A plain card over the cockpit, dimmed | Two lines fade in | "Everything on this screen came from a 30-task sample that ran in under a minute, for 43 cents of Muse Spark calls at list price. All 130 tasks, in two runs, cost a dollar sixty-seven at list price." | "30 tasks · 49 s · $0.43 of Muse Spark calls at list price (`a-agent-sample-1`) · all 130 tasks, two runs: $1.67 at list price" |
+| 11b | 2:26 | A's production record from its share link (posted by Tue Nov 3, noon ET), on the screen where the app shows its triage finding. **Not filmable on `main` yet:** the cockpit shows no finding without a node, and triage's has none (dependency below) | Hold on the finding: its title, its one sentence with the quoted log line, and the app's own "Found by Muse Spark Open triage" (`finding.source.spark_open_triage`) | "When a probe fails on the live site, Muse Spark Open reads the end of its log and quotes the line." | "Muse Spark Open (Meta, open weights, on Baseten) · triage of a failed probe's log · a real job on the live site" |
 | 12 | 2:36 | Checks page | Scroll the "Each check" list: the caught OOM and the misses | "Every prediction is checked against real runs, misses included." | "Held-out checks on real runs" |
 | 13 | 2:46 | End card (ends near 2:58) | Public link and repo | "Preflight. Fly the run before you pay for it." | link · repo · "Built Oct 26 to Nov 4" |
 
-Narration is about 230 words, about 93 s of speech in 2:58; shot 11 is the fullest (about 30 words in
-16 s). Spoken numbers: step 200, 189 seconds, about four cents of GPU at list price, 20.4 of
+Narration is about 233 words, about 93 s of speech in 2:58; shot 11 is the fullest (38 words
+written, about 41 spoken, in 19 s: its 16 s plus 3 s left from shot 10). Shot 11b speaks no number. If 11b is dropped, shot 10
+comes back at 2:07 and shot 11 runs 2:20 to 2:36, as before; at 16 s its line is about 2.6 words
+a second, so trim "in two runs" if the take runs long.
+
+Spoken numbers: step 200, 189 seconds, about four cents of GPU at list price, 20.4 of
 22.06 GiB, 130 tasks in two runs, none of the cached tokens, 30 tasks in under a minute, 43 cents
 and $1.67 of Muse Spark calls at list price. Each is in the table above.
 
@@ -91,6 +99,7 @@ and $1.67 of Muse Spark calls at list price. Each is in the table above.
 | 7 | the caching finding's text as the record holds it (30 tasks) | none: the 130-task caption comes from A's status file, not the screen |
 | 9 | the retry-loop finding on screen, with its code line | none: it is a static finding in the record |
 | 10 | the agent cockpit's tank and cost readouts | If the engine abstains, record the hatched band as it is and keep the line, since it promises no number |
+| 11b | A's production record on the deployed app, from its share link, with `harness.spark_open_triage` on in production; a probe that didn't finish, whose triage finding quotes a log line (not "(no log line quoted)"); the triage call in its provenance; and a screen that shows the finding. On `main` none does: the detail sheet lists only findings with a node (`DetailSheet.tsx`), the map skips info findings and those with no node (`Orbit.tsx`), the guide's tour only those with a fix (`ruleTour.ts`), and triage's finding is info with no node (`harness/triage.py`). C and A are asked (`from-d.md`) | No link by Tue Nov 3, noon ET, or no screen that shows the finding by then: drop the shot, not faked (no sample, fixture, staged or edited record, and no fixed tag standing in for it), and put shot 10 back |
 | 12 | the checks page on the deploy, unedited, and B's scorer run on Mon Nov 2 for the README's table | Show the page as it is. If its checks still say "not measured", change the line to "Every prediction gets checked against real runs, misses included." |
 
 ## Before recording
@@ -99,6 +108,9 @@ and $1.67 of Muse Spark calls at list price. Each is in the table above.
 - [ ] Both records open from their share links on the deployed app.
 - [ ] Muse Spark is named only where a record shows it did that work: the agent's own calls
   (shots 6 to 11), and the script map only if the fine-tune record shows the call.
+- [ ] Muse Spark Open is named only in shot 11b, on A's production record that shows the triage
+  finding (with a quoted log line) and call; no link or no screen for it by Tue Nov 3, noon ET,
+  and the shot is dropped, not faked.
 - [ ] No sample screens ("Illustrative").
 - [ ] The retry loop is called "read from the code", never "caught running", unless a re-sample
   shows the stall and its numbers are added above.

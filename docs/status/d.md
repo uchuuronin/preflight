@@ -8,6 +8,46 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 11:20 (standing yes; the Spark Open triage shot in both cuts; push log)
+
+**Standing yes (Chiya, 11:14):** pushes to `ws-d` go without asking once gitleaks is clean and one
+read-only review has checked the change; runs under $1 on a T4, L4 or A10, up to $5 a day, without
+asking. Still asked first: anything past those, A100 or H100, a new kind of run, deploys or
+anything that keeps billing, anything to `main`, production flags, contract changes.
+
+- **Spark Open triage shot** (Chiya: one shot in both video cuts, labelled on screen, on a real
+  production record; A posts the link today; no link by Tue Nov 3, noon ET, and it's dropped, not
+  faked):
+  `storyboard.md` 12b (3-minute plan A) and E (45-second cut), `fallback-cut.md` 11b (plan B).
+  Each holds on the triage finding, where the app writes "Found by Muse Spark Open triage"
+  (`finding.source.spark_open_triage` in `en.json`), with a burned-in caption naming the model.
+  No number is spoken in it, and the line says only what the code does: when a probe fails, Spark
+  Open reads the end of its log and quotes the line.
+- **Blocker, found in review: no screen shows a triage finding.** Triage's finding is info with
+  no node; on `main` the detail sheet shows only findings with a node, the map skips info and
+  node-less ones, and the tour takes only findings with a fix. So the shot can't be filmed today,
+  even with A's link. Asked A (tie the finding to its probe's node: the smaller change) or C (list
+  node-less findings), for Chiya's next batch. The storyboards say so in the shot's row.
+- **Decision: what makes room.** The 3-minute video has a hard 3-minute limit (Judging playbook)
+  and both 3-minute cuts already end near 2:55 to 2:58. Plan A drops shot 7 (Boarding's "Checking
+  the logs" tag), which says the same thing with a label that shows whether or not the model ran
+  (finding 12); plan B drops shot 10 (the tank and cost readouts, the shot with no measured
+  number). The 45-second cut takes 4 s from shot C and 3 s from the end card. Each comes back as
+  before if the triage shot is dropped. Chiya can swap which shot gives way.
+- **Asked A** (`from-d.md`): triage makes a finding only for a probe that didn't finish, so the
+  record needs a failed probe whose finding quotes a log line; post the link.
+- **Open:** the submission's Spark Open lines (`meta-and-partners.md`: "not yet run on a real
+  job"; `portal.md`) change once A's record exists; I'll update them when the link lands.
+
+**Push to `origin/ws-d`, 11:25** (gitleaks clean; reviewed read-only: the first three at 11:00,
+the rest below):
+- `9c55415` GNN zoo script: `N_TRAIN_NODES` as a plain top-level setting.
+- `ea4bbf2` README draft and submission: the divergence refit numbers (0.66, lead 138).
+- `8b94541` Review fixes for those two.
+- This commit: the triage shot in both cuts, the request to A, and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 11:00 (pushed; GNN run length; waiting on B's report)
 
 Pushed `adc9ca3`..`b781a91` with Chiya's yes (10:57).

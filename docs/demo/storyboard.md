@@ -23,6 +23,10 @@ cut in `fallback-cut.md` instead (the fine-tune and the agent run, measured numb
 - **Nothing from Chiya's ongoing research.**
 - **Record on the deployed app**, with the real record of the Oct 28 run (record
   `ICDYrfHQ2nBNbv3mlRHHMg`), never a sample: samples are labelled "Illustrative".
+- **The Spark Open triage shot (12b, and E in the 45-second cut) is a real production record or
+  nothing** (Chiya, Nov 1). A posts its share link on Sun Nov 1. If the link isn't there by
+  Tue Nov 3 at noon ET, the shot is dropped, not faked: no sample, fixture, staged or edited
+  record, and no fixed tag standing in for it.
 
 ## Numbers this video may use
 
@@ -47,12 +51,13 @@ any hours or monthly savings, and any accuracy rate (one script gives no rate).
 | 4 | 0:30 | Check-in, data-use notice | Hold on the notice for a beat | "It runs a few minutes sandboxed on a rented GPU, with none of our keys." | |
 | 5 | 0:38 | Boarding | Stages light in turn; "Reading your script" with the Muse Spark tag | "Muse Spark reads the code and finds the training loop." | "Muse Spark (Meta)" at the moment the stage lights |
 | 6 | 0:50 | Boarding | "Running probe steps" lights; route fills | "Then it runs a few real steps on a real GPU." | "L4, measured" |
-| 7 | 1:00 | Boarding | "Checking the logs" with the Muse Spark Open tag | "Muse Spark Open, open weights on Baseten, reads the logs." | "Muse Spark Open (Meta, open weights)" |
-| 8 | 1:10 | Cockpit of the Oct 28 record | Map draws; the memory ring fills past the line; red finding "runs out of memory" | "In 189 seconds, for about four cents of GPU at list price, it caught the crash: the evaluation pass reaches 20.4 GiB of a 22.06 GiB card and runs out." | "189 s of probing · $0.042 of GPU at list price · 20.4 of 22.06 GiB · one script" |
-| 9 | 1:25 | Cockpit, detail sheet on the eval node | Open the finding; press "Adjust eval batch" | "It says why, and which setting fixes it." | |
-| 10 | 1:35 | Cockpit, knob dock | Drag eval batch size down; dials and ring move together | "Move a setting and the whole run answers at once." | "Predicted" (the app's own label on the dials) |
-| 11 | 1:50 | Cockpit, live guide | The guide proposes one knob move; Accept | "Ask the guide, and Muse Spark moves the knobs that matter, one at a time." | "Muse Spark (Meta)" |
-| 12 | 2:05 | Fix loop | Two or three candidate fixes run side by side; the measured winner is kept | "Muse Code tries fixes in parallel, and Preflight's own probe picks the winner by measurement." | "Muse Code (Meta)" |
+| ~~7~~ | | Boarding, "Checking the logs" | Cut: shot 12b shows Spark Open at work in a record, and takes these 10 s. Back only if 12b is dropped, under its own rule below | | |
+| 8 | 1:00 | Cockpit of the Oct 28 record | Map draws; the memory ring fills past the line; red finding "runs out of memory" | "In 189 seconds, for about four cents of GPU at list price, it caught the crash: the evaluation pass reaches 20.4 GiB of a 22.06 GiB card and runs out." | "189 s of probing · $0.042 of GPU at list price · 20.4 of 22.06 GiB · one script" |
+| 9 | 1:15 | Cockpit, detail sheet on the eval node | Open the finding; press "Adjust eval batch" | "It says why, and which setting fixes it." | |
+| 10 | 1:25 | Cockpit, knob dock | Drag eval batch size down; dials and ring move together | "Move a setting and the whole run answers at once." | "Predicted" (the app's own label on the dials) |
+| 11 | 1:40 | Cockpit, live guide | The guide proposes one knob move; Accept | "Ask the guide, and Muse Spark moves the knobs that matter, one at a time." | "Muse Spark (Meta)" |
+| 12 | 1:55 | Fix loop | Two or three candidate fixes run side by side; the measured winner is kept | "Muse Code tries fixes in parallel, and Preflight's own probe picks the winner by measurement." | "Muse Code (Meta)" |
+| 12b | 2:10 | A's production record from its share link (posted by Tue Nov 3, noon ET), on the screen where the app shows its triage finding. **Not filmable on `main` yet:** the cockpit shows no finding without a node, and triage's has none (dependency below) | Hold on the finding: its title, its one sentence with the quoted log line, and the app's own "Found by Muse Spark Open triage" (`finding.source.spark_open_triage`) | "When a probe fails on the live site, Muse Spark Open reads the end of its log and quotes the line." | "Muse Spark Open (Meta, open weights, on Baseten) · triage of a failed probe's log · a real job on the live site" |
 | 13 | 2:20 | Checks page | Scroll the "Each check" list: the caught OOM, and the step-time misses | "Every prediction is checked against real runs, misses included." | "Held-out checks on real runs" |
 | 14 | 2:33 | Cockpit, then a new tab | Copy the address from the address bar, paste it in a new tab; the same flight opens | "Every flight is a link anyone can open." | |
 | 15 | 2:43 | End card (about 10 s, ends near 2:55) | Public link and repo | "Preflight. Fly the run before you pay for it." | link · repo · "Built Oct 26 to Nov 4" |
@@ -63,37 +68,40 @@ any hours or monthly savings, and any accuracy rate (one script gives no rate).
 | --- | --- | --- |
 | 3, 4, 6 | check-in open on the deploy (`runner.queue`) and the runner up, for a live check-in we record as it happens | Boarding can't be replayed (a finished job's events arrive at once, and the stream needs the runner), so cut shots 3 to 7 and open on the Oct 28 record's cockpit with the caption "checked in on Oct 28" |
 | 5 | Muse Spark reading the script (`harness.spark_script_map`), and a recorded run where it did (the record's model calls show it) | Boarding's model tags are fixed labels that show whether or not the model ran: crop or blur the tag and drop the narration line, or cut the shot. C is asked to show tags only for models that ran (from-d.md, finding 12) |
-| 7 | Muse Spark Open doing triage in the recorded run, shown in the record | Cut the shot; name Muse Spark Open only where a record shows it, and crop the fixed tag |
+| 7 | Muse Spark Open doing triage in the recorded run, shown in the record | Cut (its 10 s go to 12b). If 12b is dropped, shot 7 comes back only if the recorded check-in's own record shows the triage call; otherwise give the 10 s to shots 8 to 10, and crop the fixed tag |
 | 8 to 10 | the Oct 28 record's share link (A) on the deployed app | none: this is the core of the video |
 | 11 | the live guide (`c.guide.live`) working on the deploy | Show the rule-based tour, labelled as such, and name no model in that shot |
-| 12 | the fix loop (`c.fix_loop`) with a recorded race and a measured winner | Cut the shot and give its 20 seconds to shots 8 to 10 |
+| 12 | the fix loop (`c.fix_loop`) with a recorded race and a measured winner | Cut the shot and give its 15 seconds to shots 8 to 10 |
+| 12b | A's production record on the deployed app, from its share link, with `harness.spark_open_triage` on in production; a probe that didn't finish, whose triage finding quotes a log line (not "(no log line quoted)"); the triage call in its provenance; and a screen that shows the finding. On `main` none does: the detail sheet lists only findings with a node (`DetailSheet.tsx`), the map skips info findings and those with no node (`Orbit.tsx`), the guide's tour only those with a fix (`ruleTour.ts`), and triage's finding is info with no node (`harness/triage.py`). C and A are asked (`from-d.md`) | No link by Tue Nov 3, noon ET, or no screen that shows the finding by then: drop the shot, not faked (no sample, fixture, staged or edited record, and no fixed tag standing in for it), and give its 10 s back to shot 7's rule. Name Muse Spark Open nowhere else in the video unless a recorded record shows its call |
 | 13 | the checks page as on the deploy, unedited | none: show it as it is |
 | 14 | the record's share link (A) | none needed: the link is the page's address; copy it from the address bar |
 
 ## The 45-second cut (for X), ready to record
 
-Four shots from the main storyboard (1, 8, 10, 15), recorded once the site is public. It has to
+Five shots from the main storyboard (1, 8, 10, 12b, 15), recorded once the site is public. It has to
 work with the sound off, so **every narration line is also a burned-in caption**, and the first
 frame has to stand on its own.
 
 **Format:** 1920 x 1080, 30 fps, H.264 MP4, under 45 s. Browser window at
 1440 x 900 inside the frame, dusk theme, browser zoom 110%, no bookmarks bar or other tabs
-showing, cursor highlight on. Record the cockpit shots on the deployed app with the Oct 28
-record's share link, never a sample.
+showing, cursor highlight on. Record shots B and C on the deployed app with the Oct 28
+record's share link, and shot E with A's production record's, never a sample.
 
 | # | Time | Screen | Action | Narration (about 2.5 words a second) | Caption, burned in |
 | --- | --- | --- | --- | --- | --- |
 | A (shot 1) | 0:00 to 0:08 | `zoo/finetune_lora_hf/train.py` in an editor, dark theme, 20 pt | Hold 1 s on the file, then a slow zoom to `EVAL_EVERY = 200` and the eval batch line | "This fine-tune looks fine. At step 200, its first evaluation, it runs out of memory." (16 words) | 0:00 to 0:03 "Your GPU job, flown before you run it" · 0:03 to 0:08 "At step 200, its first evaluation, it runs out of memory" |
 | B (shot 8) | 0:08 to 0:24 | Cockpit of the Oct 28 record | The map draws, the memory ring fills past the line, the red finding "runs out of memory" appears; hold 2 s on the finding | "Preflight ran a few real steps on one L4. In 189 seconds of probing, for about four cents of GPU at list price, it caught the crash before the real run." (31 words written, about 35 spoken) | "Caught in 189 s of probing, before the run · $0.042 of GPU at list price · eval peaks at 20.4 of 22.06 GiB · one script" · from 0:08 to 0:12 also "Script read by Muse Spark (Meta)" |
-| C (shot 10) | 0:24 to 0:36 | Same cockpit, knob dock | Drag eval batch size from 32 down; the ring drops under the line and the dials move together | "Move a setting, and the whole run answers at once." (10 words) | "Predicted" stays as the app labels the dials; caption "Every reading carries its range" |
-| D (shot 15) | 0:36 to 0:45 | End card | Public link and repo URL fade in | "Preflight. Fly the run before you pay for it." (8 words) | link · repo · "Built Oct 26 to Nov 4 for the Meta hackathon" |
+| C (shot 10) | 0:24 to 0:32 | Same cockpit, knob dock | Drag eval batch size from 32 down; the ring drops under the line and the dials move together | "Move a setting, and the whole run answers at once." (10 words) | "Predicted" stays as the app labels the dials; caption "Every reading carries its range" |
+| E (shot 12b) | 0:32 to 0:39 | As shot 12b: A's production record, on the screen that shows its triage finding | Cut in on the finding; hold on it and the app's "Found by Muse Spark Open triage" | "When a probe fails, Muse Spark Open reads its log and quotes the line." (14 words) | "Muse Spark Open (Meta, open weights, on Baseten) · triage of a failed probe's log · a real job on the live site" |
+| D (shot 15) | 0:39 to 0:45 | End card | Public link and repo URL fade in | "Preflight. Fly the run before you pay for it." (9 words) | link · repo · "Built Oct 26 to Nov 4 for the Meta hackathon" |
 
-Narration is 65 written words; spoken, with "200" and "189" said in full, about 71, so about 28 s
+Narration is 80 written words; spoken, with "200" and "189" said in full, about 86, so about 34 s
 of speech in 45 s, and shot B's 35 spoken words take its 16 s at about 2.2 a second (trim
 "Preflight ran a few real steps on one L4" to its caption if the take runs long). The only spoken numbers are in
 the table at the top: step 200, 189 s and $0.042 said as "about four cents of GPU at list price";
 20.4 of 22.06 GiB is captioned, not spoken. Nothing is predicted aloud; the dials in shot C keep
-the app's own "Predicted" label.
+the app's own "Predicted" label. Shot E speaks no number. If shot E is dropped (no production link
+by Tue Nov 3, noon ET), C runs 0:24 to 0:36 and D 0:36 to 0:45, as before.
 
 **Before recording this cut** (on top of the list below):
 
@@ -104,6 +112,9 @@ the app's own "Predicted" label.
 - [ ] Shot C: dragging eval batch size moves the ring under the line on that record. If the
   engine abstains there, record it as it shows (the hatched band is honest) and change the
   caption to "Outside what was measured: Preflight says so".
+- [ ] Shot E: A's production record opens from its share link by Tue Nov 3, noon ET, and the app
+  shows its triage finding with a quoted log line; otherwise drop shot E, not faked (never a
+  sample or a staged record).
 - [ ] Captions are burned in, white on a dark band, at least 36 px tall at 1080p, and none is on
   screen for under 2 s.
 - [ ] The repo is public and the link on the end card opens.
@@ -112,7 +123,10 @@ the app's own "Predicted" label.
 
 - [ ] Every number spoken or captioned is in the table above, with its source.
 - [ ] The Oct 28 record opens from its share link on the deployed app.
-- [ ] Each Meta model named in the video did that work in the recorded run (its record shows it).
+- [ ] Each Meta model named in the video did that work in the record on screen (that record shows it).
+- [ ] Shot 12b (and E): A's production record, from its share link, shows a finding marked
+  "Found by Muse Spark Open triage" that quotes a log line; posted by Tue Nov 3, noon ET, or the
+  shot is dropped, not faked. Spark Open's work is shown in that record, not the Oct 28 one.
 - [ ] No sample screens (they say "Illustrative").
 - [ ] Each shot's flag is on and checked on the deploy, or the fallback is used.
 - [ ] Captions on for every narration line.
