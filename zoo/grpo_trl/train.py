@@ -20,14 +20,28 @@ the bare run and the probe alike (20.91 GiB allocated, asking 2.32 GiB more of t
 factored state is a few MB where AdamW's is two fp32 copies of the weights (3.7 GiB here), keeping
 fp32 weights so the 1e-6 learning rate still moves them (pure bf16 would round the updates away).
 Neither change is a planted problem; Preflight should show the 2-prompt setting's OOM before it runs.
+The second run (Nov 1, a-gt-grpo-l4-2) ran out again with 3.95 GiB fragmented [measured], so the
+script turns on expandable segments in PyTorch's allocator, also not a planted problem.
 
 Everything is public: the model (Apache-2.0) and GSM8K (MIT). Written for Preflight, not taken
 from any other project.
 """
 
+import contextlib
+import os
 import re
 
+# Not a planted problem: 8 completions' logits leave the allocator fragmented (Oct 31, second run:
+# 3.95 GiB reserved but unallocated when a 2.00 GiB block was asked for), so let it grow segments
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import torch
+
+if torch.cuda.is_available():
+	# also when CUDA was set up before this script ran (a recorder imports torch first)
+	with contextlib.suppress(AttributeError, RuntimeError):
+		torch.cuda.memory._set_allocator_settings("expandable_segments:True")
+
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 
