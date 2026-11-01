@@ -7,8 +7,8 @@
 			"job_type": "finetune",
 			"record": "../b-a-smoke-l4-main-4.record.json",
 			"ground_truth": "ground_truth_finetune_lora_hf.json",
-			"calibrates": ["*"],
-			"$calibrates": "Chiya, Nov 1: the step band was widened after looking at this run (6a994eb), so it is used for calibration; only Monday's full runs are held out",
+			"calibrates": ["step", "intervals"],
+			"$calibrates": "Chiya, Nov 1: the step band was widened after looking at this run (6a994eb), so it is used for calibration for step time and intervals; it stays in the OOM and planted-problems rows (the OOM was caught before it, and no memory rule changed after it)",
 			"planted": ["eval.batch_large", "eval.no_grad", "data.no_packing"]
 		},
 		{

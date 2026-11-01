@@ -21,7 +21,7 @@ Manifest (JSON):
 		"agent_total_usd": 6.80,                     # agent: the full benchmark run's cost
 		"preflight_usd": 0.42, "preflight_s": 210,  # what this Preflight run itself cost and took
 		"used_for_tuning": false,
-		"calibrates": ["rollout"]                    # rows it calibrated, which then don't score it (the GRPO zoo, Nov 1)
+		"calibrates": ["rollout"]                    # rows it calibrated, unscored; "intervals": out of coverage; "*": every row
 	}],
 	"knob_ms": [41, 55, ...],                        # browser timings of knob moves (C)
 	"corpus": ["path/to/kernels/store", ...]         # for the cross-GPU row (leave-one-GPU-out)
@@ -419,7 +419,7 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		(f"{r.script}:{k}", getattr(r, k))
 		for r, cal in zip(runs, calibrates, strict=True)
 		for k in ("memory_inside", "step_inside", "rollout_inside", "serving_inside", "agent_inside")
-		if _row_of(k) not in cal
+		if _row_of(k) not in cal and "intervals" not in cal
 	]
 	rows.append(
 		_share_row(

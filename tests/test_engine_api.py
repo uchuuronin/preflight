@@ -708,7 +708,7 @@ def _with_lengths(rec, **extras):
 
 def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
 	# review, Nov 1: a factor taken from whichever probe matched jumped 4.5% when a knob moved onto another probe
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	for pid in ("p1", "p2", "p3"):
 		p = next(q for q in lens.probes if q.id == pid)
 		pv = api._probe_values(lens, p)
@@ -727,7 +727,7 @@ def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
 
 
 def test_a_knob_move_between_probes_doesnt_jump():
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	pts = [api.predict(lens, {"batch_size": b, "seq_len": 1024}).root["time.step"].point for b in (2, 3, 4)]
 	assert pts[0] < pts[1] < pts[2]  # the fit interpolates between the corrected probes
 
@@ -745,7 +745,7 @@ def test_without_the_datasets_lengths_the_probes_spread_sets_both_terms():
 
 def test_a_long_tail_moves_memory_not_time():
 	# Chiya, Nov 1: time follows the median and the mean; p99.9 and the longest row belong to peak memory
-	base = _with_lengths(_lora(), dataset_median_tokens=140.0, dataset_mean_tokens=152.0)
+	base = _with_lengths(_lora(), dataset_p50_tokens=140.0, dataset_mean_tokens=152.0)
 	tail = _with_lengths(base, dataset_p999_tokens=1000.0, dataset_max_tokens=4000.0)
 	a, b = api.predict(base).root["time.step"], api.predict(tail).root["time.step"]
 	assert a.point == b.point and a.hi == b.hi
@@ -760,7 +760,7 @@ def _lora_steps(n=1000):
 
 
 def test_a_total_follows_the_mean_and_its_length_error_shrinks_with_the_steps():
-	rec = _with_lengths(_lora_steps(1000), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	rec = _with_lengths(_lora_steps(1000), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	p = next(q for q in rec.probes if q.id == "p1")
 	lt = api._length_term(rec, {}, p, 1000)
 	pv = api._probe_values(rec, p)
@@ -784,7 +784,7 @@ def test_the_cold_cost_doesnt_grow_with_accumulation():
 
 
 def test_rl_and_packed_rows_take_no_padding_term():
-	rec = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	rec = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	p = next(q for q in rec.probes if q.id == "p1")
 	assert api._length_term(rec, {"packing": True}, p).total_scale == 1.0
 	rl = rec.model_copy(update={"job": rec.job.model_copy(update={"lens": "rl"})})
@@ -806,7 +806,7 @@ def _at_dataset(rec, med_tokens=200.0, mean_tokens=260.0, log=True):
 		upd = {
 			"extras": {
 				**(p.extras or {}),
-				"dataset_median_tokens": med_tokens,
+				"dataset_p50_tokens": med_tokens,
 				"dataset_mean_tokens": mean_tokens,
 			}
 		}
@@ -837,7 +837,7 @@ def test_a_probe_that_saw_the_runs_data_is_left_alone():
 
 def test_one_uncorrectable_probe_leaves_every_probe_uncorrected():
 	# review, Nov 1: break p2, query between the probes (batch 3), where a mixed fit would show
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	mixed = lens.model_copy(
 		update={
 			"probes": [
@@ -879,7 +879,7 @@ def test_no_amd_measurements_on_every_engine_surface(ft):
 
 def test_one_fit_uses_one_estimator():
 	# review, Nov 1: a probe without a step log beside ones with it once mixed the median and mean factors
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	no_log = lens.model_copy(
 		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
 	)
@@ -897,7 +897,7 @@ def test_no_gpu_no_gpu_hours(ft):
 
 
 def test_a_missing_step_log_sends_every_probe_to_the_mean_factor():
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	one = lens.model_copy(
 		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
 	)
@@ -910,3 +910,35 @@ def test_a_missing_step_log_sends_every_probe_to_the_mean_factor():
 	}
 	f_mean = {p.id: api._length_factor(lens, p, False) for p in lens.probes if p.status in api.OK_PROBE}
 	assert f_one == pytest.approx(f_mean)
+
+
+def test_the_cuda_context_is_measured_not_guessed():
+	# C, Nov 1: a guessed 0.75 GiB on a GRPO probe's reserved peak read 23.8 GB on a 23.7 GB L4 for a run that fit
+	rec = _lora()
+	gaps = [
+		x.device_used_bytes - x.peak_reserved_bytes
+		for p in rec.probes
+		if p.status in api.OK_PROBE
+		for x in p.step_log
+		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
+	]
+	assert api._context_bytes(rec) == pytest.approx(statistics.median(gaps))
+	assert api._context_bytes(rec) < api.memory.DEFAULT_CONTEXT_BYTES / 2
+	bare = rec.model_copy(update={"probes": [p.model_copy(update={"step_log": []}) for p in rec.probes]})
+	assert api._context_bytes(bare) == api.memory.DEFAULT_CONTEXT_BYTES
+
+
+def test_every_memory_path_takes_the_measured_context(monkeypatch):
+	rec = _lora()
+	q = {"batch_size": 2, "seq_len": 1024}
+	measured = api.predict(rec, q).root["memory.peak"].point
+	monkeypatch.setattr(api, "_context_bytes", lambda r: float(api.memory.DEFAULT_CONTEXT_BYTES))
+	guessed = api.predict(rec, q).root["memory.peak"].point
+	real = statistics.median(
+		x.device_used_bytes - x.peak_reserved_bytes
+		for p in rec.probes
+		if p.status in api.OK_PROBE
+		for x in p.step_log
+		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
+	)
+	assert guessed - measured == pytest.approx(api.memory.DEFAULT_CONTEXT_BYTES - real, rel=0.05)

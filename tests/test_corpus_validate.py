@@ -30,15 +30,19 @@ def test_every_plan_target_has_a_row(today):
 	]  # fmt: skip
 
 
-def test_the_lora_full_run_on_oct_31_is_calibration_not_held_out(today):
-	# Chiya, Nov 1: the step band was widened after looking at it, so only Monday's full runs are held out
+def test_the_lora_full_run_on_oct_31_is_calibration_for_step_time_and_intervals(today):
+	# Chiya, Nov 1: the step band was widened after looking at it; the OOM was caught before it, and no memory rule
+	# changed after it, so it stays in the OOM and planted-problems rows
 	rows, runs = today
 	(lora,) = [r for r in runs if r.script == "finetune_lora_hf"]
-	assert lora.oom_actual is True and lora.oom_p == 1.0  # still scored, for the record
-	for m in ("OOM prediction", "Step time, same GPU", "Planted problems caught", "Interval coverage"):
+	assert lora.oom_actual is True and lora.oom_p == 1.0
+	oom = _row(rows, "OOM prediction")
+	assert oom.hit and "missed: none" in oom.note
+	assert _row(rows, "Planted problems caught").hits == 3
+	for m in ("Step time, same GPU", "Interval coverage"):
 		assert _row(rows, m).cells()[3] == "not measured"
 	m = json.loads((FIX / "manifest_oct31.json").read_text())
-	assert "Used for calibration, so not held out: finetune_lora_hf (every row)" in V.calibration_note(m)
+	assert "finetune_lora_hf (step, intervals)" in V.calibration_note(m)
 
 
 def test_the_scorer_names_the_models_it_scored_with():

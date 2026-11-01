@@ -367,7 +367,7 @@ def _padded_step(
 
 def _dataset_lengths(p) -> tuple[float, float] | None:
 	ex = p.extras or {}
-	med, mean = ex.get("dataset_median_tokens"), ex.get("dataset_mean_tokens")
+	med, mean = ex.get("dataset_p50_tokens"), ex.get("dataset_mean_tokens")  # A's names, Nov 1
 	return (float(med), float(mean)) if med and mean else None
 
 
@@ -532,6 +532,25 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 	return sorted(out)
 
 
+CONTEXT_MAX_BYTES = 4 * 2**30  # guess: a measured context above 4 GiB means another process shares the GPU
+
+
+def _context_bytes(record: FlightRecord) -> float:
+	"""The device memory outside PyTorch's allocator (CUDA context, cuBLAS workspaces, other libraries), measured: each
+	timed step's whole-device use (cudaMemGetInfo) less its reserved peak, the median over the probes' steps. C, Nov
+	1: a guessed 0.75 GiB on top of a GRPO probe's reserved peak read 23.8 GB on a 23.7 GB L4 for a run that fit.
+	Falls back to the guess when no probe logged whole-device use."""
+	gaps = [
+		x.device_used_bytes - x.peak_reserved_bytes
+		for p in record.probes
+		if p.status in OK_PROBE
+		for x in (p.step_log or [])
+		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
+	]
+	gaps = [g for g in gaps if 0 <= g <= CONTEXT_MAX_BYTES]
+	return float(np.median(gaps)) if gaps else float(memory.DEFAULT_CONTEXT_BYTES)
+
+
 def _capacity(record: FlightRecord, gpu: str) -> int:
 	"""Usable bytes on this GPU: the probe's reported total when the probe ran on it, else the table's."""
 	g = record.env.gpu if record.env else None
@@ -660,6 +679,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		why = "the GPU isn't known, so there's no capacity to compare against; pick a GPU"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	capacity = _capacity(record, gpu)
+	ctx = _context_bytes(record)  # measured from the probes' whole-device use where they logged it
 	oom_probe = _matching_probe(record, values, ok=("oom",))
 	if oom_probe is not None and gpu == _env_gpu(record):  # an OOM on one GPU says nothing about a bigger one
 		why = f"probe {oom_probe.id} ran out of memory at these settings"
@@ -708,6 +728,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		shape.seq,
 		probes=mprobes or None,
 		capacity_bytes=capacity,
+		context_bytes=ctx,
 		work_units=knobs.work_units(lens, sized_values),
 		measured=measured,
 		base_half_width=conformal.TABLE.lookup("memory.peak", gpu, lens).half_width
@@ -725,8 +746,8 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	cell = conformal.TABLE.lookup("memory.peak", gpu, lens)
 	if est.status != "abstain" and est.point and cell is not None and cell.residuals:
 		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
-		alloc = est.point - memory.DEFAULT_CONTEXT_BYTES
-		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - memory.DEFAULT_CONTEXT_BYTES)
+		alloc = est.point - ctx
+		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - ctx)
 		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
 		oom_source = f"from {cell.n} held-out runs"
 	else:
@@ -851,14 +872,15 @@ def _empirical_memory(
 	if not measured and (x > cal.range()[1] or h > memory.ABSTAIN_HALF_WIDTH):
 		why = f"{x:.0f} work units is too far from the probes for a line fit; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
-	point = cal.correct(x, 0.0) + memory.DEFAULT_CONTEXT_BYTES
+	ctx = _context_bytes(record)
+	point = cal.correct(x, 0.0) + ctx
 	if point <= 0:
 		why = "the line through the probes goes below zero here; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	p = memory.p_oom(point, h / memory.Z90, capacity)
 	hi = point * math.exp(h)
 	if cal.is_below(x):  # the same floor as the analytical path (memory.predict_peak)
-		hi = max(hi, cal.correct(cal.min_tokens, 0.0) + memory.DEFAULT_CONTEXT_BYTES)
+		hi = max(hi, cal.correct(cal.min_tokens, 0.0) + ctx)
 	est = memory.MemoryEstimate(
 		point, point * math.exp(-h), hi, "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
 		h / memory.Z90, None, "; ".join(x for x in (
