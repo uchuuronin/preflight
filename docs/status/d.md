@@ -8,6 +8,33 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, small hours (Chiya's queue of 01:19)
+
+`613ae92` was already on `origin/ws-d` when the yes came, so there was nothing to push. `main` is still at `90fcc40`: the audit re-check (12 first, then 7 to 11) and the dial rerun wait for round four.
+
+- **Fallback 3-minute cut** (`docs/demo/fallback-cut.md`, linked from `storyboard.md`, which stays as plan A's fine-tune shots). 13 shots, about 2:55: the fine-tune's OOM at step 200, then the agent run. Every spoken number is measured and sourced: step 200, 189 s of probing, 20.4 of 22.06 GiB, 130 tasks in two runs, 0 of 905,739 input tokens cached, and 30 tasks in 49 s. Decisions, with bases:
+	- The retry loop is shown only as "read from the code" (`run.py:121`). Basis: A measured 0 runaways in the 130 tasks (`a-agent-builds-1`), because they ran before plant 3 was moved to rows 26 to 29, and A hasn't re-sampled since. If a re-sample shows the stall before Tuesday, its numbers go in the table.
+	- The turn-11 overflow and the full-run cost aren't spoken. Basis: the first is derived and the second predicted; they may appear on screen under the app's own labels.
+	- The agent shots need the Oct 31 record published on the deploy with a real share link, since its token in the repo is now a placeholder (A, `e27d2fc`).
+- **Validation table hook.** B's scorer (`scripts/score_validation.py --readme`, `ws-b` `6ce7730`) already writes between `<!-- validation:start -->` and `<!-- validation:end -->`. The README draft now holds those markers around the scorer's own output on an empty manifest, so Monday's run replaces only that block.
+	- End to end: B's script with B's fixture manifest, run on a copy of the draft, filled the block and left every line outside it unchanged.
+	- `tests/test_d_readme_validation.py` checks the markers now, and the round trip through B's `into_readme` once B's module is on the branch. It passed against B's module from a `ws-b` copy.
+	- Two strings are B's, so I asked B for them: "not measured" becomes "not measured yet" (Chiya's wording), and a blank line goes before the footnote. Without it, GitHub's Markdown renders the footnote as a table row (checked with marked 14.1.4).
+- **Pretraining-grid sample.** Nothing in the repo mirrors the lab project. The campaign fixtures already use batch size × sequence length × seed, and no branch has a language × filter grid. The "3 languages × 6 filters × 3 data sizes" row is only in the plan PDF's bug-zoo table (page 16), which I can't edit, so it's back to Chiya with a replacement row.
+
+- **Read-only review of this batch,** and what changed from it. No number lacked a source, and the sums, the retry-loop treatment, the seeded block and the GFM claim checked out. Fixed:
+	- **Dollar figures.** The cut spoke $0.042 and $1.67 as measured, but they are measured time and tokens priced at list rates, which is how the README draft already tags its own costs: derived. Decision: no dollar figure is spoken or captioned in either cut. Plan A's storyboard is corrected too (its 45-second cut said "about four cents"). If Chiya rules that a list-price cost may be captioned with a "derived" tag, they can go back as captions.
+	- **Overclaims fixed:**
+		- shot 4 now says "189 seconds of probing";
+		- shot 7's caption separates the record's 30 tasks from the 130 in two runs;
+		- shot 8 states the timestamp as a fact in the code, not a measured cause;
+		- shot 11 now says the screen came from a 30-task sample in 49 s, not "130 tasks and $1.67";
+		- the full run's cost on screen is the record's $7.15, "Predicted", not A's $6.4.
+	- **Dependencies.** The dev-server fallback is gone (the cut is recorded on the deploy or not at all). Shot 12 lists B's Monday scorer run as a dependency. The retry-loop line notes that `run.py:121` is the line in the script as the record read it.
+	- **Test.** It now asserts that the seeded block is exactly the scorer's output, and it fails on a one-word hand edit, which I checked. A third string went to B: the GNN row's "+4.8%" is percentage points.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, night (add-ons "done means"; correction pushed)
 
 Pushed `613ae92` (the status correction) with Chiya's yes. `main` is still at `90fcc40`, so none of C's audit fixes have landed; the re-check on `main` starts with 12 (model tags) once they do.
