@@ -5450,7 +5450,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.6.1",
+			"default": "0.6.2",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -5602,5 +5602,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.1/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.6.2/FlightRecord"
 }

@@ -30,8 +30,8 @@ GOLDEN = ["finetune", "pretrain", "agent"]
 
 
 def test_schema_version_is_semver_0_x():
-	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch; 0.6.0 (Nov 1): campaign calendar fields, Estimate.rate, agent run endings; 0.6.1 (Nov 1): StepSample.reserved_bytes, AgentSample.concurrency. All additive over the 0.1.0 freeze
-	assert SCHEMA_VERSION == "0.6.1"
+	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch; 0.6.0 (Nov 1): campaign calendar fields, Estimate.rate, agent run endings; 0.6.1 (Nov 1): StepSample.reserved_bytes, AgentSample.concurrency; 0.6.2 (Nov 1): JobRequest.private. All additive over the 0.1.0 freeze
+	assert SCHEMA_VERSION == "0.6.2"
 
 
 def test_ulid_is_26_crockford_chars_and_sortable():
@@ -506,3 +506,11 @@ def test_0_6_1_concurrency_and_reserved_bytes():
 		FlightRecord.model_validate(raw).model_dump_json(exclude_none=True)
 	)
 	assert next(p for p in again.probes if p.step_log).step_log[0].reserved_bytes == 1_000
+
+
+def test_0_6_2_private_mode_defaults_off():
+	from preflight.schema import JobRequest
+
+	rec = {"kind": "record", "record_ref": "sample:lora-7b"}
+	assert JobRequest(source=rec, mode="probe", knobs={"batch_size": 2}).private is False
+	assert JobRequest(source=rec, mode="probe", knobs={"batch_size": 2}, private=True).private is True

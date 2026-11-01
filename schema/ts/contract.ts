@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.6.1. Generated; do not edit.
+ * Preflight contract v0.6.2. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -1655,6 +1655,10 @@ export interface JobRequest {
 	 * 0.5.0: a unified diff applied to the record's code before a probe or verify job (C's fix loop); code fixes can't be passed as knob overrides
 	 */
 	patch?: string | null;
+	/**
+	 * 0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten
+	 */
+	private?: boolean;
 }
 /**
  * target_id -> Estimate, for one knob setting.
@@ -1691,4 +1695,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.6.1";
+export const SCHEMA_VERSION = "0.6.2";
