@@ -1,5 +1,20 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Sun Nov 1, round four (Chiya's order, 01:19)
+
+| # | Item | State | Hours | Waits on |
+| --- | --- | --- | --- | --- |
+| 1 | Campaign lens: a sample with B's planner output for a grid, and a tour on the calendar to the completion-date distribution (video 2:25) | Starting now. Not waiting on B: `campaign/planner.py` on ws-b since Sat evening, 0.5.0's fields on main | 4 | |
+| 2 | GRPO lens: sample, tour, truncation and reward-spread views on A's L4 smoke record; zero-spread share measured with its Wilson interval (the video opens on it); swap in the 50-step record when A posts it | Next | 5 | A's 50-step record for the swap only |
+| 3 | Cost frontier (Pareto) for A's model sweep (video 2:05) | After 2 | 3 | A's sweep record |
+| 4 | Editable rate in the cost readout: quantity x rate = total, an edit box ($/GPU-hour, or $/M input and $/M output tokens) with the table's source and date in small text, $0 allowed, a "your rate" tag with reset, every dollar readout, the timeline and campaign totals within 400 ms, per job, carried in the export plan | After 3 | 5 | |
+| 4b | Stretch, `c.price_from_url` (off): check a rate against a pasted page (plain HTTPS fetch, private addresses blocked, 1 MB, 5 s; Muse Spark quotes candidate rates through the spend ledger; the visitor confirms) | Not before 4 ships; tomorrow's cut sheet | 4, plus about US$0.01 of Muse Spark per check |
+| 5 | First real fix race after the deploy (cap about US$0.39): costed and asked before it runs, then recorded | After the deploy | 1 | Chiya's yes |
+
+Held for Monday's cut sheet, with hours: PyodideProvider 4 (needs B's bundle), step anatomy 3, health signals 3, load test at 20 visitors 2 plus a small paid run, the other six lens tours 6 (1 each). The checks page stays out of the README until the Nov 2 runs: three probes with wide Wilson bands would read as a result.
+
+Audit trail: the first Muse Code smoke (GitHub run 41246585559) ran `muse-spark-1.3-contributor` although the command passed `--contributor-mode off`; every fix-loop run now names the standard `muse-spark-1.3`, and a candidate whose run reports a contributor model is refused.
+
 ## Sun Nov 1, early
 
 - Pushed `c28d664..80d4217` (Chiya's yes). The push changed the guide's prompt and tools, so guide-smoke ran on its own (run 41273350602): 5 rounds, US$0.019, all called tools, p50 4.9 s.
@@ -51,8 +66,8 @@ read-only review, and exclude waiting on others.
 | --- | --- | --- | --- |
 | Fine-tune lens: map, readouts, fit map with OOM frontier, memory stack, live and rule tour | On main (`c.fit_map` off) | 1 (turn flag on after the e2e run) | A's runner deploy |
 | Agent lens: map and tour on the golden record | On ws-c (`5b297cc`): sample PF331 from A's measured Oct 31 record; the tour walks the retry-loop finding (lights Tools), never offers `n_tasks` or other result-changing knobs as savings. The context overflow is only derived (D: turn 11 from the growth; no sampled task passed turn 4) and caching isn't priced (requests to A and B) | 0.5 (live Muse Spark tour check, paid) | Chiya's yes for the paid check |
-| GRPO lens: sample, tour, truncation and reward-spread views | Not started | 5 | A's GRPO zoo record; B's RL models |
-| Campaign lens: calendar with team lanes on B's planner | Not started | 6 | B's planner (only `campaign/__init__.py` exists on ws-b) |
+| GRPO lens: sample, tour, truncation and reward-spread views | Superseded by Sun Nov 1, round four (item 2) | 5 | A's L4 smoke record is in |
+| Campaign lens: calendar with team lanes on B's planner | Superseded by Sun Nov 1, round four (item 1); calendar built (`planFromRecord`) | 4 | Not waiting: B's planner on ws-b since Sat evening |
 
 **Contract C and the workspace features**
 
