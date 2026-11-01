@@ -147,10 +147,10 @@ EXTRAS_KEYS = (
 	# hygiene: generations by different weights on the same inputs, and how many came out identical
 	"outputs_compared",
 	"outputs_identical",
-	"generation_ending_known",
+	"generation_ending_known",  # the sequences generation.truncation_rate is over
 	"rl_zero_spread_groups",  # GRPO groups whose summed rewards were all equal, of rl_groups
 	"rl_groups",
-	"rl_reward_functions",  # the sequences generation.truncation_rate is over
+	"rl_reward_functions",
 	# hygiene: what the script's own checkpoints hold, for a resume that matches
 	"checkpoint_saves_seen",
 	"checkpoint_has_optimizer",
