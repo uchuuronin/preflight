@@ -35,6 +35,9 @@ Updated Sun Nov 1, 01:30 ET.
   script that samples subgraphs by hand, as zoo/gnn_pyg does, gets no graph counts, and with no
   loader the forward can't be told from the sampling, so both land in "other" (Nov 1 L4 probe:
   60% other). On the cut sheet (Chiya, Nov 1): count each conv layer's edges at SAGEConv/MessagePassing forward, about 1 hour.
+- FSDP (Nov 1, 2 × A10): `params_total` and `params_trainable` count a rank's shard (67M of the
+  fixture's 134M), since FSDP's flat parameters hold only that rank's part; per-rank peaks are right.
+  The sharded run's tokens and samples per step read 0 there and in torchtitan (no batch shape seen).
 - Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
   its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
   lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
@@ -221,6 +224,7 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Nov 1 13:10 | `a-torchtitan-check` (41309914515): startup check ok (torch 2.7.1, debug model), then the check **failed before the first step**: `KeyError: getpwuid(): uid not found: 61000`. The probe's uid has no passwd entry and the script asks for its user name. Fixed (the probe sets USER and LOGNAME, and the images get a passwd entry); not rerun, since the fix needs a push. Modal gave the A10 (the log's "on the L4" was a fixed label, fixed). The queue stopped here, so the 2× check didn't run | A10 | about 1 | about $0.01 GPU (estimate) |
 | Nov 1 15:58 | `a-startup-check-15` (41323850105) ok; `a-deploy-main-15` (41323942603): **the production runner redeployed** from ws-a 4cc6f57 (main merged in, production flags), with the probe-user fix; the 12:55 deploy (9e46c3c) would have crashed visitor scripts that ask for their user name (torch.compile, vLLM). Left running | none | — | the job store, about $0.19/day (C's estimate) |
 | Nov 1 16:02 | `a-torchtitan-check-2` (41324243638): **torchtitan working under the recorder**, on an A10 (GPU list L4, A10, L40S). torchtitan 0.1.0 on torch 2.7.1, debug model (6.27M params): 15 steps ok, p50 26 ms; phase split backward 52%, forward 32%, data 11%, optimizer 4%; peak 0.42 GB [measured]. Not read: tokens and samples per step came out 0 (the recorder doesn't see torchtitan's batch shape) | A10 | about 1.5 | about $0.02 GPU (estimate) |
+| Nov 1 16:04 | `a-multi-gpu-2x` (41324369861): **DDP and FSDP on 2 × A10** (GPU list 2 × L4, 2 × A10), the 134M-parameter MLP fixture, both ranks reporting: DDP 15 steps ok, p50 72 ms, peak 3.24 GB a rank; FSDP 15 steps ok, p50 87 ms, peak 1.36 GB a rank [measured]. Under FSDP `params_total` reads 67M, one rank's shard of the same 134M model (known limit, told B) | 2 × A10 | about 1 | about $0.04 GPU (estimate) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,
