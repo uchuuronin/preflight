@@ -3,7 +3,7 @@ import agentRaw from "../../../schema/examples/agent.json";
 import goldenRaw from "../../../schema/examples/finetune.json";
 import devRaw from "../workspace/fixtures/dev-finetune.record.json";
 import { GridProvider } from "../workspace/provider/GridProvider";
-import { currentKnobs, knobChoices } from "../workspace/record/model";
+import { currentKnobs, knobChoices, targetFor } from "../workspace/record/model";
 import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
 import type { TraceEntry } from "../workspace/state";
 import { guardSetKnob, runBrowserCall } from "./liveGuide";
@@ -141,7 +141,19 @@ describe("measure-first offers (tight settings)", () => {
 
 
 describe("sample_more (agent runs whose cost range straddles the budget)", () => {
-	const agent = normaliseRecord(agentRaw as unknown as FlightRecord);
+	const golden = normaliseRecord(agentRaw as unknown as FlightRecord);
+	// The golden agent record's own cost range may or may not straddle its budget (fixture numbers
+	// do, B's engine abstains under 10 tasks), so these tests set a range and a budget across it.
+	const costId = targetFor(golden, "cost")!.id;
+	const agent = {
+		...golden,
+		job: { ...golden.job, constraints: { ...golden.job.constraints, budget_usd: 150 } },
+		predictions: {
+			...golden.predictions,
+			grids: golden.predictions.grids.filter((g) => g.target_id !== costId),
+			estimates: { ...golden.predictions.estimates, [costId]: { point: 84, lo: 46, hi: 159, unit: "usd", status: "predicted", model_id: "m", source: "exact" } as never },
+		},
+	};
 
 	it("is in the tool schema for agent runs only", () => {
 		expect(buildTools(agent, new Set()).some((x) => x.name === "sample_more")).toBe(true);

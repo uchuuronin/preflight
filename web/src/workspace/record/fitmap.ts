@@ -25,6 +25,9 @@ export interface FitCell {
 	risk: number | null;
 	peak: number | null;
 	capacity: number | null;
+	/** The run's time and cost the dials would show at this setting, when trusted (for the preview). */
+	time: number | null;
+	cost: number | null;
 	here: boolean;
 }
 
@@ -119,12 +122,18 @@ function cellStatus(record: LoadedRecord, provider: PredictionProvider, knobs: R
 	const capacity = capacityBytes(record, knobs);
 	const riskT = record.predictions.targets.find((t) => t.id === "risk.oom");
 	const r = riskT ? p[riskT.id] : undefined;
-	if (!trusted(mem) && !trusted(r)) return { status: "abstain", risk: null, peak: null, capacity };
+	const tT = targetFor(record, "time");
+	const cT = targetFor(record, "cost");
+	const time = tT && trusted(p[tT.id]) ? p[tT.id]!.point : null;
+	const cost = cT && trusted(p[cT.id]) ? p[cT.id]!.point : null;
+	if (!trusted(mem) && !trusted(r)) return { status: "abstain", risk: null, peak: null, capacity, time, cost };
 	return {
 		status: fitOf(record, p, knobs),
 		risk: trusted(r) ? r.point : null,
 		peak: trusted(mem) ? mem.point : null,
 		capacity,
+		time,
+		cost,
 	};
 }
 

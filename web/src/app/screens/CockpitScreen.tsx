@@ -17,7 +17,7 @@ import { ExportsSection } from "../../workspace/export/ExportsSection";
 import { CampaignCalendar } from "../../workspace/campaign/Calendar";
 import { planFromRecord } from "../../workspace/campaign/plan";
 import { currentKnobs } from "../../workspace/record/model";
-import { rateFactor } from "../../workspace/rate";
+import { estimateFactor } from "../../workspace/rate";
 import { Onboarding } from "../Onboarding";
 import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
 import { RlBand } from "../../workspace/cockpit/RlBand";
@@ -29,6 +29,8 @@ import { DetailSheet } from "../../workspace/cockpit/DetailSheet";
 import { Dials } from "../../workspace/cockpit/Dials";
 import { Dock } from "../../workspace/cockpit/Dock";
 import { Orbit, useOrbitLayout } from "../../workspace/map/Orbit";
+import { OrbitGlance } from "../../workspace/map/OrbitGlance";
+import { FindingsBand, FindingsChip } from "../../workspace/cockpit/Findings";
 import { GridProvider } from "../../workspace/provider/GridProvider";
 import { loadRecord } from "../../workspace/record/load";
 import { isFixture, targetFor } from "../../workspace/record/model";
@@ -103,7 +105,7 @@ function Cockpit() {
 	const line = statusLine(record, estimates, state.knobs);
 	// A record that carries a campaign (B's to_campaign) draws its calendar; behind its flag.
 	const campaign = useMemo(
-		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k) => rateFactor(record, { ...currentKnobs(record), ...k }, state.rate)) : null),
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k, e) => estimateFactor(record, { ...currentKnobs(record), ...k }, e, state.rate)) : null),
 		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
 		[record, state.rate],
 	);
@@ -148,6 +150,7 @@ function Cockpit() {
 							{line.text}
 						</p>
 						<CostLine />
+						<FindingsChip />
 						<ProbeHere />
 					</header>
 					<div className={`pf-deck${fit ? " is-fit" : ""}`}>
@@ -165,12 +168,13 @@ function Cockpit() {
 								) : null}
 								{fit ? null : mapKey}
 							</div>
-							{fit ? <FitMap /> : <Orbit />}
+							{/* Whichever view has the stage fills it: as wide and tall as the space between the dials and the side column allows. */}
+							<div className="pf-stage-fill">{fit ? <FitMap /> : <Orbit />}</div>
 						</div>
 						<div className="pf-side">
 							{fit ? (
 								<div className="glass pf-mini-orbit">
-									<Orbit compact />
+									<OrbitGlance />
 									<button type="button" className="pf-mini-orbit__back" aria-label={t("stage.back_to_map")} title={t("stage.back_to_map")} onClick={() => setView("map")} />
 								</div>
 							) : null}
@@ -183,6 +187,7 @@ function Cockpit() {
 				</section>
 				<section className="pf-below" aria-label={t("below.label")}>
 					<h2 className="pf-h2">{t("below.title")}</h2>
+					<FindingsBand />
 					<FlightPlanBand />
 					<MemoryBand />
 					<AddonBoundary id="rl-band">

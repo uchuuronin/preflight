@@ -1,7 +1,7 @@
 {
-	"schema_version": "0.5.0",
+	"schema_version": "0.6.0",
 	"record_id": "01JBGRPOL4SMOKE00000000000",
-	"created_at": "2026-11-01T06:36:52Z",
+	"created_at": "2026-11-01T12:25:00Z",
 	"job": {
 		"lens": "rl",
 		"source": {
@@ -976,6 +976,12 @@
 				"readout": "cost"
 			},
 			{
+				"id": "cost.gpu_hours",
+				"label_key": "target.cost.gpu_hours",
+				"unit": "gpu_hours",
+				"readout": "cost"
+			},
+			{
 				"id": "risk.oom",
 				"label_key": "target.risk.oom",
 				"unit": "probability",
@@ -1136,6 +1142,17 @@
 				"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
 				"level": 0.9
 			},
+			"cost.gpu_hours": {
+				"point": null,
+				"lo": null,
+				"hi": null,
+				"unit": "gpu_hours",
+				"status": "abstain",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+				"level": 0.9
+			},
 			"risk.oom": {
 				"point": 0.6403688524590164,
 				"lo": 0.05,
@@ -1149,8 +1166,8 @@
 			},
 			"time.step": {
 				"point": 46.08692382812501,
-				"lo": 41.70371581615365,
-				"hi": 50.930826375347166,
+				"lo": 39.388292249798255,
+				"hi": 53.933768861928435,
 				"unit": "s",
 				"status": "measured",
 				"model_id": "steptime-phases@0.2.0",
@@ -1303,8 +1320,8 @@
 			},
 			"time.rollout": {
 				"point": 43.94124312999148,
-				"lo": 39.759680979031835,
-				"hi": 48.56258401135793,
+				"lo": 37.44425741267644,
+				"hi": 51.565526497939196,
 				"unit": "s",
 				"status": "predicted",
 				"model_id": "rl-rollout-bootstrap@0.1.0",
@@ -1411,6 +1428,47 @@
 				"id": "g.cost.total.checkpoint_every",
 				"target_id": "cost.total",
 				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.checkpoint_every",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
 				"axes": [
 					{
 						"knob_id": "checkpoint_every",
@@ -1625,6 +1683,51 @@
 				}
 			},
 			{
+				"id": "g.cost.gpu_hours.gpu_type",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"abstain": "/wc=",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
 				"id": "g.risk.oom.gpu_type",
 				"target_id": "risk.oom",
 				"unit": "probability",
@@ -1753,6 +1856,46 @@
 				"id": "g.cost.total.log_every",
 				"target_id": "cost.total",
 				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "log_every",
+						"values": [
+							1,
+							2,
+							5,
+							10,
+							20,
+							40
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.log_every",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
 				"axes": [
 					{
 						"knob_id": "log_every",
@@ -1947,6 +2090,45 @@
 				}
 			},
 			{
+				"id": "g.cost.gpu_hours.epochs",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
 				"id": "g.risk.oom.epochs",
 				"target_id": "risk.oom",
 				"unit": "probability",
@@ -2065,6 +2247,44 @@
 				"id": "g.cost.total.batch_size",
 				"target_id": "cost.total",
 				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAA=",
+				"abstain": "Dw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.batch_size",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
 				"axes": [
 					{
 						"knob_id": "batch_size",
@@ -2246,6 +2466,42 @@
 				}
 			},
 			{
+				"id": "g.cost.gpu_hours.gradient_checkpointing",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAA==",
+				"lo": "AAAAAA==",
+				"hi": "AAAAAA==",
+				"abstain": "Aw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
 				"id": "g.risk.oom.gradient_checkpointing",
 				"target_id": "risk.oom",
 				"unit": "probability",
@@ -2367,6 +2623,47 @@
 				"id": "g.cost.total.lr",
 				"target_id": "cost.total",
 				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							1.25e-07,
+							2.5e-07,
+							5e-07,
+							1e-06,
+							2e-06,
+							4e-06,
+							8e-06
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.lr",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
 				"axes": [
 					{
 						"knob_id": "lr",
@@ -2566,6 +2863,46 @@
 				}
 			},
 			{
+				"id": "g.cost.gpu_hours.optimizer",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "optimizer",
+						"values": [
+							"adamw_torch",
+							"adamw_torch_fused",
+							"adamw_8bit",
+							"adafactor",
+							"sgd",
+							"lion_32bit"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
 				"id": "g.risk.oom.optimizer",
 				"target_id": "risk.oom",
 				"unit": "probability",
@@ -2691,6 +3028,47 @@
 				"id": "g.cost.total.group_size",
 				"target_id": "cost.total",
 				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "group_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32,
+							64
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.group_size",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
 				"axes": [
 					{
 						"knob_id": "group_size",
@@ -2893,6 +3271,47 @@
 				}
 			},
 			{
+				"id": "g.cost.gpu_hours.kl_beta",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "kl_beta",
+						"values": [
+							0.005,
+							0.01,
+							0.02,
+							0.04,
+							0.08,
+							0.16,
+							0.32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
 				"id": "g.risk.oom.kl_beta",
 				"target_id": "risk.oom",
 				"unit": "probability",
@@ -3019,6 +3438,47 @@
 				"id": "g.cost.total.max_completion_len",
 				"target_id": "cost.total",
 				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "max_completion_len",
+						"values": [
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.max_completion_len",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
 				"axes": [
 					{
 						"knob_id": "max_completion_len",
@@ -3221,6 +3681,47 @@
 				}
 			},
 			{
+				"id": "g.cost.gpu_hours.max_prompt_len",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "max_prompt_len",
+						"values": [
+							32,
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
 				"id": "g.risk.oom.max_prompt_len",
 				"target_id": "risk.oom",
 				"unit": "probability",
@@ -3343,6 +3844,45 @@
 				"id": "g.cost.total.attn",
 				"target_id": "cost.total",
 				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "attn",
+						"values": [
+							"eager",
+							"sdpa",
+							"flash_attention_2",
+							"flash_attention_3",
+							"flex_attention"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.attn",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
 				"axes": [
 					{
 						"knob_id": "attn",
@@ -3538,6 +4078,46 @@
 				}
 			},
 			{
+				"id": "g.cost.gpu_hours.grad_accum",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "grad_accum",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa"
+				}
+			},
+			{
 				"id": "g.risk.oom.grad_accum",
 				"target_id": "risk.oom",
 				"unit": "probability",
@@ -3666,8 +4246,8 @@
 		}
 	},
 	"cost_basis": {
-		"price_table": "prices@2026-10-27",
-		"as_of": "2026-10-27",
+		"price_table": "prices@2026-11-01",
+		"as_of": "2026-11-01",
 		"provider": "modal",
 		"billing": "on_demand",
 		"currency": "USD",

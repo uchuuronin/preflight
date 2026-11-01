@@ -1,19 +1,30 @@
 /**
  * The fit map, on the stage when the visitor switches from Map to Fit: two knobs against each
- * other, every combination marked fits, tight, fails or not trusted (shape and word, never
- * colour alone), with the out-of-memory boundary drawn between squares from interpolated memory
- * (record/fitmap.ts). It follows every knob move; pressing a square flies there. Labels and
- * numbers only: the explanation sits behind the "i". Behind the c.fit_map flag.
+ * other, everything else as on the dials. Each square is that setting: its fill is the predicted
+ * peak memory as a share of the GPU's, its colour and mark the chance of running out of memory
+ * (fits, tight, fails, or hatched where the prediction isn't trusted; shape and word, never colour
+ * alone), and the edges between squares are placed from memory interpolated between them
+ * (record/fitmap.ts).
+ *
+ * It's a place to move the run, not a table to read: the run's own square is a puck that glides
+ * when any knob moves and can be dragged across the map; pointing at a square previews its
+ * memory, time and cost in the readout before anything changes; pressing it flies there; the GPU
+ * can be switched on the map itself so the edges move under the visitor's eye. Arrow keys move
+ * between squares. Behind the c.fit_map flag.
  */
-import { useDeferredValue, useId, useMemo, useState } from "react";
+import { type CSSProperties, useDeferredValue, useId, useMemo, useRef, useState } from "react";
 import { valueText } from "../../guide/GuidePanel";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { Info } from "../components/Info";
 import { FitMark } from "../components/StatusMark";
 import { type CellStatus, defaultAxes, type FitCell, type FitMapData, fitMap, fitMapKnobs } from "../record/fitmap";
-import { chosenGpu, FAILS_AT, FITS_BELOW } from "../record/terms";
+import { knobChoices, targetFor } from "../record/model";
+import { chosenGpu, FAILS_AT, FITS_BELOW, GPU_KNOBS } from "../record/terms";
 import { useWorkspace } from "../state";
+
+/** Grid gap between squares, px, set inline on the frame (it overrides the stylesheet's); the puck steps by a square plus this. */
+const GAP_PX = 4;
 
 function statusWord(s: CellStatus): string {
 	return s === "abstain" ? t("provenance.abstain") : t(`fit.${s}`);
@@ -31,6 +42,11 @@ function cellLabel(data: FitMapData, c: FitCell): string {
 	if (c.risk !== null) parts.push(t("fitmap.risk", { risk: fmt(c.risk, "probability") }));
 	if (c.here) parts.push(t("fitmap.here"));
 	return parts.join(". ");
+}
+
+/** Peak as a share of the GPU's memory: the square's fill. Over 1 is drawn full, with an over mark. */
+function share(c: FitCell): number | null {
+	return c.peak !== null && c.capacity ? c.peak / c.capacity : null;
 }
 
 /** The boundary as an SVG path in cell units: a vertical stroke per row, joined at row edges. */
@@ -52,8 +68,17 @@ function boundaryPath(cross: Array<number | null>, rowsTopDown: number[]): strin
 	return d;
 }
 
+/** Where a square sits for the puck: column and row from the top, as CSS custom properties. */
+function puckStyle(xi: number, r: number, cols: number, rows: number): CSSProperties {
+	return {
+		width: `calc((100% - ${(cols - 1) * GAP_PX}px) / ${cols})`,
+		height: `calc((100% - ${(rows - 1) * GAP_PX}px) / ${rows})`,
+		transform: `translate(calc(${xi} * (100% + ${GAP_PX}px)), calc(${r} * (100% + ${GAP_PX}px)))`,
+	};
+}
+
 export function FitMap() {
-	const { record, provider, state, actions } = useWorkspace();
+	const { record, provider, state, estimates, actions } = useWorkspace();
 	// Off the critical path: the map catches up after the dials have answered a knob change.
 	const knobs = useDeferredValue(state.knobs);
 	const id = useId();
@@ -61,6 +86,23 @@ export function FitMap() {
 	const initial = useMemo(() => defaultAxes(record, provider, knobs), [record, provider]); // eslint-disable-line react-hooks/exhaustive-deps
 	const [axes, setAxes] = useState<[string, string] | null>(initial);
 	const data = useMemo(() => (axes ? fitMap(record, provider, knobs, axes[0], axes[1]) : null), [record, provider, knobs, axes]);
+	// The square being pointed at or focused: previewed in the readout, nothing changes yet.
+	// Pointer and keyboard keep their own preview, so leaving the map with the mouse doesn't clear
+	// the square the keyboard is on; the pointer's wins while it's over a square.
+	const [hover, setHover] = useState<{ xi: number; ri: number } | null>(null);
+	const [focused, setFocused] = useState<{ xi: number; ri: number } | null>(null);
+	const readoutId = useId();
+	// A preview is of a square on this grid: new axes (or a new grid size) drop it.
+	const shape = data ? `${axes?.join("|")}:${data.xs.length}x${data.ys.length}` : "";
+	const [lastShape, setLastShape] = useState(shape);
+	if (shape !== lastShape) {
+		setLastShape(shape);
+		setHover(null);
+		setFocused(null);
+	}
+	const peek = hover ?? focused;
+	const drag = useRef<{ pointer: number; last: string } | null>(null);
+	const frame = useRef<HTMLDivElement>(null);
 
 	if (!axes || !data || options.length < 2) {
 		return (
@@ -70,20 +112,51 @@ export function FitMap() {
 		);
 	}
 	const gpu = chosenGpu(record, knobs);
+	const gpuKnob = record.knobs.find((k) => (GPU_KNOBS as readonly string[]).includes(k.id));
+	const gpuChoices = gpuKnob ? knobChoices(record, gpuKnob).filter((v): v is string => typeof v === "string") : [];
 	const cap = data.rows[0]?.[0]?.capacity ?? null;
 	const rowsTopDown = data.ys.map((_, i) => data.ys.length - 1 - i);
 	const cols = data.xs.length;
 	const rows = data.ys.length;
+	let here: { xi: number; r: number } | null = null;
+	rowsTopDown.forEach((ri, r) => data.rows[ri]!.forEach((c, xi) => (c.here ? (here = { xi, r }) : null)));
+	const hereAt = here as { xi: number; r: number } | null;
+
 	const pick = (which: 0 | 1, value: string) => {
 		const other = axes[which === 0 ? 1 : 0];
 		setAxes(which === 0 ? [value, value === other ? axes[0] : other] : [value === other ? axes[1] : other, value]);
 	};
+	/**
+	 * Both axes, the one that changes the verdict last: the guide's "you crossed into fails" offer
+	 * undoes the last knob moved, so that should be the cause. Only knobs that change are set.
+	 */
+	const fly = (c: FitCell) => {
+		const now = hereAt ? data.rows[rowsTopDown[hereAt.r]!]?.[hereAt.xi] : undefined;
+		const xi = data.xs.indexOf(c.x);
+		const ri = data.ys.indexOf(c.y);
+		const moves: Array<[string, typeof c.x]> = [];
+		if (!now || now.x !== c.x) moves.push([data.x.id, c.x]);
+		if (!now || now.y !== c.y) moves.push([data.y.id, c.y]);
+		if (moves.length === 2 && now) {
+			// Moving across alone already reaches the new verdict and moving up alone doesn't: across is the cause.
+			const acrossOnly = data.rows[data.ys.indexOf(now.y)]?.[xi]?.status;
+			const upOnly = data.rows[ri]?.[data.xs.indexOf(now.x)]?.status;
+			if (acrossOnly === c.status && upOnly !== c.status) moves.reverse();
+		}
+		for (const [k, v] of moves) actions.setKnob(k, v, "user");
+	};
+	const cellAt = (clientX: number, clientY: number): { xi: number; ri: number } | null => {
+		const el = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>("[data-xi]");
+		if (!el || !frame.current?.contains(el)) return null;
+		return { xi: Number(el.dataset.xi), ri: Number(el.dataset.ri) };
+	};
+	const focusCell = (xi: number, r: number) => {
+		const ri = rowsTopDown[r];
+		if (ri === undefined || xi < 0 || xi >= cols) return;
+		frame.current?.querySelector<HTMLButtonElement>(`[data-xi="${xi}"][data-ri="${ri}"]`)?.focus();
+	};
 	const axisSelect = (which: 0 | 1) => (
-		<select
-			aria-label={which === 0 ? t("fitmap.across") : t("fitmap.up")}
-			value={axes[which]}
-			onChange={(e) => pick(which, e.currentTarget.value)}
-		>
+		<select aria-label={which === 0 ? t("fitmap.across") : t("fitmap.up")} value={axes[which]} onChange={(e) => pick(which, e.currentTarget.value)}>
 			{options.map((k) => (
 				<option key={k.id} value={k.id}>
 					{t(k.label_key)}
@@ -91,6 +164,19 @@ export function FitMap() {
 			))}
 		</select>
 	);
+
+	// The readout: the square pointed at, else the run's own setting.
+	const shown = peek ? data.rows[peek.ri]?.[peek.xi] : hereAt ? data.rows[rowsTopDown[hereAt.r]!]?.[hereAt.xi] : undefined;
+	const tT = targetFor(record, "time");
+	const cT = targetFor(record, "cost");
+	const nowTime = tT ? estimates[tT.id] : undefined;
+	const nowCost = cT ? estimates[cT.id] : undefined;
+	const delta = (v: number | null, now: typeof nowTime, unit: string) => {
+		if (v === null || !shown || shown.here || !now || now.point === null) return null;
+		const d = v - now.point;
+		if (Math.abs(d) < Math.abs(now.point) * 0.005) return null;
+		return `${d > 0 ? "+" : "−"}${fmt(Math.abs(d), unit)}`;
+	};
 
 	return (
 		<div className="pf-fit" aria-labelledby={`${id}-t`}>
@@ -106,36 +192,140 @@ export function FitMap() {
 					<span aria-hidden="true">↕</span>
 					{axisSelect(1)}
 				</span>
-				{gpu && cap ? <span className="pf-tag">{t("fitmap.on_gpu", { gpu, cap: fmt(cap, "bytes") })}</span> : null}
+				{gpuKnob && gpuChoices.length > 1 && gpu ? (
+					<label className="pf-fit__gpu">
+						<span aria-hidden="true">{t("fitmap.gpu")}</span>
+						<select aria-label={t("fitmap.gpu_label")} value={gpu} onChange={(e) => actions.setKnob(gpuKnob.id, e.currentTarget.value, "user")}>
+							{gpuChoices.map((g) => (
+								<option key={g} value={g}>
+									{g}
+								</option>
+							))}
+						</select>
+						{cap ? <span className="pf-fit__cap">{fmt(cap, "bytes")}</span> : null}
+					</label>
+				) : gpu && cap ? (
+					<span className="pf-tag pf-fit__gpu">{t("fitmap.on_gpu", { gpu, cap: fmt(cap, "bytes") })}</span>
+				) : null}
 				<Info label={t("fitmap.title")} align="end">
 					{t("fitmap.help", { fits: fmt(FITS_BELOW, "probability"), fails: fmt(FAILS_AT, "probability") })}
 				</Info>
 			</div>
+			<p id={readoutId} className={`pf-fit__readout${peek ? " is-peek" : ""}`}>
+				{shown ? (
+					<>
+						<span className="pf-fit__where">
+							{peek && !shown.here ? null : <span className="pf-fit__herechip">{t("fitmap.here_short")}</span>}
+							{t(data.x.label_key)} <b>{valueText(data.x, shown.x)}</b>, {t(data.y.label_key)} <b>{valueText(data.y, shown.y)}</b>
+						</span>
+						{shown.status === "abstain" ? (
+							<span className="pf-dim">{t("provenance.abstain")}</span>
+						) : (
+							<>
+								<FitMark fit={shown.status} />
+								{shown.peak !== null && shown.capacity ? (
+									<span>{t("fitmap.readout.peak", { peak: fmt(shown.peak, "bytes"), share: fmt(share(shown)!, "fraction") })}</span>
+								) : null}
+							</>
+						)}
+						{shown.time !== null ? (
+							<span>
+								{fmt(shown.time, tT?.unit ?? "s")}
+								{delta(shown.time, nowTime, tT?.unit ?? "s") ? <small> {delta(shown.time, nowTime, tT?.unit ?? "s")}</small> : null}
+							</span>
+						) : null}
+						{shown.cost !== null ? (
+							<span>
+								{fmt(shown.cost, "usd")}
+								{delta(shown.cost, nowCost, "usd") ? <small> {delta(shown.cost, nowCost, "usd")}</small> : null}
+							</span>
+						) : null}
+						<span className="pf-fit__hint">{peek && !shown.here ? t("fitmap.hint.fly") : t("fitmap.hint.drag")}</span>
+					</>
+				) : (
+					<span className="pf-dim">{t("fitmap.hint.point")}</span>
+				)}
+			</p>
 			<div className="pf-fit__body">
-				<div className="pf-fitmap__frame" style={{ gridTemplateColumns: `auto repeat(${cols}, minmax(0, 1fr))` }}>
+				<div
+					ref={frame}
+					className="pf-fitmap__frame"
+					style={{ gridTemplateColumns: `auto repeat(${cols}, minmax(0, 1fr))`, gap: GAP_PX, "--rows": rows } as CSSProperties}
+					onPointerLeave={() => (drag.current ? null : setHover(null))}
+					onPointerMove={(e) => {
+						const at = cellAt(e.clientX, e.clientY);
+						if (!drag.current) {
+							if (!at) setHover(null);
+							else if (at.xi !== hover?.xi || at.ri !== hover?.ri) setHover(at);
+							return;
+						}
+						// Only the pointer that picked the run up moves it (a second finger or a hovering pen doesn't).
+						if (e.pointerId !== drag.current.pointer || !at) return;
+						const key = `${at.xi}:${at.ri}`;
+						if (key === drag.current.last) return;
+						drag.current.last = key;
+						const c = data.rows[at.ri]?.[at.xi];
+						if (c) fly(c);
+						setHover(null);
+					}}
+					onPointerUp={(e) => {
+						if (drag.current?.pointer === e.pointerId) drag.current = null;
+					}}
+					onPointerCancel={() => {
+						drag.current = null;
+					}}
+					onKeyDown={(e) => {
+						const el = (e.target as HTMLElement).closest<HTMLElement>("[data-xi]");
+						if (!el) return;
+						const xi = Number(el.dataset.xi);
+						const r = rowsTopDown.indexOf(Number(el.dataset.ri));
+						const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+						if (!step) return;
+						e.preventDefault();
+						focusCell(xi + step[0]!, r + step[1]!);
+					}}
+				>
 					{rowsTopDown.map((ri, r) => {
 						const row = data.rows[ri]!;
 						return [
 							<span key={`y${ri}`} className="pf-fitmap__tick pf-fitmap__tick--y" style={{ gridRow: r + 1, gridColumn: 1 }}>
 								{valueText(data.y, data.ys[ri])}
 							</span>,
-							...row.map((c, xi) => (
-								<button
-									key={`${ri}-${xi}`}
-									type="button"
-									className={`pf-fitcell pf-fitcell--${c.status}${c.here ? " is-here" : ""}`}
-									style={{ gridRow: r + 1, gridColumn: xi + 2 }}
-									aria-label={cellLabel(data, c)}
-									aria-pressed={c.here}
-									title={cellLabel(data, c)}
-									onClick={() => {
-										actions.setKnob(data.x.id, c.x, "user");
-										actions.setKnob(data.y.id, c.y, "user");
-									}}
-								>
-									{c.status === "abstain" ? null : <FitMark fit={c.status} label="" />}
-								</button>
-							)),
+							...row.map((c, xi) => {
+								const f = share(c);
+								return (
+									<button
+										key={`${ri}-${xi}`}
+										type="button"
+										data-xi={xi}
+										data-ri={ri}
+										className={`pf-fitcell pf-fitcell--${c.status}${c.here ? " is-here" : ""}${f !== null && f > 1 ? " is-over" : ""}`}
+										style={{ gridRow: r + 1, gridColumn: xi + 2, "--fill": f === null ? 0 : Math.min(1, f) } as CSSProperties}
+										aria-label={cellLabel(data, c)}
+										aria-pressed={c.here}
+										aria-describedby={readoutId}
+										onFocus={() => setFocused({ xi, ri })}
+										onBlur={() => setFocused(null)}
+										onPointerDown={(e) => {
+											if (e.button !== 0) return;
+											// The run's own square is the puck: dragging from it moves the run across the map.
+											if (c.here && !drag.current) {
+												drag.current = { pointer: e.pointerId, last: `${xi}:${ri}` };
+												frame.current?.setPointerCapture?.(e.pointerId);
+											}
+										}}
+										onClick={() => (c.here ? null : fly(c))}
+									>
+										<span className="pf-fitcell__fill" aria-hidden="true" />
+										{c.status === "abstain" ? null : <FitMark fit={c.status} label="" />}
+										{f !== null ? (
+											<span className="pf-fitcell__pct" aria-hidden="true">
+												{fmt(f, "fraction")}
+											</span>
+										) : null}
+									</button>
+								);
+							}),
 						];
 					})}
 					{data.xs.map((x, xi) => (
@@ -143,16 +333,16 @@ export function FitMap() {
 							{valueText(data.x, x)}
 						</span>
 					))}
-					<svg
-						className="pf-fitmap__lines"
-						style={{ gridColumn: `2 / span ${cols}`, gridRow: `1 / span ${rows}` }}
-						viewBox={`0 0 ${cols} ${rows}`}
-						preserveAspectRatio="none"
-						aria-hidden="true"
-					>
-						<path className="pf-fitmap__line pf-fitmap__line--fits" d={boundaryPath(data.frontier.fits, rowsTopDown)} vectorEffect="non-scaling-stroke" />
-						<path className="pf-fitmap__line pf-fitmap__line--fails" d={boundaryPath(data.frontier.fails, rowsTopDown)} vectorEffect="non-scaling-stroke" />
-					</svg>
+					<div className="pf-fitmap__overlay" style={{ gridColumn: `2 / span ${cols}`, gridRow: `1 / span ${rows}` }} aria-hidden="true">
+						<svg className="pf-fitmap__lines" viewBox={`0 0 ${cols} ${rows}`} preserveAspectRatio="none">
+							<path className="pf-fitmap__line pf-fitmap__line--fits" d={boundaryPath(data.frontier.fits, rowsTopDown) || "M0 0"} vectorEffect="non-scaling-stroke" />
+							<path className="pf-fitmap__line pf-fitmap__line--fails" d={boundaryPath(data.frontier.fails, rowsTopDown) || "M0 0"} vectorEffect="non-scaling-stroke" />
+						</svg>
+						{peek && !(hereAt && rowsTopDown[hereAt.r] === peek.ri && hereAt.xi === peek.xi) ? (
+							<span className="pf-fitmap__ghost" style={puckStyle(peek.xi, rowsTopDown.indexOf(peek.ri), cols, rows)} />
+						) : null}
+						{hereAt ? <span className="pf-fitmap__puck" style={puckStyle(hereAt.xi, hereAt.r, cols, rows)} /> : null}
+					</div>
 				</div>
 			</div>
 			<ul className="pf-fit__key" aria-label={t("fitmap.key")}>
@@ -168,6 +358,10 @@ export function FitMap() {
 				<li>
 					<i className="pf-fitcell pf-fitcell--abstain pf-fitmap__swatch" />
 					{t("provenance.abstain")}
+				</li>
+				<li>
+					<i className="pf-fitmap__key pf-fitmap__key--fill" />
+					{t("fitmap.key.fill")}
 				</li>
 				<li>
 					<i className="pf-fitmap__key pf-fitmap__key--fits" />

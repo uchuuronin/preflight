@@ -41,6 +41,10 @@ export interface CampaignPlan {
 	grid_gpu_hours: Estimate | null;
 	grid_usd: Estimate | null;
 	card: { id: string; notes?: string | null };
+	/** When the campaign clock starts (contract 0.6.0), as an ISO date-time; null when the record doesn't say. */
+	start?: string | null;
+	/** Slots per lane (0.6.0), so a lane with a free slot still draws its row. */
+	lane_slots?: Record<string, number> | null;
 }
 
 /** B writes GPU-hours as "gpu_hours"; fmt() calls the unit "gpu_h". */
@@ -81,7 +85,7 @@ export function hasSchedule(plan: CampaignPlan): boolean {
  * its slot (B's CellPlan.slot; 0.6.0 as requested) goes on that slot's row; one without (records
  * B writes today) goes on the first row where it doesn't overlap a run already there.
  */
-export function slotsOf(cells: PlanCell[]): PlanCell[][] {
+export function slotsOf(cells: PlanCell[], minRows = 1): PlanCell[][] {
 	const hasSlot = (c: PlanCell) => typeof c.slot === "number" && Number.isInteger(c.slot) && c.slot >= 0;
 	const rows = new Map<number, PlanCell[]>();
 	for (const c of cells.filter(hasSlot)) rows.set(c.slot as number, [...(rows.get(c.slot as number) ?? []), c]);
@@ -93,22 +97,9 @@ export function slotsOf(cells: PlanCell[]): PlanCell[][] {
 		if (row) row.push(c);
 		else ordered.push([c]);
 	}
-	return ordered.length ? ordered : [[]];
-}
-
-/**
- * Contract 0.6.0 as C requested it (docs/requests/from-c.md, Nov 1): optional fields a record may
- * carry once B's to_campaign() fills them. Read only when present; 0.5.0 records draw without them.
- */
-interface Campaign06 {
-	p_by_deadline?: number | null;
-	checkpoint_interval?: Estimate | null;
-}
-interface Cell06 {
-	slot?: number | null;
-	reason?: string | null;
-	gpu_hours_estimate?: Estimate | null;
-	usd_estimate?: Estimate | null;
+	// A lane's free slots still get a row (0.6.0 lane_slots): an idle GPU is part of the plan.
+	while (ordered.length < Math.max(1, minRows)) ordered.push([]);
+	return ordered;
 }
 
 function abstain(why: string, unit: string, modelId: string): Estimate {
@@ -121,44 +112,46 @@ function abstain(why: string, unit: string, modelId: string): Estimate {
  * record's reason or a plain one), a total the record lacks says so, and per-run costs appear only
  * as the intervals 0.6.0 adds (a bare point would read as exact).
  */
-export function planFromRecord(c: Campaign, models: readonly ModelCard[] = [], price: (knobs: Record<string, string | number | boolean>) => number = () => 1): CampaignPlan | null {
+export function planFromRecord(
+	c: Campaign,
+	models: readonly ModelCard[] = [],
+	price: (knobs: Record<string, string | number | boolean>, e: Estimate | null | undefined) => number = () => 1,
+): CampaignPlan | null {
 	const cells = c.cells ?? [];
 	if (!cells.length) return null;
-	const ext = c as Campaign & Campaign06;
 	const modelId = c.finish_s?.model_id ?? cells.find((x) => x.time)?.time?.model_id ?? "campaign";
 	const card = models.find((m) => m.id === modelId);
 	const missing = (unit: string) => abstain("not in this record", unit, modelId);
 	// The visitor's rate, where they set one (workspace/rate.ts): each run's dollars at its own setting,
-	// the totals at the record's (a grid over batch and length keeps the GPU, so one rate).
-	const usdAt = (e: Estimate | null | undefined, f: number): Estimate | null => {
-		if (!e || f === 1 || e.unit !== "usd") return e ?? null;
+	// the totals at the record's. `price` reads each estimate's own rate (0.6.0 Estimate.rate) when it has one.
+	const usdAt = (e: Estimate | null | undefined, knobs: Record<string, string | number | boolean>): Estimate | null => {
+		if (!e || e.unit !== "usd") return e ?? null;
+		const f = price(knobs, e);
+		if (f === 1) return e;
 		const m = (v: number | null | undefined) => (typeof v === "number" ? v * f : (v ?? null));
 		return { ...e, point: m(e.point), lo: m(e.lo), hi: m(e.hi) } as Estimate;
 	};
-	const fAll = price({});
+	const knobsOf = (x: CampaignCell) => Object.fromEntries(Object.entries(x.knobs).filter((kv): kv is [string, string | number | boolean] => kv[1] !== undefined));
 	return {
-		cells: cells.map((x: CampaignCell) => {
-			const e = x as CampaignCell & Cell06;
-			return {
-				id: x.id,
-				knobs: Object.fromEntries(Object.entries(x.knobs).filter((kv): kv is [string, string | number | boolean] => kv[1] !== undefined)),
-				time: (x.time as Estimate | null | undefined) ?? abstain("no run time in this record", "s", modelId),
-				gpu_hours: e.gpu_hours_estimate ?? null,
-				usd: usdAt(e.usd_estimate, price(Object.fromEntries(Object.entries(x.knobs).filter((kv): kv is [string, string | number | boolean] => kv[1] !== undefined)))),
-				segments: x.segments ?? null,
-				lane: x.lane ?? null,
-				cut: x.cut ?? false,
-				reason: typeof e.reason === "string" ? e.reason : "",
-				start_s: (x.start_s as Estimate | null | undefined) ?? null,
-				slot: typeof e.slot === "number" ? e.slot : null,
-			};
-		}),
+		cells: cells.map((x: CampaignCell) => ({
+			id: x.id,
+			knobs: knobsOf(x),
+			time: (x.time as Estimate | null | undefined) ?? abstain("no run time in this record", "s", modelId),
+			gpu_hours: (x.gpu_hours_estimate as Estimate | null | undefined) ?? null,
+			usd: usdAt(x.usd_estimate as Estimate | null | undefined, knobsOf(x)),
+			segments: x.segments ?? null,
+			lane: x.lane ?? null,
+			cut: x.cut ?? false,
+			reason: typeof x.reason === "string" ? x.reason : "",
+			start_s: (x.start_s as Estimate | null | undefined) ?? null,
+			slot: typeof x.slot === "number" ? x.slot : null,
+		})),
 		gpu_hours: (c.gpu_hours as Estimate | null | undefined) ?? missing("gpu_hours"),
-		usd: usdAt(c.usd as Estimate | null | undefined, fAll) ?? missing("usd"),
+		usd: usdAt(c.usd as Estimate | null | undefined, {}) ?? missing("usd"),
 		finish_s: (c.finish_s as Estimate | null | undefined) ?? missing("s"),
 		completion: Object.fromEntries(Object.entries(c.completion_quantiles ?? {}).filter((kv): kv is [string, string] => typeof kv[1] === "string")),
-		p_by_deadline: ext.p_by_deadline ?? null,
-		checkpoint_interval: ext.checkpoint_interval ?? missing("s"),
+		p_by_deadline: c.p_by_deadline ?? null,
+		checkpoint_interval: (c.checkpoint_interval as Estimate | null | undefined) ?? missing("s"),
 		quota: c.quota
 			? { needed_bytes: (c.quota.needed_bytes as Estimate | undefined) ?? missing("bytes"), quota_bytes: c.quota.quota_bytes ?? null, fits: c.quota.fits ?? null, reason: c.quota.reason ?? "" }
 			: { needed_bytes: missing("bytes"), quota_bytes: null, fits: null, reason: "" },
@@ -169,15 +162,16 @@ export function planFromRecord(c: Campaign, models: readonly ModelCard[] = [], p
 		cut_list: c.cut_list ?? [],
 		notes: c.notes ?? [],
 		grid_gpu_hours: (c.grid_gpu_hours as Estimate | null | undefined) ?? null,
-		grid_usd: usdAt(c.grid_usd as Estimate | null | undefined, fAll),
+		grid_usd: usdAt(c.grid_usd as Estimate | null | undefined, {}),
 		card: { id: modelId, notes: card?.notes ?? null },
+		start: typeof c.start === "string" ? c.start : null,
+		lane_slots: c.lane_slots ? Object.fromEntries(Object.entries(c.lane_slots).filter((kv): kv is [string, number] => typeof kv[1] === "number")) : null,
 	};
 }
 
 /**
  * When the last run ends, on the calendar's own axis (seconds after the campaign starts): B's p10,
- * p50 and p90 dates less the start. The start is derived, not stored (0.6.0 asks for it): B dates
- * p50 as the start plus `finish_s.point`, so the start is p50 less that. Null unless all of it holds.
+ * p50 and p90 dates less the start (the record's own from 0.6.0, else derived). Null unless all of it holds.
  */
 export function finishBand(plan: CampaignPlan): { p10: number; p50: number; p90: number } | null {
 	const f = plan.finish_s;
@@ -185,6 +179,8 @@ export function finishBand(plan: CampaignPlan): { p10: number; p50: number; p90:
 	const d = (k: string) => Date.parse(plan.completion[k] ?? "");
 	const [p10, p50, p90] = [d("p10"), d("p50"), d("p90")];
 	if (![p10, p50, p90].every(Number.isFinite) || !(p10 <= p50 && p50 <= p90)) return null;
-	const start = p50 - f.point * 1000;
-	return { p10: (p10 - start) / 1000, p50: f.point, p90: (p90 - start) / 1000 };
+	// 0.6.0 records carry the start; older ones give it as p50 less finish_s.point (B dates p50 that way).
+	const stated = plan.start ? Date.parse(plan.start) : Number.NaN;
+	const start = Number.isFinite(stated) ? stated : p50 - f.point * 1000;
+	return { p10: (p10 - start) / 1000, p50: (p50 - start) / 1000, p90: (p90 - start) / 1000 };
 }

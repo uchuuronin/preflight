@@ -12,8 +12,15 @@ export function currentKnobs(record: LoadedRecord): Record<string, KnobValue> {
 	return out;
 }
 
+/**
+ * The target a readout shows. A readout can have more than one target (B gives `cost.gpu_hours`
+ * the cost readout beside `cost.total`, Nov 1), so the one in dollars wins for cost, and otherwise
+ * the record's first: the dials, limits and rate all mean the run's dollars by "cost".
+ */
 export function targetFor(record: LoadedRecord, readout: Readout): Target | undefined {
-	return record.predictions.targets.find((t) => t.readout === readout);
+	const all = record.predictions.targets.filter((t) => t.readout === readout);
+	if (readout === "cost") return all.find((t) => t.unit === "usd") ?? all[0];
+	return all[0];
 }
 
 export function target(record: LoadedRecord, id: string): Target | undefined {
@@ -147,6 +154,10 @@ export function capacityBytes(record: LoadedRecord, knobs: Readonly<Record<strin
 
 /** True when every prediction comes from a fixture model, so the UI says "illustrative". */
 export function isFixture(record: LoadedRecord): boolean {
+	// A's golden records (scripts/make_golden.py, and the campaign sample built on them) are hand-made
+	// runs whatever fills their predictions: with B's engine (PREFLIGHT_GOLDEN_ENGINE=1) the model ids
+	// are real, but the probes under them are still illustrative. Their ids say so.
+	if (/^01JBGOLDEN/.test(record.record_id ?? "")) return true;
 	const ids = new Set<string>();
 	for (const g of record.predictions.grids) ids.add(g.model_id);
 	for (const e of Object.values(record.predictions.estimates ?? {})) if (e) ids.add(e.model_id);

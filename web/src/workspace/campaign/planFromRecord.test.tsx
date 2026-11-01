@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Campaign } from "../../../../schema/ts/contract";
 import { CampaignCalendar } from "./Calendar";
 import datedRaw from "./fixtures/pretrain-dated.plan.json";
-import { type CampaignPlan, hasSchedule, lanesOf, planFromRecord, slotsOf } from "./plan";
+import { type CampaignPlan, finishBand, hasSchedule, lanesOf, planFromRecord, slotsOf } from "./plan";
 
 const dated = datedRaw as unknown as CampaignPlan;
 
@@ -122,5 +122,40 @@ describe("a shared record's campaign draws the same calendar as the live plan", 
 		const { container } = render(<CampaignCalendar plan={two} />);
 		const firstLane = container.querySelector(".pf-cal__lane");
 		expect(firstLane?.querySelectorAll(".pf-cal__track")).toHaveLength(2);
+	});
+
+	it("reads 0.6.0's start and slots per lane: the finish is measured from the stated start, and a free slot keeps its row", () => {
+		const rec = asRecord05(dated);
+		// Half an hour before B's derived start (p50 less finish_s): the band moves out by that much.
+		const derived = Date.parse(dated.completion.p50!) - dated.finish_s.point! * 1000;
+		rec.start = new Date(derived - 1800_000).toISOString();
+		rec.lane_slots = { [dated.lanes[0]!]: 3 };
+		// One run after another (no two at once), so only lane_slots can give the lane three rows.
+		const est = (point: number) => ({ point, lo: point, hi: point, unit: "s", status: "predicted", model_id: "m", source: "exact" }) as never;
+		rec.cells = rec.cells!.map((c, i) => ({ ...c, start_s: est(i * 1e5) })) as never;
+		const p = planFromRecord(rec)!;
+		expect(p.start).toBe(rec.start);
+		expect(p.lane_slots).toEqual({ [dated.lanes[0]!]: 3 });
+		const band = finishBand(p)!;
+		expect(band.p50).toBeCloseTo(dated.finish_s.point! + 1800, 3);
+		// Without a stated start, p50 sits exactly at finish_s.point, as before.
+		expect(finishBand(planFromRecord(asRecord05(dated))!)!.p50).toBeCloseTo(dated.finish_s.point!, 3);
+		// Three slots on the first lane: three rows, even where fewer runs share a time.
+		const { container } = render(<CampaignCalendar plan={p} />);
+		expect(container.querySelector(".pf-cal__lane")?.querySelectorAll(".pf-cal__track")).toHaveLength(3);
+	});
+
+	it("re-prices each run's dollars with the rate its estimate names (0.6.0 Estimate.rate)", () => {
+		const rec = asRecord05(dated);
+		rec.cells = rec.cells!.map((c, i) => ({ ...c, usd_estimate: dated.cells[i]!.usd })) as never;
+		const seen: unknown[] = [];
+		const p = planFromRecord(rec, [], (_k, e) => {
+			seen.push(e);
+			return 0.5;
+		})!;
+		// The pricing function is handed each estimate, so it can read the estimate's own rate.
+		expect(seen).toContain(dated.cells[0]!.usd);
+		expect(p.cells[0]!.usd!.point).toBeCloseTo(dated.cells[0]!.usd!.point! / 2, 9);
+		expect(p.cells[0]!.usd!.hi).toBeCloseTo(dated.cells[0]!.usd!.hi! / 2, 9);
 	});
 });

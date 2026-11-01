@@ -60,8 +60,14 @@ export function CostLine() {
 	let rateText: string;
 	const num = (v: number, unit: "gpu_h" | "tokens") => fmt(v, unit).replace(unit === "gpu_h" ? / GPU-hours$/ : / tokens$/, "");
 	if (tr.kind === "gpu") {
+		// B's own GPU-hours target when the record has it (cost.total is exactly it times the table's
+		// rate); otherwise the same number, as the engine's dollars over that rate.
+		const ghT = target(record, "cost.gpu_hours");
+		const gh = ghT ? tableEstimates[ghT.id] : undefined;
 		const h = (v: number | null) => (v ?? tableCost.point ?? 0) / tr.usdPerHour;
-		const [lo, hi] = [num(h(tableCost.lo), "gpu_h"), num(h(tableCost.hi), "gpu_h")];
+		const [lo, hi] = trusted(gh)
+			? [num(gh.lo ?? gh.point, "gpu_h"), num(gh.hi ?? gh.point, "gpu_h")]
+			: [num(h(tableCost.lo), "gpu_h"), num(h(tableCost.hi), "gpu_h")];
 		quantity = lo === hi ? t("cost.line.gpu_hours_one", { n: lo }) : t("cost.line.gpu_hours", { lo, hi });
 		const r = mine && o?.kind === "gpu" ? o.usdPerHour : tr.usdPerHour;
 		rateText = t("cost.line.per_hour", { rate: fmt(r, "usd_small") });
