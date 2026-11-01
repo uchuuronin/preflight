@@ -1,0 +1,22 @@
+{
+  "exit": 0,
+  "stderr": "",
+  "vllm": "0.6.4.post1",
+  "torch": "2.5.1+cu124",
+  "numpy": "1.26.4",
+  "recorder": "/opt/preflight/preflight/recorder/runtime.py",
+  "probe_user": {
+    "exit": 0,
+    "probe_uid": 61000,
+    "uid": 61000,
+    "gid": 61000,
+    "user": "preflight-probe",
+    "passwd": "preflight-probe",
+    "group": "preflight-probe",
+    "imported": [
+      "torch._dynamo",
+      "vllm"
+    ]
+  },
+  "ok": true
+}
