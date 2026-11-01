@@ -444,3 +444,19 @@ def test_a_serving_probe_keeps_the_first_prompts_whole_and_the_rest_of_the_call_
 	assert kw["prompt_token_ids"] == ids
 	args, kw = _sample_prompts((list("abcd"),), {"lora_request": [1, 2, 3, 4], "priority": [0, 0, 1, 1]}, 2)
 	assert args == (["a", "b"],) and kw == {"lora_request": [1, 2], "priority": [0, 0]}
+
+
+def test_grpo_entropy_is_the_policys_mean_negative_log_prob_over_completion_tokens():
+	# TRL 0.14 logs no entropy (item 14): the policy's own log-probs on sampled tokens estimate it
+	import torch
+
+	from preflight.recorder.runtime import Recorder
+
+	r = Recorder.__new__(Recorder)
+	r.steps, r._entropy_mc, r.rl_entropy_estimated = [], [], False
+	lp = torch.log(torch.tensor([[0.5, 0.25, 0.9], [0.1, 0.2, 0.3]]))
+	mask = torch.tensor([[1, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1]])  # 3 prompt + 3 completion; one pad
+	Recorder._note_entropy(r, lp, mask)
+	step, t = r._entropy_mc[0]
+	want = -sum(torch.log(torch.tensor(p)) for p in (0.5, 0.25, 0.1, 0.2, 0.3)) / 5
+	assert step == 0 and abs(float(t) - float(want)) < 1e-6

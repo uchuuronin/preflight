@@ -136,7 +136,7 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 	try:
 		record_id = fn(lease, ctx)
 		ctx.check()
-		store.complete(lease, record_id=record_id)
+		store.complete(lease, record_id=record_id, spent_usd=_spent(ctx))
 	except (Cancelled, LeaseLost):
 		pass
 	except _permanent_types() as exc:
@@ -145,7 +145,7 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 		code = error_code(exc)
 		# the step it failed in and the way past it by hand (item 43)
 		msg = with_step(str(exc)[:700] or type(exc).__name__, code)[:1000]
-		_safe_fail(store, lease, msg, retryable=False, error_code=code)
+		_safe_fail(store, lease, msg, retryable=False, error_code=code, spent_usd=_spent(ctx))
 	except Exception:
 		log.exception("job %s failed with an internal error", lease.job_id)
 		_safe_fail(
@@ -154,6 +154,7 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 			f"Internal error while running the job (ref {lease.job_id}); retrying once",
 			retryable=True,
 			error_code="internal",
+			spent_usd=_spent(ctx),
 		)
 	finally:
 		stop.set()
@@ -161,8 +162,18 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 	return True
 
 
+def _spent(ctx) -> float:
+	"""What the job spent on GPUs and sandboxes so far, from the pipeline's budget; a job that
+	failed before its budget existed ran no probe."""
+	b = getattr(ctx, "budget", None)
+	if b is None:
+		return 0.0
+	return round(float(getattr(b, "gpu_usd", 0.0) or 0.0) + float(getattr(b, "overhead_usd", 0.0) or 0.0), 6)
+
+
 def _safe_fail(
-	store: JobStore, lease: Lease, error: str, *, retryable: bool, error_code: str | None = None
-) -> None:
+	store: JobStore, lease: Lease, error: str, *, retryable: bool, error_code: str | None = None,
+	spent_usd: float | None = None,
+) -> None:  # fmt: skip
 	with contextlib.suppress(LeaseLost):
-		store.fail(lease, error=error, retryable=retryable, error_code=error_code)
+		store.fail(lease, error=error, retryable=retryable, error_code=error_code, spent_usd=spent_usd)

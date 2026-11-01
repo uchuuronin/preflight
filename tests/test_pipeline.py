@@ -872,3 +872,27 @@ def test_a_serving_probes_sample_size_is_in_its_cache_key_and_other_keys_are_unc
 	assert cache_key(replace(spec, generate_sample=32), "L4", "img") != cache_key(
 		replace(spec, generate_sample=64), "L4", "img"
 	)
+
+
+def test_a_private_job_is_triaged_on_glimmer_only_with_its_flag_and_never_sent_to_baseten(monkeypatch):
+	# contract 0.6.2: JobRequest.private with harness.glimmer_private on -> Glimmer on B's host
+	from preflight.runner import flags
+	from preflight.runner.pipeline import Deps, _triage_client
+	from preflight.runner.records import LocalRecordWriter
+
+	spark_open, glimmer = object(), object()
+	d = Deps(records=LocalRecordWriter(Path("/tmp")), triage=spark_open, glimmer=glimmer)
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.glimmer_private": False}))
+	flags.reload()
+	try:
+		assert _triage_client(d, private=False) is spark_open
+		assert _triage_client(d, private=True) is spark_open  # the flag is off: private mode isn't offered
+		monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.glimmer_private": True}))
+		flags.reload()
+		assert _triage_client(d, private=False) is spark_open  # default jobs keep Spark Open
+		assert _triage_client(d, private=True) is glimmer
+		d.glimmer = None
+		assert _triage_client(d, private=True) is None  # no Glimmer: not triaged, never sent to Baseten
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()

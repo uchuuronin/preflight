@@ -12,3 +12,5 @@ e6e16230322ef30012d181e5cef884e0f19a9129:zoo/agent_eval_spark/record_oct31.json:
 40291c1d5110e4d33e7d9583b10f7e26802e2505:zoo/agent_eval_spark/record_oct31.json:generic-api-key:1
 # A, tests/test_agent_recorder.py: the same dollar-cap false positive as above, at its line before the inline allow moved with it; reviewed by the PM on Nov 1.
 d6888f73d92bcd2b008abe62428daa4af11053a5:tests/test_agent_recorder.py:generic-api-key:181
+# B, python/preflight/corpus/data/failures_nov1.jsonl: a corpus row's config key ("key": a 16-hex hash of its settings, corpus/sweep.py), no credential; flagged Nov 1; for the PM's review. The field is row_id from fa7fbb7's successor on, so new files don't match.
+fa7fbb7fe6fcc76df91ab82ff9795cc2df39bf6e:python/preflight/corpus/data/failures_nov1.jsonl:generic-api-key:73

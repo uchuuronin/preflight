@@ -115,3 +115,71 @@ def test_the_check_is_bounded_in_claims_and_time(rec, monkeypatch):
 	monkeypatch.setattr(diagnosis_check, "DEADLINE_S", 0.0)
 	out, calls = check_diagnosis(spark_open(script, []), rec, [claim()])
 	assert calls == [] and out[0].code == "diagnosis.abstain" and "ran out of time" in out[0].detail
+
+
+def test_one_real_run_diagnoses_then_checks_inside_its_cap(rec):
+	pytest.importorskip("matplotlib")  # the diagnosis renders its plots; CI's Python job has no matplotlib
+	from preflight.harness.diagnosis import numbers
+	from preflight.harness.diagnosis_run import run_once
+
+	def client_answering(checks, seen):
+		def handler(request):
+			seen.append(json.loads(request.content))
+			body = {"id": "r1", "choices": [{"message": {"content": json.dumps({"checks": checks})}}],
+				"usage": {"prompt_tokens": 5000, "completion_tokens": 300}}  # fmt: skip
+			return httpx.Response(200, json=body)
+
+		return ModelClient(api_key="k", transport=httpx.MockTransport(handler))
+
+	nums = numbers(rec)
+	diag = [{"verdict": "consistent", "plot": "memory_timeline", "plot_region": "whole run", "path": PATH,
+		"value": nums["probes"]["p1"]["memory"]["peak_allocated_bytes"], "detail": "agree"}]  # fmt: skip
+	out = run_once(
+		rec, client_answering(diag, []), spark_open([fetch(PATH), answer("supported", PATH)], []), 0.5
+	)
+	assert [f["code"] for f in out["checked"]] == ["diagnosis.consistent"]
+	assert [c["purpose"] for c in out["calls"]] == ["diagnosis", "diagnosis_check", "diagnosis_check"]
+	assert out["usd"] == round(sum(c["cost_usd"] for c in out["calls"]), 6) and out["usd"] < 0.5
+	# the cap holds (review, Nov 1): a diagnosis whose worst case passes it never starts
+	seen = []
+	skipped = run_once(rec, client_answering(diag, seen), spark_open([], []), 0.001)
+	assert seen == [] and skipped["usd"] == 0 and "over the $0.00 cap" in skipped["skipped"]
+	# and a check call whose worst case won't fit what's left never starts
+	pricey = spark_open([fetch(PATH), answer("supported", PATH)], [])
+	pricey.prices = {pricey.model: (1_000.0, 1_000.0, 1_000.0)}  # one call's worst case is dollars
+	tight = run_once(rec, client_answering(diag, []), pricey, 0.5)
+	assert [c["purpose"] for c in tight["calls"]] == ["diagnosis"]
+	assert (
+		tight["checked"][0]["code"] == "diagnosis.abstain" and "dollar cap" in tight["checked"][0]["detail"]
+	)
+	assert tight["usd"] <= 0.5
+
+
+def test_the_glimmer_client_sends_modals_proxy_headers_and_its_reasoning_strength(monkeypatch):
+	monkeypatch.setenv("GLIMMER_BASE_URL", "https://example.modal.run")
+	monkeypatch.setenv("GLIMMER_MODAL_KEY", "k1")
+	monkeypatch.setenv("GLIMMER_MODAL_SECRET", "s1")
+	seen = []
+
+	def handler(request):
+		seen.append((request.url, dict(request.headers), json.loads(request.content)))
+		return httpx.Response(200, json={"id": "g1", "choices": [{"message": {"content": "ok"}}],
+			"usage": {"prompt_tokens": 100, "completion_tokens": 10}})  # fmt: skip
+
+	assert ModelClient.glimmer_configured()
+	g = ModelClient.glimmer(transport=httpx.MockTransport(handler))
+	_, call = g.chat([{"role": "user", "content": "hi"}], purpose="triage", reasoning_effort="low")
+	url, headers, body = seen[0]
+	assert str(url) == "https://example.modal.run/v1/chat/completions"
+	assert headers["modal-key"] == "k1" and headers["modal-secret"] == "s1"
+	assert body["chat_template_kwargs"] == {"reasoning_strength": "low"} and "reasoning_effort" not in body
+	assert body["max_completion_tokens"] >= 1500 and body["model"] == "muse-glimmer"
+	assert call.provider == "modal-glimmer" and 0 <= call.cost_usd < 0.01  # GPU time, not tokens
+
+
+def test_an_unpriced_check_model_is_never_called_under_a_cap(rec):
+	seen = []
+	so = spark_open([fetch(PATH), answer("supported", PATH)], seen)
+	so.prices = {}
+	(f,), calls = check_diagnosis(so, rec, [claim()], budget_usd=0.5)
+	assert seen == [] and calls == [] and f.code == "diagnosis.abstain" and "no price" in f.detail

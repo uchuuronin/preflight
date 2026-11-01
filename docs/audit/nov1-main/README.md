@@ -8,7 +8,7 @@ Finding 12 was checked first. An independent read-only review re-ran or spot-che
 
 | # | Finding | On `main` `c4b95d4` [measured, Chromium] |
 | --- | --- | --- |
-| 12 | Model tags show whether or not the model ran | **Partly fixed:** right for each job on its own, but tags carry over to the next job in the same page (below). Still open with C, with a tested fix. |
+| 12 | Model tags show whether or not the model ran | **Fixed on `main` `85fbf9a`** (round five, Nov 1, 12:45): `model-tags.mjs` passes 12 of 12, the same-page case included, desk and phone [measured, Chromium]. On `c4b95d4` it was **partly fixed:** right for each job on its own, but tags carry over to the next job in the same page (below). It was open with C then, with a tested fix. |
 | 7 | Day-theme contrast | **Fixed.** axe finds no colour-contrast violation in any of the 40 states (`cockpit-desk-day.jpg`). D's add-on check goes from 14 to 20 of 20. |
 | 10 | Two job-map nodes with no focus ring | **Fixed.** No element without a visible focus ring in 12 Tab presses on any screen; every job-map node now takes a 2 px outline when focused, desk and phone. |
 | 8 | Eval markers 14 px | **Fixed.** axe target-size passes in all 40 states, the 4 knob-dock states included. |
@@ -27,7 +27,7 @@ record's provenance, and all five single-job cases pass:
   then finishes or fails (`tags-spark-open-ran-phone.jpg`);
 - a script-map call that failed shows no tag.
 
-**But tags carry over to the next job.** Boarding stays mounted, and its provenance state isn't
+**But tags carried over to the next job** (on `c4b95d4`; fixed on `85fbf9a`, above). Boarding stays mounted, and its provenance state isn't
 cleared when the job changes. So after a job that ran triage, a second job in the same page that
 fails before any call still shows both tags. A read-only review found this, and I reproduced it.
 The fix with C is one line: clear the state when the job or its record changes. I tested it on a

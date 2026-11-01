@@ -287,7 +287,8 @@ def test_global_queue_cap(clock):
 
 
 def test_position_reflects_fair_dispatch_not_raw_order(clock):
-	store = InMemoryJobStore(clock=clock, max_running=1, max_queued_per_visitor=50)
+	store = InMemoryJobStore(clock=clock, max_running=1, max_queued_per_visitor=50, visitor_daily_jobs=50,
+		daily_cap_usd=lambda day: 1_000.0)  # fmt: skip
 	for i in range(20):
 		store.submit({**REQ, "n": i}, visitor="greedy", idempotency_key=f"g{i}")
 	mine = store.submit(REQ, visitor="polite", idempotency_key="p")
@@ -324,3 +325,77 @@ def test_a_reaped_attempt_cannot_emit_and_the_retry_keeps_the_record():
 	second = store.lease("w2")
 	assert (second.record_id, second.share_token) == ("R1", "a" * 24)  # the retry continues R1
 	assert store.info(sub.job_id)["share_token"] == "a" * 24
+
+
+# ---------------------------------------------------------------- demo limits (Chiya, Nov 1)
+
+ET_NOON_NOV1 = 1793552400.0  # 2026-11-01 12:00 America/New_York (17:00 UTC)
+
+
+def test_a_visitor_gets_three_probe_jobs_a_day_until_midnight_et():
+	from preflight.runner.queue import QueueFull, et_day
+
+	now = [ET_NOON_NOV1]
+	store = InMemoryJobStore(clock=lambda: now[0], max_queued_per_visitor=50)
+	assert et_day(now[0]) == "2026-11-01"
+	for i in range(3):
+		store.submit({**REQ, "n": i}, visitor="v", idempotency_key=f"k{i}")
+	assert (
+		store.submit({**REQ, "n": 0}, visitor="v", idempotency_key="k0").created is False
+	)  # a repeat is free
+	with pytest.raises(QueueFull) as e:
+		store.submit({**REQ, "n": 3}, visitor="v", idempotency_key="k3")
+	assert e.value.code == "limit.visitor_daily" and "samples only until midnight ET" in str(e.value)
+	assert e.value.retry_after_s == 12 * 3600  # noon to midnight ET
+	store.submit({**REQ, "n": 0}, visitor="other", idempotency_key="k0")  # another visitor isn't affected
+	now[0] += 12 * 3600 + 1  # past midnight ET: a new day
+	store.cancel(store.submit({**REQ, "n": 4}, visitor="v", idempotency_key="k4").job_id)
+	store.submit({**REQ, "n": 5}, visitor="v", idempotency_key="k5")
+	store.submit({**REQ, "n": 6}, visitor="v", idempotency_key="k6")
+	with pytest.raises(QueueFull):  # a cancel doesn't give a job back
+		store.submit({**REQ, "n": 7}, visitor="v", idempotency_key="k7")
+
+
+def test_the_daily_gpu_cap_counts_reported_spend_and_what_live_jobs_may_still_spend():
+	from preflight.runner.queue import QueueFull
+
+	store = InMemoryJobStore(clock=lambda: ET_NOON_NOV1, max_running=8, max_queued_per_visitor=50,
+		visitor_daily_jobs=100, daily_cap_usd=lambda day: 2.0, job_budget_usd=0.6)  # fmt: skip
+	store.submit({**REQ, "n": 1}, visitor="a", idempotency_key="1")
+	store.submit({**REQ, "n": 2}, visitor="b", idempotency_key="1")
+	store.submit({**REQ, "n": 3}, visitor="c", idempotency_key="1")  # 3 x 0.6 reserved = 1.8 of 2.0
+	with pytest.raises(QueueFull) as e:  # nothing spent yet, only held by live jobs: busy, not midnight
+		store.submit({**REQ, "n": 4}, visitor="d", idempotency_key="1")
+	assert e.value.code == "queue_full" and e.value.retry_after_s == 120
+	lease = store.lease("w")
+	store.complete(lease, record_id="r", spent_usd=0.05)  # done for $0.05: its reserve is released
+	assert store.daily()["spent_usd"] == 0.05
+	store.submit({**REQ, "n": 4}, visitor="d", idempotency_key="1")  # 0.05 + 3 x 0.6 = 1.85
+	lease = store.lease("w")
+	store.fail(lease, error="boom", retryable=False)  # a failure that can't say what it spent: its budget
+	assert store.daily()["spent_usd"] == 0.65
+	for lease in (store.lease("w"), store.lease("w")):
+		store.complete(lease, record_id="r", spent_usd=0.6)  # 1.85 spent: no room for one more $0.60 job
+	with pytest.raises(QueueFull) as e:
+		store.submit({**REQ, "n": 5}, visitor="e", idempotency_key="1")
+	assert e.value.code == "limit.daily_spend" and "samples only until midnight ET" in str(e.value)
+
+
+def test_the_ledger_survives_a_restart_and_judging_days_get_thirty_dollars():
+	from preflight.runner.queue import QueueFull, daily_gpu_cap_usd
+
+	saved = {}
+	store = InMemoryJobStore(clock=lambda: ET_NOON_NOV1, on_change=lambda snap: saved.update(snap))
+	for i in range(3):
+		store.submit({**REQ, "n": i}, visitor="v", idempotency_key=f"k{i}")
+	again = InMemoryJobStore.restore(saved, clock=lambda: ET_NOON_NOV1)
+	with pytest.raises(QueueFull):
+		again.submit({**REQ, "n": 9}, visitor="v", idempotency_key="k9")
+	assert daily_gpu_cap_usd("2026-11-04") == 10.0 and daily_gpu_cap_usd("2026-11-05") == 30.0
+
+
+def test_seconds_to_midnight_et_is_right_on_a_dst_day():
+	from preflight.runner.queue import seconds_to_midnight_et
+
+	nov1_0030_edt = 1793507400.0  # 2026-11-01 00:30 EDT; clocks fall back at 02:00, so the day has 25 h
+	assert seconds_to_midnight_et(nov1_0030_edt) == 24 * 3600 + 30 * 60

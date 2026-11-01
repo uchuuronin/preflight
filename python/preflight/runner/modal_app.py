@@ -425,12 +425,19 @@ class JobStoreService:
 		return self.m.heartbeat(lease)
 
 	@modal.method()
-	def complete(self, lease: dict, record_id: str) -> None:
-		self.m.complete(lease, record_id)
+	def complete(self, lease: dict, record_id: str, spent_usd: float | None = None) -> None:
+		self.m.complete(lease, record_id, spent_usd)
 
 	@modal.method()
-	def fail(self, lease: dict, error: str, retryable: bool, error_code: str | None = None) -> None:
-		self.m.fail(lease, error, retryable, error_code)
+	def fail(
+		self,
+		lease: dict,
+		error: str,
+		retryable: bool,
+		error_code: str | None = None,
+		spent_usd: float | None = None,
+	) -> None:
+		self.m.fail(lease, error, retryable, error_code, spent_usd)
 
 	@modal.method()
 	def emit(self, job_id: str, stage: str, fields: dict, token: int | None = None) -> dict:
@@ -484,6 +491,14 @@ def _spark_client():
 	return ModelClient.meta() if ModelClient.meta_configured() else None
 
 
+def _glimmer_client():
+	"""Muse Glimmer on B's host for private-mode triage, when its URL and proxy keys are in the
+	environment (the preflight-glimmer secret, mounted once it exists)."""
+	from preflight.harness.spark import ModelClient
+
+	return ModelClient.glimmer() if ModelClient.glimmer_configured() else None
+
+
 def _triage_client():
 	"""Spark Open on Baseten for probe-log triage, when the preflight-baseten secret is mounted."""
 	from preflight.harness.spark import ModelClient
@@ -526,7 +541,7 @@ def run_worker() -> int:
 
 		# one sandbox per job, ended with the job; an L4 that won't schedule falls back to A10, L40S
 		with SandboxRunner(_sandbox_factory(), price=usd_per_hour) as runner:
-			deps = Deps(records=writer, runner=runner, spark=_spark_client(), triage=_triage_client(),
+			deps = Deps(records=writer, runner=runner, spark=_spark_client(), triage=_triage_client(), glimmer=_glimmer_client(),
 				cache=DictCache(cache_dict),
 				image=tag, blobs=blobs, reader=writer, install_requirements=True,
 				overhead_usd_per_h=SANDBOX_OVERHEAD_USD_PER_H)  # fmt: skip
