@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../lib/i18n";
 import type { KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
-import { bestCombo, comboKeys, comboVisit, comboWords, singleClears } from "./combos";
+import { beat, bestCombo, bestSingleRisk, comboKeys, comboVisit, comboWords, singleClears } from "./combos";
 import { valueText } from "./GuidePanel";
 import { withinLimits, NO_LIMITS } from "./limits";
 import { isFailing } from "./ruleTour";
@@ -119,7 +119,7 @@ export function LiveGuideSection({
 		const lim = withinLimits(record, provider, state.limits ?? NO_LIMITS, state.knobs, { pinned: state.pinned });
 		const objective = { kind: state.objective.kind ?? "min_time" } as const;
 		if (singleClears(record, provider, objective, lim)) return null;
-		return bestCombo(record, provider, state.knobs, objective, { pinned: lim.pinned ?? state.pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: turnedDown });
+		return bestCombo(record, provider, state.knobs, objective, { ...beat(bestSingleRisk(record, provider, objective, lim)), pinned: lim.pinned ?? state.pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: turnedDown });
 	}, [view, proposal, record, provider, state.knobs, state.limits, state.pinned, state.objective.kind, turnedDown]);
 	const words = combo ? comboWords(record, state.knobs, combo) : null;
 	const knob = proposal ? knobs.get(proposal.knobId) : undefined;

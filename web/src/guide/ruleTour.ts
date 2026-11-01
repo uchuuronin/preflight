@@ -10,7 +10,7 @@ import type { Move, PredictionProvider } from "../workspace/provider/PredictionP
 import { costStraddlesBudget, failureTarget, objectiveTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
-import { bestCombo, type ComboMove, comboKeys } from "./combos";
+import { beat, bestCombo, bestSingleRisk, type ComboMove, comboKeys } from "./combos";
 import { type Limits, NO_LIMITS, withinLimits } from "./limits";
 
 /**
@@ -399,10 +399,10 @@ export function nextStep(ctx: TourContext): TourStep {
 		};
 	}
 	if (failing) {
-		// No single knob clears it: a setting that changes two or three together may, where the
-		// record's predictions cover the combination (B's multi-axis grids).
+		// No single knob clears it: two together may, where B's pair grids cover the combination
+		// (a tight one only if it beats the best single move).
 		const o = opts(ctx, ctx.pinned);
-		const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { pinned: o.pinned, ...(o.allow ? { allow: o.allow } : {}), visited: ctx.visited });
+		const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { ...beat(bestSingleRisk(ctx.record, ctx.provider, ctx.objective, o)), pinned: o.pinned, ...(o.allow ? { allow: o.allow } : {}), visited: ctx.visited });
 		if (combo) {
 			return {
 				kind: "combo",

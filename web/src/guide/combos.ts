@@ -1,9 +1,10 @@
 /**
  * Combined moves: when no single knob clears a predicted failure, a setting that changes two or
  * three knobs together may (the live LoRA record, Nov 1: the eval fix alone isn't enough at
- * seq_len 1,024). Only settings the record's own predictions cover are offered: B's multi-axis
- * grids (contract Grid, up to 4 axes, with `fixed` for the knobs held elsewhere), read through
- * the provider like any other setting. Nothing here adds up single-knob effects.
+ * seq_len 1,024). Only settings the record's own predictions cover are offered: B's pair grids
+ * (`.clears`, engine.api.clearing_pairs: two knobs, every other knob held at its value when the
+ * record was filled), read through the provider like any other setting. Nothing here adds up
+ * single-knob effects.
  */
 import { fmt, fmtDelta } from "../lib/fmt";
 import { hasKey, t } from "../lib/i18n";
@@ -42,6 +43,8 @@ export interface ComboMove {
 export interface ComboOptions {
 	pinned?: ReadonlySet<string>;
 	/** The visitor's limits (guide/limits.ts withinLimits): false for a value they excluded or one that breaks a limit. */
+	/** A tight combination is offered only if it beats this (the best single move's risk, tight ones included). */
+	below?: number;
 	allow?: (knobId: string, value: KnobValue, after: Prediction) => boolean;
 	/** Visited markers: a combination already offered or turned down isn't offered again. */
 	visited?: ReadonlySet<string>;
@@ -80,6 +83,26 @@ export function singleClears(record: LoadedRecord, provider: PredictionProvider,
 	return fits(objective.kind ?? "min_time") || fits("fit_memory");
 }
 
+/** Knobs B leaves out of the pair search (engine.api._NOT_A_CLEARING_KNOB): the GPU is a separate decision, offered on its own. */
+const NOT_A_CLEARING_KNOB = new Set(["gpu_type", "gpu", "gpus"]);
+
+/**
+ * The lowest failure risk any single move on the job's own settings reaches, tight moves included:
+ * the bar a tight combination must beat. A GPU swap isn't counted, as in B's search: a bigger
+ * card is its own choice, not a fix to the run.
+ */
+export function bestSingleRisk(record: LoadedRecord, provider: PredictionProvider, objective: Objective, opts: SensitivityOptions): number | undefined {
+	const risks = [objective.kind ?? "min_time", "fit_memory" as const]
+		.flatMap((kind) => provider.moves(record, { ...objective, kind }, { ...opts, includeTight: true }))
+		.filter((m) => !NOT_A_CLEARING_KNOB.has(m.knobId))
+		.map((m) => m.risk)
+		.filter((r): r is number => typeof r === "number");
+	return risks.length ? Math.min(...risks) : undefined;
+}
+
+/** `below` for bestCombo from bestSingleRisk, when there is one. */
+export const beat = (risk: number | undefined): { below?: number } => (risk === undefined ? {} : { below: risk });
+
 interface Cell {
 	changes: ComboMove["changes"];
 	after: Prediction;
@@ -91,10 +114,10 @@ interface Cell {
 const known = (id: string, p: Prediction) => !!p[id] && p[id]!.status !== "abstain" && typeof p[id]!.point === "number";
 
 /**
- * The best combined setting that clears the failure, from the record's multi-axis grids: the
- * fewest knobs changed, then the best for the aim, or for memory when the aim isn't predicted for
- * every candidate (one unit for the comparison). Null when the record has no such grid or no cell
- * of one fits.
+ * The best combined setting from B's pair grids: one that fits before one that's only tight (at
+ * most CLEARS_P_OOM, and better than `below`), then the fewest knobs, then the nearest to the
+ * current setting, then the aim (or memory when the aim isn't predicted for every candidate: one
+ * unit for the comparison). Null when the record has no pair grid or none of its cells clears.
  */
 export function bestCombo(
 	record: LoadedRecord,
@@ -113,6 +136,9 @@ export function bestCombo(
 		// record's own multi-axis grids over its gridded knobs, which say nothing about clearing.
 		if (grid.target_id !== fail || grid.axes.length < 2 || !grid.id.endsWith(CLEARING_GRID_SUFFIX)) continue;
 		const fixed = (grid.fixed ?? {}) as Record<string, KnobValue>;
+		// B holds every other knob where it was when the record was filled; once the visitor has
+		// moved one, the grid no longer answers for this setting (and its move would undo theirs).
+		if (Object.entries(fixed).some(([k, v]) => !grid.axes.some((a) => a.knob_id === k) && k in knobs && !same(knobs[k], v))) continue;
 		// Axis order first, then the held knobs, so the words read as the grid does.
 		const order = [...new Set([...grid.axes.map((a) => a.knob_id), ...Object.keys(fixed)])];
 		const axisOf = new Map(grid.axes.map((a) => [a.knob_id, a.values] as const));
@@ -136,6 +162,8 @@ export function bestCombo(
 			if (opts.allow && changes.some((c) => !opts.allow!(c.knobId, c.to, after))) continue;
 			const risk = after[fail];
 			if (!risk || risk.status === "abstain" || risk.point === null || risk.point > CLEARS_P_OOM) continue;
+			// Tight is offered only where it beats the best single move, tight ones included.
+			if (risk.point >= FITS_BELOW && opts.below !== undefined && risk.point >= opts.below) continue;
 			found.push({ changes, after, risk: risk.point, steps: changes.reduce((n, c) => n + stepsFor(c.knobId, c.to), 0) });
 		}
 	}
@@ -210,6 +238,7 @@ export function comboWords(record: LoadedRecord, current: Readonly<Record<string
 		combo_peak: c.peak !== null ? fmt(c.peak, "bytes") : "",
 		combo_risk: fmt(c.risk, "probability"),
 		combo_target: tgt ? t(tgt.label_key).toLowerCase() : "",
+		ids: c.changes.map((x) => `${x.knobId}=${String(x.to)}`).join(", "),
 		combo_delta: c.delta !== null && tgt ? fmtDelta(c.delta, tgt.unit) : "",
 		n: String(c.changes.length),
 	};
