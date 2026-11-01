@@ -1,0 +1,8 @@
+SHA-256 of the held-out unseen-scripts list, fixed 2026-11-01 before any validation run.
+
+be178f20fa8bb14f3b841b6f444a21ec2fc08db98ddddc1673d36b18de99b232
+
+The list (nine public scripts, one per job type, each pinned to a commit, with fixed fallbacks)
+stays private until the validation runs. It contains a random salt, so the hash can't be matched
+by guessing candidate lists. To check it later: sha256sum unseen-scripts.md
+None of the nine comes from the census sources in docs/decisions/expertise-new-level.md or from zoo/.
