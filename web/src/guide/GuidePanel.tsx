@@ -83,13 +83,13 @@ export function GuidePanel() {
 			const from = s.knobs[step.move.knobId];
 			runTool("predict", { knobs: { [step.move.knobId]: step.move.to } }, ctx());
 			runTool("set_knob", { knob_id: step.move.knobId, value: step.move.to, why: step.textKey }, ctx());
-			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + plannedSteps(tc))) });
+			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
 			return;
 		}
 		actions.propose(null);
 		if (step.kind === "finding") {
 			// A finding is a step of the tour: counted with the findings and moves still to come.
-			setActive({ step, n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
+			setActive({ step, n, of: Math.max(n, Math.min(MAX_TOUR_STEPS, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
 			return;
 		}
 		const shown = step.kind === "move" ? { ...step, kind: "done" as const, textKey: "guide.done", whyKey: "guide.done.why" } : step;
