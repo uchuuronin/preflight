@@ -29,6 +29,7 @@ GPUs: never above PREFLIGHT_GPU_CEILING (the public demo: A100-80GB), and a
 step up after an OOM only while the job's dollar budget holds it.
 """
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -166,6 +167,7 @@ class Deps:
 	triage: object | None = (
 		None  # Spark Open on Baseten: triage (harness/triage.py) and the diagnosis check (diagnosis_check.py)
 	)
+	glimmer: object | None = None  # Muse Glimmer on B's host: a private job's triage (0.6.2)
 	cache: ProbeCache | None = None
 	image: str = "local"  # probe image tag, part of the cache key
 	budget: Callable[[], Budget] = Budget
@@ -465,6 +467,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip
 		gpu = cap
 	budget = deps.budget()
+	with contextlib.suppress(AttributeError, TypeError):
+		ctx.budget = budget  # the worker reports what the job spent to the day's GPU cap (queue.py)
 	budget.waited = lambda: float(getattr(deps.runner, "queued_s", 0.0) or 0.0)
 	patched_for: dict = {}
 	if fixed is not None:
@@ -493,7 +497,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		patched_for=patched_for,
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
-	rec, triaged = _triage(rec, results, deps)
+	rec, triaged = _triage(rec, results, deps, private=req.private)
 	kept = rec.probes
 	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
 	ran = next((g for r in results for g in [_measured_gpu(r)] if g), gpu)
@@ -521,7 +525,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
-	if req.mode != "verify":  # a verify job's record answers one question; it isn't diagnosed again
+	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
+	# or Baseten for a diagnosis (private mode, contract 0.6.2)
+	if req.mode != "verify" and not req.private:
 		out = _diagnose(out, deps)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
@@ -656,13 +662,27 @@ def _with_dataset_size(rec: FlightRecord, files: dict[str, str] | None = None) -
 	return rec.model_copy(update={"job": job})
 
 
-def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord, list]:
+def _triage_client(deps: Deps, private: bool):
+	"""Who triages: Glimmer on Preflight's own host for a private job with harness.glimmer_private on
+	(contract 0.6.2), else Spark Open on Baseten. A private job with no Glimmer client is never sent
+	to Baseten instead: it isn't triaged."""
+	from .flags import flag
+
+	if private and flag("harness.glimmer_private"):
+		return deps.glimmer
+	return deps.triage
+
+
+def _triage(
+	rec: FlightRecord, results: list, deps: Deps, *, private: bool = False
+) -> tuple[FlightRecord, list]:
 	"""Spark Open reads each fresh probe's log (plan item 29): one call per probe, every call in the
 	record's provenance (so its cost is in the record's), a finding for a probe that didn't finish.
 	Off unless harness.spark_open_triage is on: the log may hold the visitor's script output."""
 	from .flags import flag
 
-	if deps.triage is None or not flag("harness.spark_open_triage"):
+	client = _triage_client(deps, private)
+	if client is None or not flag("harness.spark_open_triage"):
 		return rec, []
 	from preflight.harness.triage import triage_probe
 
@@ -671,7 +691,7 @@ def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord,
 	for r in results:
 		if not isinstance(r, ProbeResult):
 			continue
-		f, cs = triage_probe(deps.triage, r.probe, r.log_tail, node_id=_tested_node(r.probe, nodes))
+		f, cs = triage_probe(client, r.probe, r.log_tail, node_id=_tested_node(r.probe, nodes))
 		calls += cs
 		if f is not None:
 			findings.append(f)

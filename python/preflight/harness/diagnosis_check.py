@@ -14,6 +14,7 @@ becomes "abstain, or run a probe". Every call, tool rounds included, is returned
 """
 
 import json
+import math
 import re
 import time
 
@@ -94,8 +95,21 @@ def _answer(text: str) -> dict | None:
 	return d if isinstance(d, dict) else None
 
 
+def _worst_call_usd(client, msgs: list[dict]) -> float:
+	"""What one more call could cost at most: its input as estimated, the client's full output cap."""
+	from preflight.harness.spark import estimate_tokens
+
+	if client.model not in client.prices:
+		return float("inf")  # an unpriced model has no bound
+	p_in, _, p_out = client.prices[client.model]
+	tool = len(json.dumps(TOOL)) // 4
+	return (
+		1.5 * ((estimate_tokens(msgs) + tool) * p_in + client.max_output_tokens * p_out) / 1e6
+	)  # [guess] margin
+
+
 def check_claim(
-	client, nums: dict, finding: Finding, deadline: float | None = None
+	client, nums: dict, finding: Finding, deadline: float | None = None, room=None
 ) -> tuple[str, str | None, str, list]:
 	"""(verdict "supported" or "abstain", the supporting path, the reason, the calls made)."""
 	msgs = [
@@ -111,6 +125,20 @@ def check_claim(
 		for _ in range(MAX_ROUNDS):
 			if deadline is not None and time.monotonic() >= deadline:
 				return "abstain", None, "the check ran out of time", client.calls[before:]
+			if room is not None:
+				w = _worst_call_usd(client, msgs)
+				if not math.isfinite(
+					w
+				):  # an unpriced (or NaN-priced) model has no bound: never called under a cap
+					return (
+						"abstain",
+						None,
+						"the check's model has no price, so no cap can hold",
+						client.calls[before:],
+					)
+				room.worst[0] = max(room.worst[0], w)
+				if w > room():
+					return "abstain", None, "the check's dollar cap was reached", client.calls[before:]
 			msg, _call = client.chat_message(
 				msgs, purpose="diagnosis_check", reasoning_effort="low", tools=[TOOL]
 			)
@@ -149,14 +177,32 @@ def check_claim(
 	return "supported", path, reason, calls
 
 
-def check_diagnosis(client, rec: FlightRecord, findings: list[Finding]) -> tuple[list[Finding], list]:
-	"""The diagnosis findings with Spark Open's check applied, and every call made."""
+def check_diagnosis(
+	client, rec: FlightRecord, findings: list[Finding], budget_usd: float | None = None
+) -> tuple[list[Finding], list]:
+	"""The diagnosis findings with Spark Open's check applied, and every call made. With budget_usd,
+	no call starts whose worst case would take the check's spend past it."""
 	nums = numbers(rec)
 	out, calls = [], []
 	deadline = time.monotonic() + DEADLINE_S
+	start = len(client.calls)
+
+	worst_seen = [0.0]  # the largest per-call worst case so far, what a failed (unpriced) call is charged
+
+	def room() -> float:
+		made = client.calls[start:]
+		return (
+			budget_usd
+			- sum(c.cost_usd for c in made)
+			- worst_seen[0] * sum(1 for c in made if not c.ok and not c.cost_usd)
+		)
+
+	room.worst = worst_seen
 	for i, f in enumerate(findings):
 		if i < MAX_CLAIMS:
-			verdict, path, reason, cs = check_claim(client, nums, f, deadline)
+			verdict, path, reason, cs = check_claim(
+				client, nums, f, deadline, room if budget_usd is not None else None
+			)
 		else:
 			verdict, path, reason, cs = "abstain", None, f"not checked (only the first {MAX_CLAIMS} are)", []
 		calls += cs

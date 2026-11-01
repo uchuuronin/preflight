@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Sun Nov 1, 11:30 ET.
+Updated Sun Nov 1, 12:30 ET.
 
 - **Now:** the Pareto sweep (Muse Spark arm, then Spark Open, on its own $1 ledger); the redeploy gated on the new probe-user startup check (a tiny torch.compile and the vLLM and datasets imports as uid 61000), then the serving probe again on the fixed image.
 - **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning/torchtitan adapter checks, the Muse Spark script-map gate; LoRA ground truth on L4, GRPO 50-step ground truth on A10, DDP and FSDP on 2 × A10; the production runner deployed and left running.
@@ -15,6 +15,11 @@ Updated Sun Nov 1, 11:30 ET.
 |---|---|---|---|---|
 | Nov 1 10:57 | 9e46c3c..4cc6f57 | dataset size from the probes (0bdff6f, abb93ad, fb84348); the probe uid's user name and passwd/group entry (e5b0713, 4cc6f57); the A10 GRPO record, run log and B handoff (03d1420) | 3 read-only rounds (dataset size 2, probe user 1) | clean |
 | Nov 1 11:06 | 4cc6f57..9afbf4c | the probe-user startup step (47f68ed, 88cd732); the C note on the redeploy (cf96ea5); status and B notes (ead63bb, 17582b7, 9afbf4c) | 1 read-only round | clean |
+| Nov 1 11:20 | 9afbf4c..20ebb7a | the torch.compile startup step and gcc/g++ in the sandbox images (b86b72a); pyarrow 17 in the serving image and its datasets import check, the wrong-version message (0771c5f, 20ebb7a); a comment order (bdcebd6); status (53c392c, 107ce3e) | 1 read-only round each | clean |
+| Nov 1 12:10 | 20ebb7a..998704f | main merged (0.6.1, f017010); Spark diagnosis (485df08, ace3a06, 97a458a, 7a55eb7) and Spark Open's check (202666f), both behind harness.spark_diagnosis; 0.6.1 concurrency and the review fix (fde2e68, 549a5f5); engine flags and N_TRAIN_* (913e2b6); `preflight demo` and the root/venv probe fix (eb5e5e5, 060ec5f); failures name their step (ab74a70); triage's eval node (30b0224); the serving probe's sampled generate (16d5cd6, 998704f); the CI fix, the deploy gate's rule out of ops_app (26b134b); requests and status (3f58945, 579cd23, 179c8ad, 390f778, 40fed56) | 2 rounds for diagnosis, 0.6.1 and the engine/N_TRAIN change; 1 round for the rest | clean |
+| Nov 1 12:30 | 998704f..f46fad2 | RL entropy estimate and its limit (d9f969c, f2f2c5e); the warm-pool ask and status (e851890, b4480d3); main merged (round five, 0.6.2) | 1 read-only round each, 2 for the entropy change; the merge checked for damage in A's files | clean |
+| Nov 1 12:49 | f46fad2..8154268 | main's production flags only (3c6699e: runner.queue, c.guide.live), merged onto f46fad2 so the deploy carried nothing unreviewed | main's own (PM); the merge changed flags.production.json only | clean |
+| Nov 1 13:06 | 8154268..HEAD | the ops diagnosis run and its cap (1e40d5e, ec0b39a, aaaefa8, 16ee36f); Glimmer's client and private-job routing (ea1626a, bdd3c6f); the demo limits (9a2bb82, 5a78a60); requests and status (67dd9fc, eb8adbb, b54d854, this row) | 2 rounds each for the cap and the limits, 1 for Glimmer | clean |
 
 ## Known limits, on purpose
 
@@ -51,6 +56,20 @@ Updated Sun Nov 1, 11:30 ET.
 - Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
   its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
   lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
+- Demo limits (Nov 1): the spend cap counts what jobs report (GPU at measured probe time plus the
+  sandbox estimate), so sandbox start-up and idle time aren't in it, and one job can pass its $0.60
+  between probe checks; a retried job is charged for its first attempt and reserves again. A worker
+  on new code calling a store on old code (only mid-deploy) fails its report.
+- RL entropy (Nov 1, item 14): rl.kl is recorded from TRL's logs; rl.entropy is TRL's own where it
+  logs one, else a Monte Carlo estimate (mean -log p of sampled completion tokens, biased by the
+  temperature, top-p/top-k and the EOS cut, flagged by extras.rl_entropy_estimated) on TRL versions
+  with a `_get_per_token_logps` method. **TRL 0.14, the probe image's, gets no entropy**: its
+  log-probs are a closure inside compute_loss. On the cut sheet: exact entropy from the policy's
+  logits in a chunked forward hook (about 1.5 h; extra vocab-wide memory on a GRPO run already at
+  22 of 24 GB, so it needs a GPU check).
+- Serving probe sample (Nov 1): the first generate call is the measurement, so a warmup call
+  before the real one becomes it; prompts and per-prompt lists are cut only when passed as the first
+  argument or by keyword, not prompt_token_ids, lora_request or priority by position.
 - Dataset size (`extras.train_dataset_len`, Nov 1): the training loader's sampler length, else its
   dataset's. With `batch_size=None` a split sampler isn't seen, so validation rows are counted; a
   Lightning `DistributedSamplerWrapper` over a split falls back to the whole dataset. A GNN script
@@ -242,6 +261,7 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Nov 1 16:20 | `a-startup-check-16` (41325841406) ok, with the new probe-user step: in the probe and serving images (rebuilt with gcc and g++), as uid 61000 `preflight-probe`, getpass, passwd and group resolve, a tiny torch.compile runs (7.274 = 8 sin 2), vLLM and datasets import; `a-startup-check-serving-2` (41326174732) ok; `a-deploy-main-16` (41326298472): **the production runner redeployed** from ws-a 20ebb7a, gated on both checks. Left running; C told it can deploy the API | none (CPU) | about 6 | about $0.05 CPU (estimate); the job store about $0.19/day |
 | Nov 1 16:27 | `a-smoke-serving-vllm-2` (41326407788): the vLLM serving probe on the redeployed runner, record 01M6BZ0C74ZZYJ6579G8Z91SQW: **timeout at 600 s before any measurement**, on an L40S (by its price). Cause, from the code: the recorder timed vLLM's generate whole, and zoo/serving_vllm's one call is 1,024 prompts x 4,096 tokens (about half an hour), and a probe with no optimizer steps ended as too_few_steps anyway. Fixed in ws-a 16d5cd6 (a serving probe measures one sampled call of 32 prompts and ends there), checked through a fresh install with a stand-in vLLM; not rerun (needs the redeploy) | L40S | about 11 | **$0.4986** by the record ($0.3256 GPU, $0.1586 sandbox, $0.0145 model calls) |
 | Nov 1 11:47 ET | Quickstart check (local, no GPU): wheel built, a fresh 3.11 venv, `pip install preflight[probe]` (torch from PyPI, 9 min), then `preflight demo` in an empty folder: 3 probes ok on the CPU in 31 s (batch 64 / 32 / 16, p50 14 / 12 / 11 ms) [measured]. Found and fixed: as root, probes dropped to a uid that couldn't reach the venv and ran without torch | none | — | $0 |
+| Nov 1 17:36–18:04 | `a-startup-check-17` (41332365957) and `a-startup-check-serving-3` (41332579612) ok on f46fad2, deploy held for the flag decision; `a-startup-check-18` (41334281206), `a-startup-check-serving-4` (41334482001) ok on 8154268; `a-deploy-main-18` (41334637660): **the production runner redeployed** from ws-a 8154268 (round five, runner.queue and c.guide.live on, triage on, the serving-probe and CI fixes). Left running; C told | none (CPU) | about 12 | about $0.10 CPU (estimate); the job store about $0.19/day |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,
