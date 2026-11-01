@@ -1,0 +1,25 @@
+{
+ "source": "GitHub run 41333521956 (remote-runs branch, runs/20261101-175040-41333521956-c-fix-race-1/log.txt): api/fix_app.py::race_sample on main 3c6699e, Nov 1 17:50 UTC, Muse Code's diffs as returned",
+ "script": "zoo/finetune_lora_hf/train.py",
+ "finding": "First eval will run out of memory",
+ "candidates": [
+  {
+   "id": "c1",
+   "template_id": "eval.reduce_batch",
+   "value": 8,
+   "diff": "diff --git a/train.py b/train.py\nindex 7b4e1c9..d93e4a8 100644\n--- a/train.py\n+++ b/train.py\n@@ -86,7 +86,7 @@ class PerplexityCallback(TrainerCallback):\n args = TrainingArguments(\n \toutput_dir=\"out/lora-qwen\",\n \tper_device_train_batch_size=4,\n-\tper_device_eval_batch_size=32,  # planted 1\n+\tper_device_eval_batch_size=8,  # planted 1\n \tgradient_accumulation_steps=4,\n \tlearning_rate=1e-4,\n \twarmup_steps=50,\n"
+  },
+  {
+   "id": "c2",
+   "template_id": "eval.wrap_no_grad",
+   "value": null,
+   "diff": "diff --git a/train.py b/train.py\nindex 7b4e1c9..6b3b5c2 100644\n--- a/train.py\n+++ b/train.py\n@@ -74,12 +74,13 @@ class PerplexityCallback(TrainerCallback):\n \t\tmodel.eval()\n \t\tlosses = []\n \t\tloader = DataLoader(self.dataset, batch_size=self.batch_size, collate_fn=collator)\n-\t\tfor batch in loader:\n-\t\t\tbatch = {k: v.to(model.device) for k, v in batch.items()}\n-\t\t\tout = model(**batch)  # planted 2: no torch.no_grad()\n-\t\t\tlosses.append(out.loss)  # planted 2: keeps every graph alive\n+\t\twith torch.no_grad():\n+\t\t\tfor batch in loader:\n+\t\t\t\tbatch = {k: v.to(model.device) for k, v in batch.items()}\n+\t\t\t\tout = model(**batch)\n+\t\t\t\tlosses.append(out.loss.item())\n \t\tmodel.train()\n-\t\tppl = math.exp(torch.stack(losses).mean().item())\n+\t\tppl = math.exp(sum(losses) / len(losses))\n \t\tprint(f\"step {state.global_step}: eval perplexity {ppl:.2f}\")\n \n \n"
+  },
+  {
+   "id": "c3",
+   "template_id": "memory.gradient_checkpointing",
+   "value": true,
+   "diff": "diff --git a/train.py b/train.py\nindex 7b4e1c9..55dfc08 100644\n--- a/train.py\n+++ b/train.py\n@@ -45,6 +45,8 @@ lora = LoraConfig(\n \ttask_type=\"CAUSAL_LM\",\n )\n model = get_peft_model(model, lora)\n+model.gradient_checkpointing_enable()\n+model.enable_input_require_grads()\n \n \n def format_example(ex):\n"
+  }
+ ]
+}
