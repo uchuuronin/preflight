@@ -1,0 +1,11 @@
+{
+	"name": "20261101-205853-41349583805-a-triage-glimmer-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41349583805",
+	"ref": "ws-a",
+	"sha": "3a6fa8c92ab2f17cca0fca42173cae293cc2806a",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::triage --share jgk05gwUgV-Bo78sErzKFQ --probe p1-eval --provider glimmer",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T21:01:47Z"
+}

@@ -1,0 +1,26 @@
+{
+  "record_id": "01M6C5WRVEM3RTRRBDRPAAPEGT",
+  "probe": "p1-eval",
+  "status": "oom",
+  "provider": "modal-glimmer",
+  "model": "muse-glimmer",
+  "wall_s": 150.2,
+  "finding": null,
+  "last_error": "HTTP 303 without a completion (JSONDecodeError): ''",
+  "calls": [
+    {
+      "provider": "modal-glimmer",
+      "model": "muse-glimmer",
+      "purpose": "triage",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.087626,
+      "request_id": null,
+      "at": "2026-11-01T21:01:45Z",
+      "latency_s": 150.216,
+      "ok": false
+    }
+  ],
+  "usd": 0.087626
+}
