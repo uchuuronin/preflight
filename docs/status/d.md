@@ -8,6 +8,15 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 11:00 (pushed; GNN run length; waiting on B's report)
+
+Pushed `adc9ca3`..`b781a91` with Chiya's yes (10:57).
+- **GNN run length:** `zoo/gnn_pyg/train.py` gains a plain top-level `N_TRAIN_NODES = 160_000`, used by the sampler in place of `int(0.8 * n)`. Basis: A's recorder can't count nodes when the script samples by hand, and B's engine needs a run length. It's 157 steps an epoch at batch 1,024, the same as before (0.8 x 200,494 = 160,395 also gives 157), so the run's length is unchanged, and an assert guards a smaller graph. The planted fan-out `[15, 25, 25]` is unchanged. A is asked to read it into `data.n_examples`.
+- **"C's one-line fix to build.test.ts":** not on GitHub yet (no branch changes that file), and not needed. My `adc9ca3` already makes that test hold on both golden sets. A's own flagged `make_golden.py` (`ws-a`) produces goldens byte-identical to the ones I tested.
+- **B's divergence report** (`1cfa689`, AUROC 0.66, 0.56 to 0.76; lead 138 steps, 3 to 269): not in any branch on GitHub yet. The README keeps 0.58 until I can read the report and link it; the check-in looks for it.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 08:00 (pushed; tests that pass on both golden sets; hero cards; the dial)
 
 Pushed `09648e7`..`cbbfe73` with Chiya's yes (07:42). Chiya's calls: card rendering per request stays off; the hero records get pre-rendered cards; B will commit its divergence fit report, which I'll link when it lands.
