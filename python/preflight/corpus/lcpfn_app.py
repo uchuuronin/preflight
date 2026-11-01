@@ -51,7 +51,8 @@ def fetch_weights() -> dict:
 	import requests
 	import torch
 
-	out: dict = {"package": "lcpfn==0.1.3", "torch": torch.__version__, "models": {}}
+	# str(): torch.__version__ is a TorchVersion, which can't be unpickled where torch isn't installed (Nov 1)
+	out: dict = {"package": "lcpfn==0.1.3", "torch": str(torch.__version__), "models": {}}
 	for name in NAMES:
 		gz = Path(MOUNT) / f"{name}.gz"
 		if not gz.exists():
