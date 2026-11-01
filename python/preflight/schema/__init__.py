@@ -14,7 +14,17 @@ from .encoding import MAX_GRID_CELLS, MAX_RECORD_GZIP_BYTES
 from .events import JobEvent, JobRequest
 from .ids import new_share_token, new_ulid, new_write_token
 from .migrations import UnsupportedSchemaVersion, upgrade
-from .prediction import Estimate, Grid, GridAxis, KnobImpact, Objective, Prediction, Predictions, Target
+from .prediction import (
+	Estimate,
+	EstimateRate,
+	Grid,
+	GridAxis,
+	KnobImpact,
+	Objective,
+	Prediction,
+	Predictions,
+	Target,
+)
 from .record import (
 	GPU,
 	SCHEMA_VERSION,
@@ -124,6 +134,7 @@ __all__ = [
 	"Domain",
 	"Env",
 	"Estimate",
+	"EstimateRate",
 	"EvalStats",
 	"Evidence",
 	"Finding",

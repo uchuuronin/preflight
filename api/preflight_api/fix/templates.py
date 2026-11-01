@@ -174,6 +174,31 @@ TEMPLATES: dict[str, Template] = {
 	]
 }
 
+# What a template with no {value} sets its knob to, so the visitor's limits can be checked
+# against what the fix really does (routes/patches.py), never against a value a client sends.
+APPLIES: dict[str, object] = {
+	"eval.wrap_no_grad": True,
+	"data.enable_packing": True,
+	"memory.gradient_checkpointing": True,
+	"precision.bf16_autocast": "bf16",
+	"vision.channels_last": True,
+	"agent.enable_prompt_caching": True,
+}
+
+
+def applied_value(template_id: str, value: object | None) -> object | None:
+	"""The value a fix sets its knob to: the one given, for a template that takes one; else the
+	template's own (APPLIES). Raises ValueError for a value given to a template that takes none
+	and differs from what it does."""
+	t = TEMPLATES[template_id]
+	if "{value}" in t.task:
+		return value
+	fixed = APPLIES.get(template_id)
+	if value is not None and value != fixed:
+		raise ValueError(f"{template_id} always sets {t.knob} to {fixed!r}")
+	return fixed
+
+
 PREAMBLE = """You are fixing one problem in a machine-learning script.
 
 Rules:

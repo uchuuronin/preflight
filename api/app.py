@@ -36,6 +36,7 @@ SAMPLE_FILES = [
 	"schema/examples/finetune.json",
 	"schema/examples/pretrain.json",
 	"schema/examples/agent.json",
+	"web/src/workspace/fixtures/agent-eval-oct31.record.json",
 ]
 
 image = (
@@ -51,6 +52,8 @@ image = (
 			# A's job store (python/preflight/runner/modal_app.py), for /v1/jobs and approved guide jobs
 			"PREFLIGHT_JOBSTORE_APP": "preflight-runner",
 			"PREFLIGHT_JOBSTORE_CLS": "JobStoreService",
+			# The fix loop's race (api/fix_app.py race_fix); answers only while c.fix_loop is on.
+			"PREFLIGHT_FIX": "modal",
 		}
 	)
 	.add_local_file(ROOT / "flags.json", "/root/repo/flags.json")
@@ -104,10 +107,19 @@ class SpendLedger:
 		ledger_store["snapshot"] = self.core.snapshot()
 
 	@modal.method()
-	def reserve(self, *, visitor: str, run: str, ip: str, usd: float) -> dict:
+	def reserve(
+		self,
+		*,
+		visitor: str,
+		run: str,
+		ip: str,
+		usd: float,
+		run_cap: float | None = None,
+		ttl_s: float | None = None,
+	) -> dict:
 		from dataclasses import asdict
 
-		decision = self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd)
+		decision = self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s)
 		if decision.ok:
 			self._save()
 		return asdict(decision)

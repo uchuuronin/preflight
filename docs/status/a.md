@@ -1,96 +1,10 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Oct 27, evening ET.
+Updated Sun Nov 1, 01:30 ET.
 
-## Done
-
-- Contract v0.1: Pydantic schema, generated JSON Schema and TS types, TS grid decoder with a parity
-  test, golden records (fine-tune, pretrain, agent), `upgrade()` migrations, record size and
-  decompression caps.
-- Repo skeleton, CI (lint, format, schema drift, tests, CPU torch, gitleaks), deploy and zoo
-  workflows with actions pinned to commit SHAs. Ready to hand to C.
-- Job queue (gap 2, skeleton): idempotent submit, 60 s leases renewed every 20 s, fencing tokens,
-  reaper, transactional saves with rollback, per-visitor and global backpressure, fair dispatch
-  and honest queue positions, capped and batched events, archived finished jobs.
-- Worker loop: heartbeats, stops itself when it cannot renew, cancellation reaches the probe,
-  permanent vs internal errors, no internals shown to visitors.
-- Harness: static script reader covering every lens in the plan, Muse Spark client (structured
-  output, retries that can't double-bill, overall deadline, one re-ask, token caps, provenance per
-  attempt, no `-contributor` models for visitor code), mapper that reconciles Spark with the static
-  reader, skeleton record with a job map per lens, knob domains and read-time findings.
-- Recorder: global hooks for optimizer steps, backward, data loader, eval phases (capped at 2
-  batches), output head, SDPA attention logits, checkpoint saves, GradScaler, HF generate and vLLM,
-  TRL/HF trainer logs; host RSS and GPU power sampling; failures classified into stable codes.
-- Probe runner: validated submissions, scrubbed env and throwaway HOME, non-dumpable parent,
-  unprivileged per-probe uid when root, nothing survives the probe, capped logs, hard timeout,
-  cancellation, untrusted child output parsed defensively.
-- Probe plan from a Monte Carlo (docs/decisions/probe-plan.md): warmup 2, timed 5, median; three
-  memory probes; eval and checkpoint pulled into the current-settings probe.
-- B's requests: per-kernel table from the profiled probe (top 64 plus per-class tail), canonical
-  GPU names and peak FLOP/s from B's table, the five counts in `Probe.extras`, model shape from the
-  running model, a `gpu_type` knob, and the knobs B maps (LoRA alpha and dropout, quantization,
-  attention kernel, context limit). Checked on a scratch merge with ws-b: 561 tests pass and the
-  kernel table feeds `predict_cross_gpu`. The schema carries them (`Probe.kernels`, the
-  `ModelInfo` shape fields), added before the freeze with Chiya's approval.
-- Size-aware probe GPU (L4, L40S, A100-80GB, H200; after a GPU OOM one step up, or the whole
-  ladder when the size was unknown), from a Monte Carlo (K, G, L, U in docs/decisions/probe-plan.md).
-- Kernel tables and model shapes from the probe child are checked in the parent before use
-  (`probes/untrusted.py`); visitor-supplied names are bounded before any regex sees them.
-- Bug zoo: LoRA fine-tune (HF) and nanoGPT pretrain scripts.
-- Independent code review: all Critical and High findings fixed with tests; Medium and Low fixed
-  except the two noted below.
-
-- Execution plane, as code: the pipeline job function (fetch, map, skeleton before Muse Spark,
-  plan, probes, merge; a point that can't be set is skipped, eval OOM re-runs with eval off, a
-  per-job time and dollar budget, the content-hash probe cache), the Modal app (job-store
-  service, workers, one GPU sandbox per job with no secrets, an egress allowlist and read-only
-  weights), and a working `preflight map|run` CLI. One script runs end to end through the queue
-  on CPU in the tests.
-- Review fixes (Oct 27): `.eval()` before training no longer cuts the data loader; overrides
-  handle annotated fields, config classes and argparse flags (default and command line); timed
-  steps have no recorder sync points; every step is logged; eval memory per batch; chunked
-  attention-logit check; grad norms read after the step; visitor code runs under rlimits.
-- Second review pass (Oct 27): uploads live on a volume and the job state keeps a reference; a
-  retried job keeps its record id and share token; events are fenced by the lease token; each
-  sandbox runs as one pinned uid with its own HF cache; the store's owner is claimed before it
-  restores; workers stop leasing before their own timeout; probe time and cost are measured by
-  the worker, not reported by the sandbox; flags follow the script's own spelling and argparse
-  abbreviations; repos are read from git's object store with no checkout, big blobs never
-  downloaded and the clone deleted; malformed sources are visitor errors, not crashes.
-- Oct 27 evening: guide jobs on a record (`run_probe`, `run_verify`, `sample_more`) write a new
-  record derived from it; `Knob.affects` and `changes_results`, `ModelCard.fixture` and
-  `JobEvent.error_code` for C; the Spark client reads `META_API_BASE`; the upload format for D
-  (docs/decisions/upload-format.md) with requirements.txt installed in probes and notebook pip
-  lines turned into one; probes never above A100-80GB on the demo, and the job budget counts the
-  sandbox's CPU and memory; `python -m preflight.runner.stop_app` stops the deployed app through
-  remote-run; the smoke run writes its events and record to out/; Apache-2.0 LICENSE.
-- Found and fixed before any GPU run: Debian images keep /root at 0700, so the probe's
-  unprivileged uid couldn't reach the package there. The Modal image now keeps it in
-  /opt/preflight; elsewhere (the AMD checkout) probes import a read-only copy, and nothing on the
-  host has its permissions changed.
-- Independent review of the evening's work, all fixed with tests: the CLI as root gave probes a
-  cache shared across runs that root then chowned recursively (a planted link would have handed
-  over /etc), now a fresh per-run directory root never walks; requirements used pip --target,
-  which reinstalls torch under anything that needs it, now --prefix with public-version pins and
-  one install per job; verify passed a run whose loss went NaN; a stale volume view could feed a
-  follow-up an old parent; a visitor's own upload uri and changed code are refused; moving GPU
-  drops the parent's fits along with its probes; a mistyped GPU ceiling still caps.
-
-## Blocked
-
-- The first GPU work (deploy, `prefetch`, `smoke` on L4) waits for Chiya's yes on the costed plan;
-  runs go through `remote-run.yml`, so nothing here holds a key.
-- Hugging Face is not reachable from this sandbox, so the zoo scripts run only on Modal or AMD.
-
-## Next
-
-- First real run, once approved: deploy the Modal app, `prefetch` the zoo weights, `smoke` the LoRA
-  zoo script end to end on L4, then `stop_app`; log GPU, minutes and dollars below.
-- Ground truth: both zoo scripts on a GPU, step time with and without the recorder's sync points,
-  to replace the simulated probe-plan figures.
-- Measured-rule findings (loader wait, padding, MFU, eval OOM, truncation, retry loops).
-- Agent recorder: OTel GenAI proxy around OpenAI-compatible clients; RL phase timer.
-- Remaining zoo scripts.
+- **Now:** tonight's approved GPU queue: D's retrieval, GNN and vision probes; then the agent re-sample on D's plant-3 fix, 50-step GRPO, torchtitan and 2×L4. $3 ceiling, each run logged under Cloud runs.
+- **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning adapter checks, and the Muse Spark script-map gate; LoRA and GRPO ground truths on L4.
+- **Next:** Spark Open log triage on Baseten, a GPU fallback when an L4 won't schedule, the vLLM serving probe, the Muse Spark / Spark Open Pareto sweep; plan table below.
 
 ## Known limits, on purpose
 
@@ -104,10 +18,19 @@ Updated Tue Oct 27, evening ET.
   isn't told apart from the policy's old log-probs, so it counts as forward.
 - Agent sampler: a task's key hashes its first call without the system prompt, so a timestamp or
   id in the first user message still defeats the top-up's skip; tasks that all open with the same
-  call can't be topped up. A run with no model calls for 5 minutes is stopped as stalled.
+  call can't be topped up. A run with no model call for 2 minutes (and none in flight) is stopped as stalled, so a coding agent's tool step longer than that is cut. Which task is stuck in its tool can't be told at the proxy from one that finished on a tool call (a submit, a passing test run), so none is singled out: the run's stall is the signal, and selection says how many tasks ended on a tool call and that up to the script's workers of them may be stuck; those tasks keep the proxy's own reading (done).
   The proxy's refusals carry `x-should-retry: false`, which the OpenAI SDKs honour; other
   clients may back off on them. Side calls (judges, sub-agents) start tasks of their own.
 - In-flight mode: an eval or checkpoint pause inside a window can raise a false step-time alert.
+- GPU fallback (L4 to A10 to L40S after 2 min, Nov 1): a job's budget pre-check prices the next
+  point at the GPU asked for, so after a fallback a job can overspend by about one point; an A10
+  run is never stepped up from (the ladder starts at L4), and an A10 that fit doesn't prove an L4
+  would; a follow-up whose parent ran on an A10 asks for an A10, which has no fallback; an image
+  change waits the 2 minutes for an L4 again; up to two waiting threads per job can linger for
+  30 min; an L4 scheduled just after the cutoff runs a few uncounted seconds before it's ended.
+- Spark Open triage (item 29, behind harness.spark_open_triage): calls run one after another
+  after the probes, up to 30 s each, outside the job's probe time budget and with no cancel check;
+  the quote check only asks that the quoted line (8 characters or more) appears in the log tail.
 
 ## AMD session (Thu Oct 29): what the droplet needs
 
@@ -174,24 +97,24 @@ included. Hero lenses first.
 | **Other lenses** | | | |
 | 16 | LM pretraining: throughput, MFU, loader probe, stability signals (lens) | main | 0 |
 | 17 | LR range test (lens, contract) | not started | 3 |
-| 18 | Checkpoint resume exact-match (lens, contract, hygiene) | not started | 3 |
+| 18 | Checkpoint resume exact-match (lens, contract, hygiene) | local: what the script's torch.save is given (weights with or without optimizer state, LR schedule, RNG, step; HF Trainer's optimizer.pt / scheduler.pt / rng_state by name) becomes `hygiene.resume_mismatch`. A content check, not a resumed run replayed step for step | 3 |
 | 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
 | 20 | Serving probes on vLLM for B's model (contract) | hooks on main; local: the serving image (vLLM 0.6.4.post1, its own torch) and routing; startup check and first probe wait for a yes | 3 + paid run |
 | 21 | Retrieval probes through an adapter (lens) | local: encode, faiss add/train/search timed with items a second; a stage after training isn't reached by a probe | 3 |
 | 22 | GNN probes through an adapter (lens) | local: nodes, edges, seeds, nodes per hop, largest batch; sampling time is the data phase; needs a PyG script on a GPU | 3 |
 | 23 | Vision probes through an adapter (lens) | local: images per batch, resolution, channels-last; images/s from samples; needs a vision script on a GPU | 2 |
 | 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
-| 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | not started | 3 |
+| 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | local: findings `hygiene.stale_checkpoint` (checkpoint dirs sent with the code), `hygiene.cache_not_keyed` (a fixed-path `if exists: load`), `generation.truncated` (over 10%, Wilson interval), `hygiene.identical_outputs` (two weight states, same tokens on every compared input). Not yet on a GPU run | 3 |
 | 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
 | 27 | In-flight collector (feature, contract) | local (`recorder/inflight.py`, `preflight watch`); getting the live record to the guide waits on C | 1 |
-| 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | partial | 4 |
+| 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | Nov 1, CPU probes of each framework's own loop (tests/test_adapters.py; tiny random models and synthetic data, shaped on each project's public example, since this workspace can't download from the Hub): **HF Trainer working** (transformers 5.21; also on L4 in the LoRA ground truth), **TRL working** (SFTTrainer, trl 1.17; GRPOTrainer on L4 in `a-gt-grpo-l4-3`), **Lightning working** (2.6.6; its planned run length now read from Trainer.fit). All three: steps counted, phase split, planned steps 40 of 40. **torchtitan not confirmed**: 0.4.0's trainer defaults to CUDA and doesn't import in a CPU-only install, so it needs a GPU run (and a tokenizer and dataset the wheel doesn't ship) | 3 of 4 |
 | **Muse Spark** | | | |
 | 29 | Spark Open triage of every probe log on Baseten, every call logged (contract) | client on main, triage not wired | 3 |
 | 30 | Spark Open checks each claim against the raw probe numbers (competitive #5) | not started | 5 |
 | 31 | Spark diagnosis: traces and plots as images, search grounding, cited findings (contract) | not started | 5 |
 | 32 | Glimmer host proposal with B (competitive #6) | not started | 2 |
 | **AMD** | | | |
-| 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); session this morning | 2 + droplet |
+| 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); blocked: the AMD Developer Cloud account is on a verification hold (Oct 31 evening). Session Sunday 9 AM if it clears, else to the noon cut with AMD answers from datasheets and the cross-GPU model, labelled not measured | 2 + droplet |
 | 34 | Droplet idle watchdog (contract) | not started (B's sweep has an uptime ledger) | 2 |
 | **Platform and gaps** | | | |
 | 35 | Job store, queue, leases, reaper, probe cache, sandbox policy, migrations, token caps, AMD offline (gaps 1, 2, 3, 6, 8, 9, 11) | main | 0 |
@@ -214,7 +137,7 @@ included. Hero lenses first.
 | 51 | Rollout time within 20%: GRPO zoo script and an unseen TRL script | blocked on 11, 12 | 2 + paid runs |
 | 52 | Agent run total cost inside the 90% interval: a full benchmark vs the 30-task sample | blocked on 7 | 2 + API spend |
 | 53 | Planted problems caught (bug zoo) | LoRA eval OOM caught; nanoGPT not yet on a GPU | 1 + paid run |
-| 54 | Cost of one Preflight run under $1 and under 5 minutes | $0.10 GPU, but 6 min 45 s on Oct 28: over 5 min | 3 |
+| 54 | Cost of one Preflight run under $1 and under 5 minutes | **miss**: $0.10 GPU, but 6 min 45 s upload to record on Oct 28 (`a-smoke-l4-main-4`, measured), and later runs waited 14 to 26 min for an L4; the GPU fallback (next) addresses the wait | 3 |
 
 **Total left: about 113 hours of A's work (was 138 in this morning's first version) (sum of the column, before paid runs)**, against roughly 30 working hours to noon Sunday. The
 order the PM set (hero lenses, then the rest) is the order I work in; Chiya's cuts at noon Sunday
@@ -261,6 +184,19 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Oct 31 11:30 | `a-gt-lora-l4-4` (41197146925): 120 bare steps ran (median 1.79 s, peak 17.78 GB allocated, 23.21 GB reserved); the recorder half failed at once on root's dataset locks in the shared HF cache (fixed, 82d6404) | L4 | about 26 queued, 6.5 on the L4 | about $0.09 GPU (estimate) |
 | Oct 31 20:51 | `a-startup-check-8` (41240812675): ok, both images; CPU probe 9 steps as uid 61000 | none (CPU sandbox) | 2.3 | under $0.01 (estimate) |
 | Oct 31 20:54 | `a-gt-lora-l4-5` (41241033277): bare run OOM at step 200, the first eval, at 22.13 GB (20.61 GiB) allocated, 23.37 GB reserved; the Oct 28 probe caught it at 21.9 GB (20.4 GiB). Recorder 5 + 40 steps ok; hook overhead median 1.010 (95% CI 1.004–1.017, 20 pairs), synced phase steps 1.084 (0.99–1.20, 19 pairs) [measured] | L4 | about 20 queued, 11 on the L4 | about $0.15 GPU at list (estimate) |
+| Oct 31 21:26 | `a-gt-grpo-l4` (41243558415): GRPO smoke, OOM before the first step in both runs (20.91 GiB allocated, asked 2.32 GiB more); fp32 policy and reference with 16 completions x 152k vocab, likely [inference] | L4 | about 2.5 on the L4 | about $0.03 GPU (estimate) |
+| Oct 31 23:02 | `a-agent-sample-1` (41250821790): D's agent eval, 30 of 500 tasks through the proxy (our key outside the sandbox), all 30 done in 1–4 turns, 0 cached input tokens, 470 calls refused past the sample, script wall 49 s | none (CPU sandbox + worker) | about 3 | **$0.4289 of Muse Spark calls** [measured by the proxy at the price table's rate]; CPU under $0.02 (estimate) |
+| Nov 1 01:04 | `a-gt-grpo-l4-2` (41259481848): GRPO smoke at 1 prompt (8 completions), fp32 weights, Adafactor: OOM again before the first step in both runs: 16.36 GiB allocated plus 3.95 GiB reserved but unallocated (fragmentation), asking 2.00 GiB more; peak allocated 19.88 GB (18.5 GiB) [measured] | L4 | about 3.5 on the L4 | about $0.05 GPU (estimate) |
+| Nov 1 01:19 | `a-gt-grpo-l4-3` (41260610897): GRPO smoke **fits** with expandable_segments: 4 bare + 5 recorder steps ok, peak 21.62 GB (20.14 GiB) allocated, 22.99 GB (21.41 GiB) reserved. Phase split rollout 95.3%, backward 2.4%, forward 1.2%, reference 0.8%, optimizer 0.2% [measured]. Per-prompt pass: 7 of 160 completions correct, 4.4% (Wilson 95% 2.1–8.8%); 5 of 20 prompts had any correct answer; 15 of 20 (75%, 53–89%) had zero reward spread, all of them all-wrong [measured]. Truncation not measured: TRL passes the 512 cap in generation_config, which the recorder didn't read (fixed, a test added); longest completion 512, p95 426. No overhead figure (3 steps) | L4 | about 17 queued, 9 on the L4 | about $0.12 GPU at list (estimate) |
+| Nov 1 03:32 | `a-agent-builds-1` (41269611387): D's agent eval, 100 more of 500 MBPP tasks (the Oct 31 record's 30 skipped), all 100 done in 1–4 turns (1: 28, 2: 29, 3: 38, 4: 5), 188 tool calls, 0 errors, 0 cached of 659,276 input tokens, longest context 10,383 tokens; per-task wall (whole task, tools included) median 4.1 s, p95 7.6, max 9.2; script wall 127 s. **Planted tool loop never fired**: no stall, so no sampled build failed run_tests; runaway 0 of 130 sampled so far, one-sided 95% upper bound 2.3% (0/100 alone: 3.0%) [measured, Clopper-Pearson]. Per task median $0.0096, mean $0.0124 ($0.0052–0.0353); all 130 tasks' mean $0.0128 × 500 ≈ $6.4 for the whole run [derived] | none (CPU sandbox + worker) | about 3 | **$1.2371 of Muse Spark calls** [measured by the proxy]; CPU under $0.02 (estimate) |
+| Nov 1 04:28 | `a-startup-check-5` (41273207191) ok; `a-deploy-main-5` (41273278185) deployed the runner from ws-a 5344a9b at 04:30 | none | about 2 | under $0.01 (estimate) |
+| Nov 1 04:30 | `a-smoke-eval-sweep-l4` (41273326647): D's eval sweep through the runner, record 01M6ANZ653VDK1TM5W9CDHFAP7. **No measurement**: its one probe ended with "The probe sandbox ended without a result" after 1,280 s (04:30:44 to 04:52:05). Static finding read.eval.activation_dump only; no truncation figure. Likely [inference]: about 14 min waiting for an L4, then the sandbox exec's 450 s limit (the 360 s probe timeout + 90 s slack) killed it before a result line was printed; the 1.5B model isn't prefetched, so its 3.5 GB download sits inside the probe's 360 s. Not confirmed: the runner's logs can't be published | L4 | 21 counted, of which about 7.5 likely on the GPU [inference] | record: $0.2845 GPU (counts the whole 1,280 s, queue included) + $0.3379 sandbox CPU and memory (estimate at the $0.95/h guess rate) + $0.0173 Muse Spark (pre-gate runner, our zoo script) = $0.64 by the record, over the $0.40 stated; GPU billed is likely about $0.10 (estimate) |
+| Nov 1 04:52 | `a-stop-main-5` (41274735821): runner stopped | none | 1 | under $0.01 (estimate) |
+| Nov 1 05:40 | `a-startup-check-5`, `a-deploy-main-5` (41277823019, 41277897291) and an **unintended** `a-smoke-eval-sweep-l4` rerun (41277947615): my batch script reused the head of the earlier one. Cancelled at 05:47 and the runner stopped (`a-stop-main-6`, 41278250717); its job had reached probing at 05:42:44, most likely still waiting for an L4. It showed the Muse Spark gate holding: no map refinement | L4 (if one came) | at most 5 | at most $0.15 (estimate), counted against the night's $3 |
+| Nov 1 05:48 | `a-prefetch-main-3` (41278305703): DeepSeek-R1-Distill-Qwen-1.5B, all-MiniLM-L6-v2, timm resnet50.a1_in1k, and the gsm8k, natural-questions and beans datasets into `preflight-weights`; `a-startup-check-7/8`, `a-deploy-main-7/8` ok | none (CPU) | about 6 | under $0.05 (estimate) |
+| Nov 1 05:51 | `a-smoke-retrieval_st-l4` (41278502598): never reached Modal, the workflow refused the name (underscores); runner stopped by `a-stop-main-7` | none | 0 | $0 |
+| Nov 1 05:54 | `a-smoke-retrieval-st-l4` (41278712794): D's retrieval script. **No measurement**: requirements.txt didn't install. Under the probe's uid, pip walked an unreadable PYTHONPATH entry (/root) and raised PermissionError (fixed: b60af69, pip -I). Points 2 and 3 skipped by the rule. Static finding read.retrieval.small_batch only. Runner stopped (`a-stop-main-8`) | L4 | about 0.1 (6 s) | $0.0031 by the record (GPU + sandbox estimate) |
+| Nov 1 06:04 | `a-startup-check-10`, `a-deploy-main-10` ok (runner from ws-a da80524, the pip fix in); `a-smoke-retrieval-st-l4` (41279387340): **no measurement**, job cancelled at its 15-minute limit while still in its first probe (record 01M6AVDKBTR3BN0PFTKSXQJ73A has no probe and $0 of cost); most likely the whole 15 minutes in Modal's queue for an L4 [inference], as the earlier runs waited 14 to 26 min. Fix: fall back to A10, then L40S, after 2 min (66bb070). Runner stopped (`a-stop-main-10`) | L4 (if one came) | 15 in the job, likely all queued | $0 by the record; at most about $0.44 had it run the whole time (estimate) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,

@@ -499,3 +499,101 @@ def test_an_agent_script_that_never_calls_the_proxy_fails_with_a_reason(tmp_path
 	with pytest.raises(PermanentError) as exc:
 		run_pipeline(request, _Ctx(), d)
 	assert exc.value.code == "probe.no_agent_calls"
+
+
+# ---------------------------------------------------------------- JobRequest.patch (contract 0.5.0)
+
+PATCH = """--- a/train.py
++++ b/train.py
+@@ -6,3 +6,3 @@
+ lr = 0.1
+-model = torch.nn.Linear(4, 4)
++model = torch.nn.Linear(4, 4, bias=False)
+ opt = torch.optim.SGD(model.parameters(), lr)
+"""
+
+
+def test_a_verify_with_a_patch_runs_the_fix_against_the_records_own_code(tmp_path):
+	parent, _ = _parent(tmp_path)
+	runner = LossRunner()
+	rec = run_pipeline(_on(parent, "verify", patch=PATCH), _Ctx(), _deps(tmp_path, runner))
+	by = {c["id"]: c["files"]["train.py"] for c in runner.calls}
+	v = next(k for k in by if k.startswith("v") and "-" not in k)
+	assert (
+		"bias=False" in by[v] and "bias=False" not in by[f"{v}-base"] and "bias=False" not in by[f"{v}-seed"]
+	)
+	ev = {e.metric: e.value for e in rec.findings[-1].evidence}
+	assert str(ev["verify.patch"]).startswith("sha256:")
+
+
+def test_a_probe_with_a_patch_runs_the_patched_code(tmp_path):
+	parent, _ = _parent(tmp_path)
+	runner = LossRunner()
+	run_pipeline(_on(parent, "probe", knobs={"batch_size": 4}, patch=PATCH), _Ctx(), _deps(tmp_path, runner))
+	assert all("bias=False" in c["files"]["train.py"] for c in runner.calls)
+
+
+def test_a_patch_that_doesnt_apply_or_adds_a_file_is_refused(tmp_path):
+	parent, _ = _parent(tmp_path)
+	bad = PATCH.replace("torch.nn.Linear(4, 4)\n", "torch.nn.Linear(8, 8)\n")
+	with pytest.raises(InvalidSubmission) as exc:
+		run_pipeline(_on(parent, "verify", patch=bad), _Ctx(), _deps(tmp_path, LossRunner()))
+	assert exc.value.code == "patch.does_not_apply"
+	new = "--- /dev/null\n+++ b/evil.py\n@@ -0,0 +1 @@\n+import os\n"
+	with pytest.raises(InvalidSubmission) as exc:
+		run_pipeline(_on(parent, "verify", patch=new), _Ctx(), _deps(tmp_path, LossRunner()))
+	assert exc.value.code == "patch.not_allowed"
+
+
+SHIFT = "--- a/train.py\n+++ b/train.py\n@@ -1,3 +1,4 @@\n \n import torch\n+import os\n batch_size = 8\n"
+
+
+def test_a_patch_that_moves_lines_still_sets_the_knobs_and_its_probes_are_marked(tmp_path):
+	"""Review, Oct 31: knobs were found by their line in the unpatched code."""
+	parent, _ = _parent(tmp_path)
+	runner = LossRunner()
+	rec = run_pipeline(
+		_on(parent, "probe", knobs={"batch_size": 4}, patch=SHIFT), _Ctx(), _deps(tmp_path, runner)
+	)
+	src = runner.calls[-1]["files"]["train.py"]
+	assert "import os" in src and "batch_size = 4" in src
+	new = [p for p in rec.probes if p.id not in {q.id for q in parent.probes}]
+	assert new and all(p.status == "ok" and p.extras.get("patched") == 1.0 for p in new)
+
+
+def test_a_knob_on_a_line_the_patch_edits_still_lands_on_its_own_literal():
+	"""Review, Oct 31: an edited knob line kept its old number and the override hit another loader."""
+	from preflight.harness.static import map_static
+	from preflight.recorder.overrides import apply_overrides
+	from preflight.runner.patches import apply_patch, relocate_knobs
+
+	src = ("import os\nimport sys\nfrom torch.utils.data import DataLoader\n"
+		"train = DataLoader(ds_train, batch_size=32)\nval = DataLoader(ds_val, batch_size=64)\n")  # fmt: skip
+	diff = ("--- a/train.py\n+++ b/train.py\n@@ -1,5 +1,4 @@\n import os\n-import sys\n"
+		" from torch.utils.data import DataLoader\n-train = DataLoader(ds_train, batch_size=32)\n"
+		"+train = DataLoader(ds_train, batch_size=32, num_workers=4)\n val = DataLoader(ds_val, batch_size=64)\n")  # fmt: skip
+	files = {"train.py": src}
+	sm = map_static(files, entrypoint="train.py")
+	patched = apply_patch(files, diff)
+	out = apply_overrides(patched, relocate_knobs(sm, files, patched), {"batch_size": 7})["train.py"]
+	assert "train = DataLoader(ds_train, batch_size=7, num_workers=4)" in out and "batch_size=64" in out
+
+
+def test_a_knob_whose_line_loses_it_never_lands_on_a_sibling_with_the_same_literal():
+	"""Review, Oct 31: two loaders both at batch_size=32; the patch takes it off train's line."""
+	import pytest as _pytest
+
+	from preflight.harness.static import map_static
+	from preflight.recorder.overrides import OverrideError, apply_overrides
+	from preflight.runner.patches import apply_patch, relocate_knobs
+
+	src = ("from torch.utils.data import DataLoader\n"
+		"train = DataLoader(ds_train, batch_size=32)\nval = DataLoader(ds_val, batch_size=32)\n")  # fmt: skip
+	diff = ("--- a/train.py\n+++ b/train.py\n@@ -1,3 +1,3 @@\n from torch.utils.data import DataLoader\n"
+		"-train = DataLoader(ds_train, batch_size=32)\n-val = DataLoader(ds_val, batch_size=32)\n"
+		"+train = DataLoader(ds_train, batch_sampler=bs)\n+val = DataLoader(ds_val, batch_size=32, num_workers=4)\n")  # fmt: skip
+	files = {"train.py": src}
+	sm = map_static(files, entrypoint="train.py")
+	patched = apply_patch(files, diff)
+	with _pytest.raises(OverrideError):
+		apply_overrides(patched, relocate_knobs(sm, files, patched), {"batch_size": 7})

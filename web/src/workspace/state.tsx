@@ -13,9 +13,11 @@ import {
 	useRef,
 	type ReactNode,
 } from "react";
+import { type Limits, NO_LIMITS } from "../guide/limits";
 import { currentKnobs } from "./record/model";
 import type { KnobValue, LoadedRecord, Objective, ObjectiveKind, Prediction } from "./record/types";
 import type { PredictionProvider } from "./provider/PredictionProvider";
+import { loadRate, type RateOverride, saveRate, withRate } from "./rate";
 import { recordKnobLatency } from "./telemetry";
 
 export interface Snapshot {
@@ -56,6 +58,12 @@ export interface State {
 	ghost: string | null;
 	playhead: number;
 	trace: TraceEntry[];
+	/** The visitor's limits on the guide (guide/limits.ts): hard limits for both tours. */
+	limits: Limits;
+	/** A guide suggestion the visitor's own knob move set aside (their move wins); cleared by the next one. */
+	setAside: Proposal | null;
+	/** The visitor's own rate for this job's cost (workspace/rate.ts); null: the table's rate. */
+	rate: RateOverride | null;
 }
 
 type Action =
@@ -70,20 +78,34 @@ type Action =
 	| { type: "ghost"; id: string | null }
 	| { type: "playhead"; at: number }
 	| { type: "trace"; entry: TraceEntry }
+	| { type: "limits"; limits: Limits }
+	| { type: "rate"; rate: RateOverride | null }
 	| { type: "reset"; knobs: Record<string, KnobValue> };
 
 const TRACE_LIMIT = 40;
 
 function reducer(state: State, action: Action): State {
 	switch (action.type) {
-		case "set":
+		case "set": {
 			if (action.by === "guide" && state.pinned.has(action.knobId)) return state;
-			return {
-				...state,
-				knobs: { ...state.knobs, [action.knobId]: action.value },
-				previous: action.previous,
-				lastChange: { knobId: action.knobId, by: action.by },
-			};
+			const knobs = { ...state.knobs, [action.knobId]: action.value };
+			const p = state.proposal;
+			// The visitor's own move always wins: a pending suggestion is set aside, never a lock.
+			// If they moved a different knob, the guide's previewed move goes back to where it was.
+			if (action.by === "user" && p) {
+				if (p.knobId !== action.knobId) knobs[p.knobId] = p.from;
+				return {
+					...state,
+					knobs,
+					previous: action.previous,
+					lastChange: { knobId: action.knobId, by: action.by },
+					proposal: null,
+					setAside: p,
+					highlight: state.highlight.filter((h) => !h.startsWith("knob:")),
+				};
+			}
+			return { ...state, knobs, previous: action.previous, lastChange: { knobId: action.knobId, by: action.by } };
+		}
 		case "pin": {
 			const pinned = new Set(state.pinned);
 			if (action.pinned) pinned.add(action.knobId);
@@ -100,7 +122,7 @@ function reducer(state: State, action: Action): State {
 		case "propose": {
 			const rest = state.highlight.filter((h) => !h.startsWith("knob:"));
 			const moving = action.proposal ? [`knob:${action.proposal.knobId}`] : [];
-			return { ...state, proposal: action.proposal, highlight: [...rest, ...moving] };
+			return { ...state, proposal: action.proposal, setAside: action.proposal ? null : state.setAside, highlight: [...rest, ...moving] };
 		}
 		case "focus":
 			return { ...state, focus: action.node };
@@ -116,8 +138,13 @@ function reducer(state: State, action: Action): State {
 			const rest = state.trace.filter((e) => e.id !== action.entry.id);
 			return { ...state, trace: [...rest, action.entry].slice(-TRACE_LIMIT) };
 		}
+		case "limits":
+			return { ...state, limits: action.limits };
+		case "rate":
+			// A new rate re-prices every dollar: no delta badge may credit the last knob with it.
+			return { ...state, rate: action.rate, previous: null, lastChange: null };
 		case "reset":
-			return { ...state, knobs: action.knobs, previous: null, lastChange: null, proposal: null, highlight: [] };
+			return { ...state, knobs: action.knobs, previous: null, lastChange: null, proposal: null, setAside: null, highlight: [] };
 	}
 }
 
@@ -135,6 +162,12 @@ export interface WorkspaceActions {
 	setPlayhead(at: number): void;
 	trace(entry: TraceEntry): void;
 	reset(): void;
+	/** Replace the visitor's limits (the constraints panel). */
+	setLimits(limits: Limits): void;
+	/** Price this job at the visitor's own rate (null: back to the table's), kept per job in this browser. */
+	setRate(rate: RateOverride | null): void;
+	/** "Not this": the value is excluded for the session and the knob is set aside for the tours. */
+	decline(knobId: string, value: KnobValue): void;
 }
 
 export interface Workspace {
@@ -144,6 +177,8 @@ export interface Workspace {
 	provider: PredictionProvider;
 	state: State;
 	estimates: Prediction;
+	/** The same setting at the table's rates (the engine's own dollars), for the cost line's quantity. */
+	tableEstimates: Prediction;
 	actions: WorkspaceActions;
 }
 
@@ -152,7 +187,7 @@ const Ctx = createContext<Workspace | null>(null);
 export function WorkspaceProvider({
 	record,
 	recordRef,
-	provider,
+	provider: baseProvider,
 	children,
 }: {
 	record: LoadedRecord;
@@ -175,10 +210,17 @@ export function WorkspaceProvider({
 		ghost: null,
 		playhead: 0,
 		trace: [],
+		limits: NO_LIMITS,
+		setAside: null,
+		rate: loadRate(ref),
 	}));
 
 	const changeStart = useRef<number | null>(null);
-	const estimates = useMemo(() => provider.predict(record, state.knobs), [provider, record, state.knobs]);
+	// Every reader (dials, timeline, guide, limits) goes through this provider, so the visitor's rate
+	// reaches every dollar at once.
+	const rated = useMemo(() => withRate(baseProvider, state.rate), [baseProvider, state.rate]);
+	const estimates = useMemo(() => rated.predict(record, state.knobs), [rated, record, state.knobs]);
+	const tableEstimates = useMemo(() => (state.rate ? baseProvider.predict(record, state.knobs) : estimates), [state.rate, baseProvider, record, state.knobs, estimates]);
 
 	// Knob latency is measured to the frame after the new readouts commit, which is what the
 	// person sees; the contract's target is under 400 ms at p95.
@@ -240,13 +282,30 @@ export function WorkspaceProvider({
 			setPlayhead: (at) => dispatch({ type: "playhead", at }),
 			trace: (entry) => dispatch({ type: "trace", entry }),
 			reset: () => dispatch({ type: "reset", knobs: currentKnobs(record) }),
+			setLimits: (limits) => dispatch({ type: "limits", limits }),
+			setRate: (rate) => {
+				saveRate(ref, rate);
+				dispatch({ type: "rate", rate });
+			},
+			decline: (knobId, value) => {
+				const l = latest.current.state.limits;
+				const ex = l.excluded[knobId] ?? [];
+				dispatch({
+					type: "limits",
+					limits: {
+						...l,
+						excluded: { ...l.excluded, [knobId]: ex.includes(value) ? ex : [...ex, value] },
+						declined: l.declined.includes(knobId) ? l.declined : [...l.declined, knobId],
+					},
+				});
+			},
 		}),
-		[setKnob, record],
+		[setKnob, record, ref],
 	);
 
 	const value = useMemo<Workspace>(
-		() => ({ record, recordRef: ref, provider, state, estimates, actions }),
-		[record, ref, provider, state, estimates, actions],
+		() => ({ record, recordRef: ref, provider: rated, state, estimates, tableEstimates, actions }),
+		[record, ref, rated, state, estimates, tableEstimates, actions],
 	);
 	return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

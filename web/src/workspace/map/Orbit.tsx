@@ -1,6 +1,7 @@
 import { type Node, type NodeProps, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
+import { MOVE_MS, moveEase, useTweenedText } from "../../lib/tween";
 import { fmt } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { useMapOverlays } from "../../registry";
@@ -18,6 +19,9 @@ interface BgData extends Record<string, unknown> {
 	fit: Fit;
 	evalStalled: boolean;
 	coreNumber: string;
+	/** The number behind coreNumber, so it can travel with the ring (null: abstaining). */
+	coreValue: number | null;
+	coreUnit: string;
 	coreCaption: string;
 	coreStatus: string;
 }
@@ -38,6 +42,10 @@ function phaseLabel(phase: string): string {
 
 const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<BgData>>) {
 	const { layout, highlightPhases, fit, evalStalled } = data;
+	const coreRef = useRef<HTMLSpanElement>(null);
+	const coreUnit = data.coreUnit;
+	const coreFormat = useMemo(() => (v: number) => fmt(v, coreUnit), [coreUnit]);
+	useTweenedText(coreRef, data.coreValue, coreFormat, { ms: MOVE_MS, ease: moveEase });
 	const { memory } = layout;
 	// A full ring is this GPU's memory; what doesn't fit continues on the dashed outer ring.
 	const scale = memory.capacity ?? memory.total ?? 1;
@@ -128,7 +136,9 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 				) : null}
 			</svg>
 			<div className="pf-core">
-				<span className="pf-core__num">{data.coreNumber}</span>
+				<span ref={coreRef} className="pf-core__num">
+					{data.coreNumber}
+				</span>
 				<span className="pf-core__cap">{data.coreCaption}</span>
 				{fit !== "unknown" ? <FitMark fit={fit} label={data.coreStatus} /> : null}
 			</div>
@@ -193,6 +203,8 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				fit,
 				evalStalled: failing,
 				coreNumber: trusted(peak) ? fmt(peak.point, memT?.unit ?? "bytes") : t("readout.abstain_short"),
+				coreValue: trusted(peak) ? peak.point : null,
+				coreUnit: memT?.unit ?? "bytes",
 				coreCaption:
 					memT && memT.unit !== "bytes"
 						? t(memT.label_key)
@@ -225,6 +237,13 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 			const rank = { critical: 3, error: 2, warn: 1, info: 0 } as const;
 			if (!prev || rank[f.severity] > rank[prev.severity as keyof typeof rank]) findingsByNode.set(f.node_id, f);
 		}
+		const drawn = new Set(layout.nodes.map((n) => n.graphId).filter((x): x is string => x !== null));
+		const hiddenParents = new Set(
+			state.highlight
+				.filter((h) => !drawn.has(h))
+				.map((h) => record.graph.nodes.find((g) => g.id === h)?.parent)
+				.filter((x): x is string => !!x),
+		);
 		const pfNodes: Node<NodeData>[] = layout.nodes.map((n) => {
 			const share = n.share !== null ? t("map.node.share", { share: fmt(n.share, "fraction") }) : "";
 			const evalSpike = n.phase === "eval" ? memoryTermBytes(estimates, "eval_spike") : 0;
@@ -244,7 +263,11 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 					node: n,
 					title,
 					meta,
-					accent: state.highlight.includes(n.id) || (n.graphId !== null && state.highlight.includes(n.graphId)),
+					accent:
+						state.highlight.includes(n.id) ||
+						(n.graphId !== null && state.highlight.includes(n.graphId)) ||
+						// A highlighted node the map doesn't draw (a group's child) lights its parent.
+						(n.graphId !== null && hiddenParents.has(n.graphId)),
 					dim: !!state.focus && state.focus !== n.id,
 					fails: n.phase === "eval" && failing,
 					finding: finding ? finding.title : null,
@@ -283,6 +306,10 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				minZoom={0.3}
 				maxZoom={2}
 				nodesDraggable={false}
+				// The node's own button takes focus (with its ring); React Flow's wrapper would take a
+				// second, ringless stop (audit finding 10).
+				nodesFocusable={false}
+				edgesFocusable={false}
 				nodesConnectable={false}
 				panOnDrag={false}
 				zoomOnScroll={false}

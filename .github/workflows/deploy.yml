@@ -119,3 +119,14 @@ jobs:
           set -euo pipefail
           uv run modal run --env main api/app.py::startup_check
           uv run modal deploy --env main api/app.py
+      - if: steps.has.outputs.api == 'true'
+        # No warm containers: the deployed fix app bills only while a race runs (the API starts
+        # one only with c.fix_loop on). Its startup check makes no model call.
+        name: Check the fix app's startup (no model call), then deploy it (environment main)
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          set -euo pipefail
+          uv run modal run --env main api/fix_app.py::startup_check
+          uv run modal deploy --env main api/fix_app.py

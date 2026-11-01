@@ -102,9 +102,12 @@ class FakeProc:
 
 class FakeSandbox:
 	def __init__(self, gpu, fail=False):
-		self.gpu, self.fail, self.terminated, self.execs = gpu, fail, False, 0
+		self.gpu, self.fail, self.terminated, self.execs, self.ready = gpu, fail, False, 0, 0
 
 	def exec(self, *args, timeout=None):
+		if args == ("true",):  # the runner's wait for the container (and its GPU)
+			self.ready += 1
+			return FakeProc(self)
 		assert args == ("python", "-m", "preflight.probes.remote") and timeout > 0
 		self.execs += 1
 		return FakeProc(self)
@@ -211,7 +214,9 @@ def test_duration_and_cost_are_measured_by_the_worker_not_reported_by_the_sandbo
 
 	class Slow(FakeSandbox):
 		def exec(self, *args, timeout=None):
-			t[0] += 120.0  # two minutes on the worker's clock
+			t[0] += (
+				600.0 if args == ("true",) else 120.0
+			)  # ten minutes' wait for a GPU, then a 2-minute probe
 			return super().exec(*args, timeout=timeout)
 
 	from dataclasses import replace
@@ -307,3 +312,84 @@ def test_a_serving_scripts_probes_ask_for_the_serving_image_and_key_the_cache_ap
 	)
 	assert s.image == "serving"
 	assert cache_key(s, "L4", "t") != cache_key(replace(s, image="probe"), "L4", "t")
+
+
+def test_the_wait_for_a_gpu_is_neither_probe_time_nor_cost_and_a_result_survives_a_bad_wait():
+	t = [0.0]
+
+	class Queued(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				t[0] += 900.0  # fifteen minutes in Modal's queue for an L4
+			return super().exec(*args, timeout=timeout)
+
+	class BadWait(FakeProc):
+		def wait(self):
+			raise TimeoutError("exec limit while deleting a big dump")
+
+	class SlowCleanup(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			p = super().exec(*args, timeout=timeout)
+			return p if args == ("true",) else BadWait(self)
+
+	with SandboxRunner(lambda g: Queued(g), clock=lambda: t[0]) as run:
+		r = run(spec(), "L4", should_stop=lambda: False)
+		assert r.probe.duration_s == 0.0 and run.queued_s == 900.0 and run.billed_usd(lambda g: 3.6) == 0.0
+	with SandboxRunner(lambda g: SlowCleanup(g)) as run:
+		assert run(spec(), "L4", should_stop=lambda: False).probe.status == "ok"
+
+
+def test_an_l4_that_wont_schedule_falls_back_to_an_a10_priced_as_an_a10(monkeypatch):
+	import time as _time
+
+	from preflight.runner import sandbox_runner
+
+	priced = []
+	real_timed = sandbox_runner._timed
+	monkeypatch.setattr(
+		sandbox_runner, "_timed", lambda r, s, sec: priced.append(s.gpu_usd_per_hour) or real_timed(r, s, sec)
+	)
+	from dataclasses import replace
+
+	class Stuck(FakeSandbox):  # Modal never finds an L4 in time
+		def exec(self, *args, timeout=None):
+			if args == ("true",) and self.gpu == "L4":
+				_time.sleep(1.0)
+			return super().exec(*args, timeout=timeout)
+
+	made = []
+
+	def create(gpu):
+		made.append(Stuck(gpu))
+		return made[-1]
+
+	prices = {"L4": 0.80, "A10": 1.10, "L40S": 1.95}
+	with SandboxRunner(create, price=prices.__getitem__, schedule_wait_s=0.1) as run:
+		fb = ("A10", "L40S")  # what the pipeline allows here (none when pinned or ruled out)
+		r = run(replace(spec("p1"), gpu_usd_per_hour=0.80, gpu_fallback=fb), "L4", should_stop=lambda: False)
+		run(replace(spec("p2"), gpu_fallback=fb), "L4", should_stop=lambda: False)  # the A10 keeps serving
+	assert r.probe.status == "ok" and [s.gpu for s in made] == ["L4", "A10"]
+	assert made[0].terminated and run.unscheduled == ["L4"] and run.ran_on == ["A10", "A10"]
+	assert priced == [1.10, 1.10]  # each probe costed at the A10's list price, not the L4's
+	assert set(run.gpu_seconds) == {"A10"}
+
+
+def test_with_no_fallback_allowed_the_runner_waits_for_the_gpu_it_was_given():
+	made = []
+
+	def create(gpu):
+		made.append(FakeSandbox(gpu))
+		return made[-1]
+
+	with SandboxRunner(create, schedule_wait_s=0.0) as run:  # even with no patience, no other GPU
+		assert run(spec("p1"), "L4", should_stop=lambda: False).probe.status == "ok"
+	assert [s.gpu for s in made] == ["L4"] and run.last_ran == "L4"
+
+
+def test_fallbacks_respect_a_pinned_gpu_and_the_visitors_allowed_list():
+	from preflight.runner.pipeline import _fallbacks
+
+	assert _fallbacks("L4", None, False) == ("A10", "L40S")
+	assert _fallbacks("L4", None, True) == ()  # the guide asked for an L4
+	assert _fallbacks("L4", ["L4", "L40S"], False) == ("L40S",)
+	assert _fallbacks("A100-SXM-80GB", None, False) == ()

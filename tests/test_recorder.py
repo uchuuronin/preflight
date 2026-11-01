@@ -141,7 +141,13 @@ def test_extras_carry_the_counts_b_reads_by_name(loop_result):
 	assert x["tokens_per_step"] == 4 * 32
 	assert x["train_loader_batches"] == 100_000 // 4  # the training loader's length, one epoch
 	assert "planned_steps" not in x and "epochs" not in x  # a plain loop says neither
-	assert x["dataset_max_tokens"] == 32 == x["dataset_p999_tokens"]  # fixed blocks of seq_len
+	assert (
+		x["dataset_max_tokens"]
+		== 32
+		== x["dataset_p999_tokens"]
+		== x["dataset_p50_tokens"]
+		== x["dataset_mean_tokens"]
+	)
 	assert 0 < x["dataset_rows_scanned"] <= 100_000 == x["dataset_rows_total"]
 	assert x["samples_per_step"] == 4
 	assert x["micro_steps_per_step"] == 1
@@ -286,6 +292,10 @@ def test_a_grpo_run_splits_rollout_reference_and_reward_and_records_pass_rates(t
 	assert rl.group_size == 4
 	assert rl.pass_rate_per_prompt and all(0 <= x <= 1 for x in rl.pass_rate_per_prompt)
 	assert rl.zero_spread_fraction is not None
+	ex = p.extras  # the counts behind the fraction, for the finding's Wilson interval
+	assert ex["rl_groups"] >= 1 and ex["rl_zero_spread_groups"] / ex["rl_groups"] == pytest.approx(
+		rl.zero_spread_fraction
+	)
 
 
 def test_a_closure_loop_keeps_its_forward_out_of_the_optimizer():
@@ -342,3 +352,76 @@ def test_a_profiled_ddp_probe_keeps_every_rank_in_step():
 	r = run_probe(spec("ddp_loop.py", warmup=1, timed=2, nproc=2, profile=True, timeout_s=240))
 	assert r.probe.status == "ok", (r.probe.error, r.log_tail[-2000:])
 	assert r.probe.extras["ranks_reported"] == 2
+
+
+@needs_transformers
+def test_different_weights_with_identical_outputs_are_counted():
+	r = run_probe(spec("identical_outputs.py", warmup=1, timed=3))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert ex["outputs_compared"] >= 2 and ex["outputs_identical"] == ex["outputs_compared"]
+	# the same outputs across training steps are not counted: a few small steps can leave them equal
+	ex = run_probe(spec("identical_outputs.py", warmup=1, timed=3, args=["--train-between"])).probe.extras
+	assert not ex.get("outputs_compared")
+
+
+def test_checkpoint_contents_are_read_for_a_resume():
+	r = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3))
+	assert r.probe.status == "ok", r.probe.error
+	ex = r.probe.extras
+	assert (
+		ex["checkpoint_saves_seen"] >= 1
+		and ex["checkpoint_has_optimizer"] == 0
+		and ex["checkpoint_has_step"] == 0
+	)
+	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--full"])).probe.extras
+	assert all(ex[f"checkpoint_has_{k}"] == 1 for k in ("optimizer", "scheduler", "rng", "step"))
+	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--lightning"])).probe.extras
+	assert all(ex[f"checkpoint_has_{k}"] == 1 for k in ("optimizer", "scheduler", "rng", "step"))
+	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--data-cache"])).probe.extras
+	assert "checkpoint_saves_seen" not in ex
+	for mode in ("--head-only", "--gan"):  # trained tensors past the dict's start; a second optimizer first
+		ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=[mode])).probe.extras
+		assert ex.get("checkpoint_saves_seen", 0) >= 1 and ex["checkpoint_has_optimizer"] == 0, mode
+
+
+def test_a_cap_given_in_a_generation_config_is_seen():
+	r = run_probe(spec("gen_config_cap.py", warmup=1, timed=3))
+	assert r.probe.status == "ok", r.probe.error
+	g = r.probe.generation
+	assert g.max_new_tokens == 4 and g.truncation_rate is not None and g.truncation_rate > 0
+
+
+def test_a_sandbox_entry_gets_its_result_before_the_probes_files_are_deleted(tmp_path, monkeypatch):
+	from preflight.probes import local
+
+	monkeypatch.setattr(local, "DEFER_CLEANUP", True)
+	monkeypatch.setattr(local, "_DISCARDED", [])
+	r = run_probe(spec("tiny_loop.py", warmup=1, timed=2))
+	assert r.probe.status == "ok", r.probe.error
+	pending = list(local._DISCARDED)
+	assert pending and all(
+		p.name.endswith(".discard") and p.exists() for p in pending
+	)  # set aside, not yet gone
+	local.finish_cleanup()
+	assert not any(p.exists() for p in pending)
+
+
+@needs_transformers
+def test_a_ground_truth_probe_becomes_a_record_with_its_measured_zero_spread():
+	"""runner/gt_record.py: the GRPO record built from a ground-truth run's recorder probe."""
+	from preflight.runner.gt_record import build
+
+	root = FIX / "fake_grpo"
+	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
+	r = run_probe(
+		ProbeSpec(probe_id="gt", files=files, entrypoint="train.py", warmup=2, timed=3, timeout_s=240)
+	)
+	assert r.probe.status == "ok", r.probe.error
+	gt = {"recorder": {"probe": r.probe.model_dump(mode="json", exclude={"kernels", "trace"})}}
+	rec = build(gt, files, "grpo_trl")
+	assert rec.job.lens == "rl" and rec.probes[0].rl.group_size == 4
+	z = [f for f in rec.findings if f.code == "rl.zero_spread"]
+	ex = rec.probes[0].extras
+	share = ex["rl_zero_spread_groups"] / ex["rl_groups"]
+	assert bool(z) == (share > 0.5) and (not z or "95% interval" in z[0].detail)

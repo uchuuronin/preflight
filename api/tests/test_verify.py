@@ -85,3 +85,12 @@ def test_the_command_line_is_the_actions_pass_fail(tmp_path: Path, capsys):
 	assert main([str(b), str(bad)]) == 1
 	out = capsys.readouterr().out
 	assert "FAIL" in out and "effective_batch" in out
+
+
+def test_the_command_line_takes_what_a_fix_may_change(tmp_path: Path):
+	b, a = tmp_path / "b.json", tmp_path / "a.json"
+	b.write_text(json.dumps(record()))
+	a.write_text(json.dumps(fixed()))
+	# A fix that touches evaluation must show the same evaluation still ran: unmeasured is an error.
+	assert main([str(b), str(a), "--keep-eval"]) == 2
+	assert main([str(b), str(a), "--may-change", "throughput_floor, fixed_seed_loss"]) == 0

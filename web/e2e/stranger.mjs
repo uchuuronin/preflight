@@ -4,8 +4,14 @@
 //
 //   node e2e/stranger.mjs                      # against http://127.0.0.1:4173 (vite preview)
 //   BASE_URL=https://preview.example node e2e/stranger.mjs
+//   KNOB_MS_OUT=out/knob_ms.json node e2e/stranger.mjs   # also save the knob timings
 //
+// KNOB_MS_OUT writes the knob-to-readout timings in the shape B's validation scorer reads
+// (python/preflight/corpus/validate.py manifest: "knob_ms"), so the README's "Knob response"
+// row comes from this run's browser, under the same CPU slowdown.
 // Prints one JSON report; exits 1 when a check fails. Thresholds carry their source.
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { chromium } from "playwright";
 
 const BASE = (process.env.BASE_URL ?? "http://127.0.0.1:4173").replace(/\/$/, "");
@@ -103,8 +109,15 @@ try {
 	const knob = await page.evaluate(() => {
 		const s = window.__preflight?.samples() ?? [];
 		const sorted = [...s].sort((a, b) => a - b);
-		return { n: s.length, p95: sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : null };
+		return { n: s.length, all: s, p95: sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : null };
 	});
+	if (process.env.KNOB_MS_OUT) {
+		mkdirSync(dirname(process.env.KNOB_MS_OUT), { recursive: true });
+		writeFileSync(
+			process.env.KNOB_MS_OUT,
+			`${JSON.stringify({ knob_ms: knob.all.map((m) => Math.round(m * 10) / 10), base: BASE, cpu_slowdown: CPU_SLOWDOWN, measured_at: new Date().toISOString() }, null, 1)}\n`,
+		);
+	}
 	const after = await page.locator(".pf-dial-wrap").first().textContent();
 	check("moving a knob changes the readouts", knob.n > 0 && before !== after, { changes: knob.n });
 	check(`knob to readout p95 under ${KNOB_P95_MS} ms at ${CPU_SLOWDOWN}x CPU slowdown`, knob.p95 !== null && knob.p95 < KNOB_P95_MS, {
@@ -120,7 +133,9 @@ try {
 	await step.waitFor({ timeout: 10_000 });
 	const said = (await step.textContent())?.trim() ?? "";
 	check("the guide says something", said.length > 0, { said: said.slice(0, 160) });
-	if (await apply.count()) {
+	// Counted when the step is shown: after Apply the tour moves on, possibly to a step with no move.
+	const offered = await apply.count();
+	if (offered) {
 		const knobsBefore = await page.locator(".pf-dock__row").textContent();
 		await apply.first().click();
 		await page.waitForTimeout(500);
@@ -129,7 +144,7 @@ try {
 			changed: knobsBefore !== knobsAfter,
 		});
 	}
-	check("the guide offers a move on the sample", (await apply.count()) > 0);
+	check("the guide offers a move on the sample", offered > 0);
 
 	// ---------- check-in: the data-use notice comes first
 	await page.goto(`${BASE}/#/new`, { waitUntil: "load" });

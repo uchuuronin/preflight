@@ -170,7 +170,15 @@ function angleOf(x: number, y: number): number {
 
 export function layoutOrbit(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>, est: Prediction): OrbitLayout {
 	const top = record.graph.nodes.filter((n) => !n.parent);
-	const loopNodes = top.filter((n) => !isBranch(n));
+	// An agent run's loop is its model call, tools and context, which A's graph keeps inside an
+	// "agent loop" group: for the agent lens a group's children go round the loop in its place.
+	const agent = record.job.lens === "agent";
+	const expand = (list: typeof top) =>
+		list.flatMap((n) => {
+			const kids = record.graph.nodes.filter((c) => c.parent === n.id);
+			return agent && n.kind === "group" && kids.length ? kids : [n];
+		});
+	const loopNodes = expand(top.filter((n) => !isBranch(n)));
 	const branchNodes = top.filter(isBranch);
 	const source = phaseShares(record, knobs, est);
 
@@ -182,7 +190,7 @@ export function layoutOrbit(record: LoadedRecord, knobs: Readonly<Record<string,
 	}
 	let phases = LOOP_PHASES.filter((p) => needed.has(p));
 	// A lens with no phase vocabulary (agent turns, serving) puts its nodes round the loop in order.
-	const generic = phases.length < 2;
+	const generic = agent || phases.length < 2;
 	if (generic) phases = loopNodes.map((n) => n.id);
 
 	const shareOf = (p: string): number => {

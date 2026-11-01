@@ -5,6 +5,7 @@
  * status and interval as the dials show it; an abstaining readout has no numbers, so an
  * export can never print one the cockpit wouldn't.
  */
+import { appliesHere, chosenModel, type RateOverride, tableRate } from "../rate";
 import type { CodeLocation, Estimate, KnobValue, Lens, LoadedRecord, Patch, Readout, Source } from "../record/types";
 import type { EstimateStatus } from "../record/types";
 
@@ -52,7 +53,17 @@ export interface ExportPlan {
 	codeChangesVerified: boolean;
 	/** A link that opens this record read-only (share token or sample id), or null without one. */
 	shareUrl: string | null;
+	/**
+	 * The rate the dollars above are at, so a config, sbatch file or CLI line quotes the same number
+	 * the cockpit showed: the visitor's own when they set one for this GPU or model, else the
+	 * table's (with its row id). Null when the cost has no single rate to quote.
+	 */
+	rate: PlanRate | null;
 }
+
+export type PlanRate =
+	| { kind: "gpu"; gpu: string; usdPerHour: number; source: "visitor" | "table"; priceRow: string }
+	| { kind: "tokens"; model: string; inputPerM: number; outputPerM: number; source: "visitor" | "table"; priceRow: string };
 
 const TRUSTED: ReadonlySet<EstimateStatus> = new Set(["measured", "predicted", "extrapolated"]);
 
@@ -70,6 +81,7 @@ export function exportPlan(
 	estimates: Readonly<Record<string, Estimate | undefined>>,
 	ref: string | null,
 	base: string | null,
+	override: RateOverride | null = null,
 ): ExportPlan {
 	const map = record.job.script_map ?? null;
 	const where = new Map((map?.knobs ?? []).map((k) => [k.id, k]));
@@ -127,5 +139,24 @@ export function exportPlan(
 		patches,
 		codeChangesVerified: code.every(verified),
 		shareUrl: ref && base ? `${base}#/cockpit/${encodeURIComponent(ref)}` : null,
+		rate: planRate(record, knobs, override),
+	};
+}
+
+/** The rate the plan's dollars are at (workspace/rate.ts): the visitor's when it applies here, else the table's. */
+function planRate(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>, o: RateOverride | null): PlanRate | null {
+	const tr = tableRate(record, knobs);
+	if (!tr) return null;
+	const mine = appliesHere(record, knobs, o);
+	if (tr.kind === "gpu") {
+		return { kind: "gpu", gpu: tr.row.gpu, usdPerHour: mine && o?.kind === "gpu" ? o.usdPerHour : tr.usdPerHour, source: mine ? "visitor" : "table", priceRow: tr.row.id };
+	}
+	return {
+		kind: "tokens",
+		model: chosenModel(record, knobs) ?? tr.row.model,
+		inputPerM: mine && o?.kind === "tokens" ? o.inputPerM : tr.row.input_per_m,
+		outputPerM: mine && o?.kind === "tokens" ? o.outputPerM : tr.row.output_per_m,
+		source: mine ? "visitor" : "table",
+		priceRow: tr.row.id,
 	};
 }

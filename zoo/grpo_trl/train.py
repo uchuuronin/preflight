@@ -12,13 +12,36 @@ Preflight must catch every one from a few minutes of probing.
   3. beta 0.04 keeps the KL term, so a whole reference-model forward runs on every micro-step
      (step_time.by_phase.reference).
 
+Caught by the first probe (Oct 31, a-gt-grpo-l4, before this script's settings changed): with 2
+prompts x 8 completions a micro-step, the run ran out of memory on an L4 before its first step, in
+the bare run and the probe alike (20.91 GiB allocated, asking 2.32 GiB more of the 22.06 GiB card)
+[measured]. The 2.32 GiB is exactly the bf16 logits of 16 completions: 16 x 513 x 151,936 x 2 bytes
+[derived]. The script now takes 1 prompt (8 completions) a micro-step and uses Adafactor, whose
+factored state is a few MB where AdamW's is two fp32 copies of the weights (3.7 GiB here), keeping
+fp32 weights so the 1e-6 learning rate still moves them (pure bf16 would round the updates away).
+Neither change is a planted problem; Preflight should show the 2-prompt setting's OOM before it runs.
+The second run (Nov 1, a-gt-grpo-l4-2) ran out again with 3.95 GiB fragmented [measured], so the
+script turns on expandable segments in PyTorch's allocator, also not a planted problem.
+
 Everything is public: the model (Apache-2.0) and GSM8K (MIT). Written for Preflight, not taken
 from any other project.
 """
 
+import contextlib
+import os
 import re
 
+# Not a planted problem: 8 completions' logits leave the allocator fragmented (Oct 31, second run:
+# 3.95 GiB reserved but unallocated when a 2.00 GiB block was asked for), so let it grow segments
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import torch
+
+if torch.cuda.is_available():
+	# also when CUDA was set up before this script ran (a recorder imports torch first)
+	with contextlib.suppress(AttributeError, RuntimeError):
+		torch.cuda.memory._set_allocator_settings("expandable_segments:True")
+
 from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 
@@ -27,7 +50,7 @@ DATASET = "openai/gsm8k"
 MAX_COMPLETION = 512  # planted 1
 GROUP = 8  # planted 2
 BETA = 0.04  # planted 3: the KL term keeps a reference forward on every step
-PROMPTS_PER_STEP = 2
+PROMPTS_PER_STEP = 1  # 8 completions a micro-step (2 ran out of memory on an L4, Oct 31)
 
 SYSTEM = (
 	"Solve the problem. First reason step by step inside <think> </think>, "
@@ -69,6 +92,7 @@ def formatted(prompts, completions, **kwargs):
 args = GRPOConfig(
 	output_dir="out/grpo-qwen",
 	learning_rate=1e-6,
+	optim="adafactor",  # fits an L4 with fp32 weights (AdamW's state would not, Oct 31 review estimate)
 	per_device_train_batch_size=PROMPTS_PER_STEP,
 	gradient_accumulation_steps=4,
 	num_generations=GROUP,

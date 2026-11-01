@@ -137,3 +137,14 @@ def test_requirements_keep_the_image_stack_and_skip_anything_but_plain_pypi_line
 	assert keep == ["sentencepiece==0.2.0", "einops", "rich[jupyter] ; python_version>'3'"]
 	assert any("kept the image's torch 2.5.1" in n for n in notes)
 	assert sum("only plain PyPI" in n for n in notes) == 5
+
+
+def test_an_ops_only_zoo_script_is_not_a_sample():
+	import pytest
+
+	from preflight.probes.local import InvalidSubmission
+	from preflight.runner.sources import _sample
+
+	with pytest.raises(InvalidSubmission):
+		_sample("sample://zoo/torchtitan_debug")
+	assert _sample("sample://zoo/grpo_trl").name == "grpo_trl"

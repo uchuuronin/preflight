@@ -52,6 +52,10 @@ class RecordView:
 	budget_usd: float | None
 	samples_tasks: bool
 	extra: dict[str, Any] = field(default_factory=dict)
+	#: target id -> the readout it drives (memory, time, cost, risk), for the number limits
+	readouts: dict[str, str] = field(default_factory=dict)
+	#: GPUs the record ran on, for GPU-hours when no gpus knob says otherwise
+	gpu_count: int = 1
 
 	@classmethod
 	def from_record(cls, rec: dict) -> RecordView:
@@ -90,4 +94,13 @@ class RecordView:
 			nodes=frozenset(n["id"] for n in (rec.get("graph") or {}).get("nodes") or []),
 			budget_usd=constraints.get("budget_usd"),
 			samples_tasks=bool(rec.get("agent_sample")) or job.get("lens") == "agent",
+			readouts={
+				t["id"]: t["readout"]
+				for t in (rec.get("predictions") or {}).get("targets") or []
+				if t.get("readout")
+			},
+			gpu_count=int(((rec.get("env") or {}).get("gpu") or {}).get("count") or 1),
 		)
+
+	def target_for(self, readout: str) -> str | None:
+		return next((t for t, r in self.readouts.items() if r == readout), None)

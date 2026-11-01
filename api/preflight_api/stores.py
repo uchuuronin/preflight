@@ -146,6 +146,7 @@ SAMPLES: dict[str, str] = {
 	"lora-qwen": "schema/examples/finetune.json",
 	"pretrain": "schema/examples/pretrain.json",
 	"agent": "schema/examples/agent.json",
+	"agent-eval": "web/src/workspace/fixtures/agent-eval-oct31.record.json",
 }
 
 
