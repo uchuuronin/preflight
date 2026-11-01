@@ -220,7 +220,7 @@ def targets_for(record: FlightRecord) -> list[Target]:
 
 def _has_shape(record: FlightRecord) -> bool:
 	try:
-		knobs.setup_from(record.job.script_map, _current(record))
+		knobs.setup_from(_script_map(record), _current(record))
 	except (ValueError, AttributeError):
 		return False
 	return True
@@ -600,6 +600,23 @@ def _capacity(record: FlightRecord, gpu: str) -> int:
 	return gpus.get_gpu(gpu).capacity_bytes()
 
 
+def _script_map(record: FlightRecord):
+	"""The script map, with the parameter count a probe measured when the map itself doesn't give one (Nov 1: A's
+	A10 GRPO record names Qwen2.5-0.5B-Instruct but no size, while its probe counted 494,032,768 parameters)."""
+	sm = record.job.script_map
+	model = getattr(sm, "model", None)
+	if sm is None or model is None or getattr(model, "param_count", None):
+		return sm
+	counted = [
+		float(p.extras["params_total"])
+		for p in record.probes
+		if p.status in OK_PROBE and p.extras and p.extras.get("params_total")
+	]
+	if not counted:
+		return sm
+	return sm.model_copy(update={"model": model.model_copy(update={"param_count": int(max(counted))})})
+
+
 def _env_gpu(record: FlightRecord) -> str | None:
 	"""The probe's GPU: a table name, or an unlisted fallback built from the probe's own memory and SM count."""
 	if record.env and record.env.gpu and record.env.gpu.name:
@@ -691,12 +708,74 @@ def _longest_seen(p) -> float | None:
 	return float(max(rows)) if rows else None
 
 
+def _dataset_longest(record: FlightRecord) -> tuple[float, float, int | None, int | None] | None:
+	"""The training set's longest row as A's recorder measured it (Probe.extras dataset_max_tokens), with the seq_len
+	it was cut at, the rows scanned and the rows in the set: from the probe that cut least, since each probe reads
+	rows at its own knobs."""
+	best = None
+	for p in record.probes:
+		ex = p.extras or {}
+		mx = ex.get("dataset_max_tokens") if p.status in OK_PROBE else None
+		if not mx:
+			continue
+		cut = float(_probe_values(record, p).get("seq_len") or 0)
+		rows, total = ex.get("dataset_rows_scanned"), ex.get("dataset_rows_total")
+		if best is None or cut > best[1] or (cut == best[1] and float(mx) > best[0]):
+			best = (float(mx), cut, int(rows) if rows else None, int(total) if total else None)
+	return best
+
+
+def _query_seq(record: FlightRecord, values: dict) -> tuple[float | None, str | None]:
+	"""The length a memory query is sized at, and a note saying why. A full run meets the training set's longest
+	row, which a few probe batches don't see (review, Oct 30), so the tail sets peak memory (Chiya, Nov 1: p99.9 and
+	max belong to peak memory). Only a scan of every row sizes a query below seq_len, at min(seq_len, longest row);
+	otherwise it's sized at seq_len, and the readout says why (C, Nov 1: the LoRA zoo record's probes saw 517
+	tokens, a query was sized at 1,024, and no eval fix could clear the OOM that length implies)."""
+	if record.job.lens not in TOKEN_LENSES:
+		return None, None
+	q = float(values.get("seq_len") or 0)
+	known = _dataset_longest(record)
+	if known is not None:
+		mx, cut, rows, total = known
+		if not (rows and total and rows >= total):
+			# review, Nov 1: the recorder scans at most 200,000 rows and stops after 10 s, so a partial scan's longest
+			# row may not be the set's
+			scanned = f"{rows:,} of {total:,}" if rows and total else "part of the"
+			return None, (
+				f"sized for rows of {q:,.0f} tokens, the seq_len: the recorder scanned {scanned} training rows, so "
+				"the set's longest row isn't known"
+			)
+		over = f" over all {rows:,} training rows"
+		if cut and mx >= cut:  # the probe's own cut hid the longest row: rows reach at least the cut
+			if q and q > cut:
+				return None, (
+					f"sized for rows of {q:,.0f} tokens, the seq_len: rows reach at least {cut:,.0f}{over}, and past "
+					"that isn't measured"
+				)
+			return (
+				None,
+				f"sized for rows of {q:,.0f} tokens, the seq_len: the training set has rows that long{over}",
+			)
+		seq = min(q, mx) if q else mx
+		return seq, (
+			f"sized for the training set's longest row, {seq:,.0f} tokens (measured{over}), which a full run meets; "
+			"an eval set's rows aren't measured, so eval is sized the same"
+		)
+	seen = [x for x in (_longest_seen(p) for p in record.probes if p.status in OK_PROBE) if x]
+	if q and seen and max(seen) < 0.9 * q:
+		return None, (
+			f"sized for rows of {q:,.0f} tokens, the seq_len, as a full run may meet them: the probes' rows reached "
+			f"{max(seen):,.0f}, and the dataset's longest row isn't recorded"
+		)
+	return None, None
+
+
 def _padded_seq(record: FlightRecord, values: dict, probe=None) -> float | None:
-	"""The sequence length activations were sized by, for fitting the memory model: a probe's longest padded row
-	(cut by its seq_len), from its step log. Queries keep their seq_len setting (None here): a full run meets the
-	dataset's longest row, which a few probe batches don't see, so sizing a query by the rows the probes saw could
-	say "fits" for a run that runs out of memory later (review, Oct 30)."""
-	if probe is None or record.job.lens not in TOKEN_LENSES:
+	"""The sequence length activations were sized by: a probe's longest padded row (cut by its seq_len), from its
+	step log; a query's from _query_seq (the dataset's longest row when it's recorded, else the seq_len setting)."""
+	if probe is None:
+		return _query_seq(record, values)[0]
+	if record.job.lens not in TOKEN_LENSES:
 		return None
 	longest = _longest_seen(probe)
 	sq = float(_probe_values(record, probe).get("seq_len") or 0)
@@ -731,12 +810,16 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	if moves:
 		why = f"{', '.join(moves)} changes memory in a way the engine doesn't model yet; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
-	sm = record.job.script_map
+	sm = _script_map(record)
 	lens = record.job.lens
 	try:
 		arch, setup, shape = knobs.setup_from(sm, values)
 	except (ValueError, AttributeError) as exc:
-		return _empirical_memory(record, values, capacity, str(exc))
+		res = _empirical_memory(record, values, capacity, str(exc))
+		_seq, seq_note = _query_seq(record, values)  # review, Nov 1: the no-shape path is sized the same way
+		if seq_note and res.peak.status != "abstain":
+			res = replace(res, peak=_with_note(res.peak, seq_note), oom=_with_note(res.oom, seq_note))
+		return res
 	shape, sized_values = _sized(shape, values, _padded_seq(record, values))
 	if eval_off:
 		setup = replace(setup, eval_batch=None)  # predict_as_run: the probe ran this point without eval
@@ -810,10 +893,25 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		if est.breakdown.peak_moment == "eval":
 			# C's ring shows eval as its own wedge: the training moment's terms plus the eval spike
 			train = memory.breakdown(
-				arch, replace(setup, eval_batch=None), shape.batch, shape.seq, capacity_bytes=capacity
+				arch,
+				replace(setup, eval_batch=None),
+				shape.batch,
+				shape.seq,
+				context_bytes=ctx,  # Nov 1: the measured context, as the point has
+				capacity_bytes=capacity,
 			)
 			stack = {**train.stack, "eval_spike": est.breakdown.allocator_peak - train.allocator_peak}
 		res = replace(res, terms=_term_estimates(stack, res.peak))
+	_seq, seq_note = _query_seq(record, values)
+	if seq_note and res.peak.status != "abstain":
+		res = replace(res, peak=_with_note(res.peak, seq_note), oom=_with_note(res.oom, seq_note))
+	probed = any(
+		p.status in OK_PROBE for p in record.probes
+	)  # review: a skeleton has no GPU before any probe
+	if probed and _env_gpu(record) is None and res.peak.status != "abstain":
+		# Nov 1: A's A10 GRPO record carried no GPU, and the readout said "tight, 69%" for the knob's L4 unannounced
+		note = f"the probe's GPU isn't in the record, so this is for {gpu} from the GPU knob, with a guessed CUDA context"
+		res = replace(res, peak=_with_note(res.peak, note), oom=_with_note(res.oom, note))
 	return res
 
 
@@ -1351,7 +1449,7 @@ def _grad_bytes(record: FlightRecord, values: dict) -> float | None:
 			break
 	if n is None:
 		try:
-			arch, setup, _ = knobs.setup_from(record.job.script_map, values)
+			arch, setup, _ = knobs.setup_from(_script_map(record), values)
 			n = memory.static_terms(arch, setup)["gradients"] / memory.dtype_bytes(setup.compute_dtype)
 		except (ValueError, AttributeError, KeyError):
 			return None
@@ -1829,7 +1927,7 @@ def _peak_moment(record: FlightRecord, values: dict, mem: _MemoryResult) -> str:
 		return mem.detail.breakdown.peak_moment
 	gpu = _target_gpu(record, values)
 	try:
-		arch, setup, shape = knobs.setup_from(record.job.script_map, values)
+		arch, setup, shape = knobs.setup_from(_script_map(record), values)
 		shape, _ = _sized(shape, values, _padded_seq(record, values))
 		cap = _capacity(record, gpu) if gpu else None
 		return memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap).peak_moment
@@ -2144,7 +2242,7 @@ def _serve_probe(record: FlightRecord, values: dict | None = None):
 
 def _serve_setup(record: FlightRecord, values: dict) -> tuple[serving.ServeSetup | None, str]:
 	try:
-		arch, setup, _ = knobs.setup_from(record.job.script_map, values)
+		arch, setup, _ = knobs.setup_from(_script_map(record), values)
 	except (ValueError, AttributeError) as exc:
 		return None, f"no model shape to size the KV cache: {exc}"
 	if not isinstance(arch, memory.TransformerArch):
@@ -2968,6 +3066,71 @@ def _probed_ranges(record: FlightRecord) -> list[Knob]:
 	return out
 
 
+CLEARS_P_OOM = oom_model.UNCERTAIN[0]  # cited: the "unlikely" end of the shown P(OOM) range (Chiya, Oct 31)
+MAX_CLEARING_PAIRS = 3  # guess: enough for the guide to offer a choice; each pair adds one local 2-D grid
+# moves that can only add memory are never tried; bools are tried at the value that saves memory
+_SAVES_AT = {"eval_no_grad": True, "gradient_checkpointing": True, "packing": False}
+# review, Nov 1: the guide offers GPUs on their own, and a GPU swap "clears" any run (a B200 did on the LoRA record,
+# so no pair was ever searched); eval_every doesn't move the peak; parallelism saves memory going up, not tried
+_NOT_A_CLEARING_KNOB = {"gpu_type", "gpus", "eval_every", "tensor_parallel", "pipeline_parallel"}
+CLEARING_GRID_SUFFIX = ".clears"  # pair grids' ids end with this, apart from a record's own 2-D grids
+
+
+def _saving_values(k: Knob) -> list:
+	"""The local values of a memory knob that could lower the peak: smaller sizes, the memory-saving side of a
+	switch, any other category."""
+	if k.kind == "bool":
+		v = _SAVES_AT.get(k.id)
+		return [v] if v is not None and v != k.current else []
+	if k.kind == "categorical":
+		return [v for v in local_values(k) if v != k.current]
+	return [v for v in local_values(k) if float(v) < float(k.current)]
+
+
+def _p_oom(record: FlightRecord, values: dict) -> float | None:
+	e = predict(record, values).root.get("risk.oom")
+	return e.point if e is not None and e.status != "abstain" else None
+
+
+def clearing_pairs(record: FlightRecord, max_pairs: int = MAX_CLEARING_PAIRS) -> list[tuple[str, str]]:
+	"""Pairs of memory knobs that together clear an out-of-memory risk no single move clears (Chiya, Nov 1: the
+	guide had nothing to offer on the LoRA zoo record, where eval batch 4 with seq_len 512 reads 17.5 GiB and
+	"unlikely" but every single move still fails). Empty when the current setting already clears, or one move does.
+	Ranked by how few steps from the current setting the nearest clearing cell is."""
+	base = _p_oom(record, {})
+	if base is None or base <= CLEARS_P_OOM:
+		return []
+	mem = [
+		k
+		for k in record.knobs
+		if k.id not in WORKLOAD_KNOBS
+		and k.id not in _NOT_A_CLEARING_KNOB
+		and "memory" in knobs.knob_spec(k.id).affects
+		and _saving_values(k)
+	]
+	singles = {k.id: _saving_values(k) for k in mem}
+	for k in mem:
+		for v in singles[k.id]:
+			p = _p_oom(record, {k.id: v})
+			if p is not None and p <= CLEARS_P_OOM:
+				return []  # one move clears: the 1-D grids already show it
+	found = []
+	for a, b in itertools.combinations(mem, 2):
+		best = None
+		for i, va in enumerate(singles[a.id]):
+			for j, vb in enumerate(singles[b.id]):
+				p = _p_oom(record, {a.id: va, b.id: vb})
+				if p is not None and p <= CLEARS_P_OOM:
+					# steps from current: the largest saving values sit nearest the current one
+					steps = (len(singles[a.id]) - i if a.kind in ("int", "float") else 1) + (
+						len(singles[b.id]) - j if b.kind in ("int", "float") else 1
+					)
+					best = steps if best is None else min(best, steps)
+		if best is not None:
+			found.append((best, a.id, b.id))
+	return [(a, b) for _, a, b in sorted(found)[:max_pairs]]
+
+
 def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	"""Targets, estimates at the current knobs, and grids over the gridded knobs (two at a time)."""
 	targets = targets_for(record)
@@ -2977,6 +3140,13 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	# Review, Oct 27: a 1-D grid for every knob around the current point, so any single move reads instantly
 	for k in record.knobs:
 		grids += build_grids(record, [k.id], local=True)
+	# Chiya, Nov 1: when no single move clears the risk of running out of memory, local 2-D grids over the pairs
+	# that do, so the guide can offer a combined move it reads off the record (agreed with C in from-b.md)
+	for a, b in clearing_pairs(record):
+		grids += [
+			g.model_copy(update={"id": g.id + CLEARING_GRID_SUFFIX})
+			for g in build_grids(record, [a, b], local=True)
+		]
 	return Predictions(
 		targets=targets, estimates={t.id: est[t.id] for t in targets if t.id in est}, grids=grids
 	)

@@ -1,25 +1,25 @@
 {
  "model": "meta-models/muse-spark-open-1026",
  "effort": "low",
- "run": "remote-runs b-spark-open-labels (GitHub run 41333478249, Nov 1)",
+ "run": "remote-runs b-spark-open-labels (GitHub run 41333478249) with b-spark-open-relabel (41340028097), Nov 1",
  "rows": 73,
- "answered": 64,
+ "answered": 72,
  "oom": {
   "rows": 29,
-  "compared": 17,
-  "agree": 11,
-  "rate": 0.6470588235294118,
+  "compared": 21,
+  "agree": 15,
+  "rate": 0.7142857142857143,
   "wilson_95": [
-   0.41300363485218694,
-   0.8269027960275627
+   0.5004361928391441,
+   0.8618613704787788
   ],
   "rule_vs_spark": {
    "logits": {
     "activations": 3,
-    "logits": 4
+    "logits": 6
    },
    "activations": {
-    "activations": 7,
+    "activations": 9,
     "other": 1
    },
    "model_state": {
@@ -27,41 +27,41 @@
    }
   },
   "no_rule_label": 7,
-  "no_answer": 6
+  "no_answer": 1
  },
  "divergence": {
   "rows": 44,
-  "compared": 41,
-  "agree": 41,
+  "compared": 44,
+  "agree": 44,
   "rate": 1.0,
   "wilson_95": [
-   0.9143324298155681,
-   0.9999999999999999
+   0.9197043962415192,
+   1.0
   ],
   "rule_vs_spark": {
    "non_finite": {
-    "non_finite": 35
+    "non_finite": 37
    },
    "blow_up": {
-    "blow_up": 6
+    "blow_up": 7
    }
   },
   "no_rule_label": 0,
-  "no_answer": 3
+  "no_answer": 0
  },
  "overall": {
-  "compared": 58,
-  "agree": 52,
-  "rate": 0.896551724137931,
+  "compared": 65,
+  "agree": 59,
+  "rate": 0.9076923076923077,
   "wilson_95": [
-   0.7921189700751577,
-   0.951718592576371
+   0.8128799948403962,
+   0.9570049103886591
   ]
  },
- "calls": 80,
- "cost_usd": 0.5376,
+ "calls": 90,
+ "cost_usd": 0.7046,
  "tokens": {
-  "input": 37471,
-  "output": 115463
+  "input": 42454,
+  "output": 153953
  }
 }
