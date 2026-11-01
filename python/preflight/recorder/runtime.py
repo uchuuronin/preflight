@@ -579,9 +579,12 @@ class Recorder:
 				rec._train_dataset = getattr(it, "_dataset", None)  # its row lengths, read at the end
 				# what the loader draws per epoch: a SubsetRandomSampler over a train split, or a
 				# WeightedRandomSampler's num_samples, is fewer rows than the dataset (A review, Nov 1)
-				smp = getattr(getattr(it, "_index_sampler", None), "sampler", None)
-				# a DistributedSampler's length is one rank's share: the dataset is the run's
-				rec._train_sampler = None if hasattr(smp, "num_replicas") else smp
+				# a DistributedSampler's length is one rank's share: the dataset is the run's. Inside
+				# suppress: a custom sampler's property must never raise in the script's next()
+				rec._train_sampler = None
+				with suppress(Exception):
+					smp = getattr(getattr(it, "_index_sampler", None), "sampler", None)
+					rec._train_sampler = None if hasattr(smp, "num_replicas") else smp
 				rec._train_iter = id(it)
 			rec._maybe_stop()
 			rec._sync()

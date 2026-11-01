@@ -601,8 +601,8 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 
 
 def _with_dataset_size(rec: FlightRecord) -> FlightRecord:
-	"""The dataset size the static reader couldn't see, from the probes: the rows of the training
-	loader's dataset (extras.train_dataset_len), else the token-row scan's total. B's engine divides
+	"""The dataset size the static reader couldn't see, from the unpatched probes: the rows the
+	training loader's sampler draws per epoch (extras.train_dataset_len), else the token-row scan's total. B's engine divides
 	it by the batch for the run's length, so time.total and cost.total don't abstain (D, Nov 1)."""
 	sm = rec.job.script_map
 	if sm is None or sm.data is None or sm.data.n_examples:
