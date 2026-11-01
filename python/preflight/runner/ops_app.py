@@ -21,6 +21,7 @@ import modal
 
 from preflight.runner.modal_app import (
 	APP_NAME,
+	REMOTE_PKG,
 	SERVICE_NAME,
 	WEIGHTS_DIR,
 	ZOO_MODELS,
@@ -28,6 +29,7 @@ from preflight.runner.modal_app import (
 	probe_image,
 	records_vol,
 	serving_image,
+	titan_image,
 	weights_vol,
 	worker_image,
 )
@@ -404,6 +406,81 @@ def multi_gpu():
 	Path("out/multi_gpu.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps({k: {kk: v for kk, v in r.items() if kk != "log_tail"} for k, r in res.items()}, indent=2),
 		flush=True)  # fmt: skip
+
+
+# ---------------------------------------------------------------- torchtitan adapter check (L4, paid: ask first)
+
+TITAN_TIMEOUT_S = 15 * 60  # the container's own end, whatever the probe does
+
+
+def _titan_files() -> dict:
+	from preflight.runner.sources import _read_tree
+
+	return _read_tree(Path(__file__).resolve().parents[3] / "zoo" / "torchtitan_debug")
+
+
+@ops.function(image=titan_image, timeout=600)
+def startup_check_titan_image(files: dict) -> dict:
+	"""CPU, before the L4: the titan image imports torch, torchtitan's trainer and the recorder, and
+	torchtitan parses the zoo config. A failure here costs no GPU."""
+	import json
+	import os
+	import subprocess
+	import sys
+	import tempfile
+
+	work = Path(tempfile.mkdtemp())
+	for rel, text in files.items():
+		(work / rel).parent.mkdir(parents=True, exist_ok=True)
+		(work / rel).write_text(text)
+	cmd = ("import json, torch, torchtitan.train, preflight.recorder.runtime; "
+		"from torchtitan.config_manager import ConfigManager; "
+		"c = ConfigManager().parse_args(['--job.config_file', 'debug_model.toml']); "
+		"print(json.dumps({'torch': torch.__version__, 'flavor': c.model.flavor, 'steps': c.training.steps}))")  # fmt: skip
+	p = subprocess.run([sys.executable, "-c", cmd], cwd=work, capture_output=True, text=True, timeout=300,
+		env={**os.environ, "PYTHONPATH": REMOTE_PKG})  # fmt: skip
+	out = {"exit": p.returncode, "stderr_tail": p.stderr[-1500:] if p.returncode else ""}
+	if p.returncode == 0:
+		out.update(json.loads(p.stdout.strip().splitlines()[-1]))
+	return out
+
+
+@ops.function(image=titan_image, gpu="L4", timeout=TITAN_TIMEOUT_S)
+def titan_check_on_l4(files: dict, warmup: int = 3, timed: int = 10) -> dict:
+	"""torchtitan's trainer on its debug model under the recorder, one L4."""
+	from preflight.probes.local import ProbeSpec, run_probe
+
+	print("[titan] container up on the L4", flush=True)
+	r = run_probe(ProbeSpec(probe_id="titan", files=files, entrypoint="train.py", warmup=warmup, timed=timed,
+		timeout_s=600))  # fmt: skip
+	p = r.probe
+	return {"status": p.status, "error": p.error, "error_code": p.error_code, "steps": p.steps,
+		"p50_s": p.step_time.p50_s if p.step_time else None,
+		"by_phase": p.step_time.by_phase if p.step_time else None,
+		"peak_allocated_bytes": p.memory.peak_allocated_bytes if p.memory else None,
+		"extras": p.extras, "gpu": r.env.gpu.name if r.env and r.env.gpu else None,
+		"seconds": p.duration_s, "log_tail": r.log_tail[-1500:] if p.status != "ok" else ""}  # fmt: skip
+
+
+@ops.local_entrypoint()
+def torchtitan_check():
+	"""modal run --env main python/preflight/runner/ops_app.py::torchtitan_check
+	The CPU startup check first; the L4 only if it passes. Writes out/torchtitan_check.json."""
+	import json
+	import sys
+
+	files = _titan_files()
+	start = startup_check_titan_image.remote(files)
+	print(f"[titan] startup check: {json.dumps(start)}", flush=True)
+	res = {"startup": start}
+	if start.get("exit") == 0:
+		print("[titan] waiting for an L4 (Modal queues it)", flush=True)
+		res["probe"] = titan_check_on_l4.remote(files)
+		print(json.dumps({k: v for k, v in res["probe"].items() if k != "log_tail"}, indent=2), flush=True)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/torchtitan_check.json").write_text(json.dumps(res, indent=2))
+	if start.get("exit") != 0 or res["probe"].get("status") != "ok":
+		sys.exit(1)
 
 
 # ---------------------------------------------------------------- agent sample (Meta API, paid: ask first)

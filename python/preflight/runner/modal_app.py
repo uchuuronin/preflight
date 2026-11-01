@@ -178,6 +178,30 @@ serving_image = (
 )
 SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image}
 
+# the torchtitan adapter check only (zoo/torchtitan_debug, an ops run): torchtitan 0.1.0 targets
+# torch 2.7, which the probe image's 2.5.1 isn't, so its own pins; no visitor job uses this image
+TITAN_PACKAGES = [
+	"torch==2.7.1",
+	"torchtitan==0.1.0",
+	"torchdata==0.11.0",
+	"datasets==3.6.0",
+	"tiktoken==0.9.0",
+	"blobfile==3.0.0",
+	"tomli==2.2.1",
+	"tyro==0.9.24",
+	"tensorboard==2.19.0",
+	"psutil==6.1.0",
+	"nvidia-ml-py==12.560.30",
+	"pydantic>=2.8,<3",
+	"numpy>=1.26,<2.3",
+	"httpx>=0.27",
+]
+titan_image = (
+	_base.pip_install(*TITAN_PACKAGES)
+	.env({"HF_HOME": HF_HOME, "PREFLIGHT_SANDBOX_DIR": "/tmp", "PREFLIGHT_PROBE_UID": "61000"})
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+)
+
 jobs_dict = modal.Dict.from_name("preflight-jobs", create_if_missing=True)
 cache_dict = modal.Dict.from_name("preflight-probe-cache", create_if_missing=True)
 records_vol = modal.Volume.from_name("preflight-records", create_if_missing=True)
