@@ -294,6 +294,10 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				minZoom={0.3}
 				maxZoom={2}
 				nodesDraggable={false}
+				// The node's own button takes focus (with its ring); React Flow's wrapper would take a
+				// second, ringless stop (audit finding 10).
+				nodesFocusable={false}
+				edgesFocusable={false}
 				nodesConnectable={false}
 				panOnDrag={false}
 				zoomOnScroll={false}

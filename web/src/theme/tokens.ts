@@ -90,9 +90,11 @@ export const dayTokens = {
 	...shared,
 	"color-scheme": "light",
 	"sky-base": "#9EBAE0",
-	sky: "linear-gradient(180deg, #5F86BC 0%, #7FA3D2 22%, #9EBAE0 44%, #CFE0F2 70%, #FFF5D1 100%)",
+	// The top stops were #5F86BC and #7FA3D2, where even fg was 3.05:1 (D's audit, finding 7):
+	// lightened so any text over the sky passes 4.5:1 (fg 6.3:1, fg-dim 5.4:1, fail 5.0:1 at the top).
+	sky: "linear-gradient(180deg, #A9C3E5 0%, #B4CBE9 26%, #C3D6EE 48%, #D9E6F4 72%, #FFF5D1 100%)",
 	fg: "#173E50",
-	"fg-dim": "#3B5F70",
+	"fg-dim": "#2D4855", // was #3B5F70, 3.45:1 on the sky (audit finding 7); 4.86:1 on sky-base, 6.82:1 on glass
 	glass: "rgba(255, 255, 255, 0.46)",
 	"glass-hi": "rgba(255, 255, 255, 0.62)",
 	"glass-solid": "#F4F7FB",
@@ -101,7 +103,7 @@ export const dayTokens = {
 	node: "rgba(255, 255, 255, 0.72)",
 	accent: "#A86F00",
 	"accent-glow": "rgba(250, 213, 99, 0.75)",
-	ok: "#2E7652",
+	ok: "#1F5A3D", // was #2E7652, 3.87:1 (audit finding 7); 5.72:1 on glass
 	tight: "#9A5A00",
 	fail: "#8B1E2D",
 	"fail-soft": "rgba(139, 30, 45, 0.16)",

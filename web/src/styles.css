@@ -313,7 +313,8 @@ a {
 	padding: 10px 14px;
 	border-radius: var(--pf-radius-sm);
 	border: 1px solid var(--pf-fail);
-	background: var(--pf-fail-soft);
+	/* Over glass, so the text keeps its contrast on any sky (audit finding 7: 4.49:1, hint 2.7:1). */
+	background: linear-gradient(var(--pf-fail-soft), var(--pf-fail-soft)), var(--pf-glass-hi);
 	color: var(--pf-fg);
 	font-size: 13.5px;
 	line-height: 1.5;
@@ -1314,31 +1315,49 @@ a {
 
 .pf-ptrack { position: relative; height: 70px; margin: 0 8px; touch-action: none; cursor: ew-resize; }
 .pf-pline { position: absolute; left: 0; right: 0; top: 34px; height: 2px; background: var(--pf-stroke-strong); }
+/* A 24 px target (WCAG 2.5.8, audit finding 8) drawing a 14 px dot: the padding is transparent. */
 .pf-pmark {
 	position: absolute;
 	top: 35px;
-	width: 14px;
-	height: 14px;
-	padding: 0;
+	box-sizing: border-box;
+	width: 24px;
+	height: 24px;
+	padding: 5px;
+	background-clip: content-box;
 	border: 0;
 	border-radius: 50%;
 	transform: translate(-50%, -50%);
-	background: var(--pf-ok);
+	background-color: var(--pf-ok);
 	cursor: pointer;
 	transition: background 0.4s ease, opacity 0.4s ease, transform var(--pf-dur-press) var(--pf-ease);
 }
-.pf-pmark::after { content: ""; position: absolute; inset: -15px; }
+.pf-pmark::after { content: ""; position: absolute; inset: -10px; }
 .pf-pmark:hover { transform: translate(-50%, -50%) scale(1.25); }
+/* The diamond is drawn by ::before, so the 24 px box itself isn't rotated and doesn't reach up
+   over the eval marks above it (a rotated box's corners did: axe "partially obscured"). */
 .pf-pmark--checkpoint {
-	top: 58px;
+	top: 59px;
+	border-radius: 0;
+	background-color: transparent;
+}
+.pf-pmark--checkpoint::before {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 50%;
 	width: 9px;
 	height: 9px;
 	border-radius: 2px;
-	transform: translate(-50%, -50%) rotate(45deg);
 	background: var(--pf-fg-dim);
+	transform: translate(-50%, -50%) rotate(45deg);
 }
-.pf-pmark--checkpoint:hover { transform: translate(-50%, -50%) rotate(45deg) scale(1.3); }
-.pf-pmark.is-fail { background: var(--pf-fail); box-shadow: 0 0 0 6px var(--pf-fail-soft); }
+.pf-pmark--checkpoint:hover { transform: translate(-50%, -50%) scale(1.3); }
+.pf-pmark.is-passive { cursor: inherit; pointer-events: none; }
+/* A mark sits above the playhead, so a mark under it stays a whole target; the playhead's tall
+   strip keeps 24 px above and below the marks to grab. */
+.pf-pmark:not(.is-passive) { z-index: 2; }
+.pf-pmark.is-fail { background-color: var(--pf-fail); box-shadow: inset 0 0 0 5px var(--pf-fail-soft); background-clip: content-box; }
+.pf-pmark:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 0; }
 .pf-pmark.is-ghost { opacity: 0.28; }
 .pf-pflag {
 	position: absolute;
@@ -1354,28 +1373,45 @@ a {
 	white-space: nowrap;
 	pointer-events: none;
 }
+/* Near either end the flag hangs inward from its mark, so its words stay on the band. */
+.pf-pflag.is-start { transform: translateX(-12px); }
+.pf-pflag.is-end { transform: translateX(calc(-100% + 12px)); }
 .pf-pflag::before { content: "✕ "; }
+/* The playhead's target is its 24 px knob above the marks (WCAG 2.5.8); the line down the track
+   is drawn by ::after and takes no clicks, so it never covers a mark's target or is covered by one. */
 .pf-playhead {
 	position: absolute;
-	top: 14px;
-	bottom: 4px;
-	width: 2px;
+	top: -2px;
+	width: 24px;
+	height: 24px;
 	transform: translateX(-50%);
-	background: var(--pf-accent);
-	border-radius: 1px;
 	cursor: ew-resize;
+	border-radius: 50%;
 }
 .pf-playhead::before {
 	content: "";
 	position: absolute;
 	left: 50%;
-	top: -6px;
+	top: 50%;
 	width: 12px;
 	height: 12px;
 	border-radius: 50%;
-	transform: translateX(-50%);
+	transform: translate(-50%, -50%);
 	background: var(--pf-accent);
 	box-shadow: 0 0 0 5px var(--pf-accent-glow);
+}
+.pf-playhead::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 12px;
+	width: 2px;
+	height: 56px;
+	transform: translateX(-50%);
+	border-radius: 1px;
+	background: var(--pf-accent);
+	pointer-events: none;
+	z-index: -1;
 }
 .pf-playhead:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 4px; }
 .pf-axis { display: flex; justify-content: space-between; font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fg-dim); }
@@ -1663,8 +1699,8 @@ a {
 .pf-info__btn {
 	display: grid;
 	place-items: center;
-	width: 22px;
-	height: 22px;
+	width: 24px; /* was 22 px (audit finding 11, WCAG 2.5.8) */
+	height: 24px;
 	padding: 0;
 	border: 1px solid var(--pf-stroke-strong);
 	border-radius: 50%;
@@ -1832,6 +1868,8 @@ a {
 .pf-checks__row > * { min-width: 0; overflow-wrap: anywhere; }
 .pf-checks__list .pf-chips { display: flex; flex-direction: column; gap: 8px; }
 .pf-checks__list .pf-chip { cursor: default; }
+/* A 24 px target (audit finding 11, WCAG 2.5.8): the summary was 19 px tall. */
+.pf-checks__skipped > summary { display: flex; align-items: center; min-height: 24px; cursor: pointer; }
 .pf-checks__skipped { margin-top: 12px; font-size: 13px; }
 .pf-checks__skipped summary { cursor: pointer; color: var(--pf-fg-dim); }
 .pf-checks__skipped ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }

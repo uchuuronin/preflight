@@ -2,7 +2,7 @@
  * "The whole run, step by step": the flight plan along the run's steps, and what fills the
  * GPU at its peak. Both read the record and the provider; neither computes a prediction.
  */
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fmt, fmtRange } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { useOrbitLayout } from "../map/Orbit";
@@ -33,6 +33,34 @@ function predictedStop(record: LoadedRecord, est: Prediction, evalEvery: number 
 	return evalDriven && evalEvery ? evalEvery : 1;
 }
 
+// Source: WCAG 2.5.8 (target size, minimum): 24 px between neighbouring targets' centres.
+const MIN_TARGET_GAP_PX = 24;
+
+/**
+ * Which marks are their own pressable targets: per kind, left to right, each at least
+ * MIN_TARGET_GAP_PX from the last one kept (the failing eval always kept). With no width yet
+ * (first paint, tests) every mark is pressable.
+ */
+export function targetsApart(marks: readonly PlanMark[], width: number, keep: (m: PlanMark) => boolean): Set<number> {
+	const out = new Set<number>();
+	if (!width) {
+		marks.forEach((_, i) => out.add(i));
+		return out;
+	}
+	for (const kind of ["eval", "checkpoint"] as const) {
+		const idx = marks.map((m, i) => [m, i] as const).filter(([m]) => m.kind === kind);
+		const kept: number[] = idx.filter(([m]) => keep(m)).map(([m]) => m.at * width);
+		for (const [m, i] of idx) {
+			const x = m.at * width;
+			if (keep(m) || kept.every((k) => Math.abs(k - x) >= MIN_TARGET_GAP_PX)) {
+				out.add(i);
+				if (!keep(m)) kept.push(x);
+			}
+		}
+	}
+	return out;
+}
+
 export function FlightPlanBand() {
 	const { record, estimates, state, actions } = useWorkspace();
 	const track = useRef<HTMLDivElement>(null);
@@ -43,6 +71,14 @@ export function FlightPlanBand() {
 	const time = timeT ? estimates[timeT.id] : undefined;
 	const cost = costT ? estimates[costT.id] : undefined;
 	const stop = predictedStop(record, estimates, plan.evalEvery);
+	const [width, setWidth] = useState(0);
+	useEffect(() => {
+		const el = track.current;
+		if (!el || typeof ResizeObserver === "undefined") return;
+		const ro = new ResizeObserver(([e]) => setWidth(e?.contentRect.width ?? 0));
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [total]);
 
 	if (!total) {
 		return (
@@ -65,6 +101,8 @@ export function FlightPlanBand() {
 	push("eval", plan.evalEvery);
 	push("checkpoint", plan.checkpointEvery);
 	const stopAt = stop ? stop / total : null;
+	const isFail = (m: PlanMark) => stopAt !== null && m.kind === "eval" && Math.abs(m.at - stopAt) < 1e-9;
+	const pressable = targetsApart(marks, width, isFail);
 	const atPointer = (x: number) => {
 		const r = track.current?.getBoundingClientRect();
 		return r ? (x - r.left) / r.width : 0;
@@ -112,11 +150,15 @@ export function FlightPlanBand() {
 				}}
 			>
 				<div className="pf-pline" />
-				{marks.map((m, i) => (
+				{marks.map((m, i) => {
+					const cls = `pf-pmark pf-pmark--${m.kind}${stopAt !== null && m.at > stopAt ? " is-ghost" : ""}${isFail(m) ? " is-fail" : ""}`;
+					// Too close to a neighbour to be its own 24 px target: drawn, not pressable.
+					if (!pressable.has(i)) return <span key={`${m.kind}-${m.step}-${i}`} className={`${cls} is-passive`} style={{ left: `${m.at * 100}%` }} aria-hidden="true" />;
+					return (
 					<button
 						type="button"
 						key={`${m.kind}-${m.step}-${i}`}
-						className={`pf-pmark pf-pmark--${m.kind}${stopAt !== null && m.at > stopAt ? " is-ghost" : ""}${stopAt !== null && m.kind === "eval" && Math.abs(m.at - stopAt) < 1e-9 ? " is-fail" : ""}`}
+						className={cls}
 						style={{ left: `${m.at * 100}%` }}
 						aria-label={t(`plan.event.${m.kind}`, { step: fmt(m.step, "count") })}
 						onPointerDown={(e) => e.stopPropagation()}
@@ -125,9 +167,10 @@ export function FlightPlanBand() {
 							actions.focus(m.kind === "eval" ? "eval" : (record.graph.nodes.find((n) => n.kind === "io")?.id ?? null));
 						}}
 					/>
-				))}
+					);
+				})}
 				{stopAt !== null ? (
-					<span className="pf-pflag" style={{ left: `${stopAt * 100}%` }}>
+					<span className={`pf-pflag${stopAt < 0.2 ? " is-start" : stopAt > 0.8 ? " is-end" : ""}`} style={{ left: `${stopAt * 100}%` }}>
 						{t("plan.flag_stop", { step: fmt(stop ?? 0, "count") })}
 					</span>
 				) : null}
