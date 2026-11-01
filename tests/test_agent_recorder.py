@@ -100,7 +100,8 @@ _URLS: dict = {}
 
 
 def _url(proxy, task):
-	key = (id(proxy), task)
+	# the port too: a collected proxy's id can be reused by the next test's, whose port differs
+	key = (id(proxy), proxy._server.server_address, task)
 	if key not in _URLS:
 		_URLS[key] = proxy.open_task(task)
 	return _URLS[key]
