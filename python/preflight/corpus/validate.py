@@ -178,15 +178,35 @@ class Scored:
 	notes: list[str] = field(default_factory=list)
 
 
+def production_flags(root: Path) -> dict[str, bool]:
+	"""flags.json with flags.production.json over it: the switches Monday's runs are predicted under."""
+	flags: dict[str, bool] = {}
+	for name in ("flags.json", "flags.production.json"):
+		p = root / name
+		if p.exists():
+			flags.update({k: v for k, v in json.loads(p.read_text()).items() if isinstance(v, bool)})
+	return flags
+
+
 def score_run(run: dict, base: Path) -> Scored:
 	from preflight.engine import api
 
 	if run.get("set") == "unseen" and run.get("used_for_tuning"):
 		raise ValueError(f"{run.get('script')}: an unseen script's rows are never tuned on")
-	rec = _record(base / run["record"])
-	gt = _load(base / run["ground_truth"]) if run.get("ground_truth") else {}
-	pred = api.predict(rec, run.get("values") or None).root
 	s = Scored(run.get("script", "?"), run.get("set", "zoo"))
+	# dry run, Nov 1: a run whose record or ground truth hasn't landed (a full run that failed, or one not run yet)
+	# is "not measured" with the reason, and the other runs still score
+	if not run.get("record") or not (base / run["record"]).exists():
+		s.notes.append(f"{s.script}: not measured, no record yet")
+		return s
+	rec = _record(base / run["record"])
+	# a ground truth named but not there is a full run that didn't land: the rows that need it don't score, the
+	# rest (planted problems, the harness, the run's own cost) still do
+	gt_path = base / run["ground_truth"] if run.get("ground_truth") else None
+	gt = _load(gt_path) if gt_path is not None and gt_path.exists() else {}
+	if gt_path is not None and not gt_path.exists():
+		s.notes.append(f"{s.script}: no ground truth yet, so memory and step time aren't scored")
+	pred = api.predict(rec, run.get("values") or None).root
 
 	bare = gt.get("bare") or {}
 	peak = bare.get("peak_reserved_bytes")
@@ -310,16 +330,25 @@ def _row_of(attr: str) -> str:
 	return _ROWS.get(base, base)
 
 
-def models_used(runs: list[dict], base: Path) -> list[str]:
+def models_used(runs: list[dict], base: Path, flags: dict[str, bool] | None = None) -> list[str]:
 	"""Every model id and version the engine scored these runs with, and the calibration table's version, so the
 	table can show that nothing was retuned on the unseen scripts (Chiya, Nov 1: the engine is frozen at the
 	validation-freeze tag)."""
 	from preflight.engine import api, conformal
 
 	ids: set[str] = set()
-	for run in runs:
-		rec = _record(base / run["record"])
-		ids |= {e.model_id for e in api.predict(rec, run.get("values") or None).root.values() if e.model_id}
+	token = None if flags is None else api._FEATURES_NOW.set(api.features_from(lambda k: flags.get(k, False)))
+	try:
+		for run in runs:
+			if not run.get("record") or not (base / run["record"]).exists():
+				continue  # not measured: nothing was predicted for it
+			rec = _record(base / run["record"])
+			ids |= {
+				e.model_id for e in api.predict(rec, run.get("values") or None).root.values() if e.model_id
+			}
+	finally:
+		if token is not None:
+			api._FEATURES_NOW.reset(token)
 	return [*sorted(ids), f"calibration table {conformal.TABLE.version}"]
 
 
@@ -333,7 +362,10 @@ def calibration_note(manifest: dict) -> str:
 	return f"Used for calibration, so not held out: {'; '.join(used)}." if used else ""
 
 
-def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
+def build(
+	manifest: dict, base: Path, divergence: dict | None = None, flags: dict[str, bool] | None = None
+) -> tuple[list[Row], list[Scored]]:
+	"""`flags`: the switches to predict under (score_validation passes production's); None keeps the engine's own."""
 	# per run, not per script: two runs of one script can differ (review, Nov 1). "*" is a run used for calibration
 	# altogether (Chiya, Nov 1: the Oct 31 LoRA run), which no held-out row scores
 	all_cal = [set(r.get("calibrates") or ()) for r in manifest.get("runs", [])]
@@ -342,7 +374,14 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		unknown
 	):  # review, Nov 1: a typo ("interval") would silently leave a calibration run in the held-out rows
 		raise ValueError(f"unknown 'calibrates' names {sorted(unknown)}; known: {sorted(CALIBRATES)}")
-	all_runs = [score_run(r, base) for r in manifest.get("runs", [])]
+	from preflight.engine import api
+
+	token = None if flags is None else api._FEATURES_NOW.set(api.features_from(lambda k: flags.get(k, False)))
+	try:
+		all_runs = [score_run(r, base) for r in manifest.get("runs", [])]
+	finally:
+		if token is not None:
+			api._FEATURES_NOW.reset(token)
 	keep = [i for i, cal in enumerate(all_cal) if "*" not in cal]
 	runs = [all_runs[i] for i in keep]
 	calibrates = [all_cal[i] for i in keep]
