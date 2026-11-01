@@ -212,6 +212,66 @@ def _messages(item: dict) -> list[dict]:
 	]
 
 
+RELABEL_BUDGET_USD = 0.48  # Chiya, Nov 1: relabel the unanswered rows only if it stays under $0.50
+RELABEL_MAX_TOKENS = 16_384  # the first run's 8,192 cut 8 answers off before their JSON closed
+RELABEL_TIMEOUT_S = 90.0
+
+
+def relabel(first: str, out_dir: str) -> None:
+	"""The rows the first run left unanswered, again, with room to finish: a higher output cap and a longer
+	timeout. A row starts only if its worst case (two calls at the full cap) still fits under the budget."""
+	from preflight.harness.spark import ModelClient
+
+	done = {r["row_id"]: r for r in (json.loads(x) for x in Path(first).read_text().splitlines())}
+	items = [
+		i
+		for i in (json.loads(x) for x in INPUTS.read_text().splitlines())
+		if not done[i["row_id"]].get("label")
+	]
+	client = ModelClient.baseten_spark_open(max_output_tokens=RELABEL_MAX_TOKENS)
+	client.timeout_s, client.deadline_s = RELABEL_TIMEOUT_S, 2.5 * RELABEL_TIMEOUT_S
+	if client.model != MODEL:
+		raise SystemExit(f"expected {MODEL}, the client would call {client.model} (SPARK_OPEN_MODEL)")
+	rate_in, _cached, rate_out = client.prices.get(MODEL, (1.25, 1.25, 4.25))
+	worst_row = 2 * (RELABEL_MAX_TOKENS * rate_out + 2_000 * rate_in) / 1e6
+	out = Path(out_dir)
+	out.mkdir(parents=True, exist_ok=True)
+	spent = 0.0
+	with open(out / "spark_relabels.jsonl", "w") as fh:
+		for item in items:
+			if spent + worst_row > RELABEL_BUDGET_USD:
+				print(
+					f"stopping before {item['row_id']}: ${spent:.3f} spent, a row can cost ${worst_row:.3f}"
+				)
+				break
+			schema = _schema(OOM_LABELS if item["task"] == "oom" else DIV_LABELS)
+			before = len(client.calls)
+			try:
+				ans, _ = client.structured(_messages(item), schema, purpose="label", reasoning_effort="low")
+				got = {"label": ans.label, "confidence": ans.confidence, "why": ans.why[:300]}
+			except Exception as exc:
+				got = {"label": None, "error": f"{type(exc).__name__}: {exc}"[:300]}
+			calls = [c.model_dump(mode="json") for c in client.calls[before:]]
+			spent += sum(c["cost_usd"] for c in calls)
+			row = {"row_id": item["row_id"], "task": item["task"], **got, "calls": calls, "relabel": True}
+			fh.write(json.dumps(row) + "\n")
+	print(f"relabelled {len(items)} rows; {len(client.calls)} calls; ${spent:.4f}")
+
+
+def merge(first: str, second: str, out: str) -> None:
+	"""The first run's rows with the relabelled ones in place; every call of both runs is kept for provenance."""
+	rows = [json.loads(x) for x in Path(first).read_text().splitlines()]
+	again = {r["row_id"]: r for r in (json.loads(x) for x in Path(second).read_text().splitlines())}
+	merged = []
+	for r in rows:
+		if r["row_id"] in again:
+			new = again[r["row_id"]]
+			merged.append({**new, "calls": r["calls"] + new["calls"]})
+		else:
+			merged.append(r)
+	Path(out).write_text("".join(json.dumps(r) + "\n" for r in merged))
+
+
 def label(out_dir: str) -> None:
 	from preflight.harness.spark import ModelClient
 
@@ -323,6 +383,15 @@ def main(argv: list[str] | None = None) -> int:
 	p.add_argument("--divergence", required=True)
 	lab = sub.add_parser("label")
 	lab.add_argument("--out", default="out")
+	rl = sub.add_parser("relabel")
+	rl.add_argument(
+		"--first", default=str(ROOT / "python/preflight/corpus/reports/spark_labels_nov1_rows.jsonl")
+	)
+	rl.add_argument("--out", default="out")
+	mg = sub.add_parser("merge")
+	mg.add_argument("--first", required=True)
+	mg.add_argument("--second", required=True)
+	mg.add_argument("--out", required=True)
 	s = sub.add_parser("score")
 	s.add_argument("--labels", required=True)
 	s.add_argument("--run", default="")
@@ -331,6 +400,10 @@ def main(argv: list[str] | None = None) -> int:
 		prepare(a.store, a.divergence)
 	elif a.cmd == "label":
 		label(a.out)
+	elif a.cmd == "relabel":
+		relabel(a.first, a.out)
+	elif a.cmd == "merge":
+		merge(a.first, a.second, a.out)
 	else:
 		score(a.labels, a.run)
 	return 0
