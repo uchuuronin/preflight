@@ -1,0 +1,11 @@
+{
+	"name": "20261101-160956-41324883012-a-smoke-serving-vllm",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41324883012",
+	"ref": "ws-a",
+	"sha": "9afbf4c8834827ec6c36fc46e9e99756702c6e24",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/serving_vllm --gpus L4,A10,L40S --max-minutes 30",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T16:11:57Z"
+}
