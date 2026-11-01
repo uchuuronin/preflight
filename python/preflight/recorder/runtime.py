@@ -639,6 +639,8 @@ class Recorder:
 		self._importer.on("transformers.generation.utils", self._hook_hf_generate)
 		self._importer.on("transformers.trainer", self._hook_trainer)
 		self._importer.on("trl.trainer.grpo_trainer", self._hook_grpo)
+		for name in ("lightning.pytorch.trainer.trainer", "pytorch_lightning.trainer.trainer"):
+			self._importer.on(name, self._hook_lightning)
 		if self.hf_overrides:
 			self._importer.on("transformers.training_args", self._hook_training_args)
 		self._importer.on("vllm.entrypoints.llm", self._hook_vllm)
@@ -1042,6 +1044,26 @@ class Recorder:
 
 		if hasattr(tr, "create_scheduler"):
 			self._patch(tr, "create_scheduler", plan_factory)
+
+	def _hook_lightning(self, mod):
+		"""Lightning's Trainer: the run's length, as HF's create_scheduler gives it (max_steps, or
+		max_epochs for the loader's batches to multiply)."""
+		rec = self
+		tr = getattr(mod, "Trainer", None)
+		if tr is None:
+			return
+
+		def factory(orig):
+			def fit(self_, *args, **kwargs):
+				with suppress(Exception):
+					steps, epochs = getattr(self_, "max_steps", -1), getattr(self_, "max_epochs", None)
+					rec.run_length = {"planned_steps": int(steps) if steps and steps > 0 else None,
+						"epochs": float(epochs) if (not steps or steps <= 0) and epochs and epochs > 0 else None}  # fmt: skip
+				return orig(self_, *args, **kwargs)
+
+			return fit
+
+		self._patch(tr, "fit", factory)
 
 	def _hook_grpo(self, mod):
 		"""TRL's GRPOTrainer: the reference model's log-probs (computed with no gradient) and the
