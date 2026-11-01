@@ -493,11 +493,6 @@ AGENT_SAMPLE_TIMEOUT_S = 45 * 60  # the container's own end: the sample's 30 min
 AGENT_MAX_USD = 3.0  # proposed to Chiya for one sample (the proxy stops at it); her yes sets it
 
 
-@ops.function(
-	image=worker_image,
-	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
-	timeout=AGENT_SAMPLE_TIMEOUT_S,
-)
 def _mbpp_row_keys(n: int) -> dict[str, int]:
 	"""zoo/agent_eval_spark's first n MBPP rows by their opening key (the proxy's hash of the first user
 	message, as run.py writes it), so a sweep can say which sampled task is which row, planted rows
@@ -517,6 +512,11 @@ def _mbpp_row_keys(n: int) -> dict[str, int]:
 	return keys
 
 
+@ops.function(
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	timeout=AGENT_SAMPLE_TIMEOUT_S,
+)
 def agent_sample_hosted(
 	files: dict,
 	entrypoint: str,
