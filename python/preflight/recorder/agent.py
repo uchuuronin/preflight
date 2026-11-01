@@ -531,8 +531,12 @@ class AgentProxy:
 	def _rate_for(self, model: str | None):
 		if self._rate is None or not model:
 			return None
-		# a hosted id ("meta-models/muse-spark-open-1026") is priced by its model's own name
-		return self._rate(model) or (self._rate(model.rsplit("/", 1)[-1]) if "/" in model else None)
+		# the override's hosted id ("meta-models/muse-spark-open-1026") is priced by its model's own
+		# name; any other id is priced as it is (a visitor's "x/muse-spark-1.3" stays unpriced)
+		r = self._rate(model)
+		if r is None and model == self.model_override and "/" in model:
+			r = self._rate(model.rsplit("/", 1)[-1])
+		return r
 
 	def _price(self, model: str | None, u: dict) -> float:
 		r = self._rate_for(model)
@@ -631,6 +635,10 @@ class AgentProxy:
 				{"error": {"type": "invalid_request", "message": "preflight: body is not a JSON object"}},
 			)
 			return
+		if self.model_override:
+			# before admission and pricing: the call is budgeted, priced and logged as the model that serves it
+			req["model"] = self.model_override
+			body = json.dumps(req).encode()
 		if run is not None:
 			task_id = self._task_for(run, req)
 			if task_id == "":
@@ -673,9 +681,7 @@ class AgentProxy:
 			if inject:
 				# the usage arrives only when asked for; the extra chunk it adds is read and dropped
 				req["stream_options"] = {**opts, "include_usage": True}
-			if self.model_override:
-				req["model"] = call.model = self.model_override
-			if inject or self.model_override:
+			if inject:
 				body = json.dumps(req).encode()
 			headers = {k: v for k, v in h.headers.items() if k.lower() not in _DROP_HEADERS}
 			headers.update({"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})

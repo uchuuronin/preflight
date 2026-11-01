@@ -491,6 +491,10 @@ def test_a_model_override_sends_every_call_to_spark_open_and_prices_it_there():
 	try:
 		assert _chat(proxy, "t1").status_code == 200
 		assert _chat(proxy, "t1", stream=True).status_code == 200
+		# a model the price table doesn't know is admitted too: it's budgeted as the one that serves it
+		r = httpx.post(f"{_url(proxy, 't2')}/chat/completions", json={"model": "gpt-4o-mini",
+			"messages": [{"role": "user", "content": "other"}]}, timeout=10)  # fmt: skip
+		assert r.status_code == 200
 		assert {s["body"]["model"] for s in prov.seen} == {"meta-models/muse-spark-open-1026"}
 		t = proxy.task("t1")
 		assert t.model and "muse-spark-open" in t.model
@@ -499,3 +503,10 @@ def test_a_model_override_sends_every_call_to_spark_open_and_prices_it_there():
 	finally:
 		proxy.stop()
 		prov.server.shutdown()
+
+
+def test_a_hosted_looking_id_from_the_script_is_not_priced_by_its_last_part(setup):
+	prov, proxy = setup  # no override: "x/muse-spark-1.3" isn't a price the table has
+	r = httpx.post(f"{_url(proxy, 't9')}/chat/completions", json={"model": "evil/muse-spark-1.3",
+		"messages": [{"role": "user", "content": "do it"}]}, timeout=10)  # fmt: skip
+	assert r.status_code != 200 and not prov.seen  # refused as unpriced, never forwarded
