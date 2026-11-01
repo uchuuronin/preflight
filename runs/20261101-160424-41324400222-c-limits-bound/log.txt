@@ -1,0 +1,53 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Q8E4tJ2vHyTuDtKd4VEl4i
+✓ Created objects.
+{
+ "calls": 1,
+ "usd": 0.006,
+ "results": [
+  {
+   "text": "sequence length has to stay 2048, batch size at most 8",
+   "model_returned": {
+    "allowed": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       2048
+      ]
+     }
+    ],
+    "budget_usd": null,
+    "deadline_hours": null,
+    "gpu_hours": null,
+    "keep": [],
+    "not_understood": [
+     "batch size at most 8"
+    ]
+   },
+   "model_text": "Mapping your stated limits to the job's knobs.",
+   "kept": {
+    "limits": [
+     {
+      "kind": "allowed",
+      "knob_id": "seq_len",
+      "values": [
+       2048
+      ]
+     }
+    ],
+    "not_understood": [
+     "batch size at most 8"
+    ],
+    "dropped": []
+   },
+   "usd": 0.00602,
+   "tokens": [
+    1244,
+    1050
+   ]
+  }
+ ]
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Q8E4tJ2vHyTuDtKd4VEl4i

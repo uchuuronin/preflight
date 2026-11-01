@@ -1,0 +1,11 @@
+{
+	"name": "20261101-160424-41324400222-c-limits-bound",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41324400222",
+	"ref": "ws-c",
+	"sha": "7d1730b52d82e5b7a124d75e6f12dbef30a3b26d",
+	"cmd": "modal run api/limits_check_app.py::check --only 6 --cap-usd 0.0142",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T16:04:46Z"
+}
