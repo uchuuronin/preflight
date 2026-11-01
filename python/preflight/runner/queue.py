@@ -104,14 +104,14 @@ def seconds_to_midnight_et(ts: float) -> int:
 
 
 def daily_gpu_cap_usd(day: str) -> float:
-	"""The day's GPU dollar cap: $10 through Nov 4, $30 for judging from Nov 5 (Chiya, Nov 1).
+	"""The day's GPU dollar cap: $10 through Nov 4, $8 from Nov 5 (Chiya, Nov 1, 6 PM: not $30).
 	PREFLIGHT_DAILY_GPU_CAP_USD overrides it."""
 	import os
 
 	override = os.environ.get("PREFLIGHT_DAILY_GPU_CAP_USD")
 	if override:
 		return float(override)
-	return 30.0 if day >= "2026-11-05" else 10.0
+	return 8.0 if day >= "2026-11-05" else 10.0
 
 
 class StoreUnavailable(RuntimeError):

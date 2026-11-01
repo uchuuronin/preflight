@@ -277,6 +277,49 @@ def startup_check():
 
 
 @ops.local_entrypoint()
+def limit_check(modal_env: str = ""):
+	"""Confirm the demo limit on the deployed runner: one visitor's 4th probe job of the ET day is
+	refused with limit.visitor_daily. The three it accepts name a sample that doesn't exist, so the
+	worker fails them at fetch with no GPU spent. Writes out/limit_check.json."""
+	import json
+	import time
+
+	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env or None)()
+	visitor = f"ops-limit-check-{uuid.uuid4().hex[:8]}"
+	request = {"source": {"kind": "sample", "uri": "sample://zoo/limit-check-no-such-script"}}
+	out: dict = {"visitor": visitor, "accepted": [], "refused": None}
+	for i in range(4):
+		try:
+			sub = svc.submit.remote(request, visitor, f"limit-check-{i}")
+			out["accepted"].append(sub["job_id"])
+			print(f"[limit] job {i + 1} accepted: {sub['job_id']}", flush=True)
+		except Exception as exc:  # QueueFull, raised in the service and re-raised here
+			out["refused"] = {"job": i + 1, "type": type(exc).__name__, "code": getattr(exc, "code", None),
+				"retry_after_s": getattr(exc, "retry_after_s", None), "message": str(exc)[:200]}  # fmt: skip
+			print(f"[limit] job {i + 1} refused: {out['refused']}", flush=True)
+			break
+	deadline = time.monotonic() + 300
+	ended = {}
+	while time.monotonic() < deadline and len(ended) < len(out["accepted"]):  # the accepted ones end
+		for j in out["accepted"]:
+			st = svc.status.remote(j)
+			if st["status"] in ("done", "failed", "cancelled"):
+				ended[j] = {"status": st["status"], "error_code": st.get("error_code")}
+		time.sleep(5)
+	out["accepted_ended"] = ended
+	Path("out").mkdir(exist_ok=True)
+	Path("out/limit_check.json").write_text(json.dumps(out, indent=2))
+	ok = (
+		out["refused"] is not None
+		and out["refused"]["job"] == 4
+		and out["refused"]["code"] == "limit.visitor_daily"
+	)
+	print(f"[limit] {'PASS' if ok else 'FAIL'}: {json.dumps(out)}", flush=True)
+	if not ok:
+		raise SystemExit(1)
+
+
+@ops.local_entrypoint()
 def smoke(
 	sample: str = "sample://zoo/finetune_lora_hf",
 	gpus: str = "L4",
