@@ -1,0 +1,23 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-wgsVHsQRuPYxmAYk9hWMTj
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+[agent] skipping the 30 tasks zoo/agent_eval_spark/record_oct31.json already holds
+[agent] run.py: lens agent, population 500; sampling 100
+[agent] 100 tasks, $1.2371 of model calls; the first 100 tasks the script started; script wall 127 s; 30 already sampled skipped; 370 calls refused past the sample
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-wgsVHsQRuPYxmAYk9hWMTj

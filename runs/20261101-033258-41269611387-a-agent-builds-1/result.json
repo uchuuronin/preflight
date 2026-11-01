@@ -1,0 +1,11 @@
+{
+	"name": "20261101-033258-41269611387-a-agent-builds-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41269611387",
+	"ref": "ws-a",
+	"sha": "5344a9bc94a0c22988a022244a7ff7e04b500e64",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark --k 100 --skip-from zoo/agent_eval_spark/record_oct31.json",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T03:35:32Z"
+}
