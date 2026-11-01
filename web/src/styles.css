@@ -868,6 +868,63 @@ a {
 .pf-dial__val.is-off { stroke-linecap: butt; }
 .pf-dial__note.is-fits::before { content: "● "; font-size: 0.8em; }
 .pf-dial__goal { padding: 1px 8px; border-radius: var(--pf-radius-pill); background: var(--pf-pill-bg); color: var(--pf-pill-fg); font-size: 10.5px; font-weight: 600; }
+/* The wake: what the last knob move did to this readout, in the dial's open gap (Dials.tsx WAKE_MS). */
+.pf-dial__wake {
+	position: absolute;
+	left: 50%;
+	bottom: -3px;
+	padding: 1px 7px;
+	border-radius: var(--pf-radius-pill);
+	background: var(--pf-glass-solid);
+	box-shadow: 0 0 0 1px var(--pf-stroke);
+	color: var(--pf-fg);
+	font-family: var(--pf-font-mono);
+	font-size: 10.5px;
+	font-weight: 500;
+	line-height: 1.45;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	pointer-events: none;
+	opacity: 0;
+	transform: translate(-50%, 0);
+	animation: pf-wake 2600ms var(--pf-ease) forwards;
+}
+.pf-dial__wake.is-better { color: var(--pf-ok); }
+.pf-dial__wake.is-worse { color: var(--pf-tight); }
+@keyframes pf-wake {
+	0% { opacity: 0; transform: translate(-50%, 5px); }
+	9% { opacity: 1; transform: translate(-50%, 0); }
+	88% { opacity: 1; transform: translate(-50%, 0); }
+	100% { opacity: 0; transform: translate(-50%, 0); }
+}
+@keyframes pf-wake-still {
+	0% { opacity: 0; }
+	9%, 88% { opacity: 1; }
+	100% { opacity: 0; }
+}
+/* The same wakes inside the open knob control, shown only where the dials are out of sight. */
+.pf-wakes { display: none; flex-wrap: wrap; gap: 6px; min-height: 24px; }
+.pf-wakes__item {
+	padding: 2px 9px;
+	border-radius: var(--pf-radius-pill);
+	background: var(--pf-glass-solid);
+	box-shadow: 0 0 0 1px var(--pf-stroke);
+	font-family: var(--pf-font-mono);
+	font-size: 11.5px;
+	line-height: 1.5;
+	font-variant-numeric: tabular-nums;
+	color: var(--pf-fg);
+	animation: pf-wake-still 2600ms var(--pf-ease) forwards;
+}
+.pf-wakes__item.is-better { color: var(--pf-ok); }
+.pf-wakes__item.is-worse { color: var(--pf-tight); }
+.pf-wakes__label { font-family: var(--pf-font-sans); color: var(--pf-fg-dim); }
+@media (max-width: 760px) {
+	.pf-wakes { display: flex; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.pf-dial__wake { animation-name: pf-wake-still; }
+}
 
 /* The orbit map */
 .pf-stage-wrap { flex: 1 1 480px; max-width: 600px; min-width: 0; }
@@ -1006,6 +1063,9 @@ a {
 .pf-onode--diamond:active { transform: rotate(45deg) scale(0.78); }
 .pf-onode--diamond .pf-onode__inner { transform: rotate(-45deg) scale(1.25); }
 .pf-onode--hexagon { border: 0; background: var(--pf-glass-hi); clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
+/* The hexagon narrows towards its top and bottom: keep the words inside its middle band. */
+.pf-onode--hexagon .pf-onode__inner { max-width: 78%; }
+.pf-onode--hexagon .pf-onode__inner b { font-size: 10.5px; }
 .pf-onode.is-accent { border-color: var(--pf-accent); box-shadow: 0 0 0 5px var(--pf-accent-glow), 0 0 40px var(--pf-accent-glow); }
 .pf-onode--hexagon.is-accent { background: var(--pf-accent-glow); }
 .pf-onode.is-fails { border-color: var(--pf-fail); box-shadow: 0 0 0 4px var(--pf-fail-soft); }

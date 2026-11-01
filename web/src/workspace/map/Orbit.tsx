@@ -1,6 +1,7 @@
 import { type Node, type NodeProps, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
+import { MOVE_MS, moveEase, useTweenedText } from "../../lib/tween";
 import { fmt } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { useMapOverlays } from "../../registry";
@@ -18,6 +19,9 @@ interface BgData extends Record<string, unknown> {
 	fit: Fit;
 	evalStalled: boolean;
 	coreNumber: string;
+	/** The number behind coreNumber, so it can travel with the ring (null: abstaining). */
+	coreValue: number | null;
+	coreUnit: string;
 	coreCaption: string;
 	coreStatus: string;
 }
@@ -38,6 +42,10 @@ function phaseLabel(phase: string): string {
 
 const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<BgData>>) {
 	const { layout, highlightPhases, fit, evalStalled } = data;
+	const coreRef = useRef<HTMLSpanElement>(null);
+	const coreUnit = data.coreUnit;
+	const coreFormat = useMemo(() => (v: number) => fmt(v, coreUnit), [coreUnit]);
+	useTweenedText(coreRef, data.coreValue, coreFormat, MOVE_MS, moveEase);
 	const { memory } = layout;
 	// A full ring is this GPU's memory; what doesn't fit continues on the dashed outer ring.
 	const scale = memory.capacity ?? memory.total ?? 1;
@@ -128,7 +136,9 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 				) : null}
 			</svg>
 			<div className="pf-core">
-				<span className="pf-core__num">{data.coreNumber}</span>
+				<span ref={coreRef} className="pf-core__num">
+					{data.coreNumber}
+				</span>
 				<span className="pf-core__cap">{data.coreCaption}</span>
 				{fit !== "unknown" ? <FitMark fit={fit} label={data.coreStatus} /> : null}
 			</div>
@@ -193,6 +203,8 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				fit,
 				evalStalled: failing,
 				coreNumber: trusted(peak) ? fmt(peak.point, memT?.unit ?? "bytes") : t("readout.abstain_short"),
+				coreValue: trusted(peak) ? peak.point : null,
+				coreUnit: memT?.unit ?? "bytes",
 				coreCaption:
 					memT && memT.unit !== "bytes"
 						? t(memT.label_key)

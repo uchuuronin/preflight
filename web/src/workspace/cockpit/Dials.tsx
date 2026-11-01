@@ -17,6 +17,8 @@ import { FAILS_AT, FITS_BELOW, oomStatus } from "../record/terms";
 import { bounds, trusted } from "../status";
 import { flag } from "../../lib/flags";
 import { outcomes, setHops, useHops, useHopsOwner } from "../hops";
+import { useEffect, useRef, useState } from "react";
+import { useTweenedText } from "../../lib/tween";
 
 const ARC = 188.5; // 270 degrees of a radius-40 circle
 const FULL = 251.3;
@@ -31,9 +33,13 @@ interface DialSpec {
 	scale: DialScale | null;
 	goal?: ObjectiveKind;
 	format: (v: number) => string;
+	/** The value with its unit, where the dial's unit line isn't beside it (the wake strip). */
+	formatFull?: (v: number) => string;
 	note?: string;
 	/** The engine's sentence about this number (e.g. the runaway margin in an agent run's cost). */
 	reason?: string;
+	/** Which way is better, for the wake after a move: lower (time, cost, risk) or higher (speed). */
+	better?: "lower" | "higher";
 	/** fails: red note and needle; tight: amber note; fits: calm note. */
 	noteRisk?: boolean;
 	noteTight?: boolean;
@@ -45,7 +51,72 @@ function statusWord(est: Estimate | undefined, illustrative: boolean): string {
 	return t(provenanceKey(est?.status ?? "abstain", illustrative));
 }
 
-function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean }) {
+/** What a knob move did to one readout, shown in the dial's open gap for WAKE_MS. */
+interface Wake {
+	key: number;
+	text: string;
+	/** With the unit, for the strip away from the dial. */
+	full: string;
+	/** null: no better side (a readout without a direction). */
+	better: boolean | null;
+}
+
+/**
+ * Source: guess, the 600 ms sweep plus about two seconds to read a short delta; gone before the
+ * visitor's next look. Revisit with the stranger test's interaction log.
+ */
+export const WAKE_MS = 2600;
+/** Source: guess, below this share of the old value (or of the dial's scale) a change isn't worth a mark. */
+const WAKE_MIN = 0.01;
+
+/** The change between two values of a readout as signed text, e.g. "+1 h 22 min". */
+export function deltaText(from: number, to: number, format: (v: number) => string): string {
+	return `${to > from ? "+" : "\u2212"}${format(Math.abs(to - from))}`;
+}
+
+/** True when a change is big enough to mark: against the old value, or the dial's span when the old value is near 0. */
+export function worthMarking(from: number, to: number, scale: DialScale | null): boolean {
+	const d = Math.abs(to - from);
+	if (d === 0) return false;
+	const span = scale ? Math.abs(scale.hi - scale.lo) : 0;
+	// Near zero a share of the old value means nothing: measure against the dial's span there.
+	if (span > 0 && Math.abs(from) < WAKE_MIN * span) return d > WAKE_MIN * span;
+	return from === 0 || d > WAKE_MIN * Math.abs(from);
+}
+
+/**
+ * After each knob move (the visitor's or the guide's), the readouts it changed, as wakes. Nothing
+ * on first draw, on a new record, or when a readout stops being trusted.
+ */
+function useWakes(specs: DialSpec[], knobs: object, recordId: object): Record<string, Wake> {
+	const last = useRef<{ knobs: object; record: object; points: Record<string, number | null> } | null>(null);
+	const seq = useRef(0);
+	const [wakes, setWakes] = useState<Record<string, Wake>>({});
+	const points: Record<string, number | null> = {};
+	for (const s of specs) points[s.id] = trusted(s.est) && s.scale ? s.est.point : null;
+	const sig = JSON.stringify(points);
+
+	useEffect(() => {
+		const prev = last.current;
+		last.current = { knobs, record: recordId, points };
+		if (!prev || prev.knobs === knobs || prev.record !== recordId) return;
+		const next: Record<string, Wake> = {};
+		for (const s of specs) {
+			const a = prev.points[s.id];
+			const b = points[s.id];
+			if (a == null || b == null || !worthMarking(a, b, s.scale)) continue;
+			next[s.id] = { key: ++seq.current, text: deltaText(a, b, s.format), full: deltaText(a, b, s.formatFull ?? s.format), better: s.better ? (s.better === "lower" ? b < a : b > a) : null };
+		}
+		if (!Object.keys(next).length) return;
+		setWakes(next);
+		const timer = setTimeout(() => setWakes({}), WAKE_MS);
+		return () => clearTimeout(timer);
+		// specs and points are read through `sig` and `knobs`: a new array each render, the same values.
+	}, [knobs, recordId, sig]);
+	return wakes;
+}
+
+function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean; wake?: Wake | undefined }) {
 	const est = spec.est;
 	const illustrative = isFixture(useWorkspace().record);
 	const ok = trusted(est) && !!spec.scale;
@@ -64,6 +135,8 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 	const shown = hops.frame === null ? draws : draws.length ? [draws[hops.frame % draws.length]!] : [];
 	const title = [spec.reason, scaleNote].filter(Boolean).join("\n");
 	const value = ok ? spec.format(point) : t("readout.abstain_short");
+	const valueRef = useRef<HTMLElement>(null);
+	useTweenedText(valueRef, ok ? point : null, spec.format);
 	const aria = ok
 		? `${t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est, illustrative)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
 		: t("dial.aria_abstain", { label: spec.label });
@@ -95,9 +168,16 @@ function Dial({ spec, onGoal, goalOn }: { spec: DialSpec; onGoal?: () => void; g
 				) : null}
 			</svg>
 			<span className="pf-dial__text">
-				<b className={value.length > 9 ? "is-longer" : value.length > 6 ? "is-long" : undefined}>{value}</b>
+				<b ref={valueRef} className={value.length > 9 ? "is-longer" : value.length > 6 ? "is-long" : undefined}>
+					{value}
+				</b>
 				<small>{spec.unit}</small>
 			</span>
+			{wake ? (
+				<span key={wake.key} className={`pf-dial__wake${wake.better === true ? " is-better" : wake.better === false ? " is-worse" : ""}`} aria-hidden="true">
+					{wake.text}
+				</span>
+			) : null}
 		</>
 	);
 	return (
@@ -130,9 +210,9 @@ function scaleText(scale: DialScale, format: (v: number) => string): string {
 	return "";
 }
 
-export function Dials() {
-	const { record, estimates, state, actions } = useWorkspace();
-	const extra = useReadouts(record.job.lens);
+/** The four main readouts as dial specs (time, cost, speed or tokens, risk). */
+function useDialSpecs(): DialSpec[] {
+	const { record, estimates } = useWorkspace();
 
 	const est = (r: Readout) => {
 		const tg = targetFor(record, r);
@@ -156,9 +236,8 @@ export function Dials() {
 	const fail = failureTarget(record);
 	const riskT = targetFor(record, "risk") ?? (fail ? target(record, fail) : undefined);
 	const riskEst = riskT ? estimates[riskT.id] : undefined;
-	const goal = state.objective.kind;
 
-	const specs: DialSpec[] = [
+	return [
 		{
 			id: "time",
 			label: t("dial.time"),
@@ -166,6 +245,7 @@ export function Dials() {
 			est: timeEst,
 			scale: timeScale,
 			goal: "min_time",
+			better: "lower",
 			hops: true,
 			format: (v) => fmt(v, "s_short"),
 		},
@@ -176,6 +256,7 @@ export function Dials() {
 			est: costEst,
 			scale: costScale,
 			goal: "min_cost",
+			better: "lower",
 			hops: true,
 			format: (v) => fmt(v, "usd"),
 			...(costEst?.reason && costEst.status !== "abstain" ? { reason: costEst.reason } : {}),
@@ -187,7 +268,9 @@ export function Dials() {
 					unit: t("dial.tps.unit"),
 					est: tpsEst,
 					scale: tpsT ? dialScale(record, tpsT.id, tpsT.unit) : null,
+					better: "higher",
 					format: (v) => fmt(v, "tokens/s").replace(/ tokens\/s$/, ""),
+					formatFull: (v) => fmt(v, "tokens/s"),
 				}
 			: {
 					// Agent and API runs: the run's tokens instead of a training speed.
@@ -196,7 +279,9 @@ export function Dials() {
 					unit: t("dial.tokens.unit"),
 					est: tokensEst,
 					scale: tokensT ? dialScale(record, tokensT.id, tokensT.unit) : null,
+					better: "lower",
 					format: (v) => fmt(v, "tokens").replace(/ tokens$/, ""),
+					formatFull: (v) => fmt(v, "tokens"),
 				},
 		{
 			id: "risk",
@@ -204,6 +289,7 @@ export function Dials() {
 			unit: t("dial.risk.unit"),
 			est: riskEst,
 			scale: { kind: "linear", lo: 0, hi: 1, source: "probability" },
+			better: "lower",
 			format: (v) => fmt(v, "probability"),
 			noteRisk: trusted(riskEst) && riskEst.point >= FAILS_AT,
 			noteTight: trusted(riskEst) && riskEst.point >= FITS_BELOW && riskEst.point < FAILS_AT,
@@ -212,6 +298,38 @@ export function Dials() {
 			...(trusted(riskEst) ? { note: t(RISK_NOTE[oomStatus(riskEst.point)]) } : {}),
 		},
 	];
+}
+
+/**
+ * The wakes as a strip, for where the dials are out of sight (the open knob control on a phone,
+ * where the dials sit a screen above): the effect of a move appears under the finger that made it.
+ */
+export function WakeStrip() {
+	const { record, state } = useWorkspace();
+	const specs = useDialSpecs();
+	const wakes = useWakes(specs, state.knobs, record);
+	const shown = specs.filter((s) => wakes[s.id]);
+	// Always drawn (one row high), so the control doesn't jump when a wake comes or goes.
+	return (
+		<div className="pf-wakes" aria-hidden="true">
+			{shown.map((s) => {
+				const w = wakes[s.id]!;
+				return (
+					<span key={`${s.id}-${w.key}`} className={`pf-wakes__item${w.better === true ? " is-better" : w.better === false ? " is-worse" : ""}`}>
+						<span className="pf-wakes__label">{s.label}</span> {w.full}
+					</span>
+				);
+			})}
+		</div>
+	);
+}
+
+export function Dials() {
+	const { record, estimates, state, actions } = useWorkspace();
+	const extra = useReadouts(record.job.lens);
+	const specs = useDialSpecs();
+	const goal = state.objective.kind;
+	const wakes = useWakes(specs, state.knobs, record);
 
 	return (
 		<div className="pf-dials" aria-label={t("readouts.label")}>
@@ -221,6 +339,7 @@ export function Dials() {
 					<Dial
 						key={s.id}
 						spec={s}
+						wake={wakes[s.id]}
 						goalOn={!!s.goal && goal === s.goal}
 						{...(s.goal
 							? { onGoal: () => actions.setObjective(goal === s.goal ? "fit_memory" : (s.goal as ObjectiveKind)) }

@@ -15,6 +15,7 @@ import { fitOf, type Fit } from "../status";
 import { Info } from "../components/Info";
 import { FitMark } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
+import { WakeStrip } from "./Dials";
 
 type ValueStatus = Fit | "abstain";
 
@@ -113,6 +114,7 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 					))}
 				</div>
 			)}
+			<WakeStrip />
 			<div className="pf-control__foot">
 				{status === "abstain" ? <span>{t("knob.not_trusted_here")}</span> : null}
 				{knob.needs_code ? <span>{t("knob.needs_code.help")}</span> : null}

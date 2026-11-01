@@ -8,6 +8,7 @@
 - Data-use line on `harness.spark_script_map` (`b17b600`); shared-flag test passes once merged with A's f50999d.
 - Moves wait for the saved limits before animating; the guide's unpin only asks (`d322d0a`).
 - D's audit 12 (model tags only where the model ran, `adf1876`) and 7 to 11 (`98853d4`): D's sweep shows colour contrast 0 (was 16), target size 0, no focus without a ring.
+- Cockpit motion pass: numbers travel with their arcs on one value clock (no more number snapping while its arc sweeps), and after every move each readout it changed shows the change in its dial's open gap for 2.6 s ("+1 h 22 min", green if better, amber if worse). On a phone the open knob control repeats it, because the dials sit a screen above. Knob p95 at 4x CPU unchanged (80 to 152 ms against 68 to 212 before, 3 runs each); reduced motion: numbers snap and the wake only fades. The hexagon node's label no longer clips.
 - Agent tour re-walked in Chromium with a limit set (Don't change the model): finding step, then Concurrency 4 to 32 on the time aim; no errors, no overflow. GRPO waits on A's rerun; pretrain has no real record yet.
 
 ## Sat Oct 31, night
