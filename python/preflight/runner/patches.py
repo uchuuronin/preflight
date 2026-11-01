@@ -38,8 +38,10 @@ def _git(args, cwd: Path, home: Path, diff: str) -> subprocess.CompletedProcess:
 
 def apply_patch(files: dict[str, str], diff: str) -> dict[str, str]:
 	"""The files with the diff applied; only the files it edits change."""
-	if any(part.startswith(".git") for rel in files for part in Path(rel).parts):
-		raise InvalidSubmission("the record's files can't hold git settings", code="patch.not_allowed")
+	git_files = {".git", ".gitattributes", ".gitmodules", ".gitconfig"}  # .github/ and .gitignore are fine
+	if any(part in git_files for rel in files for part in Path(rel).parts):
+		raise InvalidSubmission("the record's files hold git settings, which a patch can't run beside",
+			code="patch.not_allowed")  # fmt: skip
 	with tempfile.TemporaryDirectory(prefix="preflight-patch-") as d:
 		root, home = Path(d) / "work", Path(d) / "home"
 		root.mkdir()
@@ -89,3 +91,29 @@ def apply_patch(files: dict[str, str], diff: str) -> dict[str, str]:
 			with open(root / rel, encoding="utf-8", newline="") as f:  # line endings as they are (CRLF too)
 				out[rel] = f.read()
 		return out
+
+
+def relocate_knobs(sm, before: dict[str, str], after: dict[str, str]):
+	"""The record's own script map (static and Muse Spark knobs alike) with each knob's line moved to
+	where its expression now sits in the patched files. A knob whose line the patch edited, or
+	whose expression no longer appears once, keeps its line (the override then says it can't set it)."""
+	import difflib
+
+	moved = {}
+	for f in {k.location.file for k in sm.knobs if k.location is not None and k.location.line}:
+		if f not in after or f not in before or after[f] == before[f]:
+			continue
+		a, b = before[f].splitlines(), after[f].splitlines()
+		m = {}
+		for tag, i1, i2, j1, _j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
+			if tag == "equal":
+				for k in range(i2 - i1):
+					m[i1 + k + 1] = j1 + k + 1  # 1-based lines
+		moved[f] = m
+	knobs = []
+	for k in sm.knobs:
+		loc = k.location
+		if loc is not None and loc.line and loc.file in moved and loc.line in moved[loc.file]:
+			k = k.model_copy(update={"location": loc.model_copy(update={"line": moved[loc.file][loc.line]})})
+		knobs.append(k)
+	return sm.model_copy(update={"knobs": knobs})

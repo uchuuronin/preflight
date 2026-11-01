@@ -419,9 +419,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		# C's fix loop: probe runs the patched code; verify runs the setting on it and the base
 		# and its second seed on the record's own code, so the finding reads before and after. The
 		# knobs are found again in the patched code (a fix that adds a line moves them)
-		fixed_sm = values_from_args(
-			fixed.files, map_static(fixed.files, entrypoint=fixed.entrypoint), fixed.args
-		)
+		from .patches import relocate_knobs
+
+		fixed_sm = relocate_knobs(sm, fetched.files, fixed.files)  # the record's own knobs, Spark's included
 		patched_ids = [p.probe_id for p in plan] if req.mode == "probe" else [plan[0].probe_id]
 		patched_for = dict.fromkeys(patched_ids, (fixed, fixed_sm))
 		_emit(ctx, "harnessing", rec, rev, message=f"patch applied to {', '.join(patched_ids)}")

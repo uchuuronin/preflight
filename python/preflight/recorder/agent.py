@@ -97,6 +97,8 @@ class _Run:
 	last_call_at: float | None = None  # monotonic: any call through the run, refused ones too
 	budget_hit: bool = False  # a task was refused because the proxy's dollar cap was reached
 	peak_concurrent: int = 0  # the most tasks with a call in flight at once: the script's workers
+	opened_at: dict[str, float] = field(default_factory=dict)  # task -> monotonic time it opened
+	asks: list[float] = field(default_factory=list)  # monotonic times of refused or skipped openings
 
 
 def _h(x) -> str:
@@ -394,6 +396,38 @@ class AgentProxy:
 	def _run(self, run_id: str):
 		return next((r for r in self._tokens.values() if isinstance(r, _Run) and r.run_id == run_id), None)
 
+	@staticmethod
+	def _stuck(run: "_Run", ts: dict) -> list[str]:
+		"""Tasks whose worker made no call after them. The script's first `peak_concurrent` openings
+		start its workers; every later opening, and every refused or skipped attempt, is the work of
+		the worker that finished most recently before it, which frees that worker's last task (a
+		refused attempt ends at once, so its worker is free again). A task whose last answer asked
+		for a tool and was never followed is its worker's still. Heuristic: a worker that ran out of
+		tasks after one that ended on a tool looks the same, and workers that start late are taken
+		for finished ones."""
+		free: list[tuple[float, str | None]] = []
+		workers = max(1, run.peak_concurrent)
+		started = 0
+		events = [(run.opened_at[tid], 1, tid) for tid in run.order if tid in run.opened_at]
+		events += [(t, 2, None) for t in run.asks]
+		events += [(t.calls[-1].end_mono, 0, tid) for tid, t in ts.items() if t.calls and not t.in_flight]
+		for at, kind, tid in sorted(events, key=lambda e: (e[0], e[1])):
+			if kind == 0:
+				free.append((at, tid))
+				continue
+			if started < workers:
+				started += 1  # a worker's first task: frees nothing
+			elif free:
+				free.pop()  # the most recent finisher started this
+			if kind == 2:
+				free.append((at, None))  # refused: its worker is free again at once
+		left = [
+			(at, tid)
+			for at, tid in free
+			if tid is not None and ts[tid].calls[-1].finish_reason == "tool_calls"
+		]
+		return [tid for _, tid in sorted(left)]  # the longest-waiting first
+
 	def run_tasks(self, run_id: str) -> list[str]:
 		"""The task ids a run's calls were split into, in the order they started."""
 		with self._lock:
@@ -416,6 +450,7 @@ class AgentProxy:
 				"tool_wait_s": {tid: time.monotonic() - t.calls[-1].end_mono for tid, t in ts.items()
 					if t.calls and not t.in_flight and t.calls[-1].finish_reason == "tool_calls"},
 				"peak_concurrent": run.peak_concurrent,
+				"stuck": self._stuck(run, ts),
 				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1),
 				"budget_hit": run.budget_hit,
 				# since the last call started or ended; never idle while a call is in flight
@@ -475,9 +510,11 @@ class AgentProxy:
 			if run.skipped_keys.get(key, 0) < run.skip_keys.get(key, 0):
 				run.skipped_keys[key] = run.skipped_keys.get(key, 0) + 1
 				run.skipped.append((sys_h, msgs))
+				run.asks.append(time.monotonic())
 				return ""
 			if len(run.order) >= run.max_tasks:
 				run.refused += 1
+				run.asks.append(time.monotonic())
 				return None
 			spent = sum(c.usd for x in self._tasks.values() for c in x.calls) + sum(
 				x.reserved_usd for x in self._tasks.values()
@@ -487,11 +524,13 @@ class AgentProxy:
 				# sample's cost per task; refused like a task past the sample, and said so
 				run.refused += 1
 				run.budget_hit = True
+				run.asks.append(time.monotonic())
 				return None
 			n = run.keys.get(key, 0) + 1
 			run.keys[key] = n
 			tid = f"{run.run_id}-{key}" + (f".{n}" if n > 1 else "")
 			run.order.append(tid)
+			run.opened_at[tid] = time.monotonic()
 			run.last[tid] = msgs
 			run.system[tid] = sys_h
 			self._tasks.setdefault(tid, _Task())

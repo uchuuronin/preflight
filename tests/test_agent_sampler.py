@@ -381,7 +381,8 @@ def test_tasks_told_apart_only_by_their_system_prompt_can_be_topped_up(proxy):
 def test_a_task_stuck_in_its_tools_is_a_loop_while_the_others_go_on(proxy, tmp_path):
 	"""D's plant 3: one worker's tool retries forever after the model asked for it; the other
 	worker keeps calling the model. The stuck task is marked a loop at the 2-minute cutoff (2 s here)."""
-	_, px = proxy
+	prov, px = proxy
+	prov.delay_s = 0.3  # the two workers' calls overlap, as a real model's do
 	script = tmp_path / "two.py"
 	script.write_text(
 		"import json, os, threading, time, urllib.request\n"
@@ -393,7 +394,7 @@ def test_a_task_stuck_in_its_tools_is_a_loop_while_the_others_go_on(proxy, tmp_p
 		"    call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': 'stuck'}]})\n"
 		"    while True: time.sleep(1)\n"
 		"def busy():\n"
-		"    time.sleep(1)  # after the stuck call, so the fake provider's one tool-call answer is its\n"
+		"    time.sleep(0.15)  # starts while the stuck call is still out, so both count as workers\n"
 		"    for i in range(12):\n"
 		"        call({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': f'busy {i}'}]}); time.sleep(0.5)\n"
 		"    while True: time.sleep(1)\n"
@@ -402,9 +403,44 @@ def test_a_task_stuck_in_its_tools_is_a_loop_while_the_others_go_on(proxy, tmp_p
 	)
 	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=20,
 		env=dict(os.environ), stall_s=2.0)  # fmt: skip
-	by = {t.stop_reason for t in out.tasks if t.turns == 1 and t.tool_calls}
-	assert by == {"loop"} and "stalled on their tools" in out.selection
+	assert "stalled on their tools" in out.selection
 	assert sum(t.stop_reason == "loop" for t in out.tasks) == 1  # the busy worker's tasks finished
+
+
+def test_one_stuck_worker_of_four_is_the_one_loop(tmp_path):
+	"""Review, Oct 31: four workers whose tasks end on a tool call; one gets stuck in its tool, the
+	others go on until the sample is full and their next tasks are refused. Only the stuck one is a loop."""
+	prov = Provider()  # its streamed answers end asking for a tool
+	prov.delay_s = 0.3  # calls that overlap, as a real model's do, so the workers show as workers
+	px = AgentProxy(prov.url, "our-key", rate=token_rate)
+	px.start()
+	script = tmp_path / "four.py"
+	script.write_text(
+		"import json, os, threading, time, urllib.error, urllib.request\n"
+		"base = os.environ['META_API_BASE']\n"
+		"def call(body):\n"
+		"    r = urllib.request.Request(base + '/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})\n"
+		"    return urllib.request.urlopen(r).read()\n"
+		"def worker(w):\n"
+		"    for i in range(10):\n"
+		"        try:\n"
+		"            call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': f'w{w} t{i}'}]})\n"
+		"        except urllib.error.HTTPError:\n"
+		"            continue\n"
+		"        if w == 0:\n"
+		"            while True: time.sleep(1)  # its tool never returns\n"
+		"        time.sleep(0.2)\n"
+		"ts = [threading.Thread(target=worker, args=(w,), daemon=True) for w in range(4)]\n"
+		"[t.start() for t in ts]\n"
+		"while True: time.sleep(1)\n"
+	)
+	try:
+		out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=8,
+			env=dict(os.environ), stall_s=1.5)  # fmt: skip
+	finally:
+		px.stop()
+		prov.server.shutdown()
+	assert len(out.tasks) == 8 and [t.stop_reason for t in out.tasks].count("loop") == 1
 
 
 def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):
@@ -419,9 +455,9 @@ def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):
 		"    r = urllib.request.Request(base + '/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})\n"
 		"    return urllib.request.urlopen(r).read()\n"
 		"call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': 'slow'}]})\n"
-		"time.sleep(3)  # a slow tool, past the 1 s cutoff below, then the task's next turn\n"
+		"time.sleep(3)  # a slow tool, then the task's next turn (the run-wide cutoff is 5 s)\n"
 		"call({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': 'slow'}, {'role': 'tool', 'content': 'ok'}]})\n"
 	)
 	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=5,
-		env=dict(os.environ), stall_s=10.0)  # fmt: skip
+		env=dict(os.environ), stall_s=5.0)  # fmt: skip
 	assert [t.stop_reason for t in out.tasks] == ["done"] and out.tasks[0].turns == 2

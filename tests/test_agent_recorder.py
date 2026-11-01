@@ -19,6 +19,7 @@ class Provider:
 	def __init__(self):
 		self.seen: list[dict] = []
 		self.status = 200
+		self.delay_s = 0.0  # each answer takes this long
 		provider = self
 
 		class H(BaseHTTPRequestHandler):
@@ -29,6 +30,8 @@ class Provider:
 
 			def do_POST(self):
 				body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+				if provider.delay_s:
+					time.sleep(provider.delay_s)
 				provider.seen.append({"path": self.path, "auth": self.headers.get("Authorization"),
 					"cookie": self.headers.get("Cookie"), "body": body})  # fmt: skip
 				if provider.status != 200:

@@ -16,9 +16,10 @@ Caught by the first probe (Oct 31, a-gt-grpo-l4, before this script's settings c
 prompts x 8 completions a micro-step, the run ran out of memory on an L4 before its first step, in
 the bare run and the probe alike (20.91 GiB allocated, asking 2.32 GiB more of the 22.06 GiB card)
 [measured]. The 2.32 GiB is exactly the bf16 logits of 16 completions: 16 x 513 x 151,936 x 2 bytes
-[derived]. The script now takes 1 prompt (8 completions) a micro-step, keeping fp32 weights so the
-1e-6 learning rate still moves them (pure bf16 would round the updates away); Preflight should show
-the 2-prompt setting's OOM before it runs.
+[derived]. The script now takes 1 prompt (8 completions) a micro-step and uses Adafactor, whose
+factored state is a few MB where AdamW's is two fp32 copies of the weights (3.7 GiB here), keeping
+fp32 weights so the 1e-6 learning rate still moves them (pure bf16 would round the updates away).
+Neither change is a planted problem; Preflight should show the 2-prompt setting's OOM before it runs.
 
 Everything is public: the model (Apache-2.0) and GSM8K (MIT). Written for Preflight, not taken
 from any other project.
@@ -77,6 +78,7 @@ def formatted(prompts, completions, **kwargs):
 args = GRPOConfig(
 	output_dir="out/grpo-qwen",
 	learning_rate=1e-6,
+	optim="adafactor",  # fits an L4 with fp32 weights (AdamW's state would not, Oct 31 review estimate)
 	per_device_train_batch_size=PROMPTS_PER_STEP,
 	gradient_accumulation_steps=4,
 	num_generations=GROUP,
