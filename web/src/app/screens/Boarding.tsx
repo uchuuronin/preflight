@@ -5,20 +5,11 @@
  */
 import { useEffect, useState } from "react";
 import { t } from "../../lib/i18n";
-import type { JobEvent } from "../../workspace/record/types";
-import { type BoardingEvent, boardingState } from "../boarding";
+import { type BoardingEvent, boardingState, type ModelCallSeen, modelsRan, STAGES } from "../boarding";
 import { go, href } from "../route";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
-
-const STAGES: Array<{ stage: JobEvent["stage"][]; key: string; model?: string }> = [
-	{ stage: ["queued", "admitted"], key: "boarding.stage.queue" },
-	{ stage: ["fetching", "mapping", "skeleton"], key: "boarding.stage.read", model: "Muse Spark" },
-	{ stage: ["harnessing", "probing"], key: "boarding.stage.probe" },
-	{ stage: ["triage"], key: "boarding.stage.triage", model: "Muse Spark Open" },
-	{ stage: ["predicting", "done"], key: "boarding.stage.fit" },
-];
 
 export function Boarding({ jobId }: { jobId: string | null }) {
 	const [events, setEvents] = useState<BoardingEvent[]>([]);
@@ -43,8 +34,26 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		return () => es.close();
 	}, [jobId]);
 
-	const { last, done, failed, cancelled, open, error } = boardingState(events);
-	const idx = last ? STAGES.findIndex((s) => s.stage.includes(last.stage)) : -1;
+	const { last, done, failed, cancelled, open, error, at: idx } = boardingState(events);
+
+	// A model's tag shows only once the record says it was called (its provenance), never just
+	// because the job reached that leg. Re-read when the record changes (record_rev).
+	const rev = events.reduce((n, e) => Math.max(n, e.record_rev ?? 0), 0);
+	const [calls, setCalls] = useState<ModelCallSeen[]>([]);
+	useEffect(() => {
+		if (!open) return;
+		let gone = false;
+		fetch(`${API_BASE}/v1/records/${encodeURIComponent(open)}`, { credentials: "same-origin" })
+			.then((r) => (r.ok ? r.json() : null))
+			.then((rec: { provenance?: ModelCallSeen[] } | null) => {
+				if (!gone && rec?.provenance) setCalls(rec.provenance);
+			})
+			.catch(() => {});
+		return () => {
+			gone = true;
+		};
+	}, [open, rev, done]);
+	const ran = modelsRan(calls);
 	const progress = done ? 100 : Math.max(0, idx) * 25;
 
 	return (
@@ -56,21 +65,30 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 				<div className="pf-route">
 					<svg viewBox="0 0 900 260" preserveAspectRatio="none" aria-hidden="true">
 						<path className="pf-route__base" d="M30 230 C 260 -40, 640 -40, 870 230" />
-						<path className="pf-route__done" d="M30 230 C 260 -40, 640 -40, 870 230" pathLength={100} style={{ strokeDasharray: 100, strokeDashoffset: 100 - progress }} />
+						<path className={`pf-route__done${failed ? " is-stopped" : ""}`} d="M30 230 C 260 -40, 640 -40, 870 230" pathLength={100} style={{ strokeDasharray: 100, strokeDashoffset: 100 - progress }} />
 					</svg>
-					<span className="pf-route__end" style={{ left: "3.3%" }}>
+					<span className="pf-route__end pf-route__end--from" style={{ left: "3.3%" }}>
 						{t("boarding.from")}
 					</span>
-					<span className="pf-route__end" style={{ left: "96.7%" }}>
+					<span className="pf-route__end pf-route__end--to" style={{ left: "96.7%" }}>
 						{t("boarding.to")}
 					</span>
 				</div>
 				<ol className="pf-stages">
 					{STAGES.map((s, i) => (
-						<li key={s.key} className={`glass pf-stage${i < idx || done ? " is-done" : i === idx && !failed ? " is-current" : ""}`}>
+						<li
+							key={s.key}
+							className={`glass pf-stage${i < idx || done ? " is-done" : i === idx ? (failed ? " is-stopped" : " is-current") : ""}`}
+							aria-current={i === idx && !done ? "step" : undefined}
+						>
 							<span className="pf-stage__dot" aria-hidden="true" />
 							{t(s.key)}
-							{s.model ? <span className="pf-model">{s.model}</span> : null}
+							{ran[i]?.map((m) => (
+								<span key={m} className="pf-model">
+									{m}
+								</span>
+							))}
+							{i === idx && failed ? <span className="pf-stage__stopped">{t(cancelled ? "boarding.stage.cancelled_here" : "boarding.stage.stopped_here")}</span> : null}
 						</li>
 					))}
 				</ol>

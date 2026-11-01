@@ -30,6 +30,9 @@ interface Check {
 	/** How the memory prediction was formed (coverage.py memory_target). */
 	basis?: string;
 	verdict?: string;
+	/** sized_for_seq_len checks: the probe's longest padded row and its seq_len. */
+	longest_row?: number;
+	seq_len?: number;
 }
 
 const UNIT: Record<string, string> = { step_time: "s", "time.step": "s", peak_memory: "bytes", "memory.peak": "bytes" };
@@ -98,6 +101,7 @@ export function Checks() {
 								<span data-label={t("checks.col.result")}>
 									{s.n ? t("checks.result", { hits: fmt(s.hits, "count"), n: fmt(s.n, "count") }) : t("checks.none")}
 									{s.abstained ? <small className="pf-dim"> {t("checks.abstained", { n: fmt(s.abstained, "count") })}</small> : null}
+									{s.sized_for_seq_len ? <small className="pf-dim"> {t("checks.sized_for_seq_len_n", { n: fmt(s.sized_for_seq_len, "count") })}</small> : null}
 								</span>
 								<span data-label={t("checks.col.interval")}>{s.wilson95 ? fmtRange(s.wilson95[0] ?? 0, s.wilson95[1] ?? 1, "probability") : t("value.none")}</span>
 								<FitMark fit={TONE[v]} label={t(`checks.verdict.${v}`)} />
@@ -112,7 +116,9 @@ export function Checks() {
 							const unit = UNIT[c.of ?? c.metric];
 							const p = c.predicted;
 							const said =
-								c.metric === "oom"
+								c.verdict === "sized_for_seq_len"
+									? t("checks.sized_for_seq_len", { longest: fmt(c.longest_row ?? 0, "count"), seq: fmt(c.seq_len ?? 0, "count") })
+									: c.metric === "oom"
 									? [t(`checks.oom.${c.verdict ?? "abstained"}`), c.predicted_peak?.point ? t("checks.oom.peak", { peak: fmt(c.predicted_peak.point, "bytes") }) : null].filter(Boolean).join(", ")
 									: p?.point !== undefined && unit
 										? t(c.basis === "peak_less_eval_and_context" ? "checks.predicted_no_eval" : "checks.predicted", {

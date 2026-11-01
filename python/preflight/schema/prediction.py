@@ -17,6 +17,16 @@ EstimateStatus = Literal["measured", "predicted", "extrapolated", "abstain"]
 Readout = Literal["memory", "time", "cost", "risk"]
 
 
+class EstimateRate(Strict):
+	"""0.6.0 (B, Nov 1): how a cost estimate splits into a quantity times a rate, so a client can
+	re-price it at the visitor's own rate without parsing the reason."""
+
+	quantity: str = Field(description="The target holding the quantity, e.g. cost.gpu_hours")
+	usd_per_unit: float = Field(ge=0)
+	unit: str = Field(description="The quantity's unit, e.g. gpu_hours")
+	price_row: str | None = Field(default=None, description="The price-table row id the rate came from")
+
+
 class Estimate(Strict):
 	"""One number on screen: a point with an interval, or an honest abstention."""
 
@@ -29,6 +39,7 @@ class Estimate(Strict):
 	source: Literal["grid", "exact"]
 	reason: str | None = Field(default=None, description="Why the engine abstained or extrapolated")
 	level: float = Field(default=0.9, gt=0, lt=1, description="Nominal coverage of [lo, hi]")
+	rate: EstimateRate | None = Field(default=None, description="0.6.0: cost estimates only, quantity x rate")
 
 	@model_serializer(mode="wrap")
 	def _keep_nulls(self, handler, info: SerializationInfo):

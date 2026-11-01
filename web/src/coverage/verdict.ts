@@ -17,6 +17,8 @@ export interface MetricSummary {
 	rate: number | null;
 	wilson95: number[] | null;
 	abstained: number;
+	/** Memory checks kept out of the score: the probe's rows never reached its seq_len. */
+	sized_for_seq_len?: number;
 	runs?: number;
 }
 

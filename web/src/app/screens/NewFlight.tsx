@@ -390,10 +390,12 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 							<span>{t("newflight.col.gpu")}</span>
 							<span>{t("newflight.col.status")}</span>
 						</div>
-						{SAMPLES.map((s) => (
+						{SAMPLES.filter((s) => !s.flag || flag(s.flag)).map((s) => (
 							<button key={s.id} type="button" className="pf-departures__row" onClick={() => onSample(s.id)} aria-label={t("newflight.open_sample", { job: t(s.titleKey) })}>
 								<span className="pf-departures__code">{s.code}</span>
-								<span className="pf-departures__job">{t(s.titleKey)}</span>
+								<span className="pf-departures__job">
+									{t(s.titleKey)} <span className={`pf-departures__numbers is-${s.numbers}`}>{t(`newflight.numbers.${s.numbers}`)}</span>
+								</span>
 								<span className="pf-departures__gpu">{s.gpu}</span>
 								<span className="pf-departures__status">{t("newflight.ready")}</span>
 							</button>

@@ -12,6 +12,7 @@ record's share token.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import math
 import re
@@ -169,15 +170,27 @@ async def create_job(request: Request) -> dict:
 	return reply
 
 
+async def _claim(request: Request, token: object) -> None:
+	"""The visitor following their own job sees its record's share token: they own that record
+	(preflight_api/owners.py). Best effort: a fix race on it is refused if this never lands."""
+	owners = getattr(request.app.state, "owners", None)
+	if owners is None or not isinstance(token, str) or not RECORD_REF.match(token):
+		return
+	with contextlib.suppress(Exception):
+		await owners.claim(token, visitor_of(request.state.session))
+
+
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str, request: Request) -> dict:
 	store = _store(request)
 	try:
-		return await store.status(_job_id(job_id))
+		out = await store.status(_job_id(job_id))
 	except ApiError:
 		raise
 	except Exception as e:
 		raise _store_error(e) from e
+	await _claim(request, (out or {}).get("share_token"))
+	return out
 
 
 @router.post("/jobs/{job_id}/cancel", status_code=204)
@@ -221,6 +234,8 @@ async def job_events(job_id: str, request: Request) -> Response:
 		while True:
 			for ev in batch:
 				after = max(after, int(ev.get("seq", after)))
+				if ev.get("share_token"):
+					await _claim(request, ev["share_token"])
 				yield _sse(ev)
 				if ev.get("stage") in TERMINAL:
 					return

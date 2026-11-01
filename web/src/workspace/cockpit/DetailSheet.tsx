@@ -14,6 +14,7 @@ import { useWorkspace } from "../state";
 import { bounds, trusted } from "../status";
 import { Provenance } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
+import { FixFinding } from "../../fix/FixFinding";
 
 export function DetailSheet() {
 	const { record, estimates, state, actions } = useWorkspace();
@@ -102,6 +103,7 @@ export function DetailSheet() {
 							{t("detail.open_knob", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}
 						</button>
 					) : null}
+					<FixFinding finding={f} />
 				</div>
 			))}
 			{drawer.map((p) => (

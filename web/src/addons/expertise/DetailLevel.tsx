@@ -1,6 +1,6 @@
 /**
- * The detail-level setting, docked in the Logbook's pilot card (registry slot
- * "logbook-settings"). A radio group: arrow keys move between levels, and only the chosen
+ * The detail-level setting, docked in the cockpit head (registry slot "cockpit-head", see
+ * index.ts). A radio group: arrow keys move between levels, and only the chosen
  * level is in the tab order.
  */
 import { useRef, type KeyboardEvent } from "react";

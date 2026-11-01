@@ -8,6 +8,55 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, small hours (Chiya's queue of 01:19)
+
+`613ae92` was already on `origin/ws-d` when the yes came, so there was nothing to push. `main` is still at `90fcc40`: the audit re-check (12 first, then 7 to 11) and the dial rerun wait for round four.
+
+- **Fallback 3-minute cut** (`docs/demo/fallback-cut.md`, linked from `storyboard.md`, which stays as plan A's fine-tune shots). 13 shots, about 2:55: the fine-tune's OOM at step 200, then the agent run. Every spoken number is measured and sourced: step 200, 189 s of probing, 20.4 of 22.06 GiB, 130 tasks in two runs, 0 of 905,739 input tokens cached, and 30 tasks in 49 s. Decisions, with bases:
+	- The retry loop is shown only as "read from the code" (`run.py:121`). Basis: A measured 0 runaways in the 130 tasks (`a-agent-builds-1`), because they ran before plant 3 was moved to rows 26 to 29, and A hasn't re-sampled since. If a re-sample shows the stall before Tuesday, its numbers go in the table.
+	- The turn-11 overflow and the full-run cost aren't spoken. Basis: the first is derived and the second predicted; they may appear on screen under the app's own labels.
+	- The agent shots need the Oct 31 record published on the deploy with a real share link, since its token in the repo is now a placeholder (A, `e27d2fc`).
+- **Validation table hook.** B's scorer (`scripts/score_validation.py --readme`, `ws-b` `6ce7730`) already writes between `<!-- validation:start -->` and `<!-- validation:end -->`. The README draft now holds those markers around the scorer's own output on an empty manifest, so Monday's run replaces only that block.
+	- End to end: B's script with B's fixture manifest, run on a copy of the draft, filled the block and left every line outside it unchanged.
+	- `tests/test_d_readme_validation.py` checks the markers now, and the round trip through B's `into_readme` once B's module is on the branch. It passed against B's module from a `ws-b` copy.
+	- Two strings are B's, so I asked B for them: "not measured" becomes "not measured yet" (Chiya's wording), and a blank line goes before the footnote. Without it, GitHub's Markdown renders the footnote as a table row (checked with marked 14.1.4).
+- **Pretraining-grid sample.** Nothing in the repo mirrors the lab project. The campaign fixtures already use batch size × sequence length × seed, and no branch has a language × filter grid. The "3 languages × 6 filters × 3 data sizes" row is only in the plan PDF's bug-zoo table (page 16), which I can't edit, so it's back to Chiya with a replacement row.
+
+- **Read-only review of this batch,** and what changed from it. No number lacked a source, and the sums, the retry-loop treatment, the seeded block and the GFM claim checked out. Fixed:
+	- **Dollar figures.** The cut spoke $0.042 and $1.67 as measured, but they are measured time and tokens priced at list rates, which is how the README draft already tags its own costs: derived. Decision: no dollar figure is spoken or captioned in either cut. Plan A's storyboard is corrected too (its 45-second cut said "about four cents"). If Chiya rules that a list-price cost may be captioned with a "derived" tag, they can go back as captions.
+	- **Overclaims fixed:**
+		- shot 4 now says "189 seconds of probing";
+		- shot 7's caption separates the record's 30 tasks from the 130 in two runs;
+		- shot 8 states the timestamp as a fact in the code, not a measured cause;
+		- shot 11 now says the screen came from a 30-task sample in 49 s, not "130 tasks and $1.67";
+		- the full run's cost on screen is the record's $7.15, "Predicted", not A's $6.4.
+	- **Dependencies.** The dev-server fallback is gone (the cut is recorded on the deploy or not at all). Shot 12 lists B's Monday scorer run as a dependency. The retry-loop line notes that `run.py:121` is the line in the script as the record read it.
+	- **Test.** It now asserts that the seeded block is exactly the scorer's output, and it fails on a one-word hand edit, which I checked. A third string went to B: the GNN row's "+4.8%" is percentage points.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, night (add-ons "done means"; correction pushed)
+
+Pushed `613ae92` (the status correction) with Chiya's yes. `main` is still at `90fcc40`, so none of C's audit fixes have landed; the re-check on `main` starts with 12 (model tags) once they do.
+
+I read the PM's new project doc `unseen-scripts.md` (the held-out validation set, private to Chiya until the validation runs). It stays out of the repo, and nothing I build or tune uses it. The dial's order stays frozen for the Nov 2 test.
+
+**"Done means" for D1 to D5**, the plan item no other agent's work was holding up:
+- A README line for each add-on, with its flag: a new "Add-ons" section in `docs/readme-draft.md`, covering D1 detail level, D3 currency, D4 free GPUs, D5 notebook and exports.
+- A render check, `docs/audit/scripts/addons.mjs`, for each add-on in desk and phone, dusk and day. With its flag on, it must render on its host screen, with no page or console errors, no axe violations inside it and nothing under 24 px; it also opens D1's glossary card and loads a real notebook into D5 so the preview is checked. With its flag explicitly off, the host screen must load without errors and the add-on must be absent (for D5, no Notebook tab). It prints each axe node's colours and exits 1 on any failure.
+- Result on `ws-d` `613ae92` (`main` `90fcc40` plus D's commits) [measured, Chromium, Nov 1]: 14 of 20 states pass. All add-ons render where they belong and are absent with their flags off, with no errors and no targets under 24 px. The 6 failures are day-theme colour contrast in D1, D4 and exports: all 44 failing nodes are #3B5F70 on #9EBAE0 at 3.45:1, the shared `--pf-fg-dim` token on the sky (audit finding 7, with C). No other pair fails, D4's chips included. My Oct 30 note that D's panels had no axe violations didn't hold for the day theme. Asked C to run the check nightly (CI is C's).
+- Independent read-only review of the check and the README rows, and what changed from it:
+	- the check now proves the colour pair instead of me asserting it;
+	- the flag-off half waits for the host screen, fails on errors, and uses `?flags=-<flag>`; I confirmed that it can tell (Notebook tabs: 1 on, 0 off);
+	- it covers the glossary card and the notebook preview, which it hadn't;
+	- the console filter is narrowed to the tunnel and the font host;
+	- it says dev server only, since preview builds ignore URL flags;
+	- the README rows now say only what ships: D5 previews but checks nothing in while `runner.queue` is off; D3 covers 30 ECB currencies; D1's warnings rule waits on C's findings list; and the exports CLI item and link name are corrected.
+	- A second read-only review found the D1 flag-off half opened no knob, so it couldn't fail for the glossary card, and the notebook's "What will run" stayed closed. Both are now opened. The check also warns on text axe can't measure. It warned on 6 nodes, which I measured from screenshots with the text hidden: D3's select is at least 8.89:1 and D5's code blocks at least 5.88:1, so both pass [measured, Nov 1]. Results are labelled `ws-d` `613ae92`, the tree they ran on.
+	- Decision: not claiming that C's token fix turns the check green. That depends on the value C picks, and the check will show it.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, early (agent plant 3 made to fire)
 
 Pushed `372b60e` with Chiya's yes, as `ee55977` (my merge of `main` `90fcc40` on top, then the push, at 00:29:56 and 00:29:58). **Correction, Nov 1, 01:35:** I first reported that something else had made that merge and push. It was my own turn, answering Chiya's yes. That turn was interrupted and the message re-sent, and after the restart I couldn't see the first attempt, so my second push found nothing to do. The record shows it: this session's transcript (my command at 04:29:49 UTC) and `origin/ws-d`'s ref log ("update by push" at 00:29:58). No background agent, process or hook pushed: none is running (ListAgents, `ps`), the stop hook only reads git, and the environment manager holds only signing config. Then `6215d1b` was pushed with Chiya's yes at 01:33. The data-use gap is settled: A gates the Muse Spark call on `harness.spark_script_map`, C's notice follows the same flag, and the flag goes on for the demo.
@@ -200,7 +249,7 @@ Sources: the Contracts tab (Contract D, the Oct 27 review, the competitive revie
 | D10 Command palette | deferred | 0 | |
 | D11 Phone view and dark theme | dark theme done by C; phone view not started | 2.5 | C's share route |
 | D12 Alerts outside the app | dropped | 0 | |
-| "Done means" for D1 to D5: a README line each and a nightly check that each still renders | not started | 2 | flags on in production are Chiya's call |
+| "Done means" for D1 to D5: a README line each and a nightly check that each still renders | written (README draft's "Add-ons"; `docs/audit/scripts/addons.mjs`, 14 of 20 pass, the rest are finding 7) | 0 | C runs it nightly; flags on in production are Chiya's call |
 | **Follow-ups and support** | | | |
 | Builder kit (competitive review item 10) | on ws-d | 0 | Chiya schedules the sessions (paid check-ins) |
 | Stranger-path audit, 12 findings to C | on ws-d | 1 | re-check the top four when C's fixes land |

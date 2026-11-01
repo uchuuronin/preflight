@@ -11,7 +11,7 @@ import { hasKey, t } from "../../lib/i18n";
 import { Info } from "../components/Info";
 import type { Estimate } from "../record/types";
 import { trusted } from "../status";
-import { type CampaignPlan, hasSchedule, lanesOf, type PlanCell, unitOf } from "./plan";
+import { type CampaignPlan, finishBand, hasSchedule, lanesOf, type PlanCell, slotsOf, startOf, unitOf } from "./plan";
 
 function said(e: Estimate | null | undefined): string {
 	if (!e || !trusted(e)) return e?.reason ? t("campaign.abstain", { why: e.reason }) : t("value.none");
@@ -30,8 +30,14 @@ function when(iso: string | undefined): string {
 	return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(iso));
 }
 
+/** The finish band needs all three dates, each a real date: a record with only some says the finish in seconds instead. */
+function band(q: Record<string, string>): boolean {
+	return ["p10", "p50", "p90"].every((k) => typeof q[k] === "string" && Number.isFinite(Date.parse(q[k]!)));
+}
+
 function Duration({ c }: { c: PlanCell }) {
-	if (!trusted(c.time)) return <span className="pf-cal__abstain">{t("campaign.no_time")}</span>;
+	// The record's own reason when it gives one; the generic line only when it doesn't.
+	if (!trusted(c.time)) return <span className="pf-cal__abstain">{c.time.reason ? t("campaign.abstain", { why: c.time.reason }) : t("campaign.no_time")}</span>;
 	return (
 		<span>
 			{fmt(c.time.point, "s_short")} <small className="pf-dim">({fmtRange(c.time.lo ?? c.time.point, c.time.hi ?? c.time.point, "s_short")})</small>
@@ -43,11 +49,12 @@ function Duration({ c }: { c: PlanCell }) {
 export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 	const { rows, unplaced } = lanesOf(plan);
 	const timed = hasSchedule(plan);
-	const span = timed ? Math.max(1, ...plan.cells.filter((c) => c.lane && !c.cut && trusted(c.time)).map((c) => (c.start_s ?? 0) + (c.time.hi ?? c.time.point ?? 0))) : 1;
+	const fin = timed && band(plan.completion) ? finishBand(plan) : null;
+	const span = timed ? Math.max(1, fin?.p90 ?? 0, ...plan.cells.filter((c) => c.lane && !c.cut && trusted(c.time)).map((c) => (startOf(c) ?? 0) + (c.time.hi ?? c.time.point ?? 0))) : 1;
 	const pct = (s: number) => `${Math.min(100, (s / span) * 100).toFixed(2)}%`;
 	const q = plan.completion;
 	return (
-		<section className="glass pf-band pf-cal" aria-label={t("campaign.title")}>
+		<section id="pf-campaign" className="glass pf-band pf-cal" aria-label={t("campaign.title")}>
 			<div className="pf-band__head">
 				<b>{t("campaign.title")}</b>
 				{plan.card.notes ? (
@@ -56,6 +63,8 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 					</Info>
 				) : null}
 			</div>
+			{/* The guide's step speaks here while its tour is on the calendar (GuidePanel portals into it). */}
+			<div id="pf-campaign-guide" />
 			<dl className="pf-cal__totals">
 				<div>
 					<dt>{t("campaign.cost")}</dt>
@@ -67,7 +76,7 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 				</div>
 				<div>
 					<dt>{t("campaign.finish")}</dt>
-					<dd>{q.p50 ? t("campaign.finish_band", { p10: when(q.p10), p50: when(q.p50), p90: when(q.p90) }) : said(plan.finish_s)}</dd>
+					<dd>{band(q) ? t("campaign.finish_band", { p10: when(q.p10), p50: when(q.p50), p90: when(q.p90) }) : said(plan.finish_s)}</dd>
 				</div>
 			</dl>
 			<ol className="pf-cal__lanes">
@@ -77,11 +86,16 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 						{r.cells.length === 0 ? (
 							<span className="pf-dim">{t("campaign.lane_empty")}</span>
 						) : timed ? (
-							<div className="pf-cal__track" role="list">
-								{r.cells.map((c) => (
-									<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(c.start_s ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
-										<i className="pf-cal__whisker" style={{ width: `${(((c.time.hi ?? 0) - (c.time.point ?? 0)) / Math.max(1, c.time.point ?? 1)) * 100}%` }} />
-										<span>{cellLabel(c)}</span>
+							<div className="pf-cal__slots">
+								{/* One track per slot the lane holds, so runs going at once sit on their own rows. */}
+								{slotsOf(r.cells).map((slot, i) => (
+									<div key={i} className="pf-cal__track" role="list">
+										{slot.map((c) => (
+											<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
+												<i className="pf-cal__whisker" style={{ width: `${(((c.time.hi ?? 0) - (c.time.point ?? 0)) / Math.max(1, c.time.point ?? 1)) * 100}%` }} />
+												<span>{cellLabel(c)}</span>
+											</div>
+										))}
 									</div>
 								))}
 							</div>
@@ -97,6 +111,16 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 						)}
 					</li>
 				))}
+				{fin ? (
+					<li className="pf-cal__lane pf-cal__finish">
+						<span className="pf-cal__who">{t("campaign.finish_row")}</span>
+						<div className="pf-cal__track" role="img" aria-label={t("campaign.finish_band", { p10: when(q.p10), p50: when(q.p50), p90: when(q.p90) })}>
+							{/* The middle 80% of simulated finishes, with the most likely one marked. */}
+							<span className="pf-cal__band" style={{ left: pct(fin.p10), width: pct(fin.p90 - fin.p10) }} />
+							<i className="pf-cal__p50" style={{ left: pct(fin.p50) }} />
+						</div>
+					</li>
+				) : null}
 			</ol>
 			{unplaced.length ? (
 				<div className="pf-cal__unplaced">

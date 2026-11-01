@@ -1,8 +1,10 @@
 <!--
 README draft by D, Sat Oct 31, for the PM to merge into README.md (submission checklist in the
-plan). Placeholders to fill before Nov 4 are marked TODO(PM). Every number carries its source;
-the validation table is empty for B's scorer on Mon Nov 2. Where a feature is still behind a flag
-or not yet wired, its row says so: update those rows from the status files at merge time.
+plan). Placeholders to fill before Nov 4 are marked TODO(PM). Every number carries its source.
+The validation table is B's scorer output between the `validation:start` and `validation:end`
+markers: keep both when merging, since the scorer rewrites what is between them. Where a feature
+is still behind a flag or not yet wired, its row says so: update those rows from the status
+files at merge time.
 -->
 
 # Preflight
@@ -106,27 +108,45 @@ TODO(PM): replace with the validation table's "Cost of one Preflight run" row on
 
 Every prediction is checked against real full runs, hit or miss. B's scorer fills this table on
 Mon Nov 2 from the bug zoo's and the unseen scripts' full runs; the policy is frozen before then.
+Everything between the two `validation` markers is the scorer's output, written by
+`uv run --extra probe python scripts/score_validation.py <manifest.json> --readme README.md`;
+nothing in it is edited by hand.
 
-| Metric | Target | Measured on | Result | Met? | Source |
-| --- | --- | --- | --- | --- | --- |
-| Peak memory error | Within 10% | Bug zoo and unseen scripts, full runs | | | |
-| OOM prediction | No missed OOMs; at most 1 false alarm per 10 scripts | Bug zoo and unseen scripts | | | |
-| Step time, same GPU | Within 15% | Full runs | | | |
-| Step time, unmeasured GPU | Within 20% | Train on 3 GPU types, test on the 4th (including AMD) | | | |
-| GNN + GBDT ensemble vs GBDT alone | Lower error on held-out architectures | Corpus holdout | | | |
-| Divergence warning | AUROC 0.85+, 100+ steps early | Held-out short runs | | | |
-| Rollout time (RL) | Within 20% | GRPO zoo script and an unseen TRL script | | | |
-| Serving tokens/sec | Within 15% | vLLM full runs | | | |
-| Agent run total cost | Inside the 90% interval | Full benchmark run vs the 20 to 50-task sample | | | |
-| Interval coverage | 90% intervals cover at least 88% | All of the above | | | |
-| Abstention | Every query outside the probed range is flagged | Automated test | | | |
-| Planted problems caught | All of them | Bug zoo | | | |
-| Unseen scripts harnessed | 8 of 9 without hand edits | One per job type | | | |
-| Knob response | Under 400 ms at p95 | Browser timing | | | |
-| Cost of one Preflight run | Under $1 and under 5 minutes | Modal billing and timer | | | |
+<!-- validation:start -->
+| Metric | Target | Measured on | Result | 95% interval | Hit | Notes |
+|---|---|---|---|---|---|---|
+| Peak memory error | Within 10% | Bug zoo and unseen scripts, full runs | not measured |  |  | no full run scored yet |
+| OOM prediction | No missed OOMs; at most 1 false alarm per 10 scripts | Bug zoo and unseen scripts | not measured |  |  |  |
+| Step time, same GPU | Within 15% | Full runs | not measured |  |  | no full run scored yet |
+| Step time, unmeasured GPU | Within 20% | Train on 3 GPU types, test on the 4th | not measured |  |  | no corpus store given |
+| GNN + GBDT ensemble vs GBDT alone | Lower error on held-out architectures | Corpus holdout |  |  | miss | paired gain +4.8% (95% -1.4% to +11.6%); the interval includes zero, so the GBDT is used |
+| Divergence warning | AUROC 0.85+, 100+ steps early | Held-out short runs | not measured |  |  | the classifier's held-out report isn't in yet |
+| Rollout time (RL) | Within 20% | An unseen TRL script (the GRPO zoo script calibrated it, Nov 1) | not measured |  |  | no full run scored yet |
+| Serving tokens/sec | Within 15% | vLLM full runs | not measured |  |  | no full run scored yet |
+| Agent run total cost | Inside the 90% interval | Full benchmark run vs the 30-task sample | not measured |  |  | no full run scored yet |
+| Interval coverage | 90% intervals cover at least 88% | All of the above | not measured |  |  | no full run scored yet |
+| Abstention | Every query outside the probed range is flagged | Automated test | not measured |  |  | tests/test_engine_api.py, run with the suite |
+| Planted problems caught | All of them | Bug zoo | not measured |  |  |  |
+| Unseen scripts harnessed | 8 of 9 without hand edits | One per job type | not measured |  |  |  |
+| Knob response | Under 400 ms at p95 | Browser timing | not measured |  |  | no browser timings given |
+| Cost of one Preflight run | Under $1 and under 5 minutes | Modal billing and timer | not measured |  |  | no full run scored yet |
+A "within" target is a hit when at least 90% of runs are within it; intervals are Wilson 95% on the proportion, and a hit is "confident" only when its lower end is at least 90% ("hit, few runs" otherwise). Unseen scripts are never tuned on. Not scored yet: no full runs (seeded from the scorer with an empty manifest, Nov 1).
+<!-- validation:end -->
 
-Proportions are reported as counts with Wilson 95% intervals; no number here was tuned on the
-data it is checked against.
+## Add-ons
+
+Smaller features, each behind its own flag in `flags.json` (all off until Chiya turns them on).
+`docs/audit/scripts/addons.mjs` checks that each still renders where it belongs, with no errors,
+no accessibility violations inside it and nothing under 24 px, and that it is gone with its flag
+off. TODO(PM): keep only the rows whose flags are on in production.
+
+| Add-on | What a visitor gets | Flag |
+| --- | --- | --- |
+| Detail level (D1) | "New to this" shows the few knobs that matter most for the goal, in plain words, with a glossary card in each knob's control; knobs that a warning names stay in view | `d.expertise` |
+| Show costs in (D3) | Dollar figures in one of 30 currencies at the European Central Bank's dated reference rates, picked from the browser's region or set in the Logbook; regions without a rate stay in US dollars | `d.currency` |
+| Free GPUs (D4) | Whether the plan finishes inside one free session on Google Colab, Kaggle, Modal's starter credit or Lightning AI, and how often to save a checkpoint if not | `d.freetier` |
+| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run; checking it in opens with live runs | `d.notebook` |
+| Take it with you | The plan, an edit script for the changed settings, a Slurm batch file and the run command, built from the settings on screen, and the record's link once it has one | `c.exports`; the "Check it again on your machine" item also needs `d.exports_cli` |
 
 ## Develop
 

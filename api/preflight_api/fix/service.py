@@ -8,6 +8,7 @@ the call id, the visitor and the spend reservation, in a small store keyed by th
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import time
@@ -16,6 +17,7 @@ from typing import Any, Protocol
 
 APP = os.environ.get("PREFLIGHT_FIX_APP", "preflight-fix")
 FUNCTION = "race_fix"
+log = logging.getLogger("preflight.fix")
 ENV = os.environ.get("PREFLIGHT_MODAL_ENV", "main")
 
 
@@ -98,10 +100,15 @@ class ModalFixer:
 		call = modal.FunctionCall.from_id(call_id)
 		try:
 			return await call.get.aio(timeout=0)
-		except TimeoutError:
+		except TimeoutError:  # the built-in one: not finished yet
 			return None
 		except modal.exception.OutputExpiredError:
 			return {"error": "expired", "candidates": []}
+		except (modal.exception.ConnectionError, modal.exception.ServiceError, modal.exception.InternalError):
+			return None  # Modal itself didn't answer: ask again on the next poll
+		except Exception:  # the Function raised (its own timeout, a sandbox that wouldn't start)
+			log.exception("fix race %s failed", call_id)
+			return {"error": "race_failed", "candidates": []}
 
 	async def cancel(self, call_id: str) -> None:
 		import modal

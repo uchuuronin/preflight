@@ -293,6 +293,7 @@ export class GridProvider implements PredictionProvider {
 			for (const v of knobChoices(record, knob)) {
 				if (same(v, knobs[knob.id])) continue;
 				const p = this.predict(record, { ...knobs, [knob.id]: v });
+				if (opts.allow && !opts.allow(knob.id, v, p)) continue;
 				const est = p[goal.id];
 				if (!est || est.status === "abstain" || est.point === null) continue;
 				const risk = fail ? (p[fail]?.point ?? 0) : 0;

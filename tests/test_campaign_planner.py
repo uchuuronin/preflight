@@ -1,5 +1,6 @@
 """Campaign planner (campaign/planner.py): its numbers are the engine's, scheduled, segmented and dated."""
 
+import itertools
 import math
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -255,3 +256,61 @@ def test_bad_inputs_become_notes_not_crashes(ft):
 	assert {c.lane for c in pl.cells} == {"ana"} and any("no slots" in n for n in pl.notes)
 	with pytest.raises(ValueError):
 		P.plan(ft, {"batch_size": [2]}, P.Cluster(lanes={"ana": 0}), start=START)
+
+
+def test_each_run_has_a_slot_and_a_start_for_the_calendar(ft):
+	pl = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2, 3]}, P.Cluster(slots=2), start=START)
+	assert sorted(c.slot for c in pl.cells) == [0, 0, 1, 1]
+	firsts = [c for c in pl.cells if c.start_s.point == 0]
+	assert len(firsts) == 2  # one run starts at once on each slot
+	later = [c for c in pl.cells if c.start_s.point > 0]
+	assert all(c.start > START for c in later) and all(
+		c.start_s.lo <= c.start_s.point <= c.start_s.hi for c in later
+	)
+
+
+def test_runs_on_a_slot_start_in_order_and_cut_runs_get_no_slot(ft):
+	pl = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2, 3, 4, 5]}, P.Cluster(slots=2), start=START)
+	for k in (0, 1):
+		on = sorted((c for c in pl.cells if c.slot == k), key=lambda c: c.start_s.point)
+		assert on[0].start_s.point == 0
+		for a, b in itertools.pairwise(on):  # the next starts once the one before it has run
+			assert b.start_s.point > a.start_s.point and b.start_s.lo >= a.start_s.lo
+	cut = P.plan(ft, {"batch_size": [2], "seed": [0, 1, 2]}, P.Cluster(slots=1, budget_usd=1e-9), start=START)
+	assert all(c.slot is None and c.start_s is None for c in cut.cells if c.cut)
+
+
+def test_the_record_block_carries_the_plans_intervals_and_each_runs_start(ft):
+	# contract 0.5.0: C draws the calendar from CampaignCell.start_s and the readouts from the intervals
+	pl = P.plan(
+		ft,
+		{"batch_size": [2], "seed": list(range(4))},
+		P.Cluster(slots=2),
+		asha=P.Asha(min_steps=100),
+		start=START,
+	)
+	block = pl.to_campaign()
+	FlightRecord.model_validate(ft.model_copy(update={"campaign": block}).model_dump())
+	assert block.usd == pl.usd and block.gpu_hours == pl.gpu_hours and block.finish_s == pl.finish_s
+	assert block.grid_usd == pl.grid_usd and block.grid_gpu_hours == pl.grid_gpu_hours
+	assert block.quota.needed_bytes == pl.quota.needed_bytes and block.asha.rungs
+	by_id = {c.id: c for c in pl.cells}
+	assert all(c.start_s == by_id[c.id].start_s and c.time == by_id[c.id].time for c in block.cells)
+	assert sum(1 for c in block.cells if c.start_s and c.start_s.point == 0) == 2
+
+
+def test_a_start_abstains_when_a_run_before_it_often_never_finishes(ft):
+	# review, Oct 31: dates from the good draws alone were too sure
+	cl = P.Cluster(slots=1, mtti_s=400, checkpoint_interval_s=1e9, budget_usd=1e9)
+	pl = P.plan(ft, {"seed": [0, 1, 2]}, cl, start=START)
+	assert pl.finish_s.status == "abstain"
+	first, *later = sorted(pl.cells, key=lambda c: c.start_s.status != "predicted")
+	assert first.start_s.point == 0 and first.start == START
+	assert all(c.start_s.status == "abstain" and c.start is None and c.slot == 0 for c in later)
+	assert all("never finishes" in c.start_s.reason for c in later)
+
+
+def test_runs_that_cant_be_dated_have_a_slot_and_an_abstaining_start(ft):
+	cl = P.Cluster(slots=1, mtti_s=220, checkpoint_interval_s=1e9, budget_usd=1e9)
+	pl = P.plan(ft, {"seed": [0, 1, 2]}, cl, start=START)
+	assert all(c.slot == 0 and c.start_s.status == "abstain" and c.start is None for c in pl.cells)

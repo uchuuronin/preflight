@@ -44,7 +44,9 @@ describe("the campaign calendar draws B's plan and nothing else", () => {
 
 	it("lists runs by lane until B's plan carries start times, then draws them against time", () => {
 		expect(hasSchedule(dated)).toBe(false);
-		const withStarts: CampaignPlan = { ...dated, cells: dated.cells.map((c, i) => ({ ...c, slot: 0, start_s: i * 1000 })) };
+		// Contract 0.5.0's shape: start_s is an Estimate.
+		const est = (point: number) => ({ point, lo: point, hi: point, unit: "s", status: "predicted" }) as never;
+		const withStarts: CampaignPlan = { ...dated, cells: dated.cells.map((c, i) => ({ ...c, start_s: est(i * 1000) })) };
 		expect(hasSchedule(withStarts)).toBe(true);
 		const { container } = render(<CampaignCalendar plan={withStarts} />);
 		expect(container.querySelectorAll(".pf-cal__bar").length).toBe(lanesOf(dated).rows.flatMap((r) => r.cells).length);

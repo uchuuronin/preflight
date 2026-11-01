@@ -4,6 +4,9 @@ About 3 minutes, plus a 45-second cut for X. Built on one measured run: the plan
 fine-tune in the zoo (`zoo/finetune_lora_hf/train.py`: Qwen2.5-1.5B on Alpaca, batch 4 with 4-step
 accumulation, one L4), checked in on Oct 28.
 
+If plan A's GRPO, Pareto, race or campaign beats aren't ready by Tuesday, record the fallback
+cut in `fallback-cut.md` instead (the fine-tune and the agent run, measured numbers only).
+
 ## Rules for this video
 
 - **Only measured numbers are spoken or captioned.** Each comes from A's status file
@@ -23,7 +26,7 @@ accumulation, one L4), checked in on Oct 28.
 | --- | --- | --- |
 | 189 s | probe time until the eval out-of-memory was caught (probe `p1-eval`) | measured, A's status, record `ICDYrfHQ2nBNbv3mlRHHMg` |
 | 20.4 GiB of a 22.06 GiB card | memory in use at the peak when the eval ran out, on the L4 | measured: 21,902,642,688 bytes at the peak (A, Oct 31) and 23,689,363,456 bytes of L4 (the record's env), shown in GiB as the app shows memory |
-| $0.042 | GPU cost of that probe at L4 list price | measured (probe time x $0.80/h list), A's status |
+| ($0.042) | GPU cost of that probe at L4 list price: **not spoken or captioned** | derived (measured probe time x $0.80/h list), A's status; tagged derived as the README draft tags its own costs (Nov 1 review) |
 | step 200 | where the real run crashes: its first evaluation | the script (`EVAL_EVERY = 200`), and measured: A's full run of Oct 31 (`a-gt-lora-l4-5`) ran out of memory at step 200, at 22.13 GB (20.61 GiB) allocated |
 | 1.68 s | measured step time with eval off (probe `p1`, p50) | measured, A's status |
 
@@ -41,7 +44,7 @@ any hours or monthly savings, and any accuracy rate (one script gives no rate).
 | 5 | 0:38 | Boarding | Stages light in turn; "Reading your script" with the Muse Spark tag | "Muse Spark reads the code and finds the training loop." | "Muse Spark (Meta)" at the moment the stage lights |
 | 6 | 0:50 | Boarding | "Running probe steps" lights; route fills | "Then it runs a few real steps on a real GPU." | "L4, measured" |
 | 7 | 1:00 | Boarding | "Checking the logs" with the Muse Spark Open tag | "Muse Spark Open, open weights on Baseten, reads the logs." | "Muse Spark Open (Meta, open weights)" |
-| 8 | 1:10 | Cockpit of the Oct 28 record | Map draws; the memory ring fills past the line; red finding "runs out of memory" | "In 189 seconds it caught the crash: the evaluation pass reaches 20.4 GiB of a 22.06 GiB card and runs out." | "189 s · $0.042 · 20.4 of 22.06 GiB · one script" |
+| 8 | 1:10 | Cockpit of the Oct 28 record | Map draws; the memory ring fills past the line; red finding "runs out of memory" | "In 189 seconds it caught the crash: the evaluation pass reaches 20.4 GiB of a 22.06 GiB card and runs out." | "189 s of probing · 20.4 of 22.06 GiB · one script" |
 | 9 | 1:25 | Cockpit, detail sheet on the eval node | Open the finding; press "Adjust eval batch" | "It says why, and which setting fixes it." | |
 | 10 | 1:35 | Cockpit, knob dock | Drag eval batch size down; dials and ring move together | "Move a setting and the whole run answers at once." | "Predicted" (the app's own label on the dials) |
 | 11 | 1:50 | Cockpit, live guide | The guide proposes one knob move; Accept | "Ask the guide, and Muse Spark moves the knobs that matter, one at a time." | "Muse Spark (Meta)" |
@@ -77,15 +80,15 @@ record's share link, never a sample.
 | # | Time | Screen | Action | Narration (about 2.5 words a second) | Caption, burned in |
 | --- | --- | --- | --- | --- | --- |
 | A (shot 1) | 0:00 to 0:08 | `zoo/finetune_lora_hf/train.py` in an editor, dark theme, 20 pt | Hold 1 s on the file, then a slow zoom to `EVAL_EVERY = 200` and the eval batch line | "This fine-tune looks fine. At step 200, its first evaluation, it runs out of memory." (16 words) | 0:00 to 0:03 "Your GPU job, flown before you run it" · 0:03 to 0:08 "At step 200, its first evaluation, it runs out of memory" |
-| B (shot 8) | 0:08 to 0:24 | Cockpit of the Oct 28 record | The map draws, the memory ring fills past the line, the red finding "runs out of memory" appears; hold 2 s on the finding | "Preflight ran a few real steps on one L4. In 189 seconds, for about four cents of GPU, it caught the crash before the real run." (25 words written, about 30 spoken) | "Caught in 189 s, before the run · $0.042 · eval peaks at 20.4 of 22.06 GiB · one script" · from 0:08 to 0:12 also "Script read by Muse Spark (Meta)" |
+| B (shot 8) | 0:08 to 0:24 | Cockpit of the Oct 28 record | The map draws, the memory ring fills past the line, the red finding "runs out of memory" appears; hold 2 s on the finding | "Preflight ran a few real steps on one L4. In 189 seconds of probing, it caught the crash before the real run." (21 words written, about 25 spoken) | "Caught in 189 s of probing, before the run · eval peaks at 20.4 of 22.06 GiB · one script" · from 0:08 to 0:12 also "Script read by Muse Spark (Meta)" |
 | C (shot 10) | 0:24 to 0:36 | Same cockpit, knob dock | Drag eval batch size from 32 down; the ring drops under the line and the dials move together | "Move a setting, and the whole run answers at once." (10 words) | "Predicted" stays as the app labels the dials; caption "Every reading carries its range" |
 | D (shot 15) | 0:36 to 0:45 | End card | Public link and repo URL fade in | "Preflight. Fly the run before you pay for it." (8 words) | link · repo · "Built Oct 26 to Nov 4 for the Meta hackathon" |
 
-Narration is 59 written words; spoken, with "200" and "189" said in full, about 66, so about 27 s
-of speech in 45 s, and shot B's 30 spoken words fit its 16 s. The only spoken numbers are in the
-table at the top: step 200, 189 s and $0.042 said as "about four cents"; 20.4 of 22.06 GiB is
-captioned, not spoken. Nothing is predicted aloud; the dials in shot C keep the app's own
-"Predicted" label.
+Narration is 55 written words; spoken, with "200" and "189" said in full, about 61, so about 25 s
+of speech in 45 s, and shot B's 25 spoken words fit its 16 s. The only spoken numbers are in the
+table at the top: step 200 and 189 s; 20.4 of 22.06 GiB is captioned, not spoken. No dollar
+figure is spoken or captioned: the probe's $0.042 is a list-price cost, so derived. Nothing is
+predicted aloud; the dials in shot C keep the app's own "Predicted" label.
 
 **Before recording this cut** (on top of the list below):
 

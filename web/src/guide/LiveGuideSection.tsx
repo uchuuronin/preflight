@@ -1,6 +1,6 @@
 /**
  * The live guide's part of the guide panel: start the tour, read what Muse Spark says, decide
- * on its move (Apply, Revert, Pin), approve or decline the spending tools it asks for (the
+ * on its move (Apply, Not this, Keep the visitor's value, Pin the suggestion), approve or decline the spending tools it asks for (the
  * approval runs the tool on the server and the guide hears the result), or ask it something.
  * Any failure hands over to the rule-based tour through `onFallback`.
  */
@@ -9,7 +9,8 @@ import { t } from "../lib/i18n";
 import type { KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { valueText } from "./GuidePanel";
-import { type Decision, GuideFallback, LiveTour, type LiveView, type TourContext } from "./liveGuide";
+import { GuideFallback, LiveTour, type LiveView, type TourContext } from "./liveGuide";
+import { MoveChoices } from "./MoveChoices";
 
 export function LiveGuideSection({
 	onFallback,
@@ -27,6 +28,7 @@ export function LiveGuideSection({
 	const [view, setView] = useState<LiveView | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [ask, setAsk] = useState("");
+	const [unpinAsk, setUnpinAsk] = useState<string | null>(null);
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 
 	const tourRef = useRef<LiveTour | null>(null);
@@ -39,8 +41,10 @@ export function LiveGuideSection({
 				actions,
 				knobs: s.knobs,
 				pinned: s.pinned,
+				limits: s.limits,
 				objective: { kind: s.objective.kind ?? "min_time", ...(s.objective.target_id ? { target_id: s.objective.target_id } : {}) },
 				requestApproval: () => {},
+				requestUnpin: (id) => setUnpinAsk(id),
 				...(language ? { language } : {}),
 			};
 		};
@@ -63,29 +67,38 @@ export function LiveGuideSection({
 		}
 	};
 
-	// The guide's move waits for the visitor. If they change that knob themselves, the guide hears it.
+	// The guide's move waits for the visitor. Their own knob move always wins: the reducer sets the
+	// suggestion aside (putting another knob back if they moved a different one), and the guide hears it.
 	const proposal = state.proposal;
-	const lastChange = state.lastChange;
-	const told = useRef<string | null>(null);
+	const setAside = state.setAside;
+	const told = useRef<unknown>(null);
 	useEffect(() => {
-		if (!proposal || view?.awaiting !== "decision" || busy) return;
-		if (lastChange?.by === "user" && lastChange.knobId === proposal.knobId) {
-			const stamp = `${proposal.knobId}:${String(state.knobs[proposal.knobId])}`;
-			if (told.current === stamp) return;
-			told.current = stamp;
-			actions.propose(null);
-			void run((g) => g.decide({ knob_id: proposal.knobId, action: "changed", value: state.knobs[proposal.knobId] as KnobValue }));
-		}
+		if (!setAside || view?.awaiting !== "decision" || busy || told.current === setAside) return;
+		told.current = setAside;
+		const mine = state.lastChange?.knobId === setAside.knobId;
+		void run((g) =>
+			g.decide(
+				mine
+					? { knob_id: setAside.knobId, action: "changed", value: state.knobs[setAside.knobId] as KnobValue }
+					: { knob_id: setAside.knobId, action: "reverted", value: setAside.from },
+			),
+		);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [lastChange, proposal, view?.awaiting]);
+	}, [setAside, view?.awaiting]);
 
-	const decide = (action: Decision["action"]) => {
+	/** applied, declined ("Not this"), kept (back to the visitor's value, pinned), pinned (at the suggestion). */
+	const decide = (action: "applied" | "declined" | "kept" | "pinned") => {
 		if (!proposal) return;
 		const { knobId, from, to } = proposal;
-		if (action === "reverted" || action === "pinned") actions.setKnob(knobId, from, "user");
-		if (action === "pinned") actions.pin(knobId, true);
+		// Clear the suggestion first, so putting the knob back isn't read as the visitor's own move.
 		actions.propose(null);
-		void run((g) => g.decide({ knob_id: knobId, action, value: action === "applied" ? to : from }));
+		if (action === "declined" || action === "kept") actions.setKnob(knobId, from, "user");
+		if (action === "kept" || action === "pinned") actions.pin(knobId, true);
+		if (action === "declined") actions.decline(knobId, to);
+		const value = action === "applied" || action === "pinned" || action === "declined" ? to : from;
+		// Sent on the next frame, once the put-back knob, the new pin or exclusion are committed, so
+		// the setting the server checks the next move against is the one on screen.
+		requestAnimationFrame(() => void run((g) => g.decide({ knob_id: knobId, action, value })));
 	};
 
 	const waitingOnMove = view?.awaiting === "decision" && proposal;
@@ -114,12 +127,40 @@ export function LiveGuideSection({
 					<button type="button" className="pf-btn pf-btn--primary pf-btn--small" disabled={busy} onClick={() => decide("applied")}>
 						{t("guide.apply_value", { knob: knob ? t(knob.label_key) : proposal.knobId, to: valueText(knob, proposal.to) })}
 					</button>
-					<button type="button" className="pf-btn pf-btn--small" disabled={busy} onClick={() => decide("reverted")}>
-						{t("guide.revert")}
-					</button>
-					<button type="button" className="pf-btn pf-btn--small" disabled={busy} onClick={() => decide("pinned")} title={t("guide.pin.help")}>
-						{t("guide.pin")}
-					</button>
+					<MoveChoices
+						knob={knob}
+						from={proposal.from}
+						to={proposal.to}
+						disabled={busy}
+						onDecline={() => decide("declined")}
+						onKeep={() => decide("kept")}
+						onPin={() => decide("pinned")}
+					/>
+				</div>
+			) : null}
+			{unpinAsk ? (
+				<div className="pf-guide__approval" role="group" aria-label={t("guide.unpin_ask.label")}>
+					<p>
+						{t("guide.unpin_ask", {
+							knob: knobs.get(unpinAsk) ? t(knobs.get(unpinAsk)!.label_key) : unpinAsk,
+							value: valueText(knobs.get(unpinAsk), state.knobs[unpinAsk]),
+						})}
+					</p>
+					<div className="pf-guide__actions">
+						<button
+							type="button"
+							className="pf-btn pf-btn--small"
+							onClick={() => {
+								actions.pin(unpinAsk, false);
+								setUnpinAsk(null);
+							}}
+						>
+							{t("guide.unpin_ask.release")}
+						</button>
+						<button type="button" className="pf-btn pf-btn--small pf-btn--quiet" onClick={() => setUnpinAsk(null)}>
+							{t("guide.unpin_ask.keep", { value: valueText(knobs.get(unpinAsk), state.knobs[unpinAsk]) })}
+						</button>
+					</div>
 				</div>
 			) : null}
 			{view?.approvals.map((a) => (

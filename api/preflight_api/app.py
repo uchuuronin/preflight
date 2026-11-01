@@ -19,15 +19,20 @@ from fastapi.responses import JSONResponse
 
 from . import edge, errors, session
 from .errors import envelope
+from .fix.service import Fixer, MemoryRaces, ModalFixer, ModalRaces, RaceStore
 from .guide.executors import Executor, job_executor
 from .guide.muse_spark import TIMEOUT_S
 from .idempotency import IdempotencyStore, MemoryIdempotencyStore
 from .jobs import JobsClient, jobs_client
 from .ledger import Ledger, MemoryLedger, ModalLedger
+from .owners import MemoryOwners, ModalOwners, Owners
 from .routes import guide as guide_routes
 from .routes import health as health_routes
 from .routes import jobs as jobs_routes
+from .routes import limits as limits_routes
+from .routes import patches as patch_routes
 from .routes import records as records_routes
+from .session_limits import SessionLimits, default_session_limits
 from .stores import LocalRecordStore, RecordStore, SampleStore
 
 log = logging.getLogger("preflight.api")
@@ -41,6 +46,14 @@ def default_ledger() -> Ledger:
 	if os.environ.get("PREFLIGHT_LEDGER") == "modal":
 		return ModalLedger()
 	return MemoryLedger()
+
+
+def default_fix() -> tuple[Fixer | None, RaceStore, Owners]:
+	"""The fix loop's race in production (a Modal Function, races and owners in Modal Dicts, shared
+	by every API container); in development and tests no fixer, in-process stores."""
+	if os.environ.get("PREFLIGHT_FIX") == "modal":
+		return ModalFixer(), ModalRaces(), ModalOwners()
+	return None, MemoryRaces(), MemoryOwners()
 
 
 def mount_addons(app: FastAPI, directory: Path = ADDONS_DIR) -> list[str]:
@@ -80,6 +93,10 @@ def create_app(
 	jobs: Executor | None = None,
 	jobstore: JobsClient | None = None,
 	samples: SampleStore | None = None,
+	fixer: Fixer | None = None,
+	races: RaceStore | None = None,
+	owners: Owners | None = None,
+	session_limits: SessionLimits | None = None,
 	addons_dir: Path = ADDONS_DIR,
 ) -> FastAPI:
 	session._keys()  # fail at start-up, not on the first visitor, if production has no key
@@ -107,6 +124,15 @@ def create_app(
 	# A's job store: /v1/jobs, and the guide's approved probes, verify runs and extra tasks.
 	app.state.jobstore = jobstore if jobstore is not None else jobs_client()
 	app.state.jobs = jobs if jobs is not None else job_executor(app.state.jobstore)
+	# The fix loop (/v1/patches): Muse Code's race, the races started, who owns which record.
+	d_fixer, d_races, d_owners = (
+		default_fix() if fixer is None or races is None or owners is None else (None,) * 3
+	)
+	app.state.fixer = fixer if fixer is not None else d_fixer
+	app.state.races = races if races is not None else d_races
+	app.state.owners = owners if owners is not None else d_owners
+	# Each session's confirmed limits (session_limits.py): the fix route reads them from here.
+	app.state.session_limits = session_limits if session_limits is not None else default_session_limits()
 
 	errors.install(app)
 
@@ -163,6 +189,8 @@ def create_app(
 	app.include_router(health_routes.router)
 	app.include_router(records_routes.router)
 	app.include_router(guide_routes.router)
+	app.include_router(limits_routes.router)
 	app.include_router(jobs_routes.router)
+	app.include_router(patch_routes.router)
 	app.state.addons = mount_addons(app, addons_dir)
 	return app

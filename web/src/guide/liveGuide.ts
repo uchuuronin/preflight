@@ -14,6 +14,8 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
+import { breaksLimit, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } from "./limits";
+import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
@@ -37,19 +39,34 @@ export interface RoundOut {
 	awaiting: Awaiting;
 	state: string;
 	provenance: Record<string, unknown>;
+	/** Moves the server refused after this browser made them (a number limit): put each back. */
+	reverts?: Array<{ knob_id: string; value: KnobValue | null }>;
 }
 
 export interface Setting {
 	knobs: Record<string, KnobValue>;
 	pinned: string[];
 	objective: { kind: NonNullable<Objective["kind"]>; target_id?: string };
+	/** The visitor's limits: the server refuses a set_knob outside the value limits. */
+	limits?: Record<string, unknown>;
 }
 
-export type Decision = { knob_id: string; action: "applied" | "reverted" | "pinned" | "changed"; value?: KnobValue };
+export type Decision = { knob_id: string; action: "applied" | "reverted" | "pinned" | "kept" | "declined" | "changed"; value?: KnobValue };
 
 type Readout = { point: number | null; lo: number | null; hi: number | null; unit: string; status: string; reason?: string };
 
-export type SetKnobRefusal = "pinned" | "not_in_domain" | "would_be_tight" | "would_fail" | "not_trusted" | "one_per_round";
+export type SetKnobRefusal =
+	| "pinned"
+	| "not_in_domain"
+	| "changes_results"
+	| "outside_limits"
+	| "over_budget"
+	| "past_deadline"
+	| "over_quota"
+	| "would_be_tight"
+	| "would_fail"
+	| "not_trusted"
+	| "one_per_round";
 
 export type ToolOut =
 	| { tool: "predict"; call_id: string; readouts: Record<string, Readout> }
@@ -73,6 +90,7 @@ export type ToolOut =
 			from_value: KnobValue | null;
 			to_value: KnobValue | null;
 			readouts: Record<string, Readout>;
+			baseline?: Record<string, Readout>;
 			refused: SetKnobRefusal | null;
 	  }
 	| { tool: "highlight"; call_id: string; nodes: string[] }
@@ -129,8 +147,13 @@ export function guardSetKnob(ctx: ToolContext, knobId: string, value: unknown): 
 	if (!knob) return "not_in_domain";
 	if (pinned.has(knobId)) return "pinned";
 	if (!knobChoices(record, knob).some((v) => v === value)) return "not_in_domain";
+	// A knob that changes what the run produces or measures (sequence length, an eval's task
+	// count) is a trade-off to put to the person, never a saving; only a failing run may move it.
+	if (changesResults(knobId, record) && !isFailing({ record, provider, knobs })) return "changes_results";
 	const next = { ...knobs, [knobId]: value as KnobValue };
 	const p = provider.predict(record, next);
+	const broken = breaksLimit(record, ctx.limits ?? NO_LIMITS, knobId, value as KnobValue, p, provider.predict(record, knobs), knobs);
+	if (broken) return broken;
 	const mem = targetFor(record, "memory");
 	const memEst = mem ? p[mem.id] : undefined;
 	if (memEst && (memEst.status === "abstain" || memEst.point === null)) return "not_trusted";
@@ -152,7 +175,12 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 		}
 		case "sensitivity": {
 			const kind = (a.objective as Setting["objective"]["kind"]) ?? "min_time";
-			const moves = provider.moves(record, { kind }, { pinned, knobs, includeTight: true }).slice(0, 8);
+			// Result-changing knobs are left out unless the run is failing, as in the rule tour.
+			const failing = isFailing({ record, provider, knobs });
+			const moves = provider
+				.moves(record, { kind }, withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned, includeTight: true }))
+				.filter((m) => failing || !changesResults(m.knobId, record))
+				.slice(0, 8);
 			const top = Math.max(...moves.map((m) => Math.abs(m.relative ?? m.delta)), 1e-12);
 			return {
 				tool: "sensitivity",
@@ -191,6 +219,8 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 				from_value: from,
 				to_value: to,
 				readouts: readouts(record, provider.predict(record, { ...knobs, [id]: to })),
+				// The same readouts before the move: the server checks the number limits against both.
+				baseline: readouts(record, provider.predict(record, knobs)),
 				refused: null,
 			};
 		}
@@ -202,7 +232,14 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 		}
 		case "pin": {
 			const id = String(a.knob_id);
-			const on = Boolean(a.pinned);
+			const frozen = (ctx.limits ?? NO_LIMITS).frozen.includes(id);
+			// A knob the visitor said not to change stays pinned whatever the guide asks. Releasing
+			// any other pin needs the visitor's click: the guide can only ask.
+			if (!a.pinned && pinned.has(id)) {
+				if (!frozen) ctx.requestUnpin?.(id);
+				return { tool: "pin", call_id: call.call_id, knob_id: id, pinned: true };
+			}
+			const on = Boolean(a.pinned) || frozen;
 			actions.pin(id, on);
 			return { tool: "pin", call_id: call.call_id, knob_id: id, pinned: on };
 		}
@@ -277,7 +314,7 @@ export class LiveTour {
 	}
 
 	private setting(c: TourContext): Setting {
-		return { knobs: { ...c.knobs }, pinned: [...c.pinned], objective: c.objective };
+		return { knobs: { ...c.knobs }, pinned: [...c.pinned], objective: c.objective, limits: limitsForServer(c.limits ?? NO_LIMITS) };
 	}
 
 	private async send(extra: Record<string, unknown>): Promise<LiveView> {
@@ -300,6 +337,11 @@ export class LiveTour {
 			}
 			const out = (await res.json()) as RoundOut;
 			this.state = out.state;
+			if (out.reverts?.length) {
+				const { actions } = this.ctx();
+				actions.propose(null);
+				for (const r of out.reverts) if (r.value !== null) actions.setKnob(r.knob_id, r.value, "user");
+			}
 			this.view = {
 				text: out.text || (out.withheld ? "" : this.view.text),
 				withheld: out.withheld,
@@ -310,6 +352,9 @@ export class LiveTour {
 			this.onUpdate(this.view);
 			const browser = out.calls.filter((x) => x.runs_in === "browser");
 			if (out.awaiting !== "results" || !browser.length) return this.view;
+			// The server judges a move by its saved copy of the limits: wait for the latest save, so
+			// a move it would refuse is refused here first, before anything moves on the map.
+			await limitsSaved(this.recordRef);
 			let moved = false;
 			const results: ToolOut[] = [];
 			for (const call of browser) {
