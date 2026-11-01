@@ -61,11 +61,14 @@ const shared = {
  * through violet and pink to peach at the horizon (#563A88, #8F468A, #DF6E94, #F5BAAF, #070507).
  * Clear, not murky: saturated stops, an indigo glass a little more solid than before so text never
  * sits on haze, and red-orange for alerts. The cockpit sees the sky from about 12% to 64% of this
- * gradient and the home screen from 47% (Shell.tsx SKY_Y), so the vivid pink and peach are kept to
- * the last few percent, under the home screen's last line: text on the open sky stays on violet
- * (fg 5.7:1 on #8F468A, where the home screen's lede sits). Contrast on the glass over the lowest
- * sky the cockpit shows (#7A4389): fg 11.7:1, fg-dim 7.4:1, fail 4.9:1, ok 8.3:1, tight 9.6:1
- * (WCAG formula, alpha composited).
+ * gradient and the home screen from 43% to 96% (Shell.tsx SKY_Y), so the vivid pink and peach are
+ * kept to the last few percent, below the home screen's text down to 720 px tall: text on the open
+ * sky stays on violet (fg 5.7:1 on #8F468A). Contrast on the glass over the lowest
+ * sky the cockpit shows (#7A4389), under the top-edge sheen (its worst): fg 11.8:1, fg-dim 8.6:1,
+ * fail 5.0:1, ok 8.9:1, tight 9.2:1 (WCAG formula, alpha composited; recomputed after review, Nov 1).
+ * Red-orange text can't reach 4.5:1 on the open violet sky (2.7:1 on #6E4089), so alert text on the
+ * sky sits on a glass backing (.pf-dial__note.is-risk).
+ * Text on open sky and on clouds is measured from screenshots at 1440x900, 1280x720 and 390x844.
  */
 export const duskTokens = {
 	...shared,
@@ -73,9 +76,11 @@ export const duskTokens = {
 	"sky-base": "#120C2E",
 	sky: "linear-gradient(180deg, #0A0720 0%, #171140 14%, #261C5C 26%, #3E2C78 38%, #563A88 50%, #6E4089 62%, #7A4389 72%, #8F468A 82%, #9E4B8C 88%, #C35A91 92%, #DF6E94 95%, #F5BAAF 98%, #F7A076 100%)",
 	fg: "#FFF4EE",
-	"fg-dim": "rgba(255, 244, 238, 0.76)",
+	"fg-dim": "rgba(255, 244, 238, 0.84)",
 	glass: "rgba(22, 15, 52, 0.62)",
 	"glass-hi": "rgba(255, 236, 230, 0.14)",
+	// The light across a panel's top edge: plain rgba, so a browser without color-mix keeps the glass.
+	sheen: "rgba(255, 236, 230, 0.02)",
 	"glass-solid": "#1E1645",
 	stroke: "rgba(255, 236, 230, 0.18)",
 	"stroke-strong": "rgba(255, 236, 230, 0.40)",
@@ -84,7 +89,7 @@ export const duskTokens = {
 	"accent-glow": "rgba(255, 185, 143, 0.42)",
 	ok: "#7EEBC6",
 	tight: "#FFD66E",
-	fail: "#FF6B4A",
+	fail: "#FF7A5C",
 	// Surface tints for squares and fills (not text): brighter than the text colours so a fitting
 	// setting reads as lit, not grey, on the indigo glass (Chiya, Nov 1: "a bit brighter").
 	"ok-tint": "#5FE8B8",
@@ -94,7 +99,8 @@ export const duskTokens = {
 	track: "rgba(255, 244, 238, 0.16)",
 	shadow: "0 18px 44px rgba(6, 3, 20, 0.42)",
 	// Clouds: a lit edge and a shaded body, as in the reference's sunset clouds.
-	"cloud-a": "rgba(239, 128, 160, 0.55)",
+	// Lit edge kept faint (review, Nov 1: at 0.55 it pulled light text over it under 4.5:1).
+	"cloud-a": "rgba(239, 128, 160, 0.24)",
 	"cloud-b": "rgba(86, 58, 136, 0.62)",
 	"pill-bg": "#FFB98F",
 	"pill-fg": "#1A1033",
@@ -112,7 +118,8 @@ export const duskTokens = {
  * through lavender and apple-blossom to sienna and June-day yellow (SW 6810 Lupine, 6838 Vigorous
  * Violet, 76 Appleblossom, 9009 Subdued Sienna, 6682 June Day). Deep violet-navy ink, deep maroon for
  * alerts. Contrast on the sky's top stop: fg 8.5:1, fg-dim 5.5:1, fail 6.3:1; on the glass over it:
- * fg 11.8:1, fg-dim 7.6:1, ok 5.9:1, tight 4.7:1, accent 4.7:1.
+ * fg 11.8:1, fg-dim 7.6:1, ok 5.9:1, tight 4.7:1, accent 4.7:1. ok, tight and accent fall under 4.5:1
+ * on open sky (4.3, 3.4, 3.4), so they are text on glass only.
  */
 export const dayTokens = {
 	...shared,
@@ -123,6 +130,7 @@ export const dayTokens = {
 	"fg-dim": "#463A5E",
 	glass: "rgba(255, 252, 250, 0.50)",
 	"glass-hi": "rgba(255, 255, 255, 0.70)",
+	sheen: "rgba(255, 255, 255, 0.34)",
 	"glass-solid": "#F7F3F6",
 	stroke: "rgba(36, 27, 61, 0.14)",
 	"stroke-strong": "rgba(36, 27, 61, 0.32)",

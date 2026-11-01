@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { t } from "../lib/i18n";
 import { useAppPanels } from "../registry";
 import { Plane } from "./Plane";
-import { applyTokenSet, currentTokenSet, DEFAULT_SET } from "../theme/tokens";
+import { applyTokenSet, DEFAULT_SET } from "../theme/tokens";
 import { Boarding } from "./screens/Boarding";
 import { CockpitScreen } from "./screens/CockpitScreen";
 import { Home } from "./screens/Home";
@@ -18,7 +18,8 @@ import { NewFlight } from "./screens/NewFlight";
 import { go, href, SCREEN_ORDER, type Screen, useRoute } from "./route";
 import { AddonBoundary } from "../components/AddonBoundary";
 
-const SKY_Y: Record<Screen, number> = { home: -47, new: -38, boarding: -26, cockpit: -12, logbook: 0, checks: 0 };
+// Home at -43, not -47: at 720 px tall, -47 put the scroll hint on the pink band (review, Nov 1).
+const SKY_Y: Record<Screen, number> = { home: -43, new: -38, boarding: -26, cockpit: -12, logbook: 0, checks: 0 };
 const THEME_KEY = "pf.theme";
 
 function savedTheme(): string {
@@ -51,8 +52,9 @@ export function Shell() {
 		const i = SCREEN_ORDER.indexOf(s);
 		return i === current ? "active" : i < current ? "before" : "after";
 	};
+	// From React's theme, not the page: a second click during a cross-fade still flips it back.
 	const toggleSky = () => {
-		const next = currentTokenSet() === "dusk" ? "day" : "dusk";
+		const next = theme === "dusk" ? "day" : "dusk";
 		const swap = () => flushSync(() => setTheme(applyTokenSet(next)));
 		// One cross-fade from dawn to dusk (the View Transitions API, where the browser has it and
 		// motion is allowed), instead of every colour snapping at once.
