@@ -126,3 +126,24 @@ def test_a_cache_finding_on_a_graph_without_a_data_node_still_loads():
 	f = next(f for f in hygiene_findings(rec, files) if f.code == "hygiene.cache_not_keyed")
 	assert f.node_id is None
 	load_record(rec.model_copy(update={"findings": [f]}).model_dump_json())
+
+
+def test_a_lightning_checkpoint_folder_is_stale_and_a_resume_is_not_a_cache():
+	files = {"train.py": "x = 1\n", "checkpoints/hparams.yaml": "lr: 0.1\n"}
+	assert "hygiene.stale_checkpoint" in [f.code for f in hygiene_findings(_gpu_rec(), files)]
+	resume = ("import os, torch\nif os.path.exists('state.pt'):\n    model.load_state_dict(torch.load('state.pt'))\n"
+		"torch.save(model.state_dict(), 'state.pt')\n")  # fmt: skip
+	named = "import os, torch\nif os.path.exists('checkpoints/last.pt'):\n    s = torch.load('checkpoints/last.pt')\n"
+	for code in (resume, named):
+		assert "hygiene.cache_not_keyed" not in [
+			f.code for f in hygiene_findings(_gpu_rec(), {"train.py": code})
+		]
+
+
+def test_truncation_counts_only_the_sequences_whose_ending_is_known():
+	from preflight.schema import GenerationStats
+
+	g = GenerationStats(calls=12, sequences=12, truncation_rate=1.0, max_new_tokens=64, backend="hf")
+	rec = _gpu_rec(generation=g, extras={"generation_ending_known": 2.0})
+	f = next(f for f in hygiene_findings(rec, {}) if f.code == "generation.truncated")
+	assert "2 of 2" in f.detail

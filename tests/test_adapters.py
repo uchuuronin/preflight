@@ -29,3 +29,12 @@ def test_a_framework_loop_is_probed(script, needs):
 		and p.step_time.by_phase.get("backward", 0) > 0
 	)
 	assert p.extras.get("planned_steps") == 40
+
+
+def test_lightnings_default_length_is_not_taken_as_a_plan():
+	pytest.importorskip("lightning")
+	s = "lightning_loop.py"
+	r = run_probe(ProbeSpec(probe_id="p1", files={s: (FIX / s).read_text()}, entrypoint=s, args=["--no-plan"],
+		warmup=2, timed=3, timeout_s=300))  # fmt: skip
+	assert r.probe.status == "ok", r.probe.error
+	assert "planned_steps" not in r.probe.extras and "epochs" not in r.probe.extras

@@ -339,6 +339,7 @@ class Recorder:
 		self._outputs: dict[int, dict] = {}  # input row hash -> {weights mark: output hash}
 		self.checkpoints: dict = {}  # what the script's training checkpoints hold (_inspect_save)
 		self._any_opt_steps = 0
+		self._all_opts: weakref.WeakSet = weakref.WeakSet()
 		self._output_watch_calls = 0
 		self.trainer_logs: list[dict] = []
 		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
@@ -856,15 +857,19 @@ class Recorder:
 		if name in ("optimizer.pt", "scheduler.pt") or name.startswith("rng_state"):
 			ck[{"optimizer.pt": "optimizer", "scheduler.pt": "scheduler"}.get(name, "rng")] = True
 			return
-		if not isinstance(obj, dict) or self.opt is None or re.search(r"final|best|export|inference", name):
+		if not isinstance(obj, dict) or not self._all_opts or re.search(r"final|best|export|inference", name):
 			return
-		params = {p.data_ptr() for g in self.opt.param_groups for p in g["params"]}
+		# every optimizer's parameters; 0 is an empty or ZeRO-3 placeholder tensor, which matches anything
+		params = {p.data_ptr() for o in list(self._all_opts) for g in o.param_groups for p in g["params"]} - {
+			0
+		}
 
 		def holds_params(v):
 			if isinstance(v, torch.Tensor):
 				return v.data_ptr() in params
+			# every entry: a probe or late-layer LoRA trains only tensors far down the dict
 			return isinstance(v, dict) and any(isinstance(x, torch.Tensor) and x.data_ptr() in params
-				for x in list(v.values())[:64])  # fmt: skip
+				for x in v.values())  # fmt: skip
 
 		def is_optim(v):
 			if isinstance(v, list | tuple):
@@ -1072,8 +1077,16 @@ class Recorder:
 			def fit(self_, *args, **kwargs):
 				with suppress(Exception):
 					steps, epochs = getattr(self_, "max_steps", -1), getattr(self_, "max_epochs", None)
-					rec.run_length = {"planned_steps": int(steps) if steps and steps > 0 else None,
-						"epochs": float(epochs) if (not steps or steps <= 0) and epochs and epochs > 0 else None}  # fmt: skip
+					# Lightning's default with neither set is 1000 epochs, and an early stop or a time
+					# limit ends the run before its plan: no planned length then, rather than a wrong one
+					stops_early = any(
+						type(c).__name__ in ("EarlyStopping", "Timer")
+						for c in getattr(self_, "callbacks", [])
+					)
+					if steps and steps > 0:
+						rec.run_length = {"planned_steps": int(steps), "epochs": None}
+					elif epochs and epochs > 0 and epochs != 1000 and not stops_early:
+						rec.run_length = {"planned_steps": None, "epochs": float(epochs)}
 				return orig(self_, *args, **kwargs)
 
 			return fit
@@ -1289,6 +1302,8 @@ class Recorder:
 	# ------------------------------------------------------------- optimizer hooks
 
 	def _pre(self, opt, args, kwargs):
+		with suppress(TypeError):
+			self._all_opts.add(opt)  # every optimizer, for what a checkpoint holds (a GAN's G and D)
 		if self.opt is None:
 			self.opt = opt
 			self._discover(opt)
@@ -1525,6 +1540,9 @@ class Recorder:
 		out: dict = {"steps": len(steps), "num_workers": self.num_workers, "stage": self.stage}
 		out["train_loader_batches"] = self.train_loader_batches
 		out.update(self._identical_outputs())
+		known = [t for g in self.gens for t in g["truncated"] if t is not None]
+		if self.gens and known:  # how many sequences truncation_rate is over (those whose ending is known)
+			out["generation_ending_known"] = float(len(known))
 		if self.checkpoints.get("saves"):
 			ck = self.checkpoints
 			out["checkpoint_saves_seen"] = ck["saves"]

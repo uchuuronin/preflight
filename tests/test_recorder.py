@@ -370,6 +370,9 @@ def test_checkpoint_contents_are_read_for_a_resume():
 	assert all(ex[f"checkpoint_has_{k}"] == 1 for k in ("optimizer", "scheduler", "rng", "step"))
 	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--data-cache"])).probe.extras
 	assert "checkpoint_saves_seen" not in ex
+	for mode in ("--head-only", "--gan"):  # trained tensors past the dict's start; a second optimizer first
+		ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=[mode])).probe.extras
+		assert ex.get("checkpoint_saves_seen", 0) >= 1 and ex["checkpoint_has_optimizer"] == 0, mode
 
 
 def test_a_cap_given_in_a_generation_config_is_seen():

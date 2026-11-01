@@ -147,6 +147,7 @@ EXTRAS_KEYS = (
 	# hygiene: generations by different weights on the same inputs, and how many came out identical
 	"outputs_compared",
 	"outputs_identical",
+	"generation_ending_known",  # the sequences generation.truncation_rate is over
 	# hygiene: what the script's own checkpoints hold, for a resume that matches
 	"checkpoint_saves_seen",
 	"checkpoint_has_optimizer",

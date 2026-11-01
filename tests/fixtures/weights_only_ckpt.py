@@ -8,11 +8,24 @@ import tempfile
 import torch
 
 torch.manual_seed(0)
-model = torch.nn.Linear(16, 16)
-opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
+if "--head-only" in sys.argv:  # a linear probe: only the last of 41 layers trains, far down the state dict
+	model = torch.nn.Sequential(*[torch.nn.Linear(16, 16) for _ in range(41)])
+	for p in model[:-1].parameters():
+		p.requires_grad_(False)
+	opt = torch.optim.AdamW(model[-1].parameters(), lr=1e-3)
+else:
+	model = torch.nn.Linear(16, 16)
+	opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
+if "--gan" in sys.argv:  # a second optimizer (a discriminator) steps first; the saved weights are G's
+	disc = torch.nn.Linear(16, 1)
+	d_opt = torch.optim.SGD(disc.parameters(), lr=1e-3)
 sched = torch.optim.lr_scheduler.StepLR(opt, 10)
 out = tempfile.mkdtemp()
 for step in range(40):
+	if "--gan" in sys.argv:
+		disc(torch.randn(8, 16)).mean().backward()
+		d_opt.step()
+		d_opt.zero_grad()
 	loss = model(torch.randn(8, 16)).pow(2).mean()
 	loss.backward()
 	opt.step()

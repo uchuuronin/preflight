@@ -88,10 +88,11 @@ def agent_findings(rec) -> list[Finding]:
 
 TRUNCATION_WARN = 0.10  # guess: a tenth of generations hitting the cap cuts answers often enough to matter
 _CKPT = re.compile(r"(?:^|/)(checkpoint-\d+|checkpoints?|ckpt)/")
-# what a checkpoint directory holds, as opposed to code in a package named ckpt/
-_CKPT_FILE = re.compile(r"(\.(pt|pth|bin|safetensors|ckpt|pkl|npz|npy)|trainer_state\.json)$")
 # a file a cache would be: data saved for reuse (a config.json or a model directory isn't one)
 _CACHE_EXT = re.compile(r"\.(pt|pth|pkl|pickle|npy|npz|arrow|parquet|feather|h5|cache|joblib)$")
+# a resume or pretrained weights loaded when present: not a cache
+_RESUME = re.compile(r"(?i)ckpt|checkpoint|last|resume|weights|pretrained|model")
+_RESUME_LOADERS = {"load_state_dict", "from_pretrained", "load_from_checkpoint"}
 _WRITERS = {"save", "save_to_disk", "dump", "to_parquet", "to_feather", "savez", "write_bytes"}
 _LOADERS = {"load", "load_from_disk", "load_state_dict", "from_pretrained", "load_dataset"}
 
@@ -106,9 +107,10 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 	"""Stale checkpoints and caches in the code as sent, and from the probes: generations cut at
 	their cap, and different weights generating identical outputs."""
 	out: list[Finding] = []
-	ckpts = sorted(
-		{m.group(0).strip("/") for f in files if _CKPT_FILE.search(f) for m in [_CKPT.search(f)] if m}
-	)
+	# files holds the text files sent (weights aren't among them): a checkpoint folder's state,
+	# config or hparams, not code in a package named ckpt/
+	ckpts = sorted({m.group(0).strip("/") for f in files if not f.endswith((".py", ".pyi"))
+		for m in [_CKPT.search(f)] if m})  # fmt: skip
 	if ckpts:
 		out.append(Finding(id="hygiene.stale_checkpoint", severity="warn", code="hygiene.stale_checkpoint",
 			title="Old checkpoints came with the code",
@@ -126,12 +128,15 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 	for p in rec.probes:
 		g = p.generation
 		if g is not None and g.truncation_rate is not None and g.sequences:
-			k = round(g.truncation_rate * g.sequences)
-			lo, hi = _wilson(k, g.sequences)
+			n = int(p.extras.get("generation_ending_known") or g.sequences)  # the rate's own total
+			k = round(g.truncation_rate * n)
+			lo, hi = _wilson(k, n)
 			if g.truncation_rate > TRUNCATION_WARN:
 				out.append(Finding(id=f"hygiene.truncation.{p.id}", severity="warn", code="generation.truncated",
 					title=f"{g.truncation_rate:.0%} of generations hit their length cap",
-					detail=f"{k} of {g.sequences} generated sequences ran to max_new_tokens={g.max_new_tokens} without "
+					detail=f"{k} of {n} generated sequences ran to "
+					+ (f"max_new_tokens={g.max_new_tokens}" if g.max_new_tokens else "their length cap")
+					+ " without "
 					f"ending (95% interval {lo:.0%}–{hi:.0%}) [measured]: their answers are cut off",
 					node_id=None, source="rule", knob_id="max_new_tokens",
 					evidence=[Evidence(metric="generation.truncation_rate", value=g.truncation_rate, probe_id=p.id,
@@ -202,8 +207,11 @@ def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:
 			if not isinstance(node, ast.If):
 				continue
 			path = _exists_arg(node.test, consts)
-			if path is None or not (path in written or _CACHE_EXT.search(path)):
+			if path is None or not (path in written or _CACHE_EXT.search(path)) or _RESUME.search(path):
 				continue
+			if any((getattr(c.func, "attr", None) or getattr(c.func, "id", None)) in _RESUME_LOADERS
+				for b in node.body for c in ast.walk(b) if isinstance(c, ast.Call)):  # fmt: skip
+				continue  # a resume or pretrained weights, not a cache
 			loads = [c for b in node.body for c in ast.walk(b) if isinstance(c, ast.Call)
 				and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) in _LOADERS]  # fmt: skip
 			if loads:

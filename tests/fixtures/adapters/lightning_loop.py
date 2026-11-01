@@ -1,4 +1,7 @@
-"""PyTorch Lightning, the shape of Lightning's quickstart autoencoder, on synthetic data on CPU."""
+"""PyTorch Lightning, the shape of Lightning's quickstart autoencoder, on synthetic data on CPU.
+With --no-plan neither max_steps nor max_epochs is set (Lightning runs 1000 epochs)."""
+
+import sys
 
 import lightning as L
 import torch
@@ -25,5 +28,9 @@ torch.manual_seed(0)
 data = torch.utils.data.TensorDataset(torch.randn(2048, 64))
 loader = torch.utils.data.DataLoader(data, batch_size=32, shuffle=True)
 L.Trainer(
-	max_steps=40, accelerator="cpu", logger=False, enable_checkpointing=False, enable_progress_bar=False
+	max_steps=-1 if "--no-plan" in sys.argv else 40,
+	accelerator="cpu",
+	logger=False,
+	enable_checkpointing=False,
+	enable_progress_bar=False,
 ).fit(AutoEncoder(), loader)
