@@ -50,6 +50,27 @@ Once A runs the zoo scripts to completion on a GPU, compare each one-session ver
 measured wall-clock plus measured setup, and report the share right with a Wilson 95% interval.
 SETUP_S (15 minutes) is a guess until A's job events give fetch, install and model-load times.
 
+## The real check, Sun Nov 1: not possible yet
+
+Tried against A's measured L4 records: retrieval (`a-smoke-retrieval-st-l4`, GitHub run
+41299583623), GNN (41299933798) and vision (41300131134) on `origin/remote-runs`, and the Oct 28
+LoRA smoke record. None can score a one-session verdict:
+- on all three new records the engine abstains on `time.total`: "the run's length isn't known:
+  no max_steps, and no dataset size to divide by the batch" (the script maps leave
+  `data.n_examples` empty), so D4 shows no session count, as it should;
+- the LoRA smoke record has no estimates at all;
+- no run on these was timed to the end on any GPU: the LoRA full run (`a-gt-lora-l4-5`) runs out
+  of memory at step 200, and the others are probes only.
+
+So the simulation stays, labelled as it is. What the records do check, now in
+`check.realruns.test.ts`: on real input D4 never claims one session or a session count without a
+trusted time, judges memory on the record's own peak (the GNN's measured 6.0 GB fits every free
+tier's GPU) and abstains where the engine gave no trusted memory (vision) or no estimates (LoRA).
+
+What would make the real check possible: (1) the harness filling `data.n_examples` (A, asked in
+`docs/requests/from-d.md`), so the engine predicts `time.total`; (2) a zoo script run to the end
+with its wall-clock and setup time measured, ideally on a free tier's GPU (T4 or L4).
+
 ## Caveats
 
 Colab's cap is a ceiling, not a promise: sessions end sooner under load, and the band says so.

@@ -8,6 +8,31 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, morning (Chiya's queue of 07:04: README, D2, licences, submission, D4)
+
+1. **Final README:** `docs/readme-final.md`, for the PM to swap in for `README.md`. It combines C's README on `main` with my draft, which it replaces; the test now guards the final file. A new Status section, from `main` `a52753f`, says what's on in production, what's behind a flag, and what's not used or not measured. A read-only research agent compiled it from every status file and the code, with sources.
+	- Decision: the divergence classifier's "AUROC 0.58 on held-out runs" is cited as given by Chiya, with a TODO for B's report. Basis: the number isn't in any branch or doc in the repo.
+	- Decision: the flags that gate nothing (most `engine.*`, `campaign.planner`, `corpus.sweep`, `probes.*`) aren't presented as switches. The README names what each really does: the engine's own switch in `engine/api.py`, and `engine.memory` gating every prediction.
+	- Decision: every dollar figure is tagged derived (tokens or time at list or standard prices), as the README already tagged its own costs.
+2. **D2 share cards** (`workers/`): `/s/<token>` (link-preview page, then on to the cockpit), `/card/<token>` (1200 x 630 PNG) and `/badge/<token>` (SVG). Every number comes from the record, with the app's status word. Checked three ways:
+	- 13 tests;
+	- the Workers runtime (`wrangler pages dev` with C's functions, against a mock API);
+	- four rendered cards, looked at.
+	- Decision: resvg-wasm and the fonts are vendored unmodified, so C's deploy only copies files. Basis: a Pages Function bundles from `web/`, so imports from `workers/node_modules` wouldn't resolve after the copy. The bundle is 1.1 MB gzipped [measured].
+	- Decision: responses are cached for 2 minutes. Basis: the API marks records no-cache because a running job revises them.
+	- Asked C to copy `workers/` in at deploy and run its tests in CI.
+3. **Licences after round four:** one new image (torchtitan: 90 packages, 75 permissive; 12 NVIDIA libraries and 3 MPL-2.0 flagged). The repository now bundles torchtitan's own files (BSD-3-Clause) and a C4 slice (ODC-BY 1.0; attribution in the README), plus D2's vendored resvg (MPL-2.0) and fonts (OFL-1.1). No new engine, API or web dependencies.
+4. **Submission drafts** (`docs/submission/`): portal answers, the gallery blurb, the Meta models and partner tools table, and the X post. Every number is in one table with its source; dollar figures say "at list price".
+	- Spark Open triage is described as it runs now: wired in behind `harness.spark_open_triage` (off), not yet run on a real job. There's a TODO to add the first real run before submitting, since the prize needs the partner to verify real calls.
+5. **D4 against real runs:** not possible yet (`docs/decisions/freetier-one-session.md`). On A's L4 records for retrieval, GNN and vision, the engine abstains on `time.total` because the script maps leave `data.n_examples` empty. The LoRA record has no estimates, and no run was timed to the end.
+	- The simulation stays, labelled simulated.
+	- A new `check.realruns.test.ts` checks D4 on those four real records: no session count without a trusted time, memory judged on the record's own peak, and abstains where it should.
+	- Asked A to fill `n_examples`. That also unblocks time and cost on those three lenses.
+
+Seen, not yet confirmed: A's agent re-sample (GitHub run 41301359530 on `origin/remote-runs`) stopped after 120 s with no model calls, "up to 4 may be stuck". That fits plant 3 firing. Once A logs it, the fallback cut can carry the measured stall.
+
+Cloud runs: none. GPU minutes 0, dollars 0. A local `wrangler pages dev` and a mock API only.
+
 ## Sun Nov 1, 07:00 (pushed; waiting on C's fix for 12 and A's goldens)
 
 Pushed `0683d27`, `868195d` and `b2f14f0` with Chiya's yes (06:59). `ws-d` now has `main` `a52753f` (round four and contract 0.6.0) merged in. Contract 0.6.0 needs nothing from D: every field is optional, D's 247 add-on tests and the typecheck pass, and so do D's Python tests. C has the fix for finding 12; it isn't on `main` or `ws-c` yet. Once it lands I re-run `model-tags.mjs` on `main`, and a check-in is scheduled for 09:00. The dial rerun waits on A's `make_golden.py` change (Chiya has asked A).
