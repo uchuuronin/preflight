@@ -268,6 +268,7 @@ Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking onc
 | Sun Nov 1, about 12:50 PM | 5ec50e7 the CI fix (price version a date, the false positive allowlisted, row ids unique); and this status commit | none | read-only review of 5ec50e7: nothing blocking; the PM signs off the new `.gitleaksignore` entry | clean, both scans, by exit code |
 | Sun Nov 1, about 2:10 PM | 5a1fd2c corpus export and datasheet; 5204042 the scorer's dry-run fixes; e319c8c Monday's cost; 1067d37 Spark Open's corpus labels; 74c745d and 9b4e0ae their review fixes; and this status commit | none | read-only reviews of 5a1fd2c, 5204042 and e319c8c (re-checked after 74c745d) and of 1067d37 (re-checked after its amend): nothing blocking | clean, both scans, by exit code |
 | Sun Nov 1, about 3:20 PM | b223455 GRPO on A's real A10 record (the probe's parameter count; an unrecorded GPU named); e61de35 the Spark Open relabel; 1bf079d the LC-PFN fetch app; 4caef97 and the amended review-fix commit; and this status commit (round five's main was a fast-forward, no merge commit) | none | read-only reviews of b223455 and of e61de35 with 1bf079d, each re-checked after its fixes: nothing blocking | clean, both scans, by exit code |
+| Sun Nov 1, about 3:45 PM | b49f095 the final Spark Open labels; a339b89 the LC-PFN fetch's return value; and this commit (the datasheet's cost rounding, this record) | none | read-only review of b49f095 and a339b89: nothing blocking | clean, both scans, by exit code |
 
 ## Contract requests
 In `docs/requests/from-b.md`.
