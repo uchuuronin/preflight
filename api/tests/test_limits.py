@@ -147,7 +147,21 @@ def test_the_limits_reader_is_off_with_the_live_guide(monkeypatch):
 		assert r.status_code == 503 and r.json()["error"]["code"] == "limits_reader_off"
 
 
-@pytest.mark.parametrize("text,expect", [("$40", [40.0]), ("1,200 GPU-hours", [1200.0]), ("2k", [2000.0])])
+@pytest.mark.parametrize(
+	"text,expect",
+	[
+		("$40", [40.0]),
+		("1,200 GPU-hours", [1200.0]),
+		("2k", [2000.0]),
+		# Live check, Nov 1: "budget forty dollars" lost its budget when only digits counted.
+		("budget forty dollars, no packing changes", [40.0]),
+		("forty-five bucks", [45.0]),
+		("two hundred and fifty dollars", [250.0]),
+		("a thousand GPU-hours", [1000.0]),
+		("keep it on the a100 80gb", [80.0]),
+		("bf16 only", []),
+	],
+)
 def test_numbers_in_the_visitors_words(text, expect):
 	from preflight_api.guide.limits_reader import _numbers_in
 

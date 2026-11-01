@@ -13,8 +13,11 @@ import re
 from .record_view import RecordView
 
 # Source: derived, the instructions plus the knob list run to about 1.5k tokens on the largest
-# sample; 4,000 input tokens and 600 output tokens is the worst case reserved.
-MAX_OUTPUT_TOKENS = 600
+# sample; 4,000 input tokens is the worst case reserved.
+# Output: measured Nov 1 (live check, GitHub run 41279124601): at a 600 cap, 5 of 10 calls stopped
+# mid-reasoning with no tool call; the 5 that finished used 362 to 594 output tokens. 1,600 is
+# about 2.7x the largest finished call; re-checked by the next live run.
+MAX_OUTPUT_TOKENS = 1600
 WORST_INPUT_TOKENS = 4000
 MAX_VALUES = 16
 
@@ -83,9 +86,71 @@ def _knob_list(rec: RecordView) -> str:
 	return "\n".join(lines)
 
 
+_UNITS = {
+	w: i
+	for i, w in enumerate(
+		[
+			"zero",
+			"one",
+			"two",
+			"three",
+			"four",
+			"five",
+			"six",
+			"seven",
+			"eight",
+			"nine",
+			"ten",
+			"eleven",
+			"twelve",
+			"thirteen",
+			"fourteen",
+			"fifteen",
+			"sixteen",
+			"seventeen",
+			"eighteen",
+			"nineteen",
+		]
+	)
+}
+_TENS = {
+	w: 10 * i
+	for i, w in enumerate(
+		["_", "_", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+	)
+	if w != "_"
+}
+_SCALES = {"hundred": 100, "thousand": 1000}
+
+
+def _number_words(text: str) -> list[float]:
+	"""Numbers written in words ("forty", "forty-five", "two hundred", "a thousand")."""
+	out: list[float] = []
+	words = re.findall(r"[a-z]+", text.lower().replace("-", " "))
+	total, cur, seen = 0, 0, False
+	for i, w in enumerate(words):
+		if w in _UNITS or w in _TENS:
+			cur += _UNITS.get(w, 0) + _TENS.get(w, 0)
+			seen = True
+		elif w in _SCALES and (seen or (i > 0 and words[i - 1] == "a")):
+			cur = (cur or 1) * _SCALES[w]
+			if _SCALES[w] >= 1000:
+				total, cur = total + cur, 0
+			seen = True
+		elif w == "and" and seen:
+			continue
+		else:
+			if seen:
+				out.append(float(total + cur))
+			total, cur, seen = 0, 0, False
+	if seen:
+		out.append(float(total + cur))
+	return out
+
+
 def _numbers_in(text: str) -> list[float]:
-	"""Every number the visitor wrote ("$40", "1,200", "6.5", "2k")."""
-	out = []
+	"""Every number the visitor wrote ("$40", "1,200", "6.5", "2k", "forty")."""
+	out = _number_words(text)
 	# A number standing on its own: not the "100" in "A100" or the "16" in "bf16".
 	for m in re.finditer(r"(?<![A-Za-z0-9.])(\d[\d,]*(?:\.\d+)?)\s*([kK](?![A-Za-z]))?", text):
 		try:
