@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import replace
@@ -33,6 +34,7 @@ LENS = {
 	"gnn": "gnn",
 	"hf_lora": "finetune",
 }
+_SUFFIX = re.compile(r"(\s*\(\d+ scores, holdout [^)]*\))+$")  # the suffix main() appends
 
 
 def _transformer(p: dict[str, Any], family: str) -> tuple[TransformerArch, TrainingSetup, int, int]:
@@ -205,7 +207,12 @@ def oom_pairs(rows: list[dict[str, Any]], scores: list[conformal.Score]) -> list
 			x = q.get("work_units") or p.get("batch", 1) * p.get("seq", 1)
 			pred = cal.correct(float(x), _analytical(q) or 0.0)
 			if cap and pred > 0:
-				out.append((oom.empirical_p_oom(cell.residuals, pred, float(cap)), q.get("status") == "oom"))
+				# the same P(OOM) the engine shows (Chiya, Nov 1): the context-free allocator prediction against the
+				# capacity less the context, not the whole capacity; corpus rows log no device use, so the guess
+				ctx = float(memory.DEFAULT_CONTEXT_BYTES)
+				out.append(
+					(oom.empirical_p_oom(cell.residuals, pred, float(cap) - ctx), q.get("status") == "oom")
+				)
 	return out
 
 
@@ -472,7 +479,8 @@ def main(argv: list[str] | None = None) -> int:
 	table, report = build(
 		scores,
 		holdout,
-		built_from=f"{args.built_from or args.store} ({len(scores)} scores, holdout {', '.join(holdout) or 'none'})",
+		# review, Nov 1: an old table's text passed back in keeps one suffix, not two
+		built_from=f"{_SUFFIX.sub('', args.built_from or str(args.store))} ({len(scores)} scores, holdout {', '.join(holdout) or 'none'})",
 	)
 	print(report)
 	cal_rows = [r for r in rows if not held_out(r.get("gpu"), holdout)]

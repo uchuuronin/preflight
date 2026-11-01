@@ -13,6 +13,9 @@ on:
       host:
         description: Droplet public IPv4
         required: true
+      port:
+        description: SSH port (22 on an AMD droplet; RunPod's exposed TCP port otherwise)
+        default: "22"
       cmd:
         description: Command, starting with `python scripts/` or `python -m preflight.`
         required: true
@@ -36,6 +39,7 @@ jobs:
     env:
       RUN_NAME: ${{ github.event.inputs.name }}
       RUN_HOST: ${{ github.event.inputs.host }}
+      RUN_PORT: ${{ github.event.inputs.port }}
       RUN_CMD: ${{ github.event.inputs.cmd }}
       RUN_REF: ${{ github.event.inputs.ref }}
       RUN_TIMEOUT: ${{ github.event.inputs.timeout }}
@@ -49,6 +53,7 @@ jobs:
           set -euo pipefail
           [[ "$RUN_NAME" =~ ^[A-Za-z0-9-]{1,48}$ ]] || { echo "bad name"; exit 2; }
           [[ "$RUN_HOST" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || { echo "host must be an IPv4 address"; exit 2; }
+          [[ "$RUN_PORT" =~ ^[0-9]{1,5}$ && "$RUN_PORT" -ge 1 && "$RUN_PORT" -le 65535 ]] || { echo "port must be 1 to 65535"; exit 2; }
           [[ "$RUN_TIMEOUT" =~ ^[0-9]{1,3}$ && "$RUN_TIMEOUT" -ge 1 && "$RUN_TIMEOUT" -le 240 ]] || { echo "bad timeout"; exit 2; }
           [[ "$RUN_CMD" =~ ^python\ (scripts/|-m\ preflight\.)[A-Za-z0-9_./:=,@\ -]*$ ]] || { echo "cmd must start with 'python scripts/' or 'python -m preflight.' and contain no shell operators"; exit 2; }
           [[ -z "$DESTROY_ID" || "$DESTROY_ID" =~ ^[0-9]{1,15}$ ]] || { echo "bad droplet id"; exit 2; }
@@ -61,13 +66,13 @@ jobs:
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "$AMD_SSH_KEY" > ~/.ssh/amd && chmod 600 ~/.ssh/amd
-          ssh-keyscan -T 15 "$RUN_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -T 15 -p "$RUN_PORT" "$RUN_HOST" >> ~/.ssh/known_hosts 2>/dev/null
       - name: Copy the code and run
         id: run
         run: |
           set +e
-          S="ssh -i $HOME/.ssh/amd -o BatchMode=yes -o ServerAliveInterval=30 root@$RUN_HOST"
-          rsync -az --delete -e "ssh -i $HOME/.ssh/amd -o BatchMode=yes" \
+          S="ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes -o ServerAliveInterval=30 root@$RUN_HOST"
+          rsync -az --delete -e "ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes" \
             --exclude .git --exclude node_modules --exclude .venv --exclude web/dist ./ "root@$RUN_HOST:/root/preflight/" > run.log 2>&1
           # The droplet image ships ROCm PyTorch; reuse it instead of downloading torch again.
           $S "cd /root/preflight && rm -rf out && mkdir -p out \
@@ -77,7 +82,7 @@ jobs:
             && VIRTUAL_ENV=.venv-amd uv pip install -q -e . psutil \
             && timeout ${RUN_TIMEOUT}m .venv-amd/bin/$RUN_CMD" >> run.log 2>&1
           code=$?
-          rsync -az -e "ssh -i $HOME/.ssh/amd -o BatchMode=yes" "root@$RUN_HOST:/root/preflight/out/" ./out/ >> run.log 2>&1
+          rsync -az -e "ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes" "root@$RUN_HOST:/root/preflight/out/" ./out/ >> run.log 2>&1
           echo "exit=$code" >> "$GITHUB_OUTPUT"
           tail -n 50 run.log
           exit 0

@@ -9,7 +9,7 @@ import { exportPlan } from "./export/plan";
 import { GridProvider } from "./provider/GridProvider";
 import { currentKnobs, targetFor } from "./record/model";
 import { type FlightRecord, normaliseRecord } from "./record/types";
-import { appliesHere, loadRate, rateFactor, saveRate, tableRate, withRate } from "./rate";
+import { appliesHere, estimateFactor, loadRate, rateFactor, saveRate, tableRate, withRate } from "./rate";
 
 const gpuRec = normaliseRecord(goldenRaw as unknown as FlightRecord);
 const apiRec = normaliseRecord(agentRaw as unknown as FlightRecord);
@@ -44,8 +44,13 @@ describe("the visitor's rate", () => {
 	it("takes $0 (an assigned GPU): every dollar is zero, and no cost move is offered as a saving", () => {
 		const free = withRate(base, { kind: "gpu", gpu: "L4", usdPerHour: 0 });
 		expect(free.predict(gpuRec, knobs)[cost]!.point).toBe(0);
+		// Moves that clear or lower a predicted failure stay (whatever the rate); none saves money.
 		const moves = free.moves(gpuRec, { kind: "min_cost" }, { knobs });
-		expect(moves.filter((m) => m.targetId === cost)).toHaveLength(0);
+		const riskNow = base.predict(gpuRec, knobs)["risk.oom"]?.point ?? 0;
+		for (const m of moves.filter((x) => x.targetId === cost)) {
+			expect(m.delta).toBeGreaterThanOrEqual(0);
+			expect(m.clearsFailure || (m.risk !== null && m.risk < riskNow)).toBe(true);
+		}
 	});
 
 	it("keeps the moves that clear a predicted failure, whatever the rate (review, Nov 1)", () => {
@@ -99,6 +104,17 @@ describe("the visitor's rate", () => {
 		expect(after).toBeCloseTo(before * 2, 6);
 	});
 
+	it("scales an API run's per-token prices, never a rate field, which B doesn't write for token costs (Nov 1)", () => {
+		const k = currentKnobs(apiRec);
+		const c = targetFor(apiRec, "cost")!.id;
+		const o = { kind: "tokens" as const, model: "muse-spark-1.3", inputPerM: 2.5, outputPerM: 8.5 };
+		const plain = base.predict(apiRec, k)[c]!;
+		// Even if an estimate carried a rate, the token path is the per-token ratio.
+		const withField = { ...plain, rate: { quantity: "tokens.total", usd_per_unit: 99, unit: "tokens" } } as never;
+		expect(estimateFactor(apiRec, k, withField, o)).toBeCloseTo(rateFactor(apiRec, k, o), 12);
+		expect(rateFactor(apiRec, k, o)).toBeCloseTo(2, 6);
+	});
+
 	it("goes with the export plan, so a config or sbatch file quotes the same rate", () => {
 		const k = currentKnobs(gpuRec);
 		expect(exportPlan(gpuRec, k, {}, null, null).rate).toMatchObject({ kind: "gpu", usdPerHour: 0.8, source: "table" });
@@ -111,6 +127,19 @@ describe("the visitor's rate", () => {
 		const half = planFromRecord(rec.campaign!, rec.models, () => 0.5)!;
 		expect(half.usd.point).toBeCloseTo(plain.usd.point! / 2, 9);
 		expect(half.gpu_hours).toEqual(plain.gpu_hours);
+	});
+
+	it("divides by the rate an estimate names (0.6.0 Estimate.rate), not the table's, for this GPU only", () => {
+		const k = currentKnobs(gpuRec);
+		const e = { point: 10, lo: 8, hi: 12, unit: "usd", status: "predicted", model_id: "m", source: "exact", rate: { quantity: "cost.gpu_hours", usd_per_unit: 2, unit: "gpu_hours" } } as never;
+		// Priced at US$2/h; the visitor pays US$1/h: half.
+		expect(estimateFactor(gpuRec, k, e, { kind: "gpu", gpu: "L4", usdPerHour: 1 })).toBeCloseTo(0.5, 9);
+		// No rate on the estimate: the table's (US$0.80/h on L4).
+		const plain = { point: 10, lo: 8, hi: 12, unit: "usd", status: "predicted", model_id: "m", source: "exact" } as never;
+		expect(estimateFactor(gpuRec, k, plain, { kind: "gpu", gpu: "L4", usdPerHour: 1.6 })).toBeCloseTo(2, 9);
+		// A rate for another GPU leaves the estimate's dollars alone; no visitor rate, no change.
+		expect(estimateFactor(gpuRec, k, e, { kind: "gpu", gpu: "H100", usdPerHour: 1 })).toBe(1);
+		expect(estimateFactor(gpuRec, k, e, null)).toBe(1);
 	});
 
 	it("is kept per job in this browser, and a malformed entry is ignored", () => {

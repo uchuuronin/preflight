@@ -13,29 +13,53 @@ const provider = new GridProvider();
 const GIB = 1024 ** 3;
 const cost = { kind: "min_cost" as const };
 
+/** The golden record without any grid over `knob` (or for `target`), so moving it is off every grid. */
+function withoutGrids(rec: typeof golden, drop: { knob?: string; target?: string }) {
+	const grids = rec.predictions.grids.filter((g) => !(drop.knob && g.axes.some((a) => a.knob_id === drop.knob)) && !(drop.target && g.target_id === drop.target));
+	return { ...rec, predictions: { ...rec.predictions, grids } };
+}
+
+// These read the golden record's own numbers or assert relations, so they hold whether its
+// predictions are A's fixture figures or B's engine output (PREFLIGHT_GOLDEN_ENGINE=1).
 describe("GridProvider on the golden fine-tune", () => {
-	it("returns B's estimates at the record's own settings", () => {
+	it("returns the record's own estimates at the record's own settings", () => {
 		const p = provider.predict(golden, currentKnobs(golden));
-		expect(p["risk.oom"]?.point).toBeCloseTo(0.97, 2);
-		expect(p["time.total"]?.point).toBeCloseTo(4399.6, 1);
+		for (const id of ["risk.oom", "time.total"]) {
+			const own = golden.predictions.estimates[id]!;
+			expect(p[id]?.point).toBeCloseTo(own.point!, 6);
+		}
+		// Both sets say this run fails on its GPU (the eval pass at batch 32).
+		expect(p["risk.oom"]!.point!).toBeGreaterThanOrEqual(FAILS_AT);
 	});
 
 	it("reads memory from the grid with its power-of-two scale", () => {
-		const p = provider.predict(golden, { batch_size: 2 });
-		const peak = p["memory.peak"]?.point ?? 0;
-		expect(peak).toBeGreaterThan(5 * GIB);
-		expect(peak).toBeLessThan(9 * GIB);
+		const k = currentKnobs(golden);
+		const peak = (b: number) => provider.predict(golden, { ...k, batch_size: b })["memory.peak"]?.point ?? Number.NaN;
+		const [p2, p3, p4] = [peak(2), peak(3), peak(4)];
+		expect(p2).toBeGreaterThan(0);
+		expect(p4).toBeGreaterThan(0);
+		// The two grid points differ enough that log and linear interpolation can be told apart.
+		expect(Math.abs(p4 - p2) / p3).toBeGreaterThan(0.02);
+		// Between grid points 2 and 4, at log(3) on the log axis (not halfway, as a linear axis would be).
+		// Not "rises with batch": B's engine has the eval spike dominate this peak, so it needn't.
+		expect(p3).toBeGreaterThanOrEqual(Math.min(p2, p4));
+		expect(p3).toBeLessThanOrEqual(Math.max(p2, p4));
+		const t = Math.log(3 / 2) / Math.log(4 / 2);
+		// Within 0.1% (grid values are stored rounded); halfway would be 0.4% or more off on either set.
+		expect(Math.abs(p3 - (p2 + t * (p4 - p2))) / p3).toBeLessThan(1e-3);
 	});
 
 	it("abstains when a knob no grid covers moves, instead of keeping the old number", () => {
-		const p = provider.predict(golden, { eval_batch_size: 8 });
+		const rec = withoutGrids(golden, { knob: "eval_batch_size" });
+		const p = provider.predict(rec, { ...currentKnobs(rec), eval_batch_size: 8 });
 		expect(p["risk.oom"]?.status).toBe("abstain");
 		expect(p["memory.peak"]?.status).toBe("abstain");
 		expect(p["risk.oom"]?.reason).toBe("off_grid");
 	});
 
-	it("abstains on time and cost away from the current settings (no grid for them)", () => {
-		const p = provider.predict(golden, { batch_size: 8 });
+	it("abstains on a target with no grid away from the current settings, and not on a gridded one", () => {
+		const rec = withoutGrids(golden, { target: "time.total" });
+		const p = provider.predict(rec, { ...currentKnobs(rec), batch_size: 8 });
 		expect(p["time.total"]?.status).toBe("abstain");
 		expect(p["memory.peak"]?.status).not.toBe("abstain");
 	});
@@ -129,9 +153,14 @@ describe("sensitivity and moves", () => {
 		}
 	});
 
-	it("has nothing honest to offer on the golden record's eval problem yet", () => {
+	it("offers an eval batch move on the golden record only where a grid covers that knob", () => {
+		const covered = golden.predictions.grids.some((g) => g.axes.some((a) => a.knob_id === "eval_batch_size"));
 		const ids = provider.moves(golden, cost).map((m) => m.knobId);
-		expect(ids).not.toContain("eval_batch_size");
+		if (!covered) expect(ids).not.toContain("eval_batch_size");
+		expect(provider.moves(withoutGrids(golden, { knob: "eval_batch_size" }), cost).map((m) => m.knobId)).not.toContain("eval_batch_size");
+		// Every move it does offer lands on a prediction, never an abstention.
+		const k = currentKnobs(golden);
+		for (const m of provider.moves(golden, cost)) expect(provider.predict(golden, { ...k, [m.knobId]: m.to })[m.targetId]?.status).not.toBe("abstain");
 	});
 });
 

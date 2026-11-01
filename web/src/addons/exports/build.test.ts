@@ -342,8 +342,13 @@ describe("config", () => {
 		est["memory.peak"] = { ...est["memory.peak"], status: "abstain" };
 		delete est["risk.oom"];
 		const plan = JSON.parse(configText(input(gold, {}, { estimates: est })));
+		// Whatever the golden record holds (fixture or engine estimates): the abstained and the
+		// missing readouts are named, never given a number, and every number shown is the record's own.
 		expect(plan.not_predicted).toEqual(["memory.peak", "risk.oom"]);
-		expect(Object.keys(plan.predicted)).toEqual(["time.total", "cost.total"]);
+		expect(Object.keys(plan.predicted)).not.toContain("memory.peak");
+		expect(Object.keys(plan.predicted)).not.toContain("risk.oom");
+		expect(Object.keys(plan.predicted)).toEqual(expect.arrayContaining(["time.total", "cost.total"]));
+		for (const [id, p] of Object.entries(plan.predicted as Record<string, { point: number }>)) expect(p.point).toBe(est[id]?.point);
 	});
 
 	it("marks a sample's numbers as illustrative", () => {

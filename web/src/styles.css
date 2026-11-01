@@ -76,17 +76,36 @@ a {
 	transition: transform var(--pf-dur-sky) var(--pf-ease-move);
 }
 
+/* Clouds, after the reference skies: each a shaded body with a lit underside, softened only a
+   little (blur 7px, not 30px), so the sky reads clear and cloudy rather than hazy. Thin streaks
+   carry the high, wind-drawn cloud. Positions are in the sky's own height (190% of the screen). */
 .pf-cloud {
 	position: absolute;
 	border-radius: 50%;
-	filter: blur(30px);
+	background:
+		radial-gradient(60% 46% at 50% 72%, var(--pf-cloud-a) 0 36%, transparent 72%),
+		radial-gradient(56% 52% at 46% 40%, var(--pf-cloud-b) 0 40%, transparent 74%);
+	filter: blur(7px);
 	animation: pf-drift 80s ease-in-out infinite alternate;
 }
-.pf-cloud--1 { width: 560px; height: 160px; left: -80px; top: 62%; background: radial-gradient(closest-side, var(--pf-cloud-a), transparent); }
-.pf-cloud--2 { width: 700px; height: 200px; right: -140px; top: 74%; background: radial-gradient(closest-side, var(--pf-cloud-b), transparent); animation-duration: 110s; }
-.pf-cloud--3 { width: 480px; height: 150px; left: 24%; top: 88%; background: radial-gradient(closest-side, var(--pf-cloud-a), transparent); animation-duration: 95s; animation-direction: alternate-reverse; }
-.pf-cloud--4 { width: 420px; height: 130px; left: 52%; top: 30%; background: radial-gradient(closest-side, var(--pf-cloud-b), transparent); animation-duration: 120s; }
-.pf-cloud--5 { width: 520px; height: 150px; left: 6%; top: 16%; background: radial-gradient(closest-side, var(--pf-cloud-a), transparent); animation-duration: 130s; }
+.pf-cloud--1 { width: 620px; height: 120px; left: -120px; top: 66%; }
+.pf-cloud--2 { width: 720px; height: 120px; right: -160px; top: 71%; animation-duration: 110s; }
+.pf-cloud--3 { width: 460px; height: 84px; left: 30%; top: 84%; animation-duration: 95s; animation-direction: alternate-reverse; }
+.pf-cloud--4 { width: 420px; height: 100px; right: 6%; top: 31%; animation-duration: 120s; }
+.pf-cloud--5 { width: 520px; height: 120px; left: 4%; top: 14%; animation-duration: 130s; }
+.pf-streak {
+	position: absolute;
+	height: 9px;
+	border-radius: 999px;
+	background: linear-gradient(90deg, transparent, var(--pf-cloud-a) 28% 72%, transparent);
+	filter: blur(2.5px);
+	opacity: 0.6;
+	animation: pf-drift 150s ease-in-out infinite alternate;
+}
+.pf-streak--1 { width: 46%; left: 48%; top: 22%; transform: rotate(-3deg); }
+.pf-streak--2 { width: 38%; left: 58%; top: 40%; height: 7px; animation-duration: 170s; animation-direction: alternate-reverse; }
+.pf-streak--3 { width: 52%; left: 30%; top: 50%; height: 12px; animation-duration: 140s; }
+.pf-streak--4 { width: 34%; left: 60%; top: 78%; height: 8px; animation-duration: 160s; }
 
 .pf-trail {
 	position: absolute;
@@ -105,9 +124,10 @@ a {
 }
 
 .glass {
-	background: var(--pf-glass);
-	-webkit-backdrop-filter: blur(var(--pf-blur)) saturate(150%);
-	backdrop-filter: blur(var(--pf-blur)) saturate(150%);
+	/* A faint sheen across the top edge, as light catches real glass. */
+	background: linear-gradient(180deg, var(--pf-sheen), transparent 30%), var(--pf-glass);
+	-webkit-backdrop-filter: blur(var(--pf-blur)) saturate(125%);
+	backdrop-filter: blur(var(--pf-blur)) saturate(125%);
 	border: 1px solid var(--pf-stroke);
 	box-shadow: inset 0 1px 0 var(--pf-glass-hi), var(--pf-shadow);
 }
@@ -116,6 +136,13 @@ a {
 	.glass {
 		background: var(--pf-glass-solid);
 	}
+}
+
+/* Dawn to dusk: the View Transition cross-fade the sky toggle starts (Shell.tsx). */
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation-duration: 700ms;
+	animation-timing-function: var(--pf-ease);
 }
 
 /* ---------- Navigation capsule ---------- */
@@ -290,7 +317,8 @@ a {
 	max-width: 58ch;
 	font-size: var(--pf-text-lg);
 	line-height: 1.6;
-	color: var(--pf-fg-dim);
+	/* Full ink: a lede sits on open sky, where the dimmed ink can fall under 4.5:1 near the horizon. */
+	color: var(--pf-fg);
 }
 .pf-lede--sm { font-size: 15px; line-height: 1.55; max-width: 60ch; }
 
@@ -467,7 +495,7 @@ a {
 	gap: 8px;
 	font-family: var(--pf-font-mono);
 	font-size: 11.5px;
-	color: var(--pf-fg-dim);
+	color: var(--pf-fg);
 }
 
 .pf-beats {
@@ -809,15 +837,22 @@ a {
 
 .pf-deck {
 	flex: 1;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 20px;
+	display: grid;
+	/* Dials | the stage, which takes every pixel left over | the side column. */
+	grid-template-columns: auto minmax(0, 1fr) clamp(300px, 22vw, 380px);
+	grid-template-areas: "dials stage side";
+	gap: 24px;
 	align-items: center;
-	justify-content: center;
+}
+
+/* The cockpit (not the reading sections below it) breaks out of the page's 1240 px column on
+   a wide screen, so the stage can grow into it. */
+@media (min-width: 1300px) {
+	.pf-cockpit { margin-inline: calc(50% - min(840px, 50vw - 32px)); }
 }
 
 /* Dials */
-.pf-dials { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.pf-dials { grid-area: dials; display: flex; flex-direction: column; gap: 10px; }
 .pf-dial-wrap { width: 116px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .pf-dial {
 	position: relative;
@@ -858,7 +893,7 @@ a {
 .pf-dial__text small { max-width: 68px; font-family: var(--pf-font-mono); font-size: 9.5px; line-height: 1.2; color: var(--pf-fg-dim); }
 .pf-dial__label { font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
 .pf-dial__note { max-width: 116px; font-family: var(--pf-font-mono); font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
-.pf-dial__note.is-risk { color: var(--pf-fail); font-weight: 500; }
+.pf-dial__note.is-risk { color: var(--pf-fail); font-weight: 500; padding: 1px 6px; border-radius: var(--pf-radius-pill); background: var(--pf-node); }
 .pf-dial__note.is-risk::before { content: "✕ "; }
 .pf-dial__note.is-tight { color: var(--pf-tight); }
 .pf-dial__note.is-tight::before { content: "▲ "; font-size: 0.85em; }
@@ -930,7 +965,19 @@ a {
 }
 
 /* The orbit map */
-.pf-stage-wrap { flex: 1 1 480px; max-width: 600px; min-width: 0; }
+.pf-stage-wrap { grid-area: stage; min-width: 0; display: flex; flex-direction: column; }
+/* A size container: the view on the stage is as big as its box allows, at its own shape. Its
+   height comes from the window alone (less the header, the stage bar and the knob dock, about
+   400 px), never from the columns beside it: a longer guide or an opened node detail must not
+   resize the map under a knob move or a focus glide. */
+.pf-stage-fill { height: clamp(540px, calc(100dvh - 400px), 1400px); container-type: size; display: grid; place-items: center; }
+.pf-stage-fill > .pf-orbit,
+.pf-stage-fill > .pf-fit { width: min(100cqw, 100cqh * 600 / 560); }
+/* The fit map takes the whole stage: its rows share the height, its columns the width. */
+.pf-stage-fill > .pf-fit:not(.pf-fit--empty) { width: 100%; height: 100%; aspect-ratio: auto; }
+.pf-stage-fill .pf-fit__body .pf-fitmap__frame { height: 100%; grid-template-rows: repeat(var(--rows), minmax(30px, 1fr)) auto; }
+.pf-stage-fill .pf-fitmap__frame .pf-fitcell { aspect-ratio: auto; height: 100%; }
+.pf-stage-fill .pf-fit__body { align-items: stretch; }
 
 .pf-orbit { position: relative; width: 100%; aspect-ratio: 600 / 560; }
 .pf-orbit .react-flow { position: absolute; inset: 0; background: transparent; overflow: visible; }
@@ -1024,7 +1071,8 @@ a {
 [data-busy] .pf-orbit-flow,
 [data-busy] .pf-tether-flow,
 [data-busy] .pf-stage__dot,
-[data-busy] .pf-cloud { animation-play-state: paused; }
+[data-busy] .pf-cloud,
+[data-busy] .pf-streak { animation-play-state: paused; }
 
 .pf-onode {
 	position: relative;
@@ -1085,7 +1133,8 @@ a {
 	padding: 1px 8px;
 	border-radius: var(--pf-radius-pill);
 	border: 1px solid currentColor;
-	background: var(--pf-node);
+	/* Solid, not glass: a red-orange warning over a node's edge fell under 4.5:1 (review, Nov 1). */
+	background: var(--pf-glass-solid);
 	color: var(--pf-tight);
 	font-size: 10px;
 	font-weight: 600;
@@ -1122,7 +1171,7 @@ a {
 .pf-key-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pf-fg); }
 
 /* Side column: node detail and the guide */
-.pf-side { position: relative; flex: 0 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.pf-side { grid-area: side; position: relative; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 
 .pf-detail {
 	display: flex;
@@ -1177,6 +1226,24 @@ a {
 .pf-finding--warn { border-left-color: var(--pf-tight); }
 .pf-finding--warn b::before { content: "▲ "; color: var(--pf-tight); font-size: 0.8em; }
 .pf-finding .pf-btn { align-self: flex-start; }
+/* Findings with no place on the map (cockpit/Findings.tsx). */
+.pf-findings { scroll-margin-top: 92px; }
+.pf-findings:focus { outline: none; }
+/* The severity pill carries the mark; the title doesn't repeat it. Marks are visual only. */
+.pf-findings .pf-finding b::before { content: none; }
+.pf-findings:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 3px; }
+.pf-findings__list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.pf-findings .pf-finding p { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.pf-findings__sev { align-self: flex-start; padding: 1px 8px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-stroke-strong); font-size: 11.5px; font-weight: 600; }
+.pf-findings__sev.is-critical, .pf-findings__sev.is-error { border-color: var(--pf-fail); color: var(--pf-fail); }
+.pf-findings__sev.is-critical::before, .pf-findings__sev.is-error::before { content: "✕ " / ""; }
+.pf-findings__sev.is-warn { border-color: var(--pf-tight); color: var(--pf-tight); }
+.pf-findings__sev.is-warn::before { content: "▲ " / ""; font-size: 0.85em; }
+.pf-findings__sev.is-info::before { content: "i " / ""; font-style: italic; font-family: var(--pf-font-serif); }
+.pf-findings__quote { margin: 0; padding: 8px 12px; border-radius: var(--pf-radius-sm); background: var(--pf-glass-solid); border-left: 3px solid var(--pf-accent); overflow-x: auto; }
+.pf-findings__quote code { font-family: var(--pf-font-mono); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.pf-findings__evidence { margin: 0; padding-left: 18px; font-size: 12.5px; }
+.pf-findings__source { color: var(--pf-fg-dim); font-size: 12.5px; }
 
 /* The fix race: one lane per candidate Muse Code writes (fix/FixRace.tsx). */
 .pf-fix { display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; }
@@ -1495,19 +1562,61 @@ a {
 .pf-stack__off { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-weight: 700; color: var(--pf-fail); }
 .pf-mring-untrusted { fill: none; stroke: var(--pf-stroke-strong); stroke-width: 16; opacity: 0.9; transform-box: view-box; transform-origin: 300px 280px; }
 /* Fit map (cockpit/FitMap.tsx) */
-.pf-fitmap__frame { position: relative; display: grid; gap: 3px; align-items: center; min-width: 0; }
+.pf-fitmap__frame { position: relative; display: grid; gap: 4px; align-items: center; min-width: 0; }
+/* Fit map squares: status colour underneath, the memory fill rising from the bottom over it. */
+.pf-fitcell { position: relative; overflow: hidden; isolation: isolate; transition: background-color 240ms ease, border-color 240ms ease; }
+.pf-fitcell__fill {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: currentColor;
+	opacity: 0.3;
+	transform: scaleY(var(--fill, 0));
+	transform-origin: 50% 100%;
+	transition: transform 260ms var(--pf-ease-move);
+	pointer-events: none;
+}
+.pf-fitcell--fits { color: var(--pf-ok-tint); }
+.pf-fitcell--tight { color: var(--pf-tight-tint); }
+.pf-fitcell--fails { color: var(--pf-fail-tint); }
+.pf-fitcell--abstain .pf-fitcell__fill { display: none; }
+/* Past the GPU's memory: the fill is full and its top edge turns into a dashed overflow line. */
+.pf-fitcell.is-over::after { content: ""; position: absolute; inset: 3px 6px auto; border-top: 2px dashed var(--pf-fail); opacity: 0.9; }
+.pf-fitcell__pct { position: absolute; left: 5px; bottom: 4px; font-family: var(--pf-font-mono); font-size: 10.5px; line-height: 1; color: var(--pf-fg-dim); font-variant-numeric: tabular-nums; pointer-events: none; }
+@media (hover: hover) and (pointer: fine) {
+	.pf-fitcell:not(.is-here):hover { border-color: var(--pf-stroke-strong); }
+}
+.pf-fitcell:active:not(.is-here) { transform: scale(0.97); transition: transform 120ms ease-out; }
+.pf-fitcell.is-here { cursor: grab; touch-action: none; box-shadow: none; }
+.pf-fitcell.is-here:active { cursor: grabbing; }
+/* The run's square as a puck that glides to wherever the knobs put it, and a ghost on the square pointed at. */
+.pf-fitmap__overlay { position: relative; align-self: stretch; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.pf-fitmap__overlay > .pf-fitmap__lines { position: absolute; inset: 0; }
+.pf-fitmap__puck,
+.pf-fitmap__ghost { position: absolute; left: 0; top: 0; border-radius: 8px; pointer-events: none; }
+.pf-fitmap__puck {
+	box-shadow: 0 0 0 2px var(--pf-fg), 0 0 0 6px color-mix(in srgb, var(--pf-fg) 14%, transparent), 0 8px 24px -8px rgb(0 0 0 / 0.5);
+	transition: transform 260ms var(--pf-ease-move), width 260ms var(--pf-ease-move), height 260ms var(--pf-ease-move);
+}
+.pf-fitmap__ghost { outline: 2px dashed var(--pf-fg); outline-offset: -2px; opacity: 0.75; }
+.pf-fitmap__line { transition: d 260ms var(--pf-ease-move); }
 .pf-fitmap__tick { font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fg-dim); text-align: center; }
 .pf-fitmap__tick--y { padding-right: 6px; text-align: right; }
 .pf-fitcell { display: grid; place-items: center; min-height: 26px; aspect-ratio: 1.25; padding: 0; border: 1px solid var(--pf-stroke); border-radius: 7px; cursor: pointer; }
 .pf-fitcell:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 2px; }
-.pf-fitcell--fits { background: color-mix(in srgb, var(--pf-ok) 22%, transparent); }
-.pf-fitcell--tight { background: color-mix(in srgb, var(--pf-tight) 26%, transparent); }
-.pf-fitcell--fails { background: color-mix(in srgb, var(--pf-fail) 30%, transparent); border-color: color-mix(in srgb, var(--pf-fail) 45%, transparent); }
+.pf-fitcell--fits { background: color-mix(in srgb, var(--pf-ok-tint) 40%, transparent); border-color: color-mix(in srgb, var(--pf-ok-tint) 62%, transparent); }
+.pf-fitcell--tight { background: color-mix(in srgb, var(--pf-tight-tint) 40%, transparent); border-color: color-mix(in srgb, var(--pf-tight-tint) 62%, transparent); }
+.pf-fitcell--fails { background: color-mix(in srgb, var(--pf-fail-tint) 32%, transparent); border-color: color-mix(in srgb, var(--pf-fail-tint) 52%, transparent); }
+/* Light catches the top of each square, as on the glass panels. */
+.pf-fitcell::before { content: ""; position: absolute; inset: 0 0 auto; height: 45%; z-index: -1; border-radius: inherit; background: linear-gradient(180deg, var(--pf-sheen), transparent); pointer-events: none; }
+/* Marks and shares in the full ink: the status colours on a square tinted the same hue fall under 3:1. */
+.pf-fitcell .pf-status { color: var(--pf-fg); }
+/* The share sits on a small glass chip: white on the brightest dusk tints is under 4.5:1. */
+.pf-fitcell__pct { color: var(--pf-fg); padding: 2px 5px; border-radius: 4px; background: var(--pf-glass-solid); }
 .pf-fitcell--unknown { background: var(--pf-track); }
 .pf-fitcell--abstain { background: repeating-linear-gradient(135deg, var(--pf-track) 0 4px, var(--pf-stroke-strong) 4px 6px); }
-.pf-fitcell.is-here { box-shadow: 0 0 0 2px var(--pf-fg); }
 .pf-fitcell .pf-status span:empty { display: none; }
-.pf-fitmap__lines { position: relative; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 1; }
+.pf-fitmap__lines { width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .pf-fitmap__line { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
 .pf-fitmap__line--fits { stroke: var(--pf-fg); }
 .pf-fitmap__line--fails { stroke: var(--pf-fail); stroke-dasharray: 5 4; }
@@ -1646,7 +1755,9 @@ a {
 /* ---------- Smaller screens ---------- */
 
 @media (max-width: 1100px) {
-	.pf-side { flex: 1 1 100%; max-width: 640px; }
+	/* The side column moves under the stage, which keeps the full width beside the dials. */
+	.pf-deck { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto; grid-template-areas: "dials stage" "side side"; }
+	.pf-side { justify-self: center; width: min(640px, 100%); }
 }
 
 @media (max-width: 760px) {
@@ -1665,10 +1776,19 @@ a {
 @media (max-width: 760px) {
 	.pf-cockpit { padding-block: 84px 16px; }
 	.pf-cockpit__head h1 { font-size: 28px; }
-	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; order: 2; width: 100%; }
+	.pf-deck { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "stage" "dials" "side"; gap: 20px; }
+	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 	.pf-dial-wrap { width: 106px; }
-	.pf-stage-wrap { order: 1; flex-basis: 100%; }
-	.pf-side { order: 3; }
+	/* No height to fill on a phone: the stage is the screen's width. */
+	.pf-stage-fill { height: auto; container-type: normal; display: block; }
+	.pf-stage-fill > .pf-orbit,
+	.pf-stage-fill > .pf-fit { width: 100%; }
+	.pf-stage-fill > .pf-fit:not(.pf-fit--empty) { height: auto; }
+	.pf-stage-fill .pf-fit__body .pf-fitmap__frame { height: auto; grid-template-rows: none; }
+	.pf-stage-fill .pf-fitmap__frame .pf-fitcell { aspect-ratio: 1.25; height: auto; }
+	.pf-fitcell__pct { display: none; }
+	/* No hover on a phone, so no jump to guard against: the readout grows to fit its lines. */
+	.pf-fit .pf-fit__readout { height: auto; min-height: 66px; overflow: visible; }
 	.pf-dock__row { border-radius: 24px; }
 	.pf-knob { padding: 0 12px; }
 	.pf-core__num { font-size: 30px; }
@@ -1696,6 +1816,7 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
 	.pf-cloud,
+	.pf-streak,
 	.pf-orbit-flow,
 	.pf-tether-flow,
 	.pf-stage__dot,
@@ -1825,6 +1946,17 @@ a {
 	font-size: 12.5px;
 }
 .pf-fit__body { display: flex; flex: 1; min-height: 0; align-items: center; }
+.pf-fit__gpu { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--pf-fg-dim); }
+.pf-fit__gpu select { padding: 4px 10px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-stroke-strong); background: var(--pf-glass); color: var(--pf-fg); font: inherit; font-family: var(--pf-font-mono); font-size: 12px; }
+.pf-fit__cap { font-family: var(--pf-font-mono); font-size: 12px; }
+.pf-fit__readout { display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: 4px 14px; height: 66px; overflow: hidden; margin: 0; padding: 8px 14px; border-radius: 14px; background: var(--pf-glass); border: 1px solid var(--pf-stroke); font-size: 13px; transition: border-color 160ms ease; }
+.pf-fit__readout.is-peek { border-color: var(--pf-stroke-strong); }
+.pf-fit__readout b { font-family: var(--pf-font-mono); font-weight: 500; font-size: 12.5px; }
+.pf-fit__readout small { font-family: var(--pf-font-mono); font-size: 11.5px; color: var(--pf-fg-dim); }
+.pf-fit__where .pf-fit__herechip { margin-right: 6px; }
+.pf-fit__herechip { padding: 1px 7px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-fg); font-size: 11px; font-weight: 600; }
+.pf-fit__hint { margin-left: auto; font-size: 12px; color: var(--pf-fg-dim); }
+.pf-fit__key .pf-fitmap__key.pf-fitmap__key--fill { width: 12px; height: 12px; border: 1px solid var(--pf-stroke-strong); border-top: 0; border-radius: 3px; background: linear-gradient(to top, color-mix(in srgb, var(--pf-fg) 30%, transparent) 60%, transparent 60%); }
 .pf-fit__body .pf-fitmap__frame { flex: 1; }
 .pf-fit__key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 11.5px; color: var(--pf-fg-dim); }
 .pf-fit__key li { display: inline-flex; align-items: center; gap: 6px; }
@@ -1832,7 +1964,23 @@ a {
 .pf-fit__key .pf-fitmap__key--fails { border-top: 2.5px dashed var(--pf-fail); }
 .pf-fit__key .pf-fitmap__swatch { width: 16px; height: 10px; min-height: 0; aspect-ratio: auto; border-radius: 3px; }
 
-.pf-mini-orbit { position: relative; border-radius: 28px; padding: 6px; }
+.pf-mini-orbit { position: relative; border-radius: 28px; padding: 14px 16px 16px; }
+/* The orbit at a glance (map/OrbitGlance.tsx): the whole loop, simplified, sized to the column. */
+.pf-glance { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.pf-glance__dial { position: relative; width: min(100%, 240px); aspect-ratio: 1; margin: 0 auto; }
+.pf-glance__dial > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.pf-glance__arc { fill: none; stroke: var(--pf-fg); stroke-opacity: 0.3; stroke-width: 7; stroke-linecap: round; transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move); }
+.pf-glance__track { fill: none; stroke: var(--pf-track); stroke-width: 11; }
+.pf-glance__untrusted { fill: none; stroke: var(--pf-stroke-strong); stroke-width: 11; opacity: 0.9; }
+.pf-glance__mring { fill: none; stroke-width: 11; transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move); }
+.pf-glance__core { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; pointer-events: none; }
+.pf-glance__num { font-family: var(--pf-font-serif); font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.pf-glance__cap { max-width: 52%; font-size: 11px; line-height: 1.25; color: var(--pf-fg-dim); }
+.pf-glance__phases { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--pf-fg-dim); }
+.pf-glance__phase { position: relative; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 8px; isolation: isolate; }
+.pf-glance__phase i { position: absolute; inset: 0 auto 0 0; z-index: -1; border-radius: inherit; background: color-mix(in srgb, var(--pf-fg) 10%, transparent); transition: width var(--pf-dur-move) var(--pf-ease-move); }
+.pf-glance__phase b { margin-left: auto; font-family: var(--pf-font-mono); font-weight: 500; color: var(--pf-fg); font-variant-numeric: tabular-nums; }
+.pf-mini-orbit:has(.pf-mini-orbit__back:hover) { border-color: var(--pf-stroke-strong); }
 .pf-orbit--compact { aspect-ratio: 600 / 560; }
 .pf-orbit--compact .pf-onode__chip { display: none; }
 .pf-mini-orbit__back { position: absolute; inset: 0; z-index: 5; border: 0; border-radius: inherit; background: transparent; cursor: zoom-in; }
@@ -1898,7 +2046,7 @@ a {
 .pf-chips__key { margin: 0; font-family: var(--pf-font-mono); font-size: 11px; }
 
 @media (max-width: 1100px) {
-	.pf-deck.is-fit .pf-mini-orbit { max-width: 260px; }
+	.pf-deck.is-fit .pf-mini-orbit { width: 100%; }
 }
 @media (max-width: 760px) {
 	.pf-statusline { font-size: 14px; }
@@ -1908,6 +2056,8 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
 	.pf-drawer, .pf-info__pop { transition: opacity 0.15s ease; }
+	.pf-fitmap__puck, .pf-fitcell__fill, .pf-fitmap__line, .pf-glance__arc, .pf-glance__mring, .pf-glance__phase i { transition: none; }
+	.pf-fitcell:active:not(.is-here) { transform: none; }
 }
 .pf-fitcell .pf-status { padding: 0; border: 0; background: none; box-shadow: none; }
 

@@ -94,6 +94,11 @@ class JobRequest(Strict):
 		description="0.5.0: a unified diff applied to the record's code before a probe or verify job "
 		"(C's fix loop); code fixes can't be passed as knob overrides",
 	)
+	private: bool = Field(
+		default=False,
+		description="0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on "
+		"Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten",
+	)
 
 	@model_validator(mode="after")
 	def _check(self):

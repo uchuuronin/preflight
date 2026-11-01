@@ -40,7 +40,7 @@ const shared = {
 	"radius-lg": "28px",
 	"radius-pill": "999px",
 
-	blur: "18px",
+	blur: "16px",
 	"blur-node": "10px",
 	ease: "cubic-bezier(.23, 1, .32, 1)",
 	"ease-move": "cubic-bezier(.77, 0, .175, 1)",
@@ -56,74 +56,107 @@ const shared = {
 	"dur-wake": "2600ms",
 } as const;
 
+/**
+ * Dusk (the dark sky), from Chiya's reference (Nov 1): a clear sunset over cloud, indigo overhead
+ * through violet and pink to peach at the horizon (#563A88, #8F468A, #DF6E94, #F5BAAF, #070507).
+ * Clear, not murky: saturated stops, an indigo glass a little more solid than before so text never
+ * sits on haze, and red-orange for alerts. The cockpit sees the sky from about 12% to 64% of this
+ * gradient and the home screen from 43% to 96% (Shell.tsx SKY_Y), so the vivid pink and peach are
+ * kept to the last few percent, below the home screen's text down to 720 px tall: text on the open
+ * sky stays on violet (fg 5.7:1 on #8F468A). Contrast on the glass over the lowest
+ * sky the cockpit shows (#7A4389), under the top-edge sheen (its worst): fg 11.8:1, fg-dim 8.6:1,
+ * fail 5.0:1, ok 8.9:1, tight 9.2:1 (WCAG formula, alpha composited; recomputed after review, Nov 1).
+ * Red-orange text can't reach 4.5:1 on the open violet sky (2.7:1 on #6E4089), so alert text on the
+ * sky sits on a glass backing (.pf-dial__note.is-risk).
+ * Text on open sky and on clouds is measured from screenshots at 1440x900, 1280x720 and 390x844.
+ */
 export const duskTokens = {
 	...shared,
 	"color-scheme": "dark",
-	"sky-base": "#0E2A38",
-	sky: "linear-gradient(180deg, #0A2230 0%, #123747 22%, #1A475C 44%, #3F6276 66%, #9C7A44 86%, #E7B44C 100%)",
-	fg: "#FFF5D1",
-	"fg-dim": "rgba(255, 245, 209, 0.74)",
-	glass: "rgba(14, 38, 52, 0.46)",
-	"glass-hi": "rgba(255, 245, 209, 0.10)",
-	"glass-solid": "#123747",
-	stroke: "rgba(255, 245, 209, 0.18)",
-	"stroke-strong": "rgba(255, 245, 209, 0.38)",
-	node: "rgba(14, 38, 52, 0.62)",
-	accent: "#FAD563",
-	"accent-glow": "rgba(250, 213, 99, 0.42)",
-	ok: "#8EBD9D",
-	tight: "#F2B45A",
-	fail: "#FF6B6B",
-	"fail-soft": "rgba(139, 30, 45, 0.45)",
-	track: "rgba(255, 245, 209, 0.16)",
-	shadow: "0 20px 50px rgba(4, 18, 26, 0.40)",
-	"cloud-a": "rgba(158, 186, 224, 0.30)",
-	"cloud-b": "rgba(250, 213, 99, 0.22)",
-	"pill-bg": "#FAD563",
-	"pill-fg": "#173E50",
-	"term-1": "#9EBAE0",
-	"term-2": "#B4BD62",
-	"term-3": "#8EBD9D",
-	"term-4": "#E8DCB0",
-	"term-5": "#FAD563",
-	"term-6": "#C3B1E1",
-	focus: "#FAD563",
+	"sky-base": "#120C2E",
+	sky: "linear-gradient(180deg, #0A0720 0%, #171140 14%, #261C5C 26%, #3E2C78 38%, #563A88 50%, #6E4089 62%, #7A4389 72%, #8F468A 82%, #9E4B8C 88%, #C35A91 92%, #DF6E94 95%, #F5BAAF 98%, #F7A076 100%)",
+	fg: "#FFF4EE",
+	"fg-dim": "rgba(255, 244, 238, 0.84)",
+	glass: "rgba(22, 15, 52, 0.62)",
+	"glass-hi": "rgba(255, 236, 230, 0.14)",
+	// The light across a panel's top edge: plain rgba, so a browser without color-mix keeps the glass.
+	sheen: "rgba(255, 236, 230, 0.02)",
+	"glass-solid": "#1E1645",
+	stroke: "rgba(255, 236, 230, 0.18)",
+	"stroke-strong": "rgba(255, 236, 230, 0.40)",
+	node: "rgba(22, 15, 52, 0.70)",
+	accent: "#FFB98F",
+	"accent-glow": "rgba(255, 185, 143, 0.42)",
+	ok: "#7EEBC6",
+	tight: "#FFD66E",
+	fail: "#FF7A5C",
+	// Surface tints for squares and fills (not text): brighter than the text colours so a fitting
+	// setting reads as lit, not grey, on the indigo glass (Chiya, Nov 1: "a bit brighter").
+	"ok-tint": "#5FE8B8",
+	"tight-tint": "#FFC64F",
+	"fail-tint": "#FF6B4A",
+	"fail-soft": "rgba(255, 107, 74, 0.22)",
+	track: "rgba(255, 244, 238, 0.16)",
+	shadow: "0 18px 44px rgba(6, 3, 20, 0.42)",
+	// Clouds: a lit edge and a shaded body, as in the reference's sunset clouds.
+	// Lit edge kept faint (review, Nov 1: at 0.55 it pulled light text over it under 4.5:1).
+	"cloud-a": "rgba(239, 128, 160, 0.24)",
+	"cloud-b": "rgba(86, 58, 136, 0.62)",
+	"pill-bg": "#FFB98F",
+	"pill-fg": "#1A1033",
+	"term-1": "#A9B8FF",
+	"term-2": "#F5BAAF",
+	"term-3": "#7EEBC6",
+	"term-4": "#E7D3F5",
+	"term-5": "#FFC46B",
+	"term-6": "#E57AA3",
+	focus: "#FFB98F",
 } as const;
 
+/**
+ * Dawn (the light sky), from Chiya's reference (Nov 1): a painted sunrise, lupine blue overhead
+ * through lavender and apple-blossom to sienna and June-day yellow (SW 6810 Lupine, 6838 Vigorous
+ * Violet, 76 Appleblossom, 9009 Subdued Sienna, 6682 June Day). Deep violet-navy ink, deep maroon for
+ * alerts. Contrast on the sky's top stop: fg 8.5:1, fg-dim 5.5:1, fail 6.3:1; on the glass over it:
+ * fg 11.8:1, fg-dim 7.6:1, ok 5.9:1, tight 4.7:1, accent 4.7:1. ok, tight and accent fall under 4.5:1
+ * on open sky (4.3, 3.4, 3.4), so they are text on glass only.
+ */
 export const dayTokens = {
 	...shared,
 	"color-scheme": "light",
-	"sky-base": "#9EBAE0",
-	// The top stops were #5F86BC and #7FA3D2, where even fg was 3.05:1 (D's audit, finding 7):
-	// lightened so any text over the sky passes 4.5:1 (fg 6.3:1, fg-dim 5.4:1, fail 5.0:1 at the top).
-	sky: "linear-gradient(180deg, #A9C3E5 0%, #B4CBE9 26%, #C3D6EE 48%, #D9E6F4 72%, #FFF5D1 100%)",
-	fg: "#173E50",
-	"fg-dim": "#2D4855", // was #3B5F70, 3.45:1 on the sky (audit finding 7); 4.86:1 on sky-base, 6.82:1 on glass
-	glass: "rgba(255, 255, 255, 0.46)",
-	"glass-hi": "rgba(255, 255, 255, 0.62)",
-	"glass-solid": "#F4F7FB",
-	stroke: "rgba(23, 62, 80, 0.15)",
-	"stroke-strong": "rgba(23, 62, 80, 0.34)",
-	node: "rgba(255, 255, 255, 0.72)",
-	accent: "#A86F00",
-	"accent-glow": "rgba(250, 213, 99, 0.75)",
-	ok: "#1F5A3D", // was #2E7652, 3.87:1 (audit finding 7); 5.72:1 on glass
-	tight: "#9A5A00",
-	fail: "#8B1E2D",
-	"fail-soft": "rgba(139, 30, 45, 0.16)",
-	track: "rgba(23, 62, 80, 0.13)",
-	shadow: "0 20px 50px rgba(40, 70, 100, 0.18)",
-	"cloud-a": "rgba(255, 255, 255, 0.85)",
-	"cloud-b": "rgba(255, 224, 196, 0.75)",
-	"pill-bg": "#FAD563",
-	"pill-fg": "#173E50",
-	"term-1": "#70772E",
-	"term-2": "#B4BD62",
-	"term-3": "#8EBD9D",
-	"term-4": "#4E6A7D",
-	"term-5": "#D49810",
-	"term-6": "#6C5A9C",
-	focus: "#173E50",
+	"sky-base": "#C3CCEA",
+	sky: "linear-gradient(180deg, #A8BDE6 0%, #B9C3EA 18%, #C9BFE3 34%, #D9BFD6 48%, #E9C3C0 62%, #F2C2A4 76%, #F6CF8E 88%, #F8DE86 100%)",
+	fg: "#241B3D",
+	"fg-dim": "#463A5E",
+	glass: "rgba(255, 252, 250, 0.50)",
+	"glass-hi": "rgba(255, 255, 255, 0.70)",
+	sheen: "rgba(255, 255, 255, 0.34)",
+	"glass-solid": "#F7F3F6",
+	stroke: "rgba(36, 27, 61, 0.14)",
+	"stroke-strong": "rgba(36, 27, 61, 0.32)",
+	node: "rgba(255, 252, 250, 0.74)",
+	accent: "#7B4F7A",
+	"accent-glow": "rgba(241, 206, 107, 0.72)",
+	ok: "#1F5A3D",
+	tight: "#8A5200",
+	fail: "#6E1027",
+	"ok-tint": "#4FBF8A",
+	"tight-tint": "#F0B23A",
+	"fail-tint": "#A8304F",
+	"fail-soft": "rgba(110, 16, 39, 0.16)",
+	track: "rgba(36, 27, 61, 0.12)",
+	shadow: "0 18px 44px rgba(70, 50, 110, 0.16)",
+	"cloud-a": "rgba(255, 246, 240, 0.86)",
+	"cloud-b": "rgba(150, 134, 196, 0.42)",
+	"pill-bg": "#F1CE6B",
+	"pill-fg": "#241B3D",
+	"term-1": "#4A5F9C",
+	"term-2": "#B8714F",
+	"term-3": "#5E8C74",
+	"term-4": "#7B5674",
+	"term-5": "#C99A1E",
+	"term-6": "#B5577A",
+	focus: "#241B3D",
 } as const;
 
 export type TokenName = keyof typeof duskTokens;

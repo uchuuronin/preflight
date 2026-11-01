@@ -40,16 +40,15 @@ function phaseLabel(phase: string): string {
 	return hasKey(`phase.${phase}`) ? t(`phase.${phase}`) : phase;
 }
 
-const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<BgData>>) {
-	const { layout, highlightPhases, fit, evalStalled } = data;
-	const coreRef = useRef<HTMLSpanElement>(null);
-	const coreUnit = data.coreUnit;
-	const coreFormat = useMemo(() => (v: number) => fmt(v, coreUnit), [coreUnit]);
-	useTweenedText(coreRef, data.coreValue, coreFormat, { ms: MOVE_MS, ease: moveEase });
-	const { memory } = layout;
+/**
+ * The memory ring's parts: each group's arc (a full ring is this GPU's memory), the hatched part
+ * past the peak's angle when the parts add up to more than the peak, and how far past the GPU the
+ * peak goes (the dashed outer ring). Shared by the orbit and its glance in the side column.
+ */
+export function memoryRings(memory: OrbitLayout["memory"], rMem: number = R_MEM, rOver: number = R_OVER) {
 	// A full ring is this GPU's memory; what doesn't fit continues on the dashed outer ring.
 	const scale = memory.capacity ?? memory.total ?? 1;
-	const cMem = 2 * Math.PI * R_MEM;
+	const cMem = 2 * Math.PI * rMem;
 	let acc = -90;
 	const segs = memory.segments.flatMap((s) => {
 		const room = 270 - acc;
@@ -74,7 +73,18 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 		return { rot: start, dash: `${dashes.join(" ")} 0 ${cMem.toFixed(1)}` };
 	})();
 	const over = memory.total && memory.capacity && memory.total > memory.capacity ? Math.min(1, (memory.total - memory.capacity) / memory.capacity) : 0;
-	const cOver = 2 * Math.PI * R_OVER;
+	const cOver = 2 * Math.PI * rOver;
+	return { segs, untrustedArc, over, cMem, cOver };
+}
+
+const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<BgData>>) {
+	const { layout, highlightPhases, fit, evalStalled } = data;
+	const coreRef = useRef<HTMLSpanElement>(null);
+	const coreUnit = data.coreUnit;
+	const coreFormat = useMemo(() => (v: number) => fmt(v, coreUnit), [coreUnit]);
+	useTweenedText(coreRef, data.coreValue, coreFormat, { ms: MOVE_MS, ease: moveEase });
+	const { memory } = layout;
+	const { segs, untrustedArc, over, cMem, cOver } = memoryRings(memory);
 	// One lap of dots takes less time when the job moves more tokens per second.
 	const lap = layout.tokensPerSecond ? Math.max(0.6, Math.min(8, 7000 / layout.tokensPerSecond)) : 3.2;
 	return (
@@ -177,6 +187,15 @@ const OrbitNodeView = memo(function OrbitNodeView({ data }: NodeProps<Node<NodeD
 });
 
 const NODE_TYPES = { bg: OrbitBackground, onode: OrbitNodeView };
+
+/**
+ * How far a focused node is zoomed: 1.4 times the zoom that fits the loop in this box (1.35 on
+ * the old fixed 600 px stage), so focusing always zooms in, however big the stage has grown.
+ */
+export function focusZoom(width: number, height: number): number {
+	const fitted = Math.min(width / FRAME.w, height / FRAME.h) / 1.08;
+	return Math.max(1.35, Math.min(3, fitted * 1.4));
+}
 
 function OrbitInner({ compact = false }: { compact?: boolean }) {
 	const { record, estimates, state, actions } = useWorkspace();
@@ -285,18 +304,66 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 		return [bg, ...pfNodes];
 	}, [record, estimates, state.highlight, state.focus, layout, fit, failing]);
 
+	const box = useRef<HTMLDivElement>(null);
+	const focusRef = useRef(state.focus);
+	focusRef.current = state.focus;
+	const layoutRef = useRef(layout);
+	layoutRef.current = layout;
+	// When the focus glide ends: a resize meanwhile re-fits after it, not over it.
+	const glideUntil = useRef(0);
+
 	// Focus: glide to the node; back out to the whole loop when focus clears.
 	useEffect(() => {
 		const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 		const duration = reduce ? 0 : 800;
 		const n = state.focus ? layout.nodes.find((m) => m.id === state.focus) : null;
-		if (n) void flow.setCenter(n.x, n.y, { zoom: 1.35, duration });
+		const el = box.current;
+		glideUntil.current = performance.now() + duration;
+		if (n) void flow.setCenter(n.x, n.y, { zoom: el ? focusZoom(el.clientWidth, el.clientHeight) : 1.35, duration });
 		else void flow.fitView({ padding: 0.04, duration });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [state.focus]);
 
+	// The stage grows and shrinks with the window (and swaps between the stage and the side
+	// column), so the loop is re-fitted to its box whenever the box changes size; React Flow only
+	// fits once, on first paint. No glide: it follows the resize. A focused node keeps its centre.
+	useEffect(() => {
+		const el = box.current;
+		if (!el || typeof ResizeObserver === "undefined") return;
+		let frame = 0;
+		let later = 0;
+		let last = "";
+		const ro = new ResizeObserver(([entry]) => {
+			const { width, height } = entry!.contentRect;
+			const size = `${Math.round(width)}x${Math.round(height)}`;
+			if (size === last || width === 0) return;
+			last = size;
+			cancelAnimationFrame(frame);
+			clearTimeout(later);
+			const refit = () => {
+				const wait = glideUntil.current - performance.now();
+				if (wait > 0) {
+					later = window.setTimeout(refit, wait + 16);
+					return;
+				}
+				const f = focusRef.current;
+				const n = f ? layoutRef.current.nodes.find((m) => m.id === f) : null;
+				if (n) void flow.setCenter(n.x, n.y, { zoom: focusZoom(width, height), duration: 0 });
+				else void flow.fitView({ padding: 0.04, duration: 0 });
+			};
+			frame = requestAnimationFrame(refit);
+		});
+		ro.observe(el);
+		return () => {
+			cancelAnimationFrame(frame);
+			clearTimeout(later);
+			ro.disconnect();
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [flow]);
+
 	return (
-		<div className={`pf-orbit${compact ? " pf-orbit--compact" : ""}`} role="region" aria-label={t("map.label")}>
+		<div ref={box} className={`pf-orbit${compact ? " pf-orbit--compact" : ""}`} role="region" aria-label={t("map.label")}>
 			<ReactFlow
 				nodes={nodes}
 				edges={[]}
@@ -304,7 +371,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				fitView
 				fitViewOptions={{ padding: 0.04 }}
 				minZoom={0.3}
-				maxZoom={2}
+				maxZoom={3}
 				nodesDraggable={false}
 				// The node's own button takes focus (with its ring); React Flow's wrapper would take a
 				// second, ringless stop (audit finding 10).

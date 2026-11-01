@@ -585,8 +585,8 @@ def test_the_summary_says_what_the_engine_shows():
 	assert middle and not any(b["shown_as_number"] for b in middle)
 	top = next(b for b in bins if b["lo"] >= 0.95 - 1e-9)
 	assert (
-		top["verified"] is False and top["ooms"] == 9 and top["n"] == 10
-	)  # shown as "9 of 10 similar runs did"
+		top["verified"] is False and top["ooms"] == 11 and top["n"] == 12
+	)  # shown as "11 of 12 similar runs did" (table 67ab8edae6: P(OOM) scored as the engine shows it, Nov 1)
 
 
 def test_one_threads_quiet_grid_doesnt_silence_another():
@@ -708,7 +708,7 @@ def _with_lengths(rec, **extras):
 
 def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
 	# review, Nov 1: a factor taken from whichever probe matched jumped 4.5% when a knob moved onto another probe
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	for pid in ("p1", "p2", "p3"):
 		p = next(q for q in lens.probes if q.id == pid)
 		pv = api._probe_values(lens, p)
@@ -727,7 +727,7 @@ def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
 
 
 def test_a_knob_move_between_probes_doesnt_jump():
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	pts = [api.predict(lens, {"batch_size": b, "seq_len": 1024}).root["time.step"].point for b in (2, 3, 4)]
 	assert pts[0] < pts[1] < pts[2]  # the fit interpolates between the corrected probes
 
@@ -745,7 +745,7 @@ def test_without_the_datasets_lengths_the_probes_spread_sets_both_terms():
 
 def test_a_long_tail_moves_memory_not_time():
 	# Chiya, Nov 1: time follows the median and the mean; p99.9 and the longest row belong to peak memory
-	base = _with_lengths(_lora(), dataset_median_tokens=140.0, dataset_mean_tokens=152.0)
+	base = _with_lengths(_lora(), dataset_p50_tokens=140.0, dataset_mean_tokens=152.0)
 	tail = _with_lengths(base, dataset_p999_tokens=1000.0, dataset_max_tokens=4000.0)
 	a, b = api.predict(base).root["time.step"], api.predict(tail).root["time.step"]
 	assert a.point == b.point and a.hi == b.hi
@@ -760,7 +760,7 @@ def _lora_steps(n=1000):
 
 
 def test_a_total_follows_the_mean_and_its_length_error_shrinks_with_the_steps():
-	rec = _with_lengths(_lora_steps(1000), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	rec = _with_lengths(_lora_steps(1000), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	p = next(q for q in rec.probes if q.id == "p1")
 	lt = api._length_term(rec, {}, p, 1000)
 	pv = api._probe_values(rec, p)
@@ -784,7 +784,7 @@ def test_the_cold_cost_doesnt_grow_with_accumulation():
 
 
 def test_rl_and_packed_rows_take_no_padding_term():
-	rec = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	rec = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	p = next(q for q in rec.probes if q.id == "p1")
 	assert api._length_term(rec, {"packing": True}, p).total_scale == 1.0
 	rl = rec.model_copy(update={"job": rec.job.model_copy(update={"lens": "rl"})})
@@ -806,7 +806,7 @@ def _at_dataset(rec, med_tokens=200.0, mean_tokens=260.0, log=True):
 		upd = {
 			"extras": {
 				**(p.extras or {}),
-				"dataset_median_tokens": med_tokens,
+				"dataset_p50_tokens": med_tokens,
 				"dataset_mean_tokens": mean_tokens,
 			}
 		}
@@ -837,7 +837,7 @@ def test_a_probe_that_saw_the_runs_data_is_left_alone():
 
 def test_one_uncorrectable_probe_leaves_every_probe_uncorrected():
 	# review, Nov 1: break p2, query between the probes (batch 3), where a mixed fit would show
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	mixed = lens.model_copy(
 		update={
 			"probes": [
@@ -879,7 +879,7 @@ def test_no_amd_measurements_on_every_engine_surface(ft):
 
 def test_one_fit_uses_one_estimator():
 	# review, Nov 1: a probe without a step log beside ones with it once mixed the median and mean factors
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	no_log = lens.model_copy(
 		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
 	)
@@ -897,7 +897,7 @@ def test_no_gpu_no_gpu_hours(ft):
 
 
 def test_a_missing_step_log_sends_every_probe_to_the_mean_factor():
-	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	lens = _with_lengths(_lora(), dataset_p50_tokens=200.0, dataset_mean_tokens=260.0)
 	one = lens.model_copy(
 		update={"probes": [q.model_copy(update={"step_log": []}) if q.id == "p2" else q for q in lens.probes]}
 	)
@@ -910,3 +910,141 @@ def test_a_missing_step_log_sends_every_probe_to_the_mean_factor():
 	}
 	f_mean = {p.id: api._length_factor(lens, p, False) for p in lens.probes if p.status in api.OK_PROBE}
 	assert f_one == pytest.approx(f_mean)
+
+
+def test_the_cuda_context_is_measured_not_guessed():
+	# C, Nov 1: a guessed 0.75 GiB on a GRPO probe's reserved peak read 23.8 GB on a 23.7 GB L4 for a run that fit
+	rec = _lora()
+	gaps = [
+		x.device_used_bytes - x.peak_reserved_bytes
+		for p in rec.probes
+		if p.status in api.OK_PROBE
+		for x in p.step_log
+		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
+	]
+	assert api._context_bytes(rec) == pytest.approx(
+		max(gaps)
+	)  # the step that released nothing shows it whole
+	assert api._context_bytes(rec) < api.memory.DEFAULT_CONTEXT_BYTES / 2
+	bare = rec.model_copy(update={"probes": [p.model_copy(update={"step_log": []}) for p in rec.probes]})
+	assert api._context_bytes(bare) == api.memory.DEFAULT_CONTEXT_BYTES
+
+
+def test_every_memory_path_takes_the_measured_context(monkeypatch):
+	rec = _lora()
+	q = {"batch_size": 2, "seq_len": 1024}
+	measured = api.predict(rec, q).root["memory.peak"].point
+	monkeypatch.setattr(api, "_context_bytes", lambda r, gpu=None: float(api.memory.DEFAULT_CONTEXT_BYTES))
+	guessed = api.predict(rec, q).root["memory.peak"].point
+	real = max(
+		x.device_used_bytes - x.peak_reserved_bytes
+		for p in rec.probes
+		if p.status in api.OK_PROBE
+		for x in p.step_log
+		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
+	)
+	assert guessed - measured == pytest.approx(api.memory.DEFAULT_CONTEXT_BYTES - real, rel=0.05)
+
+
+def _with_gaps(rec, gaps_mib, rest=None):
+	"""The LoRA record with its timed steps' context gaps set, in order, to gaps_mib, then `rest` (the first if None)."""
+	rest = gaps_mib[0] if rest is None else rest
+	probes, k = [], 0
+	for p in rec.probes:
+		log = []
+		for x in p.step_log or []:
+			if x.kind == "timed" and x.peak_reserved_bytes:
+				x = x.model_copy(
+					update={
+						"device_used_bytes": x.peak_reserved_bytes
+						+ int((gaps_mib[k] if k < len(gaps_mib) else rest) * 2**20)
+					}
+				)
+				k += 1
+			log.append(x)
+		probes.append(p.model_copy(update={"step_log": log}))
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_the_context_is_the_largest_gap_two_steps_agree_on():
+	# reviews, Nov 1: a release after the peak lowers a step's gap; a co-tenant's spike has no partner
+	rec = _with_gaps(_lora(), [252, 120, -900, 252, 2999, 1500], rest=200)
+	ctx = api._context_bytes(rec) / 2**20
+	assert ctx == pytest.approx(252, abs=0.5)  # not the median (200), not the one-off 1,500 MiB spike
+	assert api._context_bytes(_with_gaps(_lora(), [-50])) == api.memory.DEFAULT_CONTEXT_BYTES  # no usable gap
+
+
+def test_another_gpu_takes_the_guess():
+	rec = _lora()
+	assert api._context_bytes(rec, "H100-SXM-80GB") == api.memory.DEFAULT_CONTEXT_BYTES
+	assert api._context_bytes(rec, api._env_gpu(rec)) < api.memory.DEFAULT_CONTEXT_BYTES
+
+
+def test_every_engine_cost_estimate_carries_its_rate(ft):
+	# contract 0.6.0: quantity x rate, so the browser re-prices at the visitor's rate
+	p = api.predict(ft).root
+	r = p["cost.total"].rate
+	assert r.quantity == "cost.gpu_hours" and r.unit == "gpu_hours" and r.price_row.startswith("gpu/")
+	assert p["cost.total"].point == pytest.approx(p["cost.gpu_hours"].point * r.usd_per_unit)
+	_, jc = api.run_cost(ft) if hasattr(api, "run_cost") else (None, None)
+	if jc is not None and jc.total_usd is not None:
+		assert jc.total_usd.rate.quantity == "job_cost.gpu_hours"
+		assert jc.total_usd.point == pytest.approx(jc.gpu_hours.point * jc.total_usd.rate.usd_per_unit)
+		for line in jc.lines:
+			if line.usd is not None and line.usd.status != "abstain":
+				assert line.usd.rate.price_row == line.price_row
+
+
+def test_money_at_risk_carries_the_same_rate_as_the_total(ft):
+	_, jc = api.run_cost(ft)
+	if jc.at_risk_usd is not None and jc.at_risk_usd.status != "abstain":
+		r = jc.at_risk_usd.rate
+		assert r.quantity == "job_cost.at_risk_gpu_hours" and r.usd_per_unit == jc.total_usd.rate.usd_per_unit
+		assert jc.at_risk_usd.point == pytest.approx(jc.at_risk_gpu_hours.point * r.usd_per_unit)
+
+
+def test_a_stalled_sample_reaches_the_runaway_readout(ag):
+	"""Chiya, Nov 1: the readout counts a stalled run's open tasks up to the worker limit, through predict."""
+	rec = _agent_with(ag, 30)
+	tasks = [
+		t.model_copy(update={"stop_reason": None if i < 24 else "done", "cost_usd": 0.01, "latency_s": 20.0})
+		for i, t in enumerate(rec.agent_sample.tasks)
+	]
+	sample = rec.agent_sample.model_copy(update={"tasks": tasks, "ended": "stalled"})
+	r = api.predict(rec.model_copy(update={"agent_sample": sample})).root["risk.runaway"]
+	assert r.status != "abstain" and "stalled with 24 tasks waiting on a tool" in r.reason
+	# uniform tasks, so no other rule flags any; no worker count before contract 0.6.1: the limit is one
+	plain = api.predict(
+		rec.model_copy(update={"agent_sample": sample.model_copy(update={"ended": None})})
+	).root
+	assert r.point == pytest.approx(plain["risk.runaway"].point + 1 / 30)
+	finished = sample.model_copy(update={"ended": "finished"})
+	assert (
+		"stalled"
+		not in api.predict(rec.model_copy(update={"agent_sample": finished})).root["risk.runaway"].reason
+	)
+
+
+def _grpo_l4():
+	return load_record(
+		(Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/grpo-l4.record.json").read_text()
+	)
+
+
+def test_a_gpu_move_from_the_probes_settings_is_predicted_not_measured():
+	"""Review, Nov 1: the probe's own peak is measured only on the probe's own GPU."""
+	rec = _grpo_l4()
+	here = api.predict(rec).root["memory.peak"]
+	assert here.status == "measured"
+	moved = api.predict(rec, {"gpu_type": "A10"}).root["memory.peak"]
+	assert moved.status != "measured"
+
+
+def test_size_set_terms_keep_their_modelled_values():
+	"""C, Nov 1: a 494M-parameter GRPO model's weights read 9.9 GB when every term was scaled to the peak."""
+	rec = _grpo_l4()
+	p = api.predict(rec).root
+	terms = {k.split(".")[1]: v.point for k, v in p.items() if k.startswith("memory.") and k != "memory.peak"}
+	assert sum(terms.values()) == pytest.approx(p["memory.peak"].point)
+	assert terms["weights"] < 2.5e9 and terms["gradients"] < 2.5e9  # fp32 494M params: about 1.98 GB each
+	assert terms["activations"] > terms["weights"]  # the rest of the measured peak

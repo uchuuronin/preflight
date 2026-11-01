@@ -287,10 +287,17 @@ def runaway_rate_by_cost_and_time(
 	runaway_factor: float = RUNAWAY_FACTOR,
 	time_factor: float = TIME_RUNAWAY_FACTOR,
 	measure: str = "cost",
+	open_ends: list[bool] | None = None,
+	workers: int | None = None,
 ) -> TotalEstimate:
 	"""Share of tasks that run away by cost (or tokens) or by time, with a two-sided Clopper-Pearson interval.
 	Each rule's own count and bound are in `detail` and the reason (Chiya, Oct 31). `values` must be known for
-	every task: agent_totals passes tokens when any task is unpriced, so both rules count the same tasks."""
+	every task: agent_totals passes tokens when any task is unpriced, so both rules count the same tasks.
+
+	`open_ends` marks the tasks a stalled run left waiting on a tool (no stop reason). Each is only possibly stuck,
+	and at most one per worker can be (Chiya, Nov 1): of the open tasks, at most `workers` count as runaways in all,
+	those the other rules already flagged first. With the worker count unknown (before contract 0.6.1), the limit
+	is one, since a stall means at least one task is stuck."""
 	n = len(values)
 	if n < min_sample:
 		return _abstain("probability", f"only {n} tasks measured; run at least {min_sample}", n=n)
@@ -303,6 +310,13 @@ def runaway_rate_by_cost_and_time(
 	either = [a or b for a, b in zip(by_cost, by_time, strict=True)]
 	side = (1 + level) / 2
 	xc, xt, x = sum(by_cost), sum(by_time), sum(either)
+	opens = open_ends or [False] * n
+	opened = sum(opens)
+	flagged_open = sum(o and e for o, e in zip(opens, either, strict=True))
+	cap = workers if workers and workers > 0 else 1
+	# review, Nov 1: open tasks the other rules flagged hold a worker too, so they count against the limit
+	stuck = min(opened - flagged_open, max(0, cap - flagged_open))
+	x += stuck
 
 	def bound(k: int) -> dict:
 		return {"runaways": k, "lo": cp_lower(k, n, side), "hi": cp_upper(k, n, side)}
@@ -312,8 +326,26 @@ def runaway_rate_by_cost_and_time(
 	why = (
 		f"by {measure}: {xc} of {n} (up to {rules['cost']['hi']:.0%}); by time: {xt} of {n} (up to "
 		f"{rules['time']['hi']:.0%}), a task over {time_factor:g}x the median wall time (and {TIME_RUNAWAY_FLOOR_S:g} s) "
-		f"or stopped by the recorder for a timeout, a loop or its call or dollar cap; {pct}% Clopper-Pearson"
+		f"or stopped by the recorder for a timeout, a loop or its call or dollar cap"
 	)
+	if opened:
+		rules["stalled"] = {**bound(stuck), "open": opened, "workers": workers}
+		# review, Nov 1: plain for one task, no run-on clauses, and 0 workers is recorded, not missing
+		if workers is None:
+			limit = "the worker count isn't recorded, and a stall means at least one task is stuck"
+		elif workers > 0:
+			limit = f"at most one per worker ({workers}) can be stuck"
+		else:
+			limit = "the recorded worker count is 0, so the limit is one"
+		waiting = (
+			"1 task waiting on a tool, possibly stuck"
+			if opened == 1
+			else (f"{opened} tasks waiting on a tool, each only possibly stuck")
+		)
+		already = f"; {flagged_open} of them already flagged by the rules above" if flagged_open else ""
+		counted = "1 more counted as a runaway" if stuck == 1 else f"{stuck} more counted as runaways"
+		why += f"; the run stalled with {waiting} ({limit}{already}), so {counted}"
+	why += f"; {pct}% Clopper-Pearson"
 	if not x:
 		why = f"none of {n} sampled tasks ran away; the upper end is what {n} tasks can rule out. {why}"
 	return TotalEstimate(
@@ -361,6 +393,9 @@ def agent_totals(
 	# tasks a what-if cap stopped: the cap bounds them, so their stop isn't the recorder's and isn't a runaway
 	capped = kw.pop("capped_ids", frozenset())
 	priced = all(c is not None for c in costs)
+	# a stalled run (contract 0.6.0) leaves the tasks waiting on a tool with no stop reason: possibly stuck
+	stalled = getattr(sample, "ended", None) == "stalled"
+	open_ends = [stalled and t.stop_reason is None and t.task_id not in capped for t in tasks]
 	out = {
 		"cost.total": _flag(estimate_total(costs, pop, "usd", **kw), topped),
 		"tokens.total": _flag(estimate_total(tokens, pop, "tokens", **kw), topped),
@@ -374,6 +409,8 @@ def agent_totals(
 			runaway_factor=kw.get("runaway_factor", RUNAWAY_FACTOR),
 			time_factor=time_factor,
 			measure="cost" if priced else "tokens",
+			open_ends=open_ends,
+			workers=getattr(sample, "concurrency", None),  # contract 0.6.1: the script's workers
 		),
 	}
 	return out

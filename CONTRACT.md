@@ -1,4 +1,4 @@
-# Preflight contract v0.6.1
+# Preflight contract v0.6.2
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,9 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.2 (Nov 1, additive; C's request, approved by Chiya): `JobRequest.private` (default false). The
+  visitor chose private mode: with `harness.glimmer_private` on, triage runs on Muse Glimmer on
+  Preflight's own GPU (B's Modal host) instead of Muse Spark Open on Baseten. 0.6.1 records load unchanged.
 - 0.6.1 (Nov 1, additive; A's and B's requests, approved by Chiya): `StepSample.reserved_bytes` (the
   allocator's reserved memory read at the same instant as `device_used_bytes`, so their gap is the
   context plus other processes) and `AgentSample.concurrency` (tasks run at once; when `ended` is

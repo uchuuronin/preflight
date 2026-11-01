@@ -21,7 +21,17 @@ from preflight.corpus import validate
 def main(argv: list[str] | None = None) -> int:
 	ap = argparse.ArgumentParser()
 	ap.add_argument("manifest", type=Path)
-	ap.add_argument("--divergence", type=Path, help="the divergence classifier's held-out report (JSON)")
+	ap.add_argument(
+		"--divergence",
+		type=Path,
+		default=Path(__file__).resolve().parents[1]
+		/ "python"
+		/ "preflight"
+		/ "corpus"
+		/ "reports"
+		/ "divergence_nov1.json",
+		help="the divergence classifier's held-out report (JSON); default: the final Nov 1 fit",
+	)
 	ap.add_argument("--out", type=Path)
 	ap.add_argument("--readme", type=Path)
 	args = ap.parse_args(argv)

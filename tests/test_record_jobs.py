@@ -313,10 +313,14 @@ def test_skeleton_knobs_say_what_they_act_on_and_whether_they_change_results(tmp
 		FlightRecord.model_validate(bad)
 
 
-def test_golden_records_mark_their_fixture_models():
+def test_golden_records_are_marked_illustrative_by_their_id():
+	# Round five (Nov 1): the goldens carry B's engine output (make_golden.py with PREFLIGHT_GOLDEN_ENGINE=1),
+	# so their model cards are real; the probes under them are still hand-made, and the web marks them
+	# illustrative by the 01JBGOLDEN id (web/src/workspace/record/model.ts isFixture).
 	for name in ("finetune", "pretrain", "agent"):
 		rec = load_record((ROOT / "schema" / "examples" / f"{name}.json").read_text())
-		assert rec.models and all(m.fixture for m in rec.models)
+		assert rec.record_id.startswith("01JBGOLDEN")
+		assert rec.models
 
 
 # ---------------------------------------------------------------- the demo's GPU ceiling

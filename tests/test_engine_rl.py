@@ -31,8 +31,9 @@ def test_a_prompt_seen_passing_4_of_4_isnt_certain_to_pass_16_of_16():
 	# Jeffreys Beta(4.5, 0.5): E[p^16] exactly, by the Beta-function identity
 	exact = math.exp(math.lgamma(20.5) + math.lgamma(5.0) - math.lgamma(4.5) - math.lgamma(21.0))
 	exact += math.exp(math.lgamma(16.5) + math.lgamma(5.0) - math.lgamma(0.5) - math.lgamma(21.0))
-	assert posterior.point == pytest.approx(exact, rel=1e-9)
-	assert posterior.lo < posterior.point < posterior.hi < 1.0
+	# Nov 1: the point sits between the Jeffreys moment and the measured rates, and the band spans both
+	assert posterior.point == pytest.approx((exact + plug_in) / 2, rel=1e-9)
+	assert posterior.lo <= exact < posterior.point < posterior.hi <= 1.0
 
 
 def test_bigger_groups_waste_fewer_prompts():
@@ -283,3 +284,34 @@ def test_rollout_band_covers_the_gap_between_two_grpo_runs():
 	s2 = rl.LengthSample(mean=131.97, p95=440.0, max=512.0, n=32)
 	iv = rl.rollout_seconds(60.28 / 4, s2, 8, 512, 8, 512)
 	assert iv.lo <= 257.92 / 20 <= iv.hi
+
+
+def test_the_callers_flags_decide_a_fill_and_feature_falls_back_to_features(monkeypatch):
+	"""D, Nov 1: engine.rl in flags.json switched nothing. The runner passes its flag reader now."""
+	rec = _rl_record()
+	monkeypatch.setitem(api.FEATURES, "rl", False)
+	on = api.fill_predictions(rec, flags=lambda k: k == "engine.rl")
+	assert "rl.zero_spread" in on.predictions.estimates
+	off = api.fill_predictions(rec, flags=lambda k: False)
+	assert "rl.zero_spread" not in off.predictions.estimates
+	assert "rl.zero_spread" not in api.fill_predictions(rec).predictions.estimates  # FEATURES again
+	assert api.feature("rl") is False  # the fill's flags don't outlive it
+
+
+def test_every_engine_feature_has_its_key_in_flags_json():
+	import json
+	from pathlib import Path
+
+	flags = json.loads((Path(__file__).resolve().parents[1] / "flags.json").read_text())
+	assert set(api.FLAG_OF) == set(api.FEATURES)
+	for name, key in api.FLAG_OF.items():
+		assert key in flags, key
+		assert flags[key] == api.FEATURES[name], f"{key}: flags.json and FEATURES disagree"
+	engine_keys = {k for k in flags if k.startswith("engine.")}
+	assert engine_keys == {
+		*api.FLAG_OF.values(),
+		"engine.memory",
+	}  # engine.memory: the runner's gate on every fill
+	prod = json.loads((Path(__file__).resolve().parents[1] / "flags.production.json").read_text())
+	# review, Nov 1: a production override can only name a key the engine reads
+	assert {k for k in prod if k.startswith("engine.")} <= engine_keys

@@ -88,7 +88,7 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 						) : timed ? (
 							<div className="pf-cal__slots">
 								{/* One track per slot the lane holds, so runs going at once sit on their own rows. */}
-								{slotsOf(r.cells).map((slot, i) => (
+								{slotsOf(r.cells, plan.lane_slots?.[r.lane] ?? 1).map((slot, i) => (
 									<div key={i} className="pf-cal__track" role="list">
 										{slot.map((c) => (
 											<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
