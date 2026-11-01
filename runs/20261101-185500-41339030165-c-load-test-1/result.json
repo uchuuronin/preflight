@@ -1,0 +1,11 @@
+{
+	"name": "20261101-185500-41339030165-c-load-test-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41339030165",
+	"ref": "main",
+	"sha": "6757667ef871317e2f9a26c215db00b5228d125b",
+	"cmd": "modal run --env main api/load_test_app.py::load --visitors 20 --guided 5",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T18:56:20Z"
+}
