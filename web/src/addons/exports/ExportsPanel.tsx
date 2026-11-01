@@ -1,14 +1,13 @@
 /**
- * Exports: a band under the cockpit's whole run with the plan, the edits, a Slurm batch file,
- * the command and the record's link, each to copy or download. Everything is built by build.ts
- * from what C's registry passes in (record, knobs, estimates at the current settings).
+ * Exports: in C's "Take it with you" section, the plan, the edits, a Slurm batch file, the
+ * command and the record's link, each to copy or download. build.ts formats C's ExportPlan
+ * (the settings on screen and the cockpit's own estimates) and computes no number of its own.
  */
-import { useEffect, useId, useRef, useState } from "react";
-import { href, useRoute } from "../../app/route";
+import { useEffect, useRef, useState } from "react";
 import { flag } from "../../lib/flags";
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
-import type { WorkspaceContextValue } from "../../registry";
+import type { ExportPlan, WorkspaceContextValue } from "../../registry";
 import { isFixture } from "../../workspace/record/model";
 import { askedTime, canRecheck, changes, commandText, configText, editsText, type ExportInput, gpu, isApi, recheckText, sbatchText } from "./build";
 import { CLI_FLAG } from "./flags";
@@ -36,9 +35,7 @@ function save(text: string, file: string, type: string): boolean {
 	return true;
 }
 
-export function ExportsPanel({ record, knobs, estimates }: WorkspaceContextValue) {
-	const route = useRoute();
-	const headingId = useId();
+export function ExportsPanel({ record, plan }: WorkspaceContextValue & { plan: ExportPlan }) {
 	const [said, setSaid] = useState("");
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(() => () => {
@@ -50,17 +47,15 @@ export function ExportsPanel({ record, knobs, estimates }: WorkspaceContextValue
 		if (timer.current) clearTimeout(timer.current);
 		timer.current = setTimeout(() => setSaid(text), 60);
 	}
-	const ref = (route.screen === "cockpit" && route.param) || record.share_token;
-	const link = `${window.location.origin}${window.location.pathname}${href("cockpit", ref)}`;
 	const illustrative = isFixture(record);
-	const input: ExportInput = { record, knobs, estimates, link, illustrative };
+	const input: ExportInput = { plan, record, illustrative };
 
 	const cs = changes(input);
 	const tally = (how: string) => cs.filter((c) => c.how === how).length;
 	const g = gpu(input);
 	const gpus = `${g.count} x ${g.name ?? "GPU"}`;
 	const asked = askedTime(input);
-	const api = isApi(record);
+	const api = isApi(input);
 
 	const items: Item[] = [
 		{
@@ -107,7 +102,7 @@ export function ExportsPanel({ record, knobs, estimates }: WorkspaceContextValue
 			file: null,
 			type: "text/plain",
 		},
-		...(flag(CLI_FLAG) && canRecheck(record)
+		...(flag(CLI_FLAG) && canRecheck(input)
 			? [
 					{
 						id: "recheck",
@@ -119,14 +114,18 @@ export function ExportsPanel({ record, knobs, estimates }: WorkspaceContextValue
 					},
 				]
 			: []),
-		{
-			id: "link",
-			name: t("addon.exports.link.name"),
-			say: t("addon.exports.link.say"),
-			text: link,
-			file: null,
-			type: "text/plain",
-		},
+		...(plan.shareUrl
+			? [
+					{
+						id: "link",
+						name: t("addon.exports.link.name"),
+						say: t("addon.exports.link.say"),
+						text: plan.shareUrl,
+						file: null,
+						type: "text/plain",
+					},
+				]
+			: []),
 	];
 
 	async function copy(item: Item): Promise<void> {
@@ -138,17 +137,15 @@ export function ExportsPanel({ record, knobs, estimates }: WorkspaceContextValue
 		}
 	}
 
-	const patches = record.patches ?? [];
+	const patches = plan.patches;
 
 	return (
-		<section className="pf-addon-exports" aria-labelledby={headingId}>
-			<h2 className="pf-addon-exports__title" id={headingId}>
-				{t("addon.exports.title")}
-			</h2>
+		<div className="pf-addon-exports">
 			<p className="pf-addon-exports__lede">
 				{t("addon.exports.lede")}
 				{illustrative ? ` ${t("addon.exports.illustrative")}` : ""}
 			</p>
+			{plan.codeChangesVerified ? null : <p className="pf-addon-exports__unverified">{t("addon.exports.not_verified")}</p>}
 			<ul className="pf-addon-exports__items">
 				{items.map((item) => (
 					<li key={item.id} className="pf-addon-exports__item">
@@ -196,6 +193,6 @@ export function ExportsPanel({ record, knobs, estimates }: WorkspaceContextValue
 			<p className="pf-visually-hidden" role="status" aria-live="polite">
 				{said}
 			</p>
-		</section>
+		</div>
 	);
 }

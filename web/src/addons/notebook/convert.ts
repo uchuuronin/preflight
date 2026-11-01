@@ -11,7 +11,7 @@
  * sent (A never reads them; they can be megabytes and can hold data), and the file name is
  * cleaned to what A accepts (a browser's "train (1).ipynb" otherwise fails A's path rule).
  */
-import { MAX_TOTAL_BYTES as CHECKIN_FILE_BYTES } from "../../app/upload";
+import { MAX_TOTAL_BYTES as CHECKIN_FILE_BYTES, checkinBytes } from "../../app/upload";
 
 /** A's per-file cap, after conversion [cited: upload-format.md, probes/local.py MAX_FILE_BYTES]. */
 export const MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -246,7 +246,7 @@ export function prepareNotebook(name: string, text: string): Prepared {
 		const sent = stripped(nb);
 		// Measured as C's desk measures a handed source: the whole source as JSON, escapes included.
 		const source: NotebookSource = { kind: "notebook", files: { [safe]: sent } };
-		if (utf8(JSON.stringify(source)) > CHECKIN_BYTES) return { ok: false, error: "too_big" };
+		if (checkinBytes(source) > CHECKIN_BYTES) return { ok: false, error: "too_big" };
 		return {
 			ok: true,
 			source,
