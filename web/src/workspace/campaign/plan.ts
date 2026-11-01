@@ -121,13 +121,21 @@ function abstain(why: string, unit: string, modelId: string): Estimate {
  * record's reason or a plain one), a total the record lacks says so, and per-run costs appear only
  * as the intervals 0.6.0 adds (a bare point would read as exact).
  */
-export function planFromRecord(c: Campaign, models: readonly ModelCard[] = []): CampaignPlan | null {
+export function planFromRecord(c: Campaign, models: readonly ModelCard[] = [], price: (knobs: Record<string, string | number | boolean>) => number = () => 1): CampaignPlan | null {
 	const cells = c.cells ?? [];
 	if (!cells.length) return null;
 	const ext = c as Campaign & Campaign06;
 	const modelId = c.finish_s?.model_id ?? cells.find((x) => x.time)?.time?.model_id ?? "campaign";
 	const card = models.find((m) => m.id === modelId);
 	const missing = (unit: string) => abstain("not in this record", unit, modelId);
+	// The visitor's rate, where they set one (workspace/rate.ts): each run's dollars at its own setting,
+	// the totals at the record's (a grid over batch and length keeps the GPU, so one rate).
+	const usdAt = (e: Estimate | null | undefined, f: number): Estimate | null => {
+		if (!e || f === 1 || e.unit !== "usd") return e ?? null;
+		const m = (v: number | null | undefined) => (typeof v === "number" ? v * f : (v ?? null));
+		return { ...e, point: m(e.point), lo: m(e.lo), hi: m(e.hi) } as Estimate;
+	};
+	const fAll = price({});
 	return {
 		cells: cells.map((x: CampaignCell) => {
 			const e = x as CampaignCell & Cell06;
@@ -136,7 +144,7 @@ export function planFromRecord(c: Campaign, models: readonly ModelCard[] = []): 
 				knobs: Object.fromEntries(Object.entries(x.knobs).filter((kv): kv is [string, string | number | boolean] => kv[1] !== undefined)),
 				time: (x.time as Estimate | null | undefined) ?? abstain("no run time in this record", "s", modelId),
 				gpu_hours: e.gpu_hours_estimate ?? null,
-				usd: e.usd_estimate ?? null,
+				usd: usdAt(e.usd_estimate, price(Object.fromEntries(Object.entries(x.knobs).filter((kv): kv is [string, string | number | boolean] => kv[1] !== undefined)))),
 				segments: x.segments ?? null,
 				lane: x.lane ?? null,
 				cut: x.cut ?? false,
@@ -146,7 +154,7 @@ export function planFromRecord(c: Campaign, models: readonly ModelCard[] = []): 
 			};
 		}),
 		gpu_hours: (c.gpu_hours as Estimate | null | undefined) ?? missing("gpu_hours"),
-		usd: (c.usd as Estimate | null | undefined) ?? missing("usd"),
+		usd: usdAt(c.usd as Estimate | null | undefined, fAll) ?? missing("usd"),
 		finish_s: (c.finish_s as Estimate | null | undefined) ?? missing("s"),
 		completion: Object.fromEntries(Object.entries(c.completion_quantiles ?? {}).filter((kv): kv is [string, string] => typeof kv[1] === "string")),
 		p_by_deadline: ext.p_by_deadline ?? null,
@@ -161,7 +169,7 @@ export function planFromRecord(c: Campaign, models: readonly ModelCard[] = []): 
 		cut_list: c.cut_list ?? [],
 		notes: c.notes ?? [],
 		grid_gpu_hours: (c.grid_gpu_hours as Estimate | null | undefined) ?? null,
-		grid_usd: (c.grid_usd as Estimate | null | undefined) ?? null,
+		grid_usd: usdAt(c.grid_usd as Estimate | null | undefined, fAll),
 		card: { id: modelId, notes: card?.notes ?? null },
 	};
 }

@@ -130,12 +130,13 @@ export function fmt(value: number | null | undefined, unit: Unit | string = "non
 		}
 		case "usd_small": {
 			const v = value * currency.rate;
-			// Under a dollar, two significant figures (a cent's fraction still reads); from a dollar, as "usd".
-			const small = Math.abs(v) > 0 && Math.abs(v) < 1;
+			// Under ten cents, two significant figures (a cent's fraction still reads: "US$0.0042"); from
+			// there, cents ("US$0.80"), as "usd" does from a dollar.
+			const tiny = Math.abs(v) > 0 && Math.abs(v) < 0.1;
 			return new Intl.NumberFormat(locale(), {
 				style: "currency",
 				currency: currency.code,
-				...(small ? { maximumSignificantDigits: 2 } : { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 }),
+				...(tiny ? { maximumSignificantDigits: 2 } : { minimumFractionDigits: Math.abs(v) < 10 ? 2 : 0, maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 }),
 			}).format(v);
 		}
 		case "tokens":

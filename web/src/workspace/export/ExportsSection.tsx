@@ -21,7 +21,7 @@ export function ExportsSection() {
 	const panels = useExportsPanels(record.job.lens);
 	const on = flag("c.exports");
 	// A sample's ref is its id and a real record's is its share token: either opens it read-only.
-	const plan = useMemo(() => (on ? exportPlan(record, state.knobs, estimates, recordRef || null, appBase()) : null), [on, record, state.knobs, estimates, recordRef]);
+	const plan = useMemo(() => (on ? exportPlan(record, state.knobs, estimates, recordRef || null, appBase(), state.rate) : null), [on, record, state.knobs, estimates, recordRef, state.rate]);
 	if (!plan) return null;
 	return (
 		<section className="pf-below pf-exports" aria-label={t("exports.label")}>

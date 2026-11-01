@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { finishBand, planFromRecord } from "../workspace/campaign/plan";
+import { currentKnobs } from "../workspace/record/model";
+import { rateFactor } from "../workspace/rate";
 import { fmt, fmtDelta, fmtRange } from "../lib/fmt";
 import { wilson } from "../addons/_stats/wilson";
 import { rlProbe, spreadCount } from "../workspace/rl";
@@ -72,7 +74,11 @@ export function GuidePanel() {
 	const live = flag("c.guide.live") && !fallback;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 	// The campaign plan the cockpit draws (same flag, same record), so the tour walks what's on screen.
-	const campaign = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
+	const campaign = useMemo(
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k) => rateFactor(record, { ...currentKnobs(record), ...k }, state.rate)) : null),
+		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
+		[record, state.rate],
+	);
 
 	const latest = useRef(ws);
 	latest.current = ws;

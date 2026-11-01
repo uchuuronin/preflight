@@ -29,6 +29,7 @@ export function fakeActions(pinned = new Set<string>()) {
 		reset: vi.fn(),
 		setLimits: vi.fn(),
 		decline: vi.fn(),
+		setRate: vi.fn(),
 	};
 	return { actions, moves, trace, pinned };
 }

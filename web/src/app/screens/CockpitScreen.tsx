@@ -16,9 +16,12 @@ import { usePanels } from "../../registry";
 import { ExportsSection } from "../../workspace/export/ExportsSection";
 import { CampaignCalendar } from "../../workspace/campaign/Calendar";
 import { planFromRecord } from "../../workspace/campaign/plan";
+import { currentKnobs } from "../../workspace/record/model";
+import { rateFactor } from "../../workspace/rate";
 import { Onboarding } from "../Onboarding";
 import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
 import { RlBand } from "../../workspace/cockpit/RlBand";
+import { CostLine } from "../../workspace/cockpit/CostLine";
 import { CostFrontier } from "../../workspace/cockpit/CostFrontier";
 import { FitMap } from "../../workspace/cockpit/FitMap";
 import { flag } from "../../lib/flags";
@@ -99,7 +102,11 @@ function Cockpit() {
 	const fit = canFit && view === "fit";
 	const line = statusLine(record, estimates, state.knobs);
 	// A record that carries a campaign (B's to_campaign) draws its calendar; behind its flag.
-	const campaign = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
+	const campaign = useMemo(
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k) => rateFactor(record, { ...currentKnobs(record), ...k }, state.rate)) : null),
+		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
+		[record, state.rate],
+	);
 	const mapKey = (
 		<Info label={t("map.label")} align="start">
 			<span className="pf-map-key">
@@ -140,6 +147,7 @@ function Cockpit() {
 						<p className={`pf-statusline is-${line.tone}`} aria-live="polite">
 							{line.text}
 						</p>
+						<CostLine />
 						<ProbeHere />
 					</header>
 					<div className={`pf-deck${fit ? " is-fit" : ""}`}>
