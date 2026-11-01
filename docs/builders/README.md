@@ -19,12 +19,12 @@ hesitates or gets stuck; every one of those places becomes an onboarding fix.
   Notebook tab is off (`d.notebook` isn't in production), so a builder with a notebook downloads it
   as a `.py` and uploads that. Checked on a local build with the production flags, Nov 1: the
   check-in desk shows exactly two tabs, Repo link and Upload.
-- **Demo limits, on `main` but not yet in the deployed runner** (A's last logged deploy, `8154268`
-  at 13:04 ET, predates them): 3 probe jobs per visitor per day, and a daily GPU spend cap for the
-  whole site, $10 a day through Nov 4 [cited: `python/preflight/runner/queue.py`]. Once deployed,
-  a builder past either sees "samples only until midnight ET"; when jobs in flight hold the day's
-  budget, the desk says the GPUs are busy and to retry in about 2 minutes. Either is outside the
-  builder's control: note it word for word and go on with a sample.
+- **Demo limits:** 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site,
+  $10 a day through Nov 4 [cited: `python/preflight/runner/queue.py`]. A's status reports them
+  deployed (`a-deploy-main-19`, 20:20 UTC Nov 1). A builder past either sees "samples only until
+  midnight ET"; when jobs in flight hold the day's budget, the desk says the GPUs are busy and to
+  retry in about 2 minutes. Either is outside the builder's control: note it word for word and
+  go on with a sample.
 - **Cost:** about $0.20 a check-in, a lower bound [derived: one measured run, Oct 28, A's status
   file: $0.086 of GPU and $0.018 of Muse Spark [measured], plus about $0.10 of sandbox CPU and
   memory [guess]]. The GPU cap counts the GPU only; the live guide has its own daily cap. One
@@ -43,8 +43,9 @@ hesitates or gets stuck; every one of those places becomes an onboarding fix.
   notebook downloaded as `.py` works), up to 5 MB, loading data from Hugging Face. No keys or
   passwords in the code.
 - Open the link once yourself and check that the home page loads and New flight shows the desk.
-- Check whether A's runner redeploy with the demo limits has gone out (`docs/status/a.md`); if
-  not, the builder isn't limited, so watch that they don't run more than about 3 check-ins.
+- A's status reports the demo limits deployed at 20:20 UTC (`docs/status/a.md`), but A hasn't
+  confirmed it yet: watch that the builder runs no more than about 3 check-ins, and if a 4th gets
+  through, note it as a bug.
 
 ## During the session
 

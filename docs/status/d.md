@@ -8,6 +8,26 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 18:20 (round six merged)
+
+`b43c386` CI green. Merged `main` `50db9b6` (round six; a fast-forward, since `main` already held
+`ws-d`). On it: add-on tests 251 of 251, typecheck clean, worker tests 18 of 18, hero card up to
+date, ruff clean on the GNN script [measured].
+
+- **Limits sentence:** the TODO(PM) stays (Chiya, 18:11) until A confirms. A's status already
+  reports the redeploy with the limits (`a-deploy-main-19`, 20:20 UTC, from `ws-a` `d73b4e1`,
+  which contains `9a2bb82` and `5a78a60`); the TODO now says so, so the PM can check it at the
+  8 PM swap. The builder kit's two limits lines say the same, as A's report, and keep the "watch
+  for more than 3 check-ins" fallback until A confirms.
+- **Triage shot:** that redeploy also has A's fix `b300684` (triage reads the probe's recorded
+  error), so A's re-run of the production LoRA triage can now quote the OOM line. No re-run is
+  posted yet.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the TODO wording, the kit's two limits lines and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 16:05 (the corpus on Hugging Face, linked)
 
 `ca58c59` CI green.

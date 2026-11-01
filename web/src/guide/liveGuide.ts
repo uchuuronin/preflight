@@ -14,7 +14,7 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
-import { bestCombo, singleClears } from "./combos";
+import { beat, bestCombo, bestSingleRisk, singleClears } from "./combos";
 import { breaksLimit, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } from "./limits";
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
@@ -83,7 +83,7 @@ export type ToolOut =
 				fit: "fits" | "tight";
 			}>;
 			/** No single knob clears the failure; this setting does, together (combos.ts). */
-			combined?: { knobs: Record<string, KnobValue>; risk: number; peak_bytes: number | null };
+			combined?: { knobs: Record<string, KnobValue>; risk: number; peak_bytes: number | null; fit: "fits" | "tight" };
 	  }
 	| {
 			tool: "set_knob";
@@ -189,12 +189,12 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 			const lim = withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned });
 			const combo =
 				failing && !singleClears(record, provider, { kind }, lim)
-					? bestCombo(record, provider, knobs, { kind }, { pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}), ...(ctx.combosDeclined ? { visited: ctx.combosDeclined } : {}) })
+					? bestCombo(record, provider, knobs, { kind }, { ...beat(bestSingleRisk(record, provider, { kind }, lim)), pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}), ...(ctx.combosDeclined ? { visited: ctx.combosDeclined } : {}) })
 					: null;
 			return {
 				tool: "sensitivity",
 				call_id: call.call_id,
-				...(combo ? { combined: { knobs: Object.fromEntries(combo.changes.map((c) => [c.knobId, c.to])), risk: combo.risk, peak_bytes: combo.peak } } : {}),
+				...(combo ? { combined: { knobs: Object.fromEntries(combo.changes.map((c) => [c.knobId, c.to])), risk: combo.risk, peak_bytes: combo.peak, fit: combo.fit } } : {}),
 				ranked: moves.map((m) => {
 					const from = knobs[m.knobId];
 					const direction: "increase" | "decrease" | "change" =
@@ -266,7 +266,7 @@ export function traceText(out: ToolOut): string {
 			return (
 				[
 					out.ranked.map((r) => `${r.knob_id}→${String(r.best_value)}${r.fit === "tight" ? " (tight)" : ""}`).join(", "),
-					out.combined ? `together: ${Object.entries(out.combined.knobs).map(([k, v]) => `${k}→${String(v)}`).join(" + ")} (fits)` : "",
+					out.combined ? `together: ${Object.entries(out.combined.knobs).map(([k, v]) => `${k}→${String(v)}`).join(" + ")} (${out.combined.fit})` : "",
 				]
 					.filter(Boolean)
 					.join("; ") || "nothing improves the aim"

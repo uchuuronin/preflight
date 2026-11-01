@@ -11,19 +11,19 @@ const dev = normaliseRecord(devRaw as unknown as FlightRecord);
 
 /**
  * The live LoRA record's shape (Nov 1): at eval batch 32 the eval runs out; eval batch 4 alone
- * still leaves training too big at seq 1,024; eval batch 4 with seq 512 fits. B's multi-axis grid
- * covers eval_batch_size x seq_len with eval_no_grad held true.
+ * still leaves training too big at seq 1,024; eval batch 4 with seq 512 fits. B's pair grid covers
+ * eval_batch_size x seq_len with every other knob held where it is.
  */
 function lora(): LoadedRecord {
 	const grid = (target_id: string) => ({
-		id: `g.${target_id}.eval_batch_size+seq_len`,
+		id: `g.${target_id}.eval_batch_size+seq_len.clears`,
 		target_id,
 		unit: target_id === "memory.peak" ? "bytes" : "probability",
 		axes: [
 			{ knob_id: "eval_batch_size", values: [4, 8, 32], scale: "log" },
 			{ knob_id: "seq_len", values: [512, 1024], scale: "log" },
 		],
-		fixed: { eval_no_grad: true },
+		fixed: { eval_no_grad: false },
 		model_id: "memory-analytical@test",
 	});
 	return { ...dev, predictions: { ...dev.predictions, grids: [grid("memory.peak"), grid("risk.oom")] } } as unknown as LoadedRecord;
@@ -51,19 +51,19 @@ const fake: PredictionProvider = {
 };
 
 describe("combined moves", () => {
-	it("finds the fewest knobs that clear the failure together, holding the grid's fixed knobs", () => {
+	it("finds the knobs that clear the failure together", () => {
 		const r = lora();
 		const c = bestCombo(r, fake, currentKnobs(r), { kind: "min_cost" });
 		expect(c).not.toBeNull();
 		const set = Object.fromEntries(c!.changes.map((x) => [x.knobId, x.to]));
-		// eval_no_grad comes from the grid's fixed values: it is part of the setting it predicts.
-		expect(set).toMatchObject({ seq_len: 512, eval_no_grad: true });
+		expect(set).toEqual({ eval_batch_size: 4, seq_len: 512 });
 		expect(c!.risk).toBeLessThan(0.01);
+		expect(c!.fit).toBe("fits");
 		expect(c!.peak).toBeLessThan(22 * GIB);
 		// Words in the grid's order (its axes, then what it holds), and a knob named as not
 		// enough alone only because its own change was predicted not to clear.
 		const ids = c!.changes.map((x) => x.knobId);
-		const order = ["eval_batch_size", "seq_len", "eval_no_grad"];
+		const order = ["eval_batch_size", "seq_len"];
 		expect(ids).toEqual([...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
 		expect(c!.alone).not.toBeNull();
 		expect(fake.predict(r, { ...currentKnobs(r), [c!.alone!]: c!.changes.find((x) => x.knobId === c!.alone)!.to })["risk.oom"]!.point).toBeGreaterThanOrEqual(0.01);
@@ -80,9 +80,34 @@ describe("combined moves", () => {
 		expect(again.combo ? comboVisit(again.combo) : "").not.toBe(comboVisit(step.combo!));
 	});
 
+	it("skips a pair grid once the visitor has moved a knob it holds", () => {
+		const r = lora();
+		expect(bestCombo(r, fake, { ...currentKnobs(r), eval_no_grad: true }, { kind: "min_cost" })).toBeNull();
+	});
+
+	it("offers a tight combination only when it beats the best single move", () => {
+		const r = lora();
+		const near: PredictionProvider = {
+			...fake,
+			predict(rec, knobs) {
+				const out = fake.predict(rec, knobs);
+				const p = out["risk.oom"]!;
+				return { ...out, "risk.oom": { ...p, point: p.point! < 0.01 ? 0.03 : p.point } } as Prediction;
+			},
+		};
+		expect(bestCombo(r, near, currentKnobs(r), { kind: "min_cost" }, { below: 0.02 })).toBeNull();
+		expect(bestCombo(r, near, currentKnobs(r), { kind: "min_cost" }, { below: 0.04 })?.fit).toBe("tight");
+	});
+
 	it("never changes a pinned knob", () => {
 		const r = lora();
 		expect(bestCombo(r, fake, currentKnobs(r), { kind: "min_cost" }, { pinned: new Set(["seq_len"]) })).toBeNull();
+	});
+
+	it("reads only B's pair grids, not a record's own multi-axis grids", () => {
+		const r = lora();
+		const own = { ...r, predictions: { ...r.predictions, grids: r.predictions.grids.map((g) => ({ ...g, id: g.id.replace(/\.clears$/, "") })) } } as LoadedRecord;
+		expect(bestCombo(own, fake, currentKnobs(own), { kind: "min_cost" })).toBeNull();
 	});
 
 	it("offers nothing without a multi-axis grid", () => {
@@ -99,6 +124,23 @@ describe("the live guide hears about a combined move", () => {
 		const f = fakeActions();
 		const ctx = { record: r, provider: fake, actions: f.actions, knobs: currentKnobs(r), pinned: new Set<string>(), requestApproval: () => {} };
 		const out = runBrowserCall({ call_id: "s", name: "sensitivity", arguments: { objective: "min_cost" }, runs_in: "browser" }, ctx, false);
-		expect(out.tool === "sensitivity" && out.combined?.knobs).toMatchObject({ seq_len: 512, eval_no_grad: true });
+		expect(out.tool === "sensitivity" && out.combined).toMatchObject({ knobs: { eval_batch_size: 4, seq_len: 512 }, fit: "fits" });
+	});
+});
+
+describe("a combination B's pair grid clears only to 'unlikely' (P at most 0.05)", () => {
+	it("is offered as tight, to measure first", () => {
+		const r = lora();
+		const near: PredictionProvider = {
+			...fake,
+			predict(rec, knobs) {
+				const out = fake.predict(rec, knobs);
+				const p = out["risk.oom"]!;
+				return { ...out, "risk.oom": { ...p, point: p.point! < 0.01 ? 0.03 : p.point } } as Prediction;
+			},
+		};
+		const c = bestCombo(r, near, currentKnobs(r), { kind: "min_cost" });
+		expect(c?.fit).toBe("tight");
+		expect(c?.risk).toBeCloseTo(0.03);
 	});
 });

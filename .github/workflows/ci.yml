@@ -126,11 +126,7 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
           npm run stranger
 
-  # D's Pages Functions (share pages, cards, badges). The fonts are .bin files, which .gitignore
-  # keeps out of the repo, so `vendor` copies them (and resvg) from the pinned node_modules first;
-  # without it the card tests can't load a font on a clean machine. `vendor` also reads one licence
-  # from web/node_modules, so web's packages are installed too; the diff check fails if the
-  # committed vendored files no longer match what the pinned packages give.
+  # D's Pages Functions (share pages, cards, badges), with their committed fonts (OFL 1.1).
   workers:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -141,10 +137,7 @@ jobs:
           node-version: "22"
       - working-directory: workers
         run: |
-          npm ci --no-audit --no-fund --prefix ../web
           npm ci --no-audit --no-fund
-          npm run vendor
-          git diff --exit-code -- functions/_card
           npm test
           npm run typecheck
           npm run hero-cards:check
