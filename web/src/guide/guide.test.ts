@@ -7,7 +7,7 @@ import { currentKnobs, knobChoices, targetFor } from "../workspace/record/model"
 import { type FlightRecord, type KnobValue, normaliseRecord } from "../workspace/record/types";
 import type { TraceEntry } from "../workspace/state";
 import { guardSetKnob, runBrowserCall } from "./liveGuide";
-import { findingVisit, nextStep, SAMPLE_VISIT } from "./ruleTour";
+import { findingVisit, nextStep, nodesForKnob, SAMPLE_VISIT } from "./ruleTour";
 import { fakeActions } from "./testkit";
 import { buildTools, executeTool, runTool, type ToolContext } from "./tools";
 
@@ -229,5 +229,18 @@ describe("the agent tour on A's measured run (Oct 31)", () => {
 		const c = ctx(real, new Set(["concurrency"]));
 		expect(executeTool("set_knob", { knob_id: "concurrency", value: 8, why: "x" }, c).ok).toBe(false);
 		expect(buildTools(real, new Set(["concurrency"])).find((x) => x.name === "set_knob")?.parameters.properties).toBeTruthy();
+	});
+});
+
+describe("the nodes a knob lights", () => {
+	it("reads the record's own affects first and keeps only nodes on its map", () => {
+		const nodes = dev.graph.nodes.map((n) => n.id);
+		const [first, second] = nodes.filter((n) => n !== "eval");
+		const record = { ...dev, knobs: dev.knobs.map((k) => (k.id === "eval_batch_size" ? { ...k, affects: [second, "not_on_this_map", first] } : k)) };
+		const lit = nodesForKnob(record as typeof dev, "eval_batch_size");
+		expect(lit.slice(0, 2)).toEqual([second, first]);
+		expect(lit).not.toContain("not_on_this_map");
+		// The table still fills in for what the record leaves out.
+		expect(lit).toContain("eval");
 	});
 });

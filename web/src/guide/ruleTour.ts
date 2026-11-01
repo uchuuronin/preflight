@@ -13,8 +13,9 @@ import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/r
 import { type Limits, NO_LIMITS, withinLimits } from "./limits";
 
 /**
- * Map nodes a knob acts on, by knob id. Requested as knobs[].affects (docs/requests.md);
- * until A's records carry it, this table and the record's findings decide.
+ * Map nodes a knob acts on, by knob id, for records from before A's `knobs[].affects`
+ * (harness/knob_meta.py). A record's own `affects` comes first; this table and the record's
+ * findings fill in.
  */
 const KNOB_NODES: Record<string, string[]> = {
 	eval_batch_size: ["eval"],
@@ -104,9 +105,10 @@ export function changesResults(knobId: string, record?: LoadedRecord): boolean {
 }
 
 export function nodesForKnob(record: LoadedRecord, knobId: string): string[] {
+	const fromRecord = record.knobs.find((k) => k.id === knobId)?.affects ?? [];
 	const fromFindings = record.findings.filter((f) => f.knob_id === knobId && f.node_id).map((f) => f.node_id as string);
 	const known = new Set(record.graph.nodes.map((n) => n.id));
-	return [...new Set([...fromFindings, ...(KNOB_NODES[knobId] ?? [])])].filter((n) => known.has(n));
+	return [...new Set([...fromRecord, ...fromFindings, ...(KNOB_NODES[knobId] ?? [])])].filter((n) => known.has(n));
 }
 
 export interface TourStep {
