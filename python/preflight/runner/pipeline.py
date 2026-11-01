@@ -356,7 +356,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			rec = rec.model_copy(update=update)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message="skeleton from the static reader")
-		if deps.spark is not None and not followup:  # a follow-up asks for a measurement, not a map
+		from .flags import flag
+
+		# the job's code goes to Muse Spark only with harness.spark_script_map on: the data-use notice
+		# discloses it under that flag, so the key being set is not enough (D's review, Chiya, Nov 1)
+		if deps.spark is not None and not followup and flag("harness.spark_script_map"):
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:

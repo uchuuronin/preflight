@@ -343,7 +343,41 @@ def test_cache_hits_carry_this_points_labels_not_the_cached_runs(tmp_path):
 	assert rec.probes[1].knobs == {"batch_size": 4, "seq_len": 64}
 
 
-def test_the_records_model_calls_count_in_its_cost(tmp_path):
+@pytest.fixture
+def spark_map_flag(monkeypatch):
+	"""harness.spark_script_map on (off by default), restored for the tests after."""
+	from preflight.runner import flags
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_script_map": True}))
+	flags.reload()
+	yield
+	monkeypatch.delenv("PREFLIGHT_FLAGS")
+	flags.reload()
+
+
+@pytest.mark.parametrize("on", [False, True])
+def test_job_code_goes_to_muse_spark_only_with_the_script_map_flag(tmp_path, monkeypatch, on):
+	import preflight.runner.pipeline as pl
+	from preflight.runner import flags
+
+	sent = []
+
+	def fake_map(files, *, entrypoint, client):
+		sent.append(sorted(files))
+		return pl.map_static(files, entrypoint=entrypoint), []
+
+	monkeypatch.setattr(pl, "map_script", fake_map)
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_script_map": on}))
+	flags.reload()
+	try:
+		run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(),
+			deps(tmp_path, FakeRunner(), spark=object()))  # a client is there, as when the Meta key is set  # fmt: skip
+	finally:
+		flags.reload()
+	assert sent == ([["train.py"]] if on else [])
+
+
+def test_the_records_model_calls_count_in_its_cost(tmp_path, spark_map_flag):
 	import preflight.runner.pipeline as pl
 	from preflight.schema import ModelCall
 
