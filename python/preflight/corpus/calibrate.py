@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import replace
@@ -33,6 +34,7 @@ LENS = {
 	"gnn": "gnn",
 	"hf_lora": "finetune",
 }
+_SUFFIX = re.compile(r"(\s*\(\d+ scores, holdout [^)]*\))+$")  # the suffix main() appends
 
 
 def _transformer(p: dict[str, Any], family: str) -> tuple[TransformerArch, TrainingSetup, int, int]:
@@ -477,7 +479,8 @@ def main(argv: list[str] | None = None) -> int:
 	table, report = build(
 		scores,
 		holdout,
-		built_from=f"{args.built_from or args.store} ({len(scores)} scores, holdout {', '.join(holdout) or 'none'})",
+		# review, Nov 1: an old table's text passed back in keeps one suffix, not two
+		built_from=f"{_SUFFIX.sub('', args.built_from or str(args.store))} ({len(scores)} scores, holdout {', '.join(holdout) or 'none'})",
 	)
 	print(report)
 	cal_rows = [r for r in rows if not held_out(r.get("gpu"), holdout)]

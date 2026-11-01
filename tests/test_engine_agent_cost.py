@@ -315,8 +315,9 @@ def test_fewer_open_tasks_than_workers_counts_them_all_and_flagged_ones_once():
 	s = _stalled(3, 27, 2)
 	s.tasks[0] = s.tasks[0].model_copy(update={"latency_s": 900.0})  # open, and over 8x the median wall time
 	r = ac.agent_totals(s)["risk.runaway"]
-	assert r.detail["by_rule"]["time"]["runaways"] == 1 and r.detail["by_rule"]["stalled"]["runaways"] == 2
-	assert r.point == pytest.approx(3 / 30)
+	# review, Nov 1: the flagged open task holds one of the 2 workers, so only 1 more counts
+	assert r.detail["by_rule"]["time"]["runaways"] == 1 and r.detail["by_rule"]["stalled"]["runaways"] == 1
+	assert r.point == pytest.approx(2 / 30) and "1 already counted above" in r.reason
 
 
 def test_no_stop_reason_in_a_finished_run_isnt_possibly_stuck():
@@ -328,3 +329,11 @@ def test_no_stop_reason_in_a_finished_run_isnt_possibly_stuck():
 def test_a_what_if_capped_task_in_a_stalled_run_isnt_open():
 	r = ac.agent_totals(_stalled(2, 28, 4), capped_ids=frozenset({"t0"}))["risk.runaway"]
 	assert r.detail["by_rule"]["stalled"]["open"] == 1
+
+
+def test_one_open_task_already_flagged_reads_plainly_without_a_worker_count():
+	s = _stalled(1, 29, None)
+	s.tasks[0] = s.tasks[0].model_copy(update={"latency_s": 900.0})
+	r = ac.agent_totals(s)["risk.runaway"]
+	assert r.point == pytest.approx(1 / 30)
+	assert "with 1 task waiting" in r.reason and "so 0 more counted" in r.reason and "so one" not in r.reason

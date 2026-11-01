@@ -295,8 +295,9 @@ def runaway_rate_by_cost_and_time(
 	every task: agent_totals passes tokens when any task is unpriced, so both rules count the same tasks.
 
 	`open_ends` marks the tasks a stalled run left waiting on a tool (no stop reason). Each is only possibly stuck,
-	and at most one per worker can be (Chiya, Nov 1), so at most `workers` of those the other rules didn't flag
-	are counted; with the worker count unknown (before contract 0.6.1), one is, since a stall means one is."""
+	and at most one per worker can be (Chiya, Nov 1): of the open tasks, at most `workers` count as runaways in all,
+	those the other rules already flagged first. With the worker count unknown (before contract 0.6.1), the limit
+	is one, since a stall means at least one task is stuck."""
 	n = len(values)
 	if n < min_sample:
 		return _abstain("probability", f"only {n} tasks measured; run at least {min_sample}", n=n)
@@ -309,10 +310,12 @@ def runaway_rate_by_cost_and_time(
 	either = [a or b for a, b in zip(by_cost, by_time, strict=True)]
 	side = (1 + level) / 2
 	xc, xt, x = sum(by_cost), sum(by_time), sum(either)
-	opened = sum(open_ends or ())
-	loose = sum(o and not e for o, e in zip(open_ends or [False] * n, either, strict=True))
+	opens = open_ends or [False] * n
+	opened = sum(opens)
+	flagged_open = sum(o and e for o, e in zip(opens, either, strict=True))
 	cap = workers if workers and workers > 0 else 1
-	stuck = min(loose, cap)
+	# review, Nov 1: open tasks the other rules flagged hold a worker too, so they count against the limit
+	stuck = min(opened - flagged_open, max(0, cap - flagged_open))
 	x += stuck
 
 	def bound(k: int) -> dict:
@@ -327,14 +330,16 @@ def runaway_rate_by_cost_and_time(
 	)
 	if opened:
 		rules["stalled"] = {**bound(stuck), "open": opened, "workers": workers}
-		who = (
+		limit = (
 			f"at most one per worker ({workers}) can be stuck"
 			if workers and workers > 0
-			else "the worker count isn't recorded, so one is counted, as a stall means one is"
+			else "the worker count isn't recorded, and a stall means at least one is stuck"
 		)
+		tasks_ = "1 task" if opened == 1 else f"{opened} tasks"
+		already = f", {flagged_open} already counted above" if flagged_open else ""
 		why += (
-			f"; the run stalled with {opened} tasks waiting on a tool, each only possibly stuck: {who}, so "
-			f"{stuck} more counted"
+			f"; the run stalled with {tasks_} waiting on a tool, each only possibly stuck: {limit}{already}, "
+			f"so {stuck} more counted as runaways"
 		)
 	why += f"; {pct}% Clopper-Pearson"
 	if not x:

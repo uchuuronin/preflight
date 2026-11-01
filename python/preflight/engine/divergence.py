@@ -252,7 +252,7 @@ def warn(model: Model | None, series: dict, cfg: dict) -> dict:
 	if model is None:
 		why = (
 			"not used: the warning comes from the threshold rules (D6); the classifier missed its held-out target "
-			"(AUROC 0.66 against 0.85, corpus/reports/divergence_nov1.json)"
+			"(AUROC 0.66 against 0.85, on 720 held-out sweep runs)"
 		)
 		return {"status": "abstain", "point": None, "reason": why}
 	s = _clean(series)

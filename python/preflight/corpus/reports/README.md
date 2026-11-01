@@ -4,10 +4,10 @@
 
 | Report | Runs | Diverged | AUROC (95%) | Median lead, steps (95%) | False alarms | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
-| [divergence_nov1.json](divergence_nov1.json) (final) | 720 (377 L4, 343 A10) | 44 | 0.66 (0.56 to 0.76) | 138 (3 to 269) | 73 of 676 stable runs | Missed: not used; the warning comes from the threshold rules (D6) |
+| [divergence_nov1.json](divergence_nov1.json) (final) | 720 (377 L4, 343 A10) | 44 | 0.66 (0.56 to 0.76) | 138 (3 to 269): the point estimate clears 100, the interval doesn't | 73 of 676 stable runs | Missed: not used; the warning comes from the threshold rules (D6) |
 | [divergence_nov1_329.json](divergence_nov1_329.json) (first) | 329 (L4) | 21 | 0.58 (0.41 to 0.74) | 3 (0 to 243) | 38 of 308 stable runs | Missed; superseded by the final fit |
 
-37 of the 44 divergences in the final fit are fp16 blow-ups, and 15 come in the first 30 steps, before the classifier has a full window to read.
+37 of the 44 divergences in the final fit are fp16 blow-ups, and 15 come in the first 30 steps, when the classifier has at most a few steps past its 25-step window to read.
 
 ## Reliability bins, final fit
 

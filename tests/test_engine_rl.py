@@ -311,3 +311,6 @@ def test_every_engine_feature_has_its_key_in_flags_json():
 		*api.FLAG_OF.values(),
 		"engine.memory",
 	}  # engine.memory: the runner's gate on every fill
+	prod = json.loads((Path(__file__).resolve().parents[1] / "flags.production.json").read_text())
+	# review, Nov 1: a production override can only name a key the engine reads
+	assert {k for k in prod if k.startswith("engine.")} <= engine_keys

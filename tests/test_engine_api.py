@@ -1001,3 +1001,20 @@ def test_money_at_risk_carries_the_same_rate_as_the_total(ft):
 		r = jc.at_risk_usd.rate
 		assert r.quantity == "job_cost.at_risk_gpu_hours" and r.usd_per_unit == jc.total_usd.rate.usd_per_unit
 		assert jc.at_risk_usd.point == pytest.approx(jc.at_risk_gpu_hours.point * r.usd_per_unit)
+
+
+def test_a_stalled_sample_reaches_the_runaway_readout(ag):
+	"""Chiya, Nov 1: the readout counts a stalled run's open tasks up to the worker limit, through predict."""
+	rec = _agent_with(ag, 30)
+	tasks = [
+		t.model_copy(update={"stop_reason": None if i < 24 else "done"})
+		for i, t in enumerate(rec.agent_sample.tasks)
+	]
+	sample = rec.agent_sample.model_copy(update={"tasks": tasks, "ended": "stalled"})
+	r = api.predict(rec.model_copy(update={"agent_sample": sample})).root["risk.runaway"]
+	assert r.status != "abstain" and "stalled with 24 tasks waiting on a tool" in r.reason
+	finished = sample.model_copy(update={"ended": "finished"})
+	assert (
+		"stalled"
+		not in api.predict(rec.model_copy(update={"agent_sample": finished})).root["risk.runaway"].reason
+	)

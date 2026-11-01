@@ -15,7 +15,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Fine-tune lens: memory, P(OOM), step time, cost, money at risk | `main`; phase 2 table and fixes on branch | 1 | Today: step-time bands for vision, retrieval and pretrain, and P(OOM) shown "uncertain (5–95%)" in the middle |
 | Agent lens: per-task bootstrap, context growth, cache prices, rate-limit wall clock, runaway rate | `main` | 0.5 | Tokens-only cost when tasks lack `cost_usd`, now that the price table is in |
 | GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | Calibrated Nov 1 on A's GRPO zoo runs 2 and 3: length drift 0.16, zero-spread abstains below 8 prompts |
-| Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`, behind `campaign.planner`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
+| Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`; the view is behind C's `c.campaign_calendar`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
 
 **The other lenses and engine features**
 
@@ -29,7 +29,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Proxy campaigns | branch (`engine/proxy.py`: rank agreement and proxy settings) | 1 | Proxy runs themselves go through the campaign planner |
 | Power analysis: seeds needed from seed-to-seed variance | branch (`engine/power.py`) | 0.5 | Needs A's multi-seed probe |
 | GBDT residual on cross-GPU step time | branch: fitted and scored, **fails held out** (51% vs K1's 60% within 20%), so not used | 0 | |
-| Divergence classifier: 800+ short runs, AUROC target 0.85 | branch: fitted on 720 runs (L4 and A10), **misses**: held-out AUROC 0.66 (0.56 to 0.76), lead 138 steps (3 to 269); not used, the warning comes from the D6 threshold rules | 0 | No more divergence sweeps (Chiya, Nov 1). Why it misses: 37 of 44 divergences are fp16 blow-ups, 15 in the first 30 steps |
+| Divergence classifier: 800+ short runs, AUROC target 0.85 | branch: fitted on 720 runs (L4 and A10), **misses**: held-out AUROC 0.66 (0.56 to 0.76), lead 138 steps (3 to 269: the point estimate clears 100, the interval doesn't); not used, the warning comes from the D6 threshold rules | 0 | No more divergence sweeps (Chiya, Nov 1). Why it misses: 37 of 44 divergences are fp16 blow-ups, 15 in the first 30 steps |
 | GNN cost model, used only if it beats the GBDT held out | branch: paired gain +4.8 points (−1.4 to +11.6), so the GBDT is used and the table says so | 0 | |
 | Muse Spark Open batch-labels the corpus | not started | 2 | Needs a Baseten run through Actions: a paid ask |
 | Conformal layer, abstention rules, float16 grids within the cell budget | `main`; real table on branch | 0 | |
@@ -51,7 +51,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Step time within 15%, same GPU | branch: the line puts 461 of 575 held-out queries within 15% | 1 | Full runs still to come |
 | Step time within 20%, unmeasured GPU (4th type, incl. AMD) | corpus: K1 60% within 20% leave-one-GPU-out; A100 holdout same-GPU time 93% in band | 2 | AMD rows still to come; K1's band needs Chiya's call |
 | GNN + GBDT beats GBDT alone | miss: the paired interval includes zero, so the GBDT is used | 0 | |
-| Divergence warning: AUROC 0.85+, 100+ steps early | miss: AUROC 0.66 (0.56 to 0.76), lead 138 (3 to 269), 720 runs; the scorer reads `corpus/reports/divergence_nov1.json` | 0 | |
+| Divergence warning: AUROC 0.85+, 100+ steps early | miss: AUROC 0.66 (0.56 to 0.76), lead 138 (3 to 269: the point estimate clears 100, the interval doesn't), 720 runs; the scorer reads `corpus/reports/divergence_nov1.json` | 0 | |
 | RL rollout time within 20% | point 5.8% off between GRPO zoo runs 2 and 3; the zoo script is now calibration, so the row scores the unseen TRL script | 0.5 | Needs the Nov 2 unseen TRL run |
 | Serving tokens/sec within 15% | not started | 1 | Needs A's vLLM full runs |
 | Agent total cost inside the 90% interval | simulated on `main` (S6); no full run yet | 1 | |

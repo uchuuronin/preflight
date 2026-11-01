@@ -2774,6 +2774,9 @@ def _divergence_model():
 def _divergence(record: FlightRecord, values: dict) -> Estimate:
 	"""P(the run diverges later), from the longest probe's stability series at the probe's settings."""
 	mid = divergence.MODEL_ID
+	model = _divergence_model()
+	if model is None:  # review, Nov 1: the verdict comes first, whatever the knobs or the probe
+		return _abstain("probability", mid, divergence.warn(None, {}, {})["reason"])
 	if _off_probe(record, values, also_ok=frozenset({"grad_accum"})):
 		return _abstain(
 			"probability", mid, "the warning reads the probe's own steps; probe this setting to see it"
@@ -2786,7 +2789,7 @@ def _divergence(record: FlightRecord, values: dict) -> Estimate:
 	p = max(probes, key=lambda q: len(q.stability.series["loss"]))
 	cfg = {**{kv.id: kv.current for kv in record.knobs}, **p.knobs}
 	cfg.setdefault("precision", cfg.get("dtype"))
-	w = divergence.warn(_divergence_model(), p.stability.series, cfg)
+	w = divergence.warn(model, p.stability.series, cfg)
 	if w["status"] == "abstain":
 		return _abstain("probability", mid, w["reason"])
 	return _est(w["point"], w["point"], w["point"], "probability", "predicted", mid, w["reason"])
@@ -2796,8 +2799,8 @@ _CARDS = {
 	divergence.MODEL_ID: (
 		"classifier",
 		"Not used: the warning comes from the threshold rules (D6). Held out on 720 corpus runs (377 on L4, 343 on "
-		"A10; 44 diverged): AUROC 0.66 (95% 0.56 to 0.76) against the 0.85 target, lead 138 steps (3 to 269), 73 of 676 "
-		"stable runs alarmed. Why: 37 of the 44 divergences are fp16 blow-ups, and 15 come in the first 30 steps, "
+		"A10; 44 diverged): AUROC 0.66 (95% 0.56 to 0.76) against the 0.85 target, lead 138 steps (3 to 269: the point estimate clears 100, the interval doesn't), "
+		"73 of 676 stable runs alarmed. Why: 37 of the 44 divergences are fp16 blow-ups, and 15 come in the first 30 steps, "
 		"before the 25-step window can say much. Held out by settings family (precision, qk-norm, init), not by "
 		"architecture: every sweep run is the same small GPT",
 	),
