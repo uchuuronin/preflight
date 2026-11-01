@@ -843,3 +843,18 @@ def test_the_engine_flags_reach_the_engine_before_it_fills_predictions(tmp_path,
 		api.FEATURES.update(before)
 		monkeypatch.delenv("PREFLIGHT_FLAGS")
 		flags.reload()
+
+
+def test_a_triage_finding_names_the_node_only_when_its_probe_clearly_tested_one():
+	from preflight.runner.pipeline import _tested_node
+	from preflight.schema import Probe
+
+	def probe(pid, code=None):
+		return Probe.model_construct(id=pid, error_code=code)
+
+	nodes = {"model", "data", "eval", "optimizer"}
+	assert _tested_node(probe("p1-eval", "oom.eval"), nodes) == "eval"
+	assert _tested_node(probe("p2", "oom.eval"), nodes) == "eval"
+	assert _tested_node(probe("p1", "oom"), nodes) is None  # a training-step OOM: not one node
+	assert _tested_node(probe("p1", "user_error"), nodes) is None
+	assert _tested_node(probe("p1-eval"), {"model"}) is None  # no eval node on this map

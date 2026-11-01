@@ -658,10 +658,11 @@ def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord,
 	from preflight.harness.triage import triage_probe
 
 	findings, calls = [], []
+	nodes = {n.id for n in rec.graph.nodes} if rec.graph else set()
 	for r in results:
 		if not isinstance(r, ProbeResult):
 			continue
-		f, cs = triage_probe(deps.triage, r.probe, r.log_tail)
+		f, cs = triage_probe(deps.triage, r.probe, r.log_tail, node_id=_tested_node(r.probe, nodes))
 		calls += cs
 		if f is not None:
 			findings.append(f)
@@ -674,6 +675,13 @@ def _with_step(probe, entrypoint: str | None):
 	from .failures import with_step
 
 	return probe.model_copy(update={"error": with_step(probe.error, probe.error_code, entrypoint=entrypoint)})
+
+
+def _tested_node(probe, nodes: set[str]) -> str | None:
+	"""The one job-map node a probe clearly tested, else None (C lists those findings apart): the
+	eval probe, or an eval-pass OOM, tested the eval node."""
+	is_eval = probe.id.endswith("-eval") or (probe.error_code or "").startswith("oom.eval")
+	return "eval" if is_eval and "eval" in nodes else None
 
 
 def _diagnose(rec: FlightRecord, deps: Deps) -> FlightRecord:
