@@ -17,7 +17,7 @@ export const FREETIER_EN: Record<string, string> = {
 	"addon.freetier.chip.abstain": "Not trusted yet",
 	"addon.freetier.say.one_session": "Finishes in one session, with time to set up.",
 	"addon.freetier.say.sessions": "Runs past one session. Save a checkpoint at least every {every} and resume from it.",
-	"addon.freetier.say.no_memory": "Needs {need} at its peak; a {gpu} has {have}. Lower the batch or sequence length, or turn on checkpointing.",
+	"addon.freetier.say.no_memory": "Needs {need} at its peak ({status}); a {gpu} has {have}. Lower the batch or sequence length, or turn on checkpointing.",
 	"addon.freetier.say.other_gpu": "Memory fits. Time was predicted for {current}, so run a probe on a {gpus} to check the session length.",
 	"addon.freetier.say.abstain": "Memory or time isn't predicted at these settings yet.",
 	"addon.freetier.note.colab": "Colab doesn't publish its GPU or limits; users report a T4, and sessions can end sooner when demand is high or the tab sits idle.",
