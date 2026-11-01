@@ -149,7 +149,7 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		cut = "timeout"  # ended by its sandbox's own limit, at about the same time
 	at_cut = proxy.run_stats(run_id) if cut else {}
 	# the tasks open when the script was stopped: those with a call in flight, and those whose
-	# worker never called again after their last answer asked for a tool (agent._stuck)
+	# worker never called again after their last answer asked for a tool
 	in_flight = set(at_cut.get("in_flight", []))
 	# At the proxy a task stuck in its tool looks exactly like one that finished on a tool call (a
 	# submit, a passing test run), so no task is singled out: the run's own stall is the signal,

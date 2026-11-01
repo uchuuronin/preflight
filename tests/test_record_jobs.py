@@ -577,3 +577,23 @@ def test_a_knob_on_a_line_the_patch_edits_still_lands_on_its_own_literal():
 	patched = apply_patch(files, diff)
 	out = apply_overrides(patched, relocate_knobs(sm, files, patched), {"batch_size": 7})["train.py"]
 	assert "train = DataLoader(ds_train, batch_size=7, num_workers=4)" in out and "batch_size=64" in out
+
+
+def test_a_knob_whose_line_loses_it_never_lands_on_a_sibling_with_the_same_literal():
+	"""Review, Oct 31: two loaders both at batch_size=32; the patch takes it off train's line."""
+	import pytest as _pytest
+
+	from preflight.harness.static import map_static
+	from preflight.recorder.overrides import OverrideError, apply_overrides
+	from preflight.runner.patches import apply_patch, relocate_knobs
+
+	src = ("from torch.utils.data import DataLoader\n"
+		"train = DataLoader(ds_train, batch_size=32)\nval = DataLoader(ds_val, batch_size=32)\n")  # fmt: skip
+	diff = ("--- a/train.py\n+++ b/train.py\n@@ -1,3 +1,3 @@\n from torch.utils.data import DataLoader\n"
+		"-train = DataLoader(ds_train, batch_size=32)\n-val = DataLoader(ds_val, batch_size=32)\n"
+		"+train = DataLoader(ds_train, batch_sampler=bs)\n+val = DataLoader(ds_val, batch_size=32, num_workers=4)\n")  # fmt: skip
+	files = {"train.py": src}
+	sm = map_static(files, entrypoint="train.py")
+	patched = apply_patch(files, diff)
+	with _pytest.raises(OverrideError):
+		apply_overrides(patched, relocate_knobs(sm, files, patched), {"batch_size": 7})

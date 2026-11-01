@@ -96,7 +96,7 @@ def apply_patch(files: dict[str, str], diff: str) -> dict[str, str]:
 def relocate_knobs(sm, before: dict[str, str], after: dict[str, str]):
 	"""The record's own script map (static and Muse Spark knobs alike) with each knob's line moved to
 	where it sits in the patched files: an unchanged line by the diff's alignment; a line the patch
-	edited, to the one new line in that hunk that still holds the knob's whole expression. A knob that
+	edited one for one, to its own new line if that still holds the knob's whole expression. A knob that
 	can't be placed that way loses its line, so its override says it can't set it rather than
 	landing on another literal."""
 	import difflib
@@ -114,8 +114,9 @@ def relocate_knobs(sm, before: dict[str, str], after: dict[str, str]):
 		for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
 			for k in range(i1, i2):
 				m[k + 1] = (j1 + (k - i1) + 1) if tag == "equal" else None
-			if tag == "replace":
-				m.update({("hunk", k + 1): (j1, j2) for k in range(i1, i2)})
+			if tag == "replace" and i2 - i1 == j2 - j1:
+				# a block of edited lines replaced one for one: each line pairs with the one at its place
+				m.update({("pair", k + 1): j1 + (k - i1) + 1 for k in range(i1, i2)})
 		maps[f] = m
 	knobs = []
 	for k in sm.knobs:
@@ -124,12 +125,11 @@ def relocate_knobs(sm, before: dict[str, str], after: dict[str, str]):
 			m = maps[loc.file]
 			new = m.get(loc.line)
 			lines = after[loc.file].splitlines()
-			if new is None and ("hunk", loc.line) in m and loc.expr:
-				# an edited line: the one new line in its hunk that still holds the whole expression
-				# ("batch_size=32", "default=16"), not just the name, which a sibling may share
-				j1, j2 = m[("hunk", loc.line)]
-				hits = [j + 1 for j in range(j1, j2) if holds(lines[j], loc.expr)]
-				new = hits[0] if len(hits) == 1 else None
+			if new is None and ("pair", loc.line) in m and loc.expr:
+				# an edited line, replaced one for one: its own new line, if that still holds the whole
+				# expression ("batch_size=32", "default=16"). Never another line of the hunk: a sibling
+				# may hold the very same text
+				new = m[("pair", loc.line)]
 			if new is not None and loc.expr and not holds(lines[new - 1], loc.expr):
 				new = None  # the line moved but no longer holds the knob
 			k = k.model_copy(update={"location": loc.model_copy(update={"line": new})})
