@@ -250,7 +250,11 @@ def fit(
 def warn(model: Model | None, series: dict, cfg: dict) -> dict:
 	"""The readout for a probe: {status, point, reason} for risk.divergence."""
 	if model is None:
-		return {"status": "abstain", "point": None, "reason": "the divergence classifier isn't trained yet"}
+		why = (
+			"not used: the warning comes from the threshold rules (D6); the classifier missed its held-out target "
+			"(AUROC 0.66 against 0.85, corpus/reports/divergence_nov1.json)"
+		)
+		return {"status": "abstain", "point": None, "reason": why}
 	s = _clean(series)
 	n = len(s.get("loss") or [])
 	if n < WINDOW:

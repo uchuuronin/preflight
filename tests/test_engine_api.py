@@ -993,3 +993,11 @@ def test_every_engine_cost_estimate_carries_its_rate(ft):
 		for line in jc.lines:
 			if line.usd is not None and line.usd.status != "abstain":
 				assert line.usd.rate.price_row == line.price_row
+
+
+def test_money_at_risk_carries_the_same_rate_as_the_total(ft):
+	_, jc = api.run_cost(ft)
+	if jc.at_risk_usd is not None and jc.at_risk_usd.status != "abstain":
+		r = jc.at_risk_usd.rate
+		assert r.quantity == "job_cost.at_risk_gpu_hours" and r.usd_per_unit == jc.total_usd.rate.usd_per_unit
+		assert jc.at_risk_usd.point == pytest.approx(jc.at_risk_gpu_hours.point * r.usd_per_unit)

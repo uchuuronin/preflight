@@ -61,7 +61,7 @@
   "alarms": 73
  },
  "enough": true,
- "source": "scripts/fit_divergence.py on remote-runs b-divergence-export-2 (Nov 1): 720 runs, 377 on L4 and 343 on A10, the board on every row; folds and bootstrap by settings family (the sweep is one architecture)",
  "verdict": "not used: the warning comes from the threshold rules (D6)",
- "why": "37 of the 44 divergences are fp16 blow-ups and 15 of 44 come in the first 30 steps, before the classifier's 25-step window can say much; held-out AUROC 0.66 against the 0.85 target"
+ "why": "37 of the 44 divergences are fp16 blow-ups and 15 of 44 come in the first 30 steps, before the classifier's 25-step window can say much; held-out AUROC 0.66 against the 0.85 target",
+ "source": "scripts/fit_divergence.py on remote-runs b-divergence-export-2 (Nov 1): 720 runs, 377 on L4 and 343 on A10, the board on every row; folds and bootstrap by settings family (the sweep is one architecture)"
 }

@@ -172,3 +172,19 @@ def test_the_card_says_it_is_not_used_and_why():
 	)
 	assert card.heldout_error["auroc"] == pytest.approx(0.657) and "720 runs" in card.training_data
 	assert "fp16" in card.notes and "first 30 steps" in card.notes and "AUROC 0.66" in card.notes
+
+
+def test_without_a_model_the_readout_gives_the_verdict():
+	w = D.warn(None, {"loss": [1.0] * 50}, {})
+	assert w["status"] == "abstain" and w["reason"].startswith(
+		"not used: the warning comes from the threshold rules"
+	)
+
+
+def test_the_report_writes_its_own_verdict(sweep):
+	fd = _fit_script()
+	rep = fd.summarise(fd.evaluate(sweep))
+	v = fd.verdict(rep, sweep)
+	assert v["verdict"] == "used" and v["why"] == ""  # the synthetic sweep meets the row
+	bad = {**rep, "auroc": {**rep["auroc"], "point": 0.6}}
+	assert fd.verdict(bad, sweep)["verdict"].startswith("not used")

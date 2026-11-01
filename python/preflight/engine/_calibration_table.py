@@ -3,7 +3,6 @@
 DATA = {
 	"built_from": "remote-runs b-corpus-export-3 and b-corpus-export-hf-2 (Oct 31): L4, A10, L40S, T4; A100 "
 	"held out, scored once (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, "
-	"A100-PCIe-40GB) (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, "
 	"A100-PCIe-40GB)",
 	"cells": [
 		{

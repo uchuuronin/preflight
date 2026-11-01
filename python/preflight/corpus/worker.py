@@ -28,6 +28,17 @@ import torch.nn.functional as F
 
 from preflight.corpus import models
 from preflight.corpus.configs import CorpusConfig
+
+# the D9 label lives in corpus/labels.py, which needs no torch (Chiya, Nov 1: so its tests leave the torch job)
+from preflight.corpus.labels import (  # noqa: F401
+	COLLAPSE_NO_LEARNING,
+	COLLAPSE_SPIKE,
+	LABEL_FLOOR,
+	LABEL_RATIO,
+	LABEL_TAIL,
+	LABEL_WINDOW,
+	label_divergence,
+)
 from preflight.engine.steptime import classify_kernel
 from preflight.recorder.errors import classify
 
@@ -268,18 +279,6 @@ def _run_kernels(cfg: CorpusConfig, device: torch.device) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------- divergence
-
-
-# the D9 label lives in corpus/labels.py, which needs no torch (Chiya, Nov 1: so its tests leave the torch job)
-from preflight.corpus.labels import (  # noqa: E402, F401
-	COLLAPSE_NO_LEARNING,
-	COLLAPSE_SPIKE,
-	LABEL_FLOOR,
-	LABEL_RATIO,
-	LABEL_TAIL,
-	LABEL_WINDOW,
-	label_divergence,
-)
 
 
 def _text_tokens(data_path: str | None, gen: torch.Generator, n: int = 2_000_000) -> torch.Tensor:

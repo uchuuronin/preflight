@@ -1931,7 +1931,10 @@ def run_cost(
 		billed = not own and row is not None
 		if billed:
 			usd = _rated(
-				_scale(hours, row.usd_per_hour, "usd", why=why_rate), "quantity", row.usd_per_hour, row.id
+				_scale(hours, row.usd_per_hour, "usd", why=why_rate),
+				"line.quantity",
+				row.usd_per_hour,
+				row.id,
 			)
 		elif not own:  # billed in dollars, but this GPU has no price: say so on the line, not just the total
 			usd = _abstain("usd", MODEL_ID_RUN_COST, why_rate)
@@ -1980,6 +1983,8 @@ def run_cost(
 			else total
 		)
 	at_risk = _at_risk(record, values, mem, tm, per_s, why_rate)
+	if row is not None:  # GPU-hours at risk x the same rate, so the browser re-prices it with the total
+		at_risk = _rated(at_risk, "job_cost.at_risk_gpu_hours", row.usd_per_hour, row.id)
 	# contract 0.3.0: the same risk in GPU-hours, shown first on an own cluster (Chiya, Oct 27); it needs no price
 	hours_why = f"{n} x {gpu}" if gpu else "GPU-hours"
 	at_risk_hours = _at_risk(record, values, mem, tm, n / 3600.0, hours_why, unit="gpu_hours")
