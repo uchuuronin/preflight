@@ -1,0 +1,11 @@
+{
+	"name": "20261101-160403-41324369861-a-multi-gpu-2x",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41324369861",
+	"ref": "ws-a",
+	"sha": "4cc6f577a0db6f1835af5d096747d3338a06c925",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::multi_gpu",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T16:04:47Z"
+}

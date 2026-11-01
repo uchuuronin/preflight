@@ -1,0 +1,44 @@
+{
+  "ddp": {
+    "status": "ok",
+    "error": null,
+    "steps": 15,
+    "p50_s": 0.07227327728271485,
+    "peak_allocated_bytes": 3239656960,
+    "extras": {
+      "params_total": 134250496.0,
+      "params_trainable": 134250496.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 4389793792.0,
+      "world_size": 2.0,
+      "ranks_reported": 2.0,
+      "rank_peak_allocated_max_bytes": 3239656960.0,
+      "rank_step_p50_max_s": 0.07227327728271485
+    },
+    "gpu": "A10",
+    "log_tail": ""
+  },
+  "fsdp": {
+    "status": "ok",
+    "error": null,
+    "steps": 15,
+    "p50_s": 0.08684134674072266,
+    "peak_allocated_bytes": 1360084480,
+    "extras": {
+      "params_total": 67125248.0,
+      "params_trainable": 67125248.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 4351688704.0,
+      "world_size": 2.0,
+      "ranks_reported": 2.0,
+      "rank_peak_allocated_max_bytes": 1360084480.0,
+      "rank_step_p50_max_s": 0.08684134674072266
+    },
+    "gpu": "A10",
+    "log_tail": ""
+  }
+}
