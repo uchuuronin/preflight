@@ -10,10 +10,9 @@ Who may race: anyone on a sample with a script (A's SAMPLE_REFS) or a record of 
 a record derived from another (a probe on a shared link would otherwise hand its code out).
 
 Spend: the race's whole cap (run.stop_usd) is reserved in the ledger before anything starts,
-against the guide's day cap and a per-record cap per address, and settled with what Muse Code
-reported once the race ends. A race outlives the ledger's reservation time, so the reservation
-usually closes at the cap first and the race is counted at its cap: the ledger over-counts,
-never under. Behind `c.fix_loop`.
+against the guide's day cap and a fix budget per address, kept open as long as a race can run,
+and settled with what Muse Code reported once the race ends (the cap when nothing was).
+Behind `c.fix_loop`.
 """
 
 from __future__ import annotations
@@ -42,6 +41,9 @@ PUBLIC_SOURCES = {"repo", "sample", "template"}
 # minute: past it the race is lost and its reservation settles at the cap.
 RACE_LOST_S = 13 * 60
 NOT_OPEN = "Code fixes aren't open yet."
+# Source: guess, about five three-candidate races a day from one address (a judging room or a
+# campus behind one address), a fifth of the shared US$10 day (ledger.Limits.usd_per_day).
+FIX_USD_PER_ADDRESS_DAY = 2.00
 
 Value = bool | int | float | str
 
@@ -149,9 +151,12 @@ async def start_race(request: Request) -> dict:
 	sid: str = request.state.session
 	cap = run.stop_usd(len(cands))
 	ip = edge.ip_key(edge.client_ip(request))
-	# The per-record cap is per address, not per session: sessions are free to mint, so a run key
-	# per session would let one address spend the whole day's cap on one sample.
-	gate = await app.state.ledger.reserve(visitor=sid, run=f"fix:{view.key}:ip:{ip}", ip=ip, usd=cap)
+	# The fix budget is per address, not per session (sessions are free to mint), and is big
+	# enough for a room of visitors behind one address; the reservation stays open as long as a
+	# race can run, so what Muse Code reports is what gets counted.
+	gate = await app.state.ledger.reserve(
+		visitor=sid, run=f"fix:ip:{ip}", ip=ip, usd=cap, run_cap=FIX_USD_PER_ADDRESS_DAY, ttl_s=RACE_LOST_S
+	)
 	if not gate.ok:
 		today = gate.reason in ("daily_cap", "run_cap")
 		raise ApiError(

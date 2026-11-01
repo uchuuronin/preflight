@@ -107,10 +107,19 @@ class SpendLedger:
 		ledger_store["snapshot"] = self.core.snapshot()
 
 	@modal.method()
-	def reserve(self, *, visitor: str, run: str, ip: str, usd: float) -> dict:
+	def reserve(
+		self,
+		*,
+		visitor: str,
+		run: str,
+		ip: str,
+		usd: float,
+		run_cap: float | None = None,
+		ttl_s: float | None = None,
+	) -> dict:
 		from dataclasses import asdict
 
-		decision = self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd)
+		decision = self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s)
 		if decision.ok:
 			self._save()
 		return asdict(decision)

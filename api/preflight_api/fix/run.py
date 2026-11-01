@@ -54,12 +54,16 @@ def run_race(
 	t0 = time.monotonic()
 	try:
 		files = source_files(record_ref, reader=reader, blobs=blobs)
-	except Exception as e:  # A's InvalidSubmission carries a visitor-safe code
-		return {"error": getattr(e, "code", None) or "source_unreadable", "candidates": []}
+	except Exception as e:  # A's InvalidSubmission carries a visitor-safe code; nothing was spent
+		return {
+			"error": getattr(e, "code", None) or "source_unreadable",
+			"usd_from_reported_tokens": 0.0,
+			"candidates": [],
+		}
 	try:
 		box, close = open_box()
-	except Exception:
-		return {"error": "sandbox_failed", "candidates": []}
+	except Exception:  # no sandbox, so no model call: nothing was spent
+		return {"error": "sandbox_failed", "usd_from_reported_tokens": 0.0, "candidates": []}
 	try:
 		cands = race_mod.race(
 			box,
@@ -69,10 +73,10 @@ def run_race(
 			measured=measured,
 			path=path,
 		)
-	except race_mod.GateBroken:
-		return {"error": "gate_not_seen", "candidates": []}
+	except race_mod.GateBroken:  # refused before Muse Code ran
+		return {"error": "gate_not_seen", "usd_from_reported_tokens": 0.0, "candidates": []}
 	except race_mod.BadUpload:
-		return {"error": "nothing_to_fix", "candidates": []}
+		return {"error": "nothing_to_fix", "usd_from_reported_tokens": 0.0, "candidates": []}
 	except Exception:  # git or a write failing in the sandbox: the race is lost, reported as such
 		return {
 			"error": "race_failed",

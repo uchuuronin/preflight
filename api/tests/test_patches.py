@@ -229,7 +229,8 @@ def test_run_race_reads_the_code_before_opening_a_box_and_reports_why_it_could_n
 		open_box=lambda: opened.append(1),
 		key="k",
 	)
-	assert out == {"error": "submission.record_unknown", "candidates": []} and opened == []
+	assert out == {"error": "submission.record_unknown", "usd_from_reported_tokens": 0.0, "candidates": []}
+	assert opened == []
 
 
 def test_the_web_apps_copy_of_the_templates_matches():
@@ -252,12 +253,28 @@ def test_the_web_apps_copy_of_the_templates_matches():
 	]
 
 
-def test_one_address_gets_one_capped_race_per_record_however_many_sessions_it_makes(world):
+def test_one_address_has_one_fix_budget_however_many_sessions_it_makes(world):
 	c, *_ = world
-	assert c.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE}).status_code == 202
-	fresh = TestClient(c.app, base_url="https://testserver")  # a new session, the same address
-	r = fresh.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE})
-	assert r.status_code == 429 and r.json()["error"]["code"] == "fix_limit"
+	n = int(patches.FIX_USD_PER_ADDRESS_DAY // run.stop_usd(3))
+	for _ in range(n):  # a room of visitors behind one address: several races go through
+		fresh = TestClient(c.app, base_url="https://testserver")  # a new session, the same address
+		assert fresh.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE}).status_code == 202
+	last = TestClient(c.app, base_url="https://testserver").post(
+		"/v1/patches", json={"record": "lora-7b", "candidates": THREE}
+	)
+	assert last.status_code == 429 and last.json()["error"]["code"] == "fix_limit"
+
+
+def test_a_race_keeps_its_reservation_until_it_settles(world, monkeypatch):
+	c, fixer, ledger, _ = world
+	pid = c.post("/v1/patches", json={"record": "lora-7b", "candidates": THREE}).json()["patch_id"]
+	import time as _time
+
+	later = _time.time() + 5 * 60  # well past a guide turn's reservation time
+	assert ledger.core.spent_today(now=later) == pytest.approx(run.stop_usd(3))
+	fixer.result = {"usd_from_reported_tokens": 0.5, "candidates": []}
+	c.get(f"/v1/patches/{pid}")
+	assert ledger.core.spent_today() == pytest.approx(0.5)  # what was reported, past the cap
 
 
 def test_spend_past_the_cap_is_counted_as_reported(world):
@@ -296,7 +313,7 @@ def test_a_sandbox_that_will_not_start_or_breaks_is_reported_not_raised():
 		open_box=no_box,
 		key="k",
 	)
-	assert out == {"error": "sandbox_failed", "candidates": []}
+	assert out == {"error": "sandbox_failed", "usd_from_reported_tokens": 0.0, "candidates": []}
 	closed = []
 
 	class Box:
