@@ -15,6 +15,8 @@ Updated Sun Nov 1, 11:30 ET.
 |---|---|---|---|---|
 | Nov 1 10:57 | 9e46c3c..4cc6f57 | dataset size from the probes (0bdff6f, abb93ad, fb84348); the probe uid's user name and passwd/group entry (e5b0713, 4cc6f57); the A10 GRPO record, run log and B handoff (03d1420) | 3 read-only rounds (dataset size 2, probe user 1) | clean |
 | Nov 1 11:06 | 4cc6f57..9afbf4c | the probe-user startup step (47f68ed, 88cd732); the C note on the redeploy (cf96ea5); status and B notes (ead63bb, 17582b7, 9afbf4c) | 1 read-only round | clean |
+| Nov 1 11:20 | 9afbf4c..20ebb7a | the torch.compile startup step and gcc/g++ in the sandbox images (b86b72a); pyarrow 17 in the serving image and its datasets import check, the wrong-version message (0771c5f, 20ebb7a); a comment order (bdcebd6); status (53c392c, 107ce3e) | 1 read-only round each | clean |
+| Nov 1 12:10 | 20ebb7a..998704f | main merged (0.6.1, f017010); Spark diagnosis (485df08, ace3a06, 97a458a, 7a55eb7) and Spark Open's check (202666f), both behind harness.spark_diagnosis; 0.6.1 concurrency and the review fix (fde2e68, 549a5f5); engine flags and N_TRAIN_* (913e2b6); `preflight demo` and the root/venv probe fix (eb5e5e5, 060ec5f); failures name their step (ab74a70); triage's eval node (30b0224); the serving probe's sampled generate (16d5cd6, 998704f); the CI fix, the deploy gate's rule out of ops_app (26b134b); requests and status (3f58945, 579cd23, 179c8ad, 390f778, 40fed56) | 2 rounds for diagnosis, 0.6.1 and the engine/N_TRAIN change; 1 round for the rest | clean |
 
 ## Known limits, on purpose
 
@@ -51,6 +53,9 @@ Updated Sun Nov 1, 11:30 ET.
 - Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
   its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
   lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
+- Serving probe sample (Nov 1): the first generate call is the measurement, so a warmup call
+  before the real one becomes it; prompts and per-prompt lists are cut only when passed as the first
+  argument or by keyword, not prompt_token_ids, lora_request or priority by position.
 - Dataset size (`extras.train_dataset_len`, Nov 1): the training loader's sampler length, else its
   dataset's. With `batch_size=None` a split sampler isn't seen, so validation rows are counted; a
   Lightning `DistributedSamplerWrapper` over a split falls back to the whole dataset. A GNN script
