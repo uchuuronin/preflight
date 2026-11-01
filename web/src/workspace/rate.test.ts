@@ -44,8 +44,13 @@ describe("the visitor's rate", () => {
 	it("takes $0 (an assigned GPU): every dollar is zero, and no cost move is offered as a saving", () => {
 		const free = withRate(base, { kind: "gpu", gpu: "L4", usdPerHour: 0 });
 		expect(free.predict(gpuRec, knobs)[cost]!.point).toBe(0);
+		// Moves that clear or lower a predicted failure stay (whatever the rate); none saves money.
 		const moves = free.moves(gpuRec, { kind: "min_cost" }, { knobs });
-		expect(moves.filter((m) => m.targetId === cost)).toHaveLength(0);
+		const riskNow = base.predict(gpuRec, knobs)["risk.oom"]?.point ?? 0;
+		for (const m of moves.filter((x) => x.targetId === cost)) {
+			expect(m.delta).toBeGreaterThanOrEqual(0);
+			expect(m.clearsFailure || (m.risk !== null && m.risk < riskNow)).toBe(true);
+		}
 	});
 
 	it("keeps the moves that clear a predicted failure, whatever the rate (review, Nov 1)", () => {

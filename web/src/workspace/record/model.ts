@@ -154,6 +154,10 @@ export function capacityBytes(record: LoadedRecord, knobs: Readonly<Record<strin
 
 /** True when every prediction comes from a fixture model, so the UI says "illustrative". */
 export function isFixture(record: LoadedRecord): boolean {
+	// A's golden records (scripts/make_golden.py, and the campaign sample built on them) are hand-made
+	// runs whatever fills their predictions: with B's engine (PREFLIGHT_GOLDEN_ENGINE=1) the model ids
+	// are real, but the probes under them are still illustrative. Their ids say so.
+	if (/^01JBGOLDEN/.test(record.record_id ?? "")) return true;
 	const ids = new Set<string>();
 	for (const g of record.predictions.grids) ids.add(g.model_id);
 	for (const e of Object.values(record.predictions.estimates ?? {})) if (e) ids.add(e.model_id);
