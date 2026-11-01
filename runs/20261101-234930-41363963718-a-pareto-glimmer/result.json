@@ -1,0 +1,11 @@
+{
+	"name": "20261101-234930-41363963718-a-pareto-glimmer",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41363963718",
+	"ref": "ws-a",
+	"sha": "822003c6b9944fbe1eaae399acb453126ad8aa23",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark --k 30 --max-usd 2.5 --label-mbpp 30 --provider glimmer",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T23:56:16Z"
+}
