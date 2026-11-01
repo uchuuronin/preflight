@@ -58,7 +58,7 @@ from preflight.probes.gpu_choice import (
 	usd_per_hour,
 )
 from preflight.probes.local import InvalidSubmission, ProbeResult, ProbeSpec, run_probe
-from preflight.probes.plan import PlannedProbe, next_probe_id, plan_probes, point_probe
+from preflight.probes.plan import PlannedProbe, next_probe_id, plan_probes, point_probe, pull_eval
 from preflight.recorder.overrides import OverrideError, apply_overrides, override_args, values_from_args
 from preflight.schema import (
 	Constraints,
@@ -632,6 +632,7 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	for p in plan:
 		p.seed = record_jobs.VERIFY_SEED_2 if p.role == "verify_seed" else record_jobs.VERIFY_SEED
 		p.seed_force = True
+		pull_eval(rec, p)  # every side runs the eval, so an eval fix is tested on both (C, Nov 1)
 	return plan
 
 
