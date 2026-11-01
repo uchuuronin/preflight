@@ -1,0 +1,11 @@
+{
+  "record_id": "01M6C5WRVEM3RTRRBDRPAAPEGT",
+  "probe": "p1-eval",
+  "status": "oom",
+  "provider": "modal-glimmer",
+  "model": "muse-glimmer",
+  "wall_s": 150.3,
+  "finding": null,
+  "calls": [],
+  "usd": 0
+}
