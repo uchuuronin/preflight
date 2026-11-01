@@ -747,6 +747,9 @@ a {
 	color: var(--pf-fg-dim);
 	white-space: nowrap;
 }
+/* At the route's ends, so a narrow screen can't cut them: the start label grows right, the end label left */
+.pf-route__end--from { transform: translate(0, 8px); }
+.pf-route__end--to { transform: translate(-100%, 8px); }
 
 .pf-stages { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 .pf-stage {
@@ -770,6 +773,11 @@ a {
 	animation: pf-pulse 1.2s ease-in-out infinite;
 }
 @keyframes pf-pulse { 50% { box-shadow: 0 0 0 9px transparent; } }
+/* The leg a failed or cancelled job stopped on: named in words, not by colour alone */
+.pf-stage.is-stopped { color: var(--pf-fg); box-shadow: inset 0 0 0 1.5px var(--pf-fail); }
+.pf-stage.is-stopped .pf-stage__dot { border-color: var(--pf-fail); background: var(--pf-fail); }
+.pf-stage__stopped { margin-left: auto; font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fail); white-space: nowrap; }
+.pf-route__done.is-stopped { stroke: var(--pf-fail); }
 
 /* ---------- Cockpit ---------- */
 
