@@ -1,6 +1,8 @@
 # Status · B (prediction engine and corpus)
 
-Updated Tue Oct 27, evening ET, on `ws-b` (merged with A's `ws-a` at b59334b; from now on merges, not rebases).
+Updated Sun Nov 1, 11 AM ET, on `ws-b` (merges, not rebases, for pushed commits).
+
+**Unseen scripts:** B has not opened `unseen-scripts.md` in the Project, and won't before Monday's scoring.
 
 ## Plan items B owns (updated Sun Nov 1, 1 AM ET)
 
@@ -12,8 +14,8 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | --- | --- | --- | --- |
 | Fine-tune lens: memory, P(OOM), step time, cost, money at risk | `main`; phase 2 table and fixes on branch | 1 | Today: step-time bands for vision, retrieval and pretrain, and P(OOM) shown "uncertain (5–95%)" in the middle |
 | Agent lens: per-task bootstrap, context growth, cache prices, rate-limit wall clock, runaway rate | `main` | 0.5 | Tokens-only cost when tasks lack `cost_usd`, now that the price table is in |
-| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | Calibrated Nov 1 on A's GRPO zoo runs 2 and 3: length drift 0.16, zero-spread abstains below 8 prompts |
-| Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`, behind `campaign.planner`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
+| GRPO / RL: zero-variance fraction p^G + (1−p)^G from `pass_rate_per_prompt`, response-length bootstrap for rollout time | branch (`engine/rl.py`, behind `engine.rl`) | 1 | Calibrated Nov 1 on A's GRPO zoo runs 2 and 3 (L4) and A's 50-step run (A10, a-gt-grpo-50-b): length drift 0.21; the zero-spread band spans the Jeffreys and the measured rates (from 8 to 80 of the 50-step run's prompts it covered the rest, 7 of 7; the Jeffreys band alone missed 5 of 7, reading 0.13 to 0.18 low); abstains below 8 prompts. All three runs are calibration, so the RL rows score only the unseen TRL script |
+| Campaign planner: grid pricing, Young/Daly intervals, Slurm wall-time segments, quota check, ASHA plan, Monte Carlo completion dates, team lanes | branch (`campaign/planner.py`; the view is behind C's `c.campaign_calendar`) | 1 | The card says its accuracy is the engine's, because its numbers come from the engine's intervals |
 
 **The other lenses and engine features**
 
@@ -27,7 +29,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Proxy campaigns | branch (`engine/proxy.py`: rank agreement and proxy settings) | 1 | Proxy runs themselves go through the campaign planner |
 | Power analysis: seeds needed from seed-to-seed variance | branch (`engine/power.py`) | 0.5 | Needs A's multi-seed probe |
 | GBDT residual on cross-GPU step time | branch: fitted and scored, **fails held out** (51% vs K1's 60% within 20%), so not used | 0 | |
-| Divergence classifier: 800+ short runs, AUROC target 0.85 | branch: `engine/divergence.py` and `scripts/fit_divergence.py`, tested on synthetic sweeps; `risk.divergence` behind `engine.divergence` (off) | 1, after the sweep | The 800-config sweep is running (Nov 1, $12 cap); the fit and its held-out report follow |
+| Divergence classifier: 800+ short runs, AUROC target 0.85 | branch: fitted on 720 runs (L4 and A10), **misses**: held-out AUROC 0.66 (0.56 to 0.76), lead 138 steps (3 to 269: the point estimate clears 100, the interval doesn't); not used, the warning comes from the D6 threshold rules | 0 | No more divergence sweeps (Chiya, Nov 1). Why it misses: 37 of 44 divergences are fp16 blow-ups, 15 in the first 30 steps |
 | GNN cost model, used only if it beats the GBDT held out | branch: paired gain +4.8 points (−1.4 to +11.6), so the GBDT is used and the table says so | 0 | |
 | Muse Spark Open batch-labels the corpus | not started | 2 | Needs a Baseten run through Actions: a paid ask |
 | Conformal layer, abstention rules, float16 grids within the cell budget | `main`; real table on branch | 0 | |
@@ -36,7 +38,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Run cost and its basis (gap 21) | `main` | 0 | |
 | Corpus sweep: resumable, keyed, halts at budget (gap 13) | `main`; A100 board fix on branch | 0 | |
 | Versioned model cards pinned in records (gap 15) | branch: `stale_models`, `current_models` | 0 | C shows it |
-| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: settled with A (`docs/decisions/glimmer-host.md`) | 0 | Deferred: no host until the weights' download terms and licence are confirmed in writing (Chiya, Nov 1) |
+| Glimmer private-mode host proposal (with A, by Sun Nov 1) | branch: hosting now (`python/preflight/glimmer/`, `docs/decisions/glimmer-host.md`) | 0.5 | Chiya, Nov 1: Apache 2.0 from Meta, hold lifted. FP8 copy of Meta's bf16 checkpoint on an A100-40GB behind Modal proxy auth; Meta's Q4_K_M GGUF on an L4 for the own-GPU claim. Startup check, smokes ($2 cap) and the deploy in progress |
 | Corpus published with its datasheet (gap 16) | branch (`corpus/DATASHEET.md`) | 0.5 | Publishing the rows themselves |
 
 **Validation rows (README table)**
@@ -49,7 +51,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 | Step time within 15%, same GPU | branch: the line puts 461 of 575 held-out queries within 15% | 1 | Full runs still to come |
 | Step time within 20%, unmeasured GPU (4th type, incl. AMD) | corpus: K1 60% within 20% leave-one-GPU-out; A100 holdout same-GPU time 93% in band | 2 | AMD rows still to come; K1's band needs Chiya's call |
 | GNN + GBDT beats GBDT alone | miss: the paired interval includes zero, so the GBDT is used | 0 | |
-| Divergence warning: AUROC 0.85+, 100+ steps early | the classifier is built; the sweep is running | with the classifier | |
+| Divergence warning: AUROC 0.85+, 100+ steps early | miss: AUROC 0.66 (0.56 to 0.76), lead 138 (3 to 269: the point estimate clears 100, the interval doesn't), 720 runs; the scorer reads `corpus/reports/divergence_nov1.json` | 0 | |
 | RL rollout time within 20% | point 5.8% off between GRPO zoo runs 2 and 3; the zoo script is now calibration, so the row scores the unseen TRL script | 0.5 | Needs the Nov 2 unseen TRL run |
 | Serving tokens/sec within 15% | not started | 1 | Needs A's vLLM full runs |
 | Agent total cost inside the 90% interval | simulated on `main` (S6); no full run yet | 1 | |
@@ -108,7 +110,7 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 - **Chiya's decisions applied:**
   - **Below the smallest probe:** an "extrapolated" estimate with a growing band and a probe offer. Memory widens 25% per halving (S2d); step time widens 0.1 per halving and abstains about 2.7 halvings down (S4b).
   - **Agent sample:** 30 tasks, plus a 20-task top-up offered when the cost range straddles the budget (S6b: 88.2% final coverage).
-  - **Flags:** B's four flags are in `flags.json`, off.
+  - **Flags:** see "What each `engine.*` flag gates" below.
 - **`engine/api.py`:** `predict`, `build_grids`, `sensitivity`, plus `targets_for` and `fill_predictions` (the call `make_golden.py` makes).
   - Every lens gets its readouts: GPU lenses get memory, OOM risk, step and total time, cost, the wall-cap risk and preemption loss; API lenses get cost, tokens, wall clock under concurrency and rate limits, context fill and runaway rate.
   - Knob moves the models don't capture widen the band or abstain, and "measured" means a probe really saw the peak.
@@ -149,15 +151,39 @@ Every B item in the Contracts tab (Contract B, the gaps table, the adopted items
 - **Measured L4 (PM's Modal smoke run):** usable memory is 23,689,363,456 bytes (22.06 GiB, was 21.45), and the engine prefers a probe's reported total over the table for the probe's own GPU.
 - Tests live in root `tests/`; 798 pass across the repo (all agents' tests included), ruff clean with the repo config.
 
+## What each `engine.*` flag gates (Nov 1, for the README)
+
+D found that most `engine.*` flags switched nothing. Checked in the code on ws-b:
+
+| Flag | `flags.json` | Production | What it gates |
+| --- | --- | --- | --- |
+| `engine.memory` | off | on | **Every prediction**, not only memory. The runner fills the record's predictions (memory, time, cost, risk, the grids and the model cards) only with it on (`runner/pipeline.py::with_predictions`); off, the record keeps its measurements and has no predictions. |
+| `engine.steptime_cross_gpu` | on | on (from `flags.json`) | Moving to a GPU with no probe: on, step time takes the held-out cross-GPU band (about ±45%) and shows it past ±50%, labelled rough; another vendor abstains with "no AMD measurements". Off, the usual abstain. |
+| `engine.rl` | off | off | The RL lens's three extra readouts: zero-spread groups, rollout time and truncation. Memory, step time and cost on the RL lens don't depend on it. |
+| `engine.serving` | off | off | The serving lens's readouts: throughput, time to first token (p95), time per token and KV capacity. |
+| `engine.divergence` | off | off | The `risk.divergence` readout from the classifier. It stays off: the classifier missed its target ([report](../../python/preflight/corpus/reports/README.md)), and the threshold rules (D6) give the warning either way. |
+
+**Wired:** until now the last four were constants in `engine/api.py` (`FEATURES`), so changing them in `flags.json` did nothing. `fill_predictions(record, flags=flag)` now reads them from the caller's flag reader for that fill (`FLAG_OF` maps each to its key; a test holds `flags.json` and `FEATURES` to the same values). The runner has to pass its reader: one line in A's `pipeline.py`, requested in `from-b.md`. Until A lands it, the `FEATURES` defaults decide, and they equal `flags.json` today, so nothing shown changes.
+
+**Removed:** three B flags that nothing read. `engine.steptime_same_gpu` (same-GPU step time is always on, behind `engine.memory`), `corpus.sweep` (an offline tool; Chiya's yes per run is its gate) and `campaign.planner` (the planner runs only in C's sample script; the campaign view is behind C's `c.campaign_calendar`).
+
+## GRPO peak check (Nov 1, A's 50-step run on an A10)
+
+- The engine reads the run's peak as **measured 23.50 GB** (band 21.11 to 26.15), and the device's own most-used was 23.50 GB over 52 steps: it matches. `risk.oom` reads **tight, 34%**: the run fitted with 0.21 GB to spare on the A10's 23.71 GB (99.1% used), inside the ±10% held-out band. That's the honest reading of a run this close, not a bug.
+- Fixed on the way: a peak after a GPU move read "measured" (it's a prediction now), and the per-term split scaled every term to the peak, so a 494M-parameter model's weights read 9.9 GB; weights and gradients now read 1.98 GB each, as the probe measured, and activations take the rest.
+- C's 23.8 GB on the L4 fixture predates the measured context; the fixture reads 23.25 GB now.
+
 ## Blocked
-- The L4 runs that build the real calibration table (grouped and HF jobs) wait on Chiya's yes to the $45 corpus plan (ask before spending, Oct 27).
+- A wiring the engine flags into the runner (one line, `from-b.md`).
+- AMD: the account's verification hold.
 
 ## Next (Sun Nov 1)
-- Divergence sweep: re-price from this run's measured cost before the next slice, then fit the classifier on what landed and report its held-out AUROC and lead with the n it rests on.
+- Divergence: done. The final fit on 720 runs misses (AUROC 0.66, lead 138 steps); not used. Both fit reports are committed under `corpus/reports/`. No more divergence spend.
+- Agent runaways: a stalled run's tasks with no stop reason are possibly stuck; at most one per worker counts (`AgentSample.concurrency`, 0.6.1), and one when the worker count isn't recorded.
 - Calibrate RL on A's 50-step GRPO run first (a hero lens), then retrieval, GNN and vision records as they land; serving once A's vLLM probes land.
 - Validation: the engine freezes at the `validation-freeze` tag after round four; Monday's full runs are scored with `scripts/score_validation.py`, which prints the model ids it used. The Oct 31 LoRA run is used for calibration, not held out.
 - AMD: no AMD measurements (the account is on a verification hold). If it lifts by Monday morning, the 300 paired configs (`data/amd_grouped.jsonl`) run first.
-- Contract 0.6.0 asks: `Campaign.start`, `CampaignCell.slot`, `Estimate.rate`; C has `cost.gpu_hours` for the editable rate now.
+- Contract 0.6.0: filled (campaign calendar fields, `Estimate.rate` on every cost estimate).
 
 ## Cloud runs and spend
 Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and dollars.
@@ -193,10 +219,28 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Oct 31 | `b-divergence-smoke-2` (GitHub run 41257375094, cap $0.25 total): 1 of 10 configs ran (20.9 s), because the first smoke run's unsettled worst case ($0.14) still counted against the cap | L4 x 1 | 1 (wall), 89 container-s | $0.02 by container time ($0.16 of the $0.25 with the first run) |
 | Nov 1 | `b-divergence-sweep-1` (GitHub run 41257611597, first slice of the 800, cap $1.00 total): 24 configs ok, 16 to 25 s each (median about 22 s). Waves of 2 containers x 6. The third wave ran nothing: its containers waited for an L4 past the start-up allowance and found their end time gone (fixed locally: the end time now includes the driver's 300 s wait) | L4 x 2 | 21 (wall), 2,664 container-s | $0.65 by the driver's container time, which counts queue waits ($0.81 of the $1.00 with the smoke runs); Modal's bill is likely lower |
 | Nov 1 | `b-divergence-sweep-2` (GitHub run 41275399391, cap $12.00 total): 304 configs ok (329 of 800 with the first slice), 16 to 29 s each (median 16.9 s), 16 a container on 4 L4s. Each batch spent 230 to 390 s in its container, but waves took 790 to 1,480 s: the containers waited for L4s. The last wave's 4 containers never got one and the driver cancelled them after 1,140 s with nothing back | L4 x 4 | 110 (wall), 26,093 container-s by the driver (in-container work about 5,300) | $6.38 by the driver's container time, which counts the queue ($7.19 of the $12.00 so far); Modal's bill is likely nearer $1.50 |
+| Nov 1 | `b-divergence-export-1` (GitHub run 41299862454): the 329 divergence rows back, for the fit | CPU | about 2 | about $0.01 |
+| Nov 1 | `b-divergence-sweep-3-l4` (GitHub run 41300143834, cap $9.59 for L4): 48 configs ok (377 on L4 in all); the second wave's 2 containers waited 2,640 s for L4s and ran nothing | L4 x 2-3 | 65 (wall), 9,241 container-s by the driver | $2.26 by the driver's measure ($9.45 on L4 so far) |
+| Nov 1 | `b-divergence-sweep-3-a10` (GitHub run 41300145883, cap $2.41 for A10): 343 configs ok, a fresh draw (`--seed 1`), the board on every row; no queueing | A10 x 1-4 | about 70 (wall) | $2.10 by the driver's measure. Divergence total $11.55 of the $12.00 cap; no more divergence sweeps (Chiya, Nov 1) |
+| Nov 1 | `b-glimmer-startup-check` (GitHub run 41327084275, pre-approved, CPU only, 70 min limit): failed while building images (Modal can't read the Python version in vLLM's registry image); nothing downloaded or ran | CPU | about 3 (wall), image builds only | about $0.00 |
+| Nov 1 | `b-glimmer-startup-check-2` (GitHub run 41327585942, pre-approved, CPU only): both of Meta's downloads into the `preflight-glimmer-weights` volume (bf16 59.6 GB in 333 s, revision cec94fcf; GGUF Q4_K_M 16.8 GB in 124 s, revision b44f1072; both Apache 2.0, not gated); vLLM 0.28.0 and llama.cpp build 12030 (a91eab67d) images built; `vllm serve --help` failed on the CPU container, so the parser check read false there (the A100 smoke checks the parsers on a GPU) | CPU x 4 | about 10 (wall) | about $0.05 |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
 Total so far: ledger $1.21 plus about $0.03 today; billed estimate $4.80 to $6.70 until Modal's usage page gives the real figure. **The ledger under-counts container time.** It sums each config's own seconds, but containers are also billed for start-up, the per-batch volume reload, a volume commit after every config, and the waits between waves. That overhead was small in phase 0's single container and dominant in phase 1 (about 80 container-seconds per config against about 9 counted). So the $6 cap was enforced on the wrong measure. Phase 2 is on hold until the budget counts container wall time. Measured per config on the L4: grouped median 18.8 s, p90 25.7 s (n = 10); HF median 16.9 s, p90 25.2 s (n = 50). The HF jobs were far quicker than the 120 s guess, so phase 0 finished phase 1's HF set too. The ledger counts the configs' GPU-seconds; Modal's bill also counts container start-up between waves, so check it on Modal's usage page.
+
+## Pushes to `ws-b`
+
+Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking once gitleaks is clean (`git` over the pushed range and `dir`) and one read-only review has checked the change; each push is listed here. Anything for `main`, production flags or the contract is still asked first.
+
+| When (ET) | Commits sent (oldest first) | Merges | Review | gitleaks |
+| --- | --- | --- | --- | --- |
+| Sun Nov 1, about 11:30 AM | 977d5ef contract 0.6.0 fields; 7c803b8 P(OOM) scored as shown, table 67ab8edae6; 1cfa689 divergence not used; 0143b6a small fixes; 6b388f0 engine flags wired, stalled-run cap, both fit reports; ab72de6 review fixes; and this status commit | none (f42a30a went out with the earlier push) | read-only reviews of 977d5ef to 1cfa689 (earlier), of 0143b6a and 6b388f0, and of ab72de6; 0143b6a also on Chiya's yes (11:04 AM) | clean, both scans |
+| Sun Nov 1, about 11:45 AM | 285afc5 review minors (stalled-run reason wording, the scorer says the lead once, the API test checks the count); and this status commit | none | read-only review of 285afc5: nothing blocking | clean, both scans |
+| Sun Nov 1, about 11:50 AM | 9789338 Glimmer Modal app (startup check, quantize, smokes, endpoint); and this status commit | none | read-only review of 9789338: nothing blocks the startup check; its deploy and smoke findings are fixed in the next commit, reviewed before any GPU run | clean, both scans |
+| Sun Nov 1, about 12:10 PM | e2a7457 Glimmer review fixes (proxy auth, a vLLM image Modal can run); 47e61fe GRPO peak and RL calibration on the 50-step A10 run; and this docs commit (Glimmer decision, status, requests) | none | read-only review of e2a7457 and 47e61fe: nothing blocks the CPU startup check; its CUDA 13 point is fixed and reviewed before the A100 smoke | clean, both scans |
+| Sun Nov 1, about 12:20 PM | e0775be Glimmer before the GPU runs (CUDA 13 base, CUDA versions in the startup check, 18-minute A100 cap); and this status commit | none | read-only review of e0775be: nothing blocking | clean, both scans |
+| Sun Nov 1, about 12:35 PM | the CI format fix for tests/test_engine_api.py (CI red on d2dc950: `ruff format --check .`), the Glimmer revisions and spend, the reply to C; this commit | none | read-only review: nothing blocking, wording fixes applied; locally ruff format and check clean, 1,339 no-torch tests pass | clean, both scans |
 
 ## Contract requests
 In `docs/requests/from-b.md`.

@@ -21,7 +21,7 @@ Manifest (JSON):
 		"agent_total_usd": 6.80,                     # agent: the full benchmark run's cost
 		"preflight_usd": 0.42, "preflight_s": 210,  # what this Preflight run itself cost and took
 		"used_for_tuning": false,
-		"calibrates": ["rollout"]                    # rows it calibrated, which then don't score it (the GRPO zoo, Nov 1)
+		"calibrates": ["rollout"]                    # rows it calibrated, unscored; "intervals": out of coverage; "*": every row
 	}],
 	"knob_ms": [41, 55, ...],                        # browser timings of knob moves (C)
 	"corpus": ["path/to/kernels/store", ...]         # for the cross-GPU row (leave-one-GPU-out)
@@ -302,6 +302,9 @@ _ROWS = {"memory": "memory", "step_same": "step", "step_other": "step", "rollout
 	"agent": "agent"}  # fmt: skip
 
 
+CALIBRATES = frozenset({*_ROWS.values(), "intervals", "*"})  # a Preflight run's own cost is never calibrated
+
+
 def _row_of(attr: str) -> str:
 	base = attr.removesuffix("_inside")
 	return _ROWS.get(base, base)
@@ -331,10 +334,15 @@ def calibration_note(manifest: dict) -> str:
 
 
 def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
-	all_runs = [score_run(r, base) for r in manifest.get("runs", [])]
 	# per run, not per script: two runs of one script can differ (review, Nov 1). "*" is a run used for calibration
 	# altogether (Chiya, Nov 1: the Oct 31 LoRA run), which no held-out row scores
 	all_cal = [set(r.get("calibrates") or ()) for r in manifest.get("runs", [])]
+	unknown = set().union(*all_cal) - CALIBRATES if all_cal else set()
+	if (
+		unknown
+	):  # review, Nov 1: a typo ("interval") would silently leave a calibration run in the held-out rows
+		raise ValueError(f"unknown 'calibrates' names {sorted(unknown)}; known: {sorted(CALIBRATES)}")
+	all_runs = [score_run(r, base) for r in manifest.get("runs", [])]
 	keep = [i for i, cal in enumerate(all_cal) if "*" not in cal]
 	runs = [all_runs[i] for i in keep]
 	calibrates = [all_cal[i] for i in keep]
@@ -419,7 +427,7 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		(f"{r.script}:{k}", getattr(r, k))
 		for r, cal in zip(runs, calibrates, strict=True)
 		for k in ("memory_inside", "step_inside", "rollout_inside", "serving_inside", "agent_inside")
-		if _row_of(k) not in cal
+		if _row_of(k) not in cal and "intervals" not in cal
 	]
 	rows.append(
 		_share_row(
@@ -521,7 +529,16 @@ def divergence_row(d: dict | None) -> Row:
 		d.get("n", 0),
 		hit,
 		f"AUROC {a['point']:.2f} ({a['lo']:.2f} to {a['hi']:.2f}); warns {s['point']:.0f} steps early "
-		f"({s['lo']:.0f} to {s['hi']:.0f}); bootstrap over settings families (the sweep is one architecture)",
+		f"({s['lo']:.0f} to {s['hi']:.0f}"
+		# the report's own reason says it when the row misses (review, Nov 1: once, not twice)
+		+ (
+			"; the point estimate clears 100, the interval doesn't"
+			if s["point"] >= 100 > s["lo"] and (hit or not d.get("verdict"))
+			else ""
+		)
+		+ "); bootstrap over settings families (the sweep is one architecture)"
+		+ (f"; {d.get('diverged')} of {d.get('n')} runs diverged" if d.get("diverged") is not None else "")
+		+ (f"; {d['verdict']}: {d['why']}" if d.get("verdict") and not hit else ""),
 	)
 
 

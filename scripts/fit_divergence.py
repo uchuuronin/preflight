@@ -202,6 +202,24 @@ def summarise(oof: list[dict]) -> dict:
 	}
 
 
+def verdict(rep: dict, runs: list[dict]) -> dict:
+	"""Whether the classifier meets its row, and if not why, from the runs themselves (so a refit keeps it)."""
+	d = [r for r in runs if r["label"]["diverged"]]
+	fp16 = sum(str(r["cfg"].get("precision")) == "fp16" for r in d)
+	early = sum((r["label"].get("diverged_step") or 0) < 30 for r in d)
+	met = rep["auroc"]["point"] >= 0.85 and rep["lead_steps"]["point"] >= LEAD
+	return {
+		"verdict": "used" if met else "not used: the warning comes from the threshold rules (D6)",
+		"why": (
+			""
+			if met
+			else f"{fp16} of the {len(d)} divergences are fp16 blow-ups and {early} of {len(d)} come in the first 30 "
+			f"steps, before the classifier's {D.WINDOW}-step window can say much; held-out AUROC "
+			f"{rep['auroc']['point']:.2f} against the 0.85 target"
+		),
+	}
+
+
 def write_model(model: D.Model, out: Path) -> None:
 	from preflight.corpus.calibrate import ruff_formatted
 
@@ -246,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
 	if args.out_model:
 		write_model(model, args.out_model)
 	if args.report:
-		args.report.write_text(json.dumps(rep, indent=1, default=str))
+		args.report.write_text(json.dumps({**rep, **verdict(rep, runs)}, indent=1, default=str) + "\n")
 	return 0
 
 

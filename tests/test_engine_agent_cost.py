@@ -282,3 +282,69 @@ def test_a_what_if_turn_cap_isnt_a_runaway():
 	assert ac.agent_totals(sample)["risk.runaway"].detail["by_rule"]["time"]["runaways"] == 2
 	capped = ac.agent_totals(sample, capped_ids=frozenset({"t28"}))["risk.runaway"]
 	assert capped.detail["by_rule"]["time"]["runaways"] == 1
+
+
+def _stalled(n_open: int, n_done: int, workers: int | None):
+	"""A stalled run (contract 0.6.0) with n_open tasks left waiting on a tool; `concurrency` lands in 0.6.1."""
+	from types import SimpleNamespace
+
+	s = _tasks([0.014] * (n_open + n_done), [20.0] * (n_open + n_done), [None] * n_open + ["done"] * n_done)
+	if workers is None:
+		return s.model_copy(update={"ended": "stalled"})
+	return SimpleNamespace(
+		tasks=s.tasks, population=500, selection=None, ended="stalled", concurrency=workers
+	)
+
+
+def test_a_stalled_run_counts_at_most_one_possibly_stuck_task_per_worker():
+	# Chiya, Nov 1: tonight's re-sample has 24 tasks with no stop reason and 4 workers
+	r = ac.agent_totals(_stalled(24, 6, 4))["risk.runaway"]
+	assert r.point == pytest.approx(4 / 30)
+	stalled = r.detail["by_rule"]["stalled"]
+	assert stalled["runaways"] == 4 and stalled["open"] == 24 and stalled["workers"] == 4
+	assert "stalled with 24 tasks" in r.reason and "one per worker (4)" in r.reason
+
+
+def test_a_stalled_run_without_a_worker_count_counts_one():
+	r = ac.agent_totals(_stalled(24, 6, None))["risk.runaway"]
+	assert r.point == pytest.approx(1 / 30) and "isn't recorded" in r.reason
+
+
+def test_fewer_open_tasks_than_workers_counts_them_all_and_flagged_ones_once():
+	assert ac.agent_totals(_stalled(2, 28, 4))["risk.runaway"].point == pytest.approx(2 / 30)
+	s = _stalled(3, 27, 2)
+	s.tasks[0] = s.tasks[0].model_copy(update={"latency_s": 900.0})  # open, and over 8x the median wall time
+	r = ac.agent_totals(s)["risk.runaway"]
+	# review, Nov 1: the flagged open task holds one of the 2 workers, so only 1 more counts
+	assert r.detail["by_rule"]["time"]["runaways"] == 1 and r.detail["by_rule"]["stalled"]["runaways"] == 1
+	assert r.point == pytest.approx(2 / 30) and "1 of them already flagged by the rules above" in r.reason
+
+
+def test_no_stop_reason_in_a_finished_run_isnt_possibly_stuck():
+	s = _tasks([0.014] * 30, [20.0] * 30).model_copy(update={"ended": "finished"})
+	r = ac.agent_totals(s)["risk.runaway"]
+	assert r.point == 0 and "stalled" not in r.detail["by_rule"]
+
+
+def test_a_what_if_capped_task_in_a_stalled_run_isnt_open():
+	r = ac.agent_totals(_stalled(2, 28, 4), capped_ids=frozenset({"t0"}))["risk.runaway"]
+	assert r.detail["by_rule"]["stalled"]["open"] == 1
+
+
+def test_one_open_task_already_flagged_reads_plainly_without_a_worker_count():
+	s = _stalled(1, 29, None)
+	s.tasks[0] = s.tasks[0].model_copy(update={"latency_s": 900.0})
+	r = ac.agent_totals(s)["risk.runaway"]
+	assert r.point == pytest.approx(1 / 30)
+	assert "with 1 task waiting on a tool, possibly stuck" in r.reason and "so 0 more counted" in r.reason
+	assert "1 of them already flagged" in r.reason and "each" not in r.reason.split("stalled")[1]
+
+
+def test_a_recorded_worker_count_of_zero_isnt_called_missing():
+	from types import SimpleNamespace
+
+	s = _stalled(3, 27, None)
+	z = SimpleNamespace(tasks=s.tasks, population=500, selection=None, ended="stalled", concurrency=0)
+	r = ac.agent_totals(z)["risk.runaway"]
+	assert r.point == pytest.approx(1 / 30) and "count is 0" in r.reason and "isn't recorded" not in r.reason
+	assert "1 more counted as a runaway" in r.reason

@@ -42,6 +42,7 @@ from preflight.engine import oom as oom_model
 from preflight.schema.encoding import MAX_GRID_CELLS, choose_scale, encode_f16, encode_mask
 from preflight.schema.prediction import (
 	Estimate,
+	EstimateRate,
 	Grid,
 	GridAxis,
 	KnobImpact,
@@ -96,7 +97,30 @@ FEATURES = {
 	"serving": False,
 	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
 	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
-}  # this dict is the switch until the runner sets it from flags.json (from-b.md, B -> A); keep the two the same
+}  # the defaults when the caller passes no flags (scripts, tests); keep them the same as flags.json
+# the flags.json key for each feature: fill_predictions(record, flags=flag) reads them for that call
+FLAG_OF = {
+	"rl": "engine.rl",
+	"serving": "engine.serving",
+	"steptime_cross_gpu": "engine.steptime_cross_gpu",
+	"divergence": "engine.divergence",
+}
+_FEATURES_NOW: contextvars.ContextVar[dict[str, bool] | None] = contextvars.ContextVar(
+	"preflight_features", default=None
+)
+
+
+def feature(name: str) -> bool:
+	"""Whether a feature is on: the caller's flags for this fill, else FEATURES."""
+	now = _FEATURES_NOW.get()
+	return (now if now is not None else FEATURES)[name]
+
+
+def features_from(flag: Callable[[str], bool]) -> dict[str, bool]:
+	"""Every feature from the caller's flag reader (a missing flag reads as off)."""
+	return {name: bool(flag(key)) for name, key in FLAG_OF.items()}
+
+
 RL_TARGETS = ("rl.zero_spread", "time.rollout", "rl.truncation")
 SERVING_TARGETS = ("serving.throughput", "serving.ttft_p95", "serving.tpot", "serving.kv_tokens")
 
@@ -180,11 +204,11 @@ def targets_for(record: FlightRecord) -> list[Target]:
 		if _has_shape(record):  # the per-term split needs the analytical model
 			ids += [f"memory.{t}" for t in MEMORY_TERMS]
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
-		if FEATURES["rl"] and record.job.lens == "rl":
+		if feature("rl") and record.job.lens == "rl":
 			ids += list(RL_TARGETS)
-		if FEATURES["divergence"] and record.job.lens != "serving":  # training runs have a loss to watch
+		if feature("divergence") and record.job.lens != "serving":  # training runs have a loss to watch
 			ids.append("risk.divergence")
-		if FEATURES["serving"] and record.job.lens == "serving":
+		if feature("serving") and record.job.lens == "serving":
 			ids += list(SERVING_TARGETS)
 		c = record.job.constraints
 		if c.wall_time_cap_s:
@@ -367,7 +391,7 @@ def _padded_step(
 
 def _dataset_lengths(p) -> tuple[float, float] | None:
 	ex = p.extras or {}
-	med, mean = ex.get("dataset_median_tokens"), ex.get("dataset_mean_tokens")
+	med, mean = ex.get("dataset_p50_tokens"), ex.get("dataset_mean_tokens")  # A's names, Nov 1
 	return (float(med), float(mean)) if med and mean else None
 
 
@@ -532,6 +556,42 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 	return sorted(out)
 
 
+CONTEXT_MAX_BYTES = (
+	2 * 2**30
+)  # guess: a real context is 0.25-1 GiB; a gap above 2 GiB is another process on the GPU
+CONTEXT_AGREE_BYTES = 64 * 2**20  # guess: two steps within 64 MiB of each other agree on the context
+
+
+def _context_bytes(record: FlightRecord, gpu: str | None = None) -> float:
+	"""The device memory outside PyTorch's allocator (CUDA context, cuBLAS workspaces, other libraries), measured from
+	the probes' timed steps: whole-device use (cudaMemGetInfo, at the step boundary) less the step's reserved peak.
+	The largest gap that a second step agrees with (reviews, Nov 1): when the allocator hands memory back between the
+	peak and the boundary (GRPO frees its generation cache) a step's gap reads low or negative, so the steps that
+	released nothing show the whole context; another process's one-step spike on a shared GPU has no partner. C, Nov 1: a guessed 0.75 GiB on a GRPO probe's reserved peak read 23.8 GB on a
+	23.7 GB L4 for a run that fit. The guess stays where no probe logged whole-device use, and on any GPU other than
+	the probe's, whose driver and libraries take their own."""
+	if gpu is not None and gpu != _env_gpu(record):
+		return float(memory.DEFAULT_CONTEXT_BYTES)
+	gaps = [
+		x.device_used_bytes - x.peak_reserved_bytes
+		for p in record.probes
+		if p.status in OK_PROBE
+		for x in (p.step_log or [])
+		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
+	]
+	gaps = sorted((g for g in gaps if 0 < g <= CONTEXT_MAX_BYTES), reverse=True)
+	if not gaps:
+		return float(memory.DEFAULT_CONTEXT_BYTES)
+	if len(gaps) == 1:
+		return float(gaps[0])
+	# the largest gap that a second step agrees with: a release after the peak only lowers a step's gap, and a
+	# co-tenant's one-step spike on a shared GPU has no partner (review, Nov 1)
+	for i, g in enumerate(gaps[:-1]):
+		if g - gaps[i + 1] <= CONTEXT_AGREE_BYTES:
+			return float(g)
+	return float(np.median(gaps))
+
+
 def _capacity(record: FlightRecord, gpu: str) -> int:
 	"""Usable bytes on this GPU: the probe's reported total when the probe ran on it, else the table's."""
 	g = record.env.gpu if record.env else None
@@ -660,6 +720,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		why = "the GPU isn't known, so there's no capacity to compare against; pick a GPU"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	capacity = _capacity(record, gpu)
+	ctx = _context_bytes(record, gpu)  # measured from the probes' whole-device use where they logged it
 	oom_probe = _matching_probe(record, values, ok=("oom",))
 	if oom_probe is not None and gpu == _env_gpu(record):  # an OOM on one GPU says nothing about a bigger one
 		why = f"probe {oom_probe.id} ran out of memory at these settings"
@@ -700,7 +761,10 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	if match is not None and mprobes:
 		# a probe at these knobs measured the peak only if it saw the moment that sets it
 		moment = memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=capacity).peak_moment
-		measured = moment == "train" or (moment == "eval" and probe_ran_eval(match))
+		# review, Nov 1: and only on the probe's own GPU; a GPU move is a prediction, whatever the knobs match
+		measured = gpu == _env_gpu(record) and (
+			moment == "train" or (moment == "eval" and probe_ran_eval(match))
+		)
 	est = memory.predict_peak(
 		arch,
 		setup,
@@ -708,6 +772,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		shape.seq,
 		probes=mprobes or None,
 		capacity_bytes=capacity,
+		context_bytes=ctx,
 		work_units=knobs.work_units(lens, sized_values),
 		measured=measured,
 		base_half_width=conformal.TABLE.lookup("memory.peak", gpu, lens).half_width
@@ -725,8 +790,8 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	cell = conformal.TABLE.lookup("memory.peak", gpu, lens)
 	if est.status != "abstain" and est.point and cell is not None and cell.residuals:
 		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
-		alloc = est.point - memory.DEFAULT_CONTEXT_BYTES
-		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - memory.DEFAULT_CONTEXT_BYTES)
+		alloc = est.point - ctx
+		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - ctx)
 		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
 		oom_source = f"from {cell.n} held-out runs"
 	else:
@@ -752,20 +817,41 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	return res
 
 
+# the terms that grow with batch and length absorb what the model misses; the rest are set by the model's size
+FLEXIBLE_TERMS = ("activations", "logits", "eval_spike")
+
+
 def _term_estimates(stack: dict, peak: Estimate) -> dict:
-	"""memory.<term> at the peak, scaled so the terms add up to the calibrated peak, with its relative band."""
-	total = sum(max(0.0, v) for v in stack.values())
+	"""memory.<term> at the peak, adding up to the calibrated peak, with its relative band.
+
+	C, Nov 1: scaling every term to the peak made a GRPO run's weights read 9.9 GB for a 494M-parameter model (5x),
+	when the probe measured 2.0 GB. Weights, gradients, optimizer state, the context and the other size-set terms
+	keep their modelled values; activations, logits and the eval spike take the rest of the peak, in proportion,
+	or activations alone when the model has none. Only when the size-set terms already exceed the peak are all of
+	them scaled down together."""
+	vals = {t: max(0.0, stack.get(t, 0.0)) for t in MEMORY_TERMS}
+	total = sum(vals.values())
 	if not total or peak.status == "abstain":
 		return {}
-	scale = peak.point / total
 	lo_f, hi_f = peak.lo / peak.point, peak.hi / peak.point
 	status = "predicted" if peak.status == "measured" else peak.status  # the split is modelled, not measured
-	why = "split by the analytical model, scaled to the calibrated peak"
-	out = {}
-	for t in MEMORY_TERMS:
-		v = max(0.0, stack.get(t, 0.0)) * scale
-		out[f"memory.{t}"] = _est(v, v * lo_f, v * hi_f, "bytes", status, memory.MODEL_ID, why)
-	return out
+	fixed = sum(v for t, v in vals.items() if t not in FLEXIBLE_TERMS)
+	flex = sum(vals[t] for t in FLEXIBLE_TERMS)
+	rest = peak.point - fixed
+	if rest >= 0:
+		why = (
+			"weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike "
+			"share the rest of the calibrated peak"
+		)
+		for t in FLEXIBLE_TERMS:
+			vals[t] = rest * vals[t] / flex if flex else (rest if t == "activations" else 0.0)
+	else:
+		why = "split by the analytical model, scaled down to the calibrated peak"
+		vals = {t: v * peak.point / total for t, v in vals.items()}
+	return {
+		f"memory.{t}": _est(v, v * lo_f, v * hi_f, "bytes", status, memory.MODEL_ID, why)
+		for t, v in vals.items()
+	}
 
 
 def _from_memory_estimate(
@@ -840,7 +926,7 @@ def _empirical_memory(
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	cal = memory.Calibration.fit(pts)
 	x = knobs.work_units(lens, _sized(knobs.Shape(), values, _padded_seq(record, values))[1])
-	measured = _matching_probe(record, values) is not None
+	measured = _matching_probe(record, values) is not None and _target_gpu(record, values) == _env_gpu(record)
 	cell = conformal.TABLE.lookup("memory.peak", _target_gpu(record, values), lens)
 	h = (
 		memory.HALF_WIDTH_CALIBRATED
@@ -851,14 +937,15 @@ def _empirical_memory(
 	if not measured and (x > cal.range()[1] or h > memory.ABSTAIN_HALF_WIDTH):
 		why = f"{x:.0f} work units is too far from the probes for a line fit; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
-	point = cal.correct(x, 0.0) + memory.DEFAULT_CONTEXT_BYTES
+	ctx = _context_bytes(record, _target_gpu(record, values))
+	point = cal.correct(x, 0.0) + ctx
 	if point <= 0:
 		why = "the line through the probes goes below zero here; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	p = memory.p_oom(point, h / memory.Z90, capacity)
 	hi = point * math.exp(h)
 	if cal.is_below(x):  # the same floor as the analytical path (memory.predict_peak)
-		hi = max(hi, cal.correct(cal.min_tokens, 0.0) + memory.DEFAULT_CONTEXT_BYTES)
+		hi = max(hi, cal.correct(cal.min_tokens, 0.0) + ctx)
 	est = memory.MemoryEstimate(
 		point, point * math.exp(-h), hi, "bytes", status, mid, p, memory.oom_status(p),  # type: ignore[arg-type]
 		h / memory.Z90, None, "; ".join(x for x in (
@@ -1129,10 +1216,10 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		# shown past +-50% as rough; off, K1's simulated band and the usual abstain
 		xcell = (
 			conformal.TABLE.lookup("time.step.cross", tgt_gpu, None)
-			if FEATURES["steptime_cross_gpu"]
+			if feature("steptime_cross_gpu")
 			else None
 		)
-		if FEATURES["steptime_cross_gpu"] and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
+		if feature("steptime_cross_gpu") and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
 			# Chiya, Oct 31: abstain, labelled, until the AMD session measures; datasheets alone don't size the band
 			vendor = gpus.get_gpu(tgt_gpu).vendor
 			why = (
@@ -1345,7 +1432,7 @@ class _TimeResult:
 
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
 	step = _step(record, values)
-	if FEATURES["rl"] and record.job.lens == "rl" and step.est.status != "abstain":
+	if feature("rl") and record.job.lens == "rl" and step.est.status != "abstain":
 		step = _with_rollout(record, values, step)
 	if step.est.status == "abstain":
 		return _TimeResult(_abstain("s", MODEL_ID_TOTAL, step.est.reason), step.est, step.sigma)
@@ -1392,7 +1479,25 @@ def _cost(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
 		return _abstain("usd", MODEL_ID_COST, f"no price for {gpu or 'this GPU'} in the table")
 	rate = pr.usd_per_hour * _n_gpus(values, record) / 3600.0
 	why = f"{gpu} at ${pr.usd_per_hour:.2f}/h ({pr.provider}, {pr.as_of})"
-	return _est(time.point * rate, time.lo * rate, time.hi * rate, "usd", time.status, MODEL_ID_COST, why)
+	est = _est(time.point * rate, time.lo * rate, time.hi * rate, "usd", time.status, MODEL_ID_COST, why)
+	row = prices.gpu_rate(gpu, pr.provider) or prices.market_reference(gpu)
+	return _rated(est, "cost.gpu_hours", pr.usd_per_hour, row.id if row else None)
+
+
+def _rated(
+	est: Estimate | None, quantity: str, usd_per_unit: float | None, row: str | None, unit: str = "gpu_hours"
+):
+	"""Contract 0.6.0: a cost estimate says the quantity and rate it is, so a client re-prices it at the visitor's own
+	rate without parsing the reason. Abstentions and unpriced estimates carry none."""
+	if est is None or est.status == "abstain" or usd_per_unit is None:
+		return est
+	return est.model_copy(
+		update={
+			"rate": EstimateRate(
+				quantity=quantity, usd_per_unit=float(usd_per_unit), unit=unit, price_row=row
+			)
+		}
+	)
 
 
 def _gpu_hours(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
@@ -1872,7 +1977,12 @@ def run_cost(
 		)
 		billed = not own and row is not None
 		if billed:
-			usd = _scale(hours, row.usd_per_hour, "usd", why=why_rate)
+			usd = _rated(
+				_scale(hours, row.usd_per_hour, "usd", why=why_rate),
+				"line.quantity",
+				row.usd_per_hour,
+				row.id,
+			)
 		elif not own:  # billed in dollars, but this GPU has no price: say so on the line, not just the total
 			usd = _abstain("usd", MODEL_ID_RUN_COST, why_rate)
 		else:
@@ -1895,12 +2005,20 @@ def run_cost(
 	if own:
 		total = None
 		market = (
-			_scale(hours, row.usd_per_hour, "usd", why=why_rate)
+			_rated(
+				_scale(hours, row.usd_per_hour, "usd", why=why_rate),
+				"job_cost.gpu_hours",
+				row.usd_per_hour,
+				row.id,
+			)
 			if row
 			else _abstain("usd", MODEL_ID_RUN_COST, why_rate)
 		)
 	else:
 		total = _sum([x.usd for x in lines if x.usd is not None], "usd", why_rate)
+		total = _rated(
+			total, "job_cost.gpu_hours", row.usd_per_hour if row else None, row.id if row else None
+		)
 		market = None
 	if not own and basis.billing == "spot" and len(lines) == 1:
 		why_spot = (
@@ -1912,6 +2030,8 @@ def run_cost(
 			else total
 		)
 	at_risk = _at_risk(record, values, mem, tm, per_s, why_rate)
+	if row is not None:  # GPU-hours at risk x the same rate, so the browser re-prices it with the total
+		at_risk = _rated(at_risk, "job_cost.at_risk_gpu_hours", row.usd_per_hour, row.id)
 	# contract 0.3.0: the same risk in GPU-hours, shown first on an own cluster (Chiya, Oct 27); it needs no price
 	hours_why = f"{n} x {gpu}" if gpu else "GPU-hours"
 	at_risk_hours = _at_risk(record, values, mem, tm, n / 3600.0, hours_why, unit="gpu_hours")
@@ -1974,11 +2094,11 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.wall_cap"] = _wall_cap(record, tm)
 	if c.preemption.kind != "none":
 		out["risk.preemption_loss"] = _preemption(record, values, tm)
-	if FEATURES["rl"] and record.job.lens == "rl":
+	if feature("rl") and record.job.lens == "rl":
 		out.update(_rl_targets(record, values))
-	if FEATURES["divergence"] and record.job.lens != "serving":
+	if feature("divergence") and record.job.lens != "serving":
 		out["risk.divergence"] = _divergence(record, values)
-	if FEATURES["serving"] and record.job.lens == "serving" and not _QUIET.get():
+	if feature("serving") and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))
 	return Prediction(out)
 
@@ -2678,6 +2798,9 @@ def _divergence_model():
 def _divergence(record: FlightRecord, values: dict) -> Estimate:
 	"""P(the run diverges later), from the longest probe's stability series at the probe's settings."""
 	mid = divergence.MODEL_ID
+	model = _divergence_model()
+	if model is None:  # review, Nov 1: the verdict comes first, whatever the knobs or the probe
+		return _abstain("probability", mid, divergence.warn(None, {}, {})["reason"])
 	if _off_probe(record, values, also_ok=frozenset({"grad_accum"})):
 		return _abstain(
 			"probability", mid, "the warning reads the probe's own steps; probe this setting to see it"
@@ -2690,7 +2813,7 @@ def _divergence(record: FlightRecord, values: dict) -> Estimate:
 	p = max(probes, key=lambda q: len(q.stability.series["loss"]))
 	cfg = {**{kv.id: kv.current for kv in record.knobs}, **p.knobs}
 	cfg.setdefault("precision", cfg.get("dtype"))
-	w = divergence.warn(_divergence_model(), p.stability.series, cfg)
+	w = divergence.warn(model, p.stability.series, cfg)
 	if w["status"] == "abstain":
 		return _abstain("probability", mid, w["reason"])
 	return _est(w["point"], w["point"], w["point"], "probability", "predicted", mid, w["reason"])
@@ -2699,10 +2822,11 @@ def _divergence(record: FlightRecord, values: dict) -> Estimate:
 _CARDS = {
 	divergence.MODEL_ID: (
 		"classifier",
-		"logistic on the probe's loss, grad norm, logit growth and settings (Wortsman et al., ICLR 2024), trained on "
-		"the corpus's divergence sweep labelled by D9; a probability shows only where held-out runs verified it. Held "
-		"out by settings family (precision, qk-norm, init), not by architecture: every sweep run is the same small "
-		"GPT, so there is only one architecture to hold out",
+		"Not used: the warning comes from the threshold rules (D6). Held out on 720 corpus runs (377 on L4, 343 on "
+		"A10; 44 diverged): AUROC 0.66 (95% 0.56 to 0.76) against the 0.85 target, lead 138 steps (3 to 269: the point estimate clears 100, the interval doesn't), "
+		"73 of 676 stable runs alarmed. Why: 37 of the 44 divergences are fp16 blow-ups, and 15 come in the first 30 steps, "
+		"before the 25-step window can say much. Held out by settings family (precision, qk-norm, init), not by "
+		"architecture: every sweep run is the same small GPT",
 	),
 	serving.MODEL_ID: (
 		"simulation",
@@ -2775,7 +2899,7 @@ def _calibration(mid: str, record: FlightRecord | None = None) -> tuple[str, flo
 	target = _CARD_TARGET.get(mid)
 	if not target:
 		return CALIBRATION, None
-	if mid == steptime.MODEL_ID_CROSS and not FEATURES["steptime_cross_gpu"]:
+	if mid == steptime.MODEL_ID_CROSS and not feature("steptime_cross_gpu"):
 		return CALIBRATION, None  # the held-out band is installed but not switched on
 	if record is not None:
 		cell = conformal.TABLE.lookup(target, _env_gpu(record), record.job.lens)
@@ -2807,6 +2931,14 @@ def _cards(ids: set[str], record: FlightRecord | None = None) -> list[ModelCard]
 				h, n = (sum(v[i] for v in a100) for i in (0, 1))
 				if n:
 					notes += f" A100 holdout (same-GPU step time, scored once): {h} of {n} inside the band."
+		if mid == divergence.MODEL_ID:
+			# scored on held-out sweep runs and not used (Chiya, Nov 1); its card says so, not "simulated"
+			calib = "held_out, not used"
+			extra["training_data"] = (
+				"corpus divergence sweep, 720 runs on L4 and A10 (remote-runs b-divergence-export-2, Nov 1); "
+				"report: corpus/reports/divergence_nov1.json"
+			)
+			extra["heldout_error"] = {"auroc": 0.657, "lead_steps": 138.5, "false_alarm_rate": 73 / 676}
 		out.append(
 			ModelCard(
 				id=mid,
@@ -2950,11 +3082,19 @@ def stale_models(record: FlightRecord) -> list[tuple[str, str]]:
 	return out
 
 
-def fill_predictions(record: FlightRecord) -> FlightRecord:
+def fill_predictions(record: FlightRecord, *, flags: Callable[[str], bool] | None = None) -> FlightRecord:
 	"""The record with B's parts filled: predictions, model cards, knobs' probed ranges. Returns a copy.
 
+	`flags` is the caller's flag reader (the runner's `flag`): with it, engine.rl, engine.serving,
+	engine.steptime_cross_gpu and engine.divergence decide this fill; without it, FEATURES does.
 	This is the call scripts/make_golden.py makes in place of the fixture predictions.
 	"""
+	if flags is not None:
+		token = _FEATURES_NOW.set(features_from(flags))
+		try:
+			return fill_predictions(record)
+		finally:
+			_FEATURES_NOW.reset(token)
 	preds = predictions_for(record)
 	used = {e.model_id for e in preds.estimates.values()} | {g.model_id for g in preds.grids}
 	used.discard("none")
