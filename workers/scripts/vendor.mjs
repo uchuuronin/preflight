@@ -2,8 +2,10 @@
 // unmodified, so C's deploy only copies files (no install step). Run after `npm ci`:
 //   node scripts/vendor.mjs
 // resvg-wasm is MPL-2.0 and ships no licence file, so the MPL-2.0 text comes from lightningcss
-// (the same licence, installed here as a dependency of Vite, which Vitest uses). The fonts are OFL-1.1; each family keeps its own
-// licence file. Fonts are renamed .ttf to .bin so Wrangler bundles them as binary data modules.
+// (the same licence, installed here as a dependency of Vite, which Vitest uses). The fonts are
+// OFL-1.1; each family keeps its own licence file. Fonts are renamed .ttf to .bin so Wrangler
+// bundles them as binary data modules. Everything this copies is committed, so CI and the deploy
+// don't need to run it.
 import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

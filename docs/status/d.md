@@ -8,6 +8,32 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 15:50 (check-in: A's first triage run; Glimmer deployed, no cost per call yet)
+
+`a15a173` CI green (all six jobs). `main` is still `6757667`; nothing to merge.
+
+- **A's production triage run** (`a-triage-lora-prod`, share `jgk05gwUgV-Bo78sErzKFQ`, A's status on
+  `ws-a`): L4, the planted eval OOM caught (530 MiB asked, 486 MiB free of 22.06 GiB [measured,
+  A]). Not filmable yet: the eval probe's triage said "unclear" and quoted no line (A's fix
+  `b300684` is live at A's next deploy), and the shot needs a quoted line. Its finding sits on node
+  `eval`; checked in Chromium (desk and phone) with such a finding added to a copy of the Oct 28
+  record, it shows in the Eval loop node's detail sheet, below the rule checks' findings, the
+  quoted line inline. The storyboards now film it there.
+  Asked A (`from-d.md`) to re-run after the deploy and commit a copy of the record. Noted in both
+  storyboards' dependency rows.
+- **The one-record version:** A's record meets Chiya's condition (L4, the same eval OOM), so I'll
+  offer it, but every spoken number has to come from the record, and the record isn't in the repo
+  or reachable from my workspace. I'll draft it once A commits the copy (better from the re-run).
+- **Glimmer:** B deployed the endpoint (`b-glimmer-deploy`, scaled to zero, proxy auth), with smoke
+  latencies, but no measured cost per call from it yet, so the README and submission wording waits.
+- Also: re-wrapped `vendor.mjs`'s header comment, which my last edit had run together, and added
+  that CI and the deploy don't need to run it (as told to C).
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the storyboard notes, the request to A, the comment wrap and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 15:25 (card fonts committed)
 
 `749edd4` CI green (all six jobs). The kit is with Chiya; she sends me the sheet and form after the
