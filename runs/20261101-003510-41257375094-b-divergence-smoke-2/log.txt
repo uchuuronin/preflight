@@ -1,0 +1,21 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-40msvm2emHotAYSlMquIha
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[L4] wave 0: $0.14 of $0.25 spent (container time, worst case for unsettled waves), 0 done, 10 to do, deadline 120 s, next wave 1 x 1
+[L4] wave 0 took 59 s on 1 containers: 89 container-s ($0.02, worst case was $0.10) for 1 configs
+[L4] batch: 22.0 s in the container, reload 0.1 s, commits 0.9 s
+[L4] config 40a07058cf66 gpt-small  ok: 20.9 s
+[L4] wave 1: $0.16 of $0.25 spent (container time, worst case for unsettled waves), 1 done, 9 to do, deadline 120 s, next wave 0 x 0
+[L4] the next wave's worst case doesn't fit the money or the 11 minutes left; stopping, a rerun resumes
+[L4] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-40msvm2emHotAYSlMquIha
