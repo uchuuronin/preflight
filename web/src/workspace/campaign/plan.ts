@@ -70,20 +70,30 @@ export function startOf(c: PlanCell): number | null {
 	return s && s.status !== "abstain" && typeof s.point === "number" ? s.point : null;
 }
 
-/** True when B gave every placed run a start, so the lanes can be drawn against time. */
+/** True when B gave every placed run a start and a run time, so the lanes can be drawn against time. */
 export function hasSchedule(plan: CampaignPlan): boolean {
 	const placed = plan.cells.filter((c) => c.lane && !c.cut);
-	return placed.length > 0 && placed.every((c) => startOf(c) !== null);
+	return placed.length > 0 && placed.every((c) => startOf(c) !== null && c.time.status !== "abstain" && typeof c.time.point === "number");
 }
 
-/** A lane's runs split by the slot running them, so two runs going at once don't draw over each other. */
+/**
+ * A lane's runs split into rows, so two runs going at once never draw over each other. A run with
+ * its slot (B's CellPlan.slot; 0.6.0 as requested) goes on that slot's row; one without (records
+ * B writes today) goes on the first row where it doesn't overlap a run already there.
+ */
 export function slotsOf(cells: PlanCell[]): PlanCell[][] {
-	const by = new Map<number, PlanCell[]>();
-	for (const c of cells) {
-		const k = typeof c.slot === "number" && c.slot >= 0 ? c.slot : 0;
-		by.set(k, [...(by.get(k) ?? []), c]);
+	const hasSlot = (c: PlanCell) => typeof c.slot === "number" && Number.isInteger(c.slot) && c.slot >= 0;
+	const rows = new Map<number, PlanCell[]>();
+	for (const c of cells.filter(hasSlot)) rows.set(c.slot as number, [...(rows.get(c.slot as number) ?? []), c]);
+	const ordered = [...rows.keys()].sort((a, b) => a - b).map((k) => rows.get(k)!);
+	const end = (c: PlanCell) => (startOf(c) ?? 0) + (c.time.hi ?? c.time.point ?? 0);
+	const overlaps = (row: PlanCell[], c: PlanCell) => row.some((o) => (startOf(o) ?? 0) < end(c) && (startOf(c) ?? 0) < end(o));
+	for (const c of cells.filter((x) => !hasSlot(x)).sort((a, b) => (startOf(a) ?? 0) - (startOf(b) ?? 0))) {
+		const row = ordered.find((r) => !overlaps(r, c));
+		if (row) row.push(c);
+		else ordered.push([c]);
 	}
-	return [...by.keys()].sort((a, b) => a - b).map((k) => by.get(k)!);
+	return ordered.length ? ordered : [[]];
 }
 
 /**
@@ -91,10 +101,8 @@ export function slotsOf(cells: PlanCell[]): PlanCell[][] {
  * carry once B's to_campaign() fills them. Read only when present; 0.5.0 records draw without them.
  */
 interface Campaign06 {
-	start?: string | null;
 	p_by_deadline?: number | null;
 	checkpoint_interval?: Estimate | null;
-	lane_slots?: Record<string, number>;
 }
 interface Cell06 {
 	slot?: number | null;
@@ -132,9 +140,9 @@ export function planFromRecord(c: Campaign, models: readonly ModelCard[] = []): 
 				segments: x.segments ?? null,
 				lane: x.lane ?? null,
 				cut: x.cut ?? false,
-				reason: e.reason ?? "",
+				reason: typeof e.reason === "string" ? e.reason : "",
 				start_s: (x.start_s as Estimate | null | undefined) ?? null,
-				slot: e.slot ?? null,
+				slot: typeof e.slot === "number" ? e.slot : null,
 			};
 		}),
 		gpu_hours: (c.gpu_hours as Estimate | null | undefined) ?? missing("gpu_hours"),

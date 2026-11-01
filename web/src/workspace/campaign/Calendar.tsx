@@ -30,8 +30,14 @@ function when(iso: string | undefined): string {
 	return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(iso));
 }
 
+/** The finish band needs all three dates, each a real date: a record with only some says the finish in seconds instead. */
+function band(q: Record<string, string>): boolean {
+	return ["p10", "p50", "p90"].every((k) => typeof q[k] === "string" && Number.isFinite(Date.parse(q[k]!)));
+}
+
 function Duration({ c }: { c: PlanCell }) {
-	if (!trusted(c.time)) return <span className="pf-cal__abstain">{t("campaign.no_time")}</span>;
+	// The record's own reason when it gives one; the generic line only when it doesn't.
+	if (!trusted(c.time)) return <span className="pf-cal__abstain">{c.time.reason ? t("campaign.abstain", { why: c.time.reason }) : t("campaign.no_time")}</span>;
 	return (
 		<span>
 			{fmt(c.time.point, "s_short")} <small className="pf-dim">({fmtRange(c.time.lo ?? c.time.point, c.time.hi ?? c.time.point, "s_short")})</small>
@@ -67,7 +73,7 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 				</div>
 				<div>
 					<dt>{t("campaign.finish")}</dt>
-					<dd>{q.p50 ? t("campaign.finish_band", { p10: when(q.p10), p50: when(q.p50), p90: when(q.p90) }) : said(plan.finish_s)}</dd>
+					<dd>{band(q) ? t("campaign.finish_band", { p10: when(q.p10), p50: when(q.p50), p90: when(q.p90) }) : said(plan.finish_s)}</dd>
 				</div>
 			</dl>
 			<ol className="pf-cal__lanes">

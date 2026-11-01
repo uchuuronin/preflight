@@ -124,27 +124,47 @@ _SCALES = {"hundred": 100, "thousand": 1000}
 
 
 def _number_words(text: str) -> list[float]:
-	"""Numbers written in words ("forty", "forty-five", "two hundred", "a thousand")."""
+	"""Numbers written in words ("forty", "forty-five", "two hundred and fifty", "a thousand").
+
+	Each number is read on its own: punctuation ends one ("forty, five" is 40 and 5), a ones word
+	after a ones word or a tens word after either starts a new one ("seventeen twenty" is 17 and 20,
+	"fifty-fifty" is 50 and 50), and "and" carries on only after hundred or thousand ("between two
+	and four" is 2 and 4). Review, Nov 1: summing across them made up numbers the visitor never wrote.
+	"""
 	out: list[float] = []
-	words = re.findall(r"[a-z]+", text.lower().replace("-", " "))
-	total, cur, seen = 0, 0, False
-	for i, w in enumerate(words):
-		if w in _UNITS or w in _TENS:
-			cur += _UNITS.get(w, 0) + _TENS.get(w, 0)
-			seen = True
-		elif w in _SCALES and (seen or (i > 0 and words[i - 1] == "a")):
+	# Words (hyphens split words, as in "forty-five") and every punctuation mark as its own token.
+	tokens = re.findall(r"[a-z]+|[^a-z\s-]", text.lower())
+	total, cur, last = 0, 0, ""  # last: "", "one" (ones word), "ten" (tens word), "scale"
+
+	def flush() -> None:
+		nonlocal total, cur, last
+		if last:
+			out.append(float(total + cur))
+		total, cur, last = 0, 0, ""
+
+	for i, w in enumerate(tokens):
+		if w in _UNITS:
+			n = _UNITS[w]
+			# A ones word follows a tens word only below ten ("forty five", not "twenty twelve").
+			if last == "one" or (last == "ten" and n >= 10):
+				flush()
+			cur += n
+			last = "one"
+		elif w in _TENS:
+			if last in ("one", "ten"):
+				flush()
+			cur += _TENS[w]
+			last = "ten"
+		elif w in _SCALES and (last in ("one", "ten") or (i > 0 and tokens[i - 1] == "a" and not last)):
 			cur = (cur or 1) * _SCALES[w]
 			if _SCALES[w] >= 1000:
 				total, cur = total + cur, 0
-			seen = True
-		elif w == "and" and seen:
+			last = "scale"
+		elif w == "and" and last == "scale":
 			continue
 		else:
-			if seen:
-				out.append(float(total + cur))
-			total, cur, seen = 0, 0, False
-	if seen:
-		out.append(float(total + cur))
+			flush()
+	flush()
 	return out
 
 

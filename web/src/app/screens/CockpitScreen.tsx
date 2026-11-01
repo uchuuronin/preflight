@@ -175,7 +175,11 @@ function Cockpit() {
 					<h2 className="pf-h2">{t("below.title")}</h2>
 					<FlightPlanBand />
 					<MemoryBand />
-					{campaign ? <CampaignCalendar plan={campaign} /> : null}
+					{campaign ? (
+						<AddonBoundary id="campaign-calendar">
+							<CampaignCalendar plan={campaign} />
+						</AddonBoundary>
+					) : null}
 					{below.map((p) => (
 						<AddonBoundary key={p.id} id={p.id}>
 							<p.component record={record} knobs={state.knobs} estimates={estimates} />

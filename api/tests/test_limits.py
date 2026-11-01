@@ -160,6 +160,19 @@ def test_the_limits_reader_is_off_with_the_live_guide(monkeypatch):
 		("a thousand GPU-hours", [1000.0]),
 		("keep it on the a100 80gb", [80.0]),
 		("bf16 only", []),
+		# Review, Nov 1: separate numbers stay separate, never summed into one the visitor didn't write.
+		("under forty, five hours max", [40.0, 5.0]),
+		("budget fifty; ten GPU-hours", [50.0, 10.0]),
+		("between two and four hours", [2.0, 4.0]),
+		("GPUs: two, four or eight", [2.0, 4.0, 8.0]),
+		("batch size four, eight or sixteen", [4.0, 8.0, 16.0]),
+		("fifty-fifty", [50.0, 50.0]),
+		("seventeen twenty", [17.0, 20.0]),
+		("one hundred twenty", [120.0]),
+		("two thousand five hundred", [2500.0]),
+		("forty five thousand", [45000.0]),
+		("a thousand and one", [1001.0]),
+		("twelve hundred", [1200.0]),
 	],
 )
 def test_numbers_in_the_visitors_words(text, expect):
