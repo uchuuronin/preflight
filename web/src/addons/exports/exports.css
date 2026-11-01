@@ -6,11 +6,11 @@
 	gap: var(--pf-space-3);
 }
 
-.pf-addon-exports__title {
+.pf-addon-exports__unverified {
 	margin: 0;
-	font-family: var(--pf-font-serif);
-	font-weight: 400;
-	font-size: var(--pf-text-2xl);
+	font-size: var(--pf-text-sm);
+	font-weight: 600;
+	color: var(--pf-fg);
 }
 
 .pf-addon-exports__lede {

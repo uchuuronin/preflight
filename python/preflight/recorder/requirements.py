@@ -112,14 +112,16 @@ def install(workdir: Path, target: Path, *, log=print) -> tuple[str | None, list
 	constraints = target / "constraints.txt"
 	constraints.write_text(pins)
 	log(f"[preflight] requirements: installing {', '.join(keep)}")
-	cmd = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+	# -I: pip walks every sys.path entry, and the probe's PYTHONPATH can name a directory its
+	# unprivileged uid can't list (Modal's /root, Nov 1: PermissionError, nothing installed)
+	cmd = [sys.executable, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
 		"--no-warn-script-location", "--only-binary", ":all:", "--prefix", str(target),
 		"-c", str(constraints), *keep]  # fmt: skip
 	cache = os.environ.get("PREFLIGHT_PIP_CACHE")
 	if cache and os.access(cache, os.W_OK):  # shared across a run's probes
-		cmd[4:4] = ["--cache-dir", cache]
+		cmd[5:5] = ["--cache-dir", cache]
 	try:
-		r = subprocess.run(cmd, capture_output=True, text=True, timeout=INSTALL_TIMEOUT_S)
+		r = subprocess.run(cmd, capture_output=True, text=True, timeout=INSTALL_TIMEOUT_S, cwd=target)
 	except subprocess.TimeoutExpired:
 		return f"pip took longer than {INSTALL_TIMEOUT_S} s", []
 	if r.returncode != 0:

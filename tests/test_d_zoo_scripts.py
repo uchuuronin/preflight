@@ -173,14 +173,24 @@ def test_agent_script_is_the_golden_agent_records_job():
 	)
 	assert c["MODEL"].startswith(knobs["model"])
 	# Known difference, raised with A: the golden record says 32,768; the script keeps a
-	# 26,000-token budget so the overflow lands at turn 12 (the next test).
+	# 26,000-token budget; by Muse Spark's count it overflows at turn 11 (header), and its own check at 12.
 	assert (c["CONTEXT_LIMIT"], knobs["context_limit"]) == (26_000, 32768)
 
 
-def test_agent_context_overflows_at_turn_12_with_short_replies():
+def test_agent_script_stays_the_size_a_measured():
+	"""The script echoes its own source every turn, so its size sets the growth. A measured the
+	growth behind turn 11 on Muse Spark (Oct 31) with the 7,641-byte version; keep within 300
+	bytes (about 4% of the growth) of it, or ask A to measure again."""
+	size = len((ZOO / "agent_eval_spark/run.py").read_bytes())
+	assert abs(size - 7641) <= 300, size
+
+
+def test_agent_scripts_own_check_stops_at_turn_12_with_short_replies():
 	"""Replay the history the script builds, offline: the user's task, then each turn one short
-	run_python call and its result, which echoes the script's own source. Uses the script's
-	token count (characters of each JSON message / 4) and its own text as the echo."""
+	run_python call and its result, which echoes the script's own source. Uses the script's own
+	token estimate (characters of each JSON message / 4) and its own text as the echo. By Muse
+	Spark's count the context passes the budget at turn 11 for a typical task (the header; derived
+	from A's per-turn counts, Oct 31), so the script's own check stops it a turn later, at 12."""
 	import json
 
 	path = ZOO / "agent_eval_spark/run.py"
@@ -214,3 +224,32 @@ def test_agent_context_overflows_at_turn_12_with_short_replies():
 		out = json.dumps({"stdout": "(4,)\n", "stderr": "", "harness": harness, "task": task["text"]})
 		messages.append({"role": "tool", "tool_call_id": call["id"], "content": out})
 	assert turn == 12
+
+
+def test_agent_retry_loop_is_planted_on_the_rows_the_header_names():
+	"""Plant 3 must fire: A's 130 tasks never failed a build, so the last 4 of the first 30 tasks
+	get a test fixture that can't import. Last, so all 30 tasks of A's sample start before every
+	worker is stuck. The header's rows must be the code's, run_tests must use the fixture for
+	them, and the fixture must fail the same way every time, run as run_tests runs it."""
+	import subprocess
+	import sys
+	import tempfile
+
+	path = ZOO / "agent_eval_spark/run.py"
+	src = path.read_text()
+	doc = " ".join((ast.get_docstring(ast.parse(src)) or "").split())
+	m = re.search(r"Rows (\d+) to (\d+), the last 4 of the first 30 tasks", doc)
+	assert m, "header names the planted rows"
+	lo, hi = int(m.group(1)), int(m.group(2))
+	assert (lo, hi) == (26, 29)
+	assert f"tasks.select(range({lo}, {hi + 1}))" in src
+	assert 'setup = BROKEN_FIXTURE if task["task_id"] in broken else task["test_setup_code"]' in src
+	assert "program = " in src and "[setup, code, *task[" in src
+	fixture = _consts(path)["BROKEN_FIXTURE"]
+	errs = set()
+	for _ in range(3):
+		with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
+			f.write(fixture + "\nprint('never reached')\n")
+		r = subprocess.run([sys.executable, f.name], capture_output=True, text=True)
+		errs.add(r.stderr.strip().splitlines()[-1])
+	assert len(errs) == 1 and next(iter(errs)).startswith("ModuleNotFoundError"), errs

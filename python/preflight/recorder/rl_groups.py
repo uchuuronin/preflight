@@ -40,4 +40,8 @@ def reward_groups(calls: list[dict], g: int | None) -> dict:
 		spread += [max(total[i : i + g]) == min(total[i : i + g]) for i in range(0, len(total) - g + 1, g)]
 	if spread:
 		out["zero_spread_fraction"] = sum(spread) / len(spread)
+		# the counts behind it, and how many reward functions the spread sums (for a Wilson interval,
+		# and to tell all-wrong from all-right only when the pass signal is the whole reward)
+		out["_counts"] = {"rl_zero_spread_groups": float(sum(spread)), "rl_groups": float(len(spread)),
+			"rl_reward_functions": float(len(by_func))}  # fmt: skip
 	return out

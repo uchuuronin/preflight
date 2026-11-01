@@ -27,6 +27,8 @@ def test_tokenised_rows_give_the_longest_and_the_999th_percentile():
 	got = measure(Rows([{"input_ids": list(range(n)), "labels": [0] * n} for n in lens]))
 	assert got["dataset_max_tokens"] == 4000
 	assert got["dataset_p999_tokens"] == 100  # the outlier shows as one row, not as the bulk
+	# time follows the bulk: the median row, and the mean with the outlier in it (B, Nov 1)
+	assert got["dataset_p50_tokens"] == 100 and got["dataset_mean_tokens"] == (100 * 9999 + 4000) / 10_000
 	assert got["dataset_rows_scanned"] == got["dataset_rows_total"] == 10_000
 
 

@@ -6,10 +6,12 @@ visitor code itself; it only starts the sandbox, feeds it a spec and reads
 one result line back (runner/wire.py).
 """
 
+import contextlib
 import logging
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import replace
 
 from preflight.probes.local import ProbeResult, ProbeSpec
 from preflight.schema import ProbeCost
@@ -20,19 +22,42 @@ log = logging.getLogger("preflight.sandbox")
 
 ENTRY = ("python", "-m", "preflight.probes.remote")
 EXEC_SLACK_S = 90  # over the probe's own cap: model download is inside it, process start is not
+READY = ("true",)  # a no-op run first: returns once the container is up, after any wait for a GPU
+READY_TIMEOUT_S = 30 * 60  # Modal's queue for a GPU can be long (L4: 14 to 25 min seen, Oct 31 to Nov 1)
+
+
+def suppress_all():
+	return contextlib.suppress(Exception)  # a failed no-op shows itself on the probe's own exec
+
+
+# When a GPU won't schedule (L4 waits of 14 to 26 min, Oct 31 to Nov 1, against "first map in 5
+# minutes"), the spec's gpu_fallback GPUs are tried in turn (the pipeline says which, Chiya, Nov 1:
+# L4, then A10, then L40S); the last is waited for as long as it takes, and each probe is priced at
+# the list rate of the GPU that ran it
+SCHEDULE_WAIT_S = 120
 
 
 class SandboxRunner:
-	"""Callable as a pipeline ProbeRunner. Use as a context manager so the sandbox always ends."""
+	"""Callable as a pipeline ProbeRunner. Use as a context manager so the sandbox always ends.
 
-	def __init__(self, create: Callable[[str], object], *, clock: Callable[[], float] = time.monotonic):
+	price: list USD per hour by GPU name, to cost a probe at the GPU that ran it after a fallback."""
+
+	def __init__(self, create: Callable[[str], object], *, clock: Callable[[], float] = time.monotonic,
+		price: Callable[[str], float] | None = None, schedule_wait_s: float = SCHEDULE_WAIT_S):  # fmt: skip
 		self._create = create
 		self._clock = clock
+		self._price = price
+		self._schedule_wait_s = schedule_wait_s
 		self._sb = None
-		self._gpu: str | None = None
+		self._gpu: str | None = None  # the GPU the sandbox has
+		self._asked: str | None = None  # the GPU the job asked for (a fallback keeps serving it)
 		self._image: str = "probe"
 		self._started = 0.0
 		self.gpu_seconds: dict[str, float] = {}  # sandbox lifetime per GPU: what Modal bills
+		self.queued_s = 0.0  # time spent waiting for a GPU before any sandbox started
+		self.ran_on: list[str] = []  # the GPU each probe ran on, in order
+		self.last_ran: str | None = None  # the GPU of the last probe (the pipeline reads it)
+		self.unscheduled: list[str] = []  # GPUs given up on after SCHEDULE_WAIT_S
 
 	def __enter__(self):
 		return self
@@ -40,13 +65,44 @@ class SandboxRunner:
 	def __exit__(self, *exc):
 		self.close()
 
-	def _sandbox(self, gpu: str, image: str = "probe"):
-		if self._sb is not None and self._gpu == gpu and self._image == image:
+	def _ready(self, sb, wait_s: float | None) -> bool:
+		"""The no-op exec returns once the container is up (after Modal's wait for a GPU)."""
+		box: dict = {}
+
+		def go():
+			try:
+				sb.exec(*READY, timeout=READY_TIMEOUT_S).wait()
+				box["ok"] = True
+			except Exception:
+				box["ok"] = True  # a failed no-op shows itself on the probe's own exec
+
+		t = threading.Thread(target=go, daemon=True)
+		t.start()
+		t.join(wait_s)
+		return bool(box.get("ok"))
+
+	def _sandbox(self, gpu: str, image: str = "probe", fallback: tuple[str, ...] = ()):
+		# the job's own GPU, or the one it fell back to (the pipeline then asks for that one by name)
+		if self._sb is not None and gpu in (self._asked, self._gpu) and self._image == image:
 			return self._sb
 		self.close()
-		# the probe image by its old one-argument call; another image (serving) by name
-		self._sb = self._create(gpu) if image == "probe" else self._create(gpu, image=image)
-		self._gpu, self._image, self._started = gpu, image, self._clock()
+		options = (gpu, *(g for g in fallback if g != gpu))
+		t = self._clock()
+		for i, g in enumerate(options):
+			# the probe image by its old one-argument call; another image (serving) by name
+			sb = self._create(g) if image == "probe" else self._create(g, image=image)
+			last = i == len(options) - 1
+			# wait out the GPU queue before any clock starts: neither the probe's time limit nor its
+			# cost counts the minutes Modal spent finding a GPU (no container runs, nothing is billed)
+			if self._ready(sb, None if last else self._schedule_wait_s):
+				break
+			log.info("no %s scheduled in %.0f s; trying %s", g, self._schedule_wait_s, options[i + 1])
+			self.unscheduled.append(g)
+			with suppress_all():
+				sb.terminate()
+		self._sb, self._gpu, self._asked, self._image = sb, g, gpu, image
+		self.queued_s += self._clock() - t
+		self._started = self._clock()
 		return self._sb
 
 	def close(self) -> None:
@@ -69,11 +125,15 @@ class SandboxRunner:
 	def __call__(self, spec: ProbeSpec, gpu: str, *, should_stop: Callable[[], bool]) -> ProbeResult:
 		t0 = self._clock()
 		try:
-			sb = self._sandbox(gpu, spec.image)
+			sb = self._sandbox(gpu, spec.image, tuple(spec.gpu_fallback))
+			ran = self._gpu or gpu  # read now: a failure or a cancel below closes the sandbox
+			t0 = self._clock()  # after the container is up: the queue for a GPU is neither time nor cost
 			proc = sb.exec(*ENTRY, timeout=int(spec.timeout_s + EXEC_SLACK_S))
 		except Exception:
 			log.warning("probe %s: no sandbox on %s", spec.probe_id, gpu, exc_info=True)
 			self.close()
+			self.last_ran = gpu
+			self.ran_on.append(gpu)
 			return _timed(result_from_wire(spec, ""), spec, self._clock() - t0)
 		done = threading.Event()
 
@@ -91,14 +151,23 @@ class SandboxRunner:
 			proc.stdin.write_eof()
 			proc.stdin.drain()
 			out = proc.stdout.read()
-			proc.wait()
 		except Exception:
 			log.warning("probe %s: sandbox exec failed", spec.probe_id, exc_info=True)
 			out = ""
 			self.close()  # a broken sandbox is not reused
+		try:
+			if out:
+				proc.wait()  # the result is read: a slow cleanup after it (or a wait error) doesn't lose it
+		except Exception:
+			log.warning("probe %s: sandbox exec ended badly after its result", spec.probe_id, exc_info=True)
+			self.close()
 		finally:
 			done.set()
 			watcher.join(timeout=2)
+		self.last_ran = ran
+		self.ran_on.append(ran)
+		if ran != gpu and self._price is not None:
+			spec = replace(spec, gpu_usd_per_hour=self._price(ran))  # list price of the GPU that ran
 		return _timed(result_from_wire(spec, out or ""), spec, self._clock() - t0)
 
 
