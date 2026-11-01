@@ -1,0 +1,11 @@
+{
+	"name": "20261101-235221-41364190456-c-ledger-report",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41364190456",
+	"ref": "2b89a2f3976635a9f6314e44cde9936a9c814ec3",
+	"sha": "2b89a2f3976635a9f6314e44cde9936a9c814ec3",
+	"cmd": "modal run --env main api/ledger_report_app.py::report",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T23:52:40Z"
+}
