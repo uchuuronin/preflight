@@ -689,7 +689,8 @@ def diagnose_hosted(record_json: str, max_usd: float = 0.5) -> dict:
 	from preflight.schema import load_record
 
 	spark_open = ModelClient.baseten_spark_open() if os.environ.get("BASETEN_API_KEY") else None
-	return run_once(load_record(record_json), ModelClient.meta(), spark_open, max_usd)
+	# 180 s: up to 8,192 output tokens, reasoning included, outlast the client's default 60 s
+	return run_once(load_record(record_json), ModelClient.meta(timeout_s=180.0), spark_open, max_usd)
 
 
 @ops.local_entrypoint()
