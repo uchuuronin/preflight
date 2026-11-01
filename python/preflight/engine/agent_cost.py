@@ -31,6 +31,9 @@ LEVEL = 0.9  # cited: contract, 90% intervals
 RUNAWAY_FACTOR = 8.0  # simulated: A's D3, a task above 8x the sample median is a runaway
 # guess: the cost rule's 8x carried over to wall time, until D's planted tool loop is measured against it. A tool
 # loop makes no model calls, so the cost rule can't see it; its wall time can (Chiya, Oct 31)
+# Checked Nov 1 on A's failing-builds sample (zoo/agent_eval_spark/sample_nov1_builds.json, 100 healthy tasks, wall
+# time with tools): the slowest took 2.26x the median, so 8x raised no false alarms (0 of 100). No task in either
+# sample hit D's tool loop (0 of 130), so whether 8x catches it is unchecked: still a guess
 TIME_RUNAWAY_FACTOR = 8.0
 # measured: the recorder stopped the task itself, which the time rule counts. max_turns is also the recorder's
 # dollar cap ("stopped for running on", recorder/agent.py); context_overflow is a failure, not a runaway
