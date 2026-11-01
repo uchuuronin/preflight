@@ -28,6 +28,11 @@ Updated Sun Nov 1, 12:30 ET.
 
 ## Known limits, on purpose
 
+- A probe sandbox that outlives the probe's own time limit (the 18:06 serving run on an L4: 1,284 s
+  against 600 s) is ended from outside and its log is lost, so its record says only "ended without
+  a result". Not fixed yet; the serving cause itself is known (`a-serving-debug-1`, Nov 1).
+- Verify jobs don't run the eval inside their window, so eval fixes can't be verified yet (the
+  first attempt was reverted after review; the design is with C, Nov 1).
 - Timed steps carry no recorder sync points, but `by_phase` comes from two synchronised phase
   steps after them, so phase splits lose CPU/GPU overlap. B scales the fractions to `p50_s`.
 - The queue saves under its lock. At 8 GPUs and a few visitors that is tens of saves a minute;
@@ -309,6 +314,7 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Nov 1 18:44 | `a-diagnose-lora-2` (41338042440): again at medium effort, 8,192 tokens: one finding, consistent (the loss plot's p1 peak at steps 8–10 is loss[9] = 1.563, the series' maximum, checked against the record); Spark Open's check fetched the path and agreed. The first call still ran to 8,192 tokens and the re-ask answered | none (CPU) | about 1 | **$0.0685** ($0.0593 Muse Spark, $0.0091 Spark Open) |
 | Nov 1 18:53 | `a-smoke-eval-sweep-2` (41338293000): the eval-sweep probe, record 01M6C6YPNC7BZAZ82TAY4B9MSD: **timeout at 600 s, nothing kept** (492 s GPU wait first). The log shows batch after batch of generate set up: a generation-only probe had nothing to stop it and the recorder's stats are written at the end. Fixed in fda1762 (an eval probe measures two generate calls and ends as the third starts), checked with a stand-in; rerun after the next deploy | L4 or A10 | about 18 | **$0.3163** by the record ($0.1336 GPU, $0.1587 sandbox estimate, $0.0240 model calls) |
 | Nov 1 20:16 | `a-startup-check-19` (41346004770), `a-startup-check-serving-5` (41346187791), then `a-deploy-main-19` (41346314893): **the gated redeploy, from ws-a d73b4e1 (main's 6757667 in it)**, after C's production deploy. Worker, probe, sandbox, the probe user in all three images (torch.compile and the vLLM import as uid 61000) ok; deployed 20:20 UTC with the demo limits, the eval and serving probe stops, the warm pool off until Nov 5 | none (CPU) | about 4 | about $0.03 CPU (estimate) |
+| Nov 1 20:20 | `a-serving-debug-1` (41346358580): the serving debug run, `ops_app.py::ground_truth --script serving_vllm` (Chiya's yes), printing vLLM's log. Modal gave the A10. The sampled probe ran ok in 314 s: weights 14.25 GB loaded in 6 s, graphs 15 s, then **32 prompts x 4,096 new tokens each (all truncated, about 131k tokens) at about 480 tokens/s = 272 s**, with KV-cache preemption (the cache fits 2.19x of a 32k request) [measured]. On an L4 (about half the bandwidth) that decode is about 550 s [estimate], past the probe's 600 s with startup: the cause of the L4 failure at 18:06. Fix options (a) cap the probe's new tokens at 1,024, (b) 8 prompts, posted for B and Chiya. The bare run (the full 1,024-prompt burst) stopped at its 420 s share, as planned | A10 | about 13 | about $0.25 (estimate) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,

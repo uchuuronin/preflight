@@ -799,8 +799,11 @@ def triage_hosted(record_json: str, probe_id: str, provider: str = "glimmer") ->
 
 	from preflight.harness.spark import ModelClient
 	from preflight.harness.triage import triage_probe
+	from preflight.runner.flags import flag
 	from preflight.schema import load_record
 
+	if not flag("harness.spark_open_triage"):  # the pipeline's own gate (and the data-use notice's)
+		return {"error": "harness.spark_open_triage is off here"}
 	rec = load_record(record_json)
 	# our own zoo scripts only: a visitor's record holds their error text, which would land in the
 	# run log and out/ on the remote-runs branch, and a private one must never reach Baseten (review)
