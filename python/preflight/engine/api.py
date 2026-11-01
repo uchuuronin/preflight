@@ -287,39 +287,51 @@ _MATCH_IGNORES = frozenset(
 
 
 MEDIAN_SE = math.sqrt(math.pi / 2)  # cited: a sample median's standard error is sqrt(pi/2) x sigma / sqrt(k)
-Z999 = 3.090232306167813  # derived: the normal 99.9th percentile
-LENGTH_DRAWS = 4000  # derived: 4,000 simulated steps put the step-token spread within about 2% of its limit
+LENGTH_DRAWS = 4000  # derived: 4,000 evenly spaced quantiles put the padded-length summaries within about 1%
+TOKEN_PHASES = (
+	"forward",
+	"backward",
+)  # the phases whose time follows the tokens in a batch; the rest stay fixed
 
 
 @functools.lru_cache(maxsize=256)
-def _length_spread(mean: float, p999: float, longest: float | None, cap: float | None, batch: int) -> float:
-	"""Spread (log sigma) of a step's padded tokens when each batch pads to its longest row: rows from a lognormal
-	fitted to the probe's mean row length and the dataset's 99.9th percentile, cut at the longest row and seq_len.
-	A batch's longest row is drawn directly, exp(mu + s x the normal quantile of U^(1/batch)), so the cost doesn't
-	grow with the batch (review, Nov 1), and the result is cached for knob moves."""
+def _padded_lengths(median: float, mean: float, cap: float | None, batch: int) -> tuple[float, float, float]:
+	"""(median, mean, log spread) of a batch's padded row length when each batch pads to its longest row. Rows are
+	log-normal with the dataset's own median and mean (Chiya, Nov 1: time follows the median and the mean, not the
+	tail, which belongs to peak memory), cut at seq_len. A batch's longest row is drawn directly from the quantile
+	of U^(1/batch), so the cost doesn't grow with the batch, and the result is cached for knob moves."""
 	from statistics import NormalDist
 
-	r = math.log(max(p999, mean) / mean)
-	disc = Z999 * Z999 - 2 * r
-	s = (
-		Z999 - math.sqrt(disc) if disc >= 0 else Z999
-	)  # the root with mean and p99.9 both matched; the edge past it
-	mu = math.log(mean) - s * s / 2
-	u = (np.arange(LENGTH_DRAWS) + 0.5) / LENGTH_DRAWS  # evenly spaced, so the result is exact and repeatable
+	s = math.sqrt(2 * math.log(mean / median)) if mean > median > 0 else 0.0
+	u = (np.arange(LENGTH_DRAWS) + 0.5) / LENGTH_DRAWS
 	inv = NormalDist().inv_cdf
 	z = np.asarray([inv(min(x ** (1.0 / max(1, batch)), 1 - 1e-12)) for x in u])
-	padded = mu + s * z
-	top = min(x for x in (longest, cap) if x) if (longest or cap) else None
-	if top:
-		padded = np.minimum(padded, math.log(top))
-	return float(np.std(padded))
+	logs = math.log(median) + s * z
+	if cap:
+		logs = np.minimum(logs, math.log(cap))
+	return float(np.exp(np.median(logs))), float(np.mean(np.exp(logs))), float(np.std(logs))
 
 
-def _length_sigma(record: FlightRecord, values: dict, match) -> tuple[float, str] | None:
-	"""Chiya, Nov 1: the probe's p50 is the median of a few steps whose batches vary in length, so a full run's median
-	can sit outside a band built from timing noise alone. The band adds the median's own sampling error, from the
-	larger of the probe's measured step spread and the spread its dataset implies (A's dataset_max_tokens and
-	dataset_p999_tokens), under padding to each batch's longest row."""
+@dataclass(frozen=True)
+class _LengthTerm:
+	step_scale: float  # the full run's median step against the probe's, from padded lengths (1 without them)
+	total_scale: float  # the run's mean step against its median step (1 without them)
+	step_sigma: float  # added to the step's log sigma: the probe's few-step median against the run's median
+	total_sigma: float  # replaces it for the total, a sum over many steps
+	reason: str
+
+
+def _length_term(
+	record: FlightRecord, values: dict, match, steps_hint: float | None = None
+) -> _LengthTerm | None:
+	"""Batches that vary in length, as time sees them (Chiya, Nov 1). The run's median step follows the median padded
+	length and its total time the mean. With the dataset's median and mean row length (A's dataset_median_tokens and
+	dataset_mean_tokens), both come from the data, scaled from the padded length the probe saw on the steps'
+	token-bound share (forward and backward). The probe's p50 is the median of k steps, so its sampling error,
+	sqrt(pi/2) x the probe's own step spread / sqrt(k), stays on the step. A total sums many steps: with the
+	dataset's lengths known its length error is the per-step spread / sqrt(steps); without them the run's mean comes
+	from the probe's k steps (spread / sqrt(k)). The 99.9th percentile and the longest row stay out of time; they
+	size peak memory."""
 	probes = [p for p in record.probes if p.status in OK_PROBE and p.step_time and p.step_time.p50_s]
 	p = match if match in probes else (probes[0] if probes else None)
 	if p is None or not p.step_time.n_steps:
@@ -327,21 +339,32 @@ def _length_sigma(record: FlightRecord, values: dict, match) -> tuple[float, str
 	st_, k = p.step_time, p.step_time.n_steps
 	seen = math.log(st_.p95_s / st_.p50_s) / steptime.Z90 if st_.p95_s and st_.p95_s > st_.p50_s else 0.0
 	data, ex = p.data, p.extras or {}
-	from_data = 0.0
-	if data and not data.packing and data.tokens_per_sample_mean and ex.get("dataset_p999_tokens"):
-		pv = _probe_values(record, p)
-		cap = values.get("seq_len") or pv.get("seq_len")
-		batch = int(values.get("batch_size") or pv.get("batch_size") or 1)
-		from_data = _length_spread(
-			float(data.tokens_per_sample_mean), float(ex["dataset_p999_tokens"]),
-			ex.get("dataset_max_tokens"), float(cap) if cap else None, batch,
-		)  # fmt: skip
-	spread = max(seen, from_data)
-	if spread <= 0:
-		return None
-	src = "the dataset's row lengths" if from_data >= seen else f"the probe's {k} timed steps"
-	why = f"batches vary in length ({src}), so a full run's median step can differ from the probe's {k}-step median"
-	return MEDIAN_SE * spread / math.sqrt(k), why
+	med, mean = ex.get("dataset_median_tokens"), ex.get("dataset_mean_tokens")
+	known = bool(
+		data and not data.packing and data.tokens_per_sample_mean and med and mean
+		and data.padding_fraction is not None and data.padding_fraction < 1
+	)  # fmt: skip
+	if not known:
+		if seen <= 0:
+			return None
+		why = f"batches vary in length (the probe's {k} timed steps), so a full run's median step can differ from the probe's {k}-step median"
+		return _LengthTerm(1.0, 1.0, MEDIAN_SE * seen / math.sqrt(k), seen / math.sqrt(k), why)
+	pv = _probe_values(record, p)
+	cap = values.get("seq_len") or pv.get("seq_len")
+	batch = int(values.get("batch_size") or pv.get("batch_size") or 1)
+	run_med, run_mean, spread = _padded_lengths(float(med), float(mean), float(cap) if cap else None, batch)
+	probe_padded = float(data.tokens_per_sample_mean) / (1 - float(data.padding_fraction))
+	share = sum(st_.by_phase.get(ph, 0.0) for ph in TOKEN_PHASES) if st_.by_phase else 1.0
+	step_scale = 1 + share * (run_med / probe_padded - 1)
+	mean_scale = 1 + share * (run_mean / probe_padded - 1)
+	steps = steps_hint or 1.0
+	why = (
+		f"batches vary in length: the run's median step follows the dataset's median padded length ({run_med:.0f} "
+		f"tokens a row against the probe's {probe_padded:.0f}) and its total the mean ({run_mean:.0f})"
+	)
+	return _LengthTerm(
+		step_scale, mean_scale / step_scale, MEDIAN_SE * seen / math.sqrt(k), spread / math.sqrt(steps), why
+	)
 
 
 def _matching_probe(record: FlightRecord, values: dict, ok=OK_PROBE):
@@ -763,6 +786,9 @@ class _StepResult:
 	sigma: float  # log sigma of the step time, for totals and tail probabilities
 	first_extra_s: float = 0.0  # compile and warm-up, paid once
 	phases: dict | None = None  # seconds per phase, scaled to the step's point
+	length: _LengthTerm | None = (
+		None  # varying batch lengths: the total uses the mean, with its own length error
+	)
 
 
 def _step_x(lens: str, values: dict) -> float:
@@ -938,10 +964,11 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	if est.status == "abstain":
 		return _StepResult(_abstain("s", mid, est.reason), est.sigma_log)
 	point, sigma, status, reasons = est.point, est.sigma_log, est.status, [est.reason] if est.reason else []
-	ls = _length_sigma(record, values, match)
-	if ls is not None:
-		sigma = math.hypot(sigma, ls[0])
-		reasons.append(ls[1])
+	lt = _length_term(record, values, match, _total_steps(record, values)[0])
+	if lt is not None:
+		point *= lt.step_scale
+		sigma = math.hypot(sigma, lt.step_sigma)
+		reasons.append(lt.reason)
 
 	# precision moved away from what the probes ran
 	q_prec = _precision(values)
@@ -1103,6 +1130,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		sigma,
 		first,
 		phases,
+		lt,
 	)
 
 
@@ -1210,8 +1238,14 @@ def _time(record: FlightRecord, values: dict) -> _TimeResult:
 		return _TimeResult(_abstain("s", MODEL_ID_TOTAL, why), step.est, step.sigma)
 	extra, notes = _overheads(record, values, steps)
 	fixed = extra + step.first_extra_s
-	h = memory.Z90 * step.sigma
-	pt = steps * step.est.point
+	lt = step.length
+	tsig = step.sigma
+	if (
+		lt is not None
+	):  # a sum over many steps: the mean step, and the length error of a total, not of a median
+		tsig = math.sqrt(max(0.0, step.sigma**2 - lt.step_sigma**2) + lt.total_sigma**2)
+	h = memory.Z90 * tsig
+	pt = steps * step.est.point * (lt.total_scale if lt is not None else 1.0)
 	reason = "; ".join(x for x in [step.est.reason, *notes] if x) or None
 	total = _est(
 		pt + fixed,

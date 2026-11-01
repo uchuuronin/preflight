@@ -366,7 +366,10 @@ def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[l
 		),
 		divergence_row(divergence),
 		_share_row(
-			"Rollout time (RL)", "Within 20%", "An unseen TRL script (the GRPO zoo script calibrated it, Nov 1)", flags("rollout")
+			"Rollout time (RL)",
+			"Within 20%",
+			"An unseen TRL script (the GRPO zoo script calibrated it, Nov 1)",
+			flags("rollout"),
 		),
 		_share_row("Serving tokens/sec", "Within 15%", "vLLM full runs", flags("serving")),
 		_share_row(

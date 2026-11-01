@@ -669,10 +669,49 @@ def test_the_step_band_covers_a_few_step_median_on_varying_batches():
 	assert "batches vary in length" in e.reason
 
 
-def test_length_spread_grows_with_the_tail_and_stops_at_seq_len():
-	narrow = api._length_spread(150, 300, 400, 1024, 4)
-	wide = api._length_spread(150, 900, 1000, 1024, 4)
-	assert 0 < narrow < wide
-	capped = api._length_spread(150, 900, 1000, 160, 4)
-	assert capped < narrow  # every batch hits seq_len, so steps barely vary
-	assert api._length_spread(150, 150, 150, None, 4) < 0.05
+def test_padded_lengths_follow_median_and_mean_and_stop_at_seq_len():
+	med, mean, spread = api._padded_lengths(150, 200, 1024, 4)
+	assert med > 150 and mean > med and spread > 0  # each batch pads to its longest row
+	_, _, capped = api._padded_lengths(150, 200, 160, 4)
+	assert capped < spread  # nearly every batch hits seq_len
+	assert api._padded_lengths(150, 150, None, 4)[2] == 0.0  # no spread when every row is the median
+
+
+def _with_lengths(rec, **extras):
+	probes = [p.model_copy(update={"extras": {**(p.extras or {}), **extras}}) for p in rec.probes]
+	return rec.model_copy(update={"probes": probes})
+
+
+def test_a_long_tail_moves_memory_not_time():
+	# Chiya, Nov 1: time follows the median and the mean; p99.9 and the longest row belong to peak memory
+	from preflight.schema import load_record
+
+	rec = load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
+	base = _with_lengths(rec, dataset_median_tokens=140.0, dataset_mean_tokens=152.0)
+	tail = _with_lengths(base, dataset_p999_tokens=1000.0, dataset_max_tokens=4000.0)
+	a, b = api.predict(base).root["time.step"], api.predict(tail).root["time.step"]
+	assert a.point == b.point and a.hi == b.hi
+	assert math.log(a.hi / a.point) < math.log(1.5)  # a real long-tailed record doesn't push time to abstain
+
+
+def test_step_follows_the_median_padded_length_and_total_the_mean():
+	from preflight.schema import load_record
+
+	rec = load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
+	sm = rec.job.script_map
+	sm = sm.model_copy(update={"training": sm.training.model_copy(update={"max_steps": 1000})})
+	rec = rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm})})
+	short = api.predict(_with_lengths(rec, dataset_median_tokens=100.0, dataset_mean_tokens=110.0)).root
+	long = api.predict(_with_lengths(rec, dataset_median_tokens=200.0, dataset_mean_tokens=260.0)).root
+	assert long["time.step"].point > short["time.step"].point
+	steps = 1000
+	ratio_long = long["time.total"].point / (
+		steps * long["time.step"].point
+	)  # fixed overheads are small here
+	ratio_short = short["time.total"].point / (steps * short["time.step"].point)
+	assert (
+		ratio_long > ratio_short
+	)  # a longer tail above the median raises the mean step more than the median
+	# a total over many steps: its length error shrinks, so its band is no wider than the step's
+	t, st = long["time.total"], long["time.step"]
+	assert math.log(t.hi / t.point) <= math.log(st.hi / st.point) + 1e-9
