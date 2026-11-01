@@ -31,10 +31,10 @@ def suppress_all():
 
 
 # When a GPU won't schedule (L4 waits of 14 to 26 min, Oct 31 to Nov 1, against "first map in 5
-# minutes"), the next ones are tried in turn; the last is waited for as long as it takes. Chiya,
-# Nov 1: L4, then A10, then L40S, priced at the list rate of the one that ran
+# minutes"), the spec's gpu_fallback GPUs are tried in turn (the pipeline says which, Chiya, Nov 1:
+# L4, then A10, then L40S); the last is waited for as long as it takes, and each probe is priced at
+# the list rate of the GPU that ran it
 SCHEDULE_WAIT_S = 120
-FALLBACK = {"L4": ("A10", "L40S")}
 
 
 class SandboxRunner:
@@ -56,6 +56,7 @@ class SandboxRunner:
 		self.gpu_seconds: dict[str, float] = {}  # sandbox lifetime per GPU: what Modal bills
 		self.queued_s = 0.0  # time spent waiting for a GPU before any sandbox started
 		self.ran_on: list[str] = []  # the GPU each probe ran on, in order
+		self.last_ran: str | None = None  # the GPU of the last probe (the pipeline reads it)
 		self.unscheduled: list[str] = []  # GPUs given up on after SCHEDULE_WAIT_S
 
 	def __enter__(self):
@@ -80,11 +81,11 @@ class SandboxRunner:
 		t.join(wait_s)
 		return bool(box.get("ok"))
 
-	def _sandbox(self, gpu: str, image: str = "probe"):
+	def _sandbox(self, gpu: str, image: str = "probe", fallback: tuple[str, ...] = ()):
 		if self._sb is not None and self._asked == gpu and self._image == image:
 			return self._sb
 		self.close()
-		options = (gpu, *FALLBACK.get(gpu, ()))
+		options = (gpu, *(g for g in fallback if g != gpu))
 		t = self._clock()
 		for i, g in enumerate(options):
 			# the probe image by its old one-argument call; another image (serving) by name
@@ -123,12 +124,15 @@ class SandboxRunner:
 	def __call__(self, spec: ProbeSpec, gpu: str, *, should_stop: Callable[[], bool]) -> ProbeResult:
 		t0 = self._clock()
 		try:
-			sb = self._sandbox(gpu, spec.image)
+			sb = self._sandbox(gpu, spec.image, tuple(spec.gpu_fallback))
+			ran = self._gpu or gpu  # read now: a failure or a cancel below closes the sandbox
 			t0 = self._clock()  # after the container is up: the queue for a GPU is neither time nor cost
 			proc = sb.exec(*ENTRY, timeout=int(spec.timeout_s + EXEC_SLACK_S))
 		except Exception:
 			log.warning("probe %s: no sandbox on %s", spec.probe_id, gpu, exc_info=True)
 			self.close()
+			self.last_ran = gpu
+			self.ran_on.append(gpu)
 			return _timed(result_from_wire(spec, ""), spec, self._clock() - t0)
 		done = threading.Event()
 
@@ -159,7 +163,7 @@ class SandboxRunner:
 		finally:
 			done.set()
 			watcher.join(timeout=2)
-		ran = self._gpu or gpu
+		self.last_ran = ran
 		self.ran_on.append(ran)
 		if ran != gpu and self._price is not None:
 			spec = replace(spec, gpu_usd_per_hour=self._price(ran))  # list price of the GPU that ran

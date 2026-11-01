@@ -365,9 +365,31 @@ def test_an_l4_that_wont_schedule_falls_back_to_an_a10_priced_as_an_a10(monkeypa
 
 	prices = {"L4": 0.80, "A10": 1.10, "L40S": 1.95}
 	with SandboxRunner(create, price=prices.__getitem__, schedule_wait_s=0.1) as run:
-		r = run(replace(spec("p1"), gpu_usd_per_hour=0.80), "L4", should_stop=lambda: False)
-		run(spec("p2"), "L4", should_stop=lambda: False)  # the A10 keeps serving the job's L4 points
+		fb = ("A10", "L40S")  # what the pipeline allows here (none when pinned or ruled out)
+		r = run(replace(spec("p1"), gpu_usd_per_hour=0.80, gpu_fallback=fb), "L4", should_stop=lambda: False)
+		run(replace(spec("p2"), gpu_fallback=fb), "L4", should_stop=lambda: False)  # the A10 keeps serving
 	assert r.probe.status == "ok" and [s.gpu for s in made] == ["L4", "A10"]
 	assert made[0].terminated and run.unscheduled == ["L4"] and run.ran_on == ["A10", "A10"]
 	assert priced == [1.10, 1.10]  # each probe costed at the A10's list price, not the L4's
 	assert set(run.gpu_seconds) == {"A10"}
+
+
+def test_with_no_fallback_allowed_the_runner_waits_for_the_gpu_it_was_given():
+	made = []
+
+	def create(gpu):
+		made.append(FakeSandbox(gpu))
+		return made[-1]
+
+	with SandboxRunner(create, schedule_wait_s=0.0) as run:  # even with no patience, no other GPU
+		assert run(spec("p1"), "L4", should_stop=lambda: False).probe.status == "ok"
+	assert [s.gpu for s in made] == ["L4"] and run.last_ran == "L4"
+
+
+def test_fallbacks_respect_a_pinned_gpu_and_the_visitors_allowed_list():
+	from preflight.runner.pipeline import _fallbacks
+
+	assert _fallbacks("L4", None, False) == ("A10", "L40S")
+	assert _fallbacks("L4", None, True) == ()  # the guide asked for an L4
+	assert _fallbacks("L4", ["L4", "L40S"], False) == ("L40S",)
+	assert _fallbacks("A100-SXM-80GB", None, False) == ()

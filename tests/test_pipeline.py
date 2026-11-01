@@ -627,3 +627,19 @@ def test_generation_bound_lenses_get_a_longer_probe_time_limit():
 	assert _probe_timeout(sm, 360) == 360
 	assert _probe_timeout(sm.model_copy(update={"lens": "eval"}), 360) == GENERATION_PROBE_TIMEOUT_S
 	assert _probe_timeout(sm.model_copy(update={"lens": "eval"}), 900) == 900  # never shorter than asked
+
+
+def test_a_probe_run_on_a_fallback_gpu_is_not_cached_as_the_gpu_asked_for(tmp_path):
+	class FellBack(FakeRunner):  # every point ran on an A10 when an L4 was asked for
+		last_ran = "A10"
+
+		def __call__(self, spec, gpu, *, should_stop):
+			assert spec.gpu_fallback == ("A10", "L40S")  # the pipeline allowed these
+			r = super().__call__(spec, "A10", should_stop=should_stop)
+			return r
+
+	cache = MemoryCache()
+	req = {"source": {"kind": "upload", "files": {"train.py": SCRIPT}}, "gpu": "L4"}
+	rec = run_pipeline(req, _Ctx(), deps(tmp_path, FellBack(), cache=cache))
+	assert all(p.cache_key is None for p in rec.probes) and not cache._d  # nothing stored under the L4 key
+	assert rec.env.gpu.name == "A10"

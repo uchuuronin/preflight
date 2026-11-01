@@ -193,6 +193,8 @@ class ProbeSpec:
 	seed_force: bool = False  # override the script's own seeding (verify's seed-to-seed spread)
 	alternate_sync: bool = False  # ground truth only: alternate clean and synced steps (recorder/overhead.py)
 	install_requirements: bool = False  # pip-install requirements.txt in the probe (hosted probes only)
+	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
+	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
 	gpu_usd_per_hour: float = 0.0
 	nproc: int = 1  # processes on this node, one per GPU, under torchrun (DDP, FSDP)

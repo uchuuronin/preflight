@@ -298,10 +298,29 @@ def _run_point(spec: ProbeSpec, gpu: str, deps: Deps, ctx) -> tuple[ProbeResult 
 				log.warning("ignoring an unreadable probe-cache entry %s", key)
 	spec = replace(spec, gpu_usd_per_hour=_price(gpu))
 	result = deps.runner(spec, gpu, should_stop=ctx.should_stop)
+	ran = getattr(deps.runner, "last_ran", None) or gpu
+	if ran != gpu:  # measured on a fallback GPU: not this GPU's answer, so not cached under it
+		result.probe = result.probe.model_copy(update={"cache_key": None})
+		return result, None
 	result.probe = result.probe.model_copy(update={"cache_key": key})
 	if deps.cache is not None and result.probe.status == "ok":
 		deps.cache.put(key, json.loads(result.probe.model_dump_json(exclude_none=True)))
 	return result, None
+
+
+# Chiya, Nov 1: an L4 that won't schedule in 2 minutes gives way to an A10, then an L40S
+GPU_FALLBACK = {"L4": ("A10", "L40S")}
+
+
+def _fallbacks(gpu: str, allowed: list[str] | None, pinned: bool) -> tuple[str, ...]:
+	"""What the runner may use instead of gpu: none for a pinned GPU (the guide asked for that one),
+	only GPUs the visitor allows, and none past the probe ceiling."""
+	if pinned:
+		return ()
+	cap = gpu_ceiling()
+	return tuple(
+		g for g in GPU_FALLBACK.get(gpu, ()) if (allowed is None or g in allowed) and under_ceiling(g, cap)
+	)
 
 
 def _validated(request: dict) -> JobRequest:
@@ -459,7 +478,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
 	kept = rec.probes
-	if followup and origin.parent is not None and gpu != _parent_gpu(origin.parent):
+	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
+	ran = next((g for r in results for g in [_measured_gpu(r)] if g), gpu)
+	if followup and origin.parent is not None and ran != _parent_gpu(origin.parent):
 		# measured on another GPU: the record's env is this one, so the parent's probes don't
 		# belong, nor what was fitted or found from them; the script's own findings stay
 		kept = []
@@ -568,6 +589,13 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	return plan
 
 
+def _measured_gpu(result) -> str | None:
+	from preflight.probes.gpu_choice import canonical
+
+	env = getattr(result, "env", None)
+	return canonical(env.gpu.name) if env is not None and env.gpu is not None and env.gpu.name else None
+
+
 def _parent_gpu(rec: FlightRecord) -> str | None:
 	"""The GPU the parent measured on (or chose), so a follow-up probe compares like with like."""
 	from preflight.probes.gpu_choice import canonical
@@ -631,7 +659,9 @@ def _probe_points(
 		attempts: list = []
 
 		def run(g, spec=spec, attempts=attempts, over=over):
-			result, cached = _run_point(spec, g, deps, ctx)
+			result, cached = _run_point(
+				replace(spec, gpu_fallback=_fallbacks(g, allowed, pinned)), g, deps, ctx
+			)
 			out = result if result is not None else _CachedResult(cached)
 			if result is not None:
 				# every attempt counts, kept or not, with the sandbox's CPU and memory beside the GPU
