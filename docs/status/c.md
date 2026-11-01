@@ -3,7 +3,8 @@
 ## Sat Oct 31, night
 
 - Audit finding 4 fixed (`c28d664`): a failed or cancelled job's boarding screen marks the leg it stopped on ("Stopped here" / "Cancelled here", red route).
-- Agent tour on A's measured record (`5b297cc`), see the plan table.
+- Agent tour on A's measured record (`5b297cc`), see the plan table; review fixes in `f83b184`, `7c7c5fb`.
+- Fix loop: `/v1/patches`, `race_fix` and the race on screen (`c876e04`, `bf81087`), see the plan table.
 
 ## Sat Oct 31, evening: Muse Code smoke test (Chiya's yes, $1 cap, CPU only)
 
@@ -57,7 +58,7 @@ read-only review, and exclude waiting on others.
 | Health signals view | Not started | 3 |
 | Cost frontier (Pareto) view | Not started | 3 |
 | Fix loop: verify both sides (module and `.github/actions/verify`) | On main | 0 |
-| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | Backend on ws-c (`7bfc149`, `8a4ecda`): templates, deny-by-default gate, race in worktrees, Modal app; one review, fixes in, second review running. Smoke test waits for a yes. Not started: `/v1/patches`, race on screen, verify via A (needs `JobRequest.patch`) | 6, plus the smoke run |
+| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | On ws-c: backend, smoke passed (Oct 31); `/v1/patches` and `race_fix` (`c876e04`), race in lanes on screen (`bf81087`), deploy step for `preflight-fix` (no warm containers). Not started: verify of a candidate through A (needs A's runner to apply `JobRequest.patch`); the live guide's `propose_patch` still answers "not built" | 2 (verify wiring once A applies patches) | Chiya's yes for the first real race (about $0.39, cap) and the deploy |
 | In-app alert when an in-flight run leaves its band | Not started | 2 (needs A's in-flight collector) |
 | Autopilot and self-directed probes (gap 20) | Not started | 6 |
 | Autopilot scored over the bug zoo, Wilson intervals (adopted 7) | Not started | 3, plus a paid zoo run |
