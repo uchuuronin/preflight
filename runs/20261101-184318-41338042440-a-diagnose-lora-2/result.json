@@ -1,0 +1,11 @@
+{
+	"name": "20261101-184318-41338042440-a-diagnose-lora-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41338042440",
+	"ref": "ws-a",
+	"sha": "8da594b0166c7896a4e5b7867003a3e2e53eaff3",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::diagnose --share jgk05gwUgV-Bo78sErzKFQ --max-usd 0.45",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T18:44:38Z"
+}

@@ -1,0 +1,28 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-zXX7hCJXTgcMPdANWgDfkl
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+└── ✓ Created Function diagnose_hosted.
+[diagnose] diagnosis.consistent: Plots and numbers agree | The loss plot shows the p1 line reaching its highest peak around step 9, which matches the maximum in the raw loss series at that index. (plot: loss, steps 8-10, the p1 line; number: probes[p1].stability.series.loss[9] = 1.5630157589912415) Spark Open checked it against probes[p1].stability.series.loss[9] = 1.5630157589912415.
+[diagnose] stats {'checks': 1, 'kept': 1, 'unresolved': 0, 'mismatched': 0}; 4 calls, $0.0685
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-zXX7hCJXTgcMPdANWgDfkl

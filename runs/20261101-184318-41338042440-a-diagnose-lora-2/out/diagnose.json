@@ -1,0 +1,118 @@
+{
+  "record_id": "01M6C5WRVEM3RTRRBDRPAAPEGT",
+  "diagnosis_worst_usd": 0.1261,
+  "stats": {
+    "checks": 1,
+    "kept": 1,
+    "unresolved": 0,
+    "mismatched": 0
+  },
+  "diagnosis": [
+    {
+      "id": "diagnosis.1",
+      "severity": "info",
+      "code": "diagnosis.consistent",
+      "title": "Plots and numbers agree",
+      "detail": "The loss plot shows the p1 line reaching its highest peak around step 9, which matches the maximum in the raw loss series at that index. (plot: loss, steps 8-10, the p1 line; number: probes[p1].stability.series.loss[9] = 1.5630157589912415)",
+      "node_id": null,
+      "evidence": [
+        {
+          "metric": "probes[p1].stability.series.loss[9]",
+          "value": 1.5630157589912415,
+          "threshold": null,
+          "probe_id": "p1",
+          "step": null
+        }
+      ],
+      "source": "spark_diagnosis",
+      "fix_template": null,
+      "knob_id": null,
+      "citations": []
+    }
+  ],
+  "checked": [
+    {
+      "id": "diagnosis.1",
+      "severity": "info",
+      "code": "diagnosis.consistent",
+      "title": "Plots and numbers agree",
+      "detail": "The loss plot shows the p1 line reaching its highest peak around step 9, which matches the maximum in the raw loss series at that index. (plot: loss, steps 8-10, the p1 line; number: probes[p1].stability.series.loss[9] = 1.5630157589912415) Spark Open checked it against probes[p1].stability.series.loss[9] = 1.5630157589912415.",
+      "node_id": null,
+      "evidence": [
+        {
+          "metric": "probes[p1].stability.series.loss[9]",
+          "value": 1.5630157589912415,
+          "threshold": null,
+          "probe_id": "p1",
+          "step": null
+        },
+        {
+          "metric": "spark_open_check",
+          "value": "probes[p1].stability.series.loss[9]",
+          "threshold": null,
+          "probe_id": "p1",
+          "step": null
+        }
+      ],
+      "source": "spark_diagnosis",
+      "fix_template": null,
+      "knob_id": null,
+      "citations": []
+    }
+  ],
+  "calls": [
+    {
+      "provider": "meta",
+      "model": "muse-spark-1.3",
+      "purpose": "diagnosis",
+      "input_tokens": 3001,
+      "output_tokens": 8192,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.038567,
+      "request_id": "c3fb39cf-7d66-48a8-a262-8cdc2c715458",
+      "at": "2026-11-01T18:44:14Z",
+      "latency_s": 31.435,
+      "ok": false
+    },
+    {
+      "provider": "meta",
+      "model": "muse-spark-1.3",
+      "purpose": "diagnosis",
+      "input_tokens": 3079,
+      "output_tokens": 3981,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.020768,
+      "request_id": "7ba73cd3-7830-4227-b2e3-cc2e50a6269c",
+      "at": "2026-11-01T18:44:31Z",
+      "latency_s": 16.512,
+      "ok": true
+    },
+    {
+      "provider": "baseten",
+      "model": "meta-models/muse-spark-open-1026",
+      "purpose": "diagnosis_check",
+      "input_tokens": 1041,
+      "output_tokens": 990,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.005509,
+      "request_id": "chatcmpl-4f9b113dcf0442ebb419dd7d39337506",
+      "at": "2026-11-01T18:44:33Z",
+      "latency_s": 2.52,
+      "ok": true
+    },
+    {
+      "provider": "baseten",
+      "model": "meta-models/muse-spark-open-1026",
+      "purpose": "diagnosis_check",
+      "input_tokens": 2465,
+      "output_tokens": 392,
+      "cached_input_tokens": 1024,
+      "cost_usd": 0.003621,
+      "request_id": "chatcmpl-1cff6460e4714a4993279d16f937e657",
+      "at": "2026-11-01T18:44:35Z",
+      "latency_s": 1.537,
+      "ok": true
+    }
+  ],
+  "usd": 0.068465
+}
