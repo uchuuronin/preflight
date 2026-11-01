@@ -46,6 +46,16 @@ the rest below):
 - `8b94541` Review fixes for those two.
 - This commit: the triage shot in both cuts, the request to A, and this entry.
 
+**11:30: B's report landed** (`1cfa689` on `ws-b`, `python/preflight/corpus/reports/divergence_nov1.json`).
+It agrees with Chiya's numbers: AUROC 0.657 (0.563 to 0.765), lead 138.5 steps (3 to 269), 720
+runs, held out by settings family [measured: B's report]. The README draft, the submission table and the portal now
+link it, tagged measured as B's status does, and say "held out" again. The validation block's
+divergence row is the scorer's to fill (B: it reads the saved report). Merged `main` `f017010`
+(contract 0.6.1): add-on tests 251 of 251, worker tests 17 of 17 [measured, Nov 1].
+
+**Push to `origin/ws-d`, 11:35** (gitleaks clean; reviewed read-only): the merge of `main`
+`f017010`, and the README and submission link to B's report with this entry.
+
 Cloud runs: none. GPU minutes 0, dollars 0.
 
 ## Sun Nov 1, 11:00 (pushed; GNN run length; waiting on B's report)
