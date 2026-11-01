@@ -535,11 +535,16 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 CONTEXT_MAX_BYTES = 4 * 2**30  # guess: a measured context above 4 GiB means another process shares the GPU
 
 
-def _context_bytes(record: FlightRecord) -> float:
-	"""The device memory outside PyTorch's allocator (CUDA context, cuBLAS workspaces, other libraries), measured: each
-	timed step's whole-device use (cudaMemGetInfo) less its reserved peak, the median over the probes' steps. C, Nov
-	1: a guessed 0.75 GiB on top of a GRPO probe's reserved peak read 23.8 GB on a 23.7 GB L4 for a run that fit.
-	Falls back to the guess when no probe logged whole-device use."""
+def _context_bytes(record: FlightRecord, gpu: str | None = None) -> float:
+	"""The device memory outside PyTorch's allocator (CUDA context, cuBLAS workspaces, other libraries), measured from
+	the probes' timed steps: whole-device use (cudaMemGetInfo, at the step boundary) less the step's reserved peak.
+	The largest such gap (review, Nov 1): when the allocator hands memory back between the peak and the boundary
+	(GRPO frees its generation cache) the gap reads low or negative, so the step that released nothing is the one
+	that shows the whole context. C, Nov 1: a guessed 0.75 GiB on a GRPO probe's reserved peak read 23.8 GB on a
+	23.7 GB L4 for a run that fit. The guess stays where no probe logged whole-device use, and on any GPU other than
+	the probe's, whose driver and libraries take their own."""
+	if gpu is not None and gpu != _env_gpu(record):
+		return float(memory.DEFAULT_CONTEXT_BYTES)
 	gaps = [
 		x.device_used_bytes - x.peak_reserved_bytes
 		for p in record.probes
@@ -547,8 +552,8 @@ def _context_bytes(record: FlightRecord) -> float:
 		for x in (p.step_log or [])
 		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
 	]
-	gaps = [g for g in gaps if 0 <= g <= CONTEXT_MAX_BYTES]
-	return float(np.median(gaps)) if gaps else float(memory.DEFAULT_CONTEXT_BYTES)
+	gaps = [g for g in gaps if 0 < g <= CONTEXT_MAX_BYTES]
+	return float(max(gaps)) if gaps else float(memory.DEFAULT_CONTEXT_BYTES)
 
 
 def _capacity(record: FlightRecord, gpu: str) -> int:
@@ -679,7 +684,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		why = "the GPU isn't known, so there's no capacity to compare against; pick a GPU"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
 	capacity = _capacity(record, gpu)
-	ctx = _context_bytes(record)  # measured from the probes' whole-device use where they logged it
+	ctx = _context_bytes(record, gpu)  # measured from the probes' whole-device use where they logged it
 	oom_probe = _matching_probe(record, values, ok=("oom",))
 	if oom_probe is not None and gpu == _env_gpu(record):  # an OOM on one GPU says nothing about a bigger one
 		why = f"probe {oom_probe.id} ran out of memory at these settings"
@@ -872,7 +877,7 @@ def _empirical_memory(
 	if not measured and (x > cal.range()[1] or h > memory.ABSTAIN_HALF_WIDTH):
 		why = f"{x:.0f} work units is too far from the probes for a line fit; run a probe here"
 		return _MemoryResult(_abstain("bytes", mid, why), _abstain("probability", mid, why))
-	ctx = _context_bytes(record)
+	ctx = _context_bytes(record, _target_gpu(record, values))
 	point = cal.correct(x, 0.0) + ctx
 	if point <= 0:
 		why = "the line through the probes goes below zero here; run a probe here"

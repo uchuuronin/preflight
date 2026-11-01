@@ -302,6 +302,9 @@ _ROWS = {"memory": "memory", "step_same": "step", "step_other": "step", "rollout
 	"agent": "agent"}  # fmt: skip
 
 
+CALIBRATES = frozenset({*_ROWS.values(), "intervals", "*"})
+
+
 def _row_of(attr: str) -> str:
 	base = attr.removesuffix("_inside")
 	return _ROWS.get(base, base)
@@ -331,10 +334,15 @@ def calibration_note(manifest: dict) -> str:
 
 
 def build(manifest: dict, base: Path, divergence: dict | None = None) -> tuple[list[Row], list[Scored]]:
-	all_runs = [score_run(r, base) for r in manifest.get("runs", [])]
 	# per run, not per script: two runs of one script can differ (review, Nov 1). "*" is a run used for calibration
 	# altogether (Chiya, Nov 1: the Oct 31 LoRA run), which no held-out row scores
 	all_cal = [set(r.get("calibrates") or ()) for r in manifest.get("runs", [])]
+	unknown = set().union(*all_cal) - CALIBRATES if all_cal else set()
+	if (
+		unknown
+	):  # review, Nov 1: a typo ("interval") would silently leave a calibration run in the held-out rows
+		raise ValueError(f"unknown 'calibrates' names {sorted(unknown)}; known: {sorted(CALIBRATES)}")
+	all_runs = [score_run(r, base) for r in manifest.get("runs", [])]
 	keep = [i for i, cal in enumerate(all_cal) if "*" not in cal]
 	runs = [all_runs[i] for i in keep]
 	calibrates = [all_cal[i] for i in keep]

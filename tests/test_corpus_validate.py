@@ -183,3 +183,8 @@ def test_a_run_that_calibrated_a_model_is_left_out_of_its_rows():
 		rows, _ = V.build(m, Path("."))
 	r = _row(rows, "Rollout time (RL)")
 	assert (r.hits, r.n) == (0, 1)  # only the unseen script, which missed
+
+
+def test_an_unknown_calibration_name_is_refused(tmp_path):
+	with pytest.raises(ValueError, match="unknown 'calibrates'"):
+		V.build({"runs": [{"script": "x", "record": "r.json", "calibrates": ["interval"]}]}, tmp_path)

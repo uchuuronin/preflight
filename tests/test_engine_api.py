@@ -922,7 +922,9 @@ def test_the_cuda_context_is_measured_not_guessed():
 		for x in p.step_log
 		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
 	]
-	assert api._context_bytes(rec) == pytest.approx(statistics.median(gaps))
+	assert api._context_bytes(rec) == pytest.approx(
+		max(gaps)
+	)  # the step that released nothing shows it whole
 	assert api._context_bytes(rec) < api.memory.DEFAULT_CONTEXT_BYTES / 2
 	bare = rec.model_copy(update={"probes": [p.model_copy(update={"step_log": []}) for p in rec.probes]})
 	assert api._context_bytes(bare) == api.memory.DEFAULT_CONTEXT_BYTES
@@ -932,9 +934,9 @@ def test_every_memory_path_takes_the_measured_context(monkeypatch):
 	rec = _lora()
 	q = {"batch_size": 2, "seq_len": 1024}
 	measured = api.predict(rec, q).root["memory.peak"].point
-	monkeypatch.setattr(api, "_context_bytes", lambda r: float(api.memory.DEFAULT_CONTEXT_BYTES))
+	monkeypatch.setattr(api, "_context_bytes", lambda r, gpu=None: float(api.memory.DEFAULT_CONTEXT_BYTES))
 	guessed = api.predict(rec, q).root["memory.peak"].point
-	real = statistics.median(
+	real = max(
 		x.device_used_bytes - x.peak_reserved_bytes
 		for p in rec.probes
 		if p.status in api.OK_PROBE
@@ -942,3 +944,25 @@ def test_every_memory_path_takes_the_measured_context(monkeypatch):
 		if x.kind == "timed" and x.device_used_bytes and x.peak_reserved_bytes
 	)
 	assert guessed - measured == pytest.approx(api.memory.DEFAULT_CONTEXT_BYTES - real, rel=0.05)
+
+
+def test_a_release_after_the_peak_doesnt_shrink_the_context():
+	# review, Nov 1: GRPO frees its generation cache, so some steps' boundary use sits below their reserved peak
+	rec = _lora()
+	probes = []
+	for p in rec.probes:
+		log = [
+			x.model_copy(update={"device_used_bytes": x.peak_reserved_bytes - 2**30})
+			if x.kind == "timed" and i % 2
+			else x
+			for i, x in enumerate(p.step_log or [])
+		]
+		probes.append(p.model_copy(update={"step_log": log}))
+	released = rec.model_copy(update={"probes": probes})
+	assert api._context_bytes(released) == pytest.approx(api._context_bytes(rec))
+
+
+def test_another_gpu_takes_the_guess():
+	rec = _lora()
+	assert api._context_bytes(rec, "H100-SXM-80GB") == api.memory.DEFAULT_CONTEXT_BYTES
+	assert api._context_bytes(rec, api._env_gpu(rec)) < api.memory.DEFAULT_CONTEXT_BYTES
