@@ -1,0 +1,50 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-hKJZUQxqy4shHJRdhOtXOp
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+[titan] startup check: {"exit": 0, "stderr_tail": "", "torch": "2.7.1+cu126", "flavor": "debugmodel", "steps": 40, "vocab": 2256, "docs": 300}
+[titan] waiting for an L4, else an A10 or an L40S (Modal queues it)
+[titan] container up on the A10
+{
+  "status": "ok",
+  "error": null,
+  "error_code": null,
+  "steps": 15,
+  "p50_s": 0.02635366439819336,
+  "by_phase": {
+    "data": 0.11456650904526434,
+    "forward": 0.3176245686817218,
+    "backward": 0.5238088657229836,
+    "optimizer": 0.044000056550030246,
+    "other": 0.0
+  },
+  "peak_allocated_bytes": 420977664,
+  "extras": {
+    "params_total": 6270208.0,
+    "params_trainable": 6270208.0,
+    "tokens_per_step": 0.0,
+    "samples_per_step": 0.0,
+    "micro_steps_per_step": 1.0,
+    "host_rss_peak_bytes": 9236287488.0
+  },
+  "gpu": "A10",
+  "seconds": 10.522
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-hKJZUQxqy4shHJRdhOtXOp

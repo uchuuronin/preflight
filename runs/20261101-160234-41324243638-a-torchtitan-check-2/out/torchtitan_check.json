@@ -1,0 +1,37 @@
+{
+  "startup": {
+    "exit": 0,
+    "stderr_tail": "",
+    "torch": "2.7.1+cu126",
+    "flavor": "debugmodel",
+    "steps": 40,
+    "vocab": 2256,
+    "docs": 300
+  },
+  "probe": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 15,
+    "p50_s": 0.02635366439819336,
+    "by_phase": {
+      "data": 0.11456650904526434,
+      "forward": 0.3176245686817218,
+      "backward": 0.5238088657229836,
+      "optimizer": 0.044000056550030246,
+      "other": 0.0
+    },
+    "peak_allocated_bytes": 420977664,
+    "extras": {
+      "params_total": 6270208.0,
+      "params_trainable": 6270208.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 9236287488.0
+    },
+    "gpu": "A10",
+    "seconds": 10.522,
+    "log_tail": ""
+  }
+}
