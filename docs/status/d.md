@@ -8,6 +8,29 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 15:25 (card fonts committed)
+
+`749edd4` CI green (all six jobs). The kit is with Chiya; she sends me the sheet and form after the
+session to rank.
+
+- **My bug, caught by C:** the card's four fonts were never in the repo. The root `.gitignore`'s
+  `*.bin` kept them out, so a clean checkout couldn't run the card tests, and D2's deploy copy
+  would have shipped a bundle importing missing fonts. Chiya: commit them only if the licence
+  allows redistribution. It does: the OFL 1.1 allows bundling with software when each copy carries
+  the copyright notice and licence (both in the `OFL-*.txt` files beside them) and the fonts
+  aren't sold alone; none declares a Reserved Font Name. The files are byte-identical to the
+  packages' `.ttf` [checked with `cmp`]. Force-added; basis in `docs/licences.md`.
+- `vendor.mjs` takes the MPL-2.0 text from `workers/node_modules/lightningcss` (the same file as
+  web's), so it no longer needs web's packages. Re-running it on a clean copy changes nothing.
+- **Checked on a clean copy of the repo** (`git checkout-index`, `npm ci`, no vendor step): 18 of 18
+  tests, typecheck clean, hero card up to date [measured]. Told C to drop `npm run vendor` from the
+  CI job and the deploy step.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the four fonts, `vendor.mjs`, the licence note, the workers README line, the reply to C.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 14:10 (README: check-in and the guide on in production; builder kit ready)
 
 `f7e4306` CI green (all six jobs). `main` is `6757667`, which already holds `ws-d`; nothing to merge.
