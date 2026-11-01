@@ -121,7 +121,8 @@ def _knob_list(rec: RecordView) -> str:
 def _numbers_in(text: str) -> list[float]:
 	"""Every number the visitor wrote ("$40", "1,200", "6.5", "2k")."""
 	out = []
-	for m in re.finditer(r"(\d[\d,]*(?:\.\d+)?)\s*([kK])?", text):
+	# A number standing on its own: not the "100" in "A100" or the "16" in "bf16".
+	for m in re.finditer(r"(?<![A-Za-z0-9.])(\d[\d,]*(?:\.\d+)?)\s*([kK](?![A-Za-z]))?", text):
 		try:
 			x = float(m.group(1).replace(",", ""))
 		except ValueError:
@@ -137,20 +138,40 @@ def _stated(x: object, said: list[float]) -> float | None:
 	return float(x) if any(abs(float(x) - s) <= 1e-9 * max(1.0, s) for s in said) else None
 
 
-def checked(args: dict, rec: RecordView, text: str) -> dict:
-	"""The model's limits, kept only where the record and the visitor's text back them."""
+def _said(phrase: str, text: str) -> bool:
+	"""The phrase is the visitor's own words (whitespace and case aside)."""
+	norm = lambda x: re.sub(r"\s+", " ", x).strip().lower()  # noqa: E731
+	return bool(norm(phrase)) and norm(phrase) in norm(text)
+
+
+def checked(args: object, rec: RecordView, text: str) -> dict:
+	"""The model's limits, kept only where the record and the visitor's text back them. A reply in
+	the wrong shape keeps nothing (and says so), never fails the request after it was paid for."""
+	try:
+		if not isinstance(args, dict):
+			raise TypeError("not an object")
+		return _checked(args, rec, text)
+	except (TypeError, AttributeError, ValueError):
+		return {"limits": [], "not_understood": [text[:80]], "dropped": ["malformed"]}
+
+
+def _checked(args: dict, rec: RecordView, text: str) -> dict:
 	said = _numbers_in(text)
 	chips: list[dict] = []
 	dropped: list[str] = []
 	for a in args.get("allowed") or []:
-		k = rec.knobs.get(a.get("knob_id")) if isinstance(a, dict) else None
+		kid = a.get("knob_id") if isinstance(a, dict) else None
+		k = rec.knobs.get(kid) if isinstance(kid, str) else None
 		if k is None:
 			continue
 		values = [v for v in (a.get("values") or [])[:MAX_VALUES] if k.allows(v) or v == k.current]
+		# A number for a numeric knob must be one the visitor wrote, as for the budget.
+		if k.kind in ("int", "float"):
+			values = [v for v in values if _stated(v, said) is not None]
 		if values:
 			chips.append({"kind": "allowed", "knob_id": k.id, "values": values})
 	for kid in args.get("keep") or []:
-		if kid in rec.knobs and not any(c.get("knob_id") == kid for c in chips):
+		if isinstance(kid, str) and kid in rec.knobs and not any(c.get("knob_id") == kid for c in chips):
 			chips.append({"kind": "keep", "knob_id": kid})
 	for key, kind, scale in (
 		("budget_usd", "budget_usd", 1.0),
@@ -165,8 +186,9 @@ def checked(args: dict, rec: RecordView, text: str) -> dict:
 			dropped.append(key)
 			continue
 		chips.append({"kind": kind, "value": v * scale})
+	# Shown in quotes as the visitor's words, so only phrases they actually wrote.
 	not_understood = [
-		s.strip()[:80] for s in (args.get("not_understood") or []) if isinstance(s, str) and s.strip()
+		s.strip()[:80] for s in (args.get("not_understood") or []) if isinstance(s, str) and _said(s, text)
 	][:6]
 	return {"limits": chips, "not_understood": not_understood, "dropped": dropped}
 
@@ -217,9 +239,11 @@ async def read_limits(request: Request) -> dict:
 		raise
 	await app.state.ledger.settle(gate.reservation, result.cost_usd)
 	call = next((c for c in result.calls if c.name == "set_limits"), None)
-	out = checked(call.arguments if call else {}, rec, body.text)
-	if call is None:
-		out["not_understood"] = [body.text[:80]]
+	out = (
+		checked(call.arguments, rec, body.text)
+		if call
+		else {"limits": [], "not_understood": [body.text[:80]], "dropped": []}
+	)
 	return {
 		**out,
 		"provenance": {

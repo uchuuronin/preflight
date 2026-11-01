@@ -55,7 +55,7 @@ def build_tools(
 	limits = limits or Limits()
 	knob_ids = sorted(rec.knobs)
 	# Pinned knobs, and knobs the visitor's limits leave nowhere to go, aren't offered to set_knob.
-	movable = [k for k in knob_ids if k not in pinned and _left(rec, k, limits)]
+	movable = [k for k in knob_ids if k not in pinned and k not in limits.declined and _left(rec, k, limits)]
 	code_knobs = sorted(k for k, v in rec.knobs.items() if v.needs_code and v.patch_template)
 	nodes = sorted(rec.nodes)
 	tools = [

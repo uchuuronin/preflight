@@ -93,7 +93,10 @@ export function LiveGuideSection({
 		if (action === "declined" || action === "kept") actions.setKnob(knobId, from, "user");
 		if (action === "kept" || action === "pinned") actions.pin(knobId, true);
 		if (action === "declined") actions.decline(knobId, to);
-		void run((g) => g.decide({ knob_id: knobId, action, value: action === "applied" || action === "pinned" || action === "declined" ? to : from }));
+		const value = action === "applied" || action === "pinned" || action === "declined" ? to : from;
+		// Sent on the next frame, once the put-back knob, the new pin or exclusion are committed, so
+		// the setting the server checks the next move against is the one on screen.
+		requestAnimationFrame(() => void run((g) => g.decide({ knob_id: knobId, action, value })));
 	};
 
 	const waitingOnMove = view?.awaiting === "decision" && proposal;

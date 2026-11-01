@@ -229,6 +229,8 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 			};
 		}
 		case "pin":
+			if (!args.pinned && (ctx.limits ?? NO_LIMITS).frozen.includes(String(args.knob_id)))
+				return { ok: false, error: `${String(args.knob_id)} is one the person said not to change; it stays where it is` };
 			actions.pin(String(args.knob_id), Boolean(args.pinned));
 			return { ok: true, result: { pinned: args.knob_id, value: args.pinned } };
 		case "highlight":

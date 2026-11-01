@@ -56,14 +56,20 @@ Positive = Annotated[float, Field(gt=0, le=1e12)]
 
 
 class Limits(Strict):
-	"""The visitor's confirmed limits on the guide (web/src/guide/limits.ts). Value limits are
-	enforced here on set_knob; the number limits (budget, deadline, GPU-hours) by the browser
-	half against the readouts it computes, and the model is told all of them."""
+	"""The visitor's confirmed limits on the guide (web/src/guide/limits.ts), enforced here on every
+	move and probe the model asks for: allowed and excluded values, knobs not to change (frozen)
+	and knobs set aside after "Not this" (declined) before anything runs; the number limits
+	(budget, deadline, GPU-hours) against the readouts the browser reports for a move, before and
+	after it (routes/guide.py number_limit_broken), with the move put back if it breaks one."""
 
 	#: knob -> the only values it may take (e.g. allowed GPUs)
 	allowed: dict[Id, list[Value]] = Field(default_factory=dict, max_length=96)
 	#: knob -> values the visitor turned down ("Not this")
 	excluded: dict[Id, list[Value]] = Field(default_factory=dict, max_length=96)
+	#: knobs the visitor said not to change: never moved, never unpinned by the guide
+	frozen: list[Id] = Field(default_factory=list, max_length=96)
+	#: knobs set aside after "Not this": the guide offers another lever
+	declined: list[Id] = Field(default_factory=list, max_length=96)
 	budget_usd: Positive | None = None
 	deadline_s: Positive | None = None
 	gpu_hours: Positive | None = None
@@ -75,7 +81,16 @@ class Limits(Strict):
 			raise ValueError("at most 64 values per knob")
 		return v
 
+	def excluding(self, knob_id: str, value: Any) -> Limits:
+		"""These limits with one more value ruled out and its knob set aside ("Not this")."""
+		ex = dict(self.excluded)
+		ex[knob_id] = [*ex.get(knob_id, []), value] if value not in ex.get(knob_id, []) else ex[knob_id]
+		dec = self.declined if knob_id in self.declined else [*self.declined, knob_id]
+		return self.model_copy(update={"excluded": ex, "declined": dec})
+
 	def allows(self, knob_id: str, value: Any) -> bool:
+		if knob_id in self.frozen:
+			return False
 		allow = self.allowed.get(knob_id)
 		if allow and value not in allow:
 			return False
@@ -123,6 +138,8 @@ class SetKnobOut(Strict):
 	from_value: Value | None = None
 	to_value: Value | None = None
 	readouts: dict[Id, Readout] = Field(default_factory=dict, max_length=24)
+	#: the same readouts at the setting before the move, so the server can check number limits
+	baseline: dict[Id, Readout] = Field(default_factory=dict, max_length=24)
 	refused: (
 		Literal[
 			"pinned",
@@ -211,6 +228,9 @@ def check_setting(s: Setting, rec: RecordView) -> None:
 	for kid in s.pinned:
 		if kid not in rec.knobs:
 			raise InputError(f"unknown pinned knob {kid}")
+	for kid in [*s.limits.frozen, *s.limits.declined]:
+		if kid not in rec.knobs:
+			raise InputError(f"unknown limited knob {kid}")
 	for kid, values in [*s.limits.allowed.items(), *s.limits.excluded.items()]:
 		k = rec.knobs.get(kid)
 		if k is None:
@@ -246,6 +266,7 @@ def check_result(out: Any, rec: RecordView) -> None:
 			if v is not None and not k.allows(v) and v != k.current:
 				raise InputError(f"{out.knob_id} can't be {v!r}")
 		_check_readouts(out.readouts, rec)
+		_check_readouts(out.baseline, rec)
 	elif isinstance(out, HighlightOut):
 		bad = [n for n in out.nodes if n not in rec.nodes and not n.startswith("knob:")]
 		if bad:

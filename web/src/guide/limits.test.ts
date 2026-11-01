@@ -100,3 +100,54 @@ describe("limits are hard limits for both tours", () => {
 		expect(breaksLimit(lora, { ...NO_LIMITS, gpuHours: 0.001 }, "gpu_type", "L40S", after, before, knobs)).not.toBeNull();
 	});
 });
+
+describe("the review's gaps: fixes, frozen knobs, the guide's pin tool", () => {
+	it("a code fix never sets a value the visitor ruled out or a knob they froze", async () => {
+		const { candidatesFor } = await import("../fix/candidates");
+		const f2 = lora.findings.find((f) => f.id === "f2")!;
+		const base = { record: lora, provider, knobs: currentKnobs(lora), pinned: new Set<string>(), objective: { kind: "min_cost" as const } };
+		const free = candidatesFor(f2, { ...base, limits: NO_LIMITS });
+		const first = free[0]!;
+		expect(first.template_id).toBe("eval.reduce_batch");
+		const ruledOut = candidatesFor(f2, { ...base, limits: { ...NO_LIMITS, excluded: { eval_batch_size: [first.value as number] } } });
+		expect(ruledOut.find((c) => c.template_id === "eval.reduce_batch")?.value).not.toBe(first.value);
+		const frozen = candidatesFor(f2, { ...base, limits: { ...NO_LIMITS, frozen: ["gradient_checkpointing"] } });
+		expect(frozen.map((c) => c.template_id)).not.toContain("memory.gradient_checkpointing");
+		const noOn = candidatesFor(f2, { ...base, limits: { ...NO_LIMITS, excluded: { gradient_checkpointing: [true] } } });
+		expect(noOn.map((c) => c.template_id)).not.toContain("memory.gradient_checkpointing");
+	});
+
+	it("'Don't change' on the GPU holds in every step, the pin-in-the-way step included", () => {
+		const frozen: Limits = { ...NO_LIMITS, frozen: ["gpu_type"] };
+		for (const kind of AIMS) {
+			const { steps, knobs } = tour(kind, frozen);
+			expect(steps.filter((s) => s.move?.knobId === "gpu_type" || s.pinnedKnob === "gpu_type")).toEqual([]);
+			expect(knobs.gpu_type).toBe(A100);
+		}
+		// With every other lever pinned, the step that names a pin in the way never names the GPU.
+		const pinned = new Set(lora.knobs.map((k) => k.id).filter((k) => k !== "gpu_type"));
+		const s = nextStep({ record: lora, provider, knobs: { ...currentKnobs(lora), eval_batch_size: 8 }, pinned, objective: { kind: "min_cost" }, visited: new Set(["sample:more"]), limits: frozen });
+		expect(s.pinnedKnob).not.toBe("gpu_type");
+		expect(s.move?.knobId).not.toBe("gpu_type");
+	});
+
+	it("the guide can't unpin a knob the visitor said not to change", () => {
+		const c = liveCtx({ ...NO_LIMITS, frozen: ["gpu_type"] });
+		c.pinned.add("gpu_type");
+		const out = runBrowserCall({ call_id: "p", name: "pin", arguments: { knob_id: "gpu_type", pinned: false }, runs_in: "browser" }, c, false);
+		expect(out.tool === "pin" && out.pinned).toBe(true);
+		expect(executeTool("pin", { knob_id: "gpu_type", pinned: false }, c).ok).toBe(false);
+		expect(guardSetKnob(c, "gpu_type", "H100-SXM-80GB")).not.toBeNull();
+	});
+
+	it("a move whose range, not just its middle, passes the budget is refused", () => {
+		const est = (point: number, hi: number) => ({ "cost.total": { point, lo: point * 0.8, hi, unit: "usd", status: "predicted", model_id: "t", source: "grid", reason: null } }) as never;
+		const knobs = currentKnobs(lora);
+		// Middle US$38, top of the range US$45, budget US$40: refused.
+		expect(breaksLimit(lora, { ...NO_LIMITS, budgetUsd: 40 }, "batch_size", 8, est(38, 45), est(30, 35), knobs)).toBe("over_budget");
+		// The whole range under US$40: fine.
+		expect(breaksLimit(lora, { ...NO_LIMITS, budgetUsd: 40 }, "batch_size", 8, est(30, 39), est(30, 35), knobs)).toBeNull();
+		// Already past it and coming down: allowed.
+		expect(breaksLimit(lora, { ...NO_LIMITS, budgetUsd: 40 }, "batch_size", 8, est(42, 48), est(50, 60), knobs)).toBeNull();
+	});
+});

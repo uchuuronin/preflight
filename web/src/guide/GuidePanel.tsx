@@ -13,6 +13,7 @@ import { findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, 
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
 import { FixRace } from "../fix/FixRace";
+import { limitsForServer } from "./limits";
 import { LimitsPanel } from "./LimitsPanel";
 import { MoveChoices } from "./MoveChoices";
 
@@ -168,10 +169,14 @@ export function GuidePanel() {
 
 	const restart = () => {
 		setSetAside(null);
+		// A fresh tour may offer knobs set aside last time; values ruled out stay ruled out.
+		const l = latest.current.state.limits;
 		const v = new Set<string>();
 		setVisited(v);
 		setTaken(0);
-		begin(v, 0);
+		if (!l.declined.length) return begin(v, 0);
+		actions.setLimits({ ...l, declined: [] });
+		requestAnimationFrame(() => begin(v, 0)); // after the cleared limits are committed
 	};
 
 	// Restart the tour when the aim changes (a dial pressed, or the person's choice).
@@ -207,7 +212,7 @@ export function GuidePanel() {
 		setApprovals((all) => all.map((x) => (x.id === id ? { ...x, running: true } : x)));
 		const args = a.args as { knobs?: Record<string, KnobValue>; knob_id?: string; reason?: string };
 		const reason = typeof args.reason === "string" && /^[a-z][a-z0-9_.]{0,47}$/.test(args.reason) ? args.reason : undefined;
-		const run = await runApprovedTool(recordRef, a.name as SpendTool, { ...(args.knobs ? { knobs: args.knobs } : {}), ...(args.knob_id ? { knob_id: args.knob_id } : {}), ...(reason ? { reason } : {}) }, latest.current.state.knobs);
+		const run = await runApprovedTool(recordRef, a.name as SpendTool, { ...(args.knobs ? { knobs: args.knobs } : {}), ...(args.knob_id ? { knob_id: args.knob_id } : {}), ...(reason ? { reason } : {}) }, latest.current.state.knobs, fetch, limitsForServer(latest.current.state.limits));
 		setApprovals((all) => all.map((x) => (x.id === id ? { ...x, running: false, run } : x)));
 	};
 

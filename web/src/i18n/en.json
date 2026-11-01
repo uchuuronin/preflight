@@ -887,5 +887,6 @@
 	"limits.none": "none",
 	"limits.keep": "Don't change",
 	"limits.ruled_out": "Ruled out with \"Not this\"",
-	"limits.restore": "Allow {what} again"
+	"limits.restore": "Allow {what} again",
+	"dock.frozen_hint": "You said not to change this. The guide won't touch it."
 }

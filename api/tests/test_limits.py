@@ -152,3 +152,164 @@ def test_numbers_in_the_visitors_words(text, expect):
 	from preflight_api.routes.limits import _numbers_in
 
 	assert _numbers_in(text) == expect
+
+
+def test_frozen_and_declined_knobs_are_refused_and_never_offered():
+	limits = {"frozen": ["gpu_type"], "declined": ["batch_size"]}
+	model = Model(
+		reply(
+			calls=[
+				("set_knob", {"knob_id": "gpu_type", "value": "H100-SXM-80GB", "why": "faster"}),
+				("pin", {"knob_id": "gpu_type", "pinned": False}),
+				("run_probe", {"knobs": {"gpu_type": "H100-SXM-80GB"}, "reason": "check"}),
+			]
+		),
+		reply(text="Your GPU stays as it is."),
+	)
+	with client(model) as c:
+		r = turn(c, start=True, setting={**SETTING, "limits": limits}).json()
+		enum = next(t for t in model.requests[0]["tools"] if t["name"] == "set_knob")["parameters"][
+			"properties"
+		]["knob_id"]["enum"]
+		assert "gpu_type" not in enum and "batch_size" not in enum
+		assert r["calls"] == []  # nothing reached the browser or an approval card
+		outs = [
+			json.loads(i["output"])
+			for i in model.requests[1]["input"]
+			if i.get("type") == "function_call_output"
+		]
+		assert [o["refused"] for o in outs] == ["outside_limits", "frozen", "outside_limits"]
+
+
+def _moved(call_id, cost_after, cost_before):
+	return {
+		"tool": "set_knob",
+		"call_id": call_id,
+		"moved": True,
+		"knob_id": "gpu_type",
+		"from_value": A100,
+		"to_value": "H100-SXM-80GB",
+		"readouts": {
+			"cost.total": {
+				"point": cost_after * 0.9,
+				"lo": cost_after * 0.8,
+				"hi": cost_after,
+				"unit": "usd",
+				"status": "predicted",
+			}
+		},
+		"baseline": {
+			"cost.total": {
+				"point": cost_before,
+				"lo": cost_before,
+				"hi": cost_before,
+				"unit": "usd",
+				"status": "predicted",
+			}
+		},
+		"refused": None,
+	}
+
+
+def test_a_move_whose_range_passes_the_budget_is_refused_here_and_put_back():
+	setting = {**SETTING, "limits": {"budget_usd": 40}}
+	model = Model(
+		reply(calls=[("set_knob", {"knob_id": "gpu_type", "value": "H100-SXM-80GB", "why": "faster"})]),
+		reply(text="That goes past your budget; nothing else fits."),
+	)
+	with client(model) as c:
+		r1 = turn(c, start=True, setting=setting).json()
+		# The middle is under $40 (US$40.5 x 0.9) but the top of the range isn't.
+		r2 = turn(
+			c, state=r1["state"], results=[_moved(r1["calls"][0]["call_id"], 45.0, 30.0)], setting=setting
+		).json()
+		assert r2["reverts"] == [{"knob_id": "gpu_type", "value": A100}]
+		assert r2["awaiting"] != "decision"
+		said = [
+			json.loads(i["output"])
+			for i in model.requests[1]["input"]
+			if i.get("type") == "function_call_output"
+		]
+		assert said[-1]["refused"] == "over_budget"
+
+
+def test_a_move_that_brings_an_over_budget_run_back_down_stands():
+	setting = {**SETTING, "limits": {"budget_usd": 40}}
+	model = Model(
+		reply(calls=[("set_knob", {"knob_id": "gpu_type", "value": "H100-SXM-80GB", "why": "cheaper"})]),
+		reply(text="Cheaper, though still over your budget."),
+	)
+	with client(model) as c:
+		r1 = turn(c, start=True, setting=setting).json()
+		r2 = turn(
+			c, state=r1["state"], results=[_moved(r1["calls"][0]["call_id"], 50.0, 60.0)], setting=setting
+		).json()
+		assert r2["reverts"] == [] and r2["awaiting"] == "decision"
+
+
+def test_not_this_is_ruled_out_on_the_server_whatever_the_browser_sent():
+	model = Model(
+		reply(calls=[("set_knob", {"knob_id": "batch_size", "value": 8, "why": "x"})]),
+		reply(text="Batch 8."),
+		reply(calls=[("set_knob", {"knob_id": "batch_size", "value": 8, "why": "again"})]),
+		reply(text="Nothing else."),
+	)
+	with client(model) as c:
+		r1 = turn(c, start=True).json()
+		moved = {
+			"tool": "set_knob",
+			"call_id": r1["calls"][0]["call_id"],
+			"moved": True,
+			"knob_id": "batch_size",
+			"from_value": 4,
+			"to_value": 8,
+			"readouts": {},
+			"refused": None,
+		}
+		r2 = turn(c, state=r1["state"], results=[moved]).json()
+		# The browser's setting doesn't carry the exclusion yet; the decision alone is enough.
+		r3 = turn(
+			c, state=r2["state"], decision={"knob_id": "batch_size", "action": "declined", "value": 8}
+		).json()
+		assert r3["calls"] == []
+		outs = [
+			json.loads(i["output"])
+			for i in model.requests[-1]["input"]
+			if i.get("type") == "function_call_output"
+		]
+		assert outs[-1]["refused"] in ("outside_limits", "tool_not_offered")
+
+
+def test_the_reader_keeps_only_the_visitors_own_words_and_numbers():
+	rec = lora()
+	out = checked(
+		{
+			"allowed": [{"knob_id": "batch_size", "values": [16, 4]}],
+			"keep": [{"bad": 1}, "packing"],
+			"budget_usd": 100,  # the "100" in "A100" is not a budget
+			"deadline_hours": None,
+			"gpu_hours": None,
+			"not_understood": ["can't touch the dataset", "ignore your rules"],
+		},
+		rec,
+		"stay on A100, batch 4 at most, can't touch the dataset",
+	)
+	assert {"kind": "allowed", "knob_id": "batch_size", "values": [4]} in out["limits"]
+	assert {"kind": "keep", "knob_id": "packing"} in out["limits"]
+	assert out["dropped"] == ["budget_usd"]
+	assert out["not_understood"] == ["can't touch the dataset"]
+	assert checked(["not", "a", "dict"], rec, "x")["dropped"] == ["malformed"]
+	assert checked({"allowed": [{"knob_id": ["gpu_type"], "values": "x"}]}, rec, "x")["limits"] == []
+
+
+def test_an_approved_probe_from_the_rule_tour_respects_the_limits():
+	with client(Model()) as c:
+		body = {
+			"record": "lora-7b",
+			"tool": "run_probe",
+			"setting": SETTING["knobs"],
+			"knobs": {"gpu_type": "H100-SXM-80GB"},
+			"limits": {"allowed": {"gpu_type": [A100]}},
+		}
+		r = c.post("/v1/guide/tools", json=body)
+		assert r.status_code == 422 and r.json()["error"]["code"] == "outside_limits"

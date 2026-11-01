@@ -71,7 +71,7 @@ export function FixRace({ finding }: { finding: Finding }) {
 	const [error, setError] = useState<{ code: string; message: string } | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
-	const cands = candidatesFor(finding, { record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective });
+	const cands = candidatesFor(finding, { record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective, limits: state.limits });
 	const running = race?.status === "running";
 
 	useEffect(() => {

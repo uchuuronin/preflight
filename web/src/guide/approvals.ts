@@ -22,13 +22,14 @@ export async function runApprovedTool(
 	args: { knobs?: Record<string, KnobValue>; knob_id?: string; reason?: string },
 	setting: Record<string, KnobValue>,
 	post: typeof fetch = fetch,
+	limits?: Record<string, unknown>,
 ): Promise<ToolRun> {
 	try {
 		const res = await post("/v1/guide/tools", {
 			method: "POST",
 			credentials: "same-origin",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ record, tool, setting, ...args }),
+			body: JSON.stringify({ record, tool, setting, ...args, ...(limits ? { limits } : {}) }),
 		});
 		const body = (await res.json().catch(() => null)) as (ToolRun & { error?: { message?: string } }) | null;
 		if (!res.ok || !body?.status) return { status: "failed", reason: body?.error?.message ?? `request failed (${res.status})` };

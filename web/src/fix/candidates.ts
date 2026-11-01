@@ -8,6 +8,7 @@
  * templates.json is the API's list (api/preflight_api/fix/templates.py), checked equal in
  * api/tests/test_patches.py.
  */
+import { type Limits, NO_LIMITS, valueAllowed, withinLimits } from "../guide/limits";
 import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
 import data from "./templates.json";
@@ -50,18 +51,24 @@ interface Ctx {
 	knobs: Record<string, KnobValue>;
 	pinned: ReadonlySet<string>;
 	objective: Objective;
+	/** The visitor's limits: a fix never sets a value they ruled out or a knob they froze. */
+	limits?: Limits;
 }
 
 function valueFor(t: FixTemplate, ctx: Ctx): { ok: boolean; value?: KnobValue } {
-	if (t.knob && ctx.pinned.has(t.knob)) return { ok: false };
+	const limits = ctx.limits ?? NO_LIMITS;
+	if (t.knob && (ctx.pinned.has(t.knob) || limits.frozen.includes(t.knob))) return { ok: false };
 	const knob = t.knob ? ctx.record.knobs.find((k) => k.id === t.knob) : undefined;
-	// A switch already on has nothing to fix.
-	if (knob?.kind === "bool" && ctx.knobs[knob.id] === true) return { ok: false };
+	// A switch already on has nothing to fix; one the visitor ruled "on" out for isn't written.
+	if (knob?.kind === "bool" && (ctx.knobs[knob.id] === true || !valueAllowed(limits, knob.id, true))) return { ok: false };
 	if (!t.needs_value) return { ok: true };
-	if (!knob) return t.id in CODE_ONLY_VALUES ? { ok: true, value: CODE_ONLY_VALUES[t.id] } : { ok: false };
+	if (!knob) {
+		const v = CODE_ONLY_VALUES[t.id];
+		return v !== undefined && valueAllowed(limits, t.knob ?? t.id, v) ? { ok: true, value: v } : { ok: false };
+	}
 	if (knob.kind === "bool") return { ok: true, value: true };
 	const move = ctx.provider
-		.moves(ctx.record, ctx.objective, { pinned: ctx.pinned, knobs: ctx.knobs })
+		.moves(ctx.record, ctx.objective, withinLimits(ctx.record, ctx.provider, limits, ctx.knobs, { pinned: ctx.pinned }, false))
 		.find((m) => m.knobId === knob.id && m.fit === "fits");
 	return move ? { ok: true, value: move.to } : { ok: false };
 }

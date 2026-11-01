@@ -39,6 +39,8 @@ export interface RoundOut {
 	awaiting: Awaiting;
 	state: string;
 	provenance: Record<string, unknown>;
+	/** Moves the server refused after this browser made them (a number limit): put each back. */
+	reverts?: Array<{ knob_id: string; value: KnobValue | null }>;
 }
 
 export interface Setting {
@@ -88,6 +90,7 @@ export type ToolOut =
 			from_value: KnobValue | null;
 			to_value: KnobValue | null;
 			readouts: Record<string, Readout>;
+			baseline?: Record<string, Readout>;
 			refused: SetKnobRefusal | null;
 	  }
 	| { tool: "highlight"; call_id: string; nodes: string[] }
@@ -216,6 +219,8 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 				from_value: from,
 				to_value: to,
 				readouts: readouts(record, provider.predict(record, { ...knobs, [id]: to })),
+				// The same readouts before the move: the server checks the number limits against both.
+				baseline: readouts(record, provider.predict(record, knobs)),
 				refused: null,
 			};
 		}
@@ -227,7 +232,8 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 		}
 		case "pin": {
 			const id = String(a.knob_id);
-			const on = Boolean(a.pinned);
+			// A knob the visitor said not to change stays pinned whatever the guide asks.
+			const on = Boolean(a.pinned) || (ctx.limits ?? NO_LIMITS).frozen.includes(id);
 			actions.pin(id, on);
 			return { tool: "pin", call_id: call.call_id, knob_id: id, pinned: on };
 		}
@@ -325,6 +331,11 @@ export class LiveTour {
 			}
 			const out = (await res.json()) as RoundOut;
 			this.state = out.state;
+			if (out.reverts?.length) {
+				const { actions } = this.ctx();
+				actions.propose(null);
+				for (const r of out.reverts) if (r.value !== null) actions.setKnob(r.knob_id, r.value, "user");
+			}
 			this.view = {
 				text: out.text || (out.withheld ? "" : this.view.text),
 				withheld: out.withheld,

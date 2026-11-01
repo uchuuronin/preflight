@@ -148,6 +148,53 @@ def _unmoved_offer(state: GuideState) -> tuple[str, Any] | None:
 	return offer
 
 
+def _upper(r: Any) -> float | None:
+	"""The upper end of a reported readout's interval (its point without one), or None."""
+	if r is None or r.status == "abstain" or r.point is None:
+		return None
+	return max(r.point, r.hi) if r.hi is not None else r.point
+
+
+def number_limit_broken(out: SetKnobOut, rec: RecordView, limits: Limits, knobs: dict) -> str | None:
+	"""Which number limit a move the browser made breaks, from the readouts it reported before and
+	after: past the limit, and not an improvement on a setting already past it."""
+	time_id, cost_id = rec.target_for("time"), rec.target_for("cost")
+
+	def gpu_hours(readouts: dict, setting: dict) -> float | None:
+		t = _upper(readouts.get(time_id)) if time_id else None
+		g = setting.get("gpus")
+		n = g if isinstance(g, (int, float)) and not isinstance(g, bool) and g > 0 else rec.gpu_count
+		return None if t is None else t / 3600 * n
+
+	after_knobs = {**knobs, out.knob_id: out.to_value}
+	checks = [
+		(
+			limits.budget_usd,
+			cost_id and _upper(out.readouts.get(cost_id)),
+			cost_id and _upper(out.baseline.get(cost_id)),
+			"over_budget",
+		),
+		(
+			limits.deadline_s,
+			time_id and _upper(out.readouts.get(time_id)),
+			time_id and _upper(out.baseline.get(time_id)),
+			"past_deadline",
+		),
+		(
+			limits.gpu_hours,
+			gpu_hours(out.readouts, after_knobs),
+			gpu_hours(out.baseline, knobs),
+			"over_quota",
+		),
+	]
+	for cap, after, before, why in checks:
+		if cap is None or after is None:
+			continue
+		if after > cap and not (before is not None and before > cap and after < before):
+			return why
+	return None
+
+
 def _guard_set_knob(
 	args: dict, rec: RecordView, pinned: set[str], state: GuideState, moved_now: bool, limits: Limits
 ) -> str | None:
@@ -161,8 +208,16 @@ def _guard_set_knob(
 		return "pinned"
 	if not rec.knobs[kid].allows(args.get("value")):
 		return "not_in_domain"
-	if not limits.allows(kid, args.get("value")):
+	if kid in limits.declined or not limits.allows(kid, args.get("value")):
 		return "outside_limits"
+	return None
+
+
+def _guard_probe(args: dict, limits: Limits, knobs: dict) -> str | None:
+	"""A probe the model asks for measures a setting; one outside the visitor's limits isn't offered."""
+	for kid, v in (args.get("knobs") or {}).items():
+		if v != knobs.get(kid) and not limits.allows(kid, v):
+			return "outside_limits"
 	return None
 
 
@@ -184,6 +239,7 @@ async def guide_turn(request: Request) -> dict:
 	rec = view_of(rec_raw)
 	sid: str = request.state.session
 	pinned = set(body.setting.pinned)
+	limits = body.setting.limits
 	try:
 		check_setting(body.setting, rec)
 		state = open_state(body.state, sid=sid, record_key=rec.key)
@@ -197,6 +253,7 @@ async def guide_turn(request: Request) -> dict:
 	# ---- what happened since last round
 	pending = {p.call_id: p for p in state.pending}
 	answered = False
+	reverts: list[dict] = []
 	for out in body.results:
 		p = pending.get(out.call_id)
 		if p is None or p.name != out.tool or p.needs_approval:
@@ -205,15 +262,24 @@ async def guide_turn(request: Request) -> dict:
 			check_result(out, rec)
 		except InputError as e:
 			raise ApiError(422, "invalid_request", str(e)) from e
+		output = out.model_dump_json(exclude={"tool", "call_id", "baseline"})
 		if isinstance(out, SetKnobOut) and out.moved:
-			state.move = out.knob_id
-		state.add(
-			{
-				"type": "function_call_output",
-				"call_id": out.call_id,
-				"output": out.model_dump_json(exclude={"tool", "call_id"}),
-			}
-		)
+			broken = number_limit_broken(out, rec, limits, dict(body.setting.knobs))
+			if broken:
+				# Refused here, after the browser moved it: the browser puts it back.
+				reverts.append({"knob_id": out.knob_id, "value": out.from_value})
+				output = json.dumps(
+					{
+						"moved": False,
+						"knob_id": out.knob_id,
+						"refused": broken,
+						"hint": "That move goes past the person's limit (its range, not just its middle). "
+						"Offer another lever inside the limits, or say plainly nothing helps.",
+					}
+				)
+			else:
+				state.move = out.knob_id
+		state.add({"type": "function_call_output", "call_id": out.call_id, "output": output})
 		del pending[out.call_id]
 		answered = True
 
@@ -261,6 +327,9 @@ async def guide_turn(request: Request) -> dict:
 		state.evidence = []
 		state.ranked = None
 		state.seen = []
+		if d.action == "declined" and d.value is not None:
+			# Ruled out here too, whatever the browser's setting says yet.
+			limits = limits.excluding(d.knob_id, d.value)
 		if d.action == "declined":
 			state.add(
 				_event(
@@ -309,13 +378,13 @@ async def guide_turn(request: Request) -> dict:
 				"knobs": body.setting.knobs,
 				"pinned": sorted(pinned),
 				"objective": body.setting.objective.model_dump(exclude_none=True),
-				"limits": body.setting.limits.model_dump(exclude_none=True, exclude_defaults=True),
+				"limits": limits.model_dump(exclude_none=True, exclude_defaults=True),
 			}
 		)
 	)
 
 	# ---- reserve, call, settle
-	tools = build_tools(rec, pinned, move_pending=state.move is not None, limits=body.setting.limits)
+	tools = build_tools(rec, pinned, move_pending=state.move is not None, limits=limits)
 	offered = {t["name"] for t in tools}
 	instructions = INSTRUCTIONS + language_line(body.language)
 	# The model gets another round, inside this same request, when everything it asked for was
@@ -378,8 +447,16 @@ async def guide_turn(request: Request) -> dict:
 			if c.name not in offered:
 				refusal = "tool_not_offered"
 			elif c.name == "set_knob":
-				refusal = _guard_set_knob(c.arguments, rec, pinned, state, moved_now, body.setting.limits)
+				refusal = _guard_set_knob(c.arguments, rec, pinned, state, moved_now, limits)
 				moved_now = moved_now or refusal is None
+			elif c.name == "run_probe":
+				refusal = _guard_probe(c.arguments, limits, dict(body.setting.knobs))
+			elif (
+				c.name == "pin"
+				and not c.arguments.get("pinned")
+				and c.arguments.get("knob_id") in limits.frozen
+			):
+				refusal = "frozen"
 			elif c.name == "sensitivity":
 				fp = _fingerprint(body.setting)
 				if state.ranked == fp:
@@ -397,7 +474,9 @@ async def guide_turn(request: Request) -> dict:
 			if refusal:
 				refused_any = True
 				out = {"refused": refusal}
-				if refusal == "outside_limits":
+				if refusal == "frozen":
+					out["hint"] = "The person said not to change that knob; it stays pinned."
+				elif refusal == "outside_limits":
 					out["hint"] = (
 						"That value is outside the person's limits (shown in the setting). Offer the next "
 						"lever that stays inside them, or say plainly that nothing inside them helps."
@@ -492,6 +571,8 @@ async def guide_turn(request: Request) -> dict:
 		"text": text,
 		"withheld": withheld,
 		"calls": calls_out,
+		# Moves the server refused after the browser made them: the browser puts each back.
+		"reverts": reverts,
 		"awaiting": awaiting,
 		"state": sealed,
 		"provenance": {
@@ -520,6 +601,8 @@ class ToolIn(BaseModel):
 	)
 	knob_id: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.:-]{0,79}$")] | None = None
 	reason: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.]{0,47}$")] | None = None
+	#: the visitor's limits: a probe outside them is refused, as in the live guide
+	limits: Limits = Field(default_factory=Limits)
 
 
 @router.post("/guide/tools")
@@ -538,6 +621,8 @@ async def guide_tool(request: Request) -> dict:
 		k = rec.knobs.get(kid)
 		if k is None or (not k.allows(v) and v != k.current):
 			raise ApiError(422, "invalid_request", f"{kid} can't be {v!r}.")
+	if body.tool == "run_probe" and _guard_probe({"knobs": body.knobs}, body.limits, dict(body.setting)):
+		raise ApiError(422, "outside_limits", "That setting is outside your limits, so it isn't measured.")
 	# The job store caps jobs per visitor; the ledger's IP bucket stops a visitor minting sessions
 	# to get round that (a zero-dollar reservation spends a turn and an IP token).
 	sid = request.state.session

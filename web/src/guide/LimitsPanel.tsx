@@ -6,7 +6,7 @@
  * (record.job.constraints) are offered the same way. Confirmed limits are hard limits for both
  * tours (guide/limits.ts) and for the server (routes/guide.py).
  */
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { fmt } from "../lib/fmt";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
@@ -53,7 +53,7 @@ export function applyChip(limits: Limits, chip: Chip): Limits {
 		case "gpu_hours":
 			return { ...limits, gpuHours: chip.value };
 		case "keep":
-			return limits; // a pin: applied through actions.pin
+			return limits.frozen.includes(chip.knob_id) ? limits : { ...limits, frozen: [...limits.frozen, chip.knob_id] };
 	}
 }
 
@@ -82,7 +82,8 @@ function NumberLimit({ id, label, value, unit, onChange }: { id: string; label: 
 	const [draft, setDraft] = useState<string>(value === null ? "" : String(value));
 	const commit = () => {
 		const v = Number(draft);
-		onChange(draft.trim() === "" || !Number.isFinite(v) || v <= 0 ? null : v);
+		// Source: derived, the server takes limits up to 1e12; anything past a billion is a typo.
+		onChange(draft.trim() === "" || !Number.isFinite(v) || v <= 0 || v > 1e9 ? null : v);
 	};
 	return (
 		<label className="pf-limits__num" htmlFor={id}>
@@ -121,20 +122,18 @@ export function LimitsPanel() {
 	const [error, setError] = useState<string | null>(null);
 	const live = flag("c.guide.live");
 
+	const proposedRef = useRef<HTMLDivElement>(null);
 	const confirm = (chip: Chip) => {
-		if (chip.kind === "keep") actions.pin(chip.knob_id, true);
-		else actions.setLimits(applyChip(limits, chip));
+		actions.setLimits(applyChip(limits, chip));
 		setProposed((all) => all.filter((c) => c !== chip));
+		proposedRef.current?.focus(); // the confirmed chip's button is gone: keep focus in the group
 	};
 	const confirmAll = () => {
-		let next = limits;
-		for (const c of proposed) {
-			if (c.kind === "keep") actions.pin(c.knob_id, true);
-			else next = applyChip(next, c);
-		}
-		actions.setLimits(next);
+		actions.setLimits(proposed.reduce(applyChip, limits));
 		setProposed([]);
+		summaryRef.current?.focus();
 	};
+	const summaryRef = useRef<HTMLElement>(null);
 
 	const read = async () => {
 		const words = text.trim();
@@ -186,23 +185,28 @@ export function LimitsPanel() {
 		const excluded = { ...limits.excluded };
 		if (rest.length) excluded[knobId] = rest;
 		else delete excluded[knobId];
-		actions.setLimits({ ...limits, excluded, declined: limits.declined.filter((k) => k !== knobId) });
+		// The knob comes back to the tours once nothing on it is ruled out any more.
+		actions.setLimits({ ...limits, excluded, declined: rest.length ? limits.declined : limits.declined.filter((k) => k !== knobId) });
+	};
+	const toggleFrozen = (knobId: string) => {
+		const on = limits.frozen.includes(knobId);
+		actions.setLimits({ ...limits, frozen: on ? limits.frozen.filter((k) => k !== knobId) : [...limits.frozen, knobId] });
 	};
 	const excluded = Object.entries(limits.excluded).flatMap(([k, vs]) => vs.map((v) => [k, v] as const));
 	const count = useMemo(
 		() =>
 			Object.keys(limits.allowed).length +
 			excluded.length +
-			state.pinned.size +
+			limits.frozen.length +
 			(limits.budgetUsd !== null ? 1 : 0) +
 			(limits.deadlineS !== null ? 1 : 0) +
 			(limits.gpuHours !== null ? 1 : 0),
-		[limits, excluded.length, state.pinned.size],
+		[limits, excluded.length],
 	);
 
 	return (
 		<details className="pf-limits">
-			<summary>
+			<summary ref={summaryRef}>
 				<b>{t("limits.title")}</b>
 				<span className="pf-dim">{count ? t("limits.count", { n: fmt(count, "count") }) : t("limits.none_set")}</span>
 			</summary>
@@ -231,7 +235,7 @@ export function LimitsPanel() {
 			) : null}
 
 			{proposed.length ? (
-				<div className="pf-limits__proposed" role="group" aria-label={t("limits.proposed")}>
+				<div ref={proposedRef} tabIndex={-1} className="pf-limits__proposed" role="group" aria-label={t("limits.proposed")}>
 					<p className="pf-dim">{source === "words" ? t("limits.proposed.words") : t("limits.proposed.checkin")}</p>
 					<ul className="pf-lchips">
 						{proposed.map((c, i) => (
@@ -286,9 +290,9 @@ export function LimitsPanel() {
 				<legend>{t("limits.keep")}</legend>
 				<div className="pf-lchips">
 					{record.knobs.map((k) => {
-						const on = state.pinned.has(k.id);
+						const on = limits.frozen.includes(k.id);
 						return (
-							<button key={k.id} type="button" className={`pf-lchip pf-lchip--toggle${on ? " is-on" : ""}`} aria-pressed={on} onClick={() => actions.pin(k.id, !on)}>
+							<button key={k.id} type="button" className={`pf-lchip pf-lchip--toggle${on ? " is-on" : ""}`} aria-pressed={on} onClick={() => toggleFrozen(k.id)}>
 								{t(k.label_key)}
 								{on ? <small> · {valueText(k, state.knobs[k.id])}</small> : null}
 							</button>
@@ -306,7 +310,7 @@ export function LimitsPanel() {
 								<span>
 									{knobName(record, k)} {valueText(record.knobs.find((x) => x.id === k), v)}
 								</span>
-								<button type="button" className="pf-lchip__btn pf-lchip__btn--quiet" onClick={() => restore(k, v)} aria-label={t("limits.restore", { what: `${knobName(record, k)} ${String(v)}` })}>
+								<button type="button" className="pf-lchip__btn pf-lchip__btn--quiet" onClick={() => restore(k, v)} aria-label={t("limits.restore", { what: `${knobName(record, k)} ${valueText(record.knobs.find((x) => x.id === k), v)}` })}>
 									×
 								</button>
 							</li>
