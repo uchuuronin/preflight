@@ -210,7 +210,9 @@ def brief(res: dict) -> dict:
 	"""The result without the per-step lists, for a log line."""
 	out = {k: v for k, v in res.items() if k not in ("bare", "recorder")}
 	out["bare"] = {k: v for k, v in res["bare"].items() if k != "walls_s"}
-	out["recorder"] = {k: v for k, v in res["recorder"].items() if k not in ("step_log", "log_tail", "rl")}
+	out["recorder"] = {
+		k: v for k, v in res["recorder"].items() if k not in ("step_log", "log_tail", "rl", "probe")
+	}
 	rl = res["recorder"].get("rl")
 	if rl:  # the lists stay in the json; the log line gets their summary
 		rates = rl.get("pass_rate_per_prompt") or []
