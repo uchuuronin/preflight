@@ -71,6 +71,9 @@ _TARGETS = {
 	"time.step": ("s", None),
 	"time.total": ("s", "time"),
 	"cost.total": ("usd", "cost"),
+	# Chiya, Nov 1: the quantity the dollars come from, so the browser recomputes cost.total at a user's own rate with
+	# no round trip; the interval is the quantity's, and a user's rate has none of its own
+	"cost.gpu_hours": ("gpu_hours", "cost"),
 	"risk.wall_cap": ("probability", "risk"),
 	"risk.preemption_loss": ("s", "risk"),
 	"tokens.total": ("tokens", None),
@@ -173,7 +176,7 @@ def targets_for(record: FlightRecord) -> list[Target]:
 	if _api_lens(record):
 		ids = ["cost.total", "time.total", "memory.context_fill", "risk.runaway", "tokens.total"]
 	else:
-		ids = ["memory.peak", "time.total", "cost.total", "risk.oom", "time.step"]
+		ids = ["memory.peak", "time.total", "cost.total", "cost.gpu_hours", "risk.oom", "time.step"]
 		if _has_shape(record):  # the per-term split needs the analytical model
 			ids += [f"memory.{t}" for t in MEMORY_TERMS]
 		ids += [f"time.phase.{ph}" for ph in _probe_phases(record)]
@@ -1384,6 +1387,16 @@ def _cost(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
 	return _est(time.point * rate, time.lo * rate, time.hi * rate, "usd", time.status, MODEL_ID_COST, why)
 
 
+def _gpu_hours(record: FlightRecord, values: dict, time: Estimate) -> Estimate:
+	"""GPU-hours of the run: time.total x the GPUs it holds. cost.total is this x the table's $/GPU-hour, so a user's
+	own rate gives dollars in the browser from this alone (C, Nov 1)."""
+	if time.status == "abstain":
+		return _abstain("gpu_hours", MODEL_ID_COST, time.reason or "no run time to count GPU-hours from")
+	n = _n_gpus(values, record) / 3600.0
+	why = f"{_n_gpus(values, record)} GPU{'s' if _n_gpus(values, record) != 1 else ''} for the run's time"
+	return _est(time.point * n, time.lo * n, time.hi * n, "gpu_hours", time.status, MODEL_ID_COST, why)
+
+
 def _tail_prob(time: Estimate, sigma: float, limit: float) -> float:
 	if sigma <= 0:
 		return float(time.point > limit)
@@ -1930,6 +1943,7 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		"time.step": tm.step,
 		"time.total": tm.total,
 		"cost.total": _cost(record, values, tm.total),
+		"cost.gpu_hours": _gpu_hours(record, values, tm.total),
 	}
 	out.update(mem.terms or {})
 	if tm.phases and tm.step.status != "abstain":
@@ -2388,7 +2402,7 @@ def axis_values(knob: Knob, n: int = 6) -> list:
 	return vals
 
 
-_GRID_TARGETS = ("memory.peak", "risk.oom", "time.total", "cost.total")
+_GRID_TARGETS = ("memory.peak", "risk.oom", "time.total", "cost.total", "cost.gpu_hours")
 _AGENT_GRID_TARGETS = ("cost.total", "time.total", "memory.context_fill", "risk.runaway", "tokens.total")
 # derived: three halvings and doublings around the current value, the span A's probes cover
 LOCAL_FACTORS = (0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0)  # fmt: skip

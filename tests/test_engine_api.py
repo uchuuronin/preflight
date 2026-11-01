@@ -181,7 +181,13 @@ def test_context_fill_follows_the_limit(ag):
 
 def test_grids_decode_back_to_predict(ft):
 	grids = api.build_grids(ft, ["batch_size", "seq_len"])
-	assert {g.target_id for g in grids} == {"memory.peak", "risk.oom", "time.total", "cost.total"}
+	assert {g.target_id for g in grids} == {
+		"memory.peak",
+		"risk.oom",
+		"time.total",
+		"cost.total",
+		"cost.gpu_hours",
+	}
 	g = next(g for g in grids if g.target_id == "time.total")
 	bs, sl = g.axes[0].values, g.axes[1].values
 	assert ft.knob("batch_size").current in bs and ft.knob("seq_len").current in sl
@@ -849,3 +855,14 @@ def test_one_uncorrectable_probe_leaves_every_probe_uncorrected():
 	assert api.predict(lens, q).root["time.step"].point != pytest.approx(
 		api.predict(_lora(), q).root["time.step"].point
 	)
+
+
+def test_dollars_are_gpu_hours_times_the_rate_so_the_browser_can_recompute(ft):
+	# Chiya, Nov 1: C recomputes cost.total at a user's own rate; the interval is the quantity's
+	p = api.predict(ft).root
+	hours, usd = p["cost.gpu_hours"], p["cost.total"]
+	rate = gpus.price("L4", "modal").usd_per_hour
+	assert hours.unit == "gpu_hours"
+	for a, b in ((hours.point, usd.point), (hours.lo, usd.lo), (hours.hi, usd.hi)):
+		assert a * rate == pytest.approx(b)
+	assert "cost.gpu_hours" in {t.id for t in api.targets_for(ft)}
