@@ -207,11 +207,30 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 			"in_flight_at_stop": t in in_flight} for t in ids})  # fmt: skip
 	# 0.6.0: how the sampled run ended (a lost sandbox is none of these)
 	how = {"stalled": "stalled", "cancelled": "cancelled", "timeout": "timeout", None: "finished"}.get(cut)
-	# 0.6.1: the script's workers, as the proxy saw them (the most tasks with a call in flight at
-	# once), so the engine caps how many tasks of a stalled run can be stuck
-	workers = (at_cut or st).get("peak_concurrent") or None
+	# 0.6.1: the script's workers, so the engine caps how many tasks of a stalled run can be stuck.
+	# The proxy's peak of calls in flight misses workers busy in a tool between calls, so also the
+	# most task spans (first call to last call's end; one still in flight, to the end) that overlap.
+	# A task that ended on a tool call ends at that call: most of them finished, and which are
+	# stuck can't be told, so their tool time after it isn't counted (a lower bound still)
+	workers = max((at_cut or st).get("peak_concurrent") or 0, _max_overlap(spans)) or None
 	return AgentSample(tasks=tasks, population=population, selection=selection, ended=how,
 		concurrency=int(workers) if workers else None)  # fmt: skip
+
+
+def _max_overlap(spans: dict) -> int:
+	"""The most task spans open at once; a span with no end (a call in flight) stays open to the end."""
+	edges = []
+	for opened, end in spans.values():
+		if opened is None:
+			continue
+		edges.append((opened, 1))
+		if end is not None:
+			edges.append((end, -1))
+	most = cur = 0
+	for _, d in sorted(edges, key=lambda e: (e[0], e[1])):  # an end before a start at the same instant
+		cur += d
+		most = max(most, cur)
+	return most
 
 
 class _quiet:

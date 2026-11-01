@@ -510,3 +510,14 @@ def test_an_ops_run_can_read_how_each_task_ended_without_its_content(proxy, tmp_
 		set(e) == {"opened_rank", "last_finish", "waiting_on_tool", "in_flight_at_stop"}
 		for e in ends.values()
 	)
+
+
+def test_workers_busy_in_a_tool_still_count_toward_concurrency():
+	# 0.6.1 review: the proxy's in-flight peak misses a worker that's running a tool between calls
+	from preflight.recorder.agent_sampler import _max_overlap
+
+	spans = {"a": (0.0, 10.0), "b": (1.0, 9.0), "c": (2.0, 3.0), "d": (11.0, 12.0)}
+	assert _max_overlap(spans) == 3
+	assert _max_overlap({"a": (0.0, 1.0), "b": (1.0, 2.0)}) == 1  # one worker, back to back
+	assert _max_overlap({"a": (0.0, None), "b": (5.0, 6.0)}) == 2  # still in flight: open to the end
+	assert _max_overlap({"a": (None, None)}) == 0

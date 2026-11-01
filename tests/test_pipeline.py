@@ -811,6 +811,9 @@ def test_a_training_count_setting_in_the_script_is_the_dataset_size(tmp_path):
 	assert _train_count_setting({"train.py": "N_TRAIN_NODES = int(1e5)\n"}) is None  # not a plain setting
 	assert _train_count_setting({"train.py": "def f():\n    N_TRAIN = 9\n"}) is None  # not module-level
 	assert _train_count_setting({"train.py": "N_TRAINER = 2\nN_TRAIN_NODES = True\n"}) is None
+	# a run length, never a dataset size (review, Nov 1)
+	for name in ("NUM_TRAIN_EPOCHS", "N_TRAIN_STEPS", "NUM_TRAIN_TIMESTEPS", "N_TRAIN_ITERS"):
+		assert _train_count_setting({"train.py": f"{name} = 3\n"}) is None
 	assert _train_count_setting({"notes.txt": "N_TRAIN = 3\n", "train.py": "x = (\n"}) is None
 
 	rec = run_pipeline(

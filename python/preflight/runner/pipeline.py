@@ -160,7 +160,7 @@ class Deps:
 	runner: ProbeRunner = local_runner
 	spark: object | None = None  # harness.spark.ModelClient
 	triage: object | None = (
-		None  # Spark Open on Baseten (harness/triage.py), with harness.spark_open_triage on
+		None  # Spark Open on Baseten: triage (harness/triage.py) and the diagnosis check (diagnosis_check.py)
 	)
 	cache: ProbeCache | None = None
 	image: str = "local"  # probe image tag, part of the cache key
@@ -601,7 +601,9 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	return plan
 
 
-_TRAIN_COUNT = re.compile(r"^N(?:UM)?_TRAIN(?:_[A-Z]+)?$")  # N_TRAIN_NODES, NUM_TRAIN_SAMPLES, N_TRAIN
+# N_TRAIN_NODES, NUM_TRAIN_SAMPLES, N_TRAIN: counts of training rows only, never NUM_TRAIN_EPOCHS or
+# N_TRAIN_STEPS (a run length, not a dataset size)
+_TRAIN_COUNT = re.compile(r"^N(?:UM)?_TRAIN(?:_(?:NODES|SAMPLES|EXAMPLES|ROWS|PAIRS|IMAGES|EDGES|DOCS))?$")
 
 
 def _train_count_setting(files: dict[str, str] | None) -> int | None:
@@ -680,6 +682,13 @@ def _diagnose(rec: FlightRecord, deps: Deps) -> FlightRecord:
 		log.warning("job %s: diagnosis failed", rec.record_id, exc_info=True)
 		return rec
 	log.info("job %s: diagnosis %s", rec.record_id, stats)
+	if found and deps.triage is not None:
+		# Spark Open checks each claim against the probe numbers through a tool call (item 30);
+		# without it the claims stand as Muse Spark made them, citations checked by code
+		from preflight.harness.diagnosis_check import check_diagnosis
+
+		found, checks = check_diagnosis(deps.triage, rec, found)
+		calls = [*calls, *checks]
 	keep = [f for f in rec.findings if f.source != "spark_diagnosis"]
 	return rec.model_copy(update={"findings": [*keep, *found], "provenance": [*rec.provenance, *calls]})
 

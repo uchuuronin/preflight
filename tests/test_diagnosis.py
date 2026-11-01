@@ -127,3 +127,9 @@ def test_the_pipeline_diagnoses_only_with_its_flag_on(rec, tmp_path, monkeypatch
 	assert [f.code for f in out.findings if f.source == "spark_diagnosis"] == ["diagnosis.consistent"]
 	assert len([f for f in again.findings if f.source == "spark_diagnosis"]) == 1  # replaced, not stacked
 	assert [c.purpose for c in out.provenance][-1] == "diagnosis"
+
+
+def test_a_huge_or_padded_index_never_raises(rec):
+	nums = numbers(rec)
+	assert resolve(nums, "probes[p1].step_log[" + "9" * 5000 + "].wall_s") is None
+	assert resolve(nums, "probes[p1]" + ".memory" * 50) is None

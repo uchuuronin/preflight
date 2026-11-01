@@ -37,7 +37,7 @@ You get two plots of one record (the memory timeline: allocated, reserved and de
 per step, in GB; and the loss per step) and, as JSON, the raw probe numbers behind them.
 Check one against the other. A finding is a place where the plot and the numbers disagree: a
 spike, plateau, trend or gap the plot shows that the numbers don't bear out, or a number the plot
-should show but doesn't (a peak above the device's memory, a NaN, a step the plot skips). Also flag
+should show but doesn't (a peak above the device's memory, a step the plot skips). Also flag
 what both show that a user must act on only if the plot misrepresents it. Don't describe the plots.
 If they agree, return one finding with verdict "consistent".
 Every finding names the plot ("memory_timeline" or "loss"), the region of it (e.g. "steps 30-35,
@@ -155,8 +155,8 @@ def render(rec: FlightRecord) -> dict[str, bytes]:
 
 # ---------------------------------------------------------------- the code-side citation check
 
-_PATH = re.compile(r"^probes\[([^\]]+)\]((?:\.[A-Za-z_]+|\[\d+\])+)$")
-_PART = re.compile(r"\.([A-Za-z_]+)|\[(\d+)\]")
+_PATH = re.compile(r"^probes\[([^\]]{1,64})\]((?:\.[A-Za-z_]{1,64}|\[\d{1,6}\]){1,8})$")  # bounded
+_PART = re.compile(r"\.([A-Za-z_]{1,64})|\[(\d{1,6})\]")
 
 
 def resolve(nums: dict, path: str):
@@ -168,7 +168,7 @@ def resolve(nums: dict, path: str):
 	for key, idx in _PART.findall(m.group(2)):
 		try:
 			cur = cur[key] if key else cur[int(idx)]
-		except (KeyError, IndexError, TypeError):
+		except (KeyError, IndexError, TypeError, ValueError):
 			return None
 	return cur if isinstance(cur, int | float) and not isinstance(cur, bool) else None
 
@@ -214,7 +214,7 @@ def diagnose_record(client, rec: FlightRecord) -> tuple[list[Finding], list, dic
 			continue
 		stats["kept"] += 1
 		pid = _PATH.match(c.path.strip()).group(1)
-		row = re.search(r"\.step_log\[(\d+)\]", c.path)
+		row = re.search(r"\.step_log\[(\d{1,6})\]", c.path)
 		step = nums["probes"][pid]["step_log"][int(row.group(1))]["index"] if row else None
 		consistent = c.verdict == "consistent"
 		findings.append(Finding(
