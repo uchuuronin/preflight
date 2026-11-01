@@ -477,3 +477,34 @@ def smoke() -> None:
 		and not res["stopped_at_cap"]
 	)
 	raise SystemExit(0 if ok else 1)
+
+
+@app.local_entrypoint()
+def race_sample() -> None:
+	"""The first real race, as a visitor would start it, on the lora-7b sample's eval
+	out-of-memory finding (three fixes), run once with Chiya's yes:
+
+		modal run --env main api/fix_app.py::race_sample
+
+	The startup check runs first (no model call); the race is capped at three candidates' worth."""
+	import json
+	import sys
+
+	sys.path.insert(0, str(ROOT / "api"))  # this runs on the caller's machine, from the repo
+	from preflight_api.fix import run
+
+	check = startup_check_fix.remote()
+	if not check.get("ok"):
+		print(json.dumps(check, indent=1)[:6000])
+		raise SystemExit("startup check failed; no model call made")
+	cands = [
+		{"template_id": "eval.reduce_batch", "value": 8},
+		{"template_id": "eval.wrap_no_grad"},
+		{"template_id": "memory.gradient_checkpointing", "value": True},
+	]
+	res = race_fix.remote(
+		"sample:lora-7b", cands, "First eval will run out of memory", run.stop_usd(len(cands))
+	)
+	print(json.dumps(res, indent=1))
+	patched = [c for c in res.get("candidates", []) if c["status"] == "patched"]
+	raise SystemExit(0 if patched and not res.get("error") else 1)
