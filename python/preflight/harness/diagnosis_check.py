@@ -77,7 +77,10 @@ def _claim(f: Finding) -> str:
 	"""What Spark Open is asked to check: Muse Spark's claim and the plot region, without the path
 	and value it cited, so the check finds its own number rather than echoing the diagnosis's."""
 	detail = re.sub(r"; number: [^;()]*\)$", ")", (f.detail or "").strip())
-	return f"{f.title}. {detail}"
+	# Muse Spark's prose may quote the value too: numbers there are masked, the plot region's kept
+	prose, sep, region = detail.partition(" (plot: ")
+	prose = re.sub(r"\d[\d,._]*(?:[eE][+-]?\d+)?", "#", prose)
+	return f"{f.title}. {prose}{sep}{region}"
 
 
 def _answer(text: str) -> dict | None:

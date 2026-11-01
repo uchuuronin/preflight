@@ -53,7 +53,10 @@ class PlotCheck(BaseModel):
 	plot_region: str = Field(description="Where on the plot, e.g. 'steps 30-35, the reserved line'")
 	path: str = Field(description="The cited number's path in the JSON, e.g. probes[p1].step_log[12].wall_s")
 	value: float = Field(description="That number, copied exactly as the JSON has it")
-	detail: str = Field(description="One or two sentences: what the plot shows and what the number says")
+	detail: str = Field(
+		description="One or two sentences: what the plot shows against what the number says, "
+		"in words; the number itself goes only in value"
+	)
 
 
 class Diagnosis(BaseModel):
