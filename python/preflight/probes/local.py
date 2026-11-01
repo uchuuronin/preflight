@@ -119,6 +119,8 @@ EXTRAS_KEYS = (
 	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
 	"dataset_max_tokens",
 	"dataset_p999_tokens",
+	"dataset_p50_tokens",  # step and total time follow the median and mean; memory the max (B, Nov 1)
+	"dataset_mean_tokens",
 	"dataset_rows_scanned",
 	"dataset_rows_total",
 	# vision: the batch's images (mean over the first training batches)

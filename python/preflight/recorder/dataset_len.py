@@ -7,6 +7,8 @@ tokenised it, so the length is the script's tokenisation and truncation, not a g
 
 	dataset_max_tokens     the longest row, in tokens
 	dataset_p999_tokens    the 99.9th percentile, so one outlier row shows as one
+	dataset_p50_tokens     the median row, and
+	dataset_mean_tokens    the mean row: step and total time follow these, memory the max (B, Nov 1)
 	dataset_rows_scanned   how many rows these are over ("measured over N rows")
 	dataset_rows_total     how many rows the dataset has, when it knows
 
@@ -153,6 +155,8 @@ def _summary(lens: list[int], total: int) -> dict:
 	return {
 		"dataset_max_tokens": float(s[-1]),
 		"dataset_p999_tokens": float(percentile(s, 0.999)),
+		"dataset_p50_tokens": float(percentile(s, 0.5)),
+		"dataset_mean_tokens": sum(s) / len(s),
 		"dataset_rows_scanned": float(len(s)),
 		"dataset_rows_total": float(total),
 	}
