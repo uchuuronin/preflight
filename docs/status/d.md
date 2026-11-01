@@ -28,6 +28,13 @@ anything that keeps billing, anything to `main`, production flags, contract chan
   node-less ones, and the tour takes only findings with a fix. So the shot can't be filmed today,
   even with A's link. Asked A (tie the finding to its probe's node: the smaller change) or C (list
   node-less findings), for Chiya's next batch. The storyboards say so in the shot's row.
+  **11:30, Chiya:** C adds the cockpit list; A's production triage run is the LoRA zoo script, so
+  the failed probe is the eval probe's out-of-memory and the shot sits on the same script as the
+  fine-tune story. The room-making trade-offs stand. Storyboards and `from-d.md` updated.
+- **Glimmer (Chiya, 11:30):** back in, hosted by B on our own Modal GPU (Apache 2.0). The README
+  draft and the submission (`readme-final.md` lines on Muse Glimmer; `meta-and-partners.md`;
+  `portal.md`) keep today's wording until B's endpoint is live, then say "private mode: hosted
+  on Preflight's own GPU, behind its flag" with its measured cost per call. Watching for it.
 - **Decision: what makes room.** The 3-minute video has a hard 3-minute limit (Judging playbook)
   and both 3-minute cuts already end near 2:55 to 2:58. Plan A drops shot 7 (Boarding's "Checking
   the logs" tag), which says the same thing with a label that shows whether or not the model ran
@@ -53,7 +60,7 @@ link it, tagged measured as B's status does, and say "held out" again. The valid
 divergence row is the scorer's to fill (B: it reads the saved report). Merged `main` `f017010`
 (contract 0.6.1): add-on tests 251 of 251, worker tests 17 of 17 [measured, Nov 1].
 
-**Push to `origin/ws-d`, 11:35** (gitleaks clean; reviewed read-only): the merge of `main`
+**Push to `origin/ws-d`, 11:22** (gitleaks clean; reviewed read-only): the merge of `main`
 `f017010`, and the README and submission link to B's report with this entry.
 
 Cloud runs: none. GPU minutes 0, dollars 0.
