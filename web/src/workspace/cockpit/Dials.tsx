@@ -93,9 +93,10 @@ export function worthMarking(from: number, to: number, scale: DialScale | null):
 }
 
 /**
- * The wakes, one set per cockpit, published here by the dials and read wherever they show (the
- * dials, and the open knob control on a phone): one source, so a view that mounts with the move
- * (the guide opening the knob it just moved) still shows it.
+ * The wakes, one set per page (only the cockpit screen draws dials; a second cockpit on screen at
+ * once would need this keyed by workspace), published by the dials and read wherever they show
+ * (the dials, and the open knob control on a phone): one source, so a view that mounts with the
+ * move (the guide opening the knob it just moved) still shows it.
  */
 let wakesNow: Record<string, Wake> = {};
 const wakeListeners = new Set<() => void>();
@@ -155,7 +156,7 @@ function useWakeSource(specs: DialSpec[], knobs: object): void {
 }
 
 /** The dial's size class for a value's text (its length): applied by React and by the tween per frame. */
-function sizeClass(text: string): string | undefined {
+export function sizeClass(text: string): string | undefined {
 	return text.length > 9 ? "is-longer" : text.length > 6 ? "is-long" : undefined;
 }
 

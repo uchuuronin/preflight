@@ -7,7 +7,7 @@ import { cubicBezier, durMs, valueEase } from "../../lib/tween";
 import { GridProvider } from "../provider/GridProvider";
 import { type FlightRecord, normaliseRecord } from "../record/types";
 import { useWorkspace, WorkspaceProvider } from "../state";
-import { deltaText, Dials, WAKE_MS, WakeStrip, worthMarking } from "./Dials";
+import { deltaText, Dials, sizeClass, WAKE_MS, WakeStrip, worthMarking } from "./Dials";
 
 const record = normaliseRecord(devRaw as unknown as FlightRecord);
 
@@ -160,9 +160,9 @@ describe("the wake after a knob move", () => {
 		return new Promise<void>((done) => {
 			setTimeout(() => {
 				const b = container.querySelector(".pf-dial__text b")!;
-				const want = b.textContent;
+				const want = b.textContent ?? "";
 				expect(want).toMatch(/h|min/);
-				expect(b.className === "" || /^is-long(er)?$/.test(b.className)).toBe(true);
+				expect(b.className).toBe(sizeClass(want) ?? "");
 				done();
 			}, 800);
 		});

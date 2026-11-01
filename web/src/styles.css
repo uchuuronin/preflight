@@ -904,7 +904,8 @@ a {
 }
 /* The same wakes inside the open knob control, shown only where the dials are out of sight. */
 /* Two rows high whether or not a wake is showing, so the control under the finger never jumps. */
-.pf-wakes { display: none; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 54px; }
+/* On the narrowest phones a third row is cut rather than let the control grow; the dials keep every number. */
+.pf-wakes { display: none; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 54px; max-height: 54px; overflow: hidden; }
 .pf-wakes__empty { font-size: 12px; line-height: 24px; color: var(--pf-fg-dim); }
 .pf-wakes__item {
 	padding: 2px 9px;

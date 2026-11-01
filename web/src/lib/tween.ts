@@ -103,6 +103,12 @@ export function useTweenedText(ref: RefObject<HTMLElement | null>, value: number
 		cancelAnimationFrame(frame.current);
 		if (!el || value === null || from === null || from === value || !Number.isFinite(from) || reducedMotion() || ms <= 0) {
 			shown.current = value;
+			// A tween cut short here may have left in-between text or class that React, seeing no
+			// change in its own props, won't rewrite: put the element back in step.
+			if (el) {
+				if (value !== null) el.textContent = fmtRef.current(value);
+				if (classRef.current) el.className = classRef.current(el.textContent ?? "") ?? "";
+			}
 			return;
 		}
 		const start = performance.now();
