@@ -1,0 +1,15 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-AgabTkIMrvc32UExl0hQ7b
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+out/corpus/divergence/L4.jsonl.gz: 329 rows
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-AgabTkIMrvc32UExl0hQ7b
