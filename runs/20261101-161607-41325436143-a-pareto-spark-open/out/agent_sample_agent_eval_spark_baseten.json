@@ -1,0 +1,853 @@
+{
+  "sample": {
+    "tasks": [
+      {
+        "task_id": "s1-ae84c9ed3d02",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 818,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 4.577,
+        "success": null,
+        "context_tokens_by_turn": [
+          818
+        ],
+        "cost_usd": 0.005374,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-008d13b25a1e",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4906,
+        "output_tokens": 1446,
+        "reasoning_tokens": 1182,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 1,
+        "errors": 0,
+        "latency_s": 7.995,
+        "success": null,
+        "context_tokens_by_turn": [
+          944,
+          3962
+        ],
+        "cost_usd": 0.012278,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-db740dd9a478",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4765,
+        "output_tokens": 763,
+        "reasoning_tokens": 454,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 5.661,
+        "success": null,
+        "context_tokens_by_turn": [
+          818,
+          3947
+        ],
+        "cost_usd": 0.009199,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-22fa07b1483d",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 5145,
+        "output_tokens": 1494,
+        "reasoning_tokens": 901,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 1,
+        "errors": 0,
+        "latency_s": 6.941,
+        "success": null,
+        "context_tokens_by_turn": [
+          968,
+          4177
+        ],
+        "cost_usd": 0.012781,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-db307a0099b2",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 842,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.7,
+        "success": null,
+        "context_tokens_by_turn": [
+          842
+        ],
+        "cost_usd": 0.005404,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-c0f3c241cfc4",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 825,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1017,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.809,
+        "success": null,
+        "context_tokens_by_turn": [
+          825
+        ],
+        "cost_usd": 0.005383,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-5c376034137c",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4438,
+        "output_tokens": 1275,
+        "reasoning_tokens": 1137,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 1,
+        "errors": 0,
+        "latency_s": 6.162,
+        "success": null,
+        "context_tokens_by_turn": [
+          795,
+          3643
+        ],
+        "cost_usd": 0.010966,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-8100fd42a73e",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4905,
+        "output_tokens": 1666,
+        "reasoning_tokens": 1460,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 1,
+        "errors": 0,
+        "latency_s": 7.121,
+        "success": null,
+        "context_tokens_by_turn": [
+          830,
+          4075
+        ],
+        "cost_usd": 0.013212,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-ecdb9d9cbf3e",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 3,
+        "input_tokens": 12677,
+        "output_tokens": 1316,
+        "reasoning_tokens": 800,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 8.468,
+        "success": null,
+        "context_tokens_by_turn": [
+          836,
+          3980,
+          7861
+        ],
+        "cost_usd": 0.021439,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-aaa4150ddcb1",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 5133,
+        "output_tokens": 1263,
+        "reasoning_tokens": 742,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 5.332,
+        "success": null,
+        "context_tokens_by_turn": [
+          805,
+          4328
+        ],
+        "cost_usd": 0.011784,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-765e9963f2c0",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4788,
+        "output_tokens": 704,
+        "reasoning_tokens": 422,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.263,
+        "success": null,
+        "context_tokens_by_turn": [
+          830,
+          3958
+        ],
+        "cost_usd": 0.008977,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-e26d4cd1b703",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 5169,
+        "output_tokens": 1033,
+        "reasoning_tokens": 691,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 5.569,
+        "success": null,
+        "context_tokens_by_turn": [
+          848,
+          4321
+        ],
+        "cost_usd": 0.010852,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-f17d1a14e1f0",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4802,
+        "output_tokens": 612,
+        "reasoning_tokens": 310,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.453,
+        "success": null,
+        "context_tokens_by_turn": [
+          875,
+          3927
+        ],
+        "cost_usd": 0.008604,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-6e5aea81b5d4",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4504,
+        "output_tokens": 656,
+        "reasoning_tokens": 343,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 4.087,
+        "success": null,
+        "context_tokens_by_turn": [
+          807,
+          3697
+        ],
+        "cost_usd": 0.008418,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-ec41e5f80442",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 833,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.737,
+        "success": null,
+        "context_tokens_by_turn": [
+          833
+        ],
+        "cost_usd": 0.005393,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-b3005cc534ce",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 873,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 4.384,
+        "success": null,
+        "context_tokens_by_turn": [
+          873
+        ],
+        "cost_usd": 0.005443,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-71f990afc4a3",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 5,
+        "input_tokens": 34409,
+        "output_tokens": 1451,
+        "reasoning_tokens": 549,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 5,
+        "errors": 0,
+        "latency_s": 11.612,
+        "success": null,
+        "context_tokens_by_turn": [
+          842,
+          3668,
+          6985,
+          9960,
+          12954
+        ],
+        "cost_usd": 0.049178,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-ec0773d47127",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4619,
+        "output_tokens": 985,
+        "reasoning_tokens": 604,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 4.427,
+        "success": null,
+        "context_tokens_by_turn": [
+          806,
+          3813
+        ],
+        "cost_usd": 0.00996,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-d73401e5e077",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 3,
+        "input_tokens": 11574,
+        "output_tokens": 1087,
+        "reasoning_tokens": 427,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 3,
+        "errors": 0,
+        "latency_s": 5.136,
+        "success": null,
+        "context_tokens_by_turn": [
+          867,
+          3852,
+          6855
+        ],
+        "cost_usd": 0.019087,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-2524207ae799",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 5021,
+        "output_tokens": 991,
+        "reasoning_tokens": 571,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 4.143,
+        "success": null,
+        "context_tokens_by_turn": [
+          823,
+          4198
+        ],
+        "cost_usd": 0.010488,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-afc01d55c3ca",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 1039,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.085,
+        "success": null,
+        "context_tokens_by_turn": [
+          1039
+        ],
+        "cost_usd": 0.005651,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-23779ab1f336",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4614,
+        "output_tokens": 625,
+        "reasoning_tokens": 185,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.29,
+        "success": null,
+        "context_tokens_by_turn": [
+          811,
+          3803
+        ],
+        "cost_usd": 0.008424,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-8468117a3b8a",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4707,
+        "output_tokens": 771,
+        "reasoning_tokens": 395,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.91,
+        "success": null,
+        "context_tokens_by_turn": [
+          808,
+          3899
+        ],
+        "cost_usd": 0.009161,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-2e5e971a5ac7",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 829,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 3.434,
+        "success": null,
+        "context_tokens_by_turn": [
+          829
+        ],
+        "cost_usd": 0.005388,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-0629188c54a5",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 4656,
+        "output_tokens": 635,
+        "reasoning_tokens": 390,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.33,
+        "success": null,
+        "context_tokens_by_turn": [
+          801,
+          3855
+        ],
+        "cost_usd": 0.008519,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-35507e84e040",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 826,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 4.652,
+        "success": null,
+        "context_tokens_by_turn": [
+          826
+        ],
+        "cost_usd": 0.005385,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-ebea6001cc5d",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 5133,
+        "output_tokens": 973,
+        "reasoning_tokens": 319,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 4.275,
+        "success": null,
+        "context_tokens_by_turn": [
+          931,
+          4202
+        ],
+        "cost_usd": 0.010552,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-be1c42cbd955",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 5177,
+        "output_tokens": 1294,
+        "reasoning_tokens": 777,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 5.269,
+        "success": null,
+        "context_tokens_by_turn": [
+          848,
+          4329
+        ],
+        "cost_usd": 0.011971,
+        "stop_reason": null,
+        "trace": null
+      },
+      {
+        "task_id": "s1-baf76ad977ed",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 1,
+        "input_tokens": 822,
+        "output_tokens": 1024,
+        "reasoning_tokens": 1021,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 0,
+        "errors": 0,
+        "latency_s": 4.265,
+        "success": null,
+        "context_tokens_by_turn": [
+          822
+        ],
+        "cost_usd": 0.005379,
+        "stop_reason": "done",
+        "trace": null
+      },
+      {
+        "task_id": "s1-167f4fa4003c",
+        "model": "meta-models/muse-spark-open-1026",
+        "turns": 2,
+        "input_tokens": 5433,
+        "output_tokens": 894,
+        "reasoning_tokens": 304,
+        "cached_input_tokens": 0,
+        "cache_creation_tokens": 0,
+        "tool_calls": 2,
+        "errors": 0,
+        "latency_s": 3.509,
+        "success": null,
+        "context_tokens_by_turn": [
+          1043,
+          4390
+        ],
+        "cost_usd": 0.010591,
+        "stop_reason": null,
+        "trace": null
+      }
+    ],
+    "population": 500,
+    "selection": "the first 30 tasks the script started; script wall 203 s, stopped after 120 s with no model calls; 17 ended on a tool call, up to 4 may be stuck; 470 calls refused past the sample",
+    "rate_limit_rpm": null,
+    "rate_limit_tpm": null,
+    "ended": "stalled"
+  },
+  "usd": 0.3252,
+  "task_ends": {
+    "s1-ae84c9ed3d02": {
+      "opened_rank": 0,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-008d13b25a1e": {
+      "opened_rank": 1,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-db740dd9a478": {
+      "opened_rank": 2,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-22fa07b1483d": {
+      "opened_rank": 3,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-db307a0099b2": {
+      "opened_rank": 4,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-c0f3c241cfc4": {
+      "opened_rank": 5,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-5c376034137c": {
+      "opened_rank": 6,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-8100fd42a73e": {
+      "opened_rank": 7,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-ecdb9d9cbf3e": {
+      "opened_rank": 8,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-aaa4150ddcb1": {
+      "opened_rank": 9,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-765e9963f2c0": {
+      "opened_rank": 10,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-e26d4cd1b703": {
+      "opened_rank": 11,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-f17d1a14e1f0": {
+      "opened_rank": 12,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-6e5aea81b5d4": {
+      "opened_rank": 13,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-ec41e5f80442": {
+      "opened_rank": 14,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-b3005cc534ce": {
+      "opened_rank": 15,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-71f990afc4a3": {
+      "opened_rank": 16,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-ec0773d47127": {
+      "opened_rank": 17,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-d73401e5e077": {
+      "opened_rank": 18,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-2524207ae799": {
+      "opened_rank": 19,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-afc01d55c3ca": {
+      "opened_rank": 20,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-23779ab1f336": {
+      "opened_rank": 21,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-8468117a3b8a": {
+      "opened_rank": 22,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-2e5e971a5ac7": {
+      "opened_rank": 23,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-0629188c54a5": {
+      "opened_rank": 24,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-35507e84e040": {
+      "opened_rank": 25,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-ebea6001cc5d": {
+      "opened_rank": 26,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-be1c42cbd955": {
+      "opened_rank": 27,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    },
+    "s1-baf76ad977ed": {
+      "opened_rank": 28,
+      "last_finish": "length",
+      "waiting_on_tool": false,
+      "in_flight_at_stop": false
+    },
+    "s1-167f4fa4003c": {
+      "opened_rank": 29,
+      "last_finish": "tool_calls",
+      "waiting_on_tool": true,
+      "in_flight_at_stop": false
+    }
+  },
+  "task_rows": {
+    "s1-ae84c9ed3d02": 0,
+    "s1-008d13b25a1e": 1,
+    "s1-db740dd9a478": 3,
+    "s1-22fa07b1483d": 2,
+    "s1-db307a0099b2": 4,
+    "s1-c0f3c241cfc4": 5,
+    "s1-5c376034137c": 6,
+    "s1-8100fd42a73e": 7,
+    "s1-ecdb9d9cbf3e": 8,
+    "s1-aaa4150ddcb1": 9,
+    "s1-765e9963f2c0": 10,
+    "s1-e26d4cd1b703": 11,
+    "s1-f17d1a14e1f0": 12,
+    "s1-6e5aea81b5d4": 13,
+    "s1-ec41e5f80442": 14,
+    "s1-b3005cc534ce": 15,
+    "s1-71f990afc4a3": 16,
+    "s1-ec0773d47127": 17,
+    "s1-d73401e5e077": 18,
+    "s1-2524207ae799": 19,
+    "s1-afc01d55c3ca": 20,
+    "s1-23779ab1f336": 21,
+    "s1-8468117a3b8a": 22,
+    "s1-2e5e971a5ac7": 23,
+    "s1-0629188c54a5": 24,
+    "s1-35507e84e040": 25,
+    "s1-ebea6001cc5d": 26,
+    "s1-be1c42cbd955": 27,
+    "s1-baf76ad977ed": 28,
+    "s1-167f4fa4003c": 29
+  },
+  "provider": "baseten"
+}
