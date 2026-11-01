@@ -56,6 +56,11 @@ describe("limits and choices in the rule-based tour", () => {
 		await frame();
 		expect(r.ws!.state.knobs.batch_size).toBe(4);
 		expect(r.ws!.state.limits.excluded.batch_size).toEqual([8]);
+		// Any problem found on a knob no move ranks is said first; past it, nothing is left.
+		for (let i = 0; i < 3 && screen.queryByRole("button", { name: en["guide.next"] }); i++) {
+			fireEvent.click(screen.getByRole("button", { name: en["guide.next"] }));
+			await frame();
+		}
 		expect(screen.getByText(en["guide.done.limits"])).toBeTruthy();
 		expect(r.ws!.state.knobs.gpu_type).toBe("A100-SXM-80GB");
 	});

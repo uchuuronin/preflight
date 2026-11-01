@@ -215,11 +215,19 @@ describe("the agent tour on A's measured run (Oct 31)", () => {
 	});
 
 	it("shows only findings no knob shows, critical ones included", () => {
-		// Every finding on the other samples names a knob of its record: the moves show those.
-		for (const r of [dev, golden, normaliseRecord(agentRaw as unknown as FlightRecord)]) {
+		// Every finding on the other samples names a knob of its record: where a move ranks that
+		// knob, the moves show it, so the tour opens with a move.
+		for (const r of [dev, golden]) {
 			const step = nextStep({ record: r, provider, knobs: currentKnobs(r), pinned: new Set(), objective: cost, visited: new Set() });
 			expect(step.kind).not.toBe("finding");
 		}
+		// The agent example ranks no move for cost, so its retry-loop finding (on a knob no move
+		// ranks) is said rather than ending the tour at "done" without it.
+		const agent = normaliseRecord(agentRaw as unknown as FlightRecord);
+		const said = nextStep({ record: agent, provider, knobs: currentKnobs(agent), pinned: new Set(), objective: cost, visited: new Set() });
+		expect(said.kind).toBe("finding");
+		expect(said.textKey).toBe("guide.finding.knob");
+		expect(said.finding?.knob_id).toBe("tool_retry_cap");
 		// A critical finding whose fix is in the code is shown like an error.
 		const crit = { ...real, findings: real.findings.map((f) => ({ ...f, severity: "critical" as const })) };
 		expect(nextStep({ ...base, record: crit, visited: new Set() }).kind).toBe("finding");

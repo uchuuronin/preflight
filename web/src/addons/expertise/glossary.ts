@@ -102,6 +102,7 @@ export const KNOB_TERMS: Readonly<Record<string, string>> = {
 	hidden_channels: "hidden_channels",
 	// vision
 	image_size: "image_size",
+	channels_last: "channels_last",
 };
 
 export function termForKnob(knobId: string): string | null {

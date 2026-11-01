@@ -353,7 +353,8 @@ export function GuidePanel() {
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
 			title: step?.finding?.title ?? "",
-			detail: step?.finding?.detail ?? "",
+			// A's detail can end without a full stop; the line reads it as a sentence
+			detail: sentence(step?.finding?.detail ?? ""),
 			...campaignVars(),
 			...rlVars(),
 			...((): Record<string, string> => {
@@ -562,4 +563,9 @@ export function GuidePanel() {
 			))}
 		</section>
 	);
+}
+
+function sentence(text: string): string {
+	const s = text.trim();
+	return !s || /[.!?)"'’”]$/.test(s) ? s : `${s}.`;
 }

@@ -99,6 +99,36 @@ export const SAMPLES: Sample[] = [
 		numbers: "measured",
 		load: () => import("../fixtures/grpo-l4.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
+	// A's L4 smoke runs of D's zoo scripts (Nov 1), committed by A with placeholder share tokens
+	// (zoo/<script>/record_nov1_l4.json): A's map and measured probes, B's predictions. Each lens's
+	// planted problem is what its rule-based tour reaches.
+	{
+		id: "retrieval",
+		code: "PF610",
+		titleKey: "sample.retrieval_l4",
+		lens: "retrieval",
+		gpu: "L4",
+		numbers: "measured",
+		load: () => import("../fixtures/retrieval_st-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
+	},
+	{
+		id: "gnn",
+		code: "PF620",
+		titleKey: "sample.gnn_l4",
+		lens: "gnn",
+		gpu: "L4",
+		numbers: "measured",
+		load: () => import("../fixtures/gnn_pyg-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
+	},
+	{
+		id: "vision",
+		code: "PF630",
+		titleKey: "sample.vision_l4",
+		lens: "vision",
+		gpu: "L4",
+		numbers: "measured",
+		load: () => import("../fixtures/vision_timm-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
+	},
 ];
 
 export const DEFAULT_SAMPLE = "lora-7b";

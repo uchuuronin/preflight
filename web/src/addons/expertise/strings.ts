@@ -90,6 +90,7 @@ export const EXPERTISE_EN: Record<string, string> = {
 		hidden_channels: ["Detail per node", "hidden_channels"],
 		// vision
 		image_size: ["Image size", "image_size"],
+		channels_last: ["Image memory layout", "channels_last"],
 	}),
 };
 
