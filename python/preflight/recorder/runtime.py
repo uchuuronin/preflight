@@ -867,7 +867,8 @@ class Recorder:
 				with suppress(Exception):
 					rec._record_hf_generation(model, args, kwargs, out, dt)
 				rec.acc["generate"] += dt
-				rec._gen_calls_done += 1
+				if not rec._generating:  # the outermost call only: assisted decoding nests generate
+					rec._gen_calls_done += 1
 				return out
 
 			return generate
@@ -1072,7 +1073,11 @@ class Recorder:
 					args, kwargs = _sample_prompts(args, kwargs, rec.generate_sample)
 				rec._sync()
 				t0 = rec._now()
-				outs = orig(self_, *args, **kwargs)
+				rec._generating += 1  # beam_search calls generate once a step: those inner calls don't count
+				try:
+					outs = orig(self_, *args, **kwargs)
+				finally:
+					rec._generating -= 1
 				dt = rec._now() - t0
 				with suppress(Exception):
 					sp = kwargs.get("sampling_params", args[1] if len(args) > 1 else None)
@@ -1088,7 +1093,8 @@ class Recorder:
 						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
 					)
 				rec.acc["generate"] += dt
-				rec._gen_calls_done += 1
+				if not rec._generating:
+					rec._gen_calls_done += 1
 				if rec.generate_sample:
 					raise StopProbe  # the sampled call is the serving probe's measurement: done
 				return outs

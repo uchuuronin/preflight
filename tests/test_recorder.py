@@ -460,3 +460,28 @@ def test_grpo_entropy_is_the_policys_mean_negative_log_prob_over_completion_toke
 	step, t = r._entropy_mc[0]
 	want = -sum(torch.log(torch.tensor(p)) for p in (0.5, 0.25, 0.1, 0.2, 0.3)) / 5
 	assert step == 0 and abs(float(t) - float(want)) < 1e-6
+
+
+def test_an_eval_probe_counts_outer_generate_calls_and_stops_as_the_next_one_starts():
+	# review, Nov 1: assisted decoding nests generate; only the outermost calls count
+	import types
+
+	import torch
+
+	from preflight.recorder.runtime import Recorder, StopProbe
+
+	rec = Recorder(generate_calls=2)
+
+	class GenerationMixin:
+		def generate(self, input_ids=None, nested=False, **kw):
+			if nested:
+				self.generate(input_ids=input_ids)
+			return torch.cat([input_ids, torch.ones(input_ids.shape[0], 4, dtype=torch.long)], 1)
+
+	rec._hook_hf_generate(types.SimpleNamespace(GenerationMixin=GenerationMixin))
+	m, x = GenerationMixin(), torch.zeros(2, 3, dtype=torch.long)
+	m.generate(input_ids=x, nested=True)
+	m.generate(input_ids=x, nested=True)
+	assert rec._gen_calls_done == 2
+	with pytest.raises(StopProbe):
+		m.generate(input_ids=x)
