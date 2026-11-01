@@ -27,6 +27,8 @@ export function fakeActions(pinned = new Set<string>()) {
 		setPlayhead: vi.fn(),
 		trace: (e) => trace.push(e),
 		reset: vi.fn(),
+		setLimits: vi.fn(),
+		decline: vi.fn(),
 	};
 	return { actions, moves, trace, pinned };
 }

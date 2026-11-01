@@ -39,6 +39,7 @@ from ..guide.state import BadState, GuideState, Pending, open_state, seal
 from ..guide.tools import BROWSER_TOOLS, SERVER_TOOLS, build_tools
 from ..guide.types import (
 	InputError,
+	Limits,
 	SetKnobOut,
 	TurnIn,
 	Value,
@@ -148,7 +149,7 @@ def _unmoved_offer(state: GuideState) -> tuple[str, Any] | None:
 
 
 def _guard_set_knob(
-	args: dict, rec: RecordView, pinned: set[str], state: GuideState, moved_now: bool
+	args: dict, rec: RecordView, pinned: set[str], state: GuideState, moved_now: bool, limits: Limits
 ) -> str | None:
 	"""Server half of the set_knob guard (the browser checks the fit rule, it has the provider)."""
 	kid = args.get("knob_id")
@@ -160,6 +161,8 @@ def _guard_set_knob(
 		return "pinned"
 	if not rec.knobs[kid].allows(args.get("value")):
 		return "not_in_domain"
+	if not limits.allows(kid, args.get("value")):
+		return "outside_limits"
 	return None
 
 
@@ -258,7 +261,22 @@ async def guide_turn(request: Request) -> dict:
 		state.evidence = []
 		state.ranked = None
 		state.seen = []
-		state.add(_event(f"The person {d.action} the move of {d.knob_id}{value}. Plan the next round."))
+		if d.action == "declined":
+			state.add(
+				_event(
+					f"The person said 'not this' to {d.knob_id}{value}: it is excluded and that knob is off "
+					"the table for now. Rank again and offer the next-best lever, or say plainly that "
+					"nothing else inside their limits helps."
+				)
+			)
+		elif d.action == "kept":
+			state.add(
+				_event(
+					f"The person kept {d.knob_id} at their own value{value} and pinned it. Plan the next round."
+				)
+			)
+		else:
+			state.add(_event(f"The person {d.action} the move of {d.knob_id}{value}. Plan the next round."))
 	if body.message:
 		new_turn = True
 		if not body.decision:
@@ -291,12 +309,13 @@ async def guide_turn(request: Request) -> dict:
 				"knobs": body.setting.knobs,
 				"pinned": sorted(pinned),
 				"objective": body.setting.objective.model_dump(exclude_none=True),
+				"limits": body.setting.limits.model_dump(exclude_none=True, exclude_defaults=True),
 			}
 		)
 	)
 
 	# ---- reserve, call, settle
-	tools = build_tools(rec, pinned, move_pending=state.move is not None)
+	tools = build_tools(rec, pinned, move_pending=state.move is not None, limits=body.setting.limits)
 	offered = {t["name"] for t in tools}
 	instructions = INSTRUCTIONS + language_line(body.language)
 	# The model gets another round, inside this same request, when everything it asked for was
@@ -359,7 +378,7 @@ async def guide_turn(request: Request) -> dict:
 			if c.name not in offered:
 				refusal = "tool_not_offered"
 			elif c.name == "set_knob":
-				refusal = _guard_set_knob(c.arguments, rec, pinned, state, moved_now)
+				refusal = _guard_set_knob(c.arguments, rec, pinned, state, moved_now, body.setting.limits)
 				moved_now = moved_now or refusal is None
 			elif c.name == "sensitivity":
 				fp = _fingerprint(body.setting)
@@ -378,7 +397,12 @@ async def guide_turn(request: Request) -> dict:
 			if refusal:
 				refused_any = True
 				out = {"refused": refusal}
-				if refusal == "already_ranked":
+				if refusal == "outside_limits":
+					out["hint"] = (
+						"That value is outside the person's limits (shown in the setting). Offer the next "
+						"lever that stays inside them, or say plainly that nothing inside them helps."
+					)
+				elif refusal == "already_ranked":
 					out["hint"] = (
 						"This setting is already ranked above. If nothing there fits and improves the aim, "
 						"tell the person so in one sentence and stop."

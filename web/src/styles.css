@@ -1899,3 +1899,35 @@ a {
 .pf-onboard__step { font-family: var(--pf-font-mono); font-size: var(--pf-text-xs); color: var(--pf-fg-dim); }
 .pf-onboard-lit { scroll-margin-top: 96px; outline: 2px solid var(--pf-accent); outline-offset: 4px; border-radius: var(--pf-radius-sm); box-shadow: 0 0 0 8px var(--pf-accent-glow); }
 @media (prefers-reduced-motion: reduce) { .pf-onboard { animation: none; } }
+
+/* Your limits (guide/LimitsPanel.tsx). */
+.pf-limits { border-radius: var(--pf-radius-sm); background: var(--pf-glass-hi); padding: 10px 12px; font-size: 13px; line-height: 1.5; }
+.pf-limits[open] { display: flex; flex-direction: column; gap: 10px; }
+.pf-limits > summary { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; cursor: pointer; list-style: none; }
+.pf-limits > summary::-webkit-details-marker { display: none; }
+.pf-limits > summary::after { content: "▾"; color: var(--pf-fg-dim); }
+.pf-limits[open] > summary::after { content: "▴"; }
+.pf-limits > summary .pf-dim { margin-left: auto; font-size: 12px; }
+.pf-limits p { margin: 0; }
+.pf-limits__words { display: flex; flex-direction: column; gap: 6px; }
+.pf-limits__words label { font-size: 12.5px; color: var(--pf-fg-dim); }
+.pf-limits__words textarea { min-height: 52px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--pf-stroke-strong); background: var(--pf-glass); color: var(--pf-fg); font: inherit; resize: vertical; }
+.pf-limits__words .pf-btn, .pf-limits__proposed > .pf-btn { align-self: flex-start; }
+.pf-limits__proposed { display: flex; flex-direction: column; gap: 6px; }
+.pf-limits__error { color: var(--pf-fail); }
+.pf-limits__set { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pf-limits__set legend { padding: 0 0 4px; font-size: 12.5px; color: var(--pf-fg-dim); }
+.pf-limits__nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.pf-limits__num { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--pf-fg-dim); }
+.pf-limits__field { display: flex; align-items: center; gap: 6px; }
+.pf-limits__field input { width: 100%; min-width: 0; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--pf-stroke-strong); background: var(--pf-glass); color: var(--pf-fg); font: inherit; font-family: var(--pf-font-mono); }
+.pf-limits__field small { white-space: nowrap; }
+.pf-lchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pf-lchip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 10px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-stroke-strong); background: var(--pf-glass); color: var(--pf-fg); font: inherit; font-size: 12.5px; }
+.pf-lchip.is-proposed { border-style: dashed; border-color: var(--pf-accent); }
+.pf-lchip--toggle { cursor: pointer; }
+.pf-lchip--toggle.is-on { border-color: var(--pf-accent); background: var(--pf-accent-glow); }
+.pf-lchip--toggle small { color: var(--pf-fg-dim); }
+.pf-lchip:focus-visible, .pf-lchip__btn:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 2px; }
+.pf-lchip__btn { min-width: 24px; min-height: 24px; padding: 2px 8px; border-radius: var(--pf-radius-pill); border: 1px solid var(--pf-accent); background: transparent; color: var(--pf-fg); font: inherit; font-size: 12px; cursor: pointer; }
+.pf-lchip__btn--quiet { border-color: var(--pf-stroke-strong); }

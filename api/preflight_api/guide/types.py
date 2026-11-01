@@ -52,12 +52,43 @@ class Objective(Strict):
 	target_id: Id | None = None
 
 
+Positive = Annotated[float, Field(gt=0, le=1e12)]
+
+
+class Limits(Strict):
+	"""The visitor's confirmed limits on the guide (web/src/guide/limits.ts). Value limits are
+	enforced here on set_knob; the number limits (budget, deadline, GPU-hours) by the browser
+	half against the readouts it computes, and the model is told all of them."""
+
+	#: knob -> the only values it may take (e.g. allowed GPUs)
+	allowed: dict[Id, list[Value]] = Field(default_factory=dict, max_length=96)
+	#: knob -> values the visitor turned down ("Not this")
+	excluded: dict[Id, list[Value]] = Field(default_factory=dict, max_length=96)
+	budget_usd: Positive | None = None
+	deadline_s: Positive | None = None
+	gpu_hours: Positive | None = None
+
+	@field_validator("allowed", "excluded")
+	@classmethod
+	def _short_lists(cls, v: dict[str, list]) -> dict[str, list]:
+		if any(len(x) > 64 for x in v.values()):
+			raise ValueError("at most 64 values per knob")
+		return v
+
+	def allows(self, knob_id: str, value: Any) -> bool:
+		allow = self.allowed.get(knob_id)
+		if allow and value not in allow:
+			return False
+		return value not in self.excluded.get(knob_id, [])
+
+
 class Setting(Strict):
 	"""The visitor's cockpit right now."""
 
 	knobs: dict[Id, Value] = Field(max_length=96)
 	pinned: list[Id] = Field(default_factory=list, max_length=96)
 	objective: Objective
+	limits: Limits = Field(default_factory=Limits)
 
 
 # ---- tool results the browser computed (one per pending browser call)
@@ -97,6 +128,10 @@ class SetKnobOut(Strict):
 			"pinned",
 			"not_in_domain",
 			"changes_results",
+			"outside_limits",
+			"over_budget",
+			"past_deadline",
+			"over_quota",
 			"would_be_tight",
 			"would_fail",
 			"not_trusted",
@@ -128,7 +163,8 @@ class Decision(Strict):
 	"""What the visitor did with the guide's proposed move."""
 
 	knob_id: Id
-	action: Literal["applied", "reverted", "pinned", "changed"]
+	#: kept: reverted and pinned at the visitor's value; declined: "Not this" (excluded, next lever)
+	action: Literal["applied", "reverted", "pinned", "kept", "declined", "changed"]
 	value: Value | None = None
 
 
@@ -175,6 +211,13 @@ def check_setting(s: Setting, rec: RecordView) -> None:
 	for kid in s.pinned:
 		if kid not in rec.knobs:
 			raise InputError(f"unknown pinned knob {kid}")
+	for kid, values in [*s.limits.allowed.items(), *s.limits.excluded.items()]:
+		k = rec.knobs.get(kid)
+		if k is None:
+			raise InputError(f"unknown limited knob {kid}")
+		for v in values:
+			if not k.allows(v) and v != k.current:
+				raise InputError(f"{kid} can't be {v!r}")
 	if s.objective.target_id and s.objective.target_id not in rec.targets:
 		raise InputError(f"unknown objective target {s.objective.target_id}")
 

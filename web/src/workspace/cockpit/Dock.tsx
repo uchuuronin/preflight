@@ -51,7 +51,7 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 		<div className="glass pf-control" role="group" aria-labelledby={`${id}-title`}>
 			<div className="pf-control__head">
 				<b id={`${id}-title`}>{label}</b>
-				<span>{proposed ? t("knob.proposed") : pinned ? t("knob.pinned_hint") : t(`knob.hint.${knob.group ?? "other"}`)}</span>
+				<span>{proposed ? t("knob.proposed") : pinned ? t("knob.pinned_hint", { value: valueText(knob, value) }) : t(`knob.hint.${knob.group ?? "other"}`)}</span>
 			</div>
 			{pinned ? (
 				<div className="pf-choice">
@@ -110,7 +110,7 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 				{knob.needs_code ? <span>{t("knob.needs_code.help")}</span> : null}
 				{!pinned ? (
 					<button type="button" className="pf-link" onClick={() => actions.pin(knob.id, true)}>
-						{t("knob.pin", { knob: label.toLowerCase() })}
+						{t("knob.pin", { value: valueText(knob, value) })}
 					</button>
 				) : null}
 			</div>

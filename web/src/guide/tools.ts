@@ -12,6 +12,7 @@
  * Every call, whoever makes it (Muse Spark or the rule-based tour), goes through runTool and
  * lands in the trace with its real arguments and result.
  */
+import { breaksLimit, type Limits, NO_LIMITS, withinLimits } from "./limits";
 import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
 import { costStraddlesBudget, SAMPLE_MORE_TASKS, samplesTasks } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, ObjectiveKind, Prediction } from "../workspace/record/types";
@@ -162,6 +163,8 @@ export interface ToolContext {
 	actions: WorkspaceActions;
 	knobs: Readonly<Record<string, KnobValue>>;
 	pinned: ReadonlySet<string>;
+	/** The visitor's limits (guide/limits.ts): hard limits on every move. */
+	limits?: Limits;
 	/** Money-spending tools land here for the person to approve. */
 	requestApproval: (name: string, args: Record<string, unknown>) => void;
 }
@@ -201,7 +204,7 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 			return {
 				ok: true,
 				result: provider
-					.sensitivity(record, { kind }, { pinned, knobs })
+					.sensitivity(record, { kind }, withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned }))
 					.slice(0, 6)
 					.map((k) => ({ ...k, changes_results: changesResults(k.knob_id, record) })),
 			};
@@ -212,6 +215,8 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 			const from = knobs[id];
 			const to = args.value as KnobValue;
 			if (from === undefined) return { ok: false, error: `unknown knob ${id}` };
+			const broken = breaksLimit(record, ctx.limits ?? NO_LIMITS, id, to, provider.predict(record, { ...knobs, [id]: to }), provider.predict(record, knobs), knobs);
+			if (broken) return { ok: false, error: `${id} = ${String(to)} breaks the person's limits (${broken}); offer the next lever instead` };
 			if (changesResults(id, record) && !isFailing({ record, provider, knobs })) {
 				return { ok: false, error: `${id} changes what the run produces or measures; put it to the person as a trade-off instead of moving it` };
 			}

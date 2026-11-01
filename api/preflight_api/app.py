@@ -29,6 +29,7 @@ from .owners import MemoryOwners, ModalOwners, Owners
 from .routes import guide as guide_routes
 from .routes import health as health_routes
 from .routes import jobs as jobs_routes
+from .routes import limits as limits_routes
 from .routes import patches as patch_routes
 from .routes import records as records_routes
 from .stores import LocalRecordStore, RecordStore, SampleStore
@@ -184,6 +185,7 @@ def create_app(
 	app.include_router(health_routes.router)
 	app.include_router(records_routes.router)
 	app.include_router(guide_routes.router)
+	app.include_router(limits_routes.router)
 	app.include_router(jobs_routes.router)
 	app.include_router(patch_routes.router)
 	app.state.addons = mount_addons(app, addons_dir)

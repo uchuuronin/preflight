@@ -13,6 +13,8 @@ import { findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, 
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
 import { FixRace } from "../fix/FixRace";
+import { LimitsPanel } from "./LimitsPanel";
+import { MoveChoices } from "./MoveChoices";
 
 /** Muse Code writes a finding's fix only once the fix loop is on; until then the tour moves on. */
 const canFix = (f: Finding) => !!f.fix_template && flag("c.fix_loop");
@@ -60,13 +62,14 @@ export function GuidePanel() {
 			actions,
 			knobs: s.knobs,
 			pinned: s.pinned,
+			limits: s.limits,
 			requestApproval: (name, args) => setApprovals((a) => [...a, { id: Date.now() + a.length, name, args }]),
 		};
 	};
 
 	const begin = (nextVisited: ReadonlySet<string>, nextTaken: number) => {
 		const { state: s } = latest.current;
-		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited };
+		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited, limits: s.limits };
 		const step = nextStep(tc);
 		const n = nextTaken + 1;
 		if (step.kind === "probe_offer" && step.move) {
@@ -94,7 +97,13 @@ export function GuidePanel() {
 			setActive({ step, n, of: Math.max(n, Math.min(MAX_TOUR_STEPS, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
 			return;
 		}
-		const shown = step.kind === "move" ? { ...step, kind: "done" as const, textKey: "guide.done", whyKey: "guide.done.why" } : step;
+		// With limits set or a suggestion turned down, "done" says what it means: nothing else
+		// inside the visitor's limits helps.
+		const l = s.limits;
+		const limited = l.declined.length > 0 || Object.keys(l.allowed).length > 0 || l.budgetUsd !== null || l.deadlineS !== null || l.gpuHours !== null;
+		const doneKey = limited ? "guide.done.limits" : "guide.done";
+		const shown =
+			step.kind === "move" || step.kind === "done" ? { ...step, kind: "done" as const, textKey: doneKey, whyKey: limited ? "guide.done.limits.why" : "guide.done.why" } : step;
 		setActive({ step: shown, n, of: n });
 	};
 
@@ -117,13 +126,20 @@ export function GuidePanel() {
 	const measure = (move: { knobId: string; to: KnobValue } | undefined, reason: string) =>
 		runTool("run_probe", { knobs: move ? { [move.knobId]: move.to } : {}, reason }, ctx());
 
-	const finish = (outcome: "apply" | "revert" | "pin") => {
+	/**
+	 * apply: keep the suggestion. revert: put it back. pin: keep the suggestion and pin it there.
+	 * keep: put it back and pin the visitor's own value. decline ("Not this"): put it back, exclude
+	 * that value for the session, and move on to another lever.
+	 */
+	const finish = (outcome: "apply" | "revert" | "pin" | "keep" | "decline") => {
 		if (!active?.step.move) return;
 		const { move } = active.step;
 		const from = active.from;
-		if (outcome !== "apply" && from !== undefined) actions.setKnob(move.knobId, from, "user");
-		if (outcome === "pin") actions.pin(move.knobId, true);
+		// Clear the suggestion first, so putting the knob back isn't read as the visitor's own move.
 		actions.propose(null);
+		if (outcome !== "apply" && outcome !== "pin" && from !== undefined) actions.setKnob(move.knobId, from, "user");
+		if (outcome === "pin" || outcome === "keep") actions.pin(move.knobId, true);
+		if (outcome === "decline") actions.decline(move.knobId, move.to);
 		const v = new Set(visited);
 		v.add(move.knobId);
 		setVisited(v);
@@ -131,7 +147,27 @@ export function GuidePanel() {
 		requestAnimationFrame(() => begin(v, taken + 1));
 	};
 
+	// The visitor's own move always wins: the pending suggestion is set aside (the reducer already
+	// put any other knob back), and the tour offers to carry on from their setting.
+	const [setAside, setSetAside] = useState<string | null>(null);
+	useEffect(() => {
+		const p = state.setAside;
+		if (!p || active?.step.kind !== "move" || active.step.move?.knobId !== p.knobId) return;
+		const v = new Set(visited);
+		v.add(p.knobId);
+		setVisited(v);
+		setTaken(taken + 1);
+		setActive(null);
+		setSetAside(p.knobId);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [state.setAside]);
+	const carryOn = () => {
+		setSetAside(null);
+		begin(visited, taken);
+	};
+
 	const restart = () => {
+		setSetAside(null);
 		const v = new Set<string>();
 		setVisited(v);
 		setTaken(0);
@@ -216,7 +252,7 @@ export function GuidePanel() {
 	}
 
 	const primary = (() => {
-		if (!active) return { label: t("guide.start"), run: restart };
+		if (!active) return setAside ? { label: t("guide.carry_on"), run: carryOn } : { label: t("guide.start"), run: restart };
 		const s = active.step;
 		if (s.kind === "move") return { label: t("guide.apply_value", { knob: vars.knob, to: vars.to }), run: () => finish("apply") };
 		if (s.kind === "blocked_by_pin" && s.pinnedKnob)
@@ -258,6 +294,8 @@ export function GuidePanel() {
 				</span>
 			</div>
 
+			<LimitsPanel />
+
 			{fallback ? <p className="pf-guide__notice" role="status">{fallback}</p> : null}
 
 			{cliff ? (
@@ -280,7 +318,13 @@ export function GuidePanel() {
 				<LiveGuideSection onFallback={setFallback} onStatus={setLiveStatus} />
 			) : (
 				<>
-					<p className="pf-guide__say">{active ? t(active.step.textKey, vars) : t("guide.intro", { aim: t(`objective.${state.objective.kind ?? "min_time"}`).toLowerCase() })}</p>
+					<p className="pf-guide__say">
+						{active
+							? t(active.step.textKey, vars)
+							: setAside
+								? t("guide.set_aside", { knob: t(knobs.get(setAside)?.label_key ?? setAside) })
+								: t("guide.intro", { aim: t(`objective.${state.objective.kind ?? "min_time"}`).toLowerCase() })}
+					</p>
 					{active?.step.move && knobs.get(active.step.move.knobId)?.needs_code ? <p className="pf-guide__code">{t("guide.needs_code")}</p> : null}
 					<div className="pf-guide__actions">
 						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
@@ -291,15 +335,15 @@ export function GuidePanel() {
 								{t("guide.skip")}
 							</button>
 						) : null}
-						{active?.step.kind === "move" ? (
-							<>
-								<button type="button" className="pf-btn pf-btn--small" onClick={() => finish("revert")}>
-									{t("guide.revert")}
-								</button>
-								<button type="button" className="pf-btn pf-btn--small" onClick={() => finish("pin")} title={t("guide.pin.help")}>
-									{t("guide.pin")}
-								</button>
-							</>
+						{active?.step.kind === "move" && active.step.move ? (
+							<MoveChoices
+								knob={knobs.get(active.step.move.knobId)}
+								from={active.from}
+								to={active.step.move.to}
+								onDecline={() => finish("decline")}
+								onKeep={() => finish("keep")}
+								onPin={() => finish("pin")}
+							/>
 						) : null}
 						{active ? (
 							<button type="button" className="pf-btn pf-btn--small pf-btn--quiet" aria-expanded={why} onClick={() => setWhy(!why)}>

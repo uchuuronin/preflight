@@ -1,0 +1,112 @@
+/**
+ * The visitor's limits on the guide: hard limits both tours obey and the server enforces.
+ *
+ * - `allowed`: a knob may only take these values (allowed GPUs, from the constraints panel).
+ * - `excluded`: values the visitor turned down with "Not this", for this session.
+ * - `declined`: knobs the visitor turned down a suggestion on; the tours offer another lever
+ *   next instead of the same knob at its next value.
+ * - `budgetUsd`, `deadlineS`, `gpuHours`: a move may not take the run's predicted cost, wall
+ *   time or GPU-hours past these. A move that lowers a number already past its limit is allowed
+ *   (it helps), so a run that starts over budget can still be brought back.
+ * - "Don't change" is a pin (state.pinned), so it stays one idea everywhere.
+ *
+ * Value limits are checked again on the server (routes/guide.py), which has no provider; the
+ * number limits are checked here, against the same readouts the dials show, like the fit rule.
+ */
+import type { PredictionProvider, SensitivityOptions } from "../workspace/provider/PredictionProvider";
+import { targetFor } from "../workspace/record/model";
+import type { KnobValue, LoadedRecord, Prediction } from "../workspace/record/types";
+
+export interface Limits {
+	allowed: Readonly<Record<string, readonly KnobValue[]>>;
+	excluded: Readonly<Record<string, readonly KnobValue[]>>;
+	declined: readonly string[];
+	budgetUsd: number | null;
+	deadlineS: number | null;
+	gpuHours: number | null;
+}
+
+export const NO_LIMITS: Limits = { allowed: {}, excluded: {}, declined: [], budgetUsd: null, deadlineS: null, gpuHours: null };
+
+export type LimitRefusal = "outside_limits" | "over_budget" | "past_deadline" | "over_quota";
+
+const same = (a: KnobValue | undefined, b: KnobValue | undefined) => a === b || (typeof a === "number" && typeof b === "number" && Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(a)));
+
+/** True when the visitor's limits let this knob take this value. */
+export function valueAllowed(limits: Limits, knobId: string, value: KnobValue): boolean {
+	const allow = limits.allowed[knobId];
+	if (allow && allow.length && !allow.some((v) => same(v, value))) return false;
+	return !(limits.excluded[knobId] ?? []).some((v) => same(v, value));
+}
+
+function point(p: Prediction, id: string | undefined): number | null {
+	const e = id ? p[id] : undefined;
+	return e && e.status !== "abstain" && typeof e.point === "number" ? e.point : null;
+}
+
+/** GPUs the run uses at a setting: the gpus knob, else the record's own count. */
+function gpuCount(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): number {
+	const g = knobs.gpus;
+	return typeof g === "number" && g > 0 ? g : (record.env?.gpu?.count ?? 1);
+}
+
+/** The run's GPU-hours at a setting: wall time x GPUs (derived; no record carries it as a target yet). */
+export function gpuHoursAt(record: LoadedRecord, p: Prediction, knobs: Readonly<Record<string, KnobValue>>): number | null {
+	const s = point(p, targetFor(record, "time")?.id);
+	return s === null ? null : (s / 3600) * gpuCount(record, knobs);
+}
+
+/** Why a move breaks a limit, or null. `before` is the prediction at the current setting. */
+export function breaksLimit(
+	record: LoadedRecord,
+	limits: Limits,
+	knobId: string,
+	value: KnobValue,
+	after: Prediction,
+	before: Prediction,
+	knobs: Readonly<Record<string, KnobValue>>,
+): LimitRefusal | null {
+	if (!valueAllowed(limits, knobId, value)) return "outside_limits";
+	const next = { ...knobs, [knobId]: value };
+	const checks: Array<[number | null, number | null, number | null, LimitRefusal]> = [
+		[limits.budgetUsd, point(after, targetFor(record, "cost")?.id), point(before, targetFor(record, "cost")?.id), "over_budget"],
+		[limits.deadlineS, point(after, targetFor(record, "time")?.id), point(before, targetFor(record, "time")?.id), "past_deadline"],
+		[limits.gpuHours, gpuHoursAt(record, after, next), gpuHoursAt(record, before, knobs), "over_quota"],
+	];
+	for (const [cap, a, b, why] of checks) {
+		if (cap === null || a === null) continue;
+		// Past the limit, and not an improvement on a setting that was already past it.
+		if (a > cap && !(b !== null && b > cap && a < b)) return why;
+	}
+	return null;
+}
+
+/** Provider options that keep every move inside the limits (and off declined knobs, if asked). */
+export function withinLimits(
+	record: LoadedRecord,
+	provider: PredictionProvider,
+	limits: Limits,
+	knobs: Readonly<Record<string, KnobValue>>,
+	opts: SensitivityOptions,
+	skipDeclined = true,
+): SensitivityOptions {
+	const before = provider.predict(record, knobs);
+	const pinned = new Set([...(opts.pinned ?? []), ...(skipDeclined ? limits.declined : [])]);
+	return {
+		...opts,
+		pinned,
+		knobs,
+		allow: (knobId, value, after) => breaksLimit(record, limits, knobId, value, after, before, knobs) === null,
+	};
+}
+
+/** Limits as the server checks them (routes/guide.py Setting.limits): values only, plus the numbers for the model. */
+export function limitsForServer(limits: Limits): Record<string, unknown> {
+	return {
+		allowed: limits.allowed,
+		excluded: limits.excluded,
+		...(limits.budgetUsd !== null ? { budget_usd: limits.budgetUsd } : {}),
+		...(limits.deadlineS !== null ? { deadline_s: limits.deadlineS } : {}),
+		...(limits.gpuHours !== null ? { gpu_hours: limits.gpuHours } : {}),
+	};
+}

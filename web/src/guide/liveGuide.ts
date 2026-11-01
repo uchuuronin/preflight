@@ -14,6 +14,7 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
+import { breaksLimit, limitsForServer, NO_LIMITS, withinLimits } from "./limits";
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
 
@@ -44,9 +45,11 @@ export interface Setting {
 	knobs: Record<string, KnobValue>;
 	pinned: string[];
 	objective: { kind: NonNullable<Objective["kind"]>; target_id?: string };
+	/** The visitor's limits: the server refuses a set_knob outside the value limits. */
+	limits?: Record<string, unknown>;
 }
 
-export type Decision = { knob_id: string; action: "applied" | "reverted" | "pinned" | "changed"; value?: KnobValue };
+export type Decision = { knob_id: string; action: "applied" | "reverted" | "pinned" | "kept" | "declined" | "changed"; value?: KnobValue };
 
 type Readout = { point: number | null; lo: number | null; hi: number | null; unit: string; status: string; reason?: string };
 
@@ -54,6 +57,10 @@ export type SetKnobRefusal =
 	| "pinned"
 	| "not_in_domain"
 	| "changes_results"
+	| "outside_limits"
+	| "over_budget"
+	| "past_deadline"
+	| "over_quota"
 	| "would_be_tight"
 	| "would_fail"
 	| "not_trusted"
@@ -142,6 +149,8 @@ export function guardSetKnob(ctx: ToolContext, knobId: string, value: unknown): 
 	if (changesResults(knobId, record) && !isFailing({ record, provider, knobs })) return "changes_results";
 	const next = { ...knobs, [knobId]: value as KnobValue };
 	const p = provider.predict(record, next);
+	const broken = breaksLimit(record, ctx.limits ?? NO_LIMITS, knobId, value as KnobValue, p, provider.predict(record, knobs), knobs);
+	if (broken) return broken;
 	const mem = targetFor(record, "memory");
 	const memEst = mem ? p[mem.id] : undefined;
 	if (memEst && (memEst.status === "abstain" || memEst.point === null)) return "not_trusted";
@@ -166,7 +175,7 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 			// Result-changing knobs are left out unless the run is failing, as in the rule tour.
 			const failing = isFailing({ record, provider, knobs });
 			const moves = provider
-				.moves(record, { kind }, { pinned, knobs, includeTight: true })
+				.moves(record, { kind }, withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned, includeTight: true }))
 				.filter((m) => failing || !changesResults(m.knobId, record))
 				.slice(0, 8);
 			const top = Math.max(...moves.map((m) => Math.abs(m.relative ?? m.delta)), 1e-12);
@@ -293,7 +302,7 @@ export class LiveTour {
 	}
 
 	private setting(c: TourContext): Setting {
-		return { knobs: { ...c.knobs }, pinned: [...c.pinned], objective: c.objective };
+		return { knobs: { ...c.knobs }, pinned: [...c.pinned], objective: c.objective, limits: limitsForServer(c.limits ?? NO_LIMITS) };
 	}
 
 	private async send(extra: Record<string, unknown>): Promise<LiveView> {
