@@ -166,5 +166,8 @@ describe("the live guide falling back", () => {
 		// The notice says why, and the tour's first step is there with its move.
 		expect(document.querySelector(".pf-guide__notice")?.textContent).toContain("isn't connected");
 		expect(screen.getAllByRole("button", { name: /^Apply / }).length).toBeGreaterThan(0);
+		// Focus moves to the step's move, since the pressed button is gone.
+		for (let i = 0; i < 3; i++) await frame();
+		expect((document.activeElement as HTMLElement | null)?.textContent).toMatch(/^Apply /);
 	});
 });
