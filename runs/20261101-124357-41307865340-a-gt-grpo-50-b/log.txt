@@ -1,0 +1,133 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-bwAATmYLTd4ZvCqa92MJHp
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+[ground truth] grpo_trl: 2 files sent; waiting for an L4, else an A10 (Modal queues it)
+[ground truth] container up on the GPU; 2 files of grpo_trl
+[ground truth 12:44:19] bare run of grpo_trl: 3 optimizer steps, at most 1380 s
+[bare] running /tmp/gt-e3fpc9h_/train.py for 3 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+
+[1AGenerating train split:   0%|          | 0/7473 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 7473/7473 [00:00<00:00, 346312.30 examples/s]
+
+[1AGenerating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 1319/1319 [00:00<00:00, 194278.94 examples/s]
+
+[1AMap:   0%|          | 0/7473 [00:00<?, ? examples/s]
+[1AMap:  58%|█████▊    | 4319/7473 [00:00<00:00, 42474.09 examples/s]Map: 100%|██████████| 7473/7473 [00:00<00:00, 42625.98 examples/s]
+Detected kernel version 4.19.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+
+[1A  0%|          | 0/1868 [00:00<?, ?it/s]
+[1A  0%|          | 1/1868 [00:30<15:50:15, 30.54s/it]
+[1A  0%|          | 2/1868 [00:53<13:31:18, 26.09s/it]{"steps": 3, "ended": "steps", "error": null, "seconds": 96.08470327299999, "peak_allocated_bytes": 18365414912, "peak_reserved_bytes": 19572719616, "device": "NVIDIA A10", "timing": "cuda_events"}
+  0%|          | 2/1868 [01:22<21:22:18, 41.23s/it]
+[ground truth 12:45:58] bare run ended (steps) after 99 s, 3 steps
+[ground truth 12:45:58] recorder run: 2 warmup + 50 timed steps, at most 2601 s
+[ground truth 13:09:33] recorder run ended (ok) after 52 steps
+{
+  "script": "grpo_trl",
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": {
+    "sync_overhead": {
+      "median": 1.04662,
+      "ci95": [
+        0.82554,
+        1.25042
+      ],
+      "pairs": 24,
+      "source": "measured"
+    },
+    "hook_overhead": {
+      "median": 1.05785,
+      "ci95": [
+        1.05785,
+        1.05785
+      ],
+      "pairs": 1,
+      "source": "measured"
+    },
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "bare": {
+    "steps": 3,
+    "ended": "steps",
+    "error": null,
+    "seconds": 96.08470327299999,
+    "peak_allocated_bytes": 18365414912,
+    "peak_reserved_bytes": 19572719616,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 98.9
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 52,
+    "p50_s": 27.58956640625,
+    "peak_allocated_bytes": 22293533696,
+    "seconds": 1415.294,
+    "by_phase": {
+      "data": 2.1068335533203315e-05,
+      "forward": 0.01630231978412994,
+      "backward": 0.03133219664072784,
+      "optimizer": 0.003705940241670436,
+      "rollout": 0.9352902097729752,
+      "reference": 0.012548479954041061,
+      "reward": 6.1762839302336324e-06,
+      "other": 0.0007936089869922257
+    },
+    "generation": {
+      "calls": 208,
+      "seconds_total": 1308.4985350339987,
+      "sequences": 1664,
+      "new_tokens_mean": 89.61117788461539,
+      "new_tokens_p95": 363.0,
+      "new_tokens_max": 512.0,
+      "max_new_tokens": 512,
+      "truncation_rate": 0.013221153846153846,
+      "backend": "hf"
+    },
+    "extras": {
+      "params_total": 494032768.0,
+      "params_trainable": 494032768.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 4.0,
+      "host_rss_peak_bytes": 7865266176.0,
+      "train_loader_batches": 7473.0,
+      "epochs": 1.0,
+      "planned_steps": 1868.0,
+      "generation_ending_known": 1664.0,
+      "rl_zero_spread_groups": 167.0,
+      "rl_groups": 208.0,
+      "rl_reward_functions": 2.0
+    },
+    "rl": {
+      "group_size": 8,
+      "prompts": 208,
+      "truncation_rate": 0.013221153846153846,
+      "zero_spread_fraction": 0.8028846153846154
+    }
+  }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-bwAATmYLTd4ZvCqa92MJHp
