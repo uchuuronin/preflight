@@ -2066,3 +2066,23 @@ a {
 .pf-rl__mark { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--pf-fg); }
 .pf-rl__mark.is-max { background: var(--pf-tight); }
 .pf-rl__cap { position: absolute; top: -7px; bottom: -7px; width: 0; margin-left: -1px; border-left: 2px dashed var(--pf-fail); }
+
+/* Cost frontier of a model sweep (cockpit/CostFrontier.tsx). */
+.pf-frontier__lede { margin: 6px 0 10px; font-size: 13px; line-height: 1.5; color: var(--pf-fg-dim); max-width: 72ch; }
+.pf-frontier__plot { position: relative; max-width: 640px; }
+.pf-frontier__plot svg { display: block; max-width: 100%; overflow: visible; }
+.pf-frontier__grid { stroke: var(--pf-stroke); stroke-width: 1; }
+.pf-frontier__tick, .pf-frontier__axis { fill: var(--pf-fg-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+.pf-frontier__line { fill: none; stroke: var(--pf-accent); stroke-width: 2; stroke-linejoin: round; }
+.pf-frontier__err { stroke: var(--pf-fg-dim); stroke-width: 2; stroke-linecap: round; }
+.pf-frontier__hit { fill: transparent; }
+.pf-frontier__dot { fill: var(--pf-accent); stroke: var(--pf-glass-solid); stroke-width: 2; }
+.pf-frontier__pt.is-dominated .pf-frontier__dot { fill: var(--pf-glass-solid); stroke: var(--pf-fg-dim); }
+.pf-frontier__pt { cursor: default; outline: none; }
+.pf-frontier__pt:focus-visible .pf-frontier__dot, .pf-frontier__pt.is-hover .pf-frontier__dot { stroke: var(--pf-focus); stroke-width: 3; }
+.pf-frontier__label { fill: var(--pf-fg); font-size: 12px; font-weight: 600; }
+.pf-frontier__tip { position: absolute; box-sizing: border-box; transform: translateY(-100%); width: max-content; max-width: min(240px, 100%); pointer-events: none; padding: 6px 10px; border-radius: var(--pf-radius-sm); background: var(--pf-glass-solid); box-shadow: 0 0 0 1px var(--pf-stroke-strong), var(--pf-shadow); font-size: 12px; line-height: 1.4; }
+.pf-frontier__table { margin-top: 10px; font-size: 12.5px; }
+.pf-frontier__table summary { cursor: pointer; min-height: 24px; color: var(--pf-fg-dim); }
+.pf-frontier__table table { margin-top: 6px; border-collapse: collapse; width: 100%; max-width: 640px; }
+.pf-frontier__table th, .pf-frontier__table td { padding: 4px 8px 4px 0; text-align: left; border-bottom: 1px solid var(--pf-stroke); font-variant-numeric: tabular-nums; }

@@ -12,6 +12,8 @@ export type Unit =
 	| "s"
 	/** a duration for tight spaces: "10.3 h" instead of "10 h 19 min" */
 	| "s_short"
+	/** dollars where amounts can be fractions of a cent (cost per task, a rate per token): "US$0.0042" */
+	| "usd_small"
 	| "ms"
 	| "h"
 	| "usd"
@@ -124,6 +126,16 @@ export function fmt(value: number | null | undefined, unit: Unit | string = "non
 				style: "currency",
 				currency: currency.code,
 				maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0,
+			}).format(v);
+		}
+		case "usd_small": {
+			const v = value * currency.rate;
+			// Under a dollar, two significant figures (a cent's fraction still reads); from a dollar, as "usd".
+			const small = Math.abs(v) > 0 && Math.abs(v) < 1;
+			return new Intl.NumberFormat(locale(), {
+				style: "currency",
+				currency: currency.code,
+				...(small ? { maximumSignificantDigits: 2 } : { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 }),
 			}).format(v);
 		}
 		case "tokens":

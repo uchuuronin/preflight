@@ -19,6 +19,7 @@ import { planFromRecord } from "../../workspace/campaign/plan";
 import { Onboarding } from "../Onboarding";
 import { FlightPlanBand, MemoryBand } from "../../workspace/cockpit/Bands";
 import { RlBand } from "../../workspace/cockpit/RlBand";
+import { CostFrontier } from "../../workspace/cockpit/CostFrontier";
 import { FitMap } from "../../workspace/cockpit/FitMap";
 import { flag } from "../../lib/flags";
 import { DetailSheet } from "../../workspace/cockpit/DetailSheet";
@@ -178,6 +179,9 @@ function Cockpit() {
 					<MemoryBand />
 					<AddonBoundary id="rl-band">
 						<RlBand />
+					</AddonBoundary>
+					<AddonBoundary id="cost-frontier">
+						<CostFrontier />
 					</AddonBoundary>
 					{campaign ? (
 						<AddonBoundary id="campaign-calendar">
