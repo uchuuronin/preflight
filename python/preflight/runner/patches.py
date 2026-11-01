@@ -96,10 +96,14 @@ def apply_patch(files: dict[str, str], diff: str) -> dict[str, str]:
 def relocate_knobs(sm, before: dict[str, str], after: dict[str, str]):
 	"""The record's own script map (static and Muse Spark knobs alike) with each knob's line moved to
 	where it sits in the patched files: an unchanged line by the diff's alignment; a line the patch
-	edited, to the one new line in that hunk that still holds the knob's expression. A knob that
+	edited, to the one new line in that hunk that still holds the knob's whole expression. A knob that
 	can't be placed that way loses its line, so its override says it can't set it rather than
 	landing on another literal."""
 	import difflib
+	import re
+
+	def holds(line: str, expr: str) -> bool:  # the whole expression: "default=3" isn't in "default=32"
+		return re.search(r"(?<![\w.])" + re.escape(expr) + r"(?![\w.])", line) is not None
 
 	maps: dict[str, dict[int, int | None]] = {}
 	for f in {k.location.file for k in sm.knobs if k.location is not None and k.location.line}:
@@ -121,10 +125,12 @@ def relocate_knobs(sm, before: dict[str, str], after: dict[str, str]):
 			new = m.get(loc.line)
 			lines = after[loc.file].splitlines()
 			if new is None and ("hunk", loc.line) in m and loc.expr:
+				# an edited line: the one new line in its hunk that still holds the whole expression
+				# ("batch_size=32", "default=16"), not just the name, which a sibling may share
 				j1, j2 = m[("hunk", loc.line)]
-				hits = [j + 1 for j in range(j1, j2) if loc.expr.split("=")[0].strip() in lines[j]]
+				hits = [j + 1 for j in range(j1, j2) if holds(lines[j], loc.expr)]
 				new = hits[0] if len(hits) == 1 else None
-			if new is not None and loc.expr and loc.expr.split("=")[0].strip() not in lines[new - 1]:
+			if new is not None and loc.expr and not holds(lines[new - 1], loc.expr):
 				new = None  # the line moved but no longer holds the knob
 			k = k.model_copy(update={"location": loc.model_copy(update={"line": new})})
 		knobs.append(k)

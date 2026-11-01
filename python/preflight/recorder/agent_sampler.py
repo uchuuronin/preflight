@@ -151,12 +151,12 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	# the tasks open when the script was stopped: those with a call in flight, and those whose
 	# worker never called again after their last answer asked for a tool (agent._stuck)
 	in_flight = set(at_cut.get("in_flight", []))
-	# tasks whose worker never called again after an answer that asked for a tool. At the proxy a
-	# task stuck in its tool looks like one that finished on a tool call (a submit), so none is
-	# called a loop: on a stalled run they count as cut, and selection says the run stalled
-	waiting = set(at_cut.get("stuck", []))
+	# At the proxy a task stuck in its tool looks exactly like one that finished on a tool call (a
+	# submit, a passing test run), so no task is singled out: the run's own stall is the signal,
+	# and selection says how many tasks ended waiting on a tool, of which up to the script's
+	# workers may be stuck
+	waiting = set(at_cut.get("tool_wait_s") or {}) if cut == "stalled" else set()
 	stalled_tasks: set[str] = set()
-	in_flight |= waiting
 	proc.kill()
 	wall = time.monotonic() - t0
 	ids = proxy.run_tasks(run_id)
@@ -172,8 +172,6 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		parts.append(f"{len(withheld)} other provider keys withheld")
 	if st.get("single_call") and len(ids) and st["single_call"] * 2 > len(ids):
 		parts.append(f"{st['single_call']} one-call tasks (side calls may split tasks)")
-	if cut == "stalled" and waiting:
-		parts.append(f"{len(waiting)} tasks left waiting on their tools (one may be stuck)")
 	if st.get("budget_hit"):
 		parts.append("dollar cap reached")
 	ended = (getattr(proc, "report", None) or {}).get("ended")
@@ -182,6 +180,9 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	why = {"timeout": f", cut at {timeout_s:.0f} s", "cancelled": ", cancelled", "lost": ", sandbox lost",
 		"stalled": f", stopped after {stall_s:.0f} s with no model calls"}.get(cut, "")  # fmt: skip
 	parts.insert(1, f"script wall {wall:.0f} s{why}")  # how it ended survives the 200-character cut
+	if cut == "stalled" and waiting:
+		w = at_cut.get("peak_concurrent") or 1
+		parts.insert(2, f"{len(waiting)} ended on a tool call, up to {min(w, len(waiting))} may be stuck")
 	selection = "; ".join(parts)
 	if len(selection) > 200:
 		selection = selection[:197].rsplit(" ", 1)[0] + "..."
