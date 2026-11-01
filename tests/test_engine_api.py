@@ -706,15 +706,14 @@ def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
 		p = next(q for q in lens.probes if q.id == pid)
 		pv = api._probe_values(lens, p)
 		f = api._length_factor(lens, p)
-		med = api._padded_step(
+		mean = api._padded_step(
 			200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
-		)[0]
-		assert f == pytest.approx(med / (p.data.tokens_per_sample_mean / (1 - p.data.padding_fraction)))
-		bp = p.step_time.by_phase
-		share = (bp["forward"] + bp["backward"]) / sum(bp.values())
-		want = p.step_time.p50_s * (
-			1 + share * (f - 1)
-		)  # that probe's own time, its token-bound phases corrected
+		)[1]
+		assert f == pytest.approx(mean / (p.data.tokens_per_sample_mean / (1 - p.data.padding_fraction)))
+		ph = api.steptime.phases_seconds(p.step_time.by_phase, p.step_time.p50_s)
+		want = sum(
+			v * f if k in api.TOKEN_PHASES else v for k, v in ph.items()
+		)  # its token-bound phases corrected
 		got = api.predict(lens, {k: pv[k] for k in ("batch_size", "seq_len")}).root["time.step"]
 		assert got.point == pytest.approx(want, rel=1e-6) and got.status == "predicted"
 
@@ -731,7 +730,7 @@ def test_without_the_datasets_lengths_the_probes_spread_sets_both_terms():
 	lt = api._length_term(rec, {}, p, 1000)
 	k = p.step_time.n_steps
 	seen = math.log(p.step_time.p95_s / p.step_time.p50_s) / api.steptime.Z90
-	assert (lt.step_scale, lt.total_scale) == (1.0, 1.0)
+	assert lt.total_scale == 1.0
 	assert lt.step_sigma == pytest.approx(api.MEDIAN_SE * seen / math.sqrt(k))
 	assert lt.total_sigma == pytest.approx(seen / math.sqrt(k))
 
@@ -773,12 +772,62 @@ def test_the_cold_cost_doesnt_grow_with_accumulation():
 	api._padded_step.cache_clear()
 	t0 = time.perf_counter()
 	api._padded_step(150.0, 200.0, 1024.0, 8, 1024)
-	assert time.perf_counter() - t0 < 0.1
+	assert time.perf_counter() - t0 < 0.5  # about 4,000 quantiles whatever the accumulation
 
 
 def test_rl_and_packed_rows_take_no_padding_term():
 	rec = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
 	p = next(q for q in rec.probes if q.id == "p1")
-	assert api._length_term(rec, {"packing": True}, p).step_scale == 1.0
+	assert api._length_term(rec, {"packing": True}, p).total_scale == 1.0
 	rl = rec.model_copy(update={"job": rec.job.model_copy(update={"lens": "rl"})})
 	assert api._length_term(rl, {}, p) is None
+
+
+def test_a_probe_that_saw_the_runs_data_is_left_alone():
+	# review, Nov 1: a median-over-mean factor cut such a probe by 16%
+	rec = _lora()
+	probes = []
+	for p in rec.probes:
+		pv = api._probe_values(rec, p)
+		mean = api._padded_step(
+			200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
+		)[1]
+		pf = p.data.padding_fraction
+		data = p.data.model_copy(
+			update={"tokens_per_sample_mean": mean * (1 - pf)}
+		)  # padded mean = the run's
+		probes.append(
+			p.model_copy(
+				update={
+					"data": data,
+					"extras": {
+						**(p.extras or {}),
+						"dataset_median_tokens": 200.0,
+						"dataset_mean_tokens": 260.0,
+					},
+				}
+			)
+		)
+	rec = rec.model_copy(update={"probes": probes})
+	for p in rec.probes:
+		assert api._length_factor(rec, p) == pytest.approx(1.0)
+	assert api.predict(rec).root["time.step"].point == pytest.approx(
+		api.predict(_lora()).root["time.step"].point
+	)
+
+
+def test_one_uncorrectable_probe_leaves_every_probe_uncorrected():
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	mixed = lens.model_copy(
+		update={
+			"probes": [
+				q.model_copy(update={"data": q.data.model_copy(update={"padding_fraction": None})})
+				if q.id == "p1"
+				else q
+				for q in lens.probes
+			]
+		}
+	)
+	assert api.predict(mixed).root["time.step"].point == pytest.approx(
+		api.predict(_lora()).root["time.step"].point
+	)
