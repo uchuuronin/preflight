@@ -1,0 +1,48 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-6qAEwS0Wn19aNEMmM2ibqC
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+{
+  "exit": 0,
+  "stderr": "",
+  "vllm": "0.6.4.post1",
+  "torch": "2.5.1+cu124",
+  "numpy": "1.26.4",
+  "recorder": "/opt/preflight/preflight/recorder/runtime.py",
+  "probe_user": {
+    "exit": 0,
+    "probe_uid": 61000,
+    "uid": 61000,
+    "gid": 61000,
+    "user": "preflight-probe",
+    "passwd": "preflight-probe",
+    "group": "preflight-probe",
+    "compiled": 7.274379253387451,
+    "imported": [
+      "vllm",
+      "datasets"
+    ]
+  },
+  "ok": true
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-6qAEwS0Wn19aNEMmM2ibqC
