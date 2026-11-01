@@ -956,7 +956,7 @@ a {
 .pf-core__num { font-family: var(--pf-font-serif); font-size: var(--pf-text-3xl); line-height: 1; font-variant-numeric: tabular-nums; }
 .pf-core__cap { font-size: 11.5px; line-height: 1.3; color: var(--pf-fg-dim); }
 
-/* Every node sits in a fixed box (orbit.ts NODE_BOX); only its button takes clicks. */
+/* Every node sits in a fixed box (orbitLayout.ts NODE_BOX); only its button takes clicks. */
 .pf-onode-box { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .pf-onode-box > .pf-onode { pointer-events: auto; }
 /* Decorative loops pause while the visitor's hand is on a control (lib/busy.ts). */
