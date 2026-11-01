@@ -133,11 +133,11 @@ worker_image = (
 )
 if FLAG_OVERRIDE.is_file():
 	worker_image = worker_image.add_local_file(FLAG_OVERRIDE, f"{REMOTE_PKG}/flags.{FLAG_ENV}.json")
-# the probe uid's /etc/passwd entry (probes/local.py PROBE_USER), for code that calls pwd.getpwuid
-# directly; getpass.getuser() reads the USER the probe sets. A layer after the packages, so they stay cached
 # a C compiler in the sandbox images: Triton builds its launcher and inductor's CPU backend builds its
 # kernels with one at run time, so a visitor's torch.compile needs it; a layer after the packages
 COMPILER_PACKAGES = ("gcc", "g++")
+# the probe uid's /etc/passwd entry (probes/local.py PROBE_USER), for code that calls pwd.getpwuid
+# directly; getpass.getuser() reads the USER the probe sets. A layer after the packages, so they stay cached
 PROBE_USER_CMD = (  # the group too: the probe runs as gid 61000 (probes/local.py, group=uid)
 	"groupadd --gid 61000 preflight-probe && useradd --uid 61000 --gid 61000 --no-create-home"
 	" --home-dir /tmp --shell /usr/sbin/nologin preflight-probe"
