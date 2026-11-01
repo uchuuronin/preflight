@@ -1,0 +1,36 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-gMJXH6nVCjFsvlgvtcORMz
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+[ground truth] grpo_trl: 2 files sent; waiting for an L4 (Modal queues it)
+[ground truth] container up on the GPU; 2 files of grpo_trl
+[ground truth 12:24:31] bare run of grpo_trl: 3 optimizer steps, at most 1380 s
+[bare] running /tmp/gt-l81n7aku/train.py for 3 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+
+[1AGenerating train split:   0%|          | 0/7473 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 7473/7473 [00:00<00:00, 387642.95 examples/s]
+
+[1AGenerating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 1319/1319 [00:00<00:00, 218365.38 examples/s]
+
+[1AMap:   0%|          | 0/7473 [00:00<?, ? examples/s]
+[1AMap:  61%|██████    | 4528/7473 [00:00<00:00, 45091.16 examples/s]Map: 100%|██████████| 7473/7473 [00:00<00:00, 45748.10 examples/s]
+Detected kernel version 4.19.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+
+[1A  0%|          | 0/1868 [00:00<?, ?it/s][remote-run] stop step done
