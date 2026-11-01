@@ -669,12 +669,29 @@ def test_the_step_band_covers_a_few_step_median_on_varying_batches():
 	assert "batches vary in length" in e.reason
 
 
-def test_padded_lengths_follow_median_and_mean_and_stop_at_seq_len():
-	med, mean, spread = api._padded_lengths(150, 200, 1024, 4)
-	assert med > 150 and mean > med and spread > 0  # each batch pads to its longest row
-	_, _, capped = api._padded_lengths(150, 200, 160, 4)
-	assert capped < spread  # nearly every batch hits seq_len
-	assert api._padded_lengths(150, 150, None, 4)[2] == 0.0  # no spread when every row is the median
+def test_the_vectorised_normal_quantile():
+	from statistics import NormalDist
+
+	import numpy as np
+
+	ps = np.asarray([1e-9, 0.001, 0.02, 0.3, 0.5, 0.9, 0.99, 1 - 1e-9])
+	assert np.allclose(api._norm_ppf(ps), [NormalDist().inv_cdf(x) for x in ps], atol=1e-7)
+
+
+def test_padded_step_follows_median_and_mean_and_stops_at_seq_len():
+	med, mean, spread = api._padded_step(150, 200, 1024, 4, 1)
+	assert med > 150 and mean > med and spread > 0  # each micro-batch pads to its longest row
+	assert api._padded_step(150, 200, 160, 4, 1)[2] < spread  # nearly every batch hits seq_len
+	assert api._padded_step(150, 150, None, 4, 1)[2] == 0.0  # every row the median: no spread
+	assert api._padded_step(150, 200, 1024, 4 * 8, 1)[0] > med  # 8 ranks: a step waits for the slowest
+	acc = api._padded_step(150, 200, 1024, 4, 4)[2]
+	assert acc == pytest.approx(spread / 2, rel=0.15)  # 4 micro-batches a step average out
+
+
+def _lora():
+	from preflight.schema import load_record
+
+	return load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
 
 
 def _with_lengths(rec, **extras):
@@ -682,36 +699,69 @@ def _with_lengths(rec, **extras):
 	return rec.model_copy(update={"probes": probes})
 
 
+def test_the_correction_is_one_factor_from_the_probes_settings():
+	# review, Nov 1: batch and seq_len moves stay with the work units, so the dataset correction must not move with them
+	rec = _lora()
+	lens = _with_lengths(rec, dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	factors = []
+	for q in ({}, {"seq_len": 128}, {"seq_len": 64}, {"batch_size": 8}):
+		a, b = api.predict(rec, q).root["time.step"], api.predict(lens, q).root["time.step"]
+		if a.status != "abstain" and b.status != "abstain":
+			factors.append(b.point / a.point)
+	assert len(factors) >= 3 and max(factors) == pytest.approx(min(factors), rel=1e-9)
+
+
+def test_the_correction_is_share_times_the_padded_ratio():
+	rec = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	p = next(q for q in rec.probes if q.id == "p1")
+	lt = api._length_term(rec, {}, p, 1000)
+	pv = api._probe_values(rec, p)
+	med, mean, _ = api._padded_step(
+		200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]) * 1, int(pv.get("grad_accum") or 1)
+	)
+	seen = p.data.tokens_per_sample_mean / (1 - p.data.padding_fraction)
+	bp = p.step_time.by_phase
+	share = (bp["forward"] + bp["backward"]) / sum(bp.values())
+	assert lt.step_scale == pytest.approx(1 + share * (med / seen - 1))
+	assert lt.total_scale == pytest.approx((1 + share * (mean / seen - 1)) / lt.step_scale)
+
+
+def test_without_the_datasets_lengths_the_probes_spread_sets_both_terms():
+	rec = _lora()
+	p = next(q for q in rec.probes if q.id == "p1")
+	lt = api._length_term(rec, {}, p, 1000)
+	k = p.step_time.n_steps
+	seen = math.log(p.step_time.p95_s / p.step_time.p50_s) / api.steptime.Z90
+	assert (lt.step_scale, lt.total_scale) == (1.0, 1.0)
+	assert lt.step_sigma == pytest.approx(api.MEDIAN_SE * seen / math.sqrt(k))
+	assert lt.total_sigma == pytest.approx(seen / math.sqrt(k))
+
+
 def test_a_long_tail_moves_memory_not_time():
 	# Chiya, Nov 1: time follows the median and the mean; p99.9 and the longest row belong to peak memory
-	from preflight.schema import load_record
-
-	rec = load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
-	base = _with_lengths(rec, dataset_median_tokens=140.0, dataset_mean_tokens=152.0)
+	base = _with_lengths(_lora(), dataset_median_tokens=140.0, dataset_mean_tokens=152.0)
 	tail = _with_lengths(base, dataset_p999_tokens=1000.0, dataset_max_tokens=4000.0)
 	a, b = api.predict(base).root["time.step"], api.predict(tail).root["time.step"]
 	assert a.point == b.point and a.hi == b.hi
-	assert math.log(a.hi / a.point) < math.log(1.5)  # a real long-tailed record doesn't push time to abstain
+	assert math.log(a.hi / a.point) < math.log(1.5)  # a long-tailed record doesn't push time to abstain
 
 
-def test_step_follows_the_median_padded_length_and_total_the_mean():
-	from preflight.schema import load_record
-
-	rec = load_record((Path(__file__).parent / "fixtures" / "b-a-smoke-l4-main-4.record.json").read_text())
+def test_a_total_follows_the_mean_with_a_narrower_length_error():
+	rec = _lora()
 	sm = rec.job.script_map
 	sm = sm.model_copy(update={"training": sm.training.model_copy(update={"max_steps": 1000})})
 	rec = rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm})})
-	short = api.predict(_with_lengths(rec, dataset_median_tokens=100.0, dataset_mean_tokens=110.0)).root
-	long = api.predict(_with_lengths(rec, dataset_median_tokens=200.0, dataset_mean_tokens=260.0)).root
-	assert long["time.step"].point > short["time.step"].point
-	steps = 1000
-	ratio_long = long["time.total"].point / (
-		steps * long["time.step"].point
-	)  # fixed overheads are small here
-	ratio_short = short["time.total"].point / (steps * short["time.step"].point)
-	assert (
-		ratio_long > ratio_short
-	)  # a longer tail above the median raises the mean step more than the median
-	# a total over many steps: its length error shrinks, so its band is no wider than the step's
-	t, st = long["time.total"], long["time.step"]
-	assert math.log(t.hi / t.point) <= math.log(st.hi / st.point) + 1e-9
+	out = api.predict(_with_lengths(rec, dataset_median_tokens=200.0, dataset_mean_tokens=260.0)).root
+	t, st = out["time.total"], out["time.step"]
+	assert t.point > 1000 * st.point  # the mean step is above the median step
+	assert math.log(t.hi / t.point) < math.log(
+		st.hi / st.point
+	)  # 1/sqrt(steps), not the probe's few-step median
+
+
+def test_rl_and_packed_rows_take_no_padding_term():
+	rec = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	p = next(q for q in rec.probes if q.id == "p1")
+	assert api._length_term(rec, {"packing": True}, p).step_scale == 1.0
+	rl = rec.model_copy(update={"job": rec.job.model_copy(update={"lens": "rl"})})
+	assert api._length_term(rl, {}, p) is None

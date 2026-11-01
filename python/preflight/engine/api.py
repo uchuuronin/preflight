@@ -287,38 +287,90 @@ _MATCH_IGNORES = frozenset(
 
 
 MEDIAN_SE = math.sqrt(math.pi / 2)  # cited: a sample median's standard error is sqrt(pi/2) x sigma / sqrt(k)
-LENGTH_DRAWS = 4000  # derived: 4,000 evenly spaced quantiles put the padded-length summaries within about 1%
+LENGTH_DRAWS = 4000  # derived: 4,000 simulated steps put the padded-length summaries within about 1%
 TOKEN_PHASES = (
 	"forward",
 	"backward",
 )  # the phases whose time follows the tokens in a batch; the rest stay fixed
+_PPF_A = (
+	-3.969683028665376e01,
+	2.209460984245205e02,
+	-2.759285104469687e02,
+	1.383577518672690e02,
+	-3.066479806614716e01,
+	2.506628277459239e00,
+)
+_PPF_B = (
+	-5.447609879822406e01,
+	1.615858368580409e02,
+	-1.556989798598866e02,
+	6.680131188771972e01,
+	-1.328068155288572e01,
+)
+_PPF_C = (
+	-7.784894002430293e-03,
+	-3.223964580411365e-01,
+	-2.400758277161838e00,
+	-2.549732539343734e00,
+	4.374664141464968e00,
+	2.938163982698783e00,
+)
+_PPF_D = (7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e00, 3.754408661907416e00)
+
+
+def _poly(coef, x):
+	out = np.zeros_like(x)
+	for c in coef:
+		out = out * x + c
+	return out
+
+
+def _norm_ppf(p: np.ndarray) -> np.ndarray:
+	"""The normal quantile, vectorised (cited: Acklam's rational approximation, relative error about 1e-9)."""
+	p = np.clip(np.asarray(p, dtype=float), 1e-15, 1 - 1e-15)
+	out = np.empty_like(p)
+	lo, hi = p < 0.02425, p > 1 - 0.02425
+	mid = ~(lo | hi)
+	q = np.sqrt(-2 * np.log(p[lo]))
+	out[lo] = _poly(_PPF_C, q) / (_poly(_PPF_D, q) * q + 1)
+	q = np.sqrt(-2 * np.log(1 - p[hi]))
+	out[hi] = -_poly(_PPF_C, q) / (_poly(_PPF_D, q) * q + 1)
+	q = p[mid] - 0.5
+	r = q * q
+	out[mid] = _poly(_PPF_A, r) * q / (_poly(_PPF_B, r) * r + 1)
+	return out
 
 
 @functools.lru_cache(maxsize=256)
-def _padded_lengths(median: float, mean: float, cap: float | None, batch: int) -> tuple[float, float, float]:
-	"""(median, mean, log spread) of a batch's padded row length when each batch pads to its longest row. Rows are
+def _padded_step(
+	median: float, mean: float, cap: float | None, rows: int, accum: int
+) -> tuple[float, float, float]:
+	"""(median, mean, log spread) of a step's padded tokens per row, when every micro-batch of `rows` rows (all ranks
+	together: a step waits for the slowest) pads to its longest row and a step sums `accum` micro-batches. Rows are
 	log-normal with the dataset's own median and mean (Chiya, Nov 1: time follows the median and the mean, not the
-	tail, which belongs to peak memory), cut at seq_len. A batch's longest row is drawn directly from the quantile
-	of U^(1/batch), so the cost doesn't grow with the batch, and the result is cached for knob moves."""
-	from statistics import NormalDist
-
+	tail, which sizes peak memory), cut at seq_len. A micro-batch's longest row is drawn from the quantile of
+	U^(1/rows), so the cost doesn't grow with the batch; the result is cached for knob moves."""
 	s = math.sqrt(2 * math.log(mean / median)) if mean > median > 0 else 0.0
-	u = (np.arange(LENGTH_DRAWS) + 0.5) / LENGTH_DRAWS
-	inv = NormalDist().inv_cdf
-	z = np.asarray([inv(min(x ** (1.0 / max(1, batch)), 1 - 1e-12)) for x in u])
-	logs = math.log(median) + s * z
+	u = np.random.default_rng(0).random((LENGTH_DRAWS, max(1, accum)))
+	logs = math.log(median) + s * _norm_ppf(u ** (1.0 / max(1, rows)))
 	if cap:
 		logs = np.minimum(logs, math.log(cap))
-	return float(np.exp(np.median(logs))), float(np.mean(np.exp(logs))), float(np.std(logs))
+	step = np.exp(logs).mean(axis=1)  # tokens per row, over the step's micro-batches
+	return float(np.median(step)), float(np.mean(step)), float(np.std(np.log(step)))
 
 
 @dataclass(frozen=True)
 class _LengthTerm:
-	step_scale: float  # the full run's median step against the probe's, from padded lengths (1 without them)
+	step_scale: (
+		float  # the run's median step against the probe's measured one (1 without the dataset's lengths)
+	)
 	total_scale: float  # the run's mean step against its median step (1 without them)
 	step_sigma: float  # added to the step's log sigma: the probe's few-step median against the run's median
-	total_sigma: float  # replaces it for the total, a sum over many steps
+	total_sigma: float  # replaces it for a total, a sum over many steps
 	reason: str
+	intact: bool = (
+		True  # False once later terms rescale the step's sigma; the total then keeps the step's band
+	)
 
 
 def _length_term(
@@ -326,12 +378,15 @@ def _length_term(
 ) -> _LengthTerm | None:
 	"""Batches that vary in length, as time sees them (Chiya, Nov 1). The run's median step follows the median padded
 	length and its total time the mean. With the dataset's median and mean row length (A's dataset_median_tokens and
-	dataset_mean_tokens), both come from the data, scaled from the padded length the probe saw on the steps'
-	token-bound share (forward and backward). The probe's p50 is the median of k steps, so its sampling error,
-	sqrt(pi/2) x the probe's own step spread / sqrt(k), stays on the step. A total sums many steps: with the
+	dataset_mean_tokens), one correction is computed at the probe's own settings, the dataset's padded lengths there
+	against what the probe saw, on the steps' token-bound share; batch and seq_len moves stay with the step model's
+	work units, which already scale them (review, Nov 1). The probe's p50 is the median of k steps, so its sampling
+	error, sqrt(pi/2) x the probe's own step spread / sqrt(k), stays on the step. A total sums many steps: with the
 	dataset's lengths known its length error is the per-step spread / sqrt(steps); without them the run's mean comes
-	from the probe's k steps (spread / sqrt(k)). The 99.9th percentile and the longest row stay out of time; they
-	size peak memory."""
+	from the probe's k steps (spread / sqrt(k)). The 99.9th percentile and the longest row stay out of time. RL
+	rollouts have their own length model (engine/rl.py), and packed rows don't pad."""
+	if record.job.lens == "rl":
+		return None
 	probes = [p for p in record.probes if p.status in OK_PROBE and p.step_time and p.step_time.p50_s]
 	p = match if match in probes else (probes[0] if probes else None)
 	if p is None or not p.step_time.n_steps:
@@ -339,9 +394,11 @@ def _length_term(
 	st_, k = p.step_time, p.step_time.n_steps
 	seen = math.log(st_.p95_s / st_.p50_s) / steptime.Z90 if st_.p95_s and st_.p95_s > st_.p50_s else 0.0
 	data, ex = p.data, p.extras or {}
+	pv = _probe_values(record, p)
+	packed = bool(values.get("packing")) or bool(pv.get("packing")) or bool(data and data.packing)
 	med, mean = ex.get("dataset_median_tokens"), ex.get("dataset_mean_tokens")
 	known = bool(
-		data and not data.packing and data.tokens_per_sample_mean and med and mean
+		not packed and data and data.tokens_per_sample_mean and med and mean
 		and data.padding_fraction is not None and data.padding_fraction < 1
 	)  # fmt: skip
 	if not known:
@@ -349,21 +406,27 @@ def _length_term(
 			return None
 		why = f"batches vary in length (the probe's {k} timed steps), so a full run's median step can differ from the probe's {k}-step median"
 		return _LengthTerm(1.0, 1.0, MEDIAN_SE * seen / math.sqrt(k), seen / math.sqrt(k), why)
-	pv = _probe_values(record, p)
-	cap = values.get("seq_len") or pv.get("seq_len")
-	batch = int(values.get("batch_size") or pv.get("batch_size") or 1)
-	run_med, run_mean, spread = _padded_lengths(float(med), float(mean), float(cap) if cap else None, batch)
+	cap = pv.get("seq_len")
+	rows = int(pv.get("batch_size") or 1) * _n_gpus(pv, record)
+	accum = int(pv.get("grad_accum") or 1)
+	run_med, run_mean, spread = _padded_step(
+		float(med), float(mean), float(cap) if cap else None, rows, accum
+	)
 	probe_padded = float(data.tokens_per_sample_mean) / (1 - float(data.padding_fraction))
-	share = sum(st_.by_phase.get(ph, 0.0) for ph in TOKEN_PHASES) if st_.by_phase else 1.0
+	total_phase = sum(st_.by_phase.values()) if st_.by_phase else 0.0
+	share = sum(st_.by_phase.get(ph, 0.0) for ph in TOKEN_PHASES) / total_phase if total_phase > 0 else 1.0
 	step_scale = 1 + share * (run_med / probe_padded - 1)
 	mean_scale = 1 + share * (run_mean / probe_padded - 1)
-	steps = steps_hint or 1.0
 	why = (
-		f"batches vary in length: the run's median step follows the dataset's median padded length ({run_med:.0f} "
-		f"tokens a row against the probe's {probe_padded:.0f}) and its total the mean ({run_mean:.0f})"
+		f"batches vary in length: at the probe's settings the run's median step follows the dataset's median padded "
+		f"length ({run_med:.0f} tokens a row against the {probe_padded:.0f} the probe saw) and its total the mean ({run_mean:.0f})"
 	)
 	return _LengthTerm(
-		step_scale, mean_scale / step_scale, MEDIAN_SE * seen / math.sqrt(k), spread / math.sqrt(steps), why
+		step_scale,
+		mean_scale / step_scale,
+		MEDIAN_SE * seen / math.sqrt(k),
+		spread / math.sqrt(steps_hint or 1.0),
+		why,
 	)
 
 
@@ -969,6 +1032,8 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		point *= lt.step_scale
 		sigma = math.hypot(sigma, lt.step_sigma)
 		reasons.append(lt.reason)
+		if status == "measured" and abs(lt.step_scale - 1) > 0.01:  # the run's batches aren't the probe's
+			status = "predicted"
 
 	# precision moved away from what the probes ran
 	q_prec = _precision(values)
@@ -1091,6 +1156,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		# each part keeps its own error: the measured step its sigma, the estimated all-reduce its own
 		comm = multi.breakdown.get("comm_exposed", 0.0)
 		sigma = math.hypot(point * sigma, comm * comm_sigma) / multi.point
+		lt = replace(lt, intact=False) if lt is not None else None
 		point, status, mid = multi.point, "extrapolated", steptime.MODEL_ID_COMM
 		reasons.append(
 			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
@@ -1108,6 +1174,7 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	moves = [m for m in _unmodelled_moves(record, values, "time") if m != "gpus"]
 	if moves:
 		sigma *= UNMODELLED_WIDEN
+		lt = replace(lt, intact=False) if lt is not None else None
 		status = "extrapolated" if status != "abstain" else status
 		reasons.append(f"{', '.join(moves)} isn't modelled for time yet; held at its probed effect")
 	h = memory.Z90 * sigma
@@ -1240,9 +1307,8 @@ def _time(record: FlightRecord, values: dict) -> _TimeResult:
 	fixed = extra + step.first_extra_s
 	lt = step.length
 	tsig = step.sigma
-	if (
-		lt is not None
-	):  # a sum over many steps: the mean step, and the length error of a total, not of a median
+	# a sum over many steps: the length error of a total, not of a median (only while nothing rescaled the sigma)
+	if lt is not None and lt.intact:
 		tsig = math.sqrt(max(0.0, step.sigma**2 - lt.step_sigma**2) + lt.total_sigma**2)
 	h = memory.Z90 * tsig
 	pt = steps * step.est.point * (lt.total_scale if lt is not None else 1.0)
