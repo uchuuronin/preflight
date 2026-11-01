@@ -5,8 +5,8 @@ import json
 import pytest
 from test_guide import SETTING, Model, client, live, reply, turn  # noqa: F401 (live is autouse)
 
+from preflight_api.guide.limits_reader import checked
 from preflight_api.guide.record_view import RecordView
-from preflight_api.routes.limits import checked
 from preflight_api.stores import SampleStore
 
 A100 = "A100-SXM-80GB"
@@ -149,7 +149,7 @@ def test_the_limits_reader_is_off_with_the_live_guide(monkeypatch):
 
 @pytest.mark.parametrize("text,expect", [("$40", [40.0]), ("1,200 GPU-hours", [1200.0]), ("2k", [2000.0])])
 def test_numbers_in_the_visitors_words(text, expect):
-	from preflight_api.routes.limits import _numbers_in
+	from preflight_api.guide.limits_reader import _numbers_in
 
 	assert _numbers_in(text) == expect
 
