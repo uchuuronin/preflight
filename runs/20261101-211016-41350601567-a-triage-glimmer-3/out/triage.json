@@ -1,0 +1,39 @@
+{
+  "record_id": "01M6C5WRVEM3RTRRBDRPAAPEGT",
+  "probe": "p1-eval",
+  "status": "oom",
+  "provider": "modal-glimmer",
+  "model": "muse-glimmer",
+  "wall_s": 465.8,
+  "finding": null,
+  "last_error": "Triage output did not validate after a re-ask",
+  "calls": [
+    {
+      "provider": "modal-glimmer",
+      "model": "muse-glimmer",
+      "purpose": "triage",
+      "input_tokens": 325,
+      "output_tokens": 371,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.268049,
+      "request_id": "chatcmpl-a70a2d4e2c5ca19e",
+      "at": "2026-11-01T21:18:19Z",
+      "latency_s": 459.514,
+      "ok": false
+    },
+    {
+      "provider": "modal-glimmer",
+      "model": "muse-glimmer",
+      "purpose": "triage",
+      "input_tokens": 496,
+      "output_tokens": 247,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.003678,
+      "request_id": "chatcmpl-b6e270d3bf796086",
+      "at": "2026-11-01T21:18:26Z",
+      "latency_s": 6.306,
+      "ok": false
+    }
+  ],
+  "usd": 0.271727
+}
