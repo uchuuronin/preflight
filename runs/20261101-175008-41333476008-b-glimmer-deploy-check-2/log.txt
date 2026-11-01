@@ -1,0 +1,24 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-AnNQ4XMNcsLffdHD2Wi1xo
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/glimmer/ops.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function llama_version.
+├── ✓ Created Function smoke_l4.
+├── ✓ Created Function vllm_version.
+├── ✓ Created Function smoke_a100.
+├── ✓ Created Function make_fp8.
+└── ✓ Created Function fetch.
+{
+ "url": "https://shuureiyashi99--preflight-glimmer-glimmer-serve.us-east.modal.run",
+ "without_a_token": {
+  "status": 401,
+  "refused": true
+ },
+ "containers_running": 0,
+ "containers": []
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-AnNQ4XMNcsLffdHD2Wi1xo
