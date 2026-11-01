@@ -607,8 +607,9 @@ def _with_dataset_size(rec: FlightRecord) -> FlightRecord:
 	sm = rec.job.script_map
 	if sm is None or sm.data is None or sm.data.n_examples:
 		return rec
-	n = next((p.extras.get("train_dataset_len") or p.extras.get("dataset_rows_total") for p in rec.probes
-		if p.status == "ok" and (p.extras.get("train_dataset_len") or p.extras.get("dataset_rows_total"))), None)  # fmt: skip
+	ok = [p for p in rec.probes if p.status == "ok" and not p.extras.get("patched")]  # a patch may subsample
+	n = next((p.extras["train_dataset_len"] for p in ok if p.extras.get("train_dataset_len")), None) or next(
+		(p.extras["dataset_rows_total"] for p in ok if p.extras.get("dataset_rows_total")), None)  # fmt: skip
 	if not n:
 		return rec
 	data = sm.data.model_copy(update={"n_examples": int(n)})

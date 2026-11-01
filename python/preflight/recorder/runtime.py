@@ -367,6 +367,7 @@ class Recorder:
 		self._retrieval_lock = threading.Lock()
 		self.lens_stats: list[dict] = []  # vision and graph batch shapes, the first training batches
 		self._train_dataset = None
+		self._train_sampler = None
 		self.run_length: dict = {}
 		self._scalers: weakref.WeakSet = weakref.WeakSet()
 		self._attn_calls = 0
@@ -576,6 +577,11 @@ class Recorder:
 					n = len(it)
 				rec.train_loader_batches = n if isinstance(n, int) and n > 0 else None
 				rec._train_dataset = getattr(it, "_dataset", None)  # its row lengths, read at the end
+				# what the loader draws per epoch: a SubsetRandomSampler over a train split, or a
+				# WeightedRandomSampler's num_samples, is fewer rows than the dataset (A review, Nov 1)
+				smp = getattr(getattr(it, "_index_sampler", None), "sampler", None)
+				# a DistributedSampler's length is one rank's share: the dataset is the run's
+				rec._train_sampler = None if hasattr(smp, "num_replicas") else smp
 				rec._train_iter = id(it)
 			rec._maybe_stop()
 			rec._sync()
@@ -1560,10 +1566,13 @@ class Recorder:
 		out["train_loader_batches"] = self.train_loader_batches
 		# the dataset the training loader draws from: examples, pairs, images, or a NodeLoader's input
 		# nodes per epoch, which B's engine divides by the batch for the run's length (D, Nov 1)
-		with suppress(Exception):
-			n = len(self._train_dataset) if self._train_dataset is not None else None
+		n = None
+		for src in (self._train_sampler, self._train_dataset):  # the sampler's draw, else the dataset
+			with suppress(Exception):
+				n = len(src) if src is not None else None
 			if isinstance(n, int) and n > 0:
 				out["train_dataset_len"] = float(n)
+				break
 		out.update(self._identical_outputs())
 		known = [t for g in self.gens for t in g["truncated"] if t is not None]
 		if self.gens and known:  # how many sequences truncation_rate is over (those whose ending is known)

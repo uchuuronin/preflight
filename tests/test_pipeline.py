@@ -766,3 +766,36 @@ def test_the_probes_dataset_size_fills_the_records_n_examples(tmp_path):
 		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, Sized())
 	)
 	assert rec.job.script_map.data.n_examples == 98231
+
+
+def test_dataset_size_prefers_the_loaders_count_skips_patched_probes_and_keeps_a_static_value(tmp_path):
+	from preflight.runner.pipeline import _with_dataset_size
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	sm = rec.job.script_map
+
+	def with_probes(extras, n_examples=None):
+		data = sm.data.model_copy(update={"n_examples": n_examples})
+		job = rec.job.model_copy(update={"script_map": sm.model_copy(update={"data": data})})
+		base = rec.probes[0]
+		probes = [
+			base.model_copy(update={"id": f"x{i}", "extras": {**base.extras, **e}})
+			for i, e in enumerate(extras)
+		]
+		return rec.model_copy(update={"job": job, "probes": probes})
+
+	def n(r):
+		return _with_dataset_size(r).job.script_map.data.n_examples
+
+	# the token scan's total on the first probe loses to the loader's count on the second
+	assert n(with_probes([{"dataset_rows_total": 500.0}, {"train_dataset_len": 400.0}])) == 400
+	assert n(with_probes([{"dataset_rows_total": 500.0}])) == 500  # the scan's total when that's all there is
+	# a probe measured on patched code (which may subsample the data) is left out
+	assert n(with_probes([{"train_dataset_len": 10.0, "patched": 1.0}, {"train_dataset_len": 400.0}])) == 400
+	assert n(with_probes([{"train_dataset_len": 10.0, "patched": 1.0}])) is None
+	assert (
+		n(with_probes([{"train_dataset_len": 400.0}], n_examples=1234)) == 1234
+	)  # the static reader's value stays
+	load_record(_with_dataset_size(with_probes([{"train_dataset_len": 400.0}])).model_dump(mode="json"))
