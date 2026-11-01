@@ -156,6 +156,9 @@ class Deps:
 	records: RecordWriter
 	runner: ProbeRunner = local_runner
 	spark: object | None = None  # harness.spark.ModelClient
+	triage: object | None = (
+		None  # Spark Open on Baseten (harness/triage.py), with harness.spark_open_triage on
+	)
 	cache: ProbeCache | None = None
 	image: str = "local"  # probe image tag, part of the cache key
 	budget: Callable[[], Budget] = Budget
@@ -477,6 +480,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		patched_for=patched_for,
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
+	rec, triaged = _triage(rec, results, deps)
 	kept = rec.probes
 	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
 	ran = next((g for r in results for g in [_measured_gpu(r)] if g), gpu)
@@ -499,7 +503,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	# its own finding; a verify job's base is the record's own code) and the probes so far
 	code = fixed.files if fixed is not None and req.mode == "probe" else fetched.files
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
-	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code)]})
+	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
+	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
@@ -587,6 +592,27 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 		p.seed = record_jobs.VERIFY_SEED_2 if p.role == "verify_seed" else record_jobs.VERIFY_SEED
 		p.seed_force = True
 	return plan
+
+
+def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord, list]:
+	"""Spark Open reads each fresh probe's log (plan item 29): one call per probe, every call in the
+	record's provenance (so its cost is in the record's), a finding for a probe that didn't finish.
+	Off unless harness.spark_open_triage is on: the log may hold the visitor's script output."""
+	from .flags import flag
+
+	if deps.triage is None or not flag("harness.spark_open_triage"):
+		return rec, []
+	from preflight.harness.triage import triage_probe
+
+	findings, calls = [], []
+	for r in results:
+		if not isinstance(r, ProbeResult):
+			continue
+		f, cs = triage_probe(deps.triage, r.probe, r.log_tail)
+		calls += cs
+		if f is not None:
+			findings.append(f)
+	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
 
 
 def _measured_gpu(result) -> str | None:

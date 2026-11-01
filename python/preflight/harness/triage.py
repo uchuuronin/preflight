@@ -1,0 +1,55 @@
+"""Spark Open triage of a probe's log (plan item 29): one call per probe, every call in provenance.
+
+	finding, call = triage_probe(ModelClient.baseten_spark_open(), probe, log_tail)
+
+Spark Open (open weights, on Baseten) reads the tail of the probe's own output and its status, and
+says what happened in one line: the category comes from a fixed list and the line it rests on is
+quoted from the log, so a reader can check it. Code decides what that becomes: for a probe that
+didn't finish, an info finding beside the probe's own error; for one that did, the call alone, in
+provenance. Effort is low: triage is a short read, not a diagnosis. The log may hold what a
+visitor's script printed, so the runner calls this only with harness.spark_open_triage on, which
+the data-use notice must disclose (as harness.spark_script_map is).
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from preflight.schema import Finding
+
+TAIL_CHARS = 3000  # the end of the log: where a traceback or the last progress line is
+Category = Literal["ok", "oom", "missing_package", "data_error", "nan_or_divergence", "timeout", "script_error",
+	"infrastructure", "unclear"]  # fmt: skip
+
+
+class Triage(BaseModel):
+	category: Category
+	summary: str = Field(description="one sentence, under 160 characters, plain words")
+	evidence_line: str = Field(description="the log line the summary rests on, copied exactly, or empty")
+
+
+SYSTEM = ("You triage the output of a short probe run of a machine-learning script. Say what happened, "
+	"from the log only: a category from the list, one plain sentence, and the one log line it rests on, "
+	"copied exactly. Never guess beyond the log; use 'unclear' when it doesn't say.")  # fmt: skip
+
+
+def triage_probe(client, probe, log_tail: str) -> tuple[Finding | None, list]:
+	"""(an info finding for a probe that didn't finish, or None; the model calls made)."""
+	tail = (log_tail or "")[-TAIL_CHARS:]
+	status = f"status {probe.status}" + (f", error code {probe.error_code}" if probe.error_code else "")
+	msgs = [{"role": "system", "content": SYSTEM},
+		{"role": "user", "content": f"Probe {probe.id}: {status}, {probe.steps} optimizer steps.\nLog tail:\n{tail}"}]  # fmt: skip
+	before = len(client.calls)
+	try:
+		t, _ = client.structured(msgs, Triage, purpose="triage", reasoning_effort="low")
+	except Exception:
+		return None, client.calls[before:]  # failed attempts stay in provenance; the probe stands as it is
+	calls = client.calls[before:]
+	if probe.status in ("ok", "cached"):
+		return None, calls
+	line = t.evidence_line.strip()
+	quoted = line and line in tail  # code checks the quote is really in the log
+	detail = t.summary.strip()[:200] + (f' (log: "{line[:160]}")' if quoted else " (no log line quoted)")
+	return Finding(id=f"triage.{probe.id}", severity="info", code=f"triage.{t.category}",
+		title=f"Spark Open on probe {probe.id}: {t.category.replace('_', ' ')}", detail=detail,
+		node_id=None, source="spark_open_triage"), calls  # fmt: skip

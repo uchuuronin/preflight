@@ -667,3 +667,55 @@ def test_after_a_fallback_the_job_stays_on_that_gpu_and_drops_cache_hits_from_th
 	assert [g for _, g, *_ in runner.calls] == ["A10"] * len(runner.calls)
 	asked = [c for c in runner.calls]
 	assert len(asked) >= 2 and rec.env.gpu.name == "A10"
+
+
+class _FakeTriageClient:
+	"""Stands in for Spark Open: answers each probe's log with a category and a quoted line."""
+
+	def __init__(self):
+		from datetime import UTC, datetime
+
+		from preflight.schema import ModelCall
+
+		self.calls, self._now, self._call = [], datetime.now(UTC), ModelCall
+		self.seen = []
+
+	def structured(self, msgs, schema, *, purpose, reasoning_effort=None):
+		self.seen.append((purpose, reasoning_effort, msgs[-1]["content"]))
+		call = self._call(provider="baseten", model="meta-models/muse-spark-open-1026", purpose=purpose,
+			input_tokens=900, output_tokens=120, cost_usd=0.001635, at=self._now)  # fmt: skip
+		self.calls.append(call)
+		return schema(category="oom", summary="The forward pass ran out of GPU memory.",
+			evidence_line="CUDA out of memory"), call  # fmt: skip
+
+
+@pytest.mark.parametrize("on", [False, True])
+def test_spark_open_triages_each_probe_log_only_with_its_flag(tmp_path, monkeypatch, on):
+	from preflight.runner import flags
+
+	class LoggedRunner(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			r = super().__call__(spec, gpu, should_stop=should_stop)
+			r.log_tail = "step 1\ntorch.OutOfMemoryError: CUDA out of memory\n"
+			return r
+
+	client = _FakeTriageClient()
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_open_triage": on}))
+	flags.reload()
+	try:
+		d = deps(tmp_path, LoggedRunner(outcomes={"p2": ("oom", "oom.train")}))
+		d.triage = client
+		rec = run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), d)
+	finally:
+		flags.reload()
+	triage_calls = [c for c in rec.provenance if c.purpose == "triage"]
+	if not on:
+		assert not client.seen and not triage_calls
+		return
+	assert len(triage_calls) == len(client.seen) == len(rec.probes)  # one call per probe, all in provenance
+	assert all(effort == "low" for _, effort, _ in client.seen)
+	f = [f for f in rec.findings if f.source == "spark_open_triage"]
+	assert [x.id for x in f] == ["triage.p2"] and 'log: "CUDA out of memory"' in f[
+		0
+	].detail  # only the probe that didn't finish
+	assert rec.costs.llm_usd == pytest.approx(0.001635 * len(triage_calls))
