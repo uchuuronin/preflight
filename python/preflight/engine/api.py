@@ -351,12 +351,42 @@ def _padded_step(
 	tail, which sizes peak memory), cut at seq_len. A micro-batch's longest row is drawn from the quantile of
 	U^(1/rows), so the cost doesn't grow with the batch; the result is cached for knob moves."""
 	s = math.sqrt(2 * math.log(mean / median)) if mean > median > 0 else 0.0
-	u = np.random.default_rng(0).random((LENGTH_DRAWS, max(1, accum)))
+	n = max(
+		200, LENGTH_DRAWS // max(1, accum)
+	)  # about LENGTH_DRAWS quantiles in all, whatever the accumulation
+	u = np.random.default_rng(0).random((n, max(1, accum)))
 	logs = math.log(median) + s * _norm_ppf(u ** (1.0 / max(1, rows)))
 	if cap:
 		logs = np.minimum(logs, math.log(cap))
 	step = np.exp(logs).mean(axis=1)  # tokens per row, over the step's micro-batches
 	return float(np.median(step)), float(np.mean(step)), float(np.std(np.log(step)))
+
+
+def _dataset_lengths(p) -> tuple[float, float] | None:
+	ex = p.extras or {}
+	med, mean = ex.get("dataset_median_tokens"), ex.get("dataset_mean_tokens")
+	return (float(med), float(mean)) if med and mean else None
+
+
+def _length_factor(record: FlightRecord, p) -> float | None:
+	"""How much longer the full run's median micro-batch is than the batches this probe saw: the dataset's median
+	padded length per row at the probe's own batch, seq_len and accumulation, over the probe's padded length
+	(tokens_per_sample_mean / (1 - padding_fraction)). Applied to the probe's forward and backward time before the
+	step model fits, so each probe carries its own padding and a knob move that lands on another probe doesn't jump
+	(review, Nov 1). Per-rank rows: the probe's tokens and timing are one rank's view. None when the dataset's
+	lengths or the probe's padding aren't known, or the rows are packed."""
+	data, lens = p.data, _dataset_lengths(p)
+	pv = _probe_values(record, p)
+	if (
+		lens is None or not data or not data.tokens_per_sample_mean or data.padding_fraction is None
+		or data.padding_fraction >= 1 or data.packing or pv.get("packing") or record.job.lens == "rl"
+	):  # fmt: skip
+		return None
+	cap = pv.get("seq_len")
+	run_med, _, _ = _padded_step(
+		*lens, float(cap) if cap else None, int(pv.get("batch_size") or 1), int(pv.get("grad_accum") or 1)
+	)
+	return run_med / (float(data.tokens_per_sample_mean) / (1 - float(data.padding_fraction)))
 
 
 @dataclass(frozen=True)
@@ -377,14 +407,13 @@ def _length_term(
 	record: FlightRecord, values: dict, match, steps_hint: float | None = None
 ) -> _LengthTerm | None:
 	"""Batches that vary in length, as time sees them (Chiya, Nov 1). The run's median step follows the median padded
-	length and its total time the mean. With the dataset's median and mean row length (A's dataset_median_tokens and
-	dataset_mean_tokens), one correction is computed at the probe's own settings, the dataset's padded lengths there
-	against what the probe saw, on the steps' token-bound share; batch and seq_len moves stay with the step model's
-	work units, which already scale them (review, Nov 1). The probe's p50 is the median of k steps, so its sampling
-	error, sqrt(pi/2) x the probe's own step spread / sqrt(k), stays on the step. A total sums many steps: with the
-	dataset's lengths known its length error is the per-step spread / sqrt(steps); without them the run's mean comes
-	from the probe's k steps (spread / sqrt(k)). The 99.9th percentile and the longest row stay out of time. RL
-	rollouts have their own length model (engine/rl.py), and packed rows don't pad."""
+	length (each probe's own correction, _length_factor, before the step model fits) and its total the mean: the
+	total scales by the mean step over the median at the query's own batch, seq_len and accumulation. The probe's
+	p50 is the median of k steps, so its sampling error, sqrt(pi/2) x the probe's own step spread / sqrt(k), stays on
+	the step. A total sums many steps: with the dataset's lengths known its length error is the per-step spread /
+	sqrt(steps); without them the run's mean comes from the probe's k steps (spread / sqrt(k)). The 99.9th
+	percentile and the longest row stay out of time. RL rollouts have their own length model (engine/rl.py), and
+	packed rows don't pad."""
 	if record.job.lens == "rl":
 		return None
 	probes = [p for p in record.probes if p.status in OK_PROBE and p.step_time and p.step_time.p50_s]
@@ -393,40 +422,27 @@ def _length_term(
 		return None
 	st_, k = p.step_time, p.step_time.n_steps
 	seen = math.log(st_.p95_s / st_.p50_s) / steptime.Z90 if st_.p95_s and st_.p95_s > st_.p50_s else 0.0
-	data, ex = p.data, p.extras or {}
+	lens = _dataset_lengths(p)
 	pv = _probe_values(record, p)
-	packed = bool(values.get("packing")) or bool(pv.get("packing")) or bool(data and data.packing)
-	med, mean = ex.get("dataset_median_tokens"), ex.get("dataset_mean_tokens")
-	known = bool(
-		not packed and data and data.tokens_per_sample_mean and med and mean
-		and data.padding_fraction is not None and data.padding_fraction < 1
-	)  # fmt: skip
-	if not known:
+	packed = bool(values.get("packing")) or bool(pv.get("packing")) or bool(p.data and p.data.packing)
+	if lens is None or packed or _length_factor(record, p) is None:
 		if seen <= 0:
 			return None
 		why = f"batches vary in length (the probe's {k} timed steps), so a full run's median step can differ from the probe's {k}-step median"
 		return _LengthTerm(1.0, 1.0, MEDIAN_SE * seen / math.sqrt(k), seen / math.sqrt(k), why)
-	cap = pv.get("seq_len")
-	rows = int(pv.get("batch_size") or 1) * _n_gpus(pv, record)
-	accum = int(pv.get("grad_accum") or 1)
-	run_med, run_mean, spread = _padded_step(
-		float(med), float(mean), float(cap) if cap else None, rows, accum
-	)
-	probe_padded = float(data.tokens_per_sample_mean) / (1 - float(data.padding_fraction))
+	cap = values.get("seq_len") or pv.get("seq_len")
+	batch = int(values.get("batch_size") or pv.get("batch_size") or 1)
+	accum = int(values.get("grad_accum") or pv.get("grad_accum") or 1)
+	run_med, run_mean, spread = _padded_step(*lens, float(cap) if cap else None, batch, accum)
 	total_phase = sum(st_.by_phase.values()) if st_.by_phase else 0.0
 	share = sum(st_.by_phase.get(ph, 0.0) for ph in TOKEN_PHASES) / total_phase if total_phase > 0 else 1.0
-	step_scale = 1 + share * (run_med / probe_padded - 1)
-	mean_scale = 1 + share * (run_mean / probe_padded - 1)
+	total_scale = (1 + share * (run_mean / run_med - 1)) if run_med > 0 else 1.0
 	why = (
-		f"batches vary in length: at the probe's settings the run's median step follows the dataset's median padded "
-		f"length ({run_med:.0f} tokens a row against the {probe_padded:.0f} the probe saw) and its total the mean ({run_mean:.0f})"
+		f"batches vary in length: the run's median step follows the dataset's median padded length ({run_med:.0f} "
+		f"tokens a row here) and its total the mean ({run_mean:.0f})"
 	)
 	return _LengthTerm(
-		step_scale,
-		mean_scale / step_scale,
-		MEDIAN_SE * seen / math.sqrt(k),
-		spread / math.sqrt(steps_hint or 1.0),
-		why,
+		1.0, total_scale, MEDIAN_SE * seen / math.sqrt(k), spread / math.sqrt(steps_hint or 1.0), why
 	)
 
 
@@ -995,6 +1011,9 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		if p.status not in OK_PROBE or not st_ or not st_.p50_s:
 			continue
 		phases = steptime.phases_seconds(st_.by_phase, st_.p50_s) or {"step": st_.p50_s}
+		f = _length_factor(record, p)
+		if f is not None:  # the run's batches, not the probe's: on the phases that follow the tokens
+			phases = {k: v * f if k in TOKEN_PHASES or k == "step" else v for k, v in phases.items()}
 		sprobes.append(steptime.StepProbe(_probe_work(record, p), phases, p.id))
 		if p.kernels and current_probe is None:
 			current_probe = p
@@ -1029,10 +1048,12 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	point, sigma, status, reasons = est.point, est.sigma_log, est.status, [est.reason] if est.reason else []
 	lt = _length_term(record, values, match, _total_steps(record, values)[0])
 	if lt is not None:
-		point *= lt.step_scale
 		sigma = math.hypot(sigma, lt.step_sigma)
 		reasons.append(lt.reason)
-		if status == "measured" and abs(lt.step_scale - 1) > 0.01:  # the run's batches aren't the probe's
+		f = _length_factor(record, match) if match is not None else None
+		if (
+			status == "measured" and f is not None and abs(f - 1) > 0.01
+		):  # the run's batches aren't the probe's
 			status = "predicted"
 
 	# precision moved away from what the probes ran

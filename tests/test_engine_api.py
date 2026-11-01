@@ -699,31 +699,30 @@ def _with_lengths(rec, **extras):
 	return rec.model_copy(update={"probes": probes})
 
 
-def test_the_correction_is_one_factor_from_the_probes_settings():
-	# review, Nov 1: batch and seq_len moves stay with the work units, so the dataset correction must not move with them
-	rec = _lora()
-	lens = _with_lengths(rec, dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
-	factors = []
-	for q in ({}, {"seq_len": 128}, {"seq_len": 64}, {"batch_size": 8}):
-		a, b = api.predict(rec, q).root["time.step"], api.predict(lens, q).root["time.step"]
-		if a.status != "abstain" and b.status != "abstain":
-			factors.append(b.point / a.point)
-	assert len(factors) >= 3 and max(factors) == pytest.approx(min(factors), rel=1e-9)
+def test_each_probe_is_corrected_by_its_own_padding_before_the_fit():
+	# review, Nov 1: a factor taken from whichever probe matched jumped 4.5% when a knob moved onto another probe
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	for pid in ("p1", "p2", "p3"):
+		p = next(q for q in lens.probes if q.id == pid)
+		pv = api._probe_values(lens, p)
+		f = api._length_factor(lens, p)
+		med = api._padded_step(
+			200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
+		)[0]
+		assert f == pytest.approx(med / (p.data.tokens_per_sample_mean / (1 - p.data.padding_fraction)))
+		bp = p.step_time.by_phase
+		share = (bp["forward"] + bp["backward"]) / sum(bp.values())
+		want = p.step_time.p50_s * (
+			1 + share * (f - 1)
+		)  # that probe's own time, its token-bound phases corrected
+		got = api.predict(lens, {k: pv[k] for k in ("batch_size", "seq_len")}).root["time.step"]
+		assert got.point == pytest.approx(want, rel=1e-6) and got.status == "predicted"
 
 
-def test_the_correction_is_share_times_the_padded_ratio():
-	rec = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
-	p = next(q for q in rec.probes if q.id == "p1")
-	lt = api._length_term(rec, {}, p, 1000)
-	pv = api._probe_values(rec, p)
-	med, mean, _ = api._padded_step(
-		200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]) * 1, int(pv.get("grad_accum") or 1)
-	)
-	seen = p.data.tokens_per_sample_mean / (1 - p.data.padding_fraction)
-	bp = p.step_time.by_phase
-	share = (bp["forward"] + bp["backward"]) / sum(bp.values())
-	assert lt.step_scale == pytest.approx(1 + share * (med / seen - 1))
-	assert lt.total_scale == pytest.approx((1 + share * (mean / seen - 1)) / lt.step_scale)
+def test_a_knob_move_between_probes_doesnt_jump():
+	lens = _with_lengths(_lora(), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	pts = [api.predict(lens, {"batch_size": b, "seq_len": 1024}).root["time.step"].point for b in (2, 3, 4)]
+	assert pts[0] < pts[1] < pts[2]  # the fit interpolates between the corrected probes
 
 
 def test_without_the_datasets_lengths_the_probes_spread_sets_both_terms():
@@ -746,17 +745,35 @@ def test_a_long_tail_moves_memory_not_time():
 	assert math.log(a.hi / a.point) < math.log(1.5)  # a long-tailed record doesn't push time to abstain
 
 
-def test_a_total_follows_the_mean_with_a_narrower_length_error():
+def _lora_steps(n=1000):
 	rec = _lora()
 	sm = rec.job.script_map
-	sm = sm.model_copy(update={"training": sm.training.model_copy(update={"max_steps": 1000})})
-	rec = rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm})})
-	out = api.predict(_with_lengths(rec, dataset_median_tokens=200.0, dataset_mean_tokens=260.0)).root
+	sm = sm.model_copy(update={"training": sm.training.model_copy(update={"max_steps": n})})
+	return rec.model_copy(update={"job": rec.job.model_copy(update={"script_map": sm})})
+
+
+def test_a_total_follows_the_mean_and_its_length_error_shrinks_with_the_steps():
+	rec = _with_lengths(_lora_steps(1000), dataset_median_tokens=200.0, dataset_mean_tokens=260.0)
+	p = next(q for q in rec.probes if q.id == "p1")
+	lt = api._length_term(rec, {}, p, 1000)
+	pv = api._probe_values(rec, p)
+	_, _, spread = api._padded_step(
+		200.0, 260.0, float(pv["seq_len"]), int(pv["batch_size"]), int(pv.get("grad_accum") or 1)
+	)
+	assert lt.total_sigma == pytest.approx(spread / math.sqrt(1000)) and lt.total_scale > 1
+	out = api.predict(rec).root
 	t, st = out["time.total"], out["time.step"]
 	assert t.point > 1000 * st.point  # the mean step is above the median step
-	assert math.log(t.hi / t.point) < math.log(
-		st.hi / st.point
-	)  # 1/sqrt(steps), not the probe's few-step median
+	assert math.log(t.hi / t.point) < math.log(st.hi / st.point)
+
+
+def test_the_cold_cost_doesnt_grow_with_accumulation():
+	import time
+
+	api._padded_step.cache_clear()
+	t0 = time.perf_counter()
+	api._padded_step(150.0, 200.0, 1024.0, 8, 1024)
+	assert time.perf_counter() - t0 < 0.1
 
 
 def test_rl_and_packed_rows_take_no_padding_term():
