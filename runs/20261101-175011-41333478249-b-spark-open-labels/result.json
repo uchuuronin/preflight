@@ -1,0 +1,11 @@
+{
+	"name": "20261101-175011-41333478249-b-spark-open-labels",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41333478249",
+	"ref": "ws-b",
+	"sha": "e5a470e7af696433dc43bdc43a4e0d4a5fa16bed",
+	"cmd": "python scripts/spark_label_corpus.py label --out out",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-01T17:58:44Z"
+}
