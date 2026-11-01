@@ -31,6 +31,8 @@ export type Unit =
 	| "flops"
 	| "steps"
 	| "gpu_h"
+	/** the engine's name for GPU-hours (cost.gpu_hours, job_cost.gpu_hours): formatted as gpu_h */
+	| "gpu_hours"
 	| "none";
 
 interface CurrencyOptions {
@@ -161,6 +163,7 @@ export function fmt(value: number | null | undefined, unit: Unit | string = "non
 			}).format(p);
 		}
 		case "gpu_h":
+		case "gpu_hours":
 			return t("unit.gpu_h", { n: num(value, sig(value)) });
 		case "steps":
 			return t("unit.steps", { n: compact(value) });

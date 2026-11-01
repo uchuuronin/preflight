@@ -5,6 +5,7 @@ the record and text checks. Nothing runs on Modal: the entrypoint runs on the ca
 (a GitHub Actions runner via remote-run.yml, with the key in its environment, never printed).
 
 	modal run --env main api/limits_check_app.py::check
+	modal run --env main api/limits_check_app.py::check --only 0,1,4,5,6 --cap-usd 0.03
 """
 
 from __future__ import annotations
@@ -39,7 +40,9 @@ MAX_CALLS = 10
 
 
 @app.local_entrypoint()
-def check() -> None:
+def check(only: str = "", cap_usd: float = 0.05) -> None:
+	"""only: comma-separated phrase indexes (e.g. "0,1,4,5,6"); cap_usd: stop before a call whose
+	worst case would take the total past it (Chiya's approvals name a cap: Nov 1 re-test, US$0.03)."""
 	sys.path.insert(0, str(ROOT / "api"))
 	from preflight_api.guide import muse_spark
 	from preflight_api.guide.limits_reader import INSTRUCTIONS, MAX_OUTPUT_TOKENS, _knob_list, _tool, checked
@@ -73,8 +76,28 @@ def check() -> None:
 			"tokens": [res.input_tokens, res.output_tokens],
 		}
 
+	from preflight_api.guide.limits_reader import WORST_INPUT_TOKENS
+
+	picked = [PHRASES[int(i)] for i in only.split(",") if i.strip()] if only else PHRASES
+
+	def worst(inputs: list[int]) -> float:
+		"""The most the next call can cost: the full output cap, and the reserved input until a call
+		has shown the real input size (then the largest seen, plus 10%)."""
+		tokens_in = int(max(inputs) * 1.1) if inputs else WORST_INPUT_TOKENS
+		return (tokens_in * muse_spark.PRICE_IN + MAX_OUTPUT_TOKENS * muse_spark.PRICE_OUT) / 1e6
+
 	async def run() -> list[dict]:
-		return [await one(t) for t in PHRASES[:MAX_CALLS]]
+		out: list[dict] = []
+		for t in picked[:MAX_CALLS]:
+			spent = sum(r.get("usd", 0) for r in out)
+			w = worst([r["tokens"][0] for r in out if "tokens" in r])
+			if spent + w > cap_usd:
+				out.append(
+					{"text": t, "skipped": f"a worst-case call (US${w:.4f}) would pass the US${cap_usd} cap"}
+				)
+				continue
+			out.append(await one(t))
+		return out
 
 	results = asyncio.run(run())
 	total = round(sum(r.get("usd", 0) for r in results), 4)

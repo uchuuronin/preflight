@@ -975,5 +975,6 @@
 	"rl.length.cap_moved": "You've set the cap to {now}; these lengths were measured at {was}.",
 	"frontier.point_on": "On the frontier.",
 	"frontier.point_off": "Another model is both cheaper and more often right.",
-	"cost.line.tokens_note_short": "The range also allows for tasks that could run away, so it can be wider than tokens times the rate."
+	"cost.line.tokens_note_short": "The range also allows for tasks that could run away, so it can be wider than tokens times the rate.",
+	"target.cost.gpu_hours": "GPU-hours"
 }
