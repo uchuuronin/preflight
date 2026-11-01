@@ -35,6 +35,13 @@ def suppress_all():
 # L4, then A10, then L40S); the last is waited for as long as it takes, and each probe is priced at
 # the list rate of the GPU that ran it
 SCHEDULE_WAIT_S = 120
+# the hard cap on the whole wait for a GPU, fallbacks included (Chiya, Nov 1): past it the probe is
+# an error saying no GPU could be scheduled, not a probe that eats the job's time
+WAIT_CAP_S = 20 * 60
+
+
+class NoGPU(RuntimeError):
+	pass
 
 
 class SandboxRunner:
@@ -43,11 +50,14 @@ class SandboxRunner:
 	price: list USD per hour by GPU name, to cost a probe at the GPU that ran it after a fallback."""
 
 	def __init__(self, create: Callable[[str], object], *, clock: Callable[[], float] = time.monotonic,
-		price: Callable[[str], float] | None = None, schedule_wait_s: float = SCHEDULE_WAIT_S):  # fmt: skip
+		price: Callable[[str], float] | None = None, schedule_wait_s: float = SCHEDULE_WAIT_S,
+		wait_cap_s: float = WAIT_CAP_S):  # fmt: skip
 		self._create = create
 		self._clock = clock
 		self._price = price
 		self._schedule_wait_s = schedule_wait_s
+		self._wait_cap_s = wait_cap_s
+		self.last_wait_s = 0.0  # the wait before the current sandbox started (0 when it was reused)
 		self._sb = None
 		self._gpu: str | None = None  # the GPU the sandbox has
 		self._asked: str | None = None  # the GPU the job asked for (a fallback keeps serving it)
@@ -88,20 +98,33 @@ class SandboxRunner:
 		self.close()
 		options = (gpu, *(g for g in fallback if g != gpu))
 		t = self._clock()
+		self.last_wait_s = 0.0
 		for i, g in enumerate(options):
 			# the probe image by its old one-argument call; another image (serving) by name
 			sb = self._create(g) if image == "probe" else self._create(g, image=image)
 			last = i == len(options) - 1
+			# the cap covers the whole job's waiting, earlier sandboxes' included
+			left = max(0.0, self._wait_cap_s - self.queued_s - (self._clock() - t))
 			# wait out the GPU queue before any clock starts: neither the probe's time limit nor its
 			# cost counts the minutes Modal spent finding a GPU (no container runs, nothing is billed)
-			if self._ready(sb, None if last else self._schedule_wait_s):
+			if self._ready(sb, left if last else min(self._schedule_wait_s, left)):
 				break
-			log.info("no %s scheduled in %.0f s; trying %s", g, self._schedule_wait_s, options[i + 1])
 			self.unscheduled.append(g)
 			with suppress_all():
 				sb.terminate()
+			if last or left <= 0:
+				waited = self._clock() - t
+				self.queued_s += waited
+				self.last_wait_s = waited
+				log.warning("no GPU of %s scheduled in %.0f s; giving up", ", ".join(options), waited)
+				raise NoGPU(f"no {' or '.join(options)} could be scheduled in {waited / 60:.0f} min")
+			log.info("no %s scheduled in %.0f s; trying %s", g, self._schedule_wait_s, options[i + 1])
 		self._sb, self._gpu, self._asked, self._image = sb, g, gpu, image
-		self.queued_s += self._clock() - t
+		waited = self._clock() - t
+		self.queued_s += waited
+		self.last_wait_s = waited
+		if waited > 1:
+			log.info("%s scheduled after %.0f s of waiting", g, waited)
 		self._started = self._clock()
 		return self._sb
 
@@ -127,8 +150,17 @@ class SandboxRunner:
 		try:
 			sb = self._sandbox(gpu, spec.image, tuple(spec.gpu_fallback))
 			ran = self._gpu or gpu  # read now: a failure or a cancel below closes the sandbox
+			wait, self.last_wait_s = self.last_wait_s, 0.0
 			t0 = self._clock()  # after the container is up: the queue for a GPU is neither time nor cost
 			proc = sb.exec(*ENTRY, timeout=int(spec.timeout_s + EXEC_SLACK_S))
+		except NoGPU as exc:
+			self.close()
+			self.last_ran = gpu
+			self.ran_on.append(gpu)
+			r = result_from_wire(spec, "")
+			r.probe = r.probe.model_copy(update={"error": str(exc), "error_code": "gpu.unavailable",
+				"extras": {**r.probe.extras, "gpu_wait_s": round(self.last_wait_s, 1)}})  # fmt: skip
+			return _timed(r, spec, 0.0)
 		except Exception:
 			log.warning("probe %s: no sandbox on %s", spec.probe_id, gpu, exc_info=True)
 			self.close()
@@ -168,7 +200,10 @@ class SandboxRunner:
 		self.ran_on.append(ran)
 		if ran != gpu and self._price is not None:
 			spec = replace(spec, gpu_usd_per_hour=self._price(ran))  # list price of the GPU that ran
-		return _timed(result_from_wire(spec, out or ""), spec, self._clock() - t0)
+		r = _timed(result_from_wire(spec, out or ""), spec, self._clock() - t0)
+		if wait > 0:  # logged on the probe that waited: how long the GPU took to schedule
+			r.probe = r.probe.model_copy(update={"extras": {**r.probe.extras, "gpu_wait_s": round(wait, 1)}})
+		return r
 
 
 def _timed(result: ProbeResult, spec: ProbeSpec, seconds: float) -> ProbeResult:

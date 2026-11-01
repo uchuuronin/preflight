@@ -33,7 +33,7 @@ SYSTEM = ("You triage the output of a short probe run of a machine-learning scri
 	"copied exactly. Never guess beyond the log; use 'unclear' when it doesn't say.")  # fmt: skip
 
 
-def triage_probe(client, probe, log_tail: str) -> tuple[Finding | None, list]:
+def triage_probe(client, probe, log_tail: str, node_id: str | None = None) -> tuple[Finding | None, list]:
 	"""(an info finding for a probe that didn't finish, or None; the model calls made)."""
 	tail = (log_tail or "")[-TAIL_CHARS:]
 	status = f"status {probe.status}" + (f", error code {probe.error_code}" if probe.error_code else "")
@@ -52,6 +52,6 @@ def triage_probe(client, probe, log_tail: str) -> tuple[Finding | None, list]:
 	detail = t.summary.strip()[:200] + (f' (log: "{line[:160]}")' if quoted else " (no log line quoted)")
 	return Finding(id=f"triage.{probe.id}", severity="info", code=f"triage.{t.category}",
 		title=f"Spark Open on probe {probe.id}: {t.category.replace('_', ' ')}", detail=detail,
-		node_id=None, source="spark_open_triage",
+		node_id=node_id, source="spark_open_triage",
 		# tied to its probe, so a follow-up that drops the probe (another GPU) drops this too
 		evidence=[Evidence(metric="triage", value=1.0, probe_id=probe.id)]), calls  # fmt: skip

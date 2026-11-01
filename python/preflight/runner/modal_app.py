@@ -126,6 +126,7 @@ FLAG_OVERRIDE = FLAGS_SRC.parent / f"flags.{FLAG_ENV}.json"
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
+	.pip_install("matplotlib==3.9.2")  # harness/diagnosis.py renders the plots Muse Spark reads (item 31)
 	.env({"PREFLIGHT_ENV": FLAG_ENV})
 	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
@@ -133,6 +134,16 @@ worker_image = (
 )
 if FLAG_OVERRIDE.is_file():
 	worker_image = worker_image.add_local_file(FLAG_OVERRIDE, f"{REMOTE_PKG}/flags.{FLAG_ENV}.json")
+# a C compiler in the sandbox images: Triton builds its launcher and inductor's CPU backend builds its
+# kernels with one at run time, so a visitor's torch.compile needs it; a layer after the packages
+COMPILER_PACKAGES = ("gcc", "g++")
+# the probe uid's /etc/passwd entry (probes/local.py PROBE_USER), for code that calls pwd.getpwuid
+# directly; getpass.getuser() reads the USER the probe sets. A layer after the packages, so they stay cached
+PROBE_USER_CMD = (  # the group too: the probe runs as gid 61000 (probes/local.py, group=uid)
+	"groupadd --gid 61000 preflight-probe && useradd --uid 61000 --gid 61000 --no-create-home"
+	" --home-dir /tmp --shell /usr/sbin/nologin preflight-probe"
+)
+
 probe_image = (
 	_base.apt_install("git")
 	.pip_install(*PROBE_PACKAGES)
@@ -145,6 +156,8 @@ probe_image = (
 			"PREFLIGHT_PROBE_UID": "61000",
 		}
 	)
+	.apt_install(*COMPILER_PACKAGES)
+	.run_commands(PROBE_USER_CMD)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 
@@ -157,6 +170,9 @@ SERVING_PACKAGES = [
 	"transformers==4.46.3",
 	"numpy<2",
 	"datasets==3.1.0",
+	# datasets 3.1 takes any pyarrow 15 or later, and the newest needs numpy 2; 17.0 runs on numpy 1
+	# (the serving smoke failed on it, Nov 1)
+	"pyarrow==17.0.0",
 	"psutil==6.1.0",
 	# what the recorder imports in the sandbox, pinned as in the probe image
 	"nvidia-ml-py==12.560.30",
@@ -174,6 +190,8 @@ serving_image = (
 			"PREFLIGHT_PROBE_UID": "61000",
 		}
 	)
+	.apt_install(*COMPILER_PACKAGES)
+	.run_commands(PROBE_USER_CMD)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image}
@@ -199,6 +217,8 @@ TITAN_PACKAGES = [
 titan_image = (
 	_base.pip_install(*TITAN_PACKAGES)
 	.env({"HF_HOME": HF_HOME, "PREFLIGHT_SANDBOX_DIR": "/tmp", "PREFLIGHT_PROBE_UID": "61000"})
+	.apt_install(*COMPILER_PACKAGES)
+	.run_commands(PROBE_USER_CMD)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
 
@@ -485,7 +505,7 @@ def run_worker() -> int:
 	from preflight.runner.pipeline import JOB_PROBE_WALL_S, Deps, run_job
 	from preflight.runner.records import LocalRecordWriter
 	from preflight.runner.remote_store import DirBlobs, RemoteJobStore
-	from preflight.runner.sandbox_runner import SandboxRunner
+	from preflight.runner.sandbox_runner import WAIT_CAP_S, SandboxRunner
 	from preflight.runner.worker import run_one
 
 	svc = JobStoreService()
@@ -499,7 +519,8 @@ def run_worker() -> int:
 	while True:
 		# never lease a job this container can't finish before its own timeout: a killed worker
 		# leaves the job to the reaper and a retry, and its sandbox billing until idle_timeout
-		if time.monotonic() - started > WORKER_TIMEOUT_S - (JOB_PROBE_WALL_S + 15 * 60):
+		# a job's worst case: its GPU wait (capped), its probe wall, and the rest of the job
+		if time.monotonic() - started > WORKER_TIMEOUT_S - (WAIT_CAP_S + JOB_PROBE_WALL_S + 15 * 60):
 			return ran
 		from preflight.probes.gpu_choice import usd_per_hour
 

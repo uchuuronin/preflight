@@ -149,6 +149,7 @@ def test_extras_carry_the_counts_b_reads_by_name(loop_result):
 		== x["dataset_mean_tokens"]
 	)
 	assert 0 < x["dataset_rows_scanned"] <= 100_000 == x["dataset_rows_total"]
+	assert x["train_dataset_len"] == 100_000  # the training loader's dataset, for the run's length (D, Nov 1)
 	assert x["samples_per_step"] == 4
 	assert x["micro_steps_per_step"] == 1
 
@@ -425,3 +426,21 @@ def test_a_ground_truth_probe_becomes_a_record_with_its_measured_zero_spread():
 	ex = rec.probes[0].extras
 	share = ex["rl_zero_spread_groups"] / ex["rl_groups"]
 	assert bool(z) == (share > 0.5) and (not z or "95% interval" in z[0].detail)
+
+
+def test_a_serving_probe_keeps_the_first_prompts_whole_and_the_rest_of_the_call_as_is():
+	# the serving smoke timed out on a 1,024 x 4,096-token burst (Nov 1): a probe measures a sample
+	from preflight.recorder.runtime import _sample_prompts
+
+	params = object()
+	args, kw = _sample_prompts((["a", "b", "c", "d"], params), {}, 2)
+	assert args == (["a", "b"], params) and kw == {}
+	args, kw = _sample_prompts((), {"prompts": list("abcd"), "sampling_params": [1, 2, 3, 4]}, 3)
+	assert kw == {"prompts": ["a", "b", "c"], "sampling_params": [1, 2, 3]}
+	args, kw = _sample_prompts((["a"],), {}, 32)
+	assert args == (["a"],)  # fewer than the sample: untouched
+	ids = list(range(100))  # one prompt as token ids (review, Nov 1): never cut
+	args, kw = _sample_prompts((), {"prompt_token_ids": ids, "sampling_params": params}, 32)
+	assert kw["prompt_token_ids"] == ids
+	args, kw = _sample_prompts((list("abcd"),), {"lora_request": [1, 2, 3, 4], "priority": [0, 0, 1, 1]}, 2)
+	assert args == (["a", "b"],) and kw == {"lora_request": [1, 2], "priority": [0, 0]}

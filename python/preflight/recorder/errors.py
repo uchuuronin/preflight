@@ -50,6 +50,13 @@ def classify(exc: BaseException, *, steps: int, in_eval: bool) -> Classified:
 		m = re.search(r"requires `?([A-Za-z0-9_.\-\[\]]+?)`?(?:[<>=!~][^\s`:]*)?`?[\s:,]", msg)
 		if m or _has(msg, "pip install"):
 			pkg = m.group(1) if m else "a package"
+			# installed, at the wrong version ("pyarrow requires NumPy 2.0 or newer, found 1.26.4")
+			v = re.search(
+				r"requires \S+ ([0-9]+(?:\.[0-9a-z]+)*) or newer, found ([0-9]+(?:\.[0-9a-z]+)*)", msg
+			)
+			if v:
+				return Classified("missing_package", "error", f"A library in the script needs {pkg} "
+					f"{v.group(1)} or newer; the probe image has {v.group(2)}", False)  # fmt: skip
 			return Classified(
 				"missing_package",
 				"error",

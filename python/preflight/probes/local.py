@@ -115,6 +115,7 @@ EXTRAS_KEYS = (
 	"train_loader_batches",
 	"epochs",
 	"planned_steps",
+	"train_dataset_len",  # rows the training loader draws per epoch (examples, pairs, images, input nodes)
 	# the training set's row lengths in tokens, as the script tokenised them (B, Oct 30), over
 	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
 	"dataset_max_tokens",
@@ -199,6 +200,9 @@ class ProbeSpec:
 	gpu_usd_per_hour: float = 0.0
 	nproc: int = 1  # processes on this node, one per GPU, under torchrun (DDP, FSDP)
 	image: str = "probe"  # which sandbox image runs it: "probe", or "serving" (vLLM, its own torch)
+	# a serving probe: the prompts one vLLM generate call keeps (0: all of them), and the probe ends
+	# once that call is measured; a load test's whole burst would outrun the probe's time limit
+	generate_sample: int = 0
 
 
 @dataclass
@@ -347,6 +351,13 @@ def _kill_descendants(root: int, keep: set[int]) -> None:
 				)  # only our own (reparented) children; others raise and are skipped
 
 
+def uid_can_run_this_python() -> bool:
+	"""Whether a fresh unprivileged uid can run this interpreter with its packages. Not when it sits
+	somewhere that uid can't enter (a venv in a Docker image's /root, a 0700 home): the uid would
+	run the base Python without the venv's torch, so probes there run as the invoking user."""
+	return _others_can_reach(Path(sys.executable).parent)
+
+
 def _probe_uid() -> int | None:
 	"""A fresh unprivileged uid per probe when running as root. PREFLIGHT_PROBE_UID pins one uid for
 	every probe in this process: in a per-job sandbox the sandbox is the isolation boundary, and
@@ -356,7 +367,81 @@ def _probe_uid() -> int | None:
 	pinned = os.environ.get("PREFLIGHT_PROBE_UID")
 	if pinned and pinned.isdigit() and int(pinned) >= 1000:
 		return int(pinned)
+	if not uid_can_run_this_python():
+		log.warning(
+			"running probes as this user: a fresh uid can't reach %s and its packages", sys.executable
+		)
+		return None
 	return 61_000 + (os.getpid() * 7 + next(_UIDS)) % 4_000
+
+
+PROBE_USER = "preflight-probe"  # the images' /etc/passwd name for PREFLIGHT_PROBE_UID (runner/modal_app.py)
+
+
+def _probe_user_env(uid: int | None) -> dict[str, str]:
+	"""A name for the probe's uid: getpass.getuser() (torch.compile's cache, torchtitan, many loggers)
+	reads USER/LOGNAME before /etc/passwd, where a fresh uid has no entry, and raised KeyError
+	without them (torchtitan on an A10, Nov 1)."""
+	return {} if uid is None else {"USER": PROBE_USER, "LOGNAME": PROBE_USER}
+
+
+def _launch_as(uid: int | None, home: Path) -> tuple[str, dict[str, str], dict]:
+	"""How a probe starts: the interpreter, the scrubbed env (with the uid's user name) and the
+	Popen uid and groups. One place, so the startup check launches exactly as a probe does."""
+	pkg_root = str(Path(__file__).resolve().parents[2])
+	python = sys.executable
+	if uid is not None:
+		pkg_root = str(_package_for_probe(Path(pkg_root)))
+		python = _python_for_probe()
+	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", ""),
+		**_probe_user_env(uid)})  # fmt: skip
+	popen_kw = {"user": uid, "group": uid, "extra_groups": _extra_groups()} if uid is not None else {}
+	return python, env, popen_kw
+
+
+# what the startup check runs as the probe uid in each image (Chiya, Nov 1): the user and group
+# lookups visitor code makes, and the imports that read them, so an image bug costs cents on a CPU
+PROBE_USER_SCRIPT = """
+import getpass, grp, json, os, pwd, sys
+out = {"uid": os.getuid(), "gid": os.getgid(), "user": getpass.getuser(),
+	"passwd": pwd.getpwuid(os.getuid()).pw_name, "group": grp.getgrgid(os.getgid()).gr_name}
+for mod in sys.argv[1:]:
+	if mod == "+compile":  # a tiny torch.compile on the CPU: inductor's C++ build and its cache dir
+		import torch
+
+		f = torch.compile(lambda x: (x * 2).sin().sum())
+		out["compiled"] = float(f(torch.ones(8)))
+		continue
+	__import__(mod)
+	out.setdefault("imported", []).append(mod)
+print("PROBE_USER " + json.dumps(out))
+"""
+
+
+def probe_user_check(imports: tuple[str, ...] = ("+compile",), timeout_s: int = 420) -> dict:
+	"""Run PROBE_USER_SCRIPT as a probe would run (same uid, env and interpreter) and report what it
+	saw: {"exit", "uid", "user", "passwd", "group", "imported", "compiled"}, or the stderr tail on
+	failure. "+compile" in imports runs a tiny torch.compile instead of an import."""
+	uid = _probe_uid()
+	box = Path(tempfile.mkdtemp(prefix="preflight-usercheck-"))
+	home = box / "home"
+	(home / "tmp").mkdir(parents=True)
+	try:
+		if uid is not None:
+			os.chmod(box, 0o711)
+			_chown_tree(home, uid)
+		python, env, popen_kw = _launch_as(uid, home)
+		p = subprocess.run([python, "-c", PROBE_USER_SCRIPT, *imports], cwd=home, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+			text=True, timeout=timeout_s, **popen_kw)  # fmt: skip
+		out: dict = {"exit": p.returncode, "probe_uid": uid}
+		line = next((ln for ln in p.stdout.splitlines() if ln.startswith("PROBE_USER ")), None)
+		if p.returncode == 0 and line:
+			out.update(json.loads(line.removeprefix("PROBE_USER ")))
+		else:
+			out["stderr"] = p.stderr[-1500:]
+		return out
+	finally:
+		shutil.rmtree(box, ignore_errors=True)
 
 
 def _extra_groups() -> list[int]:
@@ -729,6 +814,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"seed": spec.seed,
 				"seed_force": spec.seed_force,
 				"alternate_sync": spec.alternate_sync,
+				"generate_sample": spec.generate_sample,
 				"install_requirements": spec.install_requirements,
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,
@@ -743,13 +829,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	_no_dumps()
 	subreaper = _become_subreaper()
 	before = _child_pids(os.getpid()) if subreaper else set()
-	pkg_root = str(Path(__file__).resolve().parents[2])
-	python = sys.executable
-	if uid is not None:
-		pkg_root = str(_package_for_probe(Path(pkg_root)))
-		python = _python_for_probe()
-	env = scrubbed_env(home, {"PYTHONPATH": pkg_root + os.pathsep + os.environ.get("PYTHONPATH", "")})
-	popen_kw = {"user": uid, "group": uid, "extra_groups": _extra_groups()} if uid is not None else {}
+	python, env, popen_kw = _launch_as(uid, home)
 
 	started = datetime.now(UTC).replace(microsecond=0)
 	t0 = time.monotonic()
