@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from preflight.schema import Evidence, Finding
 
 TAIL_CHARS = 3000  # the end of the log: where a traceback or the last progress line is
+ERROR_CHARS = 1500  # the recorded error: the classifier's line and the exception's own text
 Category = Literal["ok", "oom", "missing_package", "data_error", "nan_or_divergence", "timeout", "script_error",
 	"infrastructure", "unclear"]  # fmt: skip
 
@@ -35,7 +36,11 @@ SYSTEM = ("You triage the output of a short probe run of a machine-learning scri
 
 def triage_probe(client, probe, log_tail: str, node_id: str | None = None) -> tuple[Finding | None, list]:
 	"""(an info finding for a probe that didn't finish, or None; the model calls made)."""
+	# the recorder catches what ended the probe (an OOM in eval, say), so its traceback is in the
+	# probe's recorded error, not the stdout tail (Nov 1 production run): both go in, both can be quoted
 	tail = (log_tail or "")[-TAIL_CHARS:]
+	if probe.error:
+		tail += "\n[the probe's recorded error]\n" + probe.error[:ERROR_CHARS]
 	status = f"status {probe.status}" + (f", error code {probe.error_code}" if probe.error_code else "")
 	msgs = [{"role": "system", "content": SYSTEM},
 		{"role": "user", "content": f"Probe {probe.id}: {status}, {probe.steps} optimizer steps.\nLog tail:\n{tail}"}]  # fmt: skip

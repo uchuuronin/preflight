@@ -183,3 +183,31 @@ def test_an_unpriced_check_model_is_never_called_under_a_cap(rec):
 	so.prices = {}
 	(f,), calls = check_diagnosis(so, rec, [claim()], budget_usd=0.5)
 	assert seen == [] and calls == [] and f.code == "diagnosis.abstain" and "no price" in f.detail
+
+
+def test_triage_reads_and_can_quote_the_probes_recorded_error_not_just_stdout():
+	# Nov 1 production run: the eval OOM was caught by the recorder, so stdout had no traceback
+	from preflight.harness.triage import triage_probe
+	from preflight.schema import Probe
+
+	oom = "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB."
+	probe = Probe.model_construct(id="p1-eval", status="oom", error_code="oom.eval", steps=3, error=oom)
+	seen = []
+
+	def handler(request):
+		seen.append(json.loads(request.content))
+		ans = {"category": "oom", "summary": "the eval pass ran out of GPU memory",
+			"evidence_line": "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB."}  # fmt: skip
+		return httpx.Response(200, json={"id": "t1", "choices": [{"message": {"content": json.dumps(ans)}}],
+			"usage": {"prompt_tokens": 300, "completion_tokens": 50}})  # fmt: skip
+
+	client = ModelClient(api_key="k", model="meta-models/muse-spark-open-1026", provider="baseten",
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	f, _calls = triage_probe(client, probe, "{'loss': 1.5, 'epoch': 0.0003}\n", node_id="eval")
+	assert "CUDA out of memory" in seen[0]["messages"][1]["content"]
+	assert (
+		f.code == "triage.oom"
+		and f.node_id == "eval"
+		and "CUDA out of memory" in f.detail
+		and "no log line quoted" not in f.detail
+	)
