@@ -14,6 +14,7 @@ becomes "abstain, or run a probe". Every call, tool rounds included, is returned
 """
 
 import json
+import math
 import re
 import time
 
@@ -126,7 +127,9 @@ def check_claim(
 				return "abstain", None, "the check ran out of time", client.calls[before:]
 			if room is not None:
 				w = _worst_call_usd(client, msgs)
-				if w == float("inf"):  # an unpriced model has no bound: never called under a cap
+				if not math.isfinite(
+					w
+				):  # an unpriced (or NaN-priced) model has no bound: never called under a cap
 					return (
 						"abstain",
 						None,
