@@ -1,0 +1,53 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-hWww3gUdTgVBwsc1zAjMRd
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[L4] wave 0: $0.16 of $1.00 spent (container time, worst case for unsettled waves), 1 done, 799 to do, deadline 180 s, next wave 2 x 6
+[L4] wave 0 took 255 s on 2 containers: 569 container-s ($0.14, worst case was $0.75) for 12 configs
+[L4] batch: 136.9 s in the container, reload 0.1 s, commits 2.4 s
+[L4] config 5e8aae117666 gpt-small  ok: 21.0 s
+[L4] config 6ad1f47c4453 gpt-small  ok: 24.9 s
+[L4] config 0686d68f0613 gpt-small  ok: 20.8 s
+[L4] config 3f9f1d8200b9 gpt-small  ok: 21.1 s
+[L4] config 4008fc254b22 gpt-small  ok: 21.0 s
+[L4] config 5dbbaa1b1650 gpt-small  ok: 25.4 s
+[L4] batch: 131.9 s in the container, reload 0.1 s, commits 3.2 s
+[L4] config b8c4dde1b7b8 gpt-small  ok: 20.0 s
+[L4] config 1b9574818838 gpt-small  ok: 19.3 s
+[L4] config cf4ff587f203 gpt-small  ok: 20.0 s
+[L4] config 17aa2ee98f3c gpt-small  ok: 20.3 s
+[L4] config c703fe3153d1 gpt-small  ok: 24.8 s
+[L4] config d7f56b027167 gpt-small  ok: 24.0 s
+[L4] wave 1: $0.30 of $1.00 spent (container time, worst case for unsettled waves), 13 done, 787 to do, deadline 120 s, next wave 2 x 6
+[L4] wave 1 took 356 s on 2 containers: 771 container-s ($0.19, worst case was $0.57) for 12 configs
+[L4] batch: 133.6 s in the container, reload 0.0 s, commits 1.4 s
+[L4] config 60ecc09312bb gpt-small  ok: 20.2 s
+[L4] config 835efed544a7 gpt-small  ok: 24.8 s
+[L4] config bec29dea3987 gpt-small  ok: 20.5 s
+[L4] config 8dcff3fddead gpt-small  ok: 20.0 s
+[L4] config 7fa6ef367895 gpt-small  ok: 22.3 s
+[L4] config 0ad96d105411 gpt-small  ok: 24.2 s
+[L4] batch: 134.0 s in the container, reload 0.3 s, commits 1.7 s
+[L4] config d4eb7732aa55 gpt-small  ok: 24.3 s
+[L4] config b1e1d2eaca2e gpt-small  ok: 23.9 s
+[L4] config 35dc53538892 gpt-small  ok: 24.9 s
+[L4] config de5810e44b39 gpt-small  ok: 20.4 s
+[L4] config 49f1772f7020 gpt-small  ok: 16.2 s
+[L4] config 59effb885027 gpt-small  ok: 22.1 s
+[L4] wave 2: $0.49 of $1.00 spent (container time, worst case for unsettled waves), 25 done, 775 to do, deadline 120 s, next wave 2 x 4
+[L4] wave 2 took 632 s on 2 containers: 1324 container-s ($0.32, worst case was $0.43) for 0 configs
+[L4] batch: 0.1 s in the container, reload 0.1 s, commits 0.0 s
+[L4] batch: 0.1 s in the container, reload 0.1 s, commits 0.0 s
+[L4] wave 3: $0.81 of $1.00 spent (container time, worst case for unsettled waves), 25 done, 775 to do, deadline 120 s, next wave 0 x 0
+[L4] the next wave's worst case doesn't fit the money or the 4 minutes left; stopping, a rerun resumes
+[L4] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-hWww3gUdTgVBwsc1zAjMRd
