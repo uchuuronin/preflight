@@ -11,6 +11,7 @@ may only ask; the call waits for the visitor's click and then runs here (executo
 from __future__ import annotations
 
 from .record_view import RecordView
+from .types import Limits
 
 BROWSER_TOOLS = frozenset({"predict", "sensitivity", "set_knob", "highlight", "pin"})
 SERVER_TOOLS = frozenset({"run_probe", "propose_patch", "run_verify", "sample_more"})
@@ -35,9 +36,28 @@ def _fn(name: str, description: str, properties: dict, required: list[str]) -> d
 	}
 
 
-def build_tools(rec: RecordView, pinned: set[str], *, move_pending: bool) -> list[dict]:
+def _left(rec: RecordView, kid: str, limits: Limits) -> bool:
+	"""A knob still has a value to move to inside the limits (a categorical one is checked value by
+	value; a numeric one has a range, so it stays unless its allowed list leaves only where it is)."""
+	if kid in limits.frozen:
+		return False
+	k = rec.knobs[kid]
+	allow = limits.allowed.get(kid)
+	if allow is not None:
+		return any(v != k.current and limits.allows(kid, v) for v in allow)
+	if k.kind in ("categorical", "bool"):
+		values = k.values if k.kind == "categorical" else (True, False)
+		return any(v != k.current and limits.allows(kid, v) for v in values)
+	return True
+
+
+def build_tools(
+	rec: RecordView, pinned: set[str], *, move_pending: bool, limits: Limits | None = None
+) -> list[dict]:
+	limits = limits or Limits()
 	knob_ids = sorted(rec.knobs)
-	movable = [k for k in knob_ids if k not in pinned]
+	# Pinned knobs, and knobs the visitor's limits leave nowhere to go, aren't offered to set_knob.
+	movable = [k for k in knob_ids if k not in pinned and k not in limits.declined and _left(rec, k, limits)]
 	code_knobs = sorted(k for k, v in rec.knobs.items() if v.needs_code and v.patch_template)
 	nodes = sorted(rec.nodes)
 	tools = [
@@ -123,8 +143,9 @@ def build_tools(rec: RecordView, pinned: set[str], *, move_pending: bool) -> lis
 			_fn(
 				"set_knob",
 				"Move one unpinned knob on the live map; the person applies, reverts or pins it. Only to a "
-				"setting that fits: a move into tight or fails is refused. One move per round: after it, "
-				"explain in one or two sentences and stop.",
+				"setting that fits and stays inside the person's limits (the setting lists them: allowed "
+				"values, excluded values, budget, deadline, GPU-hours); anything else is refused. One move "
+				"per round: after it, explain in one or two sentences and stop.",
 				{
 					"knob_id": {"type": "string", "enum": movable},
 					"value": _VALUE,

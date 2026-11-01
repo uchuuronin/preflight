@@ -258,3 +258,28 @@ def test_rl_cards_say_they_arent_checked_on_a_full_run_yet(rl_on):
 	assert "not yet checked against a full RL run" in cards[rl.MODEL_ID_ZERO].notes
 	assert "not yet checked against a full RL run" in cards[rl.MODEL_ID_ROLLOUT].notes
 	FlightRecord.model_validate(out.model_dump())
+
+
+def test_too_few_prompts_abstain(rl_on):
+	# Nov 1, GRPO zoo runs 2 and 3: from 3 prompts the band missed 17 new ones; from 8 it covered 9
+	rec = _rl_record()
+	few = rec.model_copy(
+		update={
+			"probes": [
+				p.model_copy(
+					update={"rl": p.rl.model_copy(update={"pass_rate_per_prompt": [0.0, 0.375, 0.125]})}
+				)
+				for p in rec.probes
+			]
+		}
+	)
+	e = api.predict(few, {"group_size": 8}).root["rl.zero_spread"]
+	assert e.status == "abstain" and "only 3 prompts" in e.reason
+	assert api.predict(rec, {"group_size": 8}).root["rl.zero_spread"].status != "abstain"
+
+
+def test_rollout_band_covers_the_gap_between_two_grpo_runs():
+	# fitted on A's GRPO zoo runs 2 and 3 (Nov 1): run 3's time per call from run 2's lengths and time
+	s2 = rl.LengthSample(mean=131.97, p95=440.0, max=512.0, n=32)
+	iv = rl.rollout_seconds(60.28 / 4, s2, 8, 512, 8, 512)
+	assert iv.lo <= 257.92 / 20 <= iv.hi

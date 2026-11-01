@@ -376,3 +376,112 @@ def test_tasks_told_apart_only_by_their_system_prompt_can_be_topped_up(proxy):
 	url2 = px.open_run("s2", max_tasks=3, skip_keys=[task_key(t) for t in first])
 	codes = [_post(url2, body(i))[0] for i in range(6)]
 	assert codes == [429, 429, 429, 200, 200, 200] and len(px.run_tasks("s2")) == 3
+
+
+def test_a_task_stuck_in_its_tools_stalls_the_run_once_the_others_stop(proxy, tmp_path):
+	"""D's plant 3: one worker's tool retries forever after the model asked for it; the other
+	worker keeps calling, then stops. The run is stopped as stalled at the cutoff (2 s here)."""
+	prov, px = proxy
+	prov.delay_s = 0.3  # the two workers' calls overlap, as a real model's do
+	script = tmp_path / "two.py"
+	script.write_text(
+		"import json, os, threading, time, urllib.request\n"
+		"base = os.environ['META_API_BASE']\n"
+		"def call(body):\n"
+		"    r = urllib.request.Request(base + '/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})\n"
+		"    return urllib.request.urlopen(r).read()\n"
+		"def stuck():\n"
+		"    call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': 'stuck'}]})\n"
+		"    while True: time.sleep(1)\n"
+		"def busy():\n"
+		"    time.sleep(0.15)  # starts while the stuck call is still out, so both count as workers\n"
+		"    for i in range(12):\n"
+		"        call({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': f'busy {i}'}]}); time.sleep(0.5)\n"
+		"    while True: time.sleep(1)\n"
+		"threading.Thread(target=stuck, daemon=True).start(); threading.Thread(target=busy, daemon=True).start()\n"
+		"while True: time.sleep(1)\n"
+	)
+	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=20,
+		env=dict(os.environ), stall_s=2.0)  # fmt: skip
+	assert "no model calls" in out.selection and "may be stuck" in out.selection
+	assert not any(t.stop_reason == "loop" for t in out.tasks)  # which task is stuck can't be told
+
+
+def test_one_stuck_worker_of_four_stalls_the_run_and_its_task_is_cut(tmp_path):
+	"""Review, Oct 31: four workers whose tasks end on a tool call; one gets stuck in its tool, the
+	others go on until the sample is full and their next tasks are refused. The run stops as
+	stalled; the stuck task is among those counted as cut (which one is stuck can't be told)."""
+	prov = Provider()  # its streamed answers end asking for a tool
+	prov.delay_s = 0.3  # calls that overlap, as a real model's do, so the workers show as workers
+	px = AgentProxy(prov.url, "our-key", rate=token_rate)
+	px.start()
+	script = tmp_path / "four.py"
+	script.write_text(
+		"import json, os, threading, time, urllib.error, urllib.request\n"
+		"base = os.environ['META_API_BASE']\n"
+		"def call(body):\n"
+		"    r = urllib.request.Request(base + '/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})\n"
+		"    return urllib.request.urlopen(r).read()\n"
+		"def worker(w):\n"
+		"    for i in range(10):\n"
+		"        try:\n"
+		"            call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': f'w{w} t{i}'}]})\n"
+		"        except urllib.error.HTTPError:\n"
+		"            continue\n"
+		"        if w == 0:\n"
+		"            while True: time.sleep(1)  # its tool never returns\n"
+		"        time.sleep(0.2)\n"
+		"ts = [threading.Thread(target=worker, args=(w,), daemon=True) for w in range(4)]\n"
+		"[t.start() for t in ts]\n"
+		"while True: time.sleep(1)\n"
+	)
+	try:
+		out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=8,
+			env=dict(os.environ), stall_s=1.5)  # fmt: skip
+	finally:
+		px.stop()
+		prov.server.shutdown()
+	assert len(out.tasks) == 8 and "no model calls" in out.selection and "may be stuck" in out.selection
+
+
+def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):
+	"""Review, Oct 31: a task that waited past the cutoff on its tool and then finished came out as
+	a loop. Only the tasks still open when a stalled run is stopped are."""
+	_, px = proxy
+	script = tmp_path / "slow.py"
+	script.write_text(
+		"import json, os, time, urllib.request\n"
+		"base = os.environ['META_API_BASE']\n"
+		"def call(body):\n"
+		"    r = urllib.request.Request(base + '/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})\n"
+		"    return urllib.request.urlopen(r).read()\n"
+		"call({'model': 'muse-spark-1.3', 'stream': True, 'messages': [{'role': 'user', 'content': 'slow'}]})\n"
+		"time.sleep(3)  # a slow tool, then the task's next turn (the run-wide cutoff is 5 s)\n"
+		"call({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': 'slow'}, {'role': 'tool', 'content': 'ok'}]})\n"
+	)
+	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=5,
+		env=dict(os.environ), stall_s=5.0)  # fmt: skip
+	assert [t.stop_reason for t in out.tasks] == ["done"] and out.tasks[0].turns == 2
+	assert out.tasks[0].latency_s >= 3.0  # B: the task's own wall, its tool time between turns included
+
+
+def test_a_task_stopped_by_a_run_wide_cancel_is_cut_not_timed_out(proxy, tmp_path):
+	"""B, Oct 31: a healthy task in flight at a cancel is no runaway."""
+	import time
+
+	from preflight.recorder.agent import CUT
+
+	prov, px = proxy
+	prov.delay_s = 5.0
+	script = tmp_path / "one.py"
+	script.write_text(
+		"import json, os, urllib.request\n"
+		"b = json.dumps({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': 'x'}]}).encode()\n"
+		"urllib.request.urlopen(urllib.request.Request(os.environ['META_API_BASE'] + '/chat/completions', b,"
+		" {'Content-Type': 'application/json'})).read()\n"
+	)
+	t0 = time.monotonic()
+	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=3,
+		env=dict(os.environ), should_stop=lambda: time.monotonic() - t0 > 1.5)  # fmt: skip
+	assert len(out.tasks) == 1 and out.tasks[0].stop_reason == CUT and out.tasks[0].stop_reason != "timeout"
+	assert out.tasks[0].latency_s >= 1.0

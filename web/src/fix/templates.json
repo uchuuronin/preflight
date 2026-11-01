@@ -1,0 +1,171 @@
+{
+	"$source": "api/preflight_api/fix/templates.py; api/tests/test_patches.py checks this copy matches",
+	"usd_per_candidate": 0.13,
+	"templates": [
+		{
+			"id": "eval.wrap_no_grad",
+			"title": "Run evaluation without gradients",
+			"lenses": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"vision",
+				"retrieval",
+				"gnn"
+			],
+			"knob": "eval_no_grad",
+			"metric": "memory.peak",
+			"needs_value": false,
+			"verifiable": true
+		},
+		{
+			"id": "eval.reduce_batch",
+			"title": "Smaller evaluation batch",
+			"lenses": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"vision",
+				"retrieval",
+				"gnn"
+			],
+			"knob": "eval_batch_size",
+			"metric": "memory.peak",
+			"needs_value": true,
+			"verifiable": true
+		},
+		{
+			"id": "data.enable_packing",
+			"title": "Pack short examples together",
+			"lenses": [
+				"finetune",
+				"pretrain"
+			],
+			"knob": "packing",
+			"metric": "time.step",
+			"needs_value": false,
+			"verifiable": true
+		},
+		{
+			"id": "data.num_workers",
+			"title": "Load data in parallel",
+			"lenses": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"vision",
+				"retrieval",
+				"gnn"
+			],
+			"knob": "num_workers",
+			"metric": "time.step",
+			"needs_value": true,
+			"verifiable": true
+		},
+		{
+			"id": "memory.gradient_checkpointing",
+			"title": "Recompute activations instead of storing them",
+			"lenses": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"vision",
+				"retrieval",
+				"gnn"
+			],
+			"knob": "gradient_checkpointing",
+			"metric": "memory.peak",
+			"needs_value": false,
+			"verifiable": true
+		},
+		{
+			"id": "model.quantize_weights",
+			"title": "Load the base weights quantised",
+			"lenses": [
+				"finetune",
+				"eval",
+				"serving"
+			],
+			"knob": "quantization",
+			"metric": "memory.peak",
+			"needs_value": true,
+			"verifiable": true
+		},
+		{
+			"id": "model.attn_implementation",
+			"title": "Faster attention kernel",
+			"lenses": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"eval"
+			],
+			"knob": "attn",
+			"metric": "time.step",
+			"needs_value": true,
+			"verifiable": true
+		},
+		{
+			"id": "precision.bf16_autocast",
+			"title": "Train in bfloat16 with autocast",
+			"lenses": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"vision",
+				"retrieval",
+				"gnn"
+			],
+			"knob": "precision",
+			"metric": "time.step",
+			"needs_value": false,
+			"verifiable": true
+		},
+		{
+			"id": "ckpt.interval",
+			"title": "Checkpoint often enough to survive a preemption",
+			"lenses": [
+				"pretrain",
+				"finetune",
+				"rl"
+			],
+			"knob": "checkpoint_every",
+			"metric": "risk.preemption_loss",
+			"needs_value": true,
+			"verifiable": true
+		},
+		{
+			"id": "vision.channels_last",
+			"title": "Channels-last memory format",
+			"lenses": [
+				"vision"
+			],
+			"knob": "channels_last",
+			"metric": "time.step",
+			"needs_value": false,
+			"verifiable": true
+		},
+		{
+			"id": "agent.enable_prompt_caching",
+			"title": "Cache the repeated prompt prefix",
+			"lenses": [
+				"agent"
+			],
+			"knob": "prompt_caching",
+			"metric": "cost.total",
+			"needs_value": false,
+			"verifiable": false
+		},
+		{
+			"id": "agent.cap_tool_retries",
+			"title": "Cap a tool's retries",
+			"lenses": [
+				"agent"
+			],
+			"knob": "tool_retry_cap",
+			"metric": "cost.total",
+			"needs_value": true,
+			"verifiable": false
+		}
+	]
+}

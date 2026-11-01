@@ -156,6 +156,9 @@ class Deps:
 	records: RecordWriter
 	runner: ProbeRunner = local_runner
 	spark: object | None = None  # harness.spark.ModelClient
+	triage: object | None = (
+		None  # Spark Open on Baseten (harness/triage.py), with harness.spark_open_triage on
+	)
 	cache: ProbeCache | None = None
 	image: str = "local"  # probe image tag, part of the cache key
 	budget: Callable[[], Budget] = Budget
@@ -228,6 +231,19 @@ def _skipped(p: PlannedProbe, why: str) -> Probe:
 	)
 
 
+# guess: a generation-bound probe (an eval's or a GRPO step's long completions, a serving batch)
+# passes few of its own boundaries per minute; the Nov 1 eval sweep probe ran out at 360 s
+GENERATION_LENSES = ("eval", "rl", "serving")
+GENERATION_PROBE_TIMEOUT_S = 10 * 60
+
+
+def _probe_timeout(sm: ScriptMap, base: float) -> float:
+	"""The probe's time limit: longer for generation-bound lenses, within the job's probe wall."""
+	if sm.lens in GENERATION_LENSES:
+		return max(base, min(GENERATION_PROBE_TIMEOUT_S, JOB_PROBE_WALL_S - 60))
+	return base
+
+
 _VLLM_IMPORT = re.compile(r"^\s*(?:from\s+vllm\b|import\s+vllm\b)", re.M)
 
 
@@ -260,7 +276,7 @@ def _spec(
 		timed=p.timed,
 		eval_batches=eval_batches if eval_batches else 0,
 		profile=p.profile,
-		timeout_s=deps.probe_timeout_s,
+		timeout_s=_probe_timeout(sm, deps.probe_timeout_s),
 		seed=p.seed,
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
@@ -285,10 +301,29 @@ def _run_point(spec: ProbeSpec, gpu: str, deps: Deps, ctx) -> tuple[ProbeResult 
 				log.warning("ignoring an unreadable probe-cache entry %s", key)
 	spec = replace(spec, gpu_usd_per_hour=_price(gpu))
 	result = deps.runner(spec, gpu, should_stop=ctx.should_stop)
+	ran = getattr(deps.runner, "last_ran", None) or gpu
+	if ran != gpu:  # measured on a fallback GPU: not this GPU's answer, so not cached under it
+		result.probe = result.probe.model_copy(update={"cache_key": None})
+		return result, None
 	result.probe = result.probe.model_copy(update={"cache_key": key})
 	if deps.cache is not None and result.probe.status == "ok":
 		deps.cache.put(key, json.loads(result.probe.model_dump_json(exclude_none=True)))
 	return result, None
+
+
+# Chiya, Nov 1: an L4 that won't schedule in 2 minutes gives way to an A10, then an L40S
+GPU_FALLBACK = {"L4": ("A10", "L40S")}
+
+
+def _fallbacks(gpu: str, allowed: list[str] | None, pinned: bool) -> tuple[str, ...]:
+	"""What the runner may use instead of gpu: none for a pinned GPU (the guide asked for that one),
+	only GPUs the visitor allows, and none past the probe ceiling."""
+	if pinned:
+		return ()
+	cap = gpu_ceiling()
+	return tuple(
+		g for g in GPU_FALLBACK.get(gpu, ()) if (allowed is None or g in allowed) and under_ceiling(g, cap)
+	)
 
 
 def _validated(request: dict) -> JobRequest:
@@ -328,6 +363,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			raise InvalidSubmission("this record's code has changed since it was measured; check it in again",
 				code="submission.code_changed")  # fmt: skip
 	ctx.check()
+	fixed = None
+	if req.patch is not None:  # applied before anything is stored: a refused patch leaves no record
+		from .patches import apply_patch
+
+		fixed = replace(fetched, files=apply_patch(fetched.files, req.patch))
 
 	_emit(ctx, "mapping")
 	followup = req.mode != "plan"
@@ -351,7 +391,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			rec = rec.model_copy(update=update)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message="skeleton from the static reader")
-		if deps.spark is not None and not followup:  # a follow-up asks for a measurement, not a map
+		from .flags import flag
+
+		# the job's code goes to Muse Spark only with harness.spark_script_map on: the data-use notice
+		# discloses it under that flag, so the key being set is not enough (D's review, Chiya, Nov 1)
+		if deps.spark is not None and not followup and flag("harness.spark_script_map"):
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:
@@ -396,7 +440,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 				message=f"not knobs of this record, left as they are: {', '.join(sorted(unknown))}")  # fmt: skip
 		plan_knobs = record_jobs.full_setting(rec, knobs)
 		base_knobs = record_jobs.full_setting(rec, {})
-		plan = _followup_plan(rec, req.mode, knobs, plan_knobs, base_knobs)
+		plan = _followup_plan(rec, req.mode, knobs, plan_knobs, base_knobs, patched=req.patch is not None)
 		if "gpu_type" in knobs:
 			request = {**request, "gpu": knobs["gpu_type"]}
 			pinned = True
@@ -409,25 +453,70 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip
 		gpu = cap
 	budget = deps.budget()
+	patched_for: dict = {}
+	if fixed is not None:
+		# C's fix loop: probe runs the patched code; verify runs the setting on it and the base
+		# and its second seed on the record's own code, so the finding reads before and after. The
+		# knobs are found again in the patched code (a fix that adds a line moves them)
+		from .patches import relocate_knobs
+
+		fixed_sm = relocate_knobs(sm, fetched.files, fixed.files)  # the record's own knobs, Spark's included
+		patched_ids = [p.probe_id for p in plan] if req.mode == "probe" else [plan[0].probe_id]
+		patched_for = dict.fromkeys(patched_ids, (fixed, fixed_sm))
+		_emit(ctx, "harnessing", rec, rev, message=f"patch applied to {', '.join(patched_ids)}")
 	probes, results, gpu, discarded_usd = _probe_points(
-		plan, rec, rev, fetched, sm, deps, ctx, budget, gpu=gpu, allowed=allowed, need=need, pinned=pinned
+		plan,
+		rec,
+		rev,
+		fetched,
+		sm,
+		deps,
+		ctx,
+		budget,
+		gpu=gpu,
+		allowed=allowed,
+		need=need,
+		pinned=pinned,
+		patched_for=patched_for,
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
+	rec, triaged = _triage(rec, results, deps)
 	kept = rec.probes
-	if followup and origin.parent is not None and gpu != _parent_gpu(origin.parent):
+	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
+	ran = next((g for r in results for g in [_measured_gpu(r)] if g), gpu)
+	if followup and origin.parent is not None and ran != _parent_gpu(origin.parent):
 		# measured on another GPU: the record's env is this one, so the parent's probes don't
 		# belong, nor what was fitted or found from them; the script's own findings stay
 		kept = []
 		dropped = {p.id for p in rec.probes}
 		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
 		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
+	if patched_for:
+		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
+		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
+			for q in probes]  # fmt: skip
 	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.gpu_usd, overhead_usd=budget.overhead_usd,
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
+	from .measured_rules import hygiene_findings
+
+	# run hygiene, from the code the probes ran (a probe job's patch included, so a fix can clear
+	# its own finding; a verify job's base is the record's own code) and the probes so far
+	code = fixed.files if fixed is not None and req.mode == "probe" else fetched.files
+	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
+	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
+	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
 		finding = record_jobs.verify_finding(by_id[vid], by_id.get(f"{vid}-base"), plan_knobs, base_knobs,
 			{n.id for n in out.graph.nodes}, other_seed=by_id.get(f"{vid}-seed"))  # fmt: skip
+		if req.patch is not None:
+			from preflight.schema import Evidence
+
+			from .patches import patch_id
+
+			finding = finding.model_copy(update={"evidence": [*finding.evidence,
+				Evidence(metric="verify.patch", value=patch_id(req.patch), probe_id=vid)]})  # fmt: skip
 		out = out.model_copy(update={"findings": [*out.findings, finding]})
 	return out
 
@@ -476,11 +565,17 @@ def _sample_agent(rec: FlightRecord, rev, fetched: Fetched, sm, deps: Deps, ctx,
 	if top_up:
 		sample = combine_samples(first, sample)
 	out = rec.model_copy(update={"agent_sample": sample})
+	from .measured_rules import agent_findings
+
+	fresh = agent_findings(out)  # measured: replaces the parent's, keeps what was read from the code
+	keep = [f for f in out.findings if not f.id.startswith("measured.agent.")]
+	out = out.model_copy(update={"findings": [*keep, *fresh]})
 	_emit(ctx, "probing", out, deps.records.put(out), message=f"{len(sample.tasks)} tasks sampled")
 	return out
 
 
-def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, base_knobs: dict):
+def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, base_knobs: dict, *,
+	patched: bool = False):  # fmt: skip
 	"""probe: one profiled point at the setting. verify: the setting, and the current settings
 	beside it when they differ, both for VERIFY_STEPS at one fixed seed."""
 	if mode == "probe":
@@ -489,7 +584,7 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 	steps = {"warmup": record_jobs.VERIFY_WARMUP, "timed": record_jobs.VERIFY_STEPS, "cadence": False}
 	plan = [point_probe(rec, vid, knobs, role="verify", **steps)]
 	differs = {k: v for k, v in plan_knobs.items() if k != "gpu_type" and base_knobs.get(k) != v}
-	if differs:
+	if differs or patched:  # a patch is a difference too: its verify needs the base beside it
 		base = {k: base_knobs[k] for k in knobs if k in base_knobs}
 		plan.append(point_probe(rec, f"{vid}-base", base, role="verify_base", **steps))
 		plan.append(point_probe(rec, f"{vid}-seed", base, role="verify_seed", **steps))
@@ -497,6 +592,34 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 		p.seed = record_jobs.VERIFY_SEED_2 if p.role == "verify_seed" else record_jobs.VERIFY_SEED
 		p.seed_force = True
 	return plan
+
+
+def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord, list]:
+	"""Spark Open reads each fresh probe's log (plan item 29): one call per probe, every call in the
+	record's provenance (so its cost is in the record's), a finding for a probe that didn't finish.
+	Off unless harness.spark_open_triage is on: the log may hold the visitor's script output."""
+	from .flags import flag
+
+	if deps.triage is None or not flag("harness.spark_open_triage"):
+		return rec, []
+	from preflight.harness.triage import triage_probe
+
+	findings, calls = [], []
+	for r in results:
+		if not isinstance(r, ProbeResult):
+			continue
+		f, cs = triage_probe(deps.triage, r.probe, r.log_tail)
+		calls += cs
+		if f is not None:
+			findings.append(f)
+	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
+
+
+def _measured_gpu(result) -> str | None:
+	from preflight.probes.gpu_choice import canonical
+
+	env = getattr(result, "env", None)
+	return canonical(env.gpu.name) if env is not None and env.gpu is not None and env.gpu.name else None
 
 
 def _parent_gpu(rec: FlightRecord) -> str | None:
@@ -527,6 +650,7 @@ def _probe_points(
 	allowed: list[str] | None,
 	need: float,
 	pinned: bool = False,
+	patched_for: dict | None = None,
 ) -> tuple[list[Probe], list[ProbeResult], str, float]:
 	"""Run the planned points in order; returns their probes, fresh results, the GPU they settled on
 	and what discarded attempts cost."""
@@ -553,14 +677,17 @@ def _probe_points(
 			)
 			continue
 		try:
-			spec = _spec(fetched, sm, p, deps)
+			use_f, use_sm = (patched_for or {}).get(p.probe_id, (fetched, sm))
+			spec = _spec(use_f, use_sm, p, deps)
 		except OverrideError as exc:
 			probes.append(_skipped(p, f"this point can't be set in the code: {exc}"))
 			continue
 		attempts: list = []
 
 		def run(g, spec=spec, attempts=attempts, over=over):
-			result, cached = _run_point(spec, g, deps, ctx)
+			result, cached = _run_point(
+				replace(spec, gpu_fallback=_fallbacks(g, allowed, pinned)), g, deps, ctx
+			)
 			out = result if result is not None else _CachedResult(cached)
 			if result is not None:
 				# every attempt counts, kept or not, with the sandbox's CPU and memory beside the GPU
@@ -592,6 +719,8 @@ def _probe_points(
 				again = run(ladder.tried[-1], spec=_spec(fetched, sm, p, deps, eval_off=True))
 				probes.append(out.probe.model_copy(update={"id": f"{p.probe_id}-eval"}))
 				if isinstance(out, ProbeResult):
+					# its own id, as in the record: the eval-off re-run below is the point's p-id
+					out.probe = out.probe.model_copy(update={"id": f"{p.probe_id}-eval"})
 					results.append(out)
 				out = _marked_eval_off(again, rec)
 			except OverrideError:
@@ -604,6 +733,17 @@ def _probe_points(
 		probes.append(probe)
 		if isinstance(out, ProbeResult):
 			results.append(out)
+			ran = getattr(deps.runner, "last_ran", None)
+			if ran and ran != gpu:
+				# this point ran on a fallback GPU: the rest run there too, and points answered from
+				# the cache for the GPU asked for leave the record, so it holds one GPU's numbers
+				_emit(ctx, "probing", rec, rev, level="warn",
+					message=f"no {gpu} could be scheduled; this job's points run on {ran}")  # fmt: skip
+				probes = [q if q.status != "cached" else q.model_copy(update={"status": "error",
+					"error_code": "gpu.fallback", "cache_key": None,
+					"error": f"left out: answered from the cache for {gpu}, and this job's points ran on {ran}"})
+					for q in probes]  # fmt: skip
+				gpu = ran
 		kept_ids = {id(out), *(id(r) for r in results)}
 		discarded_usd += sum(
 			a.probe.cost.usd for a in attempts if isinstance(a, ProbeResult) and id(a) not in kept_ids

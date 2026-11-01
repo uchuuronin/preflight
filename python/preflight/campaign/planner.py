@@ -25,7 +25,15 @@ import numpy as np
 
 from preflight.engine import api, knobs
 from preflight.schema.prediction import Estimate
-from preflight.schema.record import Campaign, CampaignCell, FlightRecord, ModelCard
+from preflight.schema.record import (
+	AshaRung,
+	Campaign,
+	CampaignAsha,
+	CampaignCell,
+	CampaignQuota,
+	FlightRecord,
+	ModelCard,
+)
 
 MODEL_ID = "campaign-mc@0.1.0"
 Z90 = 1.6448536269514722  # the 90% two-sided normal quantile; the engine's bands are 90%
@@ -77,6 +85,11 @@ class CellPlan:
 	lane: str | None = None
 	cut: bool = False
 	reason: str = ""
+	slot: int | None = None  # which of the lane's slots runs it, 0-based
+	# seconds from the campaign's start until it starts, p50 with 5% and 95%; abstains when its slot can't be dated.
+	# Medians don't add: the p50 start of the next run on a slot isn't this one's p50 start plus its p50 time.
+	start_s: Estimate | None = None
+	start: datetime | None = None  # the p50 start as a date; None when start_s abstains
 
 
 @dataclass(frozen=True)
@@ -140,6 +153,8 @@ class CampaignPlan:
 					segments=c.segments,
 					lane=c.lane,
 					cut=c.cut,
+					time=c.time,
+					start_s=c.start_s,
 				)
 				for c in self.cells
 			],
@@ -147,6 +162,27 @@ class CampaignPlan:
 			cut_list=list(self.cut_list),
 			completion_quantiles=dict(self.completion),
 			checkpoint_interval_s=self.checkpoint_interval.point,
+			# 0.5.0: the intervals, not only the points
+			gpu_hours=self.gpu_hours,
+			usd=self.usd,
+			finish_s=self.finish_s,
+			grid_gpu_hours=self.grid_gpu_hours,
+			grid_usd=self.grid_usd,
+			quota=CampaignQuota(
+				needed_bytes=self.quota.needed_bytes,
+				quota_bytes=self.quota.quota_bytes,
+				fits=self.quota.fits,
+				reason=self.quota.reason,
+			),
+			asha=CampaignAsha(
+				rungs=[AshaRung(steps=r.steps, runs=r.runs) for r in self.asha.rungs],
+				gpu_hours=self.asha.gpu_hours,
+				saved_gpu_hours=self.asha.saved_gpu_hours,
+				reason=self.asha.reason,
+			)
+			if self.asha
+			else None,
+			notes=list(self.notes),
 		)
 
 
@@ -592,7 +628,12 @@ def plan(
 		)
 		lane_of[i] = (name, slot)
 		load[name][slot] += cells[i].time.point or 0.0
-	cells = [_replace(c, lane=lane_of[i][0] if i in lane_of else None) for i, c in enumerate(cells)]
+	cells = [
+		_replace(
+			c, lane=lane_of[i][0] if i in lane_of else None, slot=lane_of[i][1] if i in lane_of else None
+		)
+		for i, c in enumerate(cells)
+	]
 
 	# ---- the end date: each slot runs its runs back to back; the campaign ends with its last slot
 	completion: dict[str, datetime] = {}
@@ -604,10 +645,29 @@ def plan(
 		finish_est = _abstain(
 			"s", f"{sum(1 for i in kept if not runnable[i])} runs can't be dated ({bad.id}: {bad.reason})"
 		)
+		for i in kept:
+			cells[i] = _replace(cells[i], start_s=_abstain("s", finish_est.reason))
 	else:
 		slot_end = {nk: np.zeros(draws) for nk in ((n, k) for n, ss in load.items() for k in range(len(ss)))}
+		starts: dict[int, np.ndarray] = {}
 		for i in order:
+			starts[i] = slot_end[lane_of[i]]
 			slot_end[lane_of[i]] = slot_end[lane_of[i]] + wall[i]
+		for i, st in starts.items():  # C's calendar: each run's slot and when it starts
+			ok = st[np.isfinite(st)]
+			late = 1 - ok.size / st.size
+			if (
+				late > 0.05
+			):  # the same rule as the end date: dates from the good draws alone would be too sure
+				why = f"in {late:.0%} of draws a run before it on its slot never finishes"
+				cells[i] = _replace(cells[i], start_s=_abstain("s", why))
+				continue
+			q5, q50, q95 = (float(v) for v in np.quantile(ok, [0.05, 0.5, 0.95]))
+			cells[i] = _replace(
+				cells[i],
+				start_s=_est(q50, q5, q95, "s", "predicted", "when its slot frees up; Monte Carlo"),
+				start=start + timedelta(seconds=q50),
+			)
 		finish = np.max(np.stack(list(slot_end.values())), axis=0)
 		stuck = float(np.mean(~np.isfinite(finish)))
 	if kept and all(runnable[i] for i in kept) and stuck > 0.05:

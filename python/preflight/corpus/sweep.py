@@ -94,9 +94,11 @@ def container_timeout_s(batch: int, deadline_s: float) -> int:
 
 
 def wave_end_at(dispatched_at: float, batch: int, deadline_s: float) -> float:
-	"""The latest moment a wave's last config may end: Modal's cut-off less the margin for the final commit. The
-	container's start-up counts against it, as it does against the bill (Oct 30: measured from dispatch)."""
-	return dispatched_at + container_timeout_s(batch, deadline_s) - END_MARGIN_S
+	"""The latest moment a wave's last config may end: Modal's cut-off less the margin for the final commit, plus the
+	QUEUE_S the driver waits for a GPU (Oct 31: in the divergence sweep a wave's containers waited past their
+	start-up allowance for an L4 and ran nothing). Measured from dispatch, so a restart after preemption can't
+	extend it; the worst case counts the allowance as billed."""
+	return dispatched_at + container_timeout_s(batch, deadline_s) + QUEUE_S - END_MARGIN_S
 
 
 def may_start_config(now: float, deadline_s: float, end_at: float) -> bool:
@@ -106,13 +108,52 @@ def may_start_config(now: float, deadline_s: float, end_at: float) -> bool:
 	return now + deadline_s + KILL_GRACE_S <= end_at
 
 
+QUEUE_S = (
+	300.0  # guess: how long a wave may wait for its GPUs before the driver gives up (queueing isn't billed)
+)
+
+
+def wave_wait_s(container_timeout: float, minutes_left: float) -> float:
+	"""How long the driver waits for a wave before cancelling it (Oct 31: a smoke wave sat about 13 minutes with
+	nothing back, past its 540 s cap, until the workflow killed it). Modal's cut-off plus time to get a GPU, never
+	past the sweep's own time left."""
+	return max(0.0, min(container_timeout + QUEUE_S, minutes_left * 60))
+
+
+def collect_wave(calls, wait_s: float, started: float, clock) -> tuple[list, int]:
+	"""Each spawned batch's result, waiting until `started + wait_s` at most. A call still running then is cancelled
+	and counted late. Any other exception, a container hitting its own cut-off included (Modal's
+	FunctionTimeoutError), is that one batch's result, as `starmap(return_exceptions=True)` gave, and the rest go on.
+	Only the built-in TimeoutError is the driver's own wait running out (Modal 1.6, FunctionCall.get)."""
+	results: list = []
+	late = 0
+	for fc in calls:
+		left = wait_s - (clock() - started)
+		try:
+			if left <= 0:
+				raise TimeoutError
+			results.append(fc.get(timeout=left))
+		except TimeoutError as exc:
+			if type(exc) is not TimeoutError:  # a subclass is the call's own failure, not the wait
+				results.append(exc)
+				continue
+			fc.cancel(terminate_containers=True)  # a container stuck in a syscall stops too
+			results.append(exc)
+			late += 1
+		except Exception as exc:
+			results.append(exc)
+	return results, late
+
+
 def worst_wave_seconds(containers: int, batch: int, deadline_s: float) -> float:
 	"""Most container-seconds one wave can be billed: every container starts, runs a full batch with each config
-	at its deadline, and idles out. Retries are off, so a preempted batch is not re-run inside the wave."""
+	at its deadline, and idles out. Every attempt, a restart after preemption included, ends by the wave's end time
+	plus the end margin (a watchdog in run_batch), and that is the dispatch plus the cut-off plus QUEUE_S. One
+	restart adds its own start-up (Modal's startup_timeout) and idle tail."""
 	if containers <= 0 or batch <= 0:
 		return 0.0
-	# each container is cut off at container_timeout_s by Modal, then idles out
-	return containers * (container_timeout_s(batch, deadline_s) + SCALEDOWN_S)
+	span = container_timeout_s(batch, deadline_s) + QUEUE_S
+	return containers * (span + STARTUP_S + 2 * SCALEDOWN_S)
 
 
 def plan_wave(
@@ -129,7 +170,8 @@ def plan_wave(
 	from preflight.corpus.isolate import KILL_GRACE_S
 
 	rate = usd_per_hour * RATE_OVERHEAD / 3600
-	room_s = minutes_left * 60 - STARTUP_S - SCALEDOWN_S
+	# a wave can last Modal's cut-off (start-up, the batch, the end margin) plus the driver's wait for a GPU
+	room_s = minutes_left * 60 - STARTUP_S - END_MARGIN_S - QUEUE_S - SCALEDOWN_S
 	per = deadline_s + KILL_GRACE_S
 	batch = min(max_batch, int(room_s // per) if per > 0 else max_batch, max(1, n_todo))
 	best = (0, 0)

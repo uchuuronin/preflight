@@ -8,6 +8,7 @@ visitor's code. One process per probe point; the sandbox stays up between
 points of the same job on the same GPU.
 """
 
+import contextlib
 import os
 import sys
 from pathlib import Path
@@ -61,12 +62,20 @@ def deps_dir(root: Path = Path("/tmp/pf-deps")) -> Path:
 
 
 def main() -> int:
+	from preflight.probes import local
+
 	link_weights()
 	deps_dir()
 	spec = spec_from_wire(sys.stdin.read())
+	local.DEFER_CLEANUP = True
 	result = run_probe(spec)
 	sys.stdout.write(result_to_wire(result) + "\n")
 	sys.stdout.flush()
+	# the result is out, and the worker's read ends here; then the probe's files go (a dump of many GB
+	# can take a while to delete, and must not cost the result)
+	with contextlib.suppress(OSError):
+		os.close(sys.stdout.fileno())
+	local.finish_cleanup(background=True)
 	return 0
 
 

@@ -22,3 +22,12 @@ a forward with no gradient), `reward` (the reward functions), and the update as 
 `backward` and `optimizer`. Weight sync is zero here (no vLLM).
 
 Ground truth: not run yet; the L4 run and its cost are asked for separately.
+
+## torchtitan_debug (adapter check, Nov 1)
+
+torchtitan 0.1.0's own trainer on its smallest model (Llama 3 `debugmodel`), on one GPU: the
+config, test tokenizer (renamed `.txt`) and a 300-document slice of `c4_test` are torchtitan's own,
+from its v0.1.0 tag (BSD-3-Clause, `LICENSE.txt`). Nothing is planted; it confirms the recorder
+counts torchtitan's optimizer steps and splits its phases. torchtitan 0.1.0 targets torch 2.7, so
+it runs in its own image (`titan_image`, an ops run only): `ops_app.py::torchtitan_check`, a CPU
+startup check first, the L4 only if that passes.

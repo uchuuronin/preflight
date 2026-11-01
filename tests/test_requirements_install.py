@@ -32,3 +32,27 @@ def test_a_requirement_that_wont_install_is_a_missing_package_error(tmp_path):
 		install_requirements=True, out_dir=tmp_path))  # fmt: skip
 	# nothing installable: the line is skipped with a note, and the import fails as the script's own
 	assert r.probe.status == "error" and "only plain PyPI" in r.log_tail
+
+
+def test_pip_runs_isolated_from_the_probes_pythonpath(tmp_path, monkeypatch):
+	"""An unprivileged probe's PYTHONPATH can name a directory it can't list (Modal's /root, Nov 1);
+	pip walks sys.path, so it runs with -I and from its own prefix."""
+	import subprocess
+
+	from preflight.recorder import requirements
+
+	(tmp_path / "requirements.txt").write_text("some-package-not-installed==1.0\n")
+	seen = {}
+
+	def fake_run(cmd, **kw):
+		seen["cmd"], seen["cwd"] = cmd, kw.get("cwd")
+		return subprocess.CompletedProcess(cmd, 0, "", "")
+
+	monkeypatch.setattr(requirements.subprocess, "run", fake_run)
+	monkeypatch.delenv("PREFLIGHT_DEPS_DIR", raising=False)
+	err, _ = requirements.install(tmp_path, tmp_path / "deps", log=lambda m: None)
+	assert (
+		err is None
+		and seen["cmd"][1:5] == ["-I", "-m", "pip", "install"]
+		and seen["cwd"] == tmp_path / "deps"
+	)

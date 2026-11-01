@@ -17,6 +17,11 @@ export interface SensitivityOptions {
 	 * `fit: "tight"`. The guide never applies these; it offers to measure them first.
 	 */
 	includeTight?: boolean;
+	/**
+	 * The visitor's limits (guide/limits.ts): a value this returns false for is never a move, so
+	 * the knob's next-best value inside the limits is ranked instead.
+	 */
+	allow?: (knobId: string, value: KnobValue, after: Prediction) => boolean;
 }
 
 /** One candidate move with its effect, for the guide's wording. C-internal, richer than KnobImpact. */

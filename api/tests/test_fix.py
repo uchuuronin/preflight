@@ -540,3 +540,15 @@ def test_the_gate_takes_the_inputs_muse_code_1_4_14_really_sent(tmp_path):
 def test_every_real_run_names_the_standard_model():
 	assert muse.command("/p")[muse.command("/p").index("--model") + 1] == muse.MODEL
 	assert not muse.is_contributor(muse.MODEL)
+
+
+def test_the_gate_takes_search_as_the_second_real_run_sent_it(tmp_path):
+	# Smoke run 41250977670: search sent glob as a list and an output_mode.
+	assert (
+		gate(tmp_path, "search", {"glob": ["**/*.py"], "output_mode": "content", "pattern": "model\\("})
+		is None
+	)
+	assert gate(tmp_path, "search", {"paths": ["train.py"], "output_mode": "content", "pattern": "x"}) is None
+	assert denied(gate(tmp_path, "search", {"glob": ["**/*.py", "/proc/*"], "pattern": "x"}))
+	assert denied(gate(tmp_path, "search", {"glob": [{"x": 1}], "pattern": "x"}))
+	assert denied(gate(tmp_path, "search", {"output_mode": ["x"], "pattern": "x"}))

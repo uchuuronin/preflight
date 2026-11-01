@@ -4,6 +4,7 @@
  * repeats, a capsule for what you press, a ticket for what you keep.
  */
 import { useRef, useState } from "react";
+import { flag } from "../../lib/flags";
 import { t } from "../../lib/i18n";
 import { useAppPanels } from "../../registry";
 import { DEFAULT_SAMPLE } from "../../workspace/record/load";
@@ -64,7 +65,8 @@ export function Home() {
 						<span className="pf-beat__num">{t("home.step", { n: 2 })}</span>
 						<h3>{t("home.simulate.title")}</h3>
 						<p>{t("home.simulate.body")}</p>
-						<span className="pf-model">{t("home.simulate.model")}</span>
+						{/* Named only when the live guide runs on Muse Spark in this build (audit finding 12). */}
+						{flag("c.guide.live") ? <span className="pf-model">{t("home.simulate.model")}</span> : null}
 					</div>
 					<div className={`glass pf-beat pf-shape-ticket${progress > 0.4 ? " is-in" : ""}`}>
 						<span className="pf-beat__num">{t("home.step", { n: 3 })}</span>

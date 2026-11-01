@@ -1,0 +1,3755 @@
+{
+	"schema_version": "0.5.0",
+	"record_id": "01JBGRPOL4SMOKE00000000000",
+	"created_at": "2026-11-01T06:36:52Z",
+	"job": {
+		"lens": "rl",
+		"source": {
+			"kind": "repo",
+			"uri": "https://github.com/uchuuronin/preflight/tree/602edab1dbde6f8018368871d9c7b5790af3d249/zoo/grpo_trl",
+			"commit": "602edab1dbde6f8018368871d9c7b5790af3d249",
+			"entrypoint": "train.py",
+			"args": []
+		},
+		"framework": "trl",
+		"title": "GRPO on GSM8K with Qwen2.5-0.5B, measured on an L4",
+		"script_map": {
+			"lens": "rl",
+			"framework": "trl",
+			"entrypoint": "train.py",
+			"launch": "python train.py",
+			"model": {
+				"name": "Qwen2.5-0.5B-Instruct",
+				"hf_id": "Qwen/Qwen2.5-0.5B-Instruct",
+				"family": "decoder",
+				"param_count": 494032768
+			},
+			"data": {
+				"dataset": "openai/gsm8k",
+				"batch_size": 1,
+				"languages": []
+			},
+			"training": {
+				"lr": 1e-06,
+				"grad_accum": 4,
+				"precision": "unknown",
+				"epochs": 1.0,
+				"checkpoint_every": 500,
+				"distributed": "none"
+			},
+			"loop": {
+				"kind": "trl_trainer",
+				"location": {
+					"file": "train.py",
+					"line": 116,
+					"expr": "trainer.train()"
+				},
+				"step_call": "trainer.train()"
+			},
+			"knobs": [
+				{
+					"id": "batch_size",
+					"label": "Batch size",
+					"kind": "int",
+					"current": 1,
+					"unit": "samples",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 53,
+						"expr": "PROMPTS_PER_STEP = 1"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "checkpoint_every",
+					"label": "Checkpoint interval",
+					"kind": "int",
+					"current": 500,
+					"unit": "steps",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 105,
+						"expr": "save_steps=500"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "epochs",
+					"label": "Epochs",
+					"kind": "int",
+					"current": 1,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 102,
+						"expr": "num_train_epochs=1"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "grad_accum",
+					"label": "Gradient accumulation",
+					"kind": "int",
+					"current": 4,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 97,
+						"expr": "gradient_accumulation_steps=4"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "group_size",
+					"label": "Group size",
+					"kind": "int",
+					"current": 8,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 51,
+						"expr": "GROUP = 8"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "kl_beta",
+					"label": "KL coefficient",
+					"kind": "float",
+					"current": 0.04,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 52,
+						"expr": "BETA = 0.04"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "log_every",
+					"label": "Log interval",
+					"kind": "int",
+					"current": 5,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 104,
+						"expr": "logging_steps=5"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "lr",
+					"label": "Learning rate",
+					"kind": "float",
+					"current": 1e-06,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 94,
+						"expr": "learning_rate=1e-6"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "max_completion_len",
+					"label": "Max completion length",
+					"kind": "int",
+					"current": 512,
+					"unit": "tokens",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 50,
+						"expr": "MAX_COMPLETION = 512"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "max_prompt_len",
+					"label": "Max prompt length",
+					"kind": "int",
+					"current": 256,
+					"unit": "tokens",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 99,
+						"expr": "max_prompt_length=256"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "optimizer",
+					"label": "Optimizer",
+					"kind": "categorical",
+					"current": "adafactor",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 95,
+						"expr": "optim=\"adafactor\""
+					},
+					"needs_code": false
+				}
+			],
+			"blocks": [],
+			"rl": {
+				"algorithm": "grpo",
+				"group_size": 8,
+				"max_completion_len": 512,
+				"reward_functions": [
+					"correct",
+					"formatted"
+				],
+				"generation_backend": "hf"
+			},
+			"risks": [],
+			"produced_by": "adapter",
+			"confidence": 0.85
+		},
+		"objective": {
+			"kind": "min_time",
+			"weights": {}
+		},
+		"constraints": {
+			"gpu_types": [],
+			"preemption": {
+				"kind": "none"
+			}
+		}
+	},
+	"env": {
+		"backend": "cuda",
+		"provider": "modal",
+		"gpu": {
+			"name": "L4",
+			"count": 1,
+			"memory_bytes": 23689363456,
+			"vendor": "nvidia"
+		},
+		"nodes": 1,
+		"libraries": {}
+	},
+	"graph": {
+		"nodes": [
+			{
+				"id": "data",
+				"label": "gsm8k",
+				"kind": "data",
+				"repeat": 1,
+				"metrics": [
+					"probe.data.loader_wait_fraction",
+					"probe.data.padding_fraction"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "model",
+				"label": "Qwen2.5-0.5B-Instruct",
+				"kind": "group",
+				"repeat": 1,
+				"params": 494032768,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "embed",
+				"label": "Embedding",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "block",
+				"label": "Decoder block",
+				"kind": "group",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "attn",
+				"label": "Self-attention",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.max_attn_logit"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "mlp",
+				"label": "MLP",
+				"kind": "module",
+				"parent": "block",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "lm_head",
+				"label": "LM head",
+				"kind": "module",
+				"parent": "model",
+				"repeat": 1,
+				"metrics": [
+					"memory.by_term.logits"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "rollout",
+				"label": "Rollouts (hf) \u00b7 G=8 \u00b7 cap 512",
+				"kind": "phase",
+				"repeat": 1,
+				"metrics": [
+					"probe.rl.truncation_rate",
+					"probe.generation.new_tokens_p95"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "reward",
+				"label": "Reward (correct, formatted)",
+				"kind": "phase",
+				"repeat": 1,
+				"metrics": [
+					"probe.rl.zero_spread_fraction"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "reference",
+				"label": "Reference model",
+				"kind": "phase",
+				"repeat": 1,
+				"metrics": [
+					"probe.rl.kl"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "weight_sync",
+				"label": "Weight sync",
+				"kind": "phase",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "loss",
+				"label": "Loss",
+				"kind": "loss",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.loss"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "optimizer",
+				"label": "Optimizer",
+				"kind": "optimizer",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.grad_norm"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "ckpt",
+				"label": "Checkpoint every 500 steps",
+				"kind": "io",
+				"repeat": 1,
+				"metrics": [
+					"risk.preemption_loss",
+					"probe.checkpoint.seconds_mean"
+				],
+				"attrs": {}
+			}
+		],
+		"edges": [
+			{
+				"source": "embed",
+				"target": "attn",
+				"kind": "data"
+			},
+			{
+				"source": "attn",
+				"target": "mlp",
+				"kind": "data"
+			},
+			{
+				"source": "mlp",
+				"target": "lm_head",
+				"kind": "data"
+			},
+			{
+				"source": "data",
+				"target": "embed",
+				"kind": "tokens",
+				"metric": "probe.throughput.tokens_per_s"
+			},
+			{
+				"source": "data",
+				"target": "rollout",
+				"kind": "control"
+			},
+			{
+				"source": "rollout",
+				"target": "reward",
+				"kind": "tokens"
+			},
+			{
+				"source": "rollout",
+				"target": "reference",
+				"kind": "tokens"
+			},
+			{
+				"source": "reward",
+				"target": "loss",
+				"kind": "data"
+			},
+			{
+				"source": "optimizer",
+				"target": "weight_sync",
+				"kind": "weights"
+			},
+			{
+				"source": "weight_sync",
+				"target": "rollout",
+				"kind": "weights"
+			},
+			{
+				"source": "lm_head",
+				"target": "loss",
+				"kind": "data"
+			},
+			{
+				"source": "loss",
+				"target": "optimizer",
+				"kind": "grad"
+			},
+			{
+				"source": "optimizer",
+				"target": "embed",
+				"kind": "weights"
+			},
+			{
+				"source": "optimizer",
+				"target": "ckpt",
+				"kind": "control"
+			}
+		],
+		"skeleton": true
+	},
+	"knobs": [
+		{
+			"id": "checkpoint_every",
+			"label_key": "knob.checkpoint_every",
+			"unit": "steps",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1000000.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 500,
+			"probed_range": {
+				"min": 500.0,
+				"max": 500.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"ckpt"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"T4",
+					"L4",
+					"A10",
+					"L40S",
+					"A100-SXM-40GB",
+					"A100-SXM-80GB",
+					"RTX-PRO-6000-96GB",
+					"H100-SXM-80GB",
+					"H200-SXM-141GB",
+					"B200-SXM-180GB",
+					"B300-SXM-288GB"
+				],
+				"log": false
+			},
+			"current": "L4",
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"model"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "log_every",
+			"label_key": "knob.log_every",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 10000.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 5,
+			"probed_range": {
+				"min": 5.0,
+				"max": 5.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [],
+			"changes_results": false
+		},
+		{
+			"id": "epochs",
+			"label_key": "knob.epochs",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 10.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 1,
+			"probed_range": {
+				"min": 1.0,
+				"max": 1.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "data",
+			"affects": [
+				"data"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "batch_size",
+			"label_key": "knob.batch_size",
+			"unit": "samples",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 1024.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 1,
+			"probed_range": {
+				"min": 1.0,
+				"max": 1.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"data",
+				"model"
+			]
+		},
+		{
+			"id": "gradient_checkpointing",
+			"label_key": "knob.gradient_checkpointing",
+			"kind": "bool",
+			"domain": {
+				"values": [],
+				"log": false
+			},
+			"current": false,
+			"gridded": false,
+			"needs_code": false,
+			"patch_template": "memory.gradient_checkpointing",
+			"group": "memory",
+			"affects": [
+				"block",
+				"attn",
+				"mlp"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "lr",
+			"label_key": "knob.lr",
+			"kind": "float",
+			"domain": {
+				"min": 1e-08,
+				"max": 9.999999999999999e-05,
+				"values": [],
+				"log": true
+			},
+			"current": 1e-06,
+			"probed_range": {
+				"min": 1e-06,
+				"max": 1e-06
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "optimizer",
+			"label_key": "knob.optimizer",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"adamw_torch",
+					"adamw_torch_fused",
+					"adamw_8bit",
+					"adafactor",
+					"sgd",
+					"lion_32bit"
+				],
+				"log": false
+			},
+			"current": "adafactor",
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "group_size",
+			"label_key": "knob.group_size",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 64.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 8,
+			"probed_range": {
+				"min": 8.0,
+				"max": 8.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "rl",
+			"affects": [
+				"rollout",
+				"reward"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "kl_beta",
+			"label_key": "knob.kl_beta",
+			"kind": "float",
+			"domain": {
+				"min": 0.0,
+				"max": 1.0,
+				"values": [],
+				"log": false
+			},
+			"current": 0.04,
+			"probed_range": {
+				"min": 0.04,
+				"max": 0.04
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "rl",
+			"affects": [
+				"reference",
+				"loss"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "max_completion_len",
+			"label_key": "knob.max_completion_len",
+			"unit": "tokens",
+			"kind": "int",
+			"domain": {
+				"min": 16.0,
+				"max": 32768.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 512,
+			"probed_range": {
+				"min": 512.0,
+				"max": 512.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "rl",
+			"affects": [
+				"rollout"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "max_prompt_len",
+			"label_key": "knob.max_prompt_len",
+			"unit": "tokens",
+			"kind": "int",
+			"domain": {
+				"min": 16.0,
+				"max": 32768.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 256,
+			"probed_range": {
+				"min": 256.0,
+				"max": 256.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "rl",
+			"affects": [
+				"rollout",
+				"data"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "attn",
+			"label_key": "knob.attn",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"eager",
+					"sdpa",
+					"flash_attention_2",
+					"flash_attention_3",
+					"flex_attention"
+				],
+				"log": false
+			},
+			"current": "sdpa",
+			"gridded": false,
+			"needs_code": true,
+			"patch_template": "model.attn_implementation",
+			"group": "speed",
+			"affects": [
+				"attn"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "grad_accum",
+			"label_key": "knob.grad_accum",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 256.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 4,
+			"probed_range": {
+				"min": 4.0,
+				"max": 4.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "speed",
+			"affects": [
+				"data",
+				"optimizer"
+			]
+		}
+	],
+	"probes": [
+		{
+			"id": "p0",
+			"knobs": {
+				"checkpoint_every": 500,
+				"gpu_type": "L4",
+				"log_every": 5,
+				"epochs": 1,
+				"batch_size": 1,
+				"gradient_checkpointing": false,
+				"lr": 1e-06,
+				"optimizer": "adafactor",
+				"group_size": 8,
+				"kl_beta": 0.04,
+				"max_completion_len": 512,
+				"max_prompt_len": 256,
+				"attn": "sdpa",
+				"grad_accum": 4
+			},
+			"status": "ok",
+			"steps": 5,
+			"duration_s": 294.014,
+			"memory": {
+				"peak_allocated_bytes": 21623983104,
+				"peak_reserved_bytes": 22988980224,
+				"device_total_bytes": 23689363456,
+				"by_term": {}
+			},
+			"step_time": {
+				"n_steps": 5,
+				"p50_s": 46.086923828125,
+				"first_step_s": 64.22249628099999,
+				"by_phase": {
+					"data": 1.6800981191284483e-05,
+					"forward": 0.011848944575902054,
+					"backward": 0.023850515538645495,
+					"optimizer": 0.0020067074090394164,
+					"rollout": 0.9534427442774102,
+					"reference": 0.008187654172416226,
+					"reward": 4.7532274512155185e-06,
+					"other": 0.000641879817944111
+				},
+				"unprofiled": true
+			},
+			"rl": {
+				"response_length": {
+					"mean": 91.5875,
+					"p95": 426.0,
+					"max": 512.0,
+					"n": 160
+				},
+				"zero_spread_fraction": 0.75,
+				"pass_rate_per_prompt": [
+					0.0,
+					0.375,
+					0.125,
+					0.0,
+					0.0,
+					0.0,
+					0.0,
+					0.0,
+					0.125,
+					0.0,
+					0.0,
+					0.0,
+					0.125,
+					0.0,
+					0.0,
+					0.0,
+					0.0,
+					0.0,
+					0.0,
+					0.125
+				],
+				"group_size": 8,
+				"entropy": [],
+				"kl": [
+					0.0,
+					0.001042836724082008,
+					0.0018208438123110682,
+					0.003431903140153736,
+					0.0034860952146118507
+				],
+				"clip_fraction": [],
+				"reward_mean": [
+					0.125,
+					0.0,
+					0.03125,
+					0.03125,
+					0.03125
+				]
+			},
+			"generation": {
+				"calls": 20,
+				"seconds_total": 257.9176805569999,
+				"sequences": 160,
+				"new_tokens_mean": 91.5875,
+				"new_tokens_p95": 426.0,
+				"new_tokens_max": 512.0,
+				"backend": "hf"
+			},
+			"extras": {
+				"params_total": 494032768.0,
+				"params_trainable": 494032768.0,
+				"micro_steps_per_step": 4.0,
+				"host_rss_peak_bytes": 7908433920.0,
+				"train_loader_batches": 7473.0,
+				"epochs": 1.0,
+				"planned_steps": 1868.0
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 64.22249628099999,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 19796769280,
+					"peak_reserved_bytes": 21139292160,
+					"device_used_bytes": 21403533312
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 43.84312264599879,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 21409733120,
+					"peak_reserved_bytes": 22756196352,
+					"device_used_bytes": 23020437504
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 38.87717578125,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 16235719168,
+					"peak_reserved_bytes": 22756196352,
+					"device_used_bytes": 23020437504
+				},
+				{
+					"index": 4,
+					"kind": "phase",
+					"wall_s": 65.5007578125,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 21623983104,
+					"peak_reserved_bytes": 22965911552,
+					"device_used_bytes": 23230152704
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 53.296671875,
+					"micro_steps": 4,
+					"peak_allocated_bytes": 21543642624,
+					"peak_reserved_bytes": 22991077376,
+					"device_used_bytes": 23255318528
+				}
+			],
+			"cost": {
+				"gpu_seconds": 294.014,
+				"usd": 0.065336
+			}
+		}
+	],
+	"predictions": {
+		"targets": [
+			{
+				"id": "memory.peak",
+				"label_key": "target.memory.peak",
+				"unit": "bytes",
+				"readout": "memory"
+			},
+			{
+				"id": "time.total",
+				"label_key": "target.time.total",
+				"unit": "s",
+				"readout": "time"
+			},
+			{
+				"id": "cost.total",
+				"label_key": "target.cost.total",
+				"unit": "usd",
+				"readout": "cost"
+			},
+			{
+				"id": "risk.oom",
+				"label_key": "target.risk.oom",
+				"unit": "probability",
+				"readout": "risk"
+			},
+			{
+				"id": "time.step",
+				"label_key": "target.time.step",
+				"unit": "s"
+			},
+			{
+				"id": "memory.weights",
+				"label_key": "target.memory.weights",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.master_weights",
+				"label_key": "target.memory.master_weights",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.frozen_models",
+				"label_key": "target.memory.frozen_models",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.context",
+				"label_key": "target.memory.context",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.gradients",
+				"label_key": "target.memory.gradients",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.optimizer",
+				"label_key": "target.memory.optimizer",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.comm_buffers",
+				"label_key": "target.memory.comm_buffers",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.activations",
+				"label_key": "target.memory.activations",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.logits",
+				"label_key": "target.memory.logits",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.kv_cache",
+				"label_key": "target.memory.kv_cache",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.generation_engine",
+				"label_key": "target.memory.generation_engine",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.eval_spike",
+				"label_key": "target.memory.eval_spike",
+				"unit": "bytes"
+			},
+			{
+				"id": "time.phase.data",
+				"label_key": "target.time.phase.data",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.forward",
+				"label_key": "target.time.phase.forward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.backward",
+				"label_key": "target.time.phase.backward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.optimizer",
+				"label_key": "target.time.phase.optimizer",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.rollout",
+				"label_key": "target.time.phase.rollout",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.reference",
+				"label_key": "target.time.phase.reference",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.reward",
+				"label_key": "target.time.phase.reward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.other",
+				"label_key": "target.time.phase.other",
+				"unit": "s"
+			},
+			{
+				"id": "rl.zero_spread",
+				"label_key": "target.rl.zero_spread",
+				"unit": "fraction",
+				"readout": "risk"
+			},
+			{
+				"id": "time.rollout",
+				"label_key": "target.time.rollout",
+				"unit": "s"
+			},
+			{
+				"id": "rl.truncation",
+				"label_key": "target.rl.truncation",
+				"unit": "fraction"
+			}
+		],
+		"estimates": {
+			"memory.peak": {
+				"point": 23794286592.0,
+				"lo": 21379777373.401,
+				"hi": 26481476609.134937,
+				"unit": "bytes",
+				"status": "measured",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.total": {
+				"point": null,
+				"lo": null,
+				"hi": null,
+				"unit": "s",
+				"status": "abstain",
+				"model_id": "time-total@0.1.0",
+				"source": "exact",
+				"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+				"level": 0.9
+			},
+			"cost.total": {
+				"point": null,
+				"lo": null,
+				"hi": null,
+				"unit": "usd",
+				"status": "abstain",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+				"level": 0.9
+			},
+			"risk.oom": {
+				"point": 0.6403688524590164,
+				"lo": 0.05,
+				"hi": 0.95,
+				"unit": "probability",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "tight: out of memory uncertain (5\u201395%) (from 487 held-out runs); between 5% and 95% the chance isn't verified on real outcomes yet",
+				"level": 0.9
+			},
+			"time.step": {
+				"point": 46.08692382812501,
+				"lo": 41.70371581615365,
+				"hi": 50.930826375347166,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"reason": "rollout: the longest of 8 responses sets the pace; capped at 512 tokens; lengths from a log-normal fitted to the probe's mean and p95",
+				"level": 0.9
+			},
+			"memory.weights": {
+				"point": 9862848542.2451,
+				"lo": 8862022624.02223,
+				"hi": 10976701989.406055,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.master_weights": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.frozen_models": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.context": {
+				"point": 4019275264.7985773,
+				"lo": 3611422012.2364297,
+				"hi": 4473189120.375799,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.gradients": {
+				"point": 9862848542.2451,
+				"lo": 8862022624.02223,
+				"hi": 10976701989.406055,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.optimizer": {
+				"point": 49314242.711225495,
+				"lo": 44310113.12011115,
+				"hi": 54883509.94703027,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.comm_buffers": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.activations": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.logits": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.kv_cache": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.generation_engine": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"memory.eval_spike": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "predicted",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "split by the analytical model, scaled to the calibrated peak",
+				"level": 0.9
+			},
+			"rl.zero_spread": {
+				"point": 0.6070077075973083,
+				"lo": 0.4825030028617751,
+				"hi": 0.7217623996500296,
+				"unit": "fraction",
+				"status": "predicted",
+				"model_id": "rl-zero-spread@0.1.0",
+				"source": "exact",
+				"reason": "61% of groups of 8 would all pass or all fail, from 20 prompts; each prompt's rate from 8 responses, with its uncertainty; the probe measured 75% at its group size of 8",
+				"level": 0.9
+			},
+			"time.rollout": {
+				"point": 43.94124312999148,
+				"lo": 39.759680979031835,
+				"hi": 48.56258401135793,
+				"unit": "s",
+				"status": "predicted",
+				"model_id": "rl-rollout-bootstrap@0.1.0",
+				"source": "exact",
+				"reason": "the longest of 8 responses sets the pace; capped at 512 tokens; lengths from a log-normal fitted to the probe's mean and p95",
+				"level": 0.9
+			},
+			"rl.truncation": {
+				"point": 0.03,
+				"lo": 0.0125,
+				"hi": 0.05,
+				"unit": "fraction",
+				"status": "extrapolated",
+				"model_id": "rl-rollout-bootstrap@0.1.0",
+				"source": "exact",
+				"reason": "share of responses reaching the 512-token cap, from the probe's length distribution",
+				"level": 0.9
+			}
+		},
+		"grids": [
+			{
+				"id": "g.memory.peak.checkpoint_every",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZYplimU=",
+				"lo": "+mT6ZPpk+mT6ZPpk+mQ=",
+				"hi": "KmYqZipmKmYqZipmKmY=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.checkpoint_every",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.checkpoint_every",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.checkpoint_every",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "checkpoint_every",
+						"values": [
+							62,
+							125,
+							250,
+							500,
+							1000,
+							2000,
+							4000
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOR85Hzk=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.gpu_type",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "imWKZYplimWKZYplimWKZYplimWKZQ==",
+				"lo": "+mT6ZPpk+mT6ZPpk+mT6ZPpk+mT6ZA==",
+				"hi": "KmYqZipmKmYqZipmKmYqZipmKmYqZg==",
+				"abstain": "AAA=",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.gpu_type",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"abstain": "/wc=",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.gpu_type",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+				"abstain": "/wc=",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.gpu_type",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"T4",
+							"L4",
+							"A10",
+							"L40S",
+							"A100-SXM-40GB",
+							"A100-SXM-80GB",
+							"RTX-PRO-6000-96GB",
+							"H100-SXM-80GB",
+							"H200-SXM-141GB",
+							"B200-SXM-180GB",
+							"B300-SXM-288GB"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "/jsfORM5Px0/HTIUMhQyFDIUMhQyFA==",
+				"lo": "xDhmKmYqPx0/HTIUMhQyFDIUMhQyFA==",
+				"hi": "/juaO5o7Px0/HTIUMhQyFDIUMhQyFA==",
+				"abstain": "AAA=",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.log_every",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "log_every",
+						"values": [
+							1,
+							2,
+							5,
+							10,
+							20,
+							40
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZYpl",
+				"lo": "32TfZPpk32TfZN9k",
+				"hi": "TWZNZipmTWZNZk1m",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.log_every",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "log_every",
+						"values": [
+							1,
+							2,
+							5,
+							10,
+							20,
+							40
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.log_every",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "log_every",
+						"values": [
+							1,
+							2,
+							5,
+							10,
+							20,
+							40
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.log_every",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "log_every",
+						"values": [
+							1,
+							2,
+							5,
+							10,
+							20,
+							40
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOR85",
+				"lo": "ZipmKmYqZipmKmYq",
+				"hi": "mjuaO5o7mjuaO5o7",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.epochs",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "imWKZYplimWKZQ==",
+				"lo": "+mT6ZPpk+mT6ZA==",
+				"hi": "KmYqZipmKmYqZg==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.epochs",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.epochs",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.epochs",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "HzkfOR85HzkfOQ==",
+				"lo": "ZipmKmYqZipmKg==",
+				"hi": "mjuaO5o7mjuaOw==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.batch_size",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZQAAAAA=",
+				"lo": "+mTfZAAAAAA=",
+				"hi": "KmZNZgAAAAA=",
+				"abstain": "DA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.batch_size",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAA=",
+				"abstain": "Dw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.batch_size",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAA=",
+				"abstain": "Dw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.batch_size",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							1,
+							2,
+							4,
+							8
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOQAAAAA=",
+				"lo": "ZipmKgAAAAA=",
+				"hi": "mjuaOwAAAAA=",
+				"abstain": "DA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.gradient_checkpointing",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "imWKZQ==",
+				"lo": "+mTfZA==",
+				"hi": "KmZNZg==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.gradient_checkpointing",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAA==",
+				"lo": "AAAAAA==",
+				"hi": "AAAAAA==",
+				"abstain": "Aw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.gradient_checkpointing",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAA==",
+				"lo": "AAAAAA==",
+				"hi": "AAAAAA==",
+				"abstain": "Aw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.gradient_checkpointing",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "gradient_checkpointing",
+						"values": [
+							false,
+							true
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "HzkfOQ==",
+				"lo": "ZipmKg==",
+				"hi": "mjuaOw==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.lr",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							1.25e-07,
+							2.5e-07,
+							5e-07,
+							1e-06,
+							2e-06,
+							4e-06,
+							8e-06
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZYplimU=",
+				"lo": "+mT6ZPpk+mT6ZPpk+mQ=",
+				"hi": "KmYqZipmKmYqZipmKmY=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.lr",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							1.25e-07,
+							2.5e-07,
+							5e-07,
+							1e-06,
+							2e-06,
+							4e-06,
+							8e-06
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.lr",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							1.25e-07,
+							2.5e-07,
+							5e-07,
+							1e-06,
+							2e-06,
+							4e-06,
+							8e-06
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.lr",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							1.25e-07,
+							2.5e-07,
+							5e-07,
+							1e-06,
+							2e-06,
+							4e-06,
+							8e-06
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOR85Hzk=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.optimizer",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "optimizer",
+						"values": [
+							"adamw_torch",
+							"adamw_torch_fused",
+							"adamw_8bit",
+							"adafactor",
+							"sgd",
+							"lion_32bit"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "62Z1ZuJlimWKZXVm",
+				"lo": "FWatZSxl+mTeZK1l",
+				"hi": "32dZZ7FmKmZNZlln",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.optimizer",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "optimizer",
+						"values": [
+							"adamw_torch",
+							"adamw_torch_fused",
+							"adamw_8bit",
+							"adafactor",
+							"sgd",
+							"lion_32bit"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.optimizer",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "optimizer",
+						"values": [
+							"adamw_torch",
+							"adamw_torch_fused",
+							"adamw_8bit",
+							"adafactor",
+							"sgd",
+							"lion_32bit"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.optimizer",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "optimizer",
+						"values": [
+							"adamw_torch",
+							"adamw_torch_fused",
+							"adamw_8bit",
+							"adafactor",
+							"sgd",
+							"lion_32bit"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "3Du/O/E6HzkTOb87",
+				"lo": "xDjEOGYqZipmKsQ4",
+				"hi": "3DvbO5o7mjuaO9s7",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.group_size",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "group_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32,
+							64
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZYplimU=",
+				"lo": "32TfZN9k+mTfZN9k32Q=",
+				"hi": "TWZNZk1mKmZNZk1mTWY=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.group_size",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "group_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32,
+							64
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.group_size",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "group_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32,
+							64
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.group_size",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "group_size",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32,
+							64
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOR85Hzk=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.kl_beta",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "kl_beta",
+						"values": [
+							0.005,
+							0.01,
+							0.02,
+							0.04,
+							0.08,
+							0.16,
+							0.32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZYplimU=",
+				"lo": "32TfZN9k+mTfZN9k32Q=",
+				"hi": "TWZNZk1mKmZNZk1mTWY=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.kl_beta",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "kl_beta",
+						"values": [
+							0.005,
+							0.01,
+							0.02,
+							0.04,
+							0.08,
+							0.16,
+							0.32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.kl_beta",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "kl_beta",
+						"values": [
+							0.005,
+							0.01,
+							0.02,
+							0.04,
+							0.08,
+							0.16,
+							0.32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.kl_beta",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "kl_beta",
+						"values": [
+							0.005,
+							0.01,
+							0.02,
+							0.04,
+							0.08,
+							0.16,
+							0.32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOR85Hzk=",
+				"lo": "ZipmKmYqZipmKmYqZio=",
+				"hi": "mjuaO5o7mjuaO5o7mjs=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.max_completion_len",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "max_completion_len",
+						"values": [
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZQAAAAA=",
+				"lo": "rWS3ZMdk+mTfZAAAAAA=",
+				"hi": "kGaCZmxmKmZNZgAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.max_completion_len",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "max_completion_len",
+						"values": [
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.max_completion_len",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "max_completion_len",
+						"values": [
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.max_completion_len",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "max_completion_len",
+						"values": [
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOQAAAAA=",
+				"lo": "ZipmKmYqZipmKgAAAAA=",
+				"hi": "mjuaO5o7mjuaOwAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_prompt_len": 256,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.max_prompt_len",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "max_prompt_len",
+						"values": [
+							32,
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZYplAAA=",
+				"lo": "y2TOZNRk+mTfZN9kAAA=",
+				"hi": "Z2ZjZltmKmZNZk1mAAA=",
+				"abstain": "QA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.max_prompt_len",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "max_prompt_len",
+						"values": [
+							32,
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.max_prompt_len",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "max_prompt_len",
+						"values": [
+							32,
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAAAAA=",
+				"lo": "AAAAAAAAAAAAAAAAAAA=",
+				"hi": "AAAAAAAAAAAAAAAAAAA=",
+				"abstain": "fw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.max_prompt_len",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "max_prompt_len",
+						"values": [
+							32,
+							64,
+							128,
+							256,
+							512,
+							1024,
+							2048
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOR85AAA=",
+				"lo": "ZipmKmYqZipmKmYqAAA=",
+				"hi": "mjuaO5o7mjuaO5o7AAA=",
+				"abstain": "QA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"attn": "sdpa",
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.attn",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "attn",
+						"values": [
+							"eager",
+							"sdpa",
+							"flash_attention_2",
+							"flash_attention_3",
+							"flex_attention"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "imWKZYplimWKZQ==",
+				"lo": "32T6ZN9k32TfZA==",
+				"hi": "TWYqZk1mTWZNZg==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.time.total.attn",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "attn",
+						"values": [
+							"eager",
+							"sdpa",
+							"flash_attention_2",
+							"flash_attention_3",
+							"flex_attention"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.cost.total.attn",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "attn",
+						"values": [
+							"eager",
+							"sdpa",
+							"flash_attention_2",
+							"flash_attention_3",
+							"flex_attention"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "AAAAAAAAAAAAAA==",
+				"lo": "AAAAAAAAAAAAAA==",
+				"hi": "AAAAAAAAAAAAAA==",
+				"abstain": "Hw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.risk.oom.attn",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "attn",
+						"values": [
+							"eager",
+							"sdpa",
+							"flash_attention_2",
+							"flash_attention_3",
+							"flex_attention"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "HzkfOR85HzkfOQ==",
+				"lo": "ZipmKmYqZipmKg==",
+				"hi": "mjuaO5o7mjuaOw==",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"grad_accum": 4
+				}
+			},
+			{
+				"id": "g.memory.peak.grad_accum",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "grad_accum",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "imWKZYplimWKZYpl",
+				"lo": "32TfZPpk32TfZN9k",
+				"hi": "TWZNZipmTWZNZk1m",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 16777216.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa"
+				}
+			},
+			{
+				"id": "g.time.total.grad_accum",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "grad_accum",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa"
+				}
+			},
+			{
+				"id": "g.cost.total.grad_accum",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "grad_accum",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "AAAAAAAAAAAAAAAA",
+				"lo": "AAAAAAAAAAAAAAAA",
+				"hi": "AAAAAAAAAAAAAAAA",
+				"abstain": "Pw==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa"
+				}
+			},
+			{
+				"id": "g.risk.oom.grad_accum",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "grad_accum",
+						"values": [
+							1,
+							2,
+							4,
+							8,
+							16,
+							32
+						],
+						"scale": "log"
+					}
+				],
+				"point": "HzkfOR85HzkfOR85",
+				"lo": "ZipmKmYqZipmKmYq",
+				"hi": "mjuaO5o7mjuaO5o7",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 1.0,
+				"fixed": {
+					"checkpoint_every": 500,
+					"gpu_type": "L4",
+					"log_every": 5,
+					"epochs": 1,
+					"batch_size": 1,
+					"gradient_checkpointing": false,
+					"lr": 1e-06,
+					"optimizer": "adafactor",
+					"group_size": 8,
+					"kl_beta": 0.04,
+					"max_completion_len": 512,
+					"max_prompt_len": 256,
+					"attn": "sdpa"
+				}
+			}
+		]
+	},
+	"models": [
+		{
+			"id": "cost-gpu-hours@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. GPU-hours x the dated price in engine/prices",
+			"fixture": false
+		},
+		{
+			"id": "memory-analytical@0.3.1",
+			"kind": "analytical",
+			"version": "0.3.1",
+			"training_data": "remote-runs b-corpus-export-3 and b-corpus-export-hf-2 (Oct 31): L4, A10, L40S, T4; A100 held out, scored once (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table e92fbd0e7b",
+			"heldout_error": {},
+			"coverage": 0.9014373716632443,
+			"per_gpu_coverage": {
+				"A100-PCIe-80GB": 0.6666666666666666,
+				"A100-SXM-80GB": 0.875
+			},
+			"notes": "calibration: held_out. Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d.  Own cells: L40S, pretrain (n = 16); L40S, retrieval (n = 16); L40S, vision (n = 29); A10, finetune (n = 19); A10, pretrain (n = 47); A10, retrieval (n = 46); A10, vision (n = 89); L4, finetune (n = 19); L4, pretrain (n = 47); L4, retrieval (n = 46); L4, vision (n = 89); T4, vision (n = 10); merged across GPUs and job types (n = 487); finetune, merged across GPUs (n = 38); pretrain, merged across GPUs (n = 117); retrieval, merged across GPUs (n = 115); vision, merged across GPUs (n = 217). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs, then all runs. Leave-one-architecture-out coverage 439 of 487 (Wilson 95% 87% to 92%). Holdout, never tuned on: A100-PCIe-80GB 8 of 12 inside the band (Wilson 95% 39% to 86%). Holdout, never tuned on: A100-SXM-80GB 14 of 16 inside the band (Wilson 95% 64% to 97%)",
+			"fixture": false
+		},
+		{
+			"id": "rl-rollout-bootstrap@0.1.0",
+			"kind": "bootstrap",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. the expected longest capped response in a batch, bootstrapped from the probe's lengths (HybridFlow); not yet checked against a full RL run (validation row: rollout time within 20%)",
+			"fixture": false
+		},
+		{
+			"id": "rl-zero-spread@0.1.0",
+			"kind": "bootstrap",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. p^G + (1-p)^G per prompt, each pass rate with a Jeffreys posterior, prompts resampled (DAPO, Dr. GRPO); not yet checked against a full RL run (validation row: GRPO zoo script)",
+			"fixture": false
+		},
+		{
+			"id": "run-cost@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+			"fixture": false
+		},
+		{
+			"id": "steptime-phases@0.2.0",
+			"kind": "analytical",
+			"version": "0.2.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. per-phase linear fits on the probes; S4b below the smallest probe",
+			"fixture": false
+		},
+		{
+			"id": "time-total@0.1.0",
+			"kind": "analytical",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. steps x step time plus measured checkpoint and eval overheads",
+			"fixture": false
+		}
+	],
+	"findings": [],
+	"patches": [],
+	"provenance": [],
+	"costs": {
+		"gpu_usd": 0.065336,
+		"llm_usd": 0.0,
+		"breakdown": {
+			"probes": 0.065336
+		}
+	},
+	"cost_basis": {
+		"price_table": "prices@2026-10-27",
+		"as_of": "2026-10-27",
+		"provider": "modal",
+		"billing": "on_demand",
+		"currency": "USD",
+		"includes": [
+			"gpu",
+			"tokens"
+		]
+	},
+	"job_cost": {
+		"lines": [
+			{
+				"kind": "gpu",
+				"label_key": "cost.line.gpu",
+				"quantity": {
+					"point": null,
+					"lo": null,
+					"hi": null,
+					"unit": "gpu_hours",
+					"status": "abstain",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+					"level": 0.9
+				},
+				"rate_usd": 0.8,
+				"usd": {
+					"point": null,
+					"lo": null,
+					"hi": null,
+					"unit": "usd",
+					"status": "abstain",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+					"level": 0.9
+				},
+				"price_row": "gpu/modal/L4/us/on_demand"
+			}
+		],
+		"total_usd": {
+			"point": null,
+			"lo": null,
+			"hi": null,
+			"unit": "usd",
+			"status": "abstain",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+			"level": 0.9
+		},
+		"gpu_hours": {
+			"point": null,
+			"lo": null,
+			"hi": null,
+			"unit": "gpu_hours",
+			"status": "abstain",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+			"level": 0.9
+		},
+		"at_risk_gpu_hours": {
+			"point": null,
+			"lo": null,
+			"hi": null,
+			"unit": "gpu_hours",
+			"status": "abstain",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+			"level": 0.9
+		},
+		"at_risk_usd": {
+			"point": null,
+			"lo": null,
+			"hi": null,
+			"unit": "usd",
+			"status": "abstain",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "the run's length isn't known: no max_steps, and no dataset size to divide by the batch",
+			"level": 0.9
+		}
+	}
+}

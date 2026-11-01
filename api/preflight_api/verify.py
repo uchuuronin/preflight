@@ -293,13 +293,21 @@ def main(argv: list[str]) -> int:
 	ap.add_argument("before")
 	ap.add_argument("after")
 	ap.add_argument("--metric", default="memory.peak")
+	ap.add_argument(
+		"--may-change",
+		default="",
+		help="comma-separated checks the fix is allowed to move (e.g. throughput_floor)",
+	)
+	ap.add_argument("--keep-eval", action="store_true", help="the fix touches evaluation: it must still run")
+	ap.add_argument("--no-grad", action="store_true", help="the fix runs evaluation without gradients")
 	ap.add_argument("--json", action="store_true")
 	a = ap.parse_args(argv)
 	with open(a.before) as f:
 		before = json.load(f)
 	with open(a.after) as f:
 		after = json.load(f)
-	res = check(before, after, metric=a.metric)
+	may = tuple(x.strip() for x in a.may_change.split(",") if x.strip())
+	res = check(before, after, metric=a.metric, may_change=may, keep_eval=a.keep_eval, no_grad=a.no_grad)
 	if a.json:
 		print(json.dumps(res, indent=2, default=str))
 	else:

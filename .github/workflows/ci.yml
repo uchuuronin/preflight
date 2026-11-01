@@ -46,6 +46,8 @@ jobs:
         run: node --test schema/ts/*.test.ts
       - name: Web GPU table matches engine/gpus.py
         run: uv run python web/scripts/make_gpu_table.py --check
+      - name: Web price table matches engine/prices
+        run: uv run python web/scripts/make_price_table.py --check
       - name: No GPL, AGPL or SSPL dependencies (gap 22)
         run: uv run python .github/scripts/licences.py
 

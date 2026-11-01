@@ -1,5 +1,45 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Sun Nov 1, round four (Chiya's order, 01:19)
+
+| # | Item | State | Hours | Waits on |
+| --- | --- | --- | --- | --- |
+| 1 | Campaign lens: a sample with B's planner output for a grid, and a tour on the calendar to the completion-date distribution (video 2:25) | Built on ws-c: sample PF420 (B's planner from ws-b 6ce7730 on a 12-run grid, three lanes, US$60 budget; `web/scripts/make_campaign_sample.py`), a three-step tour (cost with range, the 5 runs cut, the finish p10 to p90) that lights the calendar and speaks inside it, and the finish band under the lanes. Needs `c.campaign_calendar` on (asked Chiya) | 0 | Chiya's flag |
+| 2 | GRPO lens: sample, tour, truncation and reward-spread views on A's L4 smoke record; zero-spread share measured with its Wilson interval (the video opens on it); swap in the 50-step record when A posts it | Built on ws-c: sample PF510 from A's L4 run 41260610897 (A's map, A's measured probe, B's predictions; `web/scripts/make_grpo_sample.py`); the RL view shows 15 of 20 prompts with zero reward spread (75%, Wilson 53% to 89%), one cell per prompt, B's prediction at the current group size, and completion length against the 512 cap with truncation marked not measured (B's 3% estimate beside it); the tour walks both before any move. Open: B's `memory.peak` reads 23.8 GB "measured" on a run that measured 21.6 GB allocated, so the run shows as past the L4 (asked B) | 0.5 (swap to the 50-step record) | A's 50-step record; B's peak |
+| 3 | Cost frontier (Pareto) for A's model sweep (video 2:05) | Built on ws-c against the contract's task sample (`frontier.ts`, `CostFrontier.tsx`): each model's cost per task with the 95% interval of the mean, success with its Wilson interval, the non-dominated models joined, named points, hover and focus summaries, a table; checked in both themes and at phone width on a stand-in sweep (tests only). Draws nothing until a record has two or more models with scored tasks; A's sweep isn't started (asked A for the shape) | 0 | A's sweep |
+| 4 | Editable rate in the cost readout | Built on ws-c: the cost line under the status line reads quantity x rate = total ("1.04 to 1.41 GPU-hours x US$0.80/h = US$0.83 to US$1.12", or tokens x $/M for an API run), no list-price or date label; the rate opens a box ($/GPU-hour, or $/M input and $/M output) with the table's source and date in small text; $0 allowed; a "your rate" tag with reset. Every dollar moves at once through one provider (dials, timeline, guide moves, limits, campaign totals): save to dials updated in 63 to 107 ms at 4x CPU; knob p95 102 and 114 ms. Kept per job in this browser, carried in the export plan (`rate`, with source and price row). B's rates reach the browser as `prices.json`, generated from engine/prices with a CI staleness check. Exact for a pure GPU or pure token cost; mixed costs show no rate box | 0 | |
+| 4b | Stretch, `c.price_from_url` (off): check a rate against a pasted page (plain HTTPS fetch, private addresses blocked, 1 MB, 5 s; Muse Spark quotes candidate rates through the spend ledger; the visitor confirms) | Not before 4 ships; tomorrow's cut sheet | 4, plus about US$0.01 of Muse Spark per check |
+| 5 | First real fix race after the deploy (cap about US$0.39): costed and asked before it runs, then recorded | After the deploy | 1 | Chiya's yes |
+
+Review of the round-four batch (read-only, Nov 1), fixed: the typecheck error in a new test; the campaign cut step now judges the budget at the table's rates the plan was made at (it could say "up to US$0, over the budget" under a visitor's rate); moves that clear a predicted failure are kept whatever the rate (a rate had dropped the OOM fix); a new rate clears the delta badge's "previous"; the rate box starts from the table when the visitor's rate is for another GPU; the five-move cap counts moves, not view steps; the RL cap is the one the run was measured at, with a note when the knob has moved; PF420 is listed only with `c.campaign_calendar` on and dated from Mon 9 Nov; focus returns to the rate after saving; RL prompt cells have labels. Known limitations, not fixed: the guide's sensitivity ranking and its choice of best value per knob are still at table prices (only the cost of a move is re-measured), and the cost frontier is at table prices (it says so).
+
+Held for Monday's cut sheet, with hours: PyodideProvider 4 (needs B's bundle), step anatomy 3, health signals 3, load test at 20 visitors 2 plus a small paid run, the other six lens tours 6 (1 each). The checks page stays out of the README until the Nov 2 runs: three probes with wide Wilson bands would read as a result.
+
+Audit trail: the first Muse Code smoke (GitHub run 41246585559) ran `muse-spark-1.3-contributor` although the command passed `--contributor-mode off`; every fix-loop run now names the standard `muse-spark-1.3`, and a candidate whose run reports a contributor model is refused.
+
+## Sun Nov 1, early
+
+- Pushed `c28d664..80d4217` (Chiya's yes). The push changed the guide's prompt and tools, so guide-smoke ran on its own (run 41273350602): 5 rounds, US$0.019, all called tools, p50 4.9 s.
+- Limits kept on the server per session; the fix route reads only that copy (`1bf39ee`), tested with the limits stripped.
+- Plain-words reader live check ready (`9e8164c`, api/limits_check_app.py, 10 phrases); waits on a push to run.
+- Data-use line on `harness.spark_script_map` (`b17b600`); shared-flag test passes once merged with A's f50999d.
+- Moves wait for the saved limits before animating; the guide's unpin only asks (`d322d0a`).
+- D's audit 12 (model tags only where the model ran, `adf1876`) and 7 to 11 (`98853d4`): D's sweep shows colour contrast 0 (was 16), target size 0, no focus without a ring.
+- Pushed `80d4217..4826eda` (Chiya's yes); guide-smoke ran on its own (41279114051, passed).
+- Plain-words limits live check (Chiya's yes, at most US$0.05; GitHub run 41279124601): 10 calls, US$0.0365. 5 of 10 stopped at the 600-token output cap mid-reasoning and called no tool, so those visitors would have seen their whole text as "not understood"; the cap is now 1,600 (the 5 that finished used 362 to 594). The 1,600 cap is sized from the calls that finished, so the next live run should count how many still end with no tool call. Of the 5 that answered: "L40S or H100 only, finish in 6h, max 12 GPU-hours" and "don't touch precision or LoRA rank; under $60 total" read exactly; "budget forty dollars" kept "don't change packing" but dropped the budget because only digits counted (number words now count, each read on its own: review found the first version summed "fifty; ten" into 60, fixed and tested); "has to be done by Friday" and "I just want it cheap" came back as not understood, which is right (no date or number to hold). The injection, the contradiction and "sequence length 2048, batch size at most 8" were among the cut-off five, so they're untested live.
+- README validation block: B's scorer markers in README with a line on where the table comes from, kept by `tests/test_readme_markers.py` (one pair, in order, the scorer's own strings when B's code is present). The stranger test writes its knob timings in B's manifest shape (`KNOB_MS_OUT`); asked B to take that file as `knob_ms`, and noted that the cost-per-run row comes from real jobs (`costs.total_usd`, job wall time), not the stranger test.
+- Contract 0.6.0 campaign fields drafted and sent to the PM (from-c.md): `Campaign.start`, `p_by_deadline`, `checkpoint_interval`, `lane_slots`; `CampaignCell.slot`, `reason`, `gpu_hours_estimate`, `usd_estimate`. Built against them now: `planFromRecord` draws a shared record's campaign with the live plan's calendar (0.5.0 records too; per-run costs aren't on screen yet), runs that go at once on separate rows (by slot, or by time when the record has no slots), and the cockpit mounts it under the whole run, inside an error boundary, when the record has a campaign and `c.campaign_calendar` is on. Review fixes: a run with no time shows the record's reason and never draws as a zero-length bar; the finish band needs all three dates.
+- Cockpit motion pass: numbers travel with their arcs on one value clock (no more number snapping while its arc sweeps), and after every move each readout it changed shows the change in its dial's open gap for 2.6 s ("+1 h 22 min", green if better, amber if worse). On a phone the open knob control repeats it, because the dials sit a screen above. Knob p95 at 4x CPU unchanged (80 to 152 ms against 68 to 212 before, 3 runs each); reduced motion: numbers snap and the wake only fades. The hexagon node's label no longer clips.
+- Agent tour re-walked in Chromium with a limit set (Don't change the model): finding step, then Concurrency 4 to 32 on the time aim; no errors, no overflow. GRPO waits on A's rerun; pretrain has no real record yet.
+
+## Sat Oct 31, night
+
+- Guide limits (`4e555dc`, Chiya's gap from local testing): "Not this", "Keep <value>" beside "Pin <value>", Your limits (allowed GPUs, budget, must-finish-within, GPU-hours, don't change, ruled out; plain words read by Muse Spark into chips to confirm), hard limits in both tours and refused server-side, and the visitor's own move always wins. The live words reader makes one Muse Spark call per use (about US$0.003); not run live yet.
+- Audit finding 4 fixed (`c28d664`): a failed or cancelled job's boarding screen marks the leg it stopped on ("Stopped here" / "Cancelled here", red route).
+- Agent tour on A's measured record (`5b297cc`), see the plan table; review fixes in `f83b184`, `7c7c5fb`.
+- Fix loop: `/v1/patches`, `race_fix` and the race on screen (`c876e04`, `bf81087`), review fixes `481bbd3`, see the plan table.
+- W&B export (`6fdf4e0`), verify Action options and README (`7d33368`), reduced-motion pass (`481bbd3`).
+
 ## Sat Oct 31, evening: Muse Code smoke test (Chiya's yes, $1 cap, CPU only)
 
 | Run | What | Result | Cost |
@@ -10,7 +50,9 @@
 | 41246497059 | startup check (no model) | Passed: flags, gate, exact command on the echo provider; `--disable-reminders` accepted; `-c runtime_capabilities.*` not trusted (a made-up name is accepted too) | under $0.01 |
 | 41246585559 | smoke | Fix landed (eval in `torch.no_grad()`, `.item()` losses), 45 s, 7 model calls, no observer calls. No shell command was tried: the preamble told the model not to. The gate's three denials were honoured headless. Model was `muse-spark-1.3-contributor` | $0.12 at standard prices from reported tokens (186,689 in, 133,557 cached, 5,175 out, 3,331 reasoning); Meta's Usage page decides |
 
-Tool inputs Muse Code 1.4.14 sent: `read_file {path}` and `{path, offset, limit}`; `search {pattern}` and `{paths, pattern}` (pattern is a regex); `edit_file {path, find, replace}`; `write_file {path, content}`. The gate wrongly denied the regex pattern and `find`/`replace`; fixed.
+| 41250977670 | smoke, shell block (Chiya's yes) | **Passed.** The model's first call was `bash` (`python train.py --help`); the gate refused it and Muse Code rejected the call with the gate's reason; the same correct fix landed. Model `muse-spark-1.3` (standard), observers off, 19 s | $0.09 at standard prices from reported tokens (148,560 in, 98,884 cached, 1,671 out, 913 reasoning) |
+
+Tool inputs Muse Code 1.4.14 sent: `read_file {path}` and `{path, offset, limit}`; `search {pattern}` and `{paths, pattern}` (pattern is a regex); `edit_file {path, find, replace}`; `write_file {path, content}`. The gate wrongly denied the regex pattern and `find`/`replace`; fixed. The second run added `bash {command, description, workdir}` (refused, as it should be), `search {glob: [list], output_mode, pattern}` and `search {paths, output_mode, pattern}`; the gate now takes a glob list and `output_mode`.
 
 ## Sat Oct 31, morning: every plan item C owns
 
@@ -25,9 +67,9 @@ read-only review, and exclude waiting on others.
 | Item | State | Hours | Waits on |
 | --- | --- | --- | --- |
 | Fine-tune lens: map, readouts, fit map with OOM frontier, memory stack, live and rule tour | On main (`c.fit_map` off) | 1 (turn flag on after the e2e run) | A's runner deploy |
-| Agent lens: map and tour on the golden record | On main (golden only; no real agent record yet) | 3 (tour checked on a real record, agent readouts) | A's first real agent record |
-| GRPO lens: sample, tour, truncation and reward-spread views | Not started | 5 | A's GRPO zoo record; B's RL models |
-| Campaign lens: calendar with team lanes on B's planner | Not started | 6 | B's planner (only `campaign/__init__.py` exists on ws-b) |
+| Agent lens: map and tour on the golden record | On ws-c (`5b297cc`): sample PF331 from A's measured Oct 31 record; the tour walks the retry-loop finding (lights Tools), never offers `n_tasks` or other result-changing knobs as savings. The context overflow is only derived (D: turn 11 from the growth; no sampled task passed turn 4) and caching isn't priced (requests to A and B) | 0.5 (live Muse Spark tour check, paid) | Chiya's yes for the paid check |
+| GRPO lens: sample, tour, truncation and reward-spread views | Superseded by Sun Nov 1, round four (item 2) | 5 | A's L4 smoke record is in |
+| Campaign lens: calendar with team lanes on B's planner | Superseded by Sun Nov 1, round four (item 1); calendar built (`planFromRecord`) | 4 | Not waiting: B's planner on ws-b since Sat evening |
 
 **Contract C and the workspace features**
 
@@ -50,20 +92,20 @@ read-only review, and exclude waiting on others.
 | Health signals view | Not started | 3 |
 | Cost frontier (Pareto) view | Not started | 3 |
 | Fix loop: verify both sides (module and `.github/actions/verify`) | On main | 0 |
-| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | Backend on ws-c (`7bfc149`, `8a4ecda`): templates, deny-by-default gate, race in worktrees, Modal app; one review, fixes in, second review running. Smoke test waits for a yes. Not started: `/v1/patches`, race on screen, verify via A (needs `JobRequest.patch`) | 6, plus the smoke run |
+| Fix loop: 12 templates, Muse Code headless (option 1, edits only), parallel candidates, re-probe, race on screen (`c.fix_loop`) | On ws-c: backend, smoke passed (Oct 31); `/v1/patches` and `race_fix` (`c876e04`), race in lanes on screen (`bf81087`), deploy step for `preflight-fix` (no warm containers). Not started: verify of a candidate through A (needs A's runner to apply `JobRequest.patch`); the live guide's `propose_patch` still answers "not built" | 2 (verify wiring once A applies patches) | Chiya's yes for the first real race (about $0.39, cap) and the deploy |
 | In-app alert when an in-flight run leaves its band | Not started | 2 (needs A's in-flight collector) |
 | Autopilot and self-directed probes (gap 20) | Not started | 6 |
 | Autopilot scored over the bug zoo, Wilson intervals (adopted 7) | Not started | 3, plus a paid zoo run |
 | Exports: hook for D's panel | On ws-c (`f791589`) | 0 |
 | Exports: config, patch, sbatch, CLI command, share link (D builds the panel) | Plan data on ws-c (`ExportPlan`); D's panel not started | 0.5 |
-| GitHub Action: verify pass/fail | On main | 0 |
+| GitHub Action: verify pass/fail | On main; on ws-c (`7d33368`): per-fix options (may-change, keep-eval, no-grad) and a README section for using it from other repos (works from another repo once this one is public) | 0 |
 | GitHub Action: run Preflight from a workflow | Not started | 3 |
-| W&B export | Not started | 2 |
+| W&B export | On ws-c (`6fdf4e0`): `preflight_wandb.py` from the export plan, knobs as config, readouts with intervals in the summary; checked by running it against a stand-in run; shows with `c.exports` | 0 |
 | Every Meta model labelled on screen | Partial: Muse Spark, Spark Open and diagnosis labels on main; Muse Code arrives with the fix loop | 0.5 |
 | Template status line above the readouts (adopted 8) | On main | 0 |
 | Coverage (checks) page (adopted 2) | On main; round-three re-score on ws-c next | 1 |
-| Onboarding for first-time visitors | Not started | 3 |
-| Accessibility and reduced-motion pass (D's audit feeds it) | Partial: D's first four fixes on ws-c | 4 |
+| Onboarding for first-time visitors | On ws-c: four first-visit notes in the cockpit (`c.onboarding`, flag requested from Chiya) | 0 |
+| Accessibility and reduced-motion pass (D's audit feeds it) | Reduced motion done on ws-c (`481bbd3`): no endless animation with reduced motion on Home, New flight and two cockpits; audit findings 1 to 5 fixed; 6 to 12 open | 2 (audit 6 to 12) |
 | Load test at 20 concurrent visitors | Not started | 2, plus a small paid run |
 | Licence check of everything bundled (CI dependency scan is on main) | Partial | 1 |
 | Demo rehearsed on the public link; video draft | Not started | 3 |
@@ -127,7 +169,7 @@ costing, the fix loop, then HOPs and the abstention button while the campaign pl
 | Engine | Step time within 15% | Peak memory within 10% | Inside 90% interval | OOM |
 | --- | --- | --- | --- | --- |
 | main 6c65ccd (round two) | 0 of 3 (0% to 56%) | 0 of 3: +32%, +61%, -38% | 0 of 6 (0% to 39%) | 1 of 1, none missed |
-| round three | re-run once merged | | | |
+| main 006bc57 (round three, `predict_as_run`) | 2 of 3 (21% to 94%): p1 5% low, p2 28% high, p3 4% low | 1 of 1 scored: p3 0.5% low; p1 and p2 sized for seq_len (rows up to 517 of 1024 tokens), not scored | 4 of 4 (51% to 100%) | 1 of 1, none missed |
 
 - Pushed b10be16 and a213c91 with Chiya's yes (Oct 30, 21:47).
 - API image ships `flags.production.json` (B's file, `engine.memory` on). On ws-c alone the file

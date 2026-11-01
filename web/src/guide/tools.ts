@@ -12,10 +12,12 @@
  * Every call, whoever makes it (Muse Spark or the rule-based tour), goes through runTool and
  * lands in the trace with its real arguments and result.
  */
+import { breaksLimit, type Limits, NO_LIMITS, withinLimits } from "./limits";
 import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
 import { costStraddlesBudget, SAMPLE_MORE_TASKS, samplesTasks } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, ObjectiveKind, Prediction } from "../workspace/record/types";
 import type { WorkspaceActions } from "../workspace/state";
+import { changesResults, isFailing } from "./ruleTour";
 
 export interface ToolDef {
 	type: "function";
@@ -161,6 +163,10 @@ export interface ToolContext {
 	actions: WorkspaceActions;
 	knobs: Readonly<Record<string, KnobValue>>;
 	pinned: ReadonlySet<string>;
+	/** The visitor's limits (guide/limits.ts): hard limits on every move. */
+	limits?: Limits;
+	/** The guide asks to release a pin; only the person's click releases it (live guide). */
+	requestUnpin?: (knobId: string) => void;
 	/** Money-spending tools land here for the person to approve. */
 	requestApproval: (name: string, args: Record<string, unknown>) => void;
 }
@@ -195,7 +201,15 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 		}
 		case "sensitivity": {
 			const kind = (args.objective as ObjectiveKind | undefined) ?? record.job.objective?.kind ?? "min_time";
-			return { ok: true, result: provider.sensitivity(record, { kind }, { pinned, knobs }).slice(0, 6) };
+			// Each knob says whether moving it changes what the run produces or measures (seq_len, an
+			// eval's task count): those are trade-offs to put to the person, not savings to take.
+			return {
+				ok: true,
+				result: provider
+					.sensitivity(record, { kind }, withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned }))
+					.slice(0, 6)
+					.map((k) => ({ ...k, changes_results: changesResults(k.knob_id, record) })),
+			};
 		}
 		case "set_knob": {
 			const id = String(args.knob_id);
@@ -203,6 +217,11 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 			const from = knobs[id];
 			const to = args.value as KnobValue;
 			if (from === undefined) return { ok: false, error: `unknown knob ${id}` };
+			const broken = breaksLimit(record, ctx.limits ?? NO_LIMITS, id, to, provider.predict(record, { ...knobs, [id]: to }), provider.predict(record, knobs), knobs);
+			if (broken) return { ok: false, error: `${id} = ${String(to)} breaks the person's limits (${broken}); offer the next lever instead` };
+			if (changesResults(id, record) && !isFailing({ record, provider, knobs })) {
+				return { ok: false, error: `${id} changes what the run produces or measures; put it to the person as a trade-off instead of moving it` };
+			}
 			if (!actions.setKnob(id, to, "guide")) return { ok: false, error: `could not move ${id}` };
 			actions.propose({ knobId: id, from, to });
 			actions.openKnob(id);
@@ -212,6 +231,8 @@ export function executeTool(name: string, args: Record<string, unknown>, ctx: To
 			};
 		}
 		case "pin":
+			if (!args.pinned && (ctx.limits ?? NO_LIMITS).frozen.includes(String(args.knob_id)))
+				return { ok: false, error: `${String(args.knob_id)} is one the person said not to change; it stays where it is` };
 			actions.pin(String(args.knob_id), Boolean(args.pinned));
 			return { ok: true, result: { pinned: args.knob_id, value: args.pinned } };
 		case "highlight":

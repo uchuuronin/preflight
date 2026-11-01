@@ -32,6 +32,8 @@ def spec_to_wire(spec: ProbeSpec) -> str:
 def spec_from_wire(text: str) -> ProbeSpec:
 	d = json.loads(text)
 	d["out_dir"] = None
+	if "gpu_fallback" in d:
+		d["gpu_fallback"] = tuple(d["gpu_fallback"] or ())
 	return ProbeSpec(**d)
 
 

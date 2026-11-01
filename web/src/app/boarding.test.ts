@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boardingState, type BoardingEvent } from "./boarding";
+import { boardingState, type BoardingEvent, metaModelName, modelsRan, STAGES } from "./boarding";
 
 const ev = (seq: number, stage: BoardingEvent["stage"], more: Partial<BoardingEvent> = {}): BoardingEvent => ({
 	job_id: "01JOB",
@@ -54,5 +54,51 @@ describe("boardingState", () => {
 		expect(s.cancelled).toBe(true);
 		expect(s.error).toBeNull();
 		expect(boardingState([ev(0, "cancelled", { error_code: "budget" })]).error?.code).toBe("budget");
+	});
+});
+
+describe("where a job stopped", () => {
+	const ev = (seq: number, stage: string, extra: Record<string, unknown> = {}) =>
+		({ job_id: "j", seq, at: "2026-10-31T00:00:00Z", stage, ...extra }) as never;
+
+	it("marks the leg of the last stage reached when the job fails, not none", () => {
+		const s = boardingState([ev(0, "queued"), ev(1, "fetching"), ev(2, "harnessing"), ev(3, "probing"), ev(4, "failed", { error_code: "oom" })]);
+		expect(s.failed).toBe(true);
+		expect(STAGES[s.at]?.key).toBe("boarding.stage.probe");
+	});
+
+	it("puts a failure before any stage on the queue leg, and a cancel where it happened", () => {
+		expect(boardingState([ev(0, "failed", { error_code: "submission.invalid" })]).at).toBe(0);
+		const c = boardingState([ev(0, "queued"), ev(1, "mapping"), ev(2, "cancelled")]);
+		expect(c.cancelled).toBe(true);
+		expect(STAGES[c.at]?.key).toBe("boarding.stage.read");
+	});
+
+	it("follows a running job leg by leg, and ends on the last when it's done", () => {
+		expect(STAGES[boardingState([ev(0, "queued"), ev(1, "triage")]).at]?.key).toBe("boarding.stage.triage");
+		expect(boardingState([ev(0, "predicting"), ev(1, "done")]).at).toBe(STAGES.length - 1);
+		expect(boardingState([]).at).toBe(-1);
+	});
+});
+
+
+describe("model tags on the route (audit finding 12)", () => {
+	const read = STAGES.findIndex((s) => s.key === "boarding.stage.read");
+	const triage = STAGES.findIndex((s) => s.key === "boarding.stage.triage");
+
+	it("show a Meta model only where the record says it was called", () => {
+		// A real record from A's L4 run: Muse Spark mapped the script, no triage ran.
+		const ran = modelsRan([{ provider: "meta", model: "muse-spark-1.3", purpose: "script_map", ok: true }]);
+		expect(ran[read]).toEqual(["Muse Spark"]);
+		expect(ran[triage]).toEqual([]);
+		expect(ran.flat()).toEqual(["Muse Spark"]);
+	});
+
+	it("show nothing before the record says anything, for failed calls, or for other models", () => {
+		expect(modelsRan(undefined).flat()).toEqual([]);
+		expect(modelsRan([{ model: "muse-spark-1.3", purpose: "script_map", ok: false }]).flat()).toEqual([]);
+		expect(modelsRan([{ model: "gpt-x", purpose: "triage" }]).flat()).toEqual([]);
+		expect(modelsRan([{ model: "meta-models/muse-spark-open-1026", purpose: "claim_check" }])[triage]).toEqual(["Muse Spark Open"]);
+		expect(metaModelName("muse-spark-open-1026")).toBe("Muse Spark Open");
 	});
 });

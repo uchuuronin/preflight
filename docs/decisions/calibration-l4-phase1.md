@@ -71,6 +71,7 @@ The fix is a step-time model with a floor below the probes and proportional grow
 - **How it works now:** probes are fitted with the longest padded row they processed, warm-up included. Queries keep the setting, so on data shorter than the limit the engine over-predicts and never under-predicts.
 - **Held out on A's L4 smoke record:** p3 is within 0.5%. p1 and p2 are 76% and 61% high, because their rows reached 517 of 1024.
 - **What would make it tight and still safe:** the dataset's own longest tokenized row, which the probe could record.
+- **Ground truth agrees (Chiya, Oct 31, from A's LoRA ground truth on L4):** the training peak at step 120 was 13% above the probe's reading. Sizing by the rows the probes saw would have under-predicted it; sizing by seq_len doesn't.
 
 **Step time:** a probe cut by its seq_len now gives a lower bound on row length at its batch, instead of being dropped. Held out on the same record: 2 of 3 within 15% (Wilson 95% 21% to 94%), 3 of 3 inside the 90% interval (44% to 100%).
 

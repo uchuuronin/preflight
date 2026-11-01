@@ -67,6 +67,8 @@ class Reservation:
 	ip: str
 	usd: float
 	at: float
+	#: Seconds before an unsettled reservation closes at its worst case; None is the ledger's own.
+	ttl: float | None = None
 
 
 @dataclass
@@ -111,7 +113,7 @@ class LedgerCore:
 
 	def _expire(self, now: float) -> None:
 		ttl = self.limits.reservation_ttl_s
-		for rid in [r.id for r in self._open.values() if now - r.at > ttl]:
+		for rid in [r.id for r in self._open.values() if now - r.at > (r.ttl if r.ttl is not None else ttl)]:
 			self._close(rid, None)  # kept at worst case
 
 	def _outstanding(self, *, run: str | None = None) -> float:
@@ -139,7 +141,19 @@ class LedgerCore:
 
 	# ---- public
 
-	def reserve(self, *, visitor: str, run: str, ip: str, usd: float, now: float | None = None) -> Decision:
+	def reserve(
+		self,
+		*,
+		visitor: str,
+		run: str,
+		ip: str,
+		usd: float,
+		now: float | None = None,
+		run_cap: float | None = None,
+		ttl_s: float | None = None,
+	) -> Decision:
+		"""`run_cap` replaces the per-run cap for this run (the fix loop's per-address budget);
+		`ttl_s` keeps a reservation open longer than a guide turn (a fix race runs minutes)."""
 		now = time.time() if now is None else now
 		lim = self.limits
 		with self._lock:
@@ -148,7 +162,8 @@ class LedgerCore:
 			d = self._d
 			if d.usd + self._outstanding() + usd > lim.usd_per_day:
 				return Decision(False, reason="daily_cap")
-			if d.run_usd.get(run, 0.0) + self._outstanding(run=run) + usd > lim.usd_per_run:
+			cap = lim.usd_per_run if run_cap is None else run_cap
+			if d.run_usd.get(run, 0.0) + self._outstanding(run=run) + usd > cap:
 				return Decision(False, reason="run_cap")
 			if d.turns_visitor.get(visitor, 0) >= lim.turns_per_visitor_day:
 				return Decision(False, reason="visitor_turns")
@@ -158,7 +173,7 @@ class LedgerCore:
 			if wait is not None:
 				return Decision(False, reason="ip_burst", retry_after_s=round(wait, 1))
 			rid = secrets.token_urlsafe(12)
-			self._open[rid] = Reservation(rid, visitor, run, ip, usd, now)
+			self._open[rid] = Reservation(rid, visitor, run, ip, usd, now, ttl_s)
 			d.turns_visitor[visitor] = d.turns_visitor.get(visitor, 0) + 1
 			d.turns_ip[ip] = d.turns_ip.get(ip, 0) + 1
 			return Decision(True, reservation=rid)
@@ -189,7 +204,10 @@ class LedgerCore:
 		with self._lock:
 			return {
 				"day": asdict(self._d),
-				"open": [asdict(r) for r in self._open.values()],
+				# A reservation's own ttl is kept beside the rows, not in them, so a ledger from
+				# before ttl existed can still restore this snapshot if the API is rolled back.
+				"open": [{k: v for k, v in asdict(r).items() if k != "ttl"} for r in self._open.values()],
+				"open_ttl": {r.id: r.ttl for r in self._open.values() if r.ttl is not None},
 				"bucket": {k: list(v) for k, v in self._bucket.items()},
 			}
 
@@ -204,13 +222,26 @@ class LedgerCore:
 			turns_ip=dict(day.get("turns_ip", {})),
 			run_usd=dict(day.get("run_usd", {})),
 		)
-		core._open = {r["id"]: Reservation(**r) for r in snap.get("open", [])}
+		ttls = snap.get("open_ttl") or {}
+		core._open = {
+			r["id"]: Reservation(**{**r, "ttl": ttls.get(r["id"], r.get("ttl"))})
+			for r in snap.get("open", [])
+		}
 		core._bucket = {k: (float(v[0]), float(v[1])) for k, v in (snap.get("bucket") or {}).items()}
 		return core
 
 
 class Ledger(Protocol):
-	async def reserve(self, *, visitor: str, run: str, ip: str, usd: float) -> Decision: ...
+	async def reserve(
+		self,
+		*,
+		visitor: str,
+		run: str,
+		ip: str,
+		usd: float,
+		run_cap: float | None = None,
+		ttl_s: float | None = None,
+	) -> Decision: ...
 	async def settle(self, reservation: str, usd: float) -> None: ...
 	async def release(self, reservation: str) -> None: ...
 	async def spent_today(self) -> float: ...
@@ -222,8 +253,17 @@ class MemoryLedger:
 	def __init__(self, core: LedgerCore | None = None) -> None:
 		self.core = core or LedgerCore()
 
-	async def reserve(self, *, visitor: str, run: str, ip: str, usd: float) -> Decision:
-		return self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd)
+	async def reserve(
+		self,
+		*,
+		visitor: str,
+		run: str,
+		ip: str,
+		usd: float,
+		run_cap: float | None = None,
+		ttl_s: float | None = None,
+	) -> Decision:
+		return self.core.reserve(visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s)
 
 	async def settle(self, reservation: str, usd: float) -> None:
 		self.core.settle(reservation, usd)
@@ -243,8 +283,19 @@ class ModalLedger:
 
 		self._svc = modal.Cls.from_name(app_name, cls_name)()
 
-	async def reserve(self, *, visitor: str, run: str, ip: str, usd: float) -> Decision:
-		raw = await self._svc.reserve.remote.aio(visitor=visitor, run=run, ip=ip, usd=usd)
+	async def reserve(
+		self,
+		*,
+		visitor: str,
+		run: str,
+		ip: str,
+		usd: float,
+		run_cap: float | None = None,
+		ttl_s: float | None = None,
+	) -> Decision:
+		raw = await self._svc.reserve.remote.aio(
+			visitor=visitor, run=run, ip=ip, usd=usd, run_cap=run_cap, ttl_s=ttl_s
+		)
 		return Decision(**raw)
 
 	async def settle(self, reservation: str, usd: float) -> None:
