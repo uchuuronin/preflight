@@ -446,6 +446,8 @@ def test_one_stuck_worker_of_four_stalls_the_run_and_its_task_is_left_open(tmp_p
 	# reason (possibly stuck), never "cut", which would hide the runaway
 	assert out.ended == "stalled" and all(t.stop_reason != "cut" for t in out.tasks)
 	assert any(t.stop_reason is None for t in out.tasks)
+	# 0.6.1: the script's workers, which caps how many of them can be stuck
+	assert out.concurrency is not None and 1 <= out.concurrency <= 4
 
 
 def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):

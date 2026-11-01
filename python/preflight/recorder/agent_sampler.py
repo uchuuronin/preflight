@@ -207,7 +207,11 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 			"in_flight_at_stop": t in in_flight} for t in ids})  # fmt: skip
 	# 0.6.0: how the sampled run ended (a lost sandbox is none of these)
 	how = {"stalled": "stalled", "cancelled": "cancelled", "timeout": "timeout", None: "finished"}.get(cut)
-	return AgentSample(tasks=tasks, population=population, selection=selection, ended=how)
+	# 0.6.1: the script's workers, as the proxy saw them (the most tasks with a call in flight at
+	# once), so the engine caps how many tasks of a stalled run can be stuck
+	workers = (at_cut or st).get("peak_concurrent") or None
+	return AgentSample(tasks=tasks, population=population, selection=selection, ended=how,
+		concurrency=int(workers) if workers else None)  # fmt: skip
 
 
 class _quiet:
