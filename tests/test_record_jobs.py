@@ -313,11 +313,10 @@ def test_skeleton_knobs_say_what_they_act_on_and_whether_they_change_results(tmp
 		FlightRecord.model_validate(bad)
 
 
-def test_golden_records_carry_the_engines_own_model_cards():
-	# make_golden fills the goldens with B's engine (Nov 1): real cards, none a fixture
+def test_golden_records_mark_their_fixture_models():
 	for name in ("finetune", "pretrain", "agent"):
 		rec = load_record((ROOT / "schema" / "examples" / f"{name}.json").read_text())
-		assert rec.models and not any(m.fixture for m in rec.models)
+		assert rec.models and all(m.fixture for m in rec.models)
 
 
 # ---------------------------------------------------------------- the demo's GPU ceiling

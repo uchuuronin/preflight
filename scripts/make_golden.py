@@ -11,6 +11,7 @@ B's engine replaces them.
 
 import json
 import math
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -1390,8 +1391,11 @@ def main() -> None:
 		# what each knob acts on and whether it changes results, as the skeleton writes them
 		rec = rec.model_copy(update={"knobs": annotate(rec.knobs, rec.graph)})
 		rec = FlightRecord.model_validate(rec.model_dump())
-		# B's engine fills predictions, models, probed ranges, cost basis and job cost (B, Oct 27)
-		rec = fill_predictions(rec)
+		# B's engine fills predictions, models, probed ranges, cost basis and job cost (B, Oct 27),
+		# behind PREFLIGHT_GOLDEN_ENGINE=1 until C's and D's web tests read the engine's numbers
+		# (Chiya, Nov 1: the PM regenerates the goldens with it in the next merge)
+		if os.environ.get("PREFLIGHT_GOLDEN_ENGINE") == "1":
+			rec = fill_predictions(rec)
 		# write the canonical serialisation so the round-trip test is exact
 		canonical = json.loads(rec.model_dump_json(exclude_none=True))
 		(OUT / f"{name}.json").write_text(json.dumps(canonical, indent="\t", ensure_ascii=False) + "\n")

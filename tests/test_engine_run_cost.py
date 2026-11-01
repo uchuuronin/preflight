@@ -199,8 +199,7 @@ def test_agent_cost_is_a_tokens_line(ag):
 
 
 def test_fill_predictions_replaces_the_fixture_breakdown(ft):
-	# the goldens come from make_golden with the engine's own fill (Nov 1), not a fixture breakdown
-	assert ft.cost_basis.price_table.startswith("prices@")
+	assert ft.cost_basis.price_table == "golden-fixture@0"
 	out = api.fill_predictions(ft)
 	assert out.cost_basis.price_table.startswith("prices@")
 	assert out.job_cost.lines[0].price_row == "gpu/modal/L4/us/on_demand"
