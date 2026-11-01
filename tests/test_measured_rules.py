@@ -170,3 +170,13 @@ def test_a_two_step_resume_and_a_keyword_load_are_not_caches():
 		assert "hygiene.cache_not_keyed" not in [
 			f.code for f in hygiene_findings(_gpu_rec(), {"train.py": code})
 		], code
+
+
+def test_a_cache_used_only_for_a_setting_of_a_weights_load_still_fires():
+	code = ("import os, torch\nif os.path.exists('tokens.pt'):\n    tokens = torch.load('tokens.pt')\n"
+		"    m = AutoModel.from_pretrained('gpt2', vocab_size=len(tokens))\n")  # fmt: skip
+	assert "hygiene.cache_not_keyed" in [f.code for f in hygiene_findings(_gpu_rec(), {"train.py": code})]
+	direct = "import os, torch\nP = 'out/state.pt'\nif os.path.exists(P):\n    model.load_state_dict(torch.load(P))\n"
+	assert "hygiene.cache_not_keyed" not in [
+		f.code for f in hygiene_findings(_gpu_rec(), {"train.py": direct})
+	]

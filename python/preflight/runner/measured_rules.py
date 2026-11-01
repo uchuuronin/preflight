@@ -230,18 +230,31 @@ def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:
 	return hits[:3]
 
 
+_WEIGHTS_KW = {"state_dict", "pretrained_model_name_or_path", "checkpoint_path"}
+
+
 def _feeds_weights(call, path: str, consts, loaded: set[str]) -> bool:
-	"""A weights loader (load_state_dict, from_pretrained, ...) given this very path, a load of it,
-	or a name the if-body loaded it into (`sd = torch.load(P)`, then `load_state_dict(sd["model"])`)."""
+	"""A weights loader (load_state_dict, from_pretrained, ...) whose weights argument (the first
+	positional, or state_dict= / pretrained_model_name_or_path= / checkpoint_path=) is this path, a
+	load of it (`torch.load(P)`), or a name the if-body loaded it into (`sd`, `sd["model"]`). A
+	loaded name used only for a setting (`vocab_size=len(tokens)`) is not weights."""
 	import ast
 
 	if (getattr(call.func, "attr", None) or getattr(call.func, "id", None)) not in _RESUME_LOADERS:
 		return False
-	given = [*call.args, *(k.value for k in call.keywords)]
-	for a in [x for g in given for x in ast.walk(g)]:
-		if isinstance(a, ast.Constant) and a.value == path:
+
+	def is_path(a) -> bool:
+		return (isinstance(a, ast.Constant) and a.value == path) or (
+			isinstance(a, ast.Name) and consts.get(a.id) == path
+		)
+
+	given = call.args[:1] + [k.value for k in call.keywords if k.arg in _WEIGHTS_KW]
+	for a in given:
+		while isinstance(a, ast.Subscript | ast.Attribute):
+			a = a.value
+		if is_path(a) or (isinstance(a, ast.Name) and a.id in loaded):
 			return True
-		if isinstance(a, ast.Name) and (consts.get(a.id) == path or a.id in loaded):
+		if isinstance(a, ast.Call) and any(is_path(x) for x in a.args[:1]):  # load_state_dict(torch.load(P))
 			return True
 	return False
 
