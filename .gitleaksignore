@@ -6,3 +6,7 @@
 5e9cade4b399f0acfb1075abdef3608701ee50cf:tests/test_agent_recorder.py:generic-api-key:176
 # C, api/tests/test_fix.py: the stand-in key the fix-loop tests scan for ("mk-test-0123456789abcdefABCDEF", not a key); value replaced Oct 31, flagged by C before any push; reviewed by the PM on Oct 31.
 7bfc149cfec6a9464aa4498d9a5732eabc7ec123:api/tests/test_fix.py:generic-api-key:17
+# A, zoo/agent_eval_spark/record_oct31.json: the record's share token (8lhi...), a read-only record id gitleaks takes for a key; no credential. Oct 31.
+e6e16230322ef30012d181e5cef884e0f19a9129:zoo/agent_eval_spark/record_oct31.json:generic-api-key:1
+62bd6253d1ea3bfcb5d4ba884ca7b91132670aed:zoo/agent_eval_spark/record_oct31.json:generic-api-key:1
+40291c1d5110e4d33e7d9583b10f7e26802e2505:zoo/agent_eval_spark/record_oct31.json:generic-api-key:1
