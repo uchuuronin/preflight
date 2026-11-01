@@ -425,12 +425,19 @@ class JobStoreService:
 		return self.m.heartbeat(lease)
 
 	@modal.method()
-	def complete(self, lease: dict, record_id: str) -> None:
-		self.m.complete(lease, record_id)
+	def complete(self, lease: dict, record_id: str, spent_usd: float | None = None) -> None:
+		self.m.complete(lease, record_id, spent_usd)
 
 	@modal.method()
-	def fail(self, lease: dict, error: str, retryable: bool, error_code: str | None = None) -> None:
-		self.m.fail(lease, error, retryable, error_code)
+	def fail(
+		self,
+		lease: dict,
+		error: str,
+		retryable: bool,
+		error_code: str | None = None,
+		spent_usd: float | None = None,
+	) -> None:
+		self.m.fail(lease, error, retryable, error_code, spent_usd)
 
 	@modal.method()
 	def emit(self, job_id: str, stage: str, fields: dict, token: int | None = None) -> dict:

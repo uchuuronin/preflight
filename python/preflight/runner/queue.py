@@ -65,11 +65,52 @@ class IdempotencyConflict(ValueError):
 
 
 class QueueFull(RuntimeError):
-	"""Backpressure: the visitor or the whole queue is at its cap. Retry later."""
+	"""Backpressure: the visitor or the whole queue is at its cap. Retry later.
 
-	def __init__(self, message: str, retry_after_s: int = 60):
+	code: "queue_full" (busy now), or a demo limit that lasts until midnight ET:
+	"limit.visitor_daily" (the visitor's probe jobs for the day) or "limit.daily_spend" (the day's
+	GPU budget). C's API tells them apart by this code; the class name stays QueueFull."""
+
+	def __init__(self, message: str, retry_after_s: int = 60, code: str = "queue_full"):
 		super().__init__(message)
 		self.retry_after_s = retry_after_s
+		self.code = code
+
+
+# Public demo limits (Chiya, Nov 1), counted per America/New_York calendar day
+VISITOR_DAILY_JOBS = 3  # probe jobs a visitor may submit in a day
+JOB_BUDGET_USD = 0.60  # what a queued or running job may still spend (runner/pipeline.py JOB_BUDGET_USD)
+_ET = None
+
+
+def et_day(ts: float) -> str:
+	"""The America/New_York calendar date of a Unix time, e.g. "2026-11-01"."""
+	global _ET
+	from datetime import datetime
+	from zoneinfo import ZoneInfo
+
+	_ET = _ET or ZoneInfo("America/New_York")
+	return datetime.fromtimestamp(ts, _ET).date().isoformat()
+
+
+def seconds_to_midnight_et(ts: float) -> int:
+	from datetime import datetime, timedelta
+	from zoneinfo import ZoneInfo
+
+	now = datetime.fromtimestamp(ts, ZoneInfo("America/New_York"))
+	nxt = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+	return max(60, int((nxt - now).total_seconds()))
+
+
+def daily_gpu_cap_usd(day: str) -> float:
+	"""The day's GPU dollar cap: $10 through Nov 4, $30 for judging from Nov 5 (Chiya, Nov 1).
+	PREFLIGHT_DAILY_GPU_CAP_USD overrides it."""
+	import os
+
+	override = os.environ.get("PREFLIGHT_DAILY_GPU_CAP_USD")
+	if override:
+		return float(override)
+	return 30.0 if day >= "2026-11-05" else 10.0
 
 
 class StoreUnavailable(RuntimeError):
@@ -128,8 +169,16 @@ class JobStore(Protocol):
 	def submit(self, request: dict, *, visitor: str, idempotency_key: str) -> Submitted: ...
 	def lease(self, worker: str) -> Lease | None: ...
 	def heartbeat(self, lease: Lease) -> float: ...
-	def complete(self, lease: Lease, *, record_id: str) -> None: ...
-	def fail(self, lease: Lease, *, error: str, retryable: bool, error_code: str | None = None) -> None: ...
+	def complete(self, lease: Lease, *, record_id: str, spent_usd: float | None = None) -> None: ...
+	def fail(
+		self,
+		lease: Lease,
+		*,
+		error: str,
+		retryable: bool,
+		error_code: str | None = None,
+		spent_usd: float | None = None,
+	) -> None: ...
 	def cancel(self, job_id: str) -> None: ...
 	def reap(self) -> list[str]: ...
 	def position(self, job_id: str) -> int | None: ...
@@ -159,6 +208,9 @@ class InMemoryJobStore:
 		event_flush_s: float = 1.0,
 		on_change: Callable[[dict], None] | None = None,
 		on_archive: Callable[[dict], None] | None = None,
+		visitor_daily_jobs: int = VISITOR_DAILY_JOBS,
+		daily_cap_usd: Callable[[str], float] = daily_gpu_cap_usd,
+		job_budget_usd: float = JOB_BUDGET_USD,
 	):
 		self._clock = clock
 		self.max_running = max_running
@@ -176,6 +228,11 @@ class InMemoryJobStore:
 		self._index: dict[str, dict] = {}  # every finished job: status, record id, key
 		self._order: list[str] = []  # submission order of queued jobs
 		self._keys: dict[tuple[str, str], str] = {}
+		self.visitor_daily_jobs = visitor_daily_jobs
+		self.daily_cap_usd = daily_cap_usd
+		self.job_budget_usd = job_budget_usd
+		# per ET day: {"spent": reported GPU dollars, "jobs": {visitor: probe jobs submitted}}
+		self._daily: dict[str, dict] = {}
 		self._lock = threading.RLock()
 		self._dirty_events = False
 		self._last_flush = 0.0
@@ -183,7 +240,7 @@ class InMemoryJobStore:
 	# ------------------------------------------------------------- persistence
 
 	def _state(self):
-		return (self._jobs, self._done, self._index, self._order, self._keys)
+		return (self._jobs, self._done, self._index, self._order, self._keys, self._daily)
 
 	def _txn(self, mutate: Callable[[], object]):
 		"""Run a state change; save it; on a failed save restore the previous state."""
@@ -194,7 +251,7 @@ class InMemoryJobStore:
 				try:
 					self._on_change(self.snapshot())
 				except Exception as exc:
-					self._jobs, self._done, self._index, self._order, self._keys = backup
+					self._jobs, self._done, self._index, self._order, self._keys, self._daily = backup
 					raise StoreUnavailable(f"job state could not be saved: {type(exc).__name__}") from exc
 				self._dirty_events = False
 				self._last_flush = self._clock()
@@ -218,6 +275,7 @@ class InMemoryJobStore:
 				"jobs": [asdict(j) for j in self._jobs.values()],
 				"order": list(self._order),
 				"index": dict(self._index),
+				"daily": copy.deepcopy(self._daily),
 			}
 
 	@classmethod
@@ -231,6 +289,7 @@ class InMemoryJobStore:
 			store._index[job_id] = info
 			store._keys[(info["visitor"], info["idempotency_key"])] = job_id
 		store._order = list(snap["order"])
+		store._daily = copy.deepcopy(snap.get("daily", {}))
 		return store
 
 	# ------------------------------------------------------------- helpers
@@ -364,6 +423,18 @@ class InMemoryJobStore:
 						f"Idempotency-Key {idempotency_key!r} was used for a different request"
 					)
 				return Submitted(job.job_id, False, self._position(job.job_id))
+			now = self._clock()
+			day = et_day(now)
+			today = self._daily.get(day, {"spent": 0.0, "jobs": {}})
+			if today["jobs"].get(visitor, 0) >= self.visitor_daily_jobs:
+				raise QueueFull(f"You've run today's {self.visitor_daily_jobs} probe jobs: samples only until midnight ET",
+					retry_after_s=seconds_to_midnight_et(now), code="limit.visitor_daily")  # fmt: skip
+			reserved = self.job_budget_usd * (
+				len(self._jobs) + 1
+			)  # what live jobs and this one may still spend
+			if today["spent"] + reserved > self.daily_cap_usd(day):
+				raise QueueFull("Preflight has used today's GPU budget: samples only until midnight ET",
+					retry_after_s=seconds_to_midnight_et(now), code="limit.daily_spend")  # fmt: skip
 			mine = sum(1 for j in self._jobs.values() if j.visitor == visitor)
 			if mine >= self.max_queued_per_visitor:
 				raise QueueFull(f"this visitor already has {mine} jobs waiting or running")
@@ -382,6 +453,8 @@ class InMemoryJobStore:
 				self._jobs[job.job_id] = job
 				self._keys[(visitor, idempotency_key)] = job.job_id
 				self._order.append(job.job_id)
+				t = self._today(day)
+				t["jobs"][visitor] = t["jobs"].get(visitor, 0) + 1
 				pos = self._position(job.job_id)
 				self._emit(job, "queued", queue_position=pos)
 				return Submitted(job.job_id, True, pos)
@@ -440,11 +513,12 @@ class InMemoryJobStore:
 			lease.expires_at = self._txn(do)
 			return lease.expires_at
 
-	def complete(self, lease: Lease, *, record_id: str) -> None:
+	def complete(self, lease: Lease, *, record_id: str, spent_usd: float | None = None) -> None:
 		with self._lock:
 			job = self._check(lease)
 
 			def do():
+				self._charge(spent_usd)
 				job.status = "done"
 				job.record_id = record_id
 				job.worker = None
@@ -455,10 +529,43 @@ class InMemoryJobStore:
 
 			self._txn(do)
 
-	def fail(self, lease: Lease, *, error: str, retryable: bool, error_code: str | None = None) -> None:
+	def fail(
+		self,
+		lease: Lease,
+		*,
+		error: str,
+		retryable: bool,
+		error_code: str | None = None,
+		spent_usd: float | None = None,
+	) -> None:
 		with self._lock:
 			job = self._check(lease)
-			self._txn(lambda: self._requeue_or_fail(job, error, retryable, error_code))
+
+			def do():
+				self._charge(spent_usd)
+				self._requeue_or_fail(job, error, retryable, error_code)
+
+			self._txn(do)
+
+	def _today(self, day: str) -> dict:
+		for old in [d for d in self._daily if d < day][:-1]:  # keep today and yesterday
+			del self._daily[old]
+		return self._daily.setdefault(day, {"spent": 0.0, "jobs": {}})
+
+	def _charge(self, spent_usd: float | None) -> None:
+		"""Count a finished attempt's GPU spend toward today's cap: what the worker reported, else
+		the whole job budget (a failure that can't say what it spent)."""
+		usd = self.job_budget_usd if spent_usd is None else max(0.0, float(spent_usd))
+		t = self._today(et_day(self._clock()))
+		t["spent"] = round(t["spent"] + usd, 6)
+
+	def daily(self) -> dict:
+		"""Today's ledger: spend, the cap, jobs per visitor (for ops; visitors are hashes)."""
+		with self._lock:
+			day = et_day(self._clock())
+			t = self._daily.get(day, {"spent": 0.0, "jobs": {}})
+			return {"day": day, "spent_usd": t["spent"], "cap_usd": self.daily_cap_usd(day),
+				"reserved_usd": round(self.job_budget_usd * len(self._jobs), 6), "visitors": len(t["jobs"])}  # fmt: skip
 
 	def cancel(self, job_id: str) -> None:
 		with self._lock:
@@ -467,6 +574,8 @@ class InMemoryJobStore:
 				return
 
 			def do():
+				if job.status == "running":  # its worker stops without reporting: count the job's budget
+					self._charge(None)
 				if job.job_id in self._order:
 					self._order.remove(job.job_id)
 				job.status = "cancelled"
@@ -489,6 +598,7 @@ class InMemoryJobStore:
 
 			def do():
 				for job in expired:
+					self._charge(None)  # the lost worker's GPU time can't be reported: its budget counts
 					times = {1: "once", 2: "twice"}.get(job.attempt, f"{job.attempt} times")
 					self._requeue_or_fail(
 						job, f"lease expired {times}; worker crashed or hung", True, "internal.worker_lost"

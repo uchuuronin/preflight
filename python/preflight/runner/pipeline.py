@@ -29,6 +29,7 @@ GPUs: never above PREFLIGHT_GPU_CEILING (the public demo: A100-80GB), and a
 step up after an OOM only while the job's dollar budget holds it.
 """
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -466,6 +467,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip
 		gpu = cap
 	budget = deps.budget()
+	with contextlib.suppress(AttributeError, TypeError):
+		ctx.budget = budget  # the worker reports what the job spent to the day's GPU cap (queue.py)
 	budget.waited = lambda: float(getattr(deps.runner, "queued_s", 0.0) or 0.0)
 	patched_for: dict = {}
 	if fixed is not None:
