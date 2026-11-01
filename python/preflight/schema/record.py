@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.5.0"
+SCHEMA_VERSION = "0.6.0"
 
 
 def _now() -> datetime:
@@ -501,7 +501,12 @@ class AgentTask(Strict):
 	success: bool | None = None
 	context_tokens_by_turn: list[int] = Field(default_factory=list)
 	cost_usd: float | None = None
-	stop_reason: Literal["done", "max_turns", "context_overflow", "error", "timeout", "loop"] | None = None
+	stop_reason: (
+		Literal["done", "max_turns", "context_overflow", "error", "timeout", "loop", "cut"] | None
+	) = Field(
+		default=None,
+		description="cut (0.6.0): stopped with the whole run (cancel, stall, the run's limit), not by the task itself",
+	)
 	trace: BlobRef | None = None
 
 
@@ -513,6 +518,10 @@ class AgentSample(Strict):
 	)
 	rate_limit_rpm: float | None = None
 	rate_limit_tpm: float | None = None
+	ended: Literal["finished", "stalled", "cancelled", "timeout"] | None = Field(
+		default=None,
+		description="0.6.0: how the sampled run ended; stalled = no model call for the stall time (a tool stuck)",
+	)
 
 
 # ---------------------------------------------------------------- models (B)
@@ -607,6 +616,17 @@ class CampaignCell(Strict):
 		default=None,
 		description="0.5.0: when this run starts, in seconds after the campaign starts, in its lane's slot order",
 	)
+	# 0.6.0 (B and C, Nov 1): what a shared record needs to draw the same calendar as the live plan.
+	slot: int | None = Field(
+		default=None, ge=0, description="0.6.0: which of its lane's slots runs it, 0-based"
+	)
+	reason: str | None = Field(default=None, description="0.6.0: why the run is cut or undated, in words")
+	gpu_hours_estimate: Estimate | None = Field(
+		default=None, description="0.6.0: this run's GPU-hours with its interval; gpu_hours stays the point"
+	)
+	usd_estimate: Estimate | None = Field(
+		default=None, description="0.6.0: this run's dollars with its interval; usd stays the point"
+	)
 
 
 class CampaignQuota(Strict):
@@ -649,6 +669,21 @@ class Campaign(Strict):
 	quota: CampaignQuota | None = None
 	asha: CampaignAsha | None = None
 	notes: list[str] = Field(default_factory=list)
+	# 0.6.0 (B and C, Nov 1)
+	start: datetime | None = Field(
+		default=None, description="0.6.0: when the campaign clock starts; start_s and finish_s count from it"
+	)
+	p_by_deadline: float | None = Field(
+		default=None,
+		ge=0,
+		le=1,
+		description="0.6.0: probability every run finishes by job.constraints.deadline",
+	)
+	checkpoint_interval: Estimate | None = Field(
+		default=None,
+		description="0.6.0: the checkpoint interval with its interval; checkpoint_interval_s stays the point",
+	)
+	lane_slots: dict[str, int] | None = Field(default=None, description="0.6.0: slots per lane")
 
 
 # ---------------------------------------------------------------- provenance and costs
