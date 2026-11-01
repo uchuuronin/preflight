@@ -1066,10 +1066,12 @@ def test_a_probe_s_parameter_count_stands_in_when_the_script_map_has_none():
 
 
 def test_a_record_without_its_gpu_says_which_gpu_it_assumed():
+	# A's record names its A10 since round six (0874c0f), so the no-GPU case is built here (PM, Nov 1)
 	rec = _grpo_a10()
-	assert rec.env is None
+	knob_gpu = next(k.current for k in rec.knobs if k.id == "gpu_type")
+	rec = rec.model_copy(update={"env": None})
 	p = api.predict(rec).root
-	assert "isn't in the record" in p["memory.peak"].reason and "L4" in p["memory.peak"].reason
+	assert "isn't in the record" in p["memory.peak"].reason and str(knob_gpu) in p["memory.peak"].reason
 
 
 def test_the_real_a10_grpo_record_reads_its_measured_peak_once_its_gpu_is_recorded():
