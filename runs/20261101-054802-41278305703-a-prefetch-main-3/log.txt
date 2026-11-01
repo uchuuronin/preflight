@@ -1,0 +1,59 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-fW6uYPdoh65lmuhxz8gVZK
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+
+[1AFetching 7 files:   0%|          | 0/7 [00:00<?, ?it/s]
+[1AFetching 7 files: 100%|██████████| 7/7 [00:00<00:00, 1176.99it/s]
+
+[1AFetching 14 files:   0%|          | 0/14 [00:00<?, ?it/s]Fetching 14 files: 100%|██████████| 14/14 [00:00<00:00, 1113.83it/s]
+
+[1AFetching 5 files:   0%|          | 0/5 [00:00<?, ?it/s]
+[1AFetching 5 files:  20%|██        | 1/5 [00:00<00:01,  3.09it/s]
+[1AFetching 5 files:  80%|████████  | 4/5 [00:00<00:00,  6.40it/s]
+[1AFetching 5 files: 100%|██████████| 5/5 [00:10<00:00,  2.18s/it]
+
+[1AFetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]
+[1AFetching 11 files:  73%|███████▎  | 8/11 [00:00<00:00, 27.82it/s]
+[1AFetching 11 files: 100%|██████████| 11/11 [00:01<00:00, 10.64it/s]
+
+[1AFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+[1AFetching 2 files:  50%|█████     | 1/2 [00:00<00:00,  7.72it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:01<00:00,  1.52it/s]
+[1AFetching 2 files: 100%|██████████| 2/2 [00:01<00:00,  1.52it/s]
+
+[1AFetching 7 files:   0%|          | 0/7 [00:00<?, ?it/s]
+[1AFetching 7 files:  14%|█▍        | 1/7 [00:00<00:01,  4.19it/s]
+[1AFetching 7 files:  57%|█████▋    | 4/7 [00:00<00:00,  5.91it/s]
+[1AFetching 7 files: 100%|██████████| 7/7 [00:00<00:00,  8.51it/s]
+[1AFetching 7 files: 100%|██████████| 7/7 [00:00<00:00,  8.51it/s]
+
+[1AFetching 3 files:   0%|          | 0/3 [00:00<?, ?it/s]
+[1AFetching 3 files:  33%|███▎      | 1/3 [00:00<00:00,  5.26it/s]
+[1AFetching 3 files:  67%|██████▋   | 2/3 [00:00<00:00,  5.84it/s]
+[1AFetching 3 files: 100%|██████████| 3/3 [00:00<00:00,  3.79it/s]Fetching 3 files: 100%|██████████| 3/3 [00:00<00:00,  3.79it/s]
+
+[1AFetching 8 files:   0%|          | 0/8 [00:00<?, ?it/s]
+[1AFetching 8 files:  12%|█▎        | 1/8 [00:00<00:00,  7.05it/s]
+[1AFetching 8 files:  25%|██▌       | 2/8 [00:00<00:01,  5.83it/s]
+[1AFetching 8 files:  38%|███▊      | 3/8 [00:01<00:02,  2.34it/s]
+[1AFetching 8 files:  50%|█████     | 4/8 [00:01<00:01,  2.84it/s]
+[1AFetching 8 files:  75%|███████▌  | 6/8 [00:01<00:00,  3.18it/s]
+[1AFetching 8 files: 100%|██████████| 8/8 [00:03<00:00,  2.25it/s]
+[1AFetching 8 files: 100%|██████████| 8/8 [00:03<00:00,  2.25it/s]
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-fW6uYPdoh65lmuhxz8gVZK
