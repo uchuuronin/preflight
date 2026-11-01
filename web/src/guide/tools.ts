@@ -165,6 +165,8 @@ export interface ToolContext {
 	pinned: ReadonlySet<string>;
 	/** The visitor's limits (guide/limits.ts): hard limits on every move. */
 	limits?: Limits;
+	/** The guide asks to release a pin; only the person's click releases it (live guide). */
+	requestUnpin?: (knobId: string) => void;
 	/** Money-spending tools land here for the person to approve. */
 	requestApproval: (name: string, args: Record<string, unknown>) => void;
 }

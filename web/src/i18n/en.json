@@ -888,5 +888,9 @@
 	"limits.keep": "Don't change",
 	"limits.ruled_out": "Ruled out with \"Not this\"",
 	"limits.restore": "Allow {what} again",
-	"dock.frozen_hint": "You said not to change this. The guide won't touch it."
+	"dock.frozen_hint": "You said not to change this. The guide won't touch it.",
+	"guide.unpin_ask": "The guide asks to release {knob}, which you pinned at {value}.",
+	"guide.unpin_ask.label": "The guide asks to release a pin",
+	"guide.unpin_ask.release": "Release it",
+	"guide.unpin_ask.keep": "Keep {value}"
 }

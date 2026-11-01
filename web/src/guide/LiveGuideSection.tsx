@@ -28,6 +28,7 @@ export function LiveGuideSection({
 	const [view, setView] = useState<LiveView | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [ask, setAsk] = useState("");
+	const [unpinAsk, setUnpinAsk] = useState<string | null>(null);
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 
 	const tourRef = useRef<LiveTour | null>(null);
@@ -43,6 +44,7 @@ export function LiveGuideSection({
 				limits: s.limits,
 				objective: { kind: s.objective.kind ?? "min_time", ...(s.objective.target_id ? { target_id: s.objective.target_id } : {}) },
 				requestApproval: () => {},
+				requestUnpin: (id) => setUnpinAsk(id),
 				...(language ? { language } : {}),
 			};
 		};
@@ -134,6 +136,31 @@ export function LiveGuideSection({
 						onKeep={() => decide("kept")}
 						onPin={() => decide("pinned")}
 					/>
+				</div>
+			) : null}
+			{unpinAsk ? (
+				<div className="pf-guide__approval" role="group" aria-label={t("guide.unpin_ask.label")}>
+					<p>
+						{t("guide.unpin_ask", {
+							knob: knobs.get(unpinAsk) ? t(knobs.get(unpinAsk)!.label_key) : unpinAsk,
+							value: valueText(knobs.get(unpinAsk), state.knobs[unpinAsk]),
+						})}
+					</p>
+					<div className="pf-guide__actions">
+						<button
+							type="button"
+							className="pf-btn pf-btn--small"
+							onClick={() => {
+								actions.pin(unpinAsk, false);
+								setUnpinAsk(null);
+							}}
+						>
+							{t("guide.unpin_ask.release")}
+						</button>
+						<button type="button" className="pf-btn pf-btn--small pf-btn--quiet" onClick={() => setUnpinAsk(null)}>
+							{t("guide.unpin_ask.keep", { value: valueText(knobs.get(unpinAsk), state.knobs[unpinAsk]) })}
+						</button>
+					</div>
 				</div>
 			) : null}
 			{view?.approvals.map((a) => (

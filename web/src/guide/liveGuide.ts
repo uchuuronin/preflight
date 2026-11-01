@@ -14,7 +14,7 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
-import { breaksLimit, limitsForServer, NO_LIMITS, withinLimits } from "./limits";
+import { breaksLimit, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } from "./limits";
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
 
@@ -232,8 +232,14 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 		}
 		case "pin": {
 			const id = String(a.knob_id);
-			// A knob the visitor said not to change stays pinned whatever the guide asks.
-			const on = Boolean(a.pinned) || (ctx.limits ?? NO_LIMITS).frozen.includes(id);
+			const frozen = (ctx.limits ?? NO_LIMITS).frozen.includes(id);
+			// A knob the visitor said not to change stays pinned whatever the guide asks. Releasing
+			// any other pin needs the visitor's click: the guide can only ask.
+			if (!a.pinned && pinned.has(id)) {
+				if (!frozen) ctx.requestUnpin?.(id);
+				return { tool: "pin", call_id: call.call_id, knob_id: id, pinned: true };
+			}
+			const on = Boolean(a.pinned) || frozen;
 			actions.pin(id, on);
 			return { tool: "pin", call_id: call.call_id, knob_id: id, pinned: on };
 		}
@@ -346,6 +352,9 @@ export class LiveTour {
 			this.onUpdate(this.view);
 			const browser = out.calls.filter((x) => x.runs_in === "browser");
 			if (out.awaiting !== "results" || !browser.length) return this.view;
+			// The server judges a move by its saved copy of the limits: wait for the latest save, so
+			// a move it would refuse is refused here first, before anything moves on the map.
+			await limitsSaved(this.recordRef);
 			let moved = false;
 			const results: ToolOut[] = [];
 			for (const call of browser) {

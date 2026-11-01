@@ -151,3 +151,19 @@ describe("the review's gaps: fixes, frozen knobs, the guide's pin tool", () => {
 		expect(breaksLimit(lora, { ...NO_LIMITS, budgetUsd: 40 }, "batch_size", 8, est(42, 48), est(50, 60), knobs)).toBeNull();
 	});
 });
+
+describe("releasing a pin needs the visitor's click", () => {
+	it("the guide's unpin only asks; a frozen knob isn't even asked about", () => {
+		const asked: string[] = [];
+		const c = { ...liveCtx(NO_LIMITS), requestUnpin: (id: string) => asked.push(id) };
+		c.pinned.add("batch_size");
+		const out = runBrowserCall({ call_id: "p", name: "pin", arguments: { knob_id: "batch_size", pinned: false }, runs_in: "browser" }, c, false);
+		expect(out.tool === "pin" && out.pinned).toBe(true);
+		expect(c.pinned.has("batch_size")).toBe(true);
+		expect(asked).toEqual(["batch_size"]);
+		const f = { ...liveCtx({ ...NO_LIMITS, frozen: ["gpu_type"] }), requestUnpin: (id: string) => asked.push(id) };
+		f.pinned.add("gpu_type");
+		runBrowserCall({ call_id: "p", name: "pin", arguments: { knob_id: "gpu_type", pinned: false }, runs_in: "browser" }, f, false);
+		expect(asked).toEqual(["batch_size"]);
+	});
+});
