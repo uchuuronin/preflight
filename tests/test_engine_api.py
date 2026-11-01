@@ -1145,3 +1145,39 @@ def test_the_eval_wedge_carries_the_measured_context():
 	at8 = api.predict(_lora_l4(), {"eval_batch_size": 8}).root
 	at4 = api.predict(_lora_l4(), {"eval_batch_size": 4}).root
 	assert at8["memory.context"].point == pytest.approx(at4["memory.context"].point)
+
+
+def test_when_no_single_move_clears_an_oom_the_record_carries_grids_over_pairs_that_do():
+	"""Chiya, Nov 1: on the LoRA zoo record every single fix still read 0.97; eval batch 4 with seq_len 512 reads
+	17.5 GiB, unlikely. The guide reads such a combined move off a 2-D local grid."""
+	from preflight.schema.encoding import decode_f16
+
+	rec = _lora_l4()
+	pairs = api.clearing_pairs(rec)
+	assert ("eval_batch_size", "seq_len") in pairs and len(pairs) <= api.MAX_CLEARING_PAIRS
+	grids = api.fill_predictions(rec).predictions.grids
+	g = next(
+		g
+		for g in grids
+		if g.target_id == "risk.oom" and [a.knob_id for a in g.axes] == ["eval_batch_size", "seq_len"]
+	)
+	ev, sq = (a.values for a in g.axes)
+	cell = ev.index(4) * len(sq) + sq.index(512)
+	p = decode_f16(g.point, len(ev) * len(sq))[cell] * g.scale
+	assert p <= api.CLEARS_P_OOM
+
+
+def test_no_pair_grids_when_the_run_already_fits():
+	rec = _lora_l4()
+	fixed = [
+		k.model_copy(update={"current": {"eval_batch_size": 4, "seq_len": 512}[k.id]})
+		if k.id in ("eval_batch_size", "seq_len")
+		else k
+		for k in rec.knobs
+	]
+	fits = rec.model_copy(update={"knobs": fixed})
+	assert api.predict(fits).root["risk.oom"].point <= api.CLEARS_P_OOM
+	assert api.clearing_pairs(fits) == []
+	assert all(
+		len(g.axes) == 1 for g in api.fill_predictions(fits).predictions.grids if g.target_id == "risk.oom"
+	)

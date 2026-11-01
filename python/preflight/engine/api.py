@@ -3066,6 +3066,64 @@ def _probed_ranges(record: FlightRecord) -> list[Knob]:
 	return out
 
 
+CLEARS_P_OOM = oom_model.UNCERTAIN[0]  # cited: the "unlikely" end of the shown P(OOM) range (Chiya, Oct 31)
+MAX_CLEARING_PAIRS = 3  # guess: enough for the guide to offer a choice; each pair adds one local 2-D grid
+# moves that can only add memory are never tried; bools are tried at the value that saves memory
+_SAVES_AT = {"eval_no_grad": True, "gradient_checkpointing": True, "packing": False}
+
+
+def _saving_values(k: Knob) -> list:
+	"""The local values of a memory knob that could lower the peak: smaller sizes, the memory-saving side of a
+	switch, any other category."""
+	if k.kind == "bool":
+		v = _SAVES_AT.get(k.id)
+		return [v] if v is not None and v != k.current else []
+	if k.kind == "categorical":
+		return [v for v in local_values(k) if v != k.current]
+	return [v for v in local_values(k) if float(v) < float(k.current)]
+
+
+def _p_oom(record: FlightRecord, values: dict) -> float | None:
+	e = predict(record, values).root.get("risk.oom")
+	return e.point if e is not None and e.status != "abstain" else None
+
+
+def clearing_pairs(record: FlightRecord, max_pairs: int = MAX_CLEARING_PAIRS) -> list[tuple[str, str]]:
+	"""Pairs of memory knobs that together clear an out-of-memory risk no single move clears (Chiya, Nov 1: the
+	guide had nothing to offer on the LoRA zoo record, where eval batch 4 with seq_len 512 reads 17.5 GiB and
+	"unlikely" but every single move still fails). Empty when the current setting already clears, or one move does.
+	Ranked by how few steps from the current setting the nearest clearing cell is."""
+	base = _p_oom(record, {})
+	if base is None or base <= CLEARS_P_OOM:
+		return []
+	mem = [
+		k
+		for k in record.knobs
+		if k.id not in WORKLOAD_KNOBS and "memory" in knobs.knob_spec(k.id).affects and _saving_values(k)
+	]
+	singles = {k.id: _saving_values(k) for k in mem}
+	for k in mem:
+		for v in singles[k.id]:
+			p = _p_oom(record, {k.id: v})
+			if p is not None and p <= CLEARS_P_OOM:
+				return []  # one move clears: the 1-D grids already show it
+	found = []
+	for a, b in itertools.combinations(mem, 2):
+		best = None
+		for i, va in enumerate(singles[a.id]):
+			for j, vb in enumerate(singles[b.id]):
+				p = _p_oom(record, {a.id: va, b.id: vb})
+				if p is not None and p <= CLEARS_P_OOM:
+					# steps from current: the largest saving values sit nearest the current one
+					steps = (len(singles[a.id]) - i if a.kind in ("int", "float") else 1) + (
+						len(singles[b.id]) - j if b.kind in ("int", "float") else 1
+					)
+					best = steps if best is None else min(best, steps)
+		if best is not None:
+			found.append((best, a.id, b.id))
+	return [(a, b) for _, a, b in sorted(found)[:max_pairs]]
+
+
 def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	"""Targets, estimates at the current knobs, and grids over the gridded knobs (two at a time)."""
 	targets = targets_for(record)
@@ -3075,6 +3133,10 @@ def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	# Review, Oct 27: a 1-D grid for every knob around the current point, so any single move reads instantly
 	for k in record.knobs:
 		grids += build_grids(record, [k.id], local=True)
+	# Chiya, Nov 1: when no single move clears the risk of running out of memory, local 2-D grids over the pairs
+	# that do, so the guide can offer a combined move it reads off the record (agreed with C in from-b.md)
+	for a, b in clearing_pairs(record):
+		grids += build_grids(record, [a, b], local=True)
 	return Predictions(
 		targets=targets, estimates={t.id: est[t.id] for t in targets if t.id in est}, grids=grids
 	)
