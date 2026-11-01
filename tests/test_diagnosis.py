@@ -133,3 +133,27 @@ def test_a_huge_or_padded_index_never_raises(rec):
 	nums = numbers(rec)
 	assert resolve(nums, "probes[p1].step_log[" + "9" * 5000 + "].wall_s") is None
 	assert resolve(nums, "probes[p1]" + ".memory" * 50) is None
+
+
+def test_the_diagnosis_calls_are_in_the_records_cost(rec, tmp_path, monkeypatch):
+	from preflight.runner import flags
+	from preflight.runner.pipeline import Deps, _diagnose
+	from preflight.runner.records import LocalRecordWriter
+
+	nums = numbers(rec)
+	checks = [{"verdict": "consistent", "plot": "loss", "plot_region": "all", "path": "probes[p1].steps",
+		"value": nums["probes"]["p1"]["steps"], "detail": "agree"}]  # fmt: skip
+	deps = Deps(records=LocalRecordWriter(tmp_path), spark=client_answering(checks, []))
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_diagnosis": True}))
+	flags.reload()
+	try:
+		out = _diagnose(rec, deps)
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+	call = out.provenance[-1]
+	assert call.cost_usd > 0
+	assert out.costs.llm_usd == round((rec.costs.llm_usd or 0) + call.cost_usd, 6)
+	assert out.costs.breakdown["model_calls"] == round(
+		(rec.costs.breakdown or {}).get("model_calls", 0) + call.cost_usd, 6
+	)

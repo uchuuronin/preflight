@@ -30,6 +30,7 @@ MAX_PROBES = 4  # plotted and sent; the record's first ok probes
 MAX_STEPS = 200  # step_log rows per probe in the numbers
 MAX_LOSS = 400  # loss points per probe in the numbers
 REL_TOL = 0.01  # a quoted value matches the record's within 1%
+MAX_CHECKS = 8  # findings kept from one diagnosis
 GB = 1e9
 
 SYSTEM = """You check a training run's plots against the numbers they were drawn from.
@@ -203,7 +204,7 @@ def diagnose_record(client, rec: FlightRecord) -> tuple[list[Finding], list, dic
 	except Exception:
 		return [], client.calls[before:], stats  # failed attempts stay in provenance
 	findings = []
-	for c in d.checks:
+	for c in d.checks[:MAX_CHECKS]:  # bounded, so the check behind it is too
 		stats["checks"] += 1
 		actual = resolve(nums, c.path)
 		if actual is None:

@@ -15,12 +15,15 @@ becomes "abstain, or run a probe". Every call, tool rounds included, is returned
 
 import json
 import re
+import time
 
 from preflight.harness.diagnosis import numbers, resolve
 from preflight.schema import Evidence, Finding, FlightRecord
 
-MAX_ROUNDS = 4  # tool rounds per claim before it abstains
+MAX_ROUNDS = 3  # tool rounds per claim before it abstains
 MAX_FETCHES = 12  # tool calls answered per claim
+MAX_CLAIMS = 6  # claims checked per record; the rest abstain unchecked
+DEADLINE_S = 120.0  # one budget for the whole check, every claim's calls included
 
 TOOL = {
 	"type": "function",
@@ -61,6 +64,22 @@ def _paths_guide(nums: dict) -> str:
 	return "\n".join(lines)
 
 
+def _text(content) -> str:
+	"""A message's text, whether the provider sends a string or a list of parts."""
+	if isinstance(content, list):
+		return "".join(
+			p.get("text", "") for p in content if isinstance(p, dict) and isinstance(p.get("text"), str)
+		)
+	return content if isinstance(content, str) else ""
+
+
+def _claim(f: Finding) -> str:
+	"""What Spark Open is asked to check: Muse Spark's claim and the plot region, without the path
+	and value it cited, so the check finds its own number rather than echoing the diagnosis's."""
+	detail = re.sub(r"; number: [^;()]*\)$", ")", (f.detail or "").strip())
+	return f"{f.title}. {detail}"
+
+
 def _answer(text: str) -> dict | None:
 	m = re.search(r"\{.*\}", text or "", re.S)
 	if not m:
@@ -72,26 +91,32 @@ def _answer(text: str) -> dict | None:
 	return d if isinstance(d, dict) else None
 
 
-def check_claim(client, nums: dict, finding: Finding) -> tuple[str, str | None, str, list]:
+def check_claim(
+	client, nums: dict, finding: Finding, deadline: float | None = None
+) -> tuple[str, str | None, str, list]:
 	"""(verdict "supported" or "abstain", the supporting path, the reason, the calls made)."""
 	msgs = [
 		{"role": "system", "content": SYSTEM},
 		{
 			"role": "user",
-			"content": f"Claim: {finding.title}. {finding.detail or ''}\n\nPaths:\n{_paths_guide(nums)}",
+			"content": f"Claim: {_claim(finding)}\n\nPaths:\n{_paths_guide(nums)}",
 		},
 	]
 	fetched: dict[str, float | None] = {}
 	before = len(client.calls)
 	try:
 		for _ in range(MAX_ROUNDS):
+			if deadline is not None and time.monotonic() >= deadline:
+				return "abstain", None, "the check ran out of time", client.calls[before:]
 			msg, _call = client.chat_message(
 				msgs, purpose="diagnosis_check", reasoning_effort="low", tools=[TOOL]
 			)
 			tool_calls = msg.get("tool_calls") or []
 			if not tool_calls:
 				break
-			msgs.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": tool_calls})
+			msgs.append(
+				{"role": "assistant", "content": _text(msg.get("content")) or None, "tool_calls": tool_calls}
+			)
 			for tc in tool_calls:
 				try:
 					path = str(json.loads(tc["function"]["arguments"]).get("path", ""))[:200]
@@ -100,13 +125,13 @@ def check_claim(client, nums: dict, finding: Finding) -> tuple[str, str | None, 
 				value = resolve(nums, path) if path and len(fetched) < MAX_FETCHES else None
 				if path and len(fetched) < MAX_FETCHES:
 					fetched[path] = value
-				msgs.append({"role": "tool", "tool_call_id": tc.get("id", ""),
+				msgs.append({"role": "tool", "tool_call_id": str(tc.get("id") or ""),
 					"content": json.dumps({"path": path, "value": value})})  # fmt: skip
 		else:
 			return "abstain", None, "no answer within the tool rounds", client.calls[before:]
 	except Exception as exc:  # a failed check is no support; the attempts stay in provenance
 		return "abstain", None, f"the check didn't complete ({type(exc).__name__})", client.calls[before:]
-	ans = _answer(msg.get("content") or "")
+	ans = _answer(_text(msg.get("content")))
 	calls = client.calls[before:]
 	if ans is None:
 		return "abstain", None, "no readable answer", calls
@@ -125,8 +150,12 @@ def check_diagnosis(client, rec: FlightRecord, findings: list[Finding]) -> tuple
 	"""The diagnosis findings with Spark Open's check applied, and every call made."""
 	nums = numbers(rec)
 	out, calls = [], []
-	for f in findings:
-		verdict, path, reason, cs = check_claim(client, nums, f)
+	deadline = time.monotonic() + DEADLINE_S
+	for i, f in enumerate(findings):
+		if i < MAX_CLAIMS:
+			verdict, path, reason, cs = check_claim(client, nums, f, deadline)
+		else:
+			verdict, path, reason, cs = "abstain", None, f"not checked (only the first {MAX_CLAIMS} are)", []
 		calls += cs
 		if verdict == "supported":
 			out.append(f.model_copy(update={

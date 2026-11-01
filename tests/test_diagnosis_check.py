@@ -83,3 +83,35 @@ def test_a_failed_call_abstains_and_stays_in_provenance(rec):
 	client = ModelClient(api_key="k", provider="baseten", transport=httpx.MockTransport(handler), retries=0)
 	(f,), calls = check_diagnosis(client, rec, [claim()])
 	assert f.code == "diagnosis.abstain" and len(calls) == 1 and calls[0].ok is False
+
+
+def test_spark_open_never_sees_the_number_the_diagnosis_cited(rec):
+	f = claim().model_copy(update={"detail": "Peaks below 22 GB. (plot: memory_timeline, steps 30-35; number: "
+		f"{PATH} = 22293533696)"})  # fmt: skip
+	seen = []
+	check_diagnosis(spark_open([answer("unsupported", None)], seen), rec, [f])
+	sent = json.dumps(seen[0]["messages"])
+	assert "steps 30-35" in sent and PATH not in sent and "22293533696" not in sent
+
+
+def test_a_list_shaped_answer_is_read_not_a_crash(rec):
+	parts = {
+		"content": [
+			{"type": "text", "text": json.dumps({"verdict": "supported", "path": PATH, "reason": "r"})}
+		]
+	}
+	(f,), _ = check_diagnosis(spark_open([fetch(PATH), parts], []), rec, [claim()])
+	assert f.code == "diagnosis.disagrees"
+
+
+def test_the_check_is_bounded_in_claims_and_time(rec, monkeypatch):
+	from preflight.harness import diagnosis_check
+
+	seen = []
+	script = [m for _ in range(10) for m in (fetch(PATH), answer("supported", PATH))]
+	out, calls = check_diagnosis(spark_open(script, seen), rec, [claim(i) for i in range(1, 10)])
+	assert len(out) == 9 and len(calls) == 2 * diagnosis_check.MAX_CLAIMS
+	assert [f.code for f in out[diagnosis_check.MAX_CLAIMS :]] == ["diagnosis.abstain"] * 3
+	monkeypatch.setattr(diagnosis_check, "DEADLINE_S", 0.0)
+	out, calls = check_diagnosis(spark_open(script, []), rec, [claim()])
+	assert calls == [] and out[0].code == "diagnosis.abstain" and "ran out of time" in out[0].detail

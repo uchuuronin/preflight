@@ -687,10 +687,23 @@ def _diagnose(rec: FlightRecord, deps: Deps) -> FlightRecord:
 		# without it the claims stand as Muse Spark made them, citations checked by code
 		from preflight.harness.diagnosis_check import check_diagnosis
 
-		found, checks = check_diagnosis(deps.triage, rec, found)
-		calls = [*calls, *checks]
+		try:
+			found, checks = check_diagnosis(deps.triage, rec, found)
+			calls = [*calls, *checks]
+		except Exception:  # the check never costs the visitor their record; its calls are lost with it
+			log.warning("job %s: diagnosis check failed", rec.record_id, exc_info=True)
 	keep = [f for f in rec.findings if f.source != "spark_diagnosis"]
-	return rec.model_copy(update={"findings": [*keep, *found], "provenance": [*rec.provenance, *calls]})
+	# after _merge priced the record: these calls go into its model-call cost too
+	added = round(sum(c.cost_usd for c in calls), 6)
+	breakdown = dict(rec.costs.breakdown or {})
+	if added:
+		breakdown["model_calls"] = round(breakdown.get("model_calls", 0) + added, 6)
+	costs = rec.costs.model_copy(
+		update={"llm_usd": round((rec.costs.llm_usd or 0) + added, 6), "breakdown": breakdown}
+	)
+	return rec.model_copy(
+		update={"findings": [*keep, *found], "provenance": [*rec.provenance, *calls], "costs": costs}
+	)
 
 
 def _measured_gpu(result) -> str | None:
