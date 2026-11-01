@@ -237,6 +237,10 @@ def _skipped(p: PlannedProbe, why: str) -> Probe:
 # guess: a generation-bound probe (an eval's or a GRPO step's long completions, a serving batch)
 # passes few of its own boundaries per minute; the Nov 1 eval sweep probe ran out at 360 s
 GENERATION_LENSES = ("eval", "rl", "serving")
+# a serving probe's one measured generate call: more prompts than a 24 GB card's KV cache holds at
+# once (about 16 to 21 at 4,096 tokens for a 7B model), so preemption shows, and few enough to finish
+# well inside the probe's time limit on an L4 (32 x 4,096 tokens) [guess: the next probe replaces it]
+SERVING_PROBE_PROMPTS = 32
 GENERATION_PROBE_TIMEOUT_S = 10 * 60
 
 
@@ -284,6 +288,7 @@ def _spec(
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
+		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 	)
 
 

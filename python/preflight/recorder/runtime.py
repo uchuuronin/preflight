@@ -136,6 +136,26 @@ def _batch_stats(batch) -> tuple[int | None, int | None, int | None]:
 	return tokens, real, samples
 
 
+def _sample_prompts(args: tuple, kwargs: dict, n: int) -> tuple[tuple, dict]:
+	"""vLLM generate's prompts (and a per-prompt list of sampling params) cut to the first n, each
+	prompt kept whole and its reply at the length the script asked for."""
+
+	def cut(v):
+		return v[:n] if isinstance(v, list | tuple) and len(v) > n else v
+
+	args = list(args)
+	if args:
+		args[0] = cut(args[0])
+	if len(args) > 1:
+		args[1] = cut(args[1])
+	for k in ("prompts", "prompt_token_ids", "inputs"):
+		if k in kwargs:
+			kwargs[k] = cut(kwargs[k])
+	if "sampling_params" in kwargs:
+		kwargs["sampling_params"] = cut(kwargs["sampling_params"])
+	return tuple(args), kwargs
+
+
 def _lens_stats(batch) -> dict[str, float]:
 	"""What the vision and graph lenses read from a training batch, by shape alone (no sync):
 	images (N, C, H, W) as the first tensor of the batch, and a PyG-style graph batch (num_nodes,
@@ -293,6 +313,7 @@ class Recorder:
 		eval_batches: int = 2,
 		hf_overrides: bool = True,
 		alternate_sync: bool = False,
+		generate_sample: int = 0,
 	):
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
@@ -300,6 +321,7 @@ class Recorder:
 		# ground truth only (recorder/overhead.py): after warmup, clean and synced steps alternate,
 		# and every step is timed from its boundary events, so the two kinds compare like with like
 		self.alternate_sync = alternate_sync
+		self.generate_sample = generate_sample  # a serving probe: prompts kept per generate call
 		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
 		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
 		self.trace_path = trace_path
@@ -1027,6 +1049,8 @@ class Recorder:
 		def factory(orig):
 			def generate(self_, *args, **kwargs):
 				rec._maybe_stop()
+				if rec.generate_sample:
+					args, kwargs = _sample_prompts(args, kwargs, rec.generate_sample)
 				rec._sync()
 				t0 = rec._now()
 				outs = orig(self_, *args, **kwargs)
@@ -1045,6 +1069,8 @@ class Recorder:
 						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
 					)
 				rec.acc["generate"] += dt
+				if rec.generate_sample:
+					raise StopProbe  # the sampled call is the serving probe's measurement: done
 				return outs
 
 			return generate

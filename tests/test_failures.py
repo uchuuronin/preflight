@@ -8,7 +8,8 @@ from preflight.runner.failures import FALLBACK, describe, with_step
 SRC = Path(__file__).resolve().parents[1] / "python" / "preflight"
 # where a failure's code is set: the recorder's classifier, the job's errors, a probe's error_code
 PATTERNS = (r'Classified\(\s*"([a-z_.]+)"', r'(?:InvalidSubmission|PermanentError)\([^()]*?code="([a-z_.]+)"',
-	r'"error_code":\s*"([a-z_.]+)"', r'error_code="([a-z_.]+)"')  # fmt: skip
+	r'"error_code":\s*"([a-z_.]+)"', r'error_code="([a-z_.]+)"',
+	r'status, code(?:, error)? = \(?\s*"[a-z]+",\s*"([a-z_.]+)"')  # fmt: skip
 
 
 def produced_codes() -> set[str]:

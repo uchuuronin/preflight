@@ -200,6 +200,9 @@ class ProbeSpec:
 	gpu_usd_per_hour: float = 0.0
 	nproc: int = 1  # processes on this node, one per GPU, under torchrun (DDP, FSDP)
 	image: str = "probe"  # which sandbox image runs it: "probe", or "serving" (vLLM, its own torch)
+	# a serving probe: the prompts one vLLM generate call keeps (0: all of them), and the probe ends
+	# once that call is measured; a load test's whole burst would outrun the probe's time limit
+	generate_sample: int = 0
 
 
 @dataclass
@@ -811,6 +814,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"seed": spec.seed,
 				"seed_force": spec.seed_force,
 				"alternate_sync": spec.alternate_sync,
+				"generate_sample": spec.generate_sample,
 				"install_requirements": spec.install_requirements,
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,

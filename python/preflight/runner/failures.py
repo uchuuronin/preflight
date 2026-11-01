@@ -132,6 +132,15 @@ STEPS: dict[str, tuple[str, str]] = {
 		"starting Preflight's recorder",
 		"check the Python that runs probes imports torch (`python -c 'import torch'`), then `preflight run train.py`",
 	),
+	"too_few_steps": (
+		"counting the training steps (the script ended after fewer than two)",
+		"give the script more steps (raise max_steps or the epochs), then `preflight run train.py`",
+	),
+	"nan_divergence": (
+		"the training steps (the loss went NaN or infinite)",
+		"lower the learning rate or turn on gradient clipping, then `preflight run train.py`",
+	),
+	"cancelled": ("the probe, which was cancelled", "submit again when you want it measured"),
 	# Preflight's own failure
 	"internal": (
 		"Preflight itself",

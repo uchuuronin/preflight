@@ -426,3 +426,16 @@ def test_a_ground_truth_probe_becomes_a_record_with_its_measured_zero_spread():
 	ex = rec.probes[0].extras
 	share = ex["rl_zero_spread_groups"] / ex["rl_groups"]
 	assert bool(z) == (share > 0.5) and (not z or "95% interval" in z[0].detail)
+
+
+def test_a_serving_probe_keeps_the_first_prompts_whole_and_the_rest_of_the_call_as_is():
+	# the serving smoke timed out on a 1,024 x 4,096-token burst (Nov 1): a probe measures a sample
+	from preflight.recorder.runtime import _sample_prompts
+
+	params = object()
+	args, kw = _sample_prompts((["a", "b", "c", "d"], params), {}, 2)
+	assert args == (["a", "b"], params) and kw == {}
+	args, kw = _sample_prompts((), {"prompts": list("abcd"), "sampling_params": [1, 2, 3, 4]}, 3)
+	assert kw == {"prompts": ["a", "b", "c"], "sampling_params": [1, 2, 3]}
+	args, kw = _sample_prompts((["a"],), {}, 32)
+	assert args == (["a"],)  # fewer than the sample: untouched
