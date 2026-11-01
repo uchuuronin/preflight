@@ -150,3 +150,21 @@ describe("the server keeps this session's limits", () => {
 		expect(puts.at(-1)).toMatchObject({ record: "lora-7b", limits: { allowed: { gpu_type: ["A100-SXM-80GB"] }, frozen: ["packing"] } });
 	});
 });
+
+describe("the live guide falling back", () => {
+	it("starts the rule-based tour at once when the live guide can't be reached, so the visitor's press still gives a move", async () => {
+		live = true;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response(JSON.stringify({ error: { code: "unavailable", message: "Preflight's server isn't connected yet. Samples still work." } }), { status: 503 })),
+		);
+		mount();
+		await act(async () => {
+			fireEvent.click(screen.getByRole("button", { name: en["guide.start"] }));
+		});
+		for (let i = 0; i < 5; i++) await frame();
+		// The notice says why, and the tour's first step is there with its move.
+		expect(document.querySelector(".pf-guide__notice")?.textContent).toContain("isn't connected");
+		expect(screen.getAllByRole("button", { name: /^Apply / }).length).toBeGreaterThan(0);
+	});
+});

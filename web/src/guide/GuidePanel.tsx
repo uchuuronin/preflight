@@ -452,7 +452,16 @@ export function GuidePanel() {
 			) : null}
 
 			{live ? (
-				<LiveGuideSection onFallback={setFallback} onStatus={setLiveStatus} />
+				<LiveGuideSection
+					onFallback={(message) => {
+						setFallback(message);
+						// The visitor asked the guide for something: the rule-based tour carries on in its
+						// place at once, rather than leaving them a notice and a second button to press
+						// (the deploy's stranger gate, Nov 1: with the live guide on and no API, no move was offered).
+						if (!active) restart();
+					}}
+					onStatus={setLiveStatus}
+				/>
 			) : (
 				<>
 					<p className="pf-guide__say">
