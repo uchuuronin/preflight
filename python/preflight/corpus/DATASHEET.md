@@ -2,7 +2,7 @@
 
 Following *Datasheets for Datasets* (Gebru et al.). Version: corpus@0.3.0, exported Oct 31, 2026 (`remote-runs` folders `b-corpus-export-3` and `b-corpus-export-hf-2`), with the divergence runs of Nov 1 (`b-divergence-export-2`). Owner: workstream B.
 
-**Published file** (gap 16): `preflight-corpus-0.3.0.jsonl.gz`, 2,339 rows (1,519 kernels, 100 HF jobs, 720 divergence runs), 18,462,637 bytes, sha256 `b7cf58d13c291759b8ef23004d87ae0f6b6e42290a7a7e71c998f805a04feb20`, built by `python scripts/export_corpus.py` (the same rows give the same bytes). It ships with `SHA256SUMS` and a dataset card (`README.md`) for a Hugging Face dataset or a release asset.
+**Published file** (gap 16): `preflight-corpus-0.3.0.jsonl.gz`, 2,339 rows (1,519 kernels, 100 HF jobs, 720 divergence runs), 18,462,637 bytes, sha256 `b7cf58d13c291759b8ef23004d87ae0f6b6e42290a7a7e71c998f805a04feb20`, built by `python scripts/export_corpus.py` (the same rows give the same bytes). It ships with `SHA256SUMS` and a dataset card (`README.md`). **Published on Hugging Face:** [huggingface.co/datasets/chaoschia/preflight-corpus](https://huggingface.co/datasets/chaoschia/preflight-corpus) (all three files, commit `0aac218`). It is private until the repository goes public on Nov 3 to 4.
 
 ## Motivation
 
