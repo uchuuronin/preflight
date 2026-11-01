@@ -25,6 +25,7 @@ from preflight.runner.modal_app import (
 	SERVICE_NAME,
 	WEIGHTS_DIR,
 	ZOO_MODELS,
+	_read_only,
 	image_tag,
 	probe_image,
 	records_vol,
@@ -372,7 +373,9 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 		install_requirements=install_requirements, generate_sample=generate_sample)  # fmt: skip
 
 
-_GT = {"image": None, "volumes": {WEIGHTS_DIR: weights_vol}, "timeout": GROUND_TRUTH_TIMEOUT_S}
+# weights read-only: an unseen third-party script runs as root in the bare run, and must not be
+# able to change the shared weights production probes read (review, Nov 1)
+_GT = {"image": None, "volumes": {WEIGHTS_DIR: _read_only(weights_vol)}, "timeout": GROUND_TRUTH_TIMEOUT_S}
 
 
 @ops.function(**{**_GT, "image": probe_image}, gpu=GROUND_TRUTH_GPUS)

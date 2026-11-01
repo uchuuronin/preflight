@@ -12,7 +12,9 @@ The recorder run is a probe that alternates clean and synced steps (Recorder alt
 recorder/overhead.py pairs the two into the recorder's overhead. The same code runs on Modal's L4
 (runner/ops_app.py::ground_truth) and on the AMD droplet (amd-run.yml), so the two are comparable.
 
-Our own zoo scripts on our own GPUs, never visitor code. As root (a cloud box) the bare run gets
+The zoo scripts, and Monday's unseen validation scripts (third-party code, run as ops on our own
+GPUs, never through the visitor path; on Modal the weights volume is mounted read-only for them).
+As root (a cloud box) the bare run gets
 its own root-owned caches, and the probe drops to its unprivileged uid with its own, as the CLI's
 probes do; nothing either writes is read by the other.
 """
@@ -291,7 +293,9 @@ def main(argv: list[str] | None = None) -> int:
 	from preflight.runner.sources import _read_tree
 
 	try:
-		entrypoint_of(_read_tree(ns.script_dir), ns.entrypoint)
+		p = plan(_read_tree(ns.script_dir), ns.entrypoint)
+		if not ns.generate_sample:  # a serving script's probe samples, as on Modal
+			ns.generate_sample = p["generate_sample"]
 	except ValueError as exc:
 		print(f"{ns.script_dir}: {exc}", file=sys.stderr)
 		return 2
