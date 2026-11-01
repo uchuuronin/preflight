@@ -20,6 +20,7 @@ import { outcomes, setHops, useHops, useHopsOwner } from "../hops";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { durMs, useTweenedText } from "../../lib/tween";
 import { duskTokens } from "../../theme/tokens";
+import { abstainText } from "./abstain";
 
 const ARC = 188.5; // 270 degrees of a radius-40 circle
 const FULL = 251.3;
@@ -305,7 +306,7 @@ function useDialSpecs(): DialSpec[] {
 			better: "lower",
 			hops: true,
 			format: (v) => fmt(v, "usd"),
-			...(costEst?.reason && costEst.status !== "abstain" ? { reason: costEst.reason } : {}),
+			...(costEst?.reason && costEst.status !== "abstain" ? { reason: abstainText(costEst.reason) } : {}),
 		},
 		tpsEst || !tokensEst
 			? {
