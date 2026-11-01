@@ -38,7 +38,8 @@ Updated Sun Nov 1, 01:30 ET.
 - Dataset size (`extras.train_dataset_len`, Nov 1): the training loader's sampler length, else its
   dataset's. With `batch_size=None` a split sampler isn't seen, so validation rows are counted; a
   Lightning `DistributedSamplerWrapper` over a split falls back to the whole dataset. A GNN script
-  that samples by hand (zoo/gnn_pyg) has no loader, so no size. The recorder side hasn't run on
+  that samples by hand (zoo/gnn_pyg) has no loader, so no size; D is to expose its training-node
+  count as a plain setting (Chiya, Nov 1), which A reads once it lands. The recorder side hasn't run on
   torch in this workspace; the first GPU probe is its check.
 
 ## AMD session (Thu Oct 29): what the droplet needs
