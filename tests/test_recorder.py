@@ -405,3 +405,23 @@ def test_a_sandbox_entry_gets_its_result_before_the_probes_files_are_deleted(tmp
 	)  # set aside, not yet gone
 	local.finish_cleanup()
 	assert not any(p.exists() for p in pending)
+
+
+@needs_transformers
+def test_a_ground_truth_probe_becomes_a_record_with_its_measured_zero_spread():
+	"""runner/gt_record.py: the GRPO record built from a ground-truth run's recorder probe."""
+	from preflight.runner.gt_record import build
+
+	root = FIX / "fake_grpo"
+	files = {p.relative_to(root).as_posix(): p.read_text() for p in root.rglob("*.py")}
+	r = run_probe(
+		ProbeSpec(probe_id="gt", files=files, entrypoint="train.py", warmup=2, timed=3, timeout_s=240)
+	)
+	assert r.probe.status == "ok", r.probe.error
+	gt = {"recorder": {"probe": r.probe.model_dump(mode="json", exclude={"kernels", "trace"})}}
+	rec = build(gt, files, "grpo_trl")
+	assert rec.job.lens == "rl" and rec.probes[0].rl.group_size == 4
+	z = [f for f in rec.findings if f.code == "rl.zero_spread"]
+	ex = rec.probes[0].extras
+	share = ex["rl_zero_spread_groups"] / ex["rl_groups"]
+	assert bool(z) == (share > 0.5) and (not z or "95% interval" in z[0].detail)

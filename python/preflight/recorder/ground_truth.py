@@ -200,7 +200,9 @@ def measure(
 			"by_phase": r.probe.step_time.by_phase if r.probe.step_time else {},
 			"rl": r.probe.rl.model_dump(mode="json") if r.probe.rl else None,
 			"generation": r.probe.generation.model_dump(mode="json") if r.probe.generation else None,
-			"extras": r.probe.extras, "step_log": log, "log_tail": r.log_tail[-1500:]},
+			"extras": r.probe.extras, "step_log": log, "log_tail": r.log_tail[-1500:],
+			# the whole probe, so a record can be built from the run (runner/gt_record.py)
+			"probe": r.probe.model_dump(mode="json", exclude={"kernels", "trace"})},
 		"overhead": over}  # fmt: skip
 
 
