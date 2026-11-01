@@ -9,7 +9,7 @@ import { useWorkspace } from "../state";
 import { memoryTermBytes } from "../record/terms";
 import { fitOf, likelyFails, trusted, type Fit } from "../status";
 import { FitMark } from "../components/StatusMark";
-import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, NODE_BOX, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbit";
+import { R_BAND, R_MEM, R_ORBIT, R_OVER, FRAME, NODE_BOX, arcDash, layoutOrbit, type OrbitLayout, type OrbitNode } from "./orbitLayout";
 import { AddonBoundary } from "../../components/AddonBoundary";
 
 interface BgData extends Record<string, unknown> {
