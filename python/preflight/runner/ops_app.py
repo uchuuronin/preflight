@@ -674,6 +674,37 @@ def agent_sample(
 	)
 
 
+# ---------------------------------------------------------------- Spark diagnosis, one real check (paid: ask first)
+
+
+@ops.function(
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	timeout=15 * 60,
+)
+def diagnose_hosted(record_json: str, max_usd: float = 0.5) -> dict:
+	"""harness/diagnosis_run.py's one diagnosis and check, with the Meta and Baseten keys."""
+	from preflight.harness.diagnosis_run import run_once
+	from preflight.harness.spark import ModelClient
+	from preflight.schema import load_record
+
+	spark_open = ModelClient.baseten_spark_open() if os.environ.get("BASETEN_API_KEY") else None
+	return run_once(load_record(record_json), ModelClient.meta(), spark_open, max_usd)
+
+
+@ops.local_entrypoint()
+def diagnose(share: str, max_usd: float = 0.5):
+	"""modal run --env main python/preflight/runner/ops_app.py::diagnose --share <token> [--max-usd 0.5]
+	Reads the stored record, runs the diagnosis and its check once, writes out/diagnose.json."""
+	data = b"".join(records_vol.read_file(f"{share}.json")).decode()
+	res = diagnose_hosted.remote(data, max_usd)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/diagnose.json").write_text(json.dumps(res, indent=2))
+	for f in res["checked"] or res["diagnosis"]:
+		print(f"[diagnose] {f['code']}: {f['title']} | {f['detail']}", flush=True)
+	print(f"[diagnose] stats {res['stats']}; {len(res['calls'])} calls, ${res['usd']:.4f}", flush=True)
+
+
 # ---------------------------------------------------------------- serving image (CPU, before any serving probe)
 
 

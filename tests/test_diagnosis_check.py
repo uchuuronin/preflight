@@ -115,3 +115,29 @@ def test_the_check_is_bounded_in_claims_and_time(rec, monkeypatch):
 	monkeypatch.setattr(diagnosis_check, "DEADLINE_S", 0.0)
 	out, calls = check_diagnosis(spark_open(script, []), rec, [claim()])
 	assert calls == [] and out[0].code == "diagnosis.abstain" and "ran out of time" in out[0].detail
+
+
+def test_one_real_run_diagnoses_then_checks_inside_its_cap(rec):
+	from preflight.harness.diagnosis import numbers
+	from preflight.harness.diagnosis_run import run_once
+
+	def client_answering(checks, seen):
+		def handler(request):
+			seen.append(json.loads(request.content))
+			body = {"id": "r1", "choices": [{"message": {"content": json.dumps({"checks": checks})}}],
+				"usage": {"prompt_tokens": 5000, "completion_tokens": 300}}  # fmt: skip
+			return httpx.Response(200, json=body)
+
+		return ModelClient(api_key="k", transport=httpx.MockTransport(handler))
+
+	nums = numbers(rec)
+	diag = [{"verdict": "consistent", "plot": "memory_timeline", "plot_region": "whole run", "path": PATH,
+		"value": nums["probes"]["p1"]["memory"]["peak_allocated_bytes"], "detail": "agree"}]  # fmt: skip
+	out = run_once(
+		rec, client_answering(diag, []), spark_open([fetch(PATH), answer("supported", PATH)], []), 0.5
+	)
+	assert [f["code"] for f in out["checked"]] == ["diagnosis.consistent"]
+	assert [c["purpose"] for c in out["calls"]] == ["diagnosis", "diagnosis_check", "diagnosis_check"]
+	assert out["usd"] == round(sum(c["cost_usd"] for c in out["calls"]), 6) and out["usd"] < 0.5
+	skipped = run_once(rec, client_answering(diag, []), spark_open([], []), 0.0)  # no room left for the check
+	assert skipped["checked"] is None and skipped["check_skipped"] == "not enough of the cap left"
