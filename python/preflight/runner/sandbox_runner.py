@@ -82,7 +82,8 @@ class SandboxRunner:
 		return bool(box.get("ok"))
 
 	def _sandbox(self, gpu: str, image: str = "probe", fallback: tuple[str, ...] = ()):
-		if self._sb is not None and self._asked == gpu and self._image == image:
+		# the job's own GPU, or the one it fell back to (the pipeline then asks for that one by name)
+		if self._sb is not None and gpu in (self._asked, self._gpu) and self._image == image:
 			return self._sb
 		self.close()
 		options = (gpu, *(g for g in fallback if g != gpu))

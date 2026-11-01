@@ -705,6 +705,17 @@ def _probe_points(
 		probes.append(probe)
 		if isinstance(out, ProbeResult):
 			results.append(out)
+			ran = getattr(deps.runner, "last_ran", None)
+			if ran and ran != gpu:
+				# this point ran on a fallback GPU: the rest run there too, and points answered from
+				# the cache for the GPU asked for leave the record, so it holds one GPU's numbers
+				_emit(ctx, "probing", rec, rev, level="warn",
+					message=f"no {gpu} could be scheduled; this job's points run on {ran}")  # fmt: skip
+				probes = [q if q.status != "cached" else q.model_copy(update={"status": "error",
+					"error_code": "gpu.fallback", "cache_key": None,
+					"error": f"left out: answered from the cache for {gpu}, and this job's points ran on {ran}"})
+					for q in probes]  # fmt: skip
+				gpu = ran
 		kept_ids = {id(out), *(id(r) for r in results)}
 		discarded_usd += sum(
 			a.probe.cost.usd for a in attempts if isinstance(a, ProbeResult) and id(a) not in kept_ids

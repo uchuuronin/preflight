@@ -634,12 +634,36 @@ def test_a_probe_run_on_a_fallback_gpu_is_not_cached_as_the_gpu_asked_for(tmp_pa
 		last_ran = "A10"
 
 		def __call__(self, spec, gpu, *, should_stop):
-			assert spec.gpu_fallback == ("A10", "L40S")  # the pipeline allowed these
+			# the pipeline allowed these for the L4; after the fallback the job asks for the A10 itself
+			assert spec.gpu_fallback == (("A10", "L40S") if gpu == "L4" else ())
 			r = super().__call__(spec, "A10", should_stop=should_stop)
 			return r
 
 	cache = MemoryCache()
 	req = {"source": {"kind": "upload", "files": {"train.py": SCRIPT}}, "gpu": "L4"}
 	rec = run_pipeline(req, _Ctx(), deps(tmp_path, FellBack(), cache=cache))
-	assert all(p.cache_key is None for p in rec.probes) and not cache._d  # nothing stored under the L4 key
+	# the point that fell back isn't stored under the L4 key; the rest asked for the A10 and are its
+	assert rec.probes[0].cache_key is None and len(cache._d) == len(rec.probes) - 1
 	assert rec.env.gpu.name == "A10"
+
+
+def test_after_a_fallback_the_job_stays_on_that_gpu_and_drops_cache_hits_from_the_other(tmp_path):
+	cache = MemoryCache()
+	req = {"source": {"kind": "upload", "files": {"train.py": SCRIPT}}, "gpu": "L4"}
+	first = run_pipeline(req, _Ctx(), deps(tmp_path / "a", FakeRunner(outcomes={"p2": ("error", "x"), "p3": ("error", "x")}),
+		cache=cache))  # fmt: skip
+	assert [p.status for p in first.probes][:1] == ["ok"] and len(cache._d) == 1  # only p1 cached, on an L4
+
+	class FellBack(FakeRunner):
+		last_ran = None
+
+		def __call__(self, spec, gpu, *, should_stop):
+			self.last_ran = "A10"
+			return super().__call__(spec, "A10", should_stop=should_stop)
+
+	runner = FellBack()
+	rec = run_pipeline(req, _Ctx(), deps(tmp_path / "b", runner, cache=cache))
+	assert rec.probes[0].status == "error" and rec.probes[0].error_code == "gpu.fallback"
+	assert [g for _, g, *_ in runner.calls] == ["A10"] * len(runner.calls)
+	asked = [c for c in runner.calls]
+	assert len(asked) >= 2 and rec.env.gpu.name == "A10"
