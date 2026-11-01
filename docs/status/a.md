@@ -87,6 +87,35 @@ Updated Sun Nov 1, 12:30 ET.
   count as a plain setting (Chiya, Nov 1), which A reads once it lands. The recorder side hasn't run on
   torch in this workspace; the first GPU probe is its check.
 
+## AMD session (Nov 1 plan, for today's code): A's amd-run.yml calls
+
+Each is one `amd-run.yml` dispatch with `-f host=<droplet IP> -f port=22 -f ref=REF`, run in this
+order, one at a time. REF is the ws-a commit named in the reply to the PM (the head that passed
+CI). Nothing starts before the PM posts the droplet's IP. Only the last call passes
+`destroy_droplet_id`, and only if B has said B is done.
+
+| # | name | `cmd` | timeout | Expected | What it gives |
+| --- | --- | --- | --- | --- | --- |
+| 0 | `a-amd-usercheck` | `python -m preflight.probes.user_check --uid 61000 --gpu` | 15 | 5 min | the startup check: uid 61000 as a probe launches it, the video/render groups, /dev/kfd opened, a GPU matmul, torch.compile on the CPU and on the GPU (ROCm Triton), the probe child's imports |
+| 1 | `a-amd-lora-record` | `python -m preflight.cli.main run zoo/finetune_lora_hf --out out/records --install-requirements --require-gpu` | 45 | 15 min | the LoRA zoo record on ROCm |
+| 2 | `a-amd-lora-gt` | `python -m preflight.recorder.ground_truth zoo/finetune_lora_hf out/gt_lora_mi300x.json --bare-steps 120 --recorder-steps 40 --install-requirements --budget-min 30` | 40 | 15 min | the LoRA ground truth: bare vs recorder step times |
+| 3 | `a-amd-nanogpt-record` | `python -m preflight.cli.main run zoo/pretrain_nanogpt --out out/records --install-requirements --require-gpu` | 45 | 15 min | the nanoGPT record |
+| 4 | `a-amd-nanogpt-gt` | `python -m preflight.recorder.ground_truth zoo/pretrain_nanogpt out/gt_nanogpt_mi300x.json --bare-steps 300 --recorder-steps 100 --install-requirements --budget-min 30` | 40 | 20 min | the nanoGPT ground truth |
+
+About 70 minutes of runs plus about 2 minutes of setup per call (rsync, venv, `pip install -e .`):
+**about 80 minutes expected [guess], about 1 h 40 min with one retry, 2 h at most; $3.50 to $5.20
+of droplet time at $2.59/h** (the Oct 29 rate; B's hours are B's own).
+
+What changed since Oct 29:
+- Step 0 is new. On the droplet the checkout and `.venv-amd` sit under /root, which a fresh uid
+  can't enter, so `preflight.cli.main run` there runs its probes as root (the Nov 1 quickstart
+  fix, `uid_can_run_this_python`). Steps 1 to 4 therefore don't exercise the probe user; step 0
+  pins uid 61000 and launches exactly as a probe does. Measurements don't depend on the uid.
+- A failed step 0 doesn't block steps 1 to 4: it means a root `preflight run` on ROCm with a
+  reachable Python would fail, which goes in known limits with its error.
+- The droplet has no passwd entry for 61000: the check reports the name as missing rather than
+  crashing (the Modal gate still fails an image without one).
+
 ## AMD session (Thu Oct 29): what the droplet needs
 
 `amd-run.yml` checks for ROCm PyTorch on the host and installs only this repo and psutil, so:
