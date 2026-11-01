@@ -479,3 +479,23 @@ def test_an_empty_reply_reaches_the_script_only_once_the_call_is_logged():
 		assert len(proxy.calls("n1")) == 1  # read straight after the reply, with no wait
 	finally:
 		proxy.stop()
+
+
+def test_a_model_override_sends_every_call_to_spark_open_and_prices_it_there():
+	"""The Pareto sweep: the script names Muse Spark; the proxy runs the same task on Spark Open."""
+	prov = Provider()
+	proxy = AgentProxy(
+		prov.url, "our-key", rate=token_rate, model_override="meta-models/muse-spark-open-1026"
+	)
+	proxy.start()
+	try:
+		assert _chat(proxy, "t1").status_code == 200
+		assert _chat(proxy, "t1", stream=True).status_code == 200
+		assert {s["body"]["model"] for s in prov.seen} == {"meta-models/muse-spark-open-1026"}
+		t = proxy.task("t1")
+		assert t.model and "muse-spark-open" in t.model
+		rate = token_rate("muse-spark-open")
+		assert t.cost_usd == pytest.approx(rate.usd(1000, 50, 200) + rate.usd(1200, 30, 0), abs=1e-6)
+	finally:
+		proxy.stop()
+		prov.server.shutdown()

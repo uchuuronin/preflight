@@ -301,8 +301,12 @@ class AgentProxy:
 		max_usd_total: float = MAX_USD_TOTAL,
 		timeout_s: float = 300.0,
 		transport: httpx.BaseTransport | None = None,
+		model_override: str | None = None,
 	):
 		self.upstream = upstream.rstrip("/")
+		# every call goes to this model instead of the one the script names (the Pareto sweep runs the
+		# same tasks on Spark Open); the call is logged under the model that served it
+		self.model_override = model_override
 		self._key = api_key
 		self._rate = rate
 		self.max_calls_per_task = max_calls_per_task
@@ -518,7 +522,10 @@ class AgentProxy:
 			return sum(c.usd for t in self._tasks.values() for c in t.calls)
 
 	def _rate_for(self, model: str | None):
-		return self._rate(model) if (self._rate is not None and model) else None
+		if self._rate is None or not model:
+			return None
+		# a hosted id ("meta-models/muse-spark-open-1026") is priced by its model's own name
+		return self._rate(model) or (self._rate(model.rsplit("/", 1)[-1]) if "/" in model else None)
 
 	def _price(self, model: str | None, u: dict) -> float:
 		r = self._rate_for(model)
@@ -659,6 +666,9 @@ class AgentProxy:
 			if inject:
 				# the usage arrives only when asked for; the extra chunk it adds is read and dropped
 				req["stream_options"] = {**opts, "include_usage": True}
+			if self.model_override:
+				req["model"] = call.model = self.model_override
+			if inject or self.model_override:
 				body = json.dumps(req).encode()
 			headers = {k: v for k, v in h.headers.items() if k.lower() not in _DROP_HEADERS}
 			headers.update({"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})

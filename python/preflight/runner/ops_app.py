@@ -494,10 +494,17 @@ AGENT_MAX_USD = 3.0  # proposed to Chiya for one sample (the proxy stops at it);
 
 
 @ops.function(
-	image=worker_image, secrets=[modal.Secret.from_name("preflight-meta")], timeout=AGENT_SAMPLE_TIMEOUT_S
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	timeout=AGENT_SAMPLE_TIMEOUT_S,
 )
 def agent_sample_hosted(
-	files: dict, entrypoint: str, k: int, max_usd: float, skip_keys: list | None = None
+	files: dict,
+	entrypoint: str,
+	k: int,
+	max_usd: float,
+	skip_keys: list | None = None,
+	provider: str = "meta",
 ) -> dict:
 	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
 	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
@@ -508,10 +515,19 @@ def agent_sample_hosted(
 
 	owner = modal.App._get_container_app()
 	create = _sandbox_factory(owner)
-	upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
+	if (
+		provider == "baseten"
+	):  # the Pareto sweep: the same tasks on Spark Open, whatever model the script names
+		upstream = os.environ.get("BASETEN_BASE_URL") or "https://inference.baseten.co/v1"
+		key, override = (
+			os.environ["BASETEN_API_KEY"],
+			os.environ.get("SPARK_OPEN_MODEL", "meta-models/muse-spark-open-1026"),
+		)
+	else:
+		upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
+		key, override = os.environ["META_API_KEY"], None
 	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
-		os.environ["META_API_KEY"],
-		max_usd_total=max_usd)  # fmt: skip
+		key, max_usd_total=max_usd, model_override=override)  # fmt: skip
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip
@@ -530,7 +546,11 @@ def agent_sample_hosted(
 
 @ops.local_entrypoint()
 def agent_sample(
-	script: str = "agent_eval_spark", k: int = 30, max_usd: float = AGENT_MAX_USD, skip_from: str = ""
+	script: str = "agent_eval_spark",
+	k: int = 30,
+	max_usd: float = AGENT_MAX_USD,
+	skip_from: str = "",
+	provider: str = "meta",
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
 	Writes out/agent_sample_<script>.json: the sampled tasks (counts and timings, no content).
@@ -554,9 +574,11 @@ def agent_sample(
 			print(f"[agent] {len(tasks) - len(skip)} task ids in {skip_from} have no key and may be sampled again",
 				flush=True)  # fmt: skip
 		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
-	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip)
+	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip, provider)
 	Path("out").mkdir(exist_ok=True)
-	Path(f"out/agent_sample_{script}.json").write_text(json.dumps(res, indent=2))
+	Path(f"out/agent_sample_{script}{'' if provider == 'meta' else '_' + provider}.json").write_text(
+		json.dumps(res, indent=2)
+	)
 
 
 # ---------------------------------------------------------------- serving image (CPU, before any serving probe)
