@@ -1,0 +1,175 @@
+{
+	"gpu": [
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "T4",
+			"id": "gpu/modal/T4/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 0.59
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "L4",
+			"id": "gpu/modal/L4/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 0.8
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "A10",
+			"id": "gpu/modal/A10/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 1.1
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "L40S",
+			"id": "gpu/modal/L40S/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 1.95
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "A100-SXM-80GB",
+			"id": "gpu/modal/A100-SXM-80GB/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 2.5
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "RTX-PRO-6000-96GB",
+			"id": "gpu/modal/RTX-PRO-6000-96GB/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 3.03
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "H100-SXM-80GB",
+			"id": "gpu/modal/H100-SXM-80GB/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 3.95
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "H200-SXM-141GB",
+			"id": "gpu/modal/H200-SXM-141GB/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 4.54
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "B200-SXM-180GB",
+			"id": "gpu/modal/B200-SXM-180GB/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 6.25
+		},
+		{
+			"as_of": "2026-07",
+			"confidence": "provider",
+			"gpu": "B300-SXM-288GB",
+			"id": "gpu/modal/B300-SXM-288GB/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "Modal list rate, per-second billing, base region",
+			"usd_per_hour": 7.1
+		},
+		{
+			"as_of": "2026-10",
+			"confidence": "secondary",
+			"gpu": "A100-SXM-40GB",
+			"id": "gpu/modal/A100-SXM-40GB/us/on_demand",
+			"kind": "on_demand",
+			"provider": "modal",
+			"region": "us",
+			"source": "computeprices.com, updated Oct 26 2026 (lists it as PCIe; single-GPU specs are the same)",
+			"usd_per_hour": 2.1
+		},
+		{
+			"as_of": "2026-10",
+			"confidence": "contract",
+			"gpu": "MI300X",
+			"id": "gpu/amd_devcloud/MI300X/us/on_demand",
+			"kind": "on_demand",
+			"provider": "amd_devcloud",
+			"region": "us",
+			"source": "Preflight contract, gap 8",
+			"usd_per_hour": 2.59
+		}
+	],
+	"tokens": [
+		{
+			"as_of": "2026-09",
+			"cached_input_per_m": 0.15,
+			"confidence": "secondary",
+			"id": "tokens/meta/muse-spark/us",
+			"input_per_m": 1.25,
+			"model": "muse-spark",
+			"output_per_m": 4.25,
+			"provider": "meta",
+			"region": "us",
+			"source": "eesel.ai, Muse Spark 1.3 pricing (Sep 8 2026; standard xhigh endpoint, rates confirmed on Artificial Analysis); cached input is the stated 88% discount"
+		},
+		{
+			"as_of": "2026-10",
+			"cached_input_per_m": null,
+			"confidence": "secondary",
+			"id": "tokens/baseten/muse-spark-open/us",
+			"input_per_m": 1.25,
+			"model": "muse-spark-open",
+			"output_per_m": 4.25,
+			"provider": "baseten",
+			"region": "us",
+			"source": "getmaxim.ai Bifrost cost calculator, Baseten, updated Oct 26 2026 (no cached rate listed)"
+		},
+		{
+			"as_of": "2026-09",
+			"cached_input_per_m": 0.03,
+			"confidence": "secondary",
+			"id": "tokens/qubrid/muse-glimmer/us",
+			"input_per_m": 0.25,
+			"model": "muse-glimmer",
+			"output_per_m": 1.05,
+			"provider": "qubrid",
+			"region": "us",
+			"source": "qubrid.com, Muse Glimmer-30B pricing (Sep 3 2026)"
+		}
+	],
+	"version": "2026-10-27"
+}

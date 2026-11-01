@@ -54,12 +54,34 @@ fix_image = (
 	.env({"PATH": MUSE_PATH})
 )
 
-runner_image = modal.Image.debian_slim(python_version="3.11").add_local_dir(
-	ROOT / "api" / "preflight_api" / "fix", "/root/fixpkg/preflight_api/fix"
+# The Function's own image: the fix package, and A's package and zoo so a race reads the record's
+# code exactly as A's runner does (record_jobs.resolve, sources.fetch: git for repo records).
+runner_image = (
+	modal.Image.debian_slim(python_version="3.11")
+	.apt_install("git", "ca-certificates")
+	.pip_install("pydantic>=2.8,<3", "numpy>=1.26", "httpx>=0.27")
+	.env({"PREFLIGHT_ZOO": "/root/zoo"})
+	.add_local_dir(ROOT / "api" / "preflight_api" / "fix", "/root/fixpkg/preflight_api/fix")
+	.add_local_dir(ROOT / "python" / "preflight", "/root/fixpkg/preflight")
+	.add_local_dir(ROOT / "zoo", "/root/zoo")
 )
 
 app = modal.App("preflight-fix", image=runner_image)
 META = modal.Secret.from_name("preflight-meta")
+# A's volumes (python/preflight/runner/modal_app.py creates them); read-only here, never created.
+RECORDS_DIR, UPLOADS_DIR = "/records", "/uploads"
+records_vol = modal.Volume.from_name("preflight-records")
+uploads_vol = modal.Volume.from_name("preflight-uploads")
+# Source: derived, SANDBOX_TIMEOUT_S plus reading the code (a repo clone is capped by A's
+# CLONE_TIMEOUT_S) and the sandbox's start; the API treats a race older than this as lost.
+RACE_TIMEOUT_S = 12 * 60
+
+
+def _read_only(vol):
+	try:
+		return vol.with_mount_options(read_only=True)
+	except AttributeError:  # older SDKs
+		return vol.read_only()
 
 
 def _pkg():
@@ -207,8 +229,10 @@ def startup_check_fix() -> dict:
 			timeout=60,
 		)
 		out["config_status"] = (so + se)[:6000]
+		out["reads_code"] = _reads_code()
 		out["ok"] = (
-			out["version"]["code"] == 0
+			out["reads_code"].startswith("ok")
+			and out["version"]["code"] == 0
 			and out["python"]["code"] == 0
 			and all(out["flags"].values())
 			and not out["gate"].startswith("FAILED")
@@ -217,6 +241,23 @@ def startup_check_fix() -> dict:
 		return out
 	finally:
 		sb.terminate()
+
+
+def _reads_code() -> str:
+	"""race_fix's half, in this Function's own image: A's package imports, git is there, and a
+	sample's code reads the way a race reads it (no volume needed for a sample)."""
+	import subprocess
+
+	try:
+		from preflight_api.fix import run
+
+		git = subprocess.run(
+			["/usr/bin/git", "--version"], capture_output=True, text=True, check=True
+		).stdout.strip()
+		files = run.source_files("sample:lora-7b", reader=None, blobs=None)
+		return f"ok: {git}; sample lora-7b reads as {len(files)} files"
+	except Exception as e:
+		return f"FAILED: {type(e).__name__}: {e}"
 
 
 # Settings that might turn Muse Code's background observers off, tried as `-c KEY=VALUE`, which
@@ -360,6 +401,48 @@ def smoke_fix(files: dict[str, str], observers: dict | None = None) -> dict:
 	}
 
 
+@app.function(
+	secrets=[META],
+	timeout=RACE_TIMEOUT_S,
+	retries=0,
+	volumes={RECORDS_DIR: _read_only(records_vol), UPLOADS_DIR: _read_only(uploads_vol)},
+)
+def race_fix(record_ref: str, candidates: list[dict], measured: str | None, stop_usd: float) -> dict:
+	"""One public race, spawned by the API (preflight_api/fix/service.py ModalFixer). The record's
+	code is read here, never by the API; the sandbox opens only once it is in hand."""
+	_pkg()
+	from preflight.runner.records import LocalRecordWriter
+	from preflight.runner.remote_store import DirBlobs
+
+	from preflight_api.fix import run
+
+	reader = LocalRecordWriter(RECORDS_DIR, on_read=records_vol.reload)
+	blobs = DirBlobs(UPLOADS_DIR, reload=uploads_vol.reload)
+	boxes: list[ModalBox] = []
+
+	def open_box():
+		sb = _sandbox(app, network=True)
+		box = ModalBox(sb, stop_usd=stop_usd)
+		boxes.append(box)
+
+		def close():
+			with contextlib.suppress(Exception):  # it may have ended already (cost cap, timeout)
+				sb.terminate()
+
+		return box, close
+
+	return run.run_race(
+		record_ref,
+		candidates,
+		measured,
+		reader=reader,
+		blobs=blobs,
+		open_box=open_box,
+		key=os.environ["META_API_KEY"],
+		path=MUSE_PATH,
+	)
+
+
 @app.local_entrypoint()
 def startup_check() -> None:
 	import json
@@ -394,3 +477,34 @@ def smoke() -> None:
 		and not res["stopped_at_cap"]
 	)
 	raise SystemExit(0 if ok else 1)
+
+
+@app.local_entrypoint()
+def race_sample() -> None:
+	"""The first real race, as a visitor would start it, on the lora-7b sample's eval
+	out-of-memory finding (three fixes), run once with Chiya's yes:
+
+		modal run --env main api/fix_app.py::race_sample
+
+	The startup check runs first (no model call); the race is capped at three candidates' worth."""
+	import json
+	import sys
+
+	sys.path.insert(0, str(ROOT / "api"))  # this runs on the caller's machine, from the repo
+	from preflight_api.fix import run
+
+	check = startup_check_fix.remote()
+	if not check.get("ok"):
+		print(json.dumps(check, indent=1)[:6000])
+		raise SystemExit("startup check failed; no model call made")
+	cands = [
+		{"template_id": "eval.reduce_batch", "value": 8},
+		{"template_id": "eval.wrap_no_grad"},
+		{"template_id": "memory.gradient_checkpointing", "value": True},
+	]
+	res = race_fix.remote(
+		"sample:lora-7b", cands, "First eval will run out of memory", run.stop_usd(len(cands))
+	)
+	print(json.dumps(res, indent=1))
+	patched = [c for c in res.get("candidates", []) if c["status"] == "patched"]
+	raise SystemExit(0 if patched and not res.get("error") else 1)

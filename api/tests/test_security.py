@@ -170,3 +170,18 @@ def test_memory_ledger_is_async():
 		return await led.spent_today()
 
 	assert asyncio.run(go()) == pytest.approx(0.005)
+
+
+def test_a_long_reservation_restores_on_ledgers_from_before_and_after_ttl():
+	from preflight_api.ledger import Reservation
+
+	core = LedgerCore()
+	d = core.reserve(visitor="v", run="fix:ip:a", ip="a", usd=0.39, run_cap=2.0, ttl_s=780.0)
+	snap = core.snapshot()
+	# A ledger from before ttl existed builds rows from exactly these fields (a rollback).
+	assert all(set(r) == {"id", "visitor", "run", "ip", "usd", "at"} for r in snap["open"])
+	assert all(isinstance(Reservation(**r), Reservation) for r in snap["open"])
+	assert LedgerCore.restore(snap)._open[d.reservation].ttl == 780.0
+	# A guide turn's reservation keeps the ledger's own time.
+	g = core.reserve(visitor="v", run="r", ip="b", usd=0.01)
+	assert LedgerCore.restore(core.snapshot())._open[g.reservation].ttl is None

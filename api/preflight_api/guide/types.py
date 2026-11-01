@@ -52,12 +52,87 @@ class Objective(Strict):
 	target_id: Id | None = None
 
 
+Positive = Annotated[float, Field(gt=0, le=1e12)]
+
+
+class Limits(Strict):
+	"""The visitor's confirmed limits on the guide (web/src/guide/limits.ts), enforced here on every
+	move and probe the model asks for: allowed and excluded values, knobs not to change (frozen)
+	and knobs set aside after "Not this" (declined) before anything runs; the number limits
+	(budget, deadline, GPU-hours) against the readouts the browser reports for a move, before and
+	after it (routes/guide.py number_limit_broken), with the move put back if it breaks one."""
+
+	#: knob -> the only values it may take (e.g. allowed GPUs)
+	allowed: dict[Id, list[Value]] = Field(default_factory=dict, max_length=96)
+	#: knob -> values the visitor turned down ("Not this")
+	excluded: dict[Id, list[Value]] = Field(default_factory=dict, max_length=96)
+	#: knobs the visitor said not to change: never moved, never unpinned by the guide
+	frozen: list[Id] = Field(default_factory=list, max_length=96)
+	#: knobs set aside after "Not this": the guide offers another lever
+	declined: list[Id] = Field(default_factory=list, max_length=96)
+	budget_usd: Positive | None = None
+	deadline_s: Positive | None = None
+	gpu_hours: Positive | None = None
+
+	@field_validator("allowed", "excluded")
+	@classmethod
+	def _short_lists(cls, v: dict[str, list]) -> dict[str, list]:
+		if any(len(x) > 64 for x in v.values()):
+			raise ValueError("at most 64 values per knob")
+		return v
+
+	def stricter(self, other: Limits) -> Limits:
+		"""Both sets of limits at once: allowed lists intersected, everything ruled out or frozen
+		joined, the lower of each number. Used where the server's copy meets the browser's."""
+		allowed = dict(self.allowed)
+		for kid, vs in other.allowed.items():
+			allowed[kid] = [v for v in allowed[kid] if v in vs] if kid in allowed else list(vs)
+		excluded = {k: list(v) for k, v in self.excluded.items()}
+		for kid, vs in other.excluded.items():
+			excluded[kid] = [*excluded.get(kid, []), *(v for v in vs if v not in excluded.get(kid, []))]
+			# Never cut: dropping a value would allow it again. Past 64, the allowed list is the tool.
+			if len(excluded[kid]) > 64:
+				raise ValueError(f"more than 64 values ruled out on {kid}")
+
+		def low(a: float | None, b: float | None) -> float | None:
+			return b if a is None else a if b is None else min(a, b)
+
+		return Limits(
+			allowed=allowed,
+			excluded=excluded,
+			frozen=sorted({*self.frozen, *other.frozen}),
+			declined=sorted({*self.declined, *other.declined}),
+			budget_usd=low(self.budget_usd, other.budget_usd),
+			deadline_s=low(self.deadline_s, other.deadline_s),
+			gpu_hours=low(self.gpu_hours, other.gpu_hours),
+		)
+
+	def excluding(self, knob_id: str, value: Any) -> Limits:
+		"""These limits with one more value ruled out and its knob set aside ("Not this")."""
+		ex = dict(self.excluded)
+		ex[knob_id] = [*ex.get(knob_id, []), value] if value not in ex.get(knob_id, []) else ex[knob_id]
+		if len(ex[knob_id]) > 64:
+			raise ValueError(f"more than 64 values ruled out on {knob_id}")
+		dec = self.declined if knob_id in self.declined else [*self.declined, knob_id]
+		return self.model_copy(update={"excluded": ex, "declined": dec})
+
+	def allows(self, knob_id: str, value: Any) -> bool:
+		if knob_id in self.frozen:
+			return False
+		allow = self.allowed.get(knob_id)
+		# A knob listed with no values allows none (two sets of limits that share none).
+		if allow is not None and value not in allow:
+			return False
+		return value not in self.excluded.get(knob_id, [])
+
+
 class Setting(Strict):
 	"""The visitor's cockpit right now."""
 
 	knobs: dict[Id, Value] = Field(max_length=96)
 	pinned: list[Id] = Field(default_factory=list, max_length=96)
 	objective: Objective
+	limits: Limits = Field(default_factory=Limits)
 
 
 # ---- tool results the browser computed (one per pending browser call)
@@ -92,8 +167,22 @@ class SetKnobOut(Strict):
 	from_value: Value | None = None
 	to_value: Value | None = None
 	readouts: dict[Id, Readout] = Field(default_factory=dict, max_length=24)
+	#: the same readouts at the setting before the move, so the server can check number limits
+	baseline: dict[Id, Readout] = Field(default_factory=dict, max_length=24)
 	refused: (
-		Literal["pinned", "not_in_domain", "would_be_tight", "would_fail", "not_trusted", "one_per_round"]
+		Literal[
+			"pinned",
+			"not_in_domain",
+			"changes_results",
+			"outside_limits",
+			"over_budget",
+			"past_deadline",
+			"over_quota",
+			"would_be_tight",
+			"would_fail",
+			"not_trusted",
+			"one_per_round",
+		]
 		| None
 	) = None
 
@@ -120,7 +209,8 @@ class Decision(Strict):
 	"""What the visitor did with the guide's proposed move."""
 
 	knob_id: Id
-	action: Literal["applied", "reverted", "pinned", "changed"]
+	#: kept: reverted and pinned at the visitor's value; declined: "Not this" (excluded, next lever)
+	action: Literal["applied", "reverted", "pinned", "kept", "declined", "changed"]
 	value: Value | None = None
 
 
@@ -157,6 +247,20 @@ class InputError(ValueError):
 	pass
 
 
+def check_limits(limits: Limits, rec: RecordView) -> None:
+	"""Every knob and value a set of limits names is one the record has."""
+	for kid in [*limits.frozen, *limits.declined]:
+		if kid not in rec.knobs:
+			raise InputError(f"unknown limited knob {kid}")
+	for kid, values in [*limits.allowed.items(), *limits.excluded.items()]:
+		k = rec.knobs.get(kid)
+		if k is None:
+			raise InputError(f"unknown limited knob {kid}")
+		for v in values:
+			if not k.allows(v) and v != k.current:
+				raise InputError(f"{kid} can't be {v!r}")
+
+
 def check_setting(s: Setting, rec: RecordView) -> None:
 	for kid, v in s.knobs.items():
 		k = rec.knobs.get(kid)
@@ -167,6 +271,7 @@ def check_setting(s: Setting, rec: RecordView) -> None:
 	for kid in s.pinned:
 		if kid not in rec.knobs:
 			raise InputError(f"unknown pinned knob {kid}")
+	check_limits(s.limits, rec)
 	if s.objective.target_id and s.objective.target_id not in rec.targets:
 		raise InputError(f"unknown objective target {s.objective.target_id}")
 
@@ -195,6 +300,7 @@ def check_result(out: Any, rec: RecordView) -> None:
 			if v is not None and not k.allows(v) and v != k.current:
 				raise InputError(f"{out.knob_id} can't be {v!r}")
 		_check_readouts(out.readouts, rec)
+		_check_readouts(out.baseline, rec)
 	elif isinstance(out, HighlightOut):
 		bad = [n for n in out.nodes if n not in rec.nodes and not n.startswith("knob:")]
 		if bad:

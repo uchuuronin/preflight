@@ -82,12 +82,10 @@ def test_held_out_records_carry_nothing_derived_from_the_probe():
 	assert held.models == [] and held.findings == [] and not held.predictions.estimates
 
 
-def test_an_eval_off_probe_is_scored_against_the_engine_training_peak():
-	"""Independent of coverage.py's arithmetic: the engine's analytical training-moment peak (eval
-	batch removed) plus the same calibration offset the engine applied to its eval-moment peak."""
-	from dataclasses import replace
-
-	from preflight.engine import api, knobs, memory
+def test_an_eval_off_probe_is_scored_against_the_engine_prediction_as_it_ran():
+	"""B's predict_as_run drops the eval pass for a probe that ran none: its peak is below the
+	job-as-written peak, and the page compares it after taking off only the context constant."""
+	from preflight.engine import api
 	from preflight.engine.memory import DEFAULT_CONTEXT_BYTES as C
 	from preflight.schema import load_record
 
@@ -95,18 +93,32 @@ def test_an_eval_off_probe_is_scored_against_the_engine_training_peak():
 	for pid in ("p1", "p2", "p3"):
 		p = next(q for q in rec.probes if q.id == pid)
 		held = coverage.held_out(rec, p)
-		pred = api.predict(held, dict(p.knobs)).root
-		values = api._probe_values(rec, p)
-		arch, setup, shape = knobs.setup_from(rec.job.script_map, values)
-		cap = api._capacity(held, api._target_gpu(held, values))
-		with_eval = memory.breakdown(arch, setup, shape.batch, shape.seq, capacity_bytes=cap)
-		training = memory.breakdown(
-			arch, replace(setup, eval_batch=None), shape.batch, shape.seq, capacity_bytes=cap
-		)
-		offset = pred["memory.peak"].point - C - with_eval.allocator_peak
-		m, basis = coverage.memory_target(p, pred)
+		as_run = api.predict_as_run(held, p).root
+		written = api.predict(held, dict(p.knobs)).root
+		assert not api.probe_ran_eval(p)
+		assert as_run["memory.peak"].point < written["memory.peak"].point
+		m, basis = coverage.memory_target(p, as_run)
 		assert basis == "peak_less_eval_and_context"
-		assert m["point"] == pytest.approx(training.allocator_peak + offset, rel=1e-6)
+		assert m["point"] == pytest.approx(as_run["memory.peak"].point - C)
+
+
+def test_a_probe_whose_rows_were_all_shorter_than_seq_len_is_labelled_not_scored():
+	"""Padding is "longest" on short Alpaca rows: p1 and p2 never met a 1024-token row, so the engine
+	(sized by seq_len on purpose) is held to nothing there; p3 met its 512 cap and is scored."""
+	from preflight.schema import load_record
+
+	rec = load_record(REAL.read_text())
+	by_id = {p.id: p for p in rec.probes}
+	assert coverage.sized_for_seq_len(by_id["p1"]) is not None
+	assert coverage.sized_for_seq_len(by_id["p2"]) is not None
+	assert coverage.sized_for_seq_len(by_id["p3"]) is None
+	checks, _ = coverage.check_record("a-smoke", REAL.read_text())
+	mem = {c["probe"]: c for c in checks if c["metric"] == "peak_memory"}
+	assert mem["p1"]["verdict"] == "sized_for_seq_len" and "hit" not in mem["p1"]
+	assert mem["p1"]["longest_row"] < mem["p1"]["seq_len"] == 1024
+	assert "hit" in mem["p3"]
+	s = coverage.summarise(checks)["peak_memory"]
+	assert s["n"] == 1 and s["sized_for_seq_len"] == 2
 
 
 def test_a_probe_that_ran_eval_keeps_the_eval_term():

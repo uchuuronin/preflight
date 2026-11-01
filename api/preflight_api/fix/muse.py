@@ -90,7 +90,7 @@ PATH_KEYS = {"path", "file_path", "paths", "directory", "dir"}
 PATTERN_KEYS = {"glob", "include", "exclude"}
 TEXT_KEYS = {
 	"read_file": {"offset", "limit", "start_line", "end_line", "line"},
-	"search": {"query", "pattern", "regex", "case_sensitive", "max_results", "literal"},
+	"search": {"query", "pattern", "regex", "case_sensitive", "max_results", "literal", "output_mode"},
 	"edit_file": {"old_string", "new_string", "old_str", "new_str", "replace_all", "old_text", "new_text", "find", "replace"},
 	"write_file": {"content", "text"},
 }
@@ -139,10 +139,13 @@ try:
 					out("that file isn't part of the fix.")
 				seen_path = True
 		elif key in PATTERN_KEYS:
-			# No absolute or parent paths, and none of the glob syntax that can spell one
-			# indirectly ({/proc,x}, [/]proc, an escaped slash).
-			if not isinstance(value, str) or value.startswith(("/", "~", "$")) or ".." in value or any(c in value for c in ":{}[]\\"):
-				out("patterns must stay inside the repository.")
+			# One glob or a list of them (Muse Code 1.4.14 sends a list). No absolute or parent
+			# paths, and none of the glob syntax that can spell one indirectly ({/proc,x}, [/]proc,
+			# an escaped slash).
+			globs = value if isinstance(value, list) else [value]
+			for g in globs:
+				if not isinstance(g, str) or g.startswith(("/", "~", "$")) or ".." in g or any(c in g for c in ":{}[]\\"):
+					out("patterns must stay inside the repository.")
 		elif key in TEXT_KEYS[tool]:
 			if isinstance(value, (dict, list)):
 				out("unexpected tool input.")

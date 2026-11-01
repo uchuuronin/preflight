@@ -43,9 +43,10 @@ describe("the exports hook", () => {
 		expect(seen?.shareUrl).toMatch(/#\/cockpit\/sample%3Adev$/);
 	});
 
-	it("renders nothing while the flag is off or no panel is registered", () => {
+	it("renders nothing while the flag is off, and C's own Weights & Biases file with it on", () => {
 		open();
-		expect(screen.queryByRole("region", { name: "Exports" })).toBeNull();
+		expect(screen.getByRole("region", { name: "Exports" })).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Download preflight_wandb.py" })).toBeTruthy();
 		cleanup();
 		registerExportsPanel({ id: "d.exports", titleKey: "exports.title", component: Panel });
 		exportsOn = false;

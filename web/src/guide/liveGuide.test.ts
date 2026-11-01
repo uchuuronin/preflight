@@ -95,8 +95,11 @@ describe("the browser's set_knob guard", () => {
 	});
 
 	it("refuses settings the model can't vouch for", () => {
-		const r = guardSetKnob(makeCtx({ knobs: { eval_batch_size: 8 } }).ctx(), "seq_len", 4096);
+		// The run as checked in is failing, so a result-changing knob may move, but not to a worse fit.
+		const r = guardSetKnob(makeCtx().ctx(), "seq_len", 4096);
 		expect(["not_trusted", "would_fail", "would_be_tight"]).toContain(r);
+		// Once it fits, longer sequences are a trade-off to put to the person, never a move.
+		expect(guardSetKnob(makeCtx({ knobs: { eval_batch_size: 8 } }).ctx(), "seq_len", 4096)).toBe("changes_results");
 	});
 
 	it("moves at most one knob per round", () => {

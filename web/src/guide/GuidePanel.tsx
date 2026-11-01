@@ -1,17 +1,30 @@
-import { useEffect, useRef, useState } from "react";
-import { fmt, fmtDelta } from "../lib/fmt";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { finishBand, planFromRecord } from "../workspace/campaign/plan";
+import { currentKnobs } from "../workspace/record/model";
+import { rateFactor } from "../workspace/rate";
+import { fmt, fmtDelta, fmtRange } from "../lib/fmt";
+import { wilson } from "../addons/_stats/wilson";
+import { probeCap, rlProbe, spreadCount } from "../workspace/rl";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
 import { usePanels } from "../registry";
 import { capacityBytes, costStraddlesBudget, failureTarget, objectiveTarget, SAMPLE_MORE_TASKS, target, targetFor } from "../workspace/record/model";
-import type { Knob, KnobValue } from "../workspace/record/types";
+import type { Finding, Knob, KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
-import { MAX_TOUR_STEPS, nextStep, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
+import { campaignParts, campaignVisit, rlParts, rlVisit, findingVisit, MAX_TOUR_STEPS, nextStep, pendingFindings, plannedSteps, SAMPLE_VISIT, type TourStep } from "./ruleTour";
 import { runTool, type ToolContext } from "./tools";
 import { AddonBoundary } from "../components/AddonBoundary";
+import { FixRace } from "../fix/FixRace";
+import { limitsForServer } from "./limits";
+import { LimitsPanel } from "./LimitsPanel";
+import { MoveChoices } from "./MoveChoices";
+
+/** Muse Code writes a finding's fix only once the fix loop is on; until then the tour moves on. */
+const canFix = (f: Finding) => !!f.fix_template && flag("c.fix_loop");
 
 interface Active {
 	step: TourStep;
@@ -29,6 +42,22 @@ export function valueText(knob: Knob | undefined, v: KnobValue | undefined): str
 	return fmt(v, "count");
 }
 
+/** The view each band step lights up (below the cockpit), and where the step speaks inside it. */
+const BANDS = { campaign: "pf-campaign", rl: "pf-rl" } as const;
+type BandKind = keyof typeof BANDS;
+const isBand = (k: string | undefined): k is BandKind => k === "campaign" || k === "rl";
+
+/** Light up the view the tour is on (none: all off), and bring it into view. */
+function guideBand(on: BandKind | null): void {
+	if (typeof document === "undefined") return;
+	for (const [kind, id] of Object.entries(BANDS)) {
+		const el = document.getElementById(id);
+		if (!el) continue;
+		el.classList.toggle("is-guided", kind === on);
+		if (kind === on) el.scrollIntoView?.({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+	}
+}
+
 export function GuidePanel() {
 	const ws = useWorkspace();
 	const { record, recordRef, provider, state, actions, estimates } = ws;
@@ -37,12 +66,21 @@ export function GuidePanel() {
 	const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
 	const [taken, setTaken] = useState(0);
 	const [why, setWhy] = useState(false);
+	const [fixing, setFixing] = useState<string | null>(null);
 	const [fallback, setFallback] = useState<string | null>(null);
 	const [approvals, setApprovals] = useState<Array<{ id: number; name: string; args: Record<string, unknown>; run?: ToolRun; running?: boolean }>>([]);
 	const [cliff, setCliff] = useState<{ knobId: string; from: KnobValue } | null>(null);
 	const [liveStatus, setLiveStatus] = useState("ready");
 	const live = flag("c.guide.live") && !fallback;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
+	// The campaign plan the cockpit draws (same flag, same record), so the tour walks what's on screen.
+	// B's plan at the table's rates it was made at: the budget cut is judged there, whatever rate the visitor types.
+	const campaignTable = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
+	const campaign = useMemo(
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k) => rateFactor(record, { ...currentKnobs(record), ...k }, state.rate)) : null),
+		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
+		[record, state.rate],
+	);
 
 	const latest = useRef(ws);
 	latest.current = ws;
@@ -55,36 +93,61 @@ export function GuidePanel() {
 			actions,
 			knobs: s.knobs,
 			pinned: s.pinned,
+			limits: s.limits,
 			requestApproval: (name, args) => setApprovals((a) => [...a, { id: Date.now() + a.length, name, args }]),
 		};
 	};
 
 	const begin = (nextVisited: ReadonlySet<string>, nextTaken: number) => {
 		const { state: s } = latest.current;
-		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited };
+		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited, limits: s.limits, campaign };
 		const step = nextStep(tc);
 		const n = nextTaken + 1;
+		// Steps that walk a view (the campaign plan, the RL signals) come on top of the tour's moves:
+		// the five-move cap counts moves, not these. Review, Nov 1.
+		const bands = [...nextVisited].filter((v) => v.startsWith("campaign:") || v.startsWith("rl:")).length;
+		const cap = MAX_TOUR_STEPS + bands;
+		guideBand(isBand(step.kind) ? step.kind : null);
+		if (isBand(step.kind)) {
+			setWhy(false);
+			actions.highlight([]);
+			actions.propose(null);
+			const left = rlParts(tc).length + campaignParts(tc).length - 1;
+			setActive({ step, n, of: Math.max(n, nextTaken + 1 + left + pendingFindings(tc) + Math.min(MAX_TOUR_STEPS, plannedSteps(tc))) });
+			return;
+		}
 		if (step.kind === "probe_offer" && step.move) {
 			if (step.nodes.length) runTool("highlight", { nodes: step.nodes }, ctx());
 			runTool("predict", { knobs: { [step.move.knobId]: step.move.to } }, ctx());
 			actions.propose(null);
 			actions.openKnob(step.move.knobId);
 			setWhy(false);
-			setActive({ step, n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + plannedSteps(tc))) });
+			setActive({ step, n, of: Math.min(cap, Math.max(n, nextTaken + plannedSteps(tc))) });
 			return;
 		}
 		setWhy(false);
 		if (step.nodes.length) runTool("highlight", { nodes: step.nodes }, ctx());
 		else actions.highlight([]);
-		if (step.kind === "move" && step.move && n <= MAX_TOUR_STEPS) {
+		if (step.kind === "move" && step.move && n <= cap) {
 			const from = s.knobs[step.move.knobId];
 			runTool("predict", { knobs: { [step.move.knobId]: step.move.to } }, ctx());
 			runTool("set_knob", { knob_id: step.move.knobId, value: step.move.to, why: step.textKey }, ctx());
-			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + plannedSteps(tc))) });
+			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.min(cap, Math.max(n, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
 			return;
 		}
 		actions.propose(null);
-		const shown = step.kind === "move" ? { ...step, kind: "done" as const, textKey: "guide.done", whyKey: "guide.done.why" } : step;
+		if (step.kind === "finding") {
+			// A finding is a step of the tour: counted with the findings and moves still to come.
+			setActive({ step, n, of: Math.max(n, Math.min(cap, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
+			return;
+		}
+		// With limits set or a suggestion turned down, "done" says what it means: nothing else
+		// inside the visitor's limits helps.
+		const l = s.limits;
+		const limited = l.declined.length > 0 || l.frozen.length > 0 || Object.keys(l.excluded).length > 0 || Object.keys(l.allowed).length > 0 || l.budgetUsd !== null || l.deadlineS !== null || l.gpuHours !== null;
+		const doneKey = limited ? "guide.done.limits" : "guide.done";
+		const shown =
+			step.kind === "move" || step.kind === "done" ? { ...step, kind: "done" as const, textKey: doneKey, whyKey: limited ? "guide.done.limits.why" : "guide.done.why" } : step;
 		setActive({ step: shown, n, of: n });
 	};
 
@@ -92,23 +155,39 @@ export function GuidePanel() {
 	const skipOffer = () => {
 		if (!active) return;
 		const v = new Set(visited);
+		let next = taken;
 		if (active.step.kind === "sample_offer") v.add(SAMPLE_VISIT);
-		else if (active.step.move) v.add(`probe:${active.step.move.knobId}`);
+		else if ((active.step.kind === "campaign" && active.step.campaignPart) || (active.step.kind === "rl" && active.step.rlPart)) {
+			v.add(active.step.campaignPart ? campaignVisit(active.step.campaignPart) : rlVisit(active.step.rlPart!));
+			next = taken + 1; // a part of the plan shown is a step taken
+			setTaken(next);
+		} else if (active.step.kind === "finding" && active.step.finding) {
+			v.add(findingVisit(active.step.finding));
+			next = taken + 1; // a finding shown is a step taken, so the counter moves on
+			setTaken(next);
+		} else if (active.step.move) v.add(`probe:${active.step.move.knobId}`);
 		else return;
 		setVisited(v);
-		requestAnimationFrame(() => begin(v, taken));
+		requestAnimationFrame(() => begin(v, next));
 	};
 
 	const measure = (move: { knobId: string; to: KnobValue } | undefined, reason: string) =>
 		runTool("run_probe", { knobs: move ? { [move.knobId]: move.to } : {}, reason }, ctx());
 
-	const finish = (outcome: "apply" | "revert" | "pin") => {
+	/**
+	 * apply: keep the suggestion. revert: put it back. pin: keep the suggestion and pin it there.
+	 * keep: put it back and pin the visitor's own value. decline ("Not this"): put it back, exclude
+	 * that value for the session, and move on to another lever.
+	 */
+	const finish = (outcome: "apply" | "revert" | "pin" | "keep" | "decline") => {
 		if (!active?.step.move) return;
 		const { move } = active.step;
 		const from = active.from;
-		if (outcome !== "apply" && from !== undefined) actions.setKnob(move.knobId, from, "user");
-		if (outcome === "pin") actions.pin(move.knobId, true);
+		// Clear the suggestion first, so putting the knob back isn't read as the visitor's own move.
 		actions.propose(null);
+		if (outcome !== "apply" && outcome !== "pin" && from !== undefined) actions.setKnob(move.knobId, from, "user");
+		if (outcome === "pin" || outcome === "keep") actions.pin(move.knobId, true);
+		if (outcome === "decline") actions.decline(move.knobId, move.to);
 		const v = new Set(visited);
 		v.add(move.knobId);
 		setVisited(v);
@@ -116,11 +195,35 @@ export function GuidePanel() {
 		requestAnimationFrame(() => begin(v, taken + 1));
 	};
 
+	// The visitor's own move always wins: the pending suggestion is set aside (the reducer already
+	// put any other knob back), and the tour offers to carry on from their setting.
+	const [setAside, setSetAside] = useState<string | null>(null);
+	useEffect(() => {
+		const p = state.setAside;
+		if (!p || active?.step.kind !== "move" || active.step.move?.knobId !== p.knobId) return;
+		const v = new Set(visited);
+		v.add(p.knobId);
+		setVisited(v);
+		setTaken(taken + 1);
+		setActive(null);
+		setSetAside(p.knobId);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [state.setAside]);
+	const carryOn = () => {
+		setSetAside(null);
+		begin(visited, taken);
+	};
+
 	const restart = () => {
+		setSetAside(null);
+		// A fresh tour may offer knobs set aside last time; values ruled out stay ruled out.
+		const l = latest.current.state.limits;
 		const v = new Set<string>();
 		setVisited(v);
 		setTaken(0);
-		begin(v, 0);
+		if (!l.declined.length) return begin(v, 0);
+		actions.setLimits({ ...l, declined: [] });
+		requestAnimationFrame(() => begin(v, 0)); // after the cleared limits are committed
 	};
 
 	// Restart the tour when the aim changes (a dial pressed, or the person's choice).
@@ -156,11 +259,73 @@ export function GuidePanel() {
 		setApprovals((all) => all.map((x) => (x.id === id ? { ...x, running: true } : x)));
 		const args = a.args as { knobs?: Record<string, KnobValue>; knob_id?: string; reason?: string };
 		const reason = typeof args.reason === "string" && /^[a-z][a-z0-9_.]{0,47}$/.test(args.reason) ? args.reason : undefined;
-		const run = await runApprovedTool(recordRef, a.name as SpendTool, { ...(args.knobs ? { knobs: args.knobs } : {}), ...(args.knob_id ? { knob_id: args.knob_id } : {}), ...(reason ? { reason } : {}) }, latest.current.state.knobs);
+		const run = await runApprovedTool(recordRef, a.name as SpendTool, { ...(args.knobs ? { knobs: args.knobs } : {}), ...(args.knob_id ? { knob_id: args.knob_id } : {}), ...(reason ? { reason } : {}) }, latest.current.state.knobs, fetch, limitsForServer(latest.current.state.limits));
 		setApprovals((all) => all.map((x) => (x.id === id ? { ...x, running: false, run } : x)));
 	};
 
 	const vars = stepVars(active);
+
+	/** The RL steps' numbers: the probe's measurements (A's) and B's estimates, as the RL view shows them. */
+	function rlVars(): Record<string, string> {
+		const p = rlProbe(record);
+		const c = p ? spreadCount(p) : null;
+		if (!p?.rl) return {};
+		const w = c ? wilson(c.k, c.n) : null;
+		const rates = p.rl.pass_rate_per_prompt ?? [];
+		const len = p.rl.response_length;
+		const cap = probeCap(p);
+		const e = (id: string) => {
+			const x = estimates[id];
+			return x && trusted(x) ? `${fmt(x.point, "probability")} (${fmtRange(x.lo ?? x.point, x.hi ?? x.point, "probability")})` : t("value.none");
+		};
+		return {
+			k: w ? fmt(w.k, "count") : "",
+			n: w ? fmt(w.n, "count") : "",
+			share: w ? fmt(w.p, "probability") : "",
+			lo: w ? fmt(w.lo, "probability") : "",
+			hi: w ? fmt(w.hi, "probability") : "",
+			never: fmt(rates.filter((r) => r <= 0).length, "count"),
+			g: fmt(Number(state.knobs.group_size ?? p.rl.group_size ?? 0), "count"),
+			pred: e("rl.zero_spread"),
+			trunc: e("rl.truncation"),
+			cap: typeof cap === "number" ? fmt(cap, "count") : t("value.none"),
+			p95: len?.p95 !== undefined && len?.p95 !== null ? fmt(len.p95, "count") : "",
+			longest: len?.max !== undefined && len?.max !== null ? fmt(len.max, "count") : "",
+			trunc_line:
+				typeof p.rl.truncation_rate === "number"
+					? t("guide.rl.trunc_measured", { share: fmt(p.rl.truncation_rate, "probability") })
+					: t("guide.rl.trunc_estimated", { trunc: e("rl.truncation") }),
+		};
+	}
+
+	/** The campaign steps' numbers, every one from the plan (B's), formatted as the calendar formats them. */
+	function campaignVars(): Record<string, string> {
+		const c = campaign;
+		if (!c) return {};
+		const usd = (e: { point: number | null; lo?: number | null; hi?: number | null; status: string } | null | undefined, k: "point" | "lo" | "hi") =>
+			e && e.status !== "abstain" && typeof e[k] === "number" ? fmt(e[k] as number, "usd") : t("value.none");
+		const placed = c.cells.filter((x) => !x.cut).length;
+		const day = (iso: string | undefined) =>
+			iso ? new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(iso)) : "";
+		const budget = record.job.constraints?.budget_usd;
+		return {
+			runs: fmt(c.cells.length, "count"),
+			placed: fmt(placed, "count"),
+			cut: fmt(c.cut_list.length, "count"),
+			lanes: fmt(c.lanes.length, "count"),
+			people: c.lanes.join(", "),
+			usd: usd(c.usd, "point"),
+			lo: usd(c.usd, "lo"),
+			hi: usd(c.usd, "hi"),
+			grid_hi: usd(campaignTable?.grid_usd, "hi"),
+			cut_hi: usd(campaignTable?.usd, "hi"),
+			budget: typeof budget === "number" ? fmt(budget, "usd") : t("value.none"),
+			p10: day(c.completion.p10),
+			p50: day(c.completion.p50),
+			p90: day(c.completion.p90),
+			finish_why: c.finish_s?.reason ?? (finishBand(c) ? "" : t("value.none")),
+		};
+	}
 
 	function stepVars(a: Active | null): Record<string, string> {
 		const step = a?.step;
@@ -183,6 +348,10 @@ export function GuidePanel() {
 			cap: cap ? fmt(cap, "bytes") : "",
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
+			title: step?.finding?.title ?? "",
+			detail: step?.finding?.detail ?? "",
+			...campaignVars(),
+			...rlVars(),
 			...((): Record<string, string> => {
 				const st = costStraddlesBudget(record, estimates);
 				return st
@@ -199,7 +368,7 @@ export function GuidePanel() {
 	}
 
 	const primary = (() => {
-		if (!active) return { label: t("guide.start"), run: restart };
+		if (!active) return setAside ? { label: t("guide.carry_on"), run: carryOn } : { label: t("guide.start"), run: restart };
 		const s = active.step;
 		if (s.kind === "move") return { label: t("guide.apply_value", { knob: vars.knob, to: vars.to }), run: () => finish("apply") };
 		if (s.kind === "blocked_by_pin" && s.pinnedKnob)
@@ -211,6 +380,12 @@ export function GuidePanel() {
 				},
 			};
 		if (s.kind === "probe_offer") return { label: t("guide.measure_fix"), run: () => measure(s.move, "tight") };
+		if (s.kind === "finding" && s.finding) {
+			const f = s.finding;
+			if (canFix(f)) return { label: t("guide.fix_it"), run: () => setFixing(f.id) };
+			return { label: t("guide.next"), run: skipOffer };
+		}
+		if (isBand(s.kind)) return { label: t("guide.next"), run: skipOffer };
 		if (s.kind === "sample_offer")
 			return { label: t("guide.sample_more", { tasks: SAMPLE_MORE_TASKS }), run: () => runTool("sample_more", { reason: "budget_straddle" }, ctx()) };
 		if (s.kind === "nothing_safe") {
@@ -221,20 +396,42 @@ export function GuidePanel() {
 		return { label: t("guide.restart"), run: restart };
 	})();
 
+	// While the tour is on the calendar (below the cockpit), its step is repeated there, so the
+	// visitor reads it beside what it's about and moves on without scrolling back up.
+	const [calSlot, setCalSlot] = useState<HTMLElement | null>(null);
+	const onBand = !live && isBand(active?.step.kind) ? (active!.step.kind as BandKind) : null;
+	useEffect(() => {
+		setCalSlot(onBand ? document.getElementById(`${BANDS[onBand]}-guide`) : null);
+	}, [onBand]);
+
 	return (
 		<section className="glass pf-guide" aria-label={t("guide.label")}>
+			{calSlot && active
+				? createPortal(
+						<div className="pf-cal__guide">
+							<span className="pf-model pf-model--quiet">{t("guide.step_of", { n: active.n, of: active.of })}</span>
+							<p>{t(active.step.textKey, vars)}</p>
+							<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
+								{primary.label}
+							</button>
+						</div>,
+						calSlot,
+					)
+				: null}
 			<div className="pf-guide__head">
 				<span className={live ? "pf-model" : "pf-model pf-model--quiet"}>{live ? t("guide.model.muse_spark") : t("guide.model.rule_based")}</span>
 				<span className="pf-guide__step">
 					{live
 						? t(`guide.live.status.${liveStatus}`)
-						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer"
+						: active?.step.kind === "move" || active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || active?.step.kind === "finding" || isBand(active?.step.kind)
 							? t("guide.step_of", { n: active.n, of: active.of })
 							: active
 								? t("guide.waiting")
 								: t("guide.ready")}
 				</span>
 			</div>
+
+			<LimitsPanel />
 
 			{fallback ? <p className="pf-guide__notice" role="status">{fallback}</p> : null}
 
@@ -258,26 +455,32 @@ export function GuidePanel() {
 				<LiveGuideSection onFallback={setFallback} onStatus={setLiveStatus} />
 			) : (
 				<>
-					<p className="pf-guide__say">{active ? t(active.step.textKey, vars) : t("guide.intro", { aim: t(`objective.${state.objective.kind ?? "min_time"}`).toLowerCase() })}</p>
+					<p className="pf-guide__say">
+						{active
+							? t(active.step.textKey, vars)
+							: setAside
+								? t("guide.set_aside", { knob: t(knobs.get(setAside)?.label_key ?? setAside) })
+								: t("guide.intro", { aim: t(`objective.${state.objective.kind ?? "min_time"}`).toLowerCase() })}
+					</p>
 					{active?.step.move && knobs.get(active.step.move.knobId)?.needs_code ? <p className="pf-guide__code">{t("guide.needs_code")}</p> : null}
 					<div className="pf-guide__actions">
 						<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>
 							{primary.label}
 						</button>
-						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" ? (
+						{active?.step.kind === "probe_offer" || active?.step.kind === "sample_offer" || (active?.step.kind === "finding" && !!active.step.finding && canFix(active.step.finding)) ? (
 							<button type="button" className="pf-btn pf-btn--small" onClick={skipOffer}>
 								{t("guide.skip")}
 							</button>
 						) : null}
-						{active?.step.kind === "move" ? (
-							<>
-								<button type="button" className="pf-btn pf-btn--small" onClick={() => finish("revert")}>
-									{t("guide.revert")}
-								</button>
-								<button type="button" className="pf-btn pf-btn--small" onClick={() => finish("pin")} title={t("guide.pin.help")}>
-									{t("guide.pin")}
-								</button>
-							</>
+						{active?.step.kind === "move" && active.step.move ? (
+							<MoveChoices
+								knob={knobs.get(active.step.move.knobId)}
+								from={active.from}
+								to={active.step.move.to}
+								onDecline={() => finish("decline")}
+								onKeep={() => finish("keep")}
+								onPin={() => finish("pin")}
+							/>
 						) : null}
 						{active ? (
 							<button type="button" className="pf-btn pf-btn--small pf-btn--quiet" aria-expanded={why} onClick={() => setWhy(!why)}>
@@ -286,6 +489,7 @@ export function GuidePanel() {
 						) : null}
 					</div>
 					{why && active ? <p className="pf-guide__why">{t(active.step.whyKey, vars)}</p> : null}
+					{active?.step.kind === "finding" && active.step.finding && fixing === active.step.finding.id ? <FixRace finding={active.step.finding} /> : null}
 				</>
 			)}
 
