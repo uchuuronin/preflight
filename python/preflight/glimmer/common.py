@@ -22,7 +22,9 @@ GGUF_DIR = f"{WEIGHTS}/gguf"
 SOURCES = f"{WEIGHTS}/sources.json"  # repo, file, resolved revision and sizes of each download
 
 # cited: recipes.vllm.ai/meta-models/Muse-Glimmer-30B lists vLLM 0.28.0; the parsers are required
-CUDA_BASE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"  # cited: Modal's vLLM example uses a CUDA 12.8 devel base
+# review, Nov 1: vllm 0.28.0 resolves to torch 2.13.0 with CUDA 13 libraries, so the base matches them (the
+# startup check prints torch's CUDA and nvcc's, so a mismatch shows before a GPU is paid for)
+CUDA_BASE = "nvidia/cuda:13.0.0-devel-ubuntu22.04"
 # cited: Meta's GGUF page needs llama.cpp at or after commit 62bf73d (PR #26841); the build used is recorded per run
 LLAMA_IMAGE = "ghcr.io/ggml-org/llama.cpp:server-cuda"
 PINS = {
@@ -174,8 +176,10 @@ def _calls(base_url: str, model: str, calls: int, concurrent: int, max_tokens: i
 
 	client = OpenAI(base_url=base_url, api_key="local", timeout=600)  # a local server, no key
 	serial = [_one_call(client, model, max_tokens, f"s{i}") for i in range(calls)]
+	if concurrent < 2:  # review, Nov 1: one at a time is the serial run already; nothing to measure
+		return {"serial": serial, "concurrent": None}
 	t0 = time.monotonic()
-	with cf.ThreadPoolExecutor(max(1, concurrent)) as ex:
+	with cf.ThreadPoolExecutor(concurrent) as ex:
 		together = list(ex.map(lambda i: _one_call(client, model, max_tokens, f"c{i}"), range(concurrent)))
 	both = time.monotonic() - t0
 	toks = sum(c["completion_tokens"] or 0 for c in together)
@@ -273,7 +277,10 @@ def run_smoke(kind: str, calls: int, concurrent: int, ready_s: float) -> dict:
 		) as exc:  # review, Nov 1: say why, so a failed run isn't paid for twice
 			raise RuntimeError(f"{exc}; server log tail: " + " | ".join(_tail(log, ("",))[-25:])) from exc
 		mem = _gpu_used()
-		res = _calls(f"http://127.0.0.1:{PORT}/v1", MODEL_ID, calls, concurrent)
+		try:
+			res = _calls(f"http://127.0.0.1:{PORT}/v1", MODEL_ID, calls, concurrent)
+		except Exception as exc:  # review, Nov 1: a failed call keeps the server's own account too
+			raise RuntimeError(f"{exc}; server log tail: " + " | ".join(_tail(log, ("",))[-25:])) from exc
 	finally:
 		proc.terminate()
 		try:

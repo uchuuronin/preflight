@@ -839,7 +839,10 @@ def _term_estimates(stack: dict, peak: Estimate) -> dict:
 	flex = sum(vals[t] for t in FLEXIBLE_TERMS)
 	rest = peak.point - fixed
 	if rest >= 0:
-		why = "weights, gradients and optimizer as the model sizes them; activations take the rest of the calibrated peak"
+		why = (
+			"weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike "
+			"share the rest of the calibrated peak"
+		)
 		for t in FLEXIBLE_TERMS:
 			vals[t] = rest * vals[t] / flex if flex else (rest if t == "activations" else 0.0)
 	else:

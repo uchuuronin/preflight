@@ -83,13 +83,19 @@ def fetch() -> dict:
 
 @app.function(image=vllm_image, timeout=10 * 60)
 def vllm_version() -> dict:
-	"""The serving image without a GPU: vLLM's version and whether it knows Glimmer's parsers."""
+	"""The serving image without a GPU: vLLM's version, whether it knows Glimmer's parsers, and the CUDA that torch
+	was built for against the base image's (review, Nov 1: a mismatch shows here, not on a paid GPU)."""
 	out = subprocess.run(["vllm", "serve", "--help=all"], capture_output=True, text=True, timeout=300)
 	text = out.stdout + out.stderr
+	nvcc = subprocess.run(["nvcc", "--version"], capture_output=True, text=True, timeout=60)
+	import torch
 	import vllm
 
 	return {
 		"vllm": vllm.__version__,
+		"torch": torch.__version__,
+		"torch_cuda": torch.version.cuda,
+		"nvcc": (nvcc.stdout or nvcc.stderr).strip().splitlines()[-1:],
 		"muse_glimmer_parsers": "muse_glimmer" in text,
 		"help_ok": out.returncode == 0,
 	}
@@ -156,8 +162,9 @@ def make_fp8() -> dict:
 	return {"fp8": src["fp8"]}
 
 
-# worst cases: A100 20 min $0.70, L4 35 min $0.47; with quantize's $0.77, under Chiya's $2 (Nov 1)
-@app.function(image=vllm_image, gpu=GPUS["a100"], volumes={WEIGHTS: weights}, timeout=20 * 60)
+# worst cases: A100 18 min $0.63, L4 35 min $0.47, quantize's $0.77: $1.87 of GPU and CPU, so Modal's memory and
+# CPU charges on the GPU containers fit under Chiya's $2 (Nov 1)
+@app.function(image=vllm_image, gpu=GPUS["a100"], volumes={WEIGHTS: weights}, timeout=18 * 60)
 def smoke_a100(calls: int, concurrent: int) -> dict:
 	return run_smoke("vllm", calls, concurrent, ready_s=12 * 60)
 
