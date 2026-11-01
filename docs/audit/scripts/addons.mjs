@@ -78,6 +78,11 @@ const THEMES = ["dusk", "day"];
 // ERR_TUNNEL is not tied to a host, so it would also hide a blocked request to anything else
 // (harmless where the check runs: nothing the add-ons load goes off the dev server).
 const NOISE = /ERR_TUNNEL|fonts\.g(oogleapis|static)\.com/;
+// The dev server proxies /v1 to an API on :8000. With none running, the cockpit's own limits
+// request gets a 502: that is the test setup, so it is printed as a warning naming the path. Only
+// that path; a 502 on any other /v1 path, an add-on's included, fails like every other error.
+const NO_API_PATHS = new Set(["/v1/guide/limits/state"]);
+const NO_API = (m) => /status of 502/.test(m.text()) && NO_API_PATHS.has(new URL(m.location().url || "x:", "http://h").pathname);
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 async function open(browser, view, theme, url, host) {
@@ -89,9 +94,12 @@ async function open(browser, view, theme, url, host) {
 	}, theme);
 	const page = await ctx.newPage();
 	const errors = [];
+	const noApi = new Set();
 	page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
 	page.on("console", (m) => {
-		if (m.type() === "error" && !NOISE.test(m.text())) errors.push(m.text().slice(0, 200));
+		if (m.type() !== "error" || NOISE.test(m.text())) return;
+		if (NO_API(m)) noApi.add(new URL(m.location().url).pathname);
+		else errors.push(m.text().slice(0, 200));
 	});
 	await page.goto(url);
 	let loaded = true;
@@ -101,7 +109,7 @@ async function open(browser, view, theme, url, host) {
 	} catch {
 		loaded = false;
 	}
-	return { ctx, page, errors, loaded };
+	return { ctx, page, errors, noApi, loaded };
 }
 
 async function check(page, sel) {
@@ -166,6 +174,7 @@ for (const a of ADDONS) {
 					row.problems.push(`did not render with ${a.flag} on: ${String(e).split("\n")[0].slice(0, 160)}`);
 				}
 			if (on.errors.length) row.problems.push(`errors with ${a.flag} on: ${on.errors.join(" | ")}`);
+			for (const u of on.noApi) row.warnings.push(`no API behind the dev server: ${u} (502), with ${a.flag} on`);
 			await on.ctx.close();
 			// Flag off, explicitly: the host screen still loads cleanly and the add-on is absent.
 			const off = await open(browser, vp, theme, `${base}/?flags=-${a.flag}${a.hash}`, a.host);
@@ -178,6 +187,7 @@ for (const a of ADDONS) {
 				if (left.length) row.problems.push(`shows with ${a.flag} off: ${left.join(", ")}`);
 			}
 			if (off.errors.length) row.problems.push(`errors with ${a.flag} off: ${off.errors.join(" | ")}`);
+			for (const u of off.noApi) row.warnings.push(`no API behind the dev server: ${u} (502), with ${a.flag} off`);
 			await off.ctx.close();
 			rows.push(row);
 		}

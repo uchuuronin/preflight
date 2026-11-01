@@ -8,6 +8,22 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, morning (round four: audit re-check on `main`)
+
+Pushed `ae32870` with Chiya's yes ("push it all", 06:13). `main` had moved to `c4b95d4` (round four), so I merged it locally as `0683d27`. There were no conflicts and gitleaks is clean, and D's tests pass, 36, the README hook test included: it now runs against B's real scorer. That merge came after the yes, so it waits for one of its own.
+
+**Audit re-check on `main` `c4b95d4`**, 12 first, as planned, then an independent read-only review (`docs/audit/nov1-main/README.md`) [measured, Chromium]:
+- **12 partly fixed, still open.** Each job's tags now come from its record, and the five single-job cases pass at both sizes (new `docs/audit/scripts/model-tags.mjs`). But the read-only review found that tags carry over to the next job in the same page: after a triaged job, one that fails before any call shows both tags. I reproduced it, and tested a one-line fix (`useEffect(() => setCalls([]), [jobId, open])`) on a scratch copy, C's file untouched there: 12 of 12 pass, against 10 of 12 without it, and the typecheck and C's 41 app tests pass. Sent to C with that fix. The check now has the same-page case and exits 1 on a mismatch.
+- **7, 10, 8, 11, 9 and 4 fixed** (the review re-ran or spot-checked each):
+	- 40-state sweep: no axe violation in any state, no element without a visible focus ring, no overflow, no app console errors;
+	- the "About ..." buttons are 24 px;
+	- Boarding after a failure shows "Stopped here", and the route labels show whole.
+	- These moved to Done in `from-d.md`.
+- **6 not fixed** (the job map on phones): at 390 px the share lines render at 5.5 px and the names at about 6.6 px. It stays open with C.
+- **Minor, not failures** (axe passes both on spacing): "Your limits" is 20 px tall, and the "Got it" label is 22 px. Sent to C as a note.
+- **Add-on check: 20 of 20 now** (from 14). The six nodes axe can't measure still pass by pixels, at 5.88:1 or better.
+	- Decision: the check warns only on the dev server's 502 for `/v1/guide/limits/state`, the cockpit's own limits request, and still fails on any other `/v1` 502, an add-on's included (checked both ways). Basis: that request needs the API, which the dev server doesn't run, so the 502 comes from the test setup, not an add-on. A first version warned on any `/v1` path; the review found that too broad.
+
 ## Sun Nov 1, morning (pushed; dollar figures back in the cuts)
 
 Pushed `88a1c72` and `8588646` with Chiya's yes (05:59). Chiya's ruling: dollar figures go back into both video cuts, spoken and captioned "at list price" (e.g. "$0.042 of GPU at list price"), because the rubric asks for dollars and that wording is accurate. The README keeps tagging them derived.
