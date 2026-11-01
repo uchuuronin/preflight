@@ -118,6 +118,7 @@ def test_the_check_is_bounded_in_claims_and_time(rec, monkeypatch):
 
 
 def test_one_real_run_diagnoses_then_checks_inside_its_cap(rec):
+	pytest.importorskip("matplotlib")  # the diagnosis renders its plots; CI's Python job has no matplotlib
 	from preflight.harness.diagnosis import numbers
 	from preflight.harness.diagnosis_run import run_once
 
