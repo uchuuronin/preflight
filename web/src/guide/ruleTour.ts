@@ -5,7 +5,7 @@
  */
 import { hasKey } from "../lib/i18n";
 import { type CampaignPlan, finishBand } from "../workspace/campaign/plan";
-import { rlProbe, spreadCount } from "../workspace/rl";
+import { probeCap, rlProbe, spreadCount } from "../workspace/rl";
 import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
 import { costStraddlesBudget, failureTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
@@ -263,8 +263,8 @@ export function nextStep(ctx: TourContext): TourStep {
 		let textKey = `guide.rl.${rlPart}`;
 		if (rlPart === "length") {
 			const p = rlProbe(ctx.record);
-			const capKnob = ctx.knobs.max_completion_len;
-			const cap = typeof capKnob === "number" ? capKnob : p?.generation?.max_new_tokens;
+			// Against the cap the run was measured at, not the knob as it is now.
+			const cap = p ? probeCap(p) : null;
 			const longest = p?.rl?.response_length?.max;
 			// "Reached the cap" only when the longest completion did.
 			if (!(typeof cap === "number" && typeof longest === "number" && longest >= cap)) textKey = "guide.rl.length_under";

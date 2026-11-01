@@ -141,7 +141,8 @@ function reducer(state: State, action: Action): State {
 		case "limits":
 			return { ...state, limits: action.limits };
 		case "rate":
-			return { ...state, rate: action.rate };
+			// A new rate re-prices every dollar: no delta badge may credit the last knob with it.
+			return { ...state, rate: action.rate, previous: null, lastChange: null };
 		case "reset":
 			return { ...state, knobs: action.knobs, previous: null, lastChange: null, proposal: null, setAside: null, highlight: [] };
 	}

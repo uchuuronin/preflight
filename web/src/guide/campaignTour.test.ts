@@ -55,3 +55,14 @@ describe("the campaign tour on B's plan (sample PF420)", () => {
 		expect(nextStep(base(new Set(), false)).kind).not.toBe("campaign");
 	});
 });
+
+describe("the campaign tour under the visitor's rate", () => {
+	it("judges the budget cut at the table's rates the plan was made at (review, Nov 1)", async () => {
+		const en = (await import("../i18n/en.json")).default as Record<string, string>;
+		expect(en["guide.campaign.cut"]).toMatch(/At the table's rates, which the plan was made at/);
+		// The totals rescale; the cut list doesn't.
+		const half = planFromRecord(record.campaign!, record.models, () => 0)!;
+		expect(half.usd.point).toBe(0);
+		expect(half.cut_list).toEqual(campaign.cut_list);
+	});
+});

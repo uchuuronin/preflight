@@ -30,7 +30,8 @@ GRID = {"batch_size": [8, 12, 16], "seq_len": [512, 1024], "seed": [0, 1]}
 # Three people's lanes on a shared cluster (one with two GPUs), a 4 h job limit (Slurm --time) and
 # an interruption about once a day. Guesses for an illustrative lab; the budget comes from the record.
 CLUSTER = planner.Cluster(lanes={"chiya": 2, "ana": 1, "ben": 1}, wall_time_cap_s=4 * 3600, mtti_s=24 * 3600)
-START = datetime(2026, 11, 2, 9, 0, tzinfo=UTC)
+# A Monday after judging opens, so the dates read as ahead of a visitor on Nov 4 to 8.
+START = datetime(2026, 11, 9, 9, 0, tzinfo=UTC)
 
 
 def main(engine_record: str, branch_record: str, out_path: str) -> None:

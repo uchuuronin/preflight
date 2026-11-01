@@ -29,6 +29,7 @@ function said(p: FrontierPoint): string {
 		n: fmt(p.success.n, "count"),
 		rate: fmt(p.success.p, "probability"),
 		rateRange: fmtRange(p.success.lo, p.success.hi, "probability"),
+		front: t(p.dominated ? "frontier.point_off" : "frontier.point_on"),
 	});
 }
 
@@ -41,7 +42,7 @@ export function CostFrontier() {
 	useEffect(() => {
 		const el = box.current;
 		if (!el || typeof ResizeObserver === "undefined") return;
-		const ro = new ResizeObserver(([e]) => setW(Math.max(280, Math.min(W_MAX, Math.round(e!.contentRect.width)))));
+		const ro = new ResizeObserver(([e]) => setW(Math.max(240, Math.min(W_MAX, Math.round(e!.contentRect.width)))));
 		ro.observe(el);
 		return () => ro.disconnect();
 	}, [pts.length >= 2]);

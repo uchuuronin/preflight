@@ -11,7 +11,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { fmt, fmtRange } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { target, targetFor } from "../record/model";
-import { appliesHere, chosenModel, tableRate, tokenMix } from "../rate";
+import { appliesHere, chosenModel, rateFactor, tableRate, tokenMix } from "../rate";
 import { useWorkspace } from "../state";
 import { trusted } from "../status";
 
@@ -61,15 +61,16 @@ export function CostLine() {
 	const num = (v: number, unit: "gpu_h" | "tokens") => fmt(v, unit).replace(unit === "gpu_h" ? / GPU-hours$/ : / tokens$/, "");
 	if (tr.kind === "gpu") {
 		const h = (v: number | null) => (v ?? tableCost.point ?? 0) / tr.usdPerHour;
-		quantity = t("cost.line.gpu_hours", { lo: num(h(tableCost.lo), "gpu_h"), hi: num(h(tableCost.hi), "gpu_h") });
+		const [lo, hi] = [num(h(tableCost.lo), "gpu_h"), num(h(tableCost.hi), "gpu_h")];
+		quantity = lo === hi ? t("cost.line.gpu_hours_one", { n: lo }) : t("cost.line.gpu_hours", { lo, hi });
 		const r = mine && o?.kind === "gpu" ? o.usdPerHour : tr.usdPerHour;
 		rateText = t("cost.line.per_hour", { rate: fmt(r, "usd_small") });
 	} else {
 		const tokT = target(record, "tokens.total");
 		const tok = tokT ? tableEstimates[tokT.id] : undefined;
-		quantity = trusted(tok) ? t("cost.line.tokens", { lo: num(tok.lo ?? tok.point, "tokens"), hi: num(tok.hi ?? tok.point, "tokens") }) : t("cost.line.tokens_unknown");
-		const mix = tokenMix(record)!;
-		const perM = mine && o?.kind === "tokens" ? (mix.input * o.inputPerM + mix.output * o.outputPerM) / (mix.input + mix.output) : tr.usdPerToken * 1e6;
+		const [lo, hi] = trusted(tok) ? [num(tok.lo ?? tok.point, "tokens"), num(tok.hi ?? tok.point, "tokens")] : ["", ""];
+		quantity = !trusted(tok) ? t("cost.line.tokens_unknown") : lo === hi ? t("cost.line.tokens_one", { n: lo }) : t("cost.line.tokens", { lo, hi });
+		const perM = tr.usdPerToken * 1e6 * (mine ? rateFactor(record, state.knobs, o) : 1);
 		rateText = t("cost.line.per_m", { rate: fmt(perM, "usd_small") });
 	}
 	const total = cost.lo !== cost.hi ? fmtRange(cost.lo ?? cost.point, cost.hi ?? cost.point, "usd") : fmt(cost.point, "usd");
@@ -84,13 +85,31 @@ export function CostLine() {
 			{mine ? (
 				<span className="pf-tag pf-costline__mine">
 					{t("cost.line.yours")}
-					<button type="button" className="pf-costline__reset" aria-label={t("cost.line.reset")} title={t("cost.line.reset")} onClick={() => actions.setRate(null)}>
+					<button
+						type="button"
+						className="pf-costline__reset"
+						aria-label={t("cost.line.reset")}
+						title={t("cost.line.reset")}
+						onClick={() => {
+							actions.setRate(null);
+							trigger.current?.focus();
+						}}
+					>
 						×
 					</button>
 				</span>
 			) : null}{" "}
-			<span aria-hidden="true">=</span> <b>{total}</b>
-			{open ? <RateBox id={id} boxRef={box} onClose={() => setOpen(false)} /> : null}
+			<span aria-hidden="true">=</span> <b title={tr.kind === "tokens" ? t("cost.line.tokens_note") : undefined}>{total}</b>
+			{open ? (
+				<RateBox
+					id={id}
+					boxRef={box}
+					onClose={() => {
+						setOpen(false);
+						trigger.current?.focus();
+					}}
+				/>
+			) : null}
 		</div>
 	);
 }
@@ -98,7 +117,8 @@ export function CostLine() {
 function RateBox({ id, boxRef, onClose }: { id: string; boxRef: React.RefObject<HTMLDivElement | null>; onClose: () => void }) {
 	const { record, state, actions } = useWorkspace();
 	const tr = tableRate(record, state.knobs)!;
-	const o = state.rate;
+	// The visitor's rate only where it's for this GPU or model; another one's rate isn't a starting point.
+	const o = appliesHere(record, state.knobs, state.rate) ? state.rate : null;
 	const first = useRef<HTMLInputElement>(null);
 	useEffect(() => first.current?.focus(), []);
 	const gpuName = tr.kind === "gpu" ? tr.row.gpu : "";

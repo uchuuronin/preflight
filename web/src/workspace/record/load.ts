@@ -22,6 +22,8 @@ export interface Sample {
 	gpu: string;
 	/** What the sample's numbers are: a fixture's illustrative ones, or a real run's (tested against isFixture). */
 	numbers: "illustrative" | "measured";
+	/** Listed only while this flag is on (a sample whose point is a view behind it). */
+	flag?: string;
 	load: () => Promise<FlightRecord>;
 }
 
@@ -82,6 +84,7 @@ export const SAMPLES: Sample[] = [
 		lens: "pretrain",
 		gpu: "A100",
 		numbers: "illustrative",
+		flag: "c.campaign_calendar",
 		load: () => import("../fixtures/campaign-grid.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{

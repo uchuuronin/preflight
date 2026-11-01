@@ -80,9 +80,15 @@ describe("the GRPO tour", () => {
 		expect(nextStep(ctx(v)).kind).not.toBe("rl");
 	});
 
-	it("says the cap wasn't reached when it wasn't", () => {
+	it("judges the cap against the one the run was measured at, not the knob as it is now", () => {
+		// Raising the knob doesn't make a completion that hit the measured cap "under" it.
 		const raised = { ...currentKnobs(grpo), max_completion_len: 1024 };
-		const s = nextStep({ ...ctx(new Set([rlVisit("spread")])), knobs: raised });
-		expect(s.textKey).toBe("guide.rl.length_under");
+		expect(nextStep({ ...ctx(new Set([rlVisit("spread")])), knobs: raised }).textKey).toBe("guide.rl.length");
+		// A run whose longest completion stayed under its cap says so.
+		const shorter = {
+			...grpo,
+			probes: grpo.probes.map((p) => (p.rl ? { ...p, rl: { ...p.rl, response_length: { ...p.rl.response_length!, max: 400 } } } : p)),
+		};
+		expect(nextStep({ ...ctx(new Set([rlVisit("spread")])), record: shorter }).textKey).toBe("guide.rl.length_under");
 	});
 });

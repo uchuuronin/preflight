@@ -13,7 +13,7 @@ import { fmt, fmtRange } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { target } from "../record/model";
 import type { Estimate } from "../record/types";
-import { rlProbe, spreadCount } from "../rl";
+import { probeCap, rlProbe, spreadCount } from "../rl";
 import { useWorkspace } from "../state";
 import { trusted } from "../status";
 
@@ -35,7 +35,9 @@ export function RlBand() {
 	const truncT = target(record, "rl.truncation");
 	const gen = probe.generation;
 	const len = rl.response_length;
-	const cap = typeof state.knobs.max_completion_len === "number" ? state.knobs.max_completion_len : (gen?.max_new_tokens ?? null);
+	// Lengths were measured at the probe's cap; the knob may have moved since.
+	const cap = probeCap(probe);
+	const capNow = typeof state.knobs.max_completion_len === "number" ? state.knobs.max_completion_len : cap;
 	const correct = typeof rl.group_size === "number" ? Math.round(rates.reduce((a, b) => a + b, 0) * rl.group_size) : null;
 	const answers = typeof rl.group_size === "number" ? rates.length * rl.group_size : null;
 	const truncMeasured = typeof rl.truncation_rate === "number";
@@ -62,6 +64,7 @@ export function RlBand() {
 							<li
 								key={i}
 								className={`pf-rl__cell${flat ? " is-flat" : ""}`}
+								aria-label={t(flat ? "rl.spread.cell_flat" : "rl.spread.cell", { i: i + 1, rate: fmt(p, "probability") })}
 								title={t(flat ? "rl.spread.cell_flat" : "rl.spread.cell", { i: i + 1, rate: fmt(p, "probability") })}
 								style={{ ["--pass" as string]: `${Math.round(p * 100)}%` }}
 							/>
@@ -92,6 +95,7 @@ export function RlBand() {
 					<p className="pf-rl__note">
 						{t("rl.length.measured", { mean: fmt(len.mean ?? 0, "count"), p95: fmt(len.p95 ?? 0, "count"), max: fmt(len.max ?? 0, "count") })}
 						{cap !== null ? ` ${t("rl.length.cap", { cap: fmt(cap, "count") })}` : ""}
+						{cap !== null && capNow !== null && capNow !== cap ? ` ${t("rl.length.cap_moved", { now: fmt(capNow, "count"), was: fmt(cap, "count") })}` : ""}
 					</p>
 				) : null}
 				<p className="pf-rl__pred">

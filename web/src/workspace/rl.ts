@@ -19,3 +19,11 @@ export function spreadCount(p: Probe): { k: number; n: number } | null {
 	// The recorder counts spread over the summed reward; only a share that is k of n prompts is a count.
 	return Math.abs(k - share * n) < 1e-6 ? { k, n } : null;
 }
+
+/** The completion cap the probe ran at (its own knobs, else what generation reported): what the measured lengths are against. */
+export function probeCap(p: Probe): number | null {
+	const k = p.knobs?.max_completion_len;
+	if (typeof k === "number") return k;
+	const g = p.generation?.max_new_tokens;
+	return typeof g === "number" ? g : null;
+}

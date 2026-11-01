@@ -108,7 +108,10 @@ export function tableRate(record: LoadedRecord, knobs: Knobs): { kind: "gpu"; ro
 	if (kind === "tokens") {
 		const row = tokenRow(chosenModel(record, knobs));
 		const mix = tokenMix(record);
-		return row && mix ? { kind, row, usdPerToken: blended(mix, row.input_per_m, row.output_per_m) } : null;
+		if (!row || !mix) return null;
+		// The engine's own blended rate where it priced this row (it counts cached input at the cached rate).
+		const line = record.job_cost?.lines?.find((l) => l.kind === "tokens" && l.price_row === row.id && typeof l.rate_usd === "number" && l.rate_usd > 0);
+		return { kind, row, usdPerToken: line?.rate_usd ?? blended(mix, row.input_per_m, row.output_per_m) };
 	}
 	return null;
 }
@@ -135,9 +138,11 @@ export function rateFactor(record: LoadedRecord, knobs: Knobs, o: RateOverride |
 		return o.usdPerHour / tr.usdPerHour;
 	}
 	if (o.kind === "tokens" && tr.kind === "tokens") {
-		if (tokenRow(o.model)?.id !== tr.row.id || !(tr.usdPerToken > 0)) return 1;
+		if (tokenRow(o.model)?.id !== tr.row.id) return 1;
 		const mix = tokenMix(record)!;
-		return blended(mix, o.inputPerM, o.outputPerM) / tr.usdPerToken;
+		// Both sides mixed the same way, so the ratio holds whatever the engine did with cached input.
+		const table = blended(mix, tr.row.input_per_m, tr.row.output_per_m);
+		return table > 0 ? blended(mix, o.inputPerM, o.outputPerM) / table : 1;
 	}
 	return 1;
 }
@@ -180,10 +185,14 @@ export function withRate(base: PredictionProvider, o: RateOverride | null): Pred
 			if (!costId || !ms.some((m) => m.targetId === costId)) return ms;
 			const knobs = opts?.knobs ?? {};
 			const before = priced(record, knobs, base.predict(record, knobs), o)[costId]?.point;
-			const out: Move[] = [];
+			// Moves that clear a predicted failure stay, in the engine's order and first: a run that
+			// would crash needs them whatever they cost. Review, Nov 1: filtering them dropped the OOM fix.
+			const clearing = ms.filter((m) => m.clearsFailure);
+			const rest: Move[] = [];
 			for (const m of ms) {
+				if (m.clearsFailure) continue;
 				if (m.targetId !== costId || typeof before !== "number") {
-					out.push(m);
+					rest.push(m);
 					continue;
 				}
 				const next = { ...knobs, [m.knobId]: m.to };
@@ -192,9 +201,10 @@ export function withRate(base: PredictionProvider, o: RateOverride | null): Pred
 				const delta = after - before;
 				// At the visitor's rate a "saving" that saves nothing isn't offered.
 				if (delta >= 0) continue;
-				out.push({ ...m, delta, relative: before !== 0 ? delta / Math.abs(before) : null });
+				rest.push({ ...m, delta, relative: before !== 0 ? delta / Math.abs(before) : null });
 			}
-			return out.sort((a, b) => (a.targetId === costId && b.targetId === costId ? a.delta - b.delta : 0));
+			const costMoves = rest.filter((m) => m.targetId === costId).sort((a, b) => a.delta - b.delta);
+			return [...clearing, ...costMoves, ...rest.filter((m) => m.targetId !== costId)];
 		},
 	};
 }

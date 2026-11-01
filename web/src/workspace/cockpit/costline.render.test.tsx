@@ -50,6 +50,14 @@ describe("the cost line", () => {
 		expect(container.querySelector(".pf-costline__mine")).toBeNull();
 	});
 
+	it("doesn't start another GPU's box from the rate set for this one", () => {
+		localStorage.setItem("pf.rate.v1", JSON.stringify({ "lora-qwen": { kind: "gpu", gpu: "H100-SXM-80GB", usdPerHour: 0 } }));
+		const { container } = open();
+		expect(container.querySelector(".pf-costline__mine")).toBeNull();
+		fireEvent.click(container.querySelector(".pf-costline__rate")!);
+		expect((screen.getByRole("dialog").querySelector("input") as HTMLInputElement).value).toBe("0.8");
+	});
+
 	it("refuses a negative or empty rate, and Escape closes the box", () => {
 		const { container } = open();
 		fireEvent.click(container.querySelector(".pf-costline__rate")!);

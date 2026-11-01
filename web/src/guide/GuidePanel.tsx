@@ -5,7 +5,7 @@ import { currentKnobs } from "../workspace/record/model";
 import { rateFactor } from "../workspace/rate";
 import { fmt, fmtDelta, fmtRange } from "../lib/fmt";
 import { wilson } from "../addons/_stats/wilson";
-import { rlProbe, spreadCount } from "../workspace/rl";
+import { probeCap, rlProbe, spreadCount } from "../workspace/rl";
 import { flag } from "../lib/flags";
 import { hasKey, t } from "../lib/i18n";
 import { usePanels } from "../registry";
@@ -74,6 +74,8 @@ export function GuidePanel() {
 	const live = flag("c.guide.live") && !fallback;
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 	// The campaign plan the cockpit draws (same flag, same record), so the tour walks what's on screen.
+	// B's plan at the table's rates it was made at: the budget cut is judged there, whatever rate the visitor types.
+	const campaignTable = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
 	const campaign = useMemo(
 		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k) => rateFactor(record, { ...currentKnobs(record), ...k }, state.rate)) : null),
 		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
@@ -101,6 +103,10 @@ export function GuidePanel() {
 		const tc = { record, provider, knobs: s.knobs, pinned: s.pinned, objective: s.objective, visited: nextVisited, limits: s.limits, campaign };
 		const step = nextStep(tc);
 		const n = nextTaken + 1;
+		// Steps that walk a view (the campaign plan, the RL signals) come on top of the tour's moves:
+		// the five-move cap counts moves, not these. Review, Nov 1.
+		const bands = [...nextVisited].filter((v) => v.startsWith("campaign:") || v.startsWith("rl:")).length;
+		const cap = MAX_TOUR_STEPS + bands;
 		guideBand(isBand(step.kind) ? step.kind : null);
 		if (isBand(step.kind)) {
 			setWhy(false);
@@ -116,23 +122,23 @@ export function GuidePanel() {
 			actions.propose(null);
 			actions.openKnob(step.move.knobId);
 			setWhy(false);
-			setActive({ step, n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + plannedSteps(tc))) });
+			setActive({ step, n, of: Math.min(cap, Math.max(n, nextTaken + plannedSteps(tc))) });
 			return;
 		}
 		setWhy(false);
 		if (step.nodes.length) runTool("highlight", { nodes: step.nodes }, ctx());
 		else actions.highlight([]);
-		if (step.kind === "move" && step.move && n <= MAX_TOUR_STEPS) {
+		if (step.kind === "move" && step.move && n <= cap) {
 			const from = s.knobs[step.move.knobId];
 			runTool("predict", { knobs: { [step.move.knobId]: step.move.to } }, ctx());
 			runTool("set_knob", { knob_id: step.move.knobId, value: step.move.to, why: step.textKey }, ctx());
-			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.min(MAX_TOUR_STEPS, Math.max(n, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
+			setActive({ step, ...(from !== undefined ? { from } : {}), n, of: Math.min(cap, Math.max(n, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
 			return;
 		}
 		actions.propose(null);
 		if (step.kind === "finding") {
 			// A finding is a step of the tour: counted with the findings and moves still to come.
-			setActive({ step, n, of: Math.max(n, Math.min(MAX_TOUR_STEPS, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
+			setActive({ step, n, of: Math.max(n, Math.min(cap, nextTaken + pendingFindings(tc) + plannedSteps(tc))) });
 			return;
 		}
 		// With limits set or a suggestion turned down, "done" says what it means: nothing else
@@ -267,7 +273,7 @@ export function GuidePanel() {
 		const w = c ? wilson(c.k, c.n) : null;
 		const rates = p.rl.pass_rate_per_prompt ?? [];
 		const len = p.rl.response_length;
-		const cap = typeof state.knobs.max_completion_len === "number" ? state.knobs.max_completion_len : p.generation?.max_new_tokens;
+		const cap = probeCap(p);
 		const e = (id: string) => {
 			const x = estimates[id];
 			return x && trusted(x) ? `${fmt(x.point, "probability")} (${fmtRange(x.lo ?? x.point, x.hi ?? x.point, "probability")})` : t("value.none");
@@ -311,7 +317,8 @@ export function GuidePanel() {
 			usd: usd(c.usd, "point"),
 			lo: usd(c.usd, "lo"),
 			hi: usd(c.usd, "hi"),
-			grid_hi: usd(c.grid_usd, "hi"),
+			grid_hi: usd(campaignTable?.grid_usd, "hi"),
+			cut_hi: usd(campaignTable?.usd, "hi"),
 			budget: typeof budget === "number" ? fmt(budget, "usd") : t("value.none"),
 			p10: day(c.completion.p10),
 			p50: day(c.completion.p50),
@@ -401,7 +408,7 @@ export function GuidePanel() {
 		<section className="glass pf-guide" aria-label={t("guide.label")}>
 			{calSlot && active
 				? createPortal(
-						<div className="pf-cal__guide" role="status">
+						<div className="pf-cal__guide">
 							<span className="pf-model pf-model--quiet">{t("guide.step_of", { n: active.n, of: active.of })}</span>
 							<p>{t(active.step.textKey, vars)}</p>
 							<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={primary.run}>

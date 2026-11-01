@@ -903,7 +903,7 @@
 	"campaign.finish_row": "Last run ends",
 	"guide.campaign.grid": "This plan prices a whole research grid: {runs} runs, shared across {lanes} lanes ({people}). The runs that go ahead cost {usd}, likely between {lo} and {hi}.",
 	"guide.campaign.grid.why": "Each run's time and cost come from this record's predictions with their 90% ranges. The planner adds what a shared cluster does on top: splitting runs at the job time limit, interruptions and resubmits. It never adds accuracy the predictions don't have.",
-	"guide.campaign.cut": "{cut} of the {runs} runs don't fit. The whole grid could cost up to {grid_hi}, over the {budget} budget, so the dearest runs are cut; they're listed under Not scheduled. The runs left cost at most {hi} at the top of their range.",
+	"guide.campaign.cut": "{cut} of the {runs} runs don't fit. At the table's rates, which the plan was made at, the whole grid could cost up to {grid_hi}, over the {budget} budget, so the dearest runs are cut; they're listed under Not scheduled. The runs left cost at most {cut_hi} there, at the top of their range.",
 	"guide.campaign.cut.why": "The planner assumes the runs err together (the same script and the same model), so the grid's range is as wide as it can honestly be, and it cuts against the high end of that range rather than the middle.",
 	"guide.campaign.finish": "The last run most likely ends {p50} UTC; in 80% of the simulated campaigns it ends between {p10} and {p90}. That's the band under the lanes.",
 	"guide.campaign.finish.why": "A finish date isn't one number: the planner runs the campaign thousands of times, each run's time drawn from its range and interruptions at the cluster's rate, and reports when the last run ends.",
@@ -935,9 +935,9 @@
 	"guide.rl.trunc_measured": "{share} of completions hit the cap (measured).",
 	"guide.rl.trunc_estimated": "Truncation wasn't measured on this run; from the length distribution it's about {trunc}.",
 	"frontier.title": "Cost against success, by model",
-	"frontier.lede": "{n} models on the same tasks. On the frontier (no other model is both cheaper and more often right): {front}.",
+	"frontier.lede": "{n} models on the same tasks, at the table's rates. On the frontier (no other model is both cheaper and more often right): {front}.",
 	"frontier.aria": "Scatter of {n} models: mean cost per task across, share of tasks solved up, each with its 95% interval",
-	"frontier.point": "{model}: {cost} a task ({costRange}); solved {k} of {n} ({rate}, {rateRange})",
+	"frontier.point": "{model}: {cost} a task ({costRange}); solved {k} of {n} ({rate}, {rateRange}). {front}",
 	"frontier.x": "Mean cost per task",
 	"frontier.y": "Tasks solved",
 	"frontier.table": "Show as a table",
@@ -969,5 +969,11 @@
 	"cost.box.table_gpu": "Table: {rate}/h on {provider}. {source} ({date}). Use 0 for a GPU you don't pay for.",
 	"cost.box.table_tokens": "Table: {input}/M input, {output}/M output. {source} ({date}). This run's tokens are {share} input.",
 	"cost.box.invalid": "Type a rate of 0 or more.",
-	"cost.box.save": "Use this rate"
+	"cost.box.save": "Use this rate",
+	"cost.line.gpu_hours_one": "{n} GPU-hours",
+	"cost.line.tokens_one": "{n} tokens",
+	"cost.line.tokens_note": "The range also allows for tasks that could run away, so it can be wider than tokens times the rate.",
+	"rl.length.cap_moved": "You've set the cap to {now}; these lengths were measured at {was}.",
+	"frontier.point_on": "On the frontier.",
+	"frontier.point_off": "Another model is both cheaper and more often right."
 }
