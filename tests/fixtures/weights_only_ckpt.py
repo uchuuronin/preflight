@@ -22,5 +22,12 @@ for step in range(40):
 		if "--full" in sys.argv:
 			torch.save({"model": model.state_dict(), "optimizer": opt.state_dict(), "scheduler": sched.state_dict(),
 				"rng": torch.get_rng_state(), "step": step}, os.path.join(out, "ckpt.pt"))  # fmt: skip
+		elif "--lightning" in sys.argv:  # Lightning's layout: a list of optimizer states
+			torch.save({"state_dict": model.state_dict(), "optimizer_states": [opt.state_dict()],
+				"lr_schedulers": [sched.state_dict()], "global_step": step, "rng": torch.get_rng_state()},
+				os.path.join(out, "last.ckpt"))  # fmt: skip
+		elif "--data-cache" in sys.argv:  # a tokenized-data cache: not the model's weights
+			ids = torch.randint(0, 16, (8, 16))
+			torch.save({"input_ids": ids, "labels": ids.clone()}, os.path.join(out, "tokens.pt"))
 		else:
 			torch.save({"model": model.state_dict()}, os.path.join(out, "ckpt.pt"))

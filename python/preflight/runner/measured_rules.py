@@ -88,6 +88,11 @@ def agent_findings(rec) -> list[Finding]:
 
 TRUNCATION_WARN = 0.10  # guess: a tenth of generations hitting the cap cuts answers often enough to matter
 _CKPT = re.compile(r"(?:^|/)(checkpoint-\d+|checkpoints?|ckpt)/")
+# what a checkpoint directory holds, as opposed to code in a package named ckpt/
+_CKPT_FILE = re.compile(r"(\.(pt|pth|bin|safetensors|ckpt|pkl|npz|npy)|trainer_state\.json)$")
+# a file a cache would be: data saved for reuse (a config.json or a model directory isn't one)
+_CACHE_EXT = re.compile(r"\.(pt|pth|pkl|pickle|npy|npz|arrow|parquet|feather|h5|cache|joblib)$")
+_WRITERS = {"save", "save_to_disk", "dump", "to_parquet", "to_feather", "savez", "write_bytes"}
 _LOADERS = {"load", "load_from_disk", "load_state_dict", "from_pretrained", "load_dataset"}
 
 
@@ -101,7 +106,9 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 	"""Stale checkpoints and caches in the code as sent, and from the probes: generations cut at
 	their cap, and different weights generating identical outputs."""
 	out: list[Finding] = []
-	ckpts = sorted({m.group(0).strip("/") for f in files for m in [_CKPT.search(f)] if m})
+	ckpts = sorted(
+		{m.group(0).strip("/") for f in files if _CKPT_FILE.search(f) for m in [_CKPT.search(f)] if m}
+	)
 	if ckpts:
 		out.append(Finding(id="hygiene.stale_checkpoint", severity="warn", code="hygiene.stale_checkpoint",
 			title="Old checkpoints came with the code",
@@ -109,10 +116,13 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 			"resume_from_checkpoint=True, Lightning's ckpt_path='last') starts from them instead of fresh, "
 			"and a run that saves to the same place mixes old and new.",
 			node_id=None, source="rule", fix_template="hygiene.fresh_output_dir"))  # fmt: skip
+	# the graph's data node where it has one (a vision graph's is "images"), else none: a finding
+	# pointing at a node the graph lacks makes the record unloadable
+	data_node = next((n.id for n in rec.graph.nodes if n.kind == "data"), None)
 	for where, detail in _unkeyed_caches(files):
 		out.append(Finding(id=f"hygiene.cache_not_keyed.{len(out)}", severity="warn", code="hygiene.cache_not_keyed",
-			title="A cache is reused whatever produced it", detail=f"{where}: {detail}", node_id="data", source="rule",
-			fix_template="hygiene.key_the_cache"))  # fmt: skip
+			title="A cache is reused whatever produced it", detail=f"{where}: {detail}", node_id=data_node,
+			source="rule", fix_template="hygiene.key_the_cache"))  # fmt: skip
 	for p in rec.probes:
 		g = p.generation
 		if g is not None and g.truncation_rate is not None and g.sequences:
@@ -153,8 +163,10 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 
 
 def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:
-	"""`if os.path.exists(P): x = load(P)` with P a fixed path (not built from the model, the
-	tokenizer, the length or a hash): the cache is reused after any of them change."""
+	"""`if os.path.exists(P): x = load(...)` (or `Path(P).exists()`) with P a fixed path (not built
+	from the model, the tokenizer, the length or a hash) that is a cache: the file saves to P too,
+	or P has a data file's extension. The cache is reused after any of its inputs change; a config
+	file or a model directory loaded when present is not a cache."""
 	import ast
 
 	hits = []
@@ -175,11 +187,22 @@ def _unkeyed_caches(files: dict[str, str]) -> list[tuple[str, str]]:
 				and isinstance(node.value.value, str)
 			):
 				consts[node.targets[0].id] = node.value.value
+		written = set()
+		for c in ast.walk(tree):
+			if (
+				isinstance(c, ast.Call)
+				and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) in _WRITERS
+			):
+				for a in [*c.args, *(k.value for k in c.keywords)]:
+					if isinstance(a, ast.Constant) and isinstance(a.value, str):
+						written.add(a.value)
+					elif isinstance(a, ast.Name) and a.id in consts:
+						written.add(consts[a.id])
 		for node in ast.walk(tree):
 			if not isinstance(node, ast.If):
 				continue
 			path = _exists_arg(node.test, consts)
-			if path is None:
+			if path is None or not (path in written or _CACHE_EXT.search(path)):
 				continue
 			loads = [c for b in node.body for c in ast.walk(b) if isinstance(c, ast.Call)
 				and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) in _LOADERS]  # fmt: skip

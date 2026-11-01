@@ -98,3 +98,31 @@ def test_a_weights_only_checkpoint_is_a_resume_that_wont_match():
 	}
 	rec = _gpu_rec(extras={"checkpoint_saves_seen": 4.0, **full})
 	assert not [x for x in hygiene_findings(rec, {}) if x.code == "hygiene.resume_mismatch"]
+
+
+def test_code_in_a_ckpt_package_and_a_config_loaded_when_present_are_not_flagged():
+	files = {
+		"ckpt/__init__.py": "x = 1\n",
+		"train.py": "import os, json\nif os.path.exists('config.json'):\n    c = json.load(open('config.json'))\n",
+	}
+	codes = [f.code for f in hygiene_findings(_gpu_rec(), files)]
+	assert "hygiene.stale_checkpoint" not in codes and "hygiene.cache_not_keyed" not in codes
+	saved = "import os, torch\nP = 'feats'\nif os.path.exists(P):\n    x = torch.load(P)\nelse:\n    torch.save(1, P)\n"
+	assert "hygiene.cache_not_keyed" in [f.code for f in hygiene_findings(_gpu_rec(), {"train.py": saved})]
+
+
+def test_a_cache_finding_on_a_graph_without_a_data_node_still_loads():
+	from preflight.schema import load_record
+
+	rec = _gpu_rec()
+	keep = {n.id for n in rec.graph.nodes if n.kind != "data"}
+	g = rec.graph.model_copy(update={"nodes": [n for n in rec.graph.nodes if n.id in keep],
+		"edges": [e for e in rec.graph.edges if e.source in keep and e.target in keep]})  # fmt: skip
+	knobs = [k.model_copy(update={"affects": [a for a in k.affects if a in keep]}) for k in rec.knobs]
+	rec = rec.model_copy(update={"graph": g, "knobs": knobs, "findings": []})
+	files = {
+		"train.py": "import os, torch\nif os.path.exists('tokens.pt'):\n    d = torch.load('tokens.pt')\n"
+	}
+	f = next(f for f in hygiene_findings(rec, files) if f.code == "hygiene.cache_not_keyed")
+	assert f.node_id is None
+	load_record(rec.model_copy(update={"findings": [f]}).model_dump_json())

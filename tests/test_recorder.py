@@ -350,6 +350,9 @@ def test_different_weights_with_identical_outputs_are_counted():
 	assert r.probe.status == "ok", r.probe.error
 	ex = r.probe.extras
 	assert ex["outputs_compared"] >= 2 and ex["outputs_identical"] == ex["outputs_compared"]
+	# the same outputs across training steps are not counted: a few small steps can leave them equal
+	ex = run_probe(spec("identical_outputs.py", warmup=1, timed=3, args=["--train-between"])).probe.extras
+	assert not ex.get("outputs_compared")
 
 
 def test_checkpoint_contents_are_read_for_a_resume():
@@ -363,6 +366,10 @@ def test_checkpoint_contents_are_read_for_a_resume():
 	)
 	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--full"])).probe.extras
 	assert all(ex[f"checkpoint_has_{k}"] == 1 for k in ("optimizer", "scheduler", "rng", "step"))
+	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--lightning"])).probe.extras
+	assert all(ex[f"checkpoint_has_{k}"] == 1 for k in ("optimizer", "scheduler", "rng", "step"))
+	ex = run_probe(spec("weights_only_ckpt.py", warmup=1, timed=3, args=["--data-cache"])).probe.extras
+	assert "checkpoint_saves_seen" not in ex
 
 
 def test_a_cap_given_in_a_generation_config_is_seen():

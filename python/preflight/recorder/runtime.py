@@ -34,6 +34,7 @@ import itertools
 import json
 import math
 import os
+import re
 import statistics
 import sys
 import threading
@@ -337,6 +338,7 @@ class Recorder:
 		self.gens: list[dict] = []
 		self._outputs: dict[int, dict] = {}  # input row hash -> {weights mark: output hash}
 		self.checkpoints: dict = {}  # what the script's training checkpoints hold (_inspect_save)
+		self._any_opt_steps = 0
 		self._output_watch_calls = 0
 		self.trainer_logs: list[dict] = []
 		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
@@ -835,7 +837,7 @@ class Recorder:
 			end = next((i + 1 for i, t in enumerate(row) if t in eos), None)
 			n = end if end is not None else sum(1 for t in row if t != pad or pad in eos)
 			lengths.append(n)
-			truncated.append(end is None and cap is not None and n >= cap)
+			truncated.append((end is None and n >= cap) if cap is not None else None)  # no cap: unknown
 		self.gens.append(
 			{"seconds": dt, "lengths": lengths, "truncated": truncated, "cap": cap, "backend": "hf"}
 		)
@@ -844,27 +846,33 @@ class Recorder:
 
 	def _inspect_save(self, obj, f) -> None:
 		"""Hygiene: what a training checkpoint holds, so a resume that can't match is found before
-		it happens. A torch.save of a dict holding model weights, read for optimizer state (a dict
-		with 'state' and 'param_groups'), a scheduler, RNG state and a step count. HF Trainer saves
-		these in separate files (optimizer.pt, scheduler.pt, rng_state.pth), read by name."""
-		name = str(getattr(f, "name", f)).rsplit("/", 1)[-1]
+		it happens. A torch.save of a dict holding the trained parameters themselves (tensors sharing
+		storage with the optimizer's), read for optimizer state (a dict with 'state' and
+		'param_groups', or a list of them as Lightning keeps), a scheduler, RNG state and a step
+		count. A save named as a final or best export is skipped: weights alone are its purpose. HF
+		Trainer saves optimizer.pt, scheduler.pt and rng_state.pth beside the weights, read by name."""
+		name = str(getattr(f, "name", f)).rsplit("/", 1)[-1].lower()
 		ck = self.checkpoints
 		if name in ("optimizer.pt", "scheduler.pt") or name.startswith("rng_state"):
 			ck[{"optimizer.pt": "optimizer", "scheduler.pt": "scheduler"}.get(name, "rng")] = True
 			return
-		if not isinstance(obj, dict):
+		if not isinstance(obj, dict) or self.opt is None or re.search(r"final|best|export|inference", name):
 			return
+		params = {p.data_ptr() for g in self.opt.param_groups for p in g["params"]}
 
-		def is_weights(v):
-			return (
-				isinstance(v, dict) and v and all(isinstance(x, torch.Tensor) for x in list(v.values())[:8])
-			)
+		def holds_params(v):
+			if isinstance(v, torch.Tensor):
+				return v.data_ptr() in params
+			return isinstance(v, dict) and any(isinstance(x, torch.Tensor) and x.data_ptr() in params
+				for x in list(v.values())[:64])  # fmt: skip
 
 		def is_optim(v):
+			if isinstance(v, list | tuple):
+				return any(is_optim(x) for x in v)
 			return isinstance(v, dict) and "state" in v and "param_groups" in v
 
 		vals = list(obj.values())
-		if is_weights(obj) or any(is_weights(v) for v in vals):
+		if holds_params(obj) or any(holds_params(v) for v in vals):
 			ck["saves"] = ck.get("saves", 0) + 1
 			ck["optimizer"] = ck.get("optimizer", False) or any(is_optim(v) for v in vals)
 			keys = " ".join(str(k).lower() for k in obj)
@@ -873,14 +881,20 @@ class Recorder:
 			ck["step"] = ck.get("step", False) or any(w in keys for w in ("step", "epoch", "iter"))
 
 	def _weights_mark(self, model) -> tuple:
-		"""Which weights generated: the model object, its active adapter(s), and a fingerprint of a
-		few of its trainable (else first) parameters. One small read; at most OUTPUT_WATCH calls."""
-		adapter = getattr(model, "active_adapter", None)
-		adapter = adapter() if callable(adapter) else adapter
+		"""Which weights generated: the active adapter(s), a fingerprint of a few trainable (else
+		first) parameters, and how many optimizer steps had run (generations with training between
+		them are not compared: a few small steps can leave greedy outputs the same). Not the model
+		object: two loads of one checkpoint are the same weights. At most OUTPUT_WATCH calls."""
+		adapter = None
+		with suppress(Exception):  # transformers 4.x: active_adapter() raises with no adapter loaded
+			if getattr(model, "_hf_peft_config_loaded", False):
+				adapter = model.active_adapters()
+			elif not callable(getattr(type(model), "active_adapter", None)):
+				adapter = getattr(model, "active_adapter", None)  # PEFT's PeftModel: a property
 		params = [p for p in model.parameters() if p.requires_grad][:4] or list(model.parameters())[:4]
 		with torch.no_grad():
 			fp = sum(float(p.detach().reshape(-1)[:256].float().sum()) for p in params)
-		return id(model), str(adapter), fp
+		return str(adapter), fp, self._any_opt_steps
 
 	def _watch_outputs(self, model, inputs, gen):
 		"""Hygiene (case study, Oct 28): different weights generating identical outputs for the same
@@ -897,16 +911,16 @@ class Recorder:
 				seen[mark] = hash(tuple(row_out))
 
 	def _identical_outputs(self) -> dict:
-		"""Inputs generated by two sets of weights that differ (another adapter or model, or
-		weights more than 0.1% apart by fingerprint) with the very same output."""
+		"""Inputs generated by two sets of weights that differ (another adapter, or weights loaded
+		more than 0.1% apart by fingerprint, with no training step between) with the same output."""
 		same = differ = 0
 		for seen in self._outputs.values():
 			marks = list(seen.items())
 			for i in range(len(marks)):
 				for j in range(i + 1, len(marks)):
 					(m1, o1), (m2, o2) = marks[i], marks[j]
-					weights_differ = m1[:2] != m2[:2] or abs(m1[2] - m2[2]) > 1e-3 * max(
-						abs(m1[2]), abs(m2[2]), 1e-12
+					weights_differ = m1[2] == m2[2] and (
+						m1[0] != m2[0] or abs(m1[1] - m2[1]) > 1e-3 * max(abs(m1[1]), abs(m2[1]), 1e-12)
 					)
 					if weights_differ:
 						differ += 1
@@ -999,7 +1013,8 @@ class Recorder:
 					for o in outs:
 						for c in o.outputs:
 							lengths.append(len(c.token_ids))
-							trunc.append(getattr(c, "finish_reason", None) == "length")
+							reason = getattr(c, "finish_reason", None)  # needs no cap to read
+							trunc.append(reason == "length" if reason is not None else None)
 					rec.gens.append(
 						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
 					)
@@ -1308,6 +1323,7 @@ class Recorder:
 		return total, _unique_bytes(grads)
 
 	def _post(self, opt, args, kwargs):
+		self._any_opt_steps += 1  # any optimizer: training between two generations (_identical_outputs)
 		if opt is not self.opt:
 			return
 		clean, kind = self._clean, self._kind()
@@ -1684,7 +1700,7 @@ class Recorder:
 		if not self.gens:
 			return {}
 		lengths = [n for g in self.gens for n in g["lengths"]]
-		trunc = [t for g in self.gens for t in g["truncated"]]
+		trunc = [t for g in self.gens for t in g["truncated"] if t is not None]
 		caps = [g["cap"] for g in self.gens if g["cap"]]
 		return {
 			"generation": {
@@ -1695,8 +1711,8 @@ class Recorder:
 				"new_tokens_p95": _quantile(lengths, 0.95) if lengths else None,
 				"new_tokens_max": max(lengths) if lengths else None,
 				"max_new_tokens": int(max(caps)) if caps else None,
-				# with no cap seen, nothing can be called cut off: unknown, not 0
-				"truncation_rate": sum(trunc) / len(trunc) if trunc and caps else None,
+				# over the sequences whose ending is known (a cap seen, or vLLM's finish_reason)
+				"truncation_rate": sum(trunc) / len(trunc) if trunc else None,
 				"backend": self.gens[-1]["backend"],
 			}
 		}

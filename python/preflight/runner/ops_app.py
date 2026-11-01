@@ -461,13 +461,12 @@ def agent_sample(
 	skip = []
 	if skip_from:
 		prior = json.loads((Path(__file__).resolve().parents[3] / skip_from).read_text())
-		skip = sorted(
-			{
-				key
-				for t in (prior.get("agent_sample") or {}).get("tasks", [])
-				if (key := task_key(t["task_id"]))
-			}
-		)
+		tasks = (prior.get("agent_sample") or {}).get("tasks", [])
+		# a list, not a set: a key twice skips two tasks opened the same way (open_run counts them)
+		skip = [key for t in tasks if (key := task_key(t["task_id"]))]
+		if len(skip) < len(tasks):
+			print(f"[agent] {len(tasks) - len(skip)} task ids in {skip_from} have no key and may be sampled again",
+				flush=True)  # fmt: skip
 		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
 	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip)
 	Path("out").mkdir(exist_ok=True)
