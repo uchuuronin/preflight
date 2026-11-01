@@ -10,6 +10,7 @@ import type { Move, PredictionProvider } from "../workspace/provider/PredictionP
 import { costStraddlesBudget, failureTarget, objectiveTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
+import { bestCombo, type ComboMove } from "./combos";
 import { type Limits, NO_LIMITS, withinLimits } from "./limits";
 
 /**
@@ -118,7 +119,9 @@ export interface TourStep {
 	 * move: apply a "fits" move. probe_offer: a "tight" setting would save enough to be worth
 	 * measuring first (the person's click). blocked_by_pin, nothing_safe, done: as named.
 	 */
-	kind: "move" | "probe_offer" | "sample_offer" | "finding" | "campaign" | "rl" | "blocked_by_pin" | "nothing_safe" | "done";
+	kind: "move" | "combo" | "probe_offer" | "sample_offer" | "finding" | "campaign" | "rl" | "blocked_by_pin" | "nothing_safe" | "done";
+	/** combo: a setting that changes several knobs at once, when no single one clears a failure. */
+	combo?: ComboMove;
 	/** campaign: which part of the record's campaign plan this step walks (the calendar lights up). */
 	campaignPart?: CampaignPart;
 	/** rl: which measured RL signal this step walks (the RL view lights up). */
@@ -394,6 +397,21 @@ export function nextStep(ctx: TourContext): TourStep {
 			textKey: specific ? keyFor(top.knobId, "line", fixing) : "guide.rule.generic.fix.line",
 			whyKey: specific ? keyFor(top.knobId, "why", fixing) : "guide.rule.generic.fix.why",
 		};
+	}
+	if (failing) {
+		// No single knob clears it: a setting that changes two or three together may, where the
+		// record's predictions cover the combination (B's multi-axis grids).
+		const o = opts(ctx, ctx.pinned);
+		const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { pinned: o.pinned, ...(o.allow ? { allow: o.allow } : {}), visited: ctx.visited });
+		if (combo) {
+			return {
+				kind: "combo",
+				combo,
+				nodes: [...new Set(combo.changes.flatMap((c) => nodesForKnob(ctx.record, c.knobId)))],
+				textKey: "guide.combo.line",
+				whyKey: "guide.combo.why",
+			};
+		}
 	}
 	// Nothing movable helps. A problem found on a knob no move could show comes first.
 	const last = lastFinding(ctx);

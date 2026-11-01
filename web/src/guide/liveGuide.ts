@@ -14,6 +14,7 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
+import { bestCombo } from "./combos";
 import { breaksLimit, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } from "./limits";
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
@@ -81,6 +82,8 @@ export type ToolOut =
 				delta: number | null;
 				fit: "fits" | "tight";
 			}>;
+			/** No single knob clears the failure; this setting does, together (combos.ts). */
+			combined?: { knobs: Record<string, KnobValue>; risk: number; peak_bytes: number | null };
 	  }
 	| {
 			tool: "set_knob";
@@ -182,9 +185,15 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 				.filter((m) => failing || !changesResults(m.knobId, record))
 				.slice(0, 8);
 			const top = Math.max(...moves.map((m) => Math.abs(m.relative ?? m.delta)), 1e-12);
+			const lim = withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned });
+			const combo =
+				failing && !moves.some((m) => m.fit === "fits")
+					? bestCombo(record, provider, knobs, { kind }, { pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}) })
+					: null;
 			return {
 				tool: "sensitivity",
 				call_id: call.call_id,
+				...(combo ? { combined: { knobs: Object.fromEntries(combo.changes.map((c) => [c.knobId, c.to])), risk: combo.risk, peak_bytes: combo.peak } } : {}),
 				ranked: moves.map((m) => {
 					const from = knobs[m.knobId];
 					const direction: "increase" | "decrease" | "change" =
@@ -253,7 +262,14 @@ export function traceText(out: ToolOut): string {
 		case "set_knob":
 			return out.refused ? `refused: ${out.refused}` : `moved ${out.knob_id} ${String(out.from_value)} → ${String(out.to_value)}`;
 		case "sensitivity":
-			return out.ranked.map((r) => `${r.knob_id}→${String(r.best_value)}${r.fit === "tight" ? " (tight)" : ""}`).join(", ") || "nothing improves the aim";
+			return (
+				[
+					out.ranked.map((r) => `${r.knob_id}→${String(r.best_value)}${r.fit === "tight" ? " (tight)" : ""}`).join(", "),
+					out.combined ? `together: ${Object.entries(out.combined.knobs).map(([k, v]) => `${k}→${String(v)}`).join(" + ")} (fits)` : "",
+				]
+					.filter(Boolean)
+					.join("; ") || "nothing improves the aim"
+			);
 		case "predict":
 			return Object.entries(out.readouts)
 				.map(([k, r]) => `${k}=${r.point === null ? "not trusted" : fmt(r.point, r.unit)}`)

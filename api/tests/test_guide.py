@@ -436,3 +436,33 @@ def test_a_daily_limit_on_a_guide_probe_comes_back_in_the_job_stores_words():
 	assert res["status"] == "limit"
 	assert res["code"] == "limit.daily_spend"
 	assert res["message"].startswith("Preflight has used today's GPU budget")
+
+
+def test_sensitivity_carries_a_combined_move():
+	from preflight_api.guide.types import SensitivityOut
+
+	out = SensitivityOut.model_validate(
+		{
+			"tool": "sensitivity",
+			"call_id": "s",
+			"ranked": [],
+			"combined": {
+				"knobs": {"eval_batch_size": 4, "seq_len": 512, "eval_no_grad": True},
+				"risk": 0.001,
+				"peak_bytes": 17.5 * 2**30,
+			},
+		}
+	)
+	assert out.combined is not None and out.combined.knobs["seq_len"] == 512
+	import pytest
+	from pydantic import ValidationError
+
+	with pytest.raises(ValidationError):  # one knob is a single move, never "combined"
+		SensitivityOut.model_validate(
+			{
+				"tool": "sensitivity",
+				"call_id": "s",
+				"ranked": [],
+				"combined": {"knobs": {"seq_len": 512}, "risk": 0.0},
+			}
+		)
