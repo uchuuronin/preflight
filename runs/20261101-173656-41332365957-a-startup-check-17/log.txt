@@ -1,0 +1,193 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Z8V37cQx9Szb4ayewi4VZw
+Building image im-A3FkoRkdKCNDc5TrZ0MjGK
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install matplotlib==3.9.2
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Collecting matplotlib==3.9.2
+  Downloading http://pypi-mirror.modal.local:5555/simple/matplotlib/matplotlib-3.9.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (11 kB)
+Collecting contourpy>=1.0.1 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/contourpy/contourpy-1.3.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (5.5 kB)
+Collecting cycler>=0.10 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/cycler/cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/fonttools/fonttools-4.68.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (139 kB)
+Collecting kiwisolver>=1.3.1 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/kiwisolver/kiwisolver-1.5.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (5.2 kB)
+Requirement already satisfied: numpy>=1.23 in /usr/local/lib/python3.11/site-packages (from matplotlib==3.9.2) (2.1.3)
+Collecting packaging>=20.0 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pillow>=8 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pillow/pillow-13.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+Collecting pyparsing>=2.3.1 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pyparsing/pyparsing-3.3.3-py3-none-any.whl.metadata (5.9 kB)
+Collecting python-dateutil>=2.7 (from matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/python-dateutil/python_dateutil-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+Collecting tzdata (from python-dateutil>=2.7->matplotlib==3.9.2)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tzdata/tzdata-2026.6-py2.py3-none-any.whl.metadata (1.4 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/matplotlib/matplotlib-3.9.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (8.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8.3/8.3 MB 254.8 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/contourpy/contourpy-1.3.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (355 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/cycler/cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/fonttools/fonttools-4.68.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.5/5.5 MB 527.6 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/kiwisolver/kiwisolver-1.5.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 656.8 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl (129 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pillow/pillow-13.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.1/7.1 MB 534.4 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/pyparsing/pyparsing-3.3.3-py3-none-any.whl (126 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/python-dateutil/python_dateutil-4.0.0-py3-none-any.whl (92 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/tzdata/tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+Installing collected packages: tzdata, pyparsing, pillow, packaging, kiwisolver, fonttools, cycler, contourpy, python-dateutil, matplotlib
+
+Successfully installed contourpy-1.3.3 cycler-0.12.1 fonttools-4.68.0 kiwisolver-1.5.1 matplotlib-3.9.2 packaging-26.3 pillow-13.0.0 pyparsing-3.3.3 python-dateutil-4.0.0 tzdata-2026.6
+
+[notice] A new release of pip is available: 25.2 -> 26.2.2
+[notice] To update, run: pip install --upgrade pip
+Saving image...
+Image saved, took 533.54ms
+
+Built image im-A3FkoRkdKCNDc5TrZ0MjGK in 5.63s
+
+
+Building image im-OewbRE7JqGulY2LBdonBJ3
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PREFLIGHT_ENV=production
+Saving image...
+Image saved, took 501.70ms
+
+Built image im-OewbRE7JqGulY2LBdonBJ3 in 963.83ms
+
+
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+{
+  "worker": {
+    "module": "ops_app",
+    "file": "/root/ops_app.py",
+    "runner_loaded_as": "/mc-liop6toc/modal_app.py (module modal_app, tag probe-7f3fbb29978675fd, PKG /opt/preflight/preflight, zoo /root/zoo)",
+    "zoo": "/root/zoo",
+    "zoo_samples": [
+      "README.md",
+      "agent_eval_spark",
+      "eval_sweep_reasoning",
+      "finetune_lora_hf",
+      "gnn_pyg",
+      "grpo_trl",
+      "pretrain_nanogpt",
+      "retrieval_st",
+      "serving_vllm",
+      "torchtitan_debug",
+      "vision_timm"
+    ],
+    "submitted": {
+      "job_id": "01M6C2ZZQ3KRZ7TYHJXBBCHQ8E",
+      "created": true,
+      "position": 0
+    },
+    "saves": 1,
+    "lens": "finetune",
+    "knobs": 20,
+    "imported": [
+      "preflight.runner.pipeline",
+      "preflight.runner.records",
+      "preflight.runner.sandbox_runner",
+      "preflight.runner.worker",
+      "preflight.runner.wire",
+      "preflight.runner.record_jobs",
+      "preflight.harness.spark",
+      "preflight.harness.mapper",
+      "preflight.probes.gpu_choice",
+      "preflight.probes.plan"
+    ],
+    "container_environment": "main",
+    "flags": {
+      "root": "/opt/preflight",
+      "env": "production",
+      "engine.memory": true
+    },
+    "job_store_would_claim_here": false,
+    "guard": "this container is app ap-Z8V37cQx9Szb4ayewi4VZw, not the deployed preflight-runner in main (ap-G73jgQVsr3gQQodeFppJi2)",
+    "image_tag": "probe-7f3fbb29978675fd"
+  },
+  "probe": {
+    "pkg_root": "/opt/preflight",
+    "reachable_by_probe_uid": true,
+    "euid": 0,
+    "probe_uid": "61000",
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 9,
+    "backend": "cpu",
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n/opt/preflight/preflight/recorder/runtime.py:1320: FutureWarning: `torch.distributed.reduce_op` is deprecated, please use `torch.distributed.ReduceOp` instead\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\n"
+  },
+  "sandbox": {
+    "entry": [
+      "python",
+      "-m",
+      "preflight.probes.remote"
+    ],
+    "created": true,
+    "import_stdout": "IMPORT /opt/preflight/preflight/__init__.py 2.5.1+cu124\n",
+    "import_stderr": "",
+    "import_exit": 0,
+    "probe_status": "ok",
+    "probe_steps": 9,
+    "probe_error": null,
+    "probe_error_code": null
+  },
+  "probe_user": {
+    "exit": 0,
+    "probe_uid": 61000,
+    "uid": 61000,
+    "gid": 61000,
+    "user": "preflight-probe",
+    "passwd": "preflight-probe",
+    "group": "preflight-probe",
+    "compiled": 7.274379253387451
+  },
+  "serving_user": {
+    "exit": 0,
+    "probe_uid": 61000,
+    "uid": 61000,
+    "gid": 61000,
+    "user": "preflight-probe",
+    "passwd": "preflight-probe",
+    "group": "preflight-probe",
+    "compiled": 7.274379253387451,
+    "imported": [
+      "vllm",
+      "datasets"
+    ]
+  },
+  "probe_user_ok": true,
+  "serving_user_ok": true,
+  "ok": true
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-Z8V37cQx9Szb4ayewi4VZw
