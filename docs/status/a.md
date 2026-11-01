@@ -1,10 +1,20 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Sun Nov 1, 01:30 ET.
+Updated Sun Nov 1, 11:30 ET.
 
-- **Now:** tonight's approved GPU queue: D's retrieval, GNN and vision probes; then the agent re-sample on D's plant-3 fix, 50-step GRPO, torchtitan and 2×L4. $3 ceiling, each run logged under Cloud runs.
-- **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning adapter checks, and the Muse Spark script-map gate; LoRA and GRPO ground truths on L4.
-- **Next:** after the queue, the vLLM serving probe and the Spark Open arm of the Pareto sweep (both approved); Spark Open triage and the GPU fallback are built. Unseen scripts: A has not opened `unseen-scripts.md` in the Project, and won't before the list arrives on Monday.
+- **Now:** the Pareto sweep (Muse Spark arm, then Spark Open, on its own $1 ledger); the redeploy gated on the new probe-user startup check (a tiny torch.compile and the vLLM and datasets imports as uid 61000), then the serving probe again on the fixed image.
+- **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning/torchtitan adapter checks, the Muse Spark script-map gate; LoRA ground truth on L4, GRPO 50-step ground truth on A10, DDP and FSDP on 2 × A10; the production runner deployed and left running.
+- **Next, in order (Chiya, Nov 1):** (1) Spark diagnosis, slim (item 31, behind `harness.spark_diagnosis`, off): one Muse Spark call per finished record with the rendered memory timeline and loss plot and the raw probe numbers, findings are disagreements between the two (or "consistent"), each citing the plot region and the number; no search grounding. (2) Spark Open checks each diagnosis claim against the probe numbers through a tool call (item 30, slim); no supporting number is "abstain, or run a probe"; every call logged. (3) pip-installable CLI and a 60-second quickstart (item 42). (4) Prebuilt images and a warm pool for judging, Nov 5–8 (item 45); the pool's cost is an ask before it's on. (5) Every failure names its step and offers a manual entry point (item 43, harness side). (6) Eval-sweep record (item 19), RL entropy and KL (item 14). Also: one real probe through the production runner once round five turns `harness.spark_open_triage` on, its share link, triage calls and spend posted.
+- **Planned, for Monday's cut sheet (not started):** the LR range test, the FakeTensor cross-check, Chakra export, DDP/FSDP beyond the Nov 1 2 × check, the rate-limit wall clock, A's half of data repetition, checkpoint resume exact-match.
+- **Standing yes (Chiya, Nov 1):** runs under $1 on a T4, L4 or A10, up to $5 a day for A, without asking; pushes to ws-a once gitleaks is clean and one read-only review has checked the change, each push's contents listed under Pushes below. Still asked first: over $1 or past $5 a day, A100/H100, a new kind of run, any deploy or anything that keeps billing, main, production flags, contract changes (posted before the PM's noon and 8 PM ET batches).
+- **Unseen scripts:** A has not opened `unseen-scripts.md` in the Project, and won't before the list arrives on Monday.
+
+## Pushes to ws-a (what each sends)
+
+| When (ET) | Range | What it sends | Review | gitleaks |
+|---|---|---|---|---|
+| Nov 1 10:44 | 9e46c3c..4cc6f57 | dataset size from the probes (0bdff6f, abb93ad, fb84348); the probe uid's user name and passwd/group entry (e5b0713, 4cc6f57); the A10 GRPO record, run log and B handoff (03d1420) | 3 read-only rounds (dataset size 2, probe user 1) | clean |
+| Nov 1 11:08 | 4cc6f57..9afbf4c | the probe-user startup step (47f68ed, 88cd732); the C note on the redeploy (cf96ea5); status and B notes (ead63bb, 17582b7, 9afbf4c) | 1 read-only round | clean |
 
 ## Known limits, on purpose
 
@@ -225,6 +235,8 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Nov 1 15:58 | `a-startup-check-15` (41323850105) ok; `a-deploy-main-15` (41323942603): **the production runner redeployed** from ws-a 4cc6f57 (main merged in, production flags), with the probe-user fix; the 12:55 deploy (9e46c3c) would have crashed visitor scripts that ask for their user name (torch.compile, vLLM). Left running | none | — | the job store, about $0.19/day (C's estimate) |
 | Nov 1 16:02 | `a-torchtitan-check-2` (41324243638): **torchtitan working under the recorder**, on an A10 (GPU list L4, A10, L40S). torchtitan 0.1.0 on torch 2.7.1, debug model (6.27M params): 15 steps ok, p50 26 ms; phase split backward 52%, forward 32%, data 11%, optimizer 4%; peak 0.42 GB [measured]. Not read: tokens and samples per step came out 0 (the recorder doesn't see torchtitan's batch shape) | A10 | about 1.5 | about $0.02 GPU (estimate) |
 | Nov 1 16:04 | `a-multi-gpu-2x` (41324369861): **DDP and FSDP on 2 × A10** (GPU list 2 × L4, 2 × A10), the 134M-parameter MLP fixture, both ranks reporting: DDP 15 steps ok, p50 72 ms, peak 3.24 GB a rank; FSDP 15 steps ok, p50 87 ms, peak 1.36 GB a rank [measured]. Under FSDP `params_total` reads 67M, one rank's shard of the same 134M model (known limit, told B) | 2 × A10 | about 1 | about $0.04 GPU (estimate) |
+| Nov 1 16:05 | `a-prefetch-serving` (41324593868): Qwen2.5-7B-Instruct and dolly-15k into the weights volume, CPU; `a-startup-check-serving` (41324754966) ok (vLLM 0.6.4.post1 on torch 2.5.1, and vLLM imports as the probe user) | none (CPU) | about 4 | about $0.05 counted (CPU estimate) |
+| Nov 1 16:10 | `a-smoke-serving-vllm` (41324883012): the vLLM serving probe on the production runner, **error before the first step**: `pyarrow requires NumPy 2.0 or newer, found 1.26.4`. datasets 3.1 pulled the newest pyarrow; the serving image pins numpy below 2 for vLLM. Fixed: pyarrow pinned to 17.0, and the serving startup check imports datasets. The error read "not installed", now it names both versions. The runner stayed up | not reached | about 2 | **$0.0253** by the record ($0.0026 GPU, $0.0013 sandbox, $0.0214 model calls) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,
