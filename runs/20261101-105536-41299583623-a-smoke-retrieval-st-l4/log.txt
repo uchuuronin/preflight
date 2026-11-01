@@ -1,0 +1,46 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-LjfrvRy7ol9QqRgYOrRO6l
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+└── ✓ Created Function agent_sample_hosted.
+submitted {'job_id': '01M6BC0T09399Y8RS3YPE3G0CS', 'created': True, 'position': 0}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "seq": 0, "at": "2026-11-01T10:55:54.377810Z", "stage": "queued", "queue_position": 0, "level": "info"}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "seq": 1, "at": "2026-11-01T10:55:58.374865Z", "stage": "admitted", "message": "attempt 1", "level": "info"}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "seq": 2, "at": "2026-11-01T10:55:58.776750Z", "stage": "fetching", "level": "info"}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "seq": 3, "at": "2026-11-01T10:55:58.968166Z", "stage": "mapping", "level": "info"}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "share_token": "oa8n4h-e2AXG_l3_ylu5aQ", "seq": 4, "at": "2026-11-01T10:56:01.970748Z", "stage": "skeleton", "message": "skeleton from the static reader", "level": "info", "record_rev": 1}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "share_token": "oa8n4h-e2AXG_l3_ylu5aQ", "seq": 5, "at": "2026-11-01T10:56:02.361943Z", "stage": "harnessing", "level": "info", "record_rev": 1}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "share_token": "oa8n4h-e2AXG_l3_ylu5aQ", "seq": 6, "at": "2026-11-01T10:56:02.544305Z", "stage": "probing", "progress": 0.0, "level": "info", "probe_id": "p1", "record_rev": 1}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "share_token": "oa8n4h-e2AXG_l3_ylu5aQ", "seq": 7, "at": "2026-11-01T10:59:40.790215Z", "stage": "probing", "progress": 0.333, "level": "info", "probe_id": "p2", "record_rev": 1}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "share_token": "oa8n4h-e2AXG_l3_ylu5aQ", "seq": 8, "at": "2026-11-01T10:59:54.201878Z", "stage": "probing", "progress": 0.667, "level": "info", "probe_id": "p3", "record_rev": 1}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "share_token": "oa8n4h-e2AXG_l3_ylu5aQ", "seq": 9, "at": "2026-11-01T11:00:07.956890Z", "stage": "predicting", "message": "measured; predicting", "level": "info"}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "share_token": "oa8n4h-e2AXG_l3_ylu5aQ", "seq": 10, "at": "2026-11-01T11:00:10.467813Z", "stage": "predicting", "message": "predicted", "level": "info", "record_rev": 2}
+{"job_id": "01M6BC0T09399Y8RS3YPE3G0CS", "record_id": "01M6BC0YKBCMC4GHNG33NQT111", "seq": 11, "at": "2026-11-01T11:00:10.865029Z", "stage": "done", "progress": 1.0, "level": "info"}
+{
+  "job_id": "01M6BC0T09399Y8RS3YPE3G0CS",
+  "status": "done",
+  "position": null,
+  "record_id": "01M6BC0YKBCMC4GHNG33NQT111",
+  "share_token": "oa8n4h-e2AXG_l3_ylu5aQ",
+  "error": null,
+  "retryable": null,
+  "error_code": null,
+  "last_seq": 11
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-LjfrvRy7ol9QqRgYOrRO6l
