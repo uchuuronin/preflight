@@ -462,3 +462,26 @@ def test_a_slow_tool_that_finishes_is_not_a_loop(proxy, tmp_path):
 	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=5,
 		env=dict(os.environ), stall_s=5.0)  # fmt: skip
 	assert [t.stop_reason for t in out.tasks] == ["done"] and out.tasks[0].turns == 2
+	assert out.tasks[0].latency_s >= 3.0  # B: the task's own wall, its tool time between turns included
+
+
+def test_a_task_stopped_by_a_run_wide_cancel_is_cut_not_timed_out(proxy, tmp_path):
+	"""B, Oct 31: a healthy task in flight at a cancel is no runaway."""
+	import time
+
+	from preflight.recorder.agent import CUT
+
+	prov, px = proxy
+	prov.delay_s = 5.0
+	script = tmp_path / "one.py"
+	script.write_text(
+		"import json, os, urllib.request\n"
+		"b = json.dumps({'model': 'muse-spark-1.3', 'messages': [{'role': 'user', 'content': 'x'}]}).encode()\n"
+		"urllib.request.urlopen(urllib.request.Request(os.environ['META_API_BASE'] + '/chat/completions', b,"
+		" {'Content-Type': 'application/json'})).read()\n"
+	)
+	t0 = time.monotonic()
+	out = run_sample([sys.executable, str(script)], cwd=tmp_path, proxy=px, population=None, k=3,
+		env=dict(os.environ), should_stop=lambda: time.monotonic() - t0 > 1.5)  # fmt: skip
+	assert len(out.tasks) == 1 and out.tasks[0].stop_reason == CUT and out.tasks[0].stop_reason != "timeout"
+	assert out.tasks[0].latency_s >= 1.0

@@ -148,20 +148,30 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	if cut is None and time.monotonic() - t0 >= timeout_s - 5:
 		cut = "timeout"  # ended by its sandbox's own limit, at about the same time
 	at_cut = proxy.run_stats(run_id) if cut else {}
-	# the tasks open when the script was stopped: those with a call in flight, and those whose
-	# worker never called again after their last answer asked for a tool
+	# the tasks open when the script was stopped: those with a call in flight
 	in_flight = set(at_cut.get("in_flight", []))
 	# At the proxy a task stuck in its tool looks exactly like one that finished on a tool call (a
 	# submit, a passing test run), so no task is singled out: the run's own stall is the signal,
 	# and selection says how many tasks ended waiting on a tool, of which up to the script's
 	# workers may be stuck
 	waiting = set(at_cut.get("tool_wait_s") or {}) if cut == "stalled" else set()
-	stalled_tasks: set[str] = set()
 	proc.kill()
 	wall = time.monotonic() - t0
 	ids = proxy.run_tasks(run_id)
-	tasks = [proxy.task(t, timed_out=t in in_flight and t not in stalled_tasks, stalled=t in stalled_tasks)
-		for t in ids]  # fmt: skip
+	ended_at = time.monotonic()
+	spans = proxy.run_stats(run_id).get("span") or {}
+
+	def task_wall(t):
+		"""B (Oct 31): the task's own wall time, first call to last, tool time between turns
+		included; a task still in a call when the run was stopped runs to the stop. Tool time after a
+		task's last answer can't be seen at the proxy."""
+		opened, end = spans.get(t, (None, None))
+		if opened is None:
+			return None
+		return round(max(0.0, (end if end is not None and t not in in_flight else ended_at) - opened), 3)
+
+	# a task stopped with the whole run (cancel, stall, the run's own limit) is "cut", not a timeout
+	tasks = [proxy.task(t, wall_s=task_wall(t), cut=t in in_flight) for t in ids]
 	st = proxy.run_stats(run_id)
 	parts = [f"the first {len(ids)} tasks the script started"]
 	if st.get("skipped"):

@@ -78,6 +78,7 @@ class Call:
 	stream: bool = False
 	response_id: str | None = None  # responses API: the next turn names it as previous_response_id
 	end_mono: float = 0.0  # time.monotonic() when it was logged, for the wait since
+	start_mono: float = 0.0  # time.monotonic() when the proxy took it
 	span_id: str = field(default_factory=lambda: secrets.token_hex(8))
 
 
@@ -97,6 +98,7 @@ class _Run:
 	last_call_at: float | None = None  # monotonic: any call through the run, refused ones too
 	budget_hit: bool = False  # a task was refused because the proxy's dollar cap was reached
 	peak_concurrent: int = 0  # the most tasks with a call in flight at once: the script's workers
+	opened_at: dict[str, float] = field(default_factory=dict)  # task -> monotonic time its first call came
 
 
 def _h(x) -> str:
@@ -416,6 +418,10 @@ class AgentProxy:
 				"tool_wait_s": {tid: time.monotonic() - t.calls[-1].end_mono for tid, t in ts.items()
 					if t.calls and not t.in_flight and t.calls[-1].finish_reason == "tool_calls"},
 				"peak_concurrent": run.peak_concurrent,
+				# each task's span as the proxy saw it: from its first call to its last call's end
+				# (None while a call is in flight), tool time between turns included
+				"span": {tid: (run.opened_at.get(tid), None if t.in_flight or not t.calls else t.calls[-1].end_mono)
+					for tid, t in ts.items()},
 				"single_call": sum(1 for t in ts.values() if len(t.calls) <= 1),
 				"budget_hit": run.budget_hit,
 				# since the last call started or ended; never idle while a call is in flight
@@ -492,6 +498,7 @@ class AgentProxy:
 			run.keys[key] = n
 			tid = f"{run.run_id}-{key}" + (f".{n}" if n > 1 else "")
 			run.order.append(tid)
+			run.opened_at[tid] = time.monotonic()
 			run.last[tid] = msgs
 			run.system[tid] = sys_h
 			self._tasks.setdefault(tid, _Task())
@@ -638,6 +645,7 @@ class AgentProxy:
 		stream = req.get("stream") is True
 		call = Call(start=started, seconds=0.0, status=0, model=model, stream=stream)
 		with self._lock:
+			call.start_mono = time.monotonic()
 			self._tasks.setdefault(task_id, _Task()).open.append(call)
 		sent = [False]  # this request's reply has started: a failure now can only close the connection
 		last: list = []  # the reply's last bytes (or the headers' end), sent once the call is logged
@@ -790,7 +798,7 @@ class AgentProxy:
 			return list(self._tasks.get(task_id, _Task()).calls)
 
 	def task(self, task_id: str, *, success: bool | None = None, wall_s: float | None = None,
-		timed_out: bool = False, stalled: bool = False) -> AgentTask:  # fmt: skip
+		timed_out: bool = False, cut: bool = False) -> AgentTask:  # fmt: skip
 		"""The task as the record's AgentTask: turns are the calls the provider answered. Waits (up
 		to SETTLE_S) for calls still in flight, so a script that exits at [DONE] is counted whole."""
 		with self._lock:
@@ -803,8 +811,8 @@ class AgentProxy:
 			reason = stopped
 		elif stopped == "budget":
 			reason = "max_turns"  # the record's closest word: stopped for running on, not for failing
-		elif stalled:
-			reason = "loop"  # waited on its tools past the stall cutoff with no model call: a tool stuck or looping
+		elif cut:
+			reason = CUT  # stopped with the whole run (cancel, stall, the run's limit), not on its own
 		elif timed_out:
 			reason = "timeout"
 		elif any(c.error and "context" in c.error for c in calls) or (
@@ -868,6 +876,21 @@ class AgentProxy:
 				"attributes": {k: v for k, v in attrs.items() if v is not None},
 			})  # fmt: skip
 		return out
+
+
+def _cut_reason():
+	"""B (Oct 31): a task stopped because the whole run was is not one that timed out on its own.
+	Until the schema has a value for it (asked of the PM), such a task has no stop reason rather than
+	"timeout", so healthy tasks in flight at a cancel don't count as runaways."""
+	import typing
+
+	from preflight.schema.record import AgentTask as _T
+
+	args = typing.get_args(typing.get_args(_T.model_fields["stop_reason"].annotation)[0])
+	return "cut" if "cut" in args else None
+
+
+CUT = _cut_reason()
 
 
 # the OpenAI SDKs retry a 429 unless the server says not to (x-should-retry: false); a refusal
