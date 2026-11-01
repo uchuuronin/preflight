@@ -495,6 +495,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		dropped = {p.id for p in rec.probes}
 		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
 		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
+	# a probe that didn't finish names its step and the way past it by hand (item 43)
+	probes = [_with_step(q, fetched.entrypoint) for q in probes]
 	if patched_for:
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
 		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
@@ -664,6 +666,14 @@ def _triage(rec: FlightRecord, results: list, deps: Deps) -> tuple[FlightRecord,
 		if f is not None:
 			findings.append(f)
 	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
+
+
+def _with_step(probe, entrypoint: str | None):
+	if probe.status in ("ok", "cached") or not probe.error:
+		return probe
+	from .failures import with_step
+
+	return probe.model_copy(update={"error": with_step(probe.error, probe.error_code, entrypoint=entrypoint)})
 
 
 def _diagnose(rec: FlightRecord, deps: Deps) -> FlightRecord:
