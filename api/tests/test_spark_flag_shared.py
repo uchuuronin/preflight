@@ -26,10 +26,14 @@ def test_the_notice_and_the_runner_read_the_same_flag():
 	runner = (ROOT / "python/preflight/runner/modal_app.py").read_text()
 	m = re.search(r'^SCRIPT_MAP_FLAG\s*=\s*"([a-z0-9_.]+)"', spark, re.M)
 	if not m:
-		pytest.skip("waits on A's runner change: preflight.harness.spark.SCRIPT_MAP_FLAG (docs/requests/from-c.md)")
+		pytest.skip(
+			"waits on A's runner change: preflight.harness.spark.SCRIPT_MAP_FLAG (docs/requests/from-c.md)"
+		)
 	assert m.group(1) == flag
 	body = runner[runner.index("def _spark_client") :].split("\n\n\n", 1)[0]
-	assert "SCRIPT_MAP_FLAG" in body or flag in body, "the runner's Muse Spark client must be gated on the flag"
+	assert "SCRIPT_MAP_FLAG" in body or flag in body, (
+		"the runner's Muse Spark client must be gated on the flag"
+	)
 
 
 def test_the_flag_exists_and_production_can_set_it():
