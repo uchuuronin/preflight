@@ -364,9 +364,9 @@ def test_the_daily_gpu_cap_counts_reported_spend_and_what_live_jobs_may_still_sp
 	store.submit({**REQ, "n": 1}, visitor="a", idempotency_key="1")
 	store.submit({**REQ, "n": 2}, visitor="b", idempotency_key="1")
 	store.submit({**REQ, "n": 3}, visitor="c", idempotency_key="1")  # 3 x 0.6 reserved = 1.8 of 2.0
-	with pytest.raises(QueueFull) as e:
+	with pytest.raises(QueueFull) as e:  # nothing spent yet, only held by live jobs: busy, not midnight
 		store.submit({**REQ, "n": 4}, visitor="d", idempotency_key="1")
-	assert e.value.code == "limit.daily_spend" and "today's GPU budget" in str(e.value)
+	assert e.value.code == "queue_full" and e.value.retry_after_s == 120
 	lease = store.lease("w")
 	store.complete(lease, record_id="r", spent_usd=0.05)  # done for $0.05: its reserve is released
 	assert store.daily()["spent_usd"] == 0.05
@@ -374,6 +374,11 @@ def test_the_daily_gpu_cap_counts_reported_spend_and_what_live_jobs_may_still_sp
 	lease = store.lease("w")
 	store.fail(lease, error="boom", retryable=False)  # a failure that can't say what it spent: its budget
 	assert store.daily()["spent_usd"] == 0.65
+	for lease in (store.lease("w"), store.lease("w")):
+		store.complete(lease, record_id="r", spent_usd=0.6)  # 1.85 spent: no room for one more $0.60 job
+	with pytest.raises(QueueFull) as e:
+		store.submit({**REQ, "n": 5}, visitor="e", idempotency_key="1")
+	assert e.value.code == "limit.daily_spend" and "samples only until midnight ET" in str(e.value)
 
 
 def test_the_ledger_survives_a_restart_and_judging_days_get_thirty_dollars():
@@ -387,3 +392,10 @@ def test_the_ledger_survives_a_restart_and_judging_days_get_thirty_dollars():
 	with pytest.raises(QueueFull):
 		again.submit({**REQ, "n": 9}, visitor="v", idempotency_key="k9")
 	assert daily_gpu_cap_usd("2026-11-04") == 10.0 and daily_gpu_cap_usd("2026-11-05") == 30.0
+
+
+def test_seconds_to_midnight_et_is_right_on_a_dst_day():
+	from preflight.runner.queue import seconds_to_midnight_et
+
+	nov1_0030_edt = 1793507400.0  # 2026-11-01 00:30 EDT; clocks fall back at 02:00, so the day has 25 h
+	assert seconds_to_midnight_et(nov1_0030_edt) == 24 * 3600 + 30 * 60

@@ -174,3 +174,11 @@ def test_the_glimmer_client_sends_modals_proxy_headers_and_its_reasoning_strengt
 	assert body["chat_template_kwargs"] == {"reasoning_strength": "low"} and "reasoning_effort" not in body
 	assert body["max_completion_tokens"] >= 1500 and body["model"] == "muse-glimmer"
 	assert call.provider == "modal-glimmer" and 0 <= call.cost_usd < 0.01  # GPU time, not tokens
+
+
+def test_an_unpriced_check_model_is_never_called_under_a_cap(rec):
+	seen = []
+	so = spark_open([fetch(PATH), answer("supported", PATH)], seen)
+	so.prices = {}
+	(f,), calls = check_diagnosis(so, rec, [claim()], budget_usd=0.5)
+	assert seen == [] and calls == [] and f.code == "diagnosis.abstain" and "no price" in f.detail

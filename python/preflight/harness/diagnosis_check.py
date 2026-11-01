@@ -126,6 +126,13 @@ def check_claim(
 				return "abstain", None, "the check ran out of time", client.calls[before:]
 			if room is not None:
 				w = _worst_call_usd(client, msgs)
+				if w == float("inf"):  # an unpriced model has no bound: never called under a cap
+					return (
+						"abstain",
+						None,
+						"the check's model has no price, so no cap can hold",
+						client.calls[before:],
+					)
 				room.worst[0] = max(room.worst[0], w)
 				if w > room():
 					return "abstain", None, "the check's dollar cap was reached", client.calls[before:]

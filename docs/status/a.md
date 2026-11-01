@@ -54,6 +54,10 @@ Updated Sun Nov 1, 12:30 ET.
 - Probe-user startup check (Nov 1): runs in the probe's HOME, not a workdir; a timeout kills only
   its direct child; the `user` it reports is the USER the probe sets, so only the passwd and group
   lookups test the image. The gate is the manual `startup_check` before a deploy, not CI.
+- Demo limits (Nov 1): the spend cap counts what jobs report (GPU at measured probe time plus the
+  sandbox estimate), so sandbox start-up and idle time aren't in it, and one job can pass its $0.60
+  between probe checks; a retried job is charged for its first attempt and reserves again. A worker
+  on new code calling a store on old code (only mid-deploy) fails its report.
 - RL entropy (Nov 1, item 14): rl.kl is recorded from TRL's logs; rl.entropy is TRL's own where it
   logs one, else a Monte Carlo estimate (mean -log p of sampled completion tokens, biased by the
   temperature, top-p/top-k and the EOS cut, flagged by extras.rl_entropy_estimated) on TRL versions

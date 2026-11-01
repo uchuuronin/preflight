@@ -97,9 +97,10 @@ def seconds_to_midnight_et(ts: float) -> int:
 	from datetime import datetime, timedelta
 	from zoneinfo import ZoneInfo
 
-	now = datetime.fromtimestamp(ts, ZoneInfo("America/New_York"))
-	nxt = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-	return max(60, int((nxt - now).total_seconds()))
+	et = ZoneInfo("America/New_York")
+	tomorrow = datetime.fromtimestamp(ts, et).date() + timedelta(days=1)
+	nxt = datetime(tomorrow.year, tomorrow.month, tomorrow.day, tzinfo=et)
+	return max(60, int(nxt.timestamp() - ts))  # by timestamps: a DST day is 23 or 25 hours
 
 
 def daily_gpu_cap_usd(day: str) -> float:
@@ -429,12 +430,13 @@ class InMemoryJobStore:
 			if today["jobs"].get(visitor, 0) >= self.visitor_daily_jobs:
 				raise QueueFull(f"You've run today's {self.visitor_daily_jobs} probe jobs: samples only until midnight ET",
 					retry_after_s=seconds_to_midnight_et(now), code="limit.visitor_daily")  # fmt: skip
-			reserved = self.job_budget_usd * (
-				len(self._jobs) + 1
-			)  # what live jobs and this one may still spend
-			if today["spent"] + reserved > self.daily_cap_usd(day):
+			cap = self.daily_cap_usd(day)
+			if today["spent"] + self.job_budget_usd > cap:  # spent: no room for one more job today
 				raise QueueFull("Preflight has used today's GPU budget: samples only until midnight ET",
 					retry_after_s=seconds_to_midnight_et(now), code="limit.daily_spend")  # fmt: skip
+			if today["spent"] + self.job_budget_usd * (len(self._jobs) + 1) > cap:
+				# not spent yet, only held by the jobs in flight: room comes back as they finish
+				raise QueueFull("today's GPU budget is held by the jobs in flight", retry_after_s=120)
 			mine = sum(1 for j in self._jobs.values() if j.visitor == visitor)
 			if mine >= self.max_queued_per_visitor:
 				raise QueueFull(f"this visitor already has {mine} jobs waiting or running")
