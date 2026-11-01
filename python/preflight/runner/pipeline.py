@@ -97,9 +97,12 @@ class Budget:
 	gpu_usd: float = 0.0  # GPU at measured probe time, every attempt
 	overhead_usd: float = 0.0  # the sandbox CPU and memory estimate alone
 	started: float = field(default_factory=time.monotonic)
+	# time spent waiting for a GPU to schedule: not the job's probe time (Chiya, Nov 1: the wall
+	# counts from when a probe starts on its GPU; the wait has its own cap, in the runner)
+	waited: Callable[[], float] = field(default=lambda: 0.0)
 
 	def left_s(self) -> float:
-		return self.wall_s - (time.monotonic() - self.started)
+		return self.wall_s - (time.monotonic() - self.started - self.waited())
 
 	def allows(self, est_usd: float, est_s: float) -> bool:
 		return self.spent_usd + est_usd <= self.usd and est_s <= self.left_s()
@@ -453,6 +456,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip
 		gpu = cap
 	budget = deps.budget()
+	budget.waited = lambda: float(getattr(deps.runner, "queued_s", 0.0) or 0.0)
 	patched_for: dict = {}
 	if fixed is not None:
 		# C's fix loop: probe runs the patched code; verify runs the setting on it and the base

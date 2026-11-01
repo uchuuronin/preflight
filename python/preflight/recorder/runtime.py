@@ -81,6 +81,18 @@ TRL_KEYS = {
 }
 
 
+def _step_has(field_name: str) -> bool:
+	try:
+		from preflight.schema.record import StepSample
+
+		return field_name in StepSample.model_fields
+	except Exception:
+		return False
+
+
+_STEP_HAS_RESERVED = _step_has("reserved_bytes")
+
+
 class StopProbe(BaseException):
 	pass
 
@@ -1367,11 +1379,14 @@ class Recorder:
 		opt_state = _unique_bytes(
 			t for s in opt.state.values() for t in s.values() if isinstance(t, torch.Tensor)
 		)
-		peak = reserved = used = None
+		peak = reserved = used = reserved_now = None
 		if self.cuda and torch.cuda.is_initialized():
 			peak = max(torch.cuda.max_memory_allocated(), self._eval_peak_stash)
 			reserved = torch.cuda.max_memory_reserved()
 			with suppress(Exception):
+				# B (Nov 1): the allocator's reserve read at the same instant as the whole device, so
+				# what isn't PyTorch's (NCCL, cuBLAS workspaces, the CUDA context) is their difference
+				reserved_now = torch.cuda.memory_reserved()
 				free, total = torch.cuda.mem_get_info()
 				used = total - free  # the whole device: PyTorch, NCCL, cuBLAS workspaces, other processes
 			torch.cuda.reset_peak_memory_stats()
@@ -1420,6 +1435,7 @@ class Recorder:
 				"peak": peak,
 				"reserved": reserved,
 				"device_used": used,
+				"reserved_now": reserved_now,
 				"lr": float(lr)
 				if isinstance(lr, int | float) or (torch.is_tensor(lr) and not clean)
 				else None,
@@ -1685,6 +1701,8 @@ class Recorder:
 				"peak_allocated_bytes": st["peak"],
 				"peak_reserved_bytes": st["reserved"],
 				"device_used_bytes": st["device_used"],
+				# until the schema has the field (asked of the PM), the step log leaves it out
+				**({"reserved_bytes": st.get("reserved_now")} if _STEP_HAS_RESERVED else {}),
 			}
 			for i, st in enumerate(steps, 1)
 		][:256]

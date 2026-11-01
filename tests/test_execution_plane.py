@@ -393,3 +393,40 @@ def test_fallbacks_respect_a_pinned_gpu_and_the_visitors_allowed_list():
 	assert _fallbacks("L4", None, True) == ()  # the guide asked for an L4
 	assert _fallbacks("L4", ["L4", "L40S"], False) == ("L40S",)
 	assert _fallbacks("A100-SXM-80GB", None, False) == ()
+
+
+def test_the_wait_for_a_gpu_is_logged_and_capped():
+	import time as _time
+
+	class Slow(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(0.3)  # Modal finding a GPU
+			return super().exec(*args, timeout=timeout)
+
+	with SandboxRunner(lambda g: Slow(g)) as run:
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+		again = run(spec("p2"), "L4", should_stop=lambda: False)  # the same sandbox: no wait
+	assert r.probe.extras["gpu_wait_s"] >= 0.2 and "gpu_wait_s" not in again.probe.extras
+
+	class Never(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(5)
+			return super().exec(*args, timeout=timeout)
+
+	from dataclasses import replace
+
+	with SandboxRunner(lambda g: Never(g), schedule_wait_s=0.1, wait_cap_s=0.3) as run:
+		r = run(replace(spec("p1"), gpu_fallback=("A10",)), "L4", should_stop=lambda: False)
+	assert r.probe.status == "error" and r.probe.error_code == "gpu.unavailable"
+	assert "L4 or A10" in r.probe.error and r.probe.cost.usd == 0 and run.unscheduled == ["L4", "A10"]
+
+
+def test_the_jobs_wall_budget_doesnt_count_the_gpu_wait():
+	from preflight.runner.pipeline import Budget
+
+	b = Budget(wall_s=60.0)
+	b.started -= 50.0  # 50 s since the job began...
+	b.waited = lambda: 45.0  # ...45 of them waiting for a GPU
+	assert 54.0 < b.left_s() <= 55.0
