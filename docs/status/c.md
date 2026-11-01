@@ -9,6 +9,8 @@
 - `api/ledger_report_app.py`: reads the spend ledger's snapshot (Modal Dict `preflight-ledger`) and prints sums and counts only, for the Muse Spark total.
 - Review (read-only) of the above: (1) "about N of M rows" was an upper bound said as an estimate: now "no more than"; (2) a row scan that stopped early (sampled or out of time) was said as the whole dataset: the rows sentence now needs every row read; (3) from a seq_len between a grid's values every cell counted one step, so the ranking could pick the shorter sequence again: steps now count the grid values passed; (4) the W&B text mentioned the record's link where a plan has none: only said with a link. Ledger: runs counted only where they spent; the docstring says the day shown is `day_et`.
 - Push under the standing yes, `0242ff0..` this commit, to ws-c: fdc5cad (ranking, rows sentence, W&B, stranger fix, ledger report), this commit (review fixes, status). No runs yet.
+- CI green on 2b89a2f (run 41364184733, all seven jobs).
+- **Ledger read** (GitHub run 41364190456, `modal run --env main api/ledger_report_app.py::report` from 2b89a2f, CPU only, no model call, about $0): day 2026-11-01 ET, Muse Spark US$0.0952 settled over 7 runs that spent (most on one run US$0.0453), 20 turns, 6 visitors, Muse Code US$0, no open reservations. The live guide went on at 12:46 today, so this is its whole live spend; the guide-smoke runs and my local tests don't go through the ledger.
 
 ## Sun Nov 1, morning (07:00 on)
 
