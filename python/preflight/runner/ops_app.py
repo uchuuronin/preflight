@@ -681,14 +681,15 @@ def _mbpp_row_keys(n: int) -> dict[str, int]:
 
 	from preflight.recorder.agent import _h, opening_key
 
-	r = httpx.get("https://datasets-server.huggingface.co/rows", params={"dataset": "google-research-datasets/mbpp",
-		"config": "full", "split": "test", "offset": 0, "length": n}, timeout=60)  # fmt: skip
-	r.raise_for_status()
 	keys = {}
-	for item in r.json()["rows"]:
-		row = item["row"]
-		content = f"{row['text']}\nYour code should pass these tests:\n" + "\n".join(row["test_list"])
-		keys[opening_key([_h({"role": "user", "content": content})])] = item["row_idx"]
+	for offset in range(0, n, 100):  # the rows API gives at most 100 a request
+		r = httpx.get("https://datasets-server.huggingface.co/rows", params={"dataset": "google-research-datasets/mbpp",
+			"config": "full", "split": "test", "offset": offset, "length": min(100, n - offset)}, timeout=60)  # fmt: skip
+		r.raise_for_status()
+		for item in r.json()["rows"]:
+			row = item["row"]
+			content = f"{row['text']}\nYour code should pass these tests:\n" + "\n".join(row["test_list"])
+			keys[opening_key([_h({"role": "user", "content": content})])] = item["row_idx"]
 	return keys
 
 
