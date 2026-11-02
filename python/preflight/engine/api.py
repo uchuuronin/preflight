@@ -874,23 +874,23 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	if est.status != "abstain" and est.point and cell is not None and cell.residuals:
 		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
 		alloc = est.point - ctx
-		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - ctx)
-		oom_source = f"from {cell.n} held-out runs"
-		floor = 0.5 / (len(cell.residuals) + 1)  # cited: empirical_p_oom's half-count, no run over the margin
 		pool = conformal.TABLE.cells.get(("memory.peak", "", ""))
-		if (
-			p_emp <= floor + 1e-12
-			and floor >= memory.FITS_BELOW
-			and pool is not None
-			and pool is not cell
-			and pool.residuals
-		):
-			# Chiya, Nov 1 (option b): with no run of this cell over the margin, the cell can't show a chance below
-			# its half-count floor (2.5% for 19 runs, over the 1% "fits" needs), so the wider pool decides
-			p_emp = oom_model.empirical_p_oom(pool.residuals, alloc, capacity - ctx)
-			who = " ".join(x for x in (cell.key[1], cell.key[2]) if x) or "matching"
+		p_emp, pooled = oom_model.pooled_p_oom(
+			cell.residuals,
+			pool.residuals if pool is not None and pool is not cell else None,
+			alloc,
+			capacity - ctx,
+			memory.FITS_BELOW,
+		)
+		if pooled:
+			who = " ".join(x for x in (cell.key[1], cell.key[2]) if x)
 			oom_source = f"from all {pool.n} held-out runs; none of the {cell.n} {who} runs went over"
 			floor = 0.5 / (len(pool.residuals) + 1)
+		else:
+			oom_source = f"from {cell.n} held-out runs"
+			floor = 0.5 / (
+				len(cell.residuals) + 1
+			)  # cited: empirical_p_oom's half-count, no run over the margin
 		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
 	else:
 		oom_source = "simulated band"
@@ -2393,12 +2393,16 @@ def _probe_cap(p) -> tuple[float | None, float | None]:
 	isn't known (`extras.generation_ending_known`). Without the extra, the script's cap and `truncation_rate`."""
 	g, ex = p.generation, (p.extras or {})
 	cap = ex.get("serving_probe_max_tokens")
-	if cap:
+	script = float(g.max_new_tokens) if g.max_new_tokens else None
+	# review, Nov 1: a script capped below the probe's cap stops there itself, with truncation_rate saying how often
+	if cap and (script is None or float(cap) < script):
 		share = ex.get("serving_probe_capped_fraction")
-		if share is None and ex.get("generation_ending_known") is not None and g.sequences:
-			share = max(0.0, 1 - float(ex["generation_ending_known"]) / g.sequences)
+		if share is None and g.sequences:
+			# A writes generation_ending_known only when some ending is known: missing, every reply was cut
+			known = ex.get("generation_ending_known")
+			share = max(0.0, 1 - float(known) / g.sequences) if known is not None else 1.0
 		return float(cap), (float(share) if share is not None else None)
-	return (float(g.max_new_tokens) if g.max_new_tokens else None), g.truncation_rate
+	return script, g.truncation_rate
 
 
 def _censored_fit(p) -> tuple[float, float] | None:

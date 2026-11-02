@@ -192,6 +192,8 @@ def oom_pairs(rows: list[dict[str, Any]], scores: list[conformal.Score]) -> list
 		cell = tables[arch].lookup("memory.peak", gpu, lens)
 		if cell is None or not cell.residuals:
 			continue
+		pool = tables[arch].cells.get(("memory.peak", "", ""))
+		pool_res = pool.residuals if pool is not None and pool is not cell else None
 		mp = [
 			memory.MemoryProbe(
 				float(r["work_units"]), float(r["memory"]["peak_reserved"]), _analytical(r) or 0.0
@@ -210,9 +212,9 @@ def oom_pairs(rows: list[dict[str, Any]], scores: list[conformal.Score]) -> list
 				# the same P(OOM) the engine shows (Chiya, Nov 1): the context-free allocator prediction against the
 				# capacity less the context, not the whole capacity; corpus rows log no device use, so the guess
 				ctx = float(memory.DEFAULT_CONTEXT_BYTES)
-				out.append(
-					(oom.empirical_p_oom(cell.residuals, pred, float(cap) - ctx), q.get("status") == "oom")
-				)
+				# Nov 1: the pool decides where the cell's floor is too high to read "fits", as the engine does
+				p_q, _ = oom.pooled_p_oom(cell.residuals, pool_res, pred, float(cap) - ctx, memory.FITS_BELOW)
+				out.append((p_q, q.get("status") == "oom"))
 	return out
 
 

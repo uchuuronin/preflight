@@ -144,3 +144,18 @@ def test_every_oom_reason_leads_with_the_s2b_word(monkeypatch):
 	assert "the lowest these runs can show, and fits needs below 1%" in at.reason
 	above = api._from_memory_estimate(est, memory.MODEL_ID, "from 47 held-out runs", floor=0.0104).oom
 	assert "lowest" not in above.reason and "fits needs below 1%" in above.reason
+
+
+def test_the_pool_only_lowers_p_oom_below_the_cell_s_floor():
+	"""Review, Nov 1: a pool value above the cell's floor made P(OOM) fall as memory rose (10.4% at 91.8% of the
+	card, 7.5% at 92%). The pool decides only where it is lower than the floor."""
+	from preflight.engine import oom
+
+	cell = [0.0] * 19  # no residual over any positive margin
+	pool = [0.0] * 400 + [0.2] * 87
+	low, used = oom.pooled_p_oom(cell, pool, 5.0, 22.0, 0.01)
+	assert used and low == pytest.approx(0.5 / 488)
+	near, used = oom.pooled_p_oom(cell, pool, 19.0, 22.0, 0.01)  # margin 0.147: the pool's 87 runs are over
+	assert not used and near == pytest.approx(0.5 / 20)
+	ps = [oom.pooled_p_oom(cell, pool, m, 22.0, 0.01)[0] for m in (5.0, 10.0, 15.0, 19.0, 21.0)]
+	assert ps == sorted(ps)

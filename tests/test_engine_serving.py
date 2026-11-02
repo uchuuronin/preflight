@@ -291,3 +291,24 @@ def test_a_serving_cap_shape_reads_the_probe_cap_from_its_extra(monkeypatch):
 	# the explicit extra wins over the derived share
 	p1 = p0.model_copy(update={"extras": {**p0.extras, "serving_probe_capped_fraction": 0.25}})
 	assert api._probe_cap(p1) == (1024.0, 0.25)
+
+
+def test_a_script_capped_below_the_probe_keeps_its_own_cap_and_rate():
+	"""Review, Nov 1: with the script's cap at 256 under the probe's 1,024, the script's own truncation counts."""
+	base = _serve_record()
+	upd = {"max_new_tokens": 256, "truncation_rate": 0.4}
+	p = base.probes[0].model_copy(
+		update={
+			"generation": base.probes[0].generation.model_copy(update=upd),
+			"extras": {**base.probes[0].extras, "serving_probe_max_tokens": 1024.0},
+		}
+	)
+	assert api._probe_cap(p) == (256.0, 0.4)
+	# every reply cut at the probe's cap: A writes no generation_ending_known, so the share is all of them
+	q = base.probes[0].model_copy(
+		update={
+			"generation": base.probes[0].generation.model_copy(update={"max_new_tokens": 4096}),
+			"extras": {**base.probes[0].extras, "serving_probe_max_tokens": 1024.0},
+		}
+	)
+	assert api._probe_cap(q) == (1024.0, 1.0)
