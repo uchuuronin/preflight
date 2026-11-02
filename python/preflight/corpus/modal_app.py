@@ -155,7 +155,7 @@ class Sweeper:
 				continue
 			# own process and deadline: a hang becomes a timeout row, a kernel fault can't poison the next config
 			res = run_isolated(
-				cfg, device="cuda", data_path=TEXT if cfg.kind == "divergence" else None, timeout_s=timeout_s
+				cfg, device="cuda", data_path=TEXT if cfg.kind in ("divergence", "divergence_real") else None, timeout_s=timeout_s
 			)
 			res["requested_gpu"] = requested_gpu
 			store.write_once(cfg.kind, actual, cfg.key, make_record(cfg, actual, res), replace_errors=True)
