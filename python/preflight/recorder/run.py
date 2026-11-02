@@ -188,6 +188,7 @@ def main(spec_path: str) -> int:
 		alternate_sync=bool(spec.get("alternate_sync")),
 		generate_sample=int(spec.get("generate_sample") or 0),
 		generate_calls=int(spec.get("generate_calls") or 0),
+		lr_range=spec.get("lr_range") or None,  # D's range test, behind probes.lr_range
 	).install()
 
 	status, code, error = "ok", None, None
@@ -221,6 +222,10 @@ def main(spec_path: str) -> int:
 		rec.uninstall()
 
 	summary = rec.summary()
+	if spec.get("lr_range"):
+		summary["lr_range_error"] = rec.lr_range_error
+		# per step: was its loss not finite (the series holds None for both that and no loss read)
+		summary["lr_range_nonfinite"] = [int(bool(st.get("nonfinite"))) for st in rec.steps]
 	# the training set's longest row (B, Oct 30), read after the hooks are gone so nothing is timed
 	try:
 		from preflight.recorder.dataset_len import measure_bounded

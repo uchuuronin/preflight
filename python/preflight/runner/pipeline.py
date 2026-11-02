@@ -157,6 +157,8 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		body["generate_sample"] = spec.generate_sample
 	if spec.generate_calls:  # an eval probe's measured calls, likewise
 		body["generate_calls"] = spec.generate_calls
+	if spec.lr_range:  # the range test's ramp (D, Nov 2), likewise
+		body["lr_range"] = spec.lr_range
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
 
@@ -525,6 +527,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		judged=judged,
 		patched_for=patched_for,
 	)
+	if req.mode == "plan" and not patched_for:
+		lr_probe = _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, gpu=gpu)
+		if lr_probe is not None:
+			probes.append(lr_probe)  # in the record only: not a result, so never triaged or searched
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
 	rec, triaged = _triage(rec, results, deps, private=req.private)
 	rec, grounded = _search(rec, results, deps, private=req.private, verify=req.mode == "verify", ctx=ctx)
@@ -744,6 +750,47 @@ def _triage(
 		if f is not None:
 			findings.append(f)
 	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
+
+
+LR_RANGE_LENSES = ("finetune", "pretrain")  # Chiya's list (Nov 2): LoRA and nanoGPT are where it's checked
+
+
+def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
+	"""The learning-rate range test (D, Nov 2; probes/lr_range.py): one more point after the plan,
+	at the current settings with the eval off, about 100 steps on an exponential ramp. Only with
+	probes.lr_range on, for a training lens, after the current-settings point ran, and inside the
+	job's budget. Its probe `<p1>-lr` keeps the curve and the suggestion in extras and nothing a fit
+	reads (probes/local.py with_lr_range)."""
+	from preflight.probes.lr_range import LR_END, LR_START, STEPS
+
+	from .flags import flag
+
+	if not flag("probes.lr_range") or sm.lens not in LR_RANGE_LENSES or not plan or ctx.should_stop():
+		return None
+	first = next((q for q in probes if q.id == plan[0].probe_id), None)
+	if first is None or first.status != "ok" or not first.steps:
+		return None
+	# the point's time: its first probe's, scaled to the ramp's steps [guess: setup plus steps]
+	per_step = (first.step_time.mean_s if first.step_time else None) or 1.0
+	est_s = (first.duration_s or 60.0) + STEPS * per_step
+	if not budget.allows((_price(gpu) + deps.overhead_usd_per_h) * est_s / 3600, est_s):
+		return None
+	p = replace(plan[0], probe_id=f"{plan[0].probe_id}-lr", warmup=STEPS, timed=0, profile=False)
+	try:
+		spec = _spec(fetched, sm, p, deps, eval_off=True)
+	except OverrideError:
+		return None
+	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS})
+	if spec.nproc > 1:
+		return None  # a guard (no plan runs ranks today): each rank would stop on its own loss
+	result, cached = _run_point(spec, gpu, deps, ctx)
+	if result is None:
+		return cached
+	over = (result.probe.duration_s or 0) * deps.overhead_usd_per_h / 3600
+	budget.spent_usd += result.probe.cost.usd + over
+	budget.gpu_usd += result.probe.cost.usd
+	budget.overhead_usd += over
+	return result.probe
 
 
 SEARCH_LIBRARIES = ("torch", "transformers", "peft", "trl", "accelerate", "datasets", "bitsandbytes",
