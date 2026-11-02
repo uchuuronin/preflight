@@ -15,6 +15,7 @@ import { bounds, trusted } from "../status";
 import { Provenance } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { FixFinding } from "../../fix/FixFinding";
+import { FindingCitations, findingSourceKey } from "./findingSource";
 import { abstainText } from "./abstain";
 
 export function DetailSheet() {
@@ -98,9 +99,10 @@ export function DetailSheet() {
 							<b>{f.title}</b>
 							{f.detail ? <p>{f.detail}</p> : null}
 							<p className="pf-dim">
-								{t(`finding.source.${f.source}`)}
+								{t(findingSourceKey(f))}
 								{f.knob_id && knobs.get(f.knob_id) ? ` · ${t("detail.fix_with", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}` : ""}
 							</p>
+							<FindingCitations finding={f} />
 							{f.knob_id && knobs.has(f.knob_id) ? (
 								<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.openKnob(f.knob_id ?? null)}>
 									{t("detail.open_knob", { knob: t(knobs.get(f.knob_id)?.label_key ?? f.knob_id).toLowerCase() })}

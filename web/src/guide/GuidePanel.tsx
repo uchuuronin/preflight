@@ -13,6 +13,7 @@ import { capacityBytes, costStraddlesBudget, failureTarget, objectiveTarget, SAM
 import type { Finding, Knob, KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
+import { changeWords } from "./changeWords";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
 import { comboVisit, comboWords } from "./combos";
@@ -80,9 +81,9 @@ export function GuidePanel() {
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 	// The campaign plan the cockpit draws (same flag, same record), so the tour walks what's on screen.
 	// B's plan at the table's rates it was made at: the budget cut is judged there, whatever rate the visitor types.
-	const campaignTable = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models) : null), [record]);
+	const campaignTable = useMemo(() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, undefined, record) : null), [record]);
 	const campaign = useMemo(
-		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k, e) => estimateFactor(record, { ...currentKnobs(record), ...k }, e, state.rate)) : null),
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k, e) => estimateFactor(record, { ...currentKnobs(record), ...k }, e, state.rate), record) : null),
 		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
 		[record, state.rate],
 	);
@@ -368,6 +369,7 @@ export function GuidePanel() {
 			to: valueText(knob, step?.move?.to),
 			delta: step?.move && goalTarget ? fmtDelta(step.move.delta, goalTarget.unit) : "",
 			target: goalTarget ? t(goalTarget.label_key).toLowerCase() : "",
+			...changeWords({ record, provider, knobs: state.knobs, estimates }, step?.move, a?.from, goalTarget),
 			peak: trusted(peak) ? fmt(peak.point, "bytes") : t("value.none"),
 			peakTrusted: trusted(peak) ? "1" : "",
 			cap: cap ? fmt(cap, "bytes") : "",

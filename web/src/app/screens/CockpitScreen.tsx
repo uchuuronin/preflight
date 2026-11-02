@@ -112,7 +112,7 @@ function Cockpit() {
 	const line = statusLine(record, estimates, state.knobs);
 	// A record that carries a campaign (B's to_campaign) draws its calendar; behind its flag.
 	const campaign = useMemo(
-		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k, e) => estimateFactor(record, { ...currentKnobs(record), ...k }, e, state.rate)) : null),
+		() => (flag("c.campaign_calendar") && record.campaign ? planFromRecord(record.campaign, record.models, (k, e) => estimateFactor(record, { ...currentKnobs(record), ...k }, e, state.rate), record) : null),
 		// B's plan is priced at the record's own setting, so only the visitor's rate changes its dollars.
 		[record, state.rate],
 	);

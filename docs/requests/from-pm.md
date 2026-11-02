@@ -25,6 +25,11 @@ Only the PM chat edits this file. Each line is something this agent needs from a
   - **C after A:** deploy the API and Pages from ae0e900 so the private box and its data-use line go live together with the runner. Then one private check-in on the live site to confirm the triage is labelled "Found by Muse Glimmer".
   - `c.fix_loop` stays off: verify works end to end, but no single template clears this script's OOM (C's status). Chiya decides this morning whether the race tries template pairs.
 
+- MAIN READY [PM -> all] (Nov 2, 12:25 PM ET) **main is 14ae7be**, CI green on all seven jobs. In it: ws-a 7f87d4c (unseen results, probes.repo_install and runner.hide_sample_outputs off, amd-run for any SSH host), ws-b ba3923b, ws-c 42bce19 (stacked fix race, S1 and S2 fixes, data-use lines, model labels, share pages in deploy.yml, measured campaign cells), ws-d c2e0b69 (search grounding, off). **`c.fix_loop` on in production.** `harness.spark_diagnosis` held: the runner runs the claim check under it, and A's review found a private check-in's text could reach Baseten that way. PM fixes: one duplicate `harness.spark_search` key in flags.json; the data-use test now finds D's `ground_failure`. A's `.gitleaksignore` line (D's triage-shot record's share token, our own zoo record) is accepted.
+  - **The unseen list is published:** `docs/validation/unseen-scripts.md`, byte-identical to the file hashed on Nov 1 (`be178f20…`, `docs/validation/unseen-hash.txt`). First attempts: 0 of 9 harnessed without hand edits. That stands as the result; everything from here is "after freeze".
+  - **New top priority for everyone: real repos must check in.** See each agent's message from Chiya. A: gated runner redeploy from 14ae7be now, then test `probes.repo_install` on the nine through ops runs with the flag on in that process only.
+  - **C:** deploy the API and Pages from 14ae7be after A's runner redeploy (share pages go live, the fix loop goes live, and "Found by Muse Glimmer" shows).
+
 ## Open
 
 - MEASURED [PM -> all] (Oct 28, run 40614430138, runs/20261028-012026-40614430138-pm-smoke-models on remote-runs) Model APIs, 20 tiny requests each, all HTTP 200:

@@ -19,6 +19,22 @@
 			"verifiable": true
 		},
 		{
+			"id": "eval.no_grad_and_batch",
+			"title": "Evaluation without gradients, in smaller batches",
+			"lenses": [
+				"finetune",
+				"pretrain",
+				"rl",
+				"vision",
+				"retrieval",
+				"gnn"
+			],
+			"knob": "eval_batch_size",
+			"metric": "memory.eval_peak",
+			"needs_value": true,
+			"verifiable": true
+		},
+		{
 			"id": "eval.reduce_batch",
 			"title": "Smaller evaluation batch",
 			"lenses": [

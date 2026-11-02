@@ -119,7 +119,7 @@ def test_usage_is_read_wherever_muse_puts_it():
 
 
 def test_every_template_names_a_knob_and_builds_a_prompt():
-	assert len(TEMPLATES) == 12
+	assert len(TEMPLATES) == 13
 	for t in TEMPLATES.values():
 		value = 8 if "{value}" in t.task else None
 		text = task_for(t.id, value)
@@ -552,3 +552,16 @@ def test_the_gate_takes_search_as_the_second_real_run_sent_it(tmp_path):
 	assert denied(gate(tmp_path, "search", {"glob": ["**/*.py", "/proc/*"], "pattern": "x"}))
 	assert denied(gate(tmp_path, "search", {"glob": [{"x": 1}], "pattern": "x"}))
 	assert denied(gate(tmp_path, "search", {"output_mode": ["x"], "pattern": "x"}))
+
+
+def test_a_stack_is_its_parts_on_one_metric():
+	"""The stacked eval fix (Nov 2) asks for both of its parts, is judged on the eval peak like
+	them, and is checked for autograd being off like the no-grad fix."""
+	from preflight_api.fix.templates import STACKS, verify_options
+
+	for sid, parts in STACKS.items():
+		assert sid in TEMPLATES and all(p in TEMPLATES for p in parts)
+		assert {verify_options(p)["metric"] for p in parts} == {verify_options(sid)["metric"]}
+	text = task_for("eval.no_grad_and_batch", 8)
+	assert "torch.no_grad()" in text and "evaluation batch size to 8" in text
+	assert verify_options("eval.no_grad_and_batch")["no_grad"] is True

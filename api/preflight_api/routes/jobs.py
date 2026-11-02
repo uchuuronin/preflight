@@ -92,7 +92,9 @@ def _store_error(e: Exception) -> ApiError:
 		return ApiError(
 			429,
 			"queue_full",
-			f"All probe GPUs are busy. Try again in {s} seconds, or open a sample meanwhile.",
+			# A's queue_full covers busy GPUs, the visitor's own queued jobs and budget held by jobs in
+			# flight (A, Nov 2), so the words don't blame the GPUs alone.
+			f"The queue can't take this job right now. Try again in {s} seconds, or open a sample meanwhile.",
 			retryable=True,
 			retry_after=s,
 		)

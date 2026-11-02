@@ -1,4 +1,7 @@
-# Run a command on Chiya's AMD Developer Cloud droplet (MI300X, ROCm) from any branch.
+# Run a command on Chiya's AMD Developer Cloud droplet (MI300X, ROCm) from any branch, or on any
+# rented ROCm host reachable over SSH with the AMD_SSH_KEY secret's key (its public half in the
+# host's authorized_keys): set host, port and user; torch_rocm installs ROCm PyTorch if the image
+# has none.
 # The droplet is created by hand in the AMD cloud panel (it bills by the hour while it exists);
 # this workflow copies the chosen ref to it over SSH, runs the command, brings back ./out, and can
 # destroy the droplet at the end. Results land on the `remote-runs` branch like remote-run.yml.
@@ -11,8 +14,14 @@ on:
         description: Short label for the run (letters, digits, dashes)
         required: true
       host:
-        description: Droplet public IPv4
+        description: Droplet public IPv4, or any SSH host's IPv4 or DNS name
         required: true
+      user:
+        description: SSH user (root on an AMD droplet; the provider's login user otherwise)
+        default: "root"
+      torch_rocm:
+        description: "If the host's python3 has no ROCm torch: the ROCm wheel index to install torch 2.5.1 from (6.1 or 6.2); empty uses the image's"
+        default: ""
       port:
         description: SSH port (22 on an AMD droplet; RunPod's exposed TCP port otherwise)
         default: "22"
@@ -39,6 +48,8 @@ jobs:
     env:
       RUN_NAME: ${{ github.event.inputs.name }}
       RUN_HOST: ${{ github.event.inputs.host }}
+      RUN_USER: ${{ github.event.inputs.user }}
+      TORCH_ROCM: ${{ github.event.inputs.torch_rocm }}
       RUN_PORT: ${{ github.event.inputs.port }}
       RUN_CMD: ${{ github.event.inputs.cmd }}
       RUN_REF: ${{ github.event.inputs.ref }}
@@ -52,7 +63,9 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$RUN_NAME" =~ ^[A-Za-z0-9-]{1,48}$ ]] || { echo "bad name"; exit 2; }
-          [[ "$RUN_HOST" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || { echo "host must be an IPv4 address"; exit 2; }
+          [[ "$RUN_HOST" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ || "$RUN_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$ ]] || { echo "host must be an IPv4 address or a DNS name"; exit 2; }
+          [[ "$RUN_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { echo "user must be a plain login name"; exit 2; }
+          [[ -z "$TORCH_ROCM" || "$TORCH_ROCM" =~ ^6\.[12]$ ]] || { echo "torch_rocm must be empty, 6.1 or 6.2"; exit 2; }
           [[ "$RUN_PORT" =~ ^[0-9]{1,5}$ && "$RUN_PORT" -ge 1 && "$RUN_PORT" -le 65535 ]] || { echo "port must be 1 to 65535"; exit 2; }
           [[ "$RUN_TIMEOUT" =~ ^[0-9]{1,3}$ && "$RUN_TIMEOUT" -ge 1 && "$RUN_TIMEOUT" -le 240 ]] || { echo "bad timeout"; exit 2; }
           [[ "$RUN_CMD" =~ ^python\ (scripts/|-m\ preflight\.)[A-Za-z0-9_./:=,@\ -]*$ ]] || { echo "cmd must start with 'python scripts/' or 'python -m preflight.' and contain no shell operators"; exit 2; }
@@ -71,18 +84,28 @@ jobs:
         id: run
         run: |
           set +e
-          S="ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes -o ServerAliveInterval=30 root@$RUN_HOST"
+          S="ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes -o ServerAliveInterval=30 $RUN_USER@$RUN_HOST"
+          # the checkout lives in the login's home (/root/preflight on a droplet)
           rsync -az --delete -e "ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes" \
-            --exclude .git --exclude node_modules --exclude .venv --exclude web/dist ./ "root@$RUN_HOST:/root/preflight/" > run.log 2>&1
-          # The droplet image ships ROCm PyTorch; reuse it instead of downloading torch again.
-          $S "cd /root/preflight && rm -rf out && mkdir -p out \
-            && python3 -c 'import torch; assert torch.version.hip, \"not a ROCm torch\"; print(\"torch\", torch.__version__, \"hip\", torch.version.hip, torch.cuda.get_device_name(0))' \
-            && (command -v uv >/dev/null || pip install -q uv) \
-            && uv venv -q --system-site-packages --python \$(command -v python3) .venv-amd \
+            --exclude .git --exclude node_modules --exclude .venv --exclude .venv-amd --exclude web/dist ./ "$RUN_USER@$RUN_HOST:preflight/" > run.log 2>&1
+          # The droplet image ships ROCm PyTorch; reuse it instead of downloading torch again. On a host
+          # without one, torch_rocm installs torch 2.5.1 (the probe image's) from that ROCm wheel index
+          # into the run's venv.
+          if [ -n "$TORCH_ROCM" ]; then
+            TORCH_STEP="(.venv-amd/bin/python -c 'import torch, sys; sys.exit(0 if torch.version.hip else 1)' 2>/dev/null || VIRTUAL_ENV=.venv-amd uv pip install -q torch==2.5.1 --index-url https://download.pytorch.org/whl/rocm$TORCH_ROCM)"
+          else
+            TORCH_STEP="true"
+          fi
+          $S "cd ~/preflight && rm -rf out && mkdir -p out \
+            && export PATH=\$HOME/.local/bin:\$PATH \
+            && (command -v uv >/dev/null || python3 -m pip install -q --user uv || python3 -m pip install -q --user --break-system-packages uv || python3 -m pip install -q uv) \
+            && uv venv -q --allow-existing --system-site-packages --python \$(command -v python3) .venv-amd \
+            && $TORCH_STEP \
+            && .venv-amd/bin/python -c 'import torch; assert torch.version.hip, \"not a ROCm torch\"; print(\"torch\", torch.__version__, \"hip\", torch.version.hip, torch.cuda.get_device_name(0))' \
             && VIRTUAL_ENV=.venv-amd uv pip install -q -e . psutil \
             && timeout ${RUN_TIMEOUT}m .venv-amd/bin/$RUN_CMD" >> run.log 2>&1
           code=$?
-          rsync -az -e "ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes" "root@$RUN_HOST:/root/preflight/out/" ./out/ >> run.log 2>&1
+          rsync -az -e "ssh -i $HOME/.ssh/amd -p $RUN_PORT -o BatchMode=yes" "$RUN_USER@$RUN_HOST:preflight/out/" ./out/ >> run.log 2>&1
           echo "exit=$code" >> "$GITHUB_OUTPUT"
           tail -n 50 run.log
           exit 0

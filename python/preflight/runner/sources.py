@@ -162,6 +162,20 @@ def _pick_entrypoint(files: dict[str, str], wanted) -> str:
 OPS_ONLY_SAMPLES = frozenset({"torchtitan_debug"})
 
 
+# what we measured from a sample, kept beside it (a record, a benchmark, a sample's tasks): not part
+# of the script, and with runner.hide_sample_outputs on (off), never sent with it, so a map or a model
+# reading the files can't read the answers (B, Nov 2: zoo/grpo_trl's record_nov1_a10.json)
+_SAMPLE_OUTPUT = re.compile(r"(record|bench|sample|gt)_[^/]*\.json")
+
+
+def _without_outputs(files: dict[str, str]) -> dict[str, str]:
+	from .flags import flag
+
+	if not flag("runner.hide_sample_outputs"):
+		return files
+	return {k: v for k, v in files.items() if not _SAMPLE_OUTPUT.fullmatch(k)}
+
+
 def _sample(uri: str) -> Path:
 	name = uri.removeprefix("sample://").removeprefix("zoo/").strip("/")
 	if not re.fullmatch(r"[a-z0-9_\-]+", name):
@@ -310,7 +324,7 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		raise InvalidSubmission("a commit is its full 40-character hash (git rev-parse HEAD)")
 	args = _args(source.get("args"))
 	if kind in ("sample", "template"):
-		files = _read_tree(_sample(uri))
+		files = _without_outputs(_read_tree(_sample(uri)))
 	elif kind in ("upload", "cli", "inflight"):
 		files = source.get("files")
 		if not isinstance(files, dict) or not all(

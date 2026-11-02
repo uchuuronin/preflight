@@ -129,6 +129,40 @@ def test_the_pipeline_diagnoses_only_with_its_flag_on(rec, tmp_path, monkeypatch
 	assert [c.purpose for c in out.provenance][-1] == "diagnosis"
 
 
+def _nothing_to_plot(rec):
+	r = rec.model_copy(deep=True)
+	for p in r.probes:
+		for st in p.step_log:
+			st.peak_allocated_bytes = st.peak_reserved_bytes = st.device_used_bytes = None
+		if p.stability and p.stability.series:
+			p.stability.series["loss"] = []
+	return r
+
+
+def test_a_record_with_nothing_to_plot_makes_no_call(rec):
+	bare = _nothing_to_plot(rec)
+	assert render(bare) == {}
+	seen = []
+	found, calls, stats = diagnose_record(client_answering([], seen), bare)
+	assert (found, calls, seen) == ([], [], []) and stats["no_plots"] == 1
+
+
+def test_only_the_plots_with_something_drawn_are_sent(rec):
+	r = rec.model_copy(deep=True)
+	for p in r.probes:
+		if p.stability and p.stability.series:
+			p.stability.series["loss"] = [None, None]
+	assert set(render(r)) == {"memory_timeline"}
+	seen = []
+	diagnose_record(client_answering([], seen), r)
+	(req,) = seen
+	parts = req["messages"][1]["content"]
+	assert [c["text"] for c in parts if c["type"] == "text" and c["text"].startswith("Plot:")] == [
+		"Plot: memory_timeline"
+	]
+	assert sum(c["type"] == "image_url" for c in parts) == 1
+
+
 def test_a_huge_or_padded_index_never_raises(rec):
 	nums = numbers(rec)
 	assert resolve(nums, "probes[p1].step_log[" + "9" * 5000 + "].wall_s") is None

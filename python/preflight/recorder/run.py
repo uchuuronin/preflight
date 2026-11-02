@@ -158,7 +158,8 @@ def main(spec_path: str) -> int:
 			_write(spec["progress"], {"stage": "installing requirements", "steps": 0})
 		done = Path(spec["deps"]).with_name("deps.done.json")
 		if rank == 0:
-			err, dirs = install(Path(workdir), Path(spec["deps"]))
+			err, dirs = install(Path(workdir), Path(spec["deps"]), repo=bool(spec.get("install_repo")),
+				entrypoint=spec.get("entrypoint"))  # fmt: skip
 			_write(str(done), {"error": err, "dirs": [str(d) for d in dirs]})
 		else:
 			# torchrun: rank 0 installs once into the shared prefix; the other ranks wait for it and
@@ -169,7 +170,8 @@ def main(spec_path: str) -> int:
 			err, dirs = got.get("error"), [Path(d) for d in got.get("dirs", [])]
 		if err:
 			_write(out_path, {"status": "error", "error_code": "missing_package.install",
-				"error": f"requirements.txt didn't install: {err}", "summary": {}})  # fmt: skip
+				"error": f"{'the repo' if spec.get('install_repo') and not Path('requirements.txt').is_file() else 'requirements.txt'}"
+				f" didn't install: {err}", "summary": {}})  # fmt: skip
 			return 0
 		for i, d in enumerate(dirs, 1):
 			sys.path.insert(i, str(d))  # after the script's own files, before the image

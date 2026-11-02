@@ -127,7 +127,7 @@ def _stream(cmd: list[str], *, env: dict, cwd: Path, timeout_s: float) -> tuple[
 
 def _bare(
 	work: Path, bare_steps: int, *, install_requirements: bool, caches: Path, env: dict, timeout_s: float,
-	entrypoint: str = "train.py", args: tuple[str, ...] = (),
+	entrypoint: str = "train.py", args: tuple[str, ...] = (), install_repo: bool = False,
 ) -> dict:  # fmt: skip
 	env = {**os.environ, **env}
 	if install_requirements:
@@ -139,7 +139,8 @@ def _bare(
 			k: os.environ.pop(k) for k in ("PREFLIGHT_DEPS_DIR", "PREFLIGHT_PIP_CACHE") if k in os.environ
 		}
 		try:
-			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True))
+			repo_kw = {"repo": True, "entrypoint": entrypoint} if install_repo else {}
+			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw)
 		finally:
 			os.environ.update(saved)
 		if err:
@@ -199,6 +200,7 @@ def measure(
 	args: tuple[str, ...] = (),
 	generate_sample: int = 0,
 	generate_calls: int = 0,
+	install_repo: bool = False,
 ) -> dict:
 	"""Both runs and the paired overhead, as one dict (what out/ground_truth_<script>.json holds).
 	bare_env: environment overrides for the bare run only (its own caches on a root box).
@@ -223,7 +225,7 @@ def measure(
 		)
 		bare = _bare(work, bare_steps, install_requirements=install_requirements, caches=caches,
 			env={**_bare_hf_home(caches), **(bare_env or {})}, timeout_s=budget_s * BARE_SHARE,
-			entrypoint=entrypoint, args=args)  # fmt: skip
+			entrypoint=entrypoint, args=args, install_repo=install_repo)  # fmt: skip
 		bare_wall = time.monotonic() - t0
 		_say(
 			f"bare run ended ({bare.get('ended') or 'failed'}) after {bare_wall:.0f} s, {bare.get('steps')} steps"
@@ -233,7 +235,7 @@ def measure(
 		# the recorder run is the probe the pipeline would run: a serving script's sampled generate call
 		r = run_probe(ProbeSpec(probe_id="gt", files=files, entrypoint=entrypoint, args=list(args), warmup=warmup,
 			timed=recorder_steps, timeout_s=left, alternate_sync=not (generate_sample or generate_calls),
-			install_requirements=install_requirements, generate_sample=generate_sample,
+			install_requirements=install_requirements, install_repo=install_repo, generate_sample=generate_sample,
 			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:

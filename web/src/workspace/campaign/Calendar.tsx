@@ -35,13 +35,22 @@ function band(q: Record<string, string>): boolean {
 	return ["p10", "p50", "p90"].every((k) => typeof q[k] === "string" && Number.isFinite(Date.parse(q[k]!)));
 }
 
+/** A run whose time comes from a probe at its setting, not the engine (plan.ts measuredCell). */
+function MeasuredTag({ c }: { c: PlanCell }) {
+	return c.measured ? (
+		<small className="pf-cal__measured" title={t("campaign.measured_why")}>
+			{t("campaign.measured")}
+		</small>
+	) : null;
+}
+
 function Duration({ c }: { c: PlanCell }) {
 	// The record's own reason when it gives one; the generic line only when it doesn't.
 	if (!trusted(c.time)) return <span className="pf-cal__abstain">{c.time.reason ? t("campaign.abstain", { why: c.time.reason }) : t("campaign.no_time")}</span>;
 	return (
 		<span>
 			{fmt(c.time.point, "s_short")} <small className="pf-dim">({fmtRange(c.time.lo ?? c.time.point, c.time.hi ?? c.time.point, "s_short")})</small>
-			{c.segments && c.segments > 1 ? <small className="pf-dim"> · {t("campaign.segments", { n: fmt(c.segments, "count") })}</small> : null}
+			{c.segments && c.segments > 1 ? <small className="pf-dim"> · {t("campaign.segments", { n: fmt(c.segments, "count") })}</small> : null} <MeasuredTag c={c} />
 		</span>
 	);
 }
@@ -91,9 +100,12 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 								{slotsOf(r.cells, plan.lane_slots?.[r.lane] ?? 1).map((slot, i) => (
 									<div key={i} className="pf-cal__track" role="list">
 										{slot.map((c) => (
-											<div key={c.id} role="listitem" className="pf-cal__bar" style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}`}>
+											<div key={c.id} role="listitem" className={`pf-cal__bar${c.measured ? " is-measured" : ""}`} style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}${c.measured ? ` (${t("campaign.measured_why")})` : ""}`}>
 												<i className="pf-cal__whisker" style={{ width: `${(((c.time.hi ?? 0) - (c.time.point ?? 0)) / Math.max(1, c.time.point ?? 1)) * 100}%` }} />
-												<span>{cellLabel(c)}</span>
+												<span>
+													<MeasuredTag c={c} />
+													{cellLabel(c)}
+												</span>
 											</div>
 										))}
 									</div>

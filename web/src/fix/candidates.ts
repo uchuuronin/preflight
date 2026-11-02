@@ -8,6 +8,7 @@
  * templates.json is the API's list (api/preflight_api/fix/templates.py), checked equal in
  * api/tests/test_patches.py.
  */
+import { bestCombo } from "../guide/combos";
 import { type Limits, NO_LIMITS, valueAllowed, withinLimits } from "../guide/limits";
 import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
@@ -40,6 +41,32 @@ const CODE_ONLY_VALUES: Record<string, KnobValue> = {
 	// the visitor sees the value in the fix's diff.
 	"agent.cap_tool_retries": 3,
 };
+
+/** Templates that stack others (the API's templates.STACKS): the finding's eval fixes together. */
+export const STACKS: Record<string, readonly string[]> = { "eval.no_grad_and_batch": ["eval.wrap_no_grad", "eval.reduce_batch"] };
+
+/**
+ * When none of a finding's fixes passes verify alone (Chiya, Nov 2: the LoRA eval OOM needs eval
+ * without gradients and a smaller eval batch together), the race stacks them. The eval batch is
+ * the one in the engine's combined move that the guide offers (guide/combos.ts bestCombo, with the
+ * visitor's pins and limits as the guide passes them), so the value isn't guessed. Only that value
+ * is taken: the guide's move may also change another knob (seq_len on the LoRA record), which a
+ * fix to the eval code doesn't touch, and the stack adds the no-grad fix the move doesn't model.
+ * Null when the finding isn't one of a stack's parts, the guide has no combined move with an eval
+ * batch, or the visitor's pins or limits rule it out.
+ */
+export function stackedCandidate(finding: Pick<Finding, "fix_template">, ctx: Ctx): Candidate | null {
+	const id = Object.keys(STACKS).find((k) => STACKS[k]!.includes(finding.fix_template ?? ""));
+	const t = template(id);
+	if (!t || !t.knob || !t.lenses.includes(ctx.record.job.lens)) return null;
+	const limits = ctx.limits ?? NO_LIMITS;
+	if (ctx.pinned.has(t.knob) || limits.frozen.includes(t.knob) || ctx.pinned.has("eval_no_grad") || limits.frozen.includes("eval_no_grad")) return null;
+	const o = withinLimits(ctx.record, ctx.provider, limits, ctx.knobs, { pinned: ctx.pinned });
+	const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { pinned: o.pinned, ...(o.allow ? { allow: o.allow } : {}) });
+	const to = combo?.changes.find((c) => c.knobId === t.knob)?.to;
+	if (to === undefined || !valueAllowed(limits, t.knob, to)) return null;
+	return { template_id: t.id, value: to };
+}
 
 export function template(id: string | null | undefined): FixTemplate | undefined {
 	return id ? TEMPLATES.find((t) => t.id === id) : undefined;
@@ -79,7 +106,8 @@ export function candidatesFor(finding: Finding, ctx: Ctx): Candidate[] {
 	if (!first || !first.lenses.includes(lens)) return [];
 	// Other fixes race only where verify can pick the winner by measuring: an agent's fixes can't
 	// be verified yet, so its finding gets its own fix alone.
-	const others = first.verifiable ? TEMPLATES.filter((t) => t.id !== first.id && t.verifiable && t.metric === first.metric && t.lenses.includes(lens)) : [];
+	// A stack (two fixes in one) races only after its parts have each failed verify (stackedCandidate).
+	const others = first.verifiable ? TEMPLATES.filter((t) => t.id !== first.id && !(t.id in STACKS) && t.verifiable && t.metric === first.metric && t.lenses.includes(lens)) : [];
 	const pool = [first, ...others];
 	const out: Candidate[] = [];
 	for (const t of pool) {
