@@ -2723,6 +2723,28 @@ def _with_rollout(record: FlightRecord, values: dict, step: _StepResult) -> _Ste
 	return replace(step, est=est, sigma=sigma, phases=ph)
 
 
+def _rl_signals(record: FlightRecord, values: dict, p) -> str | None:
+	"""What the probe's TRL logs say about the run: KL to the reference and where its trend goes by the last step,
+	the policy's entropy, the mean reward. None when the probe logged none of them."""
+	if p is None or not p.rl:
+		return None
+	steps_total, _ = _total_steps(record, values)
+	seen = int(p.steps or 0) or len(p.rl.kl) or len(p.rl.reward_mean)
+	parts = [
+		rl.kl_trend(p.rl.kl, seen, steps_total),
+		rl.entropy_trend(
+			p.rl.entropy,
+			bool((p.extras or {}).get("rl_entropy_estimated")),
+			bool((p.extras or {}).get("rl_entropy_exact")),
+		),
+		rl.reward_trend(p.rl.reward_mean),
+	]
+	if not p.rl.entropy:
+		parts.append("no policy entropy was logged")
+	parts = [x for x in parts if x]
+	return "training signals: " + "; ".join(parts) if len(parts) > (0 if p.rl.entropy else 1) else None
+
+
 def _rl_targets(record: FlightRecord, values: dict) -> dict:
 	out = {"time.rollout": _rollout(record, values)}
 	p = _rl_probe(record, values) or next((q for q in record.probes if q.status in OK_PROBE and q.rl), None)
@@ -2744,6 +2766,10 @@ def _rl_targets(record: FlightRecord, values: dict) -> dict:
 			why += f"; the probe measured {p.rl.zero_spread_fraction:.0%} at its group size of {int(k)}"
 		status = "predicted" if k and int(g) == int(k) else "extrapolated"
 		out["rl.zero_spread"] = _est(iv.point, iv.lo, iv.hi, "fraction", status, mid, why)
+	signals = _rl_signals(record, values, p)
+	if signals and "rl.zero_spread" in out:
+		# A's item 14 (PM, Nov 1): the probe's logged KL, entropy and reward, on the RL lens's risk readout
+		out["rl.zero_spread"] = _with_note(out["rl.zero_spread"], signals)
 	sample = _lengths(p) if p is not None else None
 	cap = values.get("max_completion_len") or (
 		p.generation.max_new_tokens if p is not None and p.generation else None

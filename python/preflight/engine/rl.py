@@ -224,3 +224,65 @@ def rollout_seconds(
 		+ ("the probe's responses" if sample.raw else "a log-normal fitted to the probe's mean and p95")
 	)
 	return Interval(point, min(lo, point), max(hi, point), "; ".join(parts))
+
+
+# ---------------------------------------------------------------- training signals (KL, entropy, reward, length)
+
+# guess: KL to the reference past this, per token, is where GRPO runs usually start to drift (TRL's beta of 0.04
+# keeps most runs well under it); the readout says where the probe's trend would take the run, not a verdict
+KL_HIGH = 0.1
+# guess: policy entropy that falls below half its opening level over a few dozen steps is collapsing
+ENTROPY_COLLAPSE = 0.5
+MIN_SIGNAL_POINTS = 6  # guess: fewer logged values than this and a trend is noise
+
+
+def _quarters(xs: list[float]) -> tuple[float, float] | None:
+	v = [float(x) for x in xs if x is not None and math.isfinite(x)]
+	if len(v) < MIN_SIGNAL_POINTS:
+		return None
+	q = max(1, len(v) // 4)
+	return float(np.mean(v[:q])), float(np.mean(v[-q:]))
+
+
+def kl_trend(kl: list[float], steps_seen: int, steps_total: float | None) -> str | None:
+	"""The probe's KL to the reference: where it ended, and where a straight line through its logged values reaches
+	by the run's last step. None with too few values."""
+	v = [float(x) for x in kl if x is not None and math.isfinite(x)]
+	if len(v) < MIN_SIGNAL_POINTS:
+		return None
+	t = np.linspace(
+		steps_seen / len(v), steps_seen, len(v)
+	)  # the logged values spread over the probe's steps
+	slope = float(np.polyfit(t, np.asarray(v), 1)[0])
+	last = float(np.mean(v[-max(1, len(v) // 4) :]))
+	why = f"KL to the reference ended near {last:.3g} over the probe's {steps_seen} steps"
+	if steps_total and slope > 0 and steps_total > steps_seen:
+		end = last + slope * (steps_total - steps_seen)
+		why += f"; rising at that rate it reaches {end:.3g} by step {steps_total:,.0f}"
+		if end >= KL_HIGH:
+			why += f", past {KL_HIGH:g}, where runs usually drift from the reference"
+	elif slope <= 0:
+		why += ", not rising"
+	return why
+
+
+def entropy_trend(entropy: list[float], estimated: bool, exact: bool = False) -> str | None:
+	"""The policy's entropy over the probe: its fall from the first quarter of logged values to the last."""
+	qs = _quarters(entropy)
+	if qs is None:
+		return None
+	first, last = qs
+	src = "from its logits" if exact else "estimated from sampled tokens" if estimated else "logged"
+	why = f"policy entropy ({src}) went from {first:.3g} to {last:.3g}"
+	if first > 0 and last < ENTROPY_COLLAPSE * first:
+		why += ", below half its start: the policy is collapsing onto fewer answers"
+	return why
+
+
+def reward_trend(reward: list[float]) -> str | None:
+	qs = _quarters(reward)
+	if qs is None:
+		return None
+	first, last = qs
+	verb = "rose" if last > first else "fell" if last < first else "stayed"
+	return f"mean reward {verb} from {first:.3g} to {last:.3g}"
