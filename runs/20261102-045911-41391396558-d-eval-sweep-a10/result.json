@@ -1,0 +1,11 @@
+{
+	"name": "20261102-045911-41391396558-d-eval-sweep-a10",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41391396558",
+	"ref": "main",
+	"sha": "cfcf83c0623c7728a4eecc21c6013c0163076428",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/eval_sweep_reasoning --gpus A10 --max-minutes 25 --visitor d-eval",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T05:04:27Z"
+}
