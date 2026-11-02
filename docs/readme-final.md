@@ -45,7 +45,7 @@ is live at <https://preflight-cqn.pages.dev>.
 | --- | --- | --- |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
 | The CLI re-check item in the exports | `d.exports_cli` | Built on `main`; on once the repository is public (Nov 3 to 4) |
-| Notebook check-in | `d.notebook` | Built on `main`; on once a real notebook check-in runs through the deployed runner |
+| Notebook check-in | `d.notebook` | Built on `main`. A's check-in through the deployed runner shows it accepts notebooks (`a-notebook-checkin-1`, Nov 2); on once a run of a notebook that trains passes |
 | Private mode: log triage by Muse Glimmer | `harness.glimmer_private` | Hosted on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys, scaled to zero when idle), behind its flag. Triage cost US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`]. Same category as Spark Open on 9 of 11 failed zoo probes [measured, `a-triage-agreement`] |
 
 **Not used, or not measured**
@@ -229,7 +229,7 @@ its flag off: 20 of 20 states pass on `main` `50db9b6` [measured, Chromium, Nov 
 | Detail level (D1) | "New to this" shows the few knobs that matter most for the goal, in plain words, with a glossary card in each knob's control; knobs that a warning names stay in view | `d.expertise` |
 | Show costs in (D3) | Dollar figures in one of 30 currencies at the European Central Bank's dated reference rates, picked from the browser's region or set in the Logbook; regions without a rate stay in US dollars | `d.currency` |
 | Free GPUs (D4) | Whether the plan finishes inside one free session on Google Colab, Kaggle, Modal's starter credit or Lightning AI, and how often to save a checkpoint if not | `d.freetier` |
-| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run | `d.notebook` (off until A's real notebook check-in passes) |
+| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run | `d.notebook` (off until a check-in of a notebook that trains passes) |
 | Take it with you | The plan, an edit script for the changed settings, a Slurm batch file and the run command, built from the settings on screen, and the record's link once it has one | `c.exports`; the "Check it again on your machine" item also needs `d.exports_cli` |
 
 ## Develop
