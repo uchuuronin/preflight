@@ -1,0 +1,102 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-OlOaDR0OlCJOJLLrtG6Sfe
+✓ Created objects.
+c4 (eval.wrap_no_grad): submitted
+{
+ "id": "c4",
+ "template_id": "eval.wrap_no_grad",
+ "job_status": "done",
+ "record_id": "01M6DRVJADZ1N14KKJA490H0KW",
+ "error_code": null,
+ "error": "",
+ "minutes": 3.0,
+ "usd": 0.1022,
+ "gpu": "A10",
+ "probes": {
+  "v1": {
+   "status": "ok",
+   "gpu": null,
+   "peak_gib": 15.2
+  },
+  "v1-base": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-seed": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 16.11
+  }
+ },
+ "verify": {
+  "status": "failed",
+  "metric": "memory.eval_peak",
+  "before": null,
+  "after": 11153155072.0,
+  "fixed_seed_loss_delta": 0.0012087652446259054
+ },
+ "checks": [
+  [
+   "target_improved",
+   true,
+   false
+  ],
+  [
+   "effective_batch",
+   true,
+   false
+  ],
+  [
+   "tokens_seen",
+   false,
+   false
+  ],
+  [
+   "lr_schedule",
+   true,
+   false
+  ],
+  [
+   "throughput_floor",
+   true,
+   false
+  ],
+  [
+   "fixed_seed_loss",
+   true,
+   false
+  ],
+  [
+   "eval_kept",
+   true,
+   false
+  ],
+  [
+   "same_model",
+   true,
+   false
+  ]
+ ],
+ "a_finding": {
+  "code": "verify.passed",
+  "severity": "info",
+  "title": "The loss holds: it stays within the current setting's own seed-to-seed spread"
+ }
+}
+{
+ "spent_usd": 0.1022,
+ "winner": null,
+ "results": [
+  {
+   "id": "c4",
+   "template_id": "eval.wrap_no_grad",
+   "job_status": "done",
+   "usd": 0.1022,
+   "verify": "failed"
+  }
+ ]
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-OlOaDR0OlCJOJLLrtG6Sfe

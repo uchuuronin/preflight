@@ -1,0 +1,11 @@
+{
+	"name": "20261102-091821-41419500178-c-fix-race-verify-combined",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41419500178",
+	"ref": "ce2d46cce56570b916828c7e6549e8f6b8dbd21b",
+	"sha": "ce2d46cce56570b916828c7e6549e8f6b8dbd21b",
+	"cmd": "modal run --env main api/verify_race_app.py::verify_race --attempt nov2c --gpu A10 --race nov2_lora_combined",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T09:21:44Z"
+}
