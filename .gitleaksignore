@@ -14,3 +14,5 @@ e6e16230322ef30012d181e5cef884e0f19a9129:zoo/agent_eval_spark/record_oct31.json:
 d6888f73d92bcd2b008abe62428daa4af11053a5:tests/test_agent_recorder.py:generic-api-key:181
 # B, python/preflight/corpus/data/failures_nov1.jsonl: a corpus row's config key ("key": a 16-hex hash of its settings, corpus/sweep.py), no credential; flagged Nov 1; for the PM's review. The field is row_id from fa7fbb7's successor on, so new files don't match.
 fa7fbb7fe6fcc76df91ab82ff9795cc2df39bf6e:python/preflight/corpus/data/failures_nov1.jsonl:generic-api-key:73
+# A, api/tests/fixtures/a-triage-lora-prod-2.record.json: a record's read-only share token (a link id, no credential; D's triage-shot record), replaced by a placeholder in 257702b; one pushed commit still holds it. Added by A on Nov 2 so ws-a's CI can go green while Chiya is out; for the PM's review (remove this line to undo).
+99f628bc3ec3d6313e8c166de5db7beaa9cd71cd:api/tests/fixtures/a-triage-lora-prod-2.record.json:generic-api-key:1

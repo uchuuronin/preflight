@@ -135,7 +135,8 @@ def test_the_search_line_shows_whenever_the_runner_searches():
 	searching = [p.name for p in harness.rglob("*.py") if re.search(r"web_search|search_web", p.read_text())]
 	if not searching:
 		pytest.skip("no Muse Spark search in A's harness yet: the line waits on harness.spark_search")
-	gates = _runner_gates("web_search") | _runner_gates("search_web")
+	# D's runner entry point is ground_failure (harness/search_grounding.py), called from pipeline._search
+	gates = _runner_gates("web_search") | _runner_gates("search_web") | _runner_gates("ground_failure(")
 	assert "harness.spark_search" in gates, (
 		f"the runner searches under {gates}, the notice under harness.spark_search"
 	)

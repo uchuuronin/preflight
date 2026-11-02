@@ -1,0 +1,190 @@
+{
+ "docs": 200000,
+ "sets": [
+  {
+   "dataset": "HuggingFaceFW/fineweb-edu",
+   "config": "sample-10BT",
+   "dataset_tokens": 10000000000.0,
+   "column": "int_score",
+   "read_s": 56.2,
+   "sample": {
+    "docs": {
+     "int_score 3": 173498,
+     "int_score 4": 26355,
+     "int_score 5": 147
+    },
+    "tokens": {
+     "int_score 3": 178622437.0,
+     "int_score 4": 28249241.0,
+     "int_score 5": 167015.0
+    },
+    "missing": 0,
+    "low": []
+   },
+   "tables": [
+    {
+     "budget_tokens": 10000000000.0,
+     "weights": null,
+     "rows": [
+      {
+       "name": "int_score 3",
+       "low_quality": false,
+       "unique_tokens": 8627490562.8389,
+       "seen_per_epoch": 8627490562.8389,
+       "epochs": 0.9999999999999998,
+       "flag": null
+      },
+      {
+       "name": "int_score 4",
+       "low_quality": false,
+       "unique_tokens": 1364442587.550531,
+       "seen_per_epoch": 1364442587.550531,
+       "epochs": 0.9999999999999998,
+       "flag": null
+      },
+      {
+       "name": "int_score 5",
+       "low_quality": false,
+       "unique_tokens": 8066849.610570136,
+       "seen_per_epoch": 8066849.610570136,
+       "epochs": 0.9999999999999998,
+       "flag": null
+      }
+     ]
+    },
+    {
+     "budget_tokens": 30000000000.0,
+     "weights": null,
+     "rows": [
+      {
+       "name": "int_score 3",
+       "low_quality": false,
+       "unique_tokens": 8627490562.8389,
+       "seen_per_epoch": 8627490562.8389,
+       "epochs": 2.9999999999999996,
+       "flag": null
+      },
+      {
+       "name": "int_score 4",
+       "low_quality": false,
+       "unique_tokens": 1364442587.550531,
+       "seen_per_epoch": 1364442587.550531,
+       "epochs": 2.9999999999999996,
+       "flag": null
+      },
+      {
+       "name": "int_score 5",
+       "low_quality": false,
+       "unique_tokens": 8066849.610570136,
+       "seen_per_epoch": 8066849.610570136,
+       "epochs": 2.9999999999999996,
+       "flag": null
+      }
+     ]
+    },
+    {
+     "budget_tokens": 30000000000.0,
+     "weights": {
+      "int_score 4": 4.0,
+      "int_score 5": 4.0
+     },
+     "rows": [
+      {
+       "name": "int_score 3",
+       "low_quality": false,
+       "unique_tokens": 8627490562.8389,
+       "seen_per_epoch": 6111190551.550894,
+       "epochs": 2.1250178740989507,
+       "flag": null
+      },
+      {
+       "name": "int_score 4",
+       "low_quality": false,
+       "unique_tokens": 1364442587.550531,
+       "seen_per_epoch": 3865953182.302269,
+       "epochs": 8.500071496395805,
+       "flag": "int_score 4 is repeated 8.5 times, past the ~4 epochs where repeats stop helping much"
+      },
+      {
+       "name": "int_score 5",
+       "low_quality": false,
+       "unique_tokens": 8066849.610570136,
+       "seen_per_epoch": 22856266.146839608,
+       "epochs": 8.500071496395805,
+       "flag": "int_score 5 is repeated 8.5 times, past the ~4 epochs where repeats stop helping much"
+      }
+     ]
+    }
+   ],
+   "budget_base_tokens": 10000000000.0
+  },
+  {
+   "dataset": "HuggingFaceFW/fineweb-edu-score-2",
+   "config": "CC-MAIN-2025-05",
+   "dataset_tokens": null,
+   "column": "int_score",
+   "read_s": 61.3,
+   "sample": {
+    "docs": {
+     "int_score 2": 200000
+    },
+    "tokens": {
+     "int_score 2": 186022212.0
+    },
+    "missing": 0,
+    "low": [
+     "int_score 2"
+    ]
+   },
+   "tables": [
+    {
+     "budget_tokens": 186022212.0,
+     "weights": null,
+     "rows": [
+      {
+       "name": "int_score 2",
+       "low_quality": true,
+       "unique_tokens": 186022212.0,
+       "seen_per_epoch": 186022212.0,
+       "epochs": 1.0,
+       "flag": null
+      }
+     ]
+    },
+    {
+     "budget_tokens": 558066636.0,
+     "weights": null,
+     "rows": [
+      {
+       "name": "int_score 2",
+       "low_quality": true,
+       "unique_tokens": 186022212.0,
+       "seen_per_epoch": 186022212.0,
+       "epochs": 3.0,
+       "flag": "low-quality documents in int_score 2 are each seen 3.0 times"
+      }
+     ]
+    },
+    {
+     "budget_tokens": 558066636.0,
+     "weights": {
+      "int_score 4": 4.0,
+      "int_score 5": 4.0
+     },
+     "rows": [
+      {
+       "name": "int_score 2",
+       "low_quality": true,
+       "unique_tokens": 186022212.0,
+       "seen_per_epoch": 186022212.0,
+       "epochs": 3.0,
+       "flag": "low-quality documents in int_score 2 are each seen 3.0 times"
+      }
+     ]
+    }
+   ],
+   "budget_base_tokens": 186022212.0
+  }
+ ],
+ "wall_s": 134.3
+}

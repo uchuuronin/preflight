@@ -937,3 +937,60 @@ def test_during_judging_a_job_starts_on_the_a10_and_only_its_first_point_may_fal
 	assert seen and all(g == "A10" for g, _ in seen)
 	assert seen[0][1] == ("L4",) and all(fb == () for _, fb in seen[1:])
 	assert rec.env.gpu.name == "A10" or rec.env.gpu.name is None
+
+
+@pytest.mark.parametrize("on,private", [(False, False), (True, False), (True, True)])
+def test_spark_search_grounds_failed_probes_only_with_its_flag_and_never_for_private_jobs(
+	tmp_path, monkeypatch, on, private
+):
+	import httpx
+
+	from preflight.harness.spark import ModelClient
+	from preflight.runner import flags
+
+	url = "https://github.com/pytorch/pytorch/issues/1"
+	seen = []
+
+	def handler(req):
+		seen.append(req.url.path)
+		text = json.dumps({"status": "found", "sources": [{"url": url, "title": "OOM", "why": "same error"}]})
+		return httpx.Response(200, json={"output": [
+			{"type": "web_search_call", "action": {"type": "search", "query": "q"}},
+			{"type": "message", "content": [{"type": "output_text", "text": text,
+				"annotations": [{"type": "url_citation", "url": url}]}]},
+		], "usage": {"input_tokens": 1000, "output_tokens": 100}})  # fmt: skip
+
+	off = {k: False for k in ("harness.spark_script_map", "harness.spark_diagnosis", "harness.spark_open_triage",
+		"harness.glimmer_private")}  # fmt: skip
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({**off, "harness.spark_search": on}))
+	flags.reload()
+	try:
+
+		class Erred(FakeRunner):
+			def __call__(self, spec, gpu, *, should_stop):
+				r = super().__call__(spec, gpu, should_stop=should_stop)
+				if r.probe.status == "oom":
+					r.probe = r.probe.model_copy(
+						update={"error": "torch.OutOfMemoryError: CUDA out of memory."}
+					)
+				return r
+
+		d = deps(tmp_path, Erred(outcomes={"p2": ("oom", "oom.train"), "p3": ("oom", "oom.train")}))
+		d.spark = ModelClient(base_url="https://api.meta.ai/v1", api_key="t", model="muse-spark-1.3",
+			transport=httpx.MockTransport(handler))  # fmt: skip
+		req = {
+			"source": {"kind": "upload", "files": {"train.py": SCRIPT}},
+			**({"private": True} if private else {}),
+		}
+		rec = run_pipeline(req, _Ctx(), d)
+	finally:
+		flags.reload()
+	found = [f for f in rec.findings if f.code.startswith("search.")]
+	if not on or private:
+		assert not seen and not found
+		return
+	assert all(p.endswith("/responses") for p in seen) and seen
+	assert [f.id for f in found] == ["search.p2"] and found[0].citations[0].url == url
+	searches = [c for c in rec.provenance if c.purpose == "search"]
+	assert len(searches) == len(seen) == 1  # two points out of memory the same way: one question
+	assert rec.costs.llm_usd == pytest.approx(sum(c.cost_usd for c in searches)) and rec.costs.llm_usd > 0

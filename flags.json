@@ -3,6 +3,7 @@
 	"probes.finetune": false,
 	"probes.pretrain": false,
 	"probes.agent": false,
+	"probes.repo_install": false,
 	"harness.spark_script_map": false,
 	"harness.spark_open_triage": false,
 	"harness.spark_diagnosis": false,
@@ -10,6 +11,7 @@
 	"harness.spark_search": false,
 	"harness.glimmer_private": false,
 	"runner.queue": false,
+	"runner.hide_sample_outputs": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,
@@ -27,5 +29,6 @@
 	"engine.serving": false,
 	"d.freetier": false,
 	"d.notebook": false,
-	"d.exports_cli": false
+	"d.exports_cli": false,
+	"probes.lr_range": false
 }

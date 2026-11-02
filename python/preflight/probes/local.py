@@ -200,6 +200,9 @@ class ProbeSpec:
 	seed_force: bool = False  # override the script's own seeding (verify's seed-to-seed spread)
 	alternate_sync: bool = False  # ground truth only: alternate clean and synced steps (recorder/overhead.py)
 	install_requirements: bool = False  # pip-install requirements.txt in the probe (hosted probes only)
+	# probes.repo_install: with no requirements.txt, install what the repo declares and the known
+	# packages it imports, and put a src/ layout on the path (recorder/requirements.repo_requirements)
+	install_repo: bool = False
 	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
 	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
@@ -851,6 +854,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"generate_sample": spec.generate_sample,
 				"generate_calls": spec.generate_calls,
 				"install_requirements": spec.install_requirements,
+				"install_repo": spec.install_repo,
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,
 			}

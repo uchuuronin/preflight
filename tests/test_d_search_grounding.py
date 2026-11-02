@@ -1,0 +1,198 @@
+"""Muse Spark search grounding (D, Nov 2). The Responses API is replaced at the HTTP transport."""
+
+import json
+
+import httpx
+
+from preflight.harness.search_grounding import annotated_urls, ground_failure, parse_answer, scrub
+from preflight.harness.spark import ModelClient
+from preflight.schema.record import Probe
+
+OOM = (
+	"Traceback (most recent call last):\n  ...\ntorch.OutOfMemoryError: CUDA out of memory. "
+	"Tried to allocate 530.00 MiB. GPU 0 has a total capacity of 22.06 GiB"
+)
+ISSUE = "https://github.com/huggingface/transformers/issues/12345"
+
+
+def probe(status="oom", error=OOM, code="oom.eval") -> Probe:
+	return Probe(id="p1", knobs={}, status=status, steps=0, error=error, error_code=code)
+
+
+def response(text: str, *, cited=(), opened=(), searched=True, open_status="completed") -> dict:
+	out: list[dict] = [{"type": "reasoning", "summary": []}]
+	if searched:
+		out.append(
+			{"type": "web_search_call", "status": "completed", "action": {"type": "search", "query": "q"}}
+		)
+	for url in opened:
+		out.append(
+			{"type": "web_search_call", "status": open_status, "action": {"type": "open_page", "url": url}}
+		)
+	anns = [{"type": "url_citation", "url": u, "title": "t", "start_index": 0, "end_index": 1} for u in cited]
+	out.append({"type": "message", "content": [{"type": "output_text", "text": text, "annotations": anns}]})
+	return {"id": "resp_1", "output": out, "usage": {"input_tokens": 3000, "output_tokens": 400}}
+
+
+def client(data: dict, seen: list | None = None) -> ModelClient:
+	def handler(req: httpx.Request) -> httpx.Response:
+		if seen is not None:
+			seen.append((req.url.path, json.loads(req.content)))
+		return httpx.Response(200, json=data)
+
+	return ModelClient(
+		base_url="https://api.meta.ai/v1",
+		api_key="test",
+		model="muse-spark-1.3",
+		transport=httpx.MockTransport(handler),
+		backoff_s=0.0,
+	)
+
+
+def answer(status: str, *urls: str) -> str:
+	src = [{"url": u, "title": "OOM in eval", "why": "same error during evaluation"} for u in urls]
+	return "I searched.\n" + json.dumps({"status": status, "sources": src})
+
+
+def test_found_keeps_only_retrieved_sources():
+	made_up = "https://github.com/huggingface/transformers/issues/99999"
+	seen: list = []
+	c = client(response(answer("found", ISSUE, made_up), cited=[ISSUE]), seen)
+	f, calls = ground_failure(c, probe(), {"torch": "2.5.1", "transformers": "4.46.0"}, "finetune")
+	assert f is not None and f.code == "search.known_issue"
+	assert [x.url for x in f.citations] == [ISSUE]
+	assert {e.metric: e.value for e in f.evidence}["search.dropped_unannotated"] == 1.0
+	assert f.source == "model" and f.evidence[0].probe_id == "p1"
+	path, body = seen[0]
+	assert path.endswith("/responses") and body["tools"] == [{"type": "web_search"}]
+	assert body["store"] is False and "transformers 4.46.0" in body["input"]
+	assert len(calls) == 1 and calls[0].purpose == "search" and calls[0].input_tokens == 3000
+
+
+def test_url_forms_match_but_an_opened_page_alone_isnt_enough():
+	cited = "http://www." + ISSUE[8:] + "/?utm_source=x#top"
+	f, _ = ground_failure(client(response(answer("found", ISSUE), cited=[cited])), probe(), {})
+	assert f.code == "search.known_issue" and len(f.citations) == 1
+	# opened but never annotated: dropped
+	f, _ = ground_failure(client(response(answer("found", ISSUE), opened=[ISSUE])), probe(), {})
+	assert f.code == "search.none_found"
+	# annotated, but its open failed: dropped
+	data = response(answer("found", ISSUE), cited=[ISSUE], opened=[ISSUE], open_status="failed")
+	f, _ = ground_failure(client(data), probe(), {})
+	assert f.code == "search.none_found"
+	# the path's case matters
+	f, _ = ground_failure(client(response(answer("found", ISSUE.upper().replace("HTTPS", "https"))
+		, cited=[ISSUE])), probe(), {})  # fmt: skip
+	assert f.code == "search.none_found"
+
+
+def test_at_most_three_sources():
+	urls = [f"https://discuss.pytorch.org/t/{i}" for i in range(5)]
+	f, _ = ground_failure(client(response(answer("found", *urls), cited=urls)), probe(), {})
+	assert len(f.citations) == 3
+
+
+def test_only_made_up_sources_means_none_found():
+	f, _ = ground_failure(client(response(answer("found", ISSUE), cited=[])), probe(), {})
+	assert f.code == "search.none_found" and f.citations == []
+
+
+def test_none_found_answer():
+	f, _ = ground_failure(client(response(answer("none_found"))), probe(), {})
+	assert f.code == "search.none_found" and "none" in f.detail
+
+
+def test_no_search_or_no_answer_makes_no_finding():
+	f, calls = ground_failure(client(response(answer("none_found"), searched=False)), probe(), {})
+	assert f is None and len(calls) == 1
+	f, _ = ground_failure(client(response("I could not decide.")), probe(), {})
+	assert f is None
+
+
+def test_skips_without_a_call():
+	seen: list = []
+	c = client(response(answer("none_found")), seen)
+	assert ground_failure(c, probe(status="ok", error=None, code=None), {}) == (None, [])
+	assert ground_failure(c, probe(status="error", error="over budget", code="budget"), {}) == (None, [])
+	assert seen == []
+
+
+def test_http_failure_keeps_the_call_and_makes_no_finding():
+	def handler(req):
+		return httpx.Response(400, json={"error": {"message": "bad"}})
+
+	c = ModelClient(
+		base_url="https://api.meta.ai/v1",
+		api_key="t",
+		model="muse-spark-1.3",
+		transport=httpx.MockTransport(handler),
+	)
+	f, calls = ground_failure(c, probe(), {})
+	assert f is None and calls and not calls[0].ok
+
+
+def test_parse_answer_takes_the_last_valid_object():
+	text = 'Example {"a": 1} then {"status": "none_found", "sources": []}'
+	assert parse_answer(text).status == "none_found"
+	assert parse_answer('{"status": "maybe", "sources": []}') is None
+
+
+def test_annotated_urls_ignore_actions():
+	data = {
+		"output": [{"type": "web_search_call", "action": {"type": "open_page", "url": "https://x.example"}}]
+	}
+	assert annotated_urls(data) == set()
+
+
+def test_skips_preflights_own_failures():
+	seen: list = []
+	c = client(response(answer("none_found")), seen)
+	for code in ("recorder", "timeout", "too_few_steps", "gpu.unavailable"):
+		assert ground_failure(c, probe(status="error", error="The probe sandbox ended", code=code), {}) == (
+			None,
+			[],
+		)
+	assert seen == []
+	f, _ = ground_failure(
+		c, probe(status="error", error="The probe sandbox ended", code="recorder"), {}, skip_codes=()
+	)
+	assert f is not None and len(seen) == 1
+
+
+def test_the_error_is_scrubbed_before_it_is_sent():
+	seen: list = []
+	err = ("HTTPError: 403 for url: https://b.s3.amazonaws.com/w.bin?X-Amz-Signature=abc123 HF_TOKEN=hf_abcdefghijk "
+		"File \"/home/shreya/proj/train.py\" Bearer eyJhbGciOi")  # fmt: skip
+	ground_failure(
+		client(response(answer("none_found")), seen), probe(status="error", error=err, code="script.error")
+	)
+	sent = seen[0][1]["input"]
+	for leaked in ("X-Amz-Signature", "hf_abcdefghijk", "shreya", "eyJhbGciOi"):
+		assert leaked not in sent
+	assert "https://b.s3.amazonaws.com/w.bin" in sent
+	path = (
+		'File "/usr/local/lib/python3.11/site-packages/pip/_internal/metadata/importlib/_envs.py", line 103'
+	)
+	assert scrub(path) == path
+	# identifiers and tokenizer settings the search needs stay as they are
+	for keep in ("max_new_tokens=512", "hf_hub_download(repo_id)", "tokenizer.pad_token = tokenizer.eos_token",
+		"_prepare_4d_causal_attention_mask_with_cache_position", "libbitsandbytes_cuda121_nocublaslt.so"):  # fmt: skip
+		assert scrub(keep) == keep
+	for env in (
+		"DB_PASSWORD=hunter2",
+		"GITHUB_TOKEN=abc123",
+		"MY_SECRET=abc",
+		"AWS_SECRET_ACCESS_KEY=wJalr/x+y",
+	):
+		assert scrub(env).endswith("=<masked>"), env
+	assert (
+		scrub('{"token": "abc"}') == '{"token": "<masked>"}'
+		and scrub("AKIA" + "ABCDEFGHIJKLMNOP") == "<masked>"
+	)
+
+
+def test_null_usage_is_priced_as_zero_and_recorded():
+	data = response(answer("none_found"))
+	data["usage"] = {"input_tokens": None, "output_tokens": None}
+	f, calls = ground_failure(client(data), probe(), {})
+	assert f.code == "search.none_found" and calls[0].input_tokens == 0 and calls[0].ok
