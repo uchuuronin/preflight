@@ -1,0 +1,286 @@
+{
+  "submitted": {
+    "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+    "status": "done",
+    "position": null,
+    "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+    "share_token": "RY8SMYWbCiBfz_JA4qbZ1w",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 30
+  },
+  "events": [
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 0,
+      "at": "2026-11-02T16:09:07.118085Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 1,
+      "at": "2026-11-02T16:09:07.520374Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 2,
+      "at": "2026-11-02T16:09:07.923567Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 3,
+      "at": "2026-11-02T16:09:10.648302Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+      "share_token": "RY8SMYWbCiBfz_JA4qbZ1w",
+      "seq": 4,
+      "at": "2026-11-02T16:09:14.919525Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+      "share_token": "RY8SMYWbCiBfz_JA4qbZ1w",
+      "seq": 5,
+      "at": "2026-11-02T16:09:31.590993Z",
+      "stage": "skeleton",
+      "message": "map refined by Muse Spark",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+      "share_token": "RY8SMYWbCiBfz_JA4qbZ1w",
+      "seq": 6,
+      "at": "2026-11-02T16:09:32.020261Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+      "share_token": "RY8SMYWbCiBfz_JA4qbZ1w",
+      "seq": 7,
+      "at": "2026-11-02T16:09:32.443005Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 8,
+      "at": "2026-11-02T16:10:33.340270Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (1 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 9,
+      "at": "2026-11-02T16:11:33.760568Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (2 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 10,
+      "at": "2026-11-02T16:12:34.181966Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (3 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 11,
+      "at": "2026-11-02T16:13:34.600546Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (4 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 12,
+      "at": "2026-11-02T16:14:35.029521Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (5 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 13,
+      "at": "2026-11-02T16:15:35.450999Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (6 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 14,
+      "at": "2026-11-02T16:16:35.875599Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (7 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 15,
+      "at": "2026-11-02T16:17:36.296384Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (8 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 16,
+      "at": "2026-11-02T16:18:36.720965Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (9 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 17,
+      "at": "2026-11-02T16:19:37.142243Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (10 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 18,
+      "at": "2026-11-02T16:20:37.570819Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (11 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 19,
+      "at": "2026-11-02T16:21:37.989751Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (12 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 20,
+      "at": "2026-11-02T16:22:38.411399Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (13 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 21,
+      "at": "2026-11-02T16:23:38.830575Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (14 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 22,
+      "at": "2026-11-02T16:24:39.255640Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (15 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 23,
+      "at": "2026-11-02T16:25:39.677793Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (16 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 24,
+      "at": "2026-11-02T16:26:40.099637Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (17 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 25,
+      "at": "2026-11-02T16:27:40.519043Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (18 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 26,
+      "at": "2026-11-02T16:28:40.941013Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (19 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "seq": 27,
+      "at": "2026-11-02T16:29:33.336383Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (20 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+      "share_token": "RY8SMYWbCiBfz_JA4qbZ1w",
+      "seq": 28,
+      "at": "2026-11-02T16:29:35.875141Z",
+      "stage": "predicting",
+      "message": "measured; predicting",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+      "share_token": "RY8SMYWbCiBfz_JA4qbZ1w",
+      "seq": 29,
+      "at": "2026-11-02T16:29:40.468617Z",
+      "stage": "predicting",
+      "message": "predicted",
+      "level": "info",
+      "record_rev": 3
+    },
+    {
+      "job_id": "01M6EGB19E68TT3A2DQK7KFN5X",
+      "record_id": "01M6EGB5J6HPPM7ZNW6EABCEKT",
+      "seq": 30,
+      "at": "2026-11-02T16:29:40.891468Z",
+      "stage": "done",
+      "progress": 1.0,
+      "level": "info"
+    }
+  ],
+  "error": null
+}
