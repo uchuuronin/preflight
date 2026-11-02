@@ -1,0 +1,11 @@
+{
+	"name": "20261102-031847-41382389659-d-eval-sweep-l4-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41382389659",
+	"ref": "main",
+	"sha": "c084bee29e1021dd8b88c2d3d630c5f8b15a1f96",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/eval_sweep_reasoning --gpus L4 --max-minutes 30 --visitor d-eval",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T03:40:56Z"
+}
