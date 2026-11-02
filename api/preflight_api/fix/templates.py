@@ -205,6 +205,20 @@ APPLIES: dict[str, object] = {
 }
 
 
+def knobs_set(template_id: str, value: object | None) -> list[tuple[str, object | None]]:
+	"""Every knob a fix sets and what to: its own, and for a stack each part's (its eval batch is
+	the stack's value; the no-grad part sets eval_no_grad), so a visitor's limits are checked on all
+	of them (review, Nov 2)."""
+	t = TEMPLATES[template_id]
+	out: list[tuple[str, object | None]] = [(t.knob, applied_value(template_id, value))] if t.knob else []
+	for part in STACKS.get(template_id, ()):
+		pt = TEMPLATES[part]
+		pv = value if "{value}" in pt.task else APPLIES.get(part)
+		if pt.knob and all(k != pt.knob for k, _ in out):
+			out.append((pt.knob, pv))
+	return out
+
+
 def applied_value(template_id: str, value: object | None) -> object | None:
 	"""The value a fix sets its knob to: the one given, for a template that takes one; else the
 	template's own (APPLIES). Raises ValueError for a value given to a template that takes none

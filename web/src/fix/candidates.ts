@@ -122,7 +122,7 @@ export function candidatesFor(finding: Finding, ctx: Ctx): Candidate[] {
 	return out;
 }
 
-const GPU_KNOBS = new Set(["gpu_type", "gpu", "gpus"]);
+const GPU_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
 
 /**
  * What the live fix loop races for a finding (FixRace.tsx). The live site writes fixes but doesn't
