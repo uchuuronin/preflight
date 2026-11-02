@@ -193,12 +193,11 @@ Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixt
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).
 - AMD: waits on Chiya's access approval.
-- Cross-GPU top-up (up to $25, Chiya, 6 PM ET): waits on the PM's check of the config list (`from-b.md`).
 - "Fits" on L4 and A10 fine-tunes: 19 held-out runs can't show P(OOM) below 2.5%, so nothing reads "fits"; a choice for Chiya (`from-b.md`).
 
 ## Next (Sun Nov 1, evening)
 - Spark Open labelled the whole corpus: done, $8.79 of the $10 (`corpus/DATASHEET.md`).
-- The top-up, once the PM clears the list; then refit the cross-GPU band and the GBDT residual, rescore leave-one-GPU-out with five GPUs, and post the table as it comes out.
+- The top-up: done (about $16.54 of $25); the five-GPU table is in `docs/decisions/calibration-l4-phase1.md`, the rebuilt calibration table installed on ws-b.
 - LC-PFN: ported and checked on the published checkpoints (quantiles to 1e-6); `lossforecast.ensemble` combines it with the power law. Not in `predict()` yet: it needs a runner hook (A) and a check on real probe losses.
 - Serving calibration when A's capped vLLM record lands (the simulation now carries capped outputs past the cap).
 
@@ -258,6 +257,11 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-lcpfn-check` (GitHub run 41365962299, CPU): the port (`corpus/lcpfn.py`) on both published checkpoints in torch 2.8.0, loaded with `weights_only=True`: the package's quantiles reproduced to 1e-6 on both; a falling loss seen for 200 of 2,000 steps forecast at 2.15 (1.92 to 2.39) against the true 2.09 | CPU x 2 | 8 s (function), about 3 (wall) | about $0.01 |
 | Nov 1 | `b-spark-all-pilot` (GitHub run 41365960062, budget $0.30): 48 rows in 7 batches, 40 answered; one batch failed twice at the 12,000-token cap | Baseten API | 2 (wall) | $0.20 |
 | Nov 1 | `b-spark-all-labels` (GitHub run 41366240357, budget $9.30): all 2,339 rows in 293 batches, 1,997 answered; agreement in `corpus/DATASHEET.md` | Baseten API | 14 (wall) | $8.59 recorded. **Whole-corpus labels $8.79 of the $10** |
+| Nov 1 | `b-topup-dry` (GitHub run 41370815841): the sweep's dry run, each GPU's earlier spend read from its ledger | CPU | 3 (wall) | about $0.00 |
+| Nov 1 | `b-topup-seed1` (GitHub run 41371132428, caps H100 $11, L40S $6.78, A10 $5.08, L4 $4.92, T4 $1.14, each its earlier spend plus the new cap): H100 293, L40S 293, A10 280, L4 89 (its sixth wave timed out after 690 s with no L4 free, $4.66 of $4.92 counted; the wave's 720 container-s, about $0.18, came after), T4 62 | H100, L40S, A10, L4, T4, at most 4 containers each (8 GPUs at once at the peak; PM, 8:12 PM: at most 3 from now on) | 100 (wall) | $12.82 with the L4's timed-out wave |
+| Nov 1 | `b-topup-seed0` (GitHub run 41376298722, the same caps): H100 199 more (492 in all), L40S 99 more (392) | H100, L40S | 25 (wall) | $3.68 |
+| Nov 1 | `b-topup-export` (GitHub run 41378563052): failed, the one-list read ran past 15 minutes | CPU | 16 (wall) | about $0.02 |
+| Nov 1 | `b-topup-export-2` (GitHub run 41380335963): every GPU's rows, per GPU, gzipped | CPU | 6 (wall) | about $0.02. **Top-up total about $16.54 of the $25** |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
@@ -285,6 +289,7 @@ Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking onc
 | Sun Nov 1, about 6:40 PM | 79a9f8f fits/tight/fails reasons and serving past the cap (CI green on its own push) | none | read-only review of 79a9f8f: the fails prefix and a docstring, fixed before the push | clean, both scans, by exit code |
 | Sun Nov 1, about 8:30 PM | a79d3c2 whole-corpus labelling job and inputs; ae0609a the top-up plan and `--exclude-keys`; 0d57c8a its review fixes; b5e510a the labeller's try/finally; 8eab96b the LC-PFN port, its Modal check and the loss ensemble; 225d542 the run length from the probes' dataset length; 6c520ce and 8440567 its review fixes; 0e594ec the review minors; f6388c1 requests and status; and this status commit | none | read-only reviews: a79d3c2 (three blocking points fixed, then re-checked; the re-check's hang fixed in b5e510a and checked again), ae0609a (nothing blocking), 8eab96b with b5e510a (nothing blocking), 225d542 (blocking, fixed in 6c520ce, re-checked clean) | clean, both scans, by exit code |
 | Sun Nov 1, about 9:00 PM | 46f5522 and acb3138 the whole-corpus labels and their datasheet fixes (pushed about 8:45 PM, CI green); c8882d9 the fits floor (option b); f42cc91 serving reads A's probe cap; eb5e8d0 requests; 4929979 their review fixes (the pool only lowers P(OOM), the calibration does the same, serving's min cap); the equal-caps fix; and this status commit | none | read-only review of c8882d9 and f42cc91 (blocking on c8882d9: P(OOM) fell as memory rose), re-checked clean after 4929979; the equal-caps point from the re-check fixed | clean, both scans, by exit code |
+| Sun Nov 1, about 11:10 PM | ef5c17e per-GPU export (pushed 9:55 PM); 9b7a897 FakeTensor cross-check, 12526ec its review fixes; 8c03ee8 RL signals, 3a4088d the entropy off-by-one fix, a5e6b1d its test, b6ee8be formatting (pushed 10:55 PM, CI green); fa831b7 the rebuilt calibration table and the five-GPU table; 77992a7 requests; 2a1404a review fixes; and this status commit | none | read-only reviews: ef5c17e (clean); 9b7a897 (blocking: the check's own 638x and two definitional gaps), re-checked clean after 12526ec; 8c03ee8 (blocking off-by-one), re-checked after 3a4088d with its test; fa831b7 (clean: reproduces byte for byte, holdout untouched; doc fixes in 2a1404a) | clean, both scans, by exit code |
 
 ## Contract requests
 In `docs/requests/from-b.md`.

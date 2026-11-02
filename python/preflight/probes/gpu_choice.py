@@ -203,8 +203,10 @@ def estimate_need_gb(sm: ScriptMap) -> float:
 	return params * BYTES_PER_PARAM[_kind(sm)] / 1e9 + ACTIVATION_GB + 1.0  # + CUDA context
 
 
-CEILING_ENV = "PREFLIGHT_GPU_CEILING"  # set on the public demo: A100-SXM-80GB (Chiya, Oct 27: no H200)
-SAFE_CEILING = "A100-SXM-80GB"
+CEILING_ENV = (
+	"PREFLIGHT_GPU_CEILING"  # set on the public demo: L40S (Chiya, Nov 1; A100-SXM-80GB before, never H200)
+)
+SAFE_CEILING = "L40S"  # the demo's own cap (runner/modal_app.py GPU_CEILING, Nov 1)
 
 
 def ceiling() -> str | None:
@@ -222,8 +224,13 @@ def ceiling() -> str | None:
 
 
 def under_ceiling(gpu: str, cap: str | None = None) -> bool:
+	"""Whether gpu is within the cap: no more memory and no dearer an hour (an L40S cap keeps the
+	A100-40GB out, though its 40 GB is under the L40S's 48; Chiya, Nov 1)."""
 	cap = cap if cap is not None else ceiling()
-	return cap is None or usable_gb(canonical(gpu)) <= usable_gb(cap)
+	if cap is None:
+		return True
+	g = canonical(gpu)
+	return usable_gb(g) <= usable_gb(cap) and usd_per_hour(g) <= usd_per_hour(cap)
 
 
 def _pool(allowed: list[str] | None) -> list[str]:

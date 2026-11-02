@@ -26,6 +26,7 @@ so the last step's logging, save and eval still run and get measured.
 StopProbe is a BaseException, so a script's `except Exception` can't swallow it.
 """
 
+import copy
 import functools
 import gc
 import importlib.abc
@@ -57,6 +58,11 @@ PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zo
 PRETRAIN_EVAL_CAP = 8
 # synchronised steps after the timed ones, for the phase split (data/forward/backward/optimizer):
 # timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
+# a serving probe's new tokens per prompt (Chiya, Nov 1): 32 prompts at a script's 4,096 tokens
+# decoded for 272 s on an A10 and ran past the probe's 600 s on an L4 (a-serving-debug-1). The
+# script's own cap stays the record's max_new_tokens; extras.serving_probe_max_tokens says the probe
+# stopped sooner, so B's simulation extrapolates to the script's length
+SERVING_PROBE_MAX_TOKENS = 1024
 OUTPUT_WATCH = 64  # derived: generate calls watched for identical outputs; each costs one small read
 LENS_STATS_BATCHES = 64  # derived: enough batches to average a sampler's varying graph sizes
 PHASE_STEPS = (
@@ -68,6 +74,7 @@ ATTN_QUERY_SAMPLE = 128  # guess: query rows sampled for the max-logit check
 ATTN_KEY_CHUNK = 4096  # keys per matmul in the attention-logit check: bounds its extra memory
 SAMPLE_EVERY_S = 0.25  # guess: host RSS and GPU power sampling period
 ENTROPY_MC_MAX = 4096  # policy forwards kept for the entropy estimate (one device scalar each)
+ENTROPY_CHUNK_BYTES = 64 * 2**20  # guess: the exact entropy's fp32 softmax scratch per chunk of positions
 
 # TRL / HF log keys -> what they mean for Preflight's RL lens
 TRL_KEYS = {
@@ -165,6 +172,40 @@ def _sample_prompts(args: tuple, kwargs: dict, n: int) -> tuple[tuple, dict]:
 		if k in kwargs:
 			kwargs[k] = cut(kwargs[k])
 	return tuple(args), kwargs
+
+
+def _cap_new_tokens(args: tuple, kwargs: dict, cap: int) -> tuple[tuple, dict, int | None, int | None]:
+	"""vLLM generate's sampling params with max_tokens at most cap, copied (the script's own objects
+	are left alone): (args, kwargs, the script's largest max_tokens, the cap applied or None when no
+	prompt asked for more). No sampling params means vLLM's default of 16 tokens: nothing to cap."""
+	args = list(args)
+	where = ("kw", None) if "sampling_params" in kwargs else ("arg", 1) if len(args) > 1 else (None, None)
+	sp = kwargs["sampling_params"] if where[0] == "kw" else args[1] if where[0] == "arg" else None
+	if sp is None:
+		return tuple(args), kwargs, None, None
+	many = isinstance(sp, list | tuple)
+	items = list(sp) if many else [sp]
+	asked = [getattr(x, "max_tokens", None) for x in items]
+
+	def over(a) -> bool:  # None: vLLM decodes to the model's context length, the longest of all
+		return a is None or (isinstance(a, int) and a > cap)
+
+	if not any(over(a) for a in asked):
+		return tuple(args), kwargs, None, None
+	out = []
+	for x, a in zip(items, asked, strict=True):
+		if over(a):
+			x = x.clone() if hasattr(x, "clone") else copy.copy(x)
+			x.max_tokens = cap
+		out.append(x)
+	new = out if many else out[0]
+	if where[0] == "kw":
+		kwargs = {**kwargs, "sampling_params": new}
+	else:
+		args[1] = new
+	# the script's own cap: None when any prompt had none (to the context length)
+	script = None if any(a is None for a in asked) else max(a for a in asked if isinstance(a, int))
+	return tuple(args), kwargs, script, cap
 
 
 def _lens_stats(batch) -> dict[str, float]:
@@ -391,7 +432,9 @@ class Recorder:
 		self._output_watch_calls = 0
 		self.trainer_logs: list[dict] = []
 		self._entropy_mc: list = []  # (optimizer steps so far, the policy's mean -log p as a device scalar)
+		self._entropy_exact: list = []  # (optimizer steps so far, the policy's mean entropy, TRL 0.14's logits)
 		self.rl_entropy_estimated = False
+		self.rl_entropy_exact = False
 		# GRPO (TRL): each reward call's values, so pass rate per prompt and zero-spread groups can
 		# be read without trusting the trainer's own logs; the group size from the trainer
 		self.reward_calls: list[dict] = []
@@ -1069,8 +1112,12 @@ class Recorder:
 			def generate(self_, *args, **kwargs):
 				rec._maybe_stop()
 				rec._gen_call_starts()
+				script_cap = probe_cap = None
 				if rec.generate_sample:
 					args, kwargs = _sample_prompts(args, kwargs, rec.generate_sample)
+					args, kwargs, script_cap, probe_cap = _cap_new_tokens(
+						args, kwargs, SERVING_PROBE_MAX_TOKENS
+					)
 				rec._sync()
 				t0 = rec._now()
 				rec._generating += 1  # beam_search calls generate once a step: those inner calls don't count
@@ -1082,16 +1129,19 @@ class Recorder:
 				with suppress(Exception):
 					sp = kwargs.get("sampling_params", args[1] if len(args) > 1 else None)
 					sp = sp[0] if isinstance(sp, list) and sp else sp
-					cap = getattr(sp, "max_tokens", None)
+					cap = script_cap if probe_cap else getattr(sp, "max_tokens", None)
 					lengths, trunc = [], []
 					for o in outs:
 						for c in o.outputs:
 							lengths.append(len(c.token_ids))
 							reason = getattr(c, "finish_reason", None)  # needs no cap to read
-							trunc.append(reason == "length" if reason is not None else None)
-					rec.gens.append(
-						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
-					)
+							# stopped at the probe's cap, not the script's: how it would have ended isn't known
+							cut = probe_cap and reason == "length" and len(c.token_ids) >= probe_cap
+							trunc.append(
+								None if cut else (reason == "length" if reason is not None else None)
+							)
+					rec.gens.append({"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap,
+						"probe_cap": probe_cap, "backend": "vllm"})  # fmt: skip
 				rec.acc["generate"] += dt
 				if not rec._generating:
 					rec._gen_calls_done += 1
@@ -1264,6 +1314,14 @@ class Recorder:
 						ref.forward = timed("reference", ref.forward)
 					elif isinstance(getattr(self_, "model", None), nn.Module):
 						self_.model.forward = policy_forward(self_.model.forward)
+				with suppress(Exception):
+					# TRL 0.14 (no _get_per_token_logps): the policy's own forward in compute_loss returns the
+					# completion's logits, so the exact entropy is read there (A's item 14; PM, Nov 1)
+					if not hasattr(tr, "_get_per_token_logps") and isinstance(
+						getattr(self_, "model", None), nn.Module
+					):
+						eos = getattr(getattr(self_, "processing_class", None), "eos_token_id", None)
+						self_.model.register_forward_hook(rec._entropy_hook(eos), with_kwargs=True)
 				with suppress(Exception):
 					# TRL 0.14 with use_vllm: the sync is inline in compute_loss, through the vLLM
 					# model's load_weights (main process only)
@@ -1634,6 +1692,15 @@ class Recorder:
 		known = [t for g in self.gens for t in g["truncated"] if t is not None]
 		if self.gens and known:  # how many sequences truncation_rate is over (those whose ending is known)
 			out["generation_ending_known"] = float(len(known))
+		probe_caps = [g["probe_cap"] for g in self.gens if g.get("probe_cap")]
+		if probe_caps:  # the serving probe stopped each reply at this many tokens, not the script's cap
+			out["serving_probe_max_tokens"] = float(max(probe_caps))
+			capped = [g for g in self.gens if g.get("probe_cap")]
+			n = sum(len(g["truncated"]) for g in capped)
+			# the share of replies still running at the cap, for B's extrapolation past it
+			cut = sum(1 for g in capped for t in g["truncated"] if t is None)
+			if n:
+				out["serving_probe_capped_fraction"] = cut / n
 		if self.checkpoints.get("saves"):
 			ck = self.checkpoints
 			out["checkpoint_saves_seen"] = ck["saves"]
@@ -1834,6 +1901,29 @@ class Recorder:
 		if self.generate_calls and self._gen_calls_done >= self.generate_calls and not self._generating:
 			raise StopProbe
 
+	def _entropy_hook(self, eos_token_id):
+		"""A forward hook for TRL 0.14's policy: on the update's forward (gradients on, not generating, with
+		num_logits_to_keep), the mean entropy of the policy over the completion tokens TRL trains on (up to and
+		including the first EOS, as its completion_mask), from the logits themselves: exact, not a sample. Read under
+		no_grad in chunks of positions, so the extra memory is one chunk's fp32 softmax."""
+		rec = self
+
+		def hook(module, args, kwargs, output):
+			if len(rec._entropy_exact) >= ENTROPY_MC_MAX or rec._generating or not torch.is_grad_enabled():
+				return None
+			keep = kwargs.get("num_logits_to_keep") or kwargs.get("logits_to_keep")
+			ids = args[0] if args else kwargs.get("input_ids")
+			logits = getattr(output, "logits", None)
+			if not keep or ids is None or logits is None:
+				return None
+			with suppress(Exception), torch.no_grad():
+				# TRL 0.14 asks for num_logits_to_keep = K + 1 and drops the last: the completion is K tokens (review, Nov 1)
+				k = int(keep) - 1  # the hook is only on TRL 0.14's GRPO policy, which always asks for K + 1
+				rec._entropy_exact.append((len(rec.steps), completion_entropy(logits, ids, k, eos_token_id)))
+			return None
+
+		return hook
+
 	def _note_entropy(self, logps, attention_mask) -> None:
 		"""The policy's mean -log p over the completion tokens it was trained on: on sampled tokens a
 		Monte Carlo estimate of its entropy, biased by the sampling temperature (TRL's default 0.9),
@@ -1877,6 +1967,17 @@ class Recorder:
 		):
 			if col(kind):
 				rl[name] = col(kind)
+		if "entropy" not in rl and self._entropy_exact:
+			# TRL 0.14 logs no entropy: the policy's own, from its logits on the update's forward
+			by_step_x: dict[int, list[float]] = {}
+			with suppress(Exception):
+				for step, t in self._entropy_exact:
+					v = float(t)
+					if math.isfinite(v):
+						by_step_x.setdefault(step, []).append(v)
+			if by_step_x:
+				rl["entropy"] = [statistics.fmean(v) for _, v in sorted(by_step_x.items())]
+				self.rl_entropy_exact = True
 		if "entropy" not in rl and self._entropy_mc:
 			# TRL logged no entropy: the estimate from the policy's own log-probs, one per optimizer step
 			by_step: dict[int, list[float]] = {}
@@ -1904,9 +2005,38 @@ class Recorder:
 			rl["response_length"] = {"mean": statistics.fmean(m), "p95": max(mx), "max": max(mx), "n": len(m)}
 		if self.rl_entropy_estimated:
 			counts = {**counts, "rl_entropy_estimated": 1.0}  # rl.entropy is the Monte Carlo estimate
+		if self.rl_entropy_exact:
+			counts = {**counts, "rl_entropy_exact": 1.0}  # rl.entropy from the policy's logits (TRL 0.14)
 		return (
 			{"rl": rl} if rl else {}
 		) | counts  # counts: top-level extras (RLSignals has no field for them)
+
+
+def completion_entropy(logits, input_ids, keep: int, eos_token_id=None):
+	"""Mean entropy (nats) of the next-token distributions over a batch's completion tokens, as a device scalar.
+
+	`logits` is TRL 0.14's (B, keep + 1, V) from model(input_ids, num_logits_to_keep=keep + 1); the last position
+	predicts past the sequence and is dropped, as TRL drops it. The completion is input_ids' last `keep` tokens, and
+	only the tokens up to and including the first EOS count (TRL's completion_mask). Chunked over positions so the
+	fp32 softmax scratch stays near ENTROPY_CHUNK_BYTES."""
+	# position i predicts token i + 1: the K completion tokens are predicted by positions -K-1 .. -2 (review, Nov 1)
+	z = logits[:, :-1, :] if logits.shape[1] == keep + 1 else logits[:, -keep - 1 : -1, :]
+	b, k, v = z.shape
+	comp = input_ids[:, -k:]
+	if eos_token_id is not None:
+		is_eos = comp == eos_token_id
+		first = torch.where(is_eos.any(1), is_eos.int().argmax(1), torch.full((b,), k, device=comp.device))
+		mask = (torch.arange(k, device=comp.device).unsqueeze(0) <= first.unsqueeze(1)).to(torch.float32)
+	else:
+		mask = torch.ones(b, k, device=comp.device)
+	# three chunk-sized fp32 buffers live at once (the upcast, log p, p * log p in place): each a third of the budget
+	chunk = max(1, int(ENTROPY_CHUNK_BYTES // max(1, 3 * b * v * 4)))
+	total = torch.zeros((), device=z.device, dtype=torch.float32)
+	for i in range(0, k, chunk):
+		logp = torch.log_softmax(z[:, i : i + chunk, :].float(), dim=-1)
+		h = -logp.exp().mul_(logp).sum(-1)  # (B, chunk)
+		total = total + (h * mask[:, i : i + chunk]).sum()
+	return total / mask.sum().clamp(min=1)
 
 
 def detect_env() -> dict:

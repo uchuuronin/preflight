@@ -315,3 +315,31 @@ def test_every_engine_feature_has_its_key_in_flags_json():
 	prod = json.loads((Path(__file__).resolve().parents[1] / "flags.production.json").read_text())
 	# review, Nov 1: a production override can only name a key the engine reads
 	assert {k for k in prod if k.startswith("engine.")} <= engine_keys
+
+
+def test_training_signals_read_kl_entropy_and_reward():
+	"""A's item 14 (PM, Nov 1): the probe's logged KL, entropy and reward go into the RL lens's risk readout."""
+	from preflight.engine import rl
+
+	kl = [0.001 * i for i in range(1, 21)]
+	why = rl.kl_trend(kl, 20, 2000)
+	assert "ended near" in why and "by step 2,000" in why and "past 0.1" in why
+	assert "not rising" in rl.kl_trend([0.02] * 10, 10, 1000)
+	assert rl.kl_trend([0.01] * 3, 3, 100) is None  # too few values
+	assert "collapsing" in rl.entropy_trend([2.0] * 4 + [0.6] * 4, estimated=False, exact=True)
+	assert "from its logits" in rl.entropy_trend([2.0] * 8, estimated=False, exact=True)
+	assert "rose" in rl.reward_trend([0.0] * 4 + [0.5] * 4)
+
+
+def test_the_grpo_record_s_risk_readout_carries_its_signals(monkeypatch):
+	import json
+	from pathlib import Path
+
+	from preflight.engine import api
+	from preflight.schema import FlightRecord
+
+	monkeypatch.setitem(api.FEATURES, "rl", True)
+	path = Path(__file__).resolve().parents[1] / "zoo/grpo_trl/record_nov1_a10.json"
+	rec = FlightRecord.model_validate(json.loads(path.read_text()))
+	why = api.predict(rec).root["rl.zero_spread"].reason
+	assert "training signals: KL to the reference ended near" in why and "no policy entropy was logged" in why

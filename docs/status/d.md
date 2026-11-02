@@ -8,6 +8,72 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 22:00 ET (items 42 and 19 taken over from A; the 8 PM README mirrored)
+
+`0afe0c5` CI green. Merged `main` `c084bee` (round seven).
+
+- **The 8 PM README, mirrored.** The draft's "On in production" table is now the PM's, row for row
+  (`c.hops` and `c.exports`; the three add-ons), and "Behind a flag" takes the PM's rows for
+  `d.exports_cli` and `d.notebook`. What still differs from `README.md` is newer than it: the
+  Glimmer private-mode row, the guide and triage on in production in the Meta-models table, and
+  the Add-ons paragraph.
+- **Item 42, pip packaging and the quickstart (Chiya, 21:48).** Packaging already worked:
+  `pyproject.toml` builds the `preflight` command with hatchling. Checked in a clean Python 3.11
+  venv with pip 24: `pip install git+file://` of this repository (the same install path as the
+  GitHub URL, which needs the repository public) took 20 s the first time and 7 s again [measured];
+  `preflight --help` and `preflight map` work; `preflight demo` without torch says what to install;
+  with torch, `preflight demo` in an empty folder ran three probes on the CPU, all ok, in 23 to
+  24 s, and wrote a record with the probes and two findings [measured]. The extras form
+  (`"preflight[probe] @ git+file://localhost/<this repository>"`) resolves too: pip found torch
+  already satisfied [measured]. **Fixed:** two hints, the demo's and the
+  `submission` failure's next step (shown to visitors), said `pip install "preflight[probe]"`, which
+  installs an unrelated PyPI package of that name; both give the git URL now. The demo's last line
+  said to open the record in the web app, which opens records by share link only; it now points at
+  the hosted check-in. The README draft's quickstart leads with `preflight demo`. A run on a CPU
+  carries no predictions (the prediction step returned none here even with `engine.memory` on).
+- **Item 19, the eval-sweep record.** A's `fda1762` (an eval probe stops after two generate calls)
+  is in the deployed runner, so I dispatched `ops_app.py::smoke` on `zoo/eval_sweep_reasoning` on an
+  L4 through `remote-run.yml` (`d-eval-sweep-l4`, GitHub run 41380341849, visitor `d-eval`, a
+  20-minute cap, so at most about $0.60 [guess: 20 min x ($0.80 GPU + a $0.95 sandbox guess) an
+  hour]). Result in the next entry. Asked A whether the recorder's eval hooks need anything: it
+  records generate's lengths and truncation, but not the activation dump's bytes per question.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the merge of `main` `c084bee`, the packaging commit (CLI hints, `failures.py`, README
+draft), the request to A and this entry.
+
+Cloud runs: `d-eval-sweep-l4` (above), L4, result and cost in the next entry.
+
+## Sun Nov 1, 21:45 ET (check-in: Glimmer measured, so its wording moves; stale model rows fixed)
+
+`0f4ac80` CI green. `main` is still `50db9b6` on GitHub (`d5062bc` hasn't landed), so the README
+diff waits.
+
+- **Glimmer:** the endpoint is live (B's `b-glimmer-deploy`; A's runs call it) and A measured its
+  cost per call, so per Chiya it moves from "price table only" to private mode, hosted on our own
+  GPU, behind `harness.glimmer_private` (off): US$0.24 for one call through a 411 s cold start
+  [measured, `a-triage-glimmer-5`] and US$0.33 for 11 calls in one run, likely one cold start among
+  them [measured, `a-triage-agreement`] (no warm per-call figure: the run total mixes the two); the
+  same category as Spark Open on 9 of 11 failed zoo probes [measured]. A's run times are UTC.
+  Updated in `readme-final.md` (moved from "Not used" to "Behind a flag", and its Meta-models row),
+  `meta-and-partners.md` and `portal.md` (the open-weights section and "What's next"), with the
+  numbers in the submission's table. The costs come from A's status on `ws-a`, not B's.
+- **Stale rows fixed while there:** the guide and Spark Open triage are on in production (the
+  drafts still said off); the open-weights section now gives the first real run
+  (`a-triage-lora-prod`, 4 calls, $0.0184) and that Spark Open quoted a line on all 11 failed zoo
+  probes since triage reads the recorded error. A TODO(PM) waits for the production re-run's ID.
+- **Asked A:** with `harness.glimmer_private` off, `_triage_client` sends a private job to Spark Open
+  on Baseten, while its docstring and the contract say a private job never goes there. No screen
+  sets `private` today, but the API schema takes it.
+- **Not landed:** A's production triage re-run with a new share token and a committed record copy;
+  A's notebook check-in; A's $8 cap is on `ws-a` but not on `main` or in a logged deploy, so the
+  README keeps the cap after Nov 4 unnumbered.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): those drafts, the request to A and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 20:15 (the draft mirrors the 8 PM README)
 
 `b3c5c4d` CI green. Chiya (20:07): `main` `d5062bc` has `readme-final.md` as `README.md`, with

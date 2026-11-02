@@ -39,13 +39,16 @@ export const SAMPLES: Sample[] = [
 		load: () => import("../fixtures/dev-finetune.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
+		// The live record of zoo/finetune_lora_hf on an L4 (Nov 1), its share token removed: A's
+		// measured probes, B's predictions. It replaces the golden's hand-made probes, which gave
+		// 7.7 times too little activation memory per token (B, from-b.md, Nov 1).
 		id: "lora-qwen",
 		code: "PF102",
 		titleKey: "sample.lora_qwen",
 		lens: "finetune",
 		gpu: "L4",
-		numbers: "illustrative",
-		load: () => import("../../../../schema/examples/finetune.json").then((m) => m.default as unknown as FlightRecord),
+		numbers: "measured",
+		load: () => import("../fixtures/lora-live-nov1.record.json").then((m) => m.default as unknown as FlightRecord),
 	},
 	{
 		id: "pretrain",

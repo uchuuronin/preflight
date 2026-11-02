@@ -128,8 +128,10 @@ def main(argv: list[str] | None = None) -> int:
 		try:
 			import torch  # noqa: F401
 		except ImportError:
-			print('preflight: the demo trains with PyTorch: pip install "preflight[probe]" (or torch), then '
-				"`preflight demo` again", file=sys.stderr)  # fmt: skip
+			# Not "preflight[probe]" from PyPI: that name there is an unrelated package.
+			print("preflight: the demo trains with PyTorch: pip install torch (or "
+				'"preflight[probe] @ git+https://github.com/uchuuronin/preflight"), then `preflight demo` again',
+				file=sys.stderr)  # fmt: skip
 			return 2
 		fresh = not (ns.dir / "train.py").exists()
 		try:
@@ -190,8 +192,10 @@ def main(argv: list[str] | None = None) -> int:
 		out["agent_sample_usd"] = round(sum(t.cost_usd or 0 for t in rec.agent_sample.tasks), 4)
 	print(json.dumps(out, indent=2))
 	if getattr(ns, "demo", False):
-		print(f"preflight: the flight record is {out['record']}. Open it in Preflight's workspace to fly the "
-			"whole run; probe your own script with `preflight run train.py`.", file=sys.stderr)  # fmt: skip
+		# The web app opens records by share link only, so point at the hosted check-in, not this file.
+		print(f"preflight: the flight record is {out['record']}: the probes' measurements and findings. Probe "
+			"your own script with `preflight run train.py`, or check it in at https://preflight-cqn.pages.dev "
+			"to fly the whole run.", file=sys.stderr)  # fmt: skip
 	if rec.job.lens == "agent":
 		if rec.agent_sample is None:
 			print("preflight: an agent run; add --agent-max-usd 5 (and OPENAI_API_KEY) to sample 30 of its "

@@ -15,7 +15,8 @@ STEPS: dict[str, tuple[str, str]] = {
 	"submission": (
 		"checking the submission",
 		"fix what the message says and submit again, or probe it on "
-		'your machine: `pip install "preflight[probe]"`, then `preflight run train.py`',
+		"your machine: `pip install git+https://github.com/uchuuronin/preflight`, then "
+		"`preflight run train.py`",
 	),
 	"submission.files_gone": ("reading the uploaded files", "upload the files again"),
 	"submission.code_changed": (

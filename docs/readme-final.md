@@ -32,12 +32,11 @@ is live at <https://preflight-cqn.pages.dev>.
 | Fit map: which settings fit, with the out-of-memory frontier | The cockpit's Fit view: drag your run across the map | `c.fit_map`, on in production (Chiya, Nov 1) |
 | RL readouts: the share of prompt groups with no reward spread, rollout time | The GRPO lens | `engine.rl`, on in production (Chiya, Nov 1); calibrated on A's GRPO runs (L4 smoke runs and a 50-step run on an A10) |
 | Log triage by Muse Spark Open on Baseten | A probe that fails gets a finding quoting its log line, labelled "Found by Muse Spark Open triage" | `harness.spark_open_triage`, on in production with its data-use line (Chiya, Nov 1) |
-| Possible outcomes (HOPs) | The readouts' "Possible outcomes" toggle: each frame is one outcome inside the 90% interval | `c.hops`, on in production (Chiya, Nov 1) |
-| Take it with you | The plan, an edit script for the changed settings, a Slurm batch file, the run command, a Weights & Biases helper that puts the plan's knobs in the run's config and each prediction with its 90% interval in its summary, and the record's link once it has one | `c.exports`, on in production (Chiya, Nov 1) |
-| Detail level, costs in your currency, free GPUs | The add-ons below: "New to this" with glossary cards, 30 currencies at the European Central Bank's dated rates, and whether the plan fits one free session on Colab, Kaggle, Modal's starter credit or Lightning AI | `d.expertise`, `d.currency`, `d.freetier`, on in production (Chiya, Nov 1); checked in Chromium on `main` `50db9b6` (`docs/audit/scripts/addons.mjs`, 20 of 20 states; `docs/status/d.md`, Nov 1, 18:45) |
 | GRPO lens on a measured run | The GRPO sample: reward spread, completion lengths, the tour | A's L4 run `a-gt-grpo-l4-3`; no flag |
 | Cost readout at your own rate | Every dollar readout: quantity x rate = total, with the price table's source and date | No flag |
 | Verify a fix in your own CI | A GitHub Action (below) | No flag; usable from other repositories once this one is public |
+| Possible outcomes (HOPs) and exports: the plan, an edit script, a Slurm batch file, the run command and a W&B script | The cockpit's "Possible outcomes" toggle, and the exports band under the whole run | `c.hops` and `c.exports`, on in production (Chiya, Nov 1, 8 PM); checked by C on all 10 samples on a production build |
+| The add-ons: detail level, costs in your currency, free GPUs | The Logbook and the cockpit (below) | `d.expertise`, `d.currency`, `d.freetier`, on in production (Chiya, Nov 1, 8 PM); checked by D in Chromium, desktop and phone |
 | The `preflight` CLI (`map`, `run`) | Your own machine | On `main`; the `pip install git+...` line works once the repository is public |
 
 **Behind a flag, off for now**
@@ -45,8 +44,9 @@ is live at <https://preflight-cqn.pages.dev>.
 | What | Flag | Where it stands |
 | --- | --- | --- |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
-| Notebook check-in | `d.notebook` | Built on `main`, and the runner's code converts notebooks (`runner/sources.py`); stays off until A's real notebook check-in through production passes |
-| The exports' "Check it again on your machine" item | `d.exports_cli` | Built on `main` |
+| The CLI re-check item in the exports | `d.exports_cli` | Built on `main`; on once the repository is public (Nov 3 to 4) |
+| Notebook check-in | `d.notebook` | Built on `main`; on once a real notebook check-in runs through the deployed runner |
+| Private mode: log triage by Muse Glimmer | `harness.glimmer_private` | Hosted on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys, scaled to zero when idle), behind its flag. Triage cost US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`]. Same category as Spark Open on 9 of 11 failed zoo probes [measured, `a-triage-agreement`] |
 
 **Not used, or not measured**
 
@@ -58,7 +58,6 @@ is live at <https://preflight-cqn.pages.dev>.
 | Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20% [measured, corpus], under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |
 | Serving model | Built, switched off (`engine.serving`) until its validation row passes | `python/preflight/engine/api.py` |
 | Claim check by Muse Spark Open | Module written, not wired in | `python/preflight/harness/claim_check.py` |
-| Muse Glimmer | Apache 2.0. B is hosting it on Preflight's own GPU for a private mode (`harness.glimmer_private`, off); not live yet | `docs/decisions/glimmer-host.md` |
 | Full-run validation | Scored on Mon Nov 2 (the table below) | B's scorer |
 
 ## Try it
@@ -76,32 +75,47 @@ For a README badge:
 `[![Preflight](https://TODO-PM-HOST/badge/<share token>)](https://TODO-PM-HOST/s/<share token>)`
 (`workers/README.md`).
 
-**On your own machine, one command** (Python 3.11 or 3.12, in the environment that has your
-torch):
+**On your own machine, one command** (Python 3.11 or 3.12). In the environment that already has
+your torch:
 
 ```bash
 pip install git+https://github.com/uchuuronin/preflight
 ```
 
-**Quickstart:**
+or, to add PyTorch too (a large download from PyPI):
 
 ```bash
-# 1. Read the script without running it (seconds): lens, framework, knobs and where the code sets them.
+pip install "preflight[probe] @ git+https://github.com/uchuuronin/preflight"
+```
+
+Install from this URL, not `pip install preflight`: that name on PyPI is an unrelated package.
+
+**Quickstart** (the first step took 23 to 24 s on a CPU here [measured]):
+
+```bash
+# 1. A first run: writes a small training script into ./preflight-demo and probes it on this
+#    machine (its GPU if it has one), then writes a flight record.
+preflight demo
+
+# 2. Read your own training script without running it (seconds): lens, framework, knobs and where the code
+#    sets them.
 preflight map train.py
 
-# 2. Measure a few steps on this machine (its GPU if it has one) and write a flight record.
-#    On a real script this takes a few minutes: probes run real training steps.
-preflight run . --entrypoint train.py --out .preflight/records
-
-# Arguments for your script go after --, e.g.
+# 3. Measure a few steps of it and write its flight record. On a real script this takes a few
+#    minutes: probes run real training steps. Arguments for your script go after --.
 preflight run . --entrypoint train.py -- --batch_size 16
 ```
 
-The record lands in `.preflight/records/<share_token>.json`, a JSON flight record. Opening a local
-record in the web app isn't built yet: the app opens records by their share link.
-(Checked Oct 31 by D: the package installed from this checkout in a fresh Python 3.11
-environment with torch 2.5.1 ran three probes of a small torch loop on the CPU and wrote a record;
-the GitHub install line itself can be tried once the repository is public.)
+`preflight demo` writes its record to `preflight-demo/records/` and `preflight run` to
+`records/<share_token>.json` (`--out` to change it): a JSON flight record with
+the probes' measurements and findings. The web app opens records by their share link only, so to
+fly the whole run, check the script in at <https://preflight-cqn.pages.dev>.
+(Checked Nov 1 by D, in a clean Python 3.11 virtual environment with pip 24: `pip install
+git+file://` of this repository, the same install path as the GitHub line, took 20 s, not counting
+PyTorch, which was added separately [measured]; then `preflight demo` in an empty folder ran three
+probes on the CPU, all ok, in 23 to 24 s, and wrote a record with the probes and two findings
+[measured]. A run on a CPU carries no predictions. The GitHub line itself can be tried once the
+repository is public.)
 
 ## How it works
 
@@ -141,12 +155,12 @@ owns which path are in [CONTRACT.md](CONTRACT.md).
 
 ## Meta models and partner tools
 
-| Tool | Where it is used | Status on `main` `a52753f` |
+| Tool | Where it is used | Status (Nov 1, ET) |
 | --- | --- | --- |
-| **Muse Spark** (`muse-spark-1.3`, Meta Model API) | Maps each script with structured output (`python/preflight/harness/`); runs the guide through the Responses API with tool calls on the live cockpit (`api/preflight_api/guide/`); the model behind the agent bug-zoo script (`zoo/agent_eval_spark/`) | Script map on in production (Oct 28 runs, before the flag: US$0.0178 and US$0.0200 a job [derived: reported tokens at list prices]); guide behind `c.guide.live` |
+| **Muse Spark** (`muse-spark-1.3`, Meta Model API) | Maps each script with structured output (`python/preflight/harness/`); runs the guide through the Responses API with tool calls on the live cockpit (`api/preflight_api/guide/`); the model behind the agent bug-zoo script (`zoo/agent_eval_spark/`) | Script map on in production (Oct 28 runs, before the flag: US$0.0178 and US$0.0200 a job [derived: reported tokens at list prices]); the guide on in production (`c.guide.live`, Nov 1) |
 | **Muse Code** (headless) | Fix loop: candidate fixes raced in parallel worktrees inside a sandbox, edits only; the API key reaches Muse Code on stdin only, never in its environment or files; each fix is gated on Preflight's own re-probe and verify, not on Muse Code's exit code (`api/preflight_api/fix/`) | Behind `c.fix_loop`; in clean smoke run 41250977670 Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]; gating on the re-probe isn't wired end to end yet |
-| **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | Behind `harness.spark_open_triage`, off; not yet run for real. The claim check (`claim_check.py`) is written but not wired in |
-| **Muse Glimmer** | One of three models in the agent model sweep's price table (`python/preflight/engine/prices/`) | Not hosted (`docs/decisions/glimmer-host.md`) |
+| **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | On in production (`harness.spark_open_triage`, Nov 1). First real run, A's `a-triage-lora-prod`: 4 calls on Baseten, US$0.0184 [measured]. Since A's fix (`b300684`, in A's redeploy of Nov 1, 20:20 UTC), triage also reads the probe's recorded error, and on the 11 failed probes in the zoo's records Spark Open quoted a line every time [measured, `a-triage-agreement`]. The claim check (`claim_check.py`) is written but not wired in |
+| **Muse Glimmer** (open weights, Apache 2.0) | Private mode: with its flag on, triages a private job's failed probes on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys), so their logs go to no outside model provider; with no Glimmer to call, such a job isn't triaged rather than sent to Baseten (`python/preflight/runner/pipeline.py`); also one of three models in the agent model sweep | Behind `harness.glimmer_private`, off. Hosted (`python/preflight/glimmer/`, `docs/decisions/glimmer-host.md`); US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`] |
 | **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run so far (Oct 28 to Nov 1, `docs/status/a.md`); the runner (job store), the API and the fix app are deployed in production and stay up since Nov 1 |
 | **AMD Developer Cloud** | ROCm probes through the CLI on an MI300X, and the AMD half of the corpus (`python/preflight/corpus/`, `.github/workflows/amd-run.yml`) | No AMD measurements: the account is on a verification hold |
 | **Cloudflare Pages** | The web app, the `/v1` edge function that forwards to the API with a shared secret and the visitor's address for quotas (`web/functions/`), and share cards (`workers/`) | Live at <https://preflight-cqn.pages.dev>; share cards wait on `workers/` joining the deploy |
