@@ -1,9 +1,9 @@
 /**
  * What the cockpit predicts for each cell of the campaign probe grid (api/campaign_probe_app.py),
- * from the Nov 2 live record (PF102, measured on an L4) before the cells were probed on an A10.
- * Run on its own; it prints JSON and checks nothing:
+ * from the Nov 2 live record (PF102, measured on an L4), on the L4 and the A10, before the cells
+ * were probed. It writes JSON and checks nothing, so it runs only when asked for:
  *
- *     npx vitest run --dir scripts campaign_predicted
+ *     PREDICTED_OUT=out.json npx vitest run --dir scripts campaign_predicted
  */
 import { writeFileSync } from "node:fs";
 import { it } from "vitest";
@@ -15,7 +15,7 @@ import {
 	normaliseRecord,
 } from "../src/workspace/record/types";
 
-it("prints the grid's predictions", () => {
+it.skipIf(!process.env.PREDICTED_OUT)("writes the grid's predictions", () => {
 	const record = normaliseRecord(raw as unknown as FlightRecord);
 	const provider = new GridProvider();
 	const base = currentKnobs(record);
@@ -45,7 +45,5 @@ it("prints the grid's predictions", () => {
 					"cost.total": pick("cost.total"),
 				};
 			}
-	const path = process.env.PREDICTED_OUT;
-	if (path) writeFileSync(path, JSON.stringify(out, null, 1));
-	else console.log(JSON.stringify(out));
+	writeFileSync(process.env.PREDICTED_OUT!, JSON.stringify(out, null, 1));
 });

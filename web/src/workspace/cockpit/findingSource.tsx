@@ -8,17 +8,19 @@
  *   later from a private record go to Spark Open. Live check-in, Nov 2 (record
  *   01M6EG0284PWZDRXGGQVVZYVND): Glimmer triaged it, and the line said Spark Open.
  * - a Muse Spark diagnosis is `spark_diagnosis`; Spark Open's check of it (diagnosis_check.py)
- *   either appends "Spark Open checked it against …" to the detail, or turns the finding into
- *   `diagnosis.abstain` ("Not backed by a probe number: abstain, or run a probe").
+ *   either adds an evidence entry `spark_open_check` (code writes it, not the model, so it's read
+ *   rather than the detail, whose words Muse Spark wrote), or turns the finding into
+ *   `diagnosis.abstain` ("Not backed by a probe number: abstain, or run a probe"), which also covers
+ *   claims the check didn't reach (its claim, time or dollar limits).
  */
 import { t } from "../../lib/i18n";
 import type { Finding } from "../record/types";
 
-export function findingSourceKey(f: Pick<Finding, "source" | "title" | "code" | "detail">): string {
+export function findingSourceKey(f: Pick<Finding, "source" | "title" | "code" | "evidence"> & Partial<Pick<Finding, "detail">>): string {
 	if (f.source === "spark_open_triage" && f.title.startsWith("Muse Glimmer ")) return "finding.source.glimmer_triage";
 	if (f.source === "spark_diagnosis") {
 		if (f.code === "diagnosis.abstain") return "finding.source.spark_diagnosis_abstain";
-		if (/ Spark Open checked it against /.test(f.detail ?? "")) return "finding.source.spark_diagnosis_checked";
+		if ((f.evidence ?? []).some((e) => e.metric === "spark_open_check")) return "finding.source.spark_diagnosis_checked";
 	}
 	return `finding.source.${f.source}`;
 }

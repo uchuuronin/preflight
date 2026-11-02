@@ -45,12 +45,15 @@ def cell_id(cell: dict) -> str:
 
 
 def measured(rec: dict, cell: dict, gpu: str) -> dict:
-	"""The cell's probe, as measured: the newest probe at the cell's setting on the GPU (the job's
-	record also carries the probes it was made from, on the L4)."""
+	"""The cell's probe, as measured: the newest probe the job planned at the cell's setting. A
+	follow-up record also carries the probes it was made from (the sample's own, on the L4); those
+	name neither `gpu_type` nor `lr` in their knobs, while a probe planned from a full setting
+	(probes/plan.py point_probe) names every knob it was given, so a probe counts only when it names
+	the cell's GPU and every knob the cell sets."""
 
 	def at_cell(p: dict) -> bool:
 		k = p.get("knobs") or {}
-		return k.get("gpu_type") == gpu and all(k.get(n) == v for n, v in cell.items())
+		return "gpu_type" in k and k["gpu_type"] == gpu and all(n in k and k[n] == v for n, v in cell.items())
 
 	probes = [p for p in rec.get("probes") or [] if at_cell(p)]
 	p = probes[-1] if probes else None
@@ -61,6 +64,7 @@ def measured(rec: dict, cell: dict, gpu: str) -> dict:
 	extras = p.get("extras") or {}
 	train_peak = extras.get("train_peak_before_eval_bytes") or mem.get("peak_allocated_bytes")
 	return {
+		"at_cell": [(q.get("id"), q.get("status")) for q in probes],  # an eval-off re-run follows an eval OOM
 		"probe": p.get("id"),
 		"status": p.get("status"),
 		"steps": p.get("steps"),
@@ -99,7 +103,7 @@ def grid_probes(attempt: str = "a", gpu: str = "L4") -> None:
 			}
 			try:
 				job = svc.submit.remote(
-					req, f"c.campaign.nov2.{attempt}.{cid}", f"c-campaign-{cid}-nov2-{attempt}"
+					req, f"c.campaign.nov2.{attempt}.{gpu}.{cid}", f"c-campaign-{cid}-{gpu}-nov2-{attempt}"
 				)
 			except Exception as e:
 				out[cid] = {"status": "refused", "why": f"{type(e).__name__}: {str(e)[:300]}"}

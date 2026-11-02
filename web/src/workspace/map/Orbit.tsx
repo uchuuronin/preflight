@@ -235,15 +235,20 @@ export function focusView(
 	const slide = (c: number, lo: number, hi: number, half: number) => (hi - lo > 2 * half ? (lo + hi) / 2 : Math.min(Math.max(c, hi - half), lo + half));
 	const x = slide(n.x, minX, maxX, width / 2 / zoom - pad / zoom);
 	const y = slide(n.y, minY, maxY, height / 2 / zoom - pad / zoom);
+	return { x, y, zoom, off: offStage(layout, id, { x, y, zoom, width, height }) };
+}
+
+/** The nodes that wouldn't sit whole inside the zoomed stage's soft edge, from where the view is. */
+export function offStage(layout: Pick<OrbitLayout, "nodes">, id: string, v: { x: number; y: number; zoom: number; width: number; height: number }): Set<string> {
 	const off = new Set<string>();
 	for (const m of layout.nodes) {
 		if (m.id === id) continue;
-		const sx = (m.x - x) * zoom + width / 2;
-		const sy = (m.y - y) * zoom + height / 2;
-		const r = (m.size / 2) * zoom;
-		if (sx - r < EDGE || sx + r > width - EDGE || sy - r < EDGE || sy + r > height - EDGE) off.add(m.id);
+		const sx = (m.x - v.x) * v.zoom + v.width / 2;
+		const sy = (m.y - v.y) * v.zoom + v.height / 2;
+		const r = (m.size / 2) * v.zoom;
+		if (sx - r < EDGE || sx + r > v.width - EDGE || sy - r < EDGE || sy + r > v.height - EDGE) off.add(m.id);
 	}
-	return { x, y, zoom, off };
+	return off;
 }
 
 function OrbitInner({ compact = false }: { compact?: boolean }) {
@@ -254,8 +259,13 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 	const fit = fitOf(record, estimates, state.knobs);
 	const failing = likelyFails(record, estimates);
 
-	// Nodes the focused zoom would cut at the stage's edge (focusView); set when the glide is aimed.
-	const [offstage, setOffstage] = useState<ReadonlySet<string>>(() => new Set());
+	// Where the focused view sits (set when the glide is aimed or the stage resizes); the nodes it would
+	// cut at the stage's edge follow the layout as knobs move (review, Nov 2). Compact maps don't zoom.
+	const [cam, setCam] = useState<{ x: number; y: number; zoom: number; width: number; height: number } | null>(null);
+	const offstage = useMemo<ReadonlySet<string>>(
+		() => (state.focus && cam && !compact ? offStage(layout, state.focus, cam) : new Set()),
+		[layout, state.focus, cam, compact],
+	);
 	const nodes = useMemo<Node[]>(() => {
 		const memT = targetFor(record, "memory");
 		const peak = memT ? estimates[memT.id] : undefined;
@@ -379,7 +389,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 			raf2 = requestAnimationFrame(() => {
 				glideUntil.current = performance.now() + duration;
 				const v = n && el ? focusView(layout, n.id, el.clientWidth, el.clientHeight) : null;
-				setOffstage(v ? v.off : new Set());
+				setCam(v && el ? { x: v.x, y: v.y, zoom: v.zoom, width: el.clientWidth, height: el.clientHeight } : null);
 				if (v) void flow.setCenter(v.x, v.y, { zoom: v.zoom, duration });
 				else if (n) void flow.setCenter(n.x, n.y, { zoom: 1.35, duration });
 				else void flow.fitView({ padding: 0.04, duration });
@@ -418,7 +428,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				const n = f ? layoutRef.current.nodes.find((m) => m.id === f) : null;
 				const v = n ? focusView(layoutRef.current, n.id, width, height) : null;
 				if (v) {
-					setOffstage(v.off);
+					setCam({ x: v.x, y: v.y, zoom: v.zoom, width, height });
 					void flow.setCenter(v.x, v.y, { zoom: v.zoom, duration: 0 });
 				} else void flow.fitView({ padding: 0.04, duration: 0 });
 			};
