@@ -1,0 +1,99 @@
+{
+  "script": "torchtune",
+  "entrypoint": "recipes/lora_finetune_single_device.py",
+  "args": [
+    "--config",
+    "qwen2_5/1.5B_lora_single_device"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "AttributeError",
+    "error": "AttributeError: module 'torch' has no attribute 'int1'\n",
+    "seconds": 1.918195656,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 15.4
+  },
+  "recorder": {
+    "status": "error",
+    "error": "AttributeError: module 'torch' has no attribute 'int1'. AttributeError: module 'torch' has no attribute 'int1' at torchtune/__init__.py:32, before the first optimizer step (stage: running script)",
+    "error_code": "user_error",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 12.589,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3616006144.0
+    },
+    "step_log": [],
+    "log_tail": " the script imports torchvision: installing torchvision\n[preflight] requirements: the script imports vllm, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports wandb: installing wandb\n[preflight] requirements: kept the image's datasets 3.1.0 (asked for 'datasets')\n[preflight] requirements: kept the image's huggingface_hub 0.36.2 (asked for 'huggingface_hub[hf_transfer]')\n[preflight] requirements: kept the image's safetensors 0.4.5 (asked for 'safetensors')\n[preflight] requirements: kept the image's tokenizers 0.20.3 (asked for 'tokenizers')\n[preflight] requirements: kept the image's numpy 2.1.3 (asked for 'numpy')\n[preflight] requirements: kept the image's tqdm 4.70.1 (asked for 'tqdm')\n[preflight] requirements: kept the image's psutil 6.1.0 (asked for 'psutil')\n[preflight] requirements: kept the image's pyarrow 26.0.0 (asked for 'pyarrow<21.0.0')\n[preflight] requirements: installing torchdata, kagglehub, sentencepiece, tiktoken, blobfile>=2, omegaconf, Pillow>=9.4.0, torchao, torchvision, wandb\n/tmp/pf-zrgv3d0z/work/torchtune/__init__.py:18: UserWarning: The 'torch' module has already been imported. Setting PYTORCH_CUDA_ALLOC_CONF may not have an effect.For best results, set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before importing 'torch'.\n  warnings.warn(\nSkipping import of cpp extensions due to incompatible torch version. Please upgrade to torch >= 2.11.0 (found 2.5.1+cu124).\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T17:32:18Z",
+      "duration_s": 12.589,
+      "error": "AttributeError: module 'torch' has no attribute 'int1'. AttributeError: module 'torch' has no attribute 'int1' at torchtune/__init__.py:32, before the first optimizer step (stage: running script)",
+      "error_code": "user_error",
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 10.7085,
+        "max_w": 11.535,
+        "samples": 4
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3616006144.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 12.589,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": null,
+  "image": "probe"
+}
