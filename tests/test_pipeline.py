@@ -966,3 +966,13 @@ def test_during_judging_a_job_starts_on_the_a10_and_only_its_first_point_may_fal
 	assert seen and all(g == "A10" for g, _ in seen)
 	assert seen[0][1] == ("L4",) and all(fb == () for _, fb in seen[1:])
 	assert rec.env.gpu.name == "A10" or rec.env.gpu.name is None
+
+
+def test_a_point_that_could_import_something_else_isnt_skipped():
+	from preflight.runner.pipeline import _import_knobs
+
+	assert _import_knobs({"batch_size": 8, "seq_len": 64}) == _import_knobs({"batch_size": 4, "seq_len": 32})
+	assert _import_knobs({"batch_size": 8, "quantization": "none"}) != _import_knobs(
+		{"batch_size": 8, "quantization": "4bit"}
+	)
+	assert _import_knobs({"gradient_checkpointing": True}) != _import_knobs({"gradient_checkpointing": False})

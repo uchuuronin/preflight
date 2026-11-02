@@ -307,6 +307,18 @@ def _spec(
 	)
 
 
+def _import_knobs(knobs: dict) -> tuple:
+	"""The knobs that can change what a script imports (quantization, attention, optimizer, precision:
+	any value that isn't a number); points that differ only in sizes import the same packages."""
+	return tuple(
+		sorted(
+			(k, str(v))
+			for k, v in (knobs or {}).items()
+			if isinstance(v, bool) or not isinstance(v, int | float)
+		)
+	)
+
+
 def _repo_install_on() -> bool:
 	"""probes.repo_install (off): a repo with no requirements.txt gets what it declares and the known
 	packages it imports (Nov 2: the unseen scripts stopped at their imports)."""
@@ -864,7 +876,13 @@ def _probe_points(
 				error="skipped: no GPU could be scheduled (see the first probe)", error_code="gpu.unavailable"))  # fmt: skip
 			continue
 		gone = next((q for q in probes if q.error_code == "missing_package" and not q.steps), None)
-		if gone is not None and stop_on_import:
+		if (
+			gone is not None
+			and stop_on_import
+			# the same code: a patched point (C's fix loop) may import something else
+			and (p.probe_id in (patched_for or {})) == (gone.id in (patched_for or {}))
+			and _import_knobs(p.knobs) == _import_knobs(gone.knobs)
+		):
 			# an import that failed before the first step fails the same way at every point: skip the
 			# rest and their triage (unseen runs, Nov 2: three probes and three paid triage calls each)
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,

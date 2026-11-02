@@ -284,7 +284,7 @@ def repo_requirement_sets(workdir: Path, entrypoint: str, *, log=print) -> tuple
 	declared_lines = list(declared(workdir))
 	if declared_lines:
 		log(
-			f"[preflight] requirements: the repo declares {len(declared_lines)} dependencies (pyproject.toml or setup.py)"
+			f"[preflight] requirements: the repo declares {len(declared_lines)} dependencies (pyproject.toml, setup.cfg or setup.py)"
 		)
 	# a URL or VCS line is skipped by plan(), so its name doesn't stop a known import of it
 	# (and plan() installs only plain lines; a marker may not hold here)
