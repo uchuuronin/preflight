@@ -1,0 +1,29 @@
+{
+  "visitor": "ops-limit-check-63e0d702",
+  "accepted": [
+    "01M6F6NTGPFQ8KRDJRWWSJ8DP4",
+    "01M6F6NVP2NGG5EAFH466TYB6X",
+    "01M6F6NWMQX7WZCXP6GDXEAHTX"
+  ],
+  "refused": {
+    "job": 4,
+    "type": "QueueFull",
+    "code": "limit.visitor_daily",
+    "retry_after_s": 22827,
+    "message": "You've run today's 3 probe jobs: samples only until midnight ET"
+  },
+  "accepted_ended": {
+    "01M6F6NTGPFQ8KRDJRWWSJ8DP4": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6F6NVP2NGG5EAFH466TYB6X": {
+      "status": "failed",
+      "error_code": "submission"
+    },
+    "01M6F6NWMQX7WZCXP6GDXEAHTX": {
+      "status": "failed",
+      "error_code": "submission"
+    }
+  }
+}
