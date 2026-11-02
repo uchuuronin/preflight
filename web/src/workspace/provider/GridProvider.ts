@@ -204,7 +204,10 @@ export function interpolate(
 	walk(0, 0, 1);
 	// A setting inside every knob's probed range that still has no usable cell is a gap in the
 	// grid (B is filling those), not a setting beyond what was measured (PM, Nov 2).
-	if (abstain) return abstained(target, grid.model_id, between() ? "between_measured" : "outside_trusted_range");
+	// Only between grid points (never on one: the engine abstained on that very cell for a reason
+	// it doesn't export) and never where a probe ran out of memory (review, Nov 2).
+	const onPoint = grid.axes.every((a) => a.values.some((x) => same(x, knobs[a.knob_id])));
+	if (abstain) return abstained(target, grid.model_id, !onPoint && between() && !failedAt(record, grid, knobs) ? "between_measured" : "outside_trusted_range");
 	if (![point, lo, hi].every(Number.isFinite)) return abstained(target, grid.model_id, "off_scale");
 	return {
 		point,
@@ -219,11 +222,18 @@ export function interpolate(
 	};
 }
 
+/** A probe ran out of memory at this setting of the grid's knobs. */
+function failedAt(record: LoadedRecord, grid: Grid, knobs: Readonly<Record<string, KnobValue>>): boolean {
+	return record.probes.some((p) => p.status === "oom" && grid.axes.every((a) => same(p.knobs[a.knob_id] ?? record.knobs.find((k) => k.id === a.knob_id)?.current, knobs[a.knob_id])));
+}
+
 /** Every knob moved off the record's setting is a number inside its probed range: the probes
  * bracket this setting, and only the precomputed values are missing (PM, Nov 2). */
 function movedWithinProbed(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
 	const moved = record.knobs.filter((k) => !same(knobs[k.id], k.current));
-	return moved.length > 0 && moved.every((k) => typeof knobs[k.id] === "number" && !!k.probed_range && inProbedRange(record, k, knobs[k.id]!));
+	if (!moved.length || !moved.every((k) => typeof knobs[k.id] === "number" && !!k.probed_range && inProbedRange(record, k, knobs[k.id]!))) return false;
+	// A probe that ran out of memory at these values measured them: not a gap.
+	return !record.probes.some((p) => p.status === "oom" && moved.every((k) => same(p.knobs[k.id], knobs[k.id])));
 }
 
 function atCurrent(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {

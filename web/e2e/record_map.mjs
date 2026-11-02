@@ -49,7 +49,7 @@ try {
 		const status = await page.locator(".pf-statusline").first().textContent().catch(() => null);
 		const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
 		check(`${theme}: the record opens to a map`, drew && nodes > 0, { ms: Date.now() - t0, nodes, record_nodes: record.graph?.nodes?.length ?? 0 });
-		check(`${theme}: readouts draw with a status word`, dials.length >= 3 && dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here/.test(d.status)), { dials, status });
+		check(`${theme}: readouts draw with a status word`, dials.length >= 3 && dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here|Ran out of memory here/.test(d.status)), { dials, status });
 		check(`${theme}: no page errors`, errors.length === 0, { errors: errors.slice(0, 5) });
 		check(`${theme}: nothing overflows sideways`, !overflow);
 		await page.screenshot({ path: join(shots, `e2e_cockpit_${theme}.png`) });

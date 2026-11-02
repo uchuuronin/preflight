@@ -60,7 +60,7 @@ try {
 	check("four readouts", dials.length >= 4, { dials: dials.length });
 	check(
 		"every dial has a status word",
-		dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here|Illustrative/.test(d.status)),
+		dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here|Ran out of memory here|Illustrative/.test(d.status)),
 		{ dials },
 	);
 

@@ -179,7 +179,9 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 	const draws = hops.on && ok && scale && spec.hops ? outcomes(est) : [];
 	const shown = hops.frame === null ? draws : draws.length ? [draws[hops.frame % draws.length]!] : [];
 	const title = [spec.reason, scaleNote].filter(Boolean).join("\n");
-	const value = ok ? spec.format(point) : t("readout.abstain_short");
+	// The engine abstains at a setting a probe ran out of memory at: that was measured (review, Nov 2).
+	const failedHere = !ok && /\bran out of memory\b/i.test(est?.reason ?? "");
+	const value = ok ? spec.format(point) : t(failedHere ? "readout.abstain_failed" : "readout.abstain_short");
 	const valueRef = useRef<HTMLElement>(null);
 	useTweenedText(valueRef, ok ? point : null, spec.format, { classFor: (text) => (ok ? sizeClass(text) : "is-abstain") });
 	const aria = ok
@@ -238,7 +240,7 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 			)}
 			<span className="pf-dial__label">{spec.label}</span>
 			<span className="pf-dial__status">
-				<Provenance status={est?.status ?? "abstain"} />
+				{failedHere ? <span className="pf-prov pf-prov--abstain">{t("readout.abstain_failed")}</span> : <Provenance status={est?.status ?? "abstain"} />}
 				{at.off ? <span className="pf-dial__off">{t("dial.off_scale_short")}</span> : null}
 			</span>
 			{spec.note ? <span className={`pf-dial__note${spec.noteRisk ? " is-risk" : spec.noteTight ? " is-tight" : spec.noteFits ? " is-fits" : ""}`}>{spec.note}</span> : null}

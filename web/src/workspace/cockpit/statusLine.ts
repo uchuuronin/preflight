@@ -66,7 +66,9 @@ export function statusLine(record: LoadedRecord, est: Prediction, knobs: Readonl
 	if (fit === "fits") return { tone: "fits", text: `${t("status.fits", { gpu })}${tail}` };
 	if (!run.length) {
 		// Inside the probed range with no precomputed value is a gap, not "too far" (PM, Nov 2).
-		const gap = [mem, time, cost, risk].some((e) => e?.status === "abstain" && e.reason === "between_measured");
+		// Only when every abstaining readout is a gap, as ProbeHere says it.
+		const out = [mem, time, cost, risk].filter((e) => e?.status === "abstain");
+		const gap = out.length > 0 && out.every((e) => e!.reason === "between_measured");
 		return { tone: "unknown", text: t(gap ? "status.between_measured" : "status.untrusted") };
 	}
 	return { tone: "unknown", text: tail.trim() };

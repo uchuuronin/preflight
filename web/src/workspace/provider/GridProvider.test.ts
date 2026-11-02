@@ -215,3 +215,13 @@ describe("why a readout has no number (PM, Nov 2)", () => {
 		expect(Object.values(p).some((e) => e?.reason === "between_measured")).toBe(false);
 	});
 });
+
+describe("a probe that ran out of memory is not a gap", () => {
+	it("doesn't call a setting a probe ran out of memory at 'between measured points'", async () => {
+		const pre = normaliseRecord((await import("../../../../schema/examples/pretrain.json")).default as unknown as FlightRecord);
+		const oom = { ...pre.probes[0]!, id: "p9", status: "oom" as const, knobs: { ...pre.probes[0]!.knobs, batch_size: 8 } };
+		const rec = { ...pre, probes: [...pre.probes.filter((p) => p.knobs.batch_size !== 8), oom] };
+		const p = provider.predict(rec, { ...currentKnobs(rec), batch_size: 8 });
+		expect(Object.values(p).some((e) => e?.reason === "between_measured")).toBe(false);
+	});
+});
