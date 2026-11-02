@@ -1,0 +1,55 @@
+{
+  "submitted": {
+    "job_id": "01M6F7T01HTCYCWP8YXJC35M5H",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6F7T01HTCYCWP8YXJC35M5H",
+    "status": "failed",
+    "position": null,
+    "record_id": null,
+    "share_token": null,
+    "error": "unknown sample 'sample://zoo/torchtitan_debug'. Step: checking the submission. By hand: fix what the message says and submit again, or probe it on your machine: `pip install git+https://github.com/uchuuronin/preflight`, then `preflight run train.py`.",
+    "retryable": false,
+    "error_code": "submission",
+    "last_seq": 3
+  },
+  "events": [
+    {
+      "job_id": "01M6F7T01HTCYCWP8YXJC35M5H",
+      "seq": 0,
+      "at": "2026-11-02T22:59:14.609580Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F7T01HTCYCWP8YXJC35M5H",
+      "seq": 1,
+      "at": "2026-11-02T22:59:19.871117Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F7T01HTCYCWP8YXJC35M5H",
+      "seq": 2,
+      "at": "2026-11-02T22:59:20.660964Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F7T01HTCYCWP8YXJC35M5H",
+      "seq": 3,
+      "at": "2026-11-02T22:59:20.969715Z",
+      "stage": "failed",
+      "message": "unknown sample 'sample://zoo/torchtitan_debug'. Step: checking the submission. By hand: fix what the message says and submit again, or probe it on your machine: `pip install git+https://github.com/uchuuronin/preflight`, then `preflight run train.py`.",
+      "level": "error",
+      "retryable": false,
+      "error_code": "submission"
+    }
+  ],
+  "error": null
+}
