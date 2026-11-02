@@ -1,0 +1,11 @@
+{
+	"name": "20261102-232502-41545242507-amd-a-amd-nanogpt-record",
+	"exit_code": 0,
+	"workflow": "amd-run",
+	"run_id": "41545242507",
+	"ref": "main",
+	"sha": "062fcfb9f99547d2a977b99766ffc9abcd58c6d0",
+	"cmd": "python -m preflight.cli.main run zoo/pretrain_nanogpt --out out/records --install-requirements --require-gpu",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:25:45Z"
+}

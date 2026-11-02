@@ -1,0 +1,46 @@
+torch 2.5.1+rocm6.2 hip 6.2.41133-dd7f95766 AMD Instinct MI300X
+preflight: running probes as root: an unprivileged uid can't reach /root/preflight/.venv-amd/bin/python and its packages (install Preflight where other users can read it to probe as one)
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+{
+  "record": "out/records/cLZczX5cEFaGOG4mV6pkEQ.json",
+  "lens": "pretrain",
+  "backend": "rocm",
+  "gpu": "MI300X",
+  "probes": [
+    {
+      "probe": "p1",
+      "status": "error",
+      "knobs": {
+        "batch_size": 12,
+        "seq_len": 1024
+      },
+      "step_s": null,
+      "peak_bytes": null,
+      "error": "The script imports datasets, which is not installed in the probe image. ModuleNotFoundError: No module named 'datasets' at train.py:58, before the first optimizer step (stage: running script). Step: importing the script's packages. By hand: add the package (with its version) to requirements.txt, or run `preflight run train.py` where it's installed."
+    },
+    {
+      "probe": "p2",
+      "status": "error",
+      "knobs": {
+        "batch_size": 6,
+        "seq_len": 1024
+      },
+      "step_s": null,
+      "peak_bytes": null,
+      "error": "The script imports datasets, which is not installed in the probe image. ModuleNotFoundError: No module named 'datasets' at train.py:58, before the first optimizer step (stage: running script). Step: importing the script's packages. By hand: add the package (with its version) to requirements.txt, or run `preflight run train.py` where it's installed."
+    },
+    {
+      "probe": "p3",
+      "status": "error",
+      "knobs": {
+        "batch_size": 12,
+        "seq_len": 512
+      },
+      "step_s": null,
+      "peak_bytes": null,
+      "error": "The script imports datasets, which is not installed in the probe image. ModuleNotFoundError: No module named 'datasets' at train.py:58, before the first optimizer step (stage: running script). Step: importing the script's packages. By hand: add the package (with its version) to requirements.txt, or run `preflight run train.py` where it's installed."
+    }
+  ]
+}
