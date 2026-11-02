@@ -134,6 +134,8 @@ class PackageRefused(ValueError):
 		listed = ", ".join(names)
 		if code == "missing_package.no_wheels":
 			msg = f"{listed}: PyPI has no ready-built version for this machine, so Preflight can't install it"
+		elif code == "submission.invalid":
+			msg = f"a job installs at most {MAX_EXTRA_PACKAGES} extra packages ({listed}, with the record's own)"
 		else:
 			msg = f"Preflight installs only packages from its list; {listed} isn't on it"
 		super().__init__(msg)
@@ -147,8 +149,10 @@ def extra_requirements(names) -> list[str]:
 		return []
 	if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
 		raise PackageRefused("missing_package.not_allowed", ["the extra packages (a list of names)"])
-	if len(names) > MAX_EXTRA_PACKAGES:
-		raise PackageRefused("missing_package.not_allowed", [f"more than {MAX_EXTRA_PACKAGES} packages"])
+	if (
+		len(names) > 2 * MAX_EXTRA_PACKAGES
+	):  # a record's own and a request's at most; the count is checked below
+		raise PackageRefused("submission.invalid", [f"{len(names)} asked for"])
 	known = known_packages()
 	no_wheels = {_norm(m) for m in NO_WHEELS}
 	out, refused, unbuilt = [], [], []
@@ -166,6 +170,8 @@ def extra_requirements(names) -> list[str]:
 		raise PackageRefused("missing_package.no_wheels", unbuilt)
 	if refused:
 		raise PackageRefused("missing_package.not_allowed", refused)
+	if len(out) > MAX_EXTRA_PACKAGES:  # counted once each, `sklearn` and `scikit-learn` as one
+		raise PackageRefused("submission.invalid", [f"{len(out)} asked for"])
 	return out
 
 

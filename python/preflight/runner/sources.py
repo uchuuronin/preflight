@@ -494,6 +494,8 @@ def _extra_packages(raw) -> list[str]:
 	except PackageRefused as exc:
 		if exc.code == "missing_package.no_wheels":
 			raise InvalidSubmission(str(exc), code="missing_package.no_wheels") from None
+		if exc.code == "submission.invalid":
+			raise InvalidSubmission(str(exc), code="submission.invalid") from None
 		raise InvalidSubmission(str(exc), code="missing_package.not_allowed") from None
 	return [_REQ_NAME.match(line)[0] for line in lines]
 

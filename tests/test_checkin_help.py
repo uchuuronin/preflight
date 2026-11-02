@@ -51,8 +51,16 @@ def test_a_package_with_no_wheels_says_so_and_more_than_ten_are_refused():
 	with pytest.raises(R.PackageRefused) as exc:
 		R.extra_requirements(["torch-sparse", "timm"])
 	assert exc.value.code == "missing_package.no_wheels" and exc.value.names == ["torch-sparse"]
-	with pytest.raises(R.PackageRefused, match="more than 10"):
-		R.extra_requirements(["timm"] * 11)
+	assert R.extra_requirements(["timm"] * 11) == ["timm"]  # counted once each
+	eleven = sorted(R.known_packages())[:11]
+	with pytest.raises(R.PackageRefused, match="at most 10") as exc:
+		R.extra_requirements(eleven)
+	assert exc.value.code == "submission.invalid"
+	with pytest.raises(InvalidSubmission) as exc:  # a record's ten and a request's one more
+		fetch(_upload(extra_packages=eleven))
+	assert exc.value.code == "submission.invalid" and "at most 10" in str(exc.value)
+	pair = [n for n in eleven if n != "scikit-learn"][:9] + ["sklearn", "scikit-learn"]
+	assert len(R.extra_requirements(pair)) == 10  # an alias pair is one package
 
 
 def test_the_list_c_serves_is_every_known_package_by_pypi_name():
