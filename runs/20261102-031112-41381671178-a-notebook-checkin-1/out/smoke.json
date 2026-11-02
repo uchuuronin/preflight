@@ -1,0 +1,149 @@
+{
+  "submitted": {
+    "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+    "status": "done",
+    "position": null,
+    "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+    "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 12
+  },
+  "events": [
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "seq": 0,
+      "at": "2026-11-02T03:11:31.674037Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "seq": 1,
+      "at": "2026-11-02T03:11:35.569592Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "seq": 2,
+      "at": "2026-11-02T03:11:35.897896Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "seq": 3,
+      "at": "2026-11-02T03:11:36.352386Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 4,
+      "at": "2026-11-02T03:11:37.923546Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 5,
+      "at": "2026-11-02T03:11:53.566572Z",
+      "stage": "skeleton",
+      "message": "map refined by Muse Spark",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 6,
+      "at": "2026-11-02T03:11:53.937167Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 7,
+      "at": "2026-11-02T03:11:54.099463Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 8,
+      "at": "2026-11-02T03:18:27.715675Z",
+      "stage": "probing",
+      "progress": 0.333,
+      "level": "info",
+      "probe_id": "p2",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 9,
+      "at": "2026-11-02T03:18:32.756102Z",
+      "stage": "probing",
+      "progress": 0.667,
+      "level": "info",
+      "probe_id": "p3",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 10,
+      "at": "2026-11-02T03:18:47.304263Z",
+      "stage": "predicting",
+      "message": "measured; predicting",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "share_token": "-vEITSSnJnTssUOP2y8Z4g",
+      "seq": 11,
+      "at": "2026-11-02T03:18:49.443373Z",
+      "stage": "predicting",
+      "message": "predicted",
+      "level": "info",
+      "record_rev": 3
+    },
+    {
+      "job_id": "01M6D3V7ASGN3XCCXGAKQEZPFJ",
+      "record_id": "01M6D3VC0R2Z7CVRWK818ZYJNB",
+      "seq": 12,
+      "at": "2026-11-02T03:18:49.761432Z",
+      "stage": "done",
+      "progress": 1.0,
+      "level": "info"
+    }
+  ],
+  "error": null
+}
