@@ -806,6 +806,10 @@ a {
 .pf-stage.is-stopped { color: var(--pf-fg); box-shadow: inset 0 0 0 1.5px var(--pf-fail); }
 .pf-stage.is-stopped .pf-stage__dot { border-color: var(--pf-fail); background: var(--pf-fail); }
 /* The runner's words on the leg the job is on (a GPU wait). */
+/* Boarding, after a stop while reading or installing: the step, what's missing, the way past (CheckinHelp.tsx). */
+.pf-checkin-help { display: grid; gap: 10px; margin: 16px auto 0; padding: 16px 18px; border-radius: var(--pf-radius-lg, 18px); text-align: left; max-width: 640px; }
+.pf-checkin-help p { margin: 0; }
+.pf-checkin-help .pf-btn { justify-self: start; }
 .pf-stage__note { text-align: center; min-height: 1.4em; }
 .pf-stage__stopped { margin-left: auto; font-family: var(--pf-font-mono); font-size: 10.5px; color: var(--pf-fail); white-space: nowrap; }
 .pf-route__done.is-stopped { stroke: var(--pf-fail); }

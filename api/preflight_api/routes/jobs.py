@@ -109,6 +109,18 @@ def _store_error(e: Exception) -> ApiError:
 	return ApiError(502, "store_error", "The job queue didn't answer; try again shortly.", retryable=True)
 
 
+@router.get("/packages")
+async def packages() -> dict:
+	"""The packages Preflight's probes install by name, keyed by the import name a script uses (A's
+	`preflight.recorder.requirements.KNOWN_MODULES`), and the ones it can't (no wheels on PyPI):
+	Boarding fills its "extra packages" box from a missing import's name (C, Nov 2)."""
+	try:
+		from preflight.recorder.requirements import KNOWN_MODULES, NO_WHEELS
+	except Exception:
+		return {"known": {}, "no_wheels": []}
+	return {"known": dict(sorted(KNOWN_MODULES.items())), "no_wheels": sorted(NO_WHEELS)}
+
+
 @router.post("/jobs", status_code=202)
 async def create_job(request: Request) -> dict:
 	store = _store(request)

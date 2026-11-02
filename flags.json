@@ -20,6 +20,7 @@
 	"c.exports": false,
 	"c.campaign_calendar": false,
 	"c.inflight": false,
+	"c.checkin_help": false,
 	"d.expertise": false,
 	"d.currency": false,
 	"engine.memory": false,
