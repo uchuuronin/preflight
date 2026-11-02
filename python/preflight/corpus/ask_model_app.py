@@ -18,7 +18,7 @@ import modal
 
 APP_NAME = "preflight-ask-model"
 MAX_USD = 2.0  # cited: PM, Nov 2, item 2 (Meta credit, cap $2)
-# guess: a call's worst case at Muse Spark's list price, 120k input and 8k output tokens; harness/spark.py prices
+# guess: a case's worst cost with its re-ask (60k characters in, 4k tokens out, twice) at harness/spark.py's prices, with room
 WORST_CALL_USD = 0.25
 
 app = modal.App(APP_NAME)
@@ -26,6 +26,8 @@ image = (
 	modal.Image.debian_slim(python_version="3.11")
 	.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26", "httpx>=0.27")
+	.env({"PREFLIGHT_ZOO": "/root/zoo"})  # review, Nov 2: the zoo samples, as runner/modal_app.py ships them
+	.add_local_dir(str(Path(__file__).resolve().parents[3] / "zoo"), "/root/zoo")
 	.add_local_python_source("preflight")
 )
 
@@ -66,8 +68,8 @@ def _narrow(uri: str, commit: str, entrypoint: str, args: list[str]) -> dict[str
 		if n == entrypoint
 		or (str(Path(n).parent) == here and n.endswith(SUFFIXES))
 		or any(
-			n.endswith((a, a + ".yaml", a + ".yml", a + ".json")) for a in named
-		)  # torchtune names configs bare
+			"/" in a and n.endswith((a, a + ".yaml", a + ".yml", a + ".json")) for a in named
+		)  # torchtune names configs bare; a bare word ("random", "500") is no file name
 	]
 	out = {}
 	for n in want:
@@ -94,16 +96,18 @@ def ask_all(cases: list[dict], max_usd: float = MAX_USD) -> dict:
 			rows.append(row)
 			continue
 		src = c["source"]
-		try:
-			got = fetch(src)
-			files, entry, args, how = got.files, got.entrypoint, got.args, "the runner's fetch"
-		except InvalidSubmission as exc:
-			files = _narrow(src["uri"], src["commit"], src["entrypoint"], src.get("args") or [])
-			entry, args = src["entrypoint"], src.get("args") or []
-			how = f"narrowed: the runner refused the repo ({str(exc)[:120]})"
-		row["files"] = {"how": how, "n": len(files)}
 		before = len(client.calls)
-		try:
+		try:  # review, Nov 2: one case's failure, its fetch included, is its own row
+			try:
+				got = fetch(src)
+				files, entry, args, how = got.files, got.entrypoint, got.args, "the runner's fetch"
+			except InvalidSubmission as exc:
+				if src.get("kind") != "repo":
+					raise
+				files = _narrow(src["uri"], src["commit"], src["entrypoint"], src.get("args") or [])
+				entry, args = src["entrypoint"], src.get("args") or []
+				how = f"narrowed: the runner refused the repo ({str(exc)[:120]})"
+			row["files"] = {"how": how, "n": len(files)}
 			ans, _ = client.structured(
 				am.messages(files, entry, _command(entry, args), c["gpu"], c.get("steps")),
 				am.Answer,
