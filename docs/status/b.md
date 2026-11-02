@@ -1,8 +1,26 @@
 # Status · B (prediction engine and corpus)
 
-Updated Sun Nov 1, 11 AM ET, on `ws-b` (merges, not rebases, for pushed commits).
+Updated Mon Nov 2, about 1 AM ET, on `ws-b` (merges, not rebases, for pushed commits).
 
 **Unseen scripts:** B has not opened `unseen-scripts.md` in the Project, and won't before Monday's scoring.
+
+## Decisions overnight (Nov 2, under Chiya's 12:16 AM autonomy note)
+
+| # | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 1 | **Grid fix:** every 1-D grid axis (and every grid) now holds each probed value of its knob and the knob's current value, inside the 16,384-cell budget; when the extra stops push a grid over it, the unprobed stops farthest from the current value go first (0755724, review fixes 717312c). | The PM's bug: the pretrain sample probed batch 8 and 12, but its batch axis was [2, 3, 6, 12, 24, 48, 96], so the probed batch 8 read "not trusted". | none | revert 0755724 and 717312c, refill `schema/examples/pretrain.json` |
+| 2 | **Records changed by the sweep:** only `schema/examples/pretrain.json` (refilled; its five 1-D batch grids gain 8, which is now trusted (memory and P(OOM) abstain only at 48 and 96; time and cost grids at 2, 48 and 96, and no longer at 3)). `campaign-grid.record.json` gains 8 too, but its stored grids already hold it, so it needed no refill. The other 14 of the 16 records (examples, web fixtures, zoo) have no off-grid probed value. | The PM asked which records changed. | none | as 1 |
+| 3 | **`finetune.json` not refilled.** | A refill makes eval batch 4 read "fits" there, which breaks C's guide test "says honestly that nothing safe can be moved" (`web/src/guide/guide.test.ts`); that's C's call. | none | refill it with `PREFLIGHT_GOLDEN_ENGINE=1 uv run python scripts/make_golden.py` once C updates the test |
+| 4 | **Validation readiness:** the scorer run on every full run we have, on table 50ea0fb14a; the table is in `docs/validation/table-nov2.md` and between the markers in `README.md` and `docs/readme-final.md`. A new **Status** column says measured, simulated or not yet run (ab6e310). | Overnight item 2. | none | revert ab6e310 |
+| 5 | **The agent row, on A's 500-task MBPP run:** the 30-task sample's 90% interval, $5.90 to $13.71 (point $7.15), holds the whole run's **$6.66** (the 30 sampled, $0.43, plus the other 470, $6.23, run 41383158427; all 470 ended done). Hit, 1 of 1. The point is 7% high. | Overnight item 3: written either way. | none | drop `agent_total_usd` from the manifest |
+| 6 | **Knob response row from C's stranger test**, run in B's container on a local build of main cfcf83c (18 of 18 checks passed): p95 198 ms at 4x CPU slowdown, 9 of 9 under 400 ms. The manifest's `knob_ms` now takes the test's own file, as C asked. | The deployed site isn't reachable from here; main's own build is the same web code. | none | drop `knob_ms` from the manifest |
+| 7 | **The GRPO A10 run counts as calibration for every row** in the validation manifest. | Its record's only probe is that 50-step run, so predicting it from itself tests nothing, and it calibrated the rollout band. | none | change its `calibrates` |
+| 8 | **`engine.serving` stays off.** | No vLLM full run has finished (A's serving debug run of Nov 1 hit its 420 s limit at 24 of 1,024 prompts, with 251 KV preemptions), so the serving rows have nothing to score and the simulation is checked against no measured throughput. | none | the PM flips it once a vLLM full run scores within 15% |
+| 9 | **`engine.divergence` stays off.** | The classifier misses held out: AUROC 0.66 (95% 0.56 to 0.76) against 0.85; lead 138 steps (3 to 269). The threshold rules (D6) give the warning either way. | none | none needed |
+| 10 | **LC-PFN is not wired; no loss forecast ships.** Held out on the divergence sweep's 676 runs that didn't diverge (seen for 60 or 150 of 600 steps; LC-PFN on Modal, CPU, run 41397869309): the power law's 90% band covers 24% and 23%; LC-PFN's 93% (Wilson 90 to 95%) at 60 steps but 74% (70 to 77%) at 150; the ensemble 92% and 89.6% of the curves it answers, abstaining on 380 and 129 (40% and 72% over all 676). Report: `corpus/reports/loss_coverage_nov2.json`; the card is in `engine/lossforecast.py`. | Overnight item 6: wired only where its held-out coverage meets the 90% band. It does at 60 steps alone, on one model family, and falls as the probe sees more, so I didn't wire that one case. The forecast was never in `predict`, so nothing shown changes. | about $0.01 | none needed; to revisit, rerun `scripts/loss_coverage.py` on other job types |
+| 11 | **Datasheet labelling write-up:** already on `ws-b` (213ba35, pushed Nov 1): model-written labels, 62% memory agreement, divergence 89% against a 94% always-"stable" baseline, 39 of 41 failure kinds, nothing trains on them. | Overnight item 4. | none | — |
+| 12 | **RL entropy hook memory probe:** done before midnight under the PM's approval (A10, about $0.15, 80b8684): no OOM; 21.46 GB allocated and 22.91 GB reserved of 23.68 GB. | Overnight item 5. | $0.15 (Nov 2's standing yes) | — |
+| 13 | **Option (b) for the fits floor and table 50ea0fb14a** were landed before midnight on Chiya's and the PM's calls (Nov 1, 9:47 PM and 11:58 PM); listed so the morning sees them in one place. | — | — | the old table is saved; revert the install commit |
 
 ## Plan items B owns (updated Sun Nov 1, 1 AM ET)
 
@@ -193,12 +211,11 @@ Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixt
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).
 - AMD: waits on Chiya's access approval.
-- Cross-GPU top-up (up to $25, Chiya, 6 PM ET): waits on the PM's check of the config list (`from-b.md`).
 - "Fits" on L4 and A10 fine-tunes: 19 held-out runs can't show P(OOM) below 2.5%, so nothing reads "fits"; a choice for Chiya (`from-b.md`).
 
 ## Next (Sun Nov 1, evening)
 - Spark Open labelled the whole corpus: done, $8.79 of the $10 (`corpus/DATASHEET.md`).
-- The top-up, once the PM clears the list; then refit the cross-GPU band and the GBDT residual, rescore leave-one-GPU-out with five GPUs, and post the table as it comes out.
+- The top-up: done (about $16.54 of $25); the five-GPU table is in `docs/decisions/calibration-l4-phase1.md`, the rebuilt calibration table installed on ws-b.
 - LC-PFN: ported and checked on the published checkpoints (quantiles to 1e-6); `lossforecast.ensemble` combines it with the power law. Not in `predict()` yet: it needs a runner hook (A) and a check on real probe losses.
 - Serving calibration when A's capped vLLM record lands (the simulation now carries capped outputs past the cap).
 
@@ -258,6 +275,12 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-lcpfn-check` (GitHub run 41365962299, CPU): the port (`corpus/lcpfn.py`) on both published checkpoints in torch 2.8.0, loaded with `weights_only=True`: the package's quantiles reproduced to 1e-6 on both; a falling loss seen for 200 of 2,000 steps forecast at 2.15 (1.92 to 2.39) against the true 2.09 | CPU x 2 | 8 s (function), about 3 (wall) | about $0.01 |
 | Nov 1 | `b-spark-all-pilot` (GitHub run 41365960062, budget $0.30): 48 rows in 7 batches, 40 answered; one batch failed twice at the 12,000-token cap | Baseten API | 2 (wall) | $0.20 |
 | Nov 1 | `b-spark-all-labels` (GitHub run 41366240357, budget $9.30): all 2,339 rows in 293 batches, 1,997 answered; agreement in `corpus/DATASHEET.md` | Baseten API | 14 (wall) | $8.59 recorded. **Whole-corpus labels $8.79 of the $10** |
+| Nov 1 | `b-topup-dry` (GitHub run 41370815841): the sweep's dry run, each GPU's earlier spend read from its ledger | CPU | 3 (wall) | about $0.00 |
+| Nov 1 | `b-topup-seed1` (GitHub run 41371132428, caps H100 $11, L40S $6.78, A10 $5.08, L4 $4.92, T4 $1.14, each its earlier spend plus the new cap): H100 293, L40S 293, A10 280, L4 89 (its sixth wave timed out after 690 s with no L4 free, $4.66 of $4.92 counted; the wave's 720 container-s, about $0.18, came after), T4 62 | H100, L40S, A10, L4, T4, at most 4 containers each (8 GPUs at once at the peak; PM, 8:12 PM: at most 3 from now on) | 100 (wall) | $12.82 with the L4's timed-out wave |
+| Nov 1 | `b-topup-seed0` (GitHub run 41376298722, the same caps): H100 199 more (492 in all), L40S 99 more (392) | H100, L40S | 25 (wall) | $3.68 |
+| Nov 1 | `b-topup-export` (GitHub run 41378563052): failed, the one-list read ran past 15 minutes | CPU | 16 (wall) | about $0.02 |
+| Nov 1 | `b-topup-export-2` (GitHub run 41380335963): every GPU's rows, per GPU, gzipped | CPU | 6 (wall) | about $0.02. **Top-up total about $16.54 of the $25** |
+| Nov 2 | `b-grpo-entropy-check` (GitHub run 41391382671, Chiya's yes, under $1): zoo/grpo_trl through ground_truth with the TRL 0.14 entropy hook, 2 bare and 12 recorder steps; no OOM, peak 21.46 GB allocated and 22.91 GB reserved of 23.68 GB; rl.entropy 12 values, 0.33 to 0.50 nats (rl_entropy_exact) | A10 x 1 | 8 (wall), about 450 GPU-s | about $0.15 |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
@@ -285,6 +308,7 @@ Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking onc
 | Sun Nov 1, about 6:40 PM | 79a9f8f fits/tight/fails reasons and serving past the cap (CI green on its own push) | none | read-only review of 79a9f8f: the fails prefix and a docstring, fixed before the push | clean, both scans, by exit code |
 | Sun Nov 1, about 8:30 PM | a79d3c2 whole-corpus labelling job and inputs; ae0609a the top-up plan and `--exclude-keys`; 0d57c8a its review fixes; b5e510a the labeller's try/finally; 8eab96b the LC-PFN port, its Modal check and the loss ensemble; 225d542 the run length from the probes' dataset length; 6c520ce and 8440567 its review fixes; 0e594ec the review minors; f6388c1 requests and status; and this status commit | none | read-only reviews: a79d3c2 (three blocking points fixed, then re-checked; the re-check's hang fixed in b5e510a and checked again), ae0609a (nothing blocking), 8eab96b with b5e510a (nothing blocking), 225d542 (blocking, fixed in 6c520ce, re-checked clean) | clean, both scans, by exit code |
 | Sun Nov 1, about 9:00 PM | 46f5522 and acb3138 the whole-corpus labels and their datasheet fixes (pushed about 8:45 PM, CI green); c8882d9 the fits floor (option b); f42cc91 serving reads A's probe cap; eb5e8d0 requests; 4929979 their review fixes (the pool only lowers P(OOM), the calibration does the same, serving's min cap); the equal-caps fix; and this status commit | none | read-only review of c8882d9 and f42cc91 (blocking on c8882d9: P(OOM) fell as memory rose), re-checked clean after 4929979; the equal-caps point from the re-check fixed | clean, both scans, by exit code |
+| Sun Nov 1, about 11:10 PM | ef5c17e per-GPU export (pushed 9:55 PM); 9b7a897 FakeTensor cross-check, 12526ec its review fixes; 8c03ee8 RL signals, 3a4088d the entropy off-by-one fix, a5e6b1d its test, b6ee8be formatting (pushed 10:55 PM, CI green); fa831b7 the rebuilt calibration table and the five-GPU table; 77992a7 requests; 2a1404a review fixes; and this status commit | none | read-only reviews: ef5c17e (clean); 9b7a897 (blocking: the check's own 638x and two definitional gaps), re-checked clean after 12526ec; 8c03ee8 (blocking off-by-one), re-checked after 3a4088d with its test; fa831b7 (clean: reproduces byte for byte, holdout untouched; doc fixes in 2a1404a) | clean, both scans, by exit code |
 
 ## Contract requests
 In `docs/requests/from-b.md`.

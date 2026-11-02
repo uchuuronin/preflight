@@ -107,9 +107,9 @@ WORKER_TIMEOUT_S = 3600
 
 app = modal.App(APP_NAME)
 
-# The public demo probes on GPUs up to A100-80GB, never H200 (Chiya, Oct 27); a visitor's OOM may
+# The public demo probes on GPUs up to the L40S (Chiya, Nov 1; A100-80GB before, never H200); a visitor's OOM may
 # still step up within the job's dollar budget (pipeline.JOB_BUDGET_USD).
-GPU_CEILING = "A100-SXM-80GB"
+GPU_CEILING = "L40S"  # Chiya, Nov 1 9:47 PM: was A100-SXM-80GB, the web's default request; 48 GB fits a 7B LoRA, A100 numbers come from the cross-GPU model
 # derived: Modal's sandbox rates (3x list: $0.0000394 per core-s, $0.00000667 per GiB-s, modal.com/pricing,
 # Oct 27) for ~4 cores and ~16 GiB while a 1.5B LoRA probe loads and trains = $0.95/h. guess on the
 # usage figures: the first smoke run's Modal bill replaces them
@@ -508,7 +508,13 @@ def _triage_client():
 
 @app.function(
 	image=worker_image,
-	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	# preflight-glimmer: a private job's triage (harness.glimmer_private), key from the secret store
+	# only; without it a private check-in got no triage at all (C, Nov 1)
+	secrets=[
+		modal.Secret.from_name("preflight-meta"),
+		modal.Secret.from_name("preflight-baseten"),
+		modal.Secret.from_name("preflight-glimmer"),
+	],
 	volumes={RECORDS_DIR: records_vol, UPLOADS_DIR: _read_only(uploads_vol)},
 	timeout=WORKER_TIMEOUT_S,
 	max_containers=MAX_RUNNING,

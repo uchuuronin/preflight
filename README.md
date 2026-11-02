@@ -27,7 +27,7 @@ is live at <https://preflight-cqn.pages.dev>.
 | Muse Spark reads each script (the script map) | Boarding's "Reading your script", and the cockpit's job map | `harness.spark_script_map`, on in `flags.production.json` (Chiya, Nov 1) |
 | Predictions with intervals and abstention: memory, step time, cost, risk | The cockpit's four readouts, the knobs and the flight plan | `engine.memory`, on in production (Chiya, Oct 30); it gates the whole prediction step (`runner/pipeline.py`) |
 | Campaign calendar | The campaign sample (illustrative numbers, B's planner on a 12-run grid) | `c.campaign_calendar`, on in production (Chiya, Nov 1) |
-| Checking in your own repo or script | New flight's Repo link and Upload tabs: Preflight runs a few probe steps of your job on a rented GPU, sandboxed, and opens the record in the cockpit (the Notebook tab, `d.notebook`, is off in production) | `runner.queue`, on in production (Chiya, Nov 1). Demo limits: 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site (US$10 a day through Nov 4) [cited: `python/preflight/runner/queue.py`]. Past either, the site opens samples and shared records only until midnight ET |
+| Checking in your own repo or script | New flight's Repo link and Upload tabs: Preflight runs a few probe steps of your job on a rented GPU, sandboxed, and opens the record in the cockpit and a Notebook tab for a Jupyter notebook (`d.notebook`, on in production since Nov 2: a training notebook checked in end to end, A's `a-notebook-checkin-3`) | `runner.queue`, on in production (Chiya, Nov 1). Demo limits: 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site (US$10 a day through Nov 4) [cited: `python/preflight/runner/queue.py`]. Past either, the site opens samples and shared records only until midnight ET |
 | The guide (Muse Spark moves the knobs with tool calls) | The cockpit's guide panel | `c.guide.live`, on in production (Chiya, Nov 1). Smoke runs pass: GitHub run 41273350602, 5 rounds, all called tools [measured], US$0.019 [derived: reported tokens at list prices]. Its spend limits: US$0.40 a tour [derived], and US$10 a day for the whole site [guess: the code's value, pending Chiya's answer], with round limits per visitor and per address (`api/preflight_api/ledger.py`). If the live guide fails before it answers, the rule-based tour starts in its place (`web/src/guide/GuidePanel.tsx`) |
 | Fit map: which settings fit, with the out-of-memory frontier | The cockpit's Fit view: drag your run across the map | `c.fit_map`, on in production (Chiya, Nov 1) |
 | RL readouts: the share of prompt groups with no reward spread, rollout time | The GRPO lens | `engine.rl`, on in production (Chiya, Nov 1); calibrated on A's GRPO runs (L4 smoke runs and a 50-step run on an A10) |
@@ -45,7 +45,6 @@ is live at <https://preflight-cqn.pages.dev>.
 | --- | --- | --- |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
 | The CLI re-check item in the exports | `d.exports_cli` | Built on `main`; on once the repository is public (Nov 3 to 4) |
-| Notebook check-in | `d.notebook` | Built on `main`; on once a real notebook check-in runs through the deployed runner |
 
 **Not used, or not measured**
 
@@ -53,11 +52,11 @@ is live at <https://preflight-cqn.pages.dev>.
 | --- | --- | --- |
 | Divergence classifier | Still misses after a refit on 720 runs, held out by settings family: AUROC 0.66 (0.56 to 0.76) against a 0.85 target, with a lead of 138 steps (3 to 269) [measured: B's fit report], so `risk.divergence` stays off and is not used; the warning comes from the threshold rules | B's fit report, [`divergence_nov1.json`](python/preflight/corpus/reports/divergence_nov1.json) (`1cfa689`) |
 | AMD | No AMD measurements: the AMD Developer Cloud account is on a verification hold, so every AMD figure says "not measured" | `docs/status/b.md`, `docs/status/a.md` |
-| GBDT correction for an unmeasured GPU | Fails held out (51% within 20%, against 60% for the analytical model [measured, corpus]), so it isn't used | `docs/status/b.md` |
-| Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20% [measured, corpus], under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |
+| GBDT correction for an unmeasured GPU | Ties the analytical model held out on five GPU types (57%, 56% to 59%, against K1's 57%, 56% to 58% [measured, corpus, Nov 1]) and is worst on the H100 (42%), so it isn't used | `docs/decisions/calibration-l4-phase1.md` |
+| Step time on an unmeasured GPU | Used, with its range, but 57% (56% to 58%) of held-out queries land within 20% over five GPU types and 6,694 config pairs [measured, corpus, Nov 1], under the 90% target; the H100, never scored before Nov 1, lands at 52%, and the T4 lowest at 51%. The range is honest about that: it covers 90% of held-out pairs, and for an H100 with no probe it runs from about 0.5x to 1.9x the replayed step | `docs/decisions/calibration-l4-phase1.md` (leave-one-GPU-out on the corpus) |
 | Serving model | Built, switched off (`engine.serving`) until its validation row passes | `python/preflight/engine/api.py` |
 | Claim check by Muse Spark Open | Module written, not wired in | `python/preflight/harness/claim_check.py` |
-| Muse Glimmer | Apache 2.0. B is hosting it on Preflight's own GPU for a private mode (`harness.glimmer_private`, off); not live yet | `docs/decisions/glimmer-host.md` |
+| Muse Glimmer | Apache 2.0. B hosts it on Preflight's own GPU (an A100-40GB on Modal) for a private mode, `harness.glimmer_private`, built and checked through the production runner, off until the data-use notice describes it: a private check-in's probe logs are triaged by Glimmer and never sent to Baseten. It agreed with Spark Open's triage category on 9 of 11 failed probes (82%, Wilson 95% 52% to 95%) [measured: A's a-triage-agreement]; the first triage after a quiet spell waits 5 to 8 minutes for Glimmer to start | `docs/decisions/glimmer-host.md` |
 | Full-run validation | Scored on Mon Nov 2 (the table below) | B's scorer |
 
 ## Try it
@@ -181,24 +180,24 @@ come from a stranger test run at 4x CPU slowdown (`KNOB_MS_OUT=out/knob_ms.json 
 web/e2e/stranger.mjs`), copied into the manifest's `knob_ms` list.
 
 <!-- validation:start -->
-| Metric | Target | Measured on | Result | 95% interval | Hit | Notes |
-|---|---|---|---|---|---|---|
-| Peak memory error | Within 10% | Bug zoo and unseen scripts, full runs | not measured |  |  | no full run scored yet |
-| OOM prediction | No missed OOMs; at most 1 false alarm per 10 scripts | Bug zoo and unseen scripts | not measured |  |  |  |
-| Step time, same GPU | Within 15% | Full runs | not measured |  |  | no full run scored yet |
-| Step time, unmeasured GPU | Within 20% | Train on 3 GPU types, test on the 4th | not measured |  |  | no corpus store given |
-| GNN + GBDT ensemble vs GBDT alone | Lower error on held-out architectures | Corpus holdout |  |  | miss | paired gain +4.8% (95% -1.4% to +11.6%); the interval includes zero, so the GBDT is used |
-| Divergence warning | AUROC 0.85+, 100+ steps early | Held-out short runs | not measured |  |  | the classifier's held-out report isn't in yet |
-| Rollout time (RL) | Within 20% | An unseen TRL script (the GRPO zoo script calibrated it, Nov 1) | not measured |  |  | no full run scored yet |
-| Serving tokens/sec | Within 15% | vLLM full runs | not measured |  |  | no full run scored yet |
-| Agent run total cost | Inside the 90% interval | Full benchmark run vs the 30-task sample | not measured |  |  | no full run scored yet |
-| Interval coverage | 90% intervals cover at least 88% | All of the above | not measured |  |  | no full run scored yet |
-| Abstention | Every query outside the probed range is flagged | Automated test | not measured |  |  | tests/test_engine_api.py, run with the suite |
-| Planted problems caught | All of them | Bug zoo | not measured |  |  |  |
-| Unseen scripts harnessed | 8 of 9 without hand edits | One per job type | not measured |  |  |  |
-| Knob response | Under 400 ms at p95 | Browser timing | not measured |  |  | no browser timings given |
-| Cost of one Preflight run | Under $1 and under 5 minutes | Modal billing and timer | not measured |  |  | no full run scored yet |
-A "within" target is a hit when at least 90% of runs are within it; intervals are Wilson 95% on the proportion, and a hit is "confident" only when its lower end is at least 90% ("hit, few runs" otherwise). Unseen scripts are never tuned on. Not scored yet: no full runs (seeded from the scorer with an empty manifest, Nov 1).
+| Metric | Target | Measured on | Result | 95% interval | Hit | Status | Notes |
+|---|---|---|---|---|---|---|---|
+| Peak memory error | Within 10% | Bug zoo and unseen scripts, full runs | not measured |  |  | not yet run | no full run scored yet |
+| OOM prediction | No missed OOMs; at most 1 false alarm per 10 scripts | Bug zoo and unseen scripts | 1 of 1 | 20% to 100% | hit, few runs | measured | missed: none; false alarms: none; reliability: 95%-100%: 1 of 1 ran out |
+| Step time, same GPU | Within 15% | Full runs | not measured |  |  | not yet run | no full run scored yet |
+| Step time, unmeasured GPU | Within 20% | Train on 4 GPU types, test on the 5th; no AMD measurements | 3826 of 6694 | 55% to 59% | miss | simulated | K1 roofline, 6694 config pairs over A10, H100-SXM-80GB, L4, L40S, T4; lowest held out: T4, 232 of 454 |
+| GNN + GBDT ensemble vs GBDT alone | Lower error on held-out architectures | Corpus holdout |  |  | miss | simulated | paired gain +4.8% (95% -1.4% to +11.6%); the interval includes zero, so the GBDT is used |
+| Divergence warning | AUROC 0.85+, 100+ steps early | Held-out short runs | 720 runs |  | miss | simulated | AUROC 0.66 (0.56 to 0.76); warns 138 steps early (3 to 269); bootstrap over settings families (the sweep is one architecture); 44 of 720 runs diverged; not used: the warning comes from the threshold rules (D6): 37 of the 44 divergences are fp16 blow-ups and 15 of 44 come in the first 30 steps, before the classifier's 25-step window can say much; held-out AUROC 0.66 against the 0.85 target; median lead 138 steps (95% 3 to 269): the point estimate clears 100, the interval doesn't |
+| Rollout time (RL) | Within 20% | An unseen TRL script (the GRPO zoo script calibrated it, Nov 1) | not measured |  |  | not yet run | no full run scored yet |
+| Serving tokens/sec | Within 15% | vLLM full runs | not measured |  |  | not yet run | no full run scored yet |
+| Agent run total cost | Inside the 90% interval | Full benchmark run vs the 30-task sample | 1 of 1 | 20% to 100% | hit, few runs | measured | agent_eval_spark: predicted $7.15 (90% $5.90 to $13.71), the full run cost $6.66 |
+| Interval coverage | 90% intervals cover at least 88% | All of the above | 1 of 1 | 20% to 100% | hit, few runs | measured |  |
+| Abstention | Every query outside the probed range is flagged | Automated test | checked on every CI run |  |  | test suite | tests/test_engine_api.py, run with the suite |
+| Planted problems caught | All of them | Bug zoo | 3 of 3 | 43% to 100% | hit, few runs | measured |  |
+| Unseen scripts harnessed | 8 of 9 without hand edits | One per job type | not measured |  |  | not yet run |  |
+| Knob response | Under 400 ms at p95 | Browser timing | 9 of 9 | 70% to 100% | hit, few runs | measured | p95 198 ms; stranger test: build main cfcf83c, vite preview, base http://127.0.0.1:4173, cpu slowdown 4x, measured at 2026-11-02T05:28:36.930Z |
+| Cost of one Preflight run | Under $1 and under 5 minutes | Modal billing and timer | not measured |  |  | not yet run | no Preflight run's cost and time given |
+A "within" target is a hit when at least 90% of runs are within it; intervals are Wilson 95% on the proportion, and a hit is "confident" only when its lower end is at least 90% ("hit, few runs" otherwise). Status: "measured" is scored against what real runs did; "simulated" is the engine replaying held-out corpus measurements it never saw, with no full run launched; "not yet run" waits for Monday's runs; "test suite" is checked by the automated tests on every CI run. Unseen scripts are never tuned on. Scored 2026-11-02 06:05 UTC from manifest_nov2.json: 2 runs scored; not measured yet: pretrain_nanogpt, gnn_pyg, retrieval_st, vision_timm, eval_sweep_reasoning, serving_vllm, torchtitan_debug (7); 2 of the 3 with records held out of at least one row. Used for calibration, so not held out: finetune_lora_hf (step, intervals); grpo_trl (every row). Engine flags on (flags.json with flags.production.json): engine.rl, engine.steptime_cross_gpu. Models: agent-bootstrap-cp@0.1.0, agent-context-fill@0.1.0, agent-time-concurrency@0.1.0, cost-gpu-hours@0.1.0, memory-analytical@0.3.1, rl-rollout-bootstrap@0.1.0, rl-zero-spread@0.1.0, steptime-phases@0.2.0, time-total@0.1.0, calibration table 50ea0fb14a.
 <!-- validation:end -->
 
 ## Add-ons

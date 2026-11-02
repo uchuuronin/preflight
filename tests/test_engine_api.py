@@ -585,8 +585,8 @@ def test_the_summary_says_what_the_engine_shows():
 	assert middle and not any(b["shown_as_number"] for b in middle)
 	top = next(b for b in bins if b["lo"] >= 0.95 - 1e-9)
 	assert (
-		top["verified"] is False and top["ooms"] == 11 and top["n"] == 12
-	)  # shown as "11 of 12 similar runs did" (table 67ab8edae6: P(OOM) scored as the engine shows it, Nov 1)
+		top["verified"] is False and top["ooms"] == 15 and top["n"] == 17
+	)  # shown as "15 of 17 similar runs did" (the table rebuilt with the Nov 1 top-up's rows)
 
 
 def test_one_threads_quiet_grid_doesnt_silence_another():
@@ -611,7 +611,7 @@ def test_cross_gpu_time_takes_the_held_out_band_and_its_card_says_so(ft, monkeyp
 	assert "held-out corpus pairs" in moved.reason  # with this band the move abstains (the test below)
 	(card,) = api._cards({steptime.MODEL_ID_CROSS}, ft)
 	assert card.notes.startswith("calibration: held_out") and card.coverage == pytest.approx(
-		2130 / 2286, abs=0.02
+		6030 / 6694, abs=0.02
 	)
 
 
@@ -641,7 +641,7 @@ def test_with_the_held_out_band_a_gpu_move_is_rough_with_a_probe_offer(ft, monke
 	)
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
 	assert "Rough, no probe on this GPU" in card.notes and "26 of 28" in card.notes
-	assert card.coverage == pytest.approx(2130 / 2286)
+	assert card.coverage == pytest.approx(6030 / 6694)
 
 
 def test_without_a_kernel_table_a_gpu_move_still_takes_the_held_out_band(ft, monkeypatch):
@@ -1260,12 +1260,12 @@ def test_the_probe_dataset_length_follows_the_runner_s_rules():
 
 def test_a_cell_with_no_run_over_the_margin_reads_p_oom_from_the_whole_pool():
 	"""Chiya, Nov 1 (option b): 19 L4 fine-tune runs can't show P(OOM) below 2.5%, so with none of them over the
-	margin, the 487 held-out runs decide, and the reason says so. 7.7 GiB on a 22 GiB L4 fits; 17.5 GiB is tight."""
+	margin, all the held-out runs decide (904 since the Nov 1 top-up), and the reason says so. 7.7 GiB on a 22 GiB L4 fits; 17.5 GiB is tight."""
 	path = Path(__file__).resolve().parent / "fixtures/lora_live_nov1_record.json"
 	rec = FlightRecord.model_validate(json.loads(path.read_text()))
 	small = api.predict(rec, {"eval_batch_size": 4, "seq_len": 128}).root["risk.oom"]
 	assert small.point < 0.01 and small.reason.startswith("fits: ")
-	assert "from all 487 held-out runs; none of the 19 L4 finetune runs went over" in small.reason
+	assert "from all 904 held-out runs; none of the 19 L4 finetune runs went over" in small.reason
 	close = api.predict(rec, {"eval_batch_size": 4, "seq_len": 512}).root["risk.oom"]
 	assert (
 		0.01 <= close.point < 0.05
@@ -1274,4 +1274,98 @@ def test_a_cell_with_no_run_over_the_margin_reads_p_oom_from_the_whole_pool():
 	)
 	# a cell with a run over the margin keeps its own count
 	big = api.predict(rec, {"eval_batch_size": 4, "seq_len": 1024}).root["risk.oom"]
-	assert big.reason.startswith("fails: ") and "487" not in big.reason
+	assert big.reason.startswith("fails: ") and "904" not in big.reason
+
+
+def test_a_term_the_faketensor_trace_disagrees_with_is_named():
+	"""PM, Nov 1 (A's item 4): the analytical terms are checked against a FakeTensor trace of the zoo models
+	(scripts/faketensor_memory_check.py); a term off by more than 20% is named in the memory reason, not hidden, and
+	only for the traced model itself (review, Nov 1: a Qwen case said nothing about another model)."""
+	from preflight.engine import _faketensor_check as ft
+
+	root = Path(__file__).resolve().parents[1]
+	rec = FlightRecord.model_validate(
+		json.loads((root / "web/src/workspace/fixtures/lora-live-nov1.record.json").read_text())
+	)
+	r = api.predict(rec, {"eval_batch_size": 4, "seq_len": 512}).root
+	assert "disagrees with a FakeTensor trace of Qwen2.5-1.5B LoRA, bf16 autocast, no checkpointing" in (
+		r["memory.peak"].reason
+	)
+	assert (
+		"activations 0.48" in r["memory.peak"].reason
+		and "logits" not in r["memory.peak"].reason.split("FakeTensor")[1]
+	)
+	assert "FakeTensor" in r["memory.activations"].reason and "FakeTensor" not in r["memory.weights"].reason
+	# with checkpointing every term agrees: no note
+	gc = api.predict(rec, {"gradient_checkpointing": True, "seq_len": 512, "eval_batch_size": 4}).root
+	assert "FakeTensor" not in gc["memory.peak"].reason
+	# another model gets no note from the Qwen case
+	dev = load_record((root / "web/src/workspace/fixtures/dev-finetune.record.json").read_text())
+	assert "FakeTensor" not in (api.predict(dev).root["memory.peak"].reason or "")
+	for row in ft.DATA["cases"].values():
+		for d in row["terms"].values():
+			assert d["n"] > 0 and 0 <= d["wilson_95"][0] <= d["wilson_95"][1] <= 1
+
+
+def test_every_grid_axis_holds_each_probed_value_and_the_current_one():
+	"""PM, Nov 2: the pretrain sample probed batch 8 and 12, but its batch grid's ladder around 12 ([2, 3, 6, 12,
+	...]) skipped 8, so the probed setting read "not trusted" though predict gives a measured 10.6 GB. Every grid
+	axis now holds each value a probe ran at, and the current value, inside the cell budget."""
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	k = rec.knob("batch_size")
+	assert 8 in api.probed_values(rec, k) and 8 not in api.local_values(k)
+	g = next(g for g in api.build_grids(rec, ["batch_size"], targets=["memory.peak"], local=True))
+	assert 8 in g.axes[0].values and 12 in g.axes[0].values
+	for path in [
+		*root.glob("schema/examples/*.json"),
+		*root.glob("web/src/workspace/fixtures/*.record.json"),
+	]:
+		r = FlightRecord.model_validate(json.loads(path.read_text()))
+		for grid in api.fill_predictions(r).predictions.grids:
+			for ax in grid.axes:
+				knob = r.knob(ax.knob_id)
+				for v in api.probed_values(r, knob):
+					if isinstance(v, bool) or not isinstance(v, int | float):
+						continue
+					if (knob.domain.min is None or v >= knob.domain.min) and (
+						knob.domain.max is None or v <= knob.domain.max
+					):
+						assert any(api._same(v, w) for w in ax.values), (path.name, grid.id, v)
+
+
+def test_extra_stops_stay_inside_the_cell_budget():
+	from preflight.schema.encoding import MAX_GRID_CELLS
+
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	k = rec.knob("batch_size")
+	big = [list(range(1, 200))]  # an axis far over budget on its own
+	out = api._with_probed(rec, [k], big)
+	assert 8 in out[0] and 12 in out[0] and len(out[0]) <= MAX_GRID_CELLS
+	two = api._with_probed(rec, [k, k], [list(range(1, 200)), list(range(1, 200))])
+	assert len(two[0]) * len(two[1]) <= MAX_GRID_CELLS and all(8 in a and 12 in a for a in two)
+
+
+def test_a_fully_probed_long_axis_leaves_the_trimming_to_the_others(monkeypatch):
+	# review, Nov 2: when the longest axis is all probed values, the stops to drop come from a shorter axis
+	from preflight.schema.encoding import MAX_GRID_CELLS
+
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	batch, seq = rec.knob("batch_size"), rec.knob("seq_len")
+	monkeypatch.setattr(
+		api, "probed_values", lambda record, k: list(range(1, 129)) if k.id == "batch_size" else []
+	)
+	out = api._with_probed(rec, [batch, seq], [list(range(1, 129)), list(range(64, 263))])
+	assert out[0] == list(range(1, 129))  # every stop was probed, so none goes
+	assert len(out[0]) * len(out[1]) <= MAX_GRID_CELLS
+	assert seq.current in out[1]  # the current value is added, and kept while the others are trimmed
+
+
+def test_a_half_integer_probe_on_an_int_knob_adds_nothing(monkeypatch):
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	k = rec.knob("batch_size")
+	monkeypatch.setattr(api, "probed_values", lambda record, knob: [8.5])
+	assert 8 not in api._with_probed(rec, [k], [[2, 4, 16]])[0]

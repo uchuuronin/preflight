@@ -3,13 +3,13 @@
 import json
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 
 import httpx
 import pytest
 
 from preflight.engine.prices import token_rate
-from preflight.recorder.agent import AgentProxy, read_usage
+from preflight.recorder.agent import AgentProxy, _Server, read_usage
 
 
 class Provider:
@@ -81,7 +81,7 @@ class Provider:
 				self.end_headers()
 				self.wfile.write(data)
 
-		self.server = ThreadingHTTPServer(("127.0.0.1", 0), H)
+		self.server = _Server(("127.0.0.1", 0), H)  # the proxy's backlog too: a 20-call burst reaches it
 		threading.Thread(target=self.server.serve_forever, daemon=True).start()
 		self.url = f"http://127.0.0.1:{self.server.server_address[1]}/v1"
 

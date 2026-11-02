@@ -9,8 +9,9 @@ package's own quantile predictions on a fixed curve, so the port in the runner c
 
     modal run --env main python/preflight/corpus/lcpfn_app.py::fetch
     modal run --env main python/preflight/corpus/lcpfn_app.py::check   # the port (corpus/lcpfn.py) against them
+    modal run --env main python/preflight/corpus/lcpfn_app.py::coverage --curves <curves.json.gz>  # held out
 
-Writes out/lcpfn_fetch.json and out/lcpfn_check.json. The weights stay in the `preflight-lcpfn` volume, never in git.
+Writes out/lcpfn_fetch.json, out/lcpfn_check.json and out/lcpfn_coverage.json. The weights stay in the `preflight-lcpfn` volume, never in git.
 """
 
 from __future__ import annotations
@@ -189,6 +190,58 @@ def check():
 	print(json.dumps(got, indent=1))
 	if not all(m.get("matches") for m in got["models"].values()):
 		raise SystemExit("the port doesn't match the package's quantiles")
+
+
+# Nov 2 overnight list, item 6: LC-PFN's quantiles on held-out real loss curves (scripts/loss_coverage.py prepares
+# them and scores the band); the 12-layer network, the package's default
+COVERAGE_MODEL = "pfn_EPOCH1000_EMSIZE512_NLAYERS12_NBUCKETS1000"
+
+
+@app.function(image=port_image, volumes={MOUNT: vol}, timeout=30 * 60, cpu=4, memory=4096)
+def coverage_quantiles(doc: dict) -> dict:
+	import torch
+
+	from preflight.corpus import lcpfn
+
+	torch.set_num_threads(4)
+	meta = json.loads((Path(MOUNT) / f"{COVERAGE_MODEL}.meta.json").read_text())
+	model = lcpfn.load(Path(MOUNT) / f"{COVERAGE_MODEL}.state.pt", meta)
+	rows = []
+	with torch.no_grad():
+		for c in doc["curves"]:
+			for seen in doc["seen_steps"]:
+				try:
+					q = lcpfn.forecast_loss(model, c["seen"][:seen], last_step=c["steps"])
+					rows.append(
+						{"key": c["key"], "seen": seen, "q": None if q is None else [q.lo, q.mid, q.hi]}
+					)
+				except Exception as exc:  # one curve's failure is its own row, not the whole run's
+					rows.append(
+						{
+							"key": c["key"],
+							"seen": seen,
+							"q": None,
+							"error": f"{type(exc).__name__}: {exc}"[:300],
+						}
+					)
+	return {"model": COVERAGE_MODEL, "port": lcpfn.MODEL_ID, "torch": str(torch.__version__), "rows": rows}
+
+
+@app.local_entrypoint()
+def coverage(curves: str):
+	"""modal run --env main python/preflight/corpus/lcpfn_app.py::coverage --curves <curves.json.gz>  (CPU)"""
+	import gzip
+
+	t0 = time.monotonic()
+	with gzip.open(curves, "rt") as f:
+		doc = json.load(f)
+	got = coverage_quantiles.remote(doc)
+	got["wall_s"] = round(time.monotonic() - t0, 1)
+	got["curves"] = curves
+	Path("out").mkdir(exist_ok=True)
+	Path("out/lcpfn_coverage.json").write_text(json.dumps(got))
+	errs = sum(1 for r in got["rows"] if r.get("error"))
+	print(f"{len(got['rows'])} forecasts, {errs} errors, {got['wall_s']} s")
 
 
 @app.local_entrypoint()

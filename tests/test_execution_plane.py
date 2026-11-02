@@ -425,6 +425,160 @@ def test_the_wait_for_a_gpu_is_logged_and_capped():
 	assert "L4 or A10" in r.probe.error and r.probe.cost.usd == 0 and run.unscheduled == ["L4", "A10"]
 
 
+def test_a_probe_waiting_for_a_gpu_says_so_as_it_waits_and_when_its_up(monkeypatch):
+	# D, Nov 1: an eval run sat 19.5 minutes in "probing" with no events, waiting for an L4
+	import time as _time
+
+	from preflight.runner import sandbox_runner
+
+	monkeypatch.setattr(sandbox_runner, "WAIT_NOTE_S", 0.1)
+
+	class Slow(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(0.45)  # Modal finding a GPU
+			return super().exec(*args, timeout=timeout)
+
+	told = []
+	with SandboxRunner(lambda g: Slow(g)) as run:
+		run.notify = lambda kind, gpu, waited: told.append((kind, gpu, round(waited, 1)))
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+		run(spec("p2"), "L4", should_stop=lambda: False)  # the same sandbox: nothing to wait for
+	kinds = [k for k, _, _ in told]
+	assert (
+		kinds[0] == "waiting" and kinds.count("waiting") >= 3 and kinds[-1] == "up" and kinds.count("up") == 1
+	)
+	assert all(g == "L4" for _, g, _ in told) and r.probe.extras["gpu_wait_s"] >= 0.4
+
+	def broken(kind, gpu, waited):
+		raise RuntimeError("the status line is down")
+
+	with SandboxRunner(lambda g: Slow(g)) as run:  # a notice that fails never stops the probe
+		run.notify = broken
+		assert run(spec("p1"), "L4", should_stop=lambda: False).probe.status == "ok"
+
+
+def test_a_probe_past_its_own_limit_is_stopped_by_the_runner_and_says_timeout(monkeypatch):
+	# serving and eval, Nov 1: the exec's timeout didn't end them; the sandbox's 30 min did, no log
+	import time as _time
+	from dataclasses import replace
+
+	from preflight.runner import sandbox_runner
+
+	monkeypatch.setattr(sandbox_runner, "EXEC_SLACK_S", 0)
+
+	class Hung(FakeProc):
+		def read(self):
+			while not self.sb.terminated:  # a probe that never returns until its sandbox is ended
+				_time.sleep(0.05)
+			raise RuntimeError("sandbox terminated")
+
+	class HungBox(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			p = super().exec(*args, timeout=timeout)
+			return p if args == ("true",) else Hung(self)
+
+	with SandboxRunner(lambda g: HungBox(g)) as run:
+		t0 = _time.monotonic()
+		r = run(replace(spec("p1"), timeout_s=1.5), "L4", should_stop=lambda: False)
+	assert _time.monotonic() - t0 < 5
+	assert r.probe.status == "timeout" and r.probe.error_code == "timeout" and "s limit" in r.probe.error
+
+
+def test_modals_own_capacity_wait_in_create_is_told_bounded_and_falls_back(monkeypatch):
+	# review, Nov 2: a GPU sandbox's create itself waits up to 21 min for scheduling, then raises
+	# "Insufficient capacity": three probes ended "without a result" about 1,280 s in, no wait recorded
+	import time as _time
+	from dataclasses import replace
+
+	from preflight.runner import sandbox_runner
+
+	monkeypatch.setattr(sandbox_runner, "WAIT_NOTE_S", 0.05)
+
+	class ResourceExhaustedError(Exception):
+		pass
+
+	made = []
+
+	def create(gpu):
+		if gpu == "L4":
+			_time.sleep(0.3)  # Modal waiting for an L4
+			raise ResourceExhaustedError("Insufficient capacity to create sandbox.")
+		made.append(FakeSandbox(gpu))
+		return made[-1]
+
+	told = []
+	with SandboxRunner(create, schedule_wait_s=5.0, wait_cap_s=10.0) as run:
+		run.notify = lambda kind, gpu, waited: told.append((kind, gpu))
+		r = run(replace(spec("p1"), gpu_fallback=("A10",)), "L4", should_stop=lambda: False)
+	assert r.probe.status == "ok" and run.ran_on == ["A10"] and run.unscheduled == ["L4"]
+	assert ("waiting", "L4") in told  # the wait inside create is told
+	# no fallback: NoGPU, naming Modal's reason, with the wait recorded
+	with SandboxRunner(create, schedule_wait_s=5.0, wait_cap_s=10.0) as run:
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+	assert r.probe.error_code == "gpu.unavailable" and "Insufficient capacity" in r.probe.error
+	assert r.probe.extras["gpu_wait_s"] >= 0.25
+
+	def slow_create(gpu):  # a create still waiting past the job's wait cap is abandoned, then ended
+		box = FakeSandbox(gpu)
+		made.append(box)
+		_time.sleep(0.5)
+		return box
+
+	with SandboxRunner(slow_create, schedule_wait_s=0.1, wait_cap_s=0.2) as run:
+		r = run(spec("p2"), "L4", should_stop=lambda: False)
+	assert r.probe.error_code == "gpu.unavailable"
+	deadline = _time.monotonic() + 5
+	while not made[-1].terminated and _time.monotonic() < deadline:
+		_time.sleep(0.05)
+	assert made[-1].terminated  # ended when its create came back, never left running
+
+	class Cancelled(Exception):
+		pass
+
+	def cancel(kind, gpu, waited):
+		raise Cancelled()
+
+	with SandboxRunner(slow_create, schedule_wait_s=5.0, wait_cap_s=10.0) as run:  # a cancel mid-wait
+		run.notify = cancel
+		with pytest.raises(Cancelled):
+			run(spec("p3"), "L4", should_stop=lambda: False)
+	deadline = _time.monotonic() + 5
+	while not made[-1].terminated and _time.monotonic() < deadline:
+		_time.sleep(0.05)
+	assert made[-1].terminated  # the sandbox a cancelled wait had asked for is ended too
+
+	def bad(gpu):  # any other create error stays the probe's own
+		raise ValueError("'nope' is not a GPU Modal offers")
+
+	with SandboxRunner(bad) as run:
+		assert run(spec("p4"), "nope", should_stop=lambda: False).probe.error_code == "recorder"
+
+
+def test_a_failed_start_check_is_named_on_the_probe_that_lost_its_result():
+	# Nov 1 to 2: three probes ended "without a result" about 1,280 s in with no GPU wait recorded
+	class NoReady(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				assert timeout < 30 * 60  # under the sandbox's own 30-min life
+				raise RuntimeError("exec timeout exceeds the sandbox's")
+			return super().exec(*args, timeout=timeout)
+
+	class Silent(FakeProc):
+		def read(self):
+			return ""
+
+	class Box(NoReady):
+		def exec(self, *args, timeout=None):
+			super().exec(*args, timeout=timeout)
+			return Silent(self)
+
+	with SandboxRunner(lambda g: Box(g)) as run:
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+		assert "start check failed: RuntimeError: exec timeout exceeds" in r.probe.error
+		assert run.ready_error is None  # told once, on that probe
+
+
 def test_the_jobs_wall_budget_doesnt_count_the_gpu_wait():
 	from preflight.runner.pipeline import Budget
 

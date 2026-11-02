@@ -4,6 +4,22 @@ Only the PM chat edits this file. Each line is something this agent needs from a
 
 `- TODO(contract) [PM -> X] what is needed, and why. (date)`
 
+## Main is ready (overnight, under Chiya's Nov 2 12:16 AM autonomy note)
+
+- MAIN READY [PM -> all] (Nov 2, 2:40 AM ET) **main is 1ea2dd6**, CI green on all seven jobs. In it: ws-a aaba3f6 (GPU-wait events, private jobs never fall back to Baseten, the sandbox's own time limit, failure lines per step, warm-pool dry run, the Modal capacity fix, Glimmer's secret on the worker), ws-b 7998789 (grids hold every probed value, the validation table with its Status column, the MBPP agent row, LC-PFN not wired on its coverage), ws-c 7ba9af9 ("Not measured here", PF102 on the Nov 2 live record, fix-loop verify built, in-flight behind `c.inflight`), ws-d 6c05323 (eval-sweep record, stranger audit, video plan, submission drafts). One conflict resolved by the PM: `tests/test_engine_api.py`, B's docstring with C's pinned fixture path.
+  - **A:** do the gated runner redeploy from 1ea2dd6 now. It carries Glimmer's secret on the worker, the capacity fix, the serving cap and C's fix-loop verify path. Report the SHA in your status file. Then rerun the training-notebook check-in for `d.notebook`.
+  - **C:** after A's runner redeploy, deploy the API and Pages from 1ea2dd6 (gate as usual), then run the fix race. Not before: the private-triage box must not reach visitors while the old runner is live.
+  - **B:** `finetune.json` refill waits on C's guide test ("nothing safe can be moved"); C, update the test or say why not, and B refills.
+  - **Flags:** none changed in this merge. `harness.glimmer_private` passed A's check, but it goes on only after A's runner redeploy is live, because the runner in production still sends private jobs to Spark Open on Baseten. The PM flips it at the next overnight merge (about 3:45 AM ET) once A's status file shows the redeploy. `d.notebook`, `c.fix_loop`: not yet passed. `engine.serving`, `engine.divergence`: B keeps them off (no vLLM full run; the classifier misses).
+  - **Open for the morning:** D found share pages (`/s/<token>`) aren't live because `deploy.yml` doesn't ship `workers/`. C, say what it would take to deploy them with Pages.
+
+- MAIN READY [PM -> all] (Nov 2, 4:00 AM ET) **main is 6f49c9c**, CI green on all seven jobs. In it: ws-a 78ae180 (flaky agent-proxy test fixed, status), ws-c e018e2b, and **`d.notebook` on in production** (A's training notebook, `a-notebook-checkin-3`, passed on the runner from 1ea2dd6). README updated to match.
+  - **C:** deploy the API and Pages from 6f49c9c (gate as usual) so the Notebook tab goes live. A's runner is already on 1ea2dd6, so the fix race can run now.
+  - **C, for `harness.glimmer_private`:** A's check passed and the runner is safe (private jobs never go to Baseten), but `api/tests/test_spark_flag_shared.py` fails with the flag on: the data-use notice (`web/src/app/DataUse.tsx`) has no line for it. Add one (private check-ins: probe logs go to Muse Glimmer on Preflight's own GPU, not to Baseten; the script map still goes to Muse Spark on Meta's API while `harness.spark_script_map` is on). The PM flips the flag at the 5:15 AM merge once it's on ws-c and green.
+  - **A:** after the flag flips, one more gated runner redeploy so the runner image reads `harness.glimmer_private` on. Until then a private check-in gets no triage (safe, never Baseten).
+  - **D:** mirror README.md's `d.notebook` row change into readme-final.md, and change the free-tier chip's "Not trusted yet" to match C's "Not measured here" wording.
+  - Noted: C deployed 1ea2dd6 at 2:40 AM, before A's runner redeploy at 3:24 AM. No harm: the private box was off.
+
 ## Open
 
 - MEASURED [PM -> all] (Oct 28, run 40614430138, runs/20261028-012026-40614430138-pm-smoke-models on remote-runs) Model APIs, 20 tiny requests each, all HTTP 200:

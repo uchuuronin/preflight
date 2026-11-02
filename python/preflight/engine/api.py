@@ -928,7 +928,47 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		# Nov 1: A's A10 GRPO record carried no GPU, and the readout said "tight, 69%" for the knob's L4 unannounced
 		note = f"the probe's GPU isn't in the record, so this is for {gpu} from the GPU knob, with a guessed CUDA context"
 		res = replace(res, peak=_with_note(res.peak, note), oom=_with_note(res.oom, note))
+	disagree = _faketensor_disagreements(arch, setup)
+	if disagree and res.peak.status != "abstain":
+		# PM, Nov 1: a term the FakeTensor trace disagrees with is named, never hidden
+		case, worse = disagree
+		listed = ", ".join(f"{t} {r:.3g}x" for t, r in worse.items())
+		peak_note = (
+			f"the analytical split disagrees with a FakeTensor trace of {case} on {listed} (engine / trace)"
+		)
+		terms = dict(res.terms or {})
+		for t, r in worse.items():
+			if f"memory.{t}" in terms:
+				terms[f"memory.{t}"] = _with_note(
+					terms[f"memory.{t}"],
+					f"the analytical {t} term is {r:.3g}x a FakeTensor trace of {case}"
+					+ ("; the probes calibrate the total" if probed else ""),
+				)
+		res = replace(res, peak=_with_note(res.peak, peak_note), terms=terms or res.terms)
 	return res
+
+
+def _faketensor_disagreements(arch, setup) -> tuple[str, dict[str, float]] | None:
+	"""(the traced case, {term: engine / trace}) for the terms that miss by more than 20% on the zoo model this
+	record runs (scripts/faketensor_memory_check.py), matched on its shape, method, checkpointing and optimizer
+	family; None for any other model (review, Nov 1: a Qwen case said nothing about another model or optimizer)."""
+	from preflight.engine import _faketensor_check as ft
+
+	if not isinstance(arch, memory.TransformerArch):
+		return None
+	opt = str(setup.optimizer).lower()
+	family = "adafactor" if "adafactor" in opt else "adamw" if opt.startswith("adam") else None
+	key = {
+		"model": [arch.n_layers, arch.d_model, arch.vocab_size],
+		"method": setup.method,
+		"checkpointing": setup.grad_checkpointing != "none",
+		"optimizer": family,
+	}
+	for case, row in ft.DATA["cases"].items():
+		if row["key"] == key:
+			worse = {t: d["median_ratio"] for t, d in row["terms"].items() if not d["agrees"]}
+			return (case, worse) if worse else None
+	return None
 
 
 # the terms that grow with batch and length absorb what the model misses; the rest are set by the model's size
@@ -2689,6 +2729,28 @@ def _with_rollout(record: FlightRecord, values: dict, step: _StepResult) -> _Ste
 	return replace(step, est=est, sigma=sigma, phases=ph)
 
 
+def _rl_signals(record: FlightRecord, values: dict, p) -> str | None:
+	"""What the probe's TRL logs say about the run: KL to the reference and where its trend goes by the last step,
+	the policy's entropy, the mean reward. None when the probe logged none of them."""
+	if p is None or not p.rl:
+		return None
+	steps_total, _ = _total_steps(record, values)
+	seen = int(p.steps or 0) or len(p.rl.kl) or len(p.rl.reward_mean)
+	parts = [
+		rl.kl_trend(p.rl.kl, seen, steps_total),
+		rl.entropy_trend(
+			p.rl.entropy,
+			bool((p.extras or {}).get("rl_entropy_estimated")),
+			bool((p.extras or {}).get("rl_entropy_exact")),
+		),
+		rl.reward_trend(p.rl.reward_mean),
+	]
+	if not p.rl.entropy:
+		parts.append("no policy entropy was logged")
+	parts = [x for x in parts if x]
+	return "training signals: " + "; ".join(parts) if len(parts) > (0 if p.rl.entropy else 1) else None
+
+
 def _rl_targets(record: FlightRecord, values: dict) -> dict:
 	out = {"time.rollout": _rollout(record, values)}
 	p = _rl_probe(record, values) or next((q for q in record.probes if q.status in OK_PROBE and q.rl), None)
@@ -2710,6 +2772,10 @@ def _rl_targets(record: FlightRecord, values: dict) -> dict:
 			why += f"; the probe measured {p.rl.zero_spread_fraction:.0%} at its group size of {int(k)}"
 		status = "predicted" if k and int(g) == int(k) else "extrapolated"
 		out["rl.zero_spread"] = _est(iv.point, iv.lo, iv.hi, "fraction", status, mid, why)
+	signals = _rl_signals(record, values, p)
+	if signals and "rl.zero_spread" in out:
+		# A's item 14 (PM, Nov 1): the probe's logged KL, entropy and reward, on the RL lens's risk readout
+		out["rl.zero_spread"] = _with_note(out["rl.zero_spread"], signals)
 	sample = _lengths(p) if p is not None else None
 	cap = values.get("max_completion_len") or (
 		p.generation.max_new_tokens if p is not None and p.generation else None
@@ -2796,6 +2862,72 @@ def local_values(knob: Knob) -> list:
 	return sorted({float(f"{v:.4g}") for v in vals} | {float(knob.current)})
 
 
+def probed_values(record: FlightRecord, knob: Knob) -> list:
+	"""Every value of this knob a probe ran at (ok, cached, or out of memory: each one measured)."""
+	out = []
+	for p in record.probes:
+		if p.status in (*OK_PROBE, "oom"):
+			v = _probe_values(record, p).get(knob.id)
+			if v is not None and not any(_same(v, w) for w in out):
+				out.append(v)
+	return out
+
+
+def _with_probed(record: FlightRecord, knobs_: list[Knob], axes: list[list]) -> list[list]:
+	"""Each axis with every probed value of its knob and its current value in (PM, Nov 2: the pretrain sample probed
+	batch 8 and 12, but its batch grid's ladder around 12 skipped 8, so the probed setting read "not trusted").
+	Inside the cell budget: when the extra stops push a grid over it, the stops farthest from the current value that
+	no probe ran at go first."""
+	out = []
+	for k, ax in zip(knobs_, axes, strict=True):
+		if k.kind in ("bool", "categorical"):
+			out.append(ax)
+			continue
+		keep = [*probed_values(record, k), k.current]
+		lo, hi = k.domain.min, k.domain.max
+		extra = [
+			(int(v) if k.kind == "int" else float(v))
+			for v in keep
+			if isinstance(v, int | float) and not isinstance(v, bool)
+			and (k.kind != "int" or float(v).is_integer())  # review: int(8.5) is a value no probe ran at
+			and (lo is None or v >= lo) and (hi is None or v <= hi)
+		]  # fmt: skip
+		vals = list(ax)
+		for v in extra:
+			if not any(_same(v, w) for w in vals):
+				vals.append(v)
+		out.append(sorted(vals))
+
+	def droppable(j: int) -> list:
+		protected = [*probed_values(record, knobs_[j]), knobs_[j].current]
+		return [v for v in out[j] if not any(_same(v, w) for w in protected)]
+
+	while math.prod(len(a) for a in out) > MAX_GRID_CELLS:
+		# drop one unprobed stop from the longest axis that still has one (review: not just the longest, which may
+		# be all probed values), the stop farthest (in log) from the current value
+		open_ = [j for j in range(len(out)) if knobs_[j].kind not in ("bool", "categorical") and droppable(j)]
+		if not open_:
+			break
+		i = max(open_, key=lambda j: len(out[j]))
+		k = knobs_[i]
+		cands = droppable(i)
+		cur = (
+			float(k.current)
+			if isinstance(k.current, int | float) and not isinstance(k.current, bool)
+			else 0.0
+		)
+
+		def dist(v, cur=cur):
+			try:
+				return abs(math.log(float(v) / cur)) if v > 0 and cur > 0 else abs(float(v) - cur)
+			except (TypeError, ValueError):
+				return 0.0
+
+		drop = max(cands, key=dist)
+		out[i] = out[i][: out[i].index(drop)] + out[i][out[i].index(drop) + 1 :]
+	return out
+
+
 def build_grids(
 	record: FlightRecord, knob_ids: list[str], targets: list[str] | None = None, local: bool = False
 ) -> list[Grid]:
@@ -2805,6 +2937,7 @@ def build_grids(
 	axes_knobs = [record.knob(k) for k in knob_ids]
 	per = 8 if len(knob_ids) <= 2 else 5
 	axes = [local_values(k) if local else axis_values(k, per) for k in axes_knobs]
+	axes = _with_probed(record, axes_knobs, axes)
 	cells = math.prod(len(a) for a in axes)
 	if cells > MAX_GRID_CELLS:
 		raise ValueError(f"{cells} cells is over the inline limit of {MAX_GRID_CELLS}")

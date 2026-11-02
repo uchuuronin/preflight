@@ -153,10 +153,13 @@ EXTRAS_KEYS = (
 	"outputs_compared",
 	"outputs_identical",
 	"generation_ending_known",  # the sequences generation.truncation_rate is over
+	"serving_probe_max_tokens",  # a serving probe stopped each reply here; max_new_tokens is the script's
+	"serving_probe_capped_fraction",  # the share of its replies still running at that cap
 	"rl_zero_spread_groups",  # GRPO groups whose summed rewards were all equal, of rl_groups
 	"rl_groups",
 	"rl_reward_functions",
 	"rl_entropy_estimated",  # 1: rl.entropy is the mean -log p of the sampled completion tokens (TRL logged none; not TRL 0.14)
+	"rl_entropy_exact",  # 1: rl.entropy is the policy's own, from its logits on the update's forward (TRL 0.14)
 	# hygiene: what the script's own checkpoints hold, for a resume that matches
 	"checkpoint_saves_seen",
 	"checkpoint_has_optimizer",

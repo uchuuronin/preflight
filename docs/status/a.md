@@ -1,6 +1,38 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Sun Nov 1, 16:55 ET.
+Updated Mon Nov 2, 03:40 ET.
+
+**Production runner: deployed from main 1ea2dd6** (`a-deploy-main-21`, GitHub 41412727746, Nov 2 08:24 UTC / 03:24 ET), after both startup checks passed (`a-startup-check-21` 41412104839, `a-startup-check-serving-7` 41412457816). It carries Glimmer's secret on the worker, private jobs never on Baseten, the Modal capacity fix, the runner-held probe limit, the GPU-wait events, the serving cap (1,024 tokens) and C's fix-loop verify path. The limit check passed after it (`a-limit-check-2`, 41412867356): three probe jobs accepted, the fourth refused with `limit.visitor_daily`. The previous deploy was ws-a 530785e (03:09 UTC); rollback is `modal deploy --env main` from 530785e.
+
+## Decisions overnight (Chiya's autonomy, Nov 2 12:16 AM ET)
+
+| When (ET) | Decision | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 00:20 | Formatted with CI's own ruff (0.17.3, from uv.lock) instead of the local 0.16.9 | CI's format check failed on a notebook the local ruff left alone (ed85b1b); fixed in 1e2067c | none | none needed |
+| 00:25 | GPU waits shown as `probing` events ("waiting for a free L4 GPU …", "… ready; probe running") plus `waiting_for_gpu: {gpu, since}` in GET /v1/jobs/{id}, not a new stage | a new stage is a contract change; the status passthrough and the free-text message need none | none | revert the commit; the key is additive, C may ignore it |
+| 00:25 | A private job is never triaged on Baseten: with `harness.glimmer_private` off it gets no triage (it used to fall back to Spark Open) | the contract's privacy promise (0.6.2), found by review | none | `pipeline._triage_client`: return `deps.triage` for private jobs again |
+| 00:25 | The runner holds the probe's own time limit (past it the sandbox ends, the probe reads `timeout`) | two probes ran to the sandbox's 30 min with no log (serving, eval) | none | `sandbox_runner.py` watcher: drop the limit check |
+| 00:30 | Ran the private-triage check on the production LoRA record (zoo, not derived) through the ops app with the worker's own clients and secrets, `harness.glimmer_private` on in that process only | item 3: proves the worker path before the PM's flag | $0.163 (Glimmer approval: $1.46 of $3 used) | nothing to undo; production's flag untouched |
+| 00:35 | Specific failure lines for the submission, patch and demo-limit codes; the limit lines reach visitors only once C's API adds them (asked in from-a.md) | item 43: every code names its step and a way past it | none | revert 2637ee6 and its fix |
+| 00:40 | `warm_pool_dry_run` in the ops app, read only (hydrates the deployed worker, reads the tick's last setting) | item 45: a dry run without touching production; the pool stays off until Nov 5 | none (CPU, about a minute when run) | delete the function |
+| 00:45 | Wrote zoo/notebook_tiny/tiny_train.ipynb (a 200-step MLP with AdamW) for the notebook check-in | item 5: D's colab_lora fixture has no optimizer, so it can't pass as a training check-in | none | delete the folder |
+| 03:20 | Redeployed the runner from 1ea2dd6 itself, not main's head 89ed12e | the PM's note names 1ea2dd6; 89ed12e only adds that note (docs), and its CI's one failure is a flaky agent-proxy test, fixed on ws-a in 6c73978 | none (CPU checks, the serving check's L4 minutes) | `modal deploy --env main` from 530785e |
+| 03:25 | Agent proxy listen backlog 5 → 128 (6c73978) | main's CI (89ed12e) saw one connection reset in the 20-call cap test; not reproduced locally in 60 runs under load, see 03:35: hardening, not the flake's fix; a visitor's agent can burst that many calls too | none | revert 6c73978 |
+| 03:29 | Training-notebook check-in on the new runner (`a-notebook-checkin-3`) | item 5, after the redeploy as planned | $0.023 [measured] | nothing to undo |
+| 03:35 | Kept the backlog change, but it isn't the CI flake's fix | the review found a full listen queue on Linux stalls rather than resets, and main's failed log has no handler exception, so the reset's cause is still unknown; the change is harmless. The review's second concern (a 404 or 413 closing with the body unread could reset) didn't reproduce: 60 posts of 1 to 60 MB all read their 404 or 413 cleanly, so that path is unchanged | none | revert 6c73978 |
+| 03:27 | Ran `warm_pool_dry_run` against production (`a-warm-pool-dry-1`, 41413074651), read only | item 45's dry run before the pool turns itself on | CPU, about a minute (cents) | nothing to undo |
+| 01:25 | **The "ended without a result" cause, found by review in Modal's SDK (1.6.3):** a GPU sandbox's create itself waits up to 21 min (1,260 s) for scheduling and then raises "Insufficient capacity"; the runner caught it as a broken sandbox, so no fallback, no NoGPU and no wait recorded. Now create runs inside the runner's wait: told each minute, bounded by the job's wait cap, an L4 out of capacity falls back to the A10, the last GPU gives `gpu.unavailable` naming Modal's reason, and a create still waiting when the runner gives up is ended when it returns | three probes (serving, eval, a training notebook) lost this way; a queue wait read as a hang | none | `sandbox_runner.py`: create back in the loop |
+| 01:05 | `READY_TIMEOUT_S` 30 → 25 min, and a failed sandbox start check is named on the probe that lost its result | the training-notebook check-in (`a-notebook-checkin-2`, 41394704676) ended like the serving and eval probes: "without a result" 1,284 s in, no GPU wait recorded; the same script ran in 5 s under the recorder on an A10 outside the sandbox (`a-gt-notebook-tiny`, 41397365737), so the sandbox path is at fault; the likely cause, a start check as long as the sandbox's own 30-min life failing at once, isn't proven | $0.64 (the check-in), about $0.02 (the ground truth) | `sandbox_runner.py`: READY_TIMEOUT_S back to 30 min |
+
+**Monday's unseen runs, ready (item 8; the list not opened):** from the `validation-freeze` tag, per script:
+(1) `ops_app.py::smoke --dir <dir> --entrypoint <file> --args=--a=1,--b=2 --visitor a-unseen-<n> --gpus L4,A10` checks it in through production as an upload (the record, the failures naming their step);
+(2) `ops_app.py::ground_truth --dir <dir> --entrypoint <file> --args=... --bare-steps <n> --first-gpu A10 --install-requirements` for its full run (bare and recorder, step times, memory; serving and torchtitan scripts pick their own image).
+Arguments go comma-separated (remote-run allows no quotes), `,,` for a comma inside one. Cost per script about $0.20 to $0.60 (check-in) plus the full run's own minutes on an A10 (about $1.10/h), under Chiya's $30 for Monday.
+
+**Checks passed overnight (for the PM's flags):**
+- **`harness.glimmer_private`: passed.** `a-private-triage-1` (GitHub 41394153172, Nov 2 05:33 UTC): the worker's private-job triage (`pipeline._triage`, private=True) with the worker's own clients and the preflight-glimmer secret, now mounted on `run_worker` too, live since the 08:24 UTC redeploy from 1ea2dd6: Glimmer triaged the LoRA record's p1-eval as `triage.oom` ("The eval pass ran out of GPU memory after 3 optimizer steps", quoting the recorded line), one call, 279 s (cold), $0.163; no call to Baseten. With the flag off, a private job now gets no triage at all, never Baseten.
+- **Warm pool (item 45), dry run passed** (`a-warm-pool-dry-1`, Nov 2 08:27 UTC, against the deployed runner, changing nothing): the deployed `run_worker` is found and scalable; the tick last set 0 warm workers and wants 0 now; from Nov 5 00:00 ET it wants 1 warm worker and L4 jobs probe on the A10 (a job allowed only the L4 stays on the L4), back to 0 and the L4 at Nov 9 00:00 ET. The pool turns itself on at Nov 5 00:00 ET from the deployed code, with no other step.
+- **`d.notebook`: passed.** `a-notebook-checkin-3` (GitHub 41412922818, Nov 2 08:28 UTC, on the runner deployed from 1ea2dd6): zoo/notebook_tiny/tiny_train.ipynb (a 200-step MLP with AdamW) checked in through production as kind `notebook`: converted, mapped (lens pretrain), probed three times, predicted, done; record 01M6DNTCTH4PNBHVACETPK8JZ9. All three probes `ok`, with 14, 9 and 9 optimizer steps (p50 step 1.7 ms) [measured]. The capacity fix showed in production too: no L4 could be scheduled, so after 2 min of "waiting for a free L4 GPU (N min so far)" the job's points ran on an A10 ("no L4 could be scheduled; this job's points run on A10"), `gpu_wait_s` 122.5 on p1. Cost $0.023 [measured]: $0.0055 GPU, $0.0177 model calls. (Check-in 2, which lost its probe on the old runner, cost $0.64.)
 
 - **Now:** the Pareto sweep (Muse Spark arm, then Spark Open, on its own $1 ledger); the redeploy gated on the new probe-user startup check (a tiny torch.compile and the vLLM and datasets imports as uid 61000), then the serving probe again on the fixed image.
 - **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning/torchtitan adapter checks, the Muse Spark script-map gate; LoRA ground truth on L4, GRPO 50-step ground truth on A10, DDP and FSDP on 2 × A10; the production runner deployed and left running.
@@ -13,6 +45,7 @@ Updated Sun Nov 1, 16:55 ET.
 
 | When (ET) | Range | What it sends | Review | gitleaks |
 |---|---|---|---|---|
+| Nov 2 03:42 | aaba3f6..(this push) | the agent proxy's listen backlog 128 (6c73978); status: the runner redeploy from 1ea2dd6, the limit check, the warm pool's dry run, d.notebook passed; requests: the runner is live (to PM, C), the notebook passed (to D, PM) | one read-only review of 6c73978: correct and harmless, likely not the flake's cause (logged at 03:35) | clean |
 | Nov 1 10:57 | 9e46c3c..4cc6f57 | dataset size from the probes (0bdff6f, abb93ad, fb84348); the probe uid's user name and passwd/group entry (e5b0713, 4cc6f57); the A10 GRPO record, run log and B handoff (03d1420) | 3 read-only rounds (dataset size 2, probe user 1) | clean |
 | Nov 1 11:06 | 4cc6f57..9afbf4c | the probe-user startup step (47f68ed, 88cd732); the C note on the redeploy (cf96ea5); status and B notes (ead63bb, 17582b7, 9afbf4c) | 1 read-only round | clean |
 | Nov 1 11:20 | 9afbf4c..20ebb7a | the torch.compile startup step and gcc/g++ in the sandbox images (b86b72a); pyarrow 17 in the serving image and its datasets import check, the wrong-version message (0771c5f, 20ebb7a); a comment order (bdcebd6); status (53c392c, 107ce3e) | 1 read-only round each | clean |
@@ -28,6 +61,9 @@ Updated Sun Nov 1, 16:55 ET.
 
 ## Known limits, on purpose
 
+- Under the L40S ceiling (Nov 1), a probe or verify follow-up on a record measured on an A100
+  before that night runs on the L40S with the cross-GPU warning, and, the GPU being different,
+  starts afresh: the parent's probes, predictions and models aren't carried (review, Nov 1).
 - The Glimmer arm prices each call by its own wall time at the A100-40GB rate: calls sharing the
   container are each charged in full and its cold start and idle time aren't, so the proxy's count
   isn't Modal's bill. Each call reserves its longest possible time, so 4 calls in flight hold
@@ -181,33 +217,33 @@ included. Hero lenses first.
 | 1 | Probes, recorder, memory terms by term, eval-OOM re-run, P(OOM) inputs (lens) | main; L4 run Oct 28 | 0 |
 | 2 | Packing and padding-waste measurement (lens, contract) | main (`padding_fraction`, `tokens_per_sample_mean`) | 0 |
 | 3 | Longest dataset row for B's memory rule (B, Oct 30) | ws-a | 0 |
-| 4 | FakeTensor cross-check of the analytical memory terms (contract) | not started | 3 |
+| 4 | FakeTensor cross-check of the analytical memory terms (contract) | handed to B (PM, Nov 1 9:47 PM) | 0 |
 | 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | bare run measured Oct 31; recorder half failed on a cache permission (fixed locally); rerun with 210 steps needs a yes | 0.5 + paid run |
 | **Agent and API runs (hero)** | | | |
 | 6 | OTel GenAI proxy around any OpenAI-compatible client (lens, contract) | ws-a (`recorder/agent.py`) | 0 |
 | 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | ws-a: proxy run mode, pipeline, `sample_more`, CLI; local: the hosted path (proxy behind a tunnel, script in a sandbox with no secrets), first run waits for a yes; the bound is B's `agent_totals` | 1 + API spend |
-| 8 | Rate-limit wall-clock (lens) | not started | 2 |
+| 8 | Rate-limit wall-clock (lens) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 9 | Pareto model sweep across Muse Spark and Spark Open (lens, contract) | not started | 4 |
 | 10 | Agent zoo script and an agent record on the public app (G1) | not started (D writes the script) | 2 |
 | **RL post-training (hero)** | | | |
 | 11 | GRPO zoo script, public model and data, 512-token completion cap planted (competitive #1) | local (`zoo/grpo_trl`); review: at 512 the truncation rate may be only a few percent on Qwen2.5-0.5B, ground truth will say | 0.5 |
 | 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | local: all five; weight sync misses the ZeRO-3 gather and vLLM V1 (V0 engine path only) | 0.5 |
 | 13 | Pass rate per prompt for B's zero-variance fraction (lens) | local (`recorder/rl_groups.py`, `rl.pass_rate_per_prompt`, `rl.zero_spread_fraction`) | 0 |
-| 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals) | 2 |
+| 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals; entropy estimate from the policy's log-probs); the rest handed to B (PM, Nov 1 9:47 PM) | 0 |
 | **Campaign (hero; B owns the model)** | | | |
-| 15 | Probes for a grid's points (a campaign is many records from one script) | not started; needs B's campaign spec | 3 |
+| 15 | Probes for a grid's points (a campaign is many records from one script) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | **Other lenses** | | | |
 | 16 | LM pretraining: throughput, MFU, loader probe, stability signals (lens) | main | 0 |
-| 17 | LR range test (lens, contract) | not started | 3 |
+| 17 | LR range test (lens, contract) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 18 | Checkpoint resume exact-match (lens, contract, hygiene) | local: what the script's torch.save is given (weights with or without optimizer state, LR schedule, RNG, step; HF Trainer's optimizer.pt / scheduler.pt / rng_state by name) becomes `hygiene.resume_mismatch`. A content check, not a resumed run replayed step for step | 3 |
-| 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
+| 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main, eval probe stops after two generate calls; the eval-sweep record handed to D (PM, Nov 1 9:47 PM) | 0 |
 | 20 | Serving probes on vLLM for B's model (contract) | hooks on main; local: the serving image (vLLM 0.6.4.post1, its own torch) and routing; startup check and first probe wait for a yes | 3 + paid run |
 | 21 | Retrieval probes through an adapter (lens) | local: encode, faiss add/train/search timed with items a second; a stage after training isn't reached by a probe | 3 |
 | 22 | GNN probes through an adapter (lens) | local: nodes, edges, seeds, nodes per hop, largest batch; sampling time is the data phase; needs a PyG script on a GPU | 3 |
 | 23 | Vision probes through an adapter (lens) | local: images per batch, resolution, channels-last; images/s from samples; needs a vision script on a GPU | 2 |
 | 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
 | 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | local: findings `hygiene.stale_checkpoint` (checkpoint dirs sent with the code), `hygiene.cache_not_keyed` (a fixed-path `if exists: load`), `generation.truncated` (over 10%, Wilson interval), `hygiene.identical_outputs` (two weight states, same tokens on every compared input). Not yet on a GPU run | 3 |
-| 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
+| 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only; per-document scores not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 27 | In-flight collector (feature, contract) | local (`recorder/inflight.py`, `preflight watch`); getting the live record to the guide waits on C | 1 |
 | 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | Nov 1, CPU probes of each framework's own loop (tests/test_adapters.py; tiny random models and synthetic data, shaped on each project's public example, since this workspace can't download from the Hub): **HF Trainer working** (transformers 5.21; also on L4 in the LoRA ground truth), **TRL working** (SFTTrainer, trl 1.17; GRPOTrainer on L4 in `a-gt-grpo-l4-3`), **Lightning working** (2.6.6; its planned run length now read from Trainer.fit). All three: steps counted, phase split, planned steps 40 of 40. **torchtitan working** (0.1.0 on an A10, Nov 1 `a-torchtitan-check-2`: steps and phase split; tokens and samples per step not read) | 4 of 4 |
 | **Muse Spark** | | | |
@@ -217,7 +253,7 @@ included. Hero lenses first.
 | 32 | Glimmer host proposal with B (competitive #6) | not started | 2 |
 | **AMD** | | | |
 | 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); blocked: the AMD Developer Cloud account is on a verification hold (Oct 31 evening). Session Sunday 9 AM if it clears, else to the noon cut with AMD answers from datasheets and the cross-GPU model, labelled not measured | 2 + droplet |
-| 34 | Droplet idle watchdog (contract) | not started (B's sweep has an uptime ledger) | 2 |
+| 34 | Droplet idle watchdog (contract) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | **Platform and gaps** | | | |
 | 35 | Job store, queue, leases, reaper, probe cache, sandbox policy, migrations, token caps, AMD offline (gaps 1, 2, 3, 6, 8, 9, 11) | main | 0 |
 | 36 | Hostile-repo fixture and sandbox tests (gap 17) | main | 0 |
@@ -226,11 +262,11 @@ included. Hero lenses first.
 | 39 | Runner deploy with `engine.memory` on (G1) | waits for round three on main | 1 |
 | 40 | Execution-plane logs and metrics (gap 14) | partial (backlog alarm, cleanup log) | 2 |
 | 41 | GPU power sampling (contract) | main | 0 |
-| 42 | pip-installable CLI, one-command install, 60-second quickstart (contract) | CLI on main, packaging not started | 3 |
+| 42 | pip-installable CLI, one-command install, 60-second quickstart (contract) | CLI on main, quickstart checked (Nov 1); packaging handed to D (PM, Nov 1 9:47 PM) | 0 |
 | 43 | 8 of 9 unseen scripts harnessed, failures name the step (contract; PM picks them) | not started | 6 |
 | 44 | Hash of the unseen-script list, published before Nov 2 (competitive #3) | not started (needs the PM's list) | 0.5 |
-| 45 | Prebuilt images and a warm pool for judging, Nov 5–8 (contract) | not started | 3 |
-| 46 | Chakra trace export (contract) | not started | 3 |
+| 45 | Prebuilt images and a warm pool for judging, Nov 5–8 (contract) | built: warm pool for Nov 5–8 (runner/judging.py), probe images prebuilt at deploy; A keeps it | 3 |
+| 46 | Chakra trace export (contract) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 47 | Any OpenAI-compatible endpoint in the CLI's model sweep (competitive #11, after G2) | not started | 2 |
 | 48 | First public number, "one script" (competitive #2) | ws-a (status file) | 0 |
 | **Validation rows A feeds** | | | |
@@ -333,6 +369,9 @@ or L4 unless Chiya approves bigger; `ops_app.py::smoke` holds its probes to L4.
 | Nov 1 23:49 | `a-pareto-glimmer` (41363963718): **the Pareto's third arm**, Muse Glimmer on B's Modal app through the proxy (Modal-Key headers, priced by GPU time), the same first 30 MBPP rows, labelled 30 of 30, scored as the other two arms. Clean rows: **15 of 26 ended on a tool call (58%, Wilson 95% 39–74%)**, an upper bound on passes; the run stalled with up to 2 clean rows stuck: at least 13 of 26 (50%, 32–68%). Planted rows: 2 of 4 on a tool call. 25,787 output tokens over the clean rows. Against Muse Spark 23/26 ($0.3876) and Spark Open 14/26 ($0.3252) on the same rows [measured by the proxy / derived] | Glimmer's A100-40GB (B's app), CPU sandbox | about 7 (script wall 376 s) | **$0.5383** by the proxy (each call's wall time at $2.10/h, summed: 4 calls share the GPU, so this overcounts); the GPU's own time for the 376 s run is about $0.22 [derived], plus any cold start |
 | Nov 2 00:00 | `a-triage-glimmer-5` (41364641243): **the Glimmer triage works**, with the prompt that spells out the answer (7a9b68c): on the production LoRA record's p1-eval, finding `triage.oom`, "Muse Glimmer on probe p1-eval: oom", "The eval pass ran out of GPU memory after 3 optimizer steps", quoting the recorded line "Ran out of GPU memory during the eval pass." (checked by code to be in the text); one call, 394 in / 191 out tokens, 411 s of it the cold start [measured] | Glimmer's A100-40GB (B's app) | about 7 | **$0.2398** recorded; Glimmer under the 6 PM $3: $0.97 in all |
 | Nov 2 01:20 | `a-triage-agreement` (41372018640): Glimmer vs Spark Open on **every distinct failed probe in the stored zoo records** (11: sample records only, none derived, no visitor arguments, no patched probe; same input, the probe's recorded error). **Same category on 9 of 11 (82%, Wilson 95% 52–95%)**; both answered all 11 and quoted a line all 11 times. The 2 disagreements: vision p2 `budget` (Glimmer timeout, Spark Open unclear) and an Oct 31 LoRA `recorder` error (Glimmer infrastructure, Spark Open unclear). Against the 3 stored Spark Open findings (all "unclear", made before triage read the recorded error): Glimmer 0 of 3, and Spark Open itself 0 of 3, so that gap is the input, not the model [measured] | Glimmer's A100-40GB, Baseten | about 10 | **$0.3652** ($0.3316 Glimmer, $0.0336 Spark Open); Glimmer under the 6 PM $3: $1.30 in all |
+| Nov 2 02:57 | `a-startup-check-20` (41380688130), `a-startup-check-serving-6` (41381305538), `a-deploy-main-20` (41381442911): **the gated redeploy from ws-a 530785e** (main c084bee plus the L40S probe ceiling, Chiya 9:47 PM); deployed 03:09 UTC. Then `a-limit-check-1` (41381513249): one fresh visitor's jobs 1–3 accepted (a sample that doesn't exist: failed at fetch, no GPU), **job 4 refused with `limit.visitor_daily`**, retry_after_s 6605 (midnight ET) | none (CPU) | about 14 | about $0.03 CPU (estimate) |
+| Nov 2 03:11 | `a-notebook-checkin-1` (41381671178): **D's notebook check-in through the deployed runner**: web/src/addons/notebook/fixtures/colab_lora.ipynb as kind `notebook` (visitor a-notebook-check, L4 or A10); record 01M6D3VC0R2Z7CVRWK818ZYJNB. Admitted, fetched (the notebook converted, its `!pip`/`%pip` lines as requirements), mapped (lens finetune, Muse Spark refined), 3 probes on an L4, predicted, done. Each probe ended `too_few_steps`, rightly: the fixture's loop has no optimizer (`loss = step`); the failure names its step and the manual command (`preflight run colab_lora.py`) | L4 | about 8 | **$0.0272** by the record ($0.0038 GPU and sandbox, $0.0234 model calls) |
+| Nov 2 03:27 | `a-mbpp-full` (41383158427): **the full agent benchmark on Muse Spark** (Chiya's Meta credit, cap $14; PM: no overlap with the held-out set): zoo/agent_eval_spark, MBPP full test, the 470 tasks the Oct 31 record doesn't hold (rows 30–499; rows 0–29, the planted 26–29 among them, are that record's 30, since the planted rows retry forever and stall any run that reaches them). **All 470 finished; 339 ended on a tool call (72%, Wilson 95% 68–76%, 90% 69–75%)**, an upper bound on passes (no stall, so none stuck). Against the 30-task sample's clean rows: 23 of 26 (88%, 90% interval 74–95%), at least 21 (90% 65–90%): the full run sits below the upper reading's interval and inside the lower one's [measured by the proxy / derived]. **$0.01325 a task** (the sample's clean rows: $0.0131). Rows unlabelled (the datasets-server returned 502 at offset 300); counts only kept in zoo/agent_eval_spark/bench_nov2_full470.json | none (CPU sandbox + worker) | about 14 (script wall 794 s) | **$6.2288 of Muse Spark calls** [measured by the proxy]; **the 500-task benchmark's total, with the Oct 31 sample's $0.3876: $6.62**, against B's estimate $7.15 (90% $5.90–$13.71) |
 
 **What the Oct 28 ground-truth runs most likely were (Oct 31):** today's run shows the same silence
 is Modal queueing the L4 function, not a slow download or load: no container runs while it waits,
