@@ -1,0 +1,55 @@
+{
+  "submitted": {
+    "job_id": "01M6EG81TRPV55PCVKVD71Z6TX",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6EG81TRPV55PCVKVD71Z6TX",
+    "status": "failed",
+    "position": null,
+    "record_id": null,
+    "share_token": null,
+    "error": "the source is larger than Preflight reads; point it at a smaller directory. Step: checking the submission. By hand: fix what the message says and submit again, or probe it on your machine: `pip install git+https://github.com/uchuuronin/preflight`, then `preflight run train.py`.",
+    "retryable": false,
+    "error_code": "submission",
+    "last_seq": 3
+  },
+  "events": [
+    {
+      "job_id": "01M6EG81TRPV55PCVKVD71Z6TX",
+      "seq": 0,
+      "at": "2026-11-02T16:07:29.368125Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG81TRPV55PCVKVD71Z6TX",
+      "seq": 1,
+      "at": "2026-11-02T16:07:51.699684Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG81TRPV55PCVKVD71Z6TX",
+      "seq": 2,
+      "at": "2026-11-02T16:07:52.119179Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG81TRPV55PCVKVD71Z6TX",
+      "seq": 3,
+      "at": "2026-11-02T16:08:04.622126Z",
+      "stage": "failed",
+      "message": "the source is larger than Preflight reads; point it at a smaller directory. Step: checking the submission. By hand: fix what the message says and submit again, or probe it on your machine: `pip install git+https://github.com/uchuuronin/preflight`, then `preflight run train.py`.",
+      "level": "error",
+      "retryable": false,
+      "error_code": "submission"
+    }
+  ],
+  "error": null
+}

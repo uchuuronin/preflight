@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160708-41478294041-a-unseen-6-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41478294041",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-6 --gpus L4 --max-minutes 45 --repo https://github.com/vllm-project/vllm --commit 5df63a7203cdb9328d824a27b682e77c7b9928be --entrypoint vllm/benchmarks/throughput.py --args=--model,microsoft/Phi-3.5-mini-instruct,--dataset-name,random,--input-len,512,--output-len,256,--num-prompts,500",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:08:10Z"
+}
