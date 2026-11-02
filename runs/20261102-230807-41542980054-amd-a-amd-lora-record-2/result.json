@@ -1,0 +1,11 @@
+{
+	"name": "20261102-230807-41542980054-amd-a-amd-lora-record-2",
+	"exit_code": 1,
+	"workflow": "amd-run",
+	"run_id": "41542980054",
+	"ref": "main",
+	"sha": "ea7330acfded1bc9e22068b6b5d99098b73c87b8",
+	"cmd": "python -m preflight.cli.main run zoo/finetune_lora_hf --out out/records --install-requirements --require-gpu",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:09:06Z"
+}
