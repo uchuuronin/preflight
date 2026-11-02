@@ -53,46 +53,106 @@
   {
    "script": "gnn_pyg",
    "set": "zoo",
-   "record": "../../../../zoo/gnn_pyg/record_nov1_l4.json",
+   "record": "gnn_pyg_a10.record.json",
    "ground_truth": "ground_truth_gnn_pyg.json",
    "used_for_tuning": false,
    "ask_model_id": "gnn_pyg",
-   "values": {
-    "gpu_type": "A10"
-   },
-   "$record": "probes on L4; the full run got an A10, so its step time is the unmeasured-GPU row",
+   "$record": "probes on A10",
    "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
   },
   {
    "script": "retrieval_st",
    "set": "zoo",
-   "record": "../../../../zoo/retrieval_st/record_nov1_l4.json",
+   "record": "retrieval_st_a10.record.json",
    "ground_truth": "ground_truth_retrieval_st.json",
    "used_for_tuning": false,
    "ask_model_id": "retrieval_st",
-   "values": {
-    "gpu_type": "A10"
-   },
    "planted": [
     "retrieval.small_batch"
    ],
-   "$record": "probes on L4; the full run got an A10, so its step time is the unmeasured-GPU row",
+   "$record": "probes on A10",
    "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
   },
   {
    "script": "vision_timm",
    "set": "zoo",
-   "record": "../../../../zoo/vision_timm/record_nov1_l4.json",
+   "record": "vision_timm_a10.record.json",
    "ground_truth": "ground_truth_vision_timm.json",
    "used_for_tuning": false,
    "ask_model_id": "vision_timm",
-   "values": {
-    "gpu_type": "A10"
-   },
    "planted": [
     "vision.no_channels_last",
     "vision.cpu_augment"
    ],
+   "$record": "probes on A10",
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 80 steps"
+  },
+  {
+   "script": "pretrain_nanogpt",
+   "set": "zoo",
+   "record": "pretrain_nanogpt.record.json",
+   "ground_truth": "ground_truth_pretrain_nanogpt.json",
+   "used_for_tuning": false,
+   "ask_model_id": "pretrain_nanogpt",
+   "$record": "probes on A10",
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+  },
+  {
+   "script": "serving_vllm",
+   "set": "zoo",
+   "record": "serving_vllm.record.json",
+   "ground_truth": "ground_truth_serving_vllm.json",
+   "used_for_tuning": false,
+   "ask_model_id": "serving_vllm",
+   "$record": "probes on A10",
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended None, None steps"
+  },
+  {
+   "script": "eval_sweep_reasoning",
+   "set": "zoo",
+   "record": "../../../../zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "ground_truth": "ground_truth_eval_sweep_reasoning.json",
+   "used_for_tuning": false,
+   "ask_model_id": "eval_sweep_reasoning",
+   "planted": [
+    "eval.activation_dump"
+   ],
+   "$record": "probes on A10",
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended None, None steps"
+  },
+  {
+   "script": "gnn_pyg@L4",
+   "set": "zoo",
+   "record": "../../../../zoo/gnn_pyg/record_nov1_l4.json",
+   "ground_truth": "ground_truth_gnn_pyg.json",
+   "used_for_tuning": false,
+   "values": {
+    "gpu_type": "A10"
+   },
+   "$record": "probes on L4; the full run got an A10, so its step time is the unmeasured-GPU row",
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+  },
+  {
+   "script": "retrieval_st@L4",
+   "set": "zoo",
+   "record": "../../../../zoo/retrieval_st/record_nov1_l4.json",
+   "ground_truth": "ground_truth_retrieval_st.json",
+   "used_for_tuning": false,
+   "values": {
+    "gpu_type": "A10"
+   },
+   "$record": "probes on L4; the full run got an A10, so its step time is the unmeasured-GPU row",
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+  },
+  {
+   "script": "vision_timm@L4",
+   "set": "zoo",
+   "record": "../../../../zoo/vision_timm/record_nov1_l4.json",
+   "ground_truth": "ground_truth_vision_timm.json",
+   "used_for_tuning": false,
+   "values": {
+    "gpu_type": "A10"
+   },
    "$record": "probes on L4; the full run got an A10, so its step time is the unmeasured-GPU row",
    "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 80 steps"
   }
