@@ -4,7 +4,7 @@
  * fields: every number is B's, with B's interval and status.
  */
 import type { Campaign, CampaignCell, ModelCard } from "../../../../schema/ts/contract";
-import type { Estimate } from "../record/types";
+import type { Estimate, LoadedRecord } from "../record/types";
 
 export interface PlanCell {
 	id: string;
@@ -22,6 +22,8 @@ export interface PlanCell {
 	start_s?: Estimate | number | null;
 	/** Which of its lane's slots runs it, 0-based (B's CellPlan.slot; contract 0.6.0 as requested). */
 	slot?: number | null;
+	/** The run's time, GPU hours and cost come from a probe at its setting (measuredCell), not the engine. */
+	measured?: boolean;
 }
 
 export interface CampaignPlan {
@@ -106,6 +108,38 @@ function abstain(why: string, unit: string, modelId: string): Estimate {
 	return { point: null, lo: null, hi: null, unit, status: "abstain", model_id: modelId, source: "exact", reason: why } as Estimate;
 }
 
+type ProbeSource = Pick<LoadedRecord, "knobs" | "probes" | "env">;
+
+const same = (a: unknown, b: unknown) => (typeof a === "number" && typeof b === "number" ? Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b)) : a === b);
+
+/**
+ * A run's time from a probe at its setting (PM, Nov 2: campaign grid probes, one short probe job per
+ * cell): the probe's measured step time times the run's steps (`max_steps`, the cell's or the
+ * record's), its range from the probe's own step times (mean, median, p95). A probe is at the run's
+ * setting when every knob the run sets that is one of the record's knobs (a seed isn't) equals the
+ * probe's, a knob the probe doesn't name being the record's current value, and it ran on the run's
+ * GPU. Null when no probe finished there or the run's steps aren't known (a run sized by epochs):
+ * the engine's time stands.
+ */
+export function measuredCell(cell: Pick<PlanCell, "knobs">, src: ProbeSource): Estimate | null {
+	const current: Record<string, unknown> = Object.fromEntries(src.knobs.map((k) => [k.id, k.current]));
+	const ids = new Set(src.knobs.map((k) => k.id));
+	const steps = Number(cell.knobs.max_steps ?? current.max_steps);
+	if (!Number.isFinite(steps) || steps <= 0) return null;
+	const gpu = cell.knobs.gpu_type ?? current.gpu_type ?? src.env?.gpu?.name;
+	const at = src.probes.filter(
+		(p) =>
+			(p.status === "ok" || p.status === "cached") &&
+			typeof p.step_time?.mean_s === "number" &&
+			same(p.knobs?.gpu_type ?? current.gpu_type ?? src.env?.gpu?.name, gpu) &&
+			Object.entries(cell.knobs).every(([k, v]) => !ids.has(k) || k === "max_steps" || same(p.knobs?.[k] ?? current[k], v)),
+	);
+	const st = at[at.length - 1]?.step_time;
+	if (!st || typeof st.mean_s !== "number") return null;
+	const all = [st.mean_s, st.p50_s, st.p95_s].filter((v): v is number => typeof v === "number");
+	return { point: st.mean_s * steps, lo: Math.min(...all) * steps, hi: Math.max(...all) * steps, unit: "s", status: "measured", model_id: `probe:${at[at.length - 1]!.id}`, source: "exact", reason: null } as Estimate;
+}
+
 /**
  * The calendar's plan from a shared record's campaign block, so a record drawn later shows what the
  * live plan showed. Every number is the record's: a run with no time is unplaceable (with the
@@ -116,6 +150,8 @@ export function planFromRecord(
 	c: Campaign,
 	models: readonly ModelCard[] = [],
 	price: (knobs: Record<string, string | number | boolean>, e: Estimate | null | undefined) => number = () => 1,
+	/** The record's probes: a run with one at its setting takes the measured time (measuredCell). */
+	probes?: ProbeSource,
 ): CampaignPlan | null {
 	const cells = c.cells ?? [];
 	if (!cells.length) return null;
@@ -133,19 +169,30 @@ export function planFromRecord(
 	};
 	const knobsOf = (x: CampaignCell) => Object.fromEntries(Object.entries(x.knobs).filter((kv): kv is [string, string | number | boolean] => kv[1] !== undefined));
 	return {
-		cells: cells.map((x: CampaignCell) => ({
-			id: x.id,
-			knobs: knobsOf(x),
-			time: (x.time as Estimate | null | undefined) ?? abstain("no run time in this record", "s", modelId),
-			gpu_hours: (x.gpu_hours_estimate as Estimate | null | undefined) ?? null,
-			usd: usdAt(x.usd_estimate as Estimate | null | undefined, knobsOf(x)),
-			segments: x.segments ?? null,
-			lane: x.lane ?? null,
-			cut: x.cut ?? false,
-			reason: typeof x.reason === "string" ? x.reason : "",
-			start_s: (x.start_s as Estimate | null | undefined) ?? null,
-			slot: typeof x.slot === "number" ? x.slot : null,
-		})),
+		cells: cells.map((x: CampaignCell) => {
+			const time = (x.time as Estimate | null | undefined) ?? abstain("no run time in this record", "s", modelId);
+			const m = probes && !x.cut ? measuredCell({ knobs: knobsOf(x) }, probes) : null;
+			// GPU hours and dollars: the run's own rate (per second, at the engine's point) times the measured time.
+			const scale = (e: Estimate | null | undefined): Estimate | null => {
+				if (!e || !m || !time.point || e.point === null) return e ?? null;
+				const rate = e.point / time.point;
+				return { ...e, point: rate * m.point!, lo: rate * m.lo!, hi: rate * m.hi!, status: "measured", reason: null } as Estimate;
+			};
+			return {
+				id: x.id,
+				measured: !!m,
+				knobs: knobsOf(x),
+				time: m ?? time,
+				gpu_hours: scale(x.gpu_hours_estimate as Estimate | null | undefined),
+				usd: usdAt(scale(x.usd_estimate as Estimate | null | undefined), knobsOf(x)),
+				segments: x.segments ?? null,
+				lane: x.lane ?? null,
+				cut: x.cut ?? false,
+				reason: typeof x.reason === "string" ? x.reason : "",
+				start_s: (x.start_s as Estimate | null | undefined) ?? null,
+				slot: typeof x.slot === "number" ? x.slot : null,
+			};
+		}),
 		gpu_hours: (c.gpu_hours as Estimate | null | undefined) ?? missing("gpu_hours"),
 		usd: usdAt(c.usd as Estimate | null | undefined, {}) ?? missing("usd"),
 		finish_s: (c.finish_s as Estimate | null | undefined) ?? missing("s"),
