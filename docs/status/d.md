@@ -8,6 +8,22 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 20:15 (the draft mirrors the 8 PM README)
+
+`b3c5c4d` CI green. Chiya (20:07): `main` `d5062bc` has `readme-final.md` as `README.md`, with
+`c.hops`, `c.exports`, `d.expertise`, `d.currency` and `d.freetier` on in production and
+`d.notebook` off until A's real notebook check-in passes. `d5062bc` isn't on GitHub yet (main is
+still `50db9b6` at 20:12), so I mirrored the change from her description: three rows move to "On in
+production" (possible outcomes, the exports with the Weights & Biases helper, and the three add-ons),
+"Behind a flag" keeps the notebook tab and the exports' CLI item, and the Add-ons section says
+which are on. Once `d5062bc` lands I'll diff the draft against `README.md` and match its wording.
+The cap after Nov 4 gets its number once A's $8 is deployed.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the draft's tables and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 18:45 (D's four flags checked for strangers before the 8 PM change)
 
 `b8963a9` CI green. Chiya (18:20): A's redeploy is confirmed with the limits live, so the README's
