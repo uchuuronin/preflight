@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160903-41478579273-a-unseen-a-unseen-6-checkin-gt",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41478579273",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/vllm-project/vllm --commit 5df63a7203cdb9328d824a27b682e77c7b9928be --entrypoint vllm/benchmarks/throughput.py --args=--model,microsoft/Phi-3.5-mini-instruct,--dataset-name,random,--input-len,512,--output-len,256,--num-prompts,500 --bare-steps 100000 --budget-min 45 --first-gpu L4 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:09:36Z"
+}
