@@ -3,6 +3,7 @@
 	"probes.finetune": false,
 	"probes.pretrain": false,
 	"probes.agent": false,
+	"probes.repo_install": false,
 	"harness.spark_script_map": false,
 	"harness.spark_open_triage": false,
 	"harness.spark_diagnosis": false,

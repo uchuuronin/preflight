@@ -449,7 +449,7 @@ GROUND_TRUTH_GPUS = ["L4", "A10"]
 
 def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict,
 	entrypoint: str | None = None, args: tuple = (), install_requirements: bool = False,
-	generate_sample: int = 0, generate_calls: int = 0) -> dict:  # fmt: skip
+	generate_sample: int = 0, generate_calls: int = 0, install_repo: bool = False) -> dict:  # fmt: skip
 	"""recorder/ground_truth.py on this function's GPU: a bare run (the full run), then a recorder
 	run alternating clean and synced steps, and the paired overhead. The AMD droplet runs the same."""
 	from preflight.probes import remote
@@ -462,7 +462,7 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
 		budget_s=budget_s, files=files, entrypoint=entrypoint, args=tuple(args),
 		install_requirements=install_requirements, generate_sample=generate_sample,
-		generate_calls=generate_calls)  # fmt: skip
+		generate_calls=generate_calls, install_repo=install_repo)  # fmt: skip
 
 
 # weights read-only: an unseen third-party script runs as root in the bare run, and must not be
@@ -568,6 +568,7 @@ def ground_truth(
 	repo: str = "",
 	commit: str = "",
 	edit_hex: str = "",
+	install_repo: bool = False,
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -637,7 +638,7 @@ def ground_truth(
 		f"waiting for an {first}" + ("" if first == "A100" else f", else the {'L4' if first == 'A10' else 'A10'}")
 		+ " (Modal queues it)", flush=True)  # fmt: skip
 	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(_split_args(args)),
-		install_requirements, sample, p["generate_calls"])  # fmt: skip
+		install_requirements, sample, p["generate_calls"], install_repo)  # fmt: skip
 	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{name}.json").write_text(json.dumps(res, indent=2))
