@@ -64,3 +64,39 @@ def test_the_hook_reads_the_update_s_forward_only():
 	m(ids)  # no num_logits_to_keep: not TRL's update
 	assert len(rec._entropy_exact) == 1
 	assert 0 < float(rec._entropy_exact[0][1]) <= math.log(11) + 1e-6
+
+
+def test_the_hook_counts_trl_0_14_s_completion_exactly():
+	"""Review, Nov 1: TRL 0.14 calls model(ids, num_logits_to_keep=K + 1); the hook passed K + 1 on and counted one
+	position too many. Driven the way TRL drives it, the entropy matches TRL's own completion_mask."""
+	from torch import nn
+
+	torch.manual_seed(1)
+	b, p_len, k, v, eos = 2, 4, 6, 40, 3
+	ids = torch.randint(4, v, (b, p_len + k))
+	ids[0, p_len + 2] = eos
+	full = torch.randn(b, p_len + k, v)
+
+	class Out:
+		def __init__(self, logits):
+			self.logits = logits
+
+	class Fixed(nn.Module):
+		def __init__(self):
+			super().__init__()
+			self.w = nn.Parameter(torch.ones(()))
+
+		def forward(self, input_ids, num_logits_to_keep=None):
+			return Out(full[:, -num_logits_to_keep:, :] * self.w)
+
+	rec = runtime.Recorder()
+	m = Fixed()
+	m.register_forward_hook(rec._entropy_hook(eos_token_id=eos), with_kwargs=True)
+	m(ids, num_logits_to_keep=k + 1)
+	mask = torch.zeros(b, k)
+	mask[0, :3] = 1
+	mask[1, :] = 1
+	want = _direct(full[:, -k - 1 : -1], mask)
+	assert float(rec._entropy_exact[0][1]) == pytest.approx(want, rel=1e-5)
+	# a model that ignores num_logits_to_keep returns every position: the same positions are read
+	assert float(runtime.completion_entropy(full, ids, k, eos)) == pytest.approx(want, rel=1e-5)
