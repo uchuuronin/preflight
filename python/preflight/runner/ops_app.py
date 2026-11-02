@@ -326,6 +326,7 @@ def smoke(
 	max_minutes: int = 25,
 	modal_env: str = "",
 	visitor: str = "smoke",
+	notebook: str = "",
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
@@ -340,8 +341,14 @@ def smoke(
 	import time
 
 	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env or None)()
+	source: dict = {"kind": "sample", "uri": sample}
+	if notebook:  # a notebook check-in as D's tab sends it (kind notebook, one .ipynb file)
+		nb = (Path(__file__).resolve().parents[3] / notebook).resolve()
+		if nb.suffix != ".ipynb" or Path(__file__).resolve().parents[3] not in nb.parents:
+			raise SystemExit(f"{notebook!r} isn't an .ipynb file in this checkout")
+		source = {"kind": "notebook", "files": {nb.name: nb.read_text()}}
 	request = {
-		"source": {"kind": "sample", "uri": sample},
+		"source": source,
 		# "any": no constraint, the request a visitor's sample makes, so its probes warm the cache
 		**(
 			{}
