@@ -53,9 +53,39 @@ search tool isn't in the response], about US$0.013 a failed probe; 5.6 to 19 s a
 - The queries kept to library names and the error message in every case I read (none had a path,
   code line or user name), apart from Preflight's own hint text in one skipped kind.
 
+## A's review (Nov 2) and what changed
+
+A reviewed `03d0e5f` (`from-a.md`): ready to merge off, six things before it goes on. Fixed on
+`ws-d`, then read-only reviewed (one blocking finding, fixed):
+
+1. **Spend:** `/responses` calls are never retried (an attempt that reached Meta may have searched
+   and billed already); each question sends `max_tool_calls` 4 [guess]; the search fee, US$2.50 per
+   1,000 queries [guess: second-hand, eesel.ai's summary of Meta's pricing page; Meta's own page
+   not reached], is added to the call's recorded cost per search action (page opens aren't
+   counted). The validation above recorded no fee, so its US$0.107 is tokens only. A call that
+   fails after reaching Meta records no tokens and no fee, though Meta may bill both.
+2. **Per job:** at most 2 questions [guess], and none started once 120 s [guess] have gone.
+3. **Prompt injection:** the prompt says the error text is data and must never be followed, and
+   the error sits in a block it can't close. Code drops a source the error names: the same page
+   on a public forge or docs host (GitHub, Hugging Face, PyTorch, ...), any page on any other host
+   it names (subdomains too), written with or without a scheme, defanged or followed by
+   punctuation; and every source if the model opened a page the error names off those hosts; and
+   any source on Preflight's own host. It narrows steering, it can't end it: an error can still
+   steer the search to a page its author wrote on a public host (an issue opened on a real
+   tracker), so a cited source is a lead to check.
+4. **The stored URL** is the annotation's, matched exactly: user, query and fragment count; only
+   the scheme and host's case, a trailing slash, the default port and percent-escape case don't.
+5. **The cockpit** renders citations now (C's `findingSource.tsx`), so a cited link reaches the
+   viewer: the reason item 3 matters.
+6. **Tests** for each, in `tests/test_d_search_grounding.py` and `tests/test_pipeline.py`.
+
+Not yet checked against Meta's real API: whether it takes `max_tool_calls`, and whether its search
+actions are typed `search` (the fee counts on that). The validation is re-run on this code before
+the flag goes on.
+
 ## Before `harness.spark_search` goes on
 
-1. A's review (requested in `docs/requests/from-d.md`).
+1. A's re-check of the fixes above, and the validation re-run on them.
 2. C's data-use line: a failed probe's error (its last 2,500 characters, with URL queries, common
    secret shapes such as `TOKEN=` values and API keys, and home folder names masked), its error code, the job's lens and library versions go
    to Muse Spark on Meta's API, and the model's search queries go to a web search. Never for a

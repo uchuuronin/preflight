@@ -918,7 +918,7 @@ def _search(
 		key = r.probe.error_code or r.probe.error.splitlines()[0][:120]
 		if key in asked:
 			continue
-		if len(asked) >= SEARCH_MAX_QUESTIONS or time.monotonic() - started > SEARCH_JOB_S:
+		if len(asked) >= SEARCH_MAX_QUESTIONS or (asked and time.monotonic() - started > SEARCH_JOB_S):
 			break
 		asked.add(key)
 		env = r.env or rec.env

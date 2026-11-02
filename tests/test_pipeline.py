@@ -1261,3 +1261,26 @@ def test_a_cancelled_job_stops_searching(tmp_path, monkeypatch):
 	finally:
 		flags.reload()
 	assert not seen
+
+
+def test_searching_stops_between_questions_on_a_cancel_or_the_time_limit(tmp_path, monkeypatch):
+	from preflight.runner import flags, pipeline
+	from preflight.runner.pipeline import _search
+
+	class StopAfterOne(_Ctx):
+		n = 0
+
+		def should_stop(self):
+			self.n += 1
+			return self.n > 1
+
+	rec, results, d, seen = _search_setup(tmp_path, monkeypatch)
+	try:
+		_search(rec, results, d, ctx=StopAfterOne())
+		assert len(seen) == 1
+		seen.clear()
+		monkeypatch.setattr(pipeline, "SEARCH_JOB_S", -1.0)  # past the limit after the first
+		_search(rec, results, d, ctx=_Ctx())
+		assert len(seen) == 1
+	finally:
+		flags.reload()

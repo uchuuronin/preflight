@@ -16,9 +16,15 @@ in the same library, else answer none. That is checked by hand on the zoo's real
 (`docs/decisions/spark-search.md`), not by code.
 
 A's review (Nov 2): the error text is the visitor's script's output, so it can try to steer the
-search. The prompt says it is data, and code drops any source whose address appears in the error
-text or is on Preflight's own host (a share link), so an error can't nominate its own page. The
-URL stored is the annotation's, matched exactly (fragment, user, port and query included). Spend:
+search. The prompt says it is data. Code drops a source on Preflight's own host (a share link) and
+one the error names (`named_keys`): on a public forge or docs host (`PUBLIC_HOSTS`) the same page,
+elsewhere any page on a host the error names, addresses with or without a scheme, defanged or
+followed by punctuation; and drops every source if the model opened a page the error names off
+the public hosts. That
+narrows steering; it can't stop an error that sends the search to a page its author wrote on a
+public host (an issue opened on a real tracker), so a citation is a lead to check, not a verdict.
+The URL stored is the annotation's, matched exactly (fragment, user and query included; a trailing
+slash, the default port and percent-escape case aside). Spend:
 at most MAX_TOOL_CALLS searches a question, the search fee (SEARCH_USD_PER_QUERY each) added to the
 call's recorded cost, no retries (`ModelClient.respond`), and the pipeline asks at most
 `SEARCH_MAX_QUESTIONS` a job.
@@ -34,19 +40,23 @@ after the first failed.
 
 import json
 import re
-from urllib.parse import parse_qsl, urlencode, urlsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
 from pydantic import BaseModel, Field, ValidationError
 
 from preflight.schema.record import Citation, Evidence, Finding
 
-ERROR_CHARS = 2500  # the end of the recorded error: the exception line and its last frames
-MAX_SOURCES = 3
+ERROR_CHARS = 2500  # guess: the end of the recorded error, the exception line and its last frames
+MAX_SOURCES = 3  # Chiya's spec (Nov 2): at most 3 sources
 MAX_TOOL_CALLS = 4  # guess: searches and page opens a question may make (the validation's used 1 to 4)
-# cited: US$2.50 per 1,000 web-search queries, eesel.ai's summary of Meta's pricing page (read Nov 2;
-# Meta's own page not checked); billed on top of tokens, and the response's usage doesn't carry it
+# guess: US$2.50 per 1,000 web-search queries, second-hand (eesel.ai's summary of Meta's pricing page,
+# read Nov 2; Meta's own page not reached); billed on top of tokens, and the usage doesn't carry it
 SEARCH_USD_PER_QUERY = 2.50 / 1000
-OWN_HOSTS = ("preflight-cqn.pages.dev",)  # Preflight's share links: never a source
+OWN_HOSTS = ("preflight-cqn.pages.dev",)  # Preflight's share links, and their subdomains: never a source
+# public forges and docs, where an error naming one page (a library warning linking its own issue)
+# mustn't rule out the rest of the host; elsewhere a named host is ruled out whole
+PUBLIC_HOSTS = ("github.com", "gitlab.com", "huggingface.co", "pytorch.org", "stackoverflow.com",
+	"python.org", "readthedocs.io", "pypi.org", "nvidia.com", "apache.org")  # fmt: skip
 # Preflight's own failures, which carry no library error to search for
 SKIP_CODES = ("budget", "gpu.", "recorder", "timeout", "too_few_steps", "cancelled")
 
@@ -147,20 +157,77 @@ def _exact(url: str) -> str:
 		u = urlsplit((url or "").strip())
 	except ValueError:
 		return ""
-	return u._replace(scheme=u.scheme.lower(), netloc=u.netloc.lower()).geturl()
+	netloc = u.netloc.lower()
+	if u.scheme.lower() == "https" and netloc.endswith(":443"):
+		netloc = netloc[:-4]
+	path = re.sub(r"%[0-9a-fA-F]{2}", lambda m: m.group(0).upper(), u.path)
+	path = path.rstrip("/") or "/"
+	return u._replace(scheme=u.scheme.lower(), netloc=netloc, path=path).geturl()
 
 
 def _host(url: str) -> str:
+	"""The host as compared: lowercase, no `www.` or trailing dot, as ASCII (a Unicode look-alike and
+	its punycode compare equal)."""
 	try:
-		return (urlsplit(url).hostname or "").lower()
+		h = (urlsplit(url if "//" in url else "//" + url).hostname or "").lower().rstrip(".")
 	except ValueError:
 		return ""
+	h = h.removeprefix("www.")
+	try:
+		return h.encode("idna").decode("ascii")
+	except UnicodeError:
+		return h
 
 
-def urls_in(text: str) -> set[str]:
-	"""The addresses an error text names, as compared (`_norm`, query aside): a source among them
-	is the error nominating its own page."""
-	return {_norm(m).split("?")[0] for m in re.findall(r"https?://[^\s'\"<>()\[\]]+", text or "")}
+def _public(host: str) -> bool:
+	return any(host == h or host.endswith("." + h) for h in PUBLIC_HOSTS)
+
+
+def _page(url: str) -> str:
+	"""A page as compared with what an error names: host (`_host`), and the path lowercased and
+	percent-decoded, no trailing slash; no query or fragment."""
+	try:
+		path = unquote(urlsplit(url if "//" in url else "//" + url).path).lower().rstrip("/")
+	except ValueError:
+		path = ""
+	return _host(url) + path
+
+
+def _key(url: str) -> str:
+	"""What an error naming this address rules out: the page on a public host, else the whole host."""
+	host = _host(url)
+	return _page(url) if _public(host) else host
+
+
+_ADDRESS = re.compile(
+	r"(?i)(?:h[tx]{2}ps?://)?(?:[a-z0-9\u00a1-\uffff-]+\.)+[a-z\u00a1-\uffff]{2,}(?::\d+)?(?:/[^\s'\"<>()\[\]{}`]*)?"
+)
+
+
+def named_keys(text: str) -> set[str]:
+	"""What the addresses an error text names rule out (`_key`): with or without a scheme, defanged
+	(`hxxps://`, `[.]`) or not, punctuation after them dropped."""
+	text = (text or "").replace("[.]", ".").replace("(.)", ".")
+	keys = set()
+	for m in _ADDRESS.findall(text):
+		a = m.rstrip(".,;:!?'\"")
+		a = re.sub(r"(?i)^hxxp", "http", a)
+		if "." in _host(a):
+			keys.add(_key(a))
+	return keys
+
+
+def _is_named(url: str, named: set[str]) -> bool:
+	"""Does an error's `named_keys` rule this address out (a subdomain of a named host too)?"""
+	host = _host(url)
+	if _public(host):
+		return _page(url) in named
+	return any(host == n or host.endswith("." + n) for n in named)
+
+
+def _own(url: str) -> bool:
+	host = _host(url)
+	return any(host == h or host.endswith("." + h) for h in OWN_HOSTS)
 
 
 def annotations(data: dict) -> dict[str, str]:
@@ -247,25 +314,39 @@ def parse_answer(text: str) -> Answer | None:
 	return None
 
 
+def opened(data: dict) -> list[str]:
+	"""Every page the model tried to open."""
+	out = []
+	for item in data.get("output") or []:
+		action = item.get("action") if isinstance(item, dict) else None
+		if isinstance(action, dict) and isinstance(action.get("url"), str):
+			out.append(action["url"])
+	return out
+
+
 def kept_sources(answer: Answer, data: dict, error_text: str = "") -> tuple[list[Source], list[Source]]:
 	"""(sources kept, at most 3; the others, dropped). Kept: https, no user part, an annotation for
-	exactly that URL (stored as the annotation gives it), no failed open of it, not an address the
-	error text names, not on Preflight's own host."""
-	got, bad, named = annotations(data), failed_opens(data), urls_in(error_text)
+	exactly that URL (stored as the annotation gives it), no failed open of it, nothing the error
+	text names (`named_keys`), not on Preflight's own host. None at all when the model opened a page
+	the error names off the public hosts: the error steered the search."""
+	got, bad, named = annotations(data), failed_opens(data), named_keys(error_text)
+	if any(not _public(_host(u)) and _is_named(u, named) for u in opened(data)):
+		return [], list(answer.sources)  # a library's own page on a public host is a fair open
 	keep, dropped = [], []
 	for s in answer.sources:
-		exact, n = _exact(s.url), _norm(s.url)
+		exact = _exact(s.url)
 		try:
-			user = urlsplit(s.url).username
+			u = urlsplit(s.url)
+			user = u.username is not None or u.password is not None or "@" in u.netloc
 		except ValueError:
-			user = "?"
+			user = True
 		ok = (
 			s.url.startswith("https://")
 			and not user
 			and exact in got
-			and n not in bad
-			and n.split("?")[0] not in named
-			and _host(s.url) not in OWN_HOSTS
+			and _norm(s.url) not in bad
+			and not _is_named(s.url, named)
+			and not _own(s.url)
 		)
 		(keep if ok else dropped).append(s.model_copy(update={"url": got[exact]}) if ok else s)
 	return keep[:MAX_SOURCES], dropped
@@ -295,7 +376,8 @@ def ground_failure(
 	if skipped(probe, skip_codes):
 		return None, []
 	libs = ", ".join(f"{k} {v}" for k, v in sorted((env or {}).items()) if v)
-	error = scrub(probe.error)[-ERROR_CHARS:].replace("</error>", "</ error>")  # can't close the data early
+	# the error can't close its data block early, however it spells the tag
+	error = re.sub(r"(?i)<\s*/\s*error\s*>", "< /error >", scrub(probe.error)[-ERROR_CHARS:])
 	user = (
 		f"Lens: {lens or 'unknown'}. Libraries: {libs or 'unknown'}.\n"
 		f"Error code (Preflight's): {probe.error_code or 'none'}.\n"
@@ -322,7 +404,7 @@ def ground_failure(
 		return None, calls
 	keep, dropped = kept_sources(answer, data, probe.error) if answer.status == "found" else ([], [])
 	ev = [Evidence(metric="search", value=float(len(keep)), probe_id=probe.id)]
-	if dropped:  # the name predates the other reasons a source is dropped; C and the tests read it
+	if dropped:  # every source dropped, for any reason (the name predates the others; C reads it)
 		ev.append(Evidence(metric="search.dropped_unannotated", value=float(len(dropped)), probe_id=probe.id))
 	if not keep:
 		return Finding(
