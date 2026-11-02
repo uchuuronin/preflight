@@ -1,0 +1,142 @@
+{
+ "device": "NVIDIA A10",
+ "gpu": "A10",
+ "A_on_plan": {
+  "predicted_for": "A10",
+  "bands": {
+   "step_s": [
+    0.2909256344609813,
+    0.8034057302151447
+   ],
+   "peak_gb": [
+    12.24,
+    16.59
+   ],
+   "total_h": [
+    4.86,
+    13.39
+   ]
+  },
+  "exit_code": 143,
+  "wall_s": 243.1,
+  "alerts": [
+   "[preflight] watching /tmp/a/train.py against record golden-pretrain-share-tok; live record /tmp/out_A_on_plan/Yp3P3pz_22kGjUbZAI1nTg.json",
+   "[preflight] step 11: peak memory 18.86 GiB, above the predicted 11.40\u201315.45 GiB",
+   "[preflight] step 11: at this pace the run takes 823.9 min, above the predicted 291.3\u2013803.6 min",
+   "[preflight] step 21: 0.96 s a step, above the predicted 0.291\u20130.803 s",
+   "[preflight] 231 steps, 3 alerts; record /tmp/out_A_on_plan/Yp3P3pz_22kGjUbZAI1nTg.json"
+  ],
+  "windows": 23,
+  "window_alerts": [
+   {
+    "step": 11,
+    "alerts": [
+     "step 11: peak memory 18.86 GiB, above the predicted 11.40\u201315.45 GiB",
+     "step 11: at this pace the run takes 823.9 min, above the predicted 291.3\u2013803.6 min"
+    ]
+   },
+   {
+    "step": 21,
+    "alerts": [
+     "step 21: 0.96 s a step, above the predicted 0.291\u20130.803 s"
+    ]
+   }
+  ],
+  "step_s": [
+   0.8237,
+   0.9598,
+   0.96,
+   0.9621,
+   0.9672,
+   0.9708,
+   0.9742,
+   0.9786,
+   0.9792,
+   0.9729,
+   0.9752,
+   0.9788,
+   0.9803,
+   0.9827,
+   0.9845,
+   0.9854,
+   0.9871,
+   0.9887,
+   0.9898,
+   0.9909,
+   0.9904,
+   0.9921,
+   0.9927
+  ],
+  "peak_reserved_gb": [
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25,
+   20.25
+  ],
+  "record_rewrites": 23,
+  "stderr_tail": "[preflight] watching /tmp/a/train.py against record golden-pretrain-share-tok; live record /tmp/out_A_on_plan/Yp3P3pz_22kGjUbZAI1nTg.json\n[preflight] step 11: peak memory 18.86 GiB, above the predicted 11.40\u201315.45 GiB\n[preflight] step 11: at this pace the run takes 823.9 min, above the predicted 291.3\u2013803.6 min\n[preflight] step 21: 0.96 s a step, above the predicted 0.291\u20130.803 s\nToken indices sequence length is longer than the specified maximum sequence length for this model (1053 > 1024). Running this sequence through the model will result in indexing errors\n[preflight] 231 steps, 3 alerts; record /tmp/out_A_on_plan/Yp3P3pz_22kGjUbZAI1nTg.json\n",
+  "live_record": {
+   "parses": true,
+   "source_kind": "inflight",
+   "parent_id": "01JBGOLDENPT0000000000000B",
+   "status": "cancelled",
+   "steps": 231
+  }
+ },
+ "B_off_plan": {
+  "predicted_for": "A100-SXM-40GB",
+  "bands": {
+   "step_s": [
+    0.23733052481184208,
+    0.3048954619611974
+   ],
+   "peak_gb": [
+    12.8,
+    15.86
+   ],
+   "total_h": [
+    3.96,
+    5.08
+   ]
+  },
+  "exit_code": 1,
+  "wall_s": 13.0,
+  "alerts": [
+   "[preflight] watching /tmp/b/train.py against record golden-pretrain-share-tok; live record /tmp/out_B_off_plan/seHSwFpJXQ5PTle_4Pf25g.json",
+   "[preflight] 0 steps, 0 alerts; record /tmp/out_B_off_plan/seHSwFpJXQ5PTle_4Pf25g.json"
+  ],
+  "windows": 0,
+  "window_alerts": [],
+  "step_s": [],
+  "peak_reserved_gb": [],
+  "record_rewrites": 1,
+  "stderr_tail": "py.run_path(str(script), run_name=\"__main__\")\n  File \"<frozen runpy>\", line 291, in run_path\n  File \"<frozen runpy>\", line 98, in _run_module_code\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/tmp/b/train.py\", line 172, in <module>\n    main()\n  File \"/tmp/b/train.py\", line 154, in main\n    loss.backward()\n  File \"/usr/local/lib/python3.11/site-packages/torch/_tensor.py\", line 581, in backward\n    torch.autograd.backward(\n  File \"/usr/local/lib/python3.11/site-packages/torch/autograd/__init__.py\", line 347, in backward\n    _engine_run_backward(\n  File \"/usr/local/lib/python3.11/site-packages/torch/autograd/graph.py\", line 825, in _engine_run_backward\n    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.07 GiB. GPU 0 has a total capacity of 22.06 GiB of which 2.94 GiB is free. Process 1 has 19.11 GiB memory in use. Of the allocated memory 18.79 GiB is allocated by PyTorch, and 45.40 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)\n[preflight] 0 steps, 0 alerts; record /tmp/out_B_off_plan/seHSwFpJXQ5PTle_4Pf25g.json\n",
+  "live_record": {
+   "parses": true,
+   "source_kind": "inflight",
+   "parent_id": "01JBGOLDENPT0000000000000B",
+   "status": "oom",
+   "steps": 0
+  }
+ },
+ "wall_s": 262.2
+}
