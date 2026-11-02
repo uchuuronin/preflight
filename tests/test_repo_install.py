@@ -153,3 +153,22 @@ def test_a_line_plan_wont_install_doesnt_hide_a_known_import(tmp_path, missing):
 	_tree(tmp_path, {"pyproject.toml": '[project]\nname = "x"\ndependencies = ["torchvision (>=0.15)", "x" ]\n',
 		"run.py": "import torchvision\nimport " + "a" * 300 + "\n"})  # fmt: skip
 	assert R.repo_requirements(tmp_path, "run.py", log=lambda m: None).splitlines()[-1] == "torchvision"
+
+
+def test_a_samples_measured_outputs_are_sent_only_with_the_flag_off(monkeypatch):
+	"""B, Nov 2: zoo/grpo_trl holds its own run's record; with runner.hide_sample_outputs on it stays out."""
+	import json
+
+	from preflight.runner import flags, sources
+
+	monkeypatch.delenv("PREFLIGHT_FLAGS", raising=False)
+	flags.reload()
+	assert "record_nov1_a10.json" in sources.fetch({"kind": "sample", "uri": "sample://zoo/grpo_trl"}).files
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"runner.hide_sample_outputs": True}))
+	flags.reload()
+	try:
+		got = sources.fetch({"kind": "sample", "uri": "sample://zoo/grpo_trl"}).files
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+	assert "record_nov1_a10.json" not in got and any(k.endswith(".py") for k in got)

@@ -9,6 +9,7 @@
 	"harness.spark_diagnosis": false,
 	"harness.glimmer_private": false,
 	"runner.queue": false,
+	"runner.hide_sample_outputs": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,
