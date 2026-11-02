@@ -902,7 +902,7 @@ def test_a_private_job_is_triaged_on_glimmer_only_with_its_flag_and_never_sent_t
 	flags.reload()
 	try:
 		assert _triage_client(d, private=False) is spark_open
-		assert _triage_client(d, private=True) is spark_open  # the flag is off: private mode isn't offered
+		assert _triage_client(d, private=True) is None  # flag off: a private job isn't triaged, never on Baseten
 		monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.glimmer_private": True}))
 		flags.reload()
 		assert _triage_client(d, private=False) is spark_open  # default jobs keep Spark Open

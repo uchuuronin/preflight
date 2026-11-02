@@ -75,6 +75,7 @@ class SandboxRunner:
 		# "waiting" (at once, then every WAIT_NOTE_S) or "up", so a visitor reads "waiting for a GPU"
 		# where the status line went quiet for 19 minutes (D, Nov 1)
 		self.notify: Callable[[str, str, float], None] | None = None
+		self._close_lock = threading.Lock()
 
 	def __enter__(self):
 		return self
@@ -86,7 +87,9 @@ class SandboxRunner:
 		if self.notify is not None:
 			try:
 				self.notify(kind, gpu, waited)
-			except Exception:  # a status line never stops a probe
+			except Exception as exc:  # a status line never stops a probe; a cancel does
+				if type(exc).__name__ == "Cancelled":
+					raise
 				log.warning("wait notice failed", exc_info=True)
 
 	def _ready(self, sb, wait_s: float | None, gpu: str = "", since: float | None = None) -> bool:
@@ -129,7 +132,6 @@ class SandboxRunner:
 			left = max(0.0, self._wait_cap_s - self.queued_s - (self._clock() - t))
 			# wait out the GPU queue before any clock starts: neither the probe's time limit nor its
 			# cost counts the minutes Modal spent finding a GPU (no container runs, nothing is billed)
-			self._tell("waiting", g, self._clock() - t)
 			if self._ready(sb, left if last else min(self._schedule_wait_s, left), g, t):
 				break
 			self.unscheduled.append(g)
@@ -148,19 +150,24 @@ class SandboxRunner:
 		self.last_wait_s = waited
 		if waited > 1:
 			log.info("%s scheduled after %.0f s of waiting", g, waited)
-		self._tell("up", g, waited)
+		if waited >= WAIT_NOTE_S:  # only after a wait it had told of
+			self._tell("up", g, waited)
 		self._started = self._clock()
 		return self._sb
 
 	def close(self) -> None:
-		if self._sb is None:
-			return
+		# the watcher (a cancel, the probe's limit) and the job thread may both close: one wins, and
+		# the sandbox's seconds are counted once, under its GPU (review, Nov 2)
+		with self._close_lock:
+			sb, gpu = self._sb, self._gpu
+			if sb is None:
+				return
+			self._sb, self._gpu = None, None
+			self.gpu_seconds[gpu] = self.gpu_seconds.get(gpu, 0.0) + (self._clock() - self._started)
 		try:
-			self._sb.terminate()
+			sb.terminate()
 		except Exception:
 			log.warning("sandbox terminate failed", exc_info=True)
-		self.gpu_seconds[self._gpu] = self.gpu_seconds.get(self._gpu, 0.0) + (self._clock() - self._started)
-		self._sb, self._gpu = None, None
 
 	def billed_usd(self, price: Callable[[str], float]) -> float:
 		"""What the sandboxes have cost so far, the open one included: Modal bills their lifetime."""
@@ -235,7 +242,7 @@ class SandboxRunner:
 		if ran != gpu and self._price is not None:
 			spec = replace(spec, gpu_usd_per_hour=self._price(ran))  # list price of the GPU that ran
 		r = _timed(result_from_wire(spec, out or ""), spec, self._clock() - t0)
-		if overran.is_set() and r.probe.status != "ok":
+		if overran.is_set() and not out:  # a result that came back stands, whatever its status
 			r.probe = r.probe.model_copy(update={"status": "timeout", "error_code": "timeout",
 				"error": f"The probe ran past its {spec.timeout_s:.0f} s limit and was stopped"})  # fmt: skip
 		if wait > 0:  # logged on the probe that waited: how long the GPU took to schedule

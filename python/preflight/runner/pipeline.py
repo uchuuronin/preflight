@@ -701,8 +701,8 @@ def _triage_client(deps: Deps, private: bool):
 	to Baseten instead: it isn't triaged."""
 	from .flags import flag
 
-	if private and flag("harness.glimmer_private"):
-		return deps.glimmer
+	if private:  # never Baseten: Glimmer with its flag on, else no triage (review, Nov 2)
+		return deps.glimmer if flag("harness.glimmer_private") else None
 	return deps.triage
 
 
