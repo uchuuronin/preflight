@@ -9,7 +9,7 @@
 import { fmt } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { FixFinding } from "../../fix/FixFinding";
-import { findingSourceKey } from "./findingSource";
+import { FindingCitations, findingSourceKey } from "./findingSource";
 import { useOrbitLayout } from "../map/Orbit";
 import type { LoadedRecord } from "../record/types";
 import { useWorkspace } from "../state";
@@ -110,6 +110,7 @@ export function FindingsBand() {
 								</ul>
 							) : null}
 							<p className="pf-findings__source">{t(findingSourceKey(f))}</p>
+							<FindingCitations finding={f} />
 							<FixFinding finding={f} />
 						</li>
 					);
