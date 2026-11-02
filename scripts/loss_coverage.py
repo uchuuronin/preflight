@@ -107,12 +107,23 @@ def score(curves_path: Path, pfn_path: Path) -> dict:
 				"scored": n,
 				"abstained": t["abstained"],
 				"coverage": k / n if n else None,
+				# abstaining is honest but answers nothing: coverage over every curve, abstentions as misses
+				"coverage_all_curves": k / (n + t["abstained"]) if n + t["abstained"] else None,
 				"wilson95": [lo, hi],
 				"median_abs_log_err": errs[len(errs) // 2] if errs else None,
 				"meets_90": bool(n) and k / n >= TARGET,
 			}
 		report["by_seen"][str(seen)] = row
-	report["lcpfn_wired"] = all(r["ensemble"]["meets_90"] for r in report["by_seen"].values())
+	# overnight item 6: wired only where LC-PFN's own held-out band covers 90%, and the ensemble's too. Review, Nov 2: The ensemble falls back to the power law where LC-PFN gave
+	# nothing, so a run where its forecasts failed must not pass on the power law's coverage alone
+	errors = sum(1 for r in pfn["rows"] if r.get("error"))
+	report["lcpfn_errors"] = errors
+	report["lcpfn_wired"] = errors == 0 and all(
+		r["lcpfn"]["scored"] >= 0.9 * len(doc["curves"])
+		and r["lcpfn"]["meets_90"]
+		and r["ensemble"]["meets_90"]
+		for r in report["by_seen"].values()
+	)
 	return report
 
 

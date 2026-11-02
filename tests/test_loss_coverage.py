@@ -37,4 +37,7 @@ def test_prepare_keeps_runs_that_didnt_diverge_and_scores_each_half(tmp_path, mo
 	r = rep["by_seen"]["60"]
 	assert (r["lcpfn"]["covered"], r["lcpfn"]["scored"]) == (1, 2) and not r["lcpfn"]["meets_90"]
 	assert r["power"]["scored"] + r["power"]["abstained"] == 2
-	assert rep["lcpfn_wired"] is False or r["ensemble"]["meets_90"]
+	assert rep["lcpfn_wired"] is False  # LC-PFN covered 1 of 2
+	# no LC-PFN forecasts at all: never wired, whatever the power law's own coverage
+	pfn.write_text(json.dumps({"rows": [{"key": "a", "seen": 60, "q": None, "error": "boom"}]}))
+	assert lc.score(curves, pfn)["lcpfn_wired"] is False

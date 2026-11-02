@@ -61,7 +61,10 @@ def main(argv: list[str] | None = None) -> int:
 	# the engine features these flags switch (engine.memory gates the runner's fill, not the scoring)
 	on = sorted(k for k in api.FLAG_OF.values() if flags.get(k)) or ["none"]
 	waiting = [r.script for r in runs if any(": not measured, no " in n for n in r.notes)]
-	scored = f"{len(runs) - len(waiting)} runs scored" + (
+	# review, Nov 2: a run used for calibration on every row scores none, so it isn't counted as scored
+	every = {r.get("script") for r in manifest.get("runs", []) if "*" in (r.get("calibrates") or ())}
+	n_scored = sum(1 for r in runs if r.script not in waiting and r.script not in every)
+	scored = f"{n_scored} runs scored" + (
 		f"; not measured yet: {', '.join(waiting)} ({len(waiting)})" if waiting else ""
 	)
 	stamp = (

@@ -631,7 +631,8 @@ def divergence_row(d: dict | None) -> Row:
 		None,
 		d.get("n", 0),
 		hit,
-		f"AUROC {a['point']:.2f} ({a['lo']:.2f} to {a['hi']:.2f}); warns {s['point']:.0f} steps early "
+		source="simulated",  # review, Nov 2: a held-out replay of the corpus sweep, no full run launched
+		note=f"AUROC {a['point']:.2f} ({a['lo']:.2f} to {a['hi']:.2f}); warns {s['point']:.0f} steps early "
 		f"({s['lo']:.0f} to {s['hi']:.0f}"
 		# the report's own reason says it when the row misses (review, Nov 1: once, not twice)
 		+ (
@@ -666,7 +667,8 @@ def markdown(rows: list[Row], stamp: str = "") -> str:
 		f'95% on the proportion, and a hit is "confident" only when its lower end is at least {CONFIDENT:.0%} '
 		'("hit, few runs" otherwise). Status: "measured" is scored against what real runs did; "simulated" is the '
 		'engine replaying held-out corpus measurements it never saw, with no full run launched; "not yet run" waits '
-		"for Monday's runs. Unseen scripts are never tuned on."
+		'for Monday\'s runs; "test suite" is checked by the automated tests on every CI run. Unseen scripts are never '
+		"tuned on."
 	)
 	return "\n".join(lines) + foot + (f" {stamp}" if stamp else "") + "\n"
 
