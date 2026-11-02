@@ -47,8 +47,14 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [intake, setIntake] = useState<Intake>("repo");
 	const [repo, setRepo] = useState("");
 	const [goal, setGoal] = useState<ObjectiveKind>("min_cost");
-	const [gpu, setGpu] = useState<string | null>("A100-SXM-80GB");
+	// "Not sure" by default: the runner picks the GPU from its own ladder (pipeline._requested_gpu;
+	// PM, Nov 1: the demo probes go no higher than an L40S).
+	const [gpu, setGpu] = useState<string | null>(null);
 	const [description, setDescription] = useState("");
+	// Private mode (contract 0.6.2): offered only while probe logs are triaged at all and Muse
+	// Glimmer triages private jobs (pipeline._triage_client).
+	const privateOffered = flag("harness.spark_open_triage") && flag("harness.glimmer_private");
+	const [privateMode, setPrivateMode] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [accepted, setAccepted] = useState(dataUseAccepted);
@@ -56,7 +62,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [entry, setEntry] = useState<string | undefined>();
 	const [reading, setReading] = useState(false);
 	const idem = useRef<{ key: string; body: string | null }>({ key: newKey(), body: null });
-	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId(), repoHint: useId(), repoError: useId() };
+	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId(), repoHint: useId(), repoError: useId(), privateHint: useId() };
 	// Uploads open with live probes (the same flag the API checks before taking a job).
 	const uploadsOpen = flag("runner.queue");
 	// A notebook tab (D's intake panel) previews what will run, so notebooks go through it there.
@@ -156,6 +162,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 			objective: { kind: goal, description: description.trim() || null },
 			gpu,
 			description: description.trim() || null,
+			...(privateOffered && privateMode ? { private: true } : {}),
 		};
 		// One key per distinct check-in: a retry of the same body reuses it (the API returns the job
 		// it already made), and any change to the body is a new check-in with a new key.
@@ -353,6 +360,22 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								</button>
 							</div>
 						</div>
+						{privateOffered ? (
+							<div className="pf-desk__row pf-private">
+								<label className="pf-datause__ok">
+									<input type="checkbox" checked={privateMode} aria-describedby={ids.privateHint} onChange={(e) => setPrivateMode(e.currentTarget.checked)} />
+									{t("newflight.private.label")}
+								</label>
+								<div id={ids.privateHint} className="pf-private__hint">
+									<p className="pf-hint">{t("newflight.private.body")}</p>
+									{flag("harness.spark_script_map") ? <p className="pf-hint">{t("newflight.private.map")}</p> : null}
+									{/* Source: measured, Glimmer's cold starts on its A100-40GB, Nov 1: 286 s (B's smoke,
+									    docs/decisions/glimmer-host.md) and 330 to 459 s (A's triage runs, docs/status/a.md);
+									    a warm triage took 12.8 s (median of 5). */}
+									<p className="pf-hint">{t("newflight.private.wait")}</p>
+								</div>
+							</div>
+						) : null}
 						<div className="pf-field">
 							<label htmlFor={ids.describe}>{t("newflight.describe.label")}</label>
 							<textarea id={ids.describe} rows={2} placeholder={t("newflight.describe.placeholder")} value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
