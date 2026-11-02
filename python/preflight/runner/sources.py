@@ -57,8 +57,14 @@ def content_hash(files: dict[str, str]) -> str:
 	return "sha256:" + h.hexdigest()
 
 
-def _wanted(rel: str) -> bool:
-	return not (rel.startswith(".") or "/." in rel) and Path(rel).suffix in TEXT_SUFFIXES
+# small text data a package ships beside its code (ogb's master.csv, Nov 2); read from a repo only
+# with probes.repo_install on, under the same size caps
+DATA_SUFFIXES = (".csv", ".tsv")
+
+
+def _wanted(rel: str, data: bool = False) -> bool:
+	suffixes = (*TEXT_SUFFIXES, *DATA_SUFFIXES) if data else TEXT_SUFFIXES
+	return not (rel.startswith(".") or "/." in rel) and Path(rel).suffix in suffixes
 
 
 def _too_big() -> InvalidSubmission:
@@ -176,6 +182,12 @@ def _without_outputs(files: dict[str, str]) -> dict[str, str]:
 	return {k: v for k, v in files.items() if not _SAMPLE_OUTPUT.fullmatch(k)}
 
 
+def _repo_data() -> bool:
+	from .flags import flag
+
+	return flag("probes.repo_install")
+
+
 def _sample(uri: str) -> Path:
 	name = uri.removeprefix("sample://").removeprefix("zoo/").strip("/")
 	if not re.fullmatch(r"[a-z0-9_\-]+", name):
@@ -191,7 +203,7 @@ def _git(base: list[str], *args: str, env: dict, stdin: bytes | None = None) -> 
 		timeout=CLONE_TIMEOUT_S, env=env).stdout  # fmt: skip
 
 
-def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict) -> dict[str, str]:
+def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict, data: bool = False) -> dict[str, str]:
 	"""Text files of a tree, read from the object store without a checkout or a lazy fetch.
 
 	Blobs the partial clone left out (over the per-file cap) are listed as missing and skipped
@@ -214,7 +226,7 @@ def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict) -> dict[
 			rel = raw.decode("utf-8")
 		except UnicodeDecodeError:
 			continue
-		if kind == "blob" and mode in ("100644", "100755") and oid not in missing and _wanted(rel):
+		if kind == "blob" and mode in ("100644", "100755") and oid not in missing and _wanted(rel, data):
 			entries.append((rel, oid))
 	entries.sort()
 	if not entries:
@@ -250,9 +262,10 @@ def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict) -> dict[
 	return files
 
 
-def _clone(uri, commit) -> tuple[dict[str, str], str]:
+def _clone(uri, commit, *, data: bool = False) -> tuple[dict[str, str], str]:
 	"""The text files of a public GitHub repo at its default branch or a full commit hash, and the
-	commit they were read at, so a later probe of the same record reads the same code."""
+	commit they were read at, so a later probe of the same record reads the same code. data: small
+	.csv and .tsv files too (probes.repo_install)."""
 	if not isinstance(uri, str) or not _GITHUB.fullmatch(uri):
 		raise InvalidSubmission("repositories are read from https://github.com/<owner>/<repo>")
 	if commit is not None and (not isinstance(commit, str) or not _COMMIT.fullmatch(commit)):
@@ -269,7 +282,7 @@ def _clone(uri, commit) -> tuple[dict[str, str], str]:
 			_git(base, "-C", str(dest), "fetch", *shallow, "origin", commit, env=env)
 			treeish = commit
 		sha = _git(base, "-C", str(dest), "rev-parse", f"{treeish}^{{commit}}", env=env).decode().strip()
-		return _git_files(dest, treeish, base=base, env=env), sha
+		return _git_files(dest, treeish, base=base, env=env, data=data), sha
 	except subprocess.TimeoutExpired as exc:
 		raise InvalidSubmission("the repository took too long to clone") from exc
 	except subprocess.CalledProcessError as exc:
@@ -347,7 +360,7 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		if reqs:  # the notebook's !pip install lines, installed like any upload's requirements.txt
 			files["requirements.txt"] = "\n".join(reqs) + "\n"
 	elif kind == "repo":
-		files, commit = _clone(uri, commit)
+		files, commit = _clone(uri, commit, data=_repo_data())
 	else:
 		raise InvalidSubmission(f"unknown source kind {kind!r}")
 	entry = _pick_entrypoint(

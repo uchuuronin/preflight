@@ -608,7 +608,7 @@ def ground_truth(
 	if repo:
 		from preflight.runner.sources import _clone
 
-		files, sha = _clone(repo, commit or None)
+		files, sha = _clone(repo, commit or None, data=install_repo)
 		if edit_hex:
 			files = _apply_edits(files, edit_hex)
 		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])

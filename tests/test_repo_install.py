@@ -178,3 +178,81 @@ def test_a_samples_measured_outputs_are_sent_only_with_the_flag_off():
 			os.environ["PREFLIGHT_FLAGS"] = before
 		flags.reload()
 	assert "record_nov1_a10.json" not in got and any(k.endswith(".py") for k in got)
+
+
+def test_only_the_modules_the_script_imports_are_scanned_not_their_whole_package(tmp_path, missing):
+	"""Unseen LitGPT, Nov 2: scanning all of litgpt/ found lm_eval (its eval module), which the
+	pretrain script never imports, and that one conflicting package sank the whole install."""
+	missing.update({"jsonargparse", "lm_eval"})
+	_tree(tmp_path, {"litgpt/__init__.py": "", "litgpt/pretrain.py": "from litgpt.utils import x\n",
+		"litgpt/utils.py": "import jsonargparse\n", "litgpt/eval/__init__.py": "import lm_eval\n"})  # fmt: skip
+	assert R.missing_imports(tmp_path, "litgpt/pretrain.py") == {"jsonargparse"}
+
+
+def test_the_entrypoints_own_folder_and_relative_imports_are_the_repos_own(tmp_path, missing):
+	missing.update({"torch_geometric", "logger", "loader"})
+	_tree(tmp_path, {"examples/arxiv/gnn.py": "import torch_geometric\nfrom logger import Logger\n",
+		"examples/arxiv/logger.py": "", "pkg/__init__.py": "from .sub import f\n", "pkg/sub.py": "import loader\n",
+		"run.py": "import pkg\n"})  # fmt: skip
+	assert R.missing_imports(tmp_path, "examples/arxiv/gnn.py") == {"torch_geometric"}
+	assert R.missing_imports(tmp_path, "run.py") == {"loader"}  # found through the relative import
+
+
+def test_a_declared_package_isnt_noted_as_unknown(tmp_path, missing):
+	missing.add("six")
+	_tree(tmp_path, {"setup.py": "from setuptools import setup\nsetup(install_requires=['six>=1.12'])\n",
+		"run.py": "import six\n"})  # fmt: skip
+	notes: list[str] = []
+	assert R.repo_requirement_sets(tmp_path, "run.py", log=notes.append) == (["six>=1.12"], [])
+	assert not any("add it to requirements.txt" in n for n in notes)
+
+
+def test_an_imported_package_that_wont_install_doesnt_sink_the_declared_ones(tmp_path, missing, monkeypatch):
+	missing.update({"torchvision", "lm_eval"})
+	_tree(tmp_path, {"pyproject.toml": '[project]\nname = "x"\ndependencies = ["tinypkg-xyz==1.0"]\n',
+		"run.py": "import torchvision\nimport lm_eval\n"})  # fmt: skip
+	calls = []
+
+	def fake_run(cmd, **kw):
+		pkgs = cmd[cmd.index("-c") + 2 :]
+		calls.append(pkgs)
+		bad = "lm-eval" in pkgs
+		return subprocess.CompletedProcess(cmd, 1 if bad else 0, "", "ResolutionImpossible" if bad else "")
+
+	monkeypatch.setattr(R.subprocess, "run", fake_run)
+	monkeypatch.delenv("PREFLIGHT_DEPS_DIR", raising=False)
+	notes: list[str] = []
+	err, _ = R.install(tmp_path, tmp_path / "deps", log=notes.append, repo=True, entrypoint="run.py")
+	assert err is None
+	assert calls == [
+		["tinypkg-xyz==1.0", "lm-eval", "torchvision"],
+		["tinypkg-xyz==1.0"],
+		["lm-eval"],
+		["torchvision"],
+	]
+	assert any("lm-eval didn't install" in n for n in notes) and any(
+		"torchvision installed" in n for n in notes
+	)
+
+
+def test_a_known_package_can_carry_a_pin():
+	assert R.KNOWN_MODULES["torchao"] == "torchao<0.8"  # 0.8 on needs torch 2.6; the image has 2.5.1
+
+
+def test_small_data_files_are_read_from_a_repo_only_with_the_flag():
+	from preflight.runner.sources import _wanted
+
+	assert not _wanted("ogb/nodeproppred/master.csv") and _wanted("ogb/nodeproppred/master.csv", True)
+	assert _wanted("train.py") and not _wanted(".hidden/x.csv", True)
+
+
+def test_every_known_module_maps_to_a_requirement_line():
+	assert all(R._LINE.fullmatch(v) for v in R.KNOWN_MODULES.values())
+	assert {"torchdata", "tiktoken", "sentencepiece", "torchao"} <= set(R.KNOWN_MODULES)
+
+
+def test_a_relative_import_never_reads_above_the_checkout(tmp_path, missing):
+	missing.add("outside_mod")
+	(tmp_path / "outside.py").write_text("import outside_mod\n")
+	work = _tree(tmp_path / "work", {"run.py": "from .. import outside\n"})
+	assert R.missing_imports(work, "run.py") == set()
