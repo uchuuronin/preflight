@@ -1,0 +1,11 @@
+{
+	"name": "20261102-231241-41543603490-b-lcpfn-binned",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41543603490",
+	"ref": "ws-b",
+	"sha": "a23e928f2d19429c0b2f3c14f690f70f3db92e8f",
+	"cmd": "modal run --env main python/preflight/corpus/lcpfn_app.py::coverage --curves python/preflight/corpus/data/loss_curves_heldout_nov2.json.gz",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:14:20Z"
+}
