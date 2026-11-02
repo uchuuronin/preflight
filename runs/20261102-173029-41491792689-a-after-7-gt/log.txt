@@ -1,0 +1,165 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-tfoFDCOBagi78Ns3FclU3q
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+└── ✓ Created Function triage_agreement_hosted.
+[ground truth] https://github.com/beir-cellar/beir at ef83d29307061c65d04b035b4f4e7c18bd8374af: 109 files
+[ground truth] beir: examples/retrieval/evaluation/dense/evaluate_sbert.py, lens serving, serving image, 109 files; waiting for an L4, else the A10 (Modal queues it)
+[ground truth] container up on the A10; 109 files of beir
+[ground truth 17:30:54] bare run of beir: 100000 optimizer steps, at most 1350 s
+[preflight] requirements: the repo declares 3 dependencies (pyproject.toml or setup.py)
+[preflight] requirements: the script imports cohere, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt
+[preflight] requirements: the script imports elasticsearch, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt
+[preflight] requirements: the script imports faiss: installing faiss-cpu
+[preflight] requirements: the script imports llm2vec, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt
+[preflight] requirements: the script imports nltk, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt
+[preflight] requirements: the script imports peft, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt
+[preflight] requirements: the script imports scipy: installing scipy
+[preflight] requirements: the script imports tldr, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt
+[preflight] requirements: the script imports voyageai, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt
+[preflight] requirements: kept the image's datasets 3.1.0 (asked for 'datasets')
+[preflight] requirements: installing sentence-transformers, pytrec-eval-terrier, faiss-cpu, scipy
+[bare] running /tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/evaluate_sbert.py for 100000 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+2026-11-02 17:31:12 - Downloading trec-covid.zip ...
+
+[1A/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip:   0%|          | 0.00/70.5M [00:00<?, ?iB/s]
+[1A/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip:  10%|▉         | 6.81M/70.5M [00:00<00:00, 71.4MiB/s]
+[1A/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip:  26%|██▌       | 18.4M/70.5M [00:00<00:00, 101MiB/s] 
+[1A/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip:  42%|████▏     | 29.5M/70.5M [00:00<00:00, 108MiB/s]
+[1A/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip:  57%|█████▋    | 40.1M/70.5M [00:00<00:00, 109MiB/s]
+[1A/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip:  72%|███████▏  | 50.5M/70.5M [00:00<00:00, 108MiB/s]
+[1A/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip:  86%|████████▌ | 60.8M/70.5M [00:00<00:00, 106MiB/s]/tmp/gt-jzycse2q/examples/retrieval/evaluation/dense/datasets/trec-covid.zip: 100%|██████████| 70.5M/70.5M [00:00<00:00, 105MiB/s]
+2026-11-02 17:31:12 - Unzipping trec-covid.zip ...
+2026-11-02 17:31:13 - Loading Corpus...
+
+[1A  0%|          | 0/171332 [00:00<?, ?it/s]
+[1A  8%|▊         | 13196/171332 [00:00<00:01, 131955.09it/s]
+[1A 18%|█▊        | 30272/171332 [00:00<00:00, 154767.35it/s]
+[1A 27%|██▋       | 45749/171332 [00:00<00:00, 143922.48it/s]
+[1A 35%|███▌      | 60225/171332 [00:00<00:00, 136401.25it/s]
+[1A 43%|████▎     | 73946/171332 [00:00<00:00, 132783.51it/s]
+[1A 51%|█████     | 87568/171332 [00:00<00:00, 133878.65it/s]
+[1A 62%|██████▏   | 106206/171332 [00:00<00:00, 150318.78it/s]
+[1A 72%|███████▏  | 123309/171332 [00:00<00:00, 156719.36it/s]
+[1A 81%|████████  | 139068/171332 [00:00<00:00, 141360.53it/s]
+[1A 90%|████████▉ | 153520/171332 [00:01<00:00, 132737.40it/s]
+[1A 98%|█████████▊| 167070/171332 [00:01<00:00, 127660.80it/s]100%|██████████| 171332/171332 [00:01<00:00, 136423.90it/s]
+A new version of the following files was downloaded from https://huggingface.co/NovaSearch/stella_en_1.5B_v5:
+- modeling_qwen.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/NovaSearch/stella_en_1.5B_v5:
+- tokenization_qwen.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+2026-11-02 17:31:15 - Loaded 171332 TEST Documents.
+2026-11-02 17:31:15 - Doc Example: {'text': 'OBJECTIVE: This retrospective chart review describes the epidemiology and clinical features of 40 patients with culture-proven Mycoplasma pneumoniae infections at King Abdulaziz University Hospital, Jeddah, Saudi Arabia. METHODS: Patients with positive M. pneumoniae cultures from respiratory specimens from January 1997 through December 1998 were identified through the Microbiology records. Charts of patients were reviewed. RESULTS: 40 patients were identified, 33 (82.5%) of whom required admission. Most infections (92.5%) were community-acquired. The infection affected all age groups but was most common in infants (32.5%) and pre-school children (22.5%). It occurred year-round but was most common in the fall (35%) and spring (30%). More than three-quarters of patients (77.5%) had comorbidities. Twenty-four isolates (60%) were associated with pneumonia, 14 (35%) with upper respiratory tract infections, and 2 (5%) with bronchiolitis. Cough (82.5%), fever (75%), and malaise (58.8%) were the most common symptoms, and crepitations (60%), and wheezes (40%) were the most common signs. Most patients with pneumonia had crepitations (79.2%) but only 25% had bronchial breathing. Immunocompromised patients were more likely than non-immunocompromised patients to present with pneumonia (8/9 versus 16/31, P = 0.05). Of the 24 patients with pneumonia, 14 (58.3%) had uneventful recovery, 4 (16.7%) recovered following some complications, 3 (12.5%) died because of M pneumoniae infection, and 3 (12.5%) died due to underlying comorbidities. The 3 patients who died of M pneumoniae pneumonia had other comorbidities. CONCLUSION: our results were similar to published data except for the finding that infections were more common in infants and preschool children and that the mortality rate of pneumonia in patients with comorbidities was high.', 'title': 'Clinical features of culture-proven Mycoplasma pneumoniae infections at King Abdulaziz University Hospital, Jeddah, Saudi Arabia'}
+2026-11-02 17:31:15 - Loading Queries...
+2026-11-02 17:31:15 - Loaded 50 TEST Queries.
+2026-11-02 17:31:15 - Query Example: what is the origin of COVID-19
+2026-11-02 17:31:15 - No device provided, using cuda:0
+2026-11-02 17:31:16 - Loading SentenceTransformer model from NovaSearch/stella_en_1.5B_v5.
+2026-11-02 17:31:49 - Loaded 2 prompts with these keys: ['s2p_query', 's2s_query']
+2026-11-02 17:31:49 - Query prompt: None, Passage prompt: None
+2026-11-02 17:31:49 - Query prompt name: s2p_query, Passage prompt name: None
+2026-11-02 17:31:49 - Encoding Queries...
+
+[1ABatches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:01<00:00,  1.04s/it]Batches: 100%|██████████| 1/1 [00:01<00:00,  1.04s/it]
+2026-11-02 17:31:50 - Sorting Corpus by document length (Longest first)...
+2026-11-02 17:31:50 - Encoding Corpus in batches... Warning: This might take a while!
+2026-11-02 17:31:50 - Scoring Function: Cosine Similarity (cos_sim)
+2026-11-02 17:31:50 - Encoding Batch 1/4...
+
+[1ABatches:   0%|          | 0/391 [00:00<?, ?it/s]Batches:   0%|          | 0/391 [00:16<?, ?it/s]
+{"steps": 0, "ended": "oom", "error": "CUDA out of memory. Tried to allocate 2.19 GiB. GPU 0 has a total capacity of 22.06 GiB of which 802.81 MiB is free. Process 1 has 21.27 GiB memory in use. Of the allocated memory 18.51 GiB is allocated by PyTorch, and 2.48 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-", "seconds": 62.644721645999994, "peak_allocated_bytes": 22093963264, "peak_reserved_bytes": 23089643520, "device": "NVIDIA A10", "timing": "cuda_events"}
+[ground truth 17:32:09] bare run ended (oom) after 75 s, 0 steps
+[ground truth 17:32:09] recorder run: 5 warmup + 60 timed steps, at most 2565 s
+[ground truth 17:33:19] recorder run ended (oom) after 0 steps
+{
+  "script": "beir",
+  "entrypoint": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": null,
+  "lens": "serving",
+  "image": "serving",
+  "bare": {
+    "steps": 0,
+    "ended": "oom",
+    "error": "CUDA out of memory. Tried to allocate 2.19 GiB. GPU 0 has a total capacity of 22.06 GiB of which 802.81 MiB is free. Process 1 has 21.27 GiB memory in use. Of the allocated memory 18.51 GiB is allocated by PyTorch, and 2.48 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-",
+    "seconds": 62.644721645999994,
+    "peak_allocated_bytes": 22093963264,
+    "peak_reserved_bytes": 23089643520,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 74.8
+  },
+  "recorder": {
+    "status": "oom",
+    "error": "Ran out of GPU memory before the first step. OutOfMemoryError: CUDA out of memory. Tried to allocate 2.19 GiB. GPU 0 has a total capacity of 22.06 GiB of which 802.81 MiB is free. Process 1 has 21.27 GiB memory in use. Of the allocated memory 18.51 GiB is allocated by PyTorch, and 2.48 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment- at beir/retrieval/models/sentence_bert.py:105, before the first optimizer step (stage: running script)",
+    "error_code": "oom",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 70.392,
+    "by_phase": {},
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 11110707200.0
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "vllm": "0.6.4.post1",
+        "datasets": "3.1.0",
+        "sentence-transformers": "5.7.0"
+      },
+      "python": "3.11.12"
+    }
+  }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-tfoFDCOBagi78Ns3FclU3q
