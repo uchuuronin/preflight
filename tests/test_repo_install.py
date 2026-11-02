@@ -244,3 +244,15 @@ def test_small_data_files_are_read_from_a_repo_only_with_the_flag():
 
 	assert not _wanted("ogb/nodeproppred/master.csv") and _wanted("ogb/nodeproppred/master.csv", True)
 	assert _wanted("train.py") and not _wanted(".hidden/x.csv", True)
+
+
+def test_every_known_module_maps_to_a_requirement_line():
+	assert all(R._LINE.fullmatch(v) for v in R.KNOWN_MODULES.values())
+	assert {"torchdata", "tiktoken", "sentencepiece", "torchao"} <= set(R.KNOWN_MODULES)
+
+
+def test_a_relative_import_never_reads_above_the_checkout(tmp_path, missing):
+	missing.add("outside_mod")
+	(tmp_path / "outside.py").write_text("import outside_mod\n")
+	work = _tree(tmp_path / "work", {"run.py": "from ...... import outside\n"})
+	assert R.missing_imports(work, "run.py") == set()

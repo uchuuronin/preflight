@@ -87,7 +87,9 @@ KNOWN_MODULES = {
 	"sentence_transformers": "sentence-transformers", "lightning": "lightning",
 	"pytorch_lightning": "pytorch-lightning", "lightning_utilities": "lightning-utilities",
 	"timm": "timm", "einops": "einops", "omegaconf": "omegaconf", "hydra": "hydra-core",
-	"torchao": "torchao<0.8",  # 0.8 on needs torch 2.6 (torch.int1), and pip can't tell from its metadata "torchdata": "torchdata", "tiktoken": "tiktoken", "sentencepiece": "sentencepiece",
+	# torchao 0.8 on needs torch 2.6 (torch.int1), which pip can't tell from its metadata
+	"torchao": "torchao<0.8",
+	"torchdata": "torchdata", "tiktoken": "tiktoken", "sentencepiece": "sentencepiece",
 	"tokenizers": "tokenizers", "jsonargparse": "jsonargparse", "litdata": "litdata", "evaluate": "evaluate",
 	"ogb": "ogb", "beir": "beir", "faiss": "faiss-cpu", "sklearn": "scikit-learn", "scipy": "scipy",
 	"pandas": "pandas", "yaml": "pyyaml", "PIL": "pillow", "cv2": "opencv-python-headless",
@@ -198,6 +200,8 @@ def missing_imports(workdir: Path, entrypoint: str) -> set[str]:
 			base = f.parent
 			for _ in range(level - 1):
 				base = base.parent
+			if base != workdir and workdir not in base.parents:  # never above the checkout
+				continue
 			try:
 				todo.extend(_module_files(base, dotted))
 			except OSError:
@@ -379,7 +383,10 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 			f"[preflight] requirements: together they didn't install ({err.splitlines()[-1][:200]}); trying them apart"
 		)
 		base = [k for k in keep if k not in optional]
-		err = _pip(base, target, constraints, deadline - time.monotonic()) if base else None
+		left = deadline - time.monotonic()
+		if left < 5:  # the first try used the time: its error stands
+			return err, []
+		err = _pip(base, target, constraints, left) if base else None
 		if err is None:
 			for k in opt:
 				left = deadline - time.monotonic()
