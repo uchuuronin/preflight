@@ -1,0 +1,11 @@
+{
+	"name": "20261102-225958-41541853453-b-zoo-rec-titan-dir",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41541853453",
+	"ref": "ws-b",
+	"sha": "33a9499e6ec3c3e67f0e253fc1ad98c94163e796",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --dir zoo/torchtitan_debug --gpus A10 --visitor b-zoo-rec-3 --max-minutes 25",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:01:33Z"
+}
