@@ -1,0 +1,5 @@
+/root/preflight/.venv-amd/lib/python3.12/site-packages/torch/_subclasses/functional_tensor.py:295: UserWarning: Failed to initialize NumPy: No module named 'numpy' (Triggered internally at ../torch/csrc/utils/tensor_numpy.cpp:84.)
+  cpu = _conversion_method_template(device=torch.device("cpu"))
+torch 2.5.1+rocm6.2 hip 6.2.41133-dd7f95766 AMD Instinct MI300X
+the probe user can't reach /root/preflight/.venv-amd/bin/python; probes run /opt/conda/bin/python3.12 instead
+USER_CHECK {"ok": false, "failed": ["exit 1: Traceback (most recent call last):\n  File \"<string>\", line 14, in <module>\nModuleNotFoundError: No module named 'torch'\n"], "root": true, "gpu_groups": [44], "cli_run_probes_as": "root (venv unreachable)", "exit": 1, "probe_uid": 61000, "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 14, in <module>\nModuleNotFoundError: No module named 'torch'\n"}

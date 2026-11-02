@@ -1,0 +1,11 @@
+{
+	"name": "20261102-230340-41542362735-amd-a-amd-usercheck-2",
+	"exit_code": 1,
+	"workflow": "amd-run",
+	"run_id": "41542362735",
+	"ref": "main",
+	"sha": "8ec03bc6fe7faf5136a96c7bf810e6dd78732d68",
+	"cmd": "python -m preflight.probes.user_check --uid 61000 --gpu",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:05:05Z"
+}
