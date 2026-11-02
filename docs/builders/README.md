@@ -20,8 +20,9 @@ hesitates or gets stuck; every one of those places becomes an onboarding fix.
   as a `.py` and uploads that. Checked on a local build with the production flags, Nov 1: the
   check-in desk shows exactly two tabs, Repo link and Upload.
 - **Demo limits:** 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site,
-  $10 a day through Nov 4 [cited: `python/preflight/runner/queue.py`]. Live since A's
-  redeploy (`a-deploy-main-19`, 20:20 UTC Nov 1; confirmed by Chiya, 18:20 ET). A builder past either sees "samples only until
+  $10 a day through Nov 4 and $8 a day from Nov 5 [cited: `python/preflight/runner/queue.py`]. The limits have been live
+  since A's redeploy of Nov 1 (`a-deploy-main-19`, 20:20 UTC; confirmed by Chiya, 18:20 ET); the
+  $8 from Nov 5 is in the runner A deployed from `1ea2dd6` (Nov 2, 08:24 UTC). A builder past either sees "samples only until
   midnight ET"; when jobs in flight hold the day's budget, the desk says the GPUs are busy and to
   retry in about 2 minutes. Either is outside the builder's control: note it word for word and
   go on with a sample.

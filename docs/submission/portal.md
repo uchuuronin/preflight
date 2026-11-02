@@ -45,7 +45,7 @@ and labs planning a grid of runs both lose time this way.
 builds a model of how the job behaves. Then you fly the run in the browser:
 your job drawn as a map, four readouts (memory, time, cost, risk) with ranges, and knobs that move
 everything at once. Every number says how it was made: Measured, Predicted, Extrapolated, or Not
-trusted when Preflight is too far from anything it measured to give one. On the live site you can
+measured here when Preflight is too far from anything it measured to give one. On the live site you can
 check in your own repository or script (3 probe jobs a day while the site's GPU budget lasts), ask
 the guide, and take the plan away: the settings, an edit script, a Slurm batch file, the command
 and a Weights & Biases helper. Or open a sample or a shared record, at no cost.
@@ -154,7 +154,7 @@ measurement; it is built and switched off, as that gating isn't wired end to end
 - Measuring a few minutes of a job honestly: profiler overhead distorts small kernels, so timings
   come from unprofiled steps; optimizer state appears only after the first step; a CUDA context
   sits outside any model's tensors.
-- Saying "not trusted" instead of a number when a question is too far from what was measured.
+- Saying "not measured here" instead of a number when a question is too far from what was measured.
 - Running strangers' code safely: GPU sandboxes, quotas, a spend cap and an edge that proxies
   every API call.
 

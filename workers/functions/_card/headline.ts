@@ -1,12 +1,12 @@
 /**
  * What a share card says about a flight record: a title, a subtitle and up to four headline
  * numbers, each with its status word as the app shows it (Measured, Predicted, Extrapolated,
- * Not trusted, Illustrative). Every number comes from the record itself: the engine's estimates
+ * Not measured here, Illustrative). Every number comes from the record itself: the engine's estimates
  * when the record has them, or else the probes' own measurements. Nothing is computed here
  * beyond unit conversion and picking the largest measured peak.
  */
 
-export type StatusWord = "Measured" | "Predicted" | "Extrapolated" | "Not trusted" | "Illustrative";
+export type StatusWord = "Measured" | "Predicted" | "Extrapolated" | "Not measured here" | "Illustrative";
 
 export interface Line {
 	label: string;
@@ -134,7 +134,7 @@ function word(e: Estimate, fixtures: Set<string>): StatusWord {
 		case "extrapolated":
 			return "Extrapolated";
 		case "abstain":
-			return "Not trusted";
+			return "Not measured here";
 		default:
 			return "Predicted";
 	}
@@ -165,7 +165,7 @@ export function headline(rec: RecordLike): Headline {
 		const e = estimates[id];
 		if (!e) continue;
 		const status = word(e, fixtures);
-		const value = status === "Not trusted" ? "No number" : range(e);
+		const value = status === "Not measured here" ? "No number" : range(e);
 		if (value) lines.push({ label, value, status });
 	}
 
