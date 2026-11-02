@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160839-41478547212-a-unseen-a-unseen-1b-checkin-gt",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41478547212",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/pytorch/torchtune --commit bd2a0fc7c31430972728494fa01aaeeb0ebf1ba1 --entrypoint recipes/lora_finetune_single_device.py --args=--config,qwen2_5/7B_lora_single_device --bare-steps 300 --budget-min 45 --first-gpu A100 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:09:06Z"
+}
