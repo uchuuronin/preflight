@@ -41,6 +41,9 @@ THROUGHPUT_FLOOR = 0.90
 # Source: guess, same seed and same effective batch differ by bf16 non-determinism only, well
 # under 1% of the loss over the first steps; replaced by A's repeat-run spread on the zoo.
 LOSS_TOLERANCE = 0.01
+# Source: derived, the steps of a verify window before its eval (A's VERIFY_STEPS 20, eval two steps
+# before the end): fewer shared steps can miss a change that bites only on later, longer samples.
+MIN_SHARED_STEPS = 16
 # Source: derived, tokens per step are integers; 0.5% covers padding-length rounding.
 TOKENS_TOLERANCE = 0.005
 LOWER_IS_BETTER = ("memory.", "time.", "cost.", "risk.")
@@ -149,8 +152,8 @@ def _common_step_tokens(pb: dict, pa: dict) -> tuple[float, float] | None:
 
 	b, a = by_index(pb), by_index(pa)
 	shared = sorted(set(b) & set(a))
-	if not shared:
-		return None
+	if len(shared) < MIN_SHARED_STEPS:
+		return None  # too few steps to stand for the run: the means below decide, or "not measured"
 	return sum(b[i] for i in shared), sum(a[i] for i in shared)
 
 
