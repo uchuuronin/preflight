@@ -1,0 +1,88 @@
+{
+ "rows": [
+  {
+   "case": "A-run",
+   "changed": {
+    "max_steps": true,
+    "batch": true,
+    "hidden": true
+   },
+   "run": {
+    "exit": 0,
+    "seconds": 13.9
+   },
+   "run_stderr": "",
+   "record": {
+    "gpu": "A10",
+    "backend": "cuda",
+    "gpu_type_knob": "A10",
+    "time.step": {
+     "status": "measured",
+     "lo": 0.0014023759609436484,
+     "hi": 0.002163436224688385,
+     "reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median"
+    },
+    "time.total": {
+     "status": "predicted",
+     "lo": 290.6350739650438,
+     "hi": 422.6269738238368,
+     "reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median; band from held-out runs: A10, pretrain (n = 69)"
+    },
+    "memory.peak": {
+     "status": "extrapolated",
+     "lo": 286057818.32074124,
+     "hi": 387771030.3252196,
+     "reason": "the peak comes at optimizer_step, which no probe ran; run a probe with optimizer_step in it; band from held-out runs: A10, pretrain (n = 69)"
+    }
+   }
+  },
+  {
+   "case": "B-film",
+   "watch": {
+    "exit": 143,
+    "seconds": 150.5,
+    "stopped": true
+   },
+   "preflight_lines": [
+    "[preflight] watching /tmp/tmprddb7z47/film/tiny_train.py against record _29lQso_kVaC1WC07QZHtg; live record /tmp/tmprddb7z47/records/B-film/8aMRUkXLuHyVnLP3rzSR1w.json",
+    "[preflight] step 401: 0.000784 s a step, below the predicted 0.0014\u20130.00216 s",
+    "[preflight] 185784 steps, 1 alerts; record /tmp/tmprddb7z47/records/B-film/8aMRUkXLuHyVnLP3rzSR1w.json"
+   ],
+   "alerts": [
+    "[preflight] step 401: 0.000784 s a step, below the predicted 0.0014\u20130.00216 s"
+   ],
+   "stderr_tail": "[preflight] watching /tmp/tmprddb7z47/film/tiny_train.py against record _29lQso_kVaC1WC07QZHtg; live record /tmp/tmprddb7z47/records/B-film/8aMRUkXLuHyVnLP3rzSR1w.json\n[preflight] step 401: 0.000784 s a step, below the predicted 0.0014\u20130.00216 s\n[preflight] 185784 steps, 1 alerts; record /tmp/tmprddb7z47/records/B-film/8aMRUkXLuHyVnLP3rzSR1w.json\n",
+   "live_status": "cancelled",
+   "live_steps": 185784,
+   "live_duration_s": 148.252936592,
+   "steps_per_s": 1253.155615468768,
+   "windows": 929
+  },
+  {
+   "case": "C-alert",
+   "watch": {
+    "exit": 143,
+    "seconds": 150.5,
+    "stopped": true
+   },
+   "preflight_lines": [
+    "[preflight] watching /tmp/tmprddb7z47/alert/tiny_train.py against record _29lQso_kVaC1WC07QZHtg; live record /tmp/tmprddb7z47/records/C-alert/bvXsp06ET5cE_cNTE1NWDQ.json",
+    "[preflight] step 201: peak memory 0.40 GiB, above the predicted 0.27\u20130.36 GiB",
+    "[preflight] step 401: 0.00329 s a step, above the predicted 0.0014\u20130.00216 s",
+    "[preflight] 44460 steps, 2 alerts; record /tmp/tmprddb7z47/records/C-alert/bvXsp06ET5cE_cNTE1NWDQ.json"
+   ],
+   "alerts": [
+    "[preflight] step 201: peak memory 0.40 GiB, above the predicted 0.27\u20130.36 GiB",
+    "[preflight] step 401: 0.00329 s a step, above the predicted 0.0014\u20130.00216 s"
+   ],
+   "stderr_tail": "[preflight] watching /tmp/tmprddb7z47/alert/tiny_train.py against record _29lQso_kVaC1WC07QZHtg; live record /tmp/tmprddb7z47/records/C-alert/bvXsp06ET5cE_cNTE1NWDQ.json\n[preflight] step 201: peak memory 0.40 GiB, above the predicted 0.27\u20130.36 GiB\n[preflight] step 401: 0.00329 s a step, above the predicted 0.0014\u20130.00216 s\n[preflight] 44460 steps, 2 alerts; record /tmp/tmprddb7z47/records/C-alert/bvXsp06ET5cE_cNTE1NWDQ.json\n",
+   "live_status": "cancelled",
+   "live_steps": 44460,
+   "live_duration_s": 148.26380401999998,
+   "steps_per_s": 299.8708976467553,
+   "windows": 223
+  }
+ ],
+ "container_s": 315.0,
+ "container_usd": 0.0963
+}
