@@ -249,9 +249,10 @@ def test_a_daily_limit_is_429_in_the_job_stores_own_words():
 	assert r.headers.get("Retry-After") == "3600"
 	err = r.json()["error"]
 	assert err["code"] == "limit.visitor_daily"
+	# A's way past, less what A's own words already say (midnight, the samples), in plain text.
 	assert err["message"] == (
-		"You've run today's 3 probe jobs: samples only until midnight ET. Come back after midnight ET,"
-		" open a sample meanwhile, or probe on your machine with `preflight run train.py`."
+		"You've run today's 3 probe jobs: samples only until midnight ET. You can also probe on your"
+		" machine with the preflight run command."
 	)
 	# A busy queue keeps its own code and wording.
 	assert (

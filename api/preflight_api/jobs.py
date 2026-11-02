@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from typing import Any, Protocol
 
 log = logging.getLogger("preflight.jobs")
@@ -80,14 +81,17 @@ def limit_of(e: BaseException) -> tuple[str, str] | None:
 		message = "Today's limit is reached: samples only until midnight ET."
 	elif message[-1] not in ".!?":
 		message += "."  # A's messages end without a full stop; ours follow with another sentence
-	way = way_past(code)
-	return code, f"{message} {way}" if way and way.lower() not in message.lower() else message
+	way = way_past(code, said=message)
+	return code, f"{message} {way}" if way else message
 
 
-def way_past(code: str | None) -> str | None:
-	"""A's way past a refusal, as a sentence (preflight.runner.failures.describe, Nov 2: "come back
-	after midnight ET, open a sample meanwhile, or probe on your machine with `preflight run
-	train.py`"). None when A's package or the code isn't known."""
+def way_past(code: str | None, *, said: str = "") -> str | None:
+	"""A's way past a refusal (preflight.runner.failures.describe, Nov 2: "come back after midnight
+	ET, open a sample meanwhile, or probe on your machine with `preflight run train.py`"), as a
+	sentence, keeping only the options the message before it doesn't already give (A's limit
+	messages already say "samples only until midnight ET"). Plain text: no backticks, and "the
+	preflight run command" for A's command with its placeholder file name. None when A's package or the code isn't known, or every
+	option is already said."""
 	try:
 		from preflight.runner.failures import FALLBACK, describe
 	except Exception:
@@ -95,8 +99,22 @@ def way_past(code: str | None) -> str | None:
 	step = describe(code)
 	if not code or step == FALLBACK:
 		return None
-	by_hand = step[1].strip().rstrip(".")
-	return f"{by_hand[:1].upper()}{by_hand[1:]}." if by_hand else None
+	text = (
+		re.sub(r"`preflight run [^`]*`", "the preflight run command", step[1])
+		.replace("`", "")
+		.strip()
+		.rstrip(".")
+	)
+	options = [o.strip() for o in re.split(r",\s*(?:or\s+)?|\s+or\s+", text) if o.strip()]
+	said_l = said.lower()
+	keep = [o for o in options if not any(w in said_l for w in ("midnight", "sample") if w in o.lower())]
+	if not keep:
+		return None
+	line = keep[0] if len(keep) == 1 else ", ".join(keep[:-1]) + ", or " + keep[-1]
+	if len(keep) < len(options):
+		line = "or " + line if not line.lower().startswith("or ") else line
+		line = "You can also " + line[3:]
+	return f"{line[:1].upper()}{line[1:]}."
 
 
 def retry_after(e: BaseException, default: int = 60) -> int:

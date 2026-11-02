@@ -11,6 +11,12 @@ import { go, href } from "../route";
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
 
+/** The job's events so far, plus one more, unless the job has already ended: the stream and the
+ * job's own status can both report the end, and nothing after it may reopen a finished job. */
+function withEvent(all: BoardingEvent[], ev: BoardingEvent): BoardingEvent[] {
+	return all.some((e) => e.stage === "done" || e.stage === "failed" || e.stage === "cancelled") ? all : [...all, ev];
+}
+
 export function Boarding({ jobId }: { jobId: string | null }) {
 	const [events, setEvents] = useState<BoardingEvent[]>([]);
 	const [lost, setLost] = useState(false);
@@ -23,7 +29,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		es.onmessage = (m) => {
 			try {
 				const ev = JSON.parse(m.data as string) as BoardingEvent;
-				setEvents((all) => [...all, ev]);
+				setEvents((all) => withEvent(all, ev));
 				// The server ends the stream after these; closing here stops EventSource reconnecting.
 				if (ev.stage === "done" || ev.stage === "failed" || ev.stage === "cancelled") es.close();
 			} catch {
@@ -31,6 +37,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 			}
 		};
 		es.onerror = () => setLost(true);
+		es.onopen = () => setLost(false); // back: the stream speaks for the job again
 		return () => es.close();
 	}, [jobId]);
 
@@ -44,14 +51,21 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		let gone = false;
 		const ask = () =>
 			fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}`, { credentials: "same-origin" })
-				.then((r) => (r.ok ? r.json() : null))
+				.then((r) => {
+					// Not this visitor's job, or no such job: asking again won't change that.
+					if (r.status >= 400 && r.status < 500 && r.status !== 429) {
+						gone = true;
+						clearInterval(id);
+					}
+					return r.ok ? r.json() : null;
+				})
 				.then((st) => {
 					const ev = eventFromStatus(st);
-					if (!gone && ev) setEvents((all) => [...all, ev]);
+					if (!gone && ev) setEvents((all) => withEvent(all, ev));
 				})
 				.catch(() => {});
-		void ask();
 		const id = setInterval(ask, 10_000);
+		void ask();
 		return () => {
 			gone = true;
 			clearInterval(id);

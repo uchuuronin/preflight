@@ -4,6 +4,7 @@
  * fields: every number is B's, with B's interval and status.
  */
 import type { Campaign, CampaignCell, ModelCard } from "../../../../schema/ts/contract";
+import { t } from "../../lib/i18n";
 import type { Estimate, LoadedRecord } from "../record/types";
 
 export interface PlanCell {
@@ -108,36 +109,55 @@ function abstain(why: string, unit: string, modelId: string): Estimate {
 	return { point: null, lo: null, hi: null, unit, status: "abstain", model_id: modelId, source: "exact", reason: why } as Estimate;
 }
 
+
 type ProbeSource = Pick<LoadedRecord, "knobs" | "probes" | "env">;
 
 const same = (a: unknown, b: unknown) => (typeof a === "number" && typeof b === "number" ? Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b)) : a === b);
 
 /**
  * A run's time from a probe at its setting (PM, Nov 2: campaign grid probes, one short probe job per
- * cell): the probe's measured step time times the run's steps (`max_steps`, the cell's or the
- * record's), its range from the probe's own step times (mean, median, p95). A probe is at the run's
- * setting when every knob the run sets that is one of the record's knobs (a seed isn't) equals the
- * probe's, a knob the probe doesn't name being the record's current value, and it ran on the run's
- * GPU. Null when no probe finished there or the run's steps aren't known (a run sized by epochs):
- * the engine's time stands.
+ * cell): the probe's mean step time times the run's steps (`max_steps`, the run's or the record's).
+ * The probe pins the step time; the rest of the range (batch lengths, saves, evals) is the engine's,
+ * so the range is the engine's own relative spread around the measured point (the probe's step-time
+ * spread when the engine gave none).
+ *
+ * A probe is at the run's setting when every record knob but `max_steps` is the same in both (the
+ * run's knobs over the record's current values, the probe's likewise), on the same GPU (a probe that
+ * names no `gpu_type` ran on the record's GPU: A's probes name it only when planned at a full
+ * setting, which names every knob). An eval-off re-run (`extras.eval_off`) doesn't count, and if any
+ * probe at the setting failed (an eval that ran out of memory, say) the run isn't timed from a probe:
+ * it would fail too. Null whenever it isn't timed, and the engine's time stands; also for a run sized
+ * by epochs, with no steps to multiply.
  */
-export function measuredCell(cell: Pick<PlanCell, "knobs">, src: ProbeSource): Estimate | null {
+export function measuredCell(cell: Pick<PlanCell, "knobs">, src: ProbeSource, engine?: Estimate | null): Estimate | null {
 	const current: Record<string, unknown> = Object.fromEntries(src.knobs.map((k) => [k.id, k.current]));
-	const ids = new Set(src.knobs.map((k) => k.id));
 	const steps = Number(cell.knobs.max_steps ?? current.max_steps);
 	if (!Number.isFinite(steps) || steps <= 0) return null;
-	const gpu = cell.knobs.gpu_type ?? current.gpu_type ?? src.env?.gpu?.name;
-	const at = src.probes.filter(
-		(p) =>
-			(p.status === "ok" || p.status === "cached") &&
-			typeof p.step_time?.mean_s === "number" &&
-			same(p.knobs?.gpu_type ?? current.gpu_type ?? src.env?.gpu?.name, gpu) &&
-			Object.entries(cell.knobs).every(([k, v]) => !ids.has(k) || k === "max_steps" || same(p.knobs?.[k] ?? current[k], v)),
-	);
-	const st = at[at.length - 1]?.step_time;
-	if (!st || typeof st.mean_s !== "number") return null;
-	const all = [st.mean_s, st.p50_s, st.p95_s].filter((v): v is number => typeof v === "number");
-	return { point: st.mean_s * steps, lo: Math.min(...all) * steps, hi: Math.max(...all) * steps, unit: "s", status: "measured", model_id: `probe:${at[at.length - 1]!.id}`, source: "exact", reason: null } as Estimate;
+	const want: Record<string, unknown> = { ...current, ...cell.knobs };
+	const gpu = want.gpu_type ?? src.env?.gpu?.name;
+	const compared = src.knobs.map((k) => k.id).filter((id) => id !== "max_steps" && id !== "gpu_type");
+	const atSetting = (p: (typeof src.probes)[number]) => {
+		const has: Record<string, unknown> = { ...current, ...(p.knobs ?? {}) };
+		return same(has.gpu_type ?? src.env?.gpu?.name, gpu) && compared.every((id) => same(has[id], want[id]));
+	};
+	const here = src.probes.filter(atSetting);
+	if (here.some((p) => p.status !== "ok" && p.status !== "cached")) return null;
+	const timed = here.filter((p) => !p.extras?.eval_off && typeof p.step_time?.mean_s === "number" && p.step_time.mean_s > 0);
+	const probe = timed[timed.length - 1];
+	const st = probe?.step_time;
+	if (!probe || !st || typeof st.mean_s !== "number") return null;
+	const point = st.mean_s * steps;
+	let lo: number;
+	let hi: number;
+	if (engine && typeof engine.point === "number" && engine.point > 0 && typeof engine.lo === "number" && typeof engine.hi === "number") {
+		lo = point * (engine.lo / engine.point);
+		hi = point * (engine.hi / engine.point);
+	} else {
+		const all = [st.mean_s, st.p50_s, st.p95_s].filter((v): v is number => typeof v === "number");
+		lo = Math.min(...all) * steps;
+		hi = Math.max(...all) * steps;
+	}
+	return { point, lo: Math.min(lo, point), hi: Math.max(hi, point), unit: "s", status: "measured", model_id: `probe:${probe.id}`, source: "exact", reason: null } as Estimate;
 }
 
 /**
@@ -168,15 +188,16 @@ export function planFromRecord(
 		return { ...e, point: m(e.point), lo: m(e.lo), hi: m(e.hi) } as Estimate;
 	};
 	const knobsOf = (x: CampaignCell) => Object.fromEntries(Object.entries(x.knobs).filter((kv): kv is [string, string | number | boolean] => kv[1] !== undefined));
-	return {
+	const out: CampaignPlan = {
 		cells: cells.map((x: CampaignCell) => {
 			const time = (x.time as Estimate | null | undefined) ?? abstain("no run time in this record", "s", modelId);
-			const m = probes && !x.cut ? measuredCell({ knobs: knobsOf(x) }, probes) : null;
+			const m = probes && !x.cut ? measuredCell({ knobs: knobsOf(x) }, probes, time) : null;
 			// GPU hours and dollars: the run's own rate (per second, at the engine's point) times the measured time.
 			const scale = (e: Estimate | null | undefined): Estimate | null => {
 				if (!e || !m || !time.point || e.point === null) return e ?? null;
 				const rate = e.point / time.point;
-				return { ...e, point: rate * m.point!, lo: rate * m.lo!, hi: rate * m.hi!, status: "measured", reason: null } as Estimate;
+				// at the engine's rate, so it keeps the engine's status: only the time is measured
+				return { ...e, point: rate * m.point!, lo: rate * m.lo!, hi: rate * m.hi! } as Estimate;
 			};
 			return {
 				id: x.id,
@@ -214,6 +235,9 @@ export function planFromRecord(
 		start: typeof c.start === "string" ? c.start : null,
 		lane_slots: c.lane_slots ? Object.fromEntries(Object.entries(c.lane_slots).filter((kv): kv is [string, number] => typeof kv[1] === "number")) : null,
 	};
+	// The totals, the finish and the start dates are the engine's: say so once a run is measured.
+	if (out.cells.some((x) => x.measured)) out.notes = [...out.notes, t("campaign.measured_note")];
+	return out;
 }
 
 /**

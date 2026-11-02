@@ -102,8 +102,10 @@ export function CampaignCalendar({ plan }: { plan: CampaignPlan }) {
 										{slot.map((c) => (
 											<div key={c.id} role="listitem" className={`pf-cal__bar${c.measured ? " is-measured" : ""}`} style={{ left: pct(startOf(c) ?? 0), width: pct(c.time.point ?? 0) }} title={`${cellLabel(c)}: ${said(c.time)}${c.measured ? ` (${t("campaign.measured_why")})` : ""}`}>
 												<i className="pf-cal__whisker" style={{ width: `${(((c.time.hi ?? 0) - (c.time.point ?? 0)) / Math.max(1, c.time.point ?? 1)) * 100}%` }} />
-												<span>{cellLabel(c)}</span>
-												<MeasuredTag c={c} />
+												<span>
+													<MeasuredTag c={c} />
+													{cellLabel(c)}
+												</span>
 											</div>
 										))}
 									</div>

@@ -2179,8 +2179,8 @@ a {
 .pf-cal__bar span { position: relative; display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; line-height: 22px; }
 /* A run timed by a probe at its setting, not by the engine (campaign/plan.ts measuredCell). */
 .pf-cal__measured { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: var(--pf-radius-pill); background: var(--pf-node); color: var(--pf-fg); font-size: 10px; line-height: 16px; }
-.pf-cal__bar .pf-cal__measured { position: absolute; left: 100%; top: 3px; margin-left: 4px; white-space: nowrap; }
-.pf-cal__bar.is-measured { border-width: 2px; }
+/* Inside a timed bar the tag leads its label, so it never covers the whisker or the next bar. */
+.pf-cal__bar .pf-cal__measured { margin: 0 6px 0 0; line-height: 14px; vertical-align: 1px; }
 .pf-cal__whisker { position: absolute; left: 100%; top: 11px; height: 0; border-top: 1px dashed var(--pf-fg-dim); }
 .pf-cal__unplaced { margin-top: 14px; font-size: var(--pf-text-xs); }
 .pf-cal__unplaced > b { display: block; margin-bottom: 6px; }
