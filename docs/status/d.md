@@ -80,9 +80,11 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 
 - (a) **Landed:** C's 12:45 deploy put share pages live (the Oct 28 record's `/s/` link, card and
   badge pass `scripts/share_page_check.py`). Both X posts and shot 5 now use
-  `/s/ICDYrfHQ2nBNbv3mlRHHMg`; the TODOs are gone.
+  `/s/ICDYrfHQ2nBNbv3mlRHHMg`; the TODOs are gone. Not opened in a browser yet (the live host
+  isn't reachable from here): before filming or posting.
 - (b) **Landed:** C's private check-in, record 01M6EG0284PWZDRXGGQVVZYVND, triaged by Glimmer, and
-  "Found by Muse Glimmer" shows on it live. Shot 12 marked works now (its link stays private).
+  "Found by Muse Glimmer" shows on it live. Shot 12 marked works now (its link stays private; the "Private triage" box's two flags are on in
+  production).
 - (c) **Landed:** A's `a-triage-lora-prod-2` (record 01M6EGH5YMCXPFPNY5SHPNSYV5, share
   `Q3s5qyHKTNf-fCng4dwn6g`, an A10) quotes the out-of-memory line. Checked in Chromium on A's
   committed copy (`api/tests/fixtures/a-triage-lora-prod-2.record.json`, the app served locally in
