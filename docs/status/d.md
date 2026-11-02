@@ -71,8 +71,9 @@ Three rounds of read-only review on the fixes. First: two blocking (zero-start w
 LoRA's B made a ramp that took effect read as not set; the check app's single-rate runs came
 back empty), fixed. Second: one blocking (fp16 accumulation of 64 stopped before the first
 step), fixed by reading a stalled scaler from its scale's drops. Third: nothing blocking; its
-suggestion (each scaler tracked on its own) taken. Tests: 1,692 passed before the review fixes
-(10 min, CPU torch, transformers and accelerate); the range tests (32) after each round.
+suggestion (each scaler tracked on its own) taken. Tests (CPU torch, transformers and accelerate, CI's
+non-GPU set): 1,692 passed before the review fixes, 1,699 after the first round; the range tests
+(32) after the last two.
 
 This push sends: `python/preflight/probes/lr_range.py` (`follows_rate`, `losses`),
 `recorder/runtime.py` (the range test's update sample, `initial_lr` ratios, other and rebuilt
