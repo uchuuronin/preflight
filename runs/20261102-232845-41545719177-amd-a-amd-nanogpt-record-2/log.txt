@@ -1,0 +1,46 @@
+torch 2.5.1+rocm6.2 hip 6.2.41133-dd7f95766 AMD Instinct MI300X
+preflight: running probes as root: an unprivileged uid can't reach /root/preflight/.venv-amd/bin/python and its packages (install Preflight where other users can read it to probe as one)
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+{
+  "record": "out/records/hRu0aodNJ-24-UoKix13VA.json",
+  "lens": "pretrain",
+  "backend": "rocm",
+  "gpu": "MI300X",
+  "probes": [
+    {
+      "probe": "p1",
+      "status": "ok",
+      "knobs": {
+        "batch_size": 12,
+        "seq_len": 1024
+      },
+      "step_s": 0.25418084716796874,
+      "peak_bytes": 18718325248,
+      "error": null
+    },
+    {
+      "probe": "p2",
+      "status": "ok",
+      "knobs": {
+        "batch_size": 6,
+        "seq_len": 1024
+      },
+      "step_s": 0.13585145568847656,
+      "peak_bytes": 10110155264,
+      "error": null
+    },
+    {
+      "probe": "p3",
+      "status": "ok",
+      "knobs": {
+        "batch_size": 12,
+        "seq_len": 512
+      },
+      "step_s": 0.12366587829589844,
+      "peak_bytes": 10107005440,
+      "error": null
+    }
+  ]
+}
