@@ -1,5 +1,16 @@
 # Status: D (usability add-ons)
 
+## Decisions overnight (Nov 2; Chiya offline 00:16 to about 05:30 ET)
+
+| # | When (ET) | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 00:00 | Third eval-sweep try on an A10 rather than the L40S | Chiya allowed either for one more try under $1; the A10 is cheaper (US$1.10 an hour against the L40S's US$1.95 [cited: `probes/gpu_choice.py`]) and A's ground truths ran on it | US$0.12 by the record | Nothing to undo; the record is `zoo/eval_sweep_reasoning/record_nov2_a10.json` (delete the file to drop it) |
+| 2 | 00:15 | Item 19 marked done with that A10 record; no further L4 tries | It measured the planted bug (8 of 16 cut off); the two L4 failures are A's runner question, asked in `from-d.md` | none | Re-open item 19 in this file (the 00:15 entry) and add a line to the item-19 request in `from-d.md` |
+| 3 | 00:20 | Didn't read Modal's logs | My only route is `remote-run.yml`, and a log-reading script would be a new kind of run, which still needs a yes; A is adding a "waiting for a GPU" event | none | Say yes and I add a read-only `scripts/` log reader |
+| 4 | 01:10 | Ran the stranger audit on the deployed commit served by Vite in production mode, not the live host | The live host is refused by my workspace's network allowlist; the dev server has the same code and flags, with the API mocked (not the built bundle) | none (local) | Re-run `docs/audit/scripts/stranger.mjs` against the live URL from a machine that can reach it |
+| 5 | 01:10 | Committed four audit screenshots (about 178 KB) and the audit log under `docs/audit/nov2-stranger/` | C needs the evidence for S1 and S2, and my scratch folder isn't visible to C | none | `git rm docs/audit/nov2-stranger/*.jpg docs/audit/nov2-stranger/*.png` |
+
+
 ## Cloud runs
 
 Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars.
@@ -9,6 +20,24 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 02:56 UTC | L4 (asked) | about 20 (cap) | at most about 0.60 [guess]; 0.0179 of Muse Spark by the record | `d-eval-sweep-l4` (GitHub 41380341849): cancelled while probing, no measurement |
 | Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
 | Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
+
+## Mon Nov 2, 01:15 ET (overnight: stranger audit of `cfcf83c`)
+
+`a86b0ec` CI green (all seven jobs, `workers` included now).
+
+- **Stranger audit** (overnight item 2) after C's deploy of `main` `cfcf83c` (deploy run
+  41385425843): 100 of 104 states clean [measured, Chromium] on that commit served by Vite in
+  production mode (decision 4 above); every detail state opened a sheet, and every check-in state
+  reached "Your flight record is ready.". Every sample, opened and with a node's sheet open; check-in through
+  Boarding to "Your flight record is ready"; desktop and phone, dusk and day. Two bugs, both C's,
+  filed: S1, a contrast failure on "Tight: measure first" in the day theme (3.99:1); S2, overlapping
+  and cut-off map nodes with a detail sheet open. None in D's code. `docs/audit/nov2-stranger/`,
+  script `docs/audit/scripts/stranger.mjs`.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the audit script, its README and screenshots, the request to C and this entry.
+
+Cloud runs: none.
 
 ## Mon Nov 2, 00:15 ET (the eval-sweep record measured on an A10; a notebook that trains for A)
 
