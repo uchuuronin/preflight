@@ -32,6 +32,9 @@ is live at <https://preflight-cqn.pages.dev>.
 | Fit map: which settings fit, with the out-of-memory frontier | The cockpit's Fit view: drag your run across the map | `c.fit_map`, on in production (Chiya, Nov 1) |
 | RL readouts: the share of prompt groups with no reward spread, rollout time | The GRPO lens | `engine.rl`, on in production (Chiya, Nov 1); calibrated on A's GRPO runs (L4 smoke runs and a 50-step run on an A10) |
 | Log triage by Muse Spark Open on Baseten | A probe that fails gets a finding quoting its log line, labelled "Found by Muse Spark Open triage" | `harness.spark_open_triage`, on in production with its data-use line (Chiya, Nov 1) |
+| Possible outcomes (HOPs) | The readouts' "Possible outcomes" toggle: each frame is one outcome inside the 90% interval | `c.hops`, on in production (Chiya, Nov 1) |
+| Take it with you | The plan, an edit script for the changed settings, a Slurm batch file, the run command, a Weights & Biases helper that puts the plan's knobs in the run's config and each prediction with its 90% interval in its summary, and the record's link once it has one | `c.exports`, on in production (Chiya, Nov 1) |
+| Detail level, costs in your currency, free GPUs | The add-ons below: "New to this" with glossary cards, 30 currencies at the European Central Bank's dated rates, and whether the plan fits one free session on Colab, Kaggle, Modal's starter credit or Lightning AI | `d.expertise`, `d.currency`, `d.freetier`, on in production (Chiya, Nov 1); checked in Chromium on `main` `50db9b6` (`docs/audit/scripts/addons.mjs`, 20 of 20 states; `docs/status/d.md`, Nov 1, 18:45) |
 | GRPO lens on a measured run | The GRPO sample: reward spread, completion lengths, the tour | A's L4 run `a-gt-grpo-l4-3`; no flag |
 | Cost readout at your own rate | Every dollar readout: quantity x rate = total, with the price table's source and date | No flag |
 | Verify a fix in your own CI | A GitHub Action (below) | No flag; usable from other repositories once this one is public |
@@ -42,8 +45,8 @@ is live at <https://preflight-cqn.pages.dev>.
 | What | Flag | Where it stands |
 | --- | --- | --- |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
-| HOPs view, exports, the CLI re-check item | `c.hops`, `c.exports`, `d.exports_cli` | Built on `main` |
-| The add-ons (detail level, currency, free GPUs, notebook) | `d.*` (below) | Built on `main`; checked in Chromium (`docs/audit/scripts/addons.mjs`) |
+| Notebook check-in | `d.notebook` | Built on `main`, and the runner's code converts notebooks (`runner/sources.py`); stays off until A's real notebook check-in through production passes |
+| The exports' "Check it again on your machine" item | `d.exports_cli` | Built on `main` |
 
 **Not used, or not measured**
 
@@ -201,17 +204,18 @@ A "within" target is a hit when at least 90% of runs are within it; intervals ar
 
 ## Add-ons
 
-Smaller features, each behind its own flag in `flags.json`, all off on `main` and in production (Nov 1).
-`docs/audit/scripts/addons.mjs` checks that each still renders where it belongs, with no errors,
-no accessibility violations inside it and nothing under 24 px, and that it is gone with its flag
-off: 20 of 20 states pass on `main` `c4b95d4` [measured, Chromium, Nov 1].
+Smaller features, each behind its own flag in `flags.json`. On in production since Nov 1: detail
+level, costs in your currency, free GPUs and the exports; the notebook tab and the exports' CLI item
+stay off. `docs/audit/scripts/addons.mjs` checks that each still renders where it belongs, with no
+errors, no accessibility violations inside it and nothing under 24 px, and that it is gone with
+its flag off: 20 of 20 states pass on `main` `50db9b6` [measured, Chromium, Nov 1].
 
 | Add-on | What a visitor gets | Flag |
 | --- | --- | --- |
 | Detail level (D1) | "New to this" shows the few knobs that matter most for the goal, in plain words, with a glossary card in each knob's control; knobs that a warning names stay in view | `d.expertise` |
 | Show costs in (D3) | Dollar figures in one of 30 currencies at the European Central Bank's dated reference rates, picked from the browser's region or set in the Logbook; regions without a rate stay in US dollars | `d.currency` |
 | Free GPUs (D4) | Whether the plan finishes inside one free session on Google Colab, Kaggle, Modal's starter credit or Lightning AI, and how often to save a checkpoint if not | `d.freetier` |
-| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run; checking it in opens with live runs | `d.notebook` |
+| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run | `d.notebook` (off until A's real notebook check-in passes) |
 | Take it with you | The plan, an edit script for the changed settings, a Slurm batch file and the run command, built from the settings on screen, and the record's link once it has one | `c.exports`; the "Check it again on your machine" item also needs `d.exports_cli` |
 
 ## Develop

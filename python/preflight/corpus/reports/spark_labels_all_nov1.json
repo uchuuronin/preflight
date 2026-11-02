@@ -1,0 +1,250 @@
+{
+ "model": "meta-models/muse-spark-open-1026",
+ "effort": "low",
+ "batch": 8,
+ "run": "b-spark-all-labels (GitHub run 41366240357)",
+ "corpus_rows": 2339,
+ "rows_sent": 2339,
+ "answered": 1997,
+ "memory": {
+  "rows": 1619,
+  "no_rule_label": 571,
+  "no_answer": 263,
+  "all": {
+   "compared": 881,
+   "agree": 545,
+   "rate": 0.6186152099886493,
+   "wilson_95": [
+    0.5860918832830696,
+    0.6501086223742406
+   ],
+   "existing_vs_spark": {
+    "logits": {
+     "activations": 136,
+     "logits": 194,
+     "model_state": 103,
+     "other": 7
+    },
+    "model_state": {
+     "activations": 67,
+     "model_state": 268,
+     "other": 3,
+     "logits": 5
+    },
+    "activations": {
+     "activations": 83,
+     "model_state": 14,
+     "logits": 1
+    }
+   }
+  },
+  "out_of_memory_rows": {
+   "compared": 21,
+   "agree": 16,
+   "rate": 0.7619047619047619,
+   "wilson_95": [
+    0.5490882631704924,
+    0.8937198697736354
+   ],
+   "existing_vs_spark": {
+    "logits": {
+     "activations": 3,
+     "logits": 7
+    },
+    "activations": {
+     "activations": 9,
+     "model_state": 1
+    },
+    "model_state": {
+     "activations": 1
+    }
+   }
+  },
+  "fitted_rows": {
+   "compared": 860,
+   "agree": 529,
+   "rate": 0.6151162790697674,
+   "wilson_95": [
+    0.5821533321727915,
+    0.6470553935467486
+   ],
+   "existing_vs_spark": {
+    "logits": {
+     "activations": 133,
+     "logits": 187,
+     "model_state": 103,
+     "other": 7
+    },
+    "model_state": {
+     "activations": 66,
+     "model_state": 268,
+     "other": 3,
+     "logits": 5
+    },
+    "activations": {
+     "activations": 74,
+     "model_state": 13,
+     "logits": 1
+    }
+   }
+  }
+ },
+ "divergence": {
+  "rows": 720,
+  "no_answer": 79,
+  "label": {
+   "compared": 641,
+   "agree": 572,
+   "rate": 0.8923556942277691,
+   "wilson_95": [
+    0.8659830525886807,
+    0.914053641887977
+   ],
+   "existing_vs_spark": {
+    "stable": {
+     "stable": 533,
+     "blow_up": 66,
+     "other": 1
+    },
+    "non_finite": {
+     "non_finite": 33,
+     "collapse": 2
+    },
+    "blow_up": {
+     "blow_up": 6
+    }
+   }
+  },
+  "diverged_or_not": {
+   "compared": 640,
+   "agree": 574,
+   "rate": 0.896875,
+   "wilson_95": [
+    0.8708967411900714,
+    0.9181173756244763
+   ],
+   "existing_vs_spark": {
+    "false": {
+     "false": 533,
+     "true": 66
+    },
+    "true": {
+     "true": 41
+    }
+   }
+  },
+  "finite_loss_runs": {
+   "compared": 606,
+   "agree": 539,
+   "rate": 0.8894389438943895,
+   "wilson_95": [
+    0.86197671892068,
+    0.9119949308794983
+   ],
+   "existing_vs_spark": {
+    "stable": {
+     "stable": 533,
+     "blow_up": 66,
+     "other": 1
+    },
+    "blow_up": {
+     "blow_up": 6
+    }
+   }
+  },
+  "always_stable_baseline": {
+   "compared": 720,
+   "agree": 676,
+   "rate": 0.9388888888888889,
+   "wilson_95": [
+    0.9189549976497715,
+    0.9541643744150379
+   ],
+   "existing_vs_spark": {
+    "stable": {
+     "stable": 676
+    },
+    "non_finite": {
+     "stable": 37
+    },
+    "blow_up": {
+     "stable": 7
+    }
+   }
+  },
+  "mode_where_both_say_diverged": {
+   "compared": 41,
+   "agree": 39,
+   "rate": 0.9512195121951219,
+   "wilson_95": [
+    0.8386102112962914,
+    0.9865190546348308
+   ],
+   "existing_vs_spark": {
+    "non_finite": {
+     "non_finite": 33,
+     "collapse": 2
+    },
+    "blow_up": {
+     "blow_up": 6
+    }
+   }
+  }
+ },
+ "overall": {
+  "compared": 1522,
+  "agree": 1117,
+  "rate": 0.7339027595269383,
+  "wilson_95": [
+   0.7111326401647019,
+   0.7554951316028166
+  ]
+ },
+ "batched_vs_first_run": {
+  "compared": 67,
+  "agree": 63,
+  "rate": 0.9402985074626866,
+  "wilson_95": [
+   0.8563049895862846,
+   0.9765406488601809
+  ],
+  "existing_vs_spark": {
+   "activations": {
+    "activations": 18
+   },
+   "non_finite": {
+    "non_finite": 33,
+    "collapse": 2
+   },
+   "blow_up": {
+    "blow_up": 6
+   },
+   "logits": {
+    "logits": 6,
+    "activations": 1
+   },
+   "other": {
+    "model_state": 1
+   }
+  }
+ },
+ "calls": 363,
+ "failed_calls": 111,
+ "cost_usd": 8.5946,
+ "guard": {
+  "rows": 2339,
+  "chunks": 293,
+  "rows_sent": 2339,
+  "labelled": 1997,
+  "counted_usd": 8.5946,
+  "stopped_at_chunk": null,
+  "worst_call_usd": 0.126,
+  "budget_usd": 9.3,
+  "wall_s": 855.4,
+  "worker_error": null
+ },
+ "tokens": {
+  "input": 741716,
+  "output": 1845364
+ }
+}

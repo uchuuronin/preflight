@@ -874,12 +874,24 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	if est.status != "abstain" and est.point and cell is not None and cell.residuals:
 		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
 		alloc = est.point - ctx
-		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - ctx)
+		pool = conformal.TABLE.cells.get(("memory.peak", "", ""))
+		p_emp, pooled = oom_model.pooled_p_oom(
+			cell.residuals,
+			pool.residuals if pool is not None and pool is not cell else None,
+			alloc,
+			capacity - ctx,
+			memory.FITS_BELOW,
+		)
+		if pooled:
+			who = " ".join(x for x in (cell.key[1], cell.key[2]) if x)
+			oom_source = f"from all {pool.n} held-out runs; none of the {cell.n} {who} runs went over"
+			floor = 0.5 / (len(pool.residuals) + 1)
+		else:
+			oom_source = f"from {cell.n} held-out runs"
+			floor = 0.5 / (
+				len(cell.residuals) + 1
+			)  # cited: empirical_p_oom's half-count, no run over the margin
 		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
-		oom_source = f"from {cell.n} held-out runs"
-		floor = 0.5 / (
-			len(cell.residuals) + 1
-		)  # cited: empirical_p_oom's half-count with no run over the margin
 	else:
 		oom_source = "simulated band"
 		floor = None
@@ -2331,7 +2343,9 @@ def _serve_setup(record: FlightRecord, values: dict) -> tuple[serving.ServeSetup
 	), ""
 
 
-def _serve_workload(record: FlightRecord, values: dict, p) -> tuple[list[list[serving.Request]], bool]:
+def _serve_workload(
+	record: FlightRecord, values: dict, p, probe_cap: float | None = None
+) -> tuple[list[list[serving.Request]], bool]:
 	"""(batches, online): the probe's requests, in as many back-to-back calls as the probe made, each with the
 	probe's output lengths and a prompt length from the data (else the knob's cap). With a `request_rate` knob, the
 	same requests arrive at that rate instead (online serving)."""
@@ -2345,7 +2359,7 @@ def _serve_workload(record: FlightRecord, values: dict, p) -> tuple[list[list[se
 		or 512
 	)
 	p95 = (dat.tokens_per_sample_p95 if dat and dat.tokens_per_sample_mean else None) or None
-	cap = values.get("max_new_tokens") or g.max_new_tokens
+	cap = probe_cap or values.get("max_new_tokens") or g.max_new_tokens
 	rate = values.get("request_rate")
 	calls = max(1, int(g.calls or 1))
 	reqs = serving.workload(
@@ -2356,7 +2370,7 @@ def _serve_workload(record: FlightRecord, values: dict, p) -> tuple[list[list[se
 		float(g.new_tokens_p95) if g.new_tokens_p95 else None,
 		rate_per_s=float(rate) if rate else None,
 		max_output=int(cap) if cap else None,
-		output_fit=_censored_fit(g),
+		output_fit=_censored_fit(p),
 	)
 	if rate:
 		return [reqs], True
@@ -2371,23 +2385,49 @@ TRUNCATED_CALL = 0.05
 MAX_CENSORED = 0.5
 
 
-def _censored_fit(g) -> tuple[float, float] | None:
-	"""The probe's output lengths as a log-normal fitted through the cap, when some of them hit it (PM, Nov 1: A's
-	vLLM probe caps new tokens at 1,024); None when none did, so the mean and p95 stand."""
-	t = g.truncation_rate
-	if not g.max_new_tokens or not t or t > MAX_CENSORED or not g.new_tokens_mean:
+def _probe_cap(p) -> tuple[float | None, float | None]:
+	"""(the cap the probe's replies stopped at, the share of them still running there). A's serving probe (branch
+	a-serving-cap, Nov 1) stops every reply at `extras.serving_probe_max_tokens` (1,024) and keeps the script's own
+	cap in `generation.max_new_tokens` (4,096 on zoo/serving_vllm); a reply cut at the probe's cap counts as ending
+	unknown, so the share still running is `extras.serving_probe_capped_fraction`, else the sequences whose ending
+	isn't known (`extras.generation_ending_known`). Without the extra, the script's cap and `truncation_rate`."""
+	g, ex = p.generation, (p.extras or {})
+	cap = ex.get("serving_probe_max_tokens")
+	script = float(g.max_new_tokens) if g.max_new_tokens else None
+	# review, Nov 1: a script capped below the probe's cap stops there itself, with truncation_rate saying how often
+	if cap and (script is None or float(cap) <= script):
+		share = ex.get("serving_probe_capped_fraction")
+		if share is None and g.sequences:
+			# A writes generation_ending_known only when some ending is known: missing, every reply was cut. With
+			# the two caps equal a cut reply may count either way, so the known ones that hit the cap count too
+			known = ex.get("generation_ending_known")
+			if known is None:
+				share = 1.0
+			else:
+				unknown = max(0.0, g.sequences - float(known))
+				share = min(1.0, (unknown + float(g.truncation_rate or 0.0) * float(known)) / g.sequences)
+		return float(cap), (float(share) if share is not None else None)
+	return script, g.truncation_rate
+
+
+def _censored_fit(p) -> tuple[float, float] | None:
+	"""The probe's output lengths as a log-normal fitted through its cap, when some replies were still running
+	there (PM, Nov 1: A's vLLM probe caps new tokens at 1,024); None when none were, so the mean and p95 stand."""
+	g = p.generation
+	cap, t = _probe_cap(p)
+	if not cap or not t or t > MAX_CENSORED or not g.new_tokens_mean:
 		return None
-	return serving.censored_lognormal(float(g.new_tokens_mean), float(g.max_new_tokens), float(t))
+	return serving.censored_lognormal(float(g.new_tokens_mean), cap, float(t))
 
 
 def _serving_blocker(record: FlightRecord, values: dict, p) -> str | None:
 	g = p.generation
-	cap_p, cap_q = g.max_new_tokens, values.get("max_new_tokens") or g.max_new_tokens
-	t = g.truncation_rate
+	cap_p, t = _probe_cap(p)
+	cap_q = values.get("max_new_tokens") or g.max_new_tokens
 	if cap_p and cap_q and float(cap_q) > float(cap_p):
 		per_call = max(1, round(g.sequences / max(g.calls, 1)))
 		hit = 1 - (1 - t) ** per_call if t is not None else None
-		if hit is not None and hit > TRUNCATED_CALL and _censored_fit(g) is not None:
+		if hit is not None and hit > TRUNCATED_CALL and _censored_fit(p) is not None:
 			return None  # carried past the cap by the fit; the readout says so (_censored_note)
 		if hit is None or hit > TRUNCATED_CALL:
 			seen = f"{t:.0%} of" if t is not None else "an unknown share of"
@@ -2402,13 +2442,14 @@ def _censored_note(values: dict, p) -> str | None:
 	"""When outputs past the probe's cap come from the fit rather than a measurement."""
 	g = p.generation
 	cap_q = values.get("max_new_tokens") or g.max_new_tokens
-	fit = _censored_fit(g)
-	if fit is None or not cap_q or float(cap_q) <= float(g.max_new_tokens):
+	cap_p, t = _probe_cap(p)
+	fit = _censored_fit(p)
+	if fit is None or not cap_q or not cap_p or float(cap_q) <= cap_p:
 		return None
-	k = round(float(g.truncation_rate) * g.sequences)
+	k = round(float(t) * g.sequences)
 	return (
-		f"{k} of the probe's {g.sequences} outputs hit its {g.max_new_tokens:,}-token cap; past it, lengths come from "
-		f"a log-normal fitted through the cap (median {math.exp(fit[0]):,.0f} tokens), not a measurement"
+		f"{k} of the probe's {g.sequences} outputs were still running at its {cap_p:,.0f}-token cap; past it, lengths "
+		f"come from a log-normal fitted through the cap (median {math.exp(fit[0]):,.0f} tokens), not a measurement"
 	)
 
 
@@ -2447,12 +2488,16 @@ def _serving_targets(record: FlightRecord, values: dict) -> dict:
 			g.new_tokens_p95,
 			g.max_new_tokens,
 			g.truncation_rate,
+			_probe_cap(p),
 		)
 		if key not in _SERVE_CAL:
 			if len(_SERVE_CAL) > 64:
 				_SERVE_CAL.clear()
 			_SERVE_CAL[key] = serving.calibrate(
-				probe_setup or setup, _serve_workload(record, pv, p)[0], float(p.generation.seconds_total)
+				probe_setup or setup,
+				# the probe's own replies stopped at its cap, so its simulated replies do too
+				_serve_workload(record, pv, p, probe_cap=_probe_cap(p)[0])[0],
+				float(p.generation.seconds_total),
 			)
 		cal = _SERVE_CAL[key]
 		same_hw = probe_setup is not None and (

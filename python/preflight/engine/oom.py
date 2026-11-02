@@ -44,6 +44,20 @@ def empirical_p_oom(residuals: tuple[float, ...] | list[float], predicted: float
 	return (over + 0.5) / (n + 1)
 
 
+def pooled_p_oom(residuals, pool, predicted: float, capacity: float, fits_below: float) -> tuple[float, bool]:
+	"""(P(OOM), whether the pool decided) (Chiya, Nov 1, option b). A cell's empirical P(OOM) can't fall below its
+	half-count floor, 0.5 / (n + 1); when none of its runs went over the margin and that floor is at or above
+	`fits_below`, the wider pool's P(OOM) is used, but only when it is lower than the floor (review, Nov 1: a higher
+	pool value would ignore the cell's runs that stayed under, and P(OOM) would fall as memory rose)."""
+	p = empirical_p_oom(residuals, predicted, capacity)
+	floor = 0.5 / (len(residuals) + 1)
+	if pool and pool is not residuals and p <= floor + 1e-12 and floor >= fits_below:
+		pp = empirical_p_oom(pool, predicted, capacity)
+		if pp < floor:
+			return pp, True
+	return p, False
+
+
 def lognormal_p_oom(predicted: float, capacity: float, sigma_log: float) -> float:
 	if capacity <= 0:
 		return 1.0
