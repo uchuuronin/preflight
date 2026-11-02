@@ -177,8 +177,8 @@ describe("private triage on the check-in desk", () => {
 
 	it("isn't offered while harness.glimmer_private is off, and nothing private is sent", async () => {
 		flagsOn.add("harness.spark_open_triage");
-		expect(screen.queryByRole("checkbox", { name: en["newflight.private.label"] })).toBeNull();
 		const body = await checkIn(false);
+		expect(screen.queryByRole("checkbox", { name: en["newflight.private.label"] })).toBeNull();
 		expect(screen.queryByText(en["newflight.private.wait"])).toBeNull();
 		expect(body.private).toBeUndefined();
 	});
@@ -201,6 +201,18 @@ describe("private triage on the check-in desk", () => {
 		const box = screen.getByRole("checkbox", { name: en["newflight.private.label"] });
 		const hint = document.getElementById(box.getAttribute("aria-describedby") ?? "");
 		expect(hint?.textContent).toContain(en["newflight.private.wait"]);
-		expect(en["newflight.private.wait"]).toMatch(/several minutes/);
+		expect(hint?.textContent).toMatch(/several minutes/);
+		// The map and diagnosis lines show only with their own flags on.
+		expect(hint?.textContent).not.toContain(en["newflight.private.map"]);
+		expect(hint?.textContent).not.toContain(en["newflight.private.diagnosis"]);
+	});
+
+	it("says Muse Spark still builds the map, and the diagnosis is skipped, when those are on", () => {
+		for (const f of ["harness.spark_open_triage", "harness.glimmer_private", "harness.spark_script_map", "harness.spark_diagnosis"]) flagsOn.add(f);
+		render(<NewFlight onSample={() => {}} />);
+		const box = screen.getByRole("checkbox", { name: en["newflight.private.label"] });
+		const hint = document.getElementById(box.getAttribute("aria-describedby") ?? "");
+		expect(hint?.textContent).toContain(en["newflight.private.map"]);
+		expect(hint?.textContent).toContain(en["newflight.private.diagnosis"]);
 	});
 });

@@ -47,12 +47,13 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [intake, setIntake] = useState<Intake>("repo");
 	const [repo, setRepo] = useState("");
 	const [goal, setGoal] = useState<ObjectiveKind>("min_cost");
-	// "Not sure" by default: the runner picks the GPU from its own ladder (pipeline._requested_gpu;
-	// PM, Nov 1: the demo probes go no higher than an L40S).
+	// "Not sure" by default: the runner picks the GPU (pipeline.choose_probe_gpu; PM, Nov 1: the
+	// demo probes go no higher than an L40S).
 	const [gpu, setGpu] = useState<string | null>(null);
 	const [description, setDescription] = useState("");
 	// Private mode (contract 0.6.2): offered only while probe logs are triaged at all and Muse
-	// Glimmer triages private jobs (pipeline._triage_client).
+	// Glimmer triages private jobs (pipeline._triage_client). The flag also needs the runner's
+	// worker to hold Glimmer's secret, or a private job is not triaged (docs/requests/from-c.md).
 	const privateOffered = flag("harness.spark_open_triage") && flag("harness.glimmer_private");
 	const [privateMode, setPrivateMode] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -369,6 +370,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								<div id={ids.privateHint} className="pf-private__hint">
 									<p className="pf-hint">{t("newflight.private.body")}</p>
 									{flag("harness.spark_script_map") ? <p className="pf-hint">{t("newflight.private.map")}</p> : null}
+									{/* pipeline.py skips Muse Spark's diagnosis for a private job (contract 0.6.2). */}
+									{flag("harness.spark_diagnosis") ? <p className="pf-hint">{t("newflight.private.diagnosis")}</p> : null}
 									{/* Source: measured, Glimmer's cold starts on its A100-40GB, Nov 1: 286 s (B's smoke,
 									    docs/decisions/glimmer-host.md) and 330 to 459 s (A's triage runs, docs/status/a.md);
 									    a warm triage took 12.8 s (median of 5). */}
