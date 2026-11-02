@@ -158,6 +158,8 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		body["generate_sample"] = spec.generate_sample
 	if spec.generate_calls:  # an eval probe's measured calls, likewise
 		body["generate_calls"] = spec.generate_calls
+	if spec.lr_range:  # the range test's ramp (D, Nov 2), likewise
+		body["lr_range"] = spec.lr_range
 	h.update(json.dumps(body, sort_keys=True).encode())
 	return "sha256:" + h.hexdigest()
 
@@ -304,6 +306,18 @@ def _spec(
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
+	)
+
+
+def _import_knobs(knobs: dict) -> tuple:
+	"""The knobs that can change what a script imports (quantization, attention, optimizer, precision:
+	any value that isn't a number); points that differ only in sizes import the same packages."""
+	return tuple(
+		sorted(
+			(k, str(v))
+			for k, v in (knobs or {}).items()
+			if isinstance(v, bool) or not isinstance(v, int | float)
+		)
 	)
 
 
@@ -535,9 +549,16 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		judged=judged,
 		patched_for=patched_for,
 	)
+	if req.mode == "plan" and not patched_for:
+		lr_probe = _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, gpu=gpu)
+		if lr_probe is not None:
+			probes.append(lr_probe)  # in the record only: not a result, so never triaged or searched
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
-	rec, triaged = _triage(rec, results, deps, private=req.private)
-	rec, grounded = _search(rec, results, deps, private=req.private, verify=req.mode == "verify", ctx=ctx)
+	# review, Nov 2: a probe-more from the record page sends no `private`, so a record a private job touched keeps
+	# its new logs off Baseten and Meta too
+	held = req.private or _private_history(rec)
+	rec, triaged = _triage(rec, results, deps, private=held)
+	rec, grounded = _search(rec, results, deps, private=held, verify=req.mode == "verify", ctx=ctx)
 	triaged = [*triaged, *grounded]
 	kept = rec.probes
 	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
@@ -555,6 +576,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
 		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
 			for q in probes]  # fmt: skip
+	if held:
+		# B, Nov 2 (A's review): a private job's probes and findings carry the mark on the record, so no later job
+		# on it (a probe-more, a verify) sends their numbers or text to Meta or Baseten
+		from preflight.schema import Evidence
+
+		probes = [q.model_copy(update={"extras": {**q.extras, "private_job": 1.0}}) for q in probes]
+		triaged = [f.model_copy(update={"evidence": [*f.evidence, Evidence(metric="private_job", value=1.0)]})
+			for f in triaged]  # fmt: skip
 	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.gpu_usd, overhead_usd=budget.overhead_usd,
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	from .measured_rules import hygiene_findings
@@ -565,12 +594,16 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
-	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
+	keep = [f for f in keep if not f.id.startswith("source.partial")]
+	out = out.model_copy(
+		update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *_reading_findings(fetched)]}
+	)
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
-	if req.mode != "verify" and not req.private:
+	touched = req.private or _private_history(out)
+	if req.mode != "verify" and not touched:
 		out = _diagnose(out, deps)
-	out = _claim_check(out, deps, private=req.private)
+	out = _claim_check(out, deps, private=touched)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
@@ -721,6 +754,54 @@ def _with_dataset_size(rec: FlightRecord, files: dict[str, str] | None = None) -
 	return rec.model_copy(update={"job": job})
 
 
+def _mb(n: int) -> str:
+	return f"{n / 2**20:.2f} MB" if n < 10 * 2**20 else f"{n / 2**20:.0f} MB"
+
+
+def _n_files(n: int, word: str) -> str:
+	if n == 0:
+		return f"none of the {word}s"
+	return f"the 1 {word}" if n == 1 else f"the {n:,} {word}s"
+
+
+def _reading_findings(fetched: Fetched) -> list:
+	"""Say so when Preflight read part of the source (D, Nov 2): a repository too big to read whole
+	is read as its entry point and the files it imports (runner/sources.py), and over 2 MB of Python
+	is mapped the same way (harness/static.py mapped_files). Its knobs and checks cover what was
+	read; a file reached only by a string import isn't."""
+	from preflight.harness.static import mapped_files
+	from preflight.schema import Evidence, Finding
+
+	out = []
+	p = fetched.partial
+	if p:
+		left = (
+			f"; at least {p['skipped']:,} more imported files were left out for the size limit"
+			if p.get("skipped")
+			else ""
+		)
+		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
+			title="Read the entry point and what it imports, not the whole repository",
+			detail=(f"The repository has {p['repo_files']:,} text files ({_mb(p['repo_bytes'])}), more than Preflight "
+				f"reads whole, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
+				f"({_mb(p['bytes'])} in all){left}. The map and the findings cover what was read, and the probes run "
+				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
+			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
+				Evidence(metric="source.repo_files", value=float(p["repo_files"]))]))  # fmt: skip
+	try:
+		_, m = mapped_files(fetched.files, fetched.entrypoint)
+	except ValueError:
+		m = None
+	if m:
+		out.append(Finding(id="source.partial.map", severity="info", code="source.partial", source="rule",
+			title="Mapped the entry point and what it imports, not every file",
+			detail=(f"The source has {_mb(m['python_bytes'])} of Python in {m['python_files']:,} files, more than "
+				f"Preflight maps (2 MB), so the map reads {fetched.entrypoint} and {_n_files(m['imported'], 'file')} "
+				f"it imports ({_mb(m['bytes'])}). Settings in other files aren't on the map."),
+			evidence=[Evidence(metric="map.files_read", value=float(m["files"]))]))  # fmt: skip
+	return out
+
+
 def _triage_client(deps: Deps, private: bool):
 	"""Who triages: Glimmer on Preflight's own host for a private job with harness.glimmer_private on
 	(contract 0.6.2), else Spark Open on Baseten. A private job with no Glimmer client is never sent
@@ -755,6 +836,47 @@ def _triage(
 		if f is not None:
 			findings.append(f)
 	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
+
+
+LR_RANGE_LENSES = ("finetune", "pretrain")  # Chiya's list (Nov 2): LoRA and nanoGPT are where it's checked
+
+
+def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
+	"""The learning-rate range test (D, Nov 2; probes/lr_range.py): one more point after the plan,
+	at the current settings with the eval off, about 100 steps on an exponential ramp. Only with
+	probes.lr_range on, for a training lens, after the current-settings point ran, and inside the
+	job's budget. Its probe `<p1>-lr` keeps the curve and the suggestion in extras and nothing a fit
+	reads (probes/local.py with_lr_range)."""
+	from preflight.probes.lr_range import LR_END, LR_START, STEPS
+
+	from .flags import flag
+
+	if not flag("probes.lr_range") or sm.lens not in LR_RANGE_LENSES or not plan or ctx.should_stop():
+		return None
+	first = next((q for q in probes if q.id == plan[0].probe_id), None)
+	if first is None or first.status != "ok" or not first.steps:
+		return None
+	# the point's time: its first probe's, scaled to the ramp's steps [guess: setup plus steps]
+	per_step = (first.step_time.mean_s if first.step_time else None) or 1.0
+	est_s = (first.duration_s or 60.0) + STEPS * per_step
+	if not budget.allows((_price(gpu) + deps.overhead_usd_per_h) * est_s / 3600, est_s):
+		return None
+	p = replace(plan[0], probe_id=f"{plan[0].probe_id}-lr", warmup=STEPS, timed=0, profile=False)
+	try:
+		spec = _spec(fetched, sm, p, deps, eval_off=True)
+	except OverrideError:
+		return None
+	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS})
+	if spec.nproc > 1:
+		return None  # a guard (no plan runs ranks today): each rank would stop on its own loss
+	result, cached = _run_point(spec, gpu, deps, ctx)
+	if result is None:
+		return cached
+	over = (result.probe.duration_s or 0) * deps.overhead_usd_per_h / 3600
+	budget.spent_usd += result.probe.cost.usd + over
+	budget.gpu_usd += result.probe.cost.usd
+	budget.overhead_usd += over
+	return result.probe
 
 
 SEARCH_LIBRARIES = ("torch", "transformers", "peft", "trl", "accelerate", "datasets", "bitsandbytes",
@@ -813,6 +935,14 @@ def _tested_node(probe, nodes: set[str]) -> str | None:
 	eval probe, or an eval-pass OOM, tested the eval node."""
 	is_eval = probe.id.endswith("-eval") or (probe.error_code or "").startswith("oom.eval")
 	return "eval" if is_eval and "eval" in nodes else None
+
+
+def _private_history(rec: FlightRecord) -> bool:
+	"""Whether any probe or finding on the record came from a private job (marked by the pipeline): then nothing on
+	it goes to a hosted model, in this job or any later one (B, Nov 2, from A's review of the claim check)."""
+	return any(p.extras.get("private_job") for p in rec.probes) or any(
+		e.metric == "private_job" for f in rec.findings for e in f.evidence
+	)
 
 
 def _claim_check(rec: FlightRecord, deps: Deps, *, private: bool) -> FlightRecord:
@@ -923,9 +1053,12 @@ def _probe_points(
 ) -> tuple[list[Probe], list[ProbeResult], str, float]:
 	"""Run the planned points in order; returns their probes, fresh results, the GPU they settled on
 	and what discarded attempts cost."""
+	from .flags import flag
+
 	probes: list[Probe] = []
 	results: list[ProbeResult] = []
 	discarded_usd = 0.0
+	stop_on_import = flag("runner.stop_on_import_error")  # off until its check passes
 	for i, p in enumerate(plan):
 		ctx.check()
 		_emit(ctx, "probing", rec, rev, probe_id=p.probe_id, progress=round(i / len(plan), 3))
@@ -933,6 +1066,19 @@ def _probe_points(
 			# no GPU could be scheduled within the job's wait cap: the next point would wait for nothing
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
 				error="skipped: no GPU could be scheduled (see the first probe)", error_code="gpu.unavailable"))  # fmt: skip
+			continue
+		gone = next((q for q in probes if q.error_code == "missing_package" and not q.steps), None)
+		if (
+			gone is not None
+			and stop_on_import
+			# the same code: a patched point (C's fix loop) may import something else
+			and (p.probe_id in (patched_for or {})) == (gone.id in (patched_for or {}))
+			and _import_knobs(p.knobs) == _import_knobs(gone.knobs)
+		):
+			# an import that failed before the first step fails the same way at every point: skip the
+			# rest and their triage (unseen runs, Nov 2: three probes and three paid triage calls each)
+			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
+				error=f"skipped: the script couldn't import a package (see {gone.id})", error_code="missing_package"))  # fmt: skip
 			continue
 		if any(q.error_code == "missing_package.install" for q in probes):
 			# the same requirements fail the same way at every point: don't pay for it again

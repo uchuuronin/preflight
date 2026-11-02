@@ -215,6 +215,9 @@ class ProbeSpec:
 	# an eval probe: the generate calls it measures; the probe ends as the next one starts, so what the
 	# script does with each batch (decode, score, dump activations) runs and is measured too
 	generate_calls: int = 0
+	# the learning-rate range test (D, Nov 2; probes/lr_range.py, behind probes.lr_range): {start,
+	# end, steps}; the recorder ramps the rate before each step and stops at the ramp's end
+	lr_range: dict | None = None
 
 
 @dataclass
@@ -729,6 +732,49 @@ def _probe_model(
 	)
 
 
+def with_lr_range(probe: Probe, summary: dict, ramp: dict) -> Probe:
+	"""A range-test probe as the record keeps it (D, Nov 2): its curve and reading in extras
+	(probes/lr_range.py), marked `lr_range`, and none of the measurements a fit would read (its
+	steps ran at rates the script never uses, so its loss and timings aren't the script's). The
+	rates are the ramp's own (`ramp`: start, end, steps), which the recorder set; read whatever the
+	probe ended with, so a script that stops itself on the diverging loss still leaves its curve."""
+	from preflight.probes.lr_range import analyse, lr_at
+
+	summary = summary if isinstance(summary, dict) else {}
+	series = summary.get("series")
+	series = series if isinstance(series, dict) else {}
+	losses = series.get("loss")
+	losses = losses if isinstance(losses, list) else []
+	bad = summary.get("lr_range_nonfinite")
+	bad = bad if isinstance(bad, list) else []
+	steps, start, end = int(ramp["steps"]), float(ramp["start"]), float(ramp["end"])
+	pts = []
+	for i, loss in enumerate(losses[:steps]):
+		val = float(loss) if isinstance(loss, int | float) and not isinstance(loss, bool) else None
+		pts.append((lr_at(i, steps, start, end), val, bool(bad[i]) if i < len(bad) else False))
+	extras = {**probe.extras, "lr_range": 1.0}
+	try:
+		extras.update(analyse(pts))
+	except (ValueError, ArithmeticError, OverflowError, TypeError):
+		extras["lr_range.flat"] = 1.0
+	# the rate the optimizer held after each step (group 0, read by the recorder) against the ramp: a
+	# constant ratio (group 0's share of the largest rate) says the ramp was really applied
+	held = series.get("lr")
+	held = held if isinstance(held, list) else []
+	ratios = [h / lr_at(i, steps, start, end) for i, h in enumerate(held[:steps])
+		if isinstance(h, int | float) and not isinstance(h, bool) and h > 0]  # fmt: skip
+	if summary.get("lr_range_error") or not ratios or max(ratios) > min(ratios) * (1 + 1e-6):
+		# the rate wasn't (always) the ramp's: no rate read from the ramp stands, only the losses
+		extras["lr_range.not_set"] = 1.0
+		for k in [k for k in extras if k.startswith("lr_range.lr.")] + [
+			"lr_range.suggested_lr", "lr_range.min_loss_lr", "lr_range.diverged_lr"]:  # fmt: skip
+			extras.pop(k, None)
+	else:
+		extras["lr_range.checked"] = 1.0
+	return probe.model_copy(update={"extras": extras, "memory": None, "step_time": None, "throughput": None,
+		"stability": None, "data": None, "eval": None, "step_log": [], "power": None, "rl": None})  # fmt: skip
+
+
 def _extras(summary: dict) -> dict[str, float]:
 	"""The counts B reads by name, from the probe's own (untrusted) summary: a value that isn't a
 	finite, non-negative number is left out, never stored as NaN or allowed to crash the parent."""
@@ -853,6 +899,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"alternate_sync": spec.alternate_sync,
 				"generate_sample": spec.generate_sample,
 				"generate_calls": spec.generate_calls,
+				"lr_range": spec.lr_range,
 				"install_requirements": spec.install_requirements,
 				"install_repo": spec.install_repo,
 				"deps": str(box / "deps"),
@@ -965,6 +1012,8 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 			started,
 			duration,
 		)
+	if spec.lr_range:
+		probe = with_lr_range(probe, summary, spec.lr_range)
 	final = None
 	if trace.exists() and trace.stat().st_size < 512 * 1024 * 1024:
 		final = root / f"{spec.probe_id}.trace.json"

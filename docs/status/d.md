@@ -4,12 +4,20 @@
 
 | # | When (ET) | What | Why | Cost | How to undo |
 | --- | --- | --- | --- | --- | --- |
+| B1 | 12:55 | Merged `main` `7ba177b` into `ws-d` (no conflicts) | The PM's "main is ready" (12:53) | none | Revert the merge commit |
+| B1b | 13:20 | Merged `main` `12058ca` into `ws-d`; one conflict in `runner/sources.py` (A's new `data` parameter for `probes.repo_install` against my `_git_read`/`_clone_read`), kept both | The PM's 1:15 "main is ready" | none | Revert the merge commit |
+| B2 | 13:00 | Big repositories (Chiya's new item 1) are read as the entry point plus its import closure only with a new flag, `runner.read_closure` (off); with it off, the refusals now say how big the source is and carry `submission.too_large`, not `syntax_error` | Her 11:15 rule: runner and harness changes behind new flags, off, for A's one redeploy. The message fix is a plain bug fix, so it isn't flagged | none | Leave the flag off, or revert the commit |
+| B3 | 13:00 | The closure is static (`import a.b`, `from a import b`, relative imports, package `__init__.py` files, the repo top, `src/` and the entry point's folder as roots), breadth-first, nearest first, bounded at 600 files and 2 MB (the static mapper's own budget), so a partial read never fails in the mapper | Imports by string (registries, importlib, pyproject entry points) can't be followed without running the code; 2 MB keeps the map and the read the same | none | Constants in `runner/sources.py` |
+| B4 | 13:00 | The record carries an info finding (`source.partial`) whenever the source was read or mapped in part, naming what was read and what was left out | A stranger must be able to tell a finding-free record from a partly read one | none | Drop `_reading_findings` |
 | A1 | 11:30 | Added `harness.spark_search` and `probes.lr_range` to `flags.json`, both off | Chiya's items 1 and 3 each name a new flag, off | none | Remove the two keys |
 | A2 | 11:35 | Before building item 1, a probe script (`scripts/spark_search_probe.py`) asks Meta's Responses API one question with `web_search`, `web_search_preview` and no tool, to learn whether Muse Spark can search and how it cites | Meta's docs I can reach don't say whether a search tool exists or how citations come back; building on a guess would waste the cap | a few cents of Meta credit (counted against item 1's US$1) | Delete the script |
 | A3 | 11:40 | Item 1 built as a Responses API call with Meta's `web_search` tool (`harness/search_grounding.py`, `ModelClient.respond`), wired after triage in `runner/pipeline.py` behind `harness.spark_search` (off) | A2's probe showed Muse Spark searches and returns `url_citation` annotations. Code keeps a source only if the response annotates its URL (and any attempt to open it completed); with none left the finding says "no known issue found". That stops a made-up link only if Meta annotates nothing but search results, which the validation tests with a planted fake link. Never for a private or verify job; never for Preflight's own failures that name no library (budget, no GPU, sandbox ended, timeout, too few steps); once per distinct error per job; the error's URL queries, key-shaped strings and home folder names masked before sending | none (no call while the flag is off) | Revert the commit; the flag stays off either way |
 | A4 | 11:40 | Validation cases are every distinct failed probe in the non-unseen records on `remote-runs` (10; 7 reach the model, 3 are skips), frozen in `tests/fixtures/spark_search_cases.json` | Chiya named the zoo's real failures; the records hold the exact error text the pipeline would send. Unseen runs excluded by name | none | Delete the fixture |
 | A5 | 11:50 | Item 2's check, "does `preflight watch` work on a CPU run", runs as `scripts/d_watch_cpu_check.py` through `remote-run.yml` on GitHub's CPU runner (it installs CPU torch, as CI's torch job does), not on my workspace | My workspace has no torch and can't reach PyTorch's wheel index; the runner can, with no GPU and no model call | none (a GitHub runner's minutes) | Delete the script |
 | A6 | 12:00 | The in-flight shot goes into `video-plan.md` as shot 9b, after the exports, needing B's GPU test, and taking its 10 s from shot 13 only if 13 is cut | My CPU check showed `watch` works on a CPU but no alert fired (CLI records carry no predicted bands: the CLI never fills predictions), so the shot needs a stopgap step and a GPU test; the plan is full at about 2:55, and 13 is the shot most likely cut | none | Delete the 9b row and its section |
+| A7 | 12:10 | Item 3's range test is set in the recorder's optimizer pre-step hook (every param group, keeping its ratio to the largest rate), not by rewriting the script's learning rate | A hook overrides any schedule the script runs (nanoGPT's per-step rate, the HF Trainer's scheduler) and needs no knob; rewriting the code would leave the script's warm-up in charge | none | `Recorder(lr_range=None)` (the default) leaves every probe as before; revert the commit |
+| A8 | 12:10 | The range probe `p1-lr` keeps its curve and reading in extras and drops its memory, timings and loss series; it goes into the record but not into triage, search or the fits | Its steps ran at rates the script never uses, so its loss would mislead the loss and divergence models; its memory duplicates p1's | none | Same |
+| A9 | 12:10 | Its GPU check is a separate ephemeral Modal app (`runner/lr_range_app.py`), not the deployed runner or A's `ops_app.py` | The runner isn't redeployed until A finishes the unseen scripts; an ephemeral app runs this branch's code on the runner's probe image, and keeping it out of `ops_app.py` leaves A's file alone | up to about US$1.10 (two 30-min containers on an A10) against item 3's US$2 | Delete the file |
 
 ## Decisions overnight (Nov 2; Chiya offline 00:16 to about 05:30 ET)
 
@@ -43,6 +51,67 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 16:19 UTC | none (Meta API) | about 1 | about 0.053 of Muse Spark [derived: tokens at list price; any search-tool fee unknown] | `d-spark-search-probe` (41480275641): `web_search` and `web_search_preview` both work, with `url_citation` annotations; no tool, no citations |
 | Nov 2, 16:52 UTC | none (Meta API) | about 2 | 0.107 of Muse Spark [derived: tokens at list price; any search-tool fee unknown] | `d-spark-search-validate` (41485593441): 8 calls on the zoo's failures, 1 source kept, 0 made up or irrelevant (`docs/decisions/spark-search.md`) |
 | Nov 2, 16:52 UTC | none (GitHub CPU runner) | about 3 | 0 | `d-watch-cpu-check` (41485598315): `preflight watch` on `zoo/notebook_tiny` on CPU works; no alert, as CLI records have no bands |
+| Nov 2, 17:20 UTC | A10 (both scripts) | about 11 (633 s of containers) | 0.19 [derived: container time at list price] | `d-lr-range-gpu` (41490183749): the range test on LoRA and nanoGPT, both train at the suggestion (`docs/decisions/lr-range.md`) |
+| Nov 2, 18:21 UTC | none (Meta API) | about 2 | 0.110 of Muse Spark [derived: tokens at list price] | `d-bigrepo-spark-map` (41499720563): Muse Spark's script map on the three big repositories, flag on |
+
+## Mon Nov 2, 13:40 ET (item 1: Muse Spark's map on the three repositories)
+
+CI on `ad6290e`: green, all seven jobs.
+
+`d-bigrepo-spark-map` (GitHub 41499720563, US$0.110 [derived], three calls of 19,002 to 20,905 input tokens, all ok) [measured], with `runner.read_closure` on, each repository fetched and mapped as a check-in would:
+
+| Repository | Static map | With Muse Spark | Judged |
+| --- | --- | --- | --- |
+| lm-evaluation-harness | `pretrain`, no knobs | `eval`, framework `other`; risks name it evaluation-only | Right lens now; no knobs (likely because its settings are command-line flags; the run doesn't show why) |
+| vLLM | `serving`, `vllm`; knobs batch_size 1, max_new_tokens 16, seq_len 1024, temperature, pin_memory, precision | the same, plus group_size and n_tasks; its risks say the static map's temperature, pin_memory and precision came from files other than the entry point, and that it invented a Qwen3-0.6B model and training settings and an agent loop | Right lens; the merged map still keeps the knobs Muse Spark flagged, so its knobs can't be trusted as the benchmark's settings |
+| torchtune | `pretrain`, knobs gpus 2 and temperature | unchanged: `pretrain`, the same two knobs (though its own risks say single-device only) | Wrong lens, and no real knobs. The repository was read whole and its YAML configs were among the mapped files, but nothing links the recipe to the config its command names (`qwen2_5/1.5B_lora_single_device` in the unseen list's command; this run passed no arguments) |
+
+So the fix ends the refusals, but two of three still map poorly, and the records say what was read, not that the map is right. That's the mapper's reading of big code (A's, with Muse Spark), not the reading: three follow-ups, none built:
+- **Settings from imported files:** with a closure, the static map's knobs can come from library code (Muse Spark says so of three of vLLM's), and the merge keeps them. Knobs should come from the entry point and the files its settings flow through, not every file read.
+- **Configs named on the command line:** torchtune's settings are in a YAML file its command names; linking the recipe to that file (from the arguments) would give the map its knobs.
+- **Lens on recipes:** the static reader calls a LoRA recipe `pretrain`, and Muse Spark kept it.
+
+Item 1's spend: US$0.11 of its US$1. Told A in `from-d.md`. Fact-check (read-only, against the run's output): numbers matched; it caught "library defaults" naming knobs the output doesn't attribute, "honest about what they read", the torchtune config cause (the configs were read; nothing links them), and the lm-eval reason as stated fact. Corrected.
+
+This push sends: `docs/status/d.md`, `docs/requests/from-d.md`.
+
+## Mon Nov 2, 13:25 ET (Chiya's new item 1: repositories too big to read; built behind `runner.read_closure`)
+
+Built (B2 to B4): `harness/closure.py` (the entry point's static import closure, breadth-first, nearest first, bounded at 600 files, 2 MB and 30 s, with caps on hostile names and lines), `runner/sources.py` (a repository over 2,000 files or 25 MB of text is read as its entry point and its closure, with the flag on; with it off, or with no entry point named, the refusal says how big it is), `harness/static.py` `mapped_files` (over 2 MB of Python, the map reads the closure; an entry point over 2 MB alone, or not a Python file, is refused saying so), the Spark mapper's prompt ordered by import distance (flag on), and an info finding `source.partial` saying what was read. The refusals carry `submission.too_large`, never `syntax_error`, with a hint that fits.
+
+On the three pinned repositories (`docs/validation/unseen-scripts.md`; local, static map only, no spend) [measured]:
+
+| Repository | Flag on | Flag off |
+| --- | --- | --- |
+| lm-evaluation-harness (`lm_eval/__main__.py`) | read: the entry point and 46 Python files it imports, of 15,449 text files | refused: "the repository (15,449 text files, 12 MB) is more than Preflight reads" |
+| vLLM (`vllm/benchmarks/throughput.py`) | read: 160 imported files, stopped at 2 MB with at least 206 more left out; lens serving, framework vllm | refused: 6,510 files, 71 MB |
+| torchtune (`recipes/lora_finetune_single_device.py`) | the whole repository fits; the map reads the recipe and 195 imported files (1.6 of 3.8 MB of Python) | refused: "3.77 MB of Python in 498 files, more than Preflight maps" |
+
+Still wrong after the fix, and not this item's: the static lens. torchtune reads as `pretrain` with two knobs, lm-eval as `pretrain` with none. Muse Spark's map runs next (`scripts/d_bigrepo_spark_map.py`, cap US$1) to see whether it corrects them. And a probe runs only on what was read, so a partly read repository can still stop at an import (the finding says so).
+
+Review (read-only, git-free copy): one high finding (a hostile dotted name could use gigabytes in the resolver) and medium ones (an entry point over the budget never read, a non-Python entry point crashing the mapper, a hint that didn't fit, `setup.py` followed and counted, every root's match taken instead of the first, `TYPE_CHECKING` imports followed); all fixed, with tests. The second pass found a module hidden by a data folder of the same name (`data.py` beside `data/`), "the 0 files" wording, and a long dotted name hidden across backslash-continued lines; fixed, with tests. Known and left: the 30 s deadline is checked between layers, so one parse or read can run past it; with A's `probes.repo_install` on, a partial read doesn't include the small `.csv`/`.tsv` files it wants (told A); and the static mapper's own `ast.parse` takes seconds on a pathological dotted name, flag on or off, as before (told A).
+
+This push sends: `python/preflight/harness/closure.py` (new), `harness/static.py` (`mapped_files`, `SourceTooLarge`), `harness/mapper.py` (prompt order, flag on), `runner/sources.py` (`_git_read`, `_clone_read`, accurate refusals), `runner/pipeline.py` (`_reading_findings`), `runner/failures.py` (the `submission.too_large` hint), `flags.json` (`runner.read_closure`, off), `tests/test_d_closure.py` (new), `tests/test_static_lenses.py` (the oversize test's wording), `scripts/d_bigrepo_spark_map.py` (new), this file; and the merges of `main` `7ba177b` and `12058ca`.
+
+## Mon Nov 2, 12:35 ET (item 3: GPU check passed; A reviews, B and C next)
+
+CI on `f909ac3`: green, all seven jobs; the torch job ran the four new range-test tests (118 to 122 passed).
+
+`d-lr-range-gpu` (GitHub 41490183749, A10, US$0.19 [derived]) [measured]: LoRA suggests 7.9e-5 against its own 1e-4, diverges at 7.6e-3; nanoGPT suggests 2.5e-4 against its own 6e-4, diverges at 1.0. 50 steps held at the suggested rate didn't diverge on either (LoRA 1.287 to 1.216, nanoGPT 8.74 to 6.01); at the script's own rate, 1.215 and 6.03 by step 50. LoRA's two runs can't be told apart at 0.8 times the author's rate; nanoGPT starts slower and ends level. So the suggestion lands just below the authors' rates and didn't diverge in 50 steps (one seed); it's not better than them on these two scripts. nanoGPT's divergence is read late (only at the ramp's end, though its curve was unstable from about 0.4). Write-up: `docs/decisions/lr-range.md`. Item 3's spend: US$0.19 of its US$2.
+
+Check passed (the ramp applied on both, a suggestion that trains, divergence found). Its curve goes into the record, which the live guide (Muse Spark) reads, so C should check the data-use notice's probe-measurements wording covers it. Before the PM turns `probes.lr_range` on: A's review and A's redeploy. Asked of A (review), B (the guide) and C (the curve) in `from-d.md`.
+
+Fact-check (read-only, against the run's raw outputs): every number matched; it caught "steps" that were points kept, "barely diverged" for nanoGPT, "safe", "trains" and "level with" as overclaims, and a wrong reason for needing no data-use line. All corrected.
+
+This push sends: `docs/decisions/lr-range.md` (new), `docs/requests/from-d.md`, this file.
+
+## Mon Nov 2, 12:20 ET (item 3: the LR range test, built behind `probes.lr_range`; GPU check next)
+
+Built (A7 to A9 above): `probes/lr_range.py` (the ramp, 1e-7 to 1 over 100 steps; one divergence rule, `Divergence`, used by the recorder to stop and by the reading; the reading: steepest fall of the zero-lag-smoothed loss against log rate, lowest point, divergence; extras only, floats), the recorder's `lr_range` (rate set in the optimizer pre-step hook, every group keeping its ratio to the largest; stops at divergence), `probes/local.py` `with_lr_range` (curve and reading into extras, measurements dropped; the rate the optimizer held is checked against the ramp: `lr_range.checked`, else `lr_range.not_set` and no rate is reported), the pipeline's `p1-lr` point (plan jobs only, finetune and pretrain, after p1 ran ok, inside the job's budget, not for multi-GPU; in the record, not triaged, searched or fitted), and the GPU check app `runner/lr_range_app.py` (the range test, then 50 steps held at the suggested rate and 50 at the script's own as the baseline). Nothing changes with the flag off: `lr_range` is in the cache key only when set.
+
+Review (read-only, git-free copy, three rounds): round one found a missing loss read as divergence, no stop on a NaN, the blow-up leaking into the smoothing, a possible multi-GPU hang, the confirmation running inside the scripts' warm-ups, and a predictions test that compared two empty sets; round two found rates reported when the ramp wasn't applied, a summary line reading a renamed key, a stop test that might not test the script stopping itself, and a hostile summary able to crash the reading. All fixed. The torch tests (`tests/test_d_lr_range_probe.py`) can't run in my workspace; CI's torch job runs them.
+
+This push sends: `python/preflight/probes/lr_range.py` (new), `python/preflight/recorder/runtime.py` and `recorder/run.py` (`lr_range`), `python/preflight/probes/local.py` (`ProbeSpec.lr_range`, `with_lr_range`), `python/preflight/runner/pipeline.py` (`_lr_range_point`, the cache key), `python/preflight/runner/lr_range_app.py` (new), `tests/test_d_lr_range.py` and `tests/test_d_lr_range_probe.py` (new), `tests/test_pipeline.py` (one test), this file.
 
 ## Mon Nov 2, 12:05 ET (item 2: the in-flight shot's steps; needs B's GPU test)
 

@@ -246,8 +246,10 @@ def test_repeated_epochs_flag_data_repetition():
 
 
 def test_oversized_submission_is_refused_quickly():
-	with pytest.raises(ScriptParseError, match="too large"):
+	# an entry point over the budget alone: refused, and not called a syntax error (D, Nov 2)
+	with pytest.raises(ScriptParseError, match="more than Preflight maps") as exc:
 		m("x = 1\n" * 600_000)
+	assert getattr(exc.value, "code", None) == "submission.too_large"
 
 
 def test_deeply_nested_expression_is_a_parse_error_not_a_crash():

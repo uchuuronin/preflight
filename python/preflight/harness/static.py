@@ -21,7 +21,8 @@ Coverage, by lens (the vocabularies below are the single list to extend):
   launchers             torchrun / accelerate / Slurm GPU counts in .sh, .sbatch, .yaml files
 
 It only reads code. It never imports or runs the user's script, and it is
-bounded: inputs over MAX_SOURCE_BYTES are refused, and pathological ASTs
+bounded: over MAX_SOURCE_BYTES of Python, only the entry point and what it imports is read
+(mapped_files), an entry point over it alone is refused, and pathological ASTs
 (deep nesting) become a ScriptParseError rather than a crash.
 """
 
@@ -48,6 +49,53 @@ TEXT_SUFFIXES = (".sh", ".sbatch", ".slurm", ".yaml", ".yml", ".toml", ".cfg", "
 
 class ScriptParseError(ValueError):
 	pass
+
+
+class SourceTooLarge(ScriptParseError):
+	"""The entry point alone is more Python than the static reader reads: not a syntax error."""
+
+	code = "submission.too_large"
+
+
+def mapped_files(
+	files: dict[str, str], entrypoint: str, *, closure: bool | None = None
+) -> tuple[dict[str, str], dict | None]:
+	"""The files the static reader maps: all of them when their Python fits MAX_SOURCE_BYTES, else
+	the entry point and the Python files it imports, nearest first, up to that budget, beside the
+	other text files (harness/closure.py; D, Nov 2: torchtune's repository is over 2 MB of Python).
+	The second value says what was left out, or None when nothing was. The closure needs
+	runner.read_closure on (`closure`, default: the flag); off, over the budget is refused, saying
+	how big it is (a SourceTooLarge, code submission.too_large, never a syntax error)."""
+	py = {p: s for p, s in files.items() if p.endswith(".py")}
+	sizes = {p: len(s.encode("utf-8", "surrogatepass")) for p, s in py.items()}
+	total = sum(sizes.values())
+	if total <= MAX_SOURCE_BYTES:
+		return files, None
+	limit = f"more than Preflight maps ({MAX_SOURCE_BYTES // 2**20} MB)"
+	if sizes.get(entrypoint, 0) > MAX_SOURCE_BYTES:
+		raise SourceTooLarge(f"{entrypoint} alone is {_mb(sizes[entrypoint])} of Python, {limit}")
+	if closure is None:
+		from preflight.runner.flags import flag
+
+		closure = flag("runner.read_closure")
+	if not closure:
+		raise SourceTooLarge(f"the source is {_mb(total)} of Python in {len(py):,} files, {limit}")
+	if entrypoint not in py:
+		raise SourceTooLarge(
+			f"the source is {_mb(total)} of Python in {len(py):,} files, {limit}, and {entrypoint} isn't a "
+			"Python file whose imports Preflight can follow; name the Python script it runs as the entry point"
+		)
+	from .closure import import_closure
+
+	got, info = import_closure(py, lambda paths: {p: py[p] for p in paths}, entrypoint,
+		max_files=len(py), max_bytes=MAX_SOURCE_BYTES, sizes=sizes)  # fmt: skip
+	info["python_files"] = len(py)
+	info["python_bytes"] = total
+	return {**{p: s for p, s in files.items() if not p.endswith(".py")}, **got}, info
+
+
+def _mb(n: int) -> str:
+	return f"{n / 2**20:.2f} MB"
 
 
 # ---------------------------------------------------------------- vocabularies
@@ -416,8 +464,11 @@ class Facts:
 def _parse(files: dict[str, str]) -> Facts:
 	f = Facts()
 	py = {p: s for p, s in files.items() if p.endswith(".py")}
-	if sum(len(s.encode("utf-8")) for s in py.values()) > MAX_SOURCE_BYTES:
-		raise ScriptParseError(f"Python source is too large to map (over {MAX_SOURCE_BYTES // 2**20} MB)")
+	if sum(len(s.encode("utf-8", "surrogatepass")) for s in py.values()) > MAX_SOURCE_BYTES:
+		# callers pass mapped_files(); a direct caller over the budget gets the same accurate refusal
+		raise SourceTooLarge(
+			f"the Python source is more than Preflight maps ({MAX_SOURCE_BYTES // 2**20} MB)"
+		)
 	f.texts = {p: s for p, s in files.items() if p.endswith(TEXT_SUFFIXES) and len(s) < 256 * 1024}
 	for path, src in py.items():
 		try:
@@ -782,7 +833,13 @@ def _lens(f: Facts, framework: str, hf_id: str | None) -> str:
 		return "retrieval"
 	if framework in ("pyg", "dgl"):
 		return "gnn"
-	if framework == "timm" or _has(f, "torchvision.models"):
+	# B, Nov 2 (the unseen runs): airbench imports torchvision and its transforms, not torchvision.models, and builds
+	# its own conv net, so it read as pretraining; a torchvision import with a conv layer is a vision job
+	if (
+		framework == "timm"
+		or _has(f, "torchvision.models", "torchvision.datasets", "torchvision.transforms")
+		or (_has(f, "torchvision") and any("Conv2d" in s.text for s in f.sources.values()))
+	):
 		return "vision"
 	if framework == "hf_generate":
 		return "eval"
@@ -1023,16 +1080,110 @@ def _distributed(f: Facts, by_id: dict[str, ScriptKnob]) -> str:
 	return "none"
 
 
+def _module_paths(mod: str, trees: dict, here: str = "") -> list[str]:
+	"""The repo files a dotted module name can be: a module or a package's __init__, looked up from the entrypoint's
+	own folder first (Python puts the script's folder on the path; review, Nov 2), then the repo root, then src/."""
+	stem = mod.replace(".", "/")
+	out = []
+	for root in dict.fromkeys((f"{here}/" if here else "", "", "src/")):
+		for cand in (f"{root}{stem}.py", f"{root}{stem}/__init__.py"):
+			if cand in trees and cand not in out:
+				out.append(cand)
+	return out
+
+
+def _top_level_imports(tree: ast.Module) -> list[tuple[str, int, list[str]]]:
+	"""(module, level, names) for imports at module level, in if/try blocks too, not inside a def or class: a
+	library's optional backend is imported inside the function that uses it."""
+	out = []
+
+	def visit(body):
+		for node in body:
+			if isinstance(node, ast.Import):
+				out.extend((a.name, 0, []) for a in node.names)
+			elif isinstance(node, ast.ImportFrom):
+				out.append((node.module or "", node.level, [a.name for a in node.names]))
+			elif isinstance(node, ast.If | ast.Try | ast.With):
+				for part in ("body", "orelse", "finalbody", "handlers"):
+					for sub in getattr(node, part, []) or []:
+						visit(sub.body if isinstance(sub, ast.ExceptHandler) else [sub])
+
+	visit(tree.body)
+	return out
+
+
+def _all_imports(tree: ast.Module) -> list[tuple[str, int, list[str]]]:
+	out = []
+	for node in ast.walk(tree):
+		if isinstance(node, ast.Import):
+			out.extend((a.name, 0, []) for a in node.names)
+		elif isinstance(node, ast.ImportFrom):
+			out.append((node.module or "", node.level, [a.name for a in node.names]))
+	return out
+
+
+def entry_imports(f: Facts, entrypoint: str) -> set[str]:
+	"""What the job itself imports: every import in the entrypoint, then the module-level imports of the repo files
+	it reaches. B, Nov 2 (the unseen runs): a library repo imports vLLM somewhere, so reading every file's imports
+	sent BEIR (retrieval) and a smolagents example (an API agent) to the serving lens and an API agent to a GPU.
+
+	A package's __init__ that re-exports its submodules (`from .vllm import VLLMEmbed`) is followed only into the
+	ones whose names the job's code uses: BEIR's models package re-exports a vLLM embedder beside the SentenceBERT
+	the example builds."""
+	here = entrypoint.rsplit("/", 1)[0] if "/" in entrypoint else ""
+	seen, todo, out = set(), [entrypoint], set()
+	used: set[str] = set()
+	while todo:
+		path = todo.pop()
+		if path in seen or path not in f.trees:
+			continue
+		seen.add(path)
+		tree = f.trees[path]
+		is_init = path.endswith("__init__.py")
+		if not is_init:
+			used |= set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", f.sources[path].text))
+		pkg = path.rsplit("/", 1)[0].split("/") if "/" in path else []
+		for mod, level, names in _all_imports(tree) if path == entrypoint else _top_level_imports(tree):
+			if is_init and names and "*" not in names and not (set(names) & used):
+				continue  # a re-export the job never names
+			full = mod
+			if level:  # relative: from the file's own package
+				base = pkg[: len(pkg) - (level - 1)] if level > 1 else pkg
+				full = ".".join([*base, *([mod] if mod else [])])
+			local = _module_paths(full, f.trees, here) if full else []
+			if full and not level and not local:
+				out.add(full)
+			todo.extend(local)
+			for n in names:  # "from pkg import sub": sub may be a module
+				if not is_init or n in used or n == "*":
+					todo.extend(_module_paths(f"{full}.{n}" if full else n, f.trees, here))
+	return out
+
+
+def _job_framework(f: Facts, reach: Facts, entrypoint: str) -> str:
+	"""The entrypoint's own imports first; then what it reaches in the repo (entry_imports)."""
+	own = Facts(
+		**{**f.__dict__, "imports": {m for m, lvl, _ in _all_imports(f.trees[entrypoint]) if m and not lvl}}
+	)
+	fw = _framework(own)
+	if fw not in ("plain_pytorch", "other"):
+		return fw
+	return _framework(reach)
+
+
 def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 	if entrypoint not in files:
 		raise ScriptParseError(f"entrypoint {entrypoint} is not among the submitted files")
+	files, _ = mapped_files(files, entrypoint)
 	f = _parse(files)
 	_collect_knobs(f)
 	knobs = _knobs(f)
 	by_id = {k.id: k for k in knobs}
-	framework = _framework(f)
+	# the job's own imports decide its framework and lens, not every file in the repo (B, Nov 2)
+	reach = Facts(**{**f.__dict__, "imports": entry_imports(f, entrypoint)})
+	framework = _job_framework(f, reach, entrypoint)
 	hf_id, pcall, ppath = _pretrained(f)
-	lens = _lens(f, framework, hf_id)
+	lens = _lens(reach, framework, hf_id)
 	model = _model(f, hf_id, pcall, ppath)
 	data = _data(f, by_id)
 	loop = _loop(f, framework)

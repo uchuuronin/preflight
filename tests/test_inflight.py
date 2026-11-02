@@ -66,6 +66,22 @@ def test_memory_over_the_band_alerts_at_once_and_the_total_is_projected():
 	assert any("at this pace the run takes" in s for s in said)
 
 
+def test_the_last_partial_window_ends_at_the_last_step_not_at_the_stop():
+	"""B's A10 run (Nov 2): stopped by SIGTERM a second after its last step, the partial window counted the wait as
+	step time (1.79 s against 1.4 to 1.6 s steps), which raised a false total-time alert on a run on plan."""
+	clock, said = Clock(), []
+	col = Collector(Bands(step_s=(0.9, 1.1), total_s=(95.0, 105.0), total_steps=101), window=10, clock=clock,
+		alert=said.append)  # fmt: skip
+	_go(col, clock, setup_s=0.0)
+	_run(col, clock, 1.0, 29)  # two full windows, then 9 steps
+	clock.t += 1.5  # the stop comes 1.5 s after the last step
+	col.finish()
+	last = col.windows[-1]
+	assert last["steps"] == 9 and last["step_s"] == pytest.approx(1.0)
+	assert last["elapsed_s"] == pytest.approx(29.0)
+	assert said == []
+
+
 def test_the_summary_thins_a_long_log_to_the_schema_cap():
 	clock = Clock()
 	col = Collector(Bands(), window=1, clock=clock)

@@ -193,6 +193,9 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 	why = {"timeout": f", cut at {timeout_s:.0f} s", "cancelled": ", cancelled", "lost": ", sandbox lost",
 		"stalled": f", stopped after {stall_s:.0f} s with no model calls"}.get(cut, "")  # fmt: skip
 	parts.insert(1, f"script wall {wall:.0f} s{why}")  # how it ended survives the 200-character cut
+	failed = (getattr(proc, "report", None) or {}).get("error") if ended == "exited" else None
+	if failed:  # probes.agent_error_line: why a script that made no calls stopped, ahead of the rest
+		parts.insert(2, f"script failed: {failed}")
 	if cut == "stalled" and waiting:
 		w = at_cut.get("peak_concurrent") or 1
 		parts.insert(2, f"{len(waiting)} ended on a tool call, up to {min(w, len(waiting))} may be stuck")

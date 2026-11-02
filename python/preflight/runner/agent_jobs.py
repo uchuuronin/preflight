@@ -84,11 +84,14 @@ class _SandboxProc:
 			self.sb.terminate()
 
 
-def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, forward=None, **proxy_kw):
+def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, forward=None, install_repo=None,
+	keep_error=None, **proxy_kw):  # fmt: skip
 	"""A sampler for the hosted path: the proxy runs here, with the key, behind a tunnel; the script
 	runs in a sandbox created with create_sandbox(extra_egress=[tunnel host]) that holds no secrets.
 
-	forward: modal.forward (a context manager giving the tunnel for a local port); injected for tests."""
+	forward: modal.forward (a context manager giving the tunnel for a local port); injected for tests.
+	install_repo, keep_error: probes.repo_install's and probes.agent_error_line's rules for this sampler
+	(None: the flag)."""
 	if rate is None:
 		from preflight.engine.prices import token_rate as rate
 	if forward is None:
@@ -121,9 +124,17 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 				# the sandbox outlives the sample's own limit (installs come first inside it)
 				sb = create_sandbox(extra_egress=[urlparse(tunnel.url).hostname], timeout_s=int(limit) + 900)
 
+				from .flags import flag
+
+				keep = (
+					flag("probes.agent_error_line") if keep_error is None else keep_error
+				)  # off until checked
+				repo = flag("probes.repo_install") if install_repo is None else install_repo
+
 				def launch(env):
 					return _SandboxProc(sb, {"files": fetched.files, "entrypoint": fetched.entrypoint,
-						"args": list(fetched.args or []), "env": env, "timeout_s": limit})  # fmt: skip
+						"args": list(fetched.args or []), "env": env, "timeout_s": limit,
+						**({"keep_error": True} if keep else {}), **({"install_repo": True} if repo else {})})  # fmt: skip
 
 				return run_sample(None, cwd=None, proxy=proxy, population=getattr(agent, "n_tasks", None), k=k,
 					skip_keys=skip_keys, offered_first=tuple(offered_first), run_id=run_id, timeout_s=limit,
