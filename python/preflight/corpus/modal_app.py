@@ -267,6 +267,33 @@ def read_rows(kind: str) -> list[dict[str, Any]]:
 	return out
 
 
+@app.function(image=image, volumes={MOUNT: vol}, timeout=5 * 60)
+def gpu_dirs(kind: str) -> list[str]:
+	from pathlib import Path
+
+	vol.reload()
+	root = Path(MOUNT, kind)
+	return sorted(d.name for d in root.iterdir() if d.is_dir()) if root.exists() else []
+
+
+@app.function(image=image, volumes={MOUNT: vol}, timeout=45 * 60, cpu=2)
+def read_rows_gz(kind: str, gpu: str) -> bytes:
+	"""One GPU's finished rows of one kind as gzipped JSON lines (Nov 1: every row of every GPU in one list ran past
+	the 15-minute limit once the top-up landed; gzipped per GPU, the reply stays small). CPU only."""
+	import gzip
+	import io
+	import json
+	from pathlib import Path
+
+	vol.reload()
+	buf = io.BytesIO()
+	with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz:
+		for f in sorted(Path(MOUNT, kind, gpu).rglob("*.json")):
+			if not f.name.endswith(".meta.json"):
+				gz.write((json.dumps(json.loads(f.read_text()), sort_keys=True) + "\n").encode())
+	return buf.getvalue()
+
+
 @app.local_entrypoint()
 def startup_check(gpu: str = "T4", out: str = "out/startup_check.json") -> None:
 	"""Start the app in its real image once, on the cheapest GPU, before any paid sweep (Chiya, Oct 28):
@@ -288,26 +315,22 @@ def startup_check(gpu: str = "T4", out: str = "out/startup_check.json") -> None:
 
 
 @app.local_entrypoint()
-def export(kind: str = "kernels", out: str = "out/corpus") -> None:
+def export(kind: str = "kernels", out: str = "out/corpus", gpus: str = "") -> None:
 	"""Bring the volume's rows back as one gzipped JSONL per kind and GPU (remote-run returns ./out):
 
 	modal run python/preflight/corpus/modal_app.py::export --kind kernels
 	"""
 	import gzip
-	import json
-	from collections import defaultdict
 	from pathlib import Path
 
-	by_gpu: dict[str, list[dict[str, Any]]] = defaultdict(list)
-	for row in read_rows.remote(kind):
-		by_gpu[row.get("gpu", "unknown")].append(row)
-	for gpu, rows in sorted(by_gpu.items()):
+	dirs = [d for d in gpu_dirs.remote(kind) if not gpus or d in gpus.split(",")]
+	for gpu, blob in zip(dirs, read_rows_gz.starmap([(kind, d) for d in dirs]), strict=True):
 		path = Path(out, kind, f"{gpu}.jsonl.gz")
 		path.parent.mkdir(parents=True, exist_ok=True)
-		with gzip.open(path, "wt") as f:
-			for r in rows:
-				f.write(json.dumps(r, sort_keys=True) + "\n")
-		print(f"{path}: {len(rows)} rows")
+		path.write_bytes(blob)
+		with gzip.open(path, "rt") as f:
+			n = sum(1 for _ in f)
+		print(f"{path}: {n} rows")
 
 
 @app.local_entrypoint()
