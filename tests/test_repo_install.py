@@ -266,3 +266,10 @@ def test_setup_cfg_install_requires_is_declared(tmp_path):
 		},
 	)
 	assert R.declared(tmp_path) == ["beir>=2", "tqdm"]
+
+
+def test_an_import_whose_handler_raises_again_is_required(tmp_path, missing):
+	missing.update({"openai", "wandb"})
+	_tree(tmp_path, {"run.py": "def model():\n\ttry:\n\t\timport openai\n\texcept ModuleNotFoundError:\n"
+		"\t\traise ModuleNotFoundError(\"Please install 'openai' extra\")\ntry:\n\timport wandb\nexcept ImportError:\n\twandb = None\n"})  # fmt: skip
+	assert R.missing_imports(tmp_path, "run.py") == {"openai"}
