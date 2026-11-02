@@ -262,6 +262,7 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-topup-seed0` (GitHub run 41376298722, the same caps): H100 199 more (492 in all), L40S 99 more (392) | H100, L40S | 25 (wall) | $3.68 |
 | Nov 1 | `b-topup-export` (GitHub run 41378563052): failed, the one-list read ran past 15 minutes | CPU | 16 (wall) | about $0.02 |
 | Nov 1 | `b-topup-export-2` (GitHub run 41380335963): every GPU's rows, per GPU, gzipped | CPU | 6 (wall) | about $0.02. **Top-up total about $16.54 of the $25** |
+| Nov 2 | `b-grpo-entropy-check` (GitHub run 41391382671, Chiya's yes, under $1): zoo/grpo_trl through ground_truth with the TRL 0.14 entropy hook, 2 bare and 12 recorder steps; no OOM, peak 21.46 GB allocated and 22.91 GB reserved of 23.68 GB; rl.entropy 12 values, 0.33 to 0.50 nats (rl_entropy_exact) | A10 x 1 | 8 (wall), about 450 GPU-s | about $0.15 |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
