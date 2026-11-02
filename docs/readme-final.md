@@ -238,6 +238,12 @@ Nine public scripts, one per job type, picked and hashed before the runs, each r
 
 What happens next is scored apart, as "after freeze": A has built `probes.repo_install` (off), which installs a repo's declared dependencies and known imports when it has no requirements.txt; the nine are re-run with it after the runner is redeployed, and those results never change the rows above.
 
+### After the freeze (Nov 2)
+
+Changes made after the freeze, scored apart. They never change the table above.
+
+- **Divergence warning, refit, not shipped** (`scripts/fit_divergence_v2.py`, report `python/preflight/corpus/reports/divergence_v2_nov2.json`): a prior from the run's settings, known before the first step, beside the Nov 1 step model. Scored once on the same 720 held-out sweep runs, folds, warning line and bootstrap as the row above, it reads AUROC 0.97 (95% 0.94 to 0.99) and a median lead of 162 steps (27 to 293), and all 15 early blow-ups raise an alarm. **That number measures how the sweep was drawn, not a warning a real run would get.** The sweep drew learning rates from 1e-4 to 0.48; every one of its 44 divergences came at 0.07 or more, the learning rate alone ranks the runs at AUROC 0.92 on the same folds, and none of the 465 runs at 0.03 or below diverged. A warning can't be checked where people actually train from this sweep, so it isn't shipped: `engine.divergence` stays off, and the threshold rules (D6) give the warning. What it needs is a sweep with divergences at usual learning rates (fp16 overflow, bad init, no warmup at lr 3e-4 to 3e-3). This is also the second fit on these 720 runs, with the interactions chosen after seeing the first fit's misses.
+
 ## Add-ons
 
 Smaller features, each behind its own flag in `flags.json`. On in production since Nov 1: detail
