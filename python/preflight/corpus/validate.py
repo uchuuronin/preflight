@@ -282,6 +282,15 @@ def _share_row(metric, target, on, flags: list[tuple[str, bool | None]], share=W
 	)
 
 
+def _lowest(cs: list[dict]) -> str:
+	"""The held-out GPU where K1 lands within 20% least often, as 'T4, 232 of 454'."""
+	by: dict[str, list[bool]] = {}
+	for c in cs:
+		by.setdefault(c["tgt"], []).append(abs(c["k1"] / c["actual"] - 1) <= 0.20)
+	g, v = min(by.items(), key=lambda kv: sum(kv[1]) / len(kv[1]))
+	return f"{g}, {sum(v)} of {len(v)}"
+
+
 def _ordinal(n: int) -> str:
 	return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
@@ -311,7 +320,7 @@ def cross_gpu_row(stores: list[Path]) -> Row:
 		hits,
 		len(cs),
 		hits / len(cs) >= WITHIN_SHARE,
-		f"K1 roofline, {len(cs)} config pairs over {', '.join(gpus)}",
+		f"K1 roofline, {len(cs)} config pairs over {', '.join(gpus)}; lowest held out: {_lowest(cs)}",
 	)
 
 

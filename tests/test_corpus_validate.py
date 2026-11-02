@@ -255,3 +255,16 @@ def test_the_scorer_predicts_under_the_flags_it_is_given():
 	finally:
 		api.predict = orig
 	assert seen and all(seen) and api.feature("rl") == before  # on for the scoring only
+
+
+def test_the_cross_gpu_row_counts_its_gpu_types_and_names_the_lowest():
+	from preflight.corpus import validate
+
+	assert validate._ordinal(5) == "5th" and validate._ordinal(2) == "2nd" and validate._ordinal(13) == "13th"
+	cs = [
+		{"tgt": "A10", "k1": 1.0, "actual": 1.0},
+		{"tgt": "A10", "k1": 1.0, "actual": 1.0},
+		{"tgt": "T4", "k1": 2.0, "actual": 1.0},
+		{"tgt": "T4", "k1": 1.0, "actual": 1.0},
+	]
+	assert validate._lowest(cs) == "T4, 1 of 2"
