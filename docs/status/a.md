@@ -1,6 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Mon Nov 2, 00:40 ET.
+Updated Mon Nov 2, 03:30 ET.
+
+**Production runner: deployed from main 1ea2dd6** (`a-deploy-main-21`, GitHub 41412727746, Nov 2 08:24 UTC / 03:24 ET), after both startup checks passed (`a-startup-check-21` 41412104839, `a-startup-check-serving-7` 41412457816). It carries Glimmer's secret on the worker, private jobs never on Baseten, the Modal capacity fix, the runner-held probe limit, the GPU-wait events, the serving cap (1,024 tokens) and C's fix-loop verify path. The previous deploy was ws-a 530785e (03:09 UTC); rollback is `modal deploy --env main` from 530785e.
 
 ## Decisions overnight (Chiya's autonomy, Nov 2 12:16 AM ET)
 
@@ -14,7 +16,8 @@ Updated Mon Nov 2, 00:40 ET.
 | 00:35 | Specific failure lines for the submission, patch and demo-limit codes; the limit lines reach visitors only once C's API adds them (asked in from-a.md) | item 43: every code names its step and a way past it | none | revert 2637ee6 and its fix |
 | 00:40 | `warm_pool_dry_run` in the ops app, read only (hydrates the deployed worker, reads the tick's last setting) | item 45: a dry run without touching production; the pool stays off until Nov 5 | none (CPU, about a minute when run) | delete the function |
 | 00:45 | Wrote zoo/notebook_tiny/tiny_train.ipynb (a 200-step MLP with AdamW) for the notebook check-in | item 5: D's colab_lora fixture has no optimizer, so it can't pass as a training check-in | none | delete the folder |
-
+| 03:20 | Redeployed the runner from 1ea2dd6 itself, not main's head 89ed12e | the PM's note names 1ea2dd6; 89ed12e only adds that note (docs), and its CI's one failure is a flaky agent-proxy test, fixed on ws-a in 6c73978 | none (CPU checks, the serving check's L4 minutes) | `modal deploy --env main` from 530785e |
+| 03:25 | Agent proxy listen backlog 5 → 128 (6c73978) | main's CI (89ed12e) saw one connection reset in the 20-call cap test; not reproduced locally in 60 runs under load, so the backlog is the likely cause, not a proven one; a visitor's agent can burst that many calls too | none | revert 6c73978 |
 | 01:25 | **The "ended without a result" cause, found by review in Modal's SDK (1.6.3):** a GPU sandbox's create itself waits up to 21 min (1,260 s) for scheduling and then raises "Insufficient capacity"; the runner caught it as a broken sandbox, so no fallback, no NoGPU and no wait recorded. Now create runs inside the runner's wait: told each minute, bounded by the job's wait cap, an L4 out of capacity falls back to the A10, the last GPU gives `gpu.unavailable` naming Modal's reason, and a create still waiting when the runner gives up is ended when it returns | three probes (serving, eval, a training notebook) lost this way; a queue wait read as a hang | none | `sandbox_runner.py`: create back in the loop |
 | 01:05 | `READY_TIMEOUT_S` 30 → 25 min, and a failed sandbox start check is named on the probe that lost its result | the training-notebook check-in (`a-notebook-checkin-2`, 41394704676) ended like the serving and eval probes: "without a result" 1,284 s in, no GPU wait recorded; the same script ran in 5 s under the recorder on an A10 outside the sandbox (`a-gt-notebook-tiny`, 41397365737), so the sandbox path is at fault; the likely cause, a start check as long as the sandbox's own 30-min life failing at once, isn't proven | $0.64 (the check-in), about $0.02 (the ground truth) | `sandbox_runner.py`: READY_TIMEOUT_S back to 30 min |
 
@@ -24,7 +27,7 @@ Updated Mon Nov 2, 00:40 ET.
 Arguments go comma-separated (remote-run allows no quotes), `,,` for a comma inside one. Cost per script about $0.20 to $0.60 (check-in) plus the full run's own minutes on an A10 (about $1.10/h), under Chiya's $30 for Monday.
 
 **Checks passed overnight (for the PM's flags):**
-- **`harness.glimmer_private`: passed.** `a-private-triage-1` (GitHub 41394153172, Nov 2 05:33 UTC): the worker's private-job triage (`pipeline._triage`, private=True) with the worker's own clients and the preflight-glimmer secret, now mounted on `run_worker` too (live at the next redeploy): Glimmer triaged the LoRA record's p1-eval as `triage.oom` ("The eval pass ran out of GPU memory after 3 optimizer steps", quoting the recorded line), one call, 279 s (cold), $0.163; no call to Baseten. With the flag off, a private job now gets no triage at all, never Baseten.
+- **`harness.glimmer_private`: passed.** `a-private-triage-1` (GitHub 41394153172, Nov 2 05:33 UTC): the worker's private-job triage (`pipeline._triage`, private=True) with the worker's own clients and the preflight-glimmer secret, now mounted on `run_worker` too, live since the 08:24 UTC redeploy from 1ea2dd6: Glimmer triaged the LoRA record's p1-eval as `triage.oom` ("The eval pass ran out of GPU memory after 3 optimizer steps", quoting the recorded line), one call, 279 s (cold), $0.163; no call to Baseten. With the flag off, a private job now gets no triage at all, never Baseten.
 - **`d.notebook`: not yet.** The runner accepts a notebook end to end (`a-notebook-checkin-1`, Nov 2 03:11 UTC), but the one that trains (`a-notebook-checkin-2`) lost its probe in the sandbox as above; to rerun after the next redeploy.
 
 - **Now:** the Pareto sweep (Muse Spark arm, then Spark Open, on its own $1 ledger); the redeploy gated on the new probe-user startup check (a tiny torch.compile and the vLLM and datasets imports as uid 61000), then the serving probe again on the fixed image.
