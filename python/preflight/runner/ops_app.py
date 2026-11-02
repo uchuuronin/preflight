@@ -948,6 +948,45 @@ def triage(share: str, probe: str = "p1-eval", provider: str = "glimmer"):
 	)
 
 
+# ---------------------------------------------------------------- the judging warm pool, without changing it
+
+
+@ops.local_entrypoint()
+def warm_pool_dry_run(modal_env: str = "main"):
+	"""modal run --env main python/preflight/runner/ops_app.py::warm_pool_dry_run
+	What the tick will do for judging (item 45), changing nothing: each hour from Nov 4 22:00 to
+	Nov 9 02:00 ET, the warm workers it wants and the probe GPU an L4 job gets; the deployed
+	run_worker's handle (that it can be scaled) and what the tick last set. Writes out/warm_pool.json."""
+	import datetime as dt
+	import time
+	import zoneinfo
+
+	from preflight.runner.judging import judging_gpu, warm_workers, window
+
+	et = zoneinfo.ZoneInfo("America/New_York")
+	t = dt.datetime(2026, 11, 4, 22, tzinfo=et)
+	rows, prev = [], None
+	while t <= dt.datetime(2026, 11, 9, 2, tzinfo=et):
+		ts = t.timestamp()
+		state = (warm_workers(ts), judging_gpu("L4", None, ts), judging_gpu("L4", ["L4"], ts))
+		if state != prev:  # the hours where something changes
+			rows.append({"et": t.isoformat(), "warm_workers": state[0], "l4_job_probes_on": state[1],
+				"l4_only_job_probes_on": state[2]})  # fmt: skip
+			prev = state
+		t += dt.timedelta(hours=1)
+	fn = modal.Function.from_name(APP_NAME, "run_worker", environment_name=modal_env)
+	scalable = any(hasattr(fn, a) for a in ("update_autoscaler", "autoscaler"))
+	try:
+		last = modal.Dict.from_name("preflight-jobs", environment_name=modal_env).get("warm_workers")
+	except Exception as exc:
+		last = f"unread: {type(exc).__name__}"
+	out = {"window": window(), "changes": rows, "run_worker_scalable": scalable, "tick_last_set": last,
+		"now_wants": warm_workers(time.time())}  # fmt: skip
+	Path("out").mkdir(exist_ok=True)
+	Path("out/warm_pool.json").write_text(json.dumps(out, indent=2))
+	print(f"[warm] {json.dumps(out)}", flush=True)
+
+
 # ---------------------------------------------------------------- a private job's triage, as the worker runs it
 
 
