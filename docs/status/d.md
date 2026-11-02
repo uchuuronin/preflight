@@ -30,6 +30,25 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
 | Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
 
+## Mon Nov 2, 09:00 ET (check-in: the $8 cap is deployed; three requests closed)
+
+`8bcd99a` CI green. Merged `main` `d625a39` (the validation freeze declared at `56c2141`; I touch
+nothing of the unseen list).
+
+- **The cap from Nov 5 is deployed:** `queue.py` returns $8 from Nov 5 (`c061626`), and A's runner
+  was deployed from `1ea2dd6`, which contains it (Nov 2 08:24 UTC); until Nov 5 it applies $10. (An
+  environment variable, `PREFLIGHT_DAILY_GPU_CAP_USD`, can override it; nothing I can see sets it.) Per Chiya, the README draft and the
+  builder kit now give the number.
+- **Closed with A:** private jobs never go to Baseten (A's fix, deployed); `d.notebook` passed (with
+  A's own training notebook) and the $8 cap is in.
+- **Still open:** A's production LoRA triage re-run (deadline Tue Nov 3, noon ET); the L4 eval-sweep
+  question and the items 42/19 note to A; PF102's numbers with B and the PM; S1 and S2 with C.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the merge of `main`, the cap sentences, the closed requests and this entry.
+
+Cloud runs: none.
+
 ## Mon Nov 2, 05:40 ET (overnight: the PM's third merge; audit of C's deploy; the status word)
 
 `adef21e` CI green. The PM's 5:15 merge made `main` `16e0bb3` and then `ae0e900`
