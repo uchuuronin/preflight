@@ -1506,6 +1506,17 @@ def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]
 	epochs = values.get("epochs") or (tr.epochs if tr else None) or 1.0
 	n = values.get("n_examples") or (data.n_examples if data else None)
 	if not n:
+		# C, Nov 1: the live LoRA record's script map has no dataset size, but every probe recorded the training
+		# set's length as the script loaded it (A's `train_dataset_len`)
+		n = next(
+			(
+				p.extras["train_dataset_len"]
+				for p in record.probes
+				if p.status in (*OK_PROBE, "oom") and (p.extras or {}).get("train_dataset_len")
+			),
+			None,
+		)
+	if not n:
 		return None, "the run's length isn't known: no max_steps, and no dataset size to divide by the batch"
 	per_step = (
 		float(values.get("batch_size", 1) or 1)

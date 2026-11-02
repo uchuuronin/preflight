@@ -192,9 +192,17 @@ Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixt
 
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).
-- AMD: the account's verification hold.
+- AMD: waits on Chiya's access approval.
+- Cross-GPU top-up (up to $25, Chiya, 6 PM ET): waits on the PM's check of the config list (`from-b.md`).
+- "Fits" on L4 and A10 fine-tunes: 19 held-out runs can't show P(OOM) below 2.5%, so nothing reads "fits"; a choice for Chiya (`from-b.md`).
 
-## Next (Sun Nov 1)
+## Next (Sun Nov 1, evening)
+- Spark Open labels the whole corpus (up to $10): a 48-row pilot first, then the rest, then the agreement with Wilson intervals.
+- The top-up, once the PM clears the list; then refit the cross-GPU band and the GBDT residual, rescore leave-one-GPU-out with five GPUs, and post the table as it comes out.
+- LC-PFN: the port is built and matches the package's code; the CPU check on the published checkpoints runs next (`lcpfn_app.py::check`, about $0.02).
+- Serving calibration when A's capped vLLM record lands (the simulation now carries capped outputs past the cap).
+
+## Earlier (Sun Nov 1)
 - Divergence: done. The final fit on 720 runs misses (AUROC 0.66, lead 138 steps); not used. Both fit reports are committed under `corpus/reports/`. No more divergence spend.
 - Agent runaways: a stalled run's tasks with no stop reason are possibly stuck; at most one per worker counts (`AgentSample.concurrency`, 0.6.1), and one when the worker count isn't recorded.
 - Calibrate RL on A's 50-step GRPO run first (a hero lens), then retrieval, GNN and vision records as they land; serving once A's vLLM probes land.

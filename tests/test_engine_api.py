@@ -1205,3 +1205,18 @@ def test_pair_grids_are_named_apart_from_a_record_s_own_2d_grids():
 	two = [g for g in grids if len(g.axes) == 2]
 	assert two and all(g.id.endswith(api.CLEARING_GRID_SUFFIX) for g in two)
 	assert len({g.id for g in grids}) == len(grids)
+
+
+def test_the_run_length_falls_back_on_the_probes_dataset_length():
+	"""C, Nov 1: the live LoRA record's time and cost abstained ("no dataset size"), though every probe recorded
+	train_dataset_len 50,724 (planned_steps 3,170 at batch 4 x grad_accum 4)."""
+	rec = FlightRecord.model_validate(
+		json.loads(
+			(
+				Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+			).read_text()
+		)
+	)
+	steps, why = api.total_steps(rec)
+	assert why == "" and steps == pytest.approx(3170, abs=1)
+	assert api.predict(rec).root["time.total"].status != "abstain"
