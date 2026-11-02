@@ -1,0 +1,11 @@
+{
+	"name": "20261102-163607-41483056914-a-unseen-4b-gt",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41483056914",
+	"ref": "745fe5525d87506c19e39e8dbbb73f04ef735fe7",
+	"sha": "745fe5525d87506c19e39e8dbbb73f04ef735fe7",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/huggingface/smolagents --commit 96f33faaf028479119ec8d34507b47694cf14e34 --entrypoint examples/agent_from_any_llm.py --edit-hex 7b226578616d706c65732f6167656e745f66726f6d5f616e795f6c6c6d2e7079223a205b5b2263686f73656e5f696e666572656e6365203d205c22696e666572656e63655f636c69656e745c22222c202263686f73656e5f696e666572656e6365203d205c227472616e73666f726d6572735c22225d5d7d --bare-steps 100000 --budget-min 45 --first-gpu L4 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:37:00Z"
+}
