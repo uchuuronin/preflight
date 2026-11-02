@@ -32,12 +32,11 @@ is live at <https://preflight-cqn.pages.dev>.
 | Fit map: which settings fit, with the out-of-memory frontier | The cockpit's Fit view: drag your run across the map | `c.fit_map`, on in production (Chiya, Nov 1) |
 | RL readouts: the share of prompt groups with no reward spread, rollout time | The GRPO lens | `engine.rl`, on in production (Chiya, Nov 1); calibrated on A's GRPO runs (L4 smoke runs and a 50-step run on an A10) |
 | Log triage by Muse Spark Open on Baseten | A probe that fails gets a finding quoting its log line, labelled "Found by Muse Spark Open triage" | `harness.spark_open_triage`, on in production with its data-use line (Chiya, Nov 1) |
-| Possible outcomes (HOPs) | The readouts' "Possible outcomes" toggle: each frame is one outcome inside the 90% interval | `c.hops`, on in production (Chiya, Nov 1) |
-| Take it with you | The plan, an edit script for the changed settings, a Slurm batch file, the run command, a Weights & Biases helper that puts the plan's knobs in the run's config and each prediction with its 90% interval in its summary, and the record's link once it has one | `c.exports`, on in production (Chiya, Nov 1) |
-| Detail level, costs in your currency, free GPUs | The add-ons below: "New to this" with glossary cards, 30 currencies at the European Central Bank's dated rates, and whether the plan fits one free session on Colab, Kaggle, Modal's starter credit or Lightning AI | `d.expertise`, `d.currency`, `d.freetier`, on in production (Chiya, Nov 1); checked in Chromium on `main` `50db9b6` (`docs/audit/scripts/addons.mjs`, 20 of 20 states; `docs/status/d.md`, Nov 1, 18:45) |
 | GRPO lens on a measured run | The GRPO sample: reward spread, completion lengths, the tour | A's L4 run `a-gt-grpo-l4-3`; no flag |
 | Cost readout at your own rate | Every dollar readout: quantity x rate = total, with the price table's source and date | No flag |
 | Verify a fix in your own CI | A GitHub Action (below) | No flag; usable from other repositories once this one is public |
+| Possible outcomes (HOPs) and exports: the plan, an edit script, a Slurm batch file, the run command and a W&B script | The cockpit's "Possible outcomes" toggle, and the exports band under the whole run | `c.hops` and `c.exports`, on in production (Chiya, Nov 1, 8 PM); checked by C on all 10 samples on a production build |
+| The add-ons: detail level, costs in your currency, free GPUs | The Logbook and the cockpit (below) | `d.expertise`, `d.currency`, `d.freetier`, on in production (Chiya, Nov 1, 8 PM); checked by D in Chromium, desktop and phone |
 | The `preflight` CLI (`map`, `run`) | Your own machine | On `main`; the `pip install git+...` line works once the repository is public |
 
 **Behind a flag, off for now**
@@ -45,9 +44,9 @@ is live at <https://preflight-cqn.pages.dev>.
 | What | Flag | Where it stands |
 | --- | --- | --- |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
+| The CLI re-check item in the exports | `d.exports_cli` | Built on `main`; on once the repository is public (Nov 3 to 4) |
+| Notebook check-in | `d.notebook` | Built on `main`; on once a real notebook check-in runs through the deployed runner |
 | Private mode: log triage by Muse Glimmer | `harness.glimmer_private` | Hosted on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys, scaled to zero when idle), behind its flag. Triage cost US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`]. Same category as Spark Open on 9 of 11 failed zoo probes [measured, `a-triage-agreement`] |
-| Notebook check-in | `d.notebook` | Built on `main`, and the runner's code converts notebooks (`runner/sources.py`); stays off until A's real notebook check-in through production passes |
-| The exports' "Check it again on your machine" item | `d.exports_cli` | Built on `main` |
 
 **Not used, or not measured**
 
@@ -76,32 +75,45 @@ For a README badge:
 `[![Preflight](https://TODO-PM-HOST/badge/<share token>)](https://TODO-PM-HOST/s/<share token>)`
 (`workers/README.md`).
 
-**On your own machine, one command** (Python 3.11 or 3.12, in the environment that has your
-torch):
+**On your own machine, one command** (Python 3.11 or 3.12). In the environment that already has
+your torch:
 
 ```bash
 pip install git+https://github.com/uchuuronin/preflight
 ```
 
-**Quickstart:**
+or, to add PyTorch too (a large download from PyPI):
 
 ```bash
-# 1. Read the script without running it (seconds): lens, framework, knobs and where the code sets them.
+pip install "preflight[probe] @ git+https://github.com/uchuuronin/preflight"
+```
+
+Install from this URL, not `pip install preflight`: that name on PyPI is an unrelated package.
+
+**Quickstart, about a minute:**
+
+```bash
+# 1. A first run: writes a small training script into ./preflight-demo and probes it on this
+#    machine (its GPU if it has one), then writes a flight record.
+preflight demo
+
+# 2. Read your own script without running it (seconds): lens, framework, knobs and where the code
+#    sets them.
 preflight map train.py
 
-# 2. Measure a few steps on this machine (its GPU if it has one) and write a flight record.
-#    On a real script this takes a few minutes: probes run real training steps.
-preflight run . --entrypoint train.py --out .preflight/records
-
-# Arguments for your script go after --, e.g.
+# 3. Measure a few steps of it and write its flight record. On a real script this takes a few
+#    minutes: probes run real training steps. Arguments for your script go after --.
 preflight run . --entrypoint train.py -- --batch_size 16
 ```
 
-The record lands in `.preflight/records/<share_token>.json`, a JSON flight record. Opening a local
-record in the web app isn't built yet: the app opens records by their share link.
-(Checked Oct 31 by D: the package installed from this checkout in a fresh Python 3.11
-environment with torch 2.5.1 ran three probes of a small torch loop on the CPU and wrote a record;
-the GitHub install line itself can be tried once the repository is public.)
+The record lands in `records/<share_token>.json` (`--out` to change it), a JSON flight record with
+the probes' measurements and findings. The web app opens records by their share link only, so to
+fly the whole run, check the script in at <https://preflight-cqn.pages.dev>.
+(Checked Nov 1 by D, in a clean Python 3.11 virtual environment with pip 24: `pip install
+git+file://` of this repository, the same install path as the GitHub line, took 20 s,
+not counting PyTorch, which was added separately [measured]; then `preflight demo` in an empty folder ran three probes on
+the CPU, all ok, in 23 s, and wrote a record with the probes and two findings [measured]. A run on
+a CPU carries no predictions. The GitHub line itself can be tried once the repository is public.)
 
 ## How it works
 
