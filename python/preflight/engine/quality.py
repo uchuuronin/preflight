@@ -8,10 +8,10 @@ are seen more than once or twice. A new readout beside the others; nothing in th
 Known columns (each cited to its dataset card; the low-quality cut-off is the dataset authors' own where they give one):
 - FineWeb-Edu (HuggingFaceFW/fineweb-edu): `int_score`, 0 to 5, the rounded educational score of their classifier
   (`score` is the unrounded value); the authors keep documents scoring 3 and up for the released edu set, so under 3
-  is low quality here. Its rows carry `token_count` (GPT-2 tokens).
+  is low quality here (their looser fineweb-edu-score-2 keeps 2s, which read as low). Rows carry `token_count`.
 - DCLM (mlfoundations/dclm-baseline-1.0): `fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train_prob`, the
-  fastText classifier's probability; DCLM kept roughly the top 10% by it, so the bins are its deciles and the bottom
-  half is low quality here [guess, from the paper's top-10% filter].
+  fastText classifier's probability, binned in deciles. The set is already that classifier's top slice of its pool,
+  so no decile is called low quality: the deciles are shown, and only repetition is flagged.
 - RedPajama-V2 (togethercomputer/RedPajama-Data-V2): `quality_signals`, a JSON column; its `ccnet_bucket` (head,
   middle, tail by the CCNet perplexity model), tail as low quality, the authors' own reading of the buckets.
 
@@ -48,13 +48,24 @@ KNOWN = (
 		"token_count",
 		"cited: FineWeb-Edu dataset card, the edu set keeps int_score >= 3",
 	),
+	# the authors' looser set keeps int_score 2 as well; 3 stays the edu cut-off, so its 2s read as low quality
+	Column(
+		"HuggingFaceFW/fineweb-edu-score-2",
+		"int_score",
+		"int_score",
+		3,
+		"token_count",
+		"cited: FineWeb-Edu dataset card (score-2 keeps int_score >= 2; edu's cut-off is 3)",
+	),
+	# review, Nov 2: DCLM-baseline is already its classifier's top slice, so no decile of it is called low quality;
+	# the deciles are shown, nothing is flagged for quality (repetition past 4 epochs still is)
 	Column(
 		"mlfoundations/dclm-baseline-1.0",
 		"fasttext_openhermes_reddit_eli5_vs_rw_v2_bigram_200k_train_prob",
 		"probability",
 		None,
 		None,
-		"guess: deciles; the bottom half low quality (DCLM kept about the top 10%)",
+		"cited: DCLM paper, the baseline set is the classifier's top ~10% of its pool",
 	),
 	Column(
 		"togethercomputer/RedPajama-Data-V2",
@@ -70,8 +81,8 @@ KNOWN = (
 def column_for(dataset: str, columns: list[str]) -> Column | None:
 	"""The quality column of a known dataset, if this dataset is one and has it (a config name after the id is fine)."""
 	base = dataset.split(":", 1)[0].strip().lower()
-	for c in KNOWN:
-		if base.startswith(c.dataset.lower()) and c.name in columns:
+	for c in KNOWN:  # the exact dataset (review, Nov 2: a prefix caught other datasets' names)
+		if base == c.dataset.lower() and c.name in columns:
 			return c
 	return None
 
@@ -87,7 +98,7 @@ def _bin_of(col: Column, value) -> tuple[str, bool] | None:
 		if value is None or not math.isfinite(float(value)):
 			return None
 		d = min(9, max(0, int(float(value) * 10)))
-		return f"decile {d + 1} (p {d / 10:.1f} to {(d + 1) / 10:.1f})", d < 5
+		return f"decile {d + 1} (p {d / 10:.1f} to {(d + 1) / 10:.1f})", False
 	if col.kind == "ccnet_bucket":
 		sig = json.loads(value) if isinstance(value, str) else (value or {})
 		b = sig.get("ccnet_bucket")
@@ -118,7 +129,9 @@ class Profile:
 
 def profile(rows, col: Column, tokens_of=None) -> Profile:
 	"""Bin documents (dicts with the column) by quality, counting tokens with the dataset's own token column, or
-	`tokens_of(row)` when it has none."""
+	`tokens_of(row)` when it has none (review, Nov 2: without either, there is nothing to count)."""
+	if not col.token_column and tokens_of is None:
+		raise ValueError(f"{col.dataset} has no token column; pass tokens_of to count each document's tokens")
 	p = Profile(col)
 	for r in rows:
 		got = _bin_of(col, r.get(col.name))

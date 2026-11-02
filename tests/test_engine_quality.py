@@ -34,3 +34,11 @@ def test_redpajama_reads_its_ccnet_bucket_from_the_signals():
 	col = Q.column_for("togethercomputer/RedPajama-Data-V2", ["raw_content", "quality_signals"])
 	p = Q.profile([{"quality_signals": '{"ccnet_bucket": [[0, 10, "tail"]]}'}], col, tokens_of=lambda r: 10)
 	assert p.tokens == {"ccnet tail": 10.0} and p.low == {"ccnet tail"}
+
+
+def test_only_the_exact_dataset_matches_and_dclm_flags_no_decile():
+	assert Q.column_for("HuggingFaceFW/fineweb-edu-llama3-annotations", ["int_score"]) is None
+	assert Q.column_for("HuggingFaceFW/fineweb-edu-score-2", ["int_score", "token_count"]).low_below == 3
+	col = Q.column_for("mlfoundations/dclm-baseline-1.0", [Q.KNOWN[2].name])
+	p = Q.profile([{col.name: 0.1}, {col.name: 0.95}], col, tokens_of=lambda r: 100)
+	assert p.low == set() and len(p.tokens) == 2

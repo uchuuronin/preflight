@@ -52,3 +52,15 @@ def test_destroy_sends_one_delete_with_the_token():
 		"url": "https://api.digitalocean.com/v2/droplets/123",
 		"auth": "Bearer tok",
 	}
+
+
+def test_vram_in_use_or_cpu_load_keeps_the_droplet():
+	w = wd.Watch(2, 5.0)
+	assert not w.tick([0.0], vram=[0.6]) and not w.tick([0.0], vram=[0.6])  # a model is loaded: busy
+	assert not w.tick([0.0], load=3.5) and not w.tick([0.0], load=3.5)  # downloading or copying: busy
+	assert not w.tick([0.0], vram=[0.01], load=0.2) and w.tick([0.0], vram=[0.01], load=0.2)
+
+
+def test_rocm_smi_vram_reading():
+	out = json.dumps({"card0": {"GPU Memory Allocated (VRAM%)": "37"}, "system": {}})
+	assert wd.read_vram(lambda cmd: out) == [0.37]

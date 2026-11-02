@@ -52,14 +52,16 @@ def check_remote(docs: int = DOCS) -> dict:
 		row: dict = {"dataset": name, "config": config, "dataset_tokens": total}
 		try:
 			ds = load_dataset(name, config, split="train", streaming=True)
-			col = Q.column_for(name, list(ds.features))
+			# review, Nov 2: a streamed dataset's features can be None; the first row's keys are the columns
+			cols = list(ds.features) if ds.features else list(next(iter(ds)).keys())
+			col = Q.column_for(name, cols)
 			row["column"] = col and col.name
 			if col is None:
-				row["error"] = f"no known quality column in {list(ds.features)}"
+				row["error"] = f"no known quality column in {cols}"
 				out["sets"].append(row)
 				continue
 			t0 = time.monotonic()
-			p = Q.profile((r for r, _ in zip(ds, range(docs), strict=False)), col)
+			p = Q.profile(ds.take(docs), col)
 			row["read_s"] = round(time.monotonic() - t0, 1)
 			row["sample"] = {"docs": p.docs, "tokens": p.tokens, "missing": p.missing, "low": sorted(p.low)}
 			row["tables"] = []
