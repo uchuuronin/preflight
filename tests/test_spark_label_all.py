@@ -173,3 +173,22 @@ def test_the_pilot_takes_both_kinds_and_refuses_too_few_rows():
 		with pytest.raises(SystemExit):
 			sla._pilot(items, bad)
 	assert sla._run_id(" R3 ") == sla._run_id("3") == "r3"
+
+
+def test_a_worker_that_fails_outside_the_call_releases_its_place(staged, monkeypatch):
+	"""Re-check, Nov 1: a client that can't be built left in_flight raised, and every waiting worker hung."""
+	from preflight.harness import spark
+
+	built = {"n": 0}
+
+	def make(cls, **kw):
+		built["n"] += 1
+		if built["n"] == 2:  # the first worker's own client (the first build is the model check)
+			raise RuntimeError("no client")
+		return FakeClient(**kw)
+
+	monkeypatch.setattr(spark.ModelClient, "baseten_spark_open", classmethod(make))
+	with pytest.raises(SystemExit):
+		sla.label(str(staged / "out"), None, batch=4, workers=2, budget=0.30)
+	summary = json.loads((staged / "out/spark_all_summary.json").read_text())
+	assert "no client" in summary["worker_error"] and summary["counted_usd"] >= summary["worst_call_usd"]

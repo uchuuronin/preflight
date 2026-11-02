@@ -222,49 +222,62 @@ def label(out_dir: str, limit: int | None, batch: int, workers: int, budget: flo
 				state["stopped"] = n if state["stopped"] is None else min(state["stopped"], n)
 				return
 			state["in_flight"] += 1
-		if not hasattr(local, "client"):
-			local.client = ModelClient.baseten_spark_open(max_output_tokens=MAX_OUTPUT)
-			local.client.timeout_s, local.client.deadline_s = TIMEOUT_S, 2.5 * TIMEOUT_S
-		client = local.client
-		before = len(client.calls)
-		got: dict[str, dict] = {}
-		err = None
+		# re-check, Nov 1: everything from here to the release is in try/finally, so a failure outside the call (the
+		# client, the call log) can't leave in_flight raised and hang every waiting worker; such a failure keeps the
+		# whole reservation as spent
+		cost, calls, got, err = worst, [], {}, None
 		try:
-			ans, _ = client.structured(
-				_messages(task, chunk),
-				_schema(MEM_LABELS if task == "memory" else DIV_LABELS),
-				purpose="label",
-				reasoning_effort="low",
-			)
-			for one in ans.labels:
-				got.setdefault(
-					_run_id(one.run), {"label": one.label, "confidence": one.confidence, "why": one.why[:300]}
+			if not hasattr(local, "client"):
+				local.client = ModelClient.baseten_spark_open(max_output_tokens=MAX_OUTPUT)
+				local.client.timeout_s, local.client.deadline_s = TIMEOUT_S, 2.5 * TIMEOUT_S
+			client = local.client
+			before = len(client.calls)
+			try:
+				ans, _ = client.structured(
+					_messages(task, chunk),
+					_schema(MEM_LABELS if task == "memory" else DIV_LABELS),
+					purpose="label",
+					reasoning_effort="low",
 				)
-		except (
-			Exception
-		) as exc:  # a refusal, a timeout or a schema miss: logged, the rows count as unlabelled
-			err = f"{type(exc).__name__}: {exc}"[:300]
-		calls = [c.model_dump(mode="json") for c in client.calls[before:]]
-		# a call that timed out records $0 though the provider may have billed it to the output cap: counted at one
-		# whole generation's worst case, half of `worst` (review, Nov 1: worst / 4 under-counted it)
-		cost = sum(c["cost_usd"] if c["ok"] or c["output_tokens"] else worst / 2 for c in calls)
-		with cond:
-			state["spent"] += cost
-			state["in_flight"] -= 1
-			cond.notify_all()
-			for c in calls:
-				calls_fh.write(json.dumps({"chunk": n, "task": task, "rows": len(chunk), **c}) + "\n")
-			for k, item in enumerate(chunk):
-				lab = got.get(f"r{k + 1}") or {"label": None, "error": err or "no answer for this run id"}
-				rows_fh.write(json.dumps({"row_id": item["row_id"], "task": task, "chunk": n, **lab}) + "\n")
-			rows_fh.flush()
-			calls_fh.flush()
+				for one in ans.labels:
+					got.setdefault(
+						_run_id(one.run),
+						{"label": one.label, "confidence": one.confidence, "why": one.why[:300]},
+					)
+			except Exception as exc:  # a refusal, a timeout or a schema miss: logged, the rows unlabelled
+				err = f"{type(exc).__name__}: {exc}"[:300]
+			calls = [c.model_dump(mode="json") for c in client.calls[before:]]
+			# a call that timed out records $0 though the provider may have billed it to the output cap: counted at
+			# one whole generation's worst case, half of `worst` (review, Nov 1: worst / 4 under-counted it)
+			cost = sum(c["cost_usd"] if c["ok"] or c["output_tokens"] else worst / 2 for c in calls)
+		except BaseException as exc:
+			err = err or f"worker: {type(exc).__name__}: {exc}"[:300]
+			raise
+		finally:
+			with cond:
+				state["spent"] += cost
+				state["in_flight"] -= 1
+				cond.notify_all()
+				for c in calls:
+					calls_fh.write(json.dumps({"chunk": n, "task": task, "rows": len(chunk), **c}) + "\n")
+				for k, item in enumerate(chunk):
+					lab = got.get(f"r{k + 1}") or {"label": None, "error": err or "no answer for this run id"}
+					rows_fh.write(
+						json.dumps({"row_id": item["row_id"], "task": task, "chunk": n, **lab}) + "\n"
+					)
+				rows_fh.flush()
+				calls_fh.flush()
 
 	t0 = time.monotonic()
-	with ThreadPoolExecutor(workers) as pool:
-		list(pool.map(run, enumerate(chunks)))
-	rows_fh.close()
-	calls_fh.close()
+	failed = None
+	try:
+		with ThreadPoolExecutor(workers) as pool:
+			list(pool.map(run, enumerate(chunks)))
+	except Exception as exc:  # the summary is written whatever a worker raised; the run then fails
+		failed = exc
+	finally:
+		rows_fh.close()
+		calls_fh.close()
 	done = [json.loads(x) for x in (out / "spark_all_labels.jsonl").read_text().splitlines()]
 	summary = {
 		"rows": len(items),
@@ -277,21 +290,11 @@ def label(out_dir: str, limit: int | None, batch: int, workers: int, budget: flo
 		"budget_usd": budget,
 		"wall_s": round(time.monotonic() - t0, 1),
 	}
+	summary["worker_error"] = None if failed is None else f"{type(failed).__name__}: {failed}"[:300]
 	(out / "spark_all_summary.json").write_text(json.dumps(summary, indent=1) + "\n")
-	print(
-		json.dumps(
-			{
-				"rows": len(items),
-				"chunks": len(chunks),
-				"rows_sent": len(done),
-				"labelled": sum(1 for r in done if r.get("label")),
-				"counted_usd": round(state["spent"], 4),
-				"stopped_at_chunk": state["stopped"],
-				"worst_call_usd": round(worst, 4),
-				"wall_s": round(time.monotonic() - t0, 1),
-			}
-		)
-	)
+	print(json.dumps(summary))
+	if failed is not None:
+		raise SystemExit(f"a worker failed: {summary['worker_error']}")
 
 
 # ---------------------------------------------------------------- score (local)
