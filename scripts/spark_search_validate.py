@@ -41,7 +41,9 @@ PLANTED = "https://github.com/huggingface/transformers/issues/987654321"  # made
 
 def main() -> None:
 	# `--shape first`: the first run's request again (03d0e5f), to tell Meta's variance from the shape's
-	shape = sys.argv[sys.argv.index("--shape") + 1] if "--shape" in sys.argv else "current"
+	shape = sys.argv[sys.argv.index("--shape") + 1] if "--shape" in sys.argv[:-1] else "current"
+	if shape not in ("current", "first"):
+		raise SystemExit(f"--shape {shape!r}: current or first")
 	name = "search_validate.json" if shape == "current" else f"search_validate_{shape}.json"
 	cases = json.loads(CASES.read_text())["cases"]
 	oom = next(c for c in cases if c["probe"]["error_code"] == "oom.eval")

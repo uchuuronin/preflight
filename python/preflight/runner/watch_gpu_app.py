@@ -15,8 +15,8 @@ Writes out/watch_gpu.json: the record's GPU and gpu_type knob, its time.step / t
 memory.peak estimates or why they abstained (the first row); per watch, steps a second, the last 40
 `[preflight]` lines and every alert.
 Its own app ("preflight-runner-d-watch"), an A10 only, the runner's probe image with this checkout's
-code, and the repository's flags.json as PREFLIGHT_FLAGS (as a clone's `preflight run` reads it; the
-image ships no flag file). Each row is printed as it's made, so a timeout keeps what ran. Cap: the
+code, and the repository's flags.json as PREFLIGHT_FLAGS (as a clone's `preflight run` reads it, without
+PREFLIGHT_ENV=production; the image ships no flag file). Each row is printed as it's made, so a timeout keeps what ran. Cap: the
 container's timeout (18 min) at the A10's US$1.10 an hour is US$0.33 [derived].
 """
 
@@ -125,6 +125,7 @@ def film_and_alert(src: str, flags_json: str = "{}") -> dict:
 		except (ValueError, KeyError, OSError) as exc:
 			row["record_error"] = f"{type(exc).__name__}: {exc}"[:300]
 			rows.append(row)
+			print(json.dumps(row, default=str)[:4000], flush=True)
 			return {"rows": rows, "container_s": round(time.monotonic() - t0, 1)}
 		rows.append(row)
 		print(json.dumps(row, default=str)[:4000], flush=True)

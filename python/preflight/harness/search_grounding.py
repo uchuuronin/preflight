@@ -420,9 +420,10 @@ def search_trace(data: dict) -> dict:
 	kinds = [
 		(i.get("action") or {}).get("type") if isinstance(i.get("action"), dict) else None for i in items
 	]
+	# results: the searches' own (`returned`, what a source is checked against); cited: distinct URLs cited inline
 	return {"web_search_call": bool(items), "searches": sum(k in (None, "search") for k in kinds),
-		"opens": sum(k == "open_page" for k in kinds), "results": sum(len(i.get("results") or []) for i in items),
-		"annotations": len(annotated_urls(data))}  # fmt: skip
+		"opens": sum(k == "open_page" for k in kinds), "results": len(returned(data)),
+		"cited": len(annotated_urls(data))}  # fmt: skip
 
 
 def ground_failure(
@@ -440,6 +441,8 @@ def ground_failure(
 	None, with its calls, when the call failed, nothing was searched, or the reply had no answer.
 	`shape="first"` sends the first validation run's request instead (comparison runs only); the
 	reply is read the same way. Every request logs its `search_trace`, and a finding carries it."""
+	if shape not in ("current", "first"):
+		raise ValueError(f"shape {shape!r}: current or first")
 	if skipped(probe, skip_codes):
 		return None, []
 	libs = ", ".join(f"{k} {v}" for k, v in sorted((env or {}).items()) if v)
@@ -466,8 +469,6 @@ def ground_failure(
 			f"The probe's recorded error (its end):\n{scrub(probe.error)[-ERROR_CHARS:]}\n\n{ANSWER}"
 		)
 		body = {"instructions": SYSTEM_FIRST, "input": first_user, "tools": [{"type": "web_search"}]}
-	elif shape != "current":
-		raise ValueError(f"shape {shape!r}: current or first")
 	before = len(client.calls)
 	try:
 		data, call = client.respond(body, purpose="search", reasoning_effort="low")

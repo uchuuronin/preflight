@@ -391,7 +391,7 @@ def test_the_first_runs_request_can_be_sent_again_and_every_request_is_traced():
 	assert "<error>" not in body["input"] and "data" not in body["instructions"]
 	ev = {e.metric: e.value for e in f.evidence}
 	assert ev["search.trace.web_search_call"] == 1.0 and ev["search.trace.searches"] == 1.0
-	assert ev["search.trace.opens"] == 1.0 and ev["search.trace.annotations"] == 1.0
+	assert ev["search.trace.opens"] == 1.0 and ev["search.trace.cited"] == 1.0
 	import pytest
 
 	with pytest.raises(ValueError):
