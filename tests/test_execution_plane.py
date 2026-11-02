@@ -528,8 +528,31 @@ def test_modals_own_capacity_wait_in_create_is_told_bounded_and_falls_back(monke
 	with SandboxRunner(slow_create, schedule_wait_s=0.1, wait_cap_s=0.2) as run:
 		r = run(spec("p2"), "L4", should_stop=lambda: False)
 	assert r.probe.error_code == "gpu.unavailable"
-	_time.sleep(0.6)
+	deadline = _time.monotonic() + 5
+	while not made[-1].terminated and _time.monotonic() < deadline:
+		_time.sleep(0.05)
 	assert made[-1].terminated  # ended when its create came back, never left running
+
+	class Cancelled(Exception):
+		pass
+
+	def cancel(kind, gpu, waited):
+		raise Cancelled()
+
+	with SandboxRunner(slow_create, schedule_wait_s=5.0, wait_cap_s=10.0) as run:  # a cancel mid-wait
+		run.notify = cancel
+		with pytest.raises(Cancelled):
+			run(spec("p3"), "L4", should_stop=lambda: False)
+	deadline = _time.monotonic() + 5
+	while not made[-1].terminated and _time.monotonic() < deadline:
+		_time.sleep(0.05)
+	assert made[-1].terminated  # the sandbox a cancelled wait had asked for is ended too
+
+	def bad(gpu):  # any other create error stays the probe's own
+		raise ValueError("'nope' is not a GPU Modal offers")
+
+	with SandboxRunner(bad) as run:
+		assert run(spec("p4"), "nope", should_stop=lambda: False).probe.error_code == "recorder"
 
 
 def test_a_failed_start_check_is_named_on_the_probe_that_lost_its_result():

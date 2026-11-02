@@ -89,8 +89,10 @@ class SandboxRunner:
 	def _create_within(self, gpu: str, image: str, wait_s: float, since: float):
 		"""The sandbox for gpu, or None when Modal couldn't schedule one within wait_s (its create
 		raised for capacity, or is still waiting: that sandbox is ended whenever create returns)."""
+		if wait_s <= 0:
+			return None
 		box: dict = {}
-		abandoned = threading.Event()
+		lock = threading.Lock()  # create's return and the give-up decide together who ends the sandbox
 
 		def go():
 			try:
@@ -98,24 +100,37 @@ class SandboxRunner:
 			except Exception as exc:
 				box["exc"] = exc
 				return
-			if abandoned.is_set():  # given up on: never billed past its start
+			with lock:
+				if box.get("abandoned"):  # given up on (a wait cap, a cancel): never billed past its start
+					with suppress_all():
+						sb.terminate()
+					return
+				box["sb"] = sb
+
+		def give_up() -> None:
+			with lock:
+				box["abandoned"] = True
+				sb = box.pop("sb", None)
+			if sb is not None:
 				with suppress_all():
 					sb.terminate()
-				return
-			box["sb"] = sb
 
 		th = threading.Thread(target=go, daemon=True)
 		th.start()
 		start = time.monotonic()
-		while th.is_alive():
-			left = wait_s - (time.monotonic() - start)
-			if left <= 0:
-				break
-			th.join(min(WAIT_NOTE_S, left))
-			if th.is_alive():
-				self._tell("waiting", gpu, self._clock() - since)
+		try:
+			while th.is_alive():
+				left = wait_s - (time.monotonic() - start)
+				if left <= 0:
+					break
+				th.join(min(WAIT_NOTE_S, left))
+				if th.is_alive():
+					self._tell("waiting", gpu, self._clock() - since)  # a cancel raises here
+		except BaseException:
+			give_up()
+			raise
 		if th.is_alive():
-			abandoned.set()
+			give_up()
 			log.warning("no %s sandbox created in %.0f s", gpu, wait_s)
 			return None
 		exc = box.get("exc")
@@ -182,12 +197,20 @@ class SandboxRunner:
 			# Modal's create for a GPU sandbox itself waits for scheduling (up to 21 min in the SDK) and
 			# then raises "Insufficient capacity": that wait is told, bounded and falls back like the
 			# start check's, instead of ending as a probe "without a result" (review, Nov 2)
+			began = self._clock()
 			sb = self._create_within(g, image, budget, t)
+			if sb is not None:
+				self.ready_error = None  # an earlier GPU's capacity error isn't this sandbox's
 			# wait out the GPU queue before any clock starts: neither the probe's time limit nor its
-			# cost counts the minutes Modal spent finding a GPU (no container runs, nothing is billed)
-			if sb is not None and self._ready(
-				sb, max(0.0, budget - (self._clock() - t)) if last else budget, g, t
-			):
+			# cost counts the minutes Modal spent finding a GPU (no container runs, nothing is billed);
+			# this GPU's budget covers create and the start check together
+			try:
+				up = sb is not None and self._ready(sb, max(0.0, budget - (self._clock() - began)), g, t)
+			except BaseException:  # a cancel while the start check waits: the sandbox isn't left running
+				with suppress_all():
+					sb.terminate()
+				raise
+			if up:
 				break
 			self.unscheduled.append(g)
 			if sb is not None:
@@ -250,8 +273,10 @@ class SandboxRunner:
 			r.probe = r.probe.model_copy(update={"error": f"{exc}{why}", "error_code": "gpu.unavailable",
 				"extras": {**r.probe.extras, "gpu_wait_s": round(self.last_wait_s, 1)}})  # fmt: skip
 			return _timed(r, spec, 0.0)
-		except Exception:
+		except Exception as exc:
 			self.ready_error = None
+			if type(exc).__name__ == "Cancelled":  # the job was cancelled while it waited: the worker ends it
+				raise
 			log.warning("probe %s: no sandbox on %s", spec.probe_id, gpu, exc_info=True)
 			self.close()
 			self.last_ran = gpu
