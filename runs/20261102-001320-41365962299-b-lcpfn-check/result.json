@@ -1,0 +1,11 @@
+{
+	"name": "20261102-001320-41365962299-b-lcpfn-check",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41365962299",
+	"ref": "ws-b",
+	"sha": "f979aae41f047699b0fa4d493a64370a2de7ea1f",
+	"cmd": "modal run --env main python/preflight/corpus/lcpfn_app.py::check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T00:14:11Z"
+}
