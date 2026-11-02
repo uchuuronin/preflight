@@ -1,0 +1,9 @@
+FAIL share page answers: HTTP 503
+ok   preview title: A Preflight flight record · Preflight
+ok   preview description: A flight record from Preflight, the flight simulator for ML jobs.
+FAIL names its card
+ok   sends people to the cockpit
+ok   no 'Not trusted' wording
+ok   card image: HTTP 200 image/png
+FAIL badge: HTTP 503 image/svg+xml; charset=utf-8
+FAIL app's API still answers beside them: HTTP 503
