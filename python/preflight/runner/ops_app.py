@@ -857,6 +857,13 @@ def diagnose(share: str, max_usd: float = 0.5):
 # ---------------------------------------------------------------- triage of a stored probe (paid: ask first)
 
 
+def _ours(rec) -> bool:
+	"""A stored record holding only our own zoo code's output: a sample, not derived from one (a probe
+	or verify may carry a visitor's patch), with no visitor arguments (review, Nov 1)."""
+	src = rec.job.source
+	return src.kind == "sample" and rec.parent_id is None and not getattr(src, "args", None)
+
+
 @ops.function(
 	image=worker_image,
 	secrets=[modal.Secret.from_name("preflight-glimmer"), modal.Secret.from_name("preflight-baseten")],
@@ -877,13 +884,13 @@ def triage_hosted(record_json: str, probe_id: str, provider: str = "glimmer") ->
 	rec = load_record(record_json)
 	# our own zoo scripts only: a visitor's record holds their error text, which would land in the
 	# run log and out/ on the remote-runs branch, and a private one must never reach Baseten (review)
-	if rec.job.source.kind != "sample":
-		return {"error": "only a sample (zoo) record is triaged here"}
+	if not _ours(rec):
+		return {"error": "only a sample (zoo) record, not derived and without arguments, is triaged here"}
 	probe = next((p for p in rec.probes if p.id == probe_id), None)
 	if probe is None:
 		return {"error": f"no probe {probe_id!r}: {[p.id for p in rec.probes]}"}
-	if probe.status in ("ok", "cached") or not probe.error:
-		return {"error": f"probe {probe_id} finished or has no recorded error: nothing to triage"}
+	if probe.status in ("ok", "cached") or not probe.error or probe.extras.get("patched"):
+		return {"error": f"probe {probe_id} finished, has no recorded error or ran patched code: not triaged"}
 	if provider == "glimmer":
 		if not ModelClient.glimmer_configured():
 			return {"error": "the preflight-glimmer secret has no GLIMMER_BASE_URL"}
@@ -948,23 +955,37 @@ def triage_agreement_hosted(max_usd: float = 1.0, limit: int = 40) -> dict:
 
 	if not flag("harness.spark_open_triage"):
 		return {"error": "harness.spark_open_triage is off here"}
-	cases, seen = [], set()
+	import re
+
+	cases, seen, unreadable = [], set(), 0
 	for path in sorted(Path("/records").glob("*.json")):
 		try:
 			rec = load_record(path.read_text())
 		except Exception:
+			unreadable += 1
 			continue
-		if rec.job.source.kind != "sample":
+		if not _ours(rec):
 			continue
-		stored = {f.id.split(".", 1)[1]: f.code for f in rec.findings if f.source == "spark_open_triage"}
+		# the record's own Spark Open triage (Glimmer findings share the source; their title names it)
+		stored = {f.id.split(".", 1)[1]: f.code for f in rec.findings
+			if f.source == "spark_open_triage" and f.title.startswith("Spark Open")}  # fmt: skip
 		for p in rec.probes:
-			if p.status in ("ok", "cached") or not p.error:
+			if p.status in ("ok", "cached") or not p.error or p.extras.get("patched"):
 				continue
-			key = hashlib.sha256(f"{rec.job.source.uri}|{p.error}".encode()).hexdigest()
+			# one failure seen on many records counts once: the numbers in its message (bytes, steps) aside
+			shape = re.sub(r"\d[\d,.]*", "#", p.error)
+			key = hashlib.sha256(f"{rec.job.source.uri}|{p.error_code}|{shape}".encode()).hexdigest()
 			if key in seen:
 				continue
 			seen.add(key)
-			cases.append((rec, p, stored.get(p.id)))
+			cases.append(
+				{
+					"uri": rec.job.source.uri,
+					"record_id": rec.record_id,
+					"probe": p,
+					"stored": stored.get(p.id),
+				}
+			)
 	cases = cases[:limit]
 	glim, spark = ModelClient.glimmer(), ModelClient.baseten_spark_open()
 	spent = lambda: sum(c.cost_usd for c in glim.calls + spark.calls)  # noqa: E731
@@ -972,18 +993,24 @@ def triage_agreement_hosted(max_usd: float = 1.0, limit: int = 40) -> dict:
 		glim.deadline_s * glim.usd_per_second
 	) + 0.01  # one Glimmer call at its longest, plus Spark Open's
 	rows, t0 = [], time.monotonic()
-	for rec, p, stored_code in cases:
+	for case in cases:
+		p, stored_code = case["probe"], case["stored"]
 		if spent() + worst > max_usd:
 			break
 		g, _ = triage_probe(glim, p, "")
 		o, _ = triage_probe(spark, p, "")
-		rows.append({"script": rec.job.source.uri, "record_id": rec.record_id, "probe": p.id, "status": p.status,
+		rows.append({"script": case["uri"], "record_id": case["record_id"], "probe": p.id, "status": p.status,
 			"error_code": p.error_code, "glimmer": g.code if g else None, "spark_open": o.code if o else None,
 			"stored_spark_open": stored_code, "glimmer_quoted": bool(g and "no log line quoted" not in g.detail),
 			"spark_open_quoted": bool(o and "no log line quoted" not in o.detail)})  # fmt: skip
 		print(f"[agree] {rows[-1]}", flush=True)
 	both = [r for r in rows if r["glimmer"] and r["spark_open"]]
-	return {"cases_found": len(cases), "rows": rows, "both_answered": len(both),
+	stored_rows = [r for r in rows if r["stored_spark_open"]]
+	return {"cases_found": len(cases), "unreadable_records": unreadable, "rows": rows, "both_answered": len(both),
+		"no_answer": {"glimmer": sum(not r["glimmer"] for r in rows), "spark_open": sum(not r["spark_open"] for r in rows)},
+		# Spark Open on the error alone against its own stored finding (log tail and error): what dropping the tail costs
+		"spark_open_vs_stored": [sum(r["spark_open"] == r["stored_spark_open"] for r in stored_rows if r["spark_open"]),
+			sum(1 for r in stored_rows if r["spark_open"])],
 		"agree_same_input": sum(r["glimmer"] == r["spark_open"] for r in both),
 		"with_stored": sum(1 for r in rows if r["glimmer"] and r["stored_spark_open"]),
 		"agree_stored": sum(r["glimmer"] == r["stored_spark_open"] for r in rows if r["glimmer"] and r["stored_spark_open"]),
@@ -1015,7 +1042,9 @@ def triage_agreement(max_usd: float = 1.0, limit: int = 40):
 	n, k = res["both_answered"], res["agree_same_input"]
 	print(f"[agree] same input: {k} of {n} agree (Wilson 95% {wilson(k, n)}); "
 		f"against the stored finding: {res['agree_stored']} of {res['with_stored']} ({wilson(res['agree_stored'], res['with_stored'])}); "
-		f"{res['cases_found']} distinct failed probes; spent {res['usd']}", flush=True)  # fmt: skip
+		f"{res['cases_found']} distinct failed probes, no answer {res['no_answer']}; Spark Open on the error alone vs its "
+		f"stored finding {res['spark_open_vs_stored']}; {res['unreadable_records']} records unreadable; spent {res['usd']}",
+		flush=True)  # fmt: skip
 
 
 # ---------------------------------------------------------------- serving image (CPU, before any serving probe)
