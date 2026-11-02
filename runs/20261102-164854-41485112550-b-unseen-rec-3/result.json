@@ -1,0 +1,11 @@
+{
+	"name": "20261102-164854-41485112550-b-unseen-rec-3",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41485112550",
+	"ref": "ws-b",
+	"sha": "89a965348f43cda364589f01cfe1bd9752c731f2",
+	"cmd": "modal run --env main api/record_export_app.py::export --record-id 01M6EG9JEXR64QDNXEAS9YKGSV --name unseen-3-first",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:49:23Z"
+}
