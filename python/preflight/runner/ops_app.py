@@ -330,6 +330,9 @@ def smoke(
 	dir: str = "",
 	entrypoint: str = "",
 	args: str = "",
+	repo: str = "",
+	commit: str = "",
+	edit_hex: str = "",
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
@@ -337,7 +340,11 @@ def smoke(
 	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder (to an
 	A100). --visitor: the queue's visitor (3 probe jobs a day each). --notebook path: check in an
 	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are).
-	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload. The job
+	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload.
+	--repo https://github.com/<owner>/<repo> --commit <40-hex> [--entrypoint ...] [--args=...]: a public
+	repo at a commit, sent as kind repo, as a visitor's GitHub link is (Monday's unseen scripts).
+	--edit-hex: exact replacements in the repo's files (see _apply_edits), sent as an upload of the
+	edited files, as a visitor who edited them would; only the unseen list's own "Change" lines. The job
 	is cancelled after `max_minutes`, or if this run fails partway. The job store is looked up in
 	the environment `modal run --env` names (modal_env overrides it). Writes out/smoke.json (every
 	event and the final status, or the error) and out/record.json (the flight record), which
@@ -353,8 +360,23 @@ def smoke(
 		if nb.suffix != ".ipynb" or Path(__file__).resolve().parents[3] not in nb.parents:
 			raise SystemExit(f"{notebook!r} isn't an .ipynb file in this checkout")
 		source = {"kind": "notebook", "files": {nb.name: nb.read_text()}}
-	if (entrypoint or args) and not dir:
-		raise SystemExit("--entrypoint and --args go with --dir (a sample or notebook names its own)")
+	if (entrypoint or args) and not (dir or repo):
+		raise SystemExit(
+			"--entrypoint and --args go with --dir or --repo (a sample or notebook names its own)"
+		)
+	if edit_hex and not repo:
+		raise SystemExit("--edit-hex goes with --repo")
+	if repo and edit_hex:  # the edited files, as an upload: the runner can't edit a repo it clones
+		from preflight.runner.sources import _clone
+
+		files, sha = _clone(repo, commit or None)
+		files = _apply_edits(files, edit_hex)
+		print(f"[smoke] {repo} at {sha}, edited, as an upload of {len(files)} files", flush=True)
+		source = {"kind": "upload", "files": files, **({"entrypoint": entrypoint} if entrypoint else {}),
+			**({"args": _split_args(args)} if args else {})}  # fmt: skip
+	elif repo:  # the runner clones it (runner/sources._clone), exactly as for a visitor's link
+		source = {"kind": "repo", "uri": repo, "commit": commit or None,
+			**({"entrypoint": entrypoint} if entrypoint else {}), **({"args": _split_args(args)} if args else {})}  # fmt: skip
 	if dir:  # any directory in this checkout, checked in as a visitor's upload (Monday's unseen scripts);
 		# _read_tree reads the text files the runner reads (data files such as .csv aren't sent)
 		from preflight.runner.sources import _read_tree
@@ -427,7 +449,7 @@ GROUND_TRUTH_GPUS = ["L4", "A10"]
 
 def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict,
 	entrypoint: str | None = None, args: tuple = (), install_requirements: bool = False,
-	generate_sample: int = 0, generate_calls: int = 0) -> dict:  # fmt: skip
+	generate_sample: int = 0, generate_calls: int = 0, install_repo: bool = False) -> dict:  # fmt: skip
 	"""recorder/ground_truth.py on this function's GPU: a bare run (the full run), then a recorder
 	run alternating clean and synced steps, and the paired overhead. The AMD droplet runs the same."""
 	from preflight.probes import remote
@@ -440,7 +462,7 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
 		budget_s=budget_s, files=files, entrypoint=entrypoint, args=tuple(args),
 		install_requirements=install_requirements, generate_sample=generate_sample,
-		generate_calls=generate_calls)  # fmt: skip
+		generate_calls=generate_calls, install_repo=install_repo)  # fmt: skip
 
 
 # weights read-only: an unseen third-party script runs as root in the bare run, and must not be
@@ -478,11 +500,45 @@ def ground_truth_titan_on_a10(*a, **kw) -> dict:
 	return _ground_truth(*a, **kw)
 
 
+# A100-80GB only where Chiya approves it (Nov 2: the unseen list's 7B LoRA and its GRPO run); never asked
+# for by default, and the image is the same probe or serving image the L4 runs use
+@ops.function(**{**_GT, "image": probe_image}, gpu="A100-80GB")
+def ground_truth_on_a100(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": serving_image}, gpu="A100-80GB")
+def ground_truth_serving_on_a100(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
 GT_FUNCTIONS = {
+	("probe", "A100"): ground_truth_on_a100, ("serving", "A100"): ground_truth_serving_on_a100,
 	("probe", "L4"): ground_truth_on_l4, ("probe", "A10"): ground_truth_on_a10,
 	("serving", "L4"): ground_truth_serving_on_l4, ("serving", "A10"): ground_truth_serving_on_a10,
 	("titan", "L4"): ground_truth_titan_on_l4, ("titan", "A10"): ground_truth_titan_on_a10,
 }  # fmt: skip
+
+
+def _apply_edits(files: dict, edit_hex: str) -> dict:
+	"""files with exact replacements made: edit_hex is the hex of a JSON {path: [[old, new], ...]}
+	(hex, since remote-run.yml's command allows no quotes or brackets). Each old string must occur
+	exactly once in its file, so an edit can't land somewhere it wasn't meant to; each edit is printed."""
+	import json
+
+	edits = json.loads(bytes.fromhex(edit_hex).decode())
+	out = dict(files)
+	for path, pairs in edits.items():
+		if path not in out:
+			raise SystemExit(f"--edit-hex: {path} isn't in the repo's files")
+		for old, new in pairs:
+			if out[path].count(old) != 1:
+				raise SystemExit(
+					f"--edit-hex: {old!r} occurs {out[path].count(old)} times in {path}, not once"
+				)
+			out[path] = out[path].replace(old, new)
+			print(f"[edit] {path}: {old!r} -> {new!r}", flush=True)
+	return out
 
 
 def _split_args(args: str) -> list[str]:
@@ -509,6 +565,10 @@ def ground_truth(
 	args: str = "",
 	first_gpu: str = "L4",
 	install_requirements: bool = False,
+	repo: str = "",
+	commit: str = "",
+	edit_hex: str = "",
+	install_repo: bool = False,
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -519,39 +579,66 @@ def ground_truth(
 	--script: a zoo script; --dir: any directory in this checkout (Monday's unseen scripts, from the
 	validation-freeze tag). The entrypoint is the one named, else train.py, main.py, serve.py or
 	run.py. The image follows the script: vLLM scripts the serving image, torchtitan its own.
-	--first-gpu A10 tries the A10 before the L4 (the L4 queued 19 to 59 min on Nov 1); never an
-	L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
+	--repo URL --commit SHA: a public GitHub repo at a commit, read as the runner reads a visitor's link
+	(runner/sources._clone: text files only, the same size caps), here on the machine that runs this.
+	--first-gpu A10 tries the A10 before the L4 (the L4 queued 19 to 59 min on Nov 1); A100 runs on an
+	A100-80GB only (approved runs only); never an L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
 	Writes out/ground_truth_<name>.json."""
 	import json
 
+	from preflight.harness.static import ScriptParseError
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
 
 	root = Path(__file__).resolve().parents[3]
-	if bool(script) == bool(dir):
-		raise SystemExit("name a zoo script (--script) or a directory in this checkout (--dir), not both")
+	if sum(map(bool, (script, dir, repo))) != 1:
+		raise SystemExit(
+			"name one of a zoo script (--script), a directory in this checkout (--dir) or a repo (--repo)"
+		)
 	if script:
 		if script not in ZOO_SCRIPTS:
 			raise SystemExit(
 				f"{script!r} isn't a GPU zoo script: {sorted(ZOO_SCRIPTS)} (agent_eval_spark: agent_sample)"
 			)
 		src = root / "zoo" / script
-	else:
+	elif dir:
 		src = (root / dir).resolve()
 		if root not in src.parents or not src.is_dir():
 			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
-	files = _read_tree(src)
-	p = plan(files, entrypoint or None)
+	if repo:
+		from preflight.runner.sources import _clone
+
+		files, sha = _clone(repo, commit or None)
+		if edit_hex:
+			files = _apply_edits(files, edit_hex)
+		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
+		print(f"[ground truth] {repo} at {sha}: {len(files)} files", flush=True)
+	else:
+		files = _read_tree(src)
+	try:
+		p = plan(files, entrypoint or None)
+	except ScriptParseError as exc:
+		# the mapper only picks the image and the probe's sample sizes here; a full run doesn't need
+		# it, so a repo the mapper can't read still gets its full run, in the probe image (Nov 2: the
+		# unseen torchtune repo, "too large to map", ended the ground truth before the script ran)
+		print(f"[ground truth] the mapper couldn't read it ({exc}); probe image, no lens", flush=True)
+		from preflight.recorder.ground_truth import entrypoint_of
+
+		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
+			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
 	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
-	first = "A10" if first_gpu.upper() == "A10" else "L4"
+	first = first_gpu.upper() if first_gpu.upper() in ("A10", "A100") else "L4"
+	if (image, first) not in GT_FUNCTIONS:
+		raise SystemExit(f"no {first} ground-truth function for the {image} image")
 	fn = GT_FUNCTIONS[(image, first)]
 	name = script or src.name
 	print(f"[ground truth] {name}: {entry}, lens {p['lens']}, {image} image, {len(files)} files; "
-		f"waiting for an {first}, else the {'L4' if first == 'A10' else 'A10'} (Modal queues it)", flush=True)  # fmt: skip
+		f"waiting for an {first}" + ("" if first == "A100" else f", else the {'L4' if first == 'A10' else 'A10'}")
+		+ " (Modal queues it)", flush=True)  # fmt: skip
 	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(_split_args(args)),
-		install_requirements, sample, p["generate_calls"])  # fmt: skip
+		install_requirements, sample, p["generate_calls"], install_repo)  # fmt: skip
 	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{name}.json").write_text(json.dumps(res, indent=2))
@@ -827,6 +914,10 @@ def agent_sample(
 	provider: str = "meta",
 	label_mbpp: int = 0,
 	full: bool = False,
+	repo: str = "",
+	commit: str = "",
+	entrypoint: str = "",
+	edit_hex: str = "",
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
 	--full: a half of the full benchmark (--k 250, then --k 250 --skip-from the first half's output
@@ -838,8 +929,19 @@ def agent_sample(
 	from preflight.recorder.agent import task_key
 	from preflight.runner.sources import _read_tree
 
-	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
-	entry = next((e for e in ("run.py", "train.py") if e in files), None)
+	if repo:  # a public repo at a commit (Monday's unseen agent script), read as the runner reads one
+		from preflight.runner.sources import _clone
+
+		files, sha = _clone(repo, commit or None)
+		files = _apply_edits(files, edit_hex) if edit_hex else files
+		script = repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1]
+		entry = entrypoint or None
+		print(f"[agent] {repo} at {sha}: {len(files)} files", flush=True)
+		if entry not in files:
+			raise SystemExit(f"--entrypoint {entrypoint!r} isn't in the repo's files")
+	else:
+		files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
+		entry = next((e for e in ("run.py", "train.py") if e in files), None)
 	if entry is None:
 		raise SystemExit(f"zoo/{script} has no run.py or train.py in this checkout")
 	skip = []

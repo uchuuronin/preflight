@@ -148,6 +148,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"seed": spec.seed,
 		"seed_force": spec.seed_force,
 		"install_requirements": spec.install_requirements,
+		**({"install_repo": True} if spec.install_repo else {}),  # absent: keys stay as they were
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
@@ -299,10 +300,19 @@ def _spec(
 		seed=p.seed,
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
+		install_repo=deps.install_requirements and _repo_install_on(),
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
 	)
+
+
+def _repo_install_on() -> bool:
+	"""probes.repo_install (off): a repo with no requirements.txt gets what it declares and the known
+	packages it imports (Nov 2: the unseen scripts stopped at their imports)."""
+	from .flags import flag
+
+	return flag("probes.repo_install")
 
 
 def _run_point(spec: ProbeSpec, gpu: str, deps: Deps, ctx) -> tuple[ProbeResult | None, Probe | None]:
