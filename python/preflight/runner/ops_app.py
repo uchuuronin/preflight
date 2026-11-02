@@ -331,7 +331,9 @@ def smoke(
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
 	Probes stay on `gpus` (comma-separated): L4 by default, since team runs use T4 or L4 unless
-	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder. The job
+	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder (to an
+	A100). --visitor: the queue's visitor (3 probe jobs a day each). --notebook path: check in an
+	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are). The job
 	is cancelled after `max_minutes`, or if this run fails partway. The job store is looked up in
 	the environment `modal run --env` names (modal_env overrides it). Writes out/smoke.json (every
 	event and the final status, or the error) and out/record.json (the flight record), which
@@ -349,12 +351,7 @@ def smoke(
 		source = {"kind": "notebook", "files": {nb.name: nb.read_text()}}
 	request = {
 		"source": source,
-		# "any": no constraint, the request a visitor's sample makes, so its probes warm the cache
-		**(
-			{}
-			if gpus == "any"
-			else {"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]}}
-		),
+		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
 	}
 	out = Path("out")
 	out.mkdir(exist_ok=True)
