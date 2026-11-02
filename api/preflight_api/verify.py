@@ -105,7 +105,17 @@ def _metric(rec: dict, probe: dict, metric: str) -> float | None:
 	if probe.get("status") == "oom" and metric.startswith(("memory.", "risk.")):
 		return math.inf  # ran out of memory: worse than any measured peak
 	mem = probe.get("memory") or {}
+	extras = probe.get("extras") or {}
+	if metric == "memory.eval_peak":
+		# an eval fix is judged on the eval pass itself (A's verify design, Nov 1)
+		v = (probe.get("eval") or {}).get("peak_allocated_bytes")
+		return float(v) if isinstance(v, int | float) and v > 0 else None
 	if metric == "memory.peak":
+		# a verify window ends with one eval, whose graph can outlive it into the last steps:
+		# training's own peak is the steps before it, when the probe measured that
+		v = extras.get("train_peak_before_eval_bytes")
+		if isinstance(v, int | float) and v > 0:
+			return float(v)
 		v = mem.get("peak_allocated_bytes") or mem.get("peak_reserved_bytes")
 		return float(v) if v else None
 	if metric.startswith("memory."):

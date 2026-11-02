@@ -58,6 +58,7 @@ TEMPLATES: dict[str, Template] = {
 			"`evaluate()` (custom loops and callbacks included) run without building a gradient "
 			"graph: wrap it in `torch.no_grad()` (or `torch.inference_mode()`), and keep only "
 			"detached numbers (`.item()`) from it. Trainer's own `evaluate()` already does this.",
+			metric="memory.eval_peak",
 			keep_eval=True,
 		),
 		Template(
@@ -68,6 +69,7 @@ TEMPLATES: dict[str, Template] = {
 			"Set the evaluation batch size to {value}. Change only the evaluation batch size; the "
 			"training batch size, gradient accumulation, the evaluation data and every other setting "
 			"stay as they are.",
+			metric="memory.eval_peak",
 			keep_eval=True,
 		),
 		Template(

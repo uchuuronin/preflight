@@ -104,6 +104,8 @@ VALID_STATUS = {"ok", "oom", "error", "timeout", "cancelled"}
 
 # Probe.extras keys B reads by name (docs/requests.md, B -> A); keep them stable
 EXTRAS_KEYS = (
+	# training's peak allocated bytes up to the first eval pass (verify windows end with one; A, Nov 1)
+	"train_peak_before_eval_bytes",
 	"params_total",
 	"params_trainable",
 	"tokens_per_step",

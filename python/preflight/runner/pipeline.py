@@ -629,9 +629,12 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 		base = {k: base_knobs[k] for k in knobs if k in base_knobs}
 		plan.append(point_probe(rec, f"{vid}-base", base, role="verify_base", **steps))
 		plan.append(point_probe(rec, f"{vid}-seed", base, role="verify_seed", **steps))
+	from preflight.probes.plan import pull_verify_eval
+
 	for p in plan:
 		p.seed = record_jobs.VERIFY_SEED_2 if p.role == "verify_seed" else record_jobs.VERIFY_SEED
 		p.seed_force = True
+		pull_verify_eval(rec, p)  # every side, so an eval fix reads before and after
 	return plan
 
 
@@ -880,11 +883,14 @@ def _probe_points(
 		fits = out.probe.status != "oom" or out.probe.error_code == "oom.eval"
 		if i == 0 and len(ladder.tried) > 1 and fits:
 			gpu = ladder.tried[-1]  # the GPU that held the current settings runs the smaller points too
-		if out.probe.status == "oom" and out.probe.error_code == "oom.eval":
+		# A verify side's eval running out is that side's result ("before failed"), never re-run with
+		# the eval off (A's design, Nov 1): a re-run would compare training alone with a patched eval.
+		if out.probe.status == "oom" and out.probe.error_code == "oom.eval" and p.role not in VERIFY_ROLES:
 			try:
 				# the eval batch ran out, not training: same GPU, eval off; the eval probe keeps
 				# its memory per batch so the guide can say where it ran out
-				again = run(ladder.tried[-1], spec=_spec(fetched, sm, p, deps, eval_off=True))
+				# the point's own code, patched when the job carries a patch (A's review, Nov 1)
+				again = run(ladder.tried[-1], spec=_spec(use_f, use_sm, p, deps, eval_off=True))
 				probes.append(out.probe.model_copy(update={"id": f"{p.probe_id}-eval"}))
 				if isinstance(out, ProbeResult):
 					# its own id, as in the record: the eval-off re-run below is the point's p-id
@@ -917,6 +923,9 @@ def _probe_points(
 			a.probe.cost.usd for a in attempts if isinstance(a, ProbeResult) and id(a) not in kept_ids
 		)
 	return probes, results, gpu, discarded_usd
+
+
+VERIFY_ROLES = ("verify", "verify_base", "verify_seed")
 
 
 def _marked_eval_off(out, rec: FlightRecord):

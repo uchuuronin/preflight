@@ -109,6 +109,19 @@ def _pull_cadence(rec: FlightRecord, p: PlannedProbe) -> None:
 		p.overrides["checkpoint_every"] = end - 2
 
 
+def pull_verify_eval(rec: FlightRecord, p: PlannedProbe) -> None:
+	"""One eval near the end of a verify window, on every side (A's design, from-a.md, Nov 1): the
+	eval runs once, two steps before the end (inside the window whether the script counts steps from
+	0 or 1), so an eval fix is tested on both sides, and the steps before it give training's own peak
+	(extras.train_peak_before_eval_bytes). No checkpoint and no profile: the window answers one question."""
+	end = p.warmup + p.timed
+	if _int_knob(rec, "eval_every") is not None:
+		p.overrides["eval_every"] = end - 2
+		p.eval_batches = EVAL_BATCHES
+	elif any(k.id in ("eval_batch_size", "eval_no_grad") for k in rec.knobs):
+		p.eval_batches = EVAL_BATCHES
+
+
 def next_probe_id(rec: FlightRecord, prefix: str = "p") -> str:
 	"""The next free id after the record's probes (p4 after p1..p3; v1, v2 for verify runs)."""
 	# probes, and probes that findings still name (a verify finding keeps its run's id)

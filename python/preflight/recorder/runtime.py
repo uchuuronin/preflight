@@ -381,6 +381,7 @@ class Recorder:
 		self._eval_batches_now = 0
 		self.evals: list[dict] = []
 		self._eval_peak_stash = 0
+		self._train_peak_before_eval: int | None = None
 		# io, generation, logs, scalers, sampler
 		self._io_depth = 0
 		self.gens: list[dict] = []
@@ -798,6 +799,11 @@ class Recorder:
 			self._eval_batches_now = 0
 			if self.cuda and torch.cuda.is_initialized():
 				self._eval_peak_stash = max(self._eval_peak_stash, torch.cuda.max_memory_allocated())
+				if self._train_peak_before_eval is None:
+					# A's verify design (Nov 1): training's own peak up to the first eval, so a verify
+					# window that ends with an eval still has training's peak apart from the eval's
+					steps_peak = max((s["peak"] or 0 for s in self.steps), default=0)
+					self._train_peak_before_eval = max(steps_peak, self._eval_peak_stash)
 				torch.cuda.reset_peak_memory_stats()
 			self.evals.append({"batch_size": None, "grad_enabled": None, "peak": None})
 			self._progress()
@@ -1667,6 +1673,7 @@ class Recorder:
 							and any(not p.is_contiguous() for p in convs))  # fmt: skip
 		out.update({k: v for k, v in self.run_length.items() if v is not None})
 		out["host_rss_peak_bytes"] = self._rss_peak or None
+		out["train_peak_before_eval_bytes"] = self._train_peak_before_eval or None
 		if self._kernels is not None:
 			out["kernels"] = self._kernels
 		if self._roots:

@@ -106,3 +106,32 @@ def test_a_run_sized_by_epochs_compares_tokens_per_step():
 	more = fixed(extras={"samples_per_step": 4, "tokens_per_step": 4096})
 	more["job"] = copy.deepcopy(epochs["job"])
 	assert [c["id"] for c in check(before, more)["checks"] if c["ok"] is False] == ["tokens_seen"]
+
+
+# A's verify design (Nov 1): every side ends with one eval, judged on its own for an eval fix.
+EVAL = {"batches": 2, "batch_size": 32, "loader_batches": 33, "grad_enabled": True}
+
+
+def test_an_eval_fix_is_judged_on_the_eval_pass_not_trainings_peak():
+	before = record(probe={"status": "oom", "error_code": "oom.eval", "eval": {**EVAL, "batches": 1}})
+	after = fixed(eval={**EVAL, "peak_allocated_bytes": 12 * GIB, "grad_enabled": False})
+	res = check(before, after, metric="memory.eval_peak", keep_eval=True, no_grad=True)
+	assert res["status"] == "passed", res["checks"]
+	assert res["after"] == 12 * GIB
+
+
+def test_an_eval_fix_that_still_runs_out_fails():
+	before = record(probe={"status": "oom", "error_code": "oom.eval", "eval": EVAL})
+	after = record(probe={"status": "oom", "error_code": "oom.eval", "eval": EVAL})
+	res = check(before, after, metric="memory.eval_peak", keep_eval=True)
+	assert res["status"] == "failed" and res["checks"][0]["detail"] == "out of memory both times"
+
+
+def test_a_training_memory_fix_reads_trainings_peak_before_the_windows_eval():
+	"""The eval's graph can outlive it into the last steps; training's own peak is the steps before."""
+	before = record(probe={"memory": {"peak_allocated_bytes": 95 * GIB}, "extras": {"samples_per_step": 4,
+		"tokens_per_step": 8192, "train_peak_before_eval_bytes": 80 * GIB}})  # fmt: skip
+	after = record(probe={"memory": {"peak_allocated_bytes": 94 * GIB}, "extras": {"samples_per_step": 4,
+		"tokens_per_step": 8192, "train_peak_before_eval_bytes": 60 * GIB}})  # fmt: skip
+	res = check(before, after)
+	assert res["before"] == 80 * GIB and res["after"] == 60 * GIB and res["checks"][0]["ok"] is True
