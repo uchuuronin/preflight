@@ -63,7 +63,15 @@ def _wilson(k: int, n: int) -> tuple[float, float]:
 	return conformal.wilson(k, n)
 
 
-def score(curves_path: Path, pfn_path: Path) -> dict:
+def _power(args: tuple[list[float], int]):
+	from preflight.engine import lossforecast as lf
+
+	return lf.forecast(*args)
+
+
+def score(curves_path: Path, pfn_path: Path, jobs: int = 1) -> dict:
+	from concurrent.futures import ProcessPoolExecutor
+
 	from preflight.engine import lossforecast as lf
 
 	with gzip.open(curves_path, "rt") as f:
@@ -76,9 +84,14 @@ def score(curves_path: Path, pfn_path: Path) -> dict:
 			m: {"covered": 0, "scored": 0, "abstained": 0, "log_err": []}
 			for m in ("power", "lcpfn", "ensemble")
 		}
-		for c in doc["curves"]:
-			truth, last = c["truth"], c["steps"]
-			power = lf.forecast(c["seen"][:seen], last)
+		work = [(c["seen"][:seen], c["steps"]) for c in doc["curves"]]
+		if jobs > 1:  # about a second a curve (a 200-draw block bootstrap), so the pool is worth it
+			with ProcessPoolExecutor(jobs) as ex:
+				powers = list(ex.map(_power, work, chunksize=8))
+		else:
+			powers = [_power(w) for w in work]
+		for c, power in zip(doc["curves"], powers, strict=True):
+			truth = c["truth"]
 			q = pfn_by.get((c["key"], seen))
 			qs = None if q is None or q.get("q") is None else tuple(q["q"])
 			ens = lf.ensemble(power, qs, "LC-PFN posterior")
@@ -137,11 +150,12 @@ def main(argv: list[str] | None = None) -> int:
 	b.add_argument("curves", type=Path)
 	b.add_argument("pfn", type=Path)
 	b.add_argument("--out", type=Path)
+	b.add_argument("--jobs", type=int, default=1)
 	args = ap.parse_args(argv)
 	if args.cmd == "prepare":
 		print(json.dumps(prepare(args.rows, args.out)))
 		return 0
-	rep = score(args.curves, args.pfn)
+	rep = score(args.curves, args.pfn, args.jobs)
 	text = json.dumps(rep, indent=1)
 	if args.out:
 		args.out.write_text(text + "\n")
