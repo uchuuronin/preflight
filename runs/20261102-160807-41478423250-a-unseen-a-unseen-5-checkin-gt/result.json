@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160807-41478423250-a-unseen-a-unseen-5-checkin-gt",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41478423250",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/EleutherAI/lm-evaluation-harness --commit ddd67220430a2470529f25fd5c05a576ca1057a0 --entrypoint lm_eval/__main__.py --args=--model,hf,--model_args,pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,,dtype=bfloat16,--tasks,arc_easy,,hellaswag,,piqa,--batch_size,auto --bare-steps 100000 --budget-min 45 --first-gpu L4 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:08:35Z"
+}
