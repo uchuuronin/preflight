@@ -181,33 +181,33 @@ included. Hero lenses first.
 | 1 | Probes, recorder, memory terms by term, eval-OOM re-run, P(OOM) inputs (lens) | main; L4 run Oct 28 | 0 |
 | 2 | Packing and padding-waste measurement (lens, contract) | main (`padding_fraction`, `tokens_per_sample_mean`) | 0 |
 | 3 | Longest dataset row for B's memory rule (B, Oct 30) | ws-a | 0 |
-| 4 | FakeTensor cross-check of the analytical memory terms (contract) | not started | 3 |
+| 4 | FakeTensor cross-check of the analytical memory terms (contract) | handed to B (PM, Nov 1 9:47 PM) | 0 |
 | 5 | L4 ground truth: recorder overhead, where the OOM lands (review Oct 27) | bare run measured Oct 31; recorder half failed on a cache permission (fixed locally); rerun with 210 steps needs a yes | 0.5 + paid run |
 | **Agent and API runs (hero)** | | | |
 | 6 | OTel GenAI proxy around any OpenAI-compatible client (lens, contract) | ws-a (`recorder/agent.py`) | 0 |
 | 7 | Sampler: 30 tasks, 80% runaway bound, 20 more when the range straddles the budget (lens, D3) | ws-a: proxy run mode, pipeline, `sample_more`, CLI; local: the hosted path (proxy behind a tunnel, script in a sandbox with no secrets), first run waits for a yes; the bound is B's `agent_totals` | 1 + API spend |
-| 8 | Rate-limit wall-clock (lens) | not started | 2 |
+| 8 | Rate-limit wall-clock (lens) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 9 | Pareto model sweep across Muse Spark and Spark Open (lens, contract) | not started | 4 |
 | 10 | Agent zoo script and an agent record on the public app (G1) | not started (D writes the script) | 2 |
 | **RL post-training (hero)** | | | |
 | 11 | GRPO zoo script, public model and data, 512-token completion cap planted (competitive #1) | local (`zoo/grpo_trl`); review: at 512 the truncation rate may be only a few percent on Qwen2.5-0.5B, ground truth will say | 0.5 |
 | 12 | RL phase timer: rollout, reference, reward, update, weight sync (lens, contract) | local: all five; weight sync misses the ZeRO-3 gather and vLLM V1 (V0 engine path only) | 0.5 |
 | 13 | Pass rate per prompt for B's zero-variance fraction (lens) | local (`recorder/rl_groups.py`, `rl.pass_rate_per_prompt`, `rl.zero_spread_fraction`) | 0 |
-| 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals) | 2 |
+| 14 | Entropy, KL, length and truncation signals (lens) | partial on main (TRL logs become RL signals; entropy estimate from the policy's log-probs); the rest handed to B (PM, Nov 1 9:47 PM) | 0 |
 | **Campaign (hero; B owns the model)** | | | |
-| 15 | Probes for a grid's points (a campaign is many records from one script) | not started; needs B's campaign spec | 3 |
+| 15 | Probes for a grid's points (a campaign is many records from one script) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | **Other lenses** | | | |
 | 16 | LM pretraining: throughput, MFU, loader probe, stability signals (lens) | main | 0 |
-| 17 | LR range test (lens, contract) | not started | 3 |
+| 17 | LR range test (lens, contract) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 18 | Checkpoint resume exact-match (lens, contract, hygiene) | local: what the script's torch.save is given (weights with or without optimizer state, LR schedule, RNG, step; HF Trainer's optimizer.pt / scheduler.pt / rng_state by name) becomes `hygiene.resume_mismatch`. A content check, not a resumed run replayed step for step | 3 |
-| 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main; probes on D's scripts not started | 4 |
+| 19 | Evaluation sweeps: HF generate vs vLLM throughput, thinking-cap truncation, activation-dump storage (lens) | hooks on main, eval probe stops after two generate calls; the eval-sweep record handed to D (PM, Nov 1 9:47 PM) | 0 |
 | 20 | Serving probes on vLLM for B's model (contract) | hooks on main; local: the serving image (vLLM 0.6.4.post1, its own torch) and routing; startup check and first probe wait for a yes | 3 + paid run |
 | 21 | Retrieval probes through an adapter (lens) | local: encode, faiss add/train/search timed with items a second; a stage after training isn't reached by a probe | 3 |
 | 22 | GNN probes through an adapter (lens) | local: nodes, edges, seeds, nodes per hop, largest batch; sampling time is the data phase; needs a PyG script on a GPU | 3 |
 | 23 | Vision probes through an adapter (lens) | local: images per batch, resolution, channels-last; images/s from samples; needs a vision script on a GPU | 2 |
 | 24 | DDP and FSDP on one multi-GPU Modal node (lens, contract) | not started | 6 + paid run |
 | 25 | Run hygiene: stale checkpoints and caches, identical outputs from different weights, truncation rate (lens) | local: findings `hygiene.stale_checkpoint` (checkpoint dirs sent with the code), `hygiene.cache_not_keyed` (a fixed-path `if exists: load`), `generation.truncated` (over 10%, Wilson interval), `hygiene.identical_outputs` (two weight states, same tokens on every compared input). Not yet on a GPU run | 3 |
-| 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only | 4 |
+| 26 | Data repetition and quality exposure, A's half: read per-document quality scores (lens) | static detection only; per-document scores not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 27 | In-flight collector (feature, contract) | local (`recorder/inflight.py`, `preflight watch`); getting the live record to the guide waits on C | 1 |
 | 28 | Adapters: HF Trainer, TRL on main; Lightning and torchtitan (contract) | Nov 1, CPU probes of each framework's own loop (tests/test_adapters.py; tiny random models and synthetic data, shaped on each project's public example, since this workspace can't download from the Hub): **HF Trainer working** (transformers 5.21; also on L4 in the LoRA ground truth), **TRL working** (SFTTrainer, trl 1.17; GRPOTrainer on L4 in `a-gt-grpo-l4-3`), **Lightning working** (2.6.6; its planned run length now read from Trainer.fit). All three: steps counted, phase split, planned steps 40 of 40. **torchtitan working** (0.1.0 on an A10, Nov 1 `a-torchtitan-check-2`: steps and phase split; tokens and samples per step not read) | 4 of 4 |
 | **Muse Spark** | | | |
@@ -217,7 +217,7 @@ included. Hero lenses first.
 | 32 | Glimmer host proposal with B (competitive #6) | not started | 2 |
 | **AMD** | | | |
 | 33 | ROCm probes on the MI300X, AMD kernel names (contract) | main (prepared); blocked: the AMD Developer Cloud account is on a verification hold (Oct 31 evening). Session Sunday 9 AM if it clears, else to the noon cut with AMD answers from datasheets and the cross-GPU model, labelled not measured | 2 + droplet |
-| 34 | Droplet idle watchdog (contract) | not started (B's sweep has an uptime ledger) | 2 |
+| 34 | Droplet idle watchdog (contract) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | **Platform and gaps** | | | |
 | 35 | Job store, queue, leases, reaper, probe cache, sandbox policy, migrations, token caps, AMD offline (gaps 1, 2, 3, 6, 8, 9, 11) | main | 0 |
 | 36 | Hostile-repo fixture and sandbox tests (gap 17) | main | 0 |
@@ -226,11 +226,11 @@ included. Hero lenses first.
 | 39 | Runner deploy with `engine.memory` on (G1) | waits for round three on main | 1 |
 | 40 | Execution-plane logs and metrics (gap 14) | partial (backlog alarm, cleanup log) | 2 |
 | 41 | GPU power sampling (contract) | main | 0 |
-| 42 | pip-installable CLI, one-command install, 60-second quickstart (contract) | CLI on main, packaging not started | 3 |
+| 42 | pip-installable CLI, one-command install, 60-second quickstart (contract) | CLI on main, quickstart checked (Nov 1); packaging handed to D (PM, Nov 1 9:47 PM) | 0 |
 | 43 | 8 of 9 unseen scripts harnessed, failures name the step (contract; PM picks them) | not started | 6 |
 | 44 | Hash of the unseen-script list, published before Nov 2 (competitive #3) | not started (needs the PM's list) | 0.5 |
-| 45 | Prebuilt images and a warm pool for judging, Nov 5–8 (contract) | not started | 3 |
-| 46 | Chakra trace export (contract) | not started | 3 |
+| 45 | Prebuilt images and a warm pool for judging, Nov 5–8 (contract) | built: warm pool for Nov 5–8 (runner/judging.py), probe images prebuilt at deploy; A keeps it | 3 |
+| 46 | Chakra trace export (contract) | not built by Nov 4 (PM, Nov 1 9:47 PM) | 0 |
 | 47 | Any OpenAI-compatible endpoint in the CLI's model sweep (competitive #11, after G2) | not started | 2 |
 | 48 | First public number, "one script" (competitive #2) | ws-a (status file) | 0 |
 | **Validation rows A feeds** | | | |
