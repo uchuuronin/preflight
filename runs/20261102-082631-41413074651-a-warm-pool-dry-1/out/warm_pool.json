@@ -1,0 +1,29 @@
+{
+  "window": [
+    "2026-11-05",
+    "2026-11-08"
+  ],
+  "changes": [
+    {
+      "et": "2026-11-04T22:00:00-05:00",
+      "warm_workers": 0,
+      "l4_job_probes_on": "L4",
+      "l4_only_job_probes_on": "L4"
+    },
+    {
+      "et": "2026-11-05T00:00:00-05:00",
+      "warm_workers": 1,
+      "l4_job_probes_on": "A10",
+      "l4_only_job_probes_on": "L4"
+    },
+    {
+      "et": "2026-11-09T00:00:00-05:00",
+      "warm_workers": 0,
+      "l4_job_probes_on": "L4",
+      "l4_only_job_probes_on": "L4"
+    }
+  ],
+  "run_worker_scalable": true,
+  "tick_last_set": "0:probe-ec621c6cdf0e4479",
+  "now_wants": 0
+}

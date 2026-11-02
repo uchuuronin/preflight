@@ -1,0 +1,11 @@
+{
+	"name": "20261102-082631-41413074651-a-warm-pool-dry-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41413074651",
+	"ref": "ws-a",
+	"sha": "aaba3f64b22fb6d02363f77d8ea79b683d5f2ffd",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::warm_pool_dry_run",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T08:26:53Z"
+}
