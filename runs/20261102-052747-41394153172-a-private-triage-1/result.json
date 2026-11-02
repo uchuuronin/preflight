@@ -1,0 +1,11 @@
+{
+	"name": "20261102-052747-41394153172-a-private-triage-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41394153172",
+	"ref": "ws-a",
+	"sha": "1e2067c9db21785860144944504c43608a40c3ce",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::private_triage_check --share jgk05gwUgV-Bo78sErzKFQ",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T05:32:55Z"
+}

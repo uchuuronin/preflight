@@ -1,0 +1,21 @@
+{
+  "glimmer_configured": true,
+  "probe": "p1-eval",
+  "findings": [
+    {
+      "code": "triage.oom",
+      "title": "Muse Glimmer on probe p1-eval: oom",
+      "detail": "The eval pass ran out of GPU memory after 3 optimizer steps. (log: \"Ran out of GPU memory during the eval pass.\")"
+    }
+  ],
+  "calls": [
+    {
+      "provider": "modal-glimmer",
+      "ok": true,
+      "latency_s": 279.425,
+      "cost_usd": 0.162998
+    }
+  ],
+  "baseten_calls": 0,
+  "pass": true
+}
