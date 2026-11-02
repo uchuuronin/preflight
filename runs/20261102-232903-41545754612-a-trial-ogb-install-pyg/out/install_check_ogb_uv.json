@@ -1,0 +1,12 @@
+{
+  "uv": true,
+  "pyg": true,
+  "seconds": 12.9,
+  "error": null,
+  "missing_before": [
+    "six",
+    "sklearn",
+    "torch_geometric"
+  ],
+  "missing_after": []
+}

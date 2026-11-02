@@ -1,0 +1,11 @@
+{
+	"name": "20261102-232903-41545754612-a-trial-ogb-install-pyg",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41545754612",
+	"ref": "9bbb0966b9d03a0b3bec03fd4b122a0a666d04f2",
+	"sha": "9bbb0966b9d03a0b3bec03fd4b122a0a666d04f2",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::install_check --repo https://github.com/snap-stanford/ogb --commit 61e9784ca76edeaa6e259ba0f836099608ff0586 --entrypoint examples/nodeproppred/arxiv/gnn.py --uv --pyg",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:31:40Z"
+}
