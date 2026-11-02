@@ -1,0 +1,11 @@
+{
+	"name": "20261102-174538-41494155116-c-share-check-7ba177b",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41494155116",
+	"ref": "main",
+	"sha": "7ba177b311dc486605108a36ab2ee2f6a6b5776f",
+	"cmd": "python scripts/share_page_check.py https://preflight-cqn.pages.dev ICDYrfHQ2nBNbv3mlRHHMg",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T17:45:59Z"
+}

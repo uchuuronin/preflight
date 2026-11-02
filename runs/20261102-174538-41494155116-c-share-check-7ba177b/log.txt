@@ -1,0 +1,9 @@
+ok   share page answers: HTTP 200
+ok   preview title: Fine-tune · train.py · Preflight
+ok   preview description: Ran out of memory in the evaluation pass: eval batch size 32 (measured) · Peak memory in a probe: 20.4 of 22.06 GiB (measured) · Step time at batch size 4, seq 
+ok   names its card: https://preflight-cqn.pages.dev/cards/ICDYrfHQ2nBNbv3mlRHHMg.png
+ok   sends people to the cockpit
+ok   no 'Not trusted' wording
+ok   card image: HTTP 200 image/png
+ok   badge: HTTP 200 image/svg+xml; charset=utf-8
+ok   app's API still answers beside them: HTTP 200
