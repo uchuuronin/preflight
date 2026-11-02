@@ -325,6 +325,7 @@ def smoke(
 	gpus: str = "L4",
 	max_minutes: int = 25,
 	modal_env: str = "",
+	visitor: str = "smoke",
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
@@ -341,7 +342,12 @@ def smoke(
 	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env or None)()
 	request = {
 		"source": {"kind": "sample", "uri": sample},
-		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
+		# "any": no constraint, the request a visitor's sample makes, so its probes warm the cache
+		**(
+			{}
+			if gpus == "any"
+			else {"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]}}
+		),
 	}
 	out = Path("out")
 	out.mkdir(exist_ok=True)
@@ -350,7 +356,7 @@ def smoke(
 	events: list[dict] = []
 	error = None
 	try:
-		sub = svc.submit.remote(request, "smoke", uuid.uuid4().hex)
+		sub = svc.submit.remote(request, visitor, uuid.uuid4().hex)  # one visitor: 3 jobs a day
 		print("submitted", sub, flush=True)
 		seen, deadline = -1, time.monotonic() + max_minutes * 60
 		while True:
