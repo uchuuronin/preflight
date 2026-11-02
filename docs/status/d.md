@@ -1,5 +1,12 @@
 # Status: D (usability add-ons)
 
+## Decisions while Chiya is out (Nov 2, 11:15 to about 17:00 ET)
+
+| # | When (ET) | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- | --- |
+| A1 | 11:30 | Added `harness.spark_search` and `probes.lr_range` to `flags.json`, both off | Chiya's items 1 and 3 each name a new flag, off | none | Remove the two keys |
+| A2 | 11:35 | Before building item 1, a probe script (`scripts/spark_search_probe.py`) asks Meta's Responses API one question with `web_search`, `web_search_preview` and no tool, to learn whether Muse Spark can search and how it cites | Meta's docs I can reach don't say whether a search tool exists or how citations come back; building on a guess would waste the cap | a few cents of Meta credit (counted against item 1's US$1) | Delete the script |
+
 ## Decisions overnight (Nov 2; Chiya offline 00:16 to about 05:30 ET)
 
 | # | When (ET) | What | Why | Cost | How to undo |
