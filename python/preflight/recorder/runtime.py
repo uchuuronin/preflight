@@ -69,9 +69,12 @@ PHASE_STEPS = (
 	2  # guess: two synchronised steps for the phase split; compare with the profiled window on zoo runs
 )
 PROFILE_STEPS = 2 + PROFILE_ACTIVE  # wait 1 + warmup 1 + active 3
-RANGE_STALL_MICRO = 16  # guess: backwards with no optimizer step before a range test counts as stalled
+RANGE_STALL_MICRO = (
+	16  # guess: backwards with no ramp step, while another optimizer steps, before the probe stops
+)
 RANGE_STALL_FACTOR = 4  # guess: that many times the most backwards any recorded step took
-RANGE_STALL_FIRST = 64  # guess: before the first step (a GradScaler's start-up skips are fewer than 20)
+RANGE_STALL_DROPS = 8  # guess: a GradScaler halving its scale this many times with no step has stalled
+RANGE_STALL_DROPS_FIRST = 24  # guess: before the first step, past a GradScaler's start-up skips (65,536 down)
 RANGE_SAMPLE = 4  # guess: weights whose update the range test reads; few, as each is copied every step
 RANGE_SAMPLE_MAX = 4_000_000  # guess: elements per sampled weight, so the copies stay small
 ATTN_CALLS_PER_STEP = 2  # guess: two attention layers sampled per step bound the check's cost
@@ -395,6 +398,8 @@ class Recorder:
 		self._range_params: list | None = None  # the hooked optimizer's weights whose update is sampled
 		self._range_others: set[int] = set()  # other optimizers that stepped other weights (their ids)
 		self._range_overlap_steps = 0  # steps by another optimizer over the ramp's weights since its own
+		self._range_scale: float | None = None  # the GradScaler's scale at the last check
+		self._range_drops = 0  # times it fell since the ramp's optimizer last stepped
 		self.lr_range_stalled: int | None = None  # steps done when a GradScaler stopped the stepping
 		self.lr_range_replaced = False  # the script stepped another optimizer over the same weights instead
 		if self.lr_range:
@@ -1497,20 +1502,36 @@ class Recorder:
 		self._overhead_pre = self._now() - self._t_pre
 
 	def _range_stall_check(self):
-		"""After a backward in a range test: has the ramp's optimizer stopped stepping? Two causes
-		are read, nothing else (a script may run many backwards per step on purpose): a GradScaler
-		skipping every step (fp16 overflow at a high rate never calls step(), so the ramp would wait
-		for the timeout), and the script stepping another optimizer over the same weights (it
-		rebuilt its optimizer: the ramp no longer sets the rate). Either stops the probe."""
-		most = max((s["micro"] for s in self.steps), default=0)
-		limit = max(RANGE_STALL_MICRO, RANGE_STALL_FACTOR * most) if self.steps else RANGE_STALL_FIRST
-		if self.acc["micro"] < limit:
+		"""After a backward in a range test: has the ramp's optimizer stopped stepping? Read from
+		what the script did, never from the count of backwards alone (accumulation runs many per
+		step on purpose). A GradScaler skipping every step (fp16 overflow at a high rate never calls
+		step(), so the ramp would wait for the timeout) halves its scale at each skip: RANGE_STALL_DROPS
+		falls with no step is a stall. Many more backwards than any step took, while another
+		optimizer steps instead: over the same weights the script rebuilt its optimizer (the ramp no
+		longer sets the rate, `lr_range_replaced`); over others the rates are dropped anyway. Each
+		stops the probe."""
+		scale = None
+		for sc in list(self._scalers):
+			with suppress(Exception):
+				v = float(sc.get_scale())
+				scale = v if scale is None else min(scale, v)
+		if scale is not None:
+			if self._range_scale is not None and scale < self._range_scale:
+				self._range_drops += 1
+			self._range_scale = scale
+			if self._range_drops >= (RANGE_STALL_DROPS if self.steps else RANGE_STALL_DROPS_FIRST):
+				self.lr_range_stalled = len(self.steps)
+				self._stop_pending = True
+				return
+		if not self.steps:
+			return
+		most = max(s["micro"] for s in self.steps)
+		if self.acc["micro"] < max(RANGE_STALL_MICRO, RANGE_STALL_FACTOR * most):
 			return
 		if self._range_overlap_steps:
 			self.lr_range_replaced = True
 			self._stop_pending = True
-		elif list(self._scalers):
-			self.lr_range_stalled = len(self.steps)
+		elif self._range_others:
 			self._stop_pending = True
 
 	def _range_sample(self, opt) -> list:
@@ -1534,17 +1555,18 @@ class Recorder:
 
 	def _range_note_other(self, opt):
 		"""Another optimizer stepped during a range test, noted as it steps (the script's optimizers
-		are gone by the summary). One holding a weight (an `nn.Parameter`) the ramp's optimizer
-		doesn't is another optimizer (Muon beside AdamW, a GAN's two, even with a shared encoder):
-		those weights moved at the script's own rates, so the curve isn't the ramp's alone. One over
-		plain tensors (an attack's perturbation) isn't counted. One over only the ramp's weights is a
-		wrapper or a replacement: counted towards the stall rule, which tells them apart."""
+		are gone by the summary). One holding a tensor the ramp's optimizer doesn't is another
+		optimizer (Muon beside AdamW, a GAN's two, even with a shared encoder, a classroom script's
+		plain-tensor weights; an attack's perturbation too, which drops the rates on the safe side):
+		those moved at the script's own rates, so the curve isn't the ramp's alone. One over only the
+		ramp's weights is a wrapper or a replacement: counted towards the stall rule, which tells
+		them apart."""
 		if self.opt is None:
 			return
 		with suppress(Exception):
 			mine = {id(p) for g in self.opt.param_groups for p in g["params"]}
 			theirs = [p for g in opt.param_groups for p in g["params"]]
-			if any(isinstance(p, nn.Parameter) and id(p) not in mine for p in theirs):
+			if any(id(p) not in mine for p in theirs):
 				self._range_others.add(id(opt))
 			elif theirs and all(id(p) in mine for p in theirs):
 				self._range_overlap_steps += 1
@@ -1642,7 +1664,7 @@ class Recorder:
 			upd = sum(sizes) if self.lr_range and sizes else None
 			self._sample = []
 		if self.lr_range:
-			self._range_overlap_steps = 0
+			self._range_overlap_steps = self._range_drops = 0
 		opt_state = _unique_bytes(
 			t for s in opt.state.values() for t in s.values() if isinstance(t, torch.Tensor)
 		)

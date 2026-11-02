@@ -222,3 +222,29 @@ sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1.0, s / 10))  # a 
 	assert r.probe.status == "ok", r.probe.error
 	ratios = [float(line.split()[1]) for line in r.log_tail.splitlines() if line.startswith("RATIO ")]
 	assert len(ratios) >= 5 and all(x == pytest.approx(0.25) for x in ratios)
+
+
+def test_a_scaler_with_long_accumulation_isnt_read_as_a_stall():
+	# fp16 on a T4 with HF-style accumulation: 64 backwards a step, nothing overflowing (the review's case)
+	opt = 'opt = torch.optim.Adam(model.parameters(), lr=1e-3)\nscaler = torch.amp.GradScaler("cpu")'
+	body = """for _ in range(64):
+		scaler.scale(torch.nn.functional.mse_loss(model(x), x @ w) / 64).backward()
+	scaler.step(opt)
+	scaler.update()
+	opt.zero_grad()"""
+	r = probe(script(opt, body)).probe
+	assert r.status == "ok", r.error
+	assert "lr_range.stalled" not in r.extras and r.extras["lr_range.steps"] >= 10
+
+
+def test_a_bigger_rebuilt_optimizer_stops_the_probe_and_keeps_its_curve():
+	# an unfreeze stage: the new optimizer holds a weight the first didn't (the review's case)
+	opt = "opt = torch.optim.Adam(model[0].parameters(), lr=1e-3)"
+	body = """if step == 30:
+		opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+	opt.zero_grad()
+	loss.backward()
+	opt.step()"""
+	r = probe(script(opt, body)).probe
+	assert r.status == "ok", r.error
+	assert r.extras["lr_range.other_optimizers"] == 1.0 and r.extras["lr_range.steps"] >= 10

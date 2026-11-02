@@ -69,12 +69,14 @@ The fixes then had their own read-only review, whose two blocking findings are f
    Weights kept in bf16 with no fp32 copy round small updates to zero, so a ramp on them may read
    as unverified.
 2. **Group ratios under a warm-up from 0:** the ratio is read from `initial_lr` when a scheduler
-   set it, and a hand-written warm-up from exactly 0 is read again at its next step (a CPU test
+   set it, and a hand-written warm-up from exactly 0 is read again at its next step (when the script
+   writes its rate before each step, as such warm-ups do) (a CPU test
    with two groups at 1e-3 and 2.5e-4 under a warm-up from 0 holds 0.25 every step; it read 1.0
    before).
-3. **A second optimizer** holding a weight the ramp's doesn't (Muon beside AdamW, a GAN's two,
-   even with a shared encoder) is counted as it steps: `lr_range.other_optimizers`, and the rates
-   are dropped. One over plain tensors (an attack's perturbation) isn't counted. One over only the
+3. **A second optimizer** holding a tensor the ramp's doesn't (Muon beside AdamW, a GAN's two,
+   even with a shared encoder, a script's plain-tensor weights) is counted as it steps:
+   `lr_range.other_optimizers`, and the rates are dropped (an attack's perturbation counts too,
+   on the safe side). One over only the
    ramp's weights that steps instead of it means the script rebuilt its optimizer: `not_set`,
    and the probe stops.
 4. **`p1-lr` reads as an ordinary ok probe** in the engine's filters: asked of B (the engine's
@@ -83,9 +85,11 @@ The fixes then had their own read-only review, whose two blocking findings are f
    example and web fixture made from it) has `lr_range_divergence_lr` on an ordinary probe and a
    finding `lr.headroom`; the code writes `lr_range.diverged_lr` on `p1-lr`. Asked of A.
 6. **Smaller:** a GradScaler that skips every step (fp16 overflow) no longer runs the probe to its
-   timeout: once a step's backwards reach the larger of 16 and 4 times the most any step took (64
-   before the first step), with a scaler seen, the probe stops (`lr_range.stalled`; the last rate
-   applied is the divergence, when the rates stand). The point's timeout is capped at what the job
+   timeout: a scaler halves its scale at each skip, so 8 halvings with no step (24 before the
+   first, past its start-up skips) stop the probe (`lr_range.stalled`; the last rate applied is
+   the divergence, when the rates stand). Long accumulation with a scaler (64 backwards a step) is
+   not a stall. Many more backwards than any step took while another optimizer steps instead
+   (a rebuilt or an unfrozen optimizer) also stops it, keeping the curve so far. The point's timeout is capped at what the job
    has left, in time and dollars. A `p1` answered from the cache now gets its range test too (it
    was skipped). The check app reads its single-rate runs' losses directly (they keep no rates,
    so the curve was empty: the second review's other blocking finding) and no longer prints
