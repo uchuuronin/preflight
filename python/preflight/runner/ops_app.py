@@ -330,6 +330,8 @@ def smoke(
 	dir: str = "",
 	entrypoint: str = "",
 	args: str = "",
+	repo: str = "",
+	commit: str = "",
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
@@ -337,7 +339,9 @@ def smoke(
 	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder (to an
 	A100). --visitor: the queue's visitor (3 probe jobs a day each). --notebook path: check in an
 	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are).
-	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload. The job
+	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload.
+	--repo https://github.com/<owner>/<repo> --commit <40-hex> [--entrypoint ...] [--args=...]: a public
+	repo at a commit, sent as kind repo, as a visitor's GitHub link is (Monday's unseen scripts). The job
 	is cancelled after `max_minutes`, or if this run fails partway. The job store is looked up in
 	the environment `modal run --env` names (modal_env overrides it). Writes out/smoke.json (every
 	event and the final status, or the error) and out/record.json (the flight record), which
@@ -353,8 +357,13 @@ def smoke(
 		if nb.suffix != ".ipynb" or Path(__file__).resolve().parents[3] not in nb.parents:
 			raise SystemExit(f"{notebook!r} isn't an .ipynb file in this checkout")
 		source = {"kind": "notebook", "files": {nb.name: nb.read_text()}}
-	if (entrypoint or args) and not dir:
-		raise SystemExit("--entrypoint and --args go with --dir (a sample or notebook names its own)")
+	if (entrypoint or args) and not (dir or repo):
+		raise SystemExit(
+			"--entrypoint and --args go with --dir or --repo (a sample or notebook names its own)"
+		)
+	if repo:  # the runner clones it (runner/sources._clone), exactly as for a visitor's link
+		source = {"kind": "repo", "uri": repo, "commit": commit or None,
+			**({"entrypoint": entrypoint} if entrypoint else {}), **({"args": _split_args(args)} if args else {})}  # fmt: skip
 	if dir:  # any directory in this checkout, checked in as a visitor's upload (Monday's unseen scripts);
 		# _read_tree reads the text files the runner reads (data files such as .csv aren't sent)
 		from preflight.runner.sources import _read_tree
@@ -478,7 +487,20 @@ def ground_truth_titan_on_a10(*a, **kw) -> dict:
 	return _ground_truth(*a, **kw)
 
 
+# A100-80GB only where Chiya approves it (Nov 2: the unseen list's 7B LoRA and its GRPO run); never asked
+# for by default, and the image is the same probe or serving image the L4 runs use
+@ops.function(**{**_GT, "image": probe_image}, gpu="A100-80GB")
+def ground_truth_on_a100(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": serving_image}, gpu="A100-80GB")
+def ground_truth_serving_on_a100(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
 GT_FUNCTIONS = {
+	("probe", "A100"): ground_truth_on_a100, ("serving", "A100"): ground_truth_serving_on_a100,
 	("probe", "L4"): ground_truth_on_l4, ("probe", "A10"): ground_truth_on_a10,
 	("serving", "L4"): ground_truth_serving_on_l4, ("serving", "A10"): ground_truth_serving_on_a10,
 	("titan", "L4"): ground_truth_titan_on_l4, ("titan", "A10"): ground_truth_titan_on_a10,
@@ -509,6 +531,8 @@ def ground_truth(
 	args: str = "",
 	first_gpu: str = "L4",
 	install_requirements: bool = False,
+	repo: str = "",
+	commit: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -519,8 +543,10 @@ def ground_truth(
 	--script: a zoo script; --dir: any directory in this checkout (Monday's unseen scripts, from the
 	validation-freeze tag). The entrypoint is the one named, else train.py, main.py, serve.py or
 	run.py. The image follows the script: vLLM scripts the serving image, torchtitan its own.
-	--first-gpu A10 tries the A10 before the L4 (the L4 queued 19 to 59 min on Nov 1); never an
-	L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
+	--repo URL --commit SHA: a public GitHub repo at a commit, read as the runner reads a visitor's link
+	(runner/sources._clone: text files only, the same size caps), here on the machine that runs this.
+	--first-gpu A10 tries the A10 before the L4 (the L4 queued 19 to 59 min on Nov 1); A100 runs on an
+	A100-80GB only (approved runs only); never an L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
 	Writes out/ground_truth_<name>.json."""
 	import json
 
@@ -528,28 +554,40 @@ def ground_truth(
 	from preflight.runner.sources import _read_tree
 
 	root = Path(__file__).resolve().parents[3]
-	if bool(script) == bool(dir):
-		raise SystemExit("name a zoo script (--script) or a directory in this checkout (--dir), not both")
+	if sum(map(bool, (script, dir, repo))) != 1:
+		raise SystemExit(
+			"name one of a zoo script (--script), a directory in this checkout (--dir) or a repo (--repo)"
+		)
 	if script:
 		if script not in ZOO_SCRIPTS:
 			raise SystemExit(
 				f"{script!r} isn't a GPU zoo script: {sorted(ZOO_SCRIPTS)} (agent_eval_spark: agent_sample)"
 			)
 		src = root / "zoo" / script
-	else:
+	elif dir:
 		src = (root / dir).resolve()
 		if root not in src.parents or not src.is_dir():
 			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
-	files = _read_tree(src)
+	if repo:
+		from preflight.runner.sources import _clone
+
+		files, sha = _clone(repo, commit or None)
+		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
+		print(f"[ground truth] {repo} at {sha}: {len(files)} files", flush=True)
+	else:
+		files = _read_tree(src)
 	p = plan(files, entrypoint or None)
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
 	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
-	first = "A10" if first_gpu.upper() == "A10" else "L4"
+	first = first_gpu.upper() if first_gpu.upper() in ("A10", "A100") else "L4"
+	if (image, first) not in GT_FUNCTIONS:
+		raise SystemExit(f"no {first} ground-truth function for the {image} image")
 	fn = GT_FUNCTIONS[(image, first)]
 	name = script or src.name
 	print(f"[ground truth] {name}: {entry}, lens {p['lens']}, {image} image, {len(files)} files; "
-		f"waiting for an {first}, else the {'L4' if first == 'A10' else 'A10'} (Modal queues it)", flush=True)  # fmt: skip
+		f"waiting for an {first}" + ("" if first == "A100" else f", else the {'L4' if first == 'A10' else 'A10'}")
+		+ " (Modal queues it)", flush=True)  # fmt: skip
 	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(_split_args(args)),
 		install_requirements, sample, p["generate_calls"])  # fmt: skip
 	res["lens"], res["image"] = p["lens"], image
