@@ -55,3 +55,10 @@ def test_the_ensemble_is_never_surer_than_either_half():
 	# halves that disagree widen the band past +-50%: abstain
 	wide = lf.ensemble(power, (0.9, 1.0, 1.1))
 	assert wide.status == "abstain" and "wider than" in wide.reason
+
+
+def test_a_power_law_too_wide_to_trust_keeps_the_ensemble_abstained():
+	from preflight.engine import lossforecast as lf
+
+	wide = lf.Forecast(None, None, None, "abstain", "the 90% band is wider than +-50%", (1.0, 0.3, 2.0))
+	assert lf.ensemble(wide, (1.9, 2.0, 2.1)) is wide

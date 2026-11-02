@@ -125,7 +125,11 @@ def ensemble(power: Forecast, pfn: tuple[float, float, float] | None, pfn_reason
 	if not (0 < lo_p <= mid_p <= hi_p):
 		return power
 	why_pfn = pfn_reason or "LC-PFN posterior"
-	if power.point is None:
+	if power.point is None and power.params is not None:
+		# review, Nov 1: the power law fitted but its band was too wide or unstable; LC-PFN alone would be surer
+		# than "I don't know", so the ensemble abstains too
+		return power
+	if power.point is None:  # too few points for the power law: LC-PFN alone
 		point, lo, hi = mid_p, lo_p, hi_p
 		why = f"{why_pfn}; the power law abstained ({power.reason})"
 	else:

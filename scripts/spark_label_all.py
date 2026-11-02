@@ -252,6 +252,10 @@ def label(out_dir: str, limit: int | None, batch: int, workers: int, budget: flo
 			cost = sum(c["cost_usd"] if c["ok"] or c["output_tokens"] else worst / 2 for c in calls)
 		except BaseException as exc:
 			err = err or f"worker: {type(exc).__name__}: {exc}"[:300]
+			with (
+				cond
+			):  # review, Nov 1: a broken worker stops the run instead of paying for every queued chunk
+				state["stopped"] = n if state["stopped"] is None else min(state["stopped"], n)
 			raise
 		finally:
 			with cond:

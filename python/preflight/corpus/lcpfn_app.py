@@ -122,7 +122,7 @@ def fetch_weights() -> dict:
 # the port's check (Nov 1): the runner's torch, CPU wheels; corpus/lcpfn.py loads the saved state dicts with
 # weights_only=True and must give the package's own quantiles on the reference curve
 CHECK_TOLERANCE = (
-	1e-3  # guess: the meta keeps the reference curve to 6 decimals; float32 differences sit far below
+	1e-4  # guess: the meta keeps the curve to 6 decimals; the port matched the package's own code to 2.4e-6
 )
 port_image = (
 	modal.Image.debian_slim(python_version="3.11")
@@ -151,26 +151,29 @@ def check_port() -> dict:
 			row["modules"] = meta.get("modules", "")[:4000]
 			out["models"][stem] = row
 			continue
-		ref = meta["reference"]
-		x = torch.arange(1, REFERENCE_STEPS + 1, dtype=torch.float32)
-		y = torch.tensor(ref["y_train"], dtype=torch.float32)
-		q = model.predict_quantiles(x[: ref["x_seen"]], y, x[ref["x_seen"] :], list(ref["qs"]))[-1]
-		got = [round(float(v), 6) for v in q]
-		diff = max(abs(a - b) for a, b in zip(got, ref["quantiles_at_100"], strict=True))
-		# a loss curve through the whole path: a falling power law seen for 200 of 2,000 steps
-		steps = torch.arange(1, 201, dtype=torch.float32)
-		loss = (2.0 + 4.0 * steps**-0.5).tolist()
-		fc = lcpfn.forecast_loss(model, loss, last_step=2000)
-		row.update(
-			{
-				"quantiles_at_100": got,
-				"package_quantiles_at_100": ref["quantiles_at_100"],
-				"max_abs_diff": diff,
-				"matches": diff <= CHECK_TOLERANCE,
-				"loss_forecast_at_2000": None if fc is None else [fc.lo, fc.mid, fc.hi],
-				"loss_true_at_2000": 2.0 + 4.0 * 2000**-0.5,
-			}
-		)
+		try:
+			ref = meta["reference"]
+			x = torch.arange(1, REFERENCE_STEPS + 1, dtype=torch.float32)
+			y = torch.tensor(ref["y_train"], dtype=torch.float32)
+			q = model.predict_quantiles(x[: ref["x_seen"]], y, x[ref["x_seen"] :], list(ref["qs"]))[-1]
+			got = [round(float(v), 6) for v in q]
+			diff = max(abs(a - b) for a, b in zip(got, ref["quantiles_at_100"], strict=True))
+			# a loss curve through the whole path: a falling power law seen for 200 of 2,000 steps
+			steps = torch.arange(1, 201, dtype=torch.float32)
+			loss = (2.0 + 4.0 * steps**-0.5).tolist()
+			fc = lcpfn.forecast_loss(model, loss, last_step=2000)
+			row.update(
+				{
+					"quantiles_at_100": got,
+					"package_quantiles_at_100": ref["quantiles_at_100"],
+					"max_abs_diff": diff,
+					"matches": diff <= CHECK_TOLERANCE,
+					"loss_forecast_at_2000": None if fc is None else [fc.lo, fc.mid, fc.hi],
+					"loss_true_at_2000": 2.0 + 4.0 * 2000**-0.5,
+				}
+			)
+		except Exception as exc:  # review, Nov 1: one model's failure fills its own row, not the whole run
+			row["check_error"] = f"{type(exc).__name__}: {exc}"[:2000]
 		out["models"][stem] = row
 	return out
 

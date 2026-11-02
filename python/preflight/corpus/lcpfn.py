@@ -235,8 +235,8 @@ def forecast_loss(
 	"""The loss at `last_step` as LC-PFN's 5%, 50% and 95% quantiles, from a series starting at `first_step`. None
 	when there is nothing to condition on, or the seen steps already pass the last one."""
 	pts = [(first_step + i, float(v)) for i, v in enumerate(losses) if v is not None and math.isfinite(v)]
-	if len(pts) < 2 or last_step <= pts[-1][0]:
-		return None
+	if len(pts) < 2 or last_step <= pts[-1][0] or min(v for _, v in pts) < 0:
+		return None  # a negative loss (some NLLs) has no place on the normaliser's [0, inf) range
 	if len(pts) > MAX_POINTS:
 		keep = sorted({round(k * (len(pts) - 1) / (MAX_POINTS - 1)) for k in range(MAX_POINTS)})
 		pts = [pts[k] for k in keep]
