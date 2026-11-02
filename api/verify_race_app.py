@@ -78,7 +78,9 @@ def _pair(rec: dict) -> tuple[str | None, str | None]:
 	return (base[: -len("-base")] if base else None), base
 
 
-def verify_one(svc, vol, c: dict, *, gpu: str, visitor: str, name: str) -> tuple[dict, float]:
+def verify_one(
+	svc, vol, c: dict, *, gpu: str, visitor: str, name: str, record_ref: str = "sample:lora-qwen"
+) -> tuple[dict, float]:
 	"""One candidate's verify job through the job store, waited for and judged with the fix loop's
 	checks. Returns what it found and what it cost (A's per-job cap when the record has no final
 	costs). The job is cancelled if the wait ends any way but finished. The job store allows a
@@ -87,7 +89,7 @@ def verify_one(svc, vol, c: dict, *, gpu: str, visitor: str, name: str) -> tuple
 	from preflight_api.fix.templates import verify_options
 
 	req = {
-		"source": {"kind": "record", "record_ref": "sample:lora-qwen"},
+		"source": {"kind": "record", "record_ref": record_ref},
 		"mode": "verify",
 		# the GPU, pinned by the setting's gpu_type: an L4 queued past the job's 20-minute wait on
 		# Nov 2 (gpu.unavailable), while A10s schedule in seconds (A's status, Nov 1)

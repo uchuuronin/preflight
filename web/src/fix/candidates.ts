@@ -48,10 +48,12 @@ export const STACKS: Record<string, readonly string[]> = { "eval.no_grad_and_bat
 /**
  * When none of a finding's fixes passes verify alone (Chiya, Nov 2: the LoRA eval OOM needs eval
  * without gradients and a smaller eval batch together), the race stacks them. The eval batch is
- * the one in the engine's combined move, the same cell the guide offers (guide/combos.ts
- * bestCombo), so the race and the guide agree and nothing is guessed. Null when the finding isn't
- * one of a stack's parts, the engine has no combined move with an eval batch, or the visitor's
- * pins or limits rule it out.
+ * the one in the engine's combined move that the guide offers (guide/combos.ts bestCombo, with the
+ * visitor's pins and limits as the guide passes them), so the value isn't guessed. Only that value
+ * is taken: the guide's move may also change another knob (seq_len on the LoRA record), which a
+ * fix to the eval code doesn't touch, and the stack adds the no-grad fix the move doesn't model.
+ * Null when the finding isn't one of a stack's parts, the guide has no combined move with an eval
+ * batch, or the visitor's pins or limits rule it out.
  */
 export function stackedCandidate(finding: Pick<Finding, "fix_template">, ctx: Ctx): Candidate | null {
 	const id = Object.keys(STACKS).find((k) => STACKS[k]!.includes(finding.fix_template ?? ""));
@@ -59,7 +61,8 @@ export function stackedCandidate(finding: Pick<Finding, "fix_template">, ctx: Ct
 	if (!t || !t.knob || !t.lenses.includes(ctx.record.job.lens)) return null;
 	const limits = ctx.limits ?? NO_LIMITS;
 	if (ctx.pinned.has(t.knob) || limits.frozen.includes(t.knob) || ctx.pinned.has("eval_no_grad") || limits.frozen.includes("eval_no_grad")) return null;
-	const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { pinned: ctx.pinned });
+	const o = withinLimits(ctx.record, ctx.provider, limits, ctx.knobs, { pinned: ctx.pinned });
+	const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { pinned: o.pinned, ...(o.allow ? { allow: o.allow } : {}) });
 	const to = combo?.changes.find((c) => c.knobId === t.knob)?.to;
 	if (to === undefined || !valueAllowed(limits, t.knob, to)) return null;
 	return { template_id: t.id, value: to };
