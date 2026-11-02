@@ -58,7 +58,25 @@ def test_the_normaliser_round_trips_and_a_falling_loss_rises():
 def test_a_loss_forecast_has_its_band_in_loss_order(tmp_path):
 	m = lcpfn.load(_small(tmp_path), {"nlayers": 2})
 	loss = [2.0 + 4.0 * s**-0.5 for s in range(1, 301)]
-	fc = lcpfn.forecast_loss(m, loss, last_step=3000)
+	fc = lcpfn.forecast_loss(m, loss, last_step=3000, bin_x=False)
 	assert fc is not None and fc.lo <= fc.mid <= fc.hi and "300 loss values" not in fc.reason
 	assert "100 loss values" in fc.reason  # thinned to MAX_POINTS
+	binned = lcpfn.forecast_loss(m, loss, last_step=3000)  # 300 steps of 3000: x = 1 to 10, ten means
+	assert (
+		binned is not None
+		and binned.lo <= binned.mid <= binned.hi
+		and "10 per-x mean losses" in binned.reason
+	)
 	assert lcpfn.forecast_loss(m, loss, last_step=200) is None  # already past the last step
+
+
+def test_seen_losses_go_in_as_one_mean_per_x():
+	"""Chiya's review (Nov 2): LC-PFN's prior has one value per epoch, x = 1 to 100; a 600-step run's raw steps are six
+	to an x, so they are averaged per x first."""
+	from preflight.corpus.lcpfn import X_MAX, per_x_means
+
+	pts = [(s, float(s % 6)) for s in range(1, 61)]  # 60 steps of a 600-step run
+	got = per_x_means(pts, last_step=600)
+	assert [x for x, _ in got] == [float(b) for b in range(1, 11)]
+	assert all(abs(v - 2.5) < 1e-9 for _, v in got)  # each x holds six steps: 1..5 then 0
+	assert per_x_means([(600, 1.0)], 600) == [(float(X_MAX), 1.0)]
