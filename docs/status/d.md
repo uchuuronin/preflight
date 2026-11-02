@@ -9,6 +9,10 @@
 | 3 | 00:20 | Didn't read Modal's logs | My only route is `remote-run.yml`, and a log-reading script would be a new kind of run, which still needs a yes; A is adding a "waiting for a GPU" event | none | Say yes and I add a read-only `scripts/` log reader |
 | 4 | 01:10 | Ran the stranger audit on the deployed commit served by Vite in production mode, not the live host | The live host is refused by my workspace's network allowlist; the dev server has the same code and flags, with the API mocked (not the built bundle) | none (local) | Re-run `docs/audit/scripts/stranger.mjs` against the live URL from a machine that can reach it |
 | 5 | 01:10 | Committed four audit screenshots (about 178 KB) and the audit log under `docs/audit/nov2-stranger/` | C needs the evidence for S1 and S2, and my scratch folder isn't visible to C | none | `git rm docs/audit/nov2-stranger/*.jpg docs/audit/nov2-stranger/*.png` |
+| 6 | 01:20 | Re-ran CI's failed `python` job on `49e36af` instead of changing code | It failed in A's `tests/test_agent_recorder.py::test_parallel_calls_cant_spend_past_the_cap` with "Connection reset by peer", a network flake in a file my push didn't touch; the re-run passed | none | Nothing to undo; A can harden the test |
+| 7 | 01:45 | Wrote `docs/demo/video-plan.md` as the plan of record for Tuesday's 3-minute video, superseding the plan A and B shot lists in `storyboard.md` and `fallback-cut.md` (kept as drafts; the 45-second cut there is unchanged) | Chiya's item 3 asks for live-site flows that work today with every Meta model labelled, which the older plans predate (the guide, triage and Glimmer) | none | Point the PM back at `storyboard.md` and delete `video-plan.md` |
+| 8 | 02:00 | In the portal and numbers table, replaced "60% within 20% on an unseen GPU" (four GPUs) with B's five-GPU result, 57% of 6,694 cases | Chiya's item 4 names the five-GPU table; it's B's newer, wider measurement (`calibration-l4-phase1.md`, "The Nov 1 top-up") | none | Restore the 60% row and sentence from git |
+| 9 | 02:05 | The X post links the cockpit, not the share page, with two variants (with and without the triage shot) | `deploy.yml` doesn't ship `workers/`, so `/s/<token>` isn't live; a cockpit link opens but previews as text | none | Swap in the `/s/` link once `workers/` deploys (TODO(PM) in the file) |
 
 
 ## Cloud runs
@@ -20,6 +24,34 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 02:56 UTC | L4 (asked) | about 20 (cap) | at most about 0.60 [guess]; 0.0179 of Muse Spark by the record | `d-eval-sweep-l4` (GitHub 41380341849): cancelled while probing, no measurement |
 | Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
 | Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
+
+## Mon Nov 2, 02:05 ET (overnight: video plan, submission refresh, X post)
+
+`49e36af` CI green on its second attempt (decision 6).
+
+- **Video plan** (item 3): `docs/demo/video-plan.md`, 15 shots, about 2:55, each with its
+  voice-over line, on-screen label and status. Works now: the script, home, check-in, Boarding's
+  Muse Spark and Spark Open tags, the knobs and possible outcomes, the live guide (Muse Spark), the
+  exports, the measured agent and GRPO samples, the link and the end card. Needs by Tuesday: the
+  Oct 28 record's share link opening on the live site (A); A's production triage re-run (shot 6);
+  `harness.glimmer_private` on with one private check-in triaged by Glimmer (shot 12; otherwise a
+  captioned card of the three Pareto arms keeps Glimmer labelled); B's scored checks page (shot
+  13). Each "needs" row says what replaces
+  it if it isn't ready by Tue Nov 3, noon ET.
+- **Submission drafts** (item 4): `portal.md` now says what the live site offers (check-in, the
+  guide, the exports) and drops three stale TODOs; adds the eval sweep's catch (8 of 16 cut off,
+  A10, D's run); the five-GPU cross-GPU result (57% of 6,694, B) in place of the four-GPU 60%; the
+  corpus labelling (Spark Open: 1,117 of 1,522 agree, worse than "always stable" on divergence runs,
+  $8.79); and the three Pareto arms on the same 26 tasks (Muse Spark 23, Glimmer 15, Spark Open 14
+  ended on a tool call; $0.39, about $0.22 of GPU, $0.33). Each is a row in the numbers table with
+  its source.
+- **X post** (item 5): `docs/submission/x-post.md`, two variants (262 and 269 characters), linking
+  the cockpit until `workers/` deploys (decision 9).
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the video plan, the portal and numbers table, the X post, and this entry.
+
+Cloud runs: none.
 
 ## Mon Nov 2, 01:15 ET (overnight: stranger audit of `cfcf83c`)
 
