@@ -1,0 +1,11 @@
+{
+	"name": "20261102-091649-41419320070-c-record-export-race-a10-c2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41419320070",
+	"ref": "1ce59f253c3d0b7af0bdc4eafb56ef579ccfeacf",
+	"sha": "1ce59f253c3d0b7af0bdc4eafb56ef579ccfeacf",
+	"cmd": "modal run --env main api/record_export_app.py::export --record-id 01M6DRHDZV9XG74EKF6TWWCMM8 --name race-a10-c2",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T09:17:10Z"
+}

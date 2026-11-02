@@ -1,0 +1,7568 @@
+{
+ "schema_version": "0.6.2",
+ "record_id": "01M6DRHDZV9XG74EKF6TWWCMM8",
+ "share_token": "race-a10-c2-share-token-00",
+ "parent_id": "sample:lora-qwen",
+ "created_at": "2026-11-02T09:13:10Z",
+ "job": {
+  "lens": "finetune",
+  "source": {
+   "kind": "sample",
+   "uri": "sample://zoo/finetune_lora_hf",
+   "content_hash": "sha256:84bbfce5bb70716f37298ba3cf2d06b0b98ce62e83913a831d038b44ebbe6f8d",
+   "entrypoint": "train.py",
+   "args": []
+  },
+  "framework": "hf_trainer",
+  "script_map": {
+   "lens": "finetune",
+   "framework": "hf_trainer",
+   "entrypoint": "train.py",
+   "launch": "python train.py",
+   "model": {
+    "name": "Qwen2.5-1.5B",
+    "hf_id": "Qwen/Qwen2.5-1.5B",
+    "family": "decoder",
+    "n_layers": 28,
+    "d_model": 1536,
+    "n_heads": 12,
+    "n_kv_heads": 2,
+    "d_ff": 8960,
+    "vocab_size": 151936,
+    "head_dim": 128,
+    "max_positions": 131072,
+    "gated_mlp": true,
+    "tie_embeddings": true,
+    "norm": "rmsnorm",
+    "attn_impl": "sdpa",
+    "dtype": "bfloat16",
+    "shape_source": "hf_config",
+    "lora": {
+     "r": 16,
+     "alpha": 32.0,
+     "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+     ],
+     "dropout": 0.05
+    }
+   },
+   "data": {
+    "dataset": "yahma/alpaca-cleaned",
+    "batch_size": 4,
+    "eval_batch_size": 32,
+    "seq_len": 1024,
+    "packing": false,
+    "padding": "longest",
+    "n_examples": 50724,
+    "languages": []
+   },
+   "training": {
+    "lr": 0.0001,
+    "warmup_steps": 50,
+    "grad_accum": 4,
+    "precision": "bf16",
+    "epochs": 1.0,
+    "checkpoint_every": 500,
+    "eval_every": 200,
+    "eval_under_no_grad": false,
+    "distributed": "none"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "train.py",
+     "line": 109,
+     "expr": "trainer.train()"
+    },
+    "step_call": "trainer.train()"
+   },
+   "knobs": [
+    {
+     "id": "batch_size",
+     "label": "Batch size",
+     "kind": "int",
+     "current": 4,
+     "unit": "samples",
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 88,
+      "expr": "per_device_train_batch_size=4"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "checkpoint_every",
+     "label": "Checkpoint interval",
+     "kind": "int",
+     "current": 500,
+     "unit": "steps",
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 96,
+      "expr": "save_steps=500"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "epochs",
+     "label": "Epochs",
+     "kind": "int",
+     "current": 1,
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 93,
+      "expr": "num_train_epochs=1"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "eval_batch_size",
+     "label": "Eval batch size",
+     "kind": "int",
+     "current": 32,
+     "unit": "samples",
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 89,
+      "expr": "per_device_eval_batch_size=32"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "eval_every",
+     "label": "Eval interval",
+     "kind": "int",
+     "current": 200,
+     "unit": "steps",
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 33,
+      "expr": "EVAL_EVERY = 200"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "grad_accum",
+     "label": "Gradient accumulation",
+     "kind": "int",
+     "current": 4,
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 90,
+      "expr": "gradient_accumulation_steps=4"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "log_every",
+     "label": "Log interval",
+     "kind": "int",
+     "current": 10,
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 95,
+      "expr": "logging_steps=10"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "lora_alpha",
+     "label": "LoRA alpha",
+     "kind": "int",
+     "current": 32,
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 42,
+      "expr": "lora_alpha=32"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "lora_dropout",
+     "label": "LoRA dropout",
+     "kind": "float",
+     "current": 0.05,
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 43,
+      "expr": "lora_dropout=0.05"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "lora_r",
+     "label": "LoRA rank",
+     "kind": "int",
+     "current": 16,
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 41,
+      "expr": "r=16"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "lr",
+     "label": "Learning rate",
+     "kind": "float",
+     "current": 0.0001,
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 91,
+      "expr": "learning_rate=1e-4"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "precision",
+     "label": "Precision",
+     "kind": "categorical",
+     "current": "bf16",
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 94,
+      "expr": "bf16=True"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "seq_len",
+     "label": "Sequence length",
+     "kind": "int",
+     "current": 1024,
+     "unit": "tokens",
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 32,
+      "expr": "MAX_LEN = 1024"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "warmup_steps",
+     "label": "Warm-up steps",
+     "kind": "int",
+     "current": 50,
+     "unit": "steps",
+     "choices": [],
+     "location": {
+      "file": "train.py",
+      "line": 92,
+      "expr": "warmup_steps=50"
+     },
+     "needs_code": false
+    }
+   ],
+   "blocks": [],
+   "risks": [
+    "Eval forward in PerplexityCallback.on_step_end (train.py:79) runs without torch.no_grad(); activations for backward are kept",
+    "Eval batch 32 is 8x the train batch",
+    "No sequence packing; batches are padded (longest)"
+   ],
+   "produced_by": "adapter",
+   "confidence": 0.85
+  },
+  "objective": {
+   "kind": "min_time",
+   "weights": {}
+  },
+  "constraints": {
+   "gpu_types": [
+    "A10"
+   ],
+   "preemption": {
+    "kind": "none"
+   }
+  }
+ },
+ "env": {
+  "backend": "cuda",
+  "provider": "local",
+  "gpu": {
+   "name": "A10",
+   "count": 1,
+   "memory_bytes": 23684186112,
+   "vendor": "nvidia",
+   "compute_capability": "8.6"
+  },
+  "nodes": 1,
+  "libraries": {
+   "torch": "2.5.1",
+   "transformers": "4.46.3",
+   "peft": "0.13.2",
+   "trl": "0.14.0",
+   "accelerate": "1.1.1",
+   "datasets": "3.1.0"
+  },
+  "python": "3.11.12"
+ },
+ "graph": {
+  "nodes": [
+   {
+    "id": "data",
+    "label": "alpaca-cleaned \u00b7 padded (longest)",
+    "kind": "data",
+    "repeat": 1,
+    "metrics": [
+     "probe.data.loader_wait_fraction",
+     "probe.data.padding_fraction"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "model",
+    "label": "Qwen2.5-1.5B",
+    "kind": "group",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "embed",
+    "label": "Embedding",
+    "kind": "module",
+    "parent": "model",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "block",
+    "label": "Decoder block",
+    "kind": "group",
+    "parent": "model",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "attn",
+    "label": "Self-attention + LoRA",
+    "kind": "module",
+    "parent": "block",
+    "repeat": 1,
+    "metrics": [
+     "probe.stability.max_attn_logit"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "mlp",
+    "label": "MLP + LoRA",
+    "kind": "module",
+    "parent": "block",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "lm_head",
+    "label": "LM head",
+    "kind": "module",
+    "parent": "model",
+    "repeat": 1,
+    "metrics": [
+     "memory.by_term.logits"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "loss",
+    "label": "Loss",
+    "kind": "loss",
+    "repeat": 1,
+    "metrics": [
+     "probe.stability.loss"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "optimizer",
+    "label": "Optimizer (LoRA params)",
+    "kind": "optimizer",
+    "repeat": 1,
+    "metrics": [
+     "probe.stability.grad_norm"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "eval",
+    "label": "Eval loop \u00b7 batch 32",
+    "kind": "phase",
+    "repeat": 1,
+    "metrics": [
+     "risk.oom",
+     "probe.eval.peak_allocated_bytes"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "ckpt",
+    "label": "Checkpoint every 500 steps",
+    "kind": "io",
+    "repeat": 1,
+    "metrics": [
+     "risk.preemption_loss",
+     "probe.checkpoint.seconds_mean"
+    ],
+    "attrs": {}
+   }
+  ],
+  "edges": [
+   {
+    "source": "embed",
+    "target": "attn",
+    "kind": "data"
+   },
+   {
+    "source": "attn",
+    "target": "mlp",
+    "kind": "data"
+   },
+   {
+    "source": "mlp",
+    "target": "lm_head",
+    "kind": "data"
+   },
+   {
+    "source": "data",
+    "target": "embed",
+    "kind": "tokens",
+    "metric": "probe.throughput.tokens_per_s"
+   },
+   {
+    "source": "lm_head",
+    "target": "loss",
+    "kind": "data"
+   },
+   {
+    "source": "loss",
+    "target": "optimizer",
+    "kind": "grad"
+   },
+   {
+    "source": "optimizer",
+    "target": "embed",
+    "kind": "weights"
+   },
+   {
+    "source": "data",
+    "target": "eval",
+    "kind": "control"
+   },
+   {
+    "source": "optimizer",
+    "target": "ckpt",
+    "kind": "control"
+   }
+  ],
+  "skeleton": true
+ },
+ "knobs": [
+  {
+   "id": "checkpoint_every",
+   "label_key": "knob.checkpoint_every",
+   "unit": "steps",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 1000000.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 500,
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [
+    "ckpt"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "eval_every",
+   "label_key": "knob.eval_every",
+   "unit": "steps",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 100000.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 200,
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [
+    "eval"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "gpu_type",
+   "label_key": "knob.gpu_type",
+   "kind": "categorical",
+   "domain": {
+    "values": [
+     "A10"
+    ],
+    "log": false
+   },
+   "current": "A10",
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [
+    "model"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "log_every",
+   "label_key": "knob.log_every",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 10000.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 10,
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [],
+   "changes_results": false
+  },
+  {
+   "id": "epochs",
+   "label_key": "knob.epochs",
+   "kind": "int",
+   "domain": {
+    "min": 0.0,
+    "max": 10.0,
+    "values": [],
+    "step": 1.0,
+    "log": false
+   },
+   "current": 1,
+   "gridded": false,
+   "needs_code": false,
+   "group": "data",
+   "affects": [
+    "data"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "packing",
+   "label_key": "knob.packing",
+   "kind": "bool",
+   "domain": {
+    "values": [],
+    "log": false
+   },
+   "current": false,
+   "gridded": false,
+   "needs_code": true,
+   "patch_template": "data.enable_packing",
+   "group": "data",
+   "affects": [
+    "data"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "batch_size",
+   "label_key": "knob.batch_size",
+   "unit": "samples",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 1024.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 4,
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [
+    "data",
+    "model"
+   ]
+  },
+  {
+   "id": "eval_batch_size",
+   "label_key": "knob.eval_batch_size",
+   "unit": "samples",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 512.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 32,
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [
+    "eval"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "eval_no_grad",
+   "label_key": "knob.eval_no_grad",
+   "kind": "bool",
+   "domain": {
+    "values": [],
+    "log": false
+   },
+   "current": false,
+   "gridded": false,
+   "needs_code": true,
+   "patch_template": "eval.wrap_no_grad",
+   "group": "memory",
+   "affects": [
+    "eval"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "gradient_checkpointing",
+   "label_key": "knob.gradient_checkpointing",
+   "kind": "bool",
+   "domain": {
+    "values": [],
+    "log": false
+   },
+   "current": false,
+   "gridded": false,
+   "needs_code": false,
+   "patch_template": "memory.gradient_checkpointing",
+   "group": "memory",
+   "affects": [
+    "block",
+    "attn",
+    "mlp"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "quantization",
+   "label_key": "knob.quantization",
+   "kind": "categorical",
+   "domain": {
+    "values": [
+     "none",
+     "int8",
+     "nf4",
+     "nf4_dq",
+     "fp4",
+     "fp4_dq"
+    ],
+    "log": false
+   },
+   "current": "none",
+   "gridded": false,
+   "needs_code": true,
+   "patch_template": "model.quantize_weights",
+   "group": "memory",
+   "affects": [
+    "model",
+    "attn",
+    "mlp"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "seq_len",
+   "label_key": "knob.seq_len",
+   "unit": "tokens",
+   "kind": "int",
+   "domain": {
+    "min": 64.0,
+    "max": 32768.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 1024,
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [
+    "data",
+    "attn",
+    "lm_head"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "lora_alpha",
+   "label_key": "knob.lora_alpha",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 1024.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 32,
+   "gridded": false,
+   "needs_code": false,
+   "group": "model",
+   "affects": [
+    "attn",
+    "mlp"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "lora_dropout",
+   "label_key": "knob.lora_dropout",
+   "kind": "float",
+   "domain": {
+    "min": 0.0,
+    "max": 0.5,
+    "values": [],
+    "log": false
+   },
+   "current": 0.05,
+   "gridded": false,
+   "needs_code": false,
+   "group": "model",
+   "affects": [
+    "attn",
+    "mlp"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "lora_r",
+   "label_key": "knob.lora_r",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 512.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 16,
+   "gridded": false,
+   "needs_code": false,
+   "group": "model",
+   "affects": [
+    "attn",
+    "mlp",
+    "optimizer"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "lr",
+   "label_key": "knob.lr",
+   "kind": "float",
+   "domain": {
+    "min": 1e-06,
+    "max": 0.01,
+    "values": [],
+    "log": true
+   },
+   "current": 0.0001,
+   "gridded": false,
+   "needs_code": false,
+   "group": "model",
+   "affects": [
+    "optimizer"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "warmup_steps",
+   "label_key": "knob.warmup_steps",
+   "unit": "steps",
+   "kind": "int",
+   "domain": {
+    "min": 0.0,
+    "max": 100000.0,
+    "values": [],
+    "step": 1.0,
+    "log": false
+   },
+   "current": 50,
+   "gridded": false,
+   "needs_code": false,
+   "group": "model",
+   "affects": [
+    "optimizer"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "attn",
+   "label_key": "knob.attn",
+   "kind": "categorical",
+   "domain": {
+    "values": [
+     "eager",
+     "sdpa",
+     "flash_attention_2",
+     "flash_attention_3",
+     "flex_attention"
+    ],
+    "log": false
+   },
+   "current": "sdpa",
+   "gridded": false,
+   "needs_code": true,
+   "patch_template": "model.attn_implementation",
+   "group": "speed",
+   "affects": [
+    "attn"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "grad_accum",
+   "label_key": "knob.grad_accum",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 256.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 4,
+   "gridded": false,
+   "needs_code": false,
+   "group": "speed",
+   "affects": [
+    "data",
+    "optimizer"
+   ]
+  },
+  {
+   "id": "precision",
+   "label_key": "knob.precision",
+   "kind": "categorical",
+   "domain": {
+    "values": [
+     "fp32",
+     "bf16",
+     "fp16"
+    ],
+    "log": false
+   },
+   "current": "bf16",
+   "gridded": false,
+   "needs_code": false,
+   "group": "speed",
+   "affects": [
+    "model"
+   ],
+   "changes_results": true
+  }
+ ],
+ "probes": [
+  {
+   "id": "v1",
+   "knobs": {
+    "checkpoint_every": 500,
+    "eval_every": 200,
+    "gpu_type": "A10",
+    "log_every": 10,
+    "epochs": 1,
+    "packing": false,
+    "batch_size": 4,
+    "eval_batch_size": 32,
+    "eval_no_grad": false,
+    "gradient_checkpointing": false,
+    "quantization": "none",
+    "seq_len": 1024,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "lora_r": 16,
+    "lr": 0.0001,
+    "warmup_steps": 50,
+    "attn": "sdpa",
+    "grad_accum": 4,
+    "precision": "bf16"
+   },
+   "status": "oom",
+   "steps": 20,
+   "started_at": "2026-11-02T09:13:15Z",
+   "duration_s": 71.794,
+   "error": "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 8.73 GiB. GPU 0 has a total capacity of 22.06 GiB of which 4.44 GiB is free. Process 1 has 17.60 GiB memory in use. Of the allocated memory 16.71 GiB is allocated by PyTorch, and 617.34 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment- at train.py:80, after step 20. Step: the eval pass. By hand: probe a smaller eval batch by hand: `preflight run train.py -- --eval_batch_size <n>`, or wrap eval in torch.no_grad().",
+   "error_code": "oom.eval",
+   "memory": {
+    "peak_allocated_bytes": 15814276608,
+    "peak_reserved_bytes": 22546481152,
+    "by_term": {
+     "weights": 3161295104,
+     "gradients": 73859072,
+     "optimizer": 147719712,
+     "logits": 636915712,
+     "activations": 11794487008
+    },
+    "peak_step": 19
+   },
+   "step_time": {
+    "n_steps": 18,
+    "mean_s": 1.4526008843315974,
+    "p50_s": 1.4311741333007812,
+    "p95_s": 1.9894200439453125,
+    "first_step_s": 2.032418263000004,
+    "by_phase": {
+     "data": 0.002771257752065277,
+     "forward": 0.43236743151213175,
+     "backward": 0.5613783860579951,
+     "optimizer": 0.003482924677807971,
+     "other": 0.0
+    },
+    "unprofiled": true
+   },
+   "throughput": {
+    "tokens_per_s": 3301.3580036213402,
+    "samples_per_s": 11.014725498643951,
+    "flops_per_step": 30143163751537.777,
+    "mfu": 0.16849473757336428
+   },
+   "stability": {
+    "series": {
+     "loss": [
+      1.619501143693924,
+      1.2915077954530716,
+      1.4345036894083023,
+      1.3464771211147308,
+      1.4155889004468918,
+      1.3089003264904022,
+      1.4322246611118317,
+      1.3761613368988037,
+      1.3818871825933456,
+      1.3659082055091858,
+      1.3195676058530807,
+      1.3059103339910507,
+      1.3609690815210342,
+      1.4020389318466187,
+      1.3365423828363419,
+      1.2053967267274857,
+      1.31783327460289,
+      1.2805466651916504,
+      1.2640412598848343,
+      1.197984829545021
+     ],
+     "grad_norm": [
+      0.9632323384284973,
+      0.6961877942085266,
+      0.5854278206825256,
+      0.7197722792625427,
+      0.7309061288833618,
+      0.9398279190063477,
+      0.6451266407966614,
+      0.9295867085456848,
+      0.6261549592018127,
+      0.8421452641487122,
+      0.8136686086654663,
+      0.8570122718811035,
+      0.6058521866798401,
+      0.6227778792381287,
+      0.6792926788330078,
+      0.7507831454277039,
+      0.7158443927764893,
+      0.6200247406959534,
+      0.5061751008033752,
+      0.6859977841377258
+     ],
+     "grad_norm_ma": [
+      0.9632323384284973,
+      0.829710066318512,
+      0.7482826511065165,
+      0.7411550581455231,
+      0.7391052722930909,
+      0.7725590467453003,
+      0.7543544173240662,
+      0.7762584537267685,
+      0.7595802876684401,
+      0.7678367853164673,
+      0.7720033147118308,
+      0.7790873944759369,
+      0.7657616092608526,
+      0.7555484856878009,
+      0.7504647652308146,
+      0.7504846639931202,
+      0.7484470009803772,
+      0.7413124309645759,
+      0.7289367820087232,
+      0.7267898321151733
+     ],
+     "update_to_weight": [
+      0.0,
+      0.0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "output_logit_norm": [
+      null,
+      1504.7110595703125,
+      1622.9678955078125,
+      1480.168212890625,
+      1401.7652587890625,
+      1406.49072265625,
+      1430.9354248046875,
+      1446.82568359375,
+      1514.318359375,
+      1487.6676025390625,
+      1508.92333984375,
+      1627.4140625,
+      1533.6192626953125,
+      1572.1317138671875,
+      1598.293701171875,
+      1490.568359375,
+      1480.2308349609375,
+      1627.0614013671875,
+      1454.856201171875,
+      1498.67041015625
+     ],
+     "lr": [
+      0.0,
+      2.0000000000000003e-06,
+      4.000000000000001e-06,
+      6e-06,
+      8.000000000000001e-06,
+      1e-05,
+      1.2e-05,
+      1.4000000000000001e-05,
+      1.6000000000000003e-05,
+      1.8e-05,
+      2e-05,
+      2.2000000000000003e-05,
+      2.4e-05,
+      2.6000000000000002e-05,
+      2.8000000000000003e-05,
+      3e-05,
+      3.2000000000000005e-05,
+      3.4000000000000007e-05,
+      3.6e-05,
+      3.8e-05
+     ],
+     "max_attn_logit": [
+      23351.49434190455,
+      23351.49434190455,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    "nan_count": 0,
+    "inf_count": 0,
+    "loss_scale_events": 0
+   },
+   "data": {
+    "padding_fraction": 0.4429937362591778,
+    "tokens_per_sample_mean": 165.77469135802468,
+    "loader_wait_fraction": 0.002771257752065277,
+    "num_workers": 0
+   },
+   "power": {
+    "mean_w": 76.05137735849057,
+    "max_w": 158.916,
+    "samples": 265
+   },
+   "eval": {
+    "batches": 1,
+    "batch_size": 32,
+    "seconds_per_batch": 1.8436496730000016,
+    "peak_allocated_bytes": 17946018304,
+    "grad_enabled": false,
+    "loader_batches": 33,
+    "memory_by_batch": [
+     3327032832
+    ]
+   },
+   "extras": {
+    "train_peak_before_eval_bytes": 15814276608.0,
+    "params_total": 1562179072.0,
+    "params_trainable": 18464768.0,
+    "tokens_per_step": 4795.555555555556,
+    "samples_per_step": 16.0,
+    "micro_steps_per_step": 4.0,
+    "host_rss_peak_bytes": 7241596928.0,
+    "train_loader_batches": 12681.0,
+    "epochs": 1.0,
+    "planned_steps": 3170.0,
+    "train_dataset_len": 50724.0,
+    "gpu_wait_s": 1.4,
+    "patched": 1.0
+   },
+   "step_log": [
+    {
+     "index": 1,
+     "kind": "warmup",
+     "wall_s": 2.032418263000004,
+     "tokens": 4644,
+     "real_tokens": 2365,
+     "samples": 20,
+     "padded_len": 386,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12461336576,
+     "peak_reserved_bytes": 13335789568,
+     "device_used_bytes": 13654884352,
+     "reserved_bytes": 13335789568
+    },
+    {
+     "index": 2,
+     "kind": "warmup",
+     "wall_s": 1.3481409110000158,
+     "tokens": 5464,
+     "real_tokens": 2809,
+     "samples": 16,
+     "padded_len": 428,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13606013440,
+     "peak_reserved_bytes": 16454254592,
+     "device_used_bytes": 16773349376,
+     "reserved_bytes": 16454254592
+    },
+    {
+     "index": 3,
+     "kind": "timed",
+     "wall_s": 1.445917724609375,
+     "tokens": 4548,
+     "real_tokens": 2785,
+     "samples": 16,
+     "padded_len": 377,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12387239936,
+     "peak_reserved_bytes": 16454254592,
+     "device_used_bytes": 16773349376,
+     "reserved_bytes": 16454254592
+    },
+    {
+     "index": 4,
+     "kind": "timed",
+     "wall_s": 1.6405411376953125,
+     "tokens": 6236,
+     "real_tokens": 2956,
+     "samples": 16,
+     "padded_len": 464,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 14379759616,
+     "peak_reserved_bytes": 19834863616,
+     "device_used_bytes": 20153958400,
+     "reserved_bytes": 19834863616
+    },
+    {
+     "index": 5,
+     "kind": "timed",
+     "wall_s": 1.319426025390625,
+     "tokens": 2836,
+     "real_tokens": 1822,
+     "samples": 16,
+     "padded_len": 265,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13714663936,
+     "peak_reserved_bytes": 20027801600,
+     "device_used_bytes": 20346896384,
+     "reserved_bytes": 20027801600
+    },
+    {
+     "index": 6,
+     "kind": "timed",
+     "wall_s": 1.0879283447265624,
+     "tokens": 5172,
+     "real_tokens": 2339,
+     "samples": 16,
+     "padded_len": 518,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11213751296,
+     "peak_reserved_bytes": 20027801600,
+     "device_used_bytes": 20346896384,
+     "reserved_bytes": 20027801600
+    },
+    {
+     "index": 7,
+     "kind": "timed",
+     "wall_s": 1.9894200439453125,
+     "tokens": 4952,
+     "real_tokens": 2605,
+     "samples": 16,
+     "padded_len": 518,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15776028672,
+     "peak_reserved_bytes": 22546481152,
+     "device_used_bytes": 17333288960,
+     "reserved_bytes": 17014194176
+    },
+    {
+     "index": 8,
+     "kind": "timed",
+     "wall_s": 1.2520140380859375,
+     "tokens": 4332,
+     "real_tokens": 2434,
+     "samples": 16,
+     "padded_len": 324,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11181462016,
+     "peak_reserved_bytes": 17014194176,
+     "device_used_bytes": 17333288960,
+     "reserved_bytes": 17014194176
+    },
+    {
+     "index": 9,
+     "kind": "timed",
+     "wall_s": 1.4340260009765624,
+     "tokens": 4984,
+     "real_tokens": 2937,
+     "samples": 16,
+     "padded_len": 426,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13568390656,
+     "peak_reserved_bytes": 17114857472,
+     "device_used_bytes": 17433952256,
+     "reserved_bytes": 17114857472
+    },
+    {
+     "index": 10,
+     "kind": "timed",
+     "wall_s": 1.1976519775390626,
+     "tokens": 3600,
+     "real_tokens": 1930,
+     "samples": 16,
+     "padded_len": 382,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12545330688,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 11,
+     "kind": "timed",
+     "wall_s": 1.0902159423828126,
+     "tokens": 3004,
+     "real_tokens": 1930,
+     "samples": 16,
+     "padded_len": 365,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12147591680,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 12,
+     "kind": "timed",
+     "wall_s": 1.11751171875,
+     "tokens": 4732,
+     "real_tokens": 2438,
+     "samples": 16,
+     "padded_len": 356,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11008157184,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 13,
+     "kind": "timed",
+     "wall_s": 1.47981005859375,
+     "tokens": 4688,
+     "real_tokens": 2708,
+     "samples": 16,
+     "padded_len": 331,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11767319040,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 14,
+     "kind": "timed",
+     "wall_s": 1.405907958984375,
+     "tokens": 4388,
+     "real_tokens": 2729,
+     "samples": 16,
+     "padded_len": 400,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12851328000,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 15,
+     "kind": "timed",
+     "wall_s": 1.428322265625,
+     "tokens": 5500,
+     "real_tokens": 2930,
+     "samples": 16,
+     "padded_len": 415,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13348969472,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 16,
+     "kind": "timed",
+     "wall_s": 1.2614942626953125,
+     "tokens": 3636,
+     "real_tokens": 2298,
+     "samples": 16,
+     "padded_len": 283,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12059478016,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 17,
+     "kind": "timed",
+     "wall_s": 1.5945174560546875,
+     "tokens": 6044,
+     "real_tokens": 2649,
+     "samples": 16,
+     "padded_len": 416,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12695136768,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 18,
+     "kind": "timed",
+     "wall_s": 1.7179453125,
+     "tokens": 6124,
+     "real_tokens": 4051,
+     "samples": 16,
+     "padded_len": 524,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15738223616,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 19,
+     "kind": "timed",
+     "wall_s": 2.0662119140625,
+     "tokens": 6364,
+     "real_tokens": 3970,
+     "samples": 16,
+     "padded_len": 477,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15814276608,
+     "peak_reserved_bytes": 21053308928,
+     "device_used_bytes": 21372403712,
+     "reserved_bytes": 21053308928
+    },
+    {
+     "index": 20,
+     "kind": "timed",
+     "wall_s": 1.6179537353515625,
+     "tokens": 5180,
+     "real_tokens": 3026,
+     "samples": 16,
+     "padded_len": 345,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12965454336,
+     "peak_reserved_bytes": 21053308928,
+     "device_used_bytes": 21372403712,
+     "reserved_bytes": 21053308928
+    }
+   ],
+   "cost": {
+    "gpu_seconds": 71.794,
+    "usd": 0.021937
+   },
+   "cache_key": "sha256:9b4d7ac94173429499ce8d3055511812e903ac9fc99118a50a0dab5ae6bb0579"
+  },
+  {
+   "id": "v1-base",
+   "knobs": {
+    "checkpoint_every": 500,
+    "eval_every": 200,
+    "gpu_type": "A10",
+    "log_every": 10,
+    "epochs": 1,
+    "packing": false,
+    "batch_size": 4,
+    "eval_batch_size": 32,
+    "eval_no_grad": false,
+    "gradient_checkpointing": false,
+    "quantization": "none",
+    "seq_len": 1024,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "lora_r": 16,
+    "lr": 0.0001,
+    "warmup_steps": 50,
+    "attn": "sdpa",
+    "grad_accum": 4,
+    "precision": "bf16"
+   },
+   "status": "oom",
+   "steps": 20,
+   "started_at": "2026-11-02T09:14:27Z",
+   "duration_s": 40.812,
+   "error": "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB. GPU 0 has a total capacity of 22.06 GiB of which 416.69 MiB is free. Process 1 has 21.64 GiB memory in use. Of the allocated memory 20.10 GiB is allocated by PyTorch, and 1.26 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environmen at train.py:79, after step 20. Step: the eval pass. By hand: probe a smaller eval batch by hand: `preflight run train.py -- --eval_batch_size <n>`, or wrap eval in torch.no_grad().",
+   "error_code": "oom.eval",
+   "memory": {
+    "peak_allocated_bytes": 15814276608,
+    "peak_reserved_bytes": 22546481152,
+    "by_term": {
+     "weights": 3161295104,
+     "gradients": 73859072,
+     "optimizer": 147719712,
+     "logits": 636915712,
+     "activations": 11794487008
+    },
+    "peak_step": 19
+   },
+   "step_time": {
+    "n_steps": 18,
+    "mean_s": 1.4521210259331596,
+    "p50_s": 1.4292761230468751,
+    "p95_s": 1.993634765625,
+    "first_step_s": 1.7162266389999843,
+    "by_phase": {
+     "data": 0.0030710580057083294,
+     "forward": 0.4301772467828034,
+     "backward": 0.5635068437910529,
+     "optimizer": 0.0032448514204354117,
+     "other": 0.0
+    },
+    "unprofiled": true
+   },
+   "throughput": {
+    "tokens_per_s": 3302.44894875332,
+    "samples_per_s": 11.018365352652411,
+    "flops_per_step": 30143163751537.777,
+    "mfu": 0.1687184905168905
+   },
+   "stability": {
+    "series": {
+     "loss": [
+      1.619501143693924,
+      1.2915077954530716,
+      1.4351351410150528,
+      1.347523272037506,
+      1.4150333851575851,
+      1.310110405087471,
+      1.432056725025177,
+      1.3775759488344193,
+      1.3821538835763931,
+      1.3657052963972092,
+      1.3201159536838531,
+      1.3060726821422577,
+      1.3590250760316849,
+      1.4018068760633469,
+      1.3369132280349731,
+      1.2056061625480652,
+      1.316134661436081,
+      1.281002938747406,
+      1.2634553015232086,
+      1.1985807567834854
+     ],
+     "grad_norm": [
+      0.9633191823959351,
+      0.6961749792098999,
+      0.5854368805885315,
+      0.719821572303772,
+      0.7306323647499084,
+      0.941443145275116,
+      0.6460105776786804,
+      0.9314866662025452,
+      0.6256603002548218,
+      0.8432997465133667,
+      0.8131453394889832,
+      0.8560320138931274,
+      0.6057546734809875,
+      0.6236006617546082,
+      0.6770660877227783,
+      0.748561441898346,
+      0.7148416042327881,
+      0.6193336248397827,
+      0.5055825710296631,
+      0.6852036118507385
+     ],
+     "grad_norm_ma": [
+      0.9633191823959351,
+      0.8297470808029175,
+      0.7483103473981222,
+      0.7411881536245346,
+      0.7390769958496094,
+      0.7728046874205271,
+      0.7546912431716919,
+      0.7767906710505486,
+      0.7599984076288011,
+      0.7683285415172577,
+      0.7724027958783236,
+      0.7793718973795573,
+      0.7660167263104365,
+      0.7558441502707345,
+      0.7505922794342041,
+      0.750465352088213,
+      0.7483698375084821,
+      0.7412011590268877,
+      0.7288001807112443,
+      0.726620352268219
+     ],
+     "update_to_weight": [
+      0.0,
+      0.0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "output_logit_norm": [
+      null,
+      1504.7110595703125,
+      1623.08740234375,
+      1479.68017578125,
+      1400.9034423828125,
+      1405.1553955078125,
+      1430.11767578125,
+      1445.599609375,
+      1514.04736328125,
+      1488.548095703125,
+      1508.2789306640625,
+      1627.55810546875,
+      1534.9888916015625,
+      1571.406494140625,
+      1598.6512451171875,
+      1490.0206298828125,
+      1480.94580078125,
+      1627.408203125,
+      1454.7005615234375,
+      1499.396484375
+     ],
+     "lr": [
+      0.0,
+      2.0000000000000003e-06,
+      4.000000000000001e-06,
+      6e-06,
+      8.000000000000001e-06,
+      1e-05,
+      1.2e-05,
+      1.4000000000000001e-05,
+      1.6000000000000003e-05,
+      1.8e-05,
+      2e-05,
+      2.2000000000000003e-05,
+      2.4e-05,
+      2.6000000000000002e-05,
+      2.8000000000000003e-05,
+      3e-05,
+      3.2000000000000005e-05,
+      3.4000000000000007e-05,
+      3.6e-05,
+      3.8e-05
+     ],
+     "max_attn_logit": [
+      23351.49434190455,
+      23351.49434190455,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    "nan_count": 0,
+    "inf_count": 0,
+    "loss_scale_events": 0
+   },
+   "data": {
+    "padding_fraction": 0.4429937362591778,
+    "tokens_per_sample_mean": 165.77469135802468,
+    "loader_wait_fraction": 0.0030710580057083294,
+    "num_workers": 0
+   },
+   "power": {
+    "mean_w": 123.4858493150685,
+    "max_w": 157.876,
+    "samples": 146
+   },
+   "eval": {
+    "batches": 1,
+    "batch_size": 32,
+    "seconds_per_batch": 0.6038725110000058,
+    "peak_allocated_bytes": 21903543296,
+    "loader_batches": 33,
+    "memory_by_batch": [
+     3327032832
+    ]
+   },
+   "extras": {
+    "train_peak_before_eval_bytes": 15814276608.0,
+    "params_total": 1562179072.0,
+    "params_trainable": 18464768.0,
+    "tokens_per_step": 4795.555555555556,
+    "samples_per_step": 16.0,
+    "micro_steps_per_step": 4.0,
+    "host_rss_peak_bytes": 7171489792.0,
+    "train_loader_batches": 12681.0,
+    "epochs": 1.0,
+    "planned_steps": 3170.0,
+    "train_dataset_len": 50724.0
+   },
+   "step_log": [
+    {
+     "index": 1,
+     "kind": "warmup",
+     "wall_s": 1.7162266389999843,
+     "tokens": 4644,
+     "real_tokens": 2365,
+     "samples": 20,
+     "padded_len": 386,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12461336576,
+     "peak_reserved_bytes": 13335789568,
+     "device_used_bytes": 13654884352,
+     "reserved_bytes": 13335789568
+    },
+    {
+     "index": 2,
+     "kind": "warmup",
+     "wall_s": 1.340979180000005,
+     "tokens": 5464,
+     "real_tokens": 2809,
+     "samples": 16,
+     "padded_len": 428,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13606013440,
+     "peak_reserved_bytes": 16454254592,
+     "device_used_bytes": 16773349376,
+     "reserved_bytes": 16454254592
+    },
+    {
+     "index": 3,
+     "kind": "timed",
+     "wall_s": 1.4450308837890624,
+     "tokens": 4548,
+     "real_tokens": 2785,
+     "samples": 16,
+     "padded_len": 377,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12387239936,
+     "peak_reserved_bytes": 16454254592,
+     "device_used_bytes": 16773349376,
+     "reserved_bytes": 16454254592
+    },
+    {
+     "index": 4,
+     "kind": "timed",
+     "wall_s": 1.6325355224609375,
+     "tokens": 6236,
+     "real_tokens": 2956,
+     "samples": 16,
+     "padded_len": 464,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 14379759616,
+     "peak_reserved_bytes": 19834863616,
+     "device_used_bytes": 20153958400,
+     "reserved_bytes": 19834863616
+    },
+    {
+     "index": 5,
+     "kind": "timed",
+     "wall_s": 1.3217802734375,
+     "tokens": 2836,
+     "real_tokens": 1822,
+     "samples": 16,
+     "padded_len": 265,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13714663936,
+     "peak_reserved_bytes": 20027801600,
+     "device_used_bytes": 20346896384,
+     "reserved_bytes": 20027801600
+    },
+    {
+     "index": 6,
+     "kind": "timed",
+     "wall_s": 1.081376708984375,
+     "tokens": 5172,
+     "real_tokens": 2339,
+     "samples": 16,
+     "padded_len": 518,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11213751296,
+     "peak_reserved_bytes": 20027801600,
+     "device_used_bytes": 20346896384,
+     "reserved_bytes": 20027801600
+    },
+    {
+     "index": 7,
+     "kind": "timed",
+     "wall_s": 1.993634765625,
+     "tokens": 4952,
+     "real_tokens": 2605,
+     "samples": 16,
+     "padded_len": 518,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15776028672,
+     "peak_reserved_bytes": 22546481152,
+     "device_used_bytes": 17333288960,
+     "reserved_bytes": 17014194176
+    },
+    {
+     "index": 8,
+     "kind": "timed",
+     "wall_s": 1.252991943359375,
+     "tokens": 4332,
+     "real_tokens": 2434,
+     "samples": 16,
+     "padded_len": 324,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11181462016,
+     "peak_reserved_bytes": 17014194176,
+     "device_used_bytes": 17333288960,
+     "reserved_bytes": 17014194176
+    },
+    {
+     "index": 9,
+     "kind": "timed",
+     "wall_s": 1.4309232177734375,
+     "tokens": 4984,
+     "real_tokens": 2937,
+     "samples": 16,
+     "padded_len": 426,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13568390656,
+     "peak_reserved_bytes": 17114857472,
+     "device_used_bytes": 17433952256,
+     "reserved_bytes": 17114857472
+    },
+    {
+     "index": 10,
+     "kind": "timed",
+     "wall_s": 1.1960770263671876,
+     "tokens": 3600,
+     "real_tokens": 1930,
+     "samples": 16,
+     "padded_len": 382,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12545330688,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 11,
+     "kind": "timed",
+     "wall_s": 1.0900655517578124,
+     "tokens": 3004,
+     "real_tokens": 1930,
+     "samples": 16,
+     "padded_len": 365,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12147591680,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 12,
+     "kind": "timed",
+     "wall_s": 1.115875244140625,
+     "tokens": 4732,
+     "real_tokens": 2438,
+     "samples": 16,
+     "padded_len": 356,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11008157184,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 13,
+     "kind": "timed",
+     "wall_s": 1.4838865966796875,
+     "tokens": 4688,
+     "real_tokens": 2708,
+     "samples": 16,
+     "padded_len": 331,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11767319040,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 14,
+     "kind": "timed",
+     "wall_s": 1.4068316650390624,
+     "tokens": 4388,
+     "real_tokens": 2729,
+     "samples": 16,
+     "padded_len": 400,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12851328000,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 15,
+     "kind": "timed",
+     "wall_s": 1.4276290283203126,
+     "tokens": 5500,
+     "real_tokens": 2930,
+     "samples": 16,
+     "padded_len": 415,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13348969472,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 16,
+     "kind": "timed",
+     "wall_s": 1.261981689453125,
+     "tokens": 3636,
+     "real_tokens": 2298,
+     "samples": 16,
+     "padded_len": 283,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12059478016,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 17,
+     "kind": "timed",
+     "wall_s": 1.599637451171875,
+     "tokens": 6044,
+     "real_tokens": 2649,
+     "samples": 16,
+     "padded_len": 416,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12695136768,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 18,
+     "kind": "timed",
+     "wall_s": 1.7174384765625,
+     "tokens": 6124,
+     "real_tokens": 4051,
+     "samples": 16,
+     "padded_len": 524,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15738223616,
+     "peak_reserved_bytes": 17232297984,
+     "device_used_bytes": 17551392768,
+     "reserved_bytes": 17232297984
+    },
+    {
+     "index": 19,
+     "kind": "timed",
+     "wall_s": 2.06639013671875,
+     "tokens": 6364,
+     "real_tokens": 3970,
+     "samples": 16,
+     "padded_len": 477,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15814276608,
+     "peak_reserved_bytes": 21053308928,
+     "device_used_bytes": 21372403712,
+     "reserved_bytes": 21053308928
+    },
+    {
+     "index": 20,
+     "kind": "timed",
+     "wall_s": 1.61409228515625,
+     "tokens": 5180,
+     "real_tokens": 3026,
+     "samples": 16,
+     "padded_len": 345,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12965454336,
+     "peak_reserved_bytes": 21053308928,
+     "device_used_bytes": 21372403712,
+     "reserved_bytes": 21053308928
+    }
+   ],
+   "cost": {
+    "gpu_seconds": 40.812,
+    "usd": 0.01247
+   },
+   "cache_key": "sha256:c3f76cd6cec4fcfaf1a3b7f1624f718dcc004f16493ad7698b67d19fe12a7fc6"
+  },
+  {
+   "id": "v1-seed",
+   "knobs": {
+    "checkpoint_every": 500,
+    "eval_every": 200,
+    "gpu_type": "A10",
+    "log_every": 10,
+    "epochs": 1,
+    "packing": false,
+    "batch_size": 4,
+    "eval_batch_size": 32,
+    "eval_no_grad": false,
+    "gradient_checkpointing": false,
+    "quantization": "none",
+    "seq_len": 1024,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "lora_r": 16,
+    "lr": 0.0001,
+    "warmup_steps": 50,
+    "attn": "sdpa",
+    "grad_accum": 4,
+    "precision": "bf16"
+   },
+   "status": "oom",
+   "steps": 20,
+   "started_at": "2026-11-02T09:15:08Z",
+   "duration_s": 39.888,
+   "error": "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 266.00 MiB. GPU 0 has a total capacity of 22.06 GiB of which 40.69 MiB is free. Process 1 has 22.01 GiB memory in use. Of the allocated memory 20.61 GiB is allocated by PyTorch, and 1.11 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment at train.py:79, after step 20. Step: the eval pass. By hand: probe a smaller eval batch by hand: `preflight run train.py -- --eval_batch_size <n>`, or wrap eval in torch.no_grad().",
+   "error_code": "oom.eval",
+   "memory": {
+    "peak_allocated_bytes": 17292887040,
+    "peak_reserved_bytes": 23192403968,
+    "by_term": {
+     "weights": 3161295104,
+     "gradients": 73859072,
+     "optimizer": 147719712,
+     "logits": 709844992,
+     "activations": 13200168160
+    },
+    "peak_step": 13
+   },
+   "step_time": {
+    "n_steps": 18,
+    "mean_s": 1.462116919623481,
+    "p50_s": 1.480762878417969,
+    "p95_s": 1.8664632568359374,
+    "first_step_s": 1.8708648080000074,
+    "by_phase": {
+     "data": 0.002603111926291037,
+     "forward": 0.4449187976597349,
+     "backward": 0.5486610204242282,
+     "optimizer": 0.0038170699897459386,
+     "other": 0.0
+    },
+    "unprofiled": true
+   },
+   "throughput": {
+    "tokens_per_s": 3330.0270474557587,
+    "samples_per_s": 10.943037307933118,
+    "flops_per_step": 30604111111964.44,
+    "mfu": 0.1653424005045915
+   },
+   "stability": {
+    "series": {
+     "loss": [
+      1.3232510089874268,
+      1.6203550696372986,
+      1.375316470861435,
+      1.3807837665081024,
+      1.103031650185585,
+      1.2721565216779709,
+      1.3305721282958984,
+      1.5814300030469894,
+      1.3142205774784088,
+      1.4339222759008408,
+      1.4785677790641785,
+      1.6808473616838455,
+      1.1213696897029877,
+      1.3225985020399094,
+      1.0976459383964539,
+      1.3634795099496841,
+      1.1354791074991226,
+      1.1580775529146194,
+      1.2939358055591583,
+      1.2836720049381256
+     ],
+     "grad_norm": [
+      0.878571093082428,
+      0.9685274362564087,
+      0.9999991655349731,
+      0.6142223477363586,
+      0.7331729531288147,
+      0.7200993895530701,
+      0.6435539126396179,
+      0.8253973126411438,
+      0.8166583180427551,
+      0.9622783064842224,
+      0.8951109647750854,
+      0.9999990463256836,
+      0.8067233562469482,
+      0.824651837348938,
+      0.5205869078636169,
+      0.9999991059303284,
+      0.6475457549095154,
+      0.7005773782730103,
+      0.7969554662704468,
+      0.9999992251396179
+     ],
+     "grad_norm_ma": [
+      0.878571093082428,
+      0.9235492646694183,
+      0.9490325649579366,
+      0.8653300106525421,
+      0.8388985991477966,
+      0.8190987308820089,
+      0.7940208997045245,
+      0.7979429513216019,
+      0.8000224365128411,
+      0.8162480235099793,
+      0.8234173818068071,
+      0.8381325205167135,
+      0.8357164309575007,
+      0.8349261028426034,
+      0.813970156510671,
+      0.8255969658493996,
+      0.8151233652058769,
+      0.8087596992651621,
+      0.8081384238443876,
+      0.8177314639091492
+     ],
+     "update_to_weight": [
+      0.0,
+      0.0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "output_logit_norm": [
+      null,
+      1468.8411865234375,
+      1466.75732421875,
+      1588.584716796875,
+      1404.4627685546875,
+      1457.59521484375,
+      1511.868896484375,
+      1400.690673828125,
+      1516.366943359375,
+      1497.9271240234375,
+      1484.2333984375,
+      1496.4302978515625,
+      1414.2548828125,
+      1511.2984619140625,
+      1585.012939453125,
+      1480.1463623046875,
+      1533.50390625,
+      1468.8406982421875,
+      1504.2034912109375,
+      1482.7945556640625
+     ],
+     "lr": [
+      0.0,
+      2.0000000000000003e-06,
+      4.000000000000001e-06,
+      6e-06,
+      8.000000000000001e-06,
+      1e-05,
+      1.2e-05,
+      1.4000000000000001e-05,
+      1.6000000000000003e-05,
+      1.8e-05,
+      2e-05,
+      2.2000000000000003e-05,
+      2.4e-05,
+      2.6000000000000002e-05,
+      2.8000000000000003e-05,
+      3e-05,
+      3.2000000000000005e-05,
+      3.4000000000000007e-05,
+      3.6e-05,
+      3.8e-05
+     ],
+     "max_attn_logit": [
+      24256.59102182333,
+      23351.49434190455,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    "nan_count": 0,
+    "inf_count": 0,
+    "loss_scale_events": 0
+   },
+   "data": {
+    "padding_fraction": 0.4658692513920396,
+    "tokens_per_sample_mean": 159.87654320987653,
+    "loader_wait_fraction": 0.002603111926291037,
+    "num_workers": 0
+   },
+   "power": {
+    "mean_w": 129.55003448275863,
+    "max_w": 159.216,
+    "samples": 145
+   },
+   "eval": {
+    "batches": 1,
+    "batch_size": 32,
+    "seconds_per_batch": 0.643307722000003,
+    "peak_allocated_bytes": 22133447168,
+    "loader_batches": 33,
+    "memory_by_batch": [
+     3327032832
+    ]
+   },
+   "extras": {
+    "train_peak_before_eval_bytes": 17292887040.0,
+    "params_total": 1562179072.0,
+    "params_trainable": 18464768.0,
+    "tokens_per_step": 4868.888888888889,
+    "samples_per_step": 16.0,
+    "micro_steps_per_step": 4.0,
+    "host_rss_peak_bytes": 7168393216.0,
+    "train_loader_batches": 12681.0,
+    "epochs": 1.0,
+    "planned_steps": 3170.0,
+    "train_dataset_len": 50724.0
+   },
+   "step_log": [
+    {
+     "index": 1,
+     "kind": "warmup",
+     "wall_s": 1.8708648080000074,
+     "tokens": 5788,
+     "real_tokens": 2833,
+     "samples": 20,
+     "padded_len": 392,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12515955712,
+     "peak_reserved_bytes": 14952693760,
+     "device_used_bytes": 15271788544,
+     "reserved_bytes": 14952693760
+    },
+    {
+     "index": 2,
+     "kind": "warmup",
+     "wall_s": 1.2135844140000103,
+     "tokens": 3552,
+     "real_tokens": 1829,
+     "samples": 16,
+     "padded_len": 411,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13205327872,
+     "peak_reserved_bytes": 18131976192,
+     "device_used_bytes": 18451070976,
+     "reserved_bytes": 18131976192
+    },
+    {
+     "index": 3,
+     "kind": "timed",
+     "wall_s": 0.9538068237304688,
+     "tokens": 3944,
+     "real_tokens": 2164,
+     "samples": 16,
+     "padded_len": 347,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 9257466368,
+     "peak_reserved_bytes": 18131976192,
+     "device_used_bytes": 18451070976,
+     "reserved_bytes": 18131976192
+    },
+    {
+     "index": 4,
+     "kind": "timed",
+     "wall_s": 1.79030224609375,
+     "tokens": 5712,
+     "real_tokens": 3412,
+     "samples": 16,
+     "padded_len": 520,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15740591104,
+     "peak_reserved_bytes": 21921529856,
+     "device_used_bytes": 22240624640,
+     "reserved_bytes": 21921529856
+    },
+    {
+     "index": 5,
+     "kind": "timed",
+     "wall_s": 1.464932373046875,
+     "tokens": 5372,
+     "real_tokens": 3202,
+     "samples": 16,
+     "padded_len": 487,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15031855616,
+     "peak_reserved_bytes": 21921529856,
+     "device_used_bytes": 22240624640,
+     "reserved_bytes": 21921529856
+    },
+    {
+     "index": 6,
+     "kind": "timed",
+     "wall_s": 1.7269176025390625,
+     "tokens": 6256,
+     "real_tokens": 2658,
+     "samples": 16,
+     "padded_len": 522,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12729279488,
+     "peak_reserved_bytes": 21921529856,
+     "device_used_bytes": 22240624640,
+     "reserved_bytes": 21921529856
+    },
+    {
+     "index": 7,
+     "kind": "timed",
+     "wall_s": 2.036030517578125,
+     "tokens": 4980,
+     "real_tokens": 2821,
+     "samples": 16,
+     "padded_len": 373,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15778861056,
+     "peak_reserved_bytes": 23192403968,
+     "device_used_bytes": 17201168384,
+     "reserved_bytes": 16882073600
+    },
+    {
+     "index": 8,
+     "kind": "timed",
+     "wall_s": 1.13107861328125,
+     "tokens": 4236,
+     "real_tokens": 2643,
+     "samples": 16,
+     "padded_len": 332,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11318269952,
+     "peak_reserved_bytes": 16993222656,
+     "device_used_bytes": 17312317440,
+     "reserved_bytes": 16993222656
+    },
+    {
+     "index": 9,
+     "kind": "timed",
+     "wall_s": 1.4965933837890626,
+     "tokens": 4468,
+     "real_tokens": 2235,
+     "samples": 16,
+     "padded_len": 516,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15735940608,
+     "peak_reserved_bytes": 16993222656,
+     "device_used_bytes": 17312317440,
+     "reserved_bytes": 16993222656
+    },
+    {
+     "index": 10,
+     "kind": "timed",
+     "wall_s": 1.266404296875,
+     "tokens": 4440,
+     "real_tokens": 2094,
+     "samples": 16,
+     "padded_len": 436,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13766004224,
+     "peak_reserved_bytes": 17045651456,
+     "device_used_bytes": 17364746240,
+     "reserved_bytes": 17045651456
+    },
+    {
+     "index": 11,
+     "kind": "timed",
+     "wall_s": 1.336258544921875,
+     "tokens": 5208,
+     "real_tokens": 2769,
+     "samples": 16,
+     "padded_len": 481,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 14839611392,
+     "peak_reserved_bytes": 17045651456,
+     "device_used_bytes": 17364746240,
+     "reserved_bytes": 17045651456
+    },
+    {
+     "index": 12,
+     "kind": "timed",
+     "wall_s": 1.0576240234375,
+     "tokens": 2932,
+     "real_tokens": 1534,
+     "samples": 16,
+     "padded_len": 326,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13357046784,
+     "peak_reserved_bytes": 17045651456,
+     "device_used_bytes": 17364746240,
+     "reserved_bytes": 17045651456
+    },
+    {
+     "index": 13,
+     "kind": "timed",
+     "wall_s": 1.585807373046875,
+     "tokens": 5136,
+     "real_tokens": 2428,
+     "samples": 16,
+     "padded_len": 584,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 17292887040,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    },
+    {
+     "index": 14,
+     "kind": "timed",
+     "wall_s": 1.221833740234375,
+     "tokens": 4808,
+     "real_tokens": 2683,
+     "samples": 16,
+     "padded_len": 479,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 10917051904,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    },
+    {
+     "index": 15,
+     "kind": "timed",
+     "wall_s": 1.8664632568359374,
+     "tokens": 4776,
+     "real_tokens": 3099,
+     "samples": 16,
+     "padded_len": 428,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 14728740352,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    },
+    {
+     "index": 16,
+     "kind": "timed",
+     "wall_s": 1.1722557373046876,
+     "tokens": 4848,
+     "real_tokens": 2593,
+     "samples": 16,
+     "padded_len": 373,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 12321802752,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    },
+    {
+     "index": 17,
+     "kind": "timed",
+     "wall_s": 1.6837867431640625,
+     "tokens": 6280,
+     "real_tokens": 3579,
+     "samples": 16,
+     "padded_len": 497,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13411124736,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    },
+    {
+     "index": 18,
+     "kind": "timed",
+     "wall_s": 1.8071307373046874,
+     "tokens": 5788,
+     "real_tokens": 2809,
+     "samples": 16,
+     "padded_len": 437,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 15161553408,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    },
+    {
+     "index": 19,
+     "kind": "timed",
+     "wall_s": 1.7045400390625,
+     "tokens": 4624,
+     "real_tokens": 2596,
+     "samples": 16,
+     "padded_len": 430,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 13644556800,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    },
+    {
+     "index": 20,
+     "kind": "timed",
+     "wall_s": 1.0163385009765624,
+     "tokens": 3832,
+     "real_tokens": 1819,
+     "samples": 16,
+     "padded_len": 343,
+     "micro_steps": 4,
+     "peak_allocated_bytes": 11568492544,
+     "peak_reserved_bytes": 21300772864,
+     "device_used_bytes": 21619867648,
+     "reserved_bytes": 21300772864
+    }
+   ],
+   "cost": {
+    "gpu_seconds": 39.888,
+    "usd": 0.012188
+   },
+   "cache_key": "sha256:aa4fa35119f64ae4fefddd4cf98f4c60040ef9b78a5c8b39fa0e0ea5b7ff3700"
+  }
+ ],
+ "predictions": {
+  "targets": [
+   {
+    "id": "memory.peak",
+    "label_key": "target.memory.peak",
+    "unit": "bytes",
+    "readout": "memory"
+   },
+   {
+    "id": "time.total",
+    "label_key": "target.time.total",
+    "unit": "s",
+    "readout": "time"
+   },
+   {
+    "id": "cost.total",
+    "label_key": "target.cost.total",
+    "unit": "usd",
+    "readout": "cost"
+   },
+   {
+    "id": "cost.gpu_hours",
+    "label_key": "target.cost.gpu_hours",
+    "unit": "gpu_hours",
+    "readout": "cost"
+   },
+   {
+    "id": "risk.oom",
+    "label_key": "target.risk.oom",
+    "unit": "probability",
+    "readout": "risk"
+   },
+   {
+    "id": "time.step",
+    "label_key": "target.time.step",
+    "unit": "s"
+   },
+   {
+    "id": "memory.weights",
+    "label_key": "target.memory.weights",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.master_weights",
+    "label_key": "target.memory.master_weights",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.frozen_models",
+    "label_key": "target.memory.frozen_models",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.context",
+    "label_key": "target.memory.context",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.gradients",
+    "label_key": "target.memory.gradients",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.optimizer",
+    "label_key": "target.memory.optimizer",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.comm_buffers",
+    "label_key": "target.memory.comm_buffers",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.activations",
+    "label_key": "target.memory.activations",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.logits",
+    "label_key": "target.memory.logits",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.kv_cache",
+    "label_key": "target.memory.kv_cache",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.generation_engine",
+    "label_key": "target.memory.generation_engine",
+    "unit": "bytes"
+   },
+   {
+    "id": "memory.eval_spike",
+    "label_key": "target.memory.eval_spike",
+    "unit": "bytes"
+   }
+  ],
+  "estimates": {
+   "memory.peak": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "bytes",
+    "status": "abstain",
+    "model_id": "memory-analytical@0.3.1",
+    "source": "exact",
+    "reason": "probe v1 ran out of memory at these settings",
+    "level": 0.9
+   },
+   "time.total": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "s",
+    "status": "abstain",
+    "model_id": "time-total@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "cost.total": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "usd",
+    "status": "abstain",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "cost.gpu_hours": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "gpu_hours",
+    "status": "abstain",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "risk.oom": {
+    "point": 1.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "unit": "probability",
+    "status": "measured",
+    "model_id": "memory-analytical@0.3.1",
+    "source": "exact",
+    "reason": "fails: probe v1 ran out of memory at these settings",
+    "level": 0.9
+   },
+   "time.step": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "s",
+    "status": "abstain",
+    "model_id": "steptime-phases@0.2.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   }
+  },
+  "grids": [
+   {
+    "id": "g.memory.peak.checkpoint_every",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "checkpoint_every",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.checkpoint_every",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "checkpoint_every",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.checkpoint_every",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "checkpoint_every",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.checkpoint_every",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "checkpoint_every",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.checkpoint_every",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "checkpoint_every",
+      "values": [
+       62,
+       125,
+       250,
+       500,
+       1000,
+       2000,
+       4000
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "ADwAPAA8ADwAPAA8ADw=",
+    "lo": "ADwAPAA8ADwAPAA8ADw=",
+    "hi": "ADwAPAA8ADwAPAA8ADw=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.eval_every",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.eval_every",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.eval_every",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.eval_every",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.eval_every",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "eval_every",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "ADwAPAA8ADwAPAA8ADw=",
+    "lo": "ADwAPAA8ADwAPAA8ADw=",
+    "hi": "ADwAPAA8ADwAPAA8ADw=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.gpu_type",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.gpu_type",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.gpu_type",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.gpu_type",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.gpu_type",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "ADw=",
+    "lo": "ADw=",
+    "hi": "ADw=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.log_every",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "log_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "BGQEZARkAAAEZARkBGQ=",
+    "lo": "UGJQYlBiAABQYlBiUGI=",
+    "hi": "HGUcZRxlAAAcZRxlHGU=",
+    "abstain": "CA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.log_every",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "log_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.log_every",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "log_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.log_every",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "log_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.log_every",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "log_every",
+      "values": [
+       1,
+       2,
+       5,
+       10,
+       20,
+       40,
+       80
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "zTvNO807ADzNO807zTs=",
+    "lo": "QTlBOUE5ADxBOUE5QTk=",
+    "hi": "zTvNO807ADzNO807zTs=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.epochs",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       0,
+       1,
+       2,
+       4,
+       8
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.epochs",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       0,
+       1,
+       2,
+       4,
+       8
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.epochs",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       0,
+       1,
+       2,
+       4,
+       8
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.epochs",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       0,
+       1,
+       2,
+       4,
+       8
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.epochs",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "epochs",
+      "values": [
+       0,
+       1,
+       2,
+       4,
+       8
+      ],
+      "scale": "linear"
+     }
+    ],
+    "point": "ADwAPAA8ADwAPA==",
+    "lo": "ADwAPAA8ADwAPA==",
+    "hi": "ADwAPAA8ADwAPA==",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.packing",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "packing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAEZA==",
+    "lo": "AABQYg==",
+    "hi": "AAAcZQ==",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.packing",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "packing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.packing",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "packing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.packing",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "packing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.packing",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "packing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "ADzNOw==",
+    "lo": "ADxBOQ==",
+    "hi": "ADzNOw==",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.batch_size",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "BGQEZAAABGQEZJlk",
+    "lo": "UGJQYgAAUGJQYjpj",
+    "hi": "HGUcZQAAHGUcZdpl",
+    "abstain": "BA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.batch_size",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.batch_size",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.batch_size",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.batch_size",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "zTvNOwA8zTvNO807",
+    "lo": "QTlBOQA8QTlBOUE5",
+    "hi": "zTvNOwA8zTvNO807",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.eval_batch_size",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "c01gUCNUAADpW9pf0mM=",
+    "lo": "SEzgToBSAAA4WiteJWI=",
+    "hi": "8E6RUUNVAAAJXf9g+mQ=",
+    "abstain": "CA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1073741824.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.eval_batch_size",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.eval_batch_size",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.eval_batch_size",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.eval_batch_size",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "MzXNO807ADzNO807zTs=",
+    "lo": "ZipBOUE5ADxBOUE5QTk=",
+    "hi": "mjvNO807ADzNO807zTs=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.eval_no_grad",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "eval_no_grad",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AACgYg==",
+    "lo": "AAA0YQ==",
+    "hi": "AAA3ZA==",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 67108864.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.eval_no_grad",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "eval_no_grad",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.eval_no_grad",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "eval_no_grad",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.eval_no_grad",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "eval_no_grad",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.eval_no_grad",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "eval_no_grad",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "ADzNOw==",
+    "lo": "ADxBOQ==",
+    "hi": "ADzNOw==",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.gradient_checkpointing",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "gradient_checkpointing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAD6Yg==",
+    "lo": "AAB7YQ==",
+    "hi": "AABwZA==",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 67108864.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.gradient_checkpointing",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "gradient_checkpointing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.gradient_checkpointing",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "gradient_checkpointing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.gradient_checkpointing",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "gradient_checkpointing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.gradient_checkpointing",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "gradient_checkpointing",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "ADzNOw==",
+    "lo": "ADxBOQ==",
+    "hi": "ADzNOw==",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.quantization",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "quantization",
+      "values": [
+       "none",
+       "int8",
+       "nf4",
+       "nf4_dq",
+       "fp4",
+       "fp4_dq"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAD0Y+xj62PsY+tj",
+    "lo": "AABAYjpiOWI6Yjli",
+    "hi": "AAAQZQplCmUKZQpl",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.quantization",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "quantization",
+      "values": [
+       "none",
+       "int8",
+       "nf4",
+       "nf4_dq",
+       "fp4",
+       "fp4_dq"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.quantization",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "quantization",
+      "values": [
+       "none",
+       "int8",
+       "nf4",
+       "nf4_dq",
+       "fp4",
+       "fp4_dq"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.quantization",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "quantization",
+      "values": [
+       "none",
+       "int8",
+       "nf4",
+       "nf4_dq",
+       "fp4",
+       "fp4_dq"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.quantization",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "quantization",
+      "values": [
+       "none",
+       "int8",
+       "nf4",
+       "nf4_dq",
+       "fp4",
+       "fp4_dq"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "ADzNO807zTvNO807",
+    "lo": "ADxBOUE5QTlBOUE5",
+    "hi": "ADzNO807zTvNO807",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.seq_len",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       128,
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "20xgUCNUAADpW9pf0mM=",
+    "lo": "oUvgToBSAAA4WiteJWI=",
+    "hi": "LU6RUUNVAAAJXf9g+mQ=",
+    "abstain": "CA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1073741824.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.seq_len",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       128,
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.seq_len",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       128,
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.seq_len",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       128,
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.seq_len",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "seq_len",
+      "values": [
+       128,
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "ZibNO807ADzNO807zTs=",
+    "lo": "ZiZBOUE5ADxBOUE5QTk=",
+    "hi": "ZibNO807ADzNO807zTs=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.lora_alpha",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "lora_alpha",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "BGQEZARkAAAEZARkBGQ=",
+    "lo": "UGJQYlBiAABQYlBiUGI=",
+    "hi": "HGUcZRxlAAAcZRxlHGU=",
+    "abstain": "CA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.lora_alpha",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "lora_alpha",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.lora_alpha",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "lora_alpha",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.lora_alpha",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "lora_alpha",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.lora_alpha",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "lora_alpha",
+      "values": [
+       4,
+       8,
+       16,
+       32,
+       64,
+       128,
+       256
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "zTvNO807ADzNO807zTs=",
+    "lo": "QTlBOUE5ADxBOUE5QTk=",
+    "hi": "zTvNO807ADzNO807zTs=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.lora_dropout",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "lora_dropout",
+      "values": [
+       0.00625,
+       0.0125,
+       0.025,
+       0.05,
+       0.1,
+       0.2,
+       0.4
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "BGQEZARkAAAEZARkBGQ=",
+    "lo": "UGJQYlBiAABQYlBiUGI=",
+    "hi": "HGUcZRxlAAAcZRxlHGU=",
+    "abstain": "CA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.lora_dropout",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "lora_dropout",
+      "values": [
+       0.00625,
+       0.0125,
+       0.025,
+       0.05,
+       0.1,
+       0.2,
+       0.4
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.lora_dropout",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "lora_dropout",
+      "values": [
+       0.00625,
+       0.0125,
+       0.025,
+       0.05,
+       0.1,
+       0.2,
+       0.4
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.lora_dropout",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "lora_dropout",
+      "values": [
+       0.00625,
+       0.0125,
+       0.025,
+       0.05,
+       0.1,
+       0.2,
+       0.4
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.lora_dropout",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "lora_dropout",
+      "values": [
+       0.00625,
+       0.0125,
+       0.025,
+       0.05,
+       0.1,
+       0.2,
+       0.4
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "zTvNO807ADzNO807zTs=",
+    "lo": "QTlBOUE5ADxBOUE5QTk=",
+    "hi": "zTvNO807ADzNO807zTs=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.lora_r",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "lora_r",
+      "values": [
+       2,
+       4,
+       8,
+       16,
+       32,
+       64,
+       128
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AWQCZAJkAAAHZA1kGmQ=",
+    "lo": "S2JMYk1iAABVYl9ic2I=",
+    "hi": "GWUZZRplAAAgZShlOGU=",
+    "abstain": "CA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.lora_r",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "lora_r",
+      "values": [
+       2,
+       4,
+       8,
+       16,
+       32,
+       64,
+       128
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.lora_r",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "lora_r",
+      "values": [
+       2,
+       4,
+       8,
+       16,
+       32,
+       64,
+       128
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.lora_r",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "lora_r",
+      "values": [
+       2,
+       4,
+       8,
+       16,
+       32,
+       64,
+       128
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.lora_r",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "lora_r",
+      "values": [
+       2,
+       4,
+       8,
+       16,
+       32,
+       64,
+       128
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "zTvNO807ADzNO807zTs=",
+    "lo": "QTlBOUE5ADxBOUE5QTk=",
+    "hi": "zTvNO807ADzNO807zTs=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.lr",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.lr",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.lr",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.lr",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.lr",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "lr",
+      "values": [
+       1.25e-05,
+       2.5e-05,
+       5e-05,
+       0.0001,
+       0.0002,
+       0.0004,
+       0.0008
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "ADwAPAA8ADwAPAA8ADw=",
+    "lo": "ADwAPAA8ADwAPAA8ADw=",
+    "hi": "ADwAPAA8ADwAPAA8ADw=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.warmup_steps",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "warmup_steps",
+      "values": [
+       6,
+       12,
+       25,
+       50,
+       100,
+       200,
+       400
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "BGQEZARkAAAEZARkBGQ=",
+    "lo": "UGJQYlBiAABQYlBiUGI=",
+    "hi": "HGUcZRxlAAAcZRxlHGU=",
+    "abstain": "CA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.warmup_steps",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "warmup_steps",
+      "values": [
+       6,
+       12,
+       25,
+       50,
+       100,
+       200,
+       400
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.warmup_steps",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "warmup_steps",
+      "values": [
+       6,
+       12,
+       25,
+       50,
+       100,
+       200,
+       400
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.warmup_steps",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "warmup_steps",
+      "values": [
+       6,
+       12,
+       25,
+       50,
+       100,
+       200,
+       400
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.warmup_steps",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "warmup_steps",
+      "values": [
+       6,
+       12,
+       25,
+       50,
+       100,
+       200,
+       400
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "zTvNO807ADzNO807zTs=",
+    "lo": "QTlBOUE5ADxBOUE5QTk=",
+    "hi": "zTvNO807ADzNO807zTs=",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "attn": "sdpa",
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.attn",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "attn",
+      "values": [
+       "eager",
+       "sdpa",
+       "flash_attention_2",
+       "flash_attention_3",
+       "flex_attention"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "rGQAAARkBGQEZA==",
+    "lo": "V2MAAFBiUGJQYg==",
+    "hi": "8WUAABxlHGUcZQ==",
+    "abstain": "Ag==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.attn",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "attn",
+      "values": [
+       "eager",
+       "sdpa",
+       "flash_attention_2",
+       "flash_attention_3",
+       "flex_attention"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.attn",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "attn",
+      "values": [
+       "eager",
+       "sdpa",
+       "flash_attention_2",
+       "flash_attention_3",
+       "flex_attention"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.attn",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "attn",
+      "values": [
+       "eager",
+       "sdpa",
+       "flash_attention_2",
+       "flash_attention_3",
+       "flex_attention"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.attn",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "attn",
+      "values": [
+       "eager",
+       "sdpa",
+       "flash_attention_2",
+       "flash_attention_3",
+       "flex_attention"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "zTsAPM07zTvNOw==",
+    "lo": "QTkAPEE5QTlBOQ==",
+    "hi": "zTsAPM07zTvNOw==",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "grad_accum": 4,
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.grad_accum",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "grad_accum",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "BGQEZAAABGQEZARk",
+    "lo": "UGJQYgAAUGJQYlBi",
+    "hi": "HGUcZQAAHGUcZRxl",
+    "abstain": "BA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.time.total.grad_accum",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "grad_accum",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.total.grad_accum",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "grad_accum",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.grad_accum",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "grad_accum",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAA",
+    "lo": "AAAAAAAAAAAAAAAA",
+    "hi": "AAAAAAAAAAAAAAAA",
+    "abstain": "Pw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.risk.oom.grad_accum",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "grad_accum",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "zTvNOwA8zTvNO807",
+    "lo": "QTlBOQA8QTlBOUE5",
+    "hi": "zTvNOwA8zTvNO807",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "precision": "bf16"
+    }
+   },
+   {
+    "id": "g.memory.peak.precision",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "precision",
+      "values": [
+       "fp32",
+       "bf16",
+       "fp16"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "Q2YAAARk",
+    "lo": "7GQAAFBi",
+    "hi": "+GcAABxl",
+    "abstain": "Ag==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 134217728.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4
+    }
+   },
+   {
+    "id": "g.time.total.precision",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "precision",
+      "values": [
+       "fp32",
+       "bf16",
+       "fp16"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAA",
+    "lo": "AAAAAAAA",
+    "hi": "AAAAAAAA",
+    "abstain": "Bw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4
+    }
+   },
+   {
+    "id": "g.cost.total.precision",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "precision",
+      "values": [
+       "fp32",
+       "bf16",
+       "fp16"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAA",
+    "lo": "AAAAAAAA",
+    "hi": "AAAAAAAA",
+    "abstain": "Bw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.precision",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "precision",
+      "values": [
+       "fp32",
+       "bf16",
+       "fp16"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAAAA",
+    "lo": "AAAAAAAA",
+    "hi": "AAAAAAAA",
+    "abstain": "Bw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4
+    }
+   },
+   {
+    "id": "g.risk.oom.precision",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "precision",
+      "values": [
+       "fp32",
+       "bf16",
+       "fp16"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "zTsAPM07",
+    "lo": "QTkAPEE5",
+    "hi": "zTsAPM07",
+    "abstain": "AA==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "checkpoint_every": 500,
+     "eval_every": 200,
+     "gpu_type": "A10",
+     "log_every": 10,
+     "epochs": 1,
+     "packing": false,
+     "batch_size": 4,
+     "eval_batch_size": 32,
+     "eval_no_grad": false,
+     "gradient_checkpointing": false,
+     "quantization": "none",
+     "seq_len": 1024,
+     "lora_alpha": 32,
+     "lora_dropout": 0.05,
+     "lora_r": 16,
+     "lr": 0.0001,
+     "warmup_steps": 50,
+     "attn": "sdpa",
+     "grad_accum": 4
+    }
+   }
+  ]
+ },
+ "models": [
+  {
+   "id": "cost-gpu-hours@0.1.0",
+   "kind": "rule",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. GPU-hours x the dated price in engine/prices",
+   "fixture": false
+  },
+  {
+   "id": "memory-analytical@0.3.1",
+   "kind": "analytical",
+   "version": "0.3.1",
+   "training_data": "remote-runs b-topup-export-2 (Nov 1): L4, A10, L40S, T4, H100 (the Nov 1 top-up's seed 0 and 1 rows included); A100 held out, scored once on Oct 31, not re-scored (8463 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 50ea0fb14a",
+   "heldout_error": {},
+   "coverage": 0.9048672566371682,
+   "per_gpu_coverage": {
+    "A100-PCIe-80GB": 0.6666666666666666,
+    "A100-SXM-80GB": 0.875
+   },
+   "notes": "calibration: held_out. Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d.  Own cells: H100-SXM-80GB, pretrain (n = 40); H100-SXM-80GB, retrieval (n = 40); H100-SXM-80GB, vision (n = 78); L40S, pretrain (n = 47); L40S, retrieval (n = 48); L40S, vision (n = 91); A10, finetune (n = 19); A10, pretrain (n = 69); A10, retrieval (n = 70); A10, vision (n = 130); L4, finetune (n = 19); L4, pretrain (n = 55); L4, retrieval (n = 53); L4, vision (n = 101); T4, pretrain (n = 11); T4, retrieval (n = 11); T4, vision (n = 22); merged across GPUs and job types (n = 904); finetune, merged across GPUs (n = 38); pretrain, merged across GPUs (n = 222); retrieval, merged across GPUs (n = 222); vision, merged across GPUs (n = 422). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs, then all runs. Leave-one-architecture-out coverage 818 of 904 (Wilson 95% 88% to 92%). Holdout, never tuned on: A100-PCIe-80GB 8 of 12 inside the band (Wilson 95% 39% to 86%). Holdout, never tuned on: A100-SXM-80GB 14 of 16 inside the band (Wilson 95% 64% to 97%)",
+   "fixture": false
+  },
+  {
+   "id": "run-cost@0.1.0",
+   "kind": "rule",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+   "fixture": false
+  },
+  {
+   "id": "steptime-phases@0.2.0",
+   "kind": "analytical",
+   "version": "0.2.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. per-phase linear fits on the probes; S4b below the smallest probe",
+   "fixture": false
+  },
+  {
+   "id": "time-total@0.1.0",
+   "kind": "analytical",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. steps x step time plus measured checkpoint and eval overheads",
+   "fixture": false
+  }
+ ],
+ "findings": [
+  {
+   "id": "read.eval.no_grad",
+   "severity": "error",
+   "code": "eval.no_grad",
+   "title": "Eval runs with gradients kept",
+   "detail": "Eval forward in PerplexityCallback.on_step_end (train.py:79) runs without torch.no_grad(); activations for backward are kept",
+   "node_id": "eval",
+   "evidence": [
+    {
+     "metric": "script.eval_under_no_grad",
+     "value": "false"
+    }
+   ],
+   "source": "rule",
+   "fix_template": "eval.wrap_no_grad",
+   "knob_id": "eval_no_grad",
+   "citations": []
+  },
+  {
+   "id": "read.eval.batch_large",
+   "severity": "warn",
+   "code": "eval.batch_large",
+   "title": "Eval batch is 8x the train batch",
+   "node_id": "eval",
+   "evidence": [
+    {
+     "metric": "eval_batch_size",
+     "value": 32.0,
+     "threshold": 16.0
+    }
+   ],
+   "source": "rule",
+   "fix_template": "eval.reduce_batch",
+   "knob_id": "eval_batch_size",
+   "citations": []
+  },
+  {
+   "id": "read.data.no_packing",
+   "severity": "warn",
+   "code": "data.no_packing",
+   "title": "No sequence packing; batches are padded",
+   "node_id": "data",
+   "evidence": [],
+   "source": "rule",
+   "fix_template": "data.enable_packing",
+   "knob_id": "packing",
+   "citations": []
+  },
+  {
+   "id": "triage.v1",
+   "severity": "info",
+   "code": "triage.oom",
+   "title": "Spark Open on probe v1: oom",
+   "detail": "Probe failed with CUDA out of memory during the eval pass after 20 optimizer steps. (log: \"Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 8.73 GiB. GPU 0 has a total capacity of 22.06 GiB of which 4\")",
+   "node_id": "eval",
+   "evidence": [
+    {
+     "metric": "triage",
+     "value": 1.0,
+     "probe_id": "v1"
+    }
+   ],
+   "source": "spark_open_triage",
+   "citations": []
+  },
+  {
+   "id": "triage.v1-base",
+   "severity": "info",
+   "code": "triage.oom",
+   "title": "Spark Open on probe v1-base: oom",
+   "detail": "The run OOMed during the eval pass after 20 optimizer steps when trying to allocate 530 MiB. (log: \"Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB. GPU 0 has a total capacity of 22.06 GiB of which\")",
+   "node_id": "eval",
+   "evidence": [
+    {
+     "metric": "triage",
+     "value": 1.0,
+     "probe_id": "v1-base"
+    }
+   ],
+   "source": "spark_open_triage",
+   "citations": []
+  },
+  {
+   "id": "triage.v1-seed",
+   "severity": "info",
+   "code": "triage.oom",
+   "title": "Spark Open on probe v1-seed: oom",
+   "detail": "Probe ran out of GPU memory during the eval pass after 20 optimizer steps. (log: \"Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 266.00 MiB. GPU 0 has a total capacity of 22.06 GiB of which\")",
+   "node_id": "eval",
+   "evidence": [
+    {
+     "metric": "triage",
+     "value": 1.0,
+     "probe_id": "v1-seed"
+    }
+   ],
+   "source": "spark_open_triage",
+   "citations": []
+  },
+  {
+   "id": "verify.v1",
+   "severity": "error",
+   "code": "verify.failed",
+   "title": "The eval ran out of memory with and without the change",
+   "detail": "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 8.73 GiB. GPU 0 has a total capacity of 22.06 GiB of which 4.44 GiB is free. Process 1 has 17.60 GiB memory in use. Of the allocated memory 16.71 GiB is allocated by PyTorch, and 617.34 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment- at train.py:80, after step 20. Step: the eval pass. By hand: probe a smaller eval batch by hand: `preflight run train.py -- --eval_batch_size <n>`, or wrap eval in torch.no_grad().",
+   "node_id": "loss",
+   "evidence": [
+    {
+     "metric": "probe.eval.peak_allocated_bytes",
+     "value": 17946018304.0,
+     "probe_id": "v1"
+    },
+    {
+     "metric": "verify.patch",
+     "value": "sha256:b10f5eeaaadc25ae",
+     "probe_id": "v1"
+    }
+   ],
+   "source": "rule",
+   "citations": []
+  }
+ ],
+ "patches": [],
+ "provenance": [
+  {
+   "provider": "baseten",
+   "model": "meta-models/muse-spark-open-1026",
+   "purpose": "triage",
+   "input_tokens": 1739,
+   "output_tokens": 495,
+   "cached_input_tokens": 0,
+   "cost_usd": 0.004278,
+   "request_id": "chatcmpl-5266997b626c48d49af83d827225e5ca",
+   "at": "2026-11-02T09:15:49Z",
+   "latency_s": 1.546,
+   "ok": true
+  },
+  {
+   "provider": "baseten",
+   "model": "meta-models/muse-spark-open-1026",
+   "purpose": "triage",
+   "input_tokens": 1742,
+   "output_tokens": 469,
+   "cached_input_tokens": 128,
+   "cost_usd": 0.00403,
+   "request_id": "chatcmpl-0bed7425ae714a96824ef60b39f811fa",
+   "at": "2026-11-02T09:15:51Z",
+   "latency_s": 1.371,
+   "ok": true
+  },
+  {
+   "provider": "baseten",
+   "model": "meta-models/muse-spark-open-1026",
+   "purpose": "triage",
+   "input_tokens": 1673,
+   "output_tokens": 625,
+   "cached_input_tokens": 0,
+   "cost_usd": 0.004747,
+   "request_id": "chatcmpl-ffadd3979f67496f89900e6bb86ce239",
+   "at": "2026-11-02T09:15:52Z",
+   "latency_s": 1.924,
+   "ok": true
+  }
+ ],
+ "costs": {
+  "gpu_usd": 0.046777,
+  "llm_usd": 0.013055,
+  "breakdown": {
+   "probes": 0.046595,
+   "sandbox_overhead": 0.000182,
+   "sandbox_cpu_memory_estimate": 0.040241,
+   "model_calls": 0.013055
+  }
+ },
+ "cost_basis": {
+  "price_table": "prices@2026-11-01",
+  "as_of": "2026-11-01",
+  "provider": "local",
+  "billing": "on_demand",
+  "currency": "USD",
+  "includes": [
+   "gpu",
+   "tokens"
+  ]
+ },
+ "job_cost": {
+  "lines": [
+   {
+    "kind": "gpu",
+    "label_key": "cost.line.gpu",
+    "quantity": {
+     "point": null,
+     "lo": null,
+     "hi": null,
+     "unit": "gpu_hours",
+     "status": "abstain",
+     "model_id": "run-cost@0.1.0",
+     "source": "exact",
+     "reason": "no probe timed a step yet",
+     "level": 0.9
+    },
+    "rate_usd": 1.1,
+    "usd": {
+     "point": null,
+     "lo": null,
+     "hi": null,
+     "unit": "usd",
+     "status": "abstain",
+     "model_id": "run-cost@0.1.0",
+     "source": "exact",
+     "reason": "no probe timed a step yet",
+     "level": 0.9
+    },
+    "price_row": "gpu/modal/A10/us/on_demand"
+   }
+  ],
+  "total_usd": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "usd",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  },
+  "gpu_hours": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "gpu_hours",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  },
+  "at_risk_gpu_hours": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "gpu_hours",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  },
+  "at_risk_usd": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "usd",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  }
+ }
+}
