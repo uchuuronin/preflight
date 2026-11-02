@@ -1,0 +1,185 @@
+{
+  "submitted": {
+    "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+    "status": "done",
+    "position": null,
+    "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+    "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 16
+  },
+  "events": [
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "seq": 0,
+      "at": "2026-11-02T08:25:36.945855Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "seq": 1,
+      "at": "2026-11-02T08:25:37.278654Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "seq": 2,
+      "at": "2026-11-02T08:25:37.713419Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "seq": 3,
+      "at": "2026-11-02T08:25:38.558201Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 4,
+      "at": "2026-11-02T08:25:42.314068Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 5,
+      "at": "2026-11-02T08:25:54.407441Z",
+      "stage": "skeleton",
+      "message": "map refined by Muse Spark",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 6,
+      "at": "2026-11-02T08:25:54.793671Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 7,
+      "at": "2026-11-02T08:25:55.242319Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "seq": 8,
+      "at": "2026-11-02T08:26:56.134753Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (1 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "seq": 9,
+      "at": "2026-11-02T08:27:56.137520Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (2 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "seq": 10,
+      "at": "2026-11-02T08:27:58.639456Z",
+      "stage": "probing",
+      "message": "A10 GPU ready after 2 min; probe running",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 11,
+      "at": "2026-11-02T08:28:05.467469Z",
+      "stage": "probing",
+      "message": "no L4 could be scheduled; this job's points run on A10",
+      "level": "warn",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 12,
+      "at": "2026-11-02T08:28:05.901899Z",
+      "stage": "probing",
+      "progress": 0.333,
+      "level": "info",
+      "probe_id": "p2",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 13,
+      "at": "2026-11-02T08:28:11.658931Z",
+      "stage": "probing",
+      "progress": 0.667,
+      "level": "info",
+      "probe_id": "p3",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 14,
+      "at": "2026-11-02T08:28:24.928524Z",
+      "stage": "predicting",
+      "message": "measured; predicting",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "share_token": "1tkRqAy-vKiCRkYgI0sEHg",
+      "seq": 15,
+      "at": "2026-11-02T08:28:29.308901Z",
+      "stage": "predicting",
+      "message": "predicted",
+      "level": "info",
+      "record_rev": 3
+    },
+    {
+      "job_id": "01M6DNTAXH095BKDZPPKSQ5Y94",
+      "record_id": "01M6DNTCTH4PNBHVACETPK8JZ9",
+      "seq": 16,
+      "at": "2026-11-02T08:28:29.740993Z",
+      "stage": "done",
+      "progress": 1.0,
+      "level": "info"
+    }
+  ],
+  "error": null
+}
