@@ -1247,4 +1247,16 @@ def test_the_probe_dataset_length_follows_the_runner_s_rules():
 		}
 	)
 	assert api.total_steps(eval_first)[0] == pytest.approx(3170, abs=1)
-	assert api.total_steps(rec, {"packing": True})[0] is None
+	steps, why = api.total_steps(rec, {"packing": True})
+	assert steps is None and "packing changes the row count" in why
+	# packing set in the script map, no knob: a seq_len move abstains too
+	data = rec.job.script_map.data.model_copy(update={"packing": True})
+	sm = rec.job.script_map.model_copy(update={"data": data})
+	packed = rec.model_copy(
+		update={
+			"job": rec.job.model_copy(update={"script_map": sm}),
+			"knobs": [k for k in rec.knobs if k.id != "packing"],
+		}
+	)
+	assert api.total_steps(packed, {"seq_len": 512})[0] is None
+	assert api.total_steps(packed)[0] == pytest.approx(3170, abs=1)

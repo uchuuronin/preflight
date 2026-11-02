@@ -1518,11 +1518,19 @@ def _probe_dataset_len(record: FlightRecord, values: dict) -> float | None:
 		return None
 	p = ps[0]
 	pv = _probe_values(record, p)
-	if "packing" in values and bool(values.get("packing")) != bool(pv.get("packing", values.get("packing"))):
+	sm = record.job.script_map
+	packs = values.get("packing") if "packing" in values else bool(sm and sm.data and sm.data.packing)
+	if "packing" in values and bool(packs) != bool(pv.get("packing", packs)):
 		return None
-	if values.get("packing") and values.get("seq_len") != pv.get("seq_len", values.get("seq_len")):
+	if packs and values.get("seq_len") != pv.get("seq_len", values.get("seq_len")):
 		return None
 	return float(p.extras["train_dataset_len"])
+
+
+_PACKING_MOVED = (
+	"the run's length isn't known: the probes counted the dataset's rows at their own packing and seq_len, and "
+	"packing changes the row count"
+)
 
 
 def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]:
@@ -1536,6 +1544,10 @@ def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]
 	n = values.get("n_examples") or (data.n_examples if data else None)
 	if not n:
 		n = _probe_dataset_len(record, values)
+		if not n and _probe_dataset_len(
+			record, {k: v for k, v in values.items() if k not in ("packing", "seq_len")}
+		):
+			return None, _PACKING_MOVED
 	if not n:
 		return None, "the run's length isn't known: no max_steps, and no dataset size to divide by the batch"
 	per_step = (
