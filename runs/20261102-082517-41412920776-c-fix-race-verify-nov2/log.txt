@@ -1,0 +1,193 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-cMKmJ9aVofa1w3iLP8Y5K6
+✓ Created objects.
+not raced (another metric than memory.eval_peak): c3
+c1 (eval.reduce_batch): submitted
+{
+ "id": "c1",
+ "template_id": "eval.reduce_batch",
+ "job_status": "done",
+ "record_id": "01M6DNT8RV8WQRZJ222DE59PGX",
+ "error_code": null,
+ "error": "",
+ "minutes": 20.3,
+ "usd": 0.001,
+ "gpu": null,
+ "probes": {
+  "v1": {
+   "status": "error",
+   "gpu": null,
+   "peak_gib": 0.0
+  },
+  "v1-base": {
+   "status": "error",
+   "gpu": null,
+   "peak_gib": 0.0
+  },
+  "v1-seed": {
+   "status": "error",
+   "gpu": null,
+   "peak_gib": 0.0
+  }
+ },
+ "verify": {
+  "status": "error",
+  "metric": "memory.eval_peak",
+  "before": null,
+  "after": null,
+  "fixed_seed_loss_delta": null
+ },
+ "checks": [
+  [
+   "target_improved",
+   null,
+   false
+  ],
+  [
+   "effective_batch",
+   true,
+   false
+  ],
+  [
+   "tokens_seen",
+   null,
+   false
+  ],
+  [
+   "lr_schedule",
+   true,
+   false
+  ],
+  [
+   "throughput_floor",
+   null,
+   false
+  ],
+  [
+   "fixed_seed_loss",
+   null,
+   false
+  ],
+  [
+   "eval_kept",
+   null,
+   false
+  ],
+  [
+   "same_model",
+   true,
+   false
+  ]
+ ],
+ "a_finding": {
+  "code": "verify.failed",
+  "severity": "error",
+  "title": "The verify run didn't finish"
+ }
+}
+c2 (eval.wrap_no_grad): submitted
+{
+ "id": "c2",
+ "template_id": "eval.wrap_no_grad",
+ "job_status": "done",
+ "record_id": "01M6DPZJCR4TMD2P4JX9C331NG",
+ "error_code": null,
+ "error": "",
+ "minutes": 20.5,
+ "usd": 0.0017,
+ "gpu": null,
+ "probes": {
+  "v1": {
+   "status": "error",
+   "gpu": null,
+   "peak_gib": 0.0
+  },
+  "v1-base": {
+   "status": "error",
+   "gpu": null,
+   "peak_gib": 0.0
+  },
+  "v1-seed": {
+   "status": "error",
+   "gpu": null,
+   "peak_gib": 0.0
+  }
+ },
+ "verify": {
+  "status": "error",
+  "metric": "memory.eval_peak",
+  "before": null,
+  "after": null,
+  "fixed_seed_loss_delta": null
+ },
+ "checks": [
+  [
+   "target_improved",
+   null,
+   false
+  ],
+  [
+   "effective_batch",
+   true,
+   false
+  ],
+  [
+   "tokens_seen",
+   null,
+   false
+  ],
+  [
+   "lr_schedule",
+   true,
+   false
+  ],
+  [
+   "throughput_floor",
+   null,
+   false
+  ],
+  [
+   "fixed_seed_loss",
+   null,
+   false
+  ],
+  [
+   "eval_kept",
+   null,
+   false
+  ],
+  [
+   "same_model",
+   true,
+   false
+  ]
+ ],
+ "a_finding": {
+  "code": "verify.failed",
+  "severity": "error",
+  "title": "The verify run didn't finish"
+ }
+}
+{
+ "spent_usd": 0.0027,
+ "winner": null,
+ "results": [
+  {
+   "id": "c1",
+   "template_id": "eval.reduce_batch",
+   "job_status": "done",
+   "usd": 0.001,
+   "verify": "error"
+  },
+  {
+   "id": "c2",
+   "template_id": "eval.wrap_no_grad",
+   "job_status": "done",
+   "usd": 0.0017,
+   "verify": "error"
+  }
+ ]
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-cMKmJ9aVofa1w3iLP8Y5K6

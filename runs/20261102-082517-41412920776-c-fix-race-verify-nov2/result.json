@@ -1,0 +1,11 @@
+{
+	"name": "20261102-082517-41412920776-c-fix-race-verify-nov2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41412920776",
+	"ref": "6b209d987de7bd3294a91c9eb33f19f47e0fbfa4",
+	"sha": "6b209d987de7bd3294a91c9eb33f19f47e0fbfa4",
+	"cmd": "modal run --env main api/verify_race_app.py::verify_race --attempt nov2",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T09:06:26Z"
+}
