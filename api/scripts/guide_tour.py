@@ -58,6 +58,7 @@ ROOT = Path(__file__).resolve().parents[2] if modal.is_local() else Path("/root/
 SAMPLE_FILES = [
 	"web/src/workspace/fixtures/dev-finetune.record.json",
 	"schema/examples/finetune.json",
+	"web/src/workspace/fixtures/lora-live-nov1.record.json",
 	"schema/examples/pretrain.json",
 	"schema/examples/agent.json",
 ]
