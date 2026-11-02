@@ -256,3 +256,13 @@ def test_a_relative_import_never_reads_above_the_checkout(tmp_path, missing):
 	(tmp_path / "outside.py").write_text("import outside_mod\n")
 	work = _tree(tmp_path / "work", {"run.py": "from .. import outside\n"})
 	assert R.missing_imports(work, "run.py") == set()
+
+
+def test_setup_cfg_install_requires_is_declared(tmp_path):
+	_tree(
+		tmp_path,
+		{
+			"setup.cfg": "[metadata]\nname = x\n[options]\ninstall_requires =\n    beir>=2\n    # a comment\n    tqdm\n"
+		},
+	)
+	assert R.declared(tmp_path) == ["beir>=2", "tqdm"]
