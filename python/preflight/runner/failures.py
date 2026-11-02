@@ -21,6 +21,11 @@ STEPS: dict[str, tuple[str, str]] = {
 		"`preflight run train.py`",
 	),
 	"submission.files_gone": ("reading the uploaded files", "upload the files again"),
+	"submission.too_large": (
+		"reading the source",
+		"do what the message says if it names a way, check in the folder that holds the script, "
+		"or probe it on your machine: `preflight run <your script>`",
+	),
 	"submission.invalid": (
 		"reading the job request",
 		"check the script in again from the page; if you built the request yourself, compare it with the API's JobRequest",

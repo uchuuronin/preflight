@@ -21,7 +21,8 @@ Coverage, by lens (the vocabularies below are the single list to extend):
   launchers             torchrun / accelerate / Slurm GPU counts in .sh, .sbatch, .yaml files
 
 It only reads code. It never imports or runs the user's script, and it is
-bounded: inputs over MAX_SOURCE_BYTES are refused, and pathological ASTs
+bounded: over MAX_SOURCE_BYTES of Python, only the entry point and what it imports is read
+(mapped_files), an entry point over it alone is refused, and pathological ASTs
 (deep nesting) become a ScriptParseError rather than a crash.
 """
 
@@ -48,6 +49,53 @@ TEXT_SUFFIXES = (".sh", ".sbatch", ".slurm", ".yaml", ".yml", ".toml", ".cfg", "
 
 class ScriptParseError(ValueError):
 	pass
+
+
+class SourceTooLarge(ScriptParseError):
+	"""The entry point alone is more Python than the static reader reads: not a syntax error."""
+
+	code = "submission.too_large"
+
+
+def mapped_files(
+	files: dict[str, str], entrypoint: str, *, closure: bool | None = None
+) -> tuple[dict[str, str], dict | None]:
+	"""The files the static reader maps: all of them when their Python fits MAX_SOURCE_BYTES, else
+	the entry point and the Python files it imports, nearest first, up to that budget, beside the
+	other text files (harness/closure.py; D, Nov 2: torchtune's repository is over 2 MB of Python).
+	The second value says what was left out, or None when nothing was. The closure needs
+	runner.read_closure on (`closure`, default: the flag); off, over the budget is refused, saying
+	how big it is (a SourceTooLarge, code submission.too_large, never a syntax error)."""
+	py = {p: s for p, s in files.items() if p.endswith(".py")}
+	sizes = {p: len(s.encode("utf-8", "surrogatepass")) for p, s in py.items()}
+	total = sum(sizes.values())
+	if total <= MAX_SOURCE_BYTES:
+		return files, None
+	limit = f"more than Preflight maps ({MAX_SOURCE_BYTES // 2**20} MB)"
+	if sizes.get(entrypoint, 0) > MAX_SOURCE_BYTES:
+		raise SourceTooLarge(f"{entrypoint} alone is {_mb(sizes[entrypoint])} of Python, {limit}")
+	if closure is None:
+		from preflight.runner.flags import flag
+
+		closure = flag("runner.read_closure")
+	if not closure:
+		raise SourceTooLarge(f"the source is {_mb(total)} of Python in {len(py):,} files, {limit}")
+	if entrypoint not in py:
+		raise SourceTooLarge(
+			f"the source is {_mb(total)} of Python in {len(py):,} files, {limit}, and {entrypoint} isn't a "
+			"Python file whose imports Preflight can follow; name the Python script it runs as the entry point"
+		)
+	from .closure import import_closure
+
+	got, info = import_closure(py, lambda paths: {p: py[p] for p in paths}, entrypoint,
+		max_files=len(py), max_bytes=MAX_SOURCE_BYTES, sizes=sizes)  # fmt: skip
+	info["python_files"] = len(py)
+	info["python_bytes"] = total
+	return {**{p: s for p, s in files.items() if not p.endswith(".py")}, **got}, info
+
+
+def _mb(n: int) -> str:
+	return f"{n / 2**20:.2f} MB"
 
 
 # ---------------------------------------------------------------- vocabularies
@@ -416,8 +464,11 @@ class Facts:
 def _parse(files: dict[str, str]) -> Facts:
 	f = Facts()
 	py = {p: s for p, s in files.items() if p.endswith(".py")}
-	if sum(len(s.encode("utf-8")) for s in py.values()) > MAX_SOURCE_BYTES:
-		raise ScriptParseError(f"Python source is too large to map (over {MAX_SOURCE_BYTES // 2**20} MB)")
+	if sum(len(s.encode("utf-8", "surrogatepass")) for s in py.values()) > MAX_SOURCE_BYTES:
+		# callers pass mapped_files(); a direct caller over the budget gets the same accurate refusal
+		raise SourceTooLarge(
+			f"the Python source is more than Preflight maps ({MAX_SOURCE_BYTES // 2**20} MB)"
+		)
 	f.texts = {p: s for p, s in files.items() if p.endswith(TEXT_SUFFIXES) and len(s) < 256 * 1024}
 	for path, src in py.items():
 		try:
@@ -1026,6 +1077,7 @@ def _distributed(f: Facts, by_id: dict[str, ScriptKnob]) -> str:
 def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 	if entrypoint not in files:
 		raise ScriptParseError(f"entrypoint {entrypoint} is not among the submitted files")
+	files, _ = mapped_files(files, entrypoint)
 	f = _parse(files)
 	_collect_knobs(f)
 	knobs = _knobs(f)

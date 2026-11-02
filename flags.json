@@ -12,6 +12,7 @@
 	"harness.glimmer_private": false,
 	"runner.queue": false,
 	"runner.hide_sample_outputs": false,
+	"runner.read_closure": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,

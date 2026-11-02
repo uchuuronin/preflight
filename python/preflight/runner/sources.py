@@ -45,6 +45,9 @@ class Fetched:
 	entrypoint: str
 	args: list[str] = field(default_factory=list)
 	source: Source | None = None
+	# a repository too big to read whole: its entry point and the files it imports, bounded
+	# (harness/closure.py): files and bytes read, imported files left out, the repository's files
+	partial: dict | None = None
 
 
 def content_hash(files: dict[str, str]) -> str:
@@ -67,8 +70,30 @@ def _wanted(rel: str, data: bool = False) -> bool:
 	return not (rel.startswith(".") or "/." in rel) and Path(rel).suffix in suffixes
 
 
-def _too_big() -> InvalidSubmission:
-	return InvalidSubmission("the source is larger than Preflight reads; point it at a smaller directory")
+# a repository over MAX_FILES / MAX_TOTAL_BYTES is read as its entry point and what it imports, up to
+# these: the static mapper reads up to 2 MB of Python (harness/static.py MAX_SOURCE_BYTES), so a
+# partial read never fails there
+CLOSURE_MAX_FILES = 600
+CLOSURE_MAX_BYTES = 2 * 1024 * 1024
+
+
+def _too_big(
+	n_files: int | None = None, n_bytes: int | None = None, *, repo: bool = False
+) -> InvalidSubmission:
+	limits = f"{MAX_FILES:,} files and {MAX_TOTAL_BYTES // 2**20} MB of text"
+	size = (
+		f" ({n_files:,} text files, {n_bytes / 2**20:.0f} MB)"
+		if n_files is not None and n_bytes is not None
+		else ""
+	)
+	if repo:
+		return InvalidSubmission(
+			f"the repository{size} is more than Preflight reads whole ({limits}); name its entry point, "
+			"the script you run, and Preflight reads that file and the files it imports",
+			code="submission.too_large",
+		)
+	return InvalidSubmission(f"the source{size} is more than Preflight reads ({limits}); point it at a smaller "
+		"directory, or probe it on your machine", code="submission.too_large")  # fmt: skip
 
 
 def _read_tree(root: Path) -> dict[str, str]:
@@ -204,6 +229,13 @@ def _git(base: list[str], *args: str, env: dict, stdin: bytes | None = None) -> 
 
 
 def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict, data: bool = False) -> dict[str, str]:
+	"""The whole tree's text files (see _git_read), as before."""
+	return _git_read(repo, treeish, base=base, env=env, data=data)[0]
+
+
+def _git_read(
+	repo: Path, treeish: str, *, base: list[str], env: dict, data: bool = False, entry: str | None = None
+) -> tuple[dict[str, str], dict | None]:
 	"""Text files of a tree, read from the object store without a checkout or a lazy fetch.
 
 	Blobs the partial clone left out (over the per-file cap) are listed as missing and skipped
@@ -230,19 +262,48 @@ def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict, data: bo
 			entries.append((rel, oid))
 	entries.sort()
 	if not entries:
-		return {}
+		return {}, None
 	sizes = _git(g, "cat-file", "--batch-check=%(objectname) %(objectsize)", env=env,
 		stdin="".join(f"{oid}\n" for _, oid in entries).encode()).decode().split("\n")  # fmt: skip
 	size_of = dict(ln.split() for ln in sizes if ln.count(" ") == 1)
-	keep, total = [], 0
-	for rel, oid in entries:
-		size = int(size_of.get(oid, MAX_FILE_BYTES + 1))
-		if size > MAX_FILE_BYTES:
-			continue
-		total += size
-		if len(keep) >= MAX_FILES or total > MAX_TOTAL_BYTES:
-			raise _too_big()
-		keep.append((rel, oid))
+	keep = [(rel, oid, int(size_of.get(oid, MAX_FILE_BYTES + 1))) for rel, oid in entries]
+	keep = [(rel, oid, n) for rel, oid, n in keep if n <= MAX_FILE_BYTES]
+	total = sum(n for _, _, n in keep)
+	if len(keep) <= MAX_FILES and total <= MAX_TOTAL_BYTES:
+		return _cat(g, env, [(rel, oid) for rel, oid, _ in keep]), None
+	# too big to read whole: the entry point and the files it imports (harness/closure.py), with
+	# runner.read_closure on (off: refused, saying how big it is)
+	from .flags import flag
+
+	if not flag("runner.read_closure"):
+		raise InvalidSubmission(
+			f"the repository ({len(keep):,} text files, {total / 2**20:.0f} MB) is more than Preflight reads "
+			f"({MAX_FILES:,} files and {MAX_TOTAL_BYTES // 2**20} MB of text); probe it on your machine",
+			code="submission.too_large",
+		)
+	if not entry:
+		raise _too_big(len(keep), total, repo=True)
+	oid_of = {rel: oid for rel, oid, _ in keep}
+	if entry not in oid_of:
+		raise InvalidSubmission(f"the entrypoint {entry!r} is not among the repository's text files")
+	if not entry.endswith(".py"):
+		raise InvalidSubmission(
+			f"the repository ({len(keep):,} text files, {total / 2**20:.0f} MB) is more than Preflight reads whole, "
+			f"and {entry!r} isn't a Python file whose imports it can follow; name the Python script it runs",
+			code="submission.too_large",
+		)
+	from preflight.harness.closure import import_closure
+
+	files, info = import_closure(oid_of, lambda paths: _cat(g, env, [(p, oid_of[p]) for p in paths]), entry,
+		max_files=CLOSURE_MAX_FILES, max_bytes=CLOSURE_MAX_BYTES, sizes={rel: n for rel, _, n in keep})  # fmt: skip
+	if entry not in files:  # it's in the tree, so it wasn't UTF-8 text
+		raise InvalidSubmission(f"the entrypoint {entry!r} isn't UTF-8 text")
+	info["repo_bytes"] = total
+	return files, info
+
+
+def _cat(g: list[str], env: dict, keep: list[tuple[str, str]]) -> dict[str, str]:
+	"""{path: text} for (path, blob id) pairs, read from the object store in one batch."""
 	if not keep:
 		return {}
 	out = _git(g, "cat-file", "--batch", env=env, stdin="".join(f"{oid}\n" for _, oid in keep).encode())
@@ -263,6 +324,14 @@ def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict, data: bo
 
 
 def _clone(uri, commit, *, data: bool = False) -> tuple[dict[str, str], str]:
+	"""The whole repository's text files and the commit (see _clone_read)."""
+	files, sha, _ = _clone_read(uri, commit, data=data)
+	return files, sha
+
+
+def _clone_read(
+	uri, commit, entry: str | None = None, *, data: bool = False
+) -> tuple[dict[str, str], str, dict | None]:
 	"""The text files of a public GitHub repo at its default branch or a full commit hash, and the
 	commit they were read at, so a later probe of the same record reads the same code. data: small
 	.csv and .tsv files too (probes.repo_install)."""
@@ -282,7 +351,8 @@ def _clone(uri, commit, *, data: bool = False) -> tuple[dict[str, str], str]:
 			_git(base, "-C", str(dest), "fetch", *shallow, "origin", commit, env=env)
 			treeish = commit
 		sha = _git(base, "-C", str(dest), "rev-parse", f"{treeish}^{{commit}}", env=env).decode().strip()
-		return _git_files(dest, treeish, base=base, env=env, data=data), sha
+		files, partial = _git_read(dest, treeish, base=base, env=env, data=data, entry=entry)
+		return files, sha, partial
 	except subprocess.TimeoutExpired as exc:
 		raise InvalidSubmission("the repository took too long to clone") from exc
 	except subprocess.CalledProcessError as exc:
@@ -336,6 +406,7 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 	if commit is not None and not isinstance(commit, str):
 		raise InvalidSubmission("a commit is its full 40-character hash (git rev-parse HEAD)")
 	args = _args(source.get("args"))
+	partial = None
 	if kind in ("sample", "template"):
 		files = _without_outputs(_read_tree(_sample(uri)))
 	elif kind in ("upload", "cli", "inflight"):
@@ -360,7 +431,10 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		if reqs:  # the notebook's !pip install lines, installed like any upload's requirements.txt
 			files["requirements.txt"] = "\n".join(reqs) + "\n"
 	elif kind == "repo":
-		files, commit = _clone(uri, commit, data=_repo_data())
+		want = source.get("entrypoint")
+		files, commit, partial = _clone_read(
+			uri, commit, want if isinstance(want, str) and want else None, data=_repo_data()
+		)
 	else:
 		raise InvalidSubmission(f"unknown source kind {kind!r}")
 	entry = _pick_entrypoint(
@@ -379,4 +453,4 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		entrypoint=entry,
 		args=args,
 	)
-	return Fetched(files=files, entrypoint=entry, args=args, source=src)
+	return Fetched(files=files, entrypoint=entry, args=args, source=src, partial=partial)

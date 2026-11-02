@@ -571,7 +571,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
-	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
+	keep = [f for f in keep if not f.id.startswith("source.partial")]
+	out = out.model_copy(
+		update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *_reading_findings(fetched)]}
+	)
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
 	if req.mode != "verify" and not req.private:
@@ -725,6 +728,54 @@ def _with_dataset_size(rec: FlightRecord, files: dict[str, str] | None = None) -
 	data = sm.data.model_copy(update={"n_examples": int(n)})
 	job = rec.job.model_copy(update={"script_map": sm.model_copy(update={"data": data})})
 	return rec.model_copy(update={"job": job})
+
+
+def _mb(n: int) -> str:
+	return f"{n / 2**20:.2f} MB" if n < 10 * 2**20 else f"{n / 2**20:.0f} MB"
+
+
+def _n_files(n: int, word: str) -> str:
+	if n == 0:
+		return f"none of the {word}s"
+	return f"the 1 {word}" if n == 1 else f"the {n:,} {word}s"
+
+
+def _reading_findings(fetched: Fetched) -> list:
+	"""Say so when Preflight read part of the source (D, Nov 2): a repository too big to read whole
+	is read as its entry point and the files it imports (runner/sources.py), and over 2 MB of Python
+	is mapped the same way (harness/static.py mapped_files). Its knobs and checks cover what was
+	read; a file reached only by a string import isn't."""
+	from preflight.harness.static import mapped_files
+	from preflight.schema import Evidence, Finding
+
+	out = []
+	p = fetched.partial
+	if p:
+		left = (
+			f"; at least {p['skipped']:,} more imported files were left out for the size limit"
+			if p.get("skipped")
+			else ""
+		)
+		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
+			title="Read the entry point and what it imports, not the whole repository",
+			detail=(f"The repository has {p['repo_files']:,} text files ({_mb(p['repo_bytes'])}), more than Preflight "
+				f"reads whole, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
+				f"({_mb(p['bytes'])} in all){left}. The map and the findings cover what was read, and the probes run "
+				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
+			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
+				Evidence(metric="source.repo_files", value=float(p["repo_files"]))]))  # fmt: skip
+	try:
+		_, m = mapped_files(fetched.files, fetched.entrypoint)
+	except ValueError:
+		m = None
+	if m:
+		out.append(Finding(id="source.partial.map", severity="info", code="source.partial", source="rule",
+			title="Mapped the entry point and what it imports, not every file",
+			detail=(f"The source has {_mb(m['python_bytes'])} of Python in {m['python_files']:,} files, more than "
+				f"Preflight maps (2 MB), so the map reads {fetched.entrypoint} and {_n_files(m['imported'], 'file')} "
+				f"it imports ({_mb(m['bytes'])}). Settings in other files aren't on the map."),
+			evidence=[Evidence(metric="map.files_read", value=float(m["files"]))]))  # fmt: skip
+	return out
 
 
 def _triage_client(deps: Deps, private: bool):
