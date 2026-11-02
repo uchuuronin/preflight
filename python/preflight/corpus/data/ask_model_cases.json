@@ -105,6 +105,54 @@
    "$from": "A's ground_truth command on remote-runs (Nov 2): repo, commit, entrypoint, args and first GPU; steps from --bare-steps or the script's own --max_steps"
   },
   {
+   "id": "unseen-7",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/beir-cellar/beir",
+    "commit": "ef83d29307061c65d04b035b4f4e7c18bd8374af",
+    "entrypoint": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
+    "args": []
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; steps from the script's own --epochs (full-batch: one step an epoch) where it names them"
+  },
+  {
+   "id": "unseen-8",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/snap-stanford/ogb",
+    "commit": "61e9784ca76edeaa6e259ba0f836099608ff0586",
+    "entrypoint": "examples/nodeproppred/arxiv/gnn.py",
+    "args": [
+     "--use_sage",
+     "--runs",
+     "1",
+     "--epochs",
+     "500"
+    ]
+   },
+   "gpu": "L4",
+   "steps": 500,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; steps from the script's own --epochs (full-batch: one step an epoch) where it names them"
+  },
+  {
+   "id": "unseen-9",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/KellerJordan/cifar10-airbench",
+    "commit": "4c1b6d1e3889b037efadcfd5c0ea65b246592362",
+    "entrypoint": "airbench94_muon.py",
+    "args": []
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; steps from the script's own --epochs (full-batch: one step an epoch) where it names them"
+  },
+  {
    "id": "finetune_lora_hf",
    "set": "zoo",
    "source": {
