@@ -304,7 +304,9 @@ def _nanogpt_cases():
 	raw["job"]["lens"] = "pretrain"
 	# the LoRA record's own knobs (lora_r, precision) aren't the zoo nanoGPT's: only the shape knobs stay
 	raw["knobs"] = [
-		k for k in raw["knobs"] if k["id"] in ("batch_size", "seq_len", "gradient_checkpointing", "eval_batch_size")
+		k
+		for k in raw["knobs"]
+		if k["id"] in ("batch_size", "seq_len", "gradient_checkpointing", "eval_batch_size")
 	]
 	rec = FlightRecord.model_validate(raw)
 	for b, s in itertools.product((1, 4, 12), (256, 512, 1024)):
