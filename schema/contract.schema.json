@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.2/contract",
+	"$id": "https://preflight.dev/schema/0.6.3/contract",
 	"title": "PreflightContract",
-	"description": "Preflight contract v0.6.2. Generated; do not edit.",
+	"description": "Preflight contract v0.6.3. Generated; do not edit.",
 	"type": "object",
 	"properties": {
 		"FlightRecord": {
@@ -2089,7 +2089,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"schema_version": {
-					"default": "0.6.2",
+					"default": "0.6.3",
 					"pattern": "^\\d+\\.\\d+\\.\\d+$",
 					"title": "Schema Version",
 					"type": "string"

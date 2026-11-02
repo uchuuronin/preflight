@@ -151,3 +151,11 @@ def test_a_run_on_another_card_says_different_gpu_instead_of_alerting():
 	assert "different GPU" in card_change("L4", "NVIDIA A10")
 	assert card_change(None, "NVIDIA A10G") is None and card_change("A10", None) is None
 	assert card_change("A100-SXM-80GB", "NVIDIA A100-SXM4-80GB") is None  # the same card, named its own way
+	assert (
+		card_change("T4", "Tesla T4") is None
+		and card_change("H100-SXM-80GB", "NVIDIA H100 80GB HBM3") is None
+	)
+	assert "different GPU" in card_change(
+		"A100-SXM-80GB", "NVIDIA A100-SXM4-80GB MIG 1g.10gb"
+	)  # a seventh of it
+	assert "different GPU" in card_change("RTX-4090", "NVIDIA GeForce RTX 4090 D")

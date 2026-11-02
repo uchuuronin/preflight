@@ -541,10 +541,11 @@ def _length_term(
 
 def _matching_probe(record: FlightRecord, values: dict, ok=OK_PROBE):
 	"""A probe whose every knob equals the query's: the number is a measurement, not a prediction."""
+	ignored = _ignored()
 	for p in record.probes:
 		if p.status in ok:
 			pv = _probe_values(record, p)
-			if all(_same(pv.get(k), v) for k, v in values.items() if k not in _ignored()):
+			if all(_same(pv.get(k), v) for k, v in values.items() if k not in ignored):
 				return p
 	return None
 
@@ -596,13 +597,14 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 	if not runs:
 		return []
 	out = []
+	ignored = _ignored()
 	for kid, v in values.items():
 		if (
 			kid in SHAPE_KNOBS
 			or kid in RUN_KNOBS
 			or kid in also_ok
 			or kid.startswith("fanout.")
-			or kid in _ignored()
+			or kid in ignored
 		):
 			continue
 		if not any(_same(v, pv.get(kid)) for pv in runs):
@@ -2214,6 +2216,7 @@ def run_cost(
 ) -> tuple[CostBasis, JobCost]:
 	"""The run's cost breakdown and where its rates come from (contract 0.2.0). Preflight's own spend is
 	`record.costs`, never here; money at risk sits beside the total, never in it."""
+	record = _fit_view(record)
 	basis = _basis(record, provider, billing, region)
 	values = _values(record, knob_values)
 	why = _invalid(values)
@@ -2319,6 +2322,7 @@ def run_cost(
 def predict_as_run(record: FlightRecord, probe) -> Prediction:
 	"""The prediction for a probe's own setting as that probe ran it: with no eval pass when it ran none
 	(probe_ran_eval), so a held-out check compares like with like. For C's coverage checks."""
+	record = _fit_view(record)
 	return _predict_values(
 		record, _values(record, _probe_values(record, probe)), eval_off=not probe_ran_eval(probe)
 	)
@@ -2328,9 +2332,15 @@ def _fit_view(record: FlightRecord) -> FlightRecord:
 	"""The record as the fits see it: without the learning-rate range test's probe (D's ask, from A's review, Nov 2).
 	`p1-lr` runs at p1's knobs with its measured fields cleared, so it would count twice as an ok probe at p1's settings;
 	it stays on the record, where its curve is read."""
-	if not any(any(k.startswith("lr_range.") for k in (p.extras or {})) for p in record.probes):
+	if not any(
+		any((k == "lr_range" or k.startswith("lr_range.")) for k in (p.extras or {})) for p in record.probes
+	):
 		return record
-	keep = [p for p in record.probes if not any(k.startswith("lr_range.") for k in (p.extras or {}))]
+	keep = [
+		p
+		for p in record.probes
+		if not any((k == "lr_range" or k.startswith("lr_range.")) for k in (p.extras or {}))
+	]
 	return record.model_copy(update={"probes": keep})
 
 
@@ -3227,6 +3237,9 @@ def _sensitivity(
 # ---------------------------------------------------------------- the whole predictions block
 
 
+DIVERGENCE_INPUTS = ("lr", "warmup", "warmup_steps", "lr_schedule", "grad_clip")
+
+
 def _divergence_model():
 	try:
 		from preflight.engine._divergence_model import MODEL
@@ -3251,6 +3264,16 @@ def _divergence(record: FlightRecord, values: dict) -> Estimate:
 	if not probes:
 		return _abstain("probability", mid, "no probe logged a loss series")
 	p = max(probes, key=lambda q: len(q.stability.series["loss"]))
+	# review, Nov 2: the classifier reads the learning rate, the warm-up, the schedule and the clipping, which the free
+	# knobs carry past for memory and time; a move of any of them away from the probe's own value isn't the probe's risk
+	pv = _probe_values(record, p)
+	moved = [k for k in DIVERGENCE_INPUTS if k in values and not _same(values[k], pv.get(k))]
+	if moved:
+		return _abstain(
+			"probability",
+			mid,
+			f"the warning reads the probe's own {', '.join(moved)}; probe this setting to see it",
+		)
 	cfg = {**{kv.id: kv.current for kv in record.knobs}, **p.knobs}
 	cfg.setdefault("precision", cfg.get("dtype"))
 	w = divergence.warn(model, p.stability.series, cfg)

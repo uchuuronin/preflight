@@ -249,10 +249,11 @@ def forecast_loss(
 	pts = [(first_step + i, float(v)) for i, v in enumerate(losses) if v is not None and math.isfinite(v)]
 	if len(pts) < 2 or last_step <= pts[-1][0] or min(v for _, v in pts) < 0:
 		return None  # a negative loss (some NLLs) has no place on the normaliser's [0, inf) range
+	binned = per_x_means(pts, last_step) if bin_x else []
+	if bin_x and binned and binned[-1][0] >= X_MAX:
+		return None
+	bin_x = bin_x and len(binned) >= 2  # review, Nov 2: a long run seen only in its first x keeps the raw steps
 	if bin_x:
-		binned = per_x_means(pts, last_step)
-		if len(binned) < 2 or binned[-1][0] >= X_MAX:
-			return None
 		steps = torch.tensor([b for b, _ in binned], dtype=torch.float32) * last_step / X_MAX
 		ys = torch.tensor([v for _, v in binned], dtype=torch.float32)
 		pts = [(round(float(s)), float(v)) for s, v in zip(steps, ys, strict=True)]

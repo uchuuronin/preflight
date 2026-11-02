@@ -1,5 +1,5 @@
 {
- "$comment": "A real-model check for the cross-GPU step-time row (Chiya's review, Nov 2): C's four campaign cells of the zoo LoRA script measured on the A10 (docs/status/c.md D17, GitHub run 41493588241), against the engine predicting the A10 from PF102's record, measured on the L4 only. lr doesn't move step time, so the two lr cells at each batch are both kept. step_s is each cell's p50 over 14 timed steps.",
+ "$comment": "A real-model check for the cross-GPU step-time row (Chiya's review, Nov 2): C's four campaign cells of the zoo LoRA script measured on the A10 (docs/status/c.md D17, GitHub run 41493588241), against the engine predicting the A10 from PF102's record, measured on the L4 only. lr doesn't move step time, so the two lr cells at each batch are both kept. step_s is each cell's p50 over 14 timed steps. Modal's \"A10\" sometimes gives an A10G (about 11% slower on this script, B's status rows 20 and 21) and the cells don't record which card they got, so part of the gap may be the card.",
  "record": "web/src/workspace/fixtures/lora-live-nov1.record.json",
  "from_gpu": "L4",
  "to_gpu": "A10",

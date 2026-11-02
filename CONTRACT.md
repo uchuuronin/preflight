@@ -1,4 +1,4 @@
-# Preflight contract v0.6.2
+# Preflight contract v0.6.3
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,10 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.3 (Nov 2, additive; B's, after the validation freeze, from Chiya's Nov 2 item 3): `Grid.independent_of`
+  (optional, absent by default): the knobs a grid's target doesn't depend on (the learning rate and its peers for
+  memory, time and cost), so a reader answers at any value of them instead of holding them at `fixed`. Emitted only
+  with `engine.carry_free_knobs` on (off). A reader that doesn't know it can ignore it; 0.6.2 records load unchanged.
 - 0.6.2 (Nov 1, additive; C's request, approved by Chiya): `JobRequest.private` (default false). The
   visitor chose private mode: with `harness.glimmer_private` on, triage runs on Muse Glimmer on
   Preflight's own GPU (B's Modal host) instead of Muse Spark Open on Baseten. 0.6.1 records load unchanged.

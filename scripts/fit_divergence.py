@@ -41,7 +41,10 @@ MIN_RUNS = 40  # guess: below this many labelled runs the held-out numbers are n
 def runs_of(rows: list[dict]) -> list[dict]:
 	out = []
 	for r in rows:
-		if r.get("kind") not in (None, "divergence") or r.get("status") != "ok":
+		# review, Nov 2: a raw or exported row carries its kind in its config; the realistic sweep's rows
+		# ("divergence_real") never enter this fit
+		kind = r.get("kind") or (r.get("config") or {}).get("kind")
+		if kind not in (None, "divergence") or r.get("status") != "ok":
 			continue
 		res = r.get("result") or r
 		series, label = res.get("series"), res.get("label")

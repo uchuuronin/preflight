@@ -57,6 +57,12 @@ def export(store: str, divergence: str, out: Path) -> dict:
 			("divergence", f"{divergence}/*.jsonl.gz"),
 		):
 			for fname, row in _rows(pattern):
+				own = (row.get("config") or {}).get("kind")
+				if (
+					own and own != kind
+				):  # review, Nov 2: the realistic sweep's rows never go out labelled as the Nov 1 sweep
+					counts[("skipped: kind " + own, row.get("gpu"), row.get("status"), "none")] += 1
+					continue
 				ident = (kind, row.get("gpu"), row.get("key"))
 				if ident in seen:  # each config is written once per GPU; a repeat would double-count
 					continue

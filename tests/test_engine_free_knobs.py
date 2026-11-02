@@ -161,3 +161,32 @@ def test_the_range_tests_probe_is_left_out_of_the_fits():
 	assert {t: _read(a, t) for t in TARGETS} == {t: _read(b, t) for t in TARGETS}
 	filled = api.fill_predictions(with_ramp)
 	assert [p.id for p in filled.probes] == [p.id for p in with_ramp.probes]  # it stays on the record
+
+
+def test_the_divergence_warning_abstains_when_its_own_inputs_move(monkeypatch):
+	"""Review, Nov 2: the classifier reads the probe's lr, warm-up, schedule and clipping, so with the free knobs carried
+	for memory and time a move of one of them must not show the probe's risk unchanged."""
+	from preflight.engine import divergence
+
+	rec = load_record(LORA.read_text())
+	if not any(p.stability and p.stability.series.get("loss") for p in rec.probes):
+		pytest.skip("no probe here logged a loss series")
+	monkeypatch.setattr(api, "_divergence_model", lambda: object())
+	monkeypatch.setattr(
+		divergence, "warn", lambda m, s, c: {"status": "predicted", "point": 0.1, "reason": "x"}
+	)
+	with _carry(True):
+		assert api._divergence(rec, api._values(rec, {})).status == "predicted"
+		moved = api._divergence(rec, api._values(rec, {"warmup_steps": 100}))
+	assert moved.status == "abstain" and "warmup_steps" in moved.reason
+
+
+def test_the_nov1_fit_never_reads_the_realistic_sweeps_rows():
+	import importlib.util
+
+	spec = importlib.util.spec_from_file_location("fd", ROOT / "scripts/fit_divergence.py")
+	fd = importlib.util.module_from_spec(spec)
+	spec.loader.exec_module(fd)
+	row = {"status": "ok", "config": {"kind": "divergence_real", "params": {"lr": 1e-3}},
+		"series": {"loss": [1.0] * 50}, "label": {"diverged": False}}  # fmt: skip
+	assert fd.runs_of([row]) == []
