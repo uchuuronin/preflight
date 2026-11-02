@@ -1,0 +1,11 @@
+{
+	"name": "20261102-224244-41539532194-b-gt-eval-sweep",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41539532194",
+	"ref": "ws-b",
+	"sha": "33a9499e6ec3c3e67f0e253fc1ad98c94163e796",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script eval_sweep_reasoning --recorder-steps 3 --budget-min 30 --install-requirements --first-gpu A10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:01:07Z"
+}
