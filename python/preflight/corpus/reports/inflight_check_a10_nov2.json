@@ -1,0 +1,81 @@
+{
+ "device": "NVIDIA A10",
+ "parent": {
+  "record_id": "01M6EGH5YMCXPFPNY5SHPNSYV5",
+  "gpu": "A10",
+  "probe_p50_s": 1.45200439453125,
+  "probe_peak_reserved_gb": 18.65
+ },
+ "bands": {
+  "step_s": [
+   1.2547701694762456,
+   1.5709714531824184
+  ],
+  "peak_gb": null,
+  "total_min": [
+   72.6,
+   82.9
+  ],
+  "total_steps": 3170
+ },
+ "exit_code": 143,
+ "wall_s": 276.2,
+ "alerts": [
+  "[preflight] watching /root/lora/train.py against record a-triage-lora-share-token-00; live record /tmp/out_lora/live-record-token-00.json",
+  "[preflight] 159 steps, 1 alerts; record /tmp/out_lora/live-record-token-00.json"
+ ],
+ "windows": 16,
+ "window_alerts": [
+  {
+   "step": 159,
+   "alerts": [
+    "step 159: at this pace the run takes 84.9 min, above the predicted 72.6\u201382.9 min"
+   ]
+  }
+ ],
+ "step_s": [
+  1.4192,
+  1.4224,
+  1.4373,
+  1.5275,
+  1.4645,
+  1.5132,
+  1.3699,
+  1.3953,
+  1.4352,
+  1.4489,
+  1.4525,
+  1.4915,
+  1.5516,
+  1.565,
+  1.4505,
+  1.7907
+ ],
+ "peak_reserved_gb": [
+  18.65,
+  23.12,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22,
+  23.22
+ ],
+ "record_rewrites": 15,
+ "stderr_tail": "4%|\u258d         | 140/3170 [03:25<1:27:21,  1.73s/it]\n                                                    \n\n  4%|\u258d         | 140/3170 [03:25<1:27:21,  1.73s/it]\n  4%|\u258d         | 141/3170 [03:26<1:20:34,  1.60s/it]\n  4%|\u258d         | 142/3170 [03:28<1:15:34,  1.50s/it]\n  5%|\u258d         | 143/3170 [03:29<1:16:32,  1.52s/it]\n  5%|\u258d         | 144/3170 [03:31<1:26:23,  1.71s/it]\n  5%|\u258d         | 145/3170 [03:32<1:16:13,  1.51s/it]\n  5%|\u258d         | 146/3170 [03:34<1:13:44,  1.46s/it]\n  5%|\u258d         | 147/3170 [03:35<1:07:36,  1.34s/it]\n  5%|\u258d         | 148/3170 [03:36<1:13:31,  1.46s/it]\n  5%|\u258d         | 149/3170 [03:38<1:14:32,  1.48s/it]\n  5%|\u258d         | 150/3170 [03:40<1:16:00,  1.51s/it]\n                                                    \n\n  5%|\u258d         | 150/3170 [03:40<1:16:00,  1.51s/it]\n  5%|\u258d         | 151/3170 [03:41<1:11:28,  1.42s/it]\n  5%|\u258d         | 152/3170 [03:42<1:14:40,  1.48s/it]\n  5%|\u258d         | 153/3170 [03:44<1:19:07,  1.57s/it]\n  5%|\u258d         | 154/3170 [03:46<1:21:16,  1.62s/it]\n  5%|\u258d         | 155/3170 [03:48<1:21:32,  1.62s/it]\n  5%|\u258d         | 156/3170 [03:49<1:18:09,  1.56s/it]\n  5%|\u258d         | 157/3170 [03:51<1:20:37,  1.61s/it]\n  5%|\u258d         | 158/3170 [03:52<1:20:18,  1.60s/it]\n  5%|\u258c         | 159/3170 [03:54<1:17:03,  1.54s/it][preflight] step 159: at this pace the run takes 84.9 min, above the predicted 72.6\u201382.9 min\n[preflight] 159 steps, 1 alerts; record /tmp/out_lora/live-record-token-00.json\n\n  5%|\u258c         | 159/3170 [03:55<1:14:25,  1.48s/it]\n",
+ "live_record": {
+  "parses": true,
+  "source_kind": "inflight",
+  "parent_id": "01M6EGH5YMCXPFPNY5SHPNSYV5",
+  "status": "cancelled",
+  "steps": 159
+ }
+}
