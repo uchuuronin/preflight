@@ -139,3 +139,15 @@ def test_a_failing_script_prints_its_traceback_and_keeps_its_exit_code(tmp_path)
 	assert r.returncode == 1 and "Traceback" in r.stderr and "boom in user code" in r.stderr
 	live = load_record(next((tmp_path / "o").glob("*.json")).read_text()).probes[-1]
 	assert live.status == "error" and "boom" in live.error
+
+
+def test_a_run_on_another_card_says_different_gpu_instead_of_alerting():
+	"""B's A10 check (Nov 2): Modal's A10 gave an A10G, about 11% slower, and the step and total alerts fired."""
+	from preflight.recorder.inflight import card_change
+
+	assert card_change("A10", "NVIDIA A10") is None
+	assert card_change("L4", "NVIDIA L4") is None
+	assert "different GPU" in card_change("A10", "NVIDIA A10G")
+	assert "different GPU" in card_change("L4", "NVIDIA A10")
+	assert card_change(None, "NVIDIA A10G") is None and card_change("A10", None) is None
+	assert card_change("A100-SXM-80GB", "NVIDIA A100-SXM4-80GB") is None  # the same card, named its own way
