@@ -1,0 +1,11 @@
+{
+	"name": "20261102-234113-41547304579-a-trial-litgpt-install-uv-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41547304579",
+	"ref": "380e3ad52d982e178383d328ac0bf61c8787ca99",
+	"sha": "380e3ad52d982e178383d328ac0bf61c8787ca99",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::install_check --repo https://github.com/Lightning-AI/litgpt --commit 4738993a5e0190b851162a52173729827d3884e7 --entrypoint litgpt/pretrain.py --uv",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:48:46Z"
+}
