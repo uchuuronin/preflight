@@ -201,7 +201,7 @@ web/e2e/stranger.mjs`), copied into the manifest's `knob_ms` list.
 | Peak memory error | Within 10% | Bug zoo and unseen scripts, full runs | not measured |  |  | no full run scored yet |
 | OOM prediction | No missed OOMs; at most 1 false alarm per 10 scripts | Bug zoo and unseen scripts | not measured |  |  |  |
 | Step time, same GPU | Within 15% | Full runs | not measured |  |  | no full run scored yet |
-| Step time, unmeasured GPU | Within 20% | Train on 3 GPU types, test on the 4th | not measured |  |  | no corpus store given |
+| Step time, unmeasured GPU | Within 20% | Train on all GPU types but one, test on the one left out | not measured |  |  | no corpus store given |
 | GNN + GBDT ensemble vs GBDT alone | Lower error on held-out architectures | Corpus holdout |  |  | miss | paired gain +4.8% (95% -1.4% to +11.6%); the interval includes zero, so the GBDT is used |
 | Divergence warning | AUROC 0.85+, 100+ steps early | Held-out short runs | not measured |  |  | the classifier's held-out report isn't in yet |
 | Rollout time (RL) | Within 20% | An unseen TRL script (the GRPO zoo script calibrated it, Nov 1) | not measured |  |  | no full run scored yet |
