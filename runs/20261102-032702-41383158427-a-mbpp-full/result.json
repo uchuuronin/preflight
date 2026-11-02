@@ -1,0 +1,11 @@
+{
+	"name": "20261102-032702-41383158427-a-mbpp-full",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41383158427",
+	"ref": "ws-a",
+	"sha": "29f9e6ef6186089d0a4888ca713660175b70d661",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark --k 470 --skip-from zoo/agent_eval_spark/record_oct31.json --max-usd 14 --label-mbpp 500",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T03:40:47Z"
+}

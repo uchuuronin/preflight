@@ -1,0 +1,39 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-0vBTkVB5nweUUSRabfkoXl
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+└── ✓ Created Function triage_agreement_hosted.
+[agent] skipping the 30 tasks zoo/agent_eval_spark/record_oct31.json already holds
+[agent] run.py: lens agent, population 500; sampling 470
+[agent] 470 tasks, $6.2288 of model calls; the first 470 tasks the script started; script wall 794 s; 30 already sampled skipped
+[agent] couldn't label the rows: HTTPStatusError: Server error '502 Bad Gateway' for url 'https://datasets-server.huggingface.co/rows?dataset=google-research-datasets%2Fmbpp&config=full&split=test&offset=300&length=100'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/502
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-0vBTkVB5nweUUSRabfkoXl
