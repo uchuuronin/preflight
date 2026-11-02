@@ -3,7 +3,7 @@ import devRaw from "../workspace/fixtures/dev-finetune.record.json";
 import type { Move, PredictionProvider } from "../workspace/provider/PredictionProvider";
 import { currentKnobs } from "../workspace/record/model";
 import { type FlightRecord, type KnobValue, type LoadedRecord, normaliseRecord, type Prediction } from "../workspace/record/types";
-import { bestCombo, comboVisit } from "./combos";
+import { bestCombo, comboKeys, comboVisit, comboWords, rowsCut, rowsWords } from "./combos";
 import { nextStep } from "./ruleTour";
 
 const GIB = 2 ** 30;
@@ -142,5 +142,75 @@ describe("a combination B's pair grid clears only to 'unlikely' (P at most 0.05)
 		const c = bestCombo(r, near, currentKnobs(r), { kind: "min_cost" });
 		expect(c?.fit).toBe("tight");
 		expect(c?.risk).toBeCloseTo(0.03);
+	});
+});
+
+describe("ranking combined moves (PM, Nov 1)", () => {
+	// The live LoRA record's choice: eval batch 4 with seq_len 512, or eval without gradients with
+	// seq_len 256. Both come close; the first shortens the sequence less, and the eval knobs don't
+	// change what the model learns.
+	function two(): LoadedRecord {
+		const grid = (target_id: string, a: { knob_id: string; values: KnobValue[] }, fixed: Record<string, KnobValue>) => ({
+			id: `g.${target_id}.${a.knob_id}_seq_len.clears`,
+			target_id,
+			unit: target_id === "memory.peak" ? "bytes" : "probability",
+			axes: [
+				{ ...a, scale: "linear" },
+				{ knob_id: "seq_len", values: [256, 512, 1024, 2048], scale: "log" },
+			],
+			fixed,
+			model_id: "memory-analytical@test",
+		});
+		const grids = ["memory.peak", "risk.oom"].flatMap((id) => [
+			grid(id, { knob_id: "eval_no_grad", values: [false, true] }, { eval_batch_size: 32 }),
+			grid(id, { knob_id: "eval_batch_size", values: [4, 8, 16, 32] }, { eval_no_grad: false }),
+		]);
+		const probes = [
+			{ ...dev.probes[0]!, knobs: { ...dev.probes[0]!.knobs, seq_len: 2048 }, extras: { dataset_max_tokens: 2048, dataset_p999_tokens: 1156, dataset_p50_tokens: 264, dataset_rows_scanned: 50724, dataset_rows_total: 50724 } },
+		];
+		return { ...dev, probes, predictions: { ...dev.predictions, grids } } as unknown as LoadedRecord;
+	}
+	const clears = (k: Readonly<Record<string, KnobValue>>) =>
+		(k.eval_no_grad === true && Number(k.seq_len) <= 512) || (Number(k.eval_batch_size) <= 4 && Number(k.seq_len) <= 1024);
+	const near: PredictionProvider = {
+		...fake,
+		predict(rec, knobs) {
+			const full = { ...currentKnobs(rec), ...knobs };
+			const est = (point: number, unit: string) => ({ point, lo: point, hi: point, unit, status: "predicted" as const, model_id: "t" });
+			return { "memory.peak": est(clears(full) ? 18 * GIB : 30 * GIB, "bytes"), "risk.oom": est(clears(full) ? 0.025 : 0.97, "probability") } as unknown as Prediction;
+		},
+	};
+
+	it("shortens the sequence as little as it can, and prefers the knobs that don't change what's learnt", () => {
+		const r = two();
+		// Eval without gradients with seq 512 is the fewest steps in all (1 + 2, B's order); eval
+		// batch 4 with seq 1,024 is more (3 + 1) but shortens the sequence one step, not two.
+		const c = bestCombo(r, near, currentKnobs(r), { kind: "min_cost" });
+		expect(Object.fromEntries(c!.changes.map((x) => [x.knobId, x.to]))).toEqual({ eval_batch_size: 4, seq_len: 1024 });
+		expect(c!.fit).toBe("tight");
+		// From a seq_len between the axis's values, the farther cell still counts farther.
+		const off = bestCombo(r, near, { ...currentKnobs(r), seq_len: 1536 }, { kind: "min_cost" });
+		expect(Object.fromEntries(off!.changes.map((x) => [x.knobId, x.to]))).toEqual({ eval_batch_size: 4, seq_len: 1024 });
+	});
+
+	it("says what the shorter sequence cuts, by the rows A measured", () => {
+		const r = two();
+		const c = bestCombo(r, near, currentKnobs(r), { kind: "min_cost" })!;
+		expect(c.cut).toMatchObject({ to: 1024, kind: "some", p999: 1156, p50: 264, rows: 50724 });
+		expect(comboKeys(c).whyKey).toBe("guide.combo.why_rows");
+		expect(comboWords(r, currentKnobs(r), c).rows_cut).toBe(
+			"A sequence length of 1,024 cuts short every row longer than that. Half the rows are at most 264 tokens, and no more than 1 in 1,000 is longer than 1,156.",
+		);
+		const at = (to: number, extras: Record<string, number> = {}) =>
+			rowsCut({ ...r, probes: [{ ...r.probes[0]!, extras: { ...r.probes[0]!.extras, ...extras } }] } as LoadedRecord, currentKnobs(r), [{ knobId: "seq_len", to }]);
+		expect(at(1200)?.kind).toBe("few");
+		expect(at(128)?.kind).toBe("most");
+		expect(at(1900, { dataset_max_tokens: 1800 })?.kind).toBe("none");
+		// A 99.9th percentile at the probe's own length was cut there: it says nothing about the rows.
+		expect(at(1024, { dataset_p999_tokens: 2048 })).toBeNull();
+		// A scan that stopped early speaks only for the rows it read.
+		expect(at(1200, { dataset_rows_scanned: 30000 })).toBeNull();
+		expect(rowsCut({ ...r, probes: [] } as LoadedRecord, currentKnobs(r), [{ knobId: "seq_len", to: 1024 }])).toBeNull();
+		expect(rowsWords({ cut: at(1200) })).toBe("A sequence length of 1,200 cuts at most 1 row in 1,000 short (no more than 50 of 50,724): the 99.9th percentile row is 1,156 tokens.");
 	});
 });

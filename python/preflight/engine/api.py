@@ -804,7 +804,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	if oom_probe is not None and gpu == _env_gpu(record):  # an OOM on one GPU says nothing about a bigger one
 		why = f"probe {oom_probe.id} ran out of memory at these settings"
 		est = memory.MemoryEstimate(None, None, None, "bytes", "abstain", mid, 1.0, "fails", 0.0, None, why)  # type: ignore[arg-type]
-		oom = _est(1.0, 1.0, 1.0, "probability", "measured", mid, why)
+		oom = _est(1.0, 1.0, 1.0, "probability", "measured", mid, f"fails: {why}")
 		return _MemoryResult(_abstain("bytes", mid, why), oom, est)
 	moves = _unmodelled_moves(record, values, "memory")
 	if moves:
@@ -877,13 +877,17 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - ctx)
 		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
 		oom_source = f"from {cell.n} held-out runs"
+		floor = 0.5 / (
+			len(cell.residuals) + 1
+		)  # cited: empirical_p_oom's half-count with no run over the margin
 	else:
 		oom_source = "simulated band"
+		floor = None
 	off = _off_probe(record, values)
 	if est.status in ("predicted", "measured") and off:
 		why = f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
-	res = _from_memory_estimate(est, mid, oom_source)
+	res = _from_memory_estimate(est, mid, oom_source, floor)
 	if (
 		cell is not None and mprobes and res.peak.status not in ("abstain", "measured")
 	):  # no probes: the prior set it
@@ -952,15 +956,23 @@ def _term_estimates(stack: dict, peak: Estimate) -> dict:
 	}
 
 
+def _pct(p: float) -> str:
+	"""2.5%, 40%, 97.5%: one decimal only where it isn't zero."""
+	return f"{round(p * 100, 1):g}%"
+
+
 def _from_memory_estimate(
-	est: memory.MemoryEstimate, mid: str, oom_source: str = "simulated band"
+	est: memory.MemoryEstimate, mid: str, oom_source: str = "simulated band", floor: float | None = None
 ) -> _MemoryResult:
+	"""`floor` is the lowest P(OOM) the held-out runs can give (half a count in n + 1), when they set it."""
 	if est.status == "abstain":
 		return _MemoryResult(
 			_abstain("bytes", mid, est.reason), _abstain("probability", mid, est.reason), est
 		)
 	peak = _est(est.point, est.lo, est.hi, "bytes", est.status, mid, est.reason)
-	words = {"fits": "fits", "tight": "tight", "fails": "won't fit"}[est.oom_status]
+	# PM, Nov 1: every reason leads with the S2b word itself (fits below 1%, fails at 80% or more, tight between),
+	# never a second scale ("tight: out of memory unlikely" read as two verdicts)
+	word = est.oom_status
 	# Chiya, Oct 31: a number only where the reliability diagram verifies it; in between, the 5-95% range
 	# the bins verify the empirical P(OOM) from held-out residuals; a simulated band's P(OOM) is never verified
 	empirical = oom_source != "simulated band"
@@ -970,16 +982,22 @@ def _from_memory_estimate(
 	if evidence is not None:
 		# Chiya, Oct 31: an end bin that doesn't verify shows what happened to similar runs, not a probability
 		k, n = evidence
-		lead = "Likely" if est.p_oom > oom_model.UNCERTAIN[1] else "Unlikely"
-		why = f"{lead} to run out of memory: {k} of {n} similar runs did ({oom_source})"
+		why = f"{word}: {k} of {n} similar runs ran out of memory ({oom_source})"
 		lo, hi = conformal.wilson(k, n)
 	elif shown:
-		why = f"{words}: out of memory {oom_model.bin_label(est.p_oom)} ({oom_source})"
+		why = f"{word}: P(OOM) {_pct(est.p_oom)} ({oom_source})"
+		if word == "tight" and est.p_oom < oom_model.UNCERTAIN[0]:
+			at_floor = floor is not None and est.p_oom <= floor + 1e-9
+			why += (
+				f"; that is the lowest these runs can show, and fits needs below {_pct(memory.FITS_BELOW)}"
+				if at_floor
+				else f"; fits needs below {_pct(memory.FITS_BELOW)}"
+			)
 		lo = hi = est.p_oom
 	else:
 		why = (
-			f"{words}: out of memory uncertain (5–95%) ({oom_source}); between 5% and 95% the chance isn't "
-			"verified on real outcomes yet"
+			f"{word}: P(OOM) between 5% and 95% ({oom_source}); a chance in that range isn't verified on real "
+			"outcomes yet"
 		)
 		lo, hi = oom_model.UNCERTAIN
 	if est.breakdown is not None and est.breakdown.peak_moment != "train":
@@ -1478,6 +1496,43 @@ def total_steps(record: FlightRecord, knob_values: dict | None = None) -> tuple[
 	return _total_steps(record, _values(record, knob_values))
 
 
+def _probe_dataset_len(record: FlightRecord, values: dict) -> float | None:
+	"""The training set's rows per epoch as the probes' loaders saw them (A's `train_dataset_len`), for a record
+	whose script map has none (C, Nov 1: the live LoRA record, written before the runner backfilled it). The same
+	rules as the runner's backfill (runner/pipeline.py `_with_dataset_size`, review, Nov 1): no patched probe (a
+	patch may subsample), an oom probe only past its first step (before it the latest loader may be an eval one), ok
+	before cached before oom. Not when the query packs differently from the probe: packing changes the row count."""
+	rank = {"ok": 0, "cached": 1, "oom": 2}
+	ps = sorted(
+		(
+			p
+			for p in record.probes
+			if p.status in rank
+			and not (p.extras or {}).get("patched")
+			and (p.status != "oom" or (p.steps or 0) >= 1)
+			and (p.extras or {}).get("train_dataset_len")
+		),
+		key=lambda p: rank[p.status],
+	)
+	if not ps:
+		return None
+	p = ps[0]
+	pv = _probe_values(record, p)
+	sm = record.job.script_map
+	packs = values.get("packing") if "packing" in values else bool(sm and sm.data and sm.data.packing)
+	if "packing" in values and bool(packs) != bool(pv.get("packing", packs)):
+		return None
+	if packs and values.get("seq_len") != pv.get("seq_len", values.get("seq_len")):
+		return None
+	return float(p.extras["train_dataset_len"])
+
+
+_PACKING_MOVED = (
+	"the run's length isn't known: the probes counted the dataset's rows at their own packing and seq_len, and "
+	"packing changes the row count"
+)
+
+
 def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]:
 	sm = record.job.script_map
 	tr = sm.training if sm else None
@@ -1487,6 +1542,12 @@ def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]
 		return float(steps), ""
 	epochs = values.get("epochs") or (tr.epochs if tr else None) or 1.0
 	n = values.get("n_examples") or (data.n_examples if data else None)
+	if not n:
+		n = _probe_dataset_len(record, values)
+		if not n and _probe_dataset_len(
+			record, {k: v for k, v in values.items() if k not in ("packing", "seq_len")}
+		):
+			return None, _PACKING_MOVED
 	if not n:
 		return None, "the run's length isn't known: no max_steps, and no dataset size to divide by the batch"
 	per_step = (
@@ -1986,9 +2047,12 @@ def _at_risk(
 		edges = next((lo, hi) for lo, hi, label in oom_model.BINS if label == oom_model.bin_label(p))
 		p_lo, p_hi = edges[0], min(edges[1], 1.0)
 	if oom.status == "measured":
-		why = f"a probe ran out of memory at these settings, so the run stops at {where}; {why_rate}"
+		why = f"fails: a probe ran out of memory at these settings, so the run stops at {where}; {why_rate}"
 	else:
-		why = f"P(out of memory) {oom_model.bin_label(p)} x the cost up to {where}; {why_rate}"
+		why = (
+			f"{memory.oom_status(p)}: P(OOM) between {_pct(p_lo)} and {_pct(p_hi)} x the cost up to {where}; "
+			f"{why_rate}"
+		)
 	order = ("predicted", "extrapolated")
 	status = max(
 		("predicted" if oom.status == "measured" else oom.status, _total_status(tm.step)), key=order.index
@@ -2292,6 +2356,7 @@ def _serve_workload(record: FlightRecord, values: dict, p) -> tuple[list[list[se
 		float(g.new_tokens_p95) if g.new_tokens_p95 else None,
 		rate_per_s=float(rate) if rate else None,
 		max_output=int(cap) if cap else None,
+		output_fit=_censored_fit(g),
 	)
 	if rate:
 		return [reqs], True
@@ -2302,6 +2367,17 @@ def _serve_workload(record: FlightRecord, values: dict, p) -> tuple[list[list[se
 # guess: a probe whose outputs hit its cap this often hasn't seen how long they run uncapped (per call, not per
 # response: the longest output in a call sets its pace)
 TRUNCATED_CALL = 0.05
+# guess: past this share at the cap, the probe hasn't seen the middle of its lengths, so no fit carries them past it
+MAX_CENSORED = 0.5
+
+
+def _censored_fit(g) -> tuple[float, float] | None:
+	"""The probe's output lengths as a log-normal fitted through the cap, when some of them hit it (PM, Nov 1: A's
+	vLLM probe caps new tokens at 1,024); None when none did, so the mean and p95 stand."""
+	t = g.truncation_rate
+	if not g.max_new_tokens or not t or t > MAX_CENSORED or not g.new_tokens_mean:
+		return None
+	return serving.censored_lognormal(float(g.new_tokens_mean), float(g.max_new_tokens), float(t))
 
 
 def _serving_blocker(record: FlightRecord, values: dict, p) -> str | None:
@@ -2311,6 +2387,8 @@ def _serving_blocker(record: FlightRecord, values: dict, p) -> str | None:
 	if cap_p and cap_q and float(cap_q) > float(cap_p):
 		per_call = max(1, round(g.sequences / max(g.calls, 1)))
 		hit = 1 - (1 - t) ** per_call if t is not None else None
+		if hit is not None and hit > TRUNCATED_CALL and _censored_fit(g) is not None:
+			return None  # carried past the cap by the fit; the readout says so (_censored_note)
 		if hit is None or hit > TRUNCATED_CALL:
 			seen = f"{t:.0%} of" if t is not None else "an unknown share of"
 			return (
@@ -2318,6 +2396,20 @@ def _serving_blocker(record: FlightRecord, values: dict, p) -> str | None:
 				"measured; probe at the higher cap"
 			)
 	return None
+
+
+def _censored_note(values: dict, p) -> str | None:
+	"""When outputs past the probe's cap come from the fit rather than a measurement."""
+	g = p.generation
+	cap_q = values.get("max_new_tokens") or g.max_new_tokens
+	fit = _censored_fit(g)
+	if fit is None or not cap_q or float(cap_q) <= float(g.max_new_tokens):
+		return None
+	k = round(float(g.truncation_rate) * g.sequences)
+	return (
+		f"{k} of the probe's {g.sequences} outputs hit its {g.max_new_tokens:,}-token cap; past it, lengths come from "
+		f"a log-normal fitted through the cap (median {math.exp(fit[0]):,.0f} tokens), not a measurement"
+	)
 
 
 _SERVE_CAL: dict = {}  # (record id, probe id, setup) -> Calibration: the probe's simulation runs once per record
@@ -2354,6 +2446,7 @@ def _serving_targets(record: FlightRecord, values: dict) -> dict:
 			g.new_tokens_mean,
 			g.new_tokens_p95,
 			g.max_new_tokens,
+			g.truncation_rate,
 		)
 		if key not in _SERVE_CAL:
 			if len(_SERVE_CAL) > 64:
@@ -2374,11 +2467,16 @@ def _serving_targets(record: FlightRecord, values: dict) -> dict:
 		if not same_hw:  # the scale carries over, but one probe on other hardware doesn't narrow the band
 			cal = replace(cal, sigma=serving.SIGMA_UNCALIBRATED, source=cal.source + ", on other hardware")
 	batches, online = _serve_workload(record, values, p)
+	note = _censored_note(values, p)
+	if note:  # the tail past the cap is a fit: the band stays as wide as an uncalibrated one
+		cal = replace(cal, sigma=max(cal.sigma, serving.SIGMA_UNCALIBRATED), source=f"{cal.source}; {note}")
 	f = serving.forecast(setup, batches, cal, online)
 	if f is None:
 		why = f"the model doesn't fit: no room for a KV cache on {setup.gpu} at {setup.mem_util:.0%} of its memory"
 		return {t: _abstain(_meta(t)[0], mid, why) for t in SERVING_TARGETS}
 	status = "predicted" if _matching_probe(record, values) is p and backend == "vllm" else "extrapolated"
+	if note:
+		status = "extrapolated"
 	out = {}
 	for tid, r, unit in (
 		("serving.throughput", f.throughput, "tokens/s"),
@@ -3066,7 +3164,9 @@ def _probed_ranges(record: FlightRecord) -> list[Knob]:
 	return out
 
 
-CLEARS_P_OOM = oom_model.UNCERTAIN[0]  # cited: the "unlikely" end of the shown P(OOM) range (Chiya, Oct 31)
+# cited: below 5%, where P(OOM) shows as a number (Chiya, Oct 31). Such a cell reads "tight" unless it is below 1%
+# (S2b), so the guide offers it as "measure these first", never as a fix to apply (PM, Nov 1)
+CLEARS_P_OOM = oom_model.UNCERTAIN[0]
 MAX_CLEARING_PAIRS = 3  # guess: enough for the guide to offer a choice; each pair adds one local 2-D grid
 # moves that can only add memory are never tried; bools are tried at the value that saves memory
 _SAVES_AT = {"eval_no_grad": True, "gradient_checkpointing": True, "packing": False}
@@ -3094,8 +3194,8 @@ def _p_oom(record: FlightRecord, values: dict) -> float | None:
 
 def clearing_pairs(record: FlightRecord, max_pairs: int = MAX_CLEARING_PAIRS) -> list[tuple[str, str]]:
 	"""Pairs of memory knobs that together clear an out-of-memory risk no single move clears (Chiya, Nov 1: the
-	guide had nothing to offer on the LoRA zoo record, where eval batch 4 with seq_len 512 reads 17.5 GiB and
-	"unlikely" but every single move still fails). Empty when the current setting already clears, or one move does.
+	guide had nothing to offer on the LoRA zoo record, where eval batch 4 with seq_len 512 reads 17.5 GiB at P(OOM)
+	2.5%, tight, but every single move still fails). Empty when the current setting already clears, or one move does.
 	Ranked by how few steps from the current setting the nearest clearing cell is."""
 	base = _p_oom(record, {})
 	if base is None or base <= CLEARS_P_OOM:

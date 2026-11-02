@@ -277,6 +277,49 @@ def startup_check():
 
 
 @ops.local_entrypoint()
+def limit_check(modal_env: str = ""):
+	"""Confirm the demo limit on the deployed runner: one visitor's 4th probe job of the ET day is
+	refused with limit.visitor_daily. The three it accepts name a sample that doesn't exist, so the
+	worker fails them at fetch with no GPU spent. Writes out/limit_check.json."""
+	import json
+	import time
+
+	svc = modal.Cls.from_name(APP_NAME, SERVICE_NAME, environment_name=modal_env or None)()
+	visitor = f"ops-limit-check-{uuid.uuid4().hex[:8]}"
+	request = {"source": {"kind": "sample", "uri": "sample://zoo/limit-check-no-such-script"}}
+	out: dict = {"visitor": visitor, "accepted": [], "refused": None}
+	for i in range(4):
+		try:
+			sub = svc.submit.remote(request, visitor, f"limit-check-{i}")
+			out["accepted"].append(sub["job_id"])
+			print(f"[limit] job {i + 1} accepted: {sub['job_id']}", flush=True)
+		except Exception as exc:  # QueueFull, raised in the service and re-raised here
+			out["refused"] = {"job": i + 1, "type": type(exc).__name__, "code": getattr(exc, "code", None),
+				"retry_after_s": getattr(exc, "retry_after_s", None), "message": str(exc)[:200]}  # fmt: skip
+			print(f"[limit] job {i + 1} refused: {out['refused']}", flush=True)
+			break
+	deadline = time.monotonic() + 300
+	ended = {}
+	while time.monotonic() < deadline and len(ended) < len(out["accepted"]):  # the accepted ones end
+		for j in out["accepted"]:
+			st = svc.status.remote(j)
+			if st["status"] in ("done", "failed", "cancelled"):
+				ended[j] = {"status": st["status"], "error_code": st.get("error_code")}
+		time.sleep(5)
+	out["accepted_ended"] = ended
+	Path("out").mkdir(exist_ok=True)
+	Path("out/limit_check.json").write_text(json.dumps(out, indent=2))
+	ok = (
+		out["refused"] is not None
+		and out["refused"]["job"] == 4
+		and out["refused"]["code"] == "limit.visitor_daily"
+	)
+	print(f"[limit] {'PASS' if ok else 'FAIL'}: {json.dumps(out)}", flush=True)
+	if not ok:
+		raise SystemExit(1)
+
+
+@ops.local_entrypoint()
 def smoke(
 	sample: str = "sample://zoo/finetune_lora_hf",
 	gpus: str = "L4",
@@ -641,7 +684,11 @@ def _mbpp_row_keys(n: int) -> dict[str, int]:
 
 @ops.function(
 	image=worker_image,
-	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	secrets=[
+		modal.Secret.from_name("preflight-meta"),
+		modal.Secret.from_name("preflight-baseten"),
+		modal.Secret.from_name("preflight-glimmer"),
+	],
 	timeout=AGENT_SAMPLE_TIMEOUT_S,
 )
 def agent_sample_hosted(
@@ -662,6 +709,7 @@ def agent_sample_hosted(
 
 	owner = modal.App._get_container_app()
 	create = _sandbox_factory(owner)
+	extra: dict = {}
 	if (
 		provider == "baseten"
 	):  # the Pareto sweep: the same tasks on Spark Open, whatever model the script names
@@ -670,11 +718,20 @@ def agent_sample_hosted(
 			os.environ["BASETEN_API_KEY"],
 			os.environ.get("SPARK_OPEN_MODEL", "meta-models/muse-spark-open-1026"),
 		)
+	elif provider == "glimmer":  # the third arm: Muse Glimmer on Preflight's own Modal host (B's app)
+		from preflight.harness.spark import GLIMMER_USD_PER_S
+
+		base = os.environ["GLIMMER_BASE_URL"].rstrip("/")
+		upstream = base if base.endswith("/v1") else base + "/v1"
+		key, override = "glimmer", os.environ.get("GLIMMER_MODEL", "muse-glimmer")
+		extra = {"upstream_headers": {"Modal-Key": os.environ["GLIMMER_MODAL_KEY"],
+			"Modal-Secret": os.environ["GLIMMER_MODAL_SECRET"]}, "usd_per_second": GLIMMER_USD_PER_S,
+			"follow_redirects": 3, "timeout_s": 330.0}  # fmt: skip
 	else:
 		upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
 		key, override = os.environ["META_API_KEY"], None
 	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
-		key, max_usd_total=max_usd, model_override=override)  # fmt: skip
+		key, max_usd_total=max_usd, model_override=override, **extra)  # fmt: skip
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip

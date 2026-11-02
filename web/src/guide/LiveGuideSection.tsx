@@ -161,6 +161,7 @@ export function LiveGuideSection({
 			{combo && words && !busy ? (
 				<div className="pf-guide__approval" role="group" aria-label={t("guide.combo.label")}>
 					<p>{t(comboKeys(combo).textKey, words)}</p>
+					{words.rows_cut ? <p className="pf-guide__why">{words.rows_cut}</p> : null}
 					<div className="pf-guide__actions">
 						{combo.fit === "tight" ? (
 							<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={() => void run((g) => g.ask(t("guide.combo.measure_ask", words)))}>

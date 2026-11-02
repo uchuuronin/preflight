@@ -10,8 +10,11 @@ import type { Move, PredictionProvider } from "../workspace/provider/PredictionP
 import { costStraddlesBudget, failureTarget, objectiveTarget } from "../workspace/record/model";
 import { FAILS_AT, FITS_BELOW } from "../workspace/record/terms";
 import type { Finding, KnobValue, LoadedRecord, Objective } from "../workspace/record/types";
+import { changesResults } from "./changesResults";
 import { beat, bestCombo, bestSingleRisk, type ComboMove, comboKeys } from "./combos";
 import { type Limits, NO_LIMITS, withinLimits } from "./limits";
+
+export { changesResults };
 
 /**
  * Map nodes a knob acts on, by knob id, for records from before A's `knobs[].affects`
@@ -49,60 +52,6 @@ const KNOB_NODES: Record<string, string[]> = {
 	gpu_memory_utilization: ["rollout"],
 	kv_cache_dtype: ["rollout"],
 };
-
-/**
- * Knobs that change what the model learns, not just how fast or how cheaply. The tour offers
- * them only to clear a failure. Requested as knobs[].changes_results.
- */
-const CHANGES_RESULTS = new Set([
-	// what the model sees
-	"seq_len",
-	"packing",
-	"group_by_length",
-	"max_prompt_len",
-	"max_completion_len",
-	"max_new_tokens",
-	"context_limit",
-	"image_size",
-	// what it can learn
-	"lora_r",
-	"lora_alpha",
-	"lora_dropout",
-	"quantization",
-	"precision",
-	"n_layer",
-	"d_model",
-	"n_head",
-	"hidden_channels",
-	"gnn_layers",
-	"model",
-	// how it learns
-	"lr",
-	"lr_schedule",
-	"warmup_steps",
-	"weight_decay",
-	"optimizer",
-	"grad_clip",
-	"epochs",
-	"max_steps",
-	// RL and agents
-	"group_size",
-	"temperature",
-	"reasoning_effort",
-	"kl_beta",
-	"clip_low",
-	"clip_high",
-	"loss_type",
-	"max_turns",
-	// what an eval measures: its tasks are its result, so running fewer is a different eval
-	"n_tasks",
-]);
-
-/** A's `Knob.changes_results` when the record says so, else this table. */
-export function changesResults(knobId: string, record?: LoadedRecord): boolean {
-	if (record?.knobs.find((k) => k.id === knobId)?.changes_results) return true;
-	return CHANGES_RESULTS.has(knobId);
-}
 
 export function nodesForKnob(record: LoadedRecord, knobId: string): string[] {
 	// A record that says what a knob acts on (even nothing) is the answer; the table is only for

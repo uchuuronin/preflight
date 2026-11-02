@@ -192,9 +192,17 @@ Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixt
 
 ## Blocked
 - A wiring the engine flags into the runner (one line, `from-b.md`).
-- AMD: the account's verification hold.
+- AMD: waits on Chiya's access approval.
+- Cross-GPU top-up (up to $25, Chiya, 6 PM ET): waits on the PM's check of the config list (`from-b.md`).
+- "Fits" on L4 and A10 fine-tunes: 19 held-out runs can't show P(OOM) below 2.5%, so nothing reads "fits"; a choice for Chiya (`from-b.md`).
 
-## Next (Sun Nov 1)
+## Next (Sun Nov 1, evening)
+- Spark Open labels the whole corpus (up to $10): a 48-row pilot first, then the rest, then the agreement with Wilson intervals.
+- The top-up, once the PM clears the list; then refit the cross-GPU band and the GBDT residual, rescore leave-one-GPU-out with five GPUs, and post the table as it comes out.
+- LC-PFN: the port is built and matches the package's code; the CPU check on the published checkpoints runs next (`lcpfn_app.py::check`, about $0.02).
+- Serving calibration when A's capped vLLM record lands (the simulation now carries capped outputs past the cap).
+
+## Earlier (Sun Nov 1)
 - Divergence: done. The final fit on 720 runs misses (AUROC 0.66, lead 138 steps); not used. Both fit reports are committed under `corpus/reports/`. No more divergence spend.
 - Agent runaways: a stalled run's tasks with no stop reason are possibly stuck; at most one per worker counts (`AgentSample.concurrency`, 0.6.1), and one when the worker count isn't recorded.
 - Calibrate RL on A's 50-step GRPO run first (a hero lens), then retrieval, GNN and vision records as they land; serving once A's vLLM probes land.
@@ -271,6 +279,8 @@ Standing rule (Chiya, Nov 1, 11:13 AM ET): B pushes to `ws-b` without asking onc
 | Sun Nov 1, about 3:45 PM | b49f095 the final Spark Open labels; a339b89 the LC-PFN fetch's return value; and this commit (the datasheet's cost rounding, this record) | none | read-only review of b49f095 and a339b89: nothing blocking | clean, both scans, by exit code |
 | Sun Nov 1, about 4:30 PM | ff4d554 LoRA memory: queries sized by the training set's longest row when every row was scanned, a note on every readout; d7d7d04 the MI300X at $1.99/h; 15453a7 the AMD command repinned; effb801 the critical review fix (partial scans keep seq_len); and this status commit | none | read-only reviews of ff4d554 (blocked on partial scans, then re-checked after effb801) and of d7d7d04 with 15453a7: nothing blocking | clean, both scans, by exit code |
 | Sun Nov 1, about 5:20 PM | 196b62f combined moves (local 2-D grids over knob pairs that clear an OOM no single move clears); d623e67 the corpus's Hugging Face link and the grid shape for C; d0b1949 their review fixes (a GPU swap doesn't stop the search, .clears ids); and this status commit | none | read-only review of 196b62f and d623e67, re-checked after d0b1949: nothing blocking | clean, both scans, by exit code |
+| Sun Nov 1, about 6:40 PM | 79a9f8f fits/tight/fails reasons and serving past the cap (CI green on its own push) | none | read-only review of 79a9f8f: the fails prefix and a docstring, fixed before the push | clean, both scans, by exit code |
+| Sun Nov 1, about 8:30 PM | a79d3c2 whole-corpus labelling job and inputs; ae0609a the top-up plan and `--exclude-keys`; 0d57c8a its review fixes; b5e510a the labeller's try/finally; 8eab96b the LC-PFN port, its Modal check and the loss ensemble; 225d542 the run length from the probes' dataset length; 6c520ce and 8440567 its review fixes; 0e594ec the review minors; f6388c1 requests and status; and this status commit | none | read-only reviews: a79d3c2 (three blocking points fixed, then re-checked; the re-check's hang fixed in b5e510a and checked again), ae0609a (nothing blocking), 8eab96b with b5e510a (nothing blocking), 225d542 (blocking, fixed in 6c520ce, re-checked clean) | clean, both scans, by exit code |
 
 ## Contract requests
 In `docs/requests/from-b.md`.

@@ -187,19 +187,54 @@ def test_grids_skip_the_serving_simulation(monkeypatch):
 	assert calls
 
 
-def test_raising_max_new_tokens_past_a_cap_the_probe_hit_abstains(monkeypatch):
+def _capped_record(t, cap=512, sequences=64, mean=180.0):
 	from preflight.schema.record import Domain, Knob
 
-	monkeypatch.setitem(api.FEATURES, "serving", True)
 	base = _serve_record()
-	probes = [
-		p.model_copy(update={"generation": p.generation.model_copy(update={"truncation_rate": 0.1})})
-		for p in base.probes
-	]
-	knob = Knob(id="max_new_tokens", label_key="k", kind="int", current=512, domain=Domain(min=1, max=8192))
-	rec = base.model_copy(update={"probes": probes, "knobs": [*base.knobs, knob]})
-	tp = api.predict(rec, {"max_new_tokens": 2048}).root["serving.throughput"]
-	assert tp.status == "abstain" and "hit its 512-token cap" in tp.reason
+	upd = {"truncation_rate": t, "max_new_tokens": cap, "sequences": sequences, "new_tokens_mean": mean}
+	probes = [p.model_copy(update={"generation": p.generation.model_copy(update=upd)}) for p in base.probes]
+	knob = Knob(id="max_new_tokens", label_key="k", kind="int", current=cap, domain=Domain(min=1, max=8192))
+	return base.model_copy(update={"probes": probes, "knobs": [*base.knobs, knob]})
+
+
+def test_raising_max_new_tokens_past_a_cap_most_outputs_hit_abstains(monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	for t in (None, 0.6):
+		tp = api.predict(_capped_record(t), {"max_new_tokens": 2048}).root["serving.throughput"]
+		assert tp.status == "abstain" and "hit its 512-token cap" in tp.reason
+
+
+def test_the_censored_fit_recovers_the_lengths_past_the_cap():
+	rng = np.random.default_rng(0)
+	x = rng.lognormal(5.5, 0.7, 200_000)
+	cap = 400.0
+	fit = serving.censored_lognormal(float(np.minimum(x, cap).mean()), cap, float((x >= cap).mean()))
+	assert (
+		fit is not None and fit[0] == pytest.approx(5.5, abs=0.02) and fit[1] == pytest.approx(0.7, abs=0.02)
+	)
+	assert (
+		serving.censored_lognormal(100.0, 400.0, 0.0) is None
+		and serving.censored_lognormal(500.0, 400.0, 0.1) is None
+	)
+
+
+def test_a_probe_that_hit_its_cap_extrapolates_through_the_fit(monkeypatch):
+	"""PM, Nov 1: A's vLLM probe caps new tokens at 1,024 with 32 prompts in one call. Some outputs hitting the cap
+	no longer blocks a higher cap: the lengths past it come from a log-normal fitted through the cap, labelled."""
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	rec = _capped_record(3 / 32, cap=1024, sequences=32, mean=420.0)
+	here = api.predict(rec).root["serving.throughput"]
+	assert here.status != "abstain" and "fitted through the cap" not in here.reason
+	far = api.predict(rec, {"max_new_tokens": 4096}).root
+	tp = far["serving.throughput"]
+	assert tp.status == "extrapolated" and "3 of the probe's 32 outputs hit its 1,024-token cap" in tp.reason
+	assert np.log(tp.hi / tp.point) >= serving.Z90 * serving.SIGMA_UNCALIBRATED - 1e-9
+	# longer replies keep the batch running longer, so time to first token for the batch doesn't shrink
+	assert far["serving.ttft_p95"].point >= api.predict(rec).root["serving.ttft_p95"].point * 0.99
+	# and the workload carries outputs past 1,024
+	_, _ = api._serve_workload(rec, {}, rec.probes[0])
+	batches, _ = api._serve_workload(rec, {"max_new_tokens": 4096}, rec.probes[0])
+	assert max(r.output for b in batches for r in b) > 1024
 
 
 def test_a_calibration_on_other_hardware_keeps_the_wide_band(monkeypatch):
