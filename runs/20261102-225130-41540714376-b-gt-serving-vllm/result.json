@@ -1,0 +1,11 @@
+{
+	"name": "20261102-225130-41540714376-b-gt-serving-vllm",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41540714376",
+	"ref": "ws-b",
+	"sha": "33a9499e6ec3c3e67f0e253fc1ad98c94163e796",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script serving_vllm --recorder-steps 3 --budget-min 30 --install-requirements --first-gpu A10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:08:49Z"
+}
