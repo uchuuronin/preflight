@@ -1,0 +1,11 @@
+{
+	"name": "20261102-163555-41483005956-b-inflight-check",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41483005956",
+	"ref": "ws-b",
+	"sha": "d9f7634b5b32c2a66215b4f6942a4699fd8b0a7e",
+	"cmd": "modal run --env main python/preflight/corpus/inflight_check_app.py::check",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:36:34Z"
+}
