@@ -271,7 +271,9 @@ class ModelClient:
 
 	# ------------------------------------------------------------- transport
 
-	def _post(self, body: dict, purpose: str, deadline: float) -> httpx.Response:
+	def _post(
+		self, body: dict, purpose: str, deadline: float, path: str = "/chat/completions"
+	) -> httpx.Response:
 		"""POST with bounded retries inside an overall deadline. Every failed attempt goes to provenance."""
 		attempt = 0
 		while True:
@@ -281,7 +283,7 @@ class ModelClient:
 			started = time.monotonic()
 			self._hop_deadline[:] = [deadline]
 			try:
-				resp = self._http.post("/chat/completions", json=body, timeout=min(self.timeout_s, remaining))
+				resp = self._http.post(path, json=body, timeout=min(self.timeout_s, remaining))
 			except RETRY_TRANSPORT:
 				self._record(purpose, None, started, False, None)
 				if attempt >= self.retries:
@@ -390,6 +392,54 @@ class ModelClient:
 			raise ValueError(self.last_error) from exc
 		call = self._record(purpose, data, started, True, resp.headers.get("x-request-id") or data.get("id"))
 		return message, call
+
+	def respond(
+		self, body: dict, *, purpose: str, reasoning_effort: str | None = None
+	) -> tuple[dict, ModelCall]:
+		"""One call to the Responses API (`/responses`; Meta's supports the `web_search` tool, D's
+		probe of Nov 2). The same timeout, retries and provenance as chat; its usage is recorded
+		under the chat names so it's priced the same way. Unlike chat it has no input-token check
+		and sends no extra_body: its one caller (search grounding) sends a bounded prompt, and the
+		search results the API adds aren't ours to count before the call. A timed-out call is
+		recorded with no tokens, though Meta may bill it."""
+		body = {**body, "model": self.model, "max_output_tokens": self.max_output_tokens, "store": False}
+		if reasoning_effort and self.send_reasoning_effort:
+			body["reasoning"] = {"effort": reasoning_effort}
+		deadline = time.monotonic() + self.deadline_s
+		started = time.monotonic()
+		try:
+			resp = self._post(body, purpose, deadline, path="/responses")
+		except Exception as exc:
+			self.last_error = _why(exc)
+			raise
+		try:
+			data = resp.json()
+		except ValueError as exc:
+			self._record(purpose, None, started, False, resp.headers.get("x-request-id"))
+			self.last_error = f"HTTP {resp.status_code} without a response: {_no_urls(resp.text)[:300]!r}"
+			raise ValueError(self.last_error) from exc
+		usage = (data.get("usage") or {}) if isinstance(data, dict) else {}
+		as_chat = {
+			"usage": {
+				"prompt_tokens": usage.get("input_tokens") or 0,
+				"completion_tokens": usage.get("output_tokens") or 0,
+				"prompt_tokens_details": {
+					"cached_tokens": (usage.get("input_tokens_details") or {}).get("cached_tokens") or 0
+				},
+			}
+		}
+		ok = isinstance(data, dict) and isinstance(data.get("output"), list)
+		call = self._record(
+			purpose,
+			as_chat,
+			started,
+			ok,
+			resp.headers.get("x-request-id") or (data.get("id") if isinstance(data, dict) else None),
+		)
+		if not ok:
+			self.last_error = f"HTTP {resp.status_code} without an output list"
+			raise ValueError(self.last_error)
+		return data, call
 
 	def structured(
 		self, messages: list[dict], schema: type[T], *, purpose: str, reasoning_effort: str | None = None
