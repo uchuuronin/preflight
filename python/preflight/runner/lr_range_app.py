@@ -1,6 +1,11 @@
 """The learning-rate range test on a zoo script, on a real GPU (D, Nov 2; Chiya's list item 3).
 
 	modal run --env main python/preflight/runner/lr_range_app.py::check --scripts finetune_lora_hf,pretrain_nanogpt
+	modal run --env main python/preflight/runner/lr_range_app.py::check --scripts finetune_lora_hf --lr 1e-3
+
+`--lr` sets the script's own `learning_rate=` (exactly one in the script) first: a planted bad rate,
+to see whether the reading catches it (Chiya, Nov 2, 17:33). `--confirm-steps` sets the held runs'
+length.
 
 Its own app ("preflight-runner-d-lr"), as ops_app.py is, so `modal run` never starts a copy of the
 deployed runner; it reuses the runner's probe image with this checkout's code, so what it checks
@@ -44,7 +49,7 @@ def _gpu() -> str:
 
 @app.function(image=probe_image, gpu=["A10", "L4"], timeout=TIMEOUT_S,
 	volumes={WEIGHTS_DIR: _read_only(weights_vol)})  # fmt: skip
-def range_and_confirm(name: str, files: dict, entrypoint: str) -> dict:
+def range_and_confirm(name: str, files: dict, entrypoint: str, confirm_steps: int = CONFIRM_STEPS) -> dict:
 	import math
 	import time
 
@@ -84,6 +89,14 @@ def range_and_confirm(name: str, files: dict, entrypoint: str) -> dict:
 		out["range"] = {"failed": f"{type(exc).__name__}: {str(exc)[:400]}"}
 	print(json.dumps({k: v for k, v in out["range"].items() if k != "curve"}), flush=True)
 	sug = out["range"].get("suggested_lr")
+	# where the script's own rate sits on the curve: what a guide line would say about it
+	r = out["range"]
+	if own and sug:
+		out["own_on_curve"] = {"times_suggested": own / sug,
+			"past_lowest_loss": bool(r.get("min_loss_lr") and own > r["min_loss_lr"]),
+			"past_divergence": bool(r.get("diverged_lr") and own >= r["diverged_lr"]),
+			"times_below_divergence": (r["diverged_lr"] / own) if r.get("diverged_lr") else None}  # fmt: skip
+		print(json.dumps(out["own_on_curve"]), flush=True)
 	# 50 steps held at one rate (the recorder holds it, so the script's warm-up and decay don't
 	# change it): the suggested rate, and the script's own as the baseline
 	for key, lr in (("at_suggested", sug), ("at_own", own)):
@@ -91,7 +104,7 @@ def range_and_confirm(name: str, files: dict, entrypoint: str) -> dict:
 			out[key] = {"skipped": "no rate"}
 			continue
 		try:
-			c = ramp(key, float(lr), float(lr), CONFIRM_STEPS, CONFIRM_TIMEOUT_S)
+			c = ramp(key, float(lr), float(lr), confirm_steps, CONFIRM_TIMEOUT_S)
 			losses = stored_losses(c.extras)  # a run at one rate keeps its losses, not its rate
 			first = sum(losses[:10]) / 10 if len(losses) >= 20 else None
 			last = sum(losses[-10:]) / 10 if len(losses) >= 20 else None
@@ -110,8 +123,13 @@ def range_and_confirm(name: str, files: dict, entrypoint: str) -> dict:
 
 
 @app.local_entrypoint()
-def check(scripts: str = ",".join(SCRIPTS)):
+def check(scripts: str = ",".join(SCRIPTS), lr: float = 0.0, confirm_steps: int = CONFIRM_STEPS):
+	import re
+
 	from preflight.runner.sources import _read_tree
+
+	if not 0 < confirm_steps <= 100:  # guess: 100 held steps fit CONFIRM_TIMEOUT_S on an A10 or L4
+		raise SystemExit("--confirm-steps runs from 1 to 100")
 
 	root = Path(__file__).resolve().parents[3]
 	Path("out").mkdir(exist_ok=True)
@@ -119,12 +137,20 @@ def check(scripts: str = ",".join(SCRIPTS)):
 		if name not in SCRIPTS:
 			raise SystemExit(f"{name!r}: this check runs on {SCRIPTS} only")
 		files = _read_tree(root / "zoo" / name)
+		tag = ""
+		if lr:
+			files["train.py"], n = re.subn(
+				r"\blearning_rate\s*=\s*[0-9.eE+-]+", f"learning_rate={lr!r}", files["train.py"]
+			)
+			if n != 1:
+				raise SystemExit(f"{name}: expected one learning_rate= in train.py, found {n}")
+			tag = f"_lr{lr:g}"
 		print(f"[lr range] {name}: {len(files)} files, waiting for an A10, else an L4", flush=True)
 		try:
-			res = range_and_confirm.remote(name, files, "train.py")
+			res = range_and_confirm.remote(name, files, "train.py", confirm_steps)
 		except Exception as exc:  # recorded; the next script still runs
 			res = {"script": name, "failed": f"{type(exc).__name__}: {str(exc)[:500]}"}
-		Path(f"out/lr_range_{name}.json").write_text(json.dumps(res, indent=1, default=str))
+		Path(f"out/lr_range_{name}{tag}.json").write_text(json.dumps(res, indent=1, default=str))
 		print(json.dumps({k: v for k, v in res.items() if k not in ("range", "at_suggested", "at_own")} | {
 			"suggested": (res.get("range") or {}).get("suggested_lr"),
 			"trains_at_suggested": (res.get("at_suggested") or {}).get("trains"),
