@@ -23,7 +23,7 @@ Manifest (JSON):
 		"used_for_tuning": false,
 		"calibrates": ["rollout"]                    # rows it calibrated, unscored; "intervals": out of coverage; "*": every row
 	}],
-	"knob_ms": [41, 55, ...],                        # browser timings of knob moves (C)
+	"knob_ms": [41, 55, ...],                        # knob-move timings (C), or C's stranger-test file
 	"corpus": ["path/to/kernels/store", ...]         # for the cross-GPU row (leave-one-GPU-out)
 	}
 """
@@ -67,8 +67,22 @@ class Row:
 	hit: bool | None = None  # None: not measured
 	note: str = ""
 	misses: list[str] = field(default_factory=list)
+	# Nov 2 overnight list: each row says what its number stands on. "measured": scored against what real runs did;
+	# "simulated": the engine replayed held-out corpus measurements it never saw, but no full run was launched
+	source: str = "measured"
+
+	@property
+	def status(self) -> str:
+		if self.source == "test suite":  # checked with every CI run, not by the scorer
+			return self.source
+		return "not yet run" if self.n is None or self.hit is None else self.source
 
 	def cells(self) -> list[str]:
+		return [*self._cells()[:6], self.status, self._cells()[6]]
+
+	def _cells(self) -> list[str]:
+		if self.source == "test suite":
+			return [self.metric, self.target, self.measured_on, "checked on every CI run", "", "", self.note]
 		if self.n is None or self.hit is None:
 			return [self.metric, self.target, self.measured_on, "not measured", "", "", self.note]
 		if (
@@ -172,6 +186,7 @@ class Scored:
 	serving: bool | None = None
 	serving_inside: bool | None = None
 	agent_inside: bool | None = None
+	agent_note: str = ""
 	planted: tuple[int, int] | None = None
 	harnessed: bool | None = None
 	preflight_ok: bool | None = None
@@ -246,7 +261,13 @@ def score_run(run: dict, base: Path) -> Scored:
 		s.serving = _within(e.point if e.status != "abstain" else None, run["tokens_per_s"], 0.15)
 		s.serving_inside = _inside(e, run["tokens_per_s"])
 	if run.get("agent_total_usd") is not None and "cost.total" in pred:
-		s.agent_inside = _inside(pred["cost.total"], run["agent_total_usd"])
+		e, actual = pred["cost.total"], run["agent_total_usd"]
+		s.agent_inside = _inside(e, actual)
+		if e.status != "abstain" and e.lo is not None and e.hi is not None:
+			s.agent_note = (
+				f"{s.script}: predicted ${e.point:.2f} (90% ${e.lo:.2f} to ${e.hi:.2f}), the full run cost "
+				f"${actual:.2f}"
+			)
 
 	if run.get("planted"):
 		found = {f.code for f in rec.findings}
@@ -321,6 +342,7 @@ def cross_gpu_row(stores: list[Path]) -> Row:
 		len(cs),
 		hits / len(cs) >= WITHIN_SHARE,
 		f"K1 roofline, {len(cs)} config pairs over {', '.join(gpus)}; lowest held out: {_lowest(cs)}",
+		source="simulated",
 	)
 
 
@@ -461,6 +483,7 @@ def build(
 				if GNN_VS_GBDT["lo"] > 0
 				else "the interval includes zero, so the GBDT is used"
 			),
+			source="simulated",
 		),
 		divergence_row(divergence),
 		_share_row(
@@ -476,6 +499,11 @@ def build(
 			"Full benchmark run vs the 30-task sample",
 			flags("agent_inside"),
 			share=1.0,
+			note="; ".join(
+				r.agent_note
+				for r, cal in zip(runs, calibrates, strict=True)
+				if r.agent_note and "agent" not in cal
+			),
 		),
 	]
 	inside = [
@@ -499,6 +527,7 @@ def build(
 			"Every query outside the probed range is flagged",
 			"Automated test",
 			note="tests/test_engine_api.py, run with the suite",
+			source="test suite",
 		)
 	)
 	planted = [r.planted for r in runs if r.planted]
@@ -520,7 +549,7 @@ def build(
 			(sum(got) >= HARNESS_TARGET[0] * len(got) / HARNESS_TARGET[1]) if got else None,
 		)
 	)
-	ms = manifest.get("knob_ms") or []
+	ms, knob_from = knob_ms(manifest.get("knob_ms"), base)
 	if ms:
 		p95 = float(sorted(ms)[max(0, math.ceil(0.95 * len(ms)) - 1)])
 		under = sum(m < KNOB_P95_MS for m in ms)
@@ -532,7 +561,7 @@ def build(
 				under,
 				len(ms),
 				p95 < KNOB_P95_MS,
-				f"p95 {p95:.0f} ms",
+				f"p95 {p95:.0f} ms" + (f"; {knob_from}" if knob_from else ""),
 			)
 		)
 	else:
@@ -546,9 +575,28 @@ def build(
 			"Modal billing and timer",
 			flags("preflight_ok"),
 			share=1.0,
+			note=""
+			if any(f is not None for _, f in flags("preflight_ok"))
+			else "no Preflight run's cost and time given",
 		)
 	)
 	return rows, all_runs
+
+
+def knob_ms(given, base: Path) -> tuple[list[float], str]:
+	"""The knob timings and where they came from: a list as given, or C's stranger-test file (from-c.md, Nov 1:
+	{"knob_ms": [...], "base", "cpu_slowdown", "measured_at"}), read by path so the row is that run's own."""
+	if not given:
+		return [], ""
+	if isinstance(given, list):
+		return [float(m) for m in given], ""
+	d = json.loads((base / given).read_text()) if isinstance(given, str) else given
+	src = ", ".join(
+		f"{k.replace('_', ' ')} {d[k]}{'x' if k == 'cpu_slowdown' else ''}"
+		for k in ("build", "base", "cpu_slowdown", "measured_at")
+		if d.get(k) is not None
+	)
+	return [float(m) for m in d.get("knob_ms") or []], f"stranger test: {src}" if src else ""
 
 
 def reliability(scored: list[Scored]) -> str:
@@ -599,7 +647,7 @@ def divergence_row(d: dict | None) -> Row:
 
 # ---------------------------------------------------------------- output
 
-HEADER = ["Metric", "Target", "Measured on", "Result", "95% interval", "Hit", "Notes"]
+HEADER = ["Metric", "Target", "Measured on", "Result", "95% interval", "Hit", "Status", "Notes"]
 START, END = "<!-- validation:start -->", "<!-- validation:end -->"
 
 
@@ -616,7 +664,9 @@ def markdown(rows: list[Row], stamp: str = "") -> str:
 	foot = (
 		f'\nA "within" target is a hit when at least {WITHIN_SHARE:.0%} of runs are within it; intervals are Wilson '
 		f'95% on the proportion, and a hit is "confident" only when its lower end is at least {CONFIDENT:.0%} '
-		'("hit, few runs" otherwise). Unseen scripts are never tuned on.'
+		'("hit, few runs" otherwise). Status: "measured" is scored against what real runs did; "simulated" is the '
+		'engine replaying held-out corpus measurements it never saw, with no full run launched; "not yet run" waits '
+		"for Monday's runs. Unseen scripts are never tuned on."
 	)
 	return "\n".join(lines) + foot + (f" {stamp}" if stamp else "") + "\n"
 
