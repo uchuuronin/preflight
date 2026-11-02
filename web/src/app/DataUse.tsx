@@ -52,6 +52,8 @@ export function dataUseLines(retention: typeof RETENTION = RETENTION): string[] 
 	const lines = [t("datause.sent"), t("datause.probe")];
 	if (flag("harness.spark_script_map")) lines.push(t("datause.script_map"));
 	if (flag("harness.spark_open_triage")) lines.push(t("datause.triage"));
+	// Private triage on the check-in desk (NewFlight.tsx) is offered only with both flags on.
+	if (flag("harness.spark_open_triage") && flag("harness.glimmer_private")) lines.push(t(flag("harness.spark_script_map") ? "datause.glimmer_map" : "datause.glimmer"));
 	if (flag("c.guide.live")) lines.push(t("datause.guide"));
 	if (flag("c.fix_loop")) lines.push(t("datause.fix"));
 	lines.push(t("datause.record"));
