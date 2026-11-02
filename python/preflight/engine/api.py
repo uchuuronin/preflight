@@ -928,7 +928,7 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		# Nov 1: A's A10 GRPO record carried no GPU, and the readout said "tight, 69%" for the knob's L4 unannounced
 		note = f"the probe's GPU isn't in the record, so this is for {gpu} from the GPU knob, with a guessed CUDA context"
 		res = replace(res, peak=_with_note(res.peak, note), oom=_with_note(res.oom, note))
-	disagree = _faketensor_disagreements(setup)
+	disagree = _faketensor_disagreements(arch, setup)
 	if disagree and res.peak.status != "abstain":
 		# PM, Nov 1: a term the FakeTensor trace disagrees with is named, never hidden
 		case, worse = disagree
@@ -948,15 +948,21 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	return res
 
 
-def _faketensor_disagreements(setup) -> tuple[str, dict[str, float]] | None:
-	"""(the traced case, {term: engine / trace}) for the terms that miss by more than 20% on the zoo case matching
-	this setup's method, checkpointing and optimizer family (scripts/faketensor_memory_check.py), or None."""
+def _faketensor_disagreements(arch, setup) -> tuple[str, dict[str, float]] | None:
+	"""(the traced case, {term: engine / trace}) for the terms that miss by more than 20% on the zoo model this
+	record runs (scripts/faketensor_memory_check.py), matched on its shape, method, checkpointing and optimizer
+	family; None for any other model (review, Nov 1: a Qwen case said nothing about another model or optimizer)."""
 	from preflight.engine import _faketensor_check as ft
 
+	if not isinstance(arch, memory.TransformerArch):
+		return None
+	opt = str(setup.optimizer).lower()
+	family = "adafactor" if "adafactor" in opt else "adamw" if opt.startswith("adam") else None
 	key = {
-		"method": "lora" if setup.method in ("lora", "qlora") else "full",
+		"model": [arch.n_layers, arch.d_model, arch.vocab_size],
+		"method": setup.method,
 		"checkpointing": setup.grad_checkpointing != "none",
-		"optimizer": "adafactor" if "adafactor" in str(setup.optimizer).lower() else "adam",
+		"optimizer": family,
 	}
 	for case, row in ft.DATA["cases"].items():
 		if row["key"] == key:

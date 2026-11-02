@@ -23,6 +23,7 @@ caching allocator, fused kernels or fragmentation, so it checks the terms, not t
 from __future__ import annotations
 
 import argparse
+import contextlib
 import itertools
 import json
 import pprint
@@ -51,7 +52,9 @@ NANOGPT = {"n_layer": 12, "n_head": 12, "n_embd": 768, "vocab_size": 50304, "blo
 # ---------------------------------------------------------------- the trace
 
 
-def _trace(build, batch: int, seq: int, vocab: int, optimizer: str) -> dict[str, float]:
+def _trace(
+	build, batch: int, seq: int, vocab: int, optimizer: str, autocast: bool = False
+) -> dict[str, float]:
 	"""Bytes per term for one training step of the model `build()` makes, under FakeTensorMode."""
 	import torch
 	from torch._subclasses.fake_tensor import FakeTensorMode
@@ -71,7 +74,8 @@ def _trace(build, batch: int, seq: int, vocab: int, optimizer: str) -> dict[str,
 		trainable = [p for p in params if p.requires_grad]
 		grads = sum(p.numel() * p.element_size() for p in trainable)
 		ids = torch.zeros(batch, seq, dtype=torch.long)
-		with torch.autograd.graph.saved_tensors_hooks(pack, lambda t: t):
+		amp = torch.autocast("cpu", dtype=torch.bfloat16) if autocast else contextlib.nullcontext()
+		with torch.autograd.graph.saved_tensors_hooks(pack, lambda t: t), amp:
 			logits, loss = forward(model, ids)
 		loss.backward()
 		if optimizer == "adafactor":
@@ -130,7 +134,7 @@ def _qwen(shape: dict, lora: dict | None, checkpointing: bool):
 						model,
 						LoraConfig(
 							r=lora["r"], lora_alpha=lora["alpha"], target_modules=lora["target_modules"],
-							lora_dropout=0.0,
+							lora_dropout=lora.get("dropout", 0.0),
 						),
 					)  # fmt: skip
 				finally:
@@ -207,17 +211,29 @@ def _nanogpt():
 
 
 def _engine_terms(record, values: dict, batch: int, seq: int) -> dict[str, float]:
-	"""The engine's terms for this record's model and settings, at the same batch and sequence as the trace."""
+	"""The engine's terms for this record's model and settings (every knob at its current value, as predict reads
+	them), at the same batch and sequence as the trace, on the trace's definitions (review, Nov 1):
+
+	- activations: what is saved for backward. Under full checkpointing the engine's term adds the one layer being
+	recomputed in the backward, which the forward's saved tensors never hold, so that layer comes off.
+	- logits: what is saved for the loss. The engine's term adds the transient fp32 upcast, alive during the loss
+	forward but not saved, so that copy comes off."""
 	from preflight.engine import api, knobs, memory
 
-	arch, setup, _shape = knobs.setup_from(api._script_map(record), values)
+	arch, setup, _shape = knobs.setup_from(api._script_map(record), api._values(record, values))
 	t = memory.static_terms(arch, setup)
+	act = memory.activation_bytes(arch, setup, batch, seq)
+	if setup.grad_checkpointing == "full":
+		act -= memory.activation_bytes_per_layer(arch, setup, batch, seq)
+	logits = memory.logits_bytes(arch, setup, batch, seq)
+	if memory._act_bytes(setup) < 4 and setup.logits_fp32_upcast:
+		logits -= batch * seq * getattr(arch, "vocab_size", 0) * 4.0 / max(setup.parallel.tensor, 1)
 	return {
 		"weights": t.get("weights", 0.0) + t.get("frozen_models", 0.0),
 		"gradients": t.get("gradients", 0.0),
 		"optimizer": t.get("optimizer", 0.0) + t.get("master_weights", 0.0),
-		"activations": memory.activation_bytes(arch, setup, batch, seq),
-		"logits": memory.logits_bytes(arch, setup, batch, seq),
+		"activations": act,
+		"logits": logits,
 	}
 
 
@@ -234,8 +250,8 @@ def _record(path: Path, model_update: dict | None = None, training_update: dict 
 
 
 def cases():
-	"""(case, key, record, knob values, trace builder, batch, seq, vocab, optimizer) over each model's grid. The key
-	is what the engine matches a record on: method, gradient checkpointing, optimizer family."""
+	"""(case, key, record, knob values, trace builder, batch, seq, vocab, optimizer, autocast) over each model's grid.
+	The key is what the engine matches a record on: the model's shape, method, checkpointing, optimizer family."""
 	lora = _record(LORA_RECORD)
 	m = lora.job.script_map.model
 	lshape = {
@@ -243,20 +259,32 @@ def cases():
 		"n_kv_heads": m.n_kv_heads, "vocab_size": m.vocab_size, "tie_embeddings": m.tie_embeddings,
 		"max_positions": m.max_positions,
 	}  # fmt: skip
-	lcfg = {"r": m.lora.r, "alpha": m.lora.alpha, "target_modules": list(m.lora.target_modules)}
+	lcfg = {
+		"r": m.lora.r, "alpha": m.lora.alpha, "target_modules": list(m.lora.target_modules),
+		"dropout": m.lora.dropout or 0.0,
+	}  # fmt: skip
+	sig = [m.n_layers, m.d_model, m.vocab_size]
 	for gc in (False, True):
-		name = f"Qwen2.5-1.5B LoRA, {'with' if gc else 'no'} checkpointing (zoo/finetune_lora_hf)"
-		key = {"method": "lora", "checkpointing": gc, "optimizer": "adam"}
+		# the zoo job as it runs: bf16 weights, Trainer bf16=True (autocast), the record's LoRA dropout
+		name = (
+			f"Qwen2.5-1.5B LoRA, bf16 autocast, {'with' if gc else 'no'} checkpointing (zoo/finetune_lora_hf)"
+		)
+		key = {"model": sig, "method": "lora", "checkpointing": gc, "optimizer": "adamw"}
 		for b, s in itertools.product((1, 2, 4, 8), (256, 512, 1024)):
 			v = {"batch_size": b, "seq_len": s, "gradient_checkpointing": gc, "eval_batch_size": 1}
-			yield (name, key, lora, v, _qwen(lshape, lcfg, gc), b, s, m.vocab_size, "adamw")
+			yield (name, key, lora, v, _qwen(lshape, lcfg, gc), b, s, m.vocab_size, "adamw", True)
 	grpo = _record(GRPO_RECORD, model_update=QWEN05, training_update={"precision": "bf16"})
+	sig05 = [QWEN05["n_layers"], QWEN05["d_model"], QWEN05["vocab_size"]]
 	for gc in (False, True):
-		name = f"Qwen2.5-0.5B full, Adafactor, {'with' if gc else 'no'} checkpointing (zoo/grpo_trl policy)"
-		key = {"method": "full", "checkpointing": gc, "optimizer": "adafactor"}
+		# zoo/grpo_trl's policy shape and optimizer, with bf16 weights (the script keeps fp32 weights under autocast)
+		name = (
+			f"Qwen2.5-0.5B full, bf16 weights, Adafactor, {'with' if gc else 'no'} checkpointing "
+			"(zoo/grpo_trl's policy shape)"
+		)
+		key = {"model": sig05, "method": "full", "checkpointing": gc, "optimizer": "adafactor"}
 		for b, s in itertools.product((1, 2, 4, 8), (256, 768)):
 			v = {"batch_size": b, "gradient_checkpointing": gc}
-			yield (name, key, grpo, v, _qwen(QWEN05, None, gc), b, s, 151936, "adafactor")
+			yield (name, key, grpo, v, _qwen(QWEN05, None, gc), b, s, 151936, "adafactor", False)
 
 
 def _nanogpt_cases():
@@ -274,21 +302,16 @@ def _nanogpt_cases():
 	sm["training"] = {**sm["training"], "precision": "fp32", "eval_every": None, "optimizer": "adamw_torch"}
 	sm["data"] = {**sm["data"], "eval_batch_size": None}
 	raw["job"]["lens"] = "pretrain"
+	# the LoRA record's own knobs (lora_r, precision) aren't the zoo nanoGPT's: only the shape knobs stay
+	raw["knobs"] = [
+		k for k in raw["knobs"] if k["id"] in ("batch_size", "seq_len", "gradient_checkpointing", "eval_batch_size")
+	]
 	rec = FlightRecord.model_validate(raw)
 	for b, s in itertools.product((1, 4, 12), (256, 512, 1024)):
 		v = {"batch_size": b, "seq_len": s, "gradient_checkpointing": False, "eval_batch_size": 1}
-		key = {"method": "full", "checkpointing": False, "optimizer": "adam"}
-		yield (
-			"nanoGPT 124M full, fp32 (zoo/pretrain_nanogpt)",
-			key,
-			rec,
-			v,
-			_nanogpt(),
-			b,
-			s,
-			50304,
-			"adamw",
-		)
+		key = {"model": [12, 768, 50304], "method": "full", "checkpointing": False, "optimizer": "adamw"}
+		name = "nanoGPT 124M full, fp32 (zoo/pretrain_nanogpt)"
+		yield (name, key, rec, v, _nanogpt(), b, s, 50304, "adamw", False)
 
 
 # ---------------------------------------------------------------- the report
@@ -302,14 +325,14 @@ def _wilson(k: int, n: int) -> tuple[float, float]:
 
 def run() -> dict:
 	rows = []
-	for case, key, rec, values, build, b, s, vocab, opt in itertools.chain(cases(), _nanogpt_cases()):
+	for case, key, rec, values, build, b, s, vocab, opt, amp in itertools.chain(cases(), _nanogpt_cases()):
 		vals = {k: v for k, v in values.items() if any(kn.id == k for kn in rec.knobs)}
 		try:
 			eng = _engine_terms(rec, vals, b, s)
 		except (ValueError, AttributeError, KeyError) as exc:
 			print(f"{case} b={b} s={s}: engine has no terms ({exc})")
 			continue
-		tr = _trace(build, b, s, vocab, opt)
+		tr = _trace(build, b, s, vocab, opt, autocast=amp)
 		rows.append({"case": case, "key": key, "batch": b, "seq": s, "engine": eng, "trace": tr})
 		print(case, b, s, {t: round(eng[t] / tr[t], 3) if tr[t] else None for t in TERMS})
 	report: dict = {"within": WITHIN, "cases": {}}

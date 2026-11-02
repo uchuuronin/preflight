@@ -1283,20 +1283,29 @@ def test_a_cell_with_no_run_over_the_margin_reads_p_oom_from_the_whole_pool():
 
 def test_a_term_the_faketensor_trace_disagrees_with_is_named():
 	"""PM, Nov 1 (A's item 4): the analytical terms are checked against a FakeTensor trace of the zoo models
-	(scripts/faketensor_memory_check.py); a term off by more than 20% is named in the memory reason, not hidden."""
+	(scripts/faketensor_memory_check.py); a term off by more than 20% is named in the memory reason, not hidden, and
+	only for the traced model itself (review, Nov 1: a Qwen case said nothing about another model)."""
 	from preflight.engine import _faketensor_check as ft
 
-	path = Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
-	rec = FlightRecord.model_validate(json.loads(path.read_text()))
-	r = api.predict(rec, {"eval_batch_size": 4, "seq_len": 512}).root
-	assert (
-		"disagrees with a FakeTensor trace of Qwen2.5-1.5B LoRA, no checkpointing" in r["memory.peak"].reason
+	root = Path(__file__).resolve().parents[1]
+	rec = FlightRecord.model_validate(
+		json.loads((root / "web/src/workspace/fixtures/lora-live-nov1.record.json").read_text())
 	)
-	assert "activations 0.605x" in r["memory.peak"].reason and "logits 1.67x" in r["memory.peak"].reason
+	r = api.predict(rec, {"eval_batch_size": 4, "seq_len": 512}).root
+	assert "disagrees with a FakeTensor trace of Qwen2.5-1.5B LoRA, bf16 autocast, no checkpointing" in (
+		r["memory.peak"].reason
+	)
+	assert (
+		"activations 0.48" in r["memory.peak"].reason
+		and "logits" not in r["memory.peak"].reason.split("FakeTensor")[1]
+	)
 	assert "FakeTensor" in r["memory.activations"].reason and "FakeTensor" not in r["memory.weights"].reason
-	# every case's terms carry their counts and intervals; nanoGPT's all agree, so a matching record gets no note
+	# with checkpointing every term agrees: no note
+	gc = api.predict(rec, {"gradient_checkpointing": True, "seq_len": 512, "eval_batch_size": 4}).root
+	assert "FakeTensor" not in gc["memory.peak"].reason
+	# another model gets no note from the Qwen case
+	dev = load_record((root / "web/src/workspace/fixtures/dev-finetune.record.json").read_text())
+	assert "FakeTensor" not in (api.predict(dev).root["memory.peak"].reason or "")
 	for row in ft.DATA["cases"].values():
 		for d in row["terms"].values():
 			assert d["n"] > 0 and 0 <= d["wilson_95"][0] <= d["wilson_95"][1] <= 1
-	nano = next(r for c, r in ft.DATA["cases"].items() if c.startswith("nanoGPT"))
-	assert all(d["agrees"] for d in nano["terms"].values())
