@@ -31,6 +31,6 @@ describe("the data-use notice for Muse Spark's diagnosis, its claim check and it
 		expect(l).toContain(en["datause.claim_check"]);
 		expect(en["datause.diagnosis"]).toMatch(/Muse Spark \(Meta\).*plots/);
 		expect(en["datause.claim_check"]).toMatch(/Muse Spark Open.*Baseten.*numbers/);
-		expect(en["datause.search"]).toMatch(/Muse Spark \(Meta\) searches the web for your error text/);
+		expect(en["datause.search"]).toMatch(/Muse Spark \(Meta\), which searches the web.*can quote your code.*Never for a private check-in/);
 	});
 });
