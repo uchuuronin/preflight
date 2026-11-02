@@ -65,7 +65,9 @@ def _narrow(uri: str, commit: str, entrypoint: str, args: list[str]) -> dict[str
 		for n in names
 		if n == entrypoint
 		or (str(Path(n).parent) == here and n.endswith(SUFFIXES))
-		or any(n.endswith(a) for a in named)
+		or any(
+			n.endswith((a, a + ".yaml", a + ".yml", a + ".json")) for a in named
+		)  # torchtune names configs bare
 	]
 	out = {}
 	for n in want:
