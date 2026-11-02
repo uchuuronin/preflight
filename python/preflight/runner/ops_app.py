@@ -569,6 +569,7 @@ def ground_truth(
 	commit: str = "",
 	edit_hex: str = "",
 	install_repo: bool = False,
+	command_hex: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -591,7 +592,17 @@ def ground_truth(
 	from preflight.runner.sources import _read_tree
 
 	root = Path(__file__).resolve().parents[3]
-	if sum(map(bool, (script, dir, repo))) != 1:
+	if (
+		command_hex
+	):  # runner.command_checkin's path, the flag on in this process only (hex: the workflow takes no quotes)
+		from preflight.runner.sources import _command
+
+		cmd = bytes.fromhex(command_hex).decode()
+		files, words, _lens = _command({"command": cmd}, on=True)
+		entrypoint, args = "preflight_command.py", " ".join(words)
+		install_requirements = True
+		print(f"[ground truth] by command: {cmd}", flush=True)
+	if sum(map(bool, (script, dir, repo, command_hex))) != 1:
 		raise SystemExit(
 			"name one of a zoo script (--script), a directory in this checkout (--dir) or a repo (--repo)"
 		)
@@ -605,7 +616,9 @@ def ground_truth(
 		src = (root / dir).resolve()
 		if root not in src.parents or not src.is_dir():
 			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
-	if repo:
+	if command_hex:
+		src = Path(words[0])
+	elif repo:
 		from preflight.runner.sources import _clone
 
 		files, sha = _clone(repo, commit or None, data=install_repo)
@@ -613,7 +626,7 @@ def ground_truth(
 			files = _apply_edits(files, edit_hex)
 		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
 		print(f"[ground truth] {repo} at {sha}: {len(files)} files", flush=True)
-	else:
+	if not (repo or command_hex):
 		files = _read_tree(src)
 	try:
 		p = plan(files, entrypoint or None)

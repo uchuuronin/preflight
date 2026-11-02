@@ -4761,6 +4761,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"kind": {
+					"description": "0.6.3 adds command: a console tool run by name (args holds the whole command; uri is command://<tool>), with runner.command_checkin on",
 					"enum": [
 						"sample",
 						"repo",
@@ -4769,7 +4770,8 @@
 						"template",
 						"cli",
 						"inflight",
-						"record"
+						"record",
+						"command"
 					],
 					"title": "Kind",
 					"type": "string"

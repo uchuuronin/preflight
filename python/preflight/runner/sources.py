@@ -48,6 +48,7 @@ class Fetched:
 	# a repository too big to read whole: its entry point and the files it imports, bounded
 	# (harness/closure.py): files and bytes read, imported files left out, the repository's files
 	partial: dict | None = None
+	lens: str | None = None  # a check-in by command: its tool's lens (COMMANDS), over the map's reading
 
 
 def content_hash(files: dict[str, str]) -> str:
@@ -431,6 +432,7 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 			code="submission.invalid")  # fmt: skip
 	extra = _extra_packages(source.get("extra_packages"))
 	partial = None
+	command_lens = None
 	if kind in ("sample", "template"):
 		files = _without_outputs(_read_tree(_sample(uri)))
 	elif kind in ("upload", "cli", "inflight"):
@@ -454,6 +456,8 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		reqs = notebook_requirements(script)
 		if reqs:  # the notebook's !pip install lines, installed like any upload's requirements.txt
 			files["requirements.txt"] = "\n".join(reqs) + "\n"
+	elif kind == "command":
+		files, args, command_lens = _command(source)
 	elif kind == "repo":
 		files, commit, partial = _clone_read(uri, commit, want if isinstance(want, str) and want else None,
 			data=_repo_data(), only_entry=only_entry)  # fmt: skip
@@ -461,9 +465,12 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		raise InvalidSubmission(f"unknown source kind {kind!r}")
 	if only_entry and kind != "repo":  # files already in hand: the same walk over them
 		files, partial = _only_entry(files, want)
-	entry = _pick_entrypoint(
-		files, source.get("entrypoint") or (next(iter(files)) if kind == "notebook" else None)
-	)
+	if kind == "command":
+		entry, uri = COMMAND_ENTRY, f"command://{args[0]}"
+	else:
+		entry = _pick_entrypoint(
+			files, source.get("entrypoint") or (next(iter(files)) if kind == "notebook" else None)
+		)
 	validate_files(files, entrypoint=entry)
 	if kind in ("upload", "cli", "inflight", "notebook"):
 		# never the visitor's own uri: it says where the files are kept, so a later probe of this
@@ -479,7 +486,60 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		scope="entrypoint" if only_entry else None,
 		extra_packages=extra or None,
 	)
-	return Fetched(files=files, entrypoint=entry, args=args, source=src, partial=partial)
+	return Fetched(files=files, entrypoint=entry, args=args, source=src, partial=partial, lens=command_lens)
+
+
+# ---------------------------------------------------------------- check in by command (runner.command_checkin, off)
+
+# a console tool a visitor runs by name (Nov 2: lm_eval and `vllm bench` are commands, not scripts in a repo):
+# the PyPI package that provides it (None: the image has it) and the lens its run is. Only these names.
+COMMANDS = {
+	"lm_eval": {"package": "lm-eval", "module": "lm_eval", "lens": "eval"},
+	"vllm": {"package": None, "module": "vllm", "lens": "serving"},  # the serving image's vLLM
+}
+COMMAND_ENTRY = "preflight_command.py"
+_COMMAND_SCRIPT = '''"""Runs the console command {name!r} as a script: Preflight's check in by command."""
+import sys
+from importlib.metadata import entry_points
+
+import {module}  # noqa: F401  the package the command is from
+
+found = [e for e in entry_points(group="console_scripts") if e.name == {name!r}]
+if not found:
+    raise SystemExit("the command {name} isn't installed")
+sys.argv = [{name!r}, *sys.argv[2:]]
+sys.exit(found[0].load()())
+'''
+
+
+def _command(source: dict, *, on: bool | None = None) -> tuple[dict[str, str], list[str], str]:
+	"""The files, arguments and lens of a check-in by command: `{"kind": "command", "command": "lm_eval --model
+	hf ..."}` (a string, split as a shell would, or a list). The package is installed from requirements.txt
+	like any upload's, under the same rules; nothing else is read."""
+	import shlex
+
+	from .flags import flag
+
+	if not (flag("runner.command_checkin") if on is None else on):
+		raise InvalidSubmission("checking in by command isn't on here; check in the repository or a script",
+			code="submission.invalid")  # fmt: skip
+	raw = source.get("command")
+	try:
+		words = shlex.split(raw) if isinstance(raw, str) else raw
+	except ValueError as exc:
+		raise InvalidSubmission(f"the command doesn't parse ({exc})", code="submission.invalid") from None
+	if not isinstance(words, list) or not words or not all(isinstance(w, str) for w in words):
+		raise InvalidSubmission("the command is text, or a list of words", code="submission.invalid")
+	tool = COMMANDS.get(words[0])
+	if tool is None:
+		raise InvalidSubmission(f"Preflight runs these commands by name: {', '.join(sorted(COMMANDS))}; "
+			f"{words[0][:40]!r} isn't one", code="submission.invalid")  # fmt: skip
+	files = {COMMAND_ENTRY: _COMMAND_SCRIPT.format(name=words[0], module=tool["module"])}
+	if tool["package"]:
+		from preflight.recorder.requirements import known_packages
+
+		files["requirements.txt"] = known_packages()[tool["package"]] + "\n"
+	return files, _args(words), tool["lens"]
 
 
 def _extra_packages(raw) -> list[str]:

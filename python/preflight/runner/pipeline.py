@@ -326,6 +326,11 @@ def _import_knobs(knobs: dict) -> tuple:
 	)
 
 
+def _command_lens(sm: ScriptMap, fetched: Fetched) -> ScriptMap:
+	"""A check-in by command is its tool's lens (sources.COMMANDS): the map reads only the wrapper."""
+	return sm.model_copy(update={"lens": fetched.lens}) if fetched.lens else sm
+
+
 def _flag(name: str) -> bool:
 	from .flags import flag
 
@@ -440,13 +445,17 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
 			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
 		sm = rec.job.script_map or values_from_args(
-			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+			fetched.files,
+			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			fetched.args,
 		)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message=f"continuing from record {origin.parent.share_token}")
 	else:
 		sm = values_from_args(
-			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+			fetched.files,
+			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			fetched.args,
 		)
 		rec = _skeleton(fetched, sm, request)
 		update = {"parent_id": origin.parent_id} if origin is not None else {}
@@ -464,7 +473,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:
-				sm = values_from_args(fetched.files, spark_sm, fetched.args)
+				sm = values_from_args(fetched.files, _command_lens(spark_sm, fetched), fetched.args)
 				rec = _skeleton(fetched, sm, request, base=rec)
 				if origin is not None:
 					rec = rec.model_copy(update={"parent_id": origin.parent_id})
