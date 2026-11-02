@@ -23,3 +23,14 @@ Held-out runs, binned by the classifier's highest P over the run. A bin shows a 
 | 95 to 100% | 8 | 98.0% | 100% |
 
 In each JSON file, `bins` rows are `[low, high, runs, mean P, observed rate]`.
+
+# Loss forecast: held-out coverage (Nov 2)
+
+[loss_coverage_nov2.json](loss_coverage_nov2.json), from `scripts/loss_coverage.py` on the divergence sweep's 676 runs that didn't diverge (`corpus/data/loss_curves_heldout_nov2.json.gz`); LC-PFN's quantiles came from `corpus/lcpfn_app.py::coverage` on Modal (CPU, run 41397869309, 1,352 forecasts, none failed). Each run is seen for its first 60 or 150 of 600 steps and forecast at step 600; the truth is the mean of its last 10 steps. Target: the 90% band covers at least 90%.
+
+| Seen | Power law: covered of answered (Wilson 95%) | LC-PFN | Ensemble | Median abs. log error (power, LC-PFN, ensemble) |
+| --- | --- | --- | --- | --- |
+| 60 steps | 111 of 465, 24% (20% to 28%); 211 abstained | 627 of 676, 93% (90% to 95%) | 272 of 296, 92% (88% to 95%); 380 abstained | 0.17, 0.07, 0.08 |
+| 150 steps | 147 of 636, 23% (20% to 27%); 40 abstained | 499 of 676, 74% (70% to 77%) | 490 of 547, 89.6% (86% to 92%); 129 abstained | 0.10, 0.04, 0.04 |
+
+Verdict: not wired. The power law's band is far too narrow; LC-PFN covers at 60 steps but not at 150, and the ensemble covers at 60 steps only where it answers (296 of 676 curves) and falls just short at 150. The loss forecast stays out of `predict`, as before. One model family and one run length, so this says nothing yet about other jobs.
