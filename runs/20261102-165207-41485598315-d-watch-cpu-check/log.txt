@@ -1,0 +1,3 @@
+{"case": "A-as-is", "run": {"exit": 0, "seconds": 17.7}, "watch": {"exit": 0, "seconds": 5.4}, "alerts": [], "failed": null}
+{"case": "B-film", "run": {"exit": 0, "seconds": 9.7}, "watch": {"exit": 0, "seconds": 30.5}, "alerts": [], "failed": null}
+{"case": "C-alert", "run": null, "watch": {"exit": 0, "seconds": 70.8}, "alerts": [], "failed": null}

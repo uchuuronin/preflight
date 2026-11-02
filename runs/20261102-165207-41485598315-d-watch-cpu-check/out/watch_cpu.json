@@ -1,0 +1,167 @@
+{
+ "setup": {
+  "install": {
+   "exit": 0,
+   "seconds": 27.7,
+   "tail": "Downloaded torch\nPrepared 29 packages in 23.59s\nInstalled 29 packages in 3.65s\n + cuda-bindings==13.4.4\n + cuda-pathfinder==1.8.5\n + cuda-toolkit==13.2.2\n + filelock==4.2.7\n + fsspec==2026.9.0\n + jinja2==3.1.6\n + markupsafe==3.0.4\n + mpmath==1.3.0\n + networkx==3.6.1\n + nvidia-cublas==13.4.1.3\n + nvidia-cuda-cccl==13.3.4.3.1\n + nvidia-cuda-cupti==13.2.86\n + nvidia-cuda-nvrtc==13.2.86\n + nvidia-cuda-runtime==13.2.86\n + nvidia-cudnn-cu13==9.26.0.51\n + nvidia-cufft==12.2.0.57\n + nvidia-cufile==1.17.1.22\n + nvidia-cusolver==12.2.0.11\n + nvidia-cusparse==12.7.10.12\n + nvidia-cusparselt-cu13==0.8.1\n + nvidia-nccl-cu13==2.30.7\n + nvidia-nvjitlink==13.4.92\n + nvidia-nvshmem-cu13==3.7.2\n + nvidia-nvtx==13.2.86\n + psutil==7.2.2\n + setuptools==84.2.1\n + sympy==1.14.0\n + torch==2.15.0\n + triton==3.9.0\n"
+  },
+  "torch": "2.15.0+cu132 False 2"
+ },
+ "rows": [
+  {
+   "case": "A-as-is",
+   "run": {
+    "exit": 0,
+    "seconds": 17.7
+   },
+   "run_stderr": "",
+   "parent": "AJvk8_icdp9qmw26xa2aag.json",
+   "record": {
+    "time.step": null,
+    "time.total": null,
+    "memory.peak": null,
+    "backend": "cpu",
+    "probes": [
+     {
+      "id": "p1",
+      "status": "ok",
+      "steps": 14,
+      "planned": null,
+      "error": ""
+     },
+     {
+      "id": "p2",
+      "status": "ok",
+      "steps": 9,
+      "planned": null,
+      "error": ""
+     },
+     {
+      "id": "p3",
+      "status": "ok",
+      "steps": 9,
+      "planned": null,
+      "error": ""
+     }
+    ]
+   },
+   "watch": {
+    "exit": 0,
+    "seconds": 5.4
+   },
+   "preflight_lines": [
+    "[preflight] watching /home/runner/work/preflight/preflight/zoo/notebook_tiny/tiny_train.py against record AJvk8_icdp9qmw26xa2aag; live record /tmp/tmpzvj2pz4c/records/A-as-is/0s8_sWSn2h89UzcuM6m-Wg.json",
+    "[preflight] 200 steps, 0 alerts; record /tmp/tmpzvj2pz4c/records/A-as-is/0s8_sWSn2h89UzcuM6m-Wg.json"
+   ],
+   "alerts": [],
+   "watch_stderr_tail": "[preflight] watching /home/runner/work/preflight/preflight/zoo/notebook_tiny/tiny_train.py against record AJvk8_icdp9qmw26xa2aag; live record /tmp/tmpzvj2pz4c/records/A-as-is/0s8_sWSn2h89UzcuM6m-Wg.json\n[preflight] 200 steps, 0 alerts; record /tmp/tmpzvj2pz4c/records/A-as-is/0s8_sWSn2h89UzcuM6m-Wg.json\n",
+   "live_record": "0s8_sWSn2h89UzcuM6m-Wg.json",
+   "probe": {
+    "id": "live",
+    "status": "ok",
+    "steps": 200,
+    "duration_s": 3.426999347000006
+   },
+   "windows": 10,
+   "first_window": {
+    "step": 21,
+    "elapsed_s": 3.3280118170000037,
+    "step_s": 0.0005746236999996767,
+    "steps": 20,
+    "alerts": []
+   }
+  },
+  {
+   "case": "B-film",
+   "run": {
+    "exit": 0,
+    "seconds": 9.7
+   },
+   "run_stderr": "",
+   "parent": "qxbgMxGbq_DWvGEhrakBLw.json",
+   "record": {
+    "time.step": null,
+    "time.total": null,
+    "memory.peak": null,
+    "backend": "cpu",
+    "probes": [
+     {
+      "id": "p1",
+      "status": "ok",
+      "steps": 14,
+      "planned": null,
+      "error": ""
+     },
+     {
+      "id": "p2",
+      "status": "ok",
+      "steps": 9,
+      "planned": null,
+      "error": ""
+     },
+     {
+      "id": "p3",
+      "status": "ok",
+      "steps": 9,
+      "planned": null,
+      "error": ""
+     }
+    ]
+   },
+   "watch": {
+    "exit": 0,
+    "seconds": 30.5
+   },
+   "preflight_lines": [
+    "[preflight] watching /tmp/tmpzvj2pz4c/film/tiny_train.py against record qxbgMxGbq_DWvGEhrakBLw; live record /tmp/tmpzvj2pz4c/records/B-film/xKQrZF7p2fvwBMh5I4oW_w.json",
+    "[preflight] 50000 steps, 0 alerts; record /tmp/tmpzvj2pz4c/records/B-film/xKQrZF7p2fvwBMh5I4oW_w.json"
+   ],
+   "alerts": [],
+   "watch_stderr_tail": "[preflight] watching /tmp/tmpzvj2pz4c/film/tiny_train.py against record qxbgMxGbq_DWvGEhrakBLw; live record /tmp/tmpzvj2pz4c/records/B-film/xKQrZF7p2fvwBMh5I4oW_w.json\n[preflight] 50000 steps, 0 alerts; record /tmp/tmpzvj2pz4c/records/B-film/xKQrZF7p2fvwBMh5I4oW_w.json\n",
+   "live_record": "xKQrZF7p2fvwBMh5I4oW_w.json",
+   "probe": {
+    "id": "live",
+    "status": "ok",
+    "steps": 50000,
+    "duration_s": 28.589767608000002
+   },
+   "windows": 2500,
+   "first_window": {
+    "step": 21,
+    "elapsed_s": 1.0914608060000006,
+    "step_s": 0.000594964800000497,
+    "steps": 20,
+    "alerts": []
+   }
+  },
+  {
+   "case": "C-alert",
+   "parent": "qxbgMxGbq_DWvGEhrakBLw.json",
+   "watch": {
+    "exit": 0,
+    "seconds": 70.8
+   },
+   "preflight_lines": [
+    "[preflight] watching /tmp/tmpzvj2pz4c/alert/tiny_train.py against record qxbgMxGbq_DWvGEhrakBLw; live record /tmp/tmpzvj2pz4c/records/C-alert/rLkiDQbUEgPFmqbqawJp9Q.json",
+    "[preflight] 50000 steps, 0 alerts; record /tmp/tmpzvj2pz4c/records/C-alert/rLkiDQbUEgPFmqbqawJp9Q.json"
+   ],
+   "alerts": [],
+   "watch_stderr_tail": "[preflight] watching /tmp/tmpzvj2pz4c/alert/tiny_train.py against record qxbgMxGbq_DWvGEhrakBLw; live record /tmp/tmpzvj2pz4c/records/C-alert/rLkiDQbUEgPFmqbqawJp9Q.json\n[preflight] 50000 steps, 0 alerts; record /tmp/tmpzvj2pz4c/records/C-alert/rLkiDQbUEgPFmqbqawJp9Q.json\n",
+   "live_record": "rLkiDQbUEgPFmqbqawJp9Q.json",
+   "probe": {
+    "id": "live",
+    "status": "ok",
+    "steps": 50000,
+    "duration_s": 68.75926789600001
+   },
+   "windows": 2500,
+   "first_window": {
+    "step": 21,
+    "elapsed_s": 1.1271919499999967,
+    "step_s": 0.0013810056499991674,
+    "steps": 20,
+    "alerts": []
+   }
+  }
+ ]
+}
