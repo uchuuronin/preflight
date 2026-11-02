@@ -1,0 +1,159 @@
+{
+  "cases_found": 11,
+  "unreadable_records": 0,
+  "rows": [
+    {
+      "script": "sample://zoo/serving_vllm",
+      "record_id": "01M6BY0NZNXXZER2B795X86YZY",
+      "probe": "p1",
+      "status": "error",
+      "error_code": "missing_package",
+      "glimmer": "triage.missing_package",
+      "spark_open": "triage.missing_package",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/eval_sweep_reasoning",
+      "record_id": "01M6ANZ653VDK1TM5W9CDHFAP7",
+      "probe": "p1",
+      "status": "error",
+      "error_code": "recorder",
+      "glimmer": "triage.infrastructure",
+      "spark_open": "triage.infrastructure",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/finetune_lora_hf",
+      "record_id": "01M60H0R28WQS4R3XM0G38BAJP",
+      "probe": "p1-eval",
+      "status": "oom",
+      "error_code": "oom.eval",
+      "glimmer": "triage.oom",
+      "spark_open": "triage.oom",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/vision_timm",
+      "record_id": "01M6BCEJ68ED0F4AP011M4FWSP",
+      "probe": "p2",
+      "status": "error",
+      "error_code": "budget",
+      "glimmer": "triage.timeout",
+      "spark_open": "triage.unclear",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/serving_vllm",
+      "record_id": "01M6BZ0C74ZZYJ6579G8Z91SQW",
+      "probe": "p1",
+      "status": "timeout",
+      "error_code": "timeout",
+      "glimmer": "triage.timeout",
+      "spark_open": "triage.timeout",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/retrieval_st",
+      "record_id": "01M6ATT66RAPTDQC352RN3FEG4",
+      "probe": "p1",
+      "status": "error",
+      "error_code": "missing_package.install",
+      "glimmer": "triage.missing_package",
+      "spark_open": "triage.missing_package",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/retrieval_st",
+      "record_id": "01M6ATT66RAPTDQC352RN3FEG4",
+      "probe": "p2",
+      "status": "error",
+      "error_code": "missing_package.install",
+      "glimmer": "triage.missing_package",
+      "spark_open": "triage.missing_package",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/finetune_lora_hf",
+      "record_id": "01M6C5WRVEM3RTRRBDRPAAPEGT",
+      "probe": "p1-eval",
+      "status": "oom",
+      "error_code": "oom.eval",
+      "glimmer": "triage.oom",
+      "spark_open": "triage.oom",
+      "stored_spark_open": "triage.unclear",
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/finetune_lora_hf",
+      "record_id": "01M60ES3GW28VAYPFZ4QM05EQP",
+      "probe": "p1",
+      "status": "error",
+      "error_code": "recorder",
+      "glimmer": "triage.infrastructure",
+      "spark_open": "triage.unclear",
+      "stored_spark_open": null,
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/serving_vllm",
+      "record_id": "01M6C4K2PZKQKPV894ZPHYN4Y7",
+      "probe": "p1",
+      "status": "error",
+      "error_code": "recorder",
+      "glimmer": "triage.infrastructure",
+      "spark_open": "triage.infrastructure",
+      "stored_spark_open": "triage.unclear",
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    },
+    {
+      "script": "sample://zoo/eval_sweep_reasoning",
+      "record_id": "01M6C6YPNC7BZAZ82TAY4B9MSD",
+      "probe": "p1",
+      "status": "timeout",
+      "error_code": "timeout",
+      "glimmer": "triage.timeout",
+      "spark_open": "triage.timeout",
+      "stored_spark_open": "triage.unclear",
+      "glimmer_quoted": true,
+      "spark_open_quoted": true
+    }
+  ],
+  "both_answered": 11,
+  "no_answer": {
+    "glimmer": 0,
+    "spark_open": 0
+  },
+  "spark_open_vs_stored": [
+    0,
+    3
+  ],
+  "agree_same_input": 9,
+  "with_stored": 3,
+  "agree_stored": 0,
+  "usd": {
+    "glimmer": 0.331598,
+    "spark_open": 0.03363
+  },
+  "calls": {
+    "glimmer": 11,
+    "spark_open": 11
+  },
+  "wall_s": 593.4
+}

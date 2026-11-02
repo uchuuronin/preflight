@@ -1,0 +1,11 @@
+{
+	"name": "20261102-012059-41372018640-a-triage-agreement",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41372018640",
+	"ref": "ws-a",
+	"sha": "46f6f649e161b4c7a95a6a2cf3b43026c6d24eef",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::triage_agreement --max-usd 1.0 --limit 40",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T01:31:21Z"
+}
