@@ -50,11 +50,12 @@ def main() -> int:
 	env = {k: os.environ[k] for k in BASE_ENV if k in os.environ}
 	env.update({"HOME": str(work), "PYTHONUNBUFFERED": "1"})
 	repo = bool(job.get("install_repo"))  # probes.repo_install: a repo with no requirements.txt too
-	if (work / "requirements.txt").exists() or repo:
+	extra = [x for x in job.get("extra_packages") or [] if isinstance(x, str)]  # 0.6.3, the list's lines
+	if (work / "requirements.txt").exists() or repo or extra:
 		from preflight.recorder.requirements import install
 
 		err, dirs = install(work, work.parent / f"{work.name}-deps", log=lambda m: None, repo=repo,
-			entrypoint=job["entrypoint"])  # fmt: skip
+			entrypoint=job["entrypoint"], extra=extra)  # fmt: skip
 		if err:
 			print(json.dumps({"ended": "install_failed", "error": str(err)[:500]}), flush=True)
 			return 0

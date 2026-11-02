@@ -234,9 +234,17 @@ def _git_files(repo: Path, treeish: str, *, base: list[str], env: dict, data: bo
 
 
 def _git_read(
-	repo: Path, treeish: str, *, base: list[str], env: dict, data: bool = False, entry: str | None = None
+	repo: Path,
+	treeish: str,
+	*,
+	base: list[str],
+	env: dict,
+	data: bool = False,
+	entry: str | None = None,
+	only_entry: bool = False,
 ) -> tuple[dict[str, str], dict | None]:
 	"""Text files of a tree, read from the object store without a checkout or a lazy fetch.
+	only_entry (Source.scope "entrypoint"): the entry point and what it imports, at any size.
 
 	Blobs the partial clone left out (over the per-file cap) are listed as missing and skipped
 	before anything asks for them, so nothing big is ever downloaded; symlinks and submodules
@@ -269,13 +277,14 @@ def _git_read(
 	keep = [(rel, oid, int(size_of.get(oid, MAX_FILE_BYTES + 1))) for rel, oid in entries]
 	keep = [(rel, oid, n) for rel, oid, n in keep if n <= MAX_FILE_BYTES]
 	total = sum(n for _, _, n in keep)
-	if len(keep) <= MAX_FILES and total <= MAX_TOTAL_BYTES:
+	if not only_entry and len(keep) <= MAX_FILES and total <= MAX_TOTAL_BYTES:
 		return _cat(g, env, [(rel, oid) for rel, oid, _ in keep]), None
 	# too big to read whole: the entry point and the files it imports (harness/closure.py), with
-	# runner.read_closure on (off: refused, saying how big it is)
+	# runner.read_closure on (off: refused, saying how big it is), or always when the visitor asked
+	# for only the entry point
 	from .flags import flag
 
-	if not flag("runner.read_closure"):
+	if not only_entry and not flag("runner.read_closure"):
 		raise InvalidSubmission(
 			f"the repository ({len(keep):,} text files, {total / 2**20:.0f} MB) is more than Preflight reads "
 			f"({MAX_FILES:,} files and {MAX_TOTAL_BYTES // 2**20} MB of text); probe it on your machine",
@@ -287,6 +296,9 @@ def _git_read(
 	if entry not in oid_of:
 		raise InvalidSubmission(f"the entrypoint {entry!r} is not among the repository's text files")
 	if not entry.endswith(".py"):
+		if only_entry:
+			raise InvalidSubmission(f"reading only the entry point needs a Python file whose imports Preflight "
+				f"can follow; {entry!r} isn't one, so name the Python script it runs", code="submission.invalid")  # fmt: skip
 		raise InvalidSubmission(
 			f"the repository ({len(keep):,} text files, {total / 2**20:.0f} MB) is more than Preflight reads whole, "
 			f"and {entry!r} isn't a Python file whose imports it can follow; name the Python script it runs",
@@ -299,6 +311,8 @@ def _git_read(
 	if entry not in files:  # it's in the tree, so it wasn't UTF-8 text
 		raise InvalidSubmission(f"the entrypoint {entry!r} isn't UTF-8 text")
 	info["repo_bytes"] = total
+	if only_entry:
+		info["asked"] = True
 	return files, info
 
 
@@ -330,7 +344,7 @@ def _clone(uri, commit, *, data: bool = False) -> tuple[dict[str, str], str]:
 
 
 def _clone_read(
-	uri, commit, entry: str | None = None, *, data: bool = False
+	uri, commit, entry: str | None = None, *, data: bool = False, only_entry: bool = False
 ) -> tuple[dict[str, str], str, dict | None]:
 	"""The text files of a public GitHub repo at its default branch or a full commit hash, and the
 	commit they were read at, so a later probe of the same record reads the same code. data: small
@@ -351,7 +365,8 @@ def _clone_read(
 			_git(base, "-C", str(dest), "fetch", *shallow, "origin", commit, env=env)
 			treeish = commit
 		sha = _git(base, "-C", str(dest), "rev-parse", f"{treeish}^{{commit}}", env=env).decode().strip()
-		files, partial = _git_read(dest, treeish, base=base, env=env, data=data, entry=entry)
+		files, partial = _git_read(dest, treeish, base=base, env=env, data=data, entry=entry,
+			only_entry=only_entry)  # fmt: skip
 		return files, sha, partial
 	except subprocess.TimeoutExpired as exc:
 		raise InvalidSubmission("the repository took too long to clone") from exc
@@ -406,6 +421,15 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 	if commit is not None and not isinstance(commit, str):
 		raise InvalidSubmission("a commit is its full 40-character hash (git rev-parse HEAD)")
 	args = _args(source.get("args"))
+	scope = source.get("scope")
+	if scope not in (None, "repo", "entrypoint"):
+		raise InvalidSubmission("source.scope is repo or entrypoint", code="submission.invalid")
+	only_entry = scope == "entrypoint"
+	want = source.get("entrypoint")
+	if only_entry and not (isinstance(want, str) and want):
+		raise InvalidSubmission("reading only the entry point needs source.entrypoint, the script you run",
+			code="submission.invalid")  # fmt: skip
+	extra = _extra_packages(source.get("extra_packages"))
 	partial = None
 	if kind in ("sample", "template"):
 		files = _without_outputs(_read_tree(_sample(uri)))
@@ -431,12 +455,12 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		if reqs:  # the notebook's !pip install lines, installed like any upload's requirements.txt
 			files["requirements.txt"] = "\n".join(reqs) + "\n"
 	elif kind == "repo":
-		want = source.get("entrypoint")
-		files, commit, partial = _clone_read(
-			uri, commit, want if isinstance(want, str) and want else None, data=_repo_data()
-		)
+		files, commit, partial = _clone_read(uri, commit, want if isinstance(want, str) and want else None,
+			data=_repo_data(), only_entry=only_entry)  # fmt: skip
 	else:
 		raise InvalidSubmission(f"unknown source kind {kind!r}")
+	if only_entry and kind != "repo":  # files already in hand: the same walk over them
+		files, partial = _only_entry(files, want)
 	entry = _pick_entrypoint(
 		files, source.get("entrypoint") or (next(iter(files)) if kind == "notebook" else None)
 	)
@@ -452,5 +476,51 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		content_hash=content_hash(files),
 		entrypoint=entry,
 		args=args,
+		scope="entrypoint" if only_entry else None,
+		extra_packages=extra or None,
 	)
 	return Fetched(files=files, entrypoint=entry, args=args, source=src, partial=partial)
+
+
+def _extra_packages(raw) -> list[str]:
+	"""The job's extra packages, as the PyPI names on the list (JobRequest.extra_packages, 0.6.3); a name
+	off the list, or one with no wheels, refuses the job before anything is read or run, naming it."""
+	from preflight.recorder.requirements import PackageRefused, extra_requirements
+
+	if not raw:
+		return []
+	try:
+		lines = extra_requirements(raw)
+	except PackageRefused as exc:
+		if exc.code == "missing_package.no_wheels":
+			raise InvalidSubmission(str(exc), code="missing_package.no_wheels") from None
+		raise InvalidSubmission(str(exc), code="missing_package.not_allowed") from None
+	return [_REQ_NAME.match(line)[0] for line in lines]
+
+
+_REQ_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def extra_lines(src: Source | None) -> tuple[str, ...]:
+	"""What the probe installs for a fetched source's extra packages (the list's lines, with any pin)."""
+	from preflight.recorder.requirements import extra_requirements
+
+	names = (src.extra_packages if src is not None else None) or []
+	return tuple(extra_requirements(list(names)))
+
+
+def _only_entry(files: dict[str, str], entry) -> tuple[dict[str, str], dict]:
+	"""An upload's or sample's files cut to the entry point and what it imports (Source.scope)."""
+	from preflight.harness.closure import import_closure
+
+	if not isinstance(entry, str) or entry not in files:
+		raise InvalidSubmission(f"the entrypoint {entry!r} is not among the files")
+	if not entry.endswith(".py"):
+		raise InvalidSubmission(f"reading only the entry point needs a Python file whose imports Preflight "
+			f"can follow; {entry!r} isn't one, so name the Python script it runs", code="submission.invalid")  # fmt: skip
+	sizes = {p: len(t.encode("utf-8", "surrogatepass")) for p, t in files.items()}
+	got, info = import_closure(files, lambda paths: {p: files[p] for p in paths}, entry,
+		max_files=CLOSURE_MAX_FILES, max_bytes=CLOSURE_MAX_BYTES, sizes=sizes)  # fmt: skip
+	info["repo_bytes"] = sum(sizes.values())
+	info["asked"] = True
+	return got, info

@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.6.2"
+SCHEMA_VERSION = "0.6.3"
 
 
 def _now() -> datetime:
@@ -43,6 +43,17 @@ class Source(Strict):
 	content_hash: str | None = Field(default=None, description="sha256 of the submitted code")
 	entrypoint: str | None = None
 	args: list[str] = Field(default_factory=list)
+	scope: Literal["repo", "entrypoint"] | None = Field(
+		default=None,
+		description="0.6.3: what was read. repo (or absent): the whole source, or its entry point's imports "
+		"when it's too big to read whole (runner.read_closure). entrypoint (needs entrypoint): only that "
+		"file, the source's own modules it imports (transitively) and its requirements files, at any size",
+	)
+	extra_packages: list[str] | None = Field(
+		default=None,
+		max_length=10,
+		description="0.6.3: the job's extra packages (JobRequest.extra_packages), as PyPI names on the list",
+	)
 
 
 class PreemptionRule(Strict):
@@ -461,6 +472,17 @@ class Probe(Strict):
 	error: str | None = None
 	error_code: ErrorCode | None = Field(
 		default=None, description="Stable code for the failure; the UI shows t('error.<code>') and its hint"
+	)
+	missing_module: str | None = Field(
+		default=None,
+		max_length=200,
+		description="0.6.3: on a missing_package failure, the import the script couldn't find (as Python named it)",
+	)
+	missing_package: str | None = Field(
+		default=None,
+		max_length=100,
+		description="0.6.3: the PyPI name that provides missing_module when it's on Preflight's list "
+		"(an extra package the visitor can add); absent when it isn't, or for a submodule (`a.b`)",
 	)
 	memory: Memory | None = None
 	step_time: StepTime | None = None

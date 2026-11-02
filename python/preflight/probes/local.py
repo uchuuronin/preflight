@@ -203,6 +203,8 @@ class ProbeSpec:
 	# probes.repo_install: with no requirements.txt, install what the repo declares and the known
 	# packages it imports, and put a src/ layout on the path (recorder/requirements.repo_requirements)
 	install_repo: bool = False
+	# JobRequest.extra_packages (0.6.3): the lines to install beside the requirements (a list's own pins)
+	extra_packages: tuple[str, ...] = ()
 	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
 	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
@@ -662,6 +664,25 @@ def _rl(raw: dict | None) -> RLSignals | None:
 	return RLSignals(**raw)
 
 
+# the recorder's missing-import message (recorder/errors.py): "The script imports X, which is not installed"
+_MISSING = re.compile(r"The script imports ([A-Za-z_][A-Za-z0-9_.]{0,199}), which is not installed")
+
+
+def _missing(code: str | None, error: str | None) -> dict:
+	"""Probe.missing_module and .missing_package (0.6.3) for a missing import: the module as Python named
+	it, and the PyPI name on Preflight's list that provides it (absent when it isn't on the list)."""
+	if code != "missing_package" or not error:
+		return {}
+	m = _MISSING.search(error)
+	if m is None:
+		return {}
+	from preflight.recorder.requirements import package_for_module
+
+	mod = m.group(1).rstrip(".")
+	pkg = package_for_module(mod)
+	return {"missing_module": mod, **({"missing_package": pkg} if pkg else {})}
+
+
 def _probe_model(
 	spec: ProbeSpec,
 	status: str,
@@ -689,6 +710,7 @@ def _probe_model(
 		duration_s=round(duration, 3),
 		error=error,
 		error_code=code,
+		**_missing(code, error),
 		memory=Memory(
 			peak_allocated_bytes=mem.get("peak"),
 			peak_reserved_bytes=mem.get("reserved"),
@@ -902,6 +924,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"lr_range": spec.lr_range,
 				"install_requirements": spec.install_requirements,
 				"install_repo": spec.install_repo,
+				"extra_packages": list(spec.extra_packages),
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,
 			}

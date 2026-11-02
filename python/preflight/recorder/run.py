@@ -22,6 +22,17 @@ def _user_frame(tb, workdir: str) -> str | None:
 	return None
 
 
+def _what_installed(spec: dict) -> str:
+	"""What a failed install was installing, for its message."""
+	has_req = Path("requirements.txt").is_file()
+	what = "requirements.txt" if has_req or not spec.get("install_repo") else "the repo"
+	if spec.get("extra_packages"):
+		what = (
+			f"{what} with the extra packages" if has_req or spec.get("install_repo") else "the extra packages"
+		)
+	return what
+
+
 def _write(out_path: str, result: dict) -> None:
 	tmp = out_path + ".tmp"
 	Path(tmp).write_text(json.dumps(result, default=str))
@@ -158,8 +169,9 @@ def main(spec_path: str) -> int:
 			_write(spec["progress"], {"stage": "installing requirements", "steps": 0})
 		done = Path(spec["deps"]).with_name("deps.done.json")
 		if rank == 0:
+			extra = [x for x in spec.get("extra_packages") or [] if isinstance(x, str)]
 			err, dirs = install(Path(workdir), Path(spec["deps"]), repo=bool(spec.get("install_repo")),
-				entrypoint=spec.get("entrypoint"))  # fmt: skip
+				entrypoint=spec.get("entrypoint"), extra=extra)  # fmt: skip
 			_write(str(done), {"error": err, "dirs": [str(d) for d in dirs]})
 		else:
 			# torchrun: rank 0 installs once into the shared prefix; the other ranks wait for it and
@@ -170,8 +182,7 @@ def main(spec_path: str) -> int:
 			err, dirs = got.get("error"), [Path(d) for d in got.get("dirs", [])]
 		if err:
 			_write(out_path, {"status": "error", "error_code": "missing_package.install",
-				"error": f"{'the repo' if spec.get('install_repo') and not Path('requirements.txt').is_file() else 'requirements.txt'}"
-				f" didn't install: {err}", "summary": {}})  # fmt: skip
+				"error": f"{_what_installed(spec)} didn't install: {err}", "summary": {}})  # fmt: skip
 			return 0
 		for i, d in enumerate(dirs, 1):
 			sys.path.insert(i, str(d))  # after the script's own files, before the image
