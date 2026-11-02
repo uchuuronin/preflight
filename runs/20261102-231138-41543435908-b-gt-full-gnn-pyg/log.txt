@@ -1,0 +1,150 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-4hZDM096hbzyr5dA5B9Zc0
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+└── ✓ Created Function triage_agreement_hosted.
+[ground truth] gnn_pyg: train.py, lens gnn, probe image, 3 files; waiting for an A10, else the L4 (Modal queues it)
+[ground truth] container up on the A10; 3 files of gnn_pyg
+[ground truth 23:12:03] bare run of gnn_pyg: 100000 optimizer steps, at most 900 s
+[preflight] requirements: installing torch-geometric==2.6.1
+[bare] running /tmp/gt-_7xki2vk/train.py for 100000 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+[bare] step 50 at 10 s
+[bare] step 100 at 13 s
+[bare] step 150 at 16 s
+{"epoch": 0, "loss": 540.222, "peak_bytes": 2621564928}
+[bare] step 200 at 19 s
+[bare] step 250 at 22 s
+[bare] step 300 at 25 s
+{"epoch": 1, "loss": 322.131, "peak_bytes": 2621564928}
+[bare] step 350 at 28 s
+[bare] step 400 at 31 s
+[bare] step 450 at 34 s
+{"epoch": 2, "loss": 292.026, "peak_bytes": 2624830976}
+{"wall_s": 29.2}
+{"steps": 471, "ended": "finished", "error": null, "seconds": 35.633935653, "peak_allocated_bytes": 2624830976, "peak_reserved_bytes": 8537505792, "device": "NVIDIA A10", "timing": "cuda_events"}
+[ground truth 23:12:44] bare run ended (finished) after 41 s, 471 steps
+[ground truth 23:12:44] recorder run: 5 warmup + 30 timed steps, at most 1699 s
+[ground truth 23:12:57] recorder run ended (ok) after 35 steps
+{
+  "script": "gnn_pyg",
+  "entrypoint": "train.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": {
+    "sync_overhead": {
+      "median": 0.99145,
+      "ci95": [
+        0.98933,
+        0.99624
+      ],
+      "pairs": 14,
+      "source": "measured"
+    },
+    "hook_overhead": {
+      "median": 1.02448,
+      "ci95": [
+        1.01594,
+        1.03089
+      ],
+      "pairs": 15,
+      "source": "measured"
+    },
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "gnn",
+  "image": "probe",
+  "bare": {
+    "steps": 471,
+    "ended": "finished",
+    "error": null,
+    "seconds": 35.633935653,
+    "peak_allocated_bytes": 2624830976,
+    "peak_reserved_bytes": 8537505792,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 40.6
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 35,
+    "p50_s": 0.062456832885742185,
+    "peak_allocated_bytes": 2621578752,
+    "seconds": 12.941,
+    "by_phase": {
+      "data": 0.0,
+      "forward": 0.0,
+      "backward": 0.35764752887949225,
+      "optimizer": 0.006112740130887327,
+      "other": 0.6362397309896204
+    },
+    "generation": null,
+    "extras": {
+      "params_total": 221231.0,
+      "params_trainable": 221231.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 5369741312.0
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0",
+        "torch-geometric": "2.6.1"
+      },
+      "python": "3.11.12"
+    }
+  }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-4hZDM096hbzyr5dA5B9Zc0
