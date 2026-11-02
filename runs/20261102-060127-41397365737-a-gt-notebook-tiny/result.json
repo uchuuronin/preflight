@@ -1,0 +1,11 @@
+{
+	"name": "20261102-060127-41397365737-a-gt-notebook-tiny",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41397365737",
+	"ref": "ws-a",
+	"sha": "dca8bef6aee45f904e12180776cd20c0a2866ab0",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --dir zoo/notebook_tiny --entrypoint tiny_train.py --bare-steps 50 --recorder-steps 20 --warmup 3 --budget-min 10 --first-gpu A10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T06:02:08Z"
+}
