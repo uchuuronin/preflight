@@ -2,19 +2,19 @@
 production job store, so the campaign calendar can use measured numbers where they exist.
 
 The validation grid: 2 batch sizes x 2 learning rates on the LoRA zoo script (`sample:lora-qwen`,
-zoo/finetune_lora_hf, the Nov 2 live record measured on an L4), each cell probed on an A10, so the
-cells test the engine's cross-GPU step time as well as its batch-size scaling (the record's own
-probes ran on the L4). A cell is one `mode: probe` job at the cell's full setting: one point probe
+zoo/finetune_lora_hf, the Nov 2 live record measured on an L4), each cell probed on --gpu (L4 by
+default: the record's own GPU, where the cockpit has predictions to compare; on an A10 it abstains
+for every cell, "off grid", so there the probes are the only numbers). A cell is one `mode: probe` job at the cell's full setting: one point probe
 (A's pipeline._followup_plan), with its eval and checkpoint pulled into the window as for any probe.
 
-    modal run --env main api/campaign_probe_app.py::grid_probes
+    modal run --env main api/campaign_probe_app.py::grid_probes --gpu L4
 
 Spend: every cell is submitted at once, each under A's per-job cap (US$0.60), so the worst case is
 the cells times that cap; it must be under the cap here before anything is submitted. A job still
 running when the script stops is cancelled. Each cell has its own visitor (the job store runs one
 job per visitor at a time, 3 a day). What's printed: per cell, the probe's status, its measured
 step time and training peak, the job's record id and cost. Nothing that opens a record is printed.
-The prediction each cell is compared with is the web's (web/scripts/campaign_predicted.ts), made
+The prediction each cell is compared with is the web's (web/scripts/campaign_predicted.test.ts), made
 from the Nov 2 record before these probes ran.
 """
 
@@ -38,20 +38,19 @@ JOB_TIMEOUT_S = 40 * 60
 # Source: the PM's order (2 batch sizes x 2 learning rates); 2 and 4 are the record's own probed batch
 # sizes on the L4, 1e-4 its learning rate and 2e-4 the next the LoRA knob offers.
 GRID = [{"batch_size": b, "lr": lr} for b in (2, 4) for lr in (0.0001, 0.0002)]
-GPU = "A10"
 
 
 def cell_id(cell: dict) -> str:
 	return f"bs{cell['batch_size']}-lr{cell['lr']:g}"
 
 
-def measured(rec: dict, cell: dict) -> dict:
+def measured(rec: dict, cell: dict, gpu: str) -> dict:
 	"""The cell's probe, as measured: the newest probe at the cell's setting on the GPU (the job's
 	record also carries the probes it was made from, on the L4)."""
 
 	def at_cell(p: dict) -> bool:
 		k = p.get("knobs") or {}
-		return k.get("gpu_type") == GPU and all(k.get(n) == v for n, v in cell.items())
+		return k.get("gpu_type") == gpu and all(k.get(n) == v for n, v in cell.items())
 
 	probes = [p for p in rec.get("probes") or [] if at_cell(p)]
 	p = probes[-1] if probes else None
@@ -74,10 +73,12 @@ def measured(rec: dict, cell: dict) -> dict:
 
 
 @app.local_entrypoint()
-def grid_probes(attempt: str = "a") -> None:
+def grid_probes(attempt: str = "a", gpu: str = "L4") -> None:
 	sys.path.insert(0, str(ROOT / "api"))  # this runs on the caller's machine, from the repo
 	import verify_race_app as vr
 
+	if gpu not in ("L4", "A10"):
+		raise SystemExit("gpu: L4 or A10")  # the PM's order
 	if len(GRID) * vr.JOB_CAP_USD > CAP_USD:
 		raise SystemExit(f"worst case US${len(GRID) * vr.JOB_CAP_USD:.2f} is over the cap")
 	svc = modal.Cls.from_name("preflight-runner", "JobStoreService", environment_name="main")()
@@ -91,9 +92,9 @@ def grid_probes(attempt: str = "a") -> None:
 			req = {
 				"source": {"kind": "record", "record_ref": "sample:lora-qwen"},
 				"mode": "probe",
-				"knobs": {**vr.KNOBS, **cell, "gpu_type": GPU},
-				"gpu": GPU,
-				"constraints": {"gpu_types": [GPU]},
+				"knobs": {**vr.KNOBS, **cell, "gpu_type": gpu},
+				"gpu": gpu,
+				"constraints": {"gpu_types": [gpu]},
 				"purpose": "c.campaign_probe",
 			}
 			try:
@@ -135,7 +136,7 @@ def grid_probes(attempt: str = "a") -> None:
 		spent += cost
 		o["usd"] = round(cost, 4) if final else f"unknown, counted at {cost}"
 		if rec is not None:
-			o["measured"] = measured(rec, cells[cid])
+			o["measured"] = measured(rec, cells[cid], gpu)
 			o["gpu"] = ((rec.get("env") or {}).get("gpu") or {}).get("name")
-	print(json.dumps({"spent_usd": round(spent, 4), "cap_usd": CAP_USD, "gpu": GPU, "cells": out}, indent=1))
+	print(json.dumps({"spent_usd": round(spent, 4), "cap_usd": CAP_USD, "gpu": gpu, "cells": out}, indent=1))
 	raise SystemExit(0 if all((o.get("measured") or {}).get("status") for o in out.values()) else 1)
