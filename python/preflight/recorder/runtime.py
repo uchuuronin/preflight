@@ -60,8 +60,9 @@ PRETRAIN_EVAL_CAP = 8
 # timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
 # a serving probe's new tokens per prompt (Chiya, Nov 1): 32 prompts at a script's 4,096 tokens
 # decoded for 272 s on an A10 and ran past the probe's 600 s on an L4 (a-serving-debug-1). The
-# script's own cap stays the record's max_new_tokens; extras.serving_probe_max_tokens says the probe
-# stopped sooner, so B's simulation extrapolates to the script's length
+# record's generation is what the probe measured under this cap (max_new_tokens = the cap,
+# truncation_rate = the share that hit it), which B's engine fits a log-normal through to carry the
+# lengths past it (B 79a9f8f); extras.serving_script_max_tokens keeps the script's own cap
 SERVING_PROBE_MAX_TOKENS = 1024
 OUTPUT_WATCH = 64  # derived: generate calls watched for identical outputs; each costs one small read
 LENS_STATS_BATCHES = 64  # derived: enough batches to average a sampler's varying graph sizes
@@ -1126,19 +1127,15 @@ class Recorder:
 				with suppress(Exception):
 					sp = kwargs.get("sampling_params", args[1] if len(args) > 1 else None)
 					sp = sp[0] if isinstance(sp, list) and sp else sp
-					cap = script_cap if probe_cap else getattr(sp, "max_tokens", None)
+					cap = probe_cap or getattr(sp, "max_tokens", None)  # the cap the replies ran under
 					lengths, trunc = [], []
 					for o in outs:
 						for c in o.outputs:
 							lengths.append(len(c.token_ids))
 							reason = getattr(c, "finish_reason", None)  # needs no cap to read
-							# stopped at the probe's cap, not the script's: how it would have ended isn't known
-							cut = probe_cap and reason == "length" and len(c.token_ids) >= probe_cap
-							trunc.append(
-								None if cut else (reason == "length" if reason is not None else None)
-							)
+							trunc.append(reason == "length" if reason is not None else None)
 					rec.gens.append({"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap,
-						"probe_cap": probe_cap, "backend": "vllm"})  # fmt: skip
+						"probe_cap": probe_cap, "script_cap": script_cap, "backend": "vllm"})  # fmt: skip
 				rec.acc["generate"] += dt
 				if not rec._generating:
 					rec._gen_calls_done += 1
@@ -1684,12 +1681,9 @@ class Recorder:
 		probe_caps = [g["probe_cap"] for g in self.gens if g.get("probe_cap")]
 		if probe_caps:  # the serving probe stopped each reply at this many tokens, not the script's cap
 			out["serving_probe_max_tokens"] = float(max(probe_caps))
-			capped = [g for g in self.gens if g.get("probe_cap")]
-			n = sum(len(g["truncated"]) for g in capped)
-			# the share of replies still running at the cap, for B's extrapolation past it
-			cut = sum(1 for g in capped for t in g["truncated"] if t is None)
-			if n:
-				out["serving_probe_capped_fraction"] = cut / n
+			script = [g["script_cap"] for g in self.gens if g.get("probe_cap")]
+			if script and all(isinstance(c, int) for c in script):  # None: the script's ran to the context
+				out["serving_script_max_tokens"] = float(max(script))
 		if self.checkpoints.get("saves"):
 			ck = self.checkpoints
 			out["checkpoint_saves_seen"] = ck["saves"]

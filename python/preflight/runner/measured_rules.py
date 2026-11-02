@@ -135,7 +135,9 @@ def hygiene_findings(rec, files: dict[str, str]) -> list[Finding]:
 			p, reward_node, "group_size" if any(k.id == "group_size" for k in rec.knobs) else None
 		)
 		g = p.generation
-		if g is not None and g.truncation_rate is not None and g.sequences:
+		# replies cut at the serving probe's own cap say nothing about the script's (Nov 1)
+		probe_capped = p.extras.get("serving_probe_max_tokens") is not None
+		if g is not None and g.truncation_rate is not None and g.sequences and not probe_capped:
 			n = int(p.extras.get("generation_ending_known") or g.sequences)  # the rate's own total
 			k = round(g.truncation_rate * n)
 			lo, hi = _wilson(k, n)
