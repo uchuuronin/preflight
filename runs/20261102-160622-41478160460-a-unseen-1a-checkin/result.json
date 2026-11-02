@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160622-41478160460-a-unseen-1a-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41478160460",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-1a --gpus L4 --max-minutes 45 --repo https://github.com/pytorch/torchtune --commit bd2a0fc7c31430972728494fa01aaeeb0ebf1ba1 --entrypoint recipes/lora_finetune_single_device.py --args=--config,qwen2_5/1.5B_lora_single_device",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:06:59Z"
+}
