@@ -1,0 +1,11 @@
+{
+	"name": "20261102-090948-41418388343-c-fix-race-verify-nov2-a10",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41418388343",
+	"ref": "ccb6a66814d5216f5998ef08aa56bc8c4b54035e",
+	"sha": "ccb6a66814d5216f5998ef08aa56bc8c4b54035e",
+	"cmd": "modal run --env main api/verify_race_app.py::verify_race --attempt nov2b --gpu A10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T09:16:00Z"
+}

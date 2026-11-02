@@ -1,0 +1,193 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-smEYdjXJZYKcQPcHQmxocn
+✓ Created objects.
+not raced (another metric than memory.eval_peak): c3
+c1 (eval.reduce_batch): submitted
+{
+ "id": "c1",
+ "template_id": "eval.reduce_batch",
+ "job_status": "done",
+ "record_id": "01M6DRBZBSCBRRAV5V6Y6QK65B",
+ "error_code": null,
+ "error": "",
+ "minutes": 3.0,
+ "usd": 0.0986,
+ "gpu": "A10",
+ "probes": {
+  "v1": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-base": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-seed": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 16.11
+  }
+ },
+ "verify": {
+  "status": "failed",
+  "metric": "memory.eval_peak",
+  "before": null,
+  "after": null,
+  "fixed_seed_loss_delta": 0.0011252377563832254
+ },
+ "checks": [
+  [
+   "target_improved",
+   false,
+   false
+  ],
+  [
+   "effective_batch",
+   true,
+   false
+  ],
+  [
+   "tokens_seen",
+   true,
+   false
+  ],
+  [
+   "lr_schedule",
+   true,
+   false
+  ],
+  [
+   "throughput_floor",
+   true,
+   false
+  ],
+  [
+   "fixed_seed_loss",
+   true,
+   false
+  ],
+  [
+   "eval_kept",
+   true,
+   false
+  ],
+  [
+   "same_model",
+   true,
+   false
+  ]
+ ],
+ "a_finding": {
+  "code": "verify.failed",
+  "severity": "error",
+  "title": "The eval ran out of memory with and without the change"
+ }
+}
+c2 (eval.wrap_no_grad): submitted
+{
+ "id": "c2",
+ "template_id": "eval.wrap_no_grad",
+ "job_status": "done",
+ "record_id": "01M6DRHDZV9XG74EKF6TWWCMM8",
+ "error_code": null,
+ "error": "",
+ "minutes": 2.8,
+ "usd": 0.1001,
+ "gpu": "A10",
+ "probes": {
+  "v1": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-base": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-seed": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 16.11
+  }
+ },
+ "verify": {
+  "status": "failed",
+  "metric": "memory.eval_peak",
+  "before": null,
+  "after": null,
+  "fixed_seed_loss_delta": 0.001430441221162605
+ },
+ "checks": [
+  [
+   "target_improved",
+   false,
+   false
+  ],
+  [
+   "effective_batch",
+   true,
+   false
+  ],
+  [
+   "tokens_seen",
+   true,
+   false
+  ],
+  [
+   "lr_schedule",
+   true,
+   false
+  ],
+  [
+   "throughput_floor",
+   true,
+   false
+  ],
+  [
+   "fixed_seed_loss",
+   true,
+   false
+  ],
+  [
+   "eval_kept",
+   true,
+   false
+  ],
+  [
+   "same_model",
+   true,
+   false
+  ]
+ ],
+ "a_finding": {
+  "code": "verify.failed",
+  "severity": "error",
+  "title": "The eval ran out of memory with and without the change"
+ }
+}
+{
+ "spent_usd": 0.1987,
+ "winner": null,
+ "results": [
+  {
+   "id": "c1",
+   "template_id": "eval.reduce_batch",
+   "job_status": "done",
+   "usd": 0.0986,
+   "verify": "failed"
+  },
+  {
+   "id": "c2",
+   "template_id": "eval.wrap_no_grad",
+   "job_status": "done",
+   "usd": 0.1001,
+   "verify": "failed"
+  }
+ ]
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-smEYdjXJZYKcQPcHQmxocn
