@@ -332,6 +332,7 @@ def smoke(
 	args: str = "",
 	repo: str = "",
 	commit: str = "",
+	edit_hex: str = "",
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
@@ -341,7 +342,9 @@ def smoke(
 	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are).
 	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload.
 	--repo https://github.com/<owner>/<repo> --commit <40-hex> [--entrypoint ...] [--args=...]: a public
-	repo at a commit, sent as kind repo, as a visitor's GitHub link is (Monday's unseen scripts). The job
+	repo at a commit, sent as kind repo, as a visitor's GitHub link is (Monday's unseen scripts).
+	--edit-hex: exact replacements in the repo's files (see _apply_edits), sent as an upload of the
+	edited files, as a visitor who edited them would; only the unseen list's own "Change" lines. The job
 	is cancelled after `max_minutes`, or if this run fails partway. The job store is looked up in
 	the environment `modal run --env` names (modal_env overrides it). Writes out/smoke.json (every
 	event and the final status, or the error) and out/record.json (the flight record), which
@@ -361,7 +364,17 @@ def smoke(
 		raise SystemExit(
 			"--entrypoint and --args go with --dir or --repo (a sample or notebook names its own)"
 		)
-	if repo:  # the runner clones it (runner/sources._clone), exactly as for a visitor's link
+	if edit_hex and not repo:
+		raise SystemExit("--edit-hex goes with --repo")
+	if repo and edit_hex:  # the edited files, as an upload: the runner can't edit a repo it clones
+		from preflight.runner.sources import _clone
+
+		files, sha = _clone(repo, commit or None)
+		files = _apply_edits(files, edit_hex)
+		print(f"[smoke] {repo} at {sha}, edited, as an upload of {len(files)} files", flush=True)
+		source = {"kind": "upload", "files": files, **({"entrypoint": entrypoint} if entrypoint else {}),
+			**({"args": _split_args(args)} if args else {})}  # fmt: skip
+	elif repo:  # the runner clones it (runner/sources._clone), exactly as for a visitor's link
 		source = {"kind": "repo", "uri": repo, "commit": commit or None,
 			**({"entrypoint": entrypoint} if entrypoint else {}), **({"args": _split_args(args)} if args else {})}  # fmt: skip
 	if dir:  # any directory in this checkout, checked in as a visitor's upload (Monday's unseen scripts);
@@ -507,6 +520,27 @@ GT_FUNCTIONS = {
 }  # fmt: skip
 
 
+def _apply_edits(files: dict, edit_hex: str) -> dict:
+	"""files with exact replacements made: edit_hex is the hex of a JSON {path: [[old, new], ...]}
+	(hex, since remote-run.yml's command allows no quotes or brackets). Each old string must occur
+	exactly once in its file, so an edit can't land somewhere it wasn't meant to; each edit is printed."""
+	import json
+
+	edits = json.loads(bytes.fromhex(edit_hex).decode())
+	out = dict(files)
+	for path, pairs in edits.items():
+		if path not in out:
+			raise SystemExit(f"--edit-hex: {path} isn't in the repo's files")
+		for old, new in pairs:
+			if out[path].count(old) != 1:
+				raise SystemExit(
+					f"--edit-hex: {old!r} occurs {out[path].count(old)} times in {path}, not once"
+				)
+			out[path] = out[path].replace(old, new)
+			print(f"[edit] {path}: {old!r} -> {new!r}", flush=True)
+	return out
+
+
 def _split_args(args: str) -> list[str]:
 	"""A script's arguments from one flag value. remote-run.yml's command allows no quotes, so
 	`--args=--epochs=1,--lr=3e-4` (commas, no spaces) is the form that gets through it, and `,,` a
@@ -533,6 +567,7 @@ def ground_truth(
 	install_requirements: bool = False,
 	repo: str = "",
 	commit: str = "",
+	edit_hex: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -572,6 +607,8 @@ def ground_truth(
 		from preflight.runner.sources import _clone
 
 		files, sha = _clone(repo, commit or None)
+		if edit_hex:
+			files = _apply_edits(files, edit_hex)
 		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
 		print(f"[ground truth] {repo} at {sha}: {len(files)} files", flush=True)
 	else:
@@ -865,6 +902,10 @@ def agent_sample(
 	provider: str = "meta",
 	label_mbpp: int = 0,
 	full: bool = False,
+	repo: str = "",
+	commit: str = "",
+	entrypoint: str = "",
+	edit_hex: str = "",
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
 	--full: a half of the full benchmark (--k 250, then --k 250 --skip-from the first half's output
@@ -876,8 +917,19 @@ def agent_sample(
 	from preflight.recorder.agent import task_key
 	from preflight.runner.sources import _read_tree
 
-	files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
-	entry = next((e for e in ("run.py", "train.py") if e in files), None)
+	if repo:  # a public repo at a commit (Monday's unseen agent script), read as the runner reads one
+		from preflight.runner.sources import _clone
+
+		files, sha = _clone(repo, commit or None)
+		files = _apply_edits(files, edit_hex) if edit_hex else files
+		script = repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1]
+		entry = entrypoint or None
+		print(f"[agent] {repo} at {sha}: {len(files)} files", flush=True)
+		if entry not in files:
+			raise SystemExit(f"--entrypoint {entrypoint!r} isn't in the repo's files")
+	else:
+		files = _read_tree(Path(__file__).resolve().parents[3] / "zoo" / script)
+		entry = next((e for e in ("run.py", "train.py") if e in files), None)
 	if entry is None:
 		raise SystemExit(f"zoo/{script} has no run.py or train.py in this checkout")
 	skip = []
