@@ -45,3 +45,23 @@ def test_the_message_names_the_step_once_with_the_scripts_own_file():
 	assert m.startswith("Ran out of GPU memory at step 3. Step: the training steps. By hand: ")
 	assert "preflight run finetune.py" in m and "train.py" not in m
 	assert with_step(m, "oom") == m  # idempotent
+
+
+def test_every_code_a_visitor_can_meet_has_its_own_step_not_only_its_familys():
+	# the overnight pass (Nov 2): the submission, patch and demo-limit codes had only their family's
+	# line ("checking the submission"), which says nothing a visitor can act on
+	from preflight.runner.failures import STEPS
+
+	text = "".join(f.read_text() for f in SRC.glob("runner/*.py"))
+	codes = set(re.findall(r'code="((?:submission|patch|limit)\.[a-z_]+)"', text))
+	codes |= {"queue_full"}
+	assert {
+		"limit.visitor_daily",
+		"limit.daily_spend",
+		"submission.sample_full",
+		"patch.does_not_apply",
+	} <= codes
+	missing = sorted(c for c in codes if c not in STEPS)
+	assert missing == [], missing
+	step, by_hand = describe("limit.visitor_daily")
+	assert "3 probe jobs" in step and "midnight ET" in by_hand

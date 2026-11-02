@@ -19,6 +19,49 @@ STEPS: dict[str, tuple[str, str]] = {
 		"`preflight run train.py`",
 	),
 	"submission.files_gone": ("reading the uploaded files", "upload the files again"),
+	"submission.invalid": (
+		"reading the job request",
+		"check the script in again from the page; if you built the request yourself, compare it with the API's JobRequest",
+	),
+	"submission.sample_unknown": ("finding the sample", "pick a sample from the list on the page"),
+	"submission.record_unknown": (
+		"finding the record",
+		"open the record from its link again, or check the script in afresh",
+	),
+	"submission.no_sample": (
+		"sampling the agent's tasks",
+		"check the script in once first, then ask for more tasks",
+	),
+	"submission.sample_full": (
+		"sampling the agent's tasks",
+		"every task is sampled already: read the record, or run the whole benchmark on your machine with `preflight run agent.py --agent-max-usd 5`",
+	),
+	"submission.not_agent": (
+		"choosing how to probe the script",
+		"more tasks are for agent runs; probe a training script's settings instead",
+	),
+	"submission.not_gpu_job": (
+		"choosing how to probe the script",
+		"an agent run is measured by sampling tasks: ask for more tasks instead of a GPU probe",
+	),
+	"patch.does_not_apply": (
+		"applying the fix",
+		"the code changed since the fix was made: check the script in again, then ask for the fix",
+	),
+	"patch.not_allowed": (
+		"applying the fix",
+		"a fix may only edit the script's own text files; apply it by hand (`git apply fix.patch`) and probe the result",
+	),
+	# the demo's limits (runner/queue.py QueueFull codes): not a failure of the script
+	"limit.visitor_daily": (
+		"the demo's daily limit (3 probe jobs a visitor a day)",
+		"come back after midnight ET, open a sample meanwhile, or probe on your machine with `preflight run train.py`",
+	),
+	"limit.daily_spend": (
+		"the demo's daily GPU budget",
+		"come back after midnight ET, open a sample meanwhile, or probe on your machine with `preflight run train.py`",
+	),
+	"queue_full": ("waiting for a place in the queue", "submit again in a minute or two"),
 	"submission.code_changed": (
 		"checking the record's code",
 		"check the record in again from the code as it is now",
