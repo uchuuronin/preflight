@@ -16,10 +16,15 @@ describe("check-in help on Boarding", () => {
 	});
 	it("says the step and what's missing, and how to fix it by hand while the runner can't take extra packages", () => {
 		const { container } = render(<CheckinHelp trouble={install} jobId="j1" />);
-		expect(container.textContent).toContain("Stopped while installing");
+		expect(container.textContent).toContain("Stopped at an import");
 		expect(container.textContent).toContain("Your script imports torchvision, which isn't installed here.");
 		expect(container.textContent).toContain("Add torchvision to a requirements.txt next to your script");
 		expect(container.querySelector("input")).toBeNull();
+	});
+	it("doesn't send a student to PyPI for what may be a file of their own", () => {
+		const { container } = render(<CheckinHelp trouble={{ step: "install", missing: [{ module: "utils", pkg: null }] }} jobId="j0" />);
+		expect(container.textContent).toContain("If utils is a file of yours, upload it with your script.");
+		expect(container.textContent).not.toContain("Add utils to a requirements.txt");
 	});
 	it("offers the extra-packages box, filled in, with the flag on and the check-in remembered", () => {
 		on.add("c.checkin_help");

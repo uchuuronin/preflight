@@ -27,12 +27,18 @@ describe("where a check-in stopped, from what the runner says today (unseen runs
 		});
 		// A's proposed fields win over the message
 		expect(troubleFromProbes([{ status: "error", error_code: "missing_package", missing_module: "smolagents", missing_package: "smolagents" }])).toEqual({ step: "install", missing: [{ module: "smolagents", pkg: "smolagents" }] });
-		// an import off the list has no package name
-		expect(troubleFromProbes([{ status: "error", error_code: "missing_package", error: "A library in the script needs mystery_lib, which is not installed in the probe image" }])).toEqual({ step: "install", missing: [{ module: "mystery_lib", pkg: null }] });
+		// an import off the list (or a file of the visitor's own) has no package name
+		expect(troubleFromProbes([{ status: "error", error_code: "missing_package", error: "The script imports utils, which is not installed in the probe image" }])).toEqual({ step: "install", missing: [{ module: "utils", pkg: null }] });
+		// a library's own words aren't read as an import ("needs the protobuf library")
+		expect(troubleFromProbes([{ status: "error", error_code: "missing_package", error: "A library in the script needs the, which is not installed in the probe image" }])).toBeNull();
+		// no wheels on PyPI: no package to offer
+		expect(troubleFromProbes([{ status: "error", error_code: "missing_package", error: "The script imports torch_sparse, which is not installed in the probe image" }], { torch_sparse: "torch-sparse" }, ["torch_sparse"])).toEqual({ step: "install", missing: [{ module: "torch_sparse", pkg: null, noWheels: true }] });
 	});
 	it("says nothing when a probe ran, or a probe stopped for another reason", () => {
 		expect(troubleFromProbes([{ status: "ok" }, { status: "error", error_code: "missing_package", error: "The script imports x, which is not installed" }])).toBeNull();
 		expect(troubleFromProbes([{ status: "oom", error_code: "oom" }])).toBeNull();
+		// one point ran out of memory after measuring, another stopped at an import: something was measured
+		expect(troubleFromProbes([{ status: "oom", error_code: "oom" }, { status: "error", error_code: "missing_package", error: "The script imports x, which is not installed" }])).toBeNull();
 		expect(troubleFromProbes([])).toBeNull();
 	});
 });

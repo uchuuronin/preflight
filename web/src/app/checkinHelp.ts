@@ -27,7 +27,7 @@ export type Trouble =
 	/** The Python is over what the script map reads (2 MB). */
 	| { step: "read"; limit: "map" }
 	/** The script imports packages the probe doesn't have. `pkg` is the name Preflight installs it by, when it's on its list. */
-	| { step: "install"; missing: Array<{ module: string; pkg: string | null }> };
+	| { step: "install"; missing: Array<{ module: string; pkg: string | null; noWheels?: boolean }> };
 
 /** A failed job's stop, from its error code and message. */
 export function troubleFromFailure(code: string | null | undefined, message: string | null | undefined): Trouble | null {
@@ -39,10 +39,12 @@ export function troubleFromFailure(code: string | null | undefined, message: str
 
 const IMPORT_NAME = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 
-/** The import name in a probe's missing-package message (recorder/errors.py's wording), or null. */
+/** The import name in a probe's missing-package message, or null. Only the recorder's "The script
+ * imports X" names an import (recorder/errors.py); its "A library in the script needs X" form comes
+ * from a library's own words, which can be anything ("needs the protobuf library"), so it isn't read. */
 function moduleIn(p: ProbeSeen): string | null {
 	if (p.missing_module && IMPORT_NAME.test(p.missing_module)) return p.missing_module;
-	const m = /(?:imports|needs) ([A-Za-z_][A-Za-z0-9_.]*),? which is not installed/.exec(p.error ?? "");
+	const m = /The script imports ([A-Za-z_][A-Za-z0-9_.]*), which is not installed/.exec(p.error ?? "");
 	return m ? m[1]! : null;
 }
 
@@ -50,21 +52,25 @@ function moduleIn(p: ProbeSeen): string | null {
  * A finished job whose probes all stopped at a missing import: nothing was measured, and the way
  * past is installing it. Null when any probe ran, or when a probe stopped for another reason.
  */
-export function troubleFromProbes(probes: readonly ProbeSeen[] | undefined, known: Readonly<Record<string, string>> = {}): Trouble | null {
+export function troubleFromProbes(
+	probes: readonly ProbeSeen[] | undefined,
+	known: Readonly<Record<string, string>> = {},
+	noWheels: readonly string[] = [],
+): Trouble | null {
 	const all = probes ?? [];
-	if (!all.length || all.some((p) => p.status === "ok" || p.status === "cached")) return null;
-	const stopped = all.filter((p) => p.error_code === "missing_package");
-	// the runner skips the later probes after the first one's stop: those carry other codes
-	if (!stopped.length) return null;
+	// Every probe stopped at an import (the runner runs each point, so each stops the same way): a
+	// run where any probe measured something, or stopped for another reason, isn't this stop (review, Nov 2).
+	if (!all.length || !all.every((p) => p.error_code === "missing_package")) return null;
+	const stopped = all;
 	const seen = new Map<string, string | null>();
 	for (const p of stopped) {
 		const mod = moduleIn(p);
 		if (!mod || seen.has(mod)) continue;
 		const top = mod.split(".")[0]!;
-		seen.set(mod, p.missing_package ?? known[top] ?? known[mod] ?? null);
+		seen.set(mod, noWheels.includes(top) ? null : (p.missing_package ?? known[top] ?? known[mod] ?? null));
 	}
 	if (!seen.size) return null;
-	return { step: "install", missing: [...seen].map(([module, pkg]) => ({ module, pkg })) };
+	return { step: "install", missing: [...seen].map(([module, pkg]) => (noWheels.includes(module.split(".")[0]!) ? { module, pkg, noWheels: true } : { module, pkg })) };
 }
 
 /** A package name the box accepts: a PyPI project name, nothing else (no versions, URLs or flags). */
@@ -86,8 +92,13 @@ export function parsePackages(text: string): { names: string[]; bad: string[] } 
 /** Each check-in's request, by job id, for this visit (a way past sends it again with a change). */
 const sent = new Map<string, JobRequest>();
 
+/** Only the last few: a request can hold up to 5 MB of uploaded files. */
+const KEEP = 3;
+
 export function rememberRequest(jobId: string, body: JobRequest): void {
+	sent.delete(jobId);
 	sent.set(jobId, body);
+	while (sent.size > KEEP) sent.delete(sent.keys().next().value!);
 }
 
 export function requestFor(jobId: string | null): JobRequest | null {

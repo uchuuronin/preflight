@@ -80,7 +80,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	const [calls, setCalls] = useState<ModelCallSeen[]>([]);
 	const [probes, setProbes] = useState<ProbeSeen[]>([]);
 	// The packages Preflight installs, by import name (GET /v1/packages, A's list), to fill the box.
-	const [known, setKnown] = useState<Record<string, string>>({});
+	const [known, setKnown] = useState<{ known: Record<string, string>; noWheels: string[] }>({ known: {}, noWheels: [] });
 	// A new job, or a new record, starts with no tags: the last one's model calls aren't this one's
 	// (D's audit 12, with D's fix: clear on the record too, which the same-page case needs).
 	useEffect(() => {
@@ -103,15 +103,15 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		};
 	}, [open, rev, done]);
 	const ran = modelsRan(calls);
-	const trouble = failed ? troubleFromFailure(last?.error_code, last?.message) : done ? troubleFromProbes(probes, known) : null;
+	const trouble = failed ? troubleFromFailure(last?.error_code, last?.message) : done ? troubleFromProbes(probes, known.known, known.noWheels) : null;
 	const installStop = trouble?.step === "install";
 	useEffect(() => {
 		if (!installStop) return;
 		let gone = false;
 		fetch(`${API_BASE}/v1/packages`, { credentials: "same-origin" })
 			.then((r) => (r.ok ? r.json() : null))
-			.then((j: { known?: Record<string, string> } | null) => {
-				if (!gone && j?.known) setKnown(j.known);
+			.then((j: { known?: Record<string, string>; no_wheels?: string[] } | null) => {
+				if (!gone && j?.known) setKnown({ known: j.known, noWheels: j.no_wheels ?? [] });
 			})
 			.catch(() => {});
 		return () => {
