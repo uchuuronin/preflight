@@ -384,8 +384,7 @@ class AgentProxy:
 					self, 404, {"error": {"type": "not_found", "message": "preflight: POST only"}}, close=True
 				)
 
-		self._server = ThreadingHTTPServer((bind, 0), Handler)
-		self._server.daemon_threads = True
+		self._server = _Server((bind, 0), Handler)
 		threading.Thread(target=self._server.serve_forever, name="agent-proxy", daemon=True).start()
 		return self._server.server_address[0], self._server.server_address[1]
 
@@ -959,6 +958,15 @@ CUT = _cut_reason()
 # the OpenAI SDKs retry a 429 unless the server says not to (x-should-retry: false); a refusal
 # of the proxy's own is final, so a script past its sample ends at once rather than backing off
 NO_RETRY = {"x-should-retry": "false"}
+
+
+class _Server(ThreadingHTTPServer):
+	"""The proxy's server. A script may open dozens of calls at once (an agent's parallel tools, a
+	sample's tasks side by side); socketserver's listen backlog of 5 can turn such a burst into
+	refused or reset connections, which the script would see as the provider failing."""
+
+	request_queue_size = 128
+	daemon_threads = True
 
 
 def _reply(h: BaseHTTPRequestHandler, status: int, obj: dict, *, close: bool = False, headers=None) -> None:
