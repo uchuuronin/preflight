@@ -13,6 +13,7 @@ import { capacityBytes, costStraddlesBudget, failureTarget, objectiveTarget, SAM
 import type { Finding, Knob, KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { fitOf, trusted, type Fit } from "../workspace/status";
+import { changeWords } from "./changeWords";
 import { runApprovedTool, type SpendTool, type ToolRun } from "./approvals";
 import { LiveGuideSection } from "./LiveGuideSection";
 import { comboVisit, comboWords } from "./combos";
@@ -368,6 +369,7 @@ export function GuidePanel() {
 			to: valueText(knob, step?.move?.to),
 			delta: step?.move && goalTarget ? fmtDelta(step.move.delta, goalTarget.unit) : "",
 			target: goalTarget ? t(goalTarget.label_key).toLowerCase() : "",
+			...changeWords({ record, provider, knobs: state.knobs, estimates }, step?.move, a?.from, goalTarget),
 			peak: trusted(peak) ? fmt(peak.point, "bytes") : t("value.none"),
 			peakTrusted: trusted(peak) ? "1" : "",
 			cap: cap ? fmt(cap, "bytes") : "",
