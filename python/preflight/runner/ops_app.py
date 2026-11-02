@@ -910,6 +910,101 @@ def triage(share: str, probe: str = "p1-eval", provider: str = "glimmer"):
 	)
 
 
+# ---------------------------------------------------------------- Glimmer vs Spark Open agreement (paid: ask first)
+
+
+@ops.function(
+	image=worker_image,
+	secrets=[modal.Secret.from_name("preflight-glimmer"), modal.Secret.from_name("preflight-baseten")],
+	volumes={"/records": _read_only(records_vol)},
+	timeout=40 * 60,
+)
+def triage_agreement_hosted(max_usd: float = 1.0, limit: int = 40) -> dict:
+	"""For harness.glimmer_private (Chiya's decision): every distinct failed probe in the stored
+	sample (zoo) records, triaged by Glimmer and by Spark Open on the same input (the probe's
+	recorded error; a stored record keeps no log tail), and against the record's own Spark Open
+	finding where it has one. Distinct: by script and error text, so a failure seen on many records
+	counts once. No visitor record is read past its source kind. Stops before max_usd."""
+	import hashlib
+	import time
+
+	from preflight.harness.spark import ModelClient
+	from preflight.harness.triage import triage_probe
+	from preflight.runner.flags import flag
+	from preflight.schema import load_record
+
+	if not flag("harness.spark_open_triage"):
+		return {"error": "harness.spark_open_triage is off here"}
+	cases, seen = [], set()
+	for path in sorted(Path("/records").glob("*.json")):
+		try:
+			rec = load_record(path.read_text())
+		except Exception:
+			continue
+		if rec.job.source.kind != "sample":
+			continue
+		stored = {f.id.split(".", 1)[1]: f.code for f in rec.findings if f.source == "spark_open_triage"}
+		for p in rec.probes:
+			if p.status in ("ok", "cached") or not p.error:
+				continue
+			key = hashlib.sha256(f"{rec.job.source.uri}|{p.error}".encode()).hexdigest()
+			if key in seen:
+				continue
+			seen.add(key)
+			cases.append((rec, p, stored.get(p.id)))
+	cases = cases[:limit]
+	glim, spark = ModelClient.glimmer(), ModelClient.baseten_spark_open()
+	spent = lambda: sum(c.cost_usd for c in glim.calls + spark.calls)  # noqa: E731
+	worst = (
+		glim.deadline_s * glim.usd_per_second
+	) + 0.01  # one Glimmer call at its longest, plus Spark Open's
+	rows, t0 = [], time.monotonic()
+	for rec, p, stored_code in cases:
+		if spent() + worst > max_usd:
+			break
+		g, _ = triage_probe(glim, p, "")
+		o, _ = triage_probe(spark, p, "")
+		rows.append({"script": rec.job.source.uri, "record_id": rec.record_id, "probe": p.id, "status": p.status,
+			"error_code": p.error_code, "glimmer": g.code if g else None, "spark_open": o.code if o else None,
+			"stored_spark_open": stored_code, "glimmer_quoted": bool(g and "no log line quoted" not in g.detail),
+			"spark_open_quoted": bool(o and "no log line quoted" not in o.detail)})  # fmt: skip
+		print(f"[agree] {rows[-1]}", flush=True)
+	both = [r for r in rows if r["glimmer"] and r["spark_open"]]
+	return {"cases_found": len(cases), "rows": rows, "both_answered": len(both),
+		"agree_same_input": sum(r["glimmer"] == r["spark_open"] for r in both),
+		"with_stored": sum(1 for r in rows if r["glimmer"] and r["stored_spark_open"]),
+		"agree_stored": sum(r["glimmer"] == r["stored_spark_open"] for r in rows if r["glimmer"] and r["stored_spark_open"]),
+		"usd": {"glimmer": round(sum(c.cost_usd for c in glim.calls), 6), "spark_open": round(sum(c.cost_usd for c in spark.calls), 6)},
+		"calls": {"glimmer": len(glim.calls), "spark_open": len(spark.calls)}, "wall_s": round(time.monotonic() - t0, 1)}  # fmt: skip
+
+
+@ops.local_entrypoint()
+def triage_agreement(max_usd: float = 1.0, limit: int = 40):
+	"""modal run --env main python/preflight/runner/ops_app.py::triage_agreement [--max-usd 1.0]
+	Glimmer's triage against Spark Open's on the zoo's failed probes; writes out/triage_agreement.json."""
+	import math
+
+	res = triage_agreement_hosted.remote(max_usd, limit)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/triage_agreement.json").write_text(json.dumps(res, indent=2))
+
+	def wilson(k: int, n: int) -> str:
+		if not n:
+			return "n/a"
+		z, ph = 1.96, k / n
+		d = 1 + z * z / n
+		c, h = (ph + z * z / (2 * n)) / d, z * math.sqrt(ph * (1 - ph) / n + z * z / (4 * n * n)) / d
+		return f"{max(0, c - h):.0%} to {min(1, c + h):.0%}"
+
+	if "error" in res:
+		print(f"[agree] {res['error']}", flush=True)
+		return
+	n, k = res["both_answered"], res["agree_same_input"]
+	print(f"[agree] same input: {k} of {n} agree (Wilson 95% {wilson(k, n)}); "
+		f"against the stored finding: {res['agree_stored']} of {res['with_stored']} ({wilson(res['agree_stored'], res['with_stored'])}); "
+		f"{res['cases_found']} distinct failed probes; spent {res['usd']}", flush=True)  # fmt: skip
+
+
 # ---------------------------------------------------------------- serving image (CPU, before any serving probe)
 
 
