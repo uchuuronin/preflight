@@ -1,0 +1,11 @@
+{
+	"name": "20261102-230241-41542230385-b-zoo-rec-retrieval-st-a10",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41542230385",
+	"ref": "ws-b",
+	"sha": "33a9499e6ec3c3e67f0e253fc1ad98c94163e796",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/retrieval_st --gpus A10 --visitor b-zoo-rec-5 --max-minutes 25",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:04:56Z"
+}

@@ -1,0 +1,150 @@
+{
+  "submitted": {
+    "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+    "status": "done",
+    "position": null,
+    "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+    "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 12
+  },
+  "events": [
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "seq": 0,
+      "at": "2026-11-02T23:03:02.421924Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "seq": 1,
+      "at": "2026-11-02T23:03:07.838894Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "seq": 2,
+      "at": "2026-11-02T23:03:08.727942Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "seq": 3,
+      "at": "2026-11-02T23:03:09.164429Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 4,
+      "at": "2026-11-02T23:03:12.441320Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 5,
+      "at": "2026-11-02T23:03:43.225701Z",
+      "stage": "skeleton",
+      "message": "map refined by Muse Spark",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 6,
+      "at": "2026-11-02T23:03:44.105419Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 7,
+      "at": "2026-11-02T23:03:44.538414Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 8,
+      "at": "2026-11-02T23:04:16.756707Z",
+      "stage": "probing",
+      "progress": 0.333,
+      "level": "info",
+      "probe_id": "p2",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 9,
+      "at": "2026-11-02T23:04:28.788884Z",
+      "stage": "probing",
+      "progress": 0.667,
+      "level": "info",
+      "probe_id": "p3",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 10,
+      "at": "2026-11-02T23:04:46.188991Z",
+      "stage": "predicting",
+      "message": "measured; predicting",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "share_token": "V43vU-Mv6pgNA4-LguRK-A",
+      "seq": 11,
+      "at": "2026-11-02T23:04:51.143034Z",
+      "stage": "predicting",
+      "message": "predicted",
+      "level": "info",
+      "record_rev": 3
+    },
+    {
+      "job_id": "01M6F80YGN3HJB16ABPX2VZDAX",
+      "record_id": "01M6F815ANXDARYEB9CY9ETXEA",
+      "seq": 12,
+      "at": "2026-11-02T23:04:52.045731Z",
+      "stage": "done",
+      "progress": 1.0,
+      "level": "info"
+    }
+  ],
+  "error": null
+}
