@@ -1,0 +1,84 @@
+{
+  "script": "pretrain_nanogpt",
+  "entrypoint": "train.py",
+  "args": [],
+  "gpu": "MI300X",
+  "backend": "rocm",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ModuleNotFoundError",
+    "error": "ModuleNotFoundError: No module named 'datasets'\n",
+    "seconds": 3.5564601961523294,
+    "peak_allocated_bytes": 498558976,
+    "peak_reserved_bytes": 555745280,
+    "device": "AMD Instinct MI300X",
+    "timing": "cuda_events",
+    "wall_s": 6.4
+  },
+  "recorder": {
+    "status": "error",
+    "error": "The script imports datasets, which is not installed in the probe image. ModuleNotFoundError: No module named 'datasets' at train.py:58, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 4.819,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 2395910144.0
+    },
+    "step_log": [],
+    "log_tail": "",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T23:26:43Z",
+      "duration_s": 4.819,
+      "error": "The script imports datasets, which is not installed in the probe image. ModuleNotFoundError: No module named 'datasets' at train.py:58, before the first optimizer step (stage: running script)",
+      "error_code": "missing_package",
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 2395910144.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 4.819,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "rocm",
+      "provider": "local",
+      "gpu": {
+        "name": "MI300X",
+        "count": 1,
+        "memory_bytes": 206141652992,
+        "vendor": "amd"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1+rocm6.2"
+      },
+      "python": "3.12.11"
+    }
+  },
+  "overhead": null
+}

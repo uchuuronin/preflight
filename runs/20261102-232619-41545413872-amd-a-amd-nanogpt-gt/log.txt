@@ -1,0 +1,57 @@
+torch 2.5.1+rocm6.2 hip 6.2.41133-dd7f95766 AMD Instinct MI300X
+preflight: running probes as root: an unprivileged uid can't reach /root/preflight/.venv-amd/bin/python and its packages (install Preflight where other users can read it to probe as one)
+[ground truth 23:26:37] bare run of pretrain_nanogpt: 300 optimizer steps, at most 900 s
+[bare] running /tmp/gt-407vhf0_/train.py for 300 optimizer steps
+{"steps": 0, "ended": "ModuleNotFoundError", "error": "ModuleNotFoundError: No module named 'datasets'\n", "seconds": 3.5564601961523294, "peak_allocated_bytes": 498558976, "peak_reserved_bytes": 555745280, "device": "AMD Instinct MI300X", "timing": "cuda_events"}
+[ground truth 23:26:43] bare run ended (ModuleNotFoundError) after 6 s, 0 steps
+[ground truth 23:26:43] recorder run: 5 warmup + 100 timed steps, at most 1734 s
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+[ground truth 23:26:48] recorder run ended (error) after 0 steps
+{
+  "script": "pretrain_nanogpt",
+  "entrypoint": "train.py",
+  "args": [],
+  "gpu": "MI300X",
+  "backend": "rocm",
+  "overhead": null,
+  "bare": {
+    "steps": 0,
+    "ended": "ModuleNotFoundError",
+    "error": "ModuleNotFoundError: No module named 'datasets'\n",
+    "seconds": 3.5564601961523294,
+    "peak_allocated_bytes": 498558976,
+    "peak_reserved_bytes": 555745280,
+    "device": "AMD Instinct MI300X",
+    "timing": "cuda_events",
+    "wall_s": 6.4
+  },
+  "recorder": {
+    "status": "error",
+    "error": "The script imports datasets, which is not installed in the probe image. ModuleNotFoundError: No module named 'datasets' at train.py:58, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 4.819,
+    "by_phase": {},
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 2395910144.0
+    },
+    "env": {
+      "backend": "rocm",
+      "provider": "local",
+      "gpu": {
+        "name": "MI300X",
+        "count": 1,
+        "memory_bytes": 206141652992,
+        "vendor": "amd"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1+rocm6.2"
+      },
+      "python": "3.12.11"
+    }
+  }
+}
