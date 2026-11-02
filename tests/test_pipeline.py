@@ -994,3 +994,61 @@ def test_spark_search_grounds_failed_probes_only_with_its_flag_and_never_for_pri
 	searches = [c for c in rec.provenance if c.purpose == "search"]
 	assert len(searches) == len(seen) == 1  # two points out of memory the same way: one question
 	assert rec.costs.llm_usd == pytest.approx(sum(c.cost_usd for c in searches)) and rec.costs.llm_usd > 0
+
+
+@pytest.mark.parametrize("on", [False, True])
+def test_the_lr_range_point_runs_only_with_its_flag_and_leaves_the_predictions_alone(
+	tmp_path, monkeypatch, on
+):
+	import math
+
+	from preflight.probes.local import with_lr_range
+	from preflight.probes.lr_range import STEPS, lr_at
+	from preflight.runner import flags
+
+	class Ramp(FakeRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			r = super().__call__(spec, gpu, should_stop=should_stop)
+			if spec.lr_range:
+				lrs = [lr_at(i) for i in range(STEPS)]
+				loss = [2.0 - 1.5 / (1 + math.exp(-2.5 * (math.log10(x) + 4))) for x in lrs]
+				r.probe = with_lr_range(r.probe, {"series": {"lr": lrs, "loss": loss}}, spec.lr_range)
+			return r
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": on}))
+	flags.reload()
+	try:
+		runner = Ramp()
+		rec = run_pipeline(
+			{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, runner)
+		)
+	finally:
+		flags.reload()
+	assert rec.job.lens in ("pretrain", "finetune")
+	lr = [p for p in rec.probes if p.id.endswith("-lr")]
+	if not on:
+		assert not lr and not any(c[0].endswith("-lr") for c in runner.calls)
+		return
+	(p,) = lr
+	assert p.id == "p1-lr" and p.extras["lr_range"] == 1.0 and 1e-6 < p.extras["lr_range.suggested_lr"] < 1e-3
+	assert p.memory is None and p.step_time is None and p.stability is None
+	call = next(c for c in runner.calls if c[0] == "p1-lr")
+	assert call[2] == 0  # eval off
+	assert rec.costs.gpu_usd == pytest.approx(4 * 30 * 0.80 / 3600, rel=1e-3)  # its GPU time is counted
+	# the same predictions as a job without it
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": False}))
+	flags.reload()
+	try:
+		plain = run_pipeline(
+			{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, Ramp())
+		)
+	finally:
+		flags.reload()
+	from preflight.runner.pipeline import with_predictions
+
+	# the engine sees the extra ok probe (p1's knobs, no measurements) and predicts the same
+	rec, failed = with_predictions(rec, _Ctx(), enabled=True)
+	plain, failed_plain = with_predictions(plain, _Ctx(), enabled=True)
+	assert not failed and not failed_plain
+	strip = lambda r: {k: (e.status, e.lo, e.hi) for k, e in r.predictions.estimates.items()}  # noqa: E731
+	assert strip(rec) == strip(plain) and strip(rec)

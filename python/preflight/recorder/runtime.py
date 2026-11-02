@@ -367,6 +367,7 @@ class Recorder:
 		alternate_sync: bool = False,
 		generate_sample: int = 0,
 		generate_calls: int = 0,
+		lr_range: dict | None = None,
 	):
 		if warmup + timed < 2:
 			raise ValueError("a probe runs at least 2 optimizer steps; optimizer state appears at the first")
@@ -378,6 +379,16 @@ class Recorder:
 		self.generate_calls = generate_calls  # an eval probe: generate calls measured before it ends
 		self._gen_calls_done = 0
 		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
+		# the learning-rate range test (D, Nov 2; probes/lr_range.py, behind probes.lr_range): before
+		# each optimizer step the rate is set on an exponential ramp; the run ends at the ramp's end,
+		# or where the loss diverges (no phase steps: their rates would be past the ramp). With
+		# start == end it holds one rate (the GPU check's confirmation runs)
+		self.lr_range = dict(lr_range) if lr_range else None
+		self._lr_scales: list[float] | None = None
+		self._lr_div = None  # probes/lr_range.py Divergence, made at the first step
+		self.lr_range_error: str | None = None
+		if self.lr_range:
+			self.target = int(self.lr_range["steps"])
 		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
 		self.trace_path = trace_path
 		self.progress_path = progress_path
@@ -1452,6 +1463,8 @@ class Recorder:
 		if opt is not self.opt:
 			return
 		self._maybe_stop()
+		if self.lr_range:
+			self._set_range_lr(opt)
 		self._sync()
 		self._t_pre = self._now()
 		if self._data_end_bwd:
@@ -1464,6 +1477,40 @@ class Recorder:
 		self._sample = [] if self._clean else [(p, p.detach().clone()) for p in self._sample_params]
 		self._sync()
 		self._overhead_pre = self._now() - self._t_pre
+
+	def _set_range_lr(self, opt):
+		"""The range test's rate for this step on every param group, each group keeping its ratio to
+		the largest rate the script gave (a LoRA+ or layer-wise setup keeps its shape)."""
+		from preflight.probes.lr_range import lr_at
+
+		try:
+			groups = opt.param_groups
+			if self._lr_scales is None:
+				base = [float(g.get("lr") or 0.0) for g in groups]
+				top = max(base, default=0.0)
+				self._lr_scales = [b / top if top > 0 else 1.0 for b in base]
+			lr = lr_at(len(self.steps), int(self.lr_range["steps"]), float(self.lr_range["start"]),
+				float(self.lr_range["end"]))  # fmt: skip
+			for i, g in enumerate(groups):
+				v = lr * (self._lr_scales[i] if i < len(self._lr_scales) else 1.0)
+				if torch.is_tensor(g.get("lr")):
+					g["lr"].fill_(v)
+				else:
+					g["lr"] = v
+		except Exception as exc:  # the test is extra: the probe runs on at the script's own rate
+			self.lr_range_error = f"{type(exc).__name__}: {exc}"[:300]
+			self.lr_range = None
+
+	def _range_diverged(self, step: dict):
+		"""Stop at the step the range test diverges (probes/lr_range.py `Divergence`, the rule its
+		reading uses): past it the curve says nothing more, and some scripts stop themselves on a
+		NaN. A loss that isn't finite reaches here as None with the step's non-finite count."""
+		if self._lr_div is None:
+			from preflight.probes.lr_range import Divergence
+
+			self._lr_div = Divergence()
+		if self._lr_div.add(step.get("loss"), bool(step.get("nonfinite"))):
+			self._stop_pending = True
 
 	def _grad_norm_of(self, opt):
 		"""Global grad norm, as a 0-d tensor (no sync). Read after the step: with a closure (Lightning,
@@ -1580,6 +1627,8 @@ class Recorder:
 		if kind == "timed" and n == self.warmup + self.timed and not self.alternate_sync:
 			# drain what the timed steps queued, so the first phase step doesn't carry it as "other"
 			self._hard_sync()
+		if self.lr_range:
+			self._range_diverged(self.steps[-1])
 		self.stage = f"step {n}"
 		self._progress()
 		self._last_post = self._now()
