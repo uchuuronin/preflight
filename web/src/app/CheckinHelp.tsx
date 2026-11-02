@@ -8,7 +8,7 @@ import { useEffect, useId, useState } from "react";
 import { flag } from "../lib/flags";
 import { t } from "../lib/i18n";
 import { fromFile, MAX_EXTRA_PACKAGES, parsePackages, rememberRequest, requestFor, type Trouble, withPackages } from "./checkinHelp";
-import { go, href } from "./route";
+import { go } from "./route";
 
 const API_BASE = "";
 
@@ -77,7 +77,7 @@ export function CheckinHelp({ trouble, jobId }: { trouble: Trouble; jobId: strin
 					</>
 				) : (
 					<p className="pf-dim">
-						{t("checkin.read.way_hand")} <a href={href("new")}>{t("boarding.back")}</a>
+						{t("checkin.read.way_hand")}
 					</p>
 				)}
 				{error ? (
@@ -114,7 +114,7 @@ export function CheckinHelp({ trouble, jobId }: { trouble: Trouble; jobId: strin
 				</>
 			) : (
 				<p className="pf-dim">
-					{t("checkin.install.way_hand", { names: listOf(suggested) })} <a href={href("new")}>{t("boarding.back")}</a>
+					{t("checkin.install.way_hand", { names: listOf(suggested) })}
 				</p>
 			)}
 			{error ? (

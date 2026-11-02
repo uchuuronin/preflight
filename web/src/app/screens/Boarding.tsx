@@ -118,7 +118,10 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 			gone = true;
 		};
 	}, [installStop]);
-	const progress = done ? 100 : Math.max(0, idx) * 25;
+	// A finished job whose probes all stopped at an import measured nothing: the route stops at the probe leg.
+	const probeLeg = STAGES.findIndex((s) => s.key === "boarding.stage.probe");
+	const stopAt = installStop ? probeLeg : -1;
+	const progress = stopAt >= 0 ? stopAt * 25 : done ? 100 : Math.max(0, idx) * 25;
 
 	return (
 		<div className="pf-scroll">
@@ -129,7 +132,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 				<div className="pf-route">
 					<svg viewBox="0 0 900 260" preserveAspectRatio="none" aria-hidden="true">
 						<path className="pf-route__base" d="M30 230 C 260 -40, 640 -40, 870 230" />
-						<path className={`pf-route__done${failed ? " is-stopped" : ""}`} d="M30 230 C 260 -40, 640 -40, 870 230" pathLength={100} style={{ strokeDasharray: 100, strokeDashoffset: 100 - progress }} />
+						<path className={`pf-route__done${failed || stopAt >= 0 ? " is-stopped" : ""}`} d="M30 230 C 260 -40, 640 -40, 870 230" pathLength={100} style={{ strokeDasharray: 100, strokeDashoffset: 100 - progress }} />
 					</svg>
 					<span className="pf-route__end pf-route__end--from" style={{ left: "3.3%" }}>
 						{t("boarding.from")}
@@ -142,7 +145,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 					{STAGES.map((s, i) => (
 						<li
 							key={s.key}
-							className={`glass pf-stage${i < idx || done ? " is-done" : i === idx ? (failed ? " is-stopped" : " is-current") : ""}`}
+							className={`glass pf-stage${stopAt >= 0 ? (i < stopAt ? " is-done" : i === stopAt ? " is-stopped" : "") : i < idx || done ? " is-done" : i === idx ? (failed ? " is-stopped" : " is-current") : ""}`}
 							aria-current={i === idx && !done ? "step" : undefined}
 						>
 							<span className="pf-stage__dot" aria-hidden="true" />
