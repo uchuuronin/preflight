@@ -1,0 +1,66 @@
+{
+  "script": "litgpt",
+  "entrypoint": "litgpt/pretrain.py",
+  "args": [
+    "--config",
+    "config_hub/pretrain/debug.yaml"
+  ],
+  "gpu": null,
+  "backend": "cpu",
+  "bare": {
+    "failed": "requirements: pip took longer than 420 s",
+    "wall_s": 420.4
+  },
+  "recorder": {
+    "status": "error",
+    "error": "the repo didn't install: pip took longer than 420 s",
+    "error_code": "missing_package.install",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 423.106,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "alls by name: add it to requirements.txt\n[preflight] requirements: the script imports jsonargparse: installing jsonargparse\n[preflight] requirements: the script imports lightning_utilities: installing lightning-utilities\n[preflight] requirements: the script imports litdata: installing litdata\n[preflight] requirements: the script imports pytest, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports sentencepiece: installing sentencepiece\n[preflight] requirements: the script imports torchmetrics, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: kept the image's huggingface-hub 0.36.2 (asked for 'huggingface-hub>=0.30,<1.4')\n[preflight] requirements: kept the image's psutil 6.1.0 (asked for 'psutil==7.2.2')\n[preflight] requirements: kept the image's safetensors 0.4.5 (asked for 'safetensors>=0.4.3')\n[preflight] requirements: kept the image's tokenizers 0.20.3 (asked for 'tokenizers>=0.21')\n[preflight] requirements: kept the image's torch 2.5.1 (asked for 'torch>=2.7')\n[preflight] requirements: kept the image's tqdm 4.70.1 (asked for 'tqdm>4.66')\n[preflight] requirements: installing jsonargparse[signatures]>=4.37,<=4.41; python_version>='3.10', lightning>=2.6.1, jsonargparse, lightning-utilities, litdata, sentencepiece\n[preflight] requirements: together they didn't install (pip took longer than 420 s); trying them apart\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T18:15:44Z",
+      "duration_s": 423.106,
+      "error": "the repo didn't install: pip took longer than 420 s",
+      "error_code": "missing_package.install",
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 423.106,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cpu",
+      "provider": "local",
+      "nodes": 1,
+      "libraries": {}
+    }
+  },
+  "overhead": null,
+  "lens": "finetune",
+  "image": "probe"
+}

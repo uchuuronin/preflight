@@ -1,0 +1,11 @@
+{
+	"name": "20261102-180816-41497653915-a-after-2-gt-3",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41497653915",
+	"ref": "458a8bf9f3eac8f1f0ed57fba84059cc6c666e30",
+	"sha": "458a8bf9f3eac8f1f0ed57fba84059cc6c666e30",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/Lightning-AI/litgpt --commit 4738993a5e0190b851162a52173729827d3884e7 --entrypoint litgpt/pretrain.py --args=--config,config_hub/pretrain/debug.yaml  --bare-steps 100000 --budget-min 45 --first-gpu L4 --install-requirements --install-repo",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T18:22:52Z"
+}
