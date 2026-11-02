@@ -527,6 +527,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
 	rec, triaged = _triage(rec, results, deps, private=req.private)
+	rec, grounded = _search(rec, results, deps, private=req.private, verify=req.mode == "verify", ctx=ctx)
+	triaged = [*triaged, *grounded]
 	kept = rec.probes
 	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
 	ran = next((g for r in results for g in [_measured_gpu(r)] if g), gpu)
@@ -738,6 +740,49 @@ def _triage(
 		if not isinstance(r, ProbeResult):
 			continue
 		f, cs = triage_probe(client, r.probe, r.log_tail, node_id=_tested_node(r.probe, nodes))
+		calls += cs
+		if f is not None:
+			findings.append(f)
+	return rec.model_copy(update={"provenance": [*rec.provenance, *calls]}), findings
+
+
+SEARCH_LIBRARIES = ("torch", "transformers", "peft", "trl", "accelerate", "datasets", "bitsandbytes",
+	"vllm", "sentence-transformers", "torch_geometric", "torchvision", "timm", "numpy", "deepspeed")  # fmt: skip
+
+
+def _search(
+	rec: FlightRecord, results: list, deps: Deps, *, private: bool = False, verify: bool = False, ctx=None
+) -> tuple[FlightRecord, list]:
+	"""Muse Spark searches the web for a known library issue matching each failed probe's error
+	(D, Nov 2): at most 3 sources the search returned, or "no known issue found". Off unless
+	harness.spark_search is on and the Meta client is configured; never for a private job (its
+	error text would go to Meta and the web), nor a verify job (one question, as with the
+	diagnosis). One search per distinct error code in a job: several points that ran out of memory
+	the same way are one question. Every call is in the record's provenance."""
+	from .flags import flag
+
+	if private or verify or deps.spark is None or not flag("harness.spark_search"):
+		return rec, []
+	from preflight.harness.search_grounding import ground_failure, skipped
+
+	findings, calls, asked = [], [], set()
+	for r in results:
+		if not isinstance(r, ProbeResult) or skipped(r.probe):
+			continue
+		if ctx is not None and ctx.should_stop():
+			break
+		key = r.probe.error_code or r.probe.error.splitlines()[0][:120]
+		if key in asked:
+			continue
+		asked.add(key)
+		env = r.env or rec.env
+		libs = {k: v for k, v in (env.libraries if env is not None else {}).items() if k in SEARCH_LIBRARIES}
+		before = len(deps.spark.calls)
+		try:
+			f, cs = ground_failure(deps.spark, r.probe, libs, rec.job.lens)
+		except Exception:  # a search never costs the visitor their record; its calls stay in provenance
+			log.warning("job %s: search grounding failed", rec.record_id, exc_info=True)
+			f, cs = None, deps.spark.calls[before:]
 		calls += cs
 		if f is not None:
 			findings.append(f)
