@@ -1260,3 +1260,22 @@ def test_the_probe_dataset_length_follows_the_runner_s_rules():
 	)
 	assert api.total_steps(packed, {"seq_len": 512})[0] is None
 	assert api.total_steps(packed)[0] == pytest.approx(3170, abs=1)
+
+
+def test_a_cell_with_no_run_over_the_margin_reads_p_oom_from_the_whole_pool():
+	"""Chiya, Nov 1 (option b): 19 L4 fine-tune runs can't show P(OOM) below 2.5%, so with none of them over the
+	margin, the 487 held-out runs decide, and the reason says so. 7.7 GiB on a 22 GiB L4 fits; 17.5 GiB is tight."""
+	path = Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+	rec = FlightRecord.model_validate(json.loads(path.read_text()))
+	small = api.predict(rec, {"eval_batch_size": 4, "seq_len": 128}).root["risk.oom"]
+	assert small.point < 0.01 and small.reason.startswith("fits: ")
+	assert "from all 487 held-out runs; none of the 19 L4 finetune runs went over" in small.reason
+	close = api.predict(rec, {"eval_batch_size": 4, "seq_len": 512}).root["risk.oom"]
+	assert (
+		0.01 <= close.point < 0.05
+		and close.reason.startswith("tight: ")
+		and "fits needs below 1%" in close.reason
+	)
+	# a cell with a run over the margin keeps its own count
+	big = api.predict(rec, {"eval_batch_size": 4, "seq_len": 1024}).root["risk.oom"]
+	assert big.reason.startswith("fails: ") and "487" not in big.reason

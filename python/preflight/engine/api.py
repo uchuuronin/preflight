@@ -875,11 +875,23 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
 		alloc = est.point - ctx
 		p_emp = oom_model.empirical_p_oom(cell.residuals, alloc, capacity - ctx)
-		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
 		oom_source = f"from {cell.n} held-out runs"
-		floor = 0.5 / (
-			len(cell.residuals) + 1
-		)  # cited: empirical_p_oom's half-count with no run over the margin
+		floor = 0.5 / (len(cell.residuals) + 1)  # cited: empirical_p_oom's half-count, no run over the margin
+		pool = conformal.TABLE.cells.get(("memory.peak", "", ""))
+		if (
+			p_emp <= floor + 1e-12
+			and floor >= memory.FITS_BELOW
+			and pool is not None
+			and pool is not cell
+			and pool.residuals
+		):
+			# Chiya, Nov 1 (option b): with no run of this cell over the margin, the cell can't show a chance below
+			# its half-count floor (2.5% for 19 runs, over the 1% "fits" needs), so the wider pool decides
+			p_emp = oom_model.empirical_p_oom(pool.residuals, alloc, capacity - ctx)
+			who = " ".join(x for x in (cell.key[1], cell.key[2]) if x) or "matching"
+			oom_source = f"from all {pool.n} held-out runs; none of the {cell.n} {who} runs went over"
+			floor = 0.5 / (len(pool.residuals) + 1)
+		est = replace(est, p_oom=p_emp, oom_status=memory.oom_status(p_emp))
 	else:
 		oom_source = "simulated band"
 		floor = None
