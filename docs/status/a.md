@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Mon Nov 2, 1:25 PM ET.
+Updated Mon Nov 2, 5:40 PM ET.
 
 **Production runner: deployed from main 8ec03bc** (`a-deploy-main-25`, GitHub 41538939175, Nov 2 22:38 UTC / 5:38 PM ET), after both startup checks passed (`a-startup-check-25` 41538153950, `a-startup-check-serving-11` 41538684027); the limit check passed after it (`a-limit-check-6`, 41539041885). It carries the afternoon merge: `runner.stop_on_import_error`, `probes.agent_error_line`, `runner.hide_sample_outputs`, `c.inflight`, `c.fix_loop` and `harness.glimmer_private` on; `probes.repo_install` off. The previous deploys were 7ba177b (17:57 UTC) and 14ae7be (17:34 UTC); rollback is `modal deploy --env main` from 7ba177b.
 
@@ -73,7 +73,7 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 13:00 | Two runner fixes behind new flags, off: **`runner.stop_on_import_error`** (after a probe fails importing a package before its first step, the job's other points are skipped, and so is their paid triage) and **`probes.agent_error_line`** (an agent script that exits with an error leaves its last exception line, capped at 160 characters, in the sample's selection; the rest of its output stays dropped) | Chiya's item 4, from the unseen runs: three probes and three triage calls on one missing import; a smolagents run with 0 tasks and no reason | none | the flags off; revert |
 | 13:00 | `probes.repo_install` also reads setup.cfg's `install_requires`, gives a repo's own stack 420 s to install (requirements.txt keeps 240 s), and reaches the agent sandbox | Chiya's item 2 names setup.cfg; LitGPT's install ran past 240 s; the Spark agent case runs through the agent path | none | revert |
 | 13:20 | `probes.repo_install`: a try whose `except` raises again makes its import required (and a try with only a `finally`); ops `agent_sample --keep-error` for `probes.agent_error_line`'s rule in that run | smolagents raises "Please install 'openai' extra" from such a try; the hidden reason was found with the error line | none | revert |
-| 17:35 | Redeployed the runner from main 8ec03bc (`a-deploy-main-25`), gated by both startup checks, then the limit check | Chiya's 5:31 PM note: the three runner flags the PM turned on (`runner.stop_on_import_error`, `probes.agent_error_line`, `runner.hide_sample_outputs`) reach visitors only with this image; C deploys after it | cents (CPU checks, a few L4 minutes) | `modal deploy --env main` from 7ba177b |
+| 17:33 | Redeployed the runner from main 8ec03bc (`a-deploy-main-25`), gated by both startup checks, then the limit check | Chiya's 5:31 PM note: the three runner flags the PM turned on (`runner.stop_on_import_error`, `probes.agent_error_line`, `runner.hide_sample_outputs`) reach visitors only with this image; C deploys after it | cents (CPU checks, a few L4 minutes) | `modal deploy --env main` from 7ba177b |
 
 ## Decisions overnight (Chiya's autonomy, Nov 2 12:16 AM ET)
 
