@@ -5,7 +5,7 @@ const on = new Set<string>();
 vi.mock("../lib/flags", () => ({ flag: (n: string) => on.has(n) }));
 
 import { CheckinHelp } from "./CheckinHelp";
-import { rememberRequest } from "./checkinHelp";
+import { rememberRequest } from "./checkinTrouble";
 
 const install = { step: "install" as const, missing: [{ module: "torchvision", pkg: "torchvision" }] };
 

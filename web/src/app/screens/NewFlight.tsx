@@ -11,7 +11,7 @@ import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
-import { rememberRequest } from "../checkinHelp";
+import { rememberRequest } from "../checkinTrouble";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { DATA_USE_OK_ID, DataUseNotice, dataUseAccepted } from "../DataUse";
 import { ACCEPT, ACCEPT_SCRIPTS, checkinBytes, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";

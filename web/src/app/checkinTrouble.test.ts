@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromFile, parsePackages, troubleFromFailure, troubleFromProbes, withPackages } from "./checkinHelp";
+import { fromFile, parsePackages, troubleFromFailure, troubleFromProbes, withPackages } from "./checkinTrouble";
 
 describe("where a check-in stopped, from what the runner says today (unseen runs, Nov 2)", () => {
 	it("reads a repo over the read limit and code over the map's limit", () => {

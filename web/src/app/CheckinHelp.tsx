@@ -1,13 +1,13 @@
 /**
  * On Boarding, when a check-in stopped while reading the code or installing what it imports: the
- * step, what's missing, and the way past it (checkinHelp.ts). With `c.checkin_help` on (A's runner
+ * step, what's missing, and the way past it (checkinTrouble.ts). With `c.checkin_help` on (A's runner
  * takes `extra_packages` and `source.scope`), the way past is a box that sends the check-in again;
  * without it, the words say what to change by hand.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { flag } from "../lib/flags";
 import { t } from "../lib/i18n";
-import { fromFile, MAX_EXTRA_PACKAGES, parsePackages, rememberRequest, requestFor, type Trouble, withPackages } from "./checkinHelp";
+import { fromFile, MAX_EXTRA_PACKAGES, parsePackages, rememberRequest, requestFor, type Trouble, withPackages } from "./checkinTrouble";
 import { go } from "./route";
 
 const API_BASE = "";

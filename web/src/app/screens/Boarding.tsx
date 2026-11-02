@@ -8,7 +8,7 @@ import { t } from "../../lib/i18n";
 import { type BoardingEvent, boardingState, eventFromStatus, type ModelCallSeen, modelsRan, STAGES } from "../boarding";
 import { go, href } from "../route";
 import { CheckinHelp } from "../CheckinHelp";
-import { type ProbeSeen, troubleFromFailure, troubleFromProbes } from "../checkinHelp";
+import { type ProbeSeen, troubleFromFailure, troubleFromProbes } from "../checkinTrouble";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
