@@ -122,6 +122,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: web
+          # the same Wrangler the gate built the Functions bundle with (workers/package-lock.json)
+          wranglerVersion: "4.151.0"
           command: pages deploy dist --project-name=preflight --branch=${{ steps.branch.outputs.name }}
 
   api:
