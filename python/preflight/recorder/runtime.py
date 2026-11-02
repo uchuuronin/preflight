@@ -1861,9 +1861,9 @@ class Recorder:
 			if not keep or ids is None or logits is None:
 				return None
 			with suppress(Exception), torch.no_grad():
-				rec._entropy_exact.append(
-					(len(rec.steps), completion_entropy(logits, ids, int(keep), eos_token_id))
-				)
+				# TRL 0.14 asks for num_logits_to_keep = K + 1 and drops the last: the completion is K tokens (review, Nov 1)
+				k = int(keep) - 1  # the hook is only on TRL 0.14's GRPO policy, which always asks for K + 1
+				rec._entropy_exact.append((len(rec.steps), completion_entropy(logits, ids, k, eos_token_id)))
 			return None
 
 		return hook
@@ -1963,7 +1963,8 @@ def completion_entropy(logits, input_ids, keep: int, eos_token_id=None):
 	predicts past the sequence and is dropped, as TRL drops it. The completion is input_ids' last `keep` tokens, and
 	only the tokens up to and including the first EOS count (TRL's completion_mask). Chunked over positions so the
 	fp32 softmax scratch stays near ENTROPY_CHUNK_BYTES."""
-	z = logits[:, :-1, :] if logits.shape[1] == keep + 1 else logits[:, -keep:, :]
+	# position i predicts token i + 1: the K completion tokens are predicted by positions -K-1 .. -2 (review, Nov 1)
+	z = logits[:, :-1, :] if logits.shape[1] == keep + 1 else logits[:, -keep - 1 : -1, :]
 	b, k, v = z.shape
 	comp = input_ids[:, -k:]
 	if eos_token_id is not None:
@@ -1972,12 +1973,12 @@ def completion_entropy(logits, input_ids, keep: int, eos_token_id=None):
 		mask = (torch.arange(k, device=comp.device).unsqueeze(0) <= first.unsqueeze(1)).to(torch.float32)
 	else:
 		mask = torch.ones(b, k, device=comp.device)
-	chunk = max(1, int(ENTROPY_CHUNK_BYTES // max(1, b * v * 4)))
+	# three chunk-sized fp32 buffers live at once (the upcast, log p, p * log p in place): each a third of the budget
+	chunk = max(1, int(ENTROPY_CHUNK_BYTES // max(1, 3 * b * v * 4)))
 	total = torch.zeros((), device=z.device, dtype=torch.float32)
 	for i in range(0, k, chunk):
-		x = z[:, i : i + chunk, :].float()
-		logp = torch.log_softmax(x, dim=-1)
-		h = -(logp.exp() * logp).sum(-1)  # (B, chunk)
+		logp = torch.log_softmax(z[:, i : i + chunk, :].float(), dim=-1)
+		h = -logp.exp().mul_(logp).sum(-1)  # (B, chunk)
 		total = total + (h * mask[:, i : i + chunk]).sum()
 	return total / mask.sum().clamp(min=1)
 
