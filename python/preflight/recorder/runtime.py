@@ -398,7 +398,7 @@ class Recorder:
 		self._range_params: list | None = None  # the hooked optimizer's weights whose update is sampled
 		self._range_others: set[int] = set()  # other optimizers that stepped other weights (their ids)
 		self._range_overlap_steps = 0  # steps by another optimizer over the ramp's weights since its own
-		self._range_scale: float | None = None  # the GradScaler's scale at the last check
+		self._range_scale: dict[int, float] = {}  # each GradScaler's scale at the last check, by id
 		self._range_drops = 0  # times it fell since the ramp's optimizer last stepped
 		self.lr_range_stalled: int | None = None  # steps done when a GradScaler stopped the stepping
 		self.lr_range_replaced = False  # the script stepped another optimizer over the same weights instead
@@ -1510,15 +1510,15 @@ class Recorder:
 		optimizer steps instead: over the same weights the script rebuilt its optimizer (the ramp no
 		longer sets the rate, `lr_range_replaced`); over others the rates are dropped anyway. Each
 		stops the probe."""
-		scale = None
-		for sc in list(self._scalers):
+		dropped = False
+		for sc in list(self._scalers):  # each scaler on its own: a drop in any is a skip
 			with suppress(Exception):
 				v = float(sc.get_scale())
-				scale = v if scale is None else min(scale, v)
-		if scale is not None:
-			if self._range_scale is not None and scale < self._range_scale:
-				self._range_drops += 1
-			self._range_scale = scale
+				before = self._range_scale.get(id(sc))
+				dropped |= before is not None and v < before
+				self._range_scale[id(sc)] = v
+		if self._range_scale:
+			self._range_drops += dropped
 			if self._range_drops >= (RANGE_STALL_DROPS if self.steps else RANGE_STALL_DROPS_FIRST):
 				self.lr_range_stalled = len(self.steps)
 				self._stop_pending = True

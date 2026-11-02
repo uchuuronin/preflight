@@ -58,6 +58,29 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 17:20 UTC | A10 (both scripts) | about 11 (633 s of containers) | 0.19 [derived: container time at list price] | `d-lr-range-gpu` (41490183749): the range test on LoRA and nanoGPT, both train at the suggestion (`docs/decisions/lr-range.md`) |
 | Nov 2, 18:21 UTC | none (Meta API) | about 2 | 0.110 of Muse Spark [derived: tokens at list price] | `d-bigrepo-spark-map` (41499720563): Muse Spark's script map on the three big repositories, flag on |
 
+## Mon Nov 2, 16:20 ET (12:53 item 2: the range test, A's review fixed; still off)
+
+A's review of the range test came back (ws-a `from-a.md`): ready to merge off, six fixes before
+the flag goes on. Items 1, 2, 3 and 6 fixed here; 4 asked of B and 5 of A (their files). What
+changed, and the CPU tests for each: `docs/decisions/lr-range.md`, "A's review (Nov 2) and what
+changed". The main one: "checked" now reads whether the updates grew with the ramp, not the rate
+the recorder had just written, so the GPU check's "the ramp checked" (12:35) doesn't count; the
+GPU check is re-run after A's re-check (US$0.19 last time, inside item 3's US$2).
+
+Three rounds of read-only review on the fixes. First: two blocking (zero-start weights such as
+LoRA's B made a ramp that took effect read as not set; the check app's single-rate runs came
+back empty), fixed. Second: one blocking (fp16 accumulation of 64 stopped before the first
+step), fixed by reading a stalled scaler from its scale's drops. Third: nothing blocking; its
+suggestion (each scaler tracked on its own) taken. Tests: 1,692 passed before the review fixes
+(10 min, CPU torch, transformers and accelerate); the range tests (32) after each round.
+
+This push sends: `python/preflight/probes/lr_range.py` (`follows_rate`, `losses`),
+`recorder/runtime.py` (the range test's update sample, `initial_lr` ratios, other and rebuilt
+optimizers, the stall rule), `recorder/run.py` (four summary keys, range tests only),
+`probes/local.py` (`with_lr_range`'s reasons), `runner/pipeline.py` (the timeout cap, a cached
+`p1`), `runner/lr_range_app.py`, `tests/test_d_lr_range.py`, `tests/test_d_lr_range_probe.py`,
+`tests/test_pipeline.py`, `docs/decisions/lr-range.md`, `docs/requests/from-d.md`, this file.
+
 ## Mon Nov 2, 13:40 ET (item 1: Muse Spark's map on the three repositories)
 
 CI on `ad6290e`: green, all seven jobs.
