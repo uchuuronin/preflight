@@ -928,7 +928,41 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		# Nov 1: A's A10 GRPO record carried no GPU, and the readout said "tight, 69%" for the knob's L4 unannounced
 		note = f"the probe's GPU isn't in the record, so this is for {gpu} from the GPU knob, with a guessed CUDA context"
 		res = replace(res, peak=_with_note(res.peak, note), oom=_with_note(res.oom, note))
+	disagree = _faketensor_disagreements(setup)
+	if disagree and res.peak.status != "abstain":
+		# PM, Nov 1: a term the FakeTensor trace disagrees with is named, never hidden
+		case, worse = disagree
+		listed = ", ".join(f"{t} {r:.3g}x" for t, r in worse.items())
+		peak_note = (
+			f"the analytical split disagrees with a FakeTensor trace of {case} on {listed} (engine / trace)"
+		)
+		terms = dict(res.terms or {})
+		for t, r in worse.items():
+			if f"memory.{t}" in terms:
+				terms[f"memory.{t}"] = _with_note(
+					terms[f"memory.{t}"],
+					f"the analytical {t} term is {r:.3g}x a FakeTensor trace of {case}"
+					+ ("; the probes calibrate the total" if probed else ""),
+				)
+		res = replace(res, peak=_with_note(res.peak, peak_note), terms=terms or res.terms)
 	return res
+
+
+def _faketensor_disagreements(setup) -> tuple[str, dict[str, float]] | None:
+	"""(the traced case, {term: engine / trace}) for the terms that miss by more than 20% on the zoo case matching
+	this setup's method, checkpointing and optimizer family (scripts/faketensor_memory_check.py), or None."""
+	from preflight.engine import _faketensor_check as ft
+
+	key = {
+		"method": "lora" if setup.method in ("lora", "qlora") else "full",
+		"checkpointing": setup.grad_checkpointing != "none",
+		"optimizer": "adafactor" if "adafactor" in str(setup.optimizer).lower() else "adam",
+	}
+	for case, row in ft.DATA["cases"].items():
+		if row["key"] == key:
+			worse = {t: d["median_ratio"] for t, d in row["terms"].items() if not d["agrees"]}
+			return (case, worse) if worse else None
+	return None
 
 
 # the terms that grow with batch and length absorb what the model misses; the rest are set by the model's size
