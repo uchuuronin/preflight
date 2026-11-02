@@ -14,6 +14,7 @@
 	"runner.queue": false,
 	"runner.hide_sample_outputs": false,
 	"runner.stop_on_import_error": false,
+	"runner.read_closure": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,

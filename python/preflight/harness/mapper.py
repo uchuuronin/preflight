@@ -11,6 +11,7 @@ custom models), with the static map as a hint. The two are reconciled:
 If Spark fails or times out, the static map is the answer and the job goes on.
 """
 
+import logging
 import re
 
 from preflight.schema import ModelCall
@@ -19,6 +20,7 @@ from preflight.schema.script_map import ScriptKnob, ScriptMap
 from .spark import ModelClient
 from .static import map_static
 
+log = logging.getLogger(__name__)
 MAX_FILE_CHARS = 60_000
 
 SYSTEM = """You map machine-learning scripts for Preflight, a simulator that probes a few steps of a job.
@@ -38,7 +40,21 @@ concurrency, n_tasks. Risks are short plain sentences."""
 def _prompt(files: dict[str, str], entrypoint: str, hint: ScriptMap) -> list[dict]:
 	parts = []
 	budget = MAX_FILE_CHARS
-	for path in sorted(files, key=lambda p: (p != entrypoint, p)):
+	# the entry point, then (runner.read_closure on) what it imports, nearest first, then the rest:
+	# in a big repository the budget goes to the code that runs, not whatever sorts first (D, Nov 2)
+	from preflight.runner.flags import flag
+
+	rank: dict[str, int] = {}
+	if flag("runner.read_closure") and entrypoint.endswith(".py"):
+		from .closure import import_closure
+
+		try:
+			near, _ = import_closure(files, lambda ps: {p: files[p] for p in ps if p in files}, entrypoint,
+				max_files=len(files), max_bytes=10 * MAX_FILE_CHARS)  # fmt: skip
+			rank = {p: i for i, p in enumerate(near)}
+		except Exception:  # the order is a nicety: the files go in sorted, as with the flag off
+			log.warning("import order failed for %s", entrypoint, exc_info=True)
+	for path in sorted(files, key=lambda p: (p != entrypoint, rank.get(p, len(rank)), p)):
 		text = files[path]
 		if (
 			not path.endswith((".py", ".yaml", ".yml", ".json", ".toml", ".cfg", ".txt", ".md"))
