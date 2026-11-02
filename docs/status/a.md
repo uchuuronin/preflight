@@ -28,6 +28,9 @@ Updated Sun Nov 1, 16:55 ET.
 
 ## Known limits, on purpose
 
+- Under the L40S ceiling (Nov 1), a probe or verify follow-up on a record measured on an A100
+  before that night runs on the L40S with the cross-GPU warning, and, the GPU being different,
+  starts afresh: the parent's probes, predictions and models aren't carried (review, Nov 1).
 - The Glimmer arm prices each call by its own wall time at the A100-40GB rate: calls sharing the
   container are each charged in full and its cold start and idle time aren't, so the proxy's count
   isn't Modal's bill. Each call reserves its longest possible time, so 4 calls in flight hold

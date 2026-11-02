@@ -359,6 +359,12 @@ def test_the_l40s_ceiling_keeps_dearer_gpus_out_and_probes_the_webs_a100_default
 		_deps(tmp_path, runner))  # fmt: skip
 	assert {c["gpu"] for c in runner.calls} == {"L40S"}
 	assert any("cross-GPU" in (e.get("message") or "") for e in ctx.events)
+	# a visitor who allows only A100s is probed on the cap too, and told so
+	ctx2, runner2 = _Ctx(), LossRunner()
+	run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}, "constraints": {"gpu_types": ["A100-SXM-80GB"]}},
+		ctx2, _deps(tmp_path / "b", runner2))  # fmt: skip
+	assert {c["gpu"] for c in runner2.calls} == {"L40S"}
+	assert any("cross-GPU" in (e.get("message") or "") for e in ctx2.events)
 
 
 def test_verify_fails_a_run_whose_loss_went_nan(tmp_path):

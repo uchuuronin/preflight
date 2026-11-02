@@ -203,7 +203,9 @@ def estimate_need_gb(sm: ScriptMap) -> float:
 	return params * BYTES_PER_PARAM[_kind(sm)] / 1e9 + ACTIVATION_GB + 1.0  # + CUDA context
 
 
-CEILING_ENV = "PREFLIGHT_GPU_CEILING"  # set on the public demo: A100-SXM-80GB (Chiya, Oct 27: no H200)
+CEILING_ENV = (
+	"PREFLIGHT_GPU_CEILING"  # set on the public demo: L40S (Chiya, Nov 1; A100-SXM-80GB before, never H200)
+)
 SAFE_CEILING = "L40S"  # the demo's own cap (runner/modal_app.py GPU_CEILING, Nov 1)
 
 
