@@ -78,13 +78,77 @@ def _pair(rec: dict) -> tuple[str | None, str | None]:
 	return (base[: -len("-base")] if base else None), base
 
 
+def verify_one(svc, vol, c: dict, *, gpu: str, visitor: str, name: str) -> tuple[dict, float]:
+	"""One candidate's verify job through the job store, waited for and judged with the fix loop's
+	checks. Returns what it found and what it cost (A's per-job cap when the record has no final
+	costs). The job is cancelled if the wait ends any way but finished. The job store allows a
+	visitor 3 jobs a day: callers pass one visitor per attempt."""
+	from preflight_api import verify
+	from preflight_api.fix.templates import verify_options
+
+	req = {
+		"source": {"kind": "record", "record_ref": "sample:lora-qwen"},
+		"mode": "verify",
+		# the GPU, pinned by the setting's gpu_type: an L4 queued past the job's 20-minute wait on
+		# Nov 2 (gpu.unavailable), while A10s schedule in seconds (A's status, Nov 1)
+		"knobs": {**KNOBS, "gpu_type": gpu},
+		"patch": c["diff"],
+		"gpu": gpu,
+		"constraints": {"gpu_types": [gpu]},
+		"purpose": "c.fix_verify",
+	}
+	t0 = time.monotonic()
+	try:
+		job = svc.submit.remote(req, visitor, name)
+	except Exception as e:
+		return {"id": c["id"], "status": "refused", "why": f"{type(e).__name__}: {str(e)[:300]}"}, 0.0
+	jid = job.get("job_id")
+	print(f"{c['id']} ({c['template_id']}): submitted", flush=True)
+	st: dict = {}
+	finished = False
+	try:
+		while time.monotonic() - t0 < JOB_TIMEOUT_S:
+			st = svc.status.remote(jid)
+			if st.get("status") in ("done", "failed", "cancelled"):
+				finished = True
+				break
+			time.sleep(POLL_S)
+		else:
+			st = {**st, "status": "timed_out"}
+	finally:
+		if not finished:  # a timeout, an error polling, or the run being stopped: never leave it running
+			try:
+				svc.cancel.remote(jid)
+			except Exception as e:
+				print(f"{c['id']}: cancel failed ({type(e).__name__}); A's job caps still apply", flush=True)
+	out = {"id": c["id"], "template_id": c["template_id"], "job_status": st.get("status"),
+		"record_id": st.get("record_id"), "error_code": st.get("error_code"), "error": (st.get("error") or "")[:300],
+		"minutes": round((time.monotonic() - t0) / 60, 1)}  # fmt: skip
+	rec = _read_record(vol, st["share_token"]) if st.get("share_token") else None
+	final = rec is not None and st.get("status") == "done"
+	cost = _record_cost(rec) if final else JOB_CAP_USD  # unknown spend counts at A's cap
+	out["usd"] = round(cost, 4) if final else f"unknown, counted at {JOB_CAP_USD}"
+	if rec is not None:
+		vid, base = _pair(rec)
+		opts = verify_options(c["template_id"])
+		res = verify.check(rec, rec, before_probe=base, after_probe=vid, **opts) if vid and base else None
+		probes = {p["id"]: {"status": p.get("status"), "gpu": (p.get("env") or {}).get("gpu"),
+			"peak_gib": round((p.get("memory") or {}).get("peak_allocated_bytes", 0) / 2**30, 2)}
+			for p in rec.get("probes") or []}  # fmt: skip
+		finding = next((f for f in rec.get("findings") or [] if f.get("id", "").startswith("verify")), None)
+		out |= {"gpu": ((rec.get("env") or {}).get("gpu") or {}).get("name"), "probes": probes,
+			"verify": res and {k: res[k] for k in ("status", "metric", "before", "after", "fixed_seed_loss_delta")},
+			"checks": res and [(x["id"], x["ok"], x.get("allowed", False)) for x in res["checks"]],
+			"a_finding": finding and {k: finding.get(k) for k in ("code", "severity", "title")}}  # fmt: skip
+	return out, cost
+
+
 @app.local_entrypoint()
 def verify_race(only: str = "", attempt: str = "a", gpu: str = "L4", race: str = "nov1_lora") -> None:
 	if gpu not in ("L4", "A10"):
 		# a T4 (14.7 GB, no bf16) can't run the script's bf16 setting comparably
 		raise SystemExit("gpu: L4 or A10")
 	sys.path.insert(0, str(ROOT / "api"))
-	from preflight_api import verify
 	from preflight_api.fix.templates import verify_options
 
 	if race not in ("nov1_lora", "nov2_lora_combined"):
@@ -105,68 +169,9 @@ def verify_race(only: str = "", attempt: str = "a", gpu: str = "L4", race: str =
 		if spent + JOB_CAP_USD > CAP_USD:
 			results.append({"id": c["id"], "status": "not_run", "why": f"cap: US${spent:.4f} spent"})
 			continue
-		req = {
-			"source": {"kind": "record", "record_ref": "sample:lora-qwen"},
-			"mode": "verify",
-			# the GPU, pinned by the setting's gpu_type: an L4 queued past the job's 20-minute wait on
-			# Nov 2 (gpu.unavailable), while A10s schedule in seconds (A's status, Nov 1)
-			"knobs": {**KNOBS, "gpu_type": gpu},
-			"patch": c["diff"],
-			"gpu": gpu,
-			"constraints": {"gpu_types": [gpu]},
-			"purpose": "c.fix_verify",
-		}
-		t0 = time.monotonic()
-		# the job store allows a visitor 3 jobs a day: one visitor per attempt
-		visitor = f"c.fix_verify.nov1.{attempt}"
-		try:
-			job = svc.submit.remote(req, visitor, f"c-fix-verify-{c['id']}-nov1-{attempt}")
-		except Exception as e:
-			results.append({"id": c["id"], "status": "refused", "why": f"{type(e).__name__}: {str(e)[:300]}"})
-			continue
-		jid = job.get("job_id")
-		print(f"{c['id']} ({c['template_id']}): submitted", flush=True)
-		st: dict = {}
-		finished = False
-		try:
-			while time.monotonic() - t0 < JOB_TIMEOUT_S:
-				st = svc.status.remote(jid)
-				if st.get("status") in ("done", "failed", "cancelled"):
-					finished = True
-					break
-				time.sleep(POLL_S)
-			else:
-				st = {**st, "status": "timed_out"}
-		finally:
-			if not finished:  # a timeout, an error polling, or the run being stopped: never leave it running
-				try:
-					svc.cancel.remote(jid)
-				except Exception as e:
-					print(
-						f"{c['id']}: cancel failed ({type(e).__name__}); A's job caps still apply", flush=True
-					)
-		out = {"id": c["id"], "template_id": c["template_id"], "job_status": st.get("status"),
-			"record_id": st.get("record_id"), "error_code": st.get("error_code"), "error": (st.get("error") or "")[:300],
-			"minutes": round((time.monotonic() - t0) / 60, 1)}  # fmt: skip
-		rec = _read_record(vol, st["share_token"]) if st.get("share_token") else None
-		final = rec is not None and st.get("status") == "done"
-		cost = _record_cost(rec) if final else JOB_CAP_USD  # unknown spend counts at A's cap
+		out, cost = verify_one(svc, vol, c, gpu=gpu, visitor=f"c.fix_verify.nov1.{attempt}",
+			name=f"c-fix-verify-{c['id']}-nov1-{attempt}")  # fmt: skip
 		spent += cost
-		out["usd"] = round(cost, 4) if final else f"unknown, counted at {JOB_CAP_USD}"
-		if rec is not None:
-			vid, base = _pair(rec)
-			opts = verify_options(c["template_id"])
-			res = verify.check(rec, rec, before_probe=base, after_probe=vid, **opts) if vid and base else None
-			probes = {p["id"]: {"status": p.get("status"), "gpu": (p.get("env") or {}).get("gpu"),
-				"peak_gib": round((p.get("memory") or {}).get("peak_allocated_bytes", 0) / 2**30, 2)}
-				for p in rec.get("probes") or []}  # fmt: skip
-			finding = next(
-				(f for f in rec.get("findings") or [] if f.get("id", "").startswith("verify")), None
-			)
-			out |= {"gpu": ((rec.get("env") or {}).get("gpu") or {}).get("name"), "probes": probes,
-				"verify": res and {k: res[k] for k in ("status", "metric", "before", "after", "fixed_seed_loss_delta")},
-				"checks": res and [(x["id"], x["ok"], x.get("allowed", False)) for x in res["checks"]],
-				"a_finding": finding and {k: finding.get(k) for k in ("code", "severity", "title")}}  # fmt: skip
 		results.append(out)
 		print(json.dumps(out, indent=1), flush=True)
 	passed = [r for r in results if (r.get("verify") or {}).get("status") == "passed"]

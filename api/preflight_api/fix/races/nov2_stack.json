@@ -1,0 +1,14 @@
+{
+ "$source": "The Nov 2 fix race on the LoRA zoo script's eval OOM (sample:lora-qwen, the Nov 2 live record). Round 1 is what web/src/fix/candidates.ts candidatesFor races for the finding 'Eval runs with gradients kept' on this record (eval.reduce_batch sits out: no single eval batch fits). Round 2, when no round-1 fix passes verify, is stackedCandidate: the eval fixes together, the eval batch from the guide's combined move; web/src/fix/stack.test.ts checks this file against it.",
+ "record_ref": "sample:lora-qwen",
+ "finding": "Eval runs with gradients kept",
+ "round1": [
+  {
+   "template_id": "eval.wrap_no_grad"
+  }
+ ],
+ "stack": {
+  "template_id": "eval.no_grad_and_batch",
+  "value": 8
+ }
+}

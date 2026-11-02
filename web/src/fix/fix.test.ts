@@ -43,7 +43,7 @@ describe("which fixes race for a finding", () => {
 	});
 
 	it("knows every template the API knows", () => {
-		expect(TEMPLATES).toHaveLength(12);
+		expect(TEMPLATES).toHaveLength(13); // 12, and the eval stack (Nov 2)
 		expect(candidatesFor({ ...agent.findings[0]!, fix_template: "no.such" }, ctx(agent))).toEqual([]);
 	});
 });
