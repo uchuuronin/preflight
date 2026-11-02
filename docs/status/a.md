@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Mon Nov 2, 11:55 ET.
+Updated Mon Nov 2, 12:15 ET.
 
 **Production runner: deployed from main ae0e900** (`a-deploy-main-22`, GitHub 41430240485, Nov 2 10:37 UTC / 05:37 ET), after both startup checks passed (`a-startup-check-22` 41429740249, `a-startup-check-serving-8` 41430037489). Its image carries flags.production.json from ae0e900, so `harness.glimmer_private` is on: a private check-in is triaged by Muse Glimmer on the worker, and never on Baseten. Everything in the 1ea2dd6 deploy is still in it: Glimmer's secret on the worker, the Modal capacity fix, the runner-held probe limit, the GPU-wait events, the serving cap (1,024 tokens) and C's fix-loop verify path. The limit check passed after it (`a-limit-check-3`, 41430344907): three probe jobs accepted, the fourth refused with `limit.visitor_daily`. The previous deploy was main 1ea2dd6 (08:24 UTC); rollback is `modal deploy --env main` from 1ea2dd6.
 
