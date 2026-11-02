@@ -1,0 +1,11 @@
+{
+	"name": "20261102-231308-41543664475-b-ask-model-zoo",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41543664475",
+	"ref": "ws-b",
+	"sha": "a23e928f2d19429c0b2f3c14f690f70f3db92e8f",
+	"cmd": "modal run --env main python/preflight/corpus/ask_model_app.py::ask --cases python/preflight/corpus/data/ask_model_cases.json --max-usd 1 --only pretrain_nanogpt,gnn_pyg,retrieval_st,vision_timm,eval_sweep_reasoning,serving_vllm,torchtitan_debug",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:16:33Z"
+}
