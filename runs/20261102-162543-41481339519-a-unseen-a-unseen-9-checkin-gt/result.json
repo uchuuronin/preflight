@@ -1,0 +1,11 @@
+{
+	"name": "20261102-162543-41481339519-a-unseen-a-unseen-9-checkin-gt",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41481339519",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/KellerJordan/cifar10-airbench --commit 4c1b6d1e3889b037efadcfd5c0ea65b246592362 --entrypoint airbench94_muon.py  --bare-steps 100000 --budget-min 45 --first-gpu L4 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:26:24Z"
+}
