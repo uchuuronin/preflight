@@ -1,0 +1,11 @@
+{
+	"name": "20261102-050831-41392263194-c-record-export-lora-nov2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41392263194",
+	"ref": "43344dcda665f9049196a171445530d4f40c33a3",
+	"sha": "43344dcda665f9049196a171445530d4f40c33a3",
+	"cmd": "modal run --env main api/record_export_app.py::export --record-id 01M6D5N3VSJZ4EFEHW7MDDK6Z3 --name lora-live-nov1",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T05:08:54Z"
+}
