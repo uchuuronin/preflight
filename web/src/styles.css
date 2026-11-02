@@ -903,10 +903,11 @@ a {
 .pf-dial__note { max-width: 116px; font-family: var(--pf-font-mono); font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
 .pf-dial__note.is-risk { color: var(--pf-fail); font-weight: 500; padding: 1px 6px; border-radius: var(--pf-radius-pill); background: var(--pf-node); }
 .pf-dial__note.is-risk::before { content: "✕ "; }
-.pf-dial__note.is-tight { color: var(--pf-tight); }
+/* On a pill of node glass, like is-risk: the tight colour on open day sky is 4.0:1, on the pill 5.6:1 (D's audit S1, Nov 2). */
+.pf-dial__note.is-tight { color: var(--pf-tight); padding: 1px 6px; border-radius: var(--pf-radius-pill); background: var(--pf-node); }
 .pf-dial__note.is-tight::before { content: "▲ "; font-size: 0.85em; }
 .pf-dial__status { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 6px; font-size: 10.5px; color: var(--pf-fg-dim); }
-.pf-dial__off { font-family: var(--pf-font-mono); color: var(--pf-tight); }
+.pf-dial__off { font-family: var(--pf-font-mono); color: var(--pf-tight); padding: 0 5px; border-radius: var(--pf-radius-pill); background: var(--pf-node); }
 .pf-dial__off::before { content: "› "; }
 .pf-dial__val.is-off { stroke-linecap: butt; }
 .pf-dial__note.is-fits::before { content: "● "; font-size: 0.8em; }
