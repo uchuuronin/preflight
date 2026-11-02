@@ -370,3 +370,11 @@ def test_a_source_in_the_search_results_counts_without_an_inline_citation():
 	# a URL in neither list is still dropped
 	f, _ = ground_failure(client(response(answer("found", ISSUE))), probe(), {})
 	assert f.code == "search.none_found"
+
+
+def test_a_page_opens_results_dont_count_as_returned():
+	made_up = "https://made-up.example.org/issue"
+	data = response(answer("found", made_up), opened=[made_up])
+	data["output"][2]["results"] = [{"type": "text_result", "title": "t", "url": made_up, "snippet": "s"}]
+	f, _ = ground_failure(client(data), probe(), {})
+	assert f.code == "search.none_found"

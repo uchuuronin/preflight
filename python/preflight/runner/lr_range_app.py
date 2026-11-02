@@ -14,14 +14,14 @@ an L4; never a bigger GPU):
 
   1. the range test: a probe with the rate ramped from 1e-7 to 1 over 100 steps, eval off
      (`ProbeSpec.lr_range`, the same spec the pipeline's `p1-lr` point sends)
-  2. 50 steps held at the suggested rate, and 50 at the script's own rate as the baseline, eval off
+  2. 50 steps (`--confirm-steps`) held at the suggested rate, and 50 at the script's own rate as the baseline, eval off
      (the recorder holds the rate, so the script's warm-up and schedule don't change it): does it
      train (no divergence, the last 10 steps' mean below the first 10's), and how does its loss
      compare with the script's own rate?
 
-Writes out/lr_range_<script>.json: the curve's reading, the script's own rate, both 50-step runs,
-each probe's GPU seconds and dollars at list price. Cap: the container's timeout (30 min) at the
-A10's US$1.10 an hour is US$0.55 [derived]; two scripts stay under Chiya's US$2.
+Writes out/lr_range_<script>[_lr<rate>_<n>steps].json: the curve's reading, the script's own rate and where it sits on the curve, both held runs,
+each probe's GPU seconds and dollars at list price. Cap: the container's timeout (27 min) at the
+A10's US$1.10 an hour is US$0.495 a script [derived], under Chiya's US$0.50 for the planted-rate run.
 """
 
 import json
@@ -32,7 +32,7 @@ import modal
 from preflight.runner.modal_app import APP_NAME, WEIGHTS_DIR, _read_only, probe_image, weights_vol
 
 app = modal.App(APP_NAME + "-d-lr")
-TIMEOUT_S = 30 * 60
+TIMEOUT_S = 27 * 60  # derived: under US$0.50 a script at the A10's US$1.10 an hour (Chiya's cap, Nov 2)
 RANGE_TIMEOUT_S = 600  # the range test, then two confirmations: 600 + 2 x 420 s < TIMEOUT_S
 CONFIRM_TIMEOUT_S = 420
 CONFIRM_STEPS = 50
@@ -91,13 +91,13 @@ def range_and_confirm(name: str, files: dict, entrypoint: str, confirm_steps: in
 	sug = out["range"].get("suggested_lr")
 	# where the script's own rate sits on the curve: what a guide line would say about it
 	r = out["range"]
-	if own and sug:
-		out["own_on_curve"] = {"times_suggested": own / sug,
+	if own:  # even with no suggestion (a flat or early-diverged curve), where a planted rate matters most
+		out["own_on_curve"] = {"times_suggested": (own / sug) if sug else None,
 			"past_lowest_loss": bool(r.get("min_loss_lr") and own > r["min_loss_lr"]),
 			"past_divergence": bool(r.get("diverged_lr") and own >= r["diverged_lr"]),
-			"times_below_divergence": (r["diverged_lr"] / own) if r.get("diverged_lr") else None}  # fmt: skip
+			"divergence_over_own": (r["diverged_lr"] / own) if r.get("diverged_lr") else None}  # fmt: skip
 		print(json.dumps(out["own_on_curve"]), flush=True)
-	# 50 steps held at one rate (the recorder holds it, so the script's warm-up and decay don't
+	# steps held at one rate (the recorder holds it, so the script's warm-up and decay don't
 	# change it): the suggested rate, and the script's own as the baseline
 	for key, lr in (("at_suggested", sug), ("at_own", own)):
 		if not lr:
@@ -138,13 +138,15 @@ def check(scripts: str = ",".join(SCRIPTS), lr: float = 0.0, confirm_steps: int 
 			raise SystemExit(f"{name!r}: this check runs on {SCRIPTS} only")
 		files = _read_tree(root / "zoo" / name)
 		tag = ""
+		if lr < 0:
+			raise SystemExit("--lr must be positive")
 		if lr:
 			files["train.py"], n = re.subn(
 				r"\blearning_rate\s*=\s*[0-9.eE+-]+", f"learning_rate={lr!r}", files["train.py"]
 			)
 			if n != 1:
 				raise SystemExit(f"{name}: expected one learning_rate= in train.py, found {n}")
-			tag = f"_lr{lr:g}"
+			tag = f"_lr{lr:g}_{confirm_steps}steps"
 		print(f"[lr range] {name}: {len(files)} files, waiting for an A10, else an L4", flush=True)
 		try:
 			res = range_and_confirm.remote(name, files, "train.py", confirm_steps)

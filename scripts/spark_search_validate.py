@@ -108,6 +108,13 @@ def main() -> None:
 				for i in data.get("output") or []
 				if isinstance(i, dict) and isinstance(i.get("action"), dict) and i["action"].get("url")
 			]
+			# each search call's raw keys and status (where Meta puts results, whether an open completed)
+			row["search_calls"] = [
+				{"keys": sorted(i), "status": i.get("status"), "action": (i.get("action") or {}).get("type"),
+					"results": len(i.get("results") or [])}
+				for i in data.get("output") or []
+				if isinstance(i, dict) and str(i.get("type") or "").endswith("search_call")
+			]  # fmt: skip
 			row["actions"] = [
 				i.get("action")
 				for i in data.get("output") or []

@@ -251,6 +251,9 @@ def returned(data: dict) -> dict[str, str]:
 	for item in data.get("output") or []:
 		if not isinstance(item, dict) or not str(item.get("type") or "").endswith("search_call"):
 			continue
+		action = item.get("action")
+		if isinstance(action, dict) and action.get("type") not in (None, "search"):
+			continue  # a page open's results are the page the model chose, not the search's
 		for r in item.get("results") or []:
 			if isinstance(r, dict) and isinstance(r.get("url"), str):
 				got.setdefault(_exact(r["url"]), r["url"])
@@ -352,8 +355,8 @@ def opened(data: dict) -> list[str]:
 
 
 def kept_sources(answer: Answer, data: dict, error_text: str = "") -> tuple[list[Source], list[Source]]:
-	"""(sources kept, at most 3; the others, dropped). Kept: https, no user part, an annotation for
-	exactly that URL (stored as the annotation gives it), no failed open of it, nothing the error
+	"""(sources kept, at most 3; the others, dropped). Kept: https, no user part, the search returned
+	exactly that URL (an annotation for it, or an entry in a search's `results`; stored as given there), no failed open of it, nothing the error
 	text names (`named_keys`), not on Preflight's own host. None at all when the model opened a page
 	the error names off the public hosts: the error steered the search."""
 	# what the search returned: the model's inline citations, and the results Meta lists (an answer
