@@ -24,7 +24,8 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
   `preflight --help` and `preflight map` work; `preflight demo` without torch says what to install;
   with torch, `preflight demo` in an empty folder ran three probes on the CPU, all ok, in 23 to
   24 s, and wrote a record with the probes and two findings [measured]. The extras form
-  `"preflight[probe] @ git+..."` resolves too. **Fixed:** two hints, the demo's and the
+  (`"preflight[probe] @ git+file://localhost/<this repository>"`) resolves too: pip found torch
+  already satisfied [measured]. **Fixed:** two hints, the demo's and the
   `submission` failure's next step (shown to visitors), said `pip install "preflight[probe]"`, which
   installs an unrelated PyPI package of that name; both give the git URL now. The demo's last line
   said to open the record in the web app, which opens records by share link only; it now points at
@@ -33,7 +34,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 - **Item 19, the eval-sweep record.** A's `fda1762` (an eval probe stops after two generate calls)
   is in the deployed runner, so I dispatched `ops_app.py::smoke` on `zoo/eval_sweep_reasoning` on an
   L4 through `remote-run.yml` (`d-eval-sweep-l4`, GitHub run 41380341849, visitor `d-eval`, a
-  20-minute cap, so at most about $0.60 [derived: 20 min x ($0.80 GPU + $0.95 sandbox guess) an
+  20-minute cap, so at most about $0.60 [guess: 20 min x ($0.80 GPU + a $0.95 sandbox guess) an
   hour]). Result in the next entry. Asked A whether the recorder's eval hooks need anything: it
   records generate's lengths and truncation, but not the activation dump's bytes per question.
 

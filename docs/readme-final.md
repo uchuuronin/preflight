@@ -90,14 +90,14 @@ pip install "preflight[probe] @ git+https://github.com/uchuuronin/preflight"
 
 Install from this URL, not `pip install preflight`: that name on PyPI is an unrelated package.
 
-**Quickstart, about a minute:**
+**Quickstart** (the first step took 23 to 24 s on a CPU here [measured]):
 
 ```bash
 # 1. A first run: writes a small training script into ./preflight-demo and probes it on this
 #    machine (its GPU if it has one), then writes a flight record.
 preflight demo
 
-# 2. Read your own script without running it (seconds): lens, framework, knobs and where the code
+# 2. Read your own training script without running it (seconds): lens, framework, knobs and where the code
 #    sets them.
 preflight map train.py
 
@@ -106,14 +106,16 @@ preflight map train.py
 preflight run . --entrypoint train.py -- --batch_size 16
 ```
 
-The record lands in `records/<share_token>.json` (`--out` to change it), a JSON flight record with
+`preflight demo` writes its record to `preflight-demo/records/` and `preflight run` to
+`records/<share_token>.json` (`--out` to change it): a JSON flight record with
 the probes' measurements and findings. The web app opens records by their share link only, so to
 fly the whole run, check the script in at <https://preflight-cqn.pages.dev>.
 (Checked Nov 1 by D, in a clean Python 3.11 virtual environment with pip 24: `pip install
-git+file://` of this repository, the same install path as the GitHub line, took 20 s,
-not counting PyTorch, which was added separately [measured]; then `preflight demo` in an empty folder ran three probes on
-the CPU, all ok, in 23 s, and wrote a record with the probes and two findings [measured]. A run on
-a CPU carries no predictions. The GitHub line itself can be tried once the repository is public.)
+git+file://` of this repository, the same install path as the GitHub line, took 20 s, not counting
+PyTorch, which was added separately [measured]; then `preflight demo` in an empty folder ran three
+probes on the CPU, all ok, in 23 to 24 s, and wrote a record with the probes and two findings
+[measured]. A run on a CPU carries no predictions. The GitHub line itself can be tried once the
+repository is public.)
 
 ## How it works
 
