@@ -143,7 +143,8 @@ class LocalRecordStore:
 #: without running anything. Ids match web/src/workspace/record/load.ts SAMPLES.
 SAMPLES: dict[str, str] = {
 	"lora-7b": "web/src/workspace/fixtures/dev-finetune.record.json",
-	"lora-qwen": "schema/examples/finetune.json",
+	# The live record of zoo/finetune_lora_hf on an L4, its share token removed (PF102, Nov 1).
+	"lora-qwen": "web/src/workspace/fixtures/lora-live-nov1.record.json",
 	"pretrain": "schema/examples/pretrain.json",
 	"agent": "schema/examples/agent.json",
 	"agent-eval": "web/src/workspace/fixtures/agent-eval-oct31.record.json",

@@ -357,7 +357,7 @@ export class LiveTour {
 			if (out.reverts?.length) {
 				const { actions } = this.ctx();
 				actions.propose(null);
-				for (const r of out.reverts) if (r.value !== null) actions.setKnob(r.knob_id, r.value, "user");
+				for (const r of out.reverts) if (r.value !== null) actions.setKnob(r.knob_id, r.value, "user", { putBack: true });
 			}
 			this.view = {
 				text: out.text || (out.withheld ? "" : this.view.text),

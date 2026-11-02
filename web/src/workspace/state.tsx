@@ -49,7 +49,8 @@ export interface State {
 	objective: Objective;
 	/** Estimates before the most recent change, for delta badges. */
 	previous: Prediction | null;
-	lastChange: { knobId: string; by: "user" | "guide" } | null;
+	/** putBack: the knob went back to where it was before a suggestion (Not this, Keep, a guide revert). */
+	lastChange: { knobId: string; by: "user" | "guide"; putBack?: boolean } | null;
 	highlight: string[];
 	proposal: Proposal | null;
 	focus: string | null;
@@ -67,7 +68,7 @@ export interface State {
 }
 
 type Action =
-	| { type: "set"; knobId: string; value: KnobValue; by: "user" | "guide"; previous: Prediction }
+	| { type: "set"; knobId: string; value: KnobValue; by: "user" | "guide"; previous: Prediction; putBack?: boolean }
 	| { type: "pin"; knobId: string; pinned: boolean }
 	| { type: "objective"; kind: ObjectiveKind }
 	| { type: "highlight"; nodes: string[] }
@@ -98,13 +99,13 @@ function reducer(state: State, action: Action): State {
 					...state,
 					knobs,
 					previous: action.previous,
-					lastChange: { knobId: action.knobId, by: action.by },
+					lastChange: { knobId: action.knobId, by: action.by, ...(action.putBack ? { putBack: true } : {}) },
 					proposal: null,
 					setAside: p,
 					highlight: state.highlight.filter((h) => !h.startsWith("knob:")),
 				};
 			}
-			return { ...state, knobs, previous: action.previous, lastChange: { knobId: action.knobId, by: action.by } };
+			return { ...state, knobs, previous: action.previous, lastChange: { knobId: action.knobId, by: action.by, ...(action.putBack ? { putBack: true } : {}) } };
 		}
 		case "pin": {
 			const pinned = new Set(state.pinned);
@@ -149,7 +150,7 @@ function reducer(state: State, action: Action): State {
 }
 
 export interface WorkspaceActions {
-	setKnob(knobId: string, value: KnobValue, by?: "user" | "guide"): boolean;
+	setKnob(knobId: string, value: KnobValue, by?: "user" | "guide", opts?: { putBack?: boolean }): boolean;
 	pin(knobId: string, pinned: boolean): void;
 	setObjective(kind: ObjectiveKind): void;
 	highlight(nodes: string[]): void;
@@ -236,12 +237,12 @@ export function WorkspaceProvider({
 	latest.current = { state, estimates };
 
 	const setKnob = useCallback(
-		(knobId: string, value: KnobValue, by: "user" | "guide" = "user"): boolean => {
+		(knobId: string, value: KnobValue, by: "user" | "guide" = "user", opts?: { putBack?: boolean }): boolean => {
 			const { state: s, estimates: e } = latest.current;
 			if (by === "guide" && s.pinned.has(knobId)) return false;
 			if (!record.knobs.some((k) => k.id === knobId)) return false;
 			changeStart.current = performance.now();
-			dispatch({ type: "set", knobId, value, by, previous: e });
+			dispatch({ type: "set", knobId, value, by, previous: e, ...(opts?.putBack ? { putBack: true } : {}) });
 			return true;
 		},
 		[record],

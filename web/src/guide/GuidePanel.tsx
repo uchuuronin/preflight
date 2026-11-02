@@ -208,7 +208,7 @@ export function GuidePanel() {
 		const from = active.from;
 		// Clear the suggestion first, so putting the knob back isn't read as the visitor's own move.
 		actions.propose(null);
-		if (outcome !== "apply" && outcome !== "pin" && from !== undefined) actions.setKnob(move.knobId, from, "user");
+		if (outcome !== "apply" && outcome !== "pin" && from !== undefined) actions.setKnob(move.knobId, from, "user", { putBack: true });
 		if (outcome === "pin" || outcome === "keep") actions.pin(move.knobId, true);
 		if (outcome === "decline") actions.decline(move.knobId, move.to);
 		const v = new Set(visited);
@@ -267,14 +267,14 @@ export function GuidePanel() {
 	useEffect(() => {
 		const fit = fitOf(record, estimates, state.knobs);
 		const change = state.lastChange;
-		// A knob the visitor pinned (for example "Keep L4" on a guide move) was put there on purpose: no nudge.
-		if (change?.by === "user" && fit === "fails" && prevFit.current !== "fails" && !state.pinned.has(change.knobId)) {
+		// Putting a knob back after a suggestion (Not this, Keep, a guide revert) is not crossing the limit: no nudge.
+		if (change?.by === "user" && !change.putBack && fit === "fails" && prevFit.current !== "fails") {
 			const from = prevKnobs.current[change.knobId];
 			if (from !== undefined) setCliff({ knobId: change.knobId, from });
 		} else if (fit !== "fails") setCliff(null);
 		prevFit.current = fit;
 		prevKnobs.current = state.knobs;
-	}, [estimates, record, state.knobs, state.lastChange, state.pinned]);
+	}, [estimates, record, state.knobs, state.lastChange]);
 
 	/** The visitor approved a spending tool from the rule-based tour: run it on the server. */
 	const approve = async (id: number) => {
@@ -473,7 +473,8 @@ export function GuidePanel() {
 							knob: t(knobs.get(cliff.knobId)?.label_key ?? cliff.knobId),
 							value: valueText(knobs.get(cliff.knobId), state.knobs[cliff.knobId]),
 							peak: vars.peak,
-							cap: vars.cap,
+							// Not vars.cap: an RL record's step vars reuse "cap" for the probe's token cap.
+							cap: fmt(capacityBytes(record, state.knobs) ?? 0, "bytes"),
 						})}
 					</p>
 					<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.setKnob(cliff.knobId, cliff.from, "user")}>

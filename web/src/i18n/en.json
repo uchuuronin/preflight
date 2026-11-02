@@ -334,7 +334,7 @@
 	"guide.measure_fix": "Measure it",
 	"guide.fallback": "The live guide isn't available right now, so the rule-based tour is running instead.",
 	"guide.cliff": "{knob} at {value} crosses the memory limit: peak {peak} of {cap}.",
-	"guide.cliff_no_peak": "{knob} at {value} runs out of memory on this GPU ({cap}).",
+	"guide.cliff_no_peak": "{knob} at {value} is likely to run out of memory on this GPU ({cap}).",
 	"guide.cliff.undo": "Back to {value}",
 	"guide.done": "That's the tour. No other single move improves your aim.",
 	"guide.done.why": "The tour stops when no knob it may move improves the aim without risking a failure, or when every useful knob is pinned or already toured.",
