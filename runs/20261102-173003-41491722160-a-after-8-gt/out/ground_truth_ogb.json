@@ -1,0 +1,103 @@
+{
+  "script": "ogb",
+  "entrypoint": "examples/nodeproppred/arxiv/gnn.py",
+  "args": [
+    "--use_sage",
+    "--runs",
+    "1",
+    "--epochs",
+    "500"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "FileNotFoundError",
+    "error": "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/gt-gt_mau4s/ogb/nodeproppred/master.csv'\n",
+    "seconds": 6.2714908890000025,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10G",
+    "timing": "cuda_events",
+    "wall_s": 20.8
+  },
+  "recorder": {
+    "status": "error",
+    "error": "The script imports logger, which is not installed in the probe image. ModuleNotFoundError: No module named 'logger' at examples/nodeproppred/arxiv/gnn.py:11, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 17.502,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3897270272.0
+    },
+    "step_log": [],
+    "log_tail": ".txt\n[preflight] requirements: the script imports loader, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports logger, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports rdkit, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports six, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports torch_geometric: installing torch-geometric\n[preflight] requirements: kept the image's torch 2.5.1 (asked for 'torch>=1.6.0')\n[preflight] requirements: kept the image's numpy 2.1.3 (asked for 'numpy>=1.16.0')\n[preflight] requirements: kept the image's tqdm 4.70.1 (asked for 'tqdm>=4.29.0')\n[preflight] requirements: kept the image's pandas 3.1.0 (asked for 'pandas>=0.24.0')\n[preflight] requirements: kept the image's urllib3 2.8.0 (asked for 'urllib3>=1.24.0')\n[preflight] requirements: installing scikit-learn>=0.20.0, six>=1.12.0, outdated>=0.2.0, joblib>=1.3.2, torch-geometric\nThe cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.\n\r0it [00:00, ?it/s]\r0it [00:00, ?it/s]\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T17:30:55Z",
+      "duration_s": 17.502,
+      "error": "The script imports logger, which is not installed in the probe image. ModuleNotFoundError: No module named 'logger' at examples/nodeproppred/arxiv/gnn.py:11, before the first optimizer step (stage: running script)",
+      "error_code": "missing_package",
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 12.4622,
+        "max_w": 12.552,
+        "samples": 15
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3897270272.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 17.502,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0",
+        "torch-geometric": "2.8.1"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "gnn",
+  "image": "probe"
+}
