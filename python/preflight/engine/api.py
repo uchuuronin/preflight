@@ -2395,12 +2395,17 @@ def _probe_cap(p) -> tuple[float | None, float | None]:
 	cap = ex.get("serving_probe_max_tokens")
 	script = float(g.max_new_tokens) if g.max_new_tokens else None
 	# review, Nov 1: a script capped below the probe's cap stops there itself, with truncation_rate saying how often
-	if cap and (script is None or float(cap) < script):
+	if cap and (script is None or float(cap) <= script):
 		share = ex.get("serving_probe_capped_fraction")
 		if share is None and g.sequences:
-			# A writes generation_ending_known only when some ending is known: missing, every reply was cut
+			# A writes generation_ending_known only when some ending is known: missing, every reply was cut. With
+			# the two caps equal a cut reply may count either way, so the known ones that hit the cap count too
 			known = ex.get("generation_ending_known")
-			share = max(0.0, 1 - float(known) / g.sequences) if known is not None else 1.0
+			if known is None:
+				share = 1.0
+			else:
+				unknown = max(0.0, g.sequences - float(known))
+				share = min(1.0, (unknown + float(g.truncation_rate or 0.0) * float(known)) / g.sequences)
 		return float(cap), (float(share) if share is not None else None)
 	return script, g.truncation_rate
 

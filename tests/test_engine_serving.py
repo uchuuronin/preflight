@@ -312,3 +312,22 @@ def test_a_script_capped_below_the_probe_keeps_its_own_cap_and_rate():
 		}
 	)
 	assert api._probe_cap(q) == (1024.0, 1.0)
+
+
+def test_equal_caps_count_cut_replies_whichever_way_they_were_recorded():
+	"""Re-check, Nov 1: script and probe both at 1,024; 6 of 32 cut, counted as unknown or as known truncations."""
+	base = _serve_record()
+	for known, rate in ((26.0, 0.0), (32.0, 6 / 32)):
+		p = base.probes[0].model_copy(
+			update={
+				"generation": base.probes[0].generation.model_copy(
+					update={"max_new_tokens": 1024, "sequences": 32, "truncation_rate": rate}
+				),
+				"extras": {
+					**base.probes[0].extras,
+					"serving_probe_max_tokens": 1024.0,
+					"generation_ending_known": known,
+				},
+			}
+		)
+		assert api._probe_cap(p) == (1024.0, pytest.approx(6 / 32))
