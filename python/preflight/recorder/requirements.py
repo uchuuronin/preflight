@@ -132,6 +132,13 @@ def _roots(workdir: Path) -> list[Path]:
 
 
 def _local(name: str, roots: list[Path]) -> Path | None:
+	try:
+		return _local_in(name, roots)
+	except OSError:  # a name the filesystem can't hold (over 255 bytes): not the repo's own module
+		return None
+
+
+def _local_in(name: str, roots: list[Path]) -> Path | None:
 	for r in roots:
 		if (r / name / "__init__.py").is_file() or (r / f"{name}.py").is_file():
 			return (r / name) if (r / name).is_dir() else r / f"{name}.py"
@@ -218,7 +225,13 @@ def repo_requirements(workdir: Path, entrypoint: str, *, log=print) -> str:
 			f"[preflight] requirements: the repo declares {len(lines)} dependencies (pyproject.toml or setup.py)"
 		)
 	# a URL or VCS line is skipped by plan(), so its name doesn't stop a known import of it
-	names = {_norm(_LINE.match(x.strip())["name"]) for x in lines if "@" not in x and _LINE.match(x.strip())}
+	# (and plan() installs only plain lines; a marker may not hold here)
+	plain = [
+		m
+		for x in lines
+		if "@" not in x and ";" not in x and (m := _LINE.fullmatch(x.split(" #", 1)[0].strip()))
+	]
+	names = {_norm(m["name"]) for m in plain}
 	for mod in sorted(missing_imports(workdir, entrypoint)):
 		if mod in NO_WHEELS:
 			log(f"[preflight] requirements: {mod} has no wheels on PyPI (only source); not installed")

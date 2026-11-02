@@ -146,3 +146,10 @@ def test_a_url_dependency_doesnt_hide_a_known_import(tmp_path, missing):
 	_tree(tmp_path, {"pyproject.toml": '[project]\nname = "x"\ndependencies = ["torchvision @ https://example.com/tv.whl"]\n',
 		"run.py": "import torchvision\n"})  # fmt: skip
 	assert R.repo_requirements(tmp_path, "run.py", log=lambda m: None).splitlines()[-1] == "torchvision"
+
+
+def test_a_line_plan_wont_install_doesnt_hide_a_known_import(tmp_path, missing):
+	missing.add("torchvision")
+	_tree(tmp_path, {"pyproject.toml": '[project]\nname = "x"\ndependencies = ["torchvision (>=0.15)", "x" ]\n',
+		"run.py": "import torchvision\nimport " + "a" * 300 + "\n"})  # fmt: skip
+	assert R.repo_requirements(tmp_path, "run.py", log=lambda m: None).splitlines()[-1] == "torchvision"
