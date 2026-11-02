@@ -79,7 +79,7 @@ def _pair(rec: dict) -> tuple[str | None, str | None]:
 
 
 @app.local_entrypoint()
-def verify_race(only: str = "", attempt: str = "a", gpu: str = "L4") -> None:
+def verify_race(only: str = "", attempt: str = "a", gpu: str = "L4", race: str = "nov1_lora") -> None:
 	if gpu not in ("L4", "A10"):
 		# a T4 (14.7 GB, no bf16) can't run the script's bf16 setting comparably
 		raise SystemExit("gpu: L4 or A10")
@@ -87,7 +87,9 @@ def verify_race(only: str = "", attempt: str = "a", gpu: str = "L4") -> None:
 	from preflight_api import verify
 	from preflight_api.fix.templates import verify_options
 
-	race = json.loads(RACE.read_text())
+	if race not in ("nov1_lora", "nov2_lora_combined"):
+		raise SystemExit("race: nov1_lora or nov2_lora_combined")
+	race = json.loads((RACE.parent / f"{race}.json").read_text())
 	cands = [c for c in race["candidates"] if not only or c["id"] in only.split(",")]
 	# Fixes race only on the first one's metric, as the web's candidates.ts: an eval fix's eval peak
 	# and a training fix's training peak aren't the same number (review, Nov 2).

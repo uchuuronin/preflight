@@ -1,0 +1,13 @@
+{
+ "source": "Hand-written by C on Nov 2 (not Muse Code): the race's two eval fixes together, after each alone still ran out of memory at the eval on an A10 (GitHub run 41418388343). It checks that verify passes a fix that works; it is not a Muse Code candidate.",
+ "script": "zoo/finetune_lora_hf/train.py",
+ "finding": "First eval will run out of memory",
+ "candidates": [
+  {
+   "id": "c4",
+   "template_id": "eval.wrap_no_grad",
+   "value": null,
+   "diff": "diff --git a/train.py b/train.py\nindex 7b4e1c9..a768253 100644\n--- a/train.py\n+++ b/train.py\n@@ -74,19 +74,20 @@ class PerplexityCallback(TrainerCallback):\n \t\tmodel.eval()\n \t\tlosses = []\n \t\tloader = DataLoader(self.dataset, batch_size=self.batch_size, collate_fn=collator)\n-\t\tfor batch in loader:\n-\t\t\tbatch = {k: v.to(model.device) for k, v in batch.items()}\n-\t\t\tout = model(**batch)  # planted 2: no torch.no_grad()\n-\t\t\tlosses.append(out.loss)  # planted 2: keeps every graph alive\n+\t\twith torch.no_grad():\n+\t\t\tfor batch in loader:\n+\t\t\t\tbatch = {k: v.to(model.device) for k, v in batch.items()}\n+\t\t\t\tout = model(**batch)\n+\t\t\t\tlosses.append(out.loss.item())\n \t\tmodel.train()\n-\t\tppl = math.exp(torch.stack(losses).mean().item())\n+\t\tppl = math.exp(sum(losses) / len(losses))\n \t\tprint(f\"step {state.global_step}: eval perplexity {ppl:.2f}\")\n \n \n args = TrainingArguments(\n \toutput_dir=\"out/lora-qwen\",\n \tper_device_train_batch_size=4,\n-\tper_device_eval_batch_size=32,  # planted 1\n+\tper_device_eval_batch_size=8,  # planted 1\n \tgradient_accumulation_steps=4,\n \tlearning_rate=1e-4,\n \twarmup_steps=50,\n"
+  }
+ ]
+}
