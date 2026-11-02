@@ -1012,7 +1012,8 @@ def test_the_lr_range_point_runs_only_with_its_flag_and_leaves_the_predictions_a
 			if spec.lr_range:
 				lrs = [lr_at(i) for i in range(STEPS)]
 				loss = [2.0 - 1.5 / (1 + math.exp(-2.5 * (math.log10(x) + 4))) for x in lrs]
-				r.probe = with_lr_range(r.probe, {"series": {"lr": lrs, "loss": loss}}, spec.lr_range)
+				series = {"lr": lrs, "loss": loss, "update_to_weight": [0.5 * x for x in lrs]}
+				r.probe = with_lr_range(r.probe, {"series": series}, spec.lr_range)
 			return r
 
 	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": on}))
@@ -1052,3 +1053,81 @@ def test_the_lr_range_point_runs_only_with_its_flag_and_leaves_the_predictions_a
 	assert not failed and not failed_plain
 	strip = lambda r: {k: (e.status, e.lo, e.hi) for k, e in r.predictions.estimates.items()}  # noqa: E731
 	assert strip(rec) == strip(plain) and strip(rec)
+
+
+def _range_job(tmp_path, monkeypatch, runner, **kw):
+	from preflight.runner import flags
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": True}))
+	flags.reload()
+	try:
+		return run_pipeline(
+			{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}},
+			_Ctx(),
+			deps(tmp_path, runner, **kw),
+		)
+	finally:
+		flags.reload()
+
+
+class _Timeouts(FakeRunner):
+	def __init__(self, *a, **kw):
+		super().__init__(*a, **kw)
+		self.timeouts = {}
+
+	def __call__(self, spec, gpu, *, should_stop):
+		self.timeouts[spec.probe_id] = spec.timeout_s
+		return super().__call__(spec, gpu, should_stop=should_stop)
+
+
+def test_the_lr_range_point_is_refused_past_the_budget_and_capped_at_what_is_left(tmp_path, monkeypatch):
+	# the point's estimate: p1's 30 s plus 100 steps at 1 s (no step time) = 130 s
+	runner = _Timeouts()
+	rec = _range_job(tmp_path, monkeypatch, runner, budget=lambda: Budget(usd=0.60, wall_s=120))
+	assert [p.id for p in rec.probes] == ["p1", "p2", "p3"] and "p1-lr" not in runner.timeouts
+	runner = _Timeouts()
+	_range_job(tmp_path / "b", monkeypatch, runner, budget=lambda: Budget(usd=0.60, wall_s=200))
+	assert "p1-lr" in runner.timeouts and runner.timeouts["p1-lr"] <= 200
+	assert runner.timeouts["p1-lr"] < runner.timeouts["p1"]
+
+
+def test_the_lr_range_point_follows_a_p1_from_the_cache(tmp_path, monkeypatch):
+	cache = MemoryCache()
+	_range_job(tmp_path, monkeypatch, FakeRunner(), cache=cache)  # fills the cache
+	runner = FakeRunner()
+	rec = _range_job(tmp_path, monkeypatch, runner, cache=cache)
+	got = {p.id: p.status for p in rec.probes}
+	assert got.get("p1") == "cached" and got.get("p1-lr") == "cached", got
+	assert not runner.calls  # every point, the range test's too, from the cache
+
+
+def test_the_lr_range_point_isnt_run_on_several_ranks(tmp_path, monkeypatch):
+	from dataclasses import replace
+
+	from preflight.runner import pipeline
+
+	real = pipeline._spec
+
+	def two_ranks(*a, **kw):
+		spec = real(*a, **kw)
+		return replace(spec, nproc=2) if spec.probe_id.endswith("-lr") else spec
+
+	monkeypatch.setattr(pipeline, "_spec", two_ranks)
+	runner = FakeRunner()
+	_range_job(tmp_path, monkeypatch, runner)
+	assert runner.calls and not any(c[0].endswith("-lr") for c in runner.calls)
+
+
+def test_the_cache_key_is_unchanged_without_a_range_test(monkeypatch):
+	from dataclasses import replace
+
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner import pipeline
+
+	spec = ProbeSpec(probe_id="p1", files={"train.py": SCRIPT}, entrypoint="train.py")
+	bodies = []
+	dumps = pipeline.json.dumps
+	monkeypatch.setattr(pipeline.json, "dumps", lambda obj, **kw: bodies.append(obj) or dumps(obj, **kw))
+	plain = pipeline.cache_key(spec, "L4", "img")
+	ramp = pipeline.cache_key(replace(spec, lr_range={"start": 1e-7, "end": 1.0, "steps": 100}), "L4", "img")
+	assert "lr_range" not in bodies[0] and bodies[1]["lr_range"]["steps"] == 100 and plain != ramp

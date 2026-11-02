@@ -20,11 +20,17 @@ smoothing. A step whose loss the recorder couldn't read (no one-element loss) is
 taken as divergence.
 
 The rates are the ramp's own (`lr_at`), which the recorder sets on the parameter group with the
-largest rate (others keep their ratio to it), so the suggestion is in the units of the script's
-largest rate. The suggestion is a starting point for the script's own schedule, not a measured
-optimum: the range test runs from the model's first steps, without the script's warm-up or decay.
-Not caught: an optimizer that ignores the rate it's given (Adafactor with `relative_step`), and a
-step mixed precision skipped (its loss joins the next step's).
+largest rate (others keep their ratio to it, taken from `initial_lr` when a scheduler set one, so a
+warm-up from 0 doesn't flatten it), so the suggestion is in the units of the script's largest rate.
+The suggestion is a starting point for the script's own schedule, not a measured optimum: the range
+test runs from the model's first steps, without the script's warm-up or decay.
+
+Whether the rate took effect (A's review, Nov 2): the rate the optimizer holds proves nothing (the
+recorder just wrote it), so `follows_rate` reads the step's effect instead, the update's size
+against the weights' (the recorder's update-to-weight sample) against the rate. Over the ramp's
+decades it grows with the rate for SGD and Adam alike; an optimizer that ignores the rate it's given
+(Adafactor with `relative_step`) leaves it flat. A step mixed precision skipped joins its loss to the
+next step's; a scaler that skips every step stops the probe (the recorder's stall rule).
 """
 
 import math
@@ -38,6 +44,9 @@ DIVERGE_RUN = 2  # guess: two steps running, so one spike doesn't end the curve
 SKIP_START = 5  # guess: the first few points are the optimizer's start-up, not the curve
 FLAT_DROP = 0.05  # guess: below a 5% fall from its start the curve has no slope to read
 MAX_POINTS = 128
+UPDATE_SLOPE = 0.5  # guess: d log(update/weight) / d log(lr); 1 when the update follows the rate, 0 when not
+UPDATE_POINTS = 8  # guess: steps with a measured update before the slope is read
+UPDATE_DECADES = 2.0  # guess: the rates those steps span, in powers of ten
 
 
 def lr_at(step: int, steps: int = STEPS, start: float = LR_START, end: float = LR_END) -> float:
@@ -138,6 +147,31 @@ def analyse(points: list[tuple]) -> dict[str, float]:
 		return extras
 	extras["lr_range.suggested_lr"] = lrs[best_i]
 	return extras
+
+
+def follows_rate(lrs: list, updates: list) -> bool | None:
+	"""Did the optimizer's updates follow the ramp? `lrs` and `updates` per step (update-to-weight
+	ratio, None where not measured). True: the least-squares slope of log(update) on log(lr) is at
+	least UPDATE_SLOPE; False: below it; None: too few measured steps, or too narrow a span of rates,
+	to tell (a flat-rate run, or weights too coarse in bf16 for small updates to register)."""
+	xs, ys = [], []
+	for lr, u in zip(lrs, updates, strict=False):
+		if (
+			isinstance(lr, bool)
+			or isinstance(u, bool)
+			or not isinstance(lr, int | float)
+			or not isinstance(u, int | float)
+		):
+			continue
+		if lr > 0 and u > 0 and math.isfinite(lr) and math.isfinite(u):
+			xs.append(math.log10(lr))
+			ys.append(math.log10(u))
+	if len(xs) < UPDATE_POINTS or max(xs) - min(xs) < UPDATE_DECADES:
+		return None
+	mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+	sxx = sum((x - mx) ** 2 for x in xs)
+	slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=True)) / sxx
+	return slope >= UPDATE_SLOPE
 
 
 def curve(extras: dict[str, float]) -> list[tuple[float, float]]:

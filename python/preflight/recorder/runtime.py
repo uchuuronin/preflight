@@ -69,6 +69,7 @@ PHASE_STEPS = (
 	2  # guess: two synchronised steps for the phase split; compare with the profiled window on zoo runs
 )
 PROFILE_STEPS = 2 + PROFILE_ACTIVE  # wait 1 + warmup 1 + active 3
+RANGE_STALL_MICRO = 16  # guess: backwards with no optimizer step before a range test counts as stalled
 ATTN_CALLS_PER_STEP = 2  # guess: two attention layers sampled per step bound the check's cost
 ATTN_QUERY_SAMPLE = 128  # guess: query rows sampled for the max-logit check
 ATTN_KEY_CHUNK = 4096  # keys per matmul in the attention-logit check: bounds its extra memory
@@ -387,6 +388,9 @@ class Recorder:
 		self._lr_scales: list[float] | None = None
 		self._lr_div = None  # probes/lr_range.py Divergence, made at the first step
 		self.lr_range_error: str | None = None
+		self._range_params: list | None = None  # the hooked optimizer's weights whose update is sampled
+		self._range_others: set[int] = set()  # other optimizers that stepped other weights (their ids)
+		self.lr_range_stalled: int | None = None  # steps done when the optimizer stopped stepping
 		if self.lr_range:
 			self.target = int(self.lr_range["steps"])
 		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
@@ -486,7 +490,10 @@ class Recorder:
 
 	@property
 	def _clean(self) -> bool:
-		"""True during the timed steps: no recorder sync points, no scalar reads off the GPU."""
+		"""True during the timed steps: no recorder sync points, no scalar reads off the GPU. Never in a
+		range test: every step's loss and update are read (its timings aren't kept)."""
+		if self.lr_range:
+			return False
 		n = len(self.steps)
 		if self._prof is not None or self.eval_active or not self.warmup <= n < self.warmup + self.timed:
 			return False
@@ -630,6 +637,13 @@ class Recorder:
 			# fetches every accumulation batch up front); a fetch in between moves the start again
 			rec._data_end = rec._now()
 			rec._data_end_bwd = True
+			if rec.lr_range and rec.steps and rec.lr_range_stalled is None:
+				# a GradScaler skipping every step (fp16 overflow at a high rate) never calls step(), so
+				# the ramp would wait for the timeout: many more backwards than any step took stops it
+				most = max((s["micro"] for s in rec.steps), default=1)
+				if rec.acc["micro"] >= max(RANGE_STALL_MICRO, 4 * most):
+					rec.lr_range_stalled = len(rec.steps)
+					rec._stop_pending = True
 			return out
 
 		def next_(it):
@@ -1461,6 +1475,8 @@ class Recorder:
 			self.opt = opt
 			self._discover(opt)
 		if opt is not self.opt:
+			if self.lr_range:
+				self._range_note_other(opt)
 			return
 		self._maybe_stop()
 		if self.lr_range:
@@ -1474,19 +1490,61 @@ class Recorder:
 		self._acc_at_pre = (self.acc["forward"], self.acc["backward"], self.acc["data"],
 			self.acc["generate"] + self.acc["reference"] + self.acc["reward"] + self.acc["weight_sync"])  # fmt: skip
 		# update-to-weight needs the weights before the step; a small sample, and not on timed steps
-		self._sample = [] if self._clean else [(p, p.detach().clone()) for p in self._sample_params]
+		sampled = self._range_sample(opt) if self.lr_range else self._sample_params
+		self._sample = [] if self._clean else [(p, p.detach().clone()) for p in sampled]
 		self._sync()
 		self._overhead_pre = self._now() - self._t_pre
 
+	def _range_sample(self, opt) -> list:
+		"""The weights whose update the range test reads (probes/lr_range.py `follows_rate`): from the
+		optimizer whose rate it sets, not the model's (another optimizer's weights move at that one's
+		rate). The largest four up to 4M elements, else the smallest four."""
+		if self._range_params is None:
+			self._range_params = []
+			with suppress(Exception):
+				ps = {id(p): p for g in opt.param_groups for p in g["params"] if p.requires_grad}
+				small = [p for p in ps.values() if p.numel() <= 4_000_000]
+				if small:
+					pick = sorted(small, key=lambda p: -p.numel())
+				else:
+					pick = sorted(ps.values(), key=lambda p: p.numel())
+				self._range_params = pick[:4]
+		return self._range_params
+
+	def _range_note_other(self, opt):
+		"""Another optimizer stepped during a range test. Counted when it holds weights the ramp's
+		optimizer doesn't (Muon beside AdamW, a GAN's two): those moved at the script's own rates,
+		so the curve isn't the ramp's alone. A wrapper around the same weights (accelerate's) isn't
+		another. Noted as it steps: the script's optimizers are gone by the summary."""
+		if self.opt is None or id(opt) in self._range_others:
+			return
+		with suppress(Exception):
+			mine = {id(p) for g in self.opt.param_groups for p in g["params"]}
+			if not mine & {id(p) for g in opt.param_groups for p in g["params"]}:
+				self._range_others.add(id(opt))
+
+	def range_other_optimizers(self) -> int:
+		return len(self._range_others)
+
 	def _set_range_lr(self, opt):
 		"""The range test's rate for this step on every param group, each group keeping its ratio to
-		the largest rate the script gave (a LoRA+ or layer-wise setup keeps its shape)."""
+		the largest rate the script gave (a LoRA+ or layer-wise setup keeps its shape). The ratio is
+		read from `initial_lr` when a scheduler set it: a warm-up from 0 makes every group's first
+		rate 0 (A's review, Nov 2)."""
 		from preflight.probes.lr_range import lr_at
+
+		def rate(g) -> float:
+			for key in ("initial_lr", "lr"):
+				with suppress(Exception):
+					v = float(g.get(key))
+					if v > 0:
+						return v
+			return 0.0
 
 		try:
 			groups = opt.param_groups
 			if self._lr_scales is None:
-				base = [float(g.get("lr") or 0.0) for g in groups]
+				base = [rate(g) for g in groups]
 				top = max(base, default=0.0)
 				self._lr_scales = [b / top if top > 0 else 1.0 for b in base]
 			lr = lr_at(len(self.steps), int(self.lr_range["steps"]), float(self.lr_range["start"]),

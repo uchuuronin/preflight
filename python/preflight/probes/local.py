@@ -737,40 +737,65 @@ def with_lr_range(probe: Probe, summary: dict, ramp: dict) -> Probe:
 	(probes/lr_range.py), marked `lr_range`, and none of the measurements a fit would read (its
 	steps ran at rates the script never uses, so its loss and timings aren't the script's). The
 	rates are the ramp's own (`ramp`: start, end, steps), which the recorder set; read whatever the
-	probe ended with, so a script that stops itself on the diverging loss still leaves its curve."""
-	from preflight.probes.lr_range import analyse, lr_at
+	probe ended with, so a script that stops itself on the diverging loss still leaves its curve.
+
+	A rate read from the ramp stands only when the ramp is known to have taken effect (A's review,
+	Nov 2): `lr_range.checked` when the updates grew with the rate (`follows_rate`); otherwise the
+	rates are dropped and the losses kept, with the reason: `lr_range.not_set` (setting the rate
+	failed, or the updates didn't follow it), `lr_range.unverified` (too few measured updates to
+	tell), `lr_range.other_optimizers` (that many more optimizers moved other weights at the
+	script's own rates). A scaler that stopped stepping (`lr_range.stalled`) marks where it diverged."""
+	from preflight.probes.lr_range import analyse, follows_rate, lr_at
+
+	def num(v) -> bool:
+		return isinstance(v, int | float) and not isinstance(v, bool)
+
+	def as_list(v) -> list:
+		return v if isinstance(v, list) else []
 
 	summary = summary if isinstance(summary, dict) else {}
 	series = summary.get("series")
 	series = series if isinstance(series, dict) else {}
-	losses = series.get("loss")
-	losses = losses if isinstance(losses, list) else []
-	bad = summary.get("lr_range_nonfinite")
-	bad = bad if isinstance(bad, list) else []
+	losses = as_list(series.get("loss"))
+	bad = as_list(summary.get("lr_range_nonfinite"))
 	steps, start, end = int(ramp["steps"]), float(ramp["start"]), float(ramp["end"])
 	pts = []
 	for i, loss in enumerate(losses[:steps]):
-		val = float(loss) if isinstance(loss, int | float) and not isinstance(loss, bool) else None
+		val = float(loss) if num(loss) else None
 		pts.append((lr_at(i, steps, start, end), val, bool(bad[i]) if i < len(bad) else False))
 	extras = {**probe.extras, "lr_range": 1.0}
 	try:
 		extras.update(analyse(pts))
 	except (ValueError, ArithmeticError, OverflowError, TypeError):
 		extras["lr_range.flat"] = 1.0
-	# the rate the optimizer held after each step (group 0, read by the recorder) against the ramp: a
-	# constant ratio (group 0's share of the largest rate) says the ramp was really applied
-	held = series.get("lr")
-	held = held if isinstance(held, list) else []
-	ratios = [h / lr_at(i, steps, start, end) for i, h in enumerate(held[:steps])
-		if isinstance(h, int | float) and not isinstance(h, bool) and h > 0]  # fmt: skip
-	if summary.get("lr_range_error") or not ratios or max(ratios) > min(ratios) * (1 + 1e-6):
-		# the rate wasn't (always) the ramp's: no rate read from the ramp stands, only the losses
-		extras["lr_range.not_set"] = 1.0
+	stalled = summary.get("lr_range_stalled")
+	if num(stalled) and 0 <= stalled < steps:
+		extras["lr_range.stalled"] = 1.0
+		extras.setdefault("lr_range.diverged_lr", lr_at(int(stalled), steps, start, end))
+	# the updates' size against the rate, up to where it diverged (the blow-up's own steps aside)
+	stop = extras.get("lr_range.diverged_lr", math.inf)
+	lrs = [lr_at(i, steps, start, end) for i in range(min(steps, len(losses)))]
+	updates = as_list(series.get("update_to_weight"))[: len(lrs)]
+	kept = [(lr, u) for lr, u in zip(lrs, updates, strict=False) if lr < stop]
+	follows = follows_rate([a for a, _ in kept], [b for _, b in kept]) if kept else None
+	others = summary.get("lr_range_other_optimizers")
+	others = int(others) if num(others) and others > 0 else 0
+	if summary.get("lr_range_error") or follows is False:
+		reason = "lr_range.not_set"
+	elif others:
+		reason = "lr_range.other_optimizers"
+	elif follows is None:
+		reason = "lr_range.unverified"
+	else:
+		reason = None
+	if reason is None:
+		extras["lr_range.checked"] = 1.0
+	else:
+		# no rate read from the ramp stands, only the losses
+		extras[reason] = float(others) if reason == "lr_range.other_optimizers" else 1.0
 		for k in [k for k in extras if k.startswith("lr_range.lr.")] + [
 			"lr_range.suggested_lr", "lr_range.min_loss_lr", "lr_range.diverged_lr"]:  # fmt: skip
 			extras.pop(k, None)
-	else:
-		extras["lr_range.checked"] = 1.0
 	return probe.model_copy(update={"extras": extras, "memory": None, "step_time": None, "throughput": None,
 		"stability": None, "data": None, "eval": None, "step_log": [], "power": None, "rl": None})  # fmt: skip
 

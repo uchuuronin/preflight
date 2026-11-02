@@ -80,3 +80,81 @@ def test_noise_doesnt_move_the_suggestion_far():
 def test_extras_are_floats_only():
 	ex = analyse(synthetic())
 	assert all(isinstance(v, float) for v in ex.values())
+
+
+# ---------------------------------------------------------------- did the rate take effect (A's review, Nov 2)
+
+
+def _probe():
+	from preflight.schema import Probe
+
+	return Probe(id="p1-lr", knobs={}, status="ok", steps=STEPS, cost={"gpu_seconds": 1.0, "usd": 0.0})
+
+
+RAMP = {"start": LR_START, "end": LR_END, "steps": STEPS}
+
+
+def _summary(updates, **kw):
+	pts = synthetic()
+	return {
+		"series": {"loss": [v for _, v in pts], "lr": [x for x, _ in pts], "update_to_weight": updates},
+		**kw,
+	}
+
+
+def test_updates_that_grow_with_the_rate_follow_it_and_flat_ones_dont():
+	from preflight.probes.lr_range import follows_rate
+
+	lrs = [lr_at(i) for i in range(STEPS)]
+	assert follows_rate(lrs, [0.3 * x for x in lrs]) is True  # SGD, Adam: the update scales with the rate
+	assert follows_rate(lrs, [1e-3] * STEPS) is False  # Adafactor's relative step ignores it
+	assert follows_rate(lrs, [1e-2 / (i + 1) ** 0.5 for i in range(STEPS)]) is False  # its own decay
+	assert follows_rate(lrs[:5], [x for x in lrs[:5]]) is None  # too few to tell
+	assert follows_rate([1e-3] * 50, [1e-4] * 50) is None  # one rate: no span to read
+	assert follows_rate(lrs, [None, True, float("nan"), 0.0] * 25) is None  # nothing measured
+
+
+def test_a_rate_stands_only_when_the_updates_followed_the_ramp():
+	from preflight.probes.local import with_lr_range
+
+	lrs = [lr_at(i) for i in range(STEPS)]
+	ok = with_lr_range(_probe(), _summary([0.5 * x for x in lrs]), RAMP).extras
+	assert ok["lr_range.checked"] == 1.0 and "lr_range.suggested_lr" in ok and curve(ok)
+	# the held rate always matches the ramp (the recorder wrote it): it isn't evidence any more
+	ignored = with_lr_range(_probe(), _summary([1e-3] * STEPS), RAMP).extras
+	assert ignored["lr_range.not_set"] == 1.0 and "lr_range.checked" not in ignored
+	assert "lr_range.suggested_lr" not in ignored and not curve(ignored) and "lr_range.loss.000" in ignored
+	assert ignored["lr_range.steps"] > 0  # the losses stay, without their rates
+	none = with_lr_range(_probe(), _summary([None] * STEPS), RAMP).extras
+	assert none["lr_range.unverified"] == 1.0 and "lr_range.suggested_lr" not in none
+
+
+def test_a_second_optimizer_on_other_weights_drops_the_rates():
+	from preflight.probes.local import with_lr_range
+
+	lrs = [lr_at(i) for i in range(STEPS)]
+	ex = with_lr_range(_probe(), _summary([0.5 * x for x in lrs], lr_range_other_optimizers=1), RAMP).extras
+	assert ex["lr_range.other_optimizers"] == 1.0 and "lr_range.suggested_lr" not in ex
+	assert "lr_range.checked" not in ex
+
+
+def test_a_stalled_scaler_marks_where_it_diverged():
+	from preflight.probes.local import with_lr_range
+
+	n = 40
+	lrs = [lr_at(i) for i in range(n)]
+	s = _summary([0.5 * x for x in lrs], lr_range_stalled=n)
+	s["series"] = {k: v[:n] for k, v in s["series"].items()}
+	ex = with_lr_range(_probe(), s, RAMP).extras
+	assert ex["lr_range.stalled"] == 1.0 and ex["lr_range.diverged_lr"] == lr_at(n)
+	assert ex["lr_range.checked"] == 1.0
+
+
+def test_a_hostile_summary_reads_as_unverified_not_a_crash():
+	from preflight.probes.local import with_lr_range
+
+	for bad in ({}, {"series": "x"}, {"series": {"update_to_weight": "x", "loss": [True, "a"]}},
+		{"lr_range_stalled": True, "lr_range_other_optimizers": "2"}):  # fmt: skip
+		ex = with_lr_range(_probe(), bad, RAMP).extras
+		assert ex["lr_range"] == 1.0 and "lr_range.checked" not in ex
+		assert all(isinstance(v, float) for v in ex.values() if v is not None)

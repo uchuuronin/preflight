@@ -75,7 +75,9 @@ def range_and_confirm(name: str, files: dict, entrypoint: str) -> dict:
 			"steps": ex.get("lr_range.steps"), "suggested_lr": ex.get("lr_range.suggested_lr"),
 			"min_loss_lr": ex.get("lr_range.min_loss_lr"), "diverged_lr": ex.get("lr_range.diverged_lr"),
 			"flat": ex.get("lr_range.flat"), "checked": ex.get("lr_range.checked"),
-			"not_set": ex.get("lr_range.not_set"), "curve": curve(ex), "gpu_s": p.cost.gpu_seconds,
+			"not_set": ex.get("lr_range.not_set"), "unverified": ex.get("lr_range.unverified"),
+			"other_optimizers": ex.get("lr_range.other_optimizers"), "stalled": ex.get("lr_range.stalled"),
+			"curve": curve(ex), "gpu_s": p.cost.gpu_seconds,
 			"usd": p.cost.usd}  # fmt: skip
 	except Exception as exc:  # recorded; the JSON still comes back
 		out["range"] = {"failed": f"{type(exc).__name__}: {str(exc)[:400]}"}
@@ -122,7 +124,7 @@ def check(scripts: str = ",".join(SCRIPTS)):
 		except Exception as exc:  # recorded; the next script still runs
 			res = {"script": name, "failed": f"{type(exc).__name__}: {str(exc)[:500]}"}
 		Path(f"out/lr_range_{name}.json").write_text(json.dumps(res, indent=1, default=str))
-		print(json.dumps({k: v for k, v in res.items() if k not in ("range", "confirm")} | {
+		print(json.dumps({k: v for k, v in res.items() if k not in ("range", "at_suggested", "at_own")} | {
 			"suggested": (res.get("range") or {}).get("suggested_lr"),
 			"trains_at_suggested": (res.get("at_suggested") or {}).get("trains"),
 			"trains_at_own": (res.get("at_own") or {}).get("trains")}, default=str), flush=True)  # fmt: skip

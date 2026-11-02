@@ -830,19 +830,25 @@ def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
 	if not flag("probes.lr_range") or sm.lens not in LR_RANGE_LENSES or not plan or ctx.should_stop():
 		return None
 	first = next((q for q in probes if q.id == plan[0].probe_id), None)
-	if first is None or first.status != "ok" or not first.steps:
-		return None
+	if first is None or first.status not in ("ok", "cached") or not first.steps:
+		return None  # a p1 from the cache ran too (A's review, Nov 2)
 	# the point's time: its first probe's, scaled to the ramp's steps [guess: setup plus steps]
 	per_step = (first.step_time.mean_s if first.step_time else None) or 1.0
 	est_s = (first.duration_s or 60.0) + STEPS * per_step
-	if not budget.allows((_price(gpu) + deps.overhead_usd_per_h) * est_s / 3600, est_s):
+	usd_per_s = (_price(gpu) + deps.overhead_usd_per_h) / 3600
+	if not budget.allows(usd_per_s * est_s, est_s):
 		return None
+	# it may run past its estimate, never past what the job has left (A's review, Nov 2)
+	left_s = budget.left_s()
+	if usd_per_s > 0:
+		left_s = min(left_s, (budget.usd - budget.spent_usd) / usd_per_s)
 	p = replace(plan[0], probe_id=f"{plan[0].probe_id}-lr", warmup=STEPS, timed=0, profile=False)
 	try:
 		spec = _spec(fetched, sm, p, deps, eval_off=True)
 	except OverrideError:
 		return None
-	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS})
+	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS},
+		timeout_s=max(1.0, min(spec.timeout_s, left_s)))  # fmt: skip
 	if spec.nproc > 1:
 		return None  # a guard (no plan runs ranks today): each rank would stop on its own loss
 	result, cached = _run_point(spec, gpu, deps, ctx)

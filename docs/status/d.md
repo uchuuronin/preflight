@@ -4,6 +4,10 @@
 
 | # | When (ET) | What | Why | Cost | How to undo |
 | --- | --- | --- | --- | --- | --- |
+| B5 | 15:40 | Watcher for the PM's afternoon "main is ready" stopped at its time limit with no 2:30 post (main's last is 1:15, `12058ca`); checked by hand since, the 4:15 one still to come | Its limit | none | none needed |
+| B6 | 15:45 | Took A's review of the range test (ws-a `from-a.md`) as "its review is back" (the 12:53 list's item 2) and fixed its items 1, 2, 3 and 6 on `ws-d`; 4 asked of B (the engine's `OK_PROBE` filters are B's), 5 of A (`scripts/make_golden.py` is A's) | Those are the owners; the flag stays off until A re-checks | none | Revert the commit |
+| B7 | 15:45 | "Checked" now needs the updates to grow with the ramp (slope of log update-to-weight on log rate at least 0.5 [guess]); with too few measured steps the rates are dropped as `unverified` rather than shown unchecked | A suggestion we can't show took effect shouldn't read as one; dropping it is the conservative side | none | Lower or drop `UPDATE_SLOPE`, keep rates on `unverified` |
+| B8 | 15:40 | Installed CPU torch, transformers and accelerate in my local environment to run the recorder tests (CI's torch job installs the same) | A's review listed tests that need torch | none | `uv sync` |
 | B1 | 12:55 | Merged `main` `7ba177b` into `ws-d` (no conflicts) | The PM's "main is ready" (12:53) | none | Revert the merge commit |
 | B1b | 13:20 | Merged `main` `12058ca` into `ws-d`; one conflict in `runner/sources.py` (A's new `data` parameter for `probes.repo_install` against my `_git_read`/`_clone_read`), kept both | The PM's 1:15 "main is ready" | none | Revert the merge commit |
 | B2 | 13:00 | Big repositories (Chiya's new item 1) are read as the entry point plus its import closure only with a new flag, `runner.read_closure` (off); with it off, the refusals now say how big the source is and carry `submission.too_large`, not `syntax_error` | Her 11:15 rule: runner and harness changes behind new flags, off, for A's one redeploy. The message fix is a plain bug fix, so it isn't flagged | none | Leave the flag off, or revert the commit |

@@ -228,6 +228,9 @@ def main(spec_path: str) -> int:
 		summary["lr_range_error"] = rec.lr_range_error
 		# per step: was its loss not finite (the series holds None for both that and no loss read)
 		summary["lr_range_nonfinite"] = [int(bool(st.get("nonfinite"))) for st in rec.steps]
+		# optimizers that stepped other weights (the ramp sets one), and the step a skipping scaler stalled at
+		summary["lr_range_other_optimizers"] = rec.range_other_optimizers()
+		summary["lr_range_stalled"] = rec.lr_range_stalled
 	# the training set's longest row (B, Oct 30), read after the hooks are gone so nothing is timed
 	try:
 		from preflight.recorder.dataset_len import measure_bounded
