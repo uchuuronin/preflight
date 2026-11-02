@@ -30,6 +30,25 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
 | Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
 
+## Mon Nov 2, 11:10 ET (Chiya's answers; the video plan's statuses)
+
+`f48b589` CI green. Merged `main` `f7f10b0`. Chiya (10:57): the 14 overnight decisions stand. The
+unseen runs are on today, so I touch no engine or harness code.
+
+- **Closed:** PF102 now opens the Nov 2 live record. **Explained:** the two empty L4 eval runs were
+  Modal failing to schedule an L4; A's capacity fix falls back to an A10 with the wait shown (A to
+  confirm in `from-a.md`).
+- **Video plan** (`docs/demo/video-plan.md`), statuses now: shot 5 opens from `/s/` once C confirms
+  `workers/` (today, a preview first); shot 6 waits on A's triage re-run (Tue noon); shot 12 needs
+  C's deploy today (the "Private mode" tick; the flag is on in `main` and A's runner) and C's private
+  check-in record id; shot 13 waits on B's table (likely tonight).
+- **X post:** switches to the `/s/` link when C confirms `workers/`.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the merge of `main`, the video plan's statuses, two requests and this entry.
+
+Cloud runs: none.
+
 ## Mon Nov 2, 09:00 ET (check-in: the $8 cap is deployed; three requests closed)
 
 `8bcd99a` CI green. Merged `main` `d625a39` (the validation freeze declared at `56c2141`; I touch
