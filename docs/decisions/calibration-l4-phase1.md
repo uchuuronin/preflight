@@ -258,14 +258,14 @@ Monotonicity also means a below-probe underestimate can't hide an OOM on the sam
 
 ## The Nov 1 top-up: a fifth GPU type, and the refit (Chiya, Nov 1, 6 PM ET: up to $25)
 
-**What ran:** grouped configs only, on Modal. The H100 (new) and the L40S ran seeds 0 and 1, and the A10, L4 and T4 ran seed 1 (59 new groups). Every config with an A100 row was excluded on every GPU (`data/topup_nov1_exclude.txt`, 95 keys), so the cross-GPU holdout was never run again, calibrated on or re-scored. The PM checked the list before the run. Spend by the sweep's container-time ledger, about $16.32:
+**What ran:** grouped configs only, on Modal. The H100 (new) and the L40S ran seeds 0 and 1, and the A10, L4 and T4 ran seed 1 (59 new groups). Every config with an A100 row was excluded on every GPU (`python/preflight/corpus/data/topup_nov1_exclude.txt`, 95 keys), so the cross-GPU holdout was never run again, calibrated on or re-scored. The PM checked the list before the run. Spend by the sweep's container-time ledger, about $16.50 (the L4's last, timed-out wave included):
 
 | GPU | Configs run | Spend |
 | --- | --- | --- |
-| H100 | 492 of 492 | $8.85 |
-| L40S | 392 of 392 | $3.82 |
-| A10 | 280 of 280 | $1.58 |
-| L4 | 89 of 281 (it reached its $2 cap) | $1.74 |
+| H100 | 492 (its whole list) | $8.85 |
+| L40S | 392 (its whole list) | $3.82 |
+| A10 | 280 (its whole list) | $1.58 |
+| L4 | 89 of 281 (its sixth wave timed out waiting for an L4, under its cap) | about $1.92 |
 | T4 | 62 of 75 | $0.33 |
 
 **Leave-one-GPU-out cross-GPU step time** (`scripts/fit_steptime_gbdt.py`, the same fixed hyperparameters): 6,694 cases over 848 configs, up from 2,286 over 566. Within 20% of the measured step (Wilson 95%):
