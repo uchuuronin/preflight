@@ -1,0 +1,32 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-9sjpitKqvDJsIwhqaL8ZQo
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/quality_check_
+│   app.py
+├── ✓ Uploaded PythonPackage:preflight
+└── ✓ Created Function check_remote.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+HuggingFaceFW/fineweb-edu int_score {'int_score 3': 173498, 'int_score 4': 26355, 'int_score 5': 147} 
+  budget 10000000000.0 None
+    int_score 3    low=False unique   8.63B  per epoch   8.63B  epochs  1.00  
+    int_score 4    low=False unique   1.36B  per epoch   1.36B  epochs  1.00  
+    int_score 5    low=False unique   0.01B  per epoch   0.01B  epochs  1.00  
+  budget 30000000000.0 None
+    int_score 3    low=False unique   8.63B  per epoch   8.63B  epochs  3.00  
+    int_score 4    low=False unique   1.36B  per epoch   1.36B  epochs  3.00  
+    int_score 5    low=False unique   0.01B  per epoch   0.01B  epochs  3.00  
+  budget 30000000000.0 {'int_score 4': 4.0, 'int_score 5': 4.0}
+    int_score 3    low=False unique   8.63B  per epoch   6.11B  epochs  2.13  
+    int_score 4    low=False unique   1.36B  per epoch   3.87B  epochs  8.50  int_score 4 is repeated 8.5 times, past the ~4 epochs where repeats stop helping much
+    int_score 5    low=False unique   0.01B  per epoch   0.02B  epochs  8.50  int_score 5 is repeated 8.5 times, past the ~4 epochs where repeats stop helping much
+HuggingFaceFW/fineweb-edu-score-2 int_score {'int_score 2': 200000} 
+  budget 186022212.0 None
+    int_score 2    low=True  unique   0.19B  per epoch   0.19B  epochs  1.00  
+  budget 558066636.0 None
+    int_score 2    low=True  unique   0.19B  per epoch   0.19B  epochs  3.00  low-quality documents in int_score 2 are each seen 3.0 times
+  budget 558066636.0 {'int_score 4': 4.0, 'int_score 5': 4.0}
+    int_score 2    low=True  unique   0.19B  per epoch   0.19B  epochs  3.00  low-quality documents in int_score 2 are each seen 3.0 times
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-9sjpitKqvDJsIwhqaL8ZQo
