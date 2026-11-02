@@ -1,0 +1,11 @@
+{
+	"name": "20261102-162835-41481816198-a-unseen-7-checkin-r",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41481816198",
+	"ref": "257702bb7b4843caba2404977ab85df41d1484ef",
+	"sha": "257702bb7b4843caba2404977ab85df41d1484ef",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-7r --gpus L4,A10 --max-minutes 45 --repo https://github.com/beir-cellar/beir --commit ef83d29307061c65d04b035b4f4e7c18bd8374af --entrypoint examples/retrieval/evaluation/dense/evaluate_sbert.py",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:32:58Z"
+}
