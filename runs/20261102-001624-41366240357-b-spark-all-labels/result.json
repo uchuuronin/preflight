@@ -1,0 +1,11 @@
+{
+	"name": "20261102-001624-41366240357-b-spark-all-labels",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41366240357",
+	"ref": "ws-b",
+	"sha": "f979aae41f047699b0fa4d493a64370a2de7ea1f",
+	"cmd": "python scripts/spark_label_all.py label --out out --budget 9.30 --workers 6",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T00:30:56Z"
+}

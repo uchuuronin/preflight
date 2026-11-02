@@ -1,0 +1,12 @@
+{
+ "rows": 2339,
+ "chunks": 293,
+ "rows_sent": 2339,
+ "labelled": 1997,
+ "counted_usd": 8.5946,
+ "stopped_at_chunk": null,
+ "worst_call_usd": 0.126,
+ "budget_usd": 9.3,
+ "wall_s": 855.4,
+ "worker_error": null
+}
