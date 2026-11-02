@@ -1,0 +1,179 @@
+torch 2.5.1+rocm6.2 hip 6.2.41133-dd7f95766 AMD Instinct MI300X
+preflight: running probes as root: an unprivileged uid can't reach /root/preflight/.venv-amd/bin/python and its packages (install Preflight where other users can read it to probe as one)
+[ground truth 23:32:51] bare run of pretrain_nanogpt: 300 optimizer steps, at most 900 s
+[bare] running /tmp/gt-d3kuhe59/train.py for 300 optimizer steps
+
+Generating train split:   0%|          | 0/2119719 [00:00<?, ? examples/s]
+Generating train split:   2%|▏         | 47000/2119719 [00:00<00:04, 457080.19 examples/s]
+Generating train split:   5%|▍         | 100000/2119719 [00:00<00:04, 460620.72 examples/s]
+Generating train split:   7%|▋         | 147000/2119719 [00:00<00:04, 460049.12 examples/s]
+Generating train split:   9%|▉         | 199000/2119719 [00:00<00:04, 480000.62 examples/s]
+Generating train split:  13%|█▎        | 268000/2119719 [00:00<00:03, 468741.68 examples/s]
+Generating train split:  16%|█▌        | 340000/2119719 [00:00<00:03, 466103.16 examples/s]
+Generating train split:  20%|█▉        | 414000/2119719 [00:00<00:03, 470888.41 examples/s]
+Generating train split:  23%|██▎       | 485000/2119719 [00:01<00:03, 467991.31 examples/s]
+Generating train split:  26%|██▌       | 550930/2119719 [00:01<00:03, 410871.89 examples/s]
+Generating train split:  28%|██▊       | 596930/2119719 [00:01<00:03, 419582.51 examples/s]
+Generating train split:  31%|███       | 656930/2119719 [00:01<00:03, 411287.70 examples/s]
+Generating train split:  33%|███▎      | 698930/2119719 [00:01<00:03, 395381.27 examples/s]
+Generating train split:  35%|███▌      | 742930/2119719 [00:01<00:03, 391786.18 examples/s]
+Generating train split:  38%|███▊      | 796930/2119719 [00:01<00:03, 426202.27 examples/s]
+Generating train split:  40%|███▉      | 842930/2119719 [00:01<00:03, 419137.88 examples/s]
+Generating train split:  42%|████▏     | 887930/2119719 [00:02<00:03, 408795.58 examples/s]
+Generating train split:  44%|████▍     | 936930/2119719 [00:02<00:02, 429316.58 examples/s]
+Generating train split:  47%|████▋     | 986930/2119719 [00:02<00:02, 421617.73 examples/s]
+Generating train split:  49%|████▉     | 1033930/2119719 [00:02<00:02, 429698.24 examples/s]
+Generating train split:  52%|█████▏    | 1093860/2119719 [00:02<00:02, 413667.01 examples/s]
+Generating train split:  54%|█████▍    | 1147860/2119719 [00:02<00:02, 440831.93 examples/s]
+Generating train split:  57%|█████▋    | 1197860/2119719 [00:02<00:02, 453852.95 examples/s]
+Generating train split:  60%|█████▉    | 1264860/2119719 [00:02<00:01, 446977.95 examples/s]
+Generating train split:  63%|██████▎   | 1333860/2119719 [00:03<00:01, 442172.39 examples/s]
+Generating train split:  66%|██████▋   | 1405860/2119719 [00:03<00:01, 445022.00 examples/s]
+Generating train split:  68%|██████▊   | 1451860/2119719 [00:03<00:01, 446919.95 examples/s]
+Generating train split:  72%|███████▏  | 1521860/2119719 [00:03<00:01, 438941.58 examples/s]
+Generating train split:  74%|███████▍  | 1572860/2119719 [00:03<00:01, 453210.13 examples/s]
+Generating train split:  78%|███████▊  | 1642790/2119719 [00:03<00:01, 441064.88 examples/s]
+Generating train split:  80%|███████▉  | 1688790/2119719 [00:03<00:01, 419254.07 examples/s]
+Generating train split:  82%|████████▏ | 1733790/2119719 [00:04<00:00, 412942.69 examples/s]
+Generating train split:  84%|████████▍ | 1785790/2119719 [00:04<00:00, 437634.32 examples/s]
+Generating train split:  87%|████████▋ | 1833790/2119719 [00:04<00:00, 427638.19 examples/s]
+Generating train split:  89%|████████▊ | 1877790/2119719 [00:04<00:00, 415407.26 examples/s]
+Generating train split:  91%|█████████ | 1930790/2119719 [00:04<00:00, 443267.14 examples/s]
+Generating train split:  93%|█████████▎| 1975790/2119719 [00:04<00:00, 424284.62 examples/s]
+Generating train split:  95%|█████████▌| 2021790/2119719 [00:04<00:00, 419278.39 examples/s]
+Generating train split:  98%|█████████▊| 2077790/2119719 [00:04<00:00, 454197.80 examples/s]
+Generating train split: 100%|██████████| 2119719/2119719 [00:04<00:00, 433788.11 examples/s]
+
+Generating validation split:   0%|          | 0/21990 [00:00<?, ? examples/s]
+Generating validation split: 100%|██████████| 21990/21990 [00:00<00:00, 467420.14 examples/s]
+[bare] step 50 at 56 s
+[bare] step 100 at 69 s
+[bare] step 150 at 82 s
+Token indices sequence length is longer than the specified maximum sequence length for this model (1053 > 1024). Running this sequence through the model will result in indexing errors
+[bare] step 200 at 96 s
+[bare] step 250 at 109 s
+[bare] step 300 at 122 s
+iter 0: loss 10.9837, 1122.5 ms/iter
+iter 10: loss 10.8063, 261.1 ms/iter
+iter 20: loss 10.3250, 267.1 ms/iter
+iter 30: loss 9.7492, 263.9 ms/iter
+iter 40: loss 9.3033, 267.3 ms/iter
+iter 50: loss 9.0179, 263.0 ms/iter
+iter 60: loss 8.8186, 268.5 ms/iter
+iter 70: loss 8.5654, 264.8 ms/iter
+iter 80: loss 8.2402, 266.4 ms/iter
+iter 90: loss 8.0371, 262.0 ms/iter
+iter 100: loss 7.7137, 266.8 ms/iter
+iter 110: loss 7.3663, 269.8 ms/iter
+iter 120: loss 7.1155, 268.2 ms/iter
+iter 130: loss 6.8683, 264.5 ms/iter
+iter 140: loss 6.5992, 267.4 ms/iter
+iter 150: loss 6.3096, 265.0 ms/iter
+iter 160: loss 6.2568, 265.1 ms/iter
+iter 170: loss 6.1369, 269.1 ms/iter
+iter 180: loss 6.0196, 263.6 ms/iter
+iter 190: loss 6.0541, 263.7 ms/iter
+iter 200: loss 6.0027, 259.0 ms/iter
+iter 210: loss 5.9616, 265.5 ms/iter
+iter 220: loss 6.0157, 264.6 ms/iter
+iter 230: loss 5.8984, 264.7 ms/iter
+iter 240: loss 5.9479, 261.6 ms/iter
+iter 250: loss 5.9959, 262.2 ms/iter
+iter 260: loss 6.0035, 262.8 ms/iter
+iter 270: loss 6.0025, 262.3 ms/iter
+iter 280: loss 5.9757, 261.7 ms/iter
+iter 290: loss 5.9849, 261.5 ms/iter
+{"steps": 300, "ended": "steps", "error": null, "seconds": 122.60431160591543, "peak_allocated_bytes": 18718317568, "peak_reserved_bytes": 20254294016, "device": "AMD Instinct MI300X", "timing": "cuda_events"}
+[ground truth 23:34:58] bare run ended (steps) after 127 s, 300 steps
+[ground truth 23:34:58] recorder run: 5 warmup + 100 timed steps, at most 1613 s
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+[ground truth 23:36:12] recorder run ended (ok) after 105 steps
+{
+  "script": "pretrain_nanogpt",
+  "entrypoint": "train.py",
+  "args": [],
+  "gpu": "MI300X",
+  "backend": "rocm",
+  "overhead": {
+    "sync_overhead": {
+      "median": 0.99525,
+      "ci95": [
+        0.99233,
+        0.99743
+      ],
+      "pairs": 49,
+      "source": "measured"
+    },
+    "hook_overhead": {
+      "median": 0.97,
+      "ci95": [
+        0.96059,
+        0.97489
+      ],
+      "pairs": 50,
+      "source": "measured"
+    },
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "bare": {
+    "steps": 300,
+    "ended": "steps",
+    "error": null,
+    "seconds": 122.60431160591543,
+    "peak_allocated_bytes": 18718317568,
+    "peak_reserved_bytes": 20254294016,
+    "device": "AMD Instinct MI300X",
+    "timing": "cuda_events",
+    "wall_s": 126.9
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 105,
+    "p50_s": 0.2539152526855469,
+    "peak_allocated_bytes": 18718394368,
+    "seconds": 74.341,
+    "by_phase": {
+      "data": 0.07397470394208278,
+      "forward": 0.21704334363708913,
+      "backward": 0.6725544789409766,
+      "optimizer": 0.016301719300370297,
+      "other": 0.02012575417948125
+    },
+    "generation": null,
+    "extras": {
+      "params_total": 124475904.0,
+      "params_trainable": 124475904.0,
+      "tokens_per_step": 12288.0,
+      "samples_per_step": 12.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 9257005056.0,
+      "train_loader_batches": 176644.0,
+      "train_dataset_len": 2119719.0,
+      "dataset_max_tokens": 1024.0,
+      "dataset_p999_tokens": 1024.0,
+      "dataset_p50_tokens": 1024.0,
+      "dataset_mean_tokens": 1024.0,
+      "dataset_rows_scanned": 6808.0,
+      "dataset_rows_total": 2119719.0
+    },
+    "env": {
+      "backend": "rocm",
+      "provider": "local",
+      "gpu": {
+        "name": "MI300X",
+        "count": 1,
+        "memory_bytes": 206141652992,
+        "vendor": "amd"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1+rocm6.2",
+        "transformers": "4.46.3",
+        "datasets": "3.1.0"
+      },
+      "python": "3.12.11"
+    }
+  }
+}

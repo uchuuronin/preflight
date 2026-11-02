@@ -1,0 +1,11 @@
+{
+	"name": "20261102-233235-41546215464-amd-a-amd-nanogpt-gt-2",
+	"exit_code": 0,
+	"workflow": "amd-run",
+	"run_id": "41546215464",
+	"ref": "main",
+	"sha": "7889ab921c952b2a3d32fd981a463a37dd60f53f",
+	"cmd": "python -m preflight.recorder.ground_truth zoo/pretrain_nanogpt out/gt_nanogpt_mi300x.json --bare-steps 300 --recorder-steps 100 --install-requirements --budget-min 30",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:36:16Z"
+}
