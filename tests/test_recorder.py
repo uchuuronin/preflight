@@ -540,11 +540,11 @@ def test_a_serving_probe_records_its_token_cap_beside_the_scripts():
 		entrypoint="serve.py", warmup=1, timed=2, timeout_s=120, generate_sample=32))  # fmt: skip
 	assert r.probe.status == "ok", r.probe.error
 	g = r.probe.generation
-	# what the probe measured under its cap, as B's engine reads it (79a9f8f): the cap, the share at it
-	assert g.sequences == 32 and g.max_new_tokens == 1024 and g.new_tokens_max == 1024
-	assert g.truncation_rate == 0.5 and r.probe.extras["generation_ending_known"] == 32.0
+	assert g.sequences == 32 and g.max_new_tokens == 4096 and g.new_tokens_max == 1024
 	assert r.probe.extras["serving_probe_max_tokens"] == 1024.0
-	assert r.probe.extras["serving_script_max_tokens"] == 4096.0
+	# the replies cut at the probe's cap have no known ending; those that stopped on their own do
+	assert g.truncation_rate == 0.0 and r.probe.extras["generation_ending_known"] == 16.0
+	assert r.probe.extras["serving_probe_capped_fraction"] == 0.5
 
 
 def test_grpo_entropy_is_the_policys_mean_negative_log_prob_over_completion_tokens():

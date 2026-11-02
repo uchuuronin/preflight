@@ -73,11 +73,6 @@ def test_truncated_generations_carry_a_wilson_interval():
 	g = GenerationStats(calls=4, sequences=40, truncation_rate=0.25, max_new_tokens=512, backend="hf")
 	f = next(f for f in hygiene_findings(_gpu_rec(generation=g), {}) if f.code == "generation.truncated")
 	assert "10 of 40" in f.detail and "95% interval" in f.detail and f.knob_id == "max_new_tokens"
-	# cut at the serving probe's own cap, not the script's: no warning about the script's answers
-	capped = _gpu_rec(
-		generation=g, extras={"serving_probe_max_tokens": 512.0, "serving_script_max_tokens": 4096.0}
-	)
-	assert "generation.truncated" not in [f.code for f in hygiene_findings(capped, {})]
 
 
 def test_identical_outputs_from_different_weights_are_flagged():
