@@ -139,3 +139,9 @@ def test_a_failed_install_names_the_pins_the_code_asks_past(pip, monkeypatch):
 		"the code asks for torch>=2.7 (the image has 2.5.1), which the probe image can't change."
 	)
 	assert "tqdm" not in err.split(".")[0]  # a line the image's copy satisfies isn't named
+
+
+def test_a_marker_or_a_local_label_is_never_called_a_conflict():
+	have = {"torch": "2.5.1+cu124", "numpy": "2.0.0"}
+	assert R.pin_conflicts('torch>=2.7; python_version<"3.9"\nnumpy==2.0.0+cu1\n', have) == []
+	assert R.pin_conflicts("torch>=2.7\n", have) == ["torch>=2.7 (the image has 2.5.1)"]

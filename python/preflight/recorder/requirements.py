@@ -91,7 +91,8 @@ def pin_conflicts(text: str, have: dict[str, str]) -> list[str]:
 	out = []
 	for raw in text.splitlines():
 		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
-		if m is None or not m["spec"] or _norm(m["name"]) not in have:
+		# a marker may not apply here, and a local label (+cu121) can't be compared with the image's public version
+		if m is None or not m["spec"] or m["marker"] or "+" in m["spec"] or _norm(m["name"]) not in have:
 			continue
 		got = have[_norm(m["name"])].split("+", 1)[0]
 		try:
