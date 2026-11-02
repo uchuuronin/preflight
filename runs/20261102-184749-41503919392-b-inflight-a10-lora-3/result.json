@@ -1,0 +1,11 @@
+{
+	"name": "20261102-184749-41503919392-b-inflight-a10-lora-3",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41503919392",
+	"ref": "ws-b",
+	"sha": "ae1b810d70679c8c693850abe596d70da6c08602",
+	"cmd": "modal run --env main python/preflight/corpus/inflight_check_app.py::check_a10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T18:52:53Z"
+}
