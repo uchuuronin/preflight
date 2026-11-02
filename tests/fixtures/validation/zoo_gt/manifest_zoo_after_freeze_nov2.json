@@ -58,7 +58,7 @@
    "used_for_tuning": false,
    "ask_model_id": "gnn_pyg",
    "$record": "probes on A10",
-   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 471 steps"
   },
   {
    "script": "retrieval_st",
@@ -71,7 +71,7 @@
     "retrieval.small_batch"
    ],
    "$record": "probes on A10",
-   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 12279 steps"
   },
   {
    "script": "vision_timm",
@@ -130,7 +130,7 @@
     "gpu_type": "A10"
    },
    "$record": "probes on L4; the full run got an A10, so its step time is the unmeasured-GPU row",
-   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 471 steps"
   },
   {
    "script": "retrieval_st@L4",
@@ -142,7 +142,7 @@
     "gpu_type": "A10"
    },
    "$record": "probes on L4; the full run got an A10, so its step time is the unmeasured-GPU row",
-   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+   "$ground_truth": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 12279 steps"
   },
   {
    "script": "vision_timm@L4",

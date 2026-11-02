@@ -1,0 +1,207 @@
+{
+ "prompt": "ask-model@1",
+ "prompt_hash": "211e2e084350",
+ "model": "muse-spark-1.3",
+ "usd": 0.10947,
+ "rows": [
+  {
+   "id": "pretrain_nanogpt",
+   "set": "zoo",
+   "gpu": "A10",
+   "prompt": "ask-model@1",
+   "files": {
+    "how": "the runner's fetch",
+    "n": 1
+   },
+   "answer": {
+    "peak_memory_gib": {
+     "point": 11.5,
+     "lo": 8.5,
+     "hi": 15.0
+    },
+    "step_applies": true,
+    "step_time_s": {
+     "point": 1.15,
+     "lo": 0.7,
+     "hi": 1.8
+    },
+    "oom": false,
+    "p_oom": 0.04,
+    "reasoning": "124M GPT-2, fp32 (autocast off), batch 12x1024=12288 tokens. Params+grads+Adam ~2GB fp32, logits 12*1024*50304 fp32 ~2.3GB plus backward ~5GB transient plus ~1-2GB activations with flash attention. Fits in A10 24GB. Step is ~9 TFLOP plus per-sample HuggingFace tokenization with num_workers=0, fp32 without bf16 tensor cores, so ~1s/iter."
+   },
+   "usd": 0.032265,
+   "tokens": [
+    6068,
+    5807
+   ]
+  },
+  {
+   "id": "gnn_pyg",
+   "set": "zoo",
+   "gpu": "A10",
+   "prompt": "ask-model@1",
+   "files": {
+    "how": "the runner's fetch, 1 measured output files left out",
+    "n": 2
+   },
+   "answer": {
+    "peak_memory_gib": {
+     "point": 5.5,
+     "lo": 3.5,
+     "hi": 9.0
+    },
+    "step_applies": true,
+    "step_time_s": {
+     "point": 1.1,
+     "lo": 0.5,
+     "hi": 2.2
+    },
+    "oom": false,
+    "p_oom": 0.03,
+    "reasoning": "3-layer GraphSAGE 128->256->256->47 float32, batch 1024 seeds with fanout [15,25,25]. Sampler gives ~15k/323k/3.6M edges per hop covering ~200k nodes. First-layer message tensor 3.6M*128 fp32 ~1.8GB plus 200k*256 activations, base graph ~10M undirected edges + features ~350MB on A10 24GB. Step is GPU sampling (rand+unique on millions) + forward/backward on 3.6M edges."
+   },
+   "usd": 0.037909,
+   "tokens": [
+    5752,
+    7228
+   ]
+  },
+  {
+   "id": "retrieval_st",
+   "set": "zoo",
+   "gpu": "A10",
+   "prompt": "ask-model@1",
+   "files": {
+    "how": "the runner's fetch, 1 measured output files left out",
+    "n": 2
+   },
+   "answer": {
+    "peak_memory_gib": {
+     "point": 1.3,
+     "lo": 0.8,
+     "hi": 2.2
+    },
+    "step_applies": true,
+    "step_time_s": {
+     "point": 0.06,
+     "lo": 0.025,
+     "hi": 0.15
+    },
+    "oom": false,
+    "p_oom": 0.001,
+    "reasoning": "all-MiniLM-L6-v2 is ~23M params, bf16 training with Adam, batch 8 queries + 8 answers of short NQ text (<64 tokens). Weights+grads+optimizer ~0.4GB plus tiny activations. Reserved stays ~1-2GB, far below A10 24GB. Compute per step is ~10s GFLOP, so step is overhead-bound at centiseconds on A10."
+   },
+   "usd": 0.00953,
+   "tokens": [
+    1936,
+    1673
+   ]
+  },
+  {
+   "id": "vision_timm",
+   "set": "zoo",
+   "gpu": "A10",
+   "prompt": "ask-model@1",
+   "files": {
+    "how": "the runner's fetch, 1 measured output files left out",
+    "n": 2
+   },
+   "answer": {
+    "peak_memory_gib": {
+     "point": 3.8,
+     "lo": 2.8,
+     "hi": 5.5
+    },
+    "step_applies": true,
+    "step_time_s": {
+     "point": 0.85,
+     "lo": 0.5,
+     "hi": 1.5
+    },
+    "oom": false,
+    "p_oom": 0.005,
+    "reasoning": "timm resnet50 ~25M params fine-tune, AdamW fp32 states, batch 64x3x224x224 bf16 autocast on 24GB A10 fits easily, activations ~1-2GB plus model+opt ~0.4GB so few GiB reserved. Heavy CPU RandomResizedCrop+ColorJitter+RandAugment with only 2 workers makes loader slower than A10 forward-backward (~0.15s NCHW without channels-last), so step is data-wait dominated ~0.5-1.5s."
+   },
+   "usd": 0.01013,
+   "tokens": [
+    2317,
+    1702
+   ]
+  },
+  {
+   "id": "eval_sweep_reasoning",
+   "set": "zoo",
+   "gpu": "A10",
+   "prompt": "ask-model@1",
+   "files": {
+    "how": "the runner's fetch, 1 measured output files left out",
+    "n": 2
+   },
+   "answer": {
+    "peak_memory_gib": {
+     "point": 18.5,
+     "lo": 15.5,
+     "hi": 22.5
+    },
+    "step_applies": false,
+    "step_time_s": {
+     "point": 0.0,
+     "lo": 0.0,
+     "hi": 1.0
+    },
+    "oom": false,
+    "p_oom": 0.12,
+    "reasoning": "Eval only, no optimizer step. 1.5B bf16 ~3GiB, 7B bf16 ~13GiB on single A10 24GB. Peak is 7B generate batch 8 x up to 2048 new tokens with output_hidden_states=True, holding all layers steps on GPU (~3-4GiB) plus KV-cache ~1GiB plus model, total ~18GiB, fits but close."
+   },
+   "usd": 0.011529,
+   "tokens": [
+    2416,
+    2002
+   ]
+  },
+  {
+   "id": "serving_vllm",
+   "set": "zoo",
+   "gpu": "A10",
+   "prompt": "ask-model@1",
+   "files": {
+    "how": "the runner's fetch",
+    "n": 2
+   },
+   "answer": {
+    "peak_memory_gib": {
+     "point": 20.5,
+     "lo": 19.0,
+     "hi": 21.8
+    },
+    "step_applies": false,
+    "step_time_s": {
+     "point": 0.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "oom": false,
+    "p_oom": 0.08,
+    "reasoning": "Qwen2.5-7B-Instruct in bf16 ~14GB weights on one A10 24GB (~22.5 GiB usable). vLLM with gpu_memory_utilization=0.90 reserves ~90% for weights+KV+activations, so ~20 GiB peak. max_model_len 32768 with chunked prefill 8192 avoids startup profile OOM; 256x4096 overflow causes preemption/thrashing not OOM. No training step, serving benchmark."
+   },
+   "usd": 0.008107,
+   "tokens": [
+    2021,
+    1313
+   ]
+  },
+  {
+   "id": "torchtitan_debug",
+   "set": "zoo",
+   "gpu": "A10",
+   "prompt": "ask-model@1",
+   "error": "InvalidSubmission: unknown sample 'zoo/torchtitan_debug'",
+   "usd": 0,
+   "tokens": [
+    0,
+    0
+   ]
+  }
+ ],
+ "wall_s": 184.7
+}

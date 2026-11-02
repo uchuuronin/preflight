@@ -252,7 +252,9 @@ def forecast_loss(
 	binned = per_x_means(pts, last_step) if bin_x else []
 	if bin_x and binned and binned[-1][0] >= X_MAX:
 		return None
-	bin_x = bin_x and len(binned) >= 2  # review, Nov 2: a long run seen only in its first x keeps the raw steps
+	bin_x = (
+		bin_x and len(binned) >= 2
+	)  # review, Nov 2: a long run seen only in its first x keeps the raw steps
 	if bin_x:
 		steps = torch.tensor([b for b, _ in binned], dtype=torch.float32) * last_step / X_MAX
 		ys = torch.tensor([v for _, v in binned], dtype=torch.float32)
