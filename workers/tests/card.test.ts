@@ -90,7 +90,7 @@ describe("headline", () => {
 		expect(h.lines.map((l) => [l.value, l.status])).toEqual([
 			["7.45 to 9.31 GiB", "Measured"],
 			["1 h 2 min to 1 h 25 min", "Extrapolated"],
-			["No number", "Not trusted"],
+			["No number", "Not measured here"],
 			["5% to 20%", "Predicted"],
 		]);
 	});
@@ -99,7 +99,7 @@ describe("headline", () => {
 		for (const r of [agent, grpo]) {
 			const h = headline(r);
 			expect(h.lines.length).toBeGreaterThan(0);
-			for (const l of h.lines) expect(["Measured", "Predicted", "Extrapolated", "Not trusted", "Illustrative"]).toContain(l.status);
+			for (const l of h.lines) expect(["Measured", "Predicted", "Extrapolated", "Not measured here", "Illustrative"]).toContain(l.status);
 		}
 	});
 

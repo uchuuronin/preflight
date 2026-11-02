@@ -41,3 +41,11 @@ said "Not trusted", as C intended.
 Notebook tab's states added (`NOTEBOOK=1`: upload `train_mlp.ipynb`, wait for its "runs as"
 preview): **104 of 108 clean** [measured, Chromium, `audit-6f49c9c-notebook.log`], all four notebook states
 clean; the only failures are S1's four.
+
+## Again after C's deploy of `5058361` (Nov 2, 05:35 ET)
+
+The deployed commit (deploy run 41421721223) extracted with `git archive` and served the same
+way, its own flags (`d.notebook` on, `harness.glimmer_private` off), with the Notebook tab's
+states: **104 of 108 clean** [measured, Chromium, `audit-5058361.log`]. The only failures are S1's
+four; S2 is still open (not re-checked by eye this time). The Notebook tab is live and its states
+are clean.

@@ -15,6 +15,9 @@
 | 9 | 02:05 | The X post links the cockpit, not the share page, with two variants (with and without the triage shot) | `deploy.yml` doesn't ship `workers/`, so `/s/<token>` isn't live; a cockpit link opens but previews as text | none | Swap in the `/s/` link once `workers/` deploys (TODO(PM) in the file) |
 | 10 | 04:10 | Audited the deployed `1ea2dd6` with `d.notebook` held off (`VITE_FLAGS`), and `main` `6f49c9c` with it on, rather than only one | The first is what visitors have now; the second is what the next deploy brings, with the Notebook tab C ships | none (local) | Nothing to undo |
 | 11 | 04:15 | `readme-final.md` takes the PM's 03:55 `README.md` edits: the notebook tab on in production (A's `a-notebook-checkin-3`) and Glimmer's private mode "off until the data-use notice describes it"; my behind-a-flag notebook row is gone | `readme-final.md` stays the source of truth until Tuesday's swap (Chiya), so it must carry the PM's changes | none | Revert the commit |
+| 12 | 05:30 | The free-tier chip's "Not trusted yet" now reads "Not measured here" (the PM's 4:00 ask, which I'd missed at 4:15); and I carried the same word into the share cards (`workers/functions/_card/`), their README, `readme-final.md`, `portal.md` and the X post's reply | C renamed the abstain word app-wide; the cards promise "the app's own word for its status", so they must match | none | Revert the commit; the hero card re-renders with `npm run hero-cards` |
+| 13 | 05:30 | Re-rendered the hero card (`workers/static/cards/ICDYrfHQ2nBNbv3mlRHHMg.png`) | Its footer names the status words; `hero-cards:check` fails until it's re-rendered | none | Comes back with the revert above |
+| 14 | 05:35 | Audited C's deployed `5058361` from a `git archive` of that commit, with its own flags | `main` had moved on (`ae0e900`, Glimmer's private mode on), and the audit must show what visitors have | none (local) | Nothing to undo |
 
 
 ## Cloud runs
@@ -26,6 +29,42 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 02:56 UTC | L4 (asked) | about 20 (cap) | at most about 0.60 [guess]; 0.0179 of Muse Spark by the record | `d-eval-sweep-l4` (GitHub 41380341849): cancelled while probing, no measurement |
 | Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
 | Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
+
+## Mon Nov 2, 09:00 ET (check-in: the $8 cap is deployed; three requests closed)
+
+`8bcd99a` CI green. Merged `main` `d625a39` (the validation freeze declared at `56c2141`; I touch
+nothing of the unseen list).
+
+- **The cap from Nov 5 is deployed:** `queue.py` returns $8 from Nov 5 (`c061626`), and A's runner
+  was deployed from `1ea2dd6`, which contains it (Nov 2 08:24 UTC); until Nov 5 it applies $10. (An
+  environment variable, `PREFLIGHT_DAILY_GPU_CAP_USD`, can override it; nothing I can see sets it.) Per Chiya, the README draft and the
+  builder kit now give the number.
+- **Closed with A:** private jobs never go to Baseten (A's fix, deployed); `d.notebook` passed (with
+  A's own training notebook) and the $8 cap is in.
+- **Still open:** A's production LoRA triage re-run (deadline Tue Nov 3, noon ET); the L4 eval-sweep
+  question and the items 42/19 note to A; PF102's numbers with B and the PM; S1 and S2 with C.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the merge of `main`, the cap sentences, the closed requests and this entry.
+
+Cloud runs: none.
+
+## Mon Nov 2, 05:40 ET (overnight: the PM's third merge; audit of C's deploy; the status word)
+
+`adef21e` CI green. The PM's 5:15 merge made `main` `16e0bb3` and then `ae0e900`
+(`harness.glimmer_private` on in production, with C's data-use line); `ws-d` is merged up to it.
+
+- **Free-tier chip** (the PM's 4:00 ask): "Not measured here", C's word; also in the share cards
+  and the drafts (decisions 12 and 13). 252 of 252 add-on tests, 18 of 18 worker tests, the
+  typecheck and the hero-card check pass [measured].
+- **Stranger audit** of C's deployed `5058361` (`d.notebook` on): 104 of 108 clean, S1's four the
+  only failures, the Notebook tab clean (decision 14).
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the merge of `main` `ae0e900`, the status word in the chip, cards and drafts, the
+re-rendered hero card, the audit log and this entry.
+
+Cloud runs: none.
 
 ## Mon Nov 2, 04:20 ET (overnight: the PM's two merges; audit of C's deploy)
 

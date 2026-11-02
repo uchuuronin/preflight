@@ -14,7 +14,7 @@ export const FREETIER_EN: Record<string, string> = {
 	"addon.freetier.chip.sessions": "{n} sessions",
 	"addon.freetier.chip.no_memory": "Won't fit",
 	"addon.freetier.chip.other_gpu": "Measure on {gpus}",
-	"addon.freetier.chip.abstain": "Not trusted yet",
+	"addon.freetier.chip.abstain": "Not measured here",
 	"addon.freetier.say.one_session": "Finishes in one session, with time to set up.",
 	"addon.freetier.say.sessions": "Runs past one session. Save a checkpoint at least every {every} and resume from it.",
 	"addon.freetier.say.no_memory": "Needs {need} at its peak ({status}); a {gpu} has {have}. Lower the batch or sequence length, or turn on checkpointing.",

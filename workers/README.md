@@ -10,7 +10,7 @@ Cloudflare Pages Functions that turn a flight record's share token into things p
 
 **Only numbers from the record, each with its status word.** The card reads the engine's
 estimates (`memory.peak`, `time.total`, `cost.total`, `risk.oom`) and labels each with the app's
-own word for its status: Measured, Predicted, Extrapolated, Not trusted (the engine abstained, so
+own word for its status: Measured, Predicted, Extrapolated, Not measured here (the engine abstained, so
 no number is shown) or Illustrative (a fixture model's number). A record with no estimates gets
 its probes' own measurements instead: an out-of-memory probe, the largest measured peak, and a
 measured step time. Nothing is computed beyond unit conversion (`functions/_card/headline.ts`).

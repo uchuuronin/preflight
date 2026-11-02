@@ -18,7 +18,7 @@ const CHIP: Record<StatusWord, string> = {
 	Measured: "#8FD3A5",
 	Predicted: "#FFF5D1",
 	Extrapolated: "#F2C66D",
-	"Not trusted": "#B9C6C4",
+	"Not measured here": "#B9C6C4",
 	Illustrative: "#C9B6F2",
 };
 
@@ -76,7 +76,7 @@ export function cardSvg(h: Headline, host: string): string {
 		: `<text x="80" y="${rowsTop + 20}" font-family="Instrument Sans" font-size="28" fill="${DIM}">No numbers yet: open the flight to see where it stands.</text>`;
 	const foot = h.illustrative
 		? "Illustrative numbers from a fixture, not measured."
-		: "Every number says how it was made: measured, predicted or not trusted.";
+		: "Every number says how it was made: measured, predicted or not measured here.";
 	return [
 		`<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}">`,
 		`<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${BG_TOP}"/><stop offset="1" stop-color="${BG_BOTTOM}"/></linearGradient></defs>`,
@@ -100,7 +100,7 @@ export function badgeSvg(h: Headline): string {
 	const w = (s: string) => Math.round(s.length * 6.6 + 12);
 	const lw = w(left);
 	const rw = w(right);
-	const colour = first ? (first.status === "Measured" ? "#2E7D4F" : first.status === "Not trusted" ? "#6B7B7A" : "#1F4A5E") : "#1F4A5E";
+	const colour = first ? (first.status === "Measured" ? "#2E7D4F" : first.status === "Not measured here" ? "#6B7B7A" : "#1F4A5E") : "#1F4A5E";
 	const label = `${left}: ${right}`;
 	return [
 		`<svg xmlns="http://www.w3.org/2000/svg" width="${lw + rw}" height="20" role="img" aria-label="${esc(label)}">`,
