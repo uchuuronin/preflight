@@ -1346,3 +1346,70 @@ def startup_check_serving():
 	print(json.dumps(res, indent=2), flush=True)
 	if not res["ok"]:
 		sys.exit(1)
+
+
+# ---------------------------------------------------------------- install check (CPU, after freeze)
+
+
+@ops.function(image=probe_image, timeout=20 * 60)
+def _install_check(files: dict, entrypoint: str, uv: bool, pyg: bool, repo: bool) -> dict:
+	"""requirements.install as a probe runs it (the probe image's stack pinned, wheels only), timed, on
+	CPU: then which of the script's third-party imports still can't be found. Network: this function's
+	own, not the probe sandbox's allowlist (PyPI, Hugging Face, GitHub; data.pyg.org with extra_hosts)."""
+	import importlib
+	import site
+	import sys
+	import tempfile
+	import time
+
+	from preflight.recorder import requirements as R
+
+	work = Path(tempfile.mkdtemp(prefix="pf-install-"))
+	for rel, text in files.items():
+		p = (work / rel).resolve()
+		if work.resolve() in p.parents:
+			p.parent.mkdir(parents=True, exist_ok=True)
+			p.write_text(text)
+	before = sorted(R.missing_imports(work, entrypoint))
+	t0 = time.monotonic()
+	err, dirs = R.install(work, work.parent / "deps", log=lambda m: print(m, flush=True), repo=repo,
+		entrypoint=entrypoint, uv=uv, pyg=pyg)  # fmt: skip
+	took = round(time.monotonic() - t0, 1)
+	for d in dirs:
+		if "site-packages" in str(d):
+			site.addsitedir(str(d))
+		else:
+			sys.path.insert(0, str(d))
+	importlib.invalidate_caches()
+	after = sorted(R.missing_imports(work, entrypoint)) if err is None else before
+	out = {
+		"uv": uv,
+		"pyg": pyg,
+		"seconds": took,
+		"error": err,
+		"missing_before": before,
+		"missing_after": after,
+	}
+	print(json.dumps(out), flush=True)
+	return out
+
+
+@ops.local_entrypoint()
+def install_check(repo: str, commit: str = "", entrypoint: str = "", uv: bool = False, pyg: bool = False):
+	"""How a repo's install goes in the probe image, without a GPU (probes.uv_install, probes.extra_hosts):
+
+	modal run --env main python/preflight/runner/ops_app.py::install_check --repo https://github.com/Lightning-AI/litgpt \\
+		--commit <sha> --entrypoint litgpt/__main__.py --uv"""
+	from preflight.recorder.ground_truth import entrypoint_of
+	from preflight.runner.sources import _clone
+
+	files, sha = _clone(repo, commit or None, data=True)
+	entry = entrypoint_of(files, entrypoint or None)
+	print(
+		f"[install check] {repo} at {sha}: {len(files)} files, entry {entry}, uv {uv}, pyg {pyg}", flush=True
+	)
+	res = _install_check.remote(files, entry, uv, pyg, True)
+	Path("out").mkdir(exist_ok=True)
+	Path(f"out/install_check_{repo.rstrip('/').rsplit('/', 1)[-1]}_{'uv' if uv else 'pip'}.json").write_text(
+		json.dumps(res, indent=2)
+	)

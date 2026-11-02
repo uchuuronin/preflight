@@ -150,6 +150,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"install_requirements": spec.install_requirements,
 		**({"install_repo": True} if spec.install_repo else {}),  # absent: keys stay as they were
 		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
+		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
@@ -305,6 +306,8 @@ def _spec(
 		install_requirements=deps.install_requirements,
 		install_repo=deps.install_requirements and _repo_install_on(),
 		extra_packages=extra_lines(fetched.source) if deps.install_requirements else (),
+		install_uv=deps.install_requirements and _flag("probes.uv_install"),
+		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
@@ -321,6 +324,12 @@ def _import_knobs(knobs: dict) -> tuple:
 			if isinstance(v, bool) or not isinstance(v, int | float)
 		)
 	)
+
+
+def _flag(name: str) -> bool:
+	from .flags import flag
+
+	return flag(name)
 
 
 def _repo_install_on() -> bool:

@@ -83,9 +83,16 @@ EGRESS = [
 	"codeload.github.com",
 	"*.githubusercontent.com",
 ]
+# probes.extra_hosts (off): PyG's wheel index (torch-sparse and the rest, which PyPI has only as source) and
+# torchvision's dataset host for CIFAR (Nov 2: unseen scripts 8 and 9 stopped there)
+EXTRA_EGRESS = ["data.pyg.org", "www.cs.toronto.edu"]
+PYG_INDEX = "https://data.pyg.org/whl/torch-2.5.0+cu124.html"  # PyPI's torch 2.5.1 is built for CUDA 12.4
 # pinned so a probe measures the same stack every time; part of the probe-cache key
 PROBE_PACKAGES = [
 	"torch==2.5.1",
+	# Nov 2, after freeze: torchvision stopped two of the nine unseen scripts at import; 0.20.1 is torch 2.5.1's
+	"torchvision==0.20.1",
+	"uv==0.5.11",  # probes.uv_install (off): its resolver before pip's
 	"transformers==4.46.3",
 	"accelerate==1.1.1",
 	"peft==0.13.2",
@@ -154,6 +161,7 @@ probe_image = (
 			"PREFLIGHT_SANDBOX_DIR": "/tmp",
 			# one unprivileged uid for all of a job's probes (the sandbox is per job): they share the HF cache
 			"PREFLIGHT_PROBE_UID": "61000",
+			"PREFLIGHT_PYG_INDEX": PYG_INDEX,  # read only with probes.extra_hosts (recorder/requirements.py)
 		}
 	)
 	.apt_install(*COMPILER_PACKAGES)
@@ -470,14 +478,20 @@ def _sandbox_factory(owner=None):
 		image: "probe", or "serving" for vLLM probes (SANDBOX_IMAGES). timeout_s: the sandbox's
 		lifetime, 30 min unless the caller's run needs longer (an agent sample)."""
 		from preflight.probes.gpu_choice import modal_gpu
+		from preflight.runner.flags import flag
 
+		hosts = [
+			*EGRESS,
+			*(EXTRA_EGRESS if flag("probes.extra_hosts") else []),
+			*(h for h in extra_egress if h),
+		]
 		return modal.Sandbox.create(
 			app=owner if owner is not None else app,
 			image=SANDBOX_IMAGES[image],
 			gpu=None if gpu == "cpu" else modal_gpu(gpu),
 			timeout=timeout_s or 30 * 60,
 			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes
-			outbound_domain_allowlist=[*EGRESS, *(h for h in extra_egress if h)],
+			outbound_domain_allowlist=hosts,
 			volumes={WEIGHTS_DIR: _read_only(weights_vol)},
 			workdir="/tmp",
 		)
