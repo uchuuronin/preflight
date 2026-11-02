@@ -10,6 +10,8 @@ Codes match by their longest known prefix; an unknown code falls back to its fam
 generic line, so a new code never goes out with no step.
 """
 
+from preflight.runner.queue import VISITOR_DAILY_JOBS as _DAILY
+
 STEPS: dict[str, tuple[str, str]] = {
 	# the job, before any probe
 	"submission": (
@@ -34,7 +36,8 @@ STEPS: dict[str, tuple[str, str]] = {
 	),
 	"submission.sample_full": (
 		"sampling the agent's tasks",
-		"every task is sampled already: read the record, or run the whole benchmark on your machine with `preflight run agent.py --agent-max-usd 5`",
+		"the record holds every task it can sample; to measure more, run the benchmark yourself, or "
+		"`preflight run agent.py --agent-max-usd 5` on your machine for a 30-task sample of your own",
 	),
 	"submission.not_agent": (
 		"choosing how to probe the script",
@@ -46,7 +49,8 @@ STEPS: dict[str, tuple[str, str]] = {
 	),
 	"patch.does_not_apply": (
 		"applying the fix",
-		"the code changed since the fix was made: check the script in again, then ask for the fix",
+		"the fix doesn't apply to the code as it is (the code changed, or the fix changes nothing): "
+		"check the script in again, then ask for the fix",
 	),
 	"patch.not_allowed": (
 		"applying the fix",
@@ -54,7 +58,7 @@ STEPS: dict[str, tuple[str, str]] = {
 	),
 	# the demo's limits (runner/queue.py QueueFull codes): not a failure of the script
 	"limit.visitor_daily": (
-		"the demo's daily limit (3 probe jobs a visitor a day)",
+		f"the demo's daily limit ({_DAILY} probe jobs a visitor a day)",
 		"come back after midnight ET, open a sample meanwhile, or probe on your machine with `preflight run train.py`",
 	),
 	"limit.daily_spend": (

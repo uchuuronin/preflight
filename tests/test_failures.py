@@ -64,4 +64,6 @@ def test_every_code_a_visitor_can_meet_has_its_own_step_not_only_its_familys():
 	missing = sorted(c for c in codes if c not in STEPS)
 	assert missing == [], missing
 	step, by_hand = describe("limit.visitor_daily")
-	assert "3 probe jobs" in step and "midnight ET" in by_hand
+	from preflight.runner.queue import VISITOR_DAILY_JOBS
+
+	assert f"{VISITOR_DAILY_JOBS} probe jobs" in step and "midnight ET" in by_hand

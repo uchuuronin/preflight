@@ -975,7 +975,11 @@ def warm_pool_dry_run(modal_env: str = "main"):
 			prev = state
 		t += dt.timedelta(hours=1)
 	fn = modal.Function.from_name(APP_NAME, "run_worker", environment_name=modal_env)
-	scalable = any(hasattr(fn, a) for a in ("update_autoscaler", "autoscaler"))
+	try:  # a lazy handle has every method: hydrate it to know the deployed function exists (review)
+		fn.hydrate()
+		scalable = any(hasattr(fn, a) for a in ("update_autoscaler", "autoscaler"))
+	except Exception as exc:
+		scalable = f"not found: {type(exc).__name__}"
 	try:
 		last = modal.Dict.from_name("preflight-jobs", environment_name=modal_env).get("warm_workers")
 	except Exception as exc:
