@@ -63,6 +63,29 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 17:20 UTC | A10 (both scripts) | about 11 (633 s of containers) | 0.19 [derived: container time at list price] | `d-lr-range-gpu` (41490183749): the range test on LoRA and nanoGPT, both train at the suggestion (`docs/decisions/lr-range.md`) |
 | Nov 2, 18:21 UTC | none (Meta API) | about 2 | 0.110 of Muse Spark [derived: tokens at list price] | `d-bigrepo-spark-map` (41499720563): Muse Spark's script map on the three big repositories, flag on |
 
+## Mon Nov 2, 16:35 ET (the PM's 4:25 list: A's search grounding review fixed; main merged; shot 9b)
+
+The PM's 4:25 PM "main is ready" (`8ec03bc`) merged into `ws-d` (one conflict, both sides' tests
+kept); 1,721 non-GPU tests passed on the merge (CPU torch). The PM's list for D: "fix A's review
+items on search grounding and the range test". The range test's went out at 16:20 (CI green,
+`7263013`). Search grounding's six items are fixed, still off: `docs/decisions/spark-search.md`,
+"A's review (Nov 2) and what changed". Two rounds of read-only review: the first found that an
+error could still get its own page cited (an address ending a sentence, without a scheme, another
+path on the same host) and that nothing had been checked against Meta's real API; the first is
+fixed, the second is the validation re-run after this push (about US$0.11 plus the search fee).
+The second round found nothing blocking for the merge, and one thing before the flag goes on (a
+library's error naming its own docs dropped those docs, e.g. NumPy's migration guide), fixed with
+library docs hosts read page by page, plus three small holes.
+
+Shot 9b: `preflight run` fills predictions now (B's fix, on `main`), so the video plan's stopgap
+step is replaced by a check the record has bands. On a CPU, `memory.peak` had a range (604 to 978
+MiB) and `time.step` abstained. B's GPU test of the shot's own script is still asked.
+
+This push sends: the merge of `main` `8ec03bc`; `python/preflight/harness/search_grounding.py`,
+`harness/spark.py` (`_post`'s `retries`, `respond` never retried), `runner/pipeline.py` (search
+cap), `tests/test_d_search_grounding.py`, `tests/test_pipeline.py`, `docs/decisions/spark-search.md`,
+`docs/demo/video-plan.md` (shot 9b), `docs/requests/from-d.md`, this file.
+
 ## Mon Nov 2, 16:20 ET (12:53 item 2: the range test, A's review fixed; still off)
 
 A's review of the range test came back (ws-a `from-a.md`): ready to merge off, six fixes before

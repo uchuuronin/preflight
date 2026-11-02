@@ -322,3 +322,29 @@ def test_a_connect_error_on_responses_isnt_retried():
 		transport=httpx.MockTransport(refused), backoff_s=0.0)  # fmt: skip
 	f, calls = ground_failure(c, probe(), {})
 	assert f is None and len(n) == 1 and len(calls) == 1  # chat would have tried three times
+
+
+def test_a_librarys_own_docs_named_in_its_error_dont_drop_its_other_pages():
+	# NumPy's "compiled with NumPy 1.x" error names its migration guide (the review's case)
+	guide = "https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
+	other = "https://numpy.org/doc/stable/release/2.0.0-notes.html"
+	err = OOM + f"\nA module compiled using NumPy 1.x cannot be run in NumPy 2.0. See {guide}."
+	data = response(answer("found", guide, other, ISSUE), cited=[guide, other, ISSUE], opened=[guide])
+	f, _ = ground_failure(client(data), probe(error=err), {})
+	assert [c.url for c in f.citations] == [other, ISSUE]
+
+
+def test_odd_spellings_of_a_named_host_are_caught_and_readthedocs_owners_are_apart():
+	for said, cited in {
+		"see evil.example/a//b": "https://evil.example/c",
+		"see evil\uff0eexample/k": "https://evil.example/k",
+		"see evil{.}example/k": "https://evil.example/k",
+		"see https://evil.readthedocs.io/a": "https://evil.readthedocs.io/b",
+	}.items():
+		data = response(answer("found", cited, ISSUE), cited=[cited, ISSUE])
+		f, _ = ground_failure(client(data), probe(error=OOM + "\n" + said), {})
+		assert [c.url for c in f.citations] == [ISSUE], said
+	fine = "https://docs.readthedocs.io/en/stable/x.html"
+	data = response(answer("found", fine), cited=[fine])
+	f, _ = ground_failure(client(data), probe(error=OOM + "\nsee https://evil.readthedocs.io/a"), {})
+	assert [c.url for c in f.citations] == [fine]

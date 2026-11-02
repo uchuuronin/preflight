@@ -55,8 +55,10 @@ SEARCH_USD_PER_QUERY = 2.50 / 1000
 OWN_HOSTS = ("preflight-cqn.pages.dev",)  # Preflight's share links, and their subdomains: never a source
 # public forges and docs, where an error naming one page (a library warning linking its own issue)
 # mustn't rule out the rest of the host; elsewhere a named host is ruled out whole
+# (readthedocs.io isn't one: each subdomain has its own owner, so a named one is ruled out whole)
 PUBLIC_HOSTS = ("github.com", "gitlab.com", "huggingface.co", "pytorch.org", "stackoverflow.com",
-	"python.org", "readthedocs.io", "pypi.org", "nvidia.com", "apache.org")  # fmt: skip
+	"python.org", "pypi.org", "nvidia.com", "apache.org", "numpy.org", "scipy.org", "pypa.io",
+	"pythonhosted.org", "vllm.ai", "deepspeed.ai", "ray.io", "pydata.org", "tensorflow.org")  # fmt: skip
 # Preflight's own failures, which carry no library error to search for
 SKIP_CODES = ("budget", "gpu.", "recorder", "timeout", "too_few_steps", "cancelled")
 
@@ -165,11 +167,16 @@ def _exact(url: str) -> str:
 	return u._replace(scheme=u.scheme.lower(), netloc=netloc, path=path).geturl()
 
 
+def _with_scheme(url: str) -> str:
+	"""A scheme-less address (`evil.example/a//b`) read as one, not as a path."""
+	return url if "://" in url or url.startswith("//") else "//" + url
+
+
 def _host(url: str) -> str:
 	"""The host as compared: lowercase, no `www.` or trailing dot, as ASCII (a Unicode look-alike and
 	its punycode compare equal)."""
 	try:
-		h = (urlsplit(url if "//" in url else "//" + url).hostname or "").lower().rstrip(".")
+		h = (urlsplit(_with_scheme(url)).hostname or "").lower().rstrip(".")
 	except ValueError:
 		return ""
 	h = h.removeprefix("www.")
@@ -187,7 +194,7 @@ def _page(url: str) -> str:
 	"""A page as compared with what an error names: host (`_host`), and the path lowercased and
 	percent-decoded, no trailing slash; no query or fragment."""
 	try:
-		path = unquote(urlsplit(url if "//" in url else "//" + url).path).lower().rstrip("/")
+		path = unquote(urlsplit(_with_scheme(url)).path).lower().rstrip("/")
 	except ValueError:
 		path = ""
 	return _host(url) + path
@@ -207,7 +214,10 @@ _ADDRESS = re.compile(
 def named_keys(text: str) -> set[str]:
 	"""What the addresses an error text names rule out (`_key`): with or without a scheme, defanged
 	(`hxxps://`, `[.]`) or not, punctuation after them dropped."""
-	text = (text or "").replace("[.]", ".").replace("(.)", ".")
+	text = (text or "").replace("[.]", ".").replace("(.)", ".").replace("{.}", ".")
+	text = (
+		text.replace("\uff0e", ".").replace("\u3002", ".").replace("\uff61", ".")
+	)  # wide and ideographic dots
 	keys = set()
 	for m in _ADDRESS.findall(text):
 		a = m.rstrip(".,;:!?'\"")
