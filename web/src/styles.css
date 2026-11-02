@@ -1139,7 +1139,15 @@ a {
 .pf-onode.is-accent { border-color: var(--pf-accent); box-shadow: 0 0 0 5px var(--pf-accent-glow), 0 0 40px var(--pf-accent-glow); }
 .pf-onode--hexagon.is-accent { background: var(--pf-accent-glow); }
 .pf-onode.is-fails { border-color: var(--pf-fail); box-shadow: 0 0 0 4px var(--pf-fail-soft); }
-.pf-onode.is-dim { opacity: 0.35; }
+/* Zoomed in, a node's face is opaque, so the loop's dotted arc doesn't show through it (D's audit
+   S2, Nov 2); a node dimmed while another is open fades only its words and outline. */
+.pf-orbit.is-zoomed .pf-onode:not(.pf-onode--hexagon) { background: linear-gradient(var(--pf-node), var(--pf-node)), var(--pf-sky-base); }
+.pf-onode.is-dim { border-color: var(--pf-stroke); }
+.pf-onode.is-dim .pf-onode__inner, .pf-onode.is-dim .pf-onode__chip { opacity: 0.4; transition: opacity 0.5s ease; }
+/* Zoomed in, a node that would sit cut in half at the stage's edge isn't drawn; it shows again
+   when keyboard focus reaches it, and when the zoom lets go. */
+.pf-onode.is-off { opacity: 0; pointer-events: none; }
+.pf-onode.is-off:focus-visible { opacity: 1; }
 
 .pf-onode__chip {
 	position: absolute;

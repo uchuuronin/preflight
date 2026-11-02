@@ -1,6 +1,6 @@
 import { type Node, type NodeProps, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { MOVE_MS, moveEase, useTweenedText } from "../../lib/tween";
 import { fmt } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
@@ -32,6 +32,8 @@ interface NodeData extends Record<string, unknown> {
 	meta: string;
 	accent: boolean;
 	dim: boolean;
+	/** Zoomed in on another node, and this one would sit cut in half at the stage's edge. */
+	off: boolean;
 	fails: boolean;
 	finding: string | null;
 }
@@ -157,12 +159,13 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 });
 
 const OrbitNodeView = memo(function OrbitNodeView({ data }: NodeProps<Node<NodeData>>) {
-	const { node, title, meta, accent, dim, fails, finding } = data;
+	const { node, title, meta, accent, dim, off, fails, finding } = data;
 	const cls = [
 		"pf-onode",
 		`pf-onode--${node.shape}`,
 		accent ? "is-accent" : "",
 		dim ? "is-dim" : "",
+		off ? "is-off" : "",
 		fails ? "is-fails" : "",
 	].join(" ");
 	// Outline weight carries the share of a step.
@@ -197,6 +200,52 @@ export function focusZoom(width: number, height: number): number {
 	return Math.max(1.35, Math.min(3, fitted * 1.4));
 }
 
+/** The zoomed stage's soft edge (styles.css `.pf-orbit.is-zoomed` mask), and a little air inside it. */
+const EDGE = 32;
+const AIR = 12;
+
+/**
+ * Where a focused node's glide lands (D's audit S2, Nov 2: with a detail sheet open, the zoom cut
+ * nodes in half at the stage's edge). The node and its two nearest neighbours fit whole inside the
+ * soft edge: the zoom drops towards the whole loop's fit when they wouldn't, and the centre slides
+ * off the node only as far as that needs. Every other node that wouldn't sit whole inside the edge
+ * is listed in `off`, and is hidden while zoomed rather than drawn cut in half.
+ */
+export function focusView(
+	layout: Pick<OrbitLayout, "nodes">,
+	id: string,
+	width: number,
+	height: number,
+): { x: number; y: number; zoom: number; off: Set<string> } | null {
+	const n = layout.nodes.find((m) => m.id === id);
+	if (!n) return null;
+	const near = layout.nodes
+		.filter((m) => m.id !== id)
+		.sort((a, b) => Math.hypot(a.x - n.x, a.y - n.y) - Math.hypot(b.x - n.x, b.y - n.y))
+		.slice(0, 2);
+	const group = [n, ...near];
+	const minX = Math.min(...group.map((m) => m.x - m.size / 2));
+	const maxX = Math.max(...group.map((m) => m.x + m.size / 2));
+	const minY = Math.min(...group.map((m) => m.y - m.size / 2));
+	const maxY = Math.max(...group.map((m) => m.y + m.size / 2));
+	const pad = EDGE + AIR;
+	const fitted = Math.min(width / FRAME.w, height / FRAME.h) / 1.08;
+	const zoom = Math.max(fitted, Math.min(focusZoom(width, height), (width - 2 * pad) / (maxX - minX), (height - 2 * pad) / (maxY - minY)));
+	// The centre stays on the node unless a neighbour would cross the edge; then it slides just enough.
+	const slide = (c: number, lo: number, hi: number, half: number) => (hi - lo > 2 * half ? (lo + hi) / 2 : Math.min(Math.max(c, hi - half), lo + half));
+	const x = slide(n.x, minX, maxX, width / 2 / zoom - pad / zoom);
+	const y = slide(n.y, minY, maxY, height / 2 / zoom - pad / zoom);
+	const off = new Set<string>();
+	for (const m of layout.nodes) {
+		if (m.id === id) continue;
+		const sx = (m.x - x) * zoom + width / 2;
+		const sy = (m.y - y) * zoom + height / 2;
+		const r = (m.size / 2) * zoom;
+		if (sx - r < EDGE || sx + r > width - EDGE || sy - r < EDGE || sy + r > height - EDGE) off.add(m.id);
+	}
+	return { x, y, zoom, off };
+}
+
 function OrbitInner({ compact = false }: { compact?: boolean }) {
 	const { record, estimates, state, actions } = useWorkspace();
 	const overlays = useMapOverlays(record.job.lens);
@@ -205,6 +254,8 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 	const fit = fitOf(record, estimates, state.knobs);
 	const failing = likelyFails(record, estimates);
 
+	// Nodes the focused zoom would cut at the stage's edge (focusView); set when the glide is aimed.
+	const [offstage, setOffstage] = useState<ReadonlySet<string>>(() => new Set());
 	const nodes = useMemo<Node[]>(() => {
 		const memT = targetFor(record, "memory");
 		const peak = memT ? estimates[memT.id] : undefined;
@@ -288,6 +339,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 						// A highlighted node the map doesn't draw (a group's child) lights its parent.
 						(n.graphId !== null && hiddenParents.has(n.graphId)),
 					dim: !!state.focus && state.focus !== n.id,
+					off: !!state.focus && offstage.has(n.id),
 					fails: n.phase === "eval" && failing,
 					finding: finding ? finding.title : null,
 				},
@@ -302,7 +354,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 			};
 		});
 		return [bg, ...pfNodes];
-	}, [record, estimates, state.highlight, state.focus, layout, fit, failing]);
+	}, [record, estimates, state.highlight, state.focus, layout, fit, failing, offstage]);
 
 	const box = useRef<HTMLDivElement>(null);
 	const focusRef = useRef(state.focus);
@@ -326,7 +378,10 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 		const raf1 = requestAnimationFrame(() => {
 			raf2 = requestAnimationFrame(() => {
 				glideUntil.current = performance.now() + duration;
-				if (n) void flow.setCenter(n.x, n.y, { zoom: el ? focusZoom(el.clientWidth, el.clientHeight) : 1.35, duration });
+				const v = n && el ? focusView(layout, n.id, el.clientWidth, el.clientHeight) : null;
+				setOffstage(v ? v.off : new Set());
+				if (v) void flow.setCenter(v.x, v.y, { zoom: v.zoom, duration });
+				else if (n) void flow.setCenter(n.x, n.y, { zoom: 1.35, duration });
 				else void flow.fitView({ padding: 0.04, duration });
 			});
 		});
@@ -361,8 +416,11 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				}
 				const f = focusRef.current;
 				const n = f ? layoutRef.current.nodes.find((m) => m.id === f) : null;
-				if (n) void flow.setCenter(n.x, n.y, { zoom: focusZoom(width, height), duration: 0 });
-				else void flow.fitView({ padding: 0.04, duration: 0 });
+				const v = n ? focusView(layoutRef.current, n.id, width, height) : null;
+				if (v) {
+					setOffstage(v.off);
+					void flow.setCenter(v.x, v.y, { zoom: v.zoom, duration: 0 });
+				} else void flow.fitView({ padding: 0.04, duration: 0 });
 			};
 			frame = requestAnimationFrame(refit);
 		});
