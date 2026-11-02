@@ -140,10 +140,8 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 					flag("probes.agent_error_line") if keep_error is None else keep_error
 				)  # off until checked
 				repo = flag("probes.repo_install") if install_repo is None else install_repo
-				if replies is None:  # off until checked; the ops rig turns it on for its own run
-					note = flag("probes.agent_proxy_replies")
-				else:
-					note = replies
+				# off until checked; the ops rig turns it on for its own run
+				note = flag("probes.agent_proxy_replies") if replies is None else replies
 				one = flag("probes.agent_single_task") if single_task is None else single_task
 				single = one and one_task(agent)
 
