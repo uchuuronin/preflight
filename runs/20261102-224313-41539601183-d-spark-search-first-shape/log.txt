@@ -1,0 +1,12 @@
+{"case": "a-smoke-l4-main-3:p1", "cost_usd": 0.01461, "seconds": 6.2, "code": "search.none_found", "n": 0, "trace": {"web_search_call": true, "searches": 2, "opens": 0, "results": 0, "cited": 0}}
+{"case": "a-smoke-l4-main-4:p1-eval", "cost_usd": 0.022338, "seconds": 6.5, "code": "search.none_found", "n": 0, "trace": {"web_search_call": true, "searches": 3, "opens": 0, "results": 0, "cited": 0}}
+{"case": "a-smoke-retrieval-st-l4:p1", "cost_usd": 0.024265, "seconds": 7.7, "code": "search.none_found", "n": 0, "trace": {"web_search_call": true, "searches": 3, "opens": 0, "results": 0, "cited": 0}}
+{"case": "a-smoke-retrieval-st-l4:p2", "cost_usd": 0, "seconds": 0, "code": null, "n": 0, "trace": null}
+{"case": "a-smoke-vision-timm-l4:p2", "cost_usd": 0, "seconds": 0, "code": null, "n": 0, "trace": null}
+{"case": "a-smoke-serving-vllm:p1", "cost_usd": 0.032625, "seconds": 13.4, "code": "search.known_issue", "n": 2, "trace": {"web_search_call": true, "searches": 3, "opens": 4, "results": 0, "cited": 2}}
+{"case": "a-smoke-serving-vllm-2:p1", "cost_usd": 0.013893, "seconds": 6.2, "code": "search.none_found", "n": 0, "trace": {"web_search_call": true, "searches": 2, "opens": 0, "results": 0, "cited": 0}}
+{"case": "a-smoke-serving-vllm-3:p1", "cost_usd": 0.020929, "seconds": 7.4, "code": "search.none_found", "n": 0, "trace": {"web_search_call": true, "searches": 3, "opens": 0, "results": 0, "cited": 0}}
+{"case": "a-notebook-checkin-1:p1", "cost_usd": 0.016717, "seconds": 5.1, "code": "search.none_found", "n": 0, "trace": {"web_search_call": true, "searches": 3, "opens": 0, "results": 0, "cited": 0}}
+{"case": "a-notebook-checkin-2:p2", "cost_usd": 0, "seconds": 0, "code": null, "n": 0, "trace": null}
+{"case": "planted-link", "cost_usd": 0.024116, "seconds": 12.3, "code": "search.none_found", "n": 0, "trace": {"web_search_call": true, "searches": 3, "opens": 0, "results": 0, "cited": 0}}
+spent US$0.1695 at list price (tokens only)

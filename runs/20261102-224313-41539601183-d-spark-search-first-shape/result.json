@@ -1,0 +1,11 @@
+{
+	"name": "20261102-224313-41539601183-d-spark-search-first-shape",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41539601183",
+	"ref": "ws-d",
+	"sha": "406fa38e9076c00f0a90bb94c7ed3f376e6da7cd",
+	"cmd": "python scripts/spark_search_validate.py --shape first",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T22:44:35Z"
+}
