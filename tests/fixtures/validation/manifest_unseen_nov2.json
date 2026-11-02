@@ -1,0 +1,142 @@
+{
+ "$comment": "Monday's unseen validation (Nov 2), first attempts only, scored from a checkout of the frozen commit 56c2141 (calibration table 50ea0fb14a). A's status file, 'Unseen validation runs (Nov 2)', gives each first attempt; retries ('-r') and anything after a fix are not here. No full run of an unseen script reached a first step, so no ground truth is given for any of them. The zoo runs are those of manifest_nov2.json.",
+ "runs": [
+  {
+   "script": "finetune_lora_hf",
+   "set": "zoo",
+   "job_type": "finetune",
+   "record": "../b-a-smoke-l4-main-4.record.json",
+   "ground_truth": "ground_truth_finetune_lora_hf.json",
+   "$ground_truth": "remote-runs runs/20261031-205402-41241033277-a-gt-lora-l4-5",
+   "calibrates": [
+    "step",
+    "intervals"
+   ],
+   "$calibrates": "Chiya, Nov 1: the step band was widened after looking at this run (6a994eb), so it is used for calibration for step time and intervals; it stays in the OOM and planted-problems rows (the OOM was caught before it, and no memory rule changed after it)",
+   "planted": [
+    "eval.batch_large",
+    "eval.no_grad",
+    "data.no_packing"
+   ]
+  },
+  {
+   "script": "agent_eval_spark",
+   "set": "zoo",
+   "job_type": "agent",
+   "record": "agent_eval_spark_record_oct31.json",
+   "agent_total_usd": 6.6577,
+   "$agent_total_usd": "the whole 500-task MBPP run: the record's 30 sampled tasks ($0.4289, Oct 31 run 41250821790) plus the other 470 ($6.2288, Nov 2 run 41383158427, a-mbpp-full on remote-runs; all 470 ended done), by the proxy's per-call cost [measured]"
+  },
+  {
+   "script": "grpo_trl",
+   "set": "zoo",
+   "job_type": "rl",
+   "record": "../../../zoo/grpo_trl/record_nov1_a10.json",
+   "ground_truth": "ground_truth_grpo_trl.json",
+   "$ground_truth": "remote-runs runs/20261101-124357-41307865340-a-gt-grpo-50-b (A10)",
+   "calibrates": [
+    "*"
+   ],
+   "$calibrates": "the record's only probe is this 50-step run itself, so predicting it from itself would test nothing; it calibrated the rollout band (engine/rl.py LENGTH_DRIFT), so no row scores it"
+  },
+  {
+   "script": "unseen-1",
+   "set": "unseen",
+   "job_type": "finetune",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "torchtune LoRA 1.5B, L4 (1a)",
+   "$first_attempt": "failed at mapping, no record: \"Python source is too large to map (over 2 MB)\" (a-unseen-1a-checkin 41478160460)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "ask_model_id": "unseen-1a"
+  },
+  {
+   "script": "unseen-2",
+   "set": "unseen",
+   "job_type": "pretrain",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "LitGPT pretrain debug, L4",
+   "$first_attempt": "record 01M6EG6JNE7JGKPJZGCDFZMNC9: no L4 in 20 min (gpu.unavailable), no probe ran (a-unseen-2-checkin 41478097108)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "unseen/unseen-2-first.record.json"
+  },
+  {
+   "script": "unseen-3",
+   "set": "unseen",
+   "job_type": "rl",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "open-r1 GRPO, A100",
+   "$first_attempt": "record 01M6EG9JEXR64QDNXEAS9YKGSV: 3 probes missing_package (open_r1, a src/ layout) (a-unseen-3-checkin 41478422939)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "unseen/unseen-3-first.record.json"
+  },
+  {
+   "script": "unseen-4",
+   "set": "unseen",
+   "job_type": "agent",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "smolagents with Muse Spark, edited per the list (4a)",
+   "$first_attempt": "record 01M6EGB5J6HPPM7ZNW6EABCEKT: read as a serving job, no L4 in 20 min (a-unseen-4a-checkin 41478513589); the list's Change is a hand edit",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "unseen/unseen-4a-first.record.json"
+  },
+  {
+   "script": "unseen-5",
+   "set": "unseen",
+   "job_type": "eval",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "lm-evaluation-harness, L4",
+   "$first_attempt": "refused at submission, no record: \"the source is larger than Preflight reads\" (a-unseen-5-checkin 41478227289)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'"
+  },
+  {
+   "script": "unseen-6",
+   "set": "unseen",
+   "job_type": "serving",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "vLLM throughput benchmark, L4",
+   "$first_attempt": "refused at submission, no record (a-unseen-6-checkin 41478294041)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'"
+  },
+  {
+   "script": "unseen-7",
+   "set": "unseen",
+   "job_type": "retrieval",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "BEIR dense retrieval, L4",
+   "$first_attempt": "record 01M6EG5HHP3F6Q0MF20D7ZPFX3: no L4 in 20 min, no probe ran (a-unseen-7-checkin 41478031647)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "unseen/unseen-7-first.record.json"
+  },
+  {
+   "script": "unseen-8",
+   "set": "unseen",
+   "job_type": "gnn",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "OGB arxiv GraphSAGE, L4",
+   "$first_attempt": "record 01M6EG4WGGQF9GZZ3KKB5DRRDS: no L4 in 20 min, no probe ran (a-unseen-8-checkin 41477966998)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "unseen/unseen-8-first.record.json"
+  },
+  {
+   "script": "unseen-9",
+   "set": "unseen",
+   "job_type": "vision",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "airbench94 Muon, L4",
+   "$first_attempt": "record 01M6EG4CQ56Z1RFJ9PXDH3N5A2: 3 probes missing_package (torchvision) (a-unseen-9-checkin 41477906940)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "unseen/unseen-9-first.record.json"
+  }
+ ],
+ "knob_ms": "knob_ms_nov2.json",
+ "$knob_ms": "C's stranger test (web/e2e/stranger.mjs, KNOB_MS_OUT) at 4x CPU slowdown, Nov 2, on a local build of main cfcf83c's web/ (the deployed site isn't reachable from B's container); 18 of 18 checks passed"
+}
