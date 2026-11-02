@@ -485,6 +485,30 @@ def test_a_probe_past_its_own_limit_is_stopped_by_the_runner_and_says_timeout(mo
 	assert r.probe.status == "timeout" and r.probe.error_code == "timeout" and "s limit" in r.probe.error
 
 
+def test_a_failed_start_check_is_named_on_the_probe_that_lost_its_result():
+	# Nov 1 to 2: three probes ended "without a result" about 1,280 s in with no GPU wait recorded
+	class NoReady(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				assert timeout < 30 * 60  # under the sandbox's own 30-min life
+				raise RuntimeError("exec timeout exceeds the sandbox's")
+			return super().exec(*args, timeout=timeout)
+
+	class Silent(FakeProc):
+		def read(self):
+			return ""
+
+	class Box(NoReady):
+		def exec(self, *args, timeout=None):
+			super().exec(*args, timeout=timeout)
+			return Silent(self)
+
+	with SandboxRunner(lambda g: Box(g)) as run:
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+		assert "start check failed: RuntimeError: exec timeout exceeds" in r.probe.error
+		assert run.ready_error is None  # told once, on that probe
+
+
 def test_the_jobs_wall_budget_doesnt_count_the_gpu_wait():
 	from preflight.runner.pipeline import Budget
 

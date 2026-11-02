@@ -23,7 +23,11 @@ log = logging.getLogger("preflight.sandbox")
 ENTRY = ("python", "-m", "preflight.probes.remote")
 EXEC_SLACK_S = 90  # over the probe's own cap: model download is inside it, process start is not
 READY = ("true",)  # a no-op run first: returns once the container is up, after any wait for a GPU
-READY_TIMEOUT_S = 30 * 60  # Modal's queue for a GPU can be long (L4: 14 to 25 min seen, Oct 31 to Nov 1)
+# Modal's queue for a GPU can be long (L4: 14 to 25 min seen, Oct 31 to Nov 1). Under the sandbox's
+# own 30-min life (modal_app._sandbox_factory): at 30 min the no-op may have failed at once, so the
+# probe's exec started before its GPU and three probes (serving, eval, a notebook) ended "without a
+# result" about 1,280 s in, with no wait recorded (Nov 1 to 2; the likely cause, not proven)
+READY_TIMEOUT_S = 25 * 60
 
 
 def suppress_all():
@@ -76,6 +80,7 @@ class SandboxRunner:
 		# where the status line went quiet for 19 minutes (D, Nov 1)
 		self.notify: Callable[[str, str, float], None] | None = None
 		self._close_lock = threading.Lock()
+		self.ready_error: str | None = None  # the last failed no-op (the container may not have been up)
 
 	def __enter__(self):
 		return self
@@ -100,8 +105,9 @@ class SandboxRunner:
 			try:
 				sb.exec(*READY, timeout=READY_TIMEOUT_S).wait()
 				box["ok"] = True
-			except Exception:
+			except Exception as exc:
 				box["ok"] = True  # a failed no-op shows itself on the probe's own exec
+				box["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
 
 		t = threading.Thread(target=go, daemon=True)
 		t.start()
@@ -114,6 +120,9 @@ class SandboxRunner:
 			if not t.is_alive() or (left is not None and left <= step):
 				break
 			self._tell("waiting", gpu, self._clock() - since)
+		if box.get("error"):  # Modal's own error, no visitor data: kept on the probe so the next one is seen
+			log.warning("the no-op on %s failed: %s", gpu, box["error"])
+			self.ready_error = box["error"]
 		return bool(box.get("ok"))
 
 	def _sandbox(self, gpu: str, image: str = "probe", fallback: tuple[str, ...] = ()):
@@ -247,6 +256,12 @@ class SandboxRunner:
 				"error": f"The probe ran past its {spec.timeout_s:.0f} s limit and was stopped"})  # fmt: skip
 		if wait > 0:  # logged on the probe that waited: how long the GPU took to schedule
 			r.probe = r.probe.model_copy(update={"extras": {**r.probe.extras, "gpu_wait_s": round(wait, 1)}})
+		if (
+			self.ready_error and not out
+		):  # the sandbox's no-op failed: say so with the probe that lost its result
+			r.probe = r.probe.model_copy(update={"error": f"{r.probe.error or 'no result'} (the sandbox's start check failed: "
+				f"{self.ready_error})"})  # fmt: skip
+		self.ready_error = None
 		return r
 
 
