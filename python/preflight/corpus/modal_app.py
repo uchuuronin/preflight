@@ -342,9 +342,11 @@ def main(
 		from pathlib import Path
 
 		skip = {x.strip() for x in Path(exclude_keys).read_text().splitlines() if x.strip()}
-		print(
-			f"excluding {sum(c.key in skip for c in all_cfgs)} of {len(all_cfgs)} configs listed in {exclude_keys}"
-		)
+		hit = sum(c.key in skip for c in all_cfgs)
+		print(f"excluding {hit} of {len(all_cfgs)} configs listed in {exclude_keys}")
+		# review, Nov 1: a changed pin changes every key, so a stale list would exclude nothing and run the holdout
+		if skip and not hit:
+			raise SystemExit(f"{exclude_keys} matches none of these configs: are its keys stale?")
 		all_cfgs = [c for c in all_cfgs if c.key not in skip]
 		if not all_cfgs:
 			raise SystemExit("every config is excluded")

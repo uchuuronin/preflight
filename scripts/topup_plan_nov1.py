@@ -20,7 +20,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 DATA = ROOT / "python/preflight/corpus/data"
-HOLDOUT = ("A100-SXM-80GB", "A100-PCIe-80GB", "A100-SXM-40GB", "A100-PCIe-40GB")
 # GPU -> seeds of the 300-config grouped list it runs (Nov 1 plan in docs/requests/from-b.md)
 RUNS = {
 	"H100-SXM-80GB": (0, 1),
@@ -43,7 +42,9 @@ def plan(corpus: str) -> dict:
 			r = json.loads(line)
 			if r["kind"] == "kernels":
 				done[r["gpu"]].add(r["key"])
-	holdout = sorted(set().union(*(done[g] for g in HOLDOUT)))
+	from preflight.corpus.calibrate import held_out  # the calibration's own rule, MIG slices included
+
+	holdout = sorted(set().union(*(keys for g, keys in done.items() if held_out(g))))
 	out: dict = {"n": N, "excluded_holdout_keys": len(holdout), "gpus": {}}
 	for gpu, seeds in RUNS.items():
 		rows = []
