@@ -585,6 +585,7 @@ def ground_truth(
 	Writes out/ground_truth_<name>.json."""
 	import json
 
+	from preflight.harness.static import ScriptParseError
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
 
@@ -613,7 +614,17 @@ def ground_truth(
 		print(f"[ground truth] {repo} at {sha}: {len(files)} files", flush=True)
 	else:
 		files = _read_tree(src)
-	p = plan(files, entrypoint or None)
+	try:
+		p = plan(files, entrypoint or None)
+	except ScriptParseError as exc:
+		# the mapper only picks the image and the probe's sample sizes here; a full run doesn't need
+		# it, so a repo the mapper can't read still gets its full run, in the probe image (Nov 2: the
+		# unseen torchtune repo, "too large to map", ended the ground truth before the script ran)
+		print(f"[ground truth] the mapper couldn't read it ({exc}); probe image, no lens", flush=True)
+		from preflight.recorder.ground_truth import entrypoint_of
+
+		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
+			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
 	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
