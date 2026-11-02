@@ -24,3 +24,20 @@ def test_the_demo_never_writes_through_a_link(tmp_path):
 	with pytest.raises(InvalidSubmission):
 		_write_demo(tmp_path / "demo")
 	assert not (tmp_path / "elsewhere.py").exists()
+
+
+def test_run_fills_the_engines_predictions_so_watch_has_bands(monkeypatch):
+	# D, Nov 2: `preflight run` wrote measurements only, so `preflight watch` had no bands to check against
+	from pathlib import Path
+
+	from preflight.cli import main as cli
+	from preflight.recorder.inflight import bands_from
+	from preflight.runner.pipeline import _Ctx
+	from preflight.schema import Predictions, load_record
+
+	gold = load_record((Path(__file__).resolve().parents[1] / "schema/examples/pretrain.json").read_text())
+	bare = gold.model_copy(update={"predictions": Predictions(), "models": []})
+	assert bands_from(bare).step_s is None
+	filled = cli._predict(bare, _Ctx())
+	b = bands_from(filled)
+	assert b.step_s is not None and b.peak_bytes is not None
