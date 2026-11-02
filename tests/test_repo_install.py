@@ -273,3 +273,9 @@ def test_an_import_whose_handler_raises_again_is_required(tmp_path, missing):
 	_tree(tmp_path, {"run.py": "def model():\n\ttry:\n\t\timport openai\n\texcept ModuleNotFoundError:\n"
 		"\t\traise ModuleNotFoundError(\"Please install 'openai' extra\")\ntry:\n\timport wandb\nexcept ImportError:\n\twandb = None\n"})  # fmt: skip
 	assert R.missing_imports(tmp_path, "run.py") == {"openai"}
+
+
+def test_a_try_with_only_a_finally_doesnt_make_an_import_optional(tmp_path, missing):
+	missing.add("openai")
+	_tree(tmp_path, {"run.py": "try:\n\timport openai\nfinally:\n\tpass\n"})
+	assert R.missing_imports(tmp_path, "run.py") == {"openai"}

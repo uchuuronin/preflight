@@ -122,8 +122,10 @@ def _imports(text: str) -> tuple[set[str], set[tuple[int, str]]]:
 	for node in ast.walk(tree):
 		# a try whose handler raises again (smolagents: "Please install 'openai' extra") makes the
 		# import required, not optional
-		if isinstance(node, ast.Try) and not any(
-			isinstance(x, ast.Raise) for h in node.handlers for x in ast.walk(h)
+		if (
+			isinstance(node, ast.Try)
+			and node.handlers  # a try with only a finally lets the error through: required
+			and not any(isinstance(x, ast.Raise) for h in node.handlers for x in ast.walk(h))
 		):
 			for n in (*node.body, *node.handlers):
 				guarded.update(id(x) for x in ast.walk(n))
