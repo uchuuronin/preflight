@@ -1,0 +1,1599 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-ncb8PmfIRrFFJxa1imBFwv
+Building image im-iemn19VnJPX7tIFTiqc8lN
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install accelerate==1.1.1 datasets==3.1.0 'httpx>=0.27' 'numpy>=1.26,<2.2' nvidia-ml-py==12.560.30 peft==0.13.2 psutil==6.1.0 'pydantic>=2.8,<3' safetensors==0.4.5 torch==2.5.1 torchvision==0.20.1 transformers==4.46.3 trl==0.14.0 uv==0.5.11
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Collecting accelerate==1.1.1
+  Downloading http://pypi-mirror.modal.local:5555/simple/accelerate/accelerate-1.1.1-py3-none-any.whl.metadata (19 kB)
+Collecting datasets==3.1.0
+  Downloading http://pypi-mirror.modal.local:5555/simple/datasets/datasets-3.1.0-py3-none-any.whl.metadata (20 kB)
+Collecting httpx>=0.27
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpx/httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting numpy<2.2,>=1.26
+  Downloading http://pypi-mirror.modal.local:5555/simple/numpy/numpy-2.1.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (62 kB)
+Collecting nvidia-ml-py==12.560.30
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-ml-py/nvidia_ml_py-12.560.30-py3-none-any.whl.metadata (8.6 kB)
+Collecting peft==0.13.2
+  Downloading http://pypi-mirror.modal.local:5555/simple/peft/peft-0.13.2-py3-none-any.whl.metadata (13 kB)
+Collecting psutil==6.1.0
+  Downloading http://pypi-mirror.modal.local:5555/simple/psutil/psutil-6.1.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (22 kB)
+Collecting pydantic<3,>=2.8
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl.metadata (137 kB)
+Collecting safetensors==0.4.5
+  Downloading http://pypi-mirror.modal.local:5555/simple/safetensors/safetensors-0.4.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (3.8 kB)
+Collecting torch==2.5.1
+  Downloading http://pypi-mirror.modal.local:5555/simple/torch/torch-2.5.1-cp311-cp311-manylinux1_x86_64.whl.metadata (28 kB)
+Collecting torchvision==0.20.1
+  Downloading http://pypi-mirror.modal.local:5555/simple/torchvision/torchvision-0.20.1-cp311-cp311-manylinux1_x86_64.whl.metadata (6.1 kB)
+Collecting transformers==4.46.3
+  Downloading http://pypi-mirror.modal.local:5555/simple/transformers/transformers-4.46.3-py3-none-any.whl.metadata (44 kB)
+Collecting trl==0.14.0
+  Downloading http://pypi-mirror.modal.local:5555/simple/trl/trl-0.14.0-py3-none-any.whl.metadata (12 kB)
+Collecting uv==0.5.11
+  Downloading http://pypi-mirror.modal.local:5555/simple/uv/uv-0.5.11-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (11 kB)
+Collecting huggingface-hub>=0.21.0 (from accelerate==1.1.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/huggingface-hub/huggingface_hub-2.4.0-py3-none-any.whl.metadata (16 kB)
+Collecting packaging>=20.0 (from accelerate==1.1.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pyyaml (from accelerate==1.1.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pyyaml/pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting filelock (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/filelock/filelock-4.2.7-py3-none-any.whl.metadata (2.0 kB)
+Collecting pyarrow>=15.0.0 (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pyarrow/pyarrow-26.0.0-cp311-cp311-manylinux_2_28_x86_64.whl.metadata (3.0 kB)
+Collecting dill<0.3.9,>=0.3.0 (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/dill/dill-0.3.8-py3-none-any.whl.metadata (10 kB)
+Collecting pandas (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pandas/pandas-3.1.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (18 kB)
+Collecting requests>=2.32.2 (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/requests/requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Collecting tqdm>=4.66.3 (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl.metadata (57 kB)
+Collecting xxhash (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/xxhash/xxhash-4.0.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (17 kB)
+Collecting multiprocess<0.70.17 (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/multiprocess/multiprocess-0.70.16-py311-none-any.whl.metadata (7.2 kB)
+Collecting fsspec<=2024.9.0,>=2023.1.0 (from fsspec[http]<=2024.9.0,>=2023.1.0->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/fsspec/fsspec-2024.9.0-py3-none-any.whl.metadata (11 kB)
+Collecting aiohttp (from datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/aiohttp/aiohttp-3.14.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+Collecting typing-extensions>=4.8.0 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting networkx (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/networkx/networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+Collecting jinja2 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/jinja2/jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting nvidia-cuda-nvrtc-cu12==12.4.127 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-nvrtc-cu12/nvidia_cuda_nvrtc_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl.metadata (1.5 kB)
+Collecting nvidia-cuda-runtime-cu12==12.4.127 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-runtime-cu12/nvidia_cuda_runtime_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl.metadata (1.5 kB)
+Collecting nvidia-cuda-cupti-cu12==12.4.127 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-cupti-cu12/nvidia_cuda_cupti_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl.metadata (1.6 kB)
+Collecting nvidia-cudnn-cu12==9.1.0.70 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cudnn-cu12/nvidia_cudnn_cu12-9.1.0.70-py3-none-manylinux2014_x86_64.whl.metadata (1.6 kB)
+Collecting nvidia-cublas-cu12==12.4.5.8 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cublas-cu12/nvidia_cublas_cu12-12.4.5.8-py3-none-manylinux2014_x86_64.whl.metadata (1.5 kB)
+Collecting nvidia-cufft-cu12==11.2.1.3 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cufft-cu12/nvidia_cufft_cu12-11.2.1.3-py3-none-manylinux2014_x86_64.whl.metadata (1.5 kB)
+Collecting nvidia-curand-cu12==10.3.5.147 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-curand-cu12/nvidia_curand_cu12-10.3.5.147-py3-none-manylinux2014_x86_64.whl.metadata (1.5 kB)
+Collecting nvidia-cusolver-cu12==11.6.1.9 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusolver-cu12/nvidia_cusolver_cu12-11.6.1.9-py3-none-manylinux2014_x86_64.whl.metadata (1.6 kB)
+Collecting nvidia-cusparse-cu12==12.3.1.170 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusparse-cu12/nvidia_cusparse_cu12-12.3.1.170-py3-none-manylinux2014_x86_64.whl.metadata (1.6 kB)
+Collecting nvidia-nccl-cu12==2.21.5 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nccl-cu12/nvidia_nccl_cu12-2.21.5-py3-none-manylinux2014_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-nvtx-cu12==12.4.127 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvtx-cu12/nvidia_nvtx_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-nvjitlink-cu12==12.4.127 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvjitlink-cu12/nvidia_nvjitlink_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl.metadata (1.5 kB)
+Collecting triton==3.1.0 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/triton/triton-3.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.3 kB)
+Collecting sympy==1.13.1 (from torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/sympy/sympy-1.13.1-py3-none-any.whl.metadata (12 kB)
+Collecting pillow!=8.3.*,>=5.3.0 (from torchvision==0.20.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pillow/pillow-13.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+Collecting huggingface-hub>=0.21.0 (from accelerate==1.1.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/huggingface-hub/huggingface_hub-0.36.2-py3-none-any.whl.metadata (15 kB)
+Building image im-iS4UCqsOtBIlOrdjYaa6L4
+
+=> Step 0: FROM base
+
+=> Step 1: RUN apt-get update
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+Get:4 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [360 kB]
+Fetched 450 kB in 1s (705 kB/s)
+Reading package lists...
+
+=> Step 2: RUN apt-get install -y gcc g++
+Collecting regex!=2019.12.17 (from transformers==4.46.3)
+  Downloading http://pypi-mirror.modal.local:5555/simple/regex/regex-2026.9.29-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (40 kB)
+Collecting tokenizers<0.21,>=0.20 (from transformers==4.46.3)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tokenizers/tokenizers-0.20.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.7 kB)
+Reading package lists...Collecting rich (from trl==0.14.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/rich/rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting mpmath<1.4,>=1.1.0 (from sympy==1.13.1->torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/mpmath/mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+Collecting annotated-types>=0.6.0 (from pydantic<3,>=2.8)
+  Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.50.2 (from pydantic<3,>=2.8)
+
+Building dependency tree...
+Reading state information...
+gcc is already the newest version (4:12.2.0-3).
+g++ is already the newest version (4:12.2.0-3).
+g++ set to manually installed.
+0 upgraded, 0 newly installed, 0 to remove and 64 not upgraded.
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (6.5 kB)
+Collecting typing-inspection>=0.4.4 (from pydantic<3,>=2.8)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting hf-xet<2.0.0,>=1.1.3 (from huggingface-hub>=0.21.0->accelerate==1.1.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/hf-xet/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+Collecting anyio (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+Collecting certifi (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+Collecting httpcore==1.* (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpcore/httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting idna (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting h11>=0.16 (from httpcore==1.*->httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting aiohappyeyeballs>=2.5.0 (from aiohttp->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/aiohappyeyeballs/aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+Collecting aiosignal>=1.4.0 (from aiohttp->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/aiosignal/aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+Collecting attrs>=17.3.0 (from aiohttp->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/attrs/attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+Collecting frozenlist>=1.1.1 (from aiohttp->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/frozenlist/frozenlist-1.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (20 kB)
+Collecting multidict<8.0,>=4.5 (from aiohttp->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/multidict/multidict-7.2.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (6.1 kB)
+Collecting propcache>=0.2.0 (from aiohttp->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/propcache/propcache-0.5.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (25 kB)
+Collecting yarl<2.0,>=1.25.1 (from aiohttp->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/yarl/yarl-1.25.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (111 kB)
+Saving image...
+Collecting charset_normalizer<4,>=2 (from requests>=2.32.2->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/charset-normalizer/charset_normalizer-3.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (46 kB)
+Collecting urllib3<3,>=1.26 (from requests>=2.32.2->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/urllib3/urllib3-2.8.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting MarkupSafe>=2.0 (from jinja2->torch==2.5.1)
+  Downloading http://pypi-mirror.modal.local:5555/simple/markupsafe/markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+Collecting python-dateutil>=2.9.0 (from pandas->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/python-dateutil/python_dateutil-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+Collecting tzdata (from python-dateutil>=2.9.0->pandas->datasets==3.1.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/tzdata/tzdata-2026.6-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting markdown-it-py>=2.2.0 (from rich->trl==0.14.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/markdown-it-py/markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting pygments<3.0.0,>=2.13.0 (from rich->trl==0.14.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pygments/pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich->trl==0.14.0)
+  Downloading http://pypi-mirror.modal.local:5555/simple/mdurl/mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/accelerate/accelerate-1.1.1-py3-none-any.whl (333 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/datasets/datasets-3.1.0-py3-none-any.whl (480 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-ml-py/nvidia_ml_py-12.560.30-py3-none-any.whl (40 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/peft/peft-0.13.2-py3-none-any.whl (320 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/psutil/psutil-6.1.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (287 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/safetensors/safetensors-0.4.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (435 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/torch/torch-2.5.1-cp311-cp311-manylinux1_x86_64.whl (906.5 MB)
+Image saved, took 976.45ms
+
+Built image im-iS4UCqsOtBIlOrdjYaa6L4 in 6.41s
+
+
+Building image im-t0cny3ALmKac8tf3nj5coC
+
+=> Step 0: FROM base
+
+=> Step 1: RUN groupadd --gid 61000 preflight-probe && useradd --uid 61000 --gid 61000 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin preflight-probe
+useradd warning: preflight-probe's uid 61000 outside of the UID_MIN 1000 and UID_MAX 60000 range.
+Saving image...
+Image saved, took 791.30ms
+
+Built image im-t0cny3ALmKac8tf3nj5coC in 2.40s
+
+
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 906.5/906.5 MB 312.2 MB/s  0:00:03
+Downloading http://pypi-mirror.modal.local:5555/simple/torchvision/torchvision-0.20.1-cp311-cp311-manylinux1_x86_64.whl (7.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.2/7.2 MB 216.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/transformers/transformers-4.46.3-py3-none-any.whl (10.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.0/10.0 MB 232.2 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/trl/trl-0.14.0-py3-none-any.whl (313 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/uv/uv-0.5.11-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (15.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.0/15.0 MB 21.4 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cublas-cu12/nvidia_cublas_cu12-12.4.5.8-py3-none-manylinux2014_x86_64.whl (363.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 363.4/363.4 MB 169.8 MB/s  0:00:02
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-cupti-cu12/nvidia_cuda_cupti_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl (13.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.8/13.8 MB 824.9 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-nvrtc-cu12/nvidia_cuda_nvrtc_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl (24.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 24.6/24.6 MB 1.1 GB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cuda-runtime-cu12/nvidia_cuda_runtime_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl (883 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 883.7/883.7 kB 2.1 GB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cudnn-cu12/nvidia_cudnn_cu12-9.1.0.70-py3-none-manylinux2014_x86_64.whl (664.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 664.8/664.8 MB 853.8 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cufft-cu12/nvidia_cufft_cu12-11.2.1.3-py3-none-manylinux2014_x86_64.whl (211.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 211.5/211.5 MB 506.9 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-curand-cu12/nvidia_curand_cu12-10.3.5.147-py3-none-manylinux2014_x86_64.whl (56.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 56.3/56.3 MB 335.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusolver-cu12/nvidia_cusolver_cu12-11.6.1.9-py3-none-manylinux2014_x86_64.whl (127.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 127.9/127.9 MB 650.3 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-cusparse-cu12/nvidia_cusparse_cu12-12.3.1.170-py3-none-manylinux2014_x86_64.whl (207.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 207.5/207.5 MB 572.3 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nccl-cu12/nvidia_nccl_cu12-2.21.5-py3-none-manylinux2014_x86_64.whl (188.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 188.7/188.7 MB 515.4 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvjitlink-cu12/nvidia_nvjitlink_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl (21.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 21.1/21.1 MB 246.8 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/nvidia-nvtx-cu12/nvidia_nvtx_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl (99 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/sympy/sympy-1.13.1-py3-none-any.whl (6.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.2/6.2 MB 312.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/triton/triton-3.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (209.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 209.5/209.5 MB 310.9 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/numpy/numpy-2.1.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (16.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.3/16.3 MB 642.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl (490 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 786.4 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/dill/dill-0.3.8-py3-none-any.whl (116 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/fsspec/fsspec-2024.9.0-py3-none-any.whl (179 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/huggingface-hub/huggingface_hub-0.36.2-py3-none-any.whl (566 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 566.4/566.4 kB 887.7 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/hf-xet/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.3/4.3 MB 1.1 GB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/mpmath/mpmath-1.3.0-py3-none-any.whl (536 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 336.8 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/multiprocess/multiprocess-0.70.16-py311-none-any.whl (143 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/tokenizers/tokenizers-0.20.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 459.6 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/httpx/httpx-0.28.1-py3-none-any.whl (73 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/httpcore/httpcore-1.0.9-py3-none-any.whl (78 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/aiohttp/aiohttp-3.14.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.9/1.9 MB 2.6 GB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/multidict/multidict-7.2.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (510 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/yarl/yarl-1.25.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (117 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/aiohappyeyeballs/aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/aiosignal/aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/attrs/attrs-26.1.0-py3-none-any.whl (67 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/frozenlist/frozenlist-1.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (231 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl (69 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/packaging/packaging-26.3-py3-none-any.whl (129 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pillow/pillow-13.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.1/7.1 MB 974.9 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/propcache/propcache-0.5.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (235 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pyarrow/pyarrow-26.0.0-cp311-cp311-manylinux_2_28_x86_64.whl (53.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 53.9/53.9 MB 538.1 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/pyyaml/pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 492.5 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/regex/regex-2026.9.29-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (804 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 805.0/805.0 kB 1.7 GB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/requests/requests-2.34.2-py3-none-any.whl (73 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/charset-normalizer/charset_normalizer-3.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (269 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/urllib3/urllib3-2.8.0-py3-none-any.whl (135 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl (135 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/tqdm/tqdm-4.70.1-py3-none-any.whl (80 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl (134 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/filelock/filelock-4.2.7-py3-none-any.whl (164 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/jinja2/jinja2-3.1.6-py3-none-any.whl (134 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/markupsafe/markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/networkx/networkx-3.6.1-py3-none-any.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 2.7 GB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/pandas/pandas-3.1.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.3/12.3 MB 947.9 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/python-dateutil/python_dateutil-4.0.0-py3-none-any.whl (92 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/rich/rich-15.0.0-py3-none-any.whl (310 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pygments/pygments-2.21.0-py3-none-any.whl (1.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 809.0 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/markdown-it-py/markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/mdurl/mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/tzdata/tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/xxhash/xxhash-4.0.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (260 kB)
+Installing collected packages: nvidia-ml-py, mpmath, xxhash, uv, urllib3, tzdata, typing-extensions, tqdm, sympy, safetensors, regex, pyyaml, pygments, pyarrow, psutil, propcache, pillow, packaging, nvidia-nvtx-cu12, nvidia-nvjitlink-cu12, nvidia-nccl-cu12, nvidia-curand-cu12, nvidia-cufft-cu12, nvidia-cuda-runtime-cu12, nvidia-cuda-nvrtc-cu12, nvidia-cuda-cupti-cu12, nvidia-cublas-cu12, numpy, networkx, multidict, mdurl, MarkupSafe, idna, hf-xet, h11, fsspec, frozenlist, filelock, dill, charset_normalizer, certifi, attrs, annotated-types, aiohappyeyeballs, yarl, typing-inspection, triton, requests, python-dateutil, pydantic-core, nvidia-cusparse-cu12, nvidia-cudnn-cu12, multiprocess, markdown-it-py, jinja2, httpcore, anyio, aiosignal, rich, pydantic, pandas, nvidia-cusolver-cu12, huggingface-hub, httpx, aiohttp, torch, tokenizers, transformers, torchvision, datasets, accelerate, trl, peft
+  Attempting uninstall: uv
+    Found existing installation: uv 0.8.17
+    Uninstalling uv-0.8.17:
+      Successfully uninstalled uv-0.8.17
+
+Successfully installed MarkupSafe-3.0.4 accelerate-1.1.1 aiohappyeyeballs-2.7.1 aiohttp-3.14.5 aiosignal-1.4.0 annotated-types-0.8.0 anyio-4.16.0 attrs-26.1.0 certifi-2026.10.23 charset_normalizer-3.5.2 datasets-3.1.0 dill-0.3.8 filelock-4.2.7 frozenlist-1.8.0 fsspec-2024.9.0 h11-0.16.0 hf-xet-1.8.0 httpcore-1.0.9 httpx-0.28.1 huggingface-hub-0.36.2 idna-3.20 jinja2-3.1.6 markdown-it-py-4.2.0 mdurl-0.1.2 mpmath-1.3.0 multidict-7.2.1 multiprocess-0.70.16 networkx-3.6.1 numpy-2.1.3 nvidia-cublas-cu12-12.4.5.8 nvidia-cuda-cupti-cu12-12.4.127 nvidia-cuda-nvrtc-cu12-12.4.127 nvidia-cuda-runtime-cu12-12.4.127 nvidia-cudnn-cu12-9.1.0.70 nvidia-cufft-cu12-11.2.1.3 nvidia-curand-cu12-10.3.5.147 nvidia-cusolver-cu12-11.6.1.9 nvidia-cusparse-cu12-12.3.1.170 nvidia-ml-py-12.560.30 nvidia-nccl-cu12-2.21.5 nvidia-nvjitlink-cu12-12.4.127 nvidia-nvtx-cu12-12.4.127 packaging-26.3 pandas-3.1.0 peft-0.13.2 pillow-13.0.0 propcache-0.5.4 psutil-6.1.0 pyarrow-26.0.0 pydantic-2.14.2 pydantic-core-2.50.2 pygments-2.21.0 python-dateutil-4.0.0 pyyaml-6.0.3 regex-2026.9.29 requests-2.34.2 rich-15.0.0 safetensors-0.4.5 sympy-1.13.1 tokenizers-0.20.3 torch-2.5.1 torchvision-0.20.1 tqdm-4.70.1 transformers-4.46.3 triton-3.1.0 trl-0.14.0 typing-extensions-4.16.0 typing-inspection-0.4.4 tzdata-2026.6 urllib3-2.8.0 uv-0.5.11 xxhash-4.0.2 yarl-1.25.1
+
+[notice] A new release of pip is available: 25.2 -> 26.3
+[notice] To update, run: pip install --upgrade pip
+Saving image...
+Image saved, took 6.65s
+
+Built image im-iemn19VnJPX7tIFTiqc8lN in 108.57s
+
+
+Building image im-MKroURhwT0yJN8aUWeR3Eh
+
+=> Step 0: FROM base
+
+=> Step 1: ENV HF_HOME=/tmp/hf
+
+=> Step 2: ENV PREFLIGHT_WEIGHTS_HUB=/weights/hf/hub
+
+=> Step 3: ENV PREFLIGHT_SANDBOX_DIR=/tmp
+
+=> Step 4: ENV PREFLIGHT_PROBE_UID=61000
+
+=> Step 5: ENV PREFLIGHT_PYG_INDEX=https://data.pyg.org/whl/torch-2.5.0+cu124.html
+Saving image...
+Image saved, took 768.05ms
+
+Built image im-MKroURhwT0yJN8aUWeR3Eh in 2.00s
+
+
+Building image im-GjQhkkPlpJQ7I7J3cWJeBT
+
+=> Step 0: FROM base
+
+=> Step 1: RUN apt-get update
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+Get:4 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [360 kB]
+Fetched 450 kB in 0s (1268 kB/s)
+Reading package lists...
+
+=> Step 2: RUN apt-get install -y gcc g++
+Reading package lists...
+Building dependency tree...
+Reading state information...
+gcc is already the newest version (4:12.2.0-3).
+g++ is already the newest version (4:12.2.0-3).
+g++ set to manually installed.
+0 upgraded, 0 newly installed, 0 to remove and 64 not upgraded.
+Saving image...
+Image saved, took 709.33ms
+
+Built image im-GjQhkkPlpJQ7I7J3cWJeBT in 3.18s
+
+
+Building image im-2wj5qVuOlUTLcQ6voL3oYO
+
+=> Step 0: FROM base
+
+=> Step 1: RUN groupadd --gid 61000 preflight-probe && useradd --uid 61000 --gid 61000 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin preflight-probe
+useradd warning: preflight-probe's uid 61000 outside of the UID_MIN 1000 and UID_MAX 60000 range.
+Saving image...
+Image saved, took 662.65ms
+
+Built image im-2wj5qVuOlUTLcQ6voL3oYO in 2.66s
+
+
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+├── ✓ Created Function triage_agreement_hosted.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+└── ✓ Created Function _install_check.
+[ground truth] by command: lm_eval --model hf --model_args pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,dtype=bfloat16 --tasks arc_easy,hellaswag,piqa --batch_size auto
+[ground truth] lm_eval: preflight_command.py, lens eval, probe image, 2 files; waiting for an L4, else the A10 (Modal queues it)
+[ground truth] container up on the A10; 2 files of lm_eval
+[ground truth 23:31:23] bare run of lm_eval: 100000 optimizer steps, at most 1200 s
+[preflight] requirements: installing lm-eval
+[preflight] requirements: uv's route didn't install them (For more information, try '--help'.); trying pip
+[bare] running /tmp/gt-z1b6vw05/preflight_command.py for 100000 optimizer steps
+2026-11-02:23:31:59 INFO     [_cli.run:392] Selected Tasks: ['arc_easy', 'hellaswag', 'piqa']
+2026-11-02:23:31:59 WARNING  [evaluator:184] pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct appears to be an instruct or chat variant but chat template is not applied. Recommend setting
+        `apply_chat_template` (optionally `fewshot_as_multiturn`).
+2026-11-02:23:31:59 INFO     [evaluator:214] Setting random seed to 0 | Setting numpy seed to 1234 | Setting torch manual seed to 1234 | Setting fewshot manual seed to 1234
+2026-11-02:23:31:59 INFO     [evaluator:239] Initializing hf model, with arguments: {'pretrained': 'HuggingFaceTB/SmolLM2-1.7B-Instruct', 'dtype': 'bfloat16'}
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+Detected kernel version 4.19.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+2026-11-02:23:31:59 INFO     [models.huggingface:289] Using device 'cuda:0'
+2026-11-02:23:32:00 INFO     [models.huggingface:582] Model parallel was set to False, max memory was not set, and device map was set to {'': 'cuda:0'}
+
+[1AGenerating train split:   0%|          | 0/2251 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 2251/2251 [00:00<00:00, 232174.56 examples/s]
+
+[1AGenerating test split:   0%|          | 0/2376 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 2376/2376 [00:00<00:00, 371478.97 examples/s]
+
+[1AGenerating validation split:   0%|          | 0/570 [00:00<?, ? examples/s]Generating validation split: 100%|██████████| 570/570 [00:00<00:00, 174954.50 examples/s]
+
+[1AGenerating train split:   0%|          | 0/39905 [00:00<?, ? examples/s]
+[1AGenerating train split:  70%|███████   | 28000/39905 [00:00<00:00, 266698.11 examples/s]Generating train split: 100%|██████████| 39905/39905 [00:00<00:00, 254981.53 examples/s]
+
+[1AGenerating test split:   0%|          | 0/10003 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 10003/10003 [00:00<00:00, 255286.82 examples/s]
+
+[1AGenerating validation split:   0%|          | 0/10042 [00:00<?, ? examples/s]Generating validation split: 100%|██████████| 10042/10042 [00:00<00:00, 257584.58 examples/s]
+
+[1AMap:   0%|          | 0/39905 [00:00<?, ? examples/s]
+[1AMap:   4%|▎         | 1418/39905 [00:00<00:02, 14078.34 examples/s]
+[1AMap:   8%|▊         | 3000/39905 [00:00<00:02, 13952.07 examples/s]
+[1AMap:  12%|█▏        | 4642/39905 [00:00<00:02, 15025.99 examples/s]
+[1AMap:  17%|█▋        | 6948/39905 [00:00<00:02, 15074.92 examples/s]
+[1AMap:  23%|██▎       | 9000/39905 [00:00<00:02, 14383.58 examples/s]
+[1AMap:  27%|██▋       | 10687/39905 [00:00<00:01, 15071.44 examples/s]
+[1AMap:  33%|███▎      | 13000/39905 [00:00<00:01, 14962.42 examples/s]
+[1AMap:  37%|███▋      | 14681/39905 [00:00<00:01, 15437.90 examples/s]
+[1AMap:  43%|████▎     | 17000/39905 [00:01<00:02, 10073.16 examples/s]
+[1AMap:  46%|████▋     | 18492/39905 [00:01<00:01, 10951.86 examples/s]
+[1AMap:  50%|█████     | 20000/39905 [00:01<00:01, 11478.54 examples/s]
+[1AMap:  54%|█████▍    | 21513/39905 [00:01<00:01, 12290.10 examples/s]
+[1AMap:  58%|█████▊    | 23000/39905 [00:01<00:01, 12572.20 examples/s]
+[1AMap:  61%|██████▏   | 24512/39905 [00:01<00:01, 13210.46 examples/s]
+[1AMap:  65%|██████▌   | 26000/39905 [00:01<00:01, 13250.50 examples/s]
+[1AMap:  69%|██████▉   | 27520/39905 [00:02<00:00, 13770.86 examples/s]
+[1AMap:  73%|███████▎  | 29000/39905 [00:02<00:00, 13656.74 examples/s]
+[1AMap:  76%|███████▋  | 30511/39905 [00:02<00:00, 14057.43 examples/s]
+[1AMap:  80%|████████  | 32000/39905 [00:02<00:00, 13713.96 examples/s]
+[1AMap:  84%|████████▍ | 33484/39905 [00:02<00:00, 14026.32 examples/s]
+[1AMap:  88%|████████▊ | 35000/39905 [00:02<00:00, 9417.30 examples/s] 
+[1AMap:  91%|█████████▏| 36511/39905 [00:02<00:00, 10617.88 examples/s]
+[1AMap:  95%|█████████▌| 38000/39905 [00:03<00:00, 11290.17 examples/s]
+[1AMap:  99%|█████████▉| 39515/39905 [00:03<00:00, 12228.60 examples/s]Map: 100%|██████████| 39905/39905 [00:03<00:00, 12680.22 examples/s]
+
+[1AMap:   0%|          | 0/10042 [00:00<?, ? examples/s]
+[1AMap:  15%|█▌        | 1544/10042 [00:00<00:00, 15323.51 examples/s]
+[1AMap:  39%|███▉      | 3926/10042 [00:00<00:00, 15694.53 examples/s]
+[1AMap:  60%|█████▉    | 6000/10042 [00:00<00:00, 14142.93 examples/s]
+[1AMap:  75%|███████▍  | 7525/10042 [00:00<00:00, 14482.21 examples/s]
+[1AMap:  90%|████████▉ | 9000/10042 [00:00<00:00, 14109.13 examples/s]Map: 100%|██████████| 10042/10042 [00:00<00:00, 14311.68 examples/s]
+
+[1AGenerating train split:   0%|          | 0/16113 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 16113/16113 [00:00<00:00, 734061.29 examples/s]
+
+[1AGenerating validation split:   0%|          | 0/1838 [00:00<?, ? examples/s]Generating validation split: 100%|██████████| 1838/1838 [00:00<00:00, 660877.05 examples/s]
+
+[1AGenerating test split:   0%|          | 0/3084 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 3084/3084 [00:00<00:00, 776284.79 examples/s]
+2026-11-02:23:32:29 INFO     [evaluator_utils:472] Selected tasks:
+2026-11-02:23:32:29 INFO     [evaluator_utils:506] Task: arc_easy (arc/arc_easy.yaml)
+2026-11-02:23:32:29 INFO     [evaluator_utils:506] Task: hellaswag (hellaswag/hellaswag.yaml)
+2026-11-02:23:32:29 INFO     [evaluator_utils:506] Task: piqa (piqa/piqa.yaml)
+2026-11-02:23:32:29 INFO     [api.task:312] Building contexts for arc_easy on rank 0...
+
+[1A  0%|          | 0/2376 [00:00<?, ?it/s]
+[1A  3%|▎         | 76/2376 [00:00<00:03, 752.41it/s]
+[1A  6%|▋         | 152/2376 [00:00<00:02, 753.11it/s]
+[1A 10%|▉         | 229/2376 [00:00<00:02, 757.94it/s]
+[1A 13%|█▎        | 306/2376 [00:00<00:02, 759.49it/s]
+[1A 16%|█▌        | 383/2376 [00:00<00:02, 761.88it/s]
+[1A 19%|█▉        | 460/2376 [00:00<00:02, 756.57it/s]
+[1A 23%|██▎       | 536/2376 [00:00<00:02, 755.55it/s]
+[1A 26%|██▌       | 612/2376 [00:00<00:02, 754.68it/s]
+[1A 29%|██▉       | 688/2376 [00:00<00:02, 755.74it/s]
+[1A 32%|███▏      | 764/2376 [00:01<00:02, 756.74it/s]
+[1A 35%|███▌      | 840/2376 [00:01<00:02, 754.92it/s]
+[1A 39%|███▊      | 916/2376 [00:01<00:01, 750.74it/s]
+[1A 42%|████▏     | 992/2376 [00:01<00:01, 751.16it/s]
+[1A 45%|████▍     | 1068/2376 [00:01<00:01, 751.89it/s]
+[1A 48%|████▊     | 1145/2376 [00:01<00:01, 754.73it/s]
+[1A 51%|█████▏    | 1221/2376 [00:01<00:01, 755.96it/s]
+[1A 55%|█████▍    | 1297/2376 [00:01<00:01, 756.29it/s]
+[1A 58%|█████▊    | 1373/2376 [00:01<00:01, 754.20it/s]
+[1A 61%|██████    | 1449/2376 [00:01<00:01, 753.72it/s]
+[1A 64%|██████▍   | 1525/2376 [00:02<00:01, 753.40it/s]
+[1A 67%|██████▋   | 1601/2376 [00:02<00:01, 754.72it/s]
+[1A 71%|███████   | 1677/2376 [00:02<00:00, 756.25it/s]
+[1A 74%|███████▍  | 1754/2376 [00:02<00:00, 757.21it/s]
+[1A 77%|███████▋  | 1831/2376 [00:02<00:00, 758.08it/s]
+[1A 80%|████████  | 1907/2376 [00:02<00:00, 752.85it/s]
+[1A 83%|████████▎ | 1983/2376 [00:02<00:00, 751.51it/s]
+[1A 87%|████████▋ | 2059/2376 [00:02<00:00, 751.75it/s]
+[1A 90%|████████▉ | 2135/2376 [00:02<00:00, 752.97it/s]
+[1A 93%|█████████▎| 2211/2376 [00:02<00:00, 753.96it/s]
+[1A 96%|█████████▋| 2287/2376 [00:03<00:00, 754.03it/s]
+[1A 99%|█████████▉| 2363/2376 [00:03<00:00, 750.25it/s]100%|██████████| 2376/2376 [00:03<00:00, 754.13it/s]
+2026-11-02:23:32:33 INFO     [api.task:312] Building contexts for hellaswag on rank 0...
+
+[1A  0%|          | 0/10042 [00:00<?, ?it/s]
+[1A  2%|▏         | 206/10042 [00:00<00:04, 2056.32it/s]
+[1A  4%|▍         | 415/10042 [00:00<00:04, 2074.54it/s]
+[1A  6%|▌         | 626/10042 [00:00<00:04, 2087.03it/s]
+[1A  8%|▊         | 835/10042 [00:00<00:04, 2087.22it/s]
+[1A 10%|█         | 1046/10042 [00:00<00:04, 2093.13it/s]
+[1A 13%|█▎        | 1256/10042 [00:00<00:04, 2092.42it/s]
+[1A 15%|█▍        | 1467/10042 [00:00<00:04, 2096.02it/s]
+[1A 17%|█▋        | 1677/10042 [00:00<00:03, 2093.40it/s]
+[1A 19%|█▉        | 1887/10042 [00:00<00:03, 2089.02it/s]
+[1A 21%|██        | 2098/10042 [00:01<00:03, 2094.17it/s]
+[1A 23%|██▎       | 2308/10042 [00:01<00:03, 2093.76it/s]
+[1A 25%|██▌       | 2519/10042 [00:01<00:03, 2098.59it/s]
+[1A 27%|██▋       | 2729/10042 [00:01<00:03, 2097.66it/s]
+[1A 29%|██▉       | 2940/10042 [00:01<00:03, 2100.00it/s]
+[1A 31%|███▏      | 3152/10042 [00:01<00:03, 2103.77it/s]
+[1A 33%|███▎      | 3363/10042 [00:01<00:03, 2101.00it/s]
+[1A 36%|███▌      | 3575/10042 [00:01<00:03, 2105.05it/s]
+[1A 38%|███▊      | 3786/10042 [00:01<00:02, 2093.51it/s]
+[1A 40%|███▉      | 3996/10042 [00:01<00:02, 2089.90it/s]
+[1A 42%|████▏     | 4206/10042 [00:02<00:02, 2081.17it/s]
+[1A 44%|████▍     | 4416/10042 [00:02<00:02, 2084.72it/s]
+[1A 46%|████▌     | 4625/10042 [00:02<00:02, 2080.26it/s]
+[1A 48%|████▊     | 4836/10042 [00:02<00:02, 2086.37it/s]
+[1A 50%|█████     | 5045/10042 [00:02<00:02, 2084.00it/s]
+[1A 52%|█████▏    | 5256/10042 [00:02<00:02, 2088.47it/s]
+[1A 54%|█████▍    | 5465/10042 [00:02<00:02, 2084.23it/s]
+[1A 57%|█████▋    | 5675/10042 [00:02<00:02, 2084.38it/s]
+[1A 59%|█████▊    | 5884/10042 [00:02<00:02, 2072.64it/s]
+[1A 61%|██████    | 6093/10042 [00:02<00:01, 2076.29it/s]
+[1A 63%|██████▎   | 6301/10042 [00:03<00:01, 2077.00it/s]
+[1A 65%|██████▍   | 6509/10042 [00:03<00:01, 2073.57it/s]
+[1A 67%|██████▋   | 6717/10042 [00:03<00:01, 2071.66it/s]
+[1A 69%|██████▉   | 6925/10042 [00:03<00:01, 2069.93it/s]
+[1A 71%|███████   | 7133/10042 [00:03<00:01, 2070.73it/s]
+[1A 73%|███████▎  | 7341/10042 [00:03<00:01, 2069.51it/s]
+[1A 75%|███████▌  | 7550/10042 [00:03<00:01, 2075.41it/s]
+[1A 77%|███████▋  | 7758/10042 [00:03<00:01, 2071.56it/s]
+[1A 79%|███████▉  | 7969/10042 [00:03<00:00, 2080.98it/s]
+[1A 81%|████████▏ | 8180/10042 [00:03<00:00, 2087.48it/s]
+[1A 84%|████████▎ | 8390/10042 [00:04<00:00, 2090.10it/s]
+[1A 86%|████████▌ | 8600/10042 [00:04<00:00, 2092.30it/s]
+[1A 88%|████████▊ | 8810/10042 [00:04<00:00, 2092.70it/s]
+[1A 90%|████████▉ | 9021/10042 [00:04<00:00, 2095.37it/s]
+[1A 92%|█████████▏| 9231/10042 [00:04<00:00, 2095.69it/s]
+[1A 94%|█████████▍| 9441/10042 [00:04<00:00, 2094.83it/s]
+[1A 96%|█████████▌| 9651/10042 [00:04<00:00, 2094.36it/s]
+[1A 98%|█████████▊| 9861/10042 [00:04<00:00, 2092.09it/s]100%|██████████| 10042/10042 [00:04<00:00, 2087.53it/s]
+2026-11-02:23:32:38 INFO     [api.task:312] Building contexts for piqa on rank 0...
+
+[1A  0%|          | 0/1838 [00:00<?, ?it/s]
+[1A  6%|▌         | 106/1838 [00:00<00:01, 1050.58it/s]
+[1A 12%|█▏        | 213/1838 [00:00<00:01, 1059.16it/s]
+[1A 17%|█▋        | 320/1838 [00:00<00:01, 1061.78it/s]
+[1A 23%|██▎       | 427/1838 [00:00<00:01, 1058.29it/s]
+[1A 29%|██▉       | 533/1838 [00:00<00:01, 1056.12it/s]
+[1A 35%|███▍      | 639/1838 [00:00<00:01, 1048.91it/s]
+[1A 40%|████      | 744/1838 [00:00<00:01, 1048.70it/s]
+[1A 46%|████▌     | 849/1838 [00:00<00:00, 1044.71it/s]
+[1A 52%|█████▏    | 954/1838 [00:00<00:00, 1041.86it/s]
+[1A 58%|█████▊    | 1059/1838 [00:01<00:00, 1043.77it/s]
+[1A 63%|██████▎   | 1165/1838 [00:01<00:00, 1047.33it/s]
+[1A 69%|██████▉   | 1271/1838 [00:01<00:00, 1049.65it/s]
+[1A 75%|███████▍  | 1376/1838 [00:01<00:00, 1049.39it/s]
+[1A 81%|████████  | 1482/1838 [00:01<00:00, 1051.28it/s]
+[1A 86%|████████▋ | 1588/1838 [00:01<00:00, 1053.03it/s]
+[1A 92%|█████████▏| 1694/1838 [00:01<00:00, 1053.07it/s]
+[1A 98%|█████████▊| 1800/1838 [00:01<00:00, 1054.03it/s]100%|██████████| 1838/1838 [00:01<00:00, 1051.02it/s]
+2026-11-02:23:32:40 INFO     [evaluator:589] Running loglikelihood requests
+
+[1ATokenizing inputs:   0%|          | 0/53345 [00:00<?, ?it/s]
+[1ATokenizing inputs:   1%|          | 547/53345 [00:00<00:09, 5467.01it/s]
+[1ATokenizing inputs:   2%|▏         | 1119/53345 [00:00<00:09, 5615.65it/s]
+[1ATokenizing inputs:   3%|▎         | 1714/53345 [00:00<00:08, 5767.79it/s]
+[1ATokenizing inputs:   4%|▍         | 2304/53345 [00:00<00:08, 5815.97it/s]
+[1ATokenizing inputs:   5%|▌         | 2886/53345 [00:00<00:08, 5780.31it/s]
+[1ATokenizing inputs:   7%|▋         | 3480/53345 [00:00<00:08, 5833.88it/s]
+[1ATokenizing inputs:   8%|▊         | 4064/53345 [00:00<00:08, 5708.53it/s]
+[1ATokenizing inputs:   9%|▊         | 4653/53345 [00:00<00:08, 5763.10it/s]
+[1ATokenizing inputs:  10%|▉         | 5230/53345 [00:00<00:08, 5746.75it/s]
+[1ATokenizing inputs:  11%|█         | 5835/53345 [00:01<00:08, 5838.54it/s]
+[1ATokenizing inputs:  12%|█▏        | 6435/53345 [00:01<00:07, 5887.02it/s]
+[1ATokenizing inputs:  13%|█▎        | 7024/53345 [00:01<00:07, 5859.39it/s]
+[1ATokenizing inputs:  14%|█▍        | 7636/53345 [00:01<00:07, 5936.01it/s]
+[1ATokenizing inputs:  15%|█▌        | 8240/53345 [00:01<00:07, 5964.69it/s]
+[1ATokenizing inputs:  17%|█▋        | 8860/53345 [00:01<00:07, 6033.36it/s]
+[1ATokenizing inputs:  18%|█▊        | 9469/53345 [00:01<00:07, 6049.57it/s]
+[1ATokenizing inputs:  19%|█▉        | 10075/53345 [00:01<00:07, 5868.14it/s]
+[1ATokenizing inputs:  20%|█▉        | 10664/53345 [00:01<00:07, 5715.64it/s]
+[1ATokenizing inputs:  21%|██        | 11238/53345 [00:01<00:07, 5627.01it/s]
+[1ATokenizing inputs:  22%|██▏       | 11819/53345 [00:02<00:07, 5677.66it/s]
+[1ATokenizing inputs:  23%|██▎       | 12388/53345 [00:02<00:07, 5624.53it/s]
+[1ATokenizing inputs:  24%|██▍       | 12952/53345 [00:02<00:13, 2916.55it/s]
+[1ATokenizing inputs:  25%|██▌       | 13494/53345 [00:02<00:11, 3361.57it/s]
+[1ATokenizing inputs:  26%|██▋       | 14065/53345 [00:02<00:10, 3836.17it/s]
+[1ATokenizing inputs:  27%|██▋       | 14623/53345 [00:02<00:09, 4226.12it/s]
+[1ATokenizing inputs:  28%|██▊       | 15156/53345 [00:02<00:08, 4493.49it/s]
+[1ATokenizing inputs:  29%|██▉       | 15710/53345 [00:03<00:07, 4761.60it/s]
+[1ATokenizing inputs:  30%|███       | 16256/53345 [00:03<00:07, 4946.64it/s]
+[1ATokenizing inputs:  32%|███▏      | 16809/53345 [00:03<00:07, 5107.08it/s]
+[1ATokenizing inputs:  33%|███▎      | 17359/53345 [00:03<00:06, 5217.19it/s]
+[1ATokenizing inputs:  34%|███▎      | 17915/53345 [00:03<00:06, 5313.31it/s]
+[1ATokenizing inputs:  35%|███▍      | 18466/53345 [00:03<00:06, 5368.54it/s]
+[1ATokenizing inputs:  36%|███▌      | 19038/53345 [00:03<00:06, 5468.99it/s]
+[1ATokenizing inputs:  37%|███▋      | 19623/53345 [00:03<00:06, 5580.66it/s]
+[1ATokenizing inputs:  38%|███▊      | 20187/53345 [00:03<00:05, 5531.31it/s]
+[1ATokenizing inputs:  39%|███▉      | 20745/53345 [00:03<00:05, 5499.11it/s]
+[1ATokenizing inputs:  40%|███▉      | 21298/53345 [00:04<00:05, 5506.14it/s]
+[1ATokenizing inputs:  41%|████      | 21870/53345 [00:04<00:05, 5567.27it/s]
+[1ATokenizing inputs:  42%|████▏     | 22429/53345 [00:04<00:05, 5559.68it/s]
+[1ATokenizing inputs:  43%|████▎     | 22986/53345 [00:04<00:06, 4480.00it/s]
+[1ATokenizing inputs:  44%|████▍     | 23469/53345 [00:04<00:07, 3957.00it/s]
+[1ATokenizing inputs:  45%|████▍     | 23897/53345 [00:04<00:08, 3632.06it/s]
+[1ATokenizing inputs:  46%|████▌     | 24285/53345 [00:04<00:08, 3420.32it/s]
+[1ATokenizing inputs:  46%|████▌     | 24644/53345 [00:05<00:08, 3294.51it/s]
+[1ATokenizing inputs:  47%|████▋     | 24984/53345 [00:05<00:08, 3192.01it/s]
+[1ATokenizing inputs:  47%|████▋     | 25310/53345 [00:05<00:09, 3097.15it/s]
+[1ATokenizing inputs:  48%|████▊     | 25624/53345 [00:05<00:09, 3067.90it/s]
+[1ATokenizing inputs:  49%|████▊     | 25933/53345 [00:05<00:09, 3030.33it/s]
+[1ATokenizing inputs:  49%|████▉     | 26238/53345 [00:05<00:08, 3018.91it/s]
+[1ATokenizing inputs:  50%|████▉     | 26541/53345 [00:05<00:08, 2996.12it/s]
+[1ATokenizing inputs:  50%|█████     | 26845/53345 [00:05<00:08, 3007.56it/s]
+[1ATokenizing inputs:  51%|█████     | 27147/53345 [00:05<00:08, 2990.32it/s]
+[1ATokenizing inputs:  51%|█████▏    | 27447/53345 [00:05<00:08, 2984.99it/s]
+[1ATokenizing inputs:  52%|█████▏    | 27746/53345 [00:06<00:08, 2976.89it/s]
+[1ATokenizing inputs:  53%|█████▎    | 28046/53345 [00:06<00:08, 2982.03it/s]
+[1ATokenizing inputs:  53%|█████▎    | 28347/53345 [00:06<00:08, 2989.57it/s]
+[1ATokenizing inputs:  54%|█████▎    | 28649/53345 [00:06<00:08, 2998.55it/s]
+[1ATokenizing inputs:  54%|█████▍    | 28950/53345 [00:06<00:08, 3000.58it/s]
+[1ATokenizing inputs:  55%|█████▍    | 29251/53345 [00:06<00:08, 2970.46it/s]
+[1ATokenizing inputs:  55%|█████▌    | 29549/53345 [00:06<00:08, 2968.59it/s]
+[1ATokenizing inputs:  56%|█████▌    | 29848/53345 [00:06<00:07, 2972.53it/s]
+[1ATokenizing inputs:  57%|█████▋    | 30146/53345 [00:06<00:07, 2955.50it/s]
+[1ATokenizing inputs:  57%|█████▋    | 30445/53345 [00:06<00:07, 2963.42it/s]
+[1ATokenizing inputs:  58%|█████▊    | 30744/53345 [00:07<00:07, 2971.13it/s]
+[1ATokenizing inputs:  58%|█████▊    | 31042/53345 [00:07<00:07, 2947.83it/s]
+[1ATokenizing inputs:  59%|█████▊    | 31337/53345 [00:07<00:07, 2942.59it/s]
+[1ATokenizing inputs:  59%|█████▉    | 31634/53345 [00:07<00:07, 2949.18it/s]
+[1ATokenizing inputs:  60%|█████▉    | 31937/53345 [00:07<00:07, 2972.65it/s]
+[1ATokenizing inputs:  60%|██████    | 32239/53345 [00:07<00:07, 2985.68it/s]
+[1ATokenizing inputs:  61%|██████    | 32544/53345 [00:07<00:06, 3003.97it/s]
+[1ATokenizing inputs:  62%|██████▏   | 32849/53345 [00:07<00:06, 3015.30it/s]
+[1ATokenizing inputs:  62%|██████▏   | 33151/53345 [00:07<00:06, 3013.18it/s]
+[1ATokenizing inputs:  63%|██████▎   | 33453/53345 [00:07<00:06, 2990.36it/s]
+[1ATokenizing inputs:  63%|██████▎   | 33753/53345 [00:08<00:06, 2990.29it/s]
+[1ATokenizing inputs:  64%|██████▍   | 34053/53345 [00:08<00:06, 2973.33it/s]
+[1ATokenizing inputs:  64%|██████▍   | 34355/53345 [00:08<00:06, 2984.54it/s]
+[1ATokenizing inputs:  65%|██████▍   | 34656/53345 [00:08<00:06, 2989.97it/s]
+[1ATokenizing inputs:  66%|██████▌   | 34956/53345 [00:08<00:06, 2991.88it/s]
+[1ATokenizing inputs:  66%|██████▌   | 35256/53345 [00:08<00:06, 2978.60it/s]
+[1ATokenizing inputs:  67%|██████▋   | 35554/53345 [00:08<00:06, 2961.60it/s]
+[1ATokenizing inputs:  67%|██████▋   | 35851/53345 [00:08<00:05, 2945.33it/s]
+[1ATokenizing inputs:  68%|██████▊   | 36147/53345 [00:08<00:05, 2948.32it/s]
+[1ATokenizing inputs:  68%|██████▊   | 36449/53345 [00:08<00:05, 2969.57it/s]
+[1ATokenizing inputs:  69%|██████▉   | 36746/53345 [00:09<00:05, 2943.81it/s]
+[1ATokenizing inputs:  69%|██████▉   | 37050/53345 [00:09<00:05, 2970.68it/s]
+[1ATokenizing inputs:  70%|███████   | 37348/53345 [00:09<00:05, 2946.92it/s]
+[1ATokenizing inputs:  71%|███████   | 37650/53345 [00:09<00:05, 2965.90it/s]
+[1ATokenizing inputs:  71%|███████   | 37947/53345 [00:09<00:05, 2956.05it/s]
+[1ATokenizing inputs:  72%|███████▏  | 38246/53345 [00:09<00:05, 2965.09it/s]
+[1ATokenizing inputs:  72%|███████▏  | 38543/53345 [00:09<00:05, 2953.01it/s]
+[1ATokenizing inputs:  73%|███████▎  | 38847/53345 [00:09<00:04, 2976.74it/s]
+[1ATokenizing inputs:  73%|███████▎  | 39145/53345 [00:09<00:04, 2960.98it/s]
+[1ATokenizing inputs:  74%|███████▍  | 39442/53345 [00:10<00:04, 2931.19it/s]
+[1ATokenizing inputs:  74%|███████▍  | 39736/53345 [00:10<00:04, 2921.75it/s]
+[1ATokenizing inputs:  75%|███████▌  | 40029/53345 [00:10<00:04, 2920.02it/s]
+[1ATokenizing inputs:  76%|███████▌  | 40322/53345 [00:10<00:04, 2908.74it/s]
+[1ATokenizing inputs:  76%|███████▌  | 40620/53345 [00:10<00:04, 2929.05it/s]
+[1ATokenizing inputs:  77%|███████▋  | 40913/53345 [00:10<00:04, 2925.51it/s]
+[1ATokenizing inputs:  77%|███████▋  | 41212/53345 [00:10<00:04, 2942.39it/s]
+[1ATokenizing inputs:  78%|███████▊  | 41507/53345 [00:10<00:04, 2935.49it/s]
+[1ATokenizing inputs:  78%|███████▊  | 41818/53345 [00:10<00:03, 2984.90it/s]
+[1ATokenizing inputs:  79%|███████▉  | 42129/53345 [00:10<00:03, 3020.53it/s]
+[1ATokenizing inputs:  80%|███████▉  | 42432/53345 [00:11<00:03, 3011.85it/s]
+[1ATokenizing inputs:  80%|████████  | 42734/53345 [00:11<00:03, 3007.15it/s]
+[1ATokenizing inputs:  81%|████████  | 43035/53345 [00:11<00:03, 2999.71it/s]
+[1ATokenizing inputs:  81%|████████  | 43335/53345 [00:11<00:03, 2991.35it/s]
+[1ATokenizing inputs:  82%|████████▏ | 43635/53345 [00:11<00:03, 2983.37it/s]
+[1ATokenizing inputs:  82%|████████▏ | 43934/53345 [00:11<00:03, 2979.70it/s]
+[1ATokenizing inputs:  83%|████████▎ | 44236/53345 [00:11<00:03, 2989.34it/s]
+[1ATokenizing inputs:  83%|████████▎ | 44536/53345 [00:11<00:02, 2990.53it/s]
+[1ATokenizing inputs:  84%|████████▍ | 44836/53345 [00:11<00:02, 2979.41it/s]
+[1ATokenizing inputs:  85%|████████▍ | 45134/53345 [00:11<00:02, 2926.13it/s]
+[1ATokenizing inputs:  85%|████████▌ | 45427/53345 [00:12<00:02, 2916.73it/s]
+[1ATokenizing inputs:  86%|████████▌ | 45719/53345 [00:12<00:02, 2905.43it/s]
+[1ATokenizing inputs:  86%|████████▋ | 46012/53345 [00:12<00:02, 2911.11it/s]
+[1ATokenizing inputs:  87%|████████▋ | 46310/53345 [00:12<00:02, 2930.76it/s]
+[1ATokenizing inputs:  87%|████████▋ | 46609/53345 [00:12<00:02, 2947.45it/s]
+[1ATokenizing inputs:  88%|████████▊ | 46906/53345 [00:12<00:02, 2951.62it/s]
+[1ATokenizing inputs:  89%|████████▊ | 47212/53345 [00:12<00:02, 2983.44it/s]
+[1ATokenizing inputs:  89%|████████▉ | 47511/53345 [00:12<00:01, 2974.54it/s]
+[1ATokenizing inputs:  90%|████████▉ | 47809/53345 [00:12<00:01, 2963.06it/s]
+[1ATokenizing inputs:  90%|█████████ | 48109/53345 [00:12<00:01, 2972.08it/s]
+[1ATokenizing inputs:  91%|█████████ | 48407/53345 [00:13<00:01, 2967.54it/s]
+[1ATokenizing inputs:  91%|█████████▏| 48711/53345 [00:13<00:01, 2987.43it/s]
+[1ATokenizing inputs:  92%|█████████▏| 49013/53345 [00:13<00:01, 2994.38it/s]
+[1ATokenizing inputs:  92%|█████████▏| 49317/53345 [00:13<00:01, 3006.75it/s]
+[1ATokenizing inputs:  93%|█████████▎| 49618/53345 [00:13<00:01, 2997.06it/s]
+[1ATokenizing inputs:  94%|█████████▍| 50199/53345 [00:13<00:00, 3836.12it/s]
+[1ATokenizing inputs:  95%|█████████▌| 50850/53345 [00:13<00:00, 4634.52it/s]
+[1ATokenizing inputs:  97%|█████████▋| 51501/53345 [00:13<00:00, 5192.82it/s]
+[1ATokenizing inputs:  98%|█████████▊| 52132/53345 [00:13<00:00, 5523.88it/s]
+[1ATokenizing inputs:  99%|█████████▉| 52784/53345 [00:13<00:00, 5819.66it/s]Tokenizing inputs: 100%|██████████| 53345/53345 [00:14<00:00, 3805.48it/s]
+
+[1ARunning loglikelihood requests:   0%|          | 0/53345 [00:00<?, ?it/s]
+[1ARunning loglikelihood requests:   0%|          | 1/53345 [00:07<106:43:02,  7.20s/it]
+[1ARunning loglikelihood requests:   0%|          | 65/53345 [00:07<1:17:05, 11.52it/s] 
+[1ARunning loglikelihood requests:   0%|          | 129/53345 [00:08<36:37, 24.22it/s] 
+[1ARunning loglikelihood requests:   0%|          | 194/53345 [00:08<23:15, 38.10it/s]
+[1ARunning loglikelihood requests:   0%|          | 258/53345 [00:09<17:08, 51.61it/s]
+[1ARunning loglikelihood requests:   1%|          | 322/53345 [00:10<13:38, 64.75it/s]
+[1ARunning loglikelihood requests:   1%|          | 386/53345 [00:10<11:32, 76.47it/s]
+[1ARunning loglikelihood requests:   1%|          | 451/53345 [00:11<10:08, 86.94it/s]
+[1ARunning loglikelihood requests:   1%|          | 515/53345 [00:11<09:15, 95.13it/s]
+[1ARunning loglikelihood requests:   1%|          | 579/53345 [00:12<08:39, 101.51it/s]
+[1ARunning loglikelihood requests:   1%|          | 643/53345 [00:12<08:15, 106.33it/s]
+[1ARunning loglikelihood requests:   1%|▏         | 707/53345 [00:13<07:58, 110.10it/s]
+[1ARunning loglikelihood requests:   1%|▏         | 771/53345 [00:13<07:45, 112.98it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 835/53345 [00:14<07:36, 114.97it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 899/53345 [00:14<07:30, 116.53it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 963/53345 [00:15<07:25, 117.56it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 1027/53345 [00:15<07:21, 118.43it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 1091/53345 [00:16<07:17, 119.48it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 1155/53345 [00:16<07:14, 120.10it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 1219/53345 [00:17<07:09, 121.24it/s]
+[1ARunning loglikelihood requests:   2%|▏         | 1283/53345 [00:17<07:07, 121.85it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1347/53345 [00:18<07:05, 122.33it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1411/53345 [00:19<07:03, 122.58it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1475/53345 [00:19<07:02, 122.87it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1539/53345 [00:20<07:00, 123.26it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1603/53345 [00:20<06:58, 123.62it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1667/53345 [00:21<06:58, 123.46it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1731/53345 [00:21<06:56, 123.95it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1795/53345 [00:22<06:55, 123.99it/s]
+[1ARunning loglikelihood requests:   3%|▎         | 1859/53345 [00:22<06:53, 124.37it/s]
+[1ARunning loglikelihood requests:   4%|▎         | 1923/53345 [00:23<06:53, 124.38it/s]
+[1ARunning loglikelihood requests:   4%|▎         | 1987/53345 [00:23<06:53, 124.35it/s]
+[1ARunning loglikelihood requests:   4%|▍         | 2051/53345 [00:24<06:51, 124.64it/s]
+[1ARunning loglikelihood requests:   4%|▍         | 2115/53345 [00:24<06:50, 124.70it/s]
+[1ARunning loglikelihood requests:   4%|▍         | 2181/53345 [00:25<06:47, 125.66it/s]
+[1ARunning loglikelihood requests:   4%|▍         | 2245/53345 [00:25<06:46, 125.60it/s]
+[1ARunning loglikelihood requests:   4%|▍         | 2309/53345 [00:26<06:48, 125.05it/s]
+[1ARunning loglikelihood requests:   4%|▍         | 2373/53345 [00:26<06:45, 125.70it/s]
+[1ARunning loglikelihood requests:   5%|▍         | 2437/53345 [00:27<06:44, 125.97it/s]
+[1ARunning loglikelihood requests:   5%|▍         | 2501/53345 [00:27<06:41, 126.52it/s]
+[1ARunning loglikelihood requests:   5%|▍         | 2565/53345 [00:28<06:40, 126.83it/s]
+[1ARunning loglikelihood requests:   5%|▍         | 2629/53345 [00:28<06:39, 127.10it/s]
+[1ARunning loglikelihood requests:   5%|▌         | 2693/53345 [00:29<06:37, 127.36it/s]
+[1ARunning loglikelihood requests:   5%|▌         | 2757/53345 [00:29<06:36, 127.57it/s]
+[1ARunning loglikelihood requests:   5%|▌         | 2821/53345 [00:30<06:35, 127.70it/s]
+[1ARunning loglikelihood requests:   5%|▌         | 2885/53345 [00:30<06:34, 127.85it/s]
+[1ARunning loglikelihood requests:   6%|▌         | 2949/53345 [00:31<06:34, 127.85it/s]
+[1ARunning loglikelihood requests:   6%|▌         | 3013/53345 [00:31<06:33, 127.92it/s]
+[1ARunning loglikelihood requests:   6%|▌         | 3077/53345 [00:32<06:32, 128.09it/s]
+[1ARunning loglikelihood requests:   6%|▌         | 3141/53345 [00:32<06:31, 128.27it/s]
+[1ARunning loglikelihood requests:   6%|▌         | 3205/53345 [00:33<06:30, 128.38it/s]
+[1ARunning loglikelihood requests:   6%|▌         | 3269/53345 [00:33<06:30, 128.39it/s]
+[1ARunning loglikelihood requests:   6%|▌         | 3333/53345 [00:34<06:29, 128.51it/s]
+[1ARunning loglikelihood requests:   6%|▋         | 3397/53345 [00:34<06:28, 128.47it/s]
+[1ARunning loglikelihood requests:   6%|▋         | 3461/53345 [00:35<06:28, 128.39it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3525/53345 [00:35<06:27, 128.67it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3589/53345 [00:36<06:26, 128.80it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3653/53345 [00:36<06:25, 128.77it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3717/53345 [00:37<06:25, 128.73it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3781/53345 [00:37<06:24, 128.80it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3845/53345 [00:38<06:24, 128.83it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3909/53345 [00:38<06:23, 128.83it/s]
+[1ARunning loglikelihood requests:   7%|▋         | 3973/53345 [00:39<06:21, 129.29it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4037/53345 [00:39<06:19, 129.84it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4101/53345 [00:40<06:18, 129.95it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4165/53345 [00:40<06:17, 130.33it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4229/53345 [00:41<06:17, 130.21it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4293/53345 [00:41<06:15, 130.50it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4358/53345 [00:42<06:14, 130.92it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4422/53345 [00:42<06:13, 130.85it/s]
+[1ARunning loglikelihood requests:   8%|▊         | 4486/53345 [00:43<06:14, 130.63it/s]
+[1ARunning loglikelihood requests:   9%|▊         | 4550/53345 [00:43<06:13, 130.82it/s]
+[1ARunning loglikelihood requests:   9%|▊         | 4614/53345 [00:44<06:12, 130.69it/s]
+[1ARunning loglikelihood requests:   9%|▉         | 4678/53345 [00:44<06:11, 130.91it/s]
+[1ARunning loglikelihood requests:   9%|▉         | 4742/53345 [00:45<06:11, 130.70it/s]
+[1ARunning loglikelihood requests:   9%|▉         | 4806/53345 [00:45<06:10, 130.99it/s]
+[1ARunning loglikelihood requests:   9%|▉         | 4870/53345 [00:46<06:10, 130.89it/s]
+[1ARunning loglikelihood requests:   9%|▉         | 4934/53345 [00:46<06:09, 131.15it/s]
+[1ARunning loglikelihood requests:   9%|▉         | 4998/53345 [00:47<06:08, 131.16it/s]
+[1ARunning loglikelihood requests:   9%|▉         | 5062/53345 [00:47<06:08, 131.15it/s]
+[1ARunning loglikelihood requests:  10%|▉         | 5126/53345 [00:47<06:07, 131.36it/s]
+[1ARunning loglikelihood requests:  10%|▉         | 5190/53345 [00:48<06:06, 131.42it/s]
+[1ARunning loglikelihood requests:  10%|▉         | 5254/53345 [00:48<06:06, 131.20it/s]
+[1ARunning loglikelihood requests:  10%|▉         | 5318/53345 [00:49<06:05, 131.39it/s]
+[1ARunning loglikelihood requests:  10%|█         | 5382/53345 [00:49<06:04, 131.49it/s]
+[1ARunning loglikelihood requests:  10%|█         | 5446/53345 [00:50<06:04, 131.46it/s]
+[1ARunning loglikelihood requests:  10%|█         | 5510/53345 [00:50<06:03, 131.63it/s]
+[1ARunning loglikelihood requests:  10%|█         | 5574/53345 [00:51<06:03, 131.50it/s]
+[1ARunning loglikelihood requests:  11%|█         | 5638/53345 [00:51<06:02, 131.55it/s]
+[1ARunning loglikelihood requests:  11%|█         | 5702/53345 [00:52<06:01, 131.62it/s]
+[1ARunning loglikelihood requests:  11%|█         | 5766/53345 [00:52<06:01, 131.57it/s]
+[1ARunning loglikelihood requests:  11%|█         | 5830/53345 [00:53<06:01, 131.33it/s]
+[1ARunning loglikelihood requests:  11%|█         | 5894/53345 [00:53<06:00, 131.45it/s]
+[1ARunning loglikelihood requests:  11%|█         | 5958/53345 [00:54<05:58, 132.34it/s]
+[1ARunning loglikelihood requests:  11%|█▏        | 6022/53345 [00:54<05:54, 133.53it/s]
+[1ARunning loglikelihood requests:  11%|█▏        | 6086/53345 [00:55<05:53, 133.79it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6150/53345 [00:55<05:51, 134.22it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6214/53345 [00:56<05:50, 134.61it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6278/53345 [00:56<05:49, 134.55it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6342/53345 [00:57<05:48, 134.79it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6406/53345 [00:57<05:47, 135.12it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6470/53345 [00:58<05:45, 135.61it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6534/53345 [00:58<05:44, 135.84it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6598/53345 [00:59<05:43, 136.22it/s]
+[1ARunning loglikelihood requests:  12%|█▏        | 6662/53345 [00:59<05:42, 136.38it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 6726/53345 [00:59<05:41, 136.43it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 6790/53345 [01:00<05:41, 136.45it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 6854/53345 [01:00<05:40, 136.45it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 6918/53345 [01:01<05:40, 136.43it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 6982/53345 [01:01<05:40, 136.27it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 7046/53345 [01:02<05:38, 136.71it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 7110/53345 [01:02<05:37, 136.90it/s]
+[1ARunning loglikelihood requests:  13%|█▎        | 7174/53345 [01:03<05:36, 137.12it/s]
+[1ARunning loglikelihood requests:  14%|█▎        | 7238/53345 [01:03<05:36, 137.00it/s]
+[1ARunning loglikelihood requests:  14%|█▎        | 7302/53345 [01:04<05:35, 137.30it/s]
+[1ARunning loglikelihood requests:  14%|█▍        | 7367/53345 [01:04<05:33, 137.99it/s]
+[1ARunning loglikelihood requests:  14%|█▍        | 7431/53345 [01:05<05:33, 137.81it/s]
+[1ARunning loglikelihood requests:  14%|█▍        | 7495/53345 [01:05<05:33, 137.59it/s]
+[1ARunning loglikelihood requests:  14%|█▍        | 7559/53345 [01:06<05:32, 137.64it/s]
+[1ARunning loglikelihood requests:  14%|█▍        | 7623/53345 [01:06<05:32, 137.64it/s]
+[1ARunning loglikelihood requests:  14%|█▍        | 7687/53345 [01:06<05:31, 137.56it/s]
+[1ARunning loglikelihood requests:  15%|█▍        | 7751/53345 [01:07<05:31, 137.72it/s]
+[1ARunning loglikelihood requests:  15%|█▍        | 7816/53345 [01:07<05:29, 138.33it/s]
+[1ARunning loglikelihood requests:  15%|█▍        | 7880/53345 [01:08<05:29, 138.17it/s]
+[1ARunning loglikelihood requests:  15%|█▍        | 7945/53345 [01:08<05:27, 138.59it/s]
+[1ARunning loglikelihood requests:  15%|█▌        | 8009/53345 [01:09<05:27, 138.34it/s]
+[1ARunning loglikelihood requests:  15%|█▌        | 8073/53345 [01:09<05:28, 137.97it/s]
+[1ARunning loglikelihood requests:  15%|█▌        | 8137/53345 [01:10<05:26, 138.29it/s]
+[1ARunning loglikelihood requests:  15%|█▌        | 8201/53345 [01:10<05:26, 138.47it/s]
+[1ARunning loglikelihood requests:  15%|█▌        | 8265/53345 [01:11<05:25, 138.70it/s]
+[1ARunning loglikelihood requests:  16%|█▌        | 8329/53345 [01:11<05:24, 138.73it/s]
+[1ARunning loglikelihood requests:  16%|█▌        | 8393/53345 [01:12<05:23, 138.81it/s]
+[1ARunning loglikelihood requests:  16%|█▌        | 8457/53345 [01:12<05:23, 138.85it/s]
+[1ARunning loglikelihood requests:  16%|█▌        | 8521/53345 [01:12<05:22, 138.94it/s]
+[1ARunning loglikelihood requests:  16%|█▌        | 8585/53345 [01:13<05:21, 139.06it/s]
+[1ARunning loglikelihood requests:  16%|█▌        | 8649/53345 [01:13<05:21, 138.97it/s]
+[1ARunning loglikelihood requests:  16%|█▋        | 8713/53345 [01:14<05:20, 139.47it/s]
+[1ARunning loglikelihood requests:  16%|█▋        | 8777/53345 [01:14<05:18, 139.79it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 8841/53345 [01:15<05:17, 140.09it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 8905/53345 [01:15<05:16, 140.25it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 8969/53345 [01:16<05:16, 140.07it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 9033/53345 [01:16<05:16, 139.96it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 9097/53345 [01:17<05:16, 139.94it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 9161/53345 [01:17<05:16, 139.81it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 9225/53345 [01:18<05:15, 140.02it/s]
+[1ARunning loglikelihood requests:  17%|█▋        | 9289/53345 [01:18<05:14, 139.95it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9353/53345 [01:18<05:12, 140.83it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9417/53345 [01:19<05:11, 141.13it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9482/53345 [01:19<05:08, 142.11it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9546/53345 [01:20<05:08, 142.02it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9611/53345 [01:20<05:06, 142.85it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9675/53345 [01:21<05:06, 142.59it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9739/53345 [01:21<05:05, 142.60it/s]
+[1ARunning loglikelihood requests:  18%|█▊        | 9805/53345 [01:22<05:03, 143.58it/s]
+[1ARunning loglikelihood requests:  19%|█▊        | 9870/53345 [01:22<05:02, 143.90it/s]
+[1ARunning loglikelihood requests:  19%|█▊        | 9934/53345 [01:22<05:03, 143.21it/s]
+[1ARunning loglikelihood requests:  19%|█▊        | 9998/53345 [01:23<05:02, 143.08it/s]
+[1ARunning loglikelihood requests:  19%|█▉        | 10062/53345 [01:23<05:02, 143.02it/s]
+[1ARunning loglikelihood requests:  19%|█▉        | 10126/53345 [01:24<05:02, 142.96it/s]
+[1ARunning loglikelihood requests:  19%|█▉        | 10190/53345 [01:24<05:02, 142.84it/s]
+[1ARunning loglikelihood requests:  19%|█▉        | 10254/53345 [01:25<05:01, 142.73it/s]
+[1ARunning loglikelihood requests:  19%|█▉        | 10318/53345 [01:25<05:01, 142.73it/s]
+[1ARunning loglikelihood requests:  19%|█▉        | 10382/53345 [01:26<05:01, 142.60it/s]
+[1ARunning loglikelihood requests:  20%|█▉        | 10446/53345 [01:26<05:00, 142.71it/s]
+[1ARunning loglikelihood requests:  20%|█▉        | 10511/53345 [01:27<04:59, 143.11it/s]
+[1ARunning loglikelihood requests:  20%|█▉        | 10575/53345 [01:27<04:58, 143.09it/s]
+[1ARunning loglikelihood requests:  20%|█▉        | 10639/53345 [01:27<04:58, 143.10it/s]
+[1ARunning loglikelihood requests:  20%|██        | 10703/53345 [01:28<04:57, 143.47it/s]
+[1ARunning loglikelihood requests:  20%|██        | 10767/53345 [01:28<04:56, 143.59it/s]
+[1ARunning loglikelihood requests:  20%|██        | 10831/53345 [01:29<04:56, 143.54it/s]
+[1ARunning loglikelihood requests:  20%|██        | 10895/53345 [01:29<04:55, 143.64it/s]
+[1ARunning loglikelihood requests:  21%|██        | 10959/53345 [01:30<04:55, 143.60it/s]
+[1ARunning loglikelihood requests:  21%|██        | 11023/53345 [01:30<04:54, 143.79it/s]
+[1ARunning loglikelihood requests:  21%|██        | 11088/53345 [01:31<04:53, 143.87it/s]
+[1ARunning loglikelihood requests:  21%|██        | 11152/53345 [01:31<04:52, 144.12it/s]
+[1ARunning loglikelihood requests:  21%|██        | 11216/53345 [01:31<04:52, 143.84it/s]
+[1ARunning loglikelihood requests:  21%|██        | 11280/53345 [01:32<04:52, 143.91it/s]
+[1ARunning loglikelihood requests:  21%|██▏       | 11344/53345 [01:32<04:52, 143.83it/s]
+[1ARunning loglikelihood requests:  21%|██▏       | 11408/53345 [01:33<04:51, 144.10it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11472/53345 [01:33<04:50, 144.11it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11536/53345 [01:34<04:50, 143.97it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11600/53345 [01:34<04:50, 143.88it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11664/53345 [01:35<04:49, 143.99it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11728/53345 [01:35<04:48, 144.05it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11792/53345 [01:35<04:48, 144.10it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11857/53345 [01:36<04:47, 144.52it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11921/53345 [01:36<04:47, 144.27it/s]
+[1ARunning loglikelihood requests:  22%|██▏       | 11985/53345 [01:37<04:45, 145.06it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12049/53345 [01:37<04:43, 145.78it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12113/53345 [01:38<04:42, 146.07it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12179/53345 [01:38<04:39, 147.53it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12243/53345 [01:38<04:39, 147.07it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12307/53345 [01:39<04:38, 147.21it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12371/53345 [01:39<04:38, 147.34it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12435/53345 [01:40<04:38, 147.13it/s]
+[1ARunning loglikelihood requests:  23%|██▎       | 12499/53345 [01:40<04:37, 147.22it/s]
+[1ARunning loglikelihood requests:  24%|██▎       | 12563/53345 [01:41<04:37, 146.74it/s]
+[1ARunning loglikelihood requests:  24%|██▎       | 12627/53345 [01:41<04:36, 147.03it/s]
+[1ARunning loglikelihood requests:  24%|██▍       | 12691/53345 [01:42<04:35, 147.36it/s]
+[1ARunning loglikelihood requests:  24%|██▍       | 12756/53345 [01:42<04:34, 148.07it/s]
+[1ARunning loglikelihood requests:  24%|██▍       | 12820/53345 [01:42<04:34, 147.73it/s]
+[1ARunning loglikelihood requests:  24%|██▍       | 12884/53345 [01:43<04:34, 147.66it/s]
+[1ARunning loglikelihood requests:  24%|██▍       | 12948/53345 [01:43<04:33, 147.64it/s]
+[1ARunning loglikelihood requests:  24%|██▍       | 13012/53345 [01:44<04:33, 147.67it/s]
+[1ARunning loglikelihood requests:  25%|██▍       | 13076/53345 [01:44<04:32, 147.85it/s]
+[1ARunning loglikelihood requests:  25%|██▍       | 13140/53345 [01:45<04:32, 147.56it/s]
+[1ARunning loglikelihood requests:  25%|██▍       | 13204/53345 [01:45<04:32, 147.54it/s]
+[1ARunning loglikelihood requests:  25%|██▍       | 13268/53345 [01:45<04:31, 147.53it/s]
+[1ARunning loglikelihood requests:  25%|██▍       | 13332/53345 [01:46<04:30, 147.77it/s]
+[1ARunning loglikelihood requests:  25%|██▌       | 13396/53345 [01:46<04:29, 148.20it/s]
+[1ARunning loglikelihood requests:  25%|██▌       | 13460/53345 [01:47<04:28, 148.44it/s]
+[1ARunning loglikelihood requests:  25%|██▌       | 13527/53345 [01:47<04:24, 150.71it/s]
+[1ARunning loglikelihood requests:  25%|██▌       | 13591/53345 [01:48<04:24, 150.23it/s]
+[1ARunning loglikelihood requests:  26%|██▌       | 13655/53345 [01:48<04:24, 150.06it/s]
+[1ARunning loglikelihood requests:  26%|██▌       | 13719/53345 [01:48<04:24, 149.55it/s]
+[1ARunning loglikelihood requests:  26%|██▌       | 13783/53345 [01:49<04:24, 149.54it/s]
+[1ARunning loglikelihood requests:  26%|██▌       | 13849/53345 [01:49<04:21, 150.85it/s]
+[1ARunning loglikelihood requests:  26%|██▌       | 13913/53345 [01:50<04:22, 150.32it/s]
+[1ARunning loglikelihood requests:  26%|██▌       | 13977/53345 [01:50<04:22, 150.20it/s]
+[1ARunning loglikelihood requests:  26%|██▋       | 14041/53345 [01:51<04:22, 149.99it/s]
+[1ARunning loglikelihood requests:  26%|██▋       | 14105/53345 [01:51<04:21, 150.13it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14169/53345 [01:51<04:21, 149.76it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14233/53345 [01:52<04:20, 150.00it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14297/53345 [01:52<04:20, 149.89it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14361/53345 [01:53<04:20, 149.80it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14425/53345 [01:53<04:19, 149.97it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14489/53345 [01:54<04:19, 149.73it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14553/53345 [01:54<04:18, 149.78it/s]
+[1ARunning loglikelihood requests:  27%|██▋       | 14617/53345 [01:54<04:19, 149.49it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 14681/53345 [01:55<04:17, 149.97it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 14745/53345 [01:55<04:16, 150.62it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 14809/53345 [01:56<04:15, 151.07it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 14873/53345 [01:56<04:13, 151.49it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 14940/53345 [01:57<04:12, 151.84it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 15004/53345 [01:57<04:11, 152.45it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 15068/53345 [01:57<04:11, 152.15it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 15132/53345 [01:58<04:11, 151.83it/s]
+[1ARunning loglikelihood requests:  28%|██▊       | 15196/53345 [01:58<04:11, 151.76it/s]
+[1ARunning loglikelihood requests:  29%|██▊       | 15261/53345 [01:59<04:10, 152.22it/s]
+[1ARunning loglikelihood requests:  29%|██▊       | 15325/53345 [01:59<04:09, 152.18it/s]
+[1ARunning loglikelihood requests:  29%|██▉       | 15389/53345 [01:59<04:09, 151.91it/s]
+[1ARunning loglikelihood requests:  29%|██▉       | 15453/53345 [02:00<04:09, 152.05it/s]
+[1ARunning loglikelihood requests:  29%|██▉       | 15517/53345 [02:00<04:09, 151.89it/s]
+[1ARunning loglikelihood requests:  29%|██▉       | 15581/53345 [02:01<04:08, 151.88it/s]
+[1ARunning loglikelihood requests:  29%|██▉       | 15645/53345 [02:01<04:07, 152.09it/s]
+[1ARunning loglikelihood requests:  29%|██▉       | 15709/53345 [02:02<04:07, 151.90it/s]
+[1ARunning loglikelihood requests:  30%|██▉       | 15773/53345 [02:02<04:06, 152.21it/s]
+[1ARunning loglikelihood requests:  30%|██▉       | 15838/53345 [02:02<04:05, 152.78it/s]
+[1ARunning loglikelihood requests:  30%|██▉       | 15902/53345 [02:03<04:05, 152.83it/s]
+[1ARunning loglikelihood requests:  30%|██▉       | 15966/53345 [02:03<04:04, 152.66it/s]
+[1ARunning loglikelihood requests:  30%|███       | 16030/53345 [02:04<04:04, 152.52it/s]
+[1ARunning loglikelihood requests:  30%|███       | 16094/53345 [02:04<04:03, 152.99it/s]
+[1ARunning loglikelihood requests:  30%|███       | 16158/53345 [02:05<04:03, 152.65it/s]
+[1ARunning loglikelihood requests:  30%|███       | 16222/53345 [02:05<04:02, 153.06it/s]
+[1ARunning loglikelihood requests:  31%|███       | 16286/53345 [02:05<04:02, 152.79it/s]
+[1ARunning loglikelihood requests:  31%|███       | 16350/53345 [02:06<04:02, 152.87it/s]
+[1ARunning loglikelihood requests:  31%|███       | 16414/53345 [02:06<04:01, 152.81it/s]
+[1ARunning loglikelihood requests:  31%|███       | 16478/53345 [02:07<04:01, 152.66it/s]
+[1ARunning loglikelihood requests:  31%|███       | 16542/53345 [02:07<04:00, 152.84it/s]
+[1ARunning loglikelihood requests:  31%|███       | 16606/53345 [02:07<04:00, 152.62it/s]
+[1ARunning loglikelihood requests:  31%|███▏      | 16671/53345 [02:08<03:58, 153.56it/s]
+[1ARunning loglikelihood requests:  31%|███▏      | 16735/53345 [02:08<03:59, 153.06it/s]
+[1ARunning loglikelihood requests:  31%|███▏      | 16799/53345 [02:09<03:58, 153.14it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 16863/53345 [02:09<03:57, 153.34it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 16927/53345 [02:10<03:57, 153.47it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 16991/53345 [02:10<03:56, 153.76it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 17055/53345 [02:10<03:56, 153.43it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 17119/53345 [02:11<03:55, 153.57it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 17183/53345 [02:11<03:55, 153.48it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 17247/53345 [02:12<03:55, 153.58it/s]
+[1ARunning loglikelihood requests:  32%|███▏      | 17311/53345 [02:12<03:54, 153.67it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17375/53345 [02:12<03:54, 153.65it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17439/53345 [02:13<03:50, 155.55it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17503/53345 [02:13<03:48, 156.66it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17567/53345 [02:14<03:46, 157.90it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17631/53345 [02:14<03:45, 158.54it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17695/53345 [02:14<03:44, 158.99it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17759/53345 [02:15<03:43, 159.52it/s]
+[1ARunning loglikelihood requests:  33%|███▎      | 17823/53345 [02:15<03:42, 159.39it/s]
+[1ARunning loglikelihood requests:  34%|███▎      | 17887/53345 [02:16<03:42, 159.62it/s]
+[1ARunning loglikelihood requests:  34%|███▎      | 17951/53345 [02:16<03:41, 159.79it/s]
+[1ARunning loglikelihood requests:  34%|███▍      | 18015/53345 [02:16<03:40, 159.91it/s]
+[1ARunning loglikelihood requests:  34%|███▍      | 18079/53345 [02:17<03:40, 160.24it/s]
+[1ARunning loglikelihood requests:  34%|███▍      | 18143/53345 [02:17<03:39, 160.37it/s]
+[1ARunning loglikelihood requests:  34%|███▍      | 18207/53345 [02:18<03:38, 160.53it/s]
+[1ARunning loglikelihood requests:  34%|███▍      | 18271/53345 [02:18<03:38, 160.74it/s]
+[1ARunning loglikelihood requests:  34%|███▍      | 18335/53345 [02:18<03:37, 161.01it/s]
+[1ARunning loglikelihood requests:  34%|███▍      | 18399/53345 [02:19<03:36, 161.23it/s]
+[1ARunning loglikelihood requests:  35%|███▍      | 18463/53345 [02:19<03:36, 161.17it/s]
+[1ARunning loglikelihood requests:  35%|███▍      | 18527/53345 [02:20<03:36, 160.97it/s]
+[1ARunning loglikelihood requests:  35%|███▍      | 18591/53345 [02:20<03:35, 160.99it/s]
+[1ARunning loglikelihood requests:  35%|███▍      | 18655/53345 [02:20<03:35, 161.35it/s]
+[1ARunning loglikelihood requests:  35%|███▌      | 18719/53345 [02:21<03:33, 161.85it/s]
+[1ARunning loglikelihood requests:  35%|███▌      | 18783/53345 [02:21<03:33, 162.15it/s]
+[1ARunning loglikelihood requests:  35%|███▌      | 18847/53345 [02:22<03:32, 162.17it/s]
+[1ARunning loglikelihood requests:  35%|███▌      | 18911/53345 [02:22<03:32, 162.34it/s]
+[1ARunning loglikelihood requests:  36%|███▌      | 18975/53345 [02:22<03:31, 162.51it/s]
+[1ARunning loglikelihood requests:  36%|███▌      | 19039/53345 [02:23<03:31, 162.41it/s]
+[1ARunning loglikelihood requests:  36%|███▌      | 19103/53345 [02:23<03:30, 162.60it/s]
+[1ARunning loglikelihood requests:  36%|███▌      | 19167/53345 [02:24<03:29, 162.92it/s]
+[1ARunning loglikelihood requests:  36%|███▌      | 19231/53345 [02:24<03:30, 162.36it/s]
+[1ARunning loglikelihood requests:  36%|███▌      | 19295/53345 [02:24<03:29, 162.73it/s]
+[1ARunning loglikelihood requests:  36%|███▋      | 19359/53345 [02:25<03:28, 163.16it/s]
+[1ARunning loglikelihood requests:  36%|███▋      | 19423/53345 [02:25<03:27, 163.13it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19487/53345 [02:26<03:27, 163.34it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19551/53345 [02:26<03:27, 163.16it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19615/53345 [02:26<03:26, 163.16it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19679/53345 [02:27<03:26, 163.35it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19743/53345 [02:27<03:26, 163.06it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19807/53345 [02:28<03:25, 163.29it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19871/53345 [02:28<03:24, 163.61it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19935/53345 [02:28<03:23, 164.10it/s]
+[1ARunning loglikelihood requests:  37%|███▋      | 19999/53345 [02:29<03:22, 164.60it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20063/53345 [02:29<03:22, 164.40it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20128/53345 [02:29<03:20, 165.68it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20192/53345 [02:30<03:20, 165.23it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20256/53345 [02:30<03:20, 165.15it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20320/53345 [02:31<03:20, 165.12it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20384/53345 [02:31<03:19, 164.94it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20448/53345 [02:31<03:19, 164.93it/s]
+[1ARunning loglikelihood requests:  38%|███▊      | 20512/53345 [02:32<03:19, 164.59it/s]
+[1ARunning loglikelihood requests:  39%|███▊      | 20576/53345 [02:32<03:19, 164.39it/s]
+[1ARunning loglikelihood requests:  39%|███▊      | 20640/53345 [02:33<03:18, 164.68it/s]
+[1ARunning loglikelihood requests:  39%|███▉      | 20704/53345 [02:33<03:18, 164.43it/s]
+[1ARunning loglikelihood requests:  39%|███▉      | 20768/53345 [02:33<03:18, 164.40it/s]
+[1ARunning loglikelihood requests:  39%|███▉      | 20832/53345 [02:34<03:17, 164.44it/s]
+[1ARunning loglikelihood requests:  39%|███▉      | 20896/53345 [02:34<03:17, 164.19it/s]
+[1ARunning loglikelihood requests:  39%|███▉      | 20960/53345 [02:35<03:17, 164.36it/s]
+[1ARunning loglikelihood requests:  39%|███▉      | 21024/53345 [02:35<03:16, 164.29it/s]
+[1ARunning loglikelihood requests:  40%|███▉      | 21088/53345 [02:35<03:15, 165.10it/s]
+[1ARunning loglikelihood requests:  40%|███▉      | 21152/53345 [02:36<03:13, 165.94it/s]
+[1ARunning loglikelihood requests:  40%|███▉      | 21216/53345 [02:36<03:13, 166.19it/s]
+[1ARunning loglikelihood requests:  40%|███▉      | 21280/53345 [02:36<03:12, 166.48it/s]
+[1ARunning loglikelihood requests:  40%|████      | 21344/53345 [02:37<03:11, 166.68it/s]
+[1ARunning loglikelihood requests:  40%|████      | 21408/53345 [02:37<03:11, 167.06it/s]
+[1ARunning loglikelihood requests:  40%|████      | 21472/53345 [02:38<03:10, 167.59it/s]
+[1ARunning loglikelihood requests:  40%|████      | 21536/53345 [02:38<03:10, 167.36it/s]
+[1ARunning loglikelihood requests:  40%|████      | 21600/53345 [02:38<03:09, 167.49it/s]
+[1ARunning loglikelihood requests:  41%|████      | 21664/53345 [02:39<03:09, 167.20it/s]
+[1ARunning loglikelihood requests:  41%|████      | 21728/53345 [02:39<03:09, 167.21it/s]
+[1ARunning loglikelihood requests:  41%|████      | 21792/53345 [02:39<03:08, 167.45it/s]
+[1ARunning loglikelihood requests:  41%|████      | 21856/53345 [02:40<03:08, 167.09it/s]
+[1ARunning loglikelihood requests:  41%|████      | 21920/53345 [02:40<03:07, 167.68it/s]
+[1ARunning loglikelihood requests:  41%|████      | 21984/53345 [02:41<03:06, 167.75it/s]
+[1ARunning loglikelihood requests:  41%|████▏     | 22048/53345 [02:41<03:06, 167.66it/s]
+[1ARunning loglikelihood requests:  41%|████▏     | 22112/53345 [02:41<03:05, 168.17it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22176/53345 [02:42<03:05, 168.37it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22240/53345 [02:42<03:04, 168.72it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22304/53345 [02:43<03:03, 169.04it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22368/53345 [02:43<03:03, 168.95it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22432/53345 [02:43<03:02, 168.93it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22497/53345 [02:44<03:01, 169.85it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22561/53345 [02:44<03:01, 169.67it/s]
+[1ARunning loglikelihood requests:  42%|████▏     | 22625/53345 [02:44<03:00, 169.84it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 22689/53345 [02:45<03:00, 170.12it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 22753/53345 [02:45<02:59, 170.28it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 22817/53345 [02:46<02:59, 170.15it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 22881/53345 [02:46<02:59, 170.09it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 22945/53345 [02:46<02:58, 170.51it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 23010/53345 [02:47<02:56, 171.41it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 23074/53345 [02:47<02:57, 170.83it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 23138/53345 [02:47<02:55, 172.18it/s]
+[1ARunning loglikelihood requests:  43%|████▎     | 23202/53345 [02:48<02:54, 173.20it/s]
+[1ARunning loglikelihood requests:  44%|████▎     | 23266/53345 [02:48<02:52, 174.40it/s]
+[1ARunning loglikelihood requests:  44%|████▎     | 23331/53345 [02:48<02:50, 175.83it/s]
+[1ARunning loglikelihood requests:  44%|████▍     | 23396/53345 [02:49<02:49, 176.57it/s]
+[1ARunning loglikelihood requests:  44%|████▍     | 23460/53345 [02:49<02:49, 176.23it/s]
+[1ARunning loglikelihood requests:  44%|████▍     | 23524/53345 [02:50<02:49, 175.97it/s]
+[1ARunning loglikelihood requests:  44%|████▍     | 23588/53345 [02:50<02:48, 176.17it/s]
+[1ARunning loglikelihood requests:  44%|████▍     | 23652/53345 [02:50<02:48, 176.59it/s]
+[1ARunning loglikelihood requests:  44%|████▍     | 23716/53345 [02:51<02:47, 176.47it/s]
+[1ARunning loglikelihood requests:  45%|████▍     | 23780/53345 [02:51<02:47, 176.53it/s]
+[1ARunning loglikelihood requests:  45%|████▍     | 23844/53345 [02:51<02:47, 176.49it/s]
+[1ARunning loglikelihood requests:  45%|████▍     | 23908/53345 [02:52<02:46, 176.31it/s]
+[1ARunning loglikelihood requests:  45%|████▍     | 23972/53345 [02:52<02:46, 176.24it/s]
+[1ARunning loglikelihood requests:  45%|████▌     | 24036/53345 [02:52<02:45, 176.74it/s]
+[1ARunning loglikelihood requests:  45%|████▌     | 24100/53345 [02:53<02:45, 177.17it/s]
+[1ARunning loglikelihood requests:  45%|████▌     | 24164/53345 [02:53<02:44, 177.43it/s]
+[1ARunning loglikelihood requests:  45%|████▌     | 24228/53345 [02:54<02:43, 177.67it/s]
+[1ARunning loglikelihood requests:  46%|████▌     | 24292/53345 [02:54<02:43, 177.71it/s]
+[1ARunning loglikelihood requests:  46%|████▌     | 24356/53345 [02:54<02:43, 177.63it/s]
+[1ARunning loglikelihood requests:  46%|████▌     | 24420/53345 [02:55<02:42, 177.83it/s]
+[1ARunning loglikelihood requests:  46%|████▌     | 24484/53345 [02:55<02:42, 178.09it/s]
+[1ARunning loglikelihood requests:  46%|████▌     | 24548/53345 [02:55<02:41, 178.02it/s]
+[1ARunning loglikelihood requests:  46%|████▌     | 24612/53345 [02:56<02:41, 177.97it/s]
+[1ARunning loglikelihood requests:  46%|████▋     | 24676/53345 [02:56<02:41, 177.99it/s]
+[1ARunning loglikelihood requests:  46%|████▋     | 24740/53345 [02:56<02:40, 178.02it/s]
+[1ARunning loglikelihood requests:  46%|████▋     | 24804/53345 [02:57<02:40, 177.96it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 24868/53345 [02:57<02:40, 177.68it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 24932/53345 [02:58<02:38, 178.97it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 24996/53345 [02:58<02:37, 179.74it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 25060/53345 [02:58<02:36, 181.02it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 25124/53345 [02:59<02:35, 181.19it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 25188/53345 [02:59<02:35, 181.40it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 25252/53345 [02:59<02:34, 182.09it/s]
+[1ARunning loglikelihood requests:  47%|████▋     | 25316/53345 [03:00<02:33, 182.49it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25380/53345 [03:00<02:33, 182.16it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25444/53345 [03:00<02:32, 182.67it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25508/53345 [03:01<02:32, 182.75it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25572/53345 [03:01<02:31, 183.44it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25636/53345 [03:01<02:30, 183.92it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25700/53345 [03:02<02:30, 184.03it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25767/53345 [03:02<02:27, 186.90it/s]
+[1ARunning loglikelihood requests:  48%|████▊     | 25831/53345 [03:02<02:27, 186.31it/s]
+[1ARunning loglikelihood requests:  49%|████▊     | 25895/53345 [03:03<02:28, 185.24it/s]
+[1ARunning loglikelihood requests:  49%|████▊     | 25959/53345 [03:03<02:27, 185.80it/s]
+[1ARunning loglikelihood requests:  49%|████▉     | 26023/53345 [03:03<02:26, 186.27it/s]
+[1ARunning loglikelihood requests:  49%|████▉     | 26087/53345 [03:04<02:26, 185.68it/s]
+[1ARunning loglikelihood requests:  49%|████▉     | 26151/53345 [03:04<02:26, 185.70it/s]
+[1ARunning loglikelihood requests:  49%|████▉     | 26215/53345 [03:04<02:25, 185.94it/s]
+[1ARunning loglikelihood requests:  49%|████▉     | 26279/53345 [03:05<02:23, 188.61it/s]
+[1ARunning loglikelihood requests:  49%|████▉     | 26343/53345 [03:05<02:21, 190.40it/s]
+[1ARunning loglikelihood requests:  50%|████▉     | 26407/53345 [03:05<02:19, 192.59it/s]
+[1ARunning loglikelihood requests:  50%|████▉     | 26471/53345 [03:06<02:18, 193.90it/s]
+[1ARunning loglikelihood requests:  50%|████▉     | 26535/53345 [03:06<02:18, 193.77it/s]
+[1ARunning loglikelihood requests:  50%|████▉     | 26599/53345 [03:06<02:16, 195.30it/s]
+[1ARunning loglikelihood requests:  50%|████▉     | 26663/53345 [03:07<02:16, 196.18it/s]
+[1ARunning loglikelihood requests:  50%|█████     | 26729/53345 [03:07<02:14, 198.19it/s]
+[1ARunning loglikelihood requests:  50%|█████     | 26793/53345 [03:07<02:14, 197.78it/s]
+[1ARunning loglikelihood requests:  50%|█████     | 26857/53345 [03:08<02:13, 198.25it/s]
+[1ARunning loglikelihood requests:  50%|█████     | 26921/53345 [03:08<02:13, 198.14it/s]
+[1ARunning loglikelihood requests:  51%|█████     | 26985/53345 [03:08<02:12, 198.89it/s]
+[1ARunning loglikelihood requests:  51%|█████     | 27049/53345 [03:09<02:11, 199.27it/s]
+[1ARunning loglikelihood requests:  51%|█████     | 27113/53345 [03:09<02:11, 199.34it/s]
+[1ARunning loglikelihood requests:  51%|█████     | 27177/53345 [03:09<02:10, 199.85it/s]
+[1ARunning loglikelihood requests:  51%|█████     | 27243/53345 [03:10<02:09, 202.19it/s]
+[1ARunning loglikelihood requests:  51%|█████     | 27307/53345 [03:10<02:09, 201.09it/s]
+[1ARunning loglikelihood requests:  51%|█████▏    | 27371/53345 [03:10<02:08, 201.46it/s]
+[1ARunning loglikelihood requests:  51%|█████▏    | 27435/53345 [03:11<02:08, 202.01it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27503/53345 [03:11<02:05, 205.89it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27567/53345 [03:11<02:05, 205.00it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27631/53345 [03:12<02:05, 205.10it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27695/53345 [03:12<02:05, 204.55it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27759/53345 [03:12<02:05, 204.45it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27823/53345 [03:12<02:03, 206.23it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27887/53345 [03:13<02:02, 207.10it/s]
+[1ARunning loglikelihood requests:  52%|█████▏    | 27954/53345 [03:13<02:00, 209.92it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28018/53345 [03:13<02:00, 210.41it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28082/53345 [03:14<01:59, 210.95it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28147/53345 [03:14<01:59, 211.65it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28211/53345 [03:14<01:59, 210.57it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28275/53345 [03:15<01:57, 214.05it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28341/53345 [03:15<01:54, 218.44it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28405/53345 [03:15<01:53, 218.89it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28469/53345 [03:15<01:53, 219.92it/s]
+[1ARunning loglikelihood requests:  53%|█████▎    | 28534/53345 [03:16<01:51, 221.73it/s]
+[1ARunning loglikelihood requests:  54%|█████▎    | 28598/53345 [03:16<01:51, 222.16it/s]
+[1ARunning loglikelihood requests:  54%|█████▎    | 28662/53345 [03:16<01:50, 223.68it/s]
+[1ARunning loglikelihood requests:  54%|█████▍    | 28729/53345 [03:17<01:47, 227.96it/s]
+[1ARunning loglikelihood requests:  54%|█████▍    | 28799/53345 [03:17<01:44, 233.82it/s]
+[1ARunning loglikelihood requests:  54%|█████▍    | 28863/53345 [03:17<01:45, 232.40it/s]
+[1ARunning loglikelihood requests:  54%|█████▍    | 28927/53345 [03:17<01:45, 231.39it/s]
+[1ARunning loglikelihood requests:  54%|█████▍    | 28991/53345 [03:18<01:45, 230.60it/s]
+[1ARunning loglikelihood requests:  54%|█████▍    | 29055/53345 [03:18<01:45, 231.22it/s]
+[1ARunning loglikelihood requests:  55%|█████▍    | 29124/53345 [03:18<01:42, 236.92it/s]
+[1ARunning loglikelihood requests:  55%|█████▍    | 29192/53345 [03:19<01:40, 240.21it/s]
+[1ARunning loglikelihood requests:  55%|█████▍    | 29256/53345 [03:19<01:40, 238.78it/s]
+[1ARunning loglikelihood requests:  55%|█████▍    | 29320/53345 [03:19<01:41, 237.36it/s]
+[1ARunning loglikelihood requests:  55%|█████▌    | 29384/53345 [03:19<01:41, 236.77it/s]
+[1ARunning loglikelihood requests:  55%|█████▌    | 29449/53345 [03:20<01:40, 236.94it/s]
+[1ARunning loglikelihood requests:  55%|█████▌    | 29513/53345 [03:20<01:39, 238.37it/s]
+[1ARunning loglikelihood requests:  55%|█████▌    | 29577/53345 [03:20<01:39, 238.17it/s]
+[1ARunning loglikelihood requests:  56%|█████▌    | 29643/53345 [03:20<01:38, 240.83it/s]
+[1ARunning loglikelihood requests:  56%|█████▌    | 29707/53345 [03:21<01:37, 241.36it/s]
+[1ARunning loglikelihood requests:  56%|█████▌    | 29771/53345 [03:21<01:37, 240.83it/s]
+[1ARunning loglikelihood requests:  56%|█████▌    | 29838/53345 [03:21<01:36, 243.58it/s]
+[1ARunning loglikelihood requests:  56%|█████▌    | 29902/53345 [03:21<01:36, 243.20it/s]
+[1ARunning loglikelihood requests:  56%|█████▌    | 29966/53345 [03:22<01:36, 243.00it/s]
+[1ARunning loglikelihood requests:  56%|█████▋    | 30030/53345 [03:22<01:35, 243.02it/s]
+[1ARunning loglikelihood requests:  56%|█████▋    | 30094/53345 [03:22<01:35, 243.76it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30158/53345 [03:23<01:34, 245.27it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30222/53345 [03:23<01:34, 245.78it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30286/53345 [03:23<01:34, 245.24it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30358/53345 [03:23<01:30, 254.55it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30422/53345 [03:24<01:30, 252.66it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30486/53345 [03:24<01:28, 257.63it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30550/53345 [03:24<01:27, 259.99it/s]
+[1ARunning loglikelihood requests:  57%|█████▋    | 30614/53345 [03:24<01:26, 261.72it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 30678/53345 [03:25<01:26, 263.57it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 30742/53345 [03:25<01:24, 266.03it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 30806/53345 [03:25<01:24, 267.35it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 30874/53345 [03:25<01:22, 272.60it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 30942/53345 [03:25<01:20, 276.83it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 31006/53345 [03:26<01:20, 276.69it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 31070/53345 [03:26<01:20, 276.09it/s]
+[1ARunning loglikelihood requests:  58%|█████▊    | 31135/53345 [03:26<01:20, 275.99it/s]
+[1ARunning loglikelihood requests:  59%|█████▊    | 31214/53345 [03:26<01:15, 293.97it/s]
+[1ARunning loglikelihood requests:  59%|█████▊    | 31278/53345 [03:27<01:16, 288.37it/s]
+[1ARunning loglikelihood requests:  59%|█████▉    | 31342/53345 [03:27<01:17, 284.90it/s]
+[1ARunning loglikelihood requests:  59%|█████▉    | 31406/53345 [03:27<01:17, 282.06it/s]
+[1ARunning loglikelihood requests:  59%|█████▉    | 31470/53345 [03:27<01:18, 279.56it/s]
+[1ARunning loglikelihood requests:  59%|█████▉    | 31535/53345 [03:28<01:17, 279.63it/s]
+[1ARunning loglikelihood requests:  59%|█████▉    | 31599/53345 [03:28<01:17, 278.80it/s]
+[1ARunning loglikelihood requests:  59%|█████▉    | 31663/53345 [03:28<01:17, 279.02it/s]
+[1ARunning loglikelihood requests:  59%|█████▉    | 31727/53345 [03:28<01:17, 279.20it/s]
+[1ARunning loglikelihood requests:  60%|█████▉    | 31791/53345 [03:28<01:17, 279.14it/s]
+[1ARunning loglikelihood requests:  60%|█████▉    | 31855/53345 [03:29<01:16, 279.86it/s]
+[1ARunning loglikelihood requests:  60%|█████▉    | 31932/53345 [03:29<01:12, 296.69it/s]
+[1ARunning loglikelihood requests:  60%|█████▉    | 31996/53345 [03:29<01:13, 291.85it/s]
+[1ARunning loglikelihood requests:  60%|██████    | 32060/53345 [03:29<01:13, 288.69it/s]
+[1ARunning loglikelihood requests:  60%|██████    | 32124/53345 [03:30<01:14, 286.21it/s]
+[1ARunning loglikelihood requests:  60%|██████    | 32188/53345 [03:30<01:14, 285.45it/s]
+[1ARunning loglikelihood requests:  60%|██████    | 32257/53345 [03:30<01:12, 291.23it/s]
+[1ARunning loglikelihood requests:  61%|██████    | 32324/53345 [03:30<01:13, 286.61it/s]
+[1ARunning loglikelihood requests:  61%|██████    | 32388/53345 [03:31<01:14, 280.79it/s]
+[1ARunning loglikelihood requests:  61%|██████    | 32452/53345 [03:31<01:13, 284.22it/s]
+[1ARunning loglikelihood requests:  61%|██████    | 32516/53345 [03:31<01:12, 286.72it/s]
+[1ARunning loglikelihood requests:  61%|██████    | 32580/53345 [03:31<01:12, 287.61it/s]
+[1ARunning loglikelihood requests:  61%|██████    | 32647/53345 [03:31<01:11, 291.37it/s]
+[1ARunning loglikelihood requests:  61%|██████▏   | 32713/53345 [03:32<01:10, 294.72it/s]
+[1ARunning loglikelihood requests:  61%|██████▏   | 32777/53345 [03:32<01:09, 295.12it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 32841/53345 [03:32<01:09, 295.35it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 32905/53345 [03:32<01:09, 293.91it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 32969/53345 [03:33<01:09, 293.94it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 33036/53345 [03:33<01:07, 298.72it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 33104/53345 [03:33<01:06, 304.23it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 33168/53345 [03:33<01:06, 301.34it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 33232/53345 [03:33<01:07, 298.20it/s]
+[1ARunning loglikelihood requests:  62%|██████▏   | 33296/53345 [03:34<01:07, 297.35it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33360/53345 [03:34<01:07, 297.94it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33424/53345 [03:34<01:06, 298.45it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33488/53345 [03:34<01:06, 298.47it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33555/53345 [03:34<01:05, 302.09it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33620/53345 [03:35<01:05, 302.56it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33684/53345 [03:35<01:05, 301.44it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33748/53345 [03:35<01:05, 301.42it/s]
+[1ARunning loglikelihood requests:  63%|██████▎   | 33812/53345 [03:35<01:04, 301.05it/s]
+[1ARunning loglikelihood requests:  64%|██████▎   | 33876/53345 [03:36<01:04, 301.15it/s]
+[1ARunning loglikelihood requests:  64%|██████▎   | 33940/53345 [03:36<01:04, 299.84it/s]
+[1ARunning loglikelihood requests:  64%|██████▍   | 34012/53345 [03:36<01:02, 310.65it/s]
+[1ARunning loglikelihood requests:  64%|██████▍   | 34085/53345 [03:36<01:00, 320.58it/s]
+[1ARunning loglikelihood requests:  64%|██████▍   | 34149/53345 [03:36<01:01, 314.28it/s]
+[1ARunning loglikelihood requests:  64%|██████▍   | 34213/53345 [03:37<01:01, 309.74it/s]
+[1ARunning loglikelihood requests:  64%|██████▍   | 34277/53345 [03:37<01:01, 310.59it/s]
+[1ARunning loglikelihood requests:  64%|██████▍   | 34341/53345 [03:37<01:01, 310.04it/s]
+[1ARunning loglikelihood requests:  64%|██████▍   | 34405/53345 [03:37<01:01, 310.40it/s]
+[1ARunning loglikelihood requests:  65%|██████▍   | 34469/53345 [03:37<01:00, 310.53it/s]
+[1ARunning loglikelihood requests:  65%|██████▍   | 34538/53345 [03:38<00:59, 317.59it/s]
+[1ARunning loglikelihood requests:  65%|██████▍   | 34608/53345 [03:38<00:57, 324.07it/s]
+[1ARunning loglikelihood requests:  65%|██████▌   | 34675/53345 [03:38<00:57, 324.66it/s]
+[1ARunning loglikelihood requests:  65%|██████▌   | 34739/53345 [03:38<00:58, 319.92it/s]
+[1ARunning loglikelihood requests:  65%|██████▌   | 34803/53345 [03:38<00:58, 317.04it/s]
+[1ARunning loglikelihood requests:  65%|██████▌   | 34867/53345 [03:39<00:58, 316.58it/s]
+[1ARunning loglikelihood requests:  65%|██████▌   | 34931/53345 [03:39<00:58, 316.00it/s]
+[1ARunning loglikelihood requests:  66%|██████▌   | 34995/53345 [03:39<00:58, 315.28it/s]
+[1ARunning loglikelihood requests:  66%|██████▌   | 35061/53345 [03:39<00:57, 317.70it/s]
+[1ARunning loglikelihood requests:  66%|██████▌   | 35134/53345 [03:39<00:55, 328.04it/s]
+[1ARunning loglikelihood requests:  66%|██████▌   | 35202/53345 [03:40<00:55, 329.39it/s]
+[1ARunning loglikelihood requests:  66%|██████▌   | 35266/53345 [03:40<00:55, 324.83it/s]
+[1ARunning loglikelihood requests:  66%|██████▌   | 35330/53345 [03:40<00:55, 323.05it/s]
+[1ARunning loglikelihood requests:  66%|██████▋   | 35394/53345 [03:40<00:55, 321.11it/s]
+[1ARunning loglikelihood requests:  66%|██████▋   | 35458/53345 [03:41<00:56, 318.98it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35522/53345 [03:41<00:55, 318.61it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35586/53345 [03:41<00:55, 319.18it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35666/53345 [03:41<00:51, 343.02it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35731/53345 [03:41<00:52, 337.55it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35803/53345 [03:42<00:51, 343.51it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35867/53345 [03:42<00:51, 336.24it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35931/53345 [03:42<00:52, 330.37it/s]
+[1ARunning loglikelihood requests:  67%|██████▋   | 35995/53345 [03:42<00:52, 327.46it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36059/53345 [03:42<00:53, 326.00it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36123/53345 [03:43<00:53, 324.52it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36187/53345 [03:43<00:53, 323.32it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36258/53345 [03:43<00:51, 332.84it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36324/53345 [03:43<00:51, 332.38it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36391/53345 [03:43<00:50, 334.05it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36455/53345 [03:44<00:51, 330.51it/s]
+[1ARunning loglikelihood requests:  68%|██████▊   | 36519/53345 [03:44<00:51, 326.37it/s]
+[1ARunning loglikelihood requests:  69%|██████▊   | 36583/53345 [03:44<00:51, 328.45it/s]
+[1ARunning loglikelihood requests:  69%|██████▊   | 36647/53345 [03:44<00:50, 328.97it/s]
+[1ARunning loglikelihood requests:  69%|██████▉   | 36711/53345 [03:44<00:50, 330.11it/s]
+[1ARunning loglikelihood requests:  69%|██████▉   | 36775/53345 [03:44<00:50, 331.18it/s]
+[1ARunning loglikelihood requests:  69%|██████▉   | 36842/53345 [03:45<00:49, 335.52it/s]
+[1ARunning loglikelihood requests:  69%|██████▉   | 36911/53345 [03:45<00:48, 342.31it/s]
+[1ARunning loglikelihood requests:  69%|██████▉   | 36975/53345 [03:45<00:48, 338.97it/s]
+[1ARunning loglikelihood requests:  69%|██████▉   | 37040/53345 [03:45<00:48, 337.31it/s]
+[1ARunning loglikelihood requests:  70%|██████▉   | 37104/53345 [03:45<00:48, 336.19it/s]
+[1ARunning loglikelihood requests:  70%|██████▉   | 37168/53345 [03:46<00:48, 334.75it/s]
+[1ARunning loglikelihood requests:  70%|██████▉   | 37232/53345 [03:46<00:48, 334.80it/s]
+[1ARunning loglikelihood requests:  70%|██████▉   | 37296/53345 [03:46<00:47, 335.46it/s]
+[1ARunning loglikelihood requests:  70%|███████   | 37360/53345 [03:46<00:47, 335.09it/s]
+[1ARunning loglikelihood requests:  70%|███████   | 37424/53345 [03:46<00:47, 335.46it/s]
+[1ARunning loglikelihood requests:  70%|███████   | 37491/53345 [03:47<00:46, 339.01it/s]
+[1ARunning loglikelihood requests:  70%|███████   | 37569/53345 [03:47<00:43, 359.37it/s]
+[1ARunning loglikelihood requests:  71%|███████   | 37639/53345 [03:47<00:43, 362.00it/s]
+[1ARunning loglikelihood requests:  71%|███████   | 37709/53345 [03:47<00:43, 363.29it/s]
+[1ARunning loglikelihood requests:  71%|███████   | 37773/53345 [03:47<00:43, 355.68it/s]
+[1ARunning loglikelihood requests:  71%|███████   | 37837/53345 [03:48<00:44, 349.76it/s]
+[1ARunning loglikelihood requests:  71%|███████   | 37901/53345 [03:48<00:44, 345.50it/s]
+[1ARunning loglikelihood requests:  71%|███████   | 37965/53345 [03:48<00:44, 343.99it/s]
+[1ARunning loglikelihood requests:  71%|███████▏  | 38029/53345 [03:48<00:44, 343.82it/s]
+[1ARunning loglikelihood requests:  71%|███████▏  | 38093/53345 [03:48<00:44, 343.41it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38157/53345 [03:48<00:44, 341.64it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38231/53345 [03:49<00:42, 356.59it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38295/53345 [03:49<00:42, 351.61it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38364/53345 [03:49<00:42, 356.48it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38428/53345 [03:49<00:42, 352.23it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38492/53345 [03:49<00:42, 348.26it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38556/53345 [03:50<00:42, 347.21it/s]
+[1ARunning loglikelihood requests:  72%|███████▏  | 38620/53345 [03:50<00:42, 345.93it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 38684/53345 [03:50<00:42, 345.00it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 38748/53345 [03:50<00:42, 344.38it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 38812/53345 [03:50<00:42, 344.08it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 38880/53345 [03:51<00:41, 349.31it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 38950/53345 [03:51<00:40, 357.34it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 39014/53345 [03:51<00:40, 350.56it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 39081/53345 [03:51<00:40, 352.92it/s]
+[1ARunning loglikelihood requests:  73%|███████▎  | 39145/53345 [03:51<00:40, 350.01it/s]
+[1ARunning loglikelihood requests:  74%|███████▎  | 39209/53345 [03:51<00:40, 347.59it/s]
+[1ARunning loglikelihood requests:  74%|███████▎  | 39273/53345 [03:52<00:38, 361.15it/s]
+[1ARunning loglikelihood requests:  74%|███████▎  | 39337/53345 [03:52<00:37, 370.89it/s]
+[1ARunning loglikelihood requests:  74%|███████▍  | 39401/53345 [03:52<00:36, 377.56it/s]
+[1ARunning loglikelihood requests:  74%|███████▍  | 39465/53345 [03:52<00:36, 382.07it/s]
+[1ARunning loglikelihood requests:  74%|███████▍  | 39539/53345 [03:52<00:34, 402.20it/s]
+[1ARunning loglikelihood requests:  74%|███████▍  | 39606/53345 [03:52<00:34, 402.06it/s]
+[1ARunning loglikelihood requests:  74%|███████▍  | 39676/53345 [03:53<00:33, 410.13it/s]
+[1ARunning loglikelihood requests:  75%|███████▍  | 39744/53345 [03:53<00:32, 412.46it/s]
+[1ARunning loglikelihood requests:  75%|███████▍  | 39808/53345 [03:53<00:33, 406.05it/s]
+[1ARunning loglikelihood requests:  75%|███████▍  | 39872/53345 [03:53<00:33, 401.20it/s]
+[1ARunning loglikelihood requests:  75%|███████▍  | 39936/53345 [03:53<00:33, 399.38it/s]
+[1ARunning loglikelihood requests:  75%|███████▍  | 40000/53345 [03:53<00:33, 396.17it/s]
+[1ARunning loglikelihood requests:  75%|███████▌  | 40064/53345 [03:54<00:33, 396.69it/s]
+[1ARunning loglikelihood requests:  75%|███████▌  | 40128/53345 [03:54<00:33, 396.62it/s]
+[1ARunning loglikelihood requests:  75%|███████▌  | 40199/53345 [03:54<00:32, 409.88it/s]
+[1ARunning loglikelihood requests:  75%|███████▌  | 40265/53345 [03:54<00:31, 409.79it/s]
+[1ARunning loglikelihood requests:  76%|███████▌  | 40332/53345 [03:54<00:31, 411.78it/s]
+[1ARunning loglikelihood requests:  76%|███████▌  | 40401/53345 [03:54<00:31, 415.17it/s]
+[1ARunning loglikelihood requests:  76%|███████▌  | 40466/53345 [03:55<00:31, 410.47it/s]
+[1ARunning loglikelihood requests:  76%|███████▌  | 40530/53345 [03:55<00:31, 404.60it/s]
+[1ARunning loglikelihood requests:  76%|███████▌  | 40594/53345 [03:55<00:31, 400.19it/s]
+[1ARunning loglikelihood requests:  76%|███████▌  | 40658/53345 [03:55<00:31, 400.64it/s]
+[1ARunning loglikelihood requests:  76%|███████▋  | 40722/53345 [03:55<00:31, 402.27it/s]
+[1ARunning loglikelihood requests:  76%|███████▋  | 40786/53345 [03:55<00:31, 402.55it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 40851/53345 [03:56<00:30, 403.57it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 40927/53345 [03:56<00:29, 423.64it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 40994/53345 [03:56<00:29, 421.32it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 41070/53345 [03:56<00:28, 435.98it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 41137/53345 [03:56<00:28, 432.67it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 41201/53345 [03:56<00:28, 424.87it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 41265/53345 [03:57<00:28, 417.51it/s]
+[1ARunning loglikelihood requests:  77%|███████▋  | 41329/53345 [03:57<00:29, 414.33it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41393/53345 [03:57<00:29, 410.51it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41457/53345 [03:57<00:29, 407.18it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41527/53345 [03:57<00:28, 417.03it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41593/53345 [03:57<00:28, 418.09it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41664/53345 [03:57<00:27, 428.49it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41747/53345 [03:58<00:25, 458.28it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41811/53345 [03:58<00:25, 443.90it/s]
+[1ARunning loglikelihood requests:  78%|███████▊  | 41875/53345 [03:58<00:26, 432.06it/s]
+[1ARunning loglikelihood requests:  79%|███████▊  | 41939/53345 [03:58<00:26, 427.10it/s]
+[1ARunning loglikelihood requests:  79%|███████▊  | 42003/53345 [03:58<00:26, 424.48it/s]
+[1ARunning loglikelihood requests:  79%|███████▉  | 42067/53345 [03:58<00:26, 423.20it/s]
+[1ARunning loglikelihood requests:  79%|███████▉  | 42145/53345 [03:59<00:24, 448.32it/s]
+[1ARunning loglikelihood requests:  79%|███████▉  | 42212/53345 [03:59<00:25, 444.07it/s]
+[1ARunning loglikelihood requests:  79%|███████▉  | 42276/53345 [03:59<00:25, 436.72it/s]
+[1ARunning loglikelihood requests:  79%|███████▉  | 42353/53345 [03:59<00:24, 455.98it/s]
+[1ARunning loglikelihood requests:  80%|███████▉  | 42418/53345 [03:59<00:24, 445.66it/s]
+[1ARunning loglikelihood requests:  80%|███████▉  | 42482/53345 [03:59<00:24, 437.63it/s]
+[1ARunning loglikelihood requests:  80%|███████▉  | 42546/53345 [03:59<00:24, 433.61it/s]
+[1ARunning loglikelihood requests:  80%|███████▉  | 42610/53345 [04:00<00:24, 430.68it/s]
+[1ARunning loglikelihood requests:  80%|███████▉  | 42674/53345 [04:00<00:24, 428.54it/s]
+[1ARunning loglikelihood requests:  80%|████████  | 42744/53345 [04:00<00:24, 437.55it/s]
+[1ARunning loglikelihood requests:  80%|████████  | 42811/53345 [04:00<00:23, 439.09it/s]
+[1ARunning loglikelihood requests:  80%|████████  | 42889/53345 [04:00<00:23, 437.19it/s]
+[1ARunning loglikelihood requests:  81%|████████  | 42957/53345 [04:00<00:23, 436.29it/s]
+[1ARunning loglikelihood requests:  81%|████████  | 43022/53345 [04:01<00:23, 434.34it/s]
+[1ARunning loglikelihood requests:  81%|████████  | 43086/53345 [04:01<00:23, 431.70it/s]
+[1ARunning loglikelihood requests:  81%|████████  | 43150/53345 [04:01<00:23, 434.07it/s]
+[1ARunning loglikelihood requests:  81%|████████  | 43214/53345 [04:01<00:23, 438.61it/s]
+[1ARunning loglikelihood requests:  81%|████████  | 43278/53345 [04:01<00:22, 438.77it/s]
+[1ARunning loglikelihood requests:  81%|████████▏ | 43355/53345 [04:01<00:21, 463.66it/s]
+[1ARunning loglikelihood requests:  81%|████████▏ | 43423/53345 [04:01<00:21, 464.50it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43499/53345 [04:02<00:20, 482.97it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43564/53345 [04:02<00:20, 474.50it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43630/53345 [04:02<00:20, 469.23it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43694/53345 [04:02<00:20, 461.01it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43758/53345 [04:02<00:20, 457.45it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43822/53345 [04:02<00:21, 445.42it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43887/53345 [04:02<00:21, 445.02it/s]
+[1ARunning loglikelihood requests:  82%|████████▏ | 43962/53345 [04:03<00:20, 468.07it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44026/53345 [04:03<00:20, 463.33it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44103/53345 [04:03<00:19, 485.90it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44186/53345 [04:03<00:17, 513.84it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44250/53345 [04:03<00:18, 492.66it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44314/53345 [04:03<00:18, 478.25it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44378/53345 [04:03<00:18, 472.88it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44442/53345 [04:04<00:19, 468.10it/s]
+[1ARunning loglikelihood requests:  83%|████████▎ | 44524/53345 [04:04<00:17, 501.73it/s]
+[1ARunning loglikelihood requests:  84%|████████▎ | 44591/53345 [04:04<00:17, 495.61it/s]
+[1ARunning loglikelihood requests:  84%|████████▎ | 44661/53345 [04:04<00:17, 496.64it/s]
+[1ARunning loglikelihood requests:  84%|████████▍ | 44736/53345 [04:04<00:16, 507.95it/s]
+[1ARunning loglikelihood requests:  84%|████████▍ | 44804/53345 [04:04<00:17, 501.67it/s]
+[1ARunning loglikelihood requests:  84%|████████▍ | 44873/53345 [04:04<00:16, 500.01it/s]
+[1ARunning loglikelihood requests:  84%|████████▍ | 44937/53345 [04:05<00:17, 487.60it/s]
+[1ARunning loglikelihood requests:  84%|████████▍ | 45001/53345 [04:05<00:17, 479.70it/s]
+[1ARunning loglikelihood requests:  84%|████████▍ | 45065/53345 [04:05<00:17, 475.08it/s]
+[1ARunning loglikelihood requests:  85%|████████▍ | 45145/53345 [04:05<00:16, 503.29it/s]
+[1ARunning loglikelihood requests:  85%|████████▍ | 45210/53345 [04:05<00:16, 493.68it/s]
+[1ARunning loglikelihood requests:  85%|████████▍ | 45274/53345 [04:05<00:16, 483.03it/s]
+[1ARunning loglikelihood requests:  85%|████████▌ | 45346/53345 [04:05<00:16, 493.34it/s]
+[1ARunning loglikelihood requests:  85%|████████▌ | 45410/53345 [04:06<00:16, 483.06it/s]
+[1ARunning loglikelihood requests:  85%|████████▌ | 45481/53345 [04:06<00:16, 490.34it/s]
+[1ARunning loglikelihood requests:  85%|████████▌ | 45545/53345 [04:06<00:16, 480.42it/s]
+[1ARunning loglikelihood requests:  85%|████████▌ | 45609/53345 [04:06<00:16, 482.01it/s]
+[1ARunning loglikelihood requests:  86%|████████▌ | 45673/53345 [04:06<00:15, 484.47it/s]
+[1ARunning loglikelihood requests:  86%|████████▌ | 45742/53345 [04:06<00:15, 494.93it/s]
+[1ARunning loglikelihood requests:  86%|████████▌ | 45810/53345 [04:06<00:15, 501.89it/s]
+[1ARunning loglikelihood requests:  86%|████████▌ | 45876/53345 [04:06<00:14, 501.79it/s]
+[1ARunning loglikelihood requests:  86%|████████▌ | 45954/53345 [04:07<00:14, 527.27it/s]
+[1ARunning loglikelihood requests:  86%|████████▋ | 46022/53345 [04:07<00:13, 524.65it/s]
+[1ARunning loglikelihood requests:  86%|████████▋ | 46104/53345 [04:07<00:13, 551.63it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46179/53345 [04:07<00:12, 555.77it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46243/53345 [04:07<00:13, 537.75it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46307/53345 [04:07<00:13, 523.29it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46371/53345 [04:07<00:13, 514.23it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46451/53345 [04:08<00:12, 540.49it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46521/53345 [04:08<00:12, 539.91it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46585/53345 [04:08<00:12, 524.80it/s]
+[1ARunning loglikelihood requests:  87%|████████▋ | 46657/53345 [04:08<00:12, 532.21it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 46731/53345 [04:08<00:12, 541.89it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 46799/53345 [04:08<00:12, 536.24it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 46863/53345 [04:08<00:12, 521.88it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 46927/53345 [04:08<00:12, 508.31it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 46991/53345 [04:09<00:12, 513.26it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 47058/53345 [04:09<00:12, 523.13it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 47126/53345 [04:09<00:11, 532.36it/s]
+[1ARunning loglikelihood requests:  88%|████████▊ | 47194/53345 [04:09<00:11, 537.33it/s]
+[1ARunning loglikelihood requests:  89%|████████▊ | 47262/53345 [04:09<00:11, 541.03it/s]
+[1ARunning loglikelihood requests:  89%|████████▊ | 47334/53345 [04:09<00:10, 553.91it/s]
+[1ARunning loglikelihood requests:  89%|████████▉ | 47406/53345 [04:09<00:10, 562.08it/s]
+[1ARunning loglikelihood requests:  89%|████████▉ | 47487/53345 [04:09<00:09, 589.21it/s]
+[1ARunning loglikelihood requests:  89%|████████▉ | 47551/53345 [04:10<00:10, 566.56it/s]
+[1ARunning loglikelihood requests:  89%|████████▉ | 47615/53345 [04:10<00:10, 554.00it/s]
+[1ARunning loglikelihood requests:  89%|████████▉ | 47679/53345 [04:10<00:10, 546.18it/s]
+[1ARunning loglikelihood requests:  90%|████████▉ | 47746/53345 [04:10<00:10, 548.23it/s]
+[1ARunning loglikelihood requests:  90%|████████▉ | 47814/53345 [04:10<00:10, 551.77it/s]
+[1ARunning loglikelihood requests:  90%|████████▉ | 47888/53345 [04:10<00:09, 568.35it/s]
+[1ARunning loglikelihood requests:  90%|████████▉ | 47961/53345 [04:10<00:09, 578.69it/s]
+[1ARunning loglikelihood requests:  90%|█████████ | 48040/53345 [04:10<00:08, 600.07it/s]
+[1ARunning loglikelihood requests:  90%|█████████ | 48109/53345 [04:11<00:08, 591.63it/s]
+[1ARunning loglikelihood requests:  90%|█████████ | 48173/53345 [04:11<00:09, 572.50it/s]
+[1ARunning loglikelihood requests:  90%|█████████ | 48237/53345 [04:11<00:08, 572.27it/s]
+[1ARunning loglikelihood requests:  91%|█████████ | 48304/53345 [04:11<00:08, 576.41it/s]
+[1ARunning loglikelihood requests:  91%|█████████ | 48381/53345 [04:11<00:08, 606.26it/s]
+[1ARunning loglikelihood requests:  91%|█████████ | 48450/53345 [04:11<00:08, 605.64it/s]
+[1ARunning loglikelihood requests:  91%|█████████ | 48524/53345 [04:11<00:07, 618.02it/s]
+[1ARunning loglikelihood requests:  91%|█████████ | 48601/53345 [04:11<00:07, 635.51it/s]
+[1ARunning loglikelihood requests:  91%|█████████ | 48675/53345 [04:11<00:07, 639.28it/s]
+[1ARunning loglikelihood requests:  91%|█████████▏| 48749/53345 [04:12<00:07, 642.97it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 48825/53345 [04:12<00:06, 648.23it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 48892/53345 [04:12<00:07, 630.06it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 48956/53345 [04:12<00:07, 615.84it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 49023/53345 [04:12<00:07, 607.64it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 49089/53345 [04:12<00:07, 602.22it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 49160/53345 [04:12<00:06, 613.81it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 49231/53345 [04:12<00:06, 618.64it/s]
+[1ARunning loglikelihood requests:  92%|█████████▏| 49305/53345 [04:12<00:06, 629.70it/s]
+[1ARunning loglikelihood requests:  93%|█████████▎| 49383/53345 [04:13<00:06, 647.57it/s]
+[1ARunning loglikelihood requests:  93%|█████████▎| 49455/53345 [04:13<00:06, 643.78it/s]
+[1ARunning loglikelihood requests:  93%|█████████▎| 49522/53345 [04:13<00:06, 630.73it/s]
+[1ARunning loglikelihood requests:  93%|█████████▎| 49586/53345 [04:13<00:06, 619.30it/s]
+[1ARunning loglikelihood requests:  93%|█████████▎| 49662/53345 [04:13<00:05, 643.81it/s]
+[1ARunning loglikelihood requests:  93%|█████████▎| 49730/53345 [04:13<00:05, 637.36it/s]
+[1ARunning loglikelihood requests:  93%|█████████▎| 49804/53345 [04:13<00:05, 651.23it/s]
+[1ARunning loglikelihood requests:  94%|█████████▎| 49883/53345 [04:13<00:05, 673.08it/s]
+[1ARunning loglikelihood requests:  94%|█████████▎| 49957/53345 [04:13<00:05, 675.65it/s]
+[1ARunning loglikelihood requests:  94%|█████████▍| 50043/53345 [04:14<00:04, 708.53it/s]
+[1ARunning loglikelihood requests:  94%|█████████▍| 50114/53345 [04:14<00:04, 691.40it/s]
+[1ARunning loglikelihood requests:  94%|█████████▍| 50184/53345 [04:14<00:04, 681.41it/s]
+[1ARunning loglikelihood requests:  94%|█████████▍| 50253/53345 [04:14<00:04, 669.60it/s]
+[1ARunning loglikelihood requests:  94%|█████████▍| 50320/53345 [04:14<00:04, 658.45it/s]
+[1ARunning loglikelihood requests:  94%|█████████▍| 50386/53345 [04:14<00:04, 648.73it/s]
+[1ARunning loglikelihood requests:  95%|█████████▍| 50456/53345 [04:14<00:04, 623.08it/s]
+[1ARunning loglikelihood requests:  95%|█████████▍| 50543/53345 [04:14<00:04, 668.63it/s]
+[1ARunning loglikelihood requests:  95%|█████████▍| 50622/53345 [04:14<00:03, 687.84it/s]
+[1ARunning loglikelihood requests:  95%|█████████▌| 50691/53345 [04:15<00:03, 674.28it/s]
+[1ARunning loglikelihood requests:  95%|█████████▌| 50829/53345 [04:15<00:03, 721.82it/s]
+[1ARunning loglikelihood requests:  96%|█████████▌| 50971/53345 [04:15<00:03, 756.32it/s]
+[1ARunning loglikelihood requests:  96%|█████████▌| 51155/53345 [04:15<00:02, 1006.68it/s]
+[1ARunning loglikelihood requests:  96%|█████████▌| 51263/53345 [04:15<00:02, 871.50it/s] 
+[1ARunning loglikelihood requests:  96%|█████████▋| 51395/53345 [04:15<00:02, 838.95it/s]
+[1ARunning loglikelihood requests:  97%|█████████▋| 51554/53345 [04:16<00:02, 861.92it/s]
+[1ARunning loglikelihood requests:  97%|█████████▋| 51739/53345 [04:16<00:01, 924.31it/s]
+[1ARunning loglikelihood requests:  97%|█████████▋| 51884/53345 [04:16<00:01, 891.16it/s]
+[1ARunning loglikelihood requests:  98%|█████████▊| 52072/53345 [04:16<00:01, 953.22it/s]
+[1ARunning loglikelihood requests:  98%|█████████▊| 52248/53345 [04:16<00:01, 946.79it/s]
+[1ARunning loglikelihood requests:  98%|█████████▊| 52433/53345 [04:16<00:00, 979.52it/s]
+[1ARunning loglikelihood requests:  99%|█████████▊| 52590/53345 [04:17<00:00, 960.34it/s]
+[1ARunning loglikelihood requests:  99%|█████████▉| 52763/53345 [04:17<00:00, 985.44it/s]
+[1ARunning loglikelihood requests:  99%|█████████▉| 52943/53345 [04:17<00:00, 1026.74it/s]
+[1ARunning loglikelihood requests: 100%|█████████▉| 53092/53345 [04:17<00:00, 1039.38it/s]
+[1ARunning loglikelihood requests: 100%|█████████▉| 53239/53345 [04:17<00:00, 1059.83it/s]
+[1ARunning loglikelihood requests: 100%|██████████| 53345/53345 [04:17<00:00, 207.00it/s] 
+fatal: not a git repository (or any of the parent directories): .git
+2026-11-02:23:37:21 INFO     [loggers.evaluation_tracker:316] Output path not provided, skipping saving results aggregated
+Passed argument batch_size = auto:1. Detecting largest batch size
+Determined largest batch size: 64
+hf ({'pretrained': 'HuggingFaceTB/SmolLM2-1.7B-Instruct', 'dtype': 'bfloat16'}), gen_kwargs: ({}), limit: None, num_fewshot: None, batch_size: auto (64)
+|    A    | B | C  | D |   E    | F |  G   | H |  I   |
+|---------|--:|----|--:|--------|---|-----:|---|-----:|
+|arc_easy |  1|none|  0|acc     |↑  |0.6915|±  |0.0095|
+|         |   |none|  0|acc_norm|↑  |0.6279|±  |0.0099|
+|hellaswag|  1|none|  0|acc     |↑  |0.5347|±  |0.0050|
+|         |   |none|  0|acc_norm|↑  |0.7183|±  |0.0045|
+|piqa     |  1|none|  0|acc     |↑  |0.7590|±  |0.0100|
+|         |   |none|  0|acc_norm|↑  |0.7633|±  |0.0099|
+
+{"steps": 0, "ended": "SystemExit", "error": "SystemExit\n", "seconds": 332.857718935, "peak_allocated_bytes": 9570034688, "peak_reserved_bytes": 12490637312, "device": "NVIDIA A10", "timing": "cuda_events"}
+[ground truth 23:37:23] bare run ended (SystemExit) after 359 s, 0 steps
+[ground truth 23:37:23] recorder run: 5 warmup + 60 timed steps, at most 1981 s
+[ground truth 23:43:19] recorder run ended (error) after 0 steps
+{
+  "script": "lm_eval",
+  "entrypoint": "preflight_command.py",
+  "args": [
+    "lm_eval",
+    "--model",
+    "hf",
+    "--model_args",
+    "pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,dtype=bfloat16",
+    "--tasks",
+    "arc_easy,hellaswag,piqa",
+    "--batch_size",
+    "auto"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": null,
+  "lens": "eval",
+  "image": "probe",
+  "bare": {
+    "steps": 0,
+    "ended": "SystemExit",
+    "error": "SystemExit\n",
+    "seconds": 332.857718935,
+    "peak_allocated_bytes": 9570034688,
+    "peak_reserved_bytes": 12490637312,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 359.4
+  },
+  "recorder": {
+    "status": "error",
+    "error": "script finished after 0 optimizer steps; a probe needs at least 2",
+    "error_code": "too_few_steps",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 355.82,
+    "by_phase": {},
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 34902097920.0
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-ncb8PmfIRrFFJxa1imBFwv

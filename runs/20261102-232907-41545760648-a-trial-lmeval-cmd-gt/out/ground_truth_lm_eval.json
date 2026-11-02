@@ -1,0 +1,108 @@
+{
+  "script": "lm_eval",
+  "entrypoint": "preflight_command.py",
+  "args": [
+    "lm_eval",
+    "--model",
+    "hf",
+    "--model_args",
+    "pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,dtype=bfloat16",
+    "--tasks",
+    "arc_easy,hellaswag,piqa",
+    "--batch_size",
+    "auto"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "SystemExit",
+    "error": "SystemExit\n",
+    "seconds": 332.857718935,
+    "peak_allocated_bytes": 9570034688,
+    "peak_reserved_bytes": 12490637312,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 359.4
+  },
+  "recorder": {
+    "status": "error",
+    "error": "script finished after 0 optimizer steps; a probe needs at least 2",
+    "error_code": "too_few_steps",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 355.82,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 34902097920.0
+    },
+    "step_log": [],
+    "log_tail": "t/s]\rRunning loglikelihood requests:  98%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 52302/53345 [04:17<00:01, 996.57it/s] \rRunning loglikelihood requests:  98%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 52433/53345 [04:17<00:00, 924.44it/s]\rRunning loglikelihood requests:  99%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 52590/53345 [04:17<00:00, 921.02it/s]\rRunning loglikelihood requests:  99%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 52763/53345 [04:17<00:00, 962.42it/s]\rRunning loglikelihood requests:  99%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 52943/53345 [04:17<00:00, 1014.58it/s]\rRunning loglikelihood requests: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 53092/53345 [04:18<00:00, 1015.94it/s]\rRunning loglikelihood requests: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 53239/53345 [04:18<00:00, 1043.74it/s]\rRunning loglikelihood requests: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 53345/53345 [04:18<00:00, 206.55it/s] \nfatal: not a git repository (or any of the parent directories): .git\n2026-11-02:23:43:17 INFO     [loggers.evaluation_tracker:316] Output path not provided, skipping saving results aggregated\nhf ({'pretrained': 'HuggingFaceTB/SmolLM2-1.7B-Instruct', 'dtype': 'bfloat16'}), gen_kwargs: ({}), limit: None, num_fewshot: None, batch_size: auto (64)\n|    A    | B | C  | D |   E    | F |  G   | H |  I   |\n|---------|--:|----|--:|--------|---|-----:|---|-----:|\n|arc_easy |  1|none|  0|acc     |\u2191  |0.6915|\u00b1  |0.0095|\n|         |   |none|  0|acc_norm|\u2191  |0.6279|\u00b1  |0.0099|\n|hellaswag|  1|none|  0|acc     |\u2191  |0.5347|\u00b1  |0.0050|\n|         |   |none|  0|acc_norm|\u2191  |0.7183|\u00b1  |0.0045|\n|piqa     |  1|none|  0|acc     |\u2191  |0.7590|\u00b1  |0.0100|\n|         |   |none|  0|acc_norm|\u2191  |0.7633|\u00b1  |0.0099|\n\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T23:37:23Z",
+      "duration_s": 355.82,
+      "error": "script finished after 0 optimizer steps; a probe needs at least 2",
+      "error_code": "too_few_steps",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 127.13293496557002,
+        "max_w": 157.952,
+        "samples": 1307
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 34902097920.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 355.82,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "eval",
+  "image": "probe"
+}
