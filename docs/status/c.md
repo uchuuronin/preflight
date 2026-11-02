@@ -1,5 +1,16 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Decisions, Nov 2 day (the 11:16 order; Chiya out until about 5 PM)
+
+| # | When (ET) | What | Why | Cost | How to undo |
+|---|---|---|---|---|---|
+| D1 | 10:58 | Deployed production from main **f7f10b0** (deploy run 41476764638; stranger, API, web green) | Item 1 | $0 | Re-run deploy.yml from 5058361 |
+| D2 | 11:03 | One private check-in on the live site (zoo/finetune_lora_hf, Private triage ticked): **record 01M6EG0284PWZDRXGGQVVZYVND** (for D's video; its link stays private). Glimmer triaged it: four `modal-glimmer` / `muse-glimmer` triage calls in its provenance, finding "Muse Glimmer on probe p1-eval: oom". **But the line under the finding read "Found by Muse Spark Open triage"**: the harness writes every model triage as `spark_open_triage`. Fixed in the web (6824833): the line reads the model from the finding's title, "Found by Muse Glimmer". Live after the next merge and deploy | Item 1 asks the triage to read "Found by Muse Glimmer"; no harness change today, so the web reads what the harness already writes | US$0.36 (A10 GPU 0.071, model calls 0.227 with Glimmer's, sandbox estimate 0.061) | `git revert 6824833` |
+| D3 | 11:06 | Share pages: `deploy.yml` copies D's `workers/functions` and hero cards into the Pages build (stranger and web jobs); the stranger gate runs D's tests, the hero-card check and a 3 MB gzipped bundle limit (1.13 MB); Wrangler pinned to 4.151.0. Preview from ws-c passed (deploy run 41478139402). Production waits for the PM's merge (from-c.md) | Item 2: preview first, production from main only | $0 | Revert 0ef8424 and the pin |
+| D4 | 11:20 | "About the same cost" when two cost ranges overlap (caaf165) | Item 6 (B's ask) | $0 | `git revert caaf165` |
+| D5 | 11:22 | S1: "Tight: measure first" and the off note sit on the node pill in the day theme (709ca2d): #8A5200 is 4.0:1 on the sky, 5.62:1 on the pill | Item 4, D's audit | $0 | `git revert 709ca2d` |
+| D6 | 11:25 | Fix race stacking (acee01a): template `eval.no_grad_and_batch` (both eval fixes, eval batch {value}), raced only when no round-1 fix passes verify; the value is the guide's `bestCombo` eval batch (8 on this record), checked by a web test against `races/nov2_stack.json`. `fix_app.py::race_stack` runs round 1, verifies, then round 2 only if nothing passed; before each step, spent plus that step's worst case must stay under US$1 (Muse Code at its stop cap, a verify at A's US$0.60 job cap unless its record gives costs). A10, as yesterday | Item 3 | race below | `git revert acee01a` |
+
 ## Decisions overnight (Nov 2, from 00:18 ET; Chiya offline until about 5:30)
 
 | # | When (ET) | What | Why | Cost | How to undo |
