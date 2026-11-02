@@ -1,0 +1,102 @@
+{
+  "submitted": {
+    "job_id": "01M6D3090VY77Q79MZXGHD760N",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "job_id": "01M6D3090VY77Q79MZXGHD760N",
+    "status": "cancelled",
+    "position": null,
+    "record_id": "01M6D30EYGANSVKSA2SG4EBSAE",
+    "share_token": "NOKVweynMzapv1AZ0B4EgQ",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 8
+  },
+  "events": [
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "seq": 0,
+      "at": "2026-11-02T02:56:48.667596Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "seq": 1,
+      "at": "2026-11-02T02:56:53.781620Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "seq": 2,
+      "at": "2026-11-02T02:56:54.127944Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "seq": 3,
+      "at": "2026-11-02T02:56:54.475636Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "record_id": "01M6D30EYGANSVKSA2SG4EBSAE",
+      "share_token": "NOKVweynMzapv1AZ0B4EgQ",
+      "seq": 4,
+      "at": "2026-11-02T02:56:57.672935Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "record_id": "01M6D30EYGANSVKSA2SG4EBSAE",
+      "share_token": "NOKVweynMzapv1AZ0B4EgQ",
+      "seq": 5,
+      "at": "2026-11-02T02:57:18.680953Z",
+      "stage": "skeleton",
+      "message": "map refined by Muse Spark",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "record_id": "01M6D30EYGANSVKSA2SG4EBSAE",
+      "share_token": "NOKVweynMzapv1AZ0B4EgQ",
+      "seq": 6,
+      "at": "2026-11-02T02:57:19.022743Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "record_id": "01M6D30EYGANSVKSA2SG4EBSAE",
+      "share_token": "NOKVweynMzapv1AZ0B4EgQ",
+      "seq": 7,
+      "at": "2026-11-02T02:57:19.369851Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6D3090VY77Q79MZXGHD760N",
+      "seq": 8,
+      "at": "2026-11-02T03:16:51.531449Z",
+      "stage": "cancelled",
+      "level": "info"
+    }
+  ],
+  "error": null
+}
