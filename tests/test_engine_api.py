@@ -1211,11 +1211,7 @@ def test_the_run_length_falls_back_on_the_probes_dataset_length():
 	"""C, Nov 1: the live LoRA record's time and cost abstained ("no dataset size"), though every probe recorded
 	train_dataset_len 50,724 (planned_steps 3,170 at batch 4 x grad_accum 4)."""
 	rec = FlightRecord.model_validate(
-		json.loads(
-			(
-				Path(__file__).resolve().parent / "fixtures/lora_live_nov1_record.json"
-			).read_text()
-		)
+		json.loads((Path(__file__).resolve().parent / "fixtures/lora_live_nov1_record.json").read_text())
 	)
 	steps, why = api.total_steps(rec)
 	assert why == "" and steps == pytest.approx(3170, abs=1)
