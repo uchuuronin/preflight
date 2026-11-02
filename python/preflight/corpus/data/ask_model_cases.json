@@ -36,6 +36,23 @@
    "$from": "A's ground_truth command on remote-runs (Nov 2): repo, commit, entrypoint, args and first GPU; steps from --bare-steps or the script's own --max_steps"
   },
   {
+   "id": "unseen-2",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/Lightning-AI/litgpt",
+    "commit": "4738993a5e0190b851162a52173729827d3884e7",
+    "entrypoint": "litgpt/pretrain.py",
+    "args": [
+     "--config",
+     "config_hub/pretrain/debug.yaml"
+    ]
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; the run length is the config's own"
+  },
+  {
    "id": "unseen-3",
    "set": "unseen",
    "source": {
