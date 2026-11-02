@@ -1,0 +1,11 @@
+{
+	"name": "20261102-021052-41376298722-b-topup-seed0",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41376298722",
+	"ref": "ws-b",
+	"sha": "11b8ad9bf68e44245a49a45ddc52a01a6e6d9941",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --seed 0 --exclude-keys python/preflight/corpus/data/topup_nov1_exclude.txt --budgets H100-SXM-80GB=11,L40S=6.78 --max-minutes 100",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T02:34:31Z"
+}
