@@ -1,0 +1,61 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-0sERHsAg9JqLSYcToPXCnE
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+[modal-client] 2026-11-02T02:42:08+0000 Modal Client → Modal Worker Heartbeat attempt failed (attempt_dur=61.11, time_since_heartbeat_success=61.11, error=ConnectionError('Deadline exceeded'))
+Task's current input(s) ["in-01M6D1T9TY3CAHXQM8E5GX698P:1793586964319-0"] cancelled because: Task's current input in-01M6D1T9TY3CAHXQM8E5GX698P:1793586964319-0 hit its timeout of 900s
+Stopping app - uncaught exception raised locally: FunctionTimeoutError("Task's current input in-01M6D1T9TY3CAHXQM8E5GX698P:1793586964319-0 hit its timeout of 900s").
+[modal-client] 2026-11-02T02:51:07+0000 Received a cancellation signal while processing input ('in-01M6D1T9TY3CAHXQM8E5GX698P:1793586964319-0',)
+[modal-client] 2026-11-02T02:51:07+0000 Successfully canceled input ('in-01M6D1T9TY3CAHXQM8E5GX698P:1793586964319-0',)
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py:3 │
+│ 02 in export                                                                 │
+│                                                                              │
+│   301 │   by_gpu: dict[str, list[dict[str, Any]]] = defaultdict(list)        │
+│ ❱ 302 │   for row in read_rows.remote(kind):                                 │
+│   303 │   │   by_gpu[row.get("gpu", "unknown")].append(row)                  │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_object.py:49 in wrapped                                                  │
+│                                                                              │
+│    48 │   │   await self.hydrate()                                           │
+│ ❱  49 │   │   return await method(self, *args, **kwargs)                     │
+│    50                                                                        │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2081 in remote                                              │
+│                                                                              │
+│   2080 │   │                                                                 │
+│ ❱ 2081 │   │   return await self._call_function(args, kwargs)                │
+│   2082                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:2018 in _call_function                                      │
+│                                                                              │
+│   2017 │   │                                                                 │
+│ ❱ 2018 │   │   return await invocation.run_function()                        │
+│   2019                                                                       │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_functions.py:517 in run_function                                         │
+│                                                                              │
+│    516 │   │   │   # No more retries left.                                   │
+│ ❱  517 │   │   │   return await _process_result(                             │
+│    518 │   │   │   │   await_response.output.result, await_response.output.d │
+│                                                                              │
+│ /home/runner/work/preflight/preflight/.venv/lib/python3.11/site-packages/mod │
+│ al/_utils/function_utils.py:534 in _process_result                           │
+│                                                                              │
+│   533 │   if result.status == api_pb2.GenericResult.GENERIC_STATUS_TIMEOUT:  │
+│ ❱ 534 │   │   raise FunctionTimeoutError(result.exception)                   │
+│   535 │   elif result.status == api_pb2.GenericResult.GENERIC_STATUS_INTERNA │
+╰──────────────────────────────────────────────────────────────────────────────╯
+FunctionTimeoutError: Task's current input 
+in-01M6D1T9TY3CAHXQM8E5GX698P:1793586964319-0 hit its timeout of 900s
