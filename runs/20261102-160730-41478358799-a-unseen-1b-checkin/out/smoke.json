@@ -1,0 +1,62 @@
+{
+  "submitted": {
+    "job_id": "01M6EG8Q99H3HWXGMW0XJZJ051",
+    "created": true,
+    "position": 1
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6EG8Q99H3HWXGMW0XJZJ051",
+    "status": "failed",
+    "position": null,
+    "record_id": null,
+    "share_token": null,
+    "error": "Python source is too large to map (over 2 MB). Step: reading the script. By hand: run `python -m py_compile train.py` (or `preflight map train.py`) to see the line, fix it, and submit again.",
+    "retryable": false,
+    "error_code": "syntax_error",
+    "last_seq": 4
+  },
+  "events": [
+    {
+      "job_id": "01M6EG8Q99H3HWXGMW0XJZJ051",
+      "seq": 0,
+      "at": "2026-11-02T16:07:51.337532Z",
+      "stage": "queued",
+      "queue_position": 1,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG8Q99H3HWXGMW0XJZJ051",
+      "seq": 1,
+      "at": "2026-11-02T16:08:03.284668Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG8Q99H3HWXGMW0XJZJ051",
+      "seq": 2,
+      "at": "2026-11-02T16:08:03.394268Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG8Q99H3HWXGMW0XJZJ051",
+      "seq": 3,
+      "at": "2026-11-02T16:08:04.489629Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG8Q99H3HWXGMW0XJZJ051",
+      "seq": 4,
+      "at": "2026-11-02T16:08:04.535374Z",
+      "stage": "failed",
+      "message": "Python source is too large to map (over 2 MB). Step: reading the script. By hand: run `python -m py_compile train.py` (or `preflight map train.py`) to see the line, fix it, and submit again.",
+      "level": "error",
+      "retryable": false,
+      "error_code": "syntax_error"
+    }
+  ],
+  "error": null
+}
