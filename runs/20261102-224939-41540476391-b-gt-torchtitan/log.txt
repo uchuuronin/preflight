@@ -1,0 +1,169 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-7pLzN72WoaIYORxNoaHorr
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+├── ✓ Created Function triage_agreement_hosted.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+└── ✓ Created Function startup_check_serving_image.
+[ground truth] torchtitan_debug: train.py, lens pretrain, titan image, 5 files; waiting for an L4, else the A10 (Modal queues it)
+[ground truth] container up on the A10; 5 files of torchtitan_debug
+[ground truth 22:50:04] bare run of torchtitan_debug: 40 optimizer steps, at most 750 s
+[bare] running /tmp/gt-msyc0k6l/train.py for 40 optimizer steps
+[titan] 2026-11-02 22:50:11,597 - root - INFO - Starting job: Llama 3 debug training
+[titan] 2026-11-02 22:50:11,621 - root - INFO - Building 0-D device mesh with [], []
+[titan] 2026-11-02 22:50:11,621 - root - INFO - [GC] Initial GC collection. 0.00 seconds.
+[titan] 2026-11-02 22:50:12,090 - root - INFO - TikTokenizer built: #words 2256, BOS ID 2000, EOS ID 2001
+[titan] 2026-11-02 22:50:12,091 - root - INFO - Preparing c4_test dataset from tests/assets/c4_test
+
+[1AGenerating train split: 0 examples [00:00, ? examples/s]Generating train split: 300 examples [00:00, 46755.77 examples/s]
+[titan] 2026-11-02 22:50:12,135 - root - INFO - Building llama3 debugmodel with TransformerModelArgs(_enforced='This field is used to enforce all fields have defaults.', dim=256, n_layers=6, n_heads=16, n_kv_heads=None, vocab_size=2256, multiple_of=256, ffn_dim_multiplier=None, norm_eps=1e-05, rope_theta=500000, max_seq_len=512, depth_init=True, use_flex_attn=False, attn_mask_type='causal', eos_id=2001)
+[titan] 2026-11-02 22:50:12,179 - root - INFO - CUDA capacity: NVIDIA A10 with 22.06GiB memory
+[titan] 2026-11-02 22:50:12,181 - root - WARNING - Error running lspci: [Errno 2] No such file or directory: 'lspci', fallback to use device_name
+[titan] 2026-11-02 22:50:12,181 - root - WARNING - Peak flops undefined for: NVIDIA A10, fallback to A100
+[titan] 2026-11-02 22:50:12,182 - root - INFO - [34mModel llama3 debugmodel [31msize: 6,270,208 total parameters[39m
+[titan] 2026-11-02 22:50:12,182 - root - INFO - Applied selective activation checkpointing to the model
+[titan] 2026-11-02 22:50:12,505 - root - WARNING - Error running lspci: [Errno 2] No such file or directory: 'lspci', fallback to use device_name
+[titan] 2026-11-02 22:50:12,505 - root - WARNING - Peak flops undefined for: NVIDIA A10, fallback to A100
+[titan] 2026-11-02 22:50:12,505 - root - INFO - Peak FLOPS used for computing MFU: 3.120e+14
+[titan] 2026-11-02 22:50:12,505 - root - INFO - CUDA memory usage for model: 0.04GiB(0.19%)
+[titan] 2026-11-02 22:50:12,506 - root - INFO - Mixed precision training is handled by AMP
+[titan] 2026-11-02 22:50:12,506 - root - INFO - Trainer is initialized with local batch size 8, global batch size 8, gradient accumulation steps 1, sequence length 512, total steps 40 (warmup 2).
+[titan] 2026-11-02 22:50:12,506 - root - INFO - Training starts at step 1.
+[titan] 2026-11-02 22:50:13,088 - root - INFO - [31mstep:  1  [32mloss:  8.1995  [33mmemory:  0.42GiB(1.90%)  [34mtps: 4,521  [36mtflops: 0.20  [35mmfu: 0.06%[39m
+[titan] 2026-11-02 22:50:13,088 - root - INFO - Synchronizing and adjusting timeout for all ProcessGroups to 0:01:40
+[titan] 2026-11-02 22:50:13,116 - root - INFO - [31mstep:  2  [32mloss:  8.1477  [33mmemory:  0.46GiB(2.06%)  [34mtps: 143,423  [36mtflops: 6.25  [35mmfu: 2.00%[39m
+[titan] 2026-11-02 22:50:13,142 - root - INFO - [31mstep:  3  [32mloss:  8.0873  [33mmemory:  0.46GiB(2.06%)  [34mtps: 159,563  [36mtflops: 6.96  [35mmfu: 2.23%[39m
+[titan] 2026-11-02 22:50:13,166 - root - INFO - [31mstep:  4  [32mloss:  7.9988  [33mmemory:  0.46GiB(2.06%)  [34mtps: 177,381  [36mtflops: 7.73  [35mmfu: 2.48%[39m
+[titan] 2026-11-02 22:50:13,191 - root - INFO - [31mstep:  5  [32mloss:  7.9487  [33mmemory:  0.46GiB(2.06%)  [34mtps: 165,814  [36mtflops: 7.23  [35mmfu: 2.32%[39m
+[titan] 2026-11-02 22:50:13,214 - root - INFO - [31mstep:  6  [32mloss:  7.7906  [33mmemory:  0.46GiB(2.06%)  [34mtps: 175,289  [36mtflops: 7.64  [35mmfu: 2.45%[39m
+[titan] 2026-11-02 22:50:13,239 - root - INFO - [31mstep:  7  [32mloss:  7.6011  [33mmemory:  0.46GiB(2.06%)  [34mtps: 167,847  [36mtflops: 7.32  [35mmfu: 2.35%[39m
+[titan] 2026-11-02 22:50:13,263 - root - INFO - [31mstep:  8  [32mloss:  7.2911  [33mmemory:  0.46GiB(2.06%)  [34mtps: 172,088  [36mtflops: 7.50  [35mmfu: 2.40%[39m
+[titan] 2026-11-02 22:50:13,288 - root - INFO - [31mstep:  9  [32mloss:  7.1792  [33mmemory:  0.46GiB(2.06%)  [34mtps: 169,097  [36mtflops: 7.37  [35mmfu: 2.36%[39m
+[titan] 2026-11-02 22:50:13,316 - root - INFO - [31mstep: 10  [32mloss:  6.9472  [33mmemory:  0.46GiB(2.06%)  [34mtps: 146,616  [36mtflops: 6.39  [35mmfu: 2.05%[39m
+[titan] 2026-11-02 22:50:13,337 - root - INFO - [31mstep: 11  [32mloss:  6.9142  [33mmemory:  0.46GiB(2.06%)  [34mtps: 195,219  [36mtflops: 8.51  [35mmfu: 2.73%[39m
+[titan] 2026-11-02 22:50:13,360 - root - INFO - [31mstep: 12  [32mloss:  6.7475  [33mmemory:  0.46GiB(2.06%)  [34mtps: 180,740  [36mtflops: 7.88  [35mmfu: 2.53%[39m
+[titan] 2026-11-02 22:50:13,384 - root - INFO - [31mstep: 13  [32mloss:  6.6485  [33mmemory:  0.46GiB(2.06%)  [34mtps: 172,186  [36mtflops: 7.51  [35mmfu: 2.41%[39m
+[titan] 2026-11-02 22:50:13,408 - root - INFO - [31mstep: 14  [32mloss:  6.5815  [33mmemory:  0.46GiB(2.06%)  [34mtps: 173,244  [36mtflops: 7.55  [35mmfu: 2.42%[39m
+[titan] 2026-11-02 22:50:13,431 - root - INFO - [31mstep: 15  [32mloss:  6.5371  [33mmemory:  0.46GiB(2.06%)  [34mtps: 179,817  [36mtflops: 7.84  [35mmfu: 2.51%[39m
+[titan] 2026-11-02 22:50:13,457 - root - INFO - [31mstep: 16  [32mloss:  6.5937  [33mmemory:  0.46GiB(2.06%)  [34mtps: 157,740  [36mtflops: 6.88  [35mmfu: 2.20%[39m
+[titan] 2026-11-02 22:50:13,481 - root - INFO - [31mstep: 17  [32mloss:  6.4319  [33mmemory:  0.46GiB(2.06%)  [34mtps: 174,362  [36mtflops: 7.60  [35mmfu: 2.44%[39m
+[titan] 2026-11-02 22:50:13,506 - root - INFO - [31mstep: 18  [32mloss:  6.5539  [33mmemory:  0.46GiB(2.06%)  [34mtps: 165,500  [36mtflops: 7.21  [35mmfu: 2.31%[39m
+[titan] 2026-11-02 22:50:13,531 - root - INFO - [31mstep: 19  [32mloss:  6.3912  [33mmemory:  0.46GiB(2.06%)  [34mtps: 166,632  [36mtflops: 7.26  [35mmfu: 2.33%[39m
+[titan] 2026-11-02 22:50:14,047 - root - INFO - Process group destroyed.
+{"steps": 40, "ended": "steps", "error": null, "seconds": 7.134988577, "peak_allocated_bytes": 418865152, "peak_reserved_bytes": 488636416, "device": "NVIDIA A10", "timing": "cuda_events"}
+[ground truth 22:50:15] bare run ended (steps) after 11 s, 40 steps
+[ground truth 22:50:15] recorder run: 5 warmup + 20 timed steps, at most 1429 s
+[ground truth 22:50:24] recorder run ended (ok) after 25 steps
+{
+  "script": "torchtitan_debug",
+  "entrypoint": "train.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": {
+    "sync_overhead": {
+      "median": 0.94404,
+      "ci95": [
+        0.92017,
+        1.04348
+      ],
+      "pairs": 9,
+      "source": "measured"
+    },
+    "hook_overhead": {
+      "median": 13398.47644,
+      "ci95": [
+        12859.24999,
+        19359.50066
+      ],
+      "pairs": 10,
+      "source": "measured"
+    },
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "pretrain",
+  "image": "titan",
+  "bare": {
+    "steps": 40,
+    "ended": "steps",
+    "error": null,
+    "seconds": 7.134988577,
+    "peak_allocated_bytes": 418865152,
+    "peak_reserved_bytes": 488636416,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 11.1
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 25,
+    "p50_s": 0.02701670455932617,
+    "peak_allocated_bytes": 420977664,
+    "seconds": 8.732,
+    "by_phase": {
+      "data": 0.0958114699094841,
+      "forward": 0.29625672092528854,
+      "backward": 0.49641521001791294,
+      "optimizer": 0.04004004394027234,
+      "other": 0.07147655520704202
+    },
+    "generation": null,
+    "extras": {
+      "params_total": 6270208.0,
+      "params_trainable": 6270208.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 0.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 21386887168.0
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.7.1",
+        "datasets": "3.6.0"
+      },
+      "python": "3.11.12"
+    }
+  }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-7pLzN72WoaIYORxNoaHorr
