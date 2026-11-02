@@ -1,0 +1,3 @@
+{"tools": [{"type": "web_search"}], "status": 200, "item_types": ["reasoning", "message", "web_search_call", "web_search_call", "reasoning", "message", "web_search_call", "web_search_call", "web_search_call", "reasoning", "message"], "seconds": 8.1}
+{"tools": [{"type": "web_search_preview"}], "status": 200, "item_types": ["reasoning", "message", "web_search_call", "reasoning", "message", "web_search_call", "web_search_call", "web_search_call", "reasoning", "message"], "seconds": 8.7}
+{"tools": [], "status": 200, "item_types": ["reasoning", "message"], "seconds": 8.9}
