@@ -129,3 +129,20 @@ def test_the_flag_is_off_by_default():
 	from preflight.runner.pipeline import _repo_install_on
 
 	assert _repo_install_on() is False
+
+
+def test_a_repo_that_cant_be_parsed_installs_nothing_and_never_raises(tmp_path, missing, monkeypatch):
+	_tree(tmp_path, {"pyproject.toml": "a = " + "[" * 5000, "setup.py": "x = " + "-" * 200000 + "1\n",
+		"run.py": "import deep\n", "deep.py": "y = " + "not " * 100000 + "1\n"})  # fmt: skip
+	monkeypatch.setattr(R.subprocess, "run", lambda *a, **k: pytest.fail("pip ran"))
+	assert R.install(tmp_path, tmp_path / "deps", log=lambda m: None, repo=True, entrypoint="run.py") == (
+		None,
+		[],
+	)
+
+
+def test_a_url_dependency_doesnt_hide_a_known_import(tmp_path, missing):
+	missing.add("torchvision")
+	_tree(tmp_path, {"pyproject.toml": '[project]\nname = "x"\ndependencies = ["torchvision @ https://example.com/tv.whl"]\n',
+		"run.py": "import torchvision\n"})  # fmt: skip
+	assert R.repo_requirements(tmp_path, "run.py", log=lambda m: None).splitlines()[-1] == "torchvision"

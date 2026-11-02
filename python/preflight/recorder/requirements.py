@@ -107,7 +107,7 @@ def _top_imports(text: str) -> set[str]:
 
 	try:
 		tree = ast.parse(text)
-	except (SyntaxError, ValueError, RecursionError):
+	except (SyntaxError, ValueError, RecursionError, MemoryError):
 		return set()
 	guarded: set[int] = set()
 	for node in ast.walk(tree):
@@ -152,7 +152,11 @@ def missing_imports(workdir: Path, entrypoint: str) -> set[str]:
 		if f in seen or not f.is_file():
 			continue
 		seen.add(f)
-		for name in _top_imports(f.read_text(encoding="utf-8", errors="replace")):
+		try:
+			text = f.read_text(encoding="utf-8", errors="replace")
+		except OSError:
+			continue
+		for name in _top_imports(text):
 			loc = _local(name, roots)
 			if loc is not None:
 				todo.extend([loc] if loc.suffix == ".py" else sorted(loc.rglob("*.py"))[:MAX_SCANNED_FILES])
@@ -182,7 +186,7 @@ def declared(workdir: Path) -> list[str]:
 				.get("project", {})
 				.get("dependencies")
 			)
-		except (tomllib.TOMLDecodeError, AttributeError):
+		except (tomllib.TOMLDecodeError, AttributeError, RecursionError, MemoryError, OSError):
 			deps = None
 		if isinstance(deps, list) and all(isinstance(d, str) for d in deps):
 			return deps
@@ -190,7 +194,7 @@ def declared(workdir: Path) -> list[str]:
 	if setup.is_file():
 		try:
 			tree = ast.parse(setup.read_text(encoding="utf-8", errors="replace"))
-		except (SyntaxError, ValueError, RecursionError):
+		except (SyntaxError, ValueError, RecursionError, MemoryError, OSError):
 			return []
 		lists = {t.id: n.value for n in ast.walk(tree) if isinstance(n, ast.Assign)
 			for t in n.targets if isinstance(t, ast.Name)}  # fmt: skip
@@ -213,7 +217,8 @@ def repo_requirements(workdir: Path, entrypoint: str, *, log=print) -> str:
 		log(
 			f"[preflight] requirements: the repo declares {len(lines)} dependencies (pyproject.toml or setup.py)"
 		)
-	names = {_norm(_LINE.match(x.strip())["name"]) for x in lines if _LINE.match(x.strip())}
+	# a URL or VCS line is skipped by plan(), so its name doesn't stop a known import of it
+	names = {_norm(_LINE.match(x.strip())["name"]) for x in lines if "@" not in x and _LINE.match(x.strip())}
 	for mod in sorted(missing_imports(workdir, entrypoint)):
 		if mod in NO_WHEELS:
 			log(f"[preflight] requirements: {mod} has no wheels on PyPI (only source); not installed")
@@ -251,7 +256,13 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	if req.is_file():
 		text = req.read_text(encoding="utf-8", errors="replace")
 	elif repo and entrypoint:
-		text = repo_requirements(workdir, entrypoint, log=log)
+		try:
+			text = repo_requirements(workdir, entrypoint, log=log)
+		except Exception as exc:  # a repo that can't be read for requirements runs as it would without them
+			log(
+				f"[preflight] requirements: couldn't read the repo's requirements ({type(exc).__name__}); none installed"
+			)
+			text = ""
 	else:
 		return None, extra
 	have = installed()
