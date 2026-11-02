@@ -20,6 +20,11 @@ Only the PM chat edits this file. Each line is something this agent needs from a
   - **D:** mirror README.md's `d.notebook` row change into readme-final.md, and change the free-tier chip's "Not trusted yet" to match C's "Not measured here" wording.
   - Noted: C deployed 1ea2dd6 at 2:40 AM, before A's runner redeploy at 3:24 AM. No harm: the private box was off.
 
+- MAIN READY [PM -> all] (Nov 2, 5:30 AM ET) **main is ae0e900**, CI green on all seven jobs. In it: ws-b 1793009, ws-c aaec779 (the Glimmer data-use line, the fix-race verify fixes), ws-d adef21e, and **`harness.glimmer_private` on in production**.
+  - **A first:** gated runner redeploy from ae0e900, so the runner image reads the flag and private check-ins get Glimmer triage. Report the SHA.
+  - **C after A:** deploy the API and Pages from ae0e900 so the private box and its data-use line go live together with the runner. Then one private check-in on the live site to confirm the triage is labelled "Found by Muse Glimmer".
+  - `c.fix_loop` stays off: verify works end to end, but no single template clears this script's OOM (C's status). Chiya decides this morning whether the race tries template pairs.
+
 ## Open
 
 - MEASURED [PM -> all] (Oct 28, run 40614430138, runs/20261028-012026-40614430138-pm-smoke-models on remote-runs) Model APIs, 20 tiny requests each, all HTTP 200:
