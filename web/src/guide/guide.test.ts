@@ -91,7 +91,12 @@ describe("rule-based tour", () => {
 	});
 
 	it("says honestly that nothing safe can be moved when no grid covers the fix", () => {
-		const step = nextStep({ ...base(golden), pinned: new Set() });
+		// Built here, not read off the golden's numbers (B's refill makes its eval batch 4 fit, and a
+		// B200 clear the eval, Nov 2): every grid over the eval knobs and the GPU taken away, so no
+		// grid covers a fix.
+		const fixKnobs = new Set(["eval_batch_size", "eval_no_grad", "eval_every", "gpu_type"]);
+		const noFix = { ...golden, predictions: { ...golden.predictions, grids: golden.predictions.grids.filter((g) => !g.axes.some((a) => fixKnobs.has(a.knob_id))) } };
+		const step = nextStep({ ...base(noFix), pinned: new Set() });
 		expect(step.kind).toBe("nothing_safe");
 		expect(step.nodes).toContain("eval");
 	});
