@@ -256,3 +256,26 @@ def test_a_relative_import_never_reads_above_the_checkout(tmp_path, missing):
 	(tmp_path / "outside.py").write_text("import outside_mod\n")
 	work = _tree(tmp_path / "work", {"run.py": "from .. import outside\n"})
 	assert R.missing_imports(work, "run.py") == set()
+
+
+def test_setup_cfg_install_requires_is_declared(tmp_path):
+	_tree(
+		tmp_path,
+		{
+			"setup.cfg": "[metadata]\nname = x\n[options]\ninstall_requires =\n    beir>=2\n    # a comment\n    tqdm\n"
+		},
+	)
+	assert R.declared(tmp_path) == ["beir>=2", "tqdm"]
+
+
+def test_an_import_whose_handler_raises_again_is_required(tmp_path, missing):
+	missing.update({"openai", "wandb"})
+	_tree(tmp_path, {"run.py": "def model():\n\ttry:\n\t\timport openai\n\texcept ModuleNotFoundError:\n"
+		"\t\traise ModuleNotFoundError(\"Please install 'openai' extra\")\ntry:\n\timport wandb\nexcept ImportError:\n\twandb = None\n"})  # fmt: skip
+	assert R.missing_imports(tmp_path, "run.py") == {"openai"}
+
+
+def test_a_try_with_only_a_finally_doesnt_make_an_import_optional(tmp_path, missing):
+	missing.add("openai")
+	_tree(tmp_path, {"run.py": "try:\n\timport openai\nfinally:\n\tpass\n"})
+	assert R.missing_imports(tmp_path, "run.py") == {"openai"}

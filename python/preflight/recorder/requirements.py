@@ -33,6 +33,10 @@ from pathlib import Path
 
 MAX_REQUIREMENTS = 50  # guess: well above the zoo's and the notebooks we've seen; the bug zoo checks it
 INSTALL_TIMEOUT_S = 240  # guess: inside the probe's own 6 min cap; zoo runs time a real install (Oct 28-29)
+# a repo's own declared stack (probes.repo_install) is bigger: LitGPT's (lightning, litdata, jsonargparse)
+# took over 240 s on Modal (Nov 2, a-after-2-gt-2; its resolve alone is about 40 s). guess: still inside
+# the probe's 600 s limit with time to run
+REPO_INSTALL_TIMEOUT_S = 420
 _NAME = r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})"
 _SPEC = r"(?:===|==|~=|!=|<=|>=|<|>)\s*[A-Za-z0-9.*+!_-]{1,64}"
 _LINE = re.compile(
@@ -116,7 +120,13 @@ def _imports(text: str) -> tuple[set[str], set[tuple[int, str]]]:
 		return set(), set()
 	guarded: set[int] = set()
 	for node in ast.walk(tree):
-		if isinstance(node, ast.Try):
+		# a try whose handler raises again (smolagents: "Please install 'openai' extra") makes the
+		# import required, not optional
+		if (
+			isinstance(node, ast.Try)
+			and node.handlers  # a try with only a finally lets the error through: required
+			and not any(isinstance(x, ast.Raise) for h in node.handlers for x in ast.walk(h))
+		):
 			for n in (*node.body, *node.handlers):
 				guarded.update(id(x) for x in ast.walk(n))
 	absolute, relative = set(), set()
@@ -225,9 +235,11 @@ def missing_imports(workdir: Path, entrypoint: str) -> set[str]:
 
 
 def declared(workdir: Path) -> list[str]:
-	"""The dependencies the repo declares: pyproject.toml's [project] dependencies, else setup.py's
-	install_requires when it's a literal list (or a name bound to one)."""
+	"""The dependencies the repo declares: pyproject.toml's [project] dependencies, else setup.cfg's
+	[options] install_requires, else setup.py's install_requires when it's a literal list (or a name
+	bound to one)."""
 	import ast
+	import configparser
 	import tomllib
 
 	py = workdir / "pyproject.toml"
@@ -242,6 +254,17 @@ def declared(workdir: Path) -> list[str]:
 			deps = None
 		if isinstance(deps, list) and all(isinstance(d, str) for d in deps):
 			return deps
+	cfg = workdir / "setup.cfg"
+	if cfg.is_file():
+		cp = configparser.ConfigParser(interpolation=None)
+		try:
+			cp.read_string(cfg.read_text(encoding="utf-8", errors="replace"))
+			raw = cp.get("options", "install_requires", fallback="")
+		except (configparser.Error, RecursionError, MemoryError, OSError):
+			raw = ""
+		lines = [x.strip() for x in raw.splitlines() if x.strip() and not x.strip().startswith("#")]
+		if lines:
+			return lines
 	setup = workdir / "setup.py"
 	if setup.is_file():
 		try:
@@ -267,7 +290,7 @@ def repo_requirement_sets(workdir: Path, entrypoint: str, *, log=print) -> tuple
 	declared_lines = list(declared(workdir))
 	if declared_lines:
 		log(
-			f"[preflight] requirements: the repo declares {len(declared_lines)} dependencies (pyproject.toml or setup.py)"
+			f"[preflight] requirements: the repo declares {len(declared_lines)} dependencies (pyproject.toml, setup.cfg or setup.py)"
 		)
 	# a URL or VCS line is skipped by plan(), so its name doesn't stop a known import of it
 	# (and plan() installs only plain lines; a marker may not hold here)
@@ -374,9 +397,10 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	target.mkdir(parents=True, exist_ok=True)
 	constraints = target / "constraints.txt"
 	constraints.write_text(pins)
-	deadline = time.monotonic() + INSTALL_TIMEOUT_S
+	limit = REPO_INSTALL_TIMEOUT_S if repo and not req.is_file() else INSTALL_TIMEOUT_S
+	deadline = time.monotonic() + limit
 	log(f"[preflight] requirements: installing {', '.join(keep)}")
-	err = _pip(keep, target, constraints, INSTALL_TIMEOUT_S)
+	err = _pip(keep, target, constraints, limit)
 	opt = [k for k in keep if k in optional]
 	if err and opt:  # one optional package can't sink the ones the repo declares
 		log(
