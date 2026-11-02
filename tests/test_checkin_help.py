@@ -59,7 +59,7 @@ def test_a_package_with_no_wheels_says_so_and_more_than_ten_are_refused():
 	with pytest.raises(InvalidSubmission) as exc:  # a record's ten and a request's one more
 		fetch(_upload(extra_packages=eleven))
 	assert exc.value.code == "submission.invalid" and "at most 10" in str(exc.value)
-	pair = [n for n in eleven if n != "scikit-learn"][:9] + ["sklearn", "scikit-learn"]
+	pair = [*[n for n in eleven if n != "scikit-learn"][:9], "sklearn", "scikit-learn"]
 	assert len(R.extra_requirements(pair)) == 10  # an alias pair is one package
 
 
