@@ -1,0 +1,17 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-GaTyEWjqB6wWo3to8lgxFG
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/lr_range_app.p
+│   y
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+└── ✓ Created Function range_and_confirm.
+[lr range] finetune_lora_hf: 2 files, waiting for an A10, else an L4
+{"status": "ok", "error": "", "error_code": null, "steps": 70.0, "suggested_lr": 7.924828983539173e-05, "min_loss_lr": 0.0007742636826811273, "diverged_lr": 0.010476157527896641, "flat": null, "checked": 1.0, "not_set": null, "unverified": null, "other_optimizers": null, "stalled": null, "gpu_s": 144.954, "usd": 0.044291}
+{"times_suggested": 12.618568830660205, "past_lowest_loss": true, "past_divergence": false, "divergence_over_own": 10.47615752789664}
+{"lr": 7.924828983539173e-05, "status": "ok", "error": "", "steps": 100, "diverged": false, "checked": null, "first10_mean": 1.2858260542154312, "last10_mean": 1.1739339157938957, "trains": true, "gpu_s": 160.201, "usd": 0.04895}
+{"script": "finetune_lora_hf", "gpu": "A10", "lens": "finetune", "own_lr": 0.001, "own_on_curve": {"times_suggested": 12.618568830660205, "past_lowest_loss": true, "past_divergence": false, "divergence_over_own": 10.47615752789664}, "container_s": 469.4, "container_usd": 0.1434, "suggested": 7.924828983539173e-05, "trains_at_suggested": true, "trains_at_own": true}
+{"lr": 0.001, "status": "ok", "error": "", "steps": 100, "diverged": false, "checked": null, "first10_mean": 1.2638596273958682, "last10_mean": 1.2246240623295308, "trains": true, "gpu_s": 162.256, "usd": 0.049578}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-GaTyEWjqB6wWo3to8lgxFG

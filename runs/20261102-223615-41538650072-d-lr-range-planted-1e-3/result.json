@@ -1,0 +1,11 @@
+{
+	"name": "20261102-223615-41538650072-d-lr-range-planted-1e-3",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41538650072",
+	"ref": "ws-d",
+	"sha": "9b6ddb1a85057e3d18be0e796401586e76f04d3f",
+	"cmd": "modal run --env main python/preflight/runner/lr_range_app.py::check --scripts finetune_lora_hf --lr 1e-3 --confirm-steps 100",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T22:44:31Z"
+}
