@@ -150,9 +150,11 @@ def test_tokens_are_compared_over_the_steps_both_sides_ran():
 	"""Nov 2 race: the base ran out at the window's eval after 20 steps, the fix ran 24; without
 	packing each batch has its own length, so a mean over different steps differs by itself."""
 	tokens = [4644, 5464, 4548, 6236, 2836, 5172]
-	log = lambda n: [
-		{"index": i + 1, "kind": "timed", "wall_s": 1.0, "tokens": t} for i, t in enumerate(tokens[:n])
-	]  # noqa: E731
+
+	def log(n):
+		return [
+			{"index": i + 1, "kind": "timed", "wall_s": 1.0, "tokens": t} for i, t in enumerate(tokens[:n])
+		]
 
 	def side(n, **p):
 		rec = record(
