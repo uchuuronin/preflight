@@ -11,6 +11,7 @@ import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
 import { go } from "../route";
+import { rememberRequest } from "../checkinTrouble";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { DATA_USE_OK_ID, DataUseNotice, dataUseAccepted } from "../DataUse";
 import { ACCEPT, ACCEPT_SCRIPTS, checkinBytes, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";
@@ -187,6 +188,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 				return;
 			}
 			idem.current = { key: newKey(), body: null };
+			rememberRequest(json.job_id, body);
 			go("boarding", json.job_id);
 		} catch {
 			setError(t("newflight.error.offline"));

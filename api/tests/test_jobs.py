@@ -259,3 +259,12 @@ def test_a_daily_limit_is_429_in_the_job_stores_own_words():
 		client(Store(full=True)).post("/v1/jobs", json=BODY, headers=KEY).json()["error"]["code"]
 		== "queue_full"
 	)
+
+
+def test_packages_lists_what_the_probes_install_by_import_name():
+	r = client(Store()).get("/v1/packages")
+	assert r.status_code == 200
+	body = r.json()
+	assert body["known"]["torchvision"] == "torchvision"
+	assert body["known"]["torch_geometric"] == "torch-geometric"
+	assert "torch_sparse" in body["no_wheels"]
