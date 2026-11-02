@@ -1,0 +1,241 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-w2xER5yHAM9cgRWVklBMul
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/fix_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/api/preflight_api/fix
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function smoke_fix.
+├── ✓ Created Function race_fix.
+└── ✓ Created Function startup_check_fix.
+round 1 r1c1 (eval.wrap_no_grad): patched
+r1c1 (eval.wrap_no_grad): submitted
+{
+ "id": "r1c1",
+ "template_id": "eval.wrap_no_grad",
+ "job_status": "done",
+ "record_id": "01M6EHR42KZR8F3MWZJKAQBWNW",
+ "error_code": null,
+ "error": "",
+ "minutes": 3.0,
+ "usd": 0.1008,
+ "gpu": "A10",
+ "probes": {
+  "v1": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-base": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-seed": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 16.11
+  }
+ },
+ "verify": {
+  "status": "failed",
+  "metric": "memory.eval_peak",
+  "before": null,
+  "after": null,
+  "fixed_seed_loss_delta": 0.0015093482366852705
+ },
+ "checks": [
+  [
+   "target_improved",
+   false,
+   false
+  ],
+  [
+   "effective_batch",
+   true,
+   false
+  ],
+  [
+   "tokens_seen",
+   true,
+   false
+  ],
+  [
+   "lr_schedule",
+   true,
+   false
+  ],
+  [
+   "throughput_floor",
+   true,
+   false
+  ],
+  [
+   "fixed_seed_loss",
+   true,
+   false
+  ],
+  [
+   "eval_kept",
+   true,
+   false
+  ],
+  [
+   "same_model",
+   true,
+   false
+  ]
+ ],
+ "a_finding": {
+  "code": "verify.failed",
+  "severity": "error",
+  "title": "The eval ran out of memory with and without the change"
+ },
+ "value": null,
+ "diff_lines": 23
+}
+round 2 r2c1 (eval.no_grad_and_batch): patched
+r2c1 (eval.no_grad_and_batch): submitted
+{
+ "id": "r2c1",
+ "template_id": "eval.no_grad_and_batch",
+ "job_status": "done",
+ "record_id": "01M6EHYYCM3JRHXKJ9XM5EPJ41",
+ "error_code": null,
+ "error": "",
+ "minutes": 4.6,
+ "usd": 0.1169,
+ "gpu": "A10",
+ "probes": {
+  "v1": {
+   "status": "ok",
+   "gpu": null,
+   "peak_gib": 15.2
+  },
+  "v1-base": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 14.73
+  },
+  "v1-seed": {
+   "status": "oom",
+   "gpu": null,
+   "peak_gib": 16.11
+  }
+ },
+ "verify": {
+  "status": "passed",
+  "metric": "memory.eval_peak",
+  "before": null,
+  "after": 11153155072.0,
+  "fixed_seed_loss_delta": 0.0011462052418097625
+ },
+ "checks": [
+  [
+   "target_improved",
+   true,
+   false
+  ],
+  [
+   "effective_batch",
+   true,
+   false
+  ],
+  [
+   "tokens_seen",
+   true,
+   false
+  ],
+  [
+   "lr_schedule",
+   true,
+   false
+  ],
+  [
+   "throughput_floor",
+   true,
+   false
+  ],
+  [
+   "fixed_seed_loss",
+   true,
+   false
+  ],
+  [
+   "eval_kept",
+   true,
+   false
+  ],
+  [
+   "same_model",
+   true,
+   false
+  ]
+ ],
+ "a_finding": {
+  "code": "verify.passed",
+  "severity": "info",
+  "title": "The loss holds: it stays within the current setting's own seed-to-seed spread"
+ },
+ "value": 8,
+ "diff_lines": 31
+}
+{
+ "spent_usd": 0.4007,
+ "cap_usd": 1.0,
+ "winner": {
+  "id": "r2c1",
+  "template_id": "eval.no_grad_and_batch",
+  "value": 8,
+  "verify": {
+   "status": "passed",
+   "metric": "memory.eval_peak",
+   "before": null,
+   "after": 11153155072.0,
+   "fixed_seed_loss_delta": 0.0011462052418097625
+  }
+ },
+ "rounds": [
+  {
+   "round": 1,
+   "muse_usd": 0.0829,
+   "seconds": 26.7,
+   "error": null,
+   "stopped_at_cap": false,
+   "verified": [
+    {
+     "id": "r1c1",
+     "template_id": "eval.wrap_no_grad",
+     "value": null,
+     "status": null,
+     "why": null,
+     "job_status": "done",
+     "usd": 0.1008,
+     "record_id": "01M6EHR42KZR8F3MWZJKAQBWNW",
+     "verify": "failed"
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "muse_usd": 0.0931,
+   "seconds": 34.6,
+   "error": null,
+   "stopped_at_cap": false,
+   "verified": [
+    {
+     "id": "r2c1",
+     "template_id": "eval.no_grad_and_batch",
+     "value": 8,
+     "status": null,
+     "why": null,
+     "job_status": "done",
+     "usd": 0.1169,
+     "record_id": "01M6EHYYCM3JRHXKJ9XM5EPJ41",
+     "verify": "passed"
+    }
+   ]
+  }
+ ]
+}
+Stopping app - uncaught exception raised locally: SystemExit(0).

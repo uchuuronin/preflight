@@ -1,0 +1,11 @@
+{
+	"name": "20261102-163233-41482457185-c-fix-race-stack-nov2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41482457185",
+	"ref": "ws-c",
+	"sha": "c7e863946daa8c1f57dcc24115ae09d83e6c6f2f",
+	"cmd": "modal run --env main api/fix_app.py::race_stack --gpu A10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:42:01Z"
+}
