@@ -1,0 +1,11 @@
+{
+	"name": "20261102-224311-41539593805-b-gt-pretrain-nanogpt",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41539593805",
+	"ref": "ws-b",
+	"sha": "33a9499e6ec3c3e67f0e253fc1ad98c94163e796",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script pretrain_nanogpt --bare-steps 300 --recorder-steps 30 --budget-min 25 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T22:49:07Z"
+}
