@@ -5,6 +5,8 @@
 	"probes.agent": false,
 	"probes.repo_install": false,
 	"probes.agent_error_line": false,
+	"probes.agent_proxy_replies": false,
+	"probes.agent_single_task": false,
 	"harness.spark_script_map": false,
 	"harness.spark_open_triage": false,
 	"harness.spark_diagnosis": false,

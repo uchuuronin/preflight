@@ -28,12 +28,18 @@ _EXC = re.compile(r"^(?:[A-Za-z_][\w.]*\.)?[A-Za-z_]\w*(?:Error|Exception|Exit|I
 TAIL_BYTES = 8192  # of stderr, kept in memory as it streams: never a file that could fill the disk
 
 
-def error_line(stderr_tail: str) -> str | None:
+def error_line(stderr_tail: str, *, follow: bool = False) -> str | None:
 	"""The last line of a traceback that names the exception (e.g. "ModuleNotFoundError: No module
-	named 'smolagents'"), capped; None when there is none."""
-	for line in reversed(stderr_tail.splitlines()):
-		line = line.strip()
+	named 'smolagents'"), capped; None when there is none. follow (probes.agent_proxy_replies): a line
+	that ends in ':' takes the next non-empty line too, where an SDK puts the message (smolagents'
+	"AgentGenerationError: Error while generating output:" then the API's error)."""
+	lines = stderr_tail.splitlines()
+	for i in range(len(lines) - 1, -1, -1):
+		line = lines[i].strip()
 		if _EXC.match(line):
+			if follow and line.endswith(":"):
+				nxt = next((x.strip() for x in lines[i + 1 :] if x.strip()), "")
+				line = f"{line} {nxt}".strip()
 			return line[:ERROR_LINE_CHARS]
 	return None
 
@@ -90,7 +96,7 @@ def main() -> int:
 		reader.join(timeout=5)
 		# an exception's own exit (a positive code); a killed script's tail may hold an old, handled one
 		if ended == "exited" and (proc.returncode or 0) > 0:
-			line = error_line(bytes(tail).decode("utf-8", "replace"))
+			line = error_line(bytes(tail).decode("utf-8", "replace"), follow=bool(job.get("error_follow")))
 			if line:
 				report["error"] = line
 	print(json.dumps(report), flush=True)

@@ -84,6 +84,16 @@ class _SandboxProc:
 			self.sb.terminate()
 
 
+def one_task(agent) -> bool:
+	"""probes.agent_single_task: the map found no task list (no task source, no task count), so the script
+	is one agent run, not a benchmark, and its every call is task 1 (Nov 2: unseen script 4, smolagents)."""
+	return (
+		agent is not None
+		and getattr(agent, "n_tasks", None) is None
+		and not getattr(agent, "task_source", None)
+	)
+
+
 def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, forward=None, install_repo=None,
 	keep_error=None, **proxy_kw):  # fmt: skip
 	"""A sampler for the hosted path: the proxy runs here, with the key, behind a tunnel; the script
@@ -130,6 +140,8 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 					flag("probes.agent_error_line") if keep_error is None else keep_error
 				)  # off until checked
 				repo = flag("probes.repo_install") if install_repo is None else install_repo
+				replies = flag("probes.agent_proxy_replies")  # off until checked
+				single = flag("probes.agent_single_task") and one_task(agent)
 
 				from .sources import extra_lines
 
@@ -139,12 +151,13 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 					return _SandboxProc(sb, {"files": fetched.files, "entrypoint": fetched.entrypoint,
 						"args": list(fetched.args or []), "env": env, "timeout_s": limit,
 						**({"keep_error": True} if keep else {}), **({"install_repo": True} if repo else {}),
-						**({"extra_packages": extra} if extra else {})})  # fmt: skip
+						**({"extra_packages": extra} if extra else {}), **({"error_follow": True} if replies else {})})  # fmt: skip
 
 				return run_sample(None, cwd=None, proxy=proxy, population=getattr(agent, "n_tasks", None), k=k,
 					skip_keys=skip_keys, offered_first=tuple(offered_first), run_id=run_id, timeout_s=limit,
 					env={}, should_stop=should_stop, launch=launch,
-					base_url_var=getattr(agent, "base_url_var", None), inspect=inspect)  # fmt: skip
+					base_url_var=getattr(agent, "base_url_var", None), inspect=inspect,
+					**({"single": True} if single else {}), **({"note_replies": True} if replies else {}))  # fmt: skip
 		finally:
 			if sb is not None:
 				with contextlib.suppress(Exception):
