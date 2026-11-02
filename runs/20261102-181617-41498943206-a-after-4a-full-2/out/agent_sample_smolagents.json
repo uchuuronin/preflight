@@ -1,0 +1,15 @@
+{
+  "sample": {
+    "tasks": [],
+    "population": null,
+    "selection": "the first 0 tasks the script started; script wall 4 s; script failed: ModuleNotFoundError: Please install 'openai' extra to use OpenAIModel: `pip install 'smolagents[openai]'`",
+    "rate_limit_rpm": null,
+    "rate_limit_tpm": null,
+    "ended": "finished",
+    "concurrency": null
+  },
+  "usd": 0,
+  "task_ends": {},
+  "task_rows": {},
+  "provider": "meta"
+}
