@@ -45,6 +45,7 @@ is live at <https://preflight-cqn.pages.dev>.
 | What | Flag | Where it stands |
 | --- | --- | --- |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
+| Private mode: log triage by Muse Glimmer | `harness.glimmer_private` | Hosted on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys, scaled to zero when idle), behind its flag. Triage cost US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`]. Same category as Spark Open on 9 of 11 failed zoo probes [measured, `a-triage-agreement`] |
 | Notebook check-in | `d.notebook` | Built on `main`, and the runner's code converts notebooks (`runner/sources.py`); stays off until A's real notebook check-in through production passes |
 | The exports' "Check it again on your machine" item | `d.exports_cli` | Built on `main` |
 
@@ -58,7 +59,6 @@ is live at <https://preflight-cqn.pages.dev>.
 | Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20% [measured, corpus], under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |
 | Serving model | Built, switched off (`engine.serving`) until its validation row passes | `python/preflight/engine/api.py` |
 | Claim check by Muse Spark Open | Module written, not wired in | `python/preflight/harness/claim_check.py` |
-| Muse Glimmer | Apache 2.0. B is hosting it on Preflight's own GPU for a private mode (`harness.glimmer_private`, off); not live yet | `docs/decisions/glimmer-host.md` |
 | Full-run validation | Scored on Mon Nov 2 (the table below) | B's scorer |
 
 ## Try it
@@ -141,12 +141,12 @@ owns which path are in [CONTRACT.md](CONTRACT.md).
 
 ## Meta models and partner tools
 
-| Tool | Where it is used | Status on `main` `a52753f` |
+| Tool | Where it is used | Status (Nov 1, ET) |
 | --- | --- | --- |
-| **Muse Spark** (`muse-spark-1.3`, Meta Model API) | Maps each script with structured output (`python/preflight/harness/`); runs the guide through the Responses API with tool calls on the live cockpit (`api/preflight_api/guide/`); the model behind the agent bug-zoo script (`zoo/agent_eval_spark/`) | Script map on in production (Oct 28 runs, before the flag: US$0.0178 and US$0.0200 a job [derived: reported tokens at list prices]); guide behind `c.guide.live` |
+| **Muse Spark** (`muse-spark-1.3`, Meta Model API) | Maps each script with structured output (`python/preflight/harness/`); runs the guide through the Responses API with tool calls on the live cockpit (`api/preflight_api/guide/`); the model behind the agent bug-zoo script (`zoo/agent_eval_spark/`) | Script map on in production (Oct 28 runs, before the flag: US$0.0178 and US$0.0200 a job [derived: reported tokens at list prices]); the guide on in production (`c.guide.live`, Nov 1) |
 | **Muse Code** (headless) | Fix loop: candidate fixes raced in parallel worktrees inside a sandbox, edits only; the API key reaches Muse Code on stdin only, never in its environment or files; each fix is gated on Preflight's own re-probe and verify, not on Muse Code's exit code (`api/preflight_api/fix/`) | Behind `c.fix_loop`; in clean smoke run 41250977670 Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]; gating on the re-probe isn't wired end to end yet |
-| **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | Behind `harness.spark_open_triage`, off; not yet run for real. The claim check (`claim_check.py`) is written but not wired in |
-| **Muse Glimmer** | One of three models in the agent model sweep's price table (`python/preflight/engine/prices/`) | Not hosted (`docs/decisions/glimmer-host.md`) |
+| **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | On in production (`harness.spark_open_triage`, Nov 1). First real run, A's `a-triage-lora-prod`: 4 calls on Baseten, US$0.0184 [measured]. Since A's fix (`b300684`, in A's redeploy of Nov 1, 20:20 UTC), triage also reads the probe's recorded error, and on the 11 failed probes in the zoo's records Spark Open quoted a line every time [measured, `a-triage-agreement`]. The claim check (`claim_check.py`) is written but not wired in |
+| **Muse Glimmer** (open weights, Apache 2.0) | Private mode: with its flag on, triages a private job's failed probes on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys), so their logs go to no outside model provider; with no Glimmer to call, such a job isn't triaged rather than sent to Baseten (`python/preflight/runner/pipeline.py`); also one of three models in the agent model sweep | Behind `harness.glimmer_private`, off. Hosted (`python/preflight/glimmer/`, `docs/decisions/glimmer-host.md`); US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`] |
 | **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run so far (Oct 28 to Nov 1, `docs/status/a.md`); the runner (job store), the API and the fix app are deployed in production and stay up since Nov 1 |
 | **AMD Developer Cloud** | ROCm probes through the CLI on an MI300X, and the AMD half of the corpus (`python/preflight/corpus/`, `.github/workflows/amd-run.yml`) | No AMD measurements: the account is on a verification hold |
 | **Cloudflare Pages** | The web app, the `/v1` edge function that forwards to the API with a shared secret and the visitor's address for quotas (`web/functions/`), and share cards (`workers/`) | Live at <https://preflight-cqn.pages.dev>; share cards wait on `workers/` joining the deploy |

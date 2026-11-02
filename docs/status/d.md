@@ -8,6 +8,36 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 21:45 ET (check-in: Glimmer measured, so its wording moves; stale model rows fixed)
+
+`0f4ac80` CI green. `main` is still `50db9b6` on GitHub (`d5062bc` hasn't landed), so the README
+diff waits.
+
+- **Glimmer:** the endpoint is live (B's `b-glimmer-deploy`; A's runs call it) and A measured its
+  cost per call, so per Chiya it moves from "price table only" to private mode, hosted on our own
+  GPU, behind `harness.glimmer_private` (off): US$0.24 for one call through a 411 s cold start
+  [measured, `a-triage-glimmer-5`] and US$0.33 for 11 calls in one run, likely one cold start among
+  them [measured, `a-triage-agreement`] (no warm per-call figure: the run total mixes the two); the
+  same category as Spark Open on 9 of 11 failed zoo probes [measured]. A's run times are UTC.
+  Updated in `readme-final.md` (moved from "Not used" to "Behind a flag", and its Meta-models row),
+  `meta-and-partners.md` and `portal.md` (the open-weights section and "What's next"), with the
+  numbers in the submission's table. The costs come from A's status on `ws-a`, not B's.
+- **Stale rows fixed while there:** the guide and Spark Open triage are on in production (the
+  drafts still said off); the open-weights section now gives the first real run
+  (`a-triage-lora-prod`, 4 calls, $0.0184) and that Spark Open quoted a line on all 11 failed zoo
+  probes since triage reads the recorded error. A TODO(PM) waits for the production re-run's ID.
+- **Asked A:** with `harness.glimmer_private` off, `_triage_client` sends a private job to Spark Open
+  on Baseten, while its docstring and the contract say a private job never goes there. No screen
+  sets `private` today, but the API schema takes it.
+- **Not landed:** A's production triage re-run with a new share token and a committed record copy;
+  A's notebook check-in; A's $8 cap is on `ws-a` but not on `main` or in a logged deploy, so the
+  README keeps the cap after Nov 4 unnumbered.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): those drafts, the request to A and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 20:15 (the draft mirrors the 8 PM README)
 
 `b3c5c4d` CI green. Chiya (20:07): `main` `d5062bc` has `readme-final.md` as `README.md`, with
