@@ -52,6 +52,7 @@ def range_and_confirm(name: str, files: dict, entrypoint: str) -> dict:
 	from preflight.probes import remote
 	from preflight.probes.local import ProbeSpec, run_probe
 	from preflight.probes.lr_range import LR_END, LR_START, STEPS, curve
+	from preflight.probes.lr_range import losses as stored_losses
 
 	t0 = time.monotonic()
 	remote.link_weights()
@@ -91,7 +92,7 @@ def range_and_confirm(name: str, files: dict, entrypoint: str) -> dict:
 			continue
 		try:
 			c = ramp(key, float(lr), float(lr), CONFIRM_STEPS, CONFIRM_TIMEOUT_S)
-			losses = [v for _, v in curve(c.extras)]
+			losses = stored_losses(c.extras)  # a run at one rate keeps its losses, not its rate
 			first = sum(losses[:10]) / 10 if len(losses) >= 20 else None
 			last = sum(losses[-10:]) / 10 if len(losses) >= 20 else None
 			out[key] = {"lr": float(lr), "status": c.status, "error": (c.error or "")[:400],

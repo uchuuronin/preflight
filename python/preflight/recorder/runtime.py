@@ -70,6 +70,10 @@ PHASE_STEPS = (
 )
 PROFILE_STEPS = 2 + PROFILE_ACTIVE  # wait 1 + warmup 1 + active 3
 RANGE_STALL_MICRO = 16  # guess: backwards with no optimizer step before a range test counts as stalled
+RANGE_STALL_FACTOR = 4  # guess: that many times the most backwards any recorded step took
+RANGE_STALL_FIRST = 64  # guess: before the first step (a GradScaler's start-up skips are fewer than 20)
+RANGE_SAMPLE = 4  # guess: weights whose update the range test reads; few, as each is copied every step
+RANGE_SAMPLE_MAX = 4_000_000  # guess: elements per sampled weight, so the copies stay small
 ATTN_CALLS_PER_STEP = 2  # guess: two attention layers sampled per step bound the check's cost
 ATTN_QUERY_SAMPLE = 128  # guess: query rows sampled for the max-logit check
 ATTN_KEY_CHUNK = 4096  # keys per matmul in the attention-logit check: bounds its extra memory
@@ -390,7 +394,9 @@ class Recorder:
 		self.lr_range_error: str | None = None
 		self._range_params: list | None = None  # the hooked optimizer's weights whose update is sampled
 		self._range_others: set[int] = set()  # other optimizers that stepped other weights (their ids)
-		self.lr_range_stalled: int | None = None  # steps done when the optimizer stopped stepping
+		self._range_overlap_steps = 0  # steps by another optimizer over the ramp's weights since its own
+		self.lr_range_stalled: int | None = None  # steps done when a GradScaler stopped the stepping
+		self.lr_range_replaced = False  # the script stepped another optimizer over the same weights instead
 		if self.lr_range:
 			self.target = int(self.lr_range["steps"])
 		self._boundary_events: list = []  # CUDA event at each step boundary, read once at the end
@@ -637,13 +643,8 @@ class Recorder:
 			# fetches every accumulation batch up front); a fetch in between moves the start again
 			rec._data_end = rec._now()
 			rec._data_end_bwd = True
-			if rec.lr_range and rec.steps and rec.lr_range_stalled is None:
-				# a GradScaler skipping every step (fp16 overflow at a high rate) never calls step(), so
-				# the ramp would wait for the timeout: many more backwards than any step took stops it
-				most = max((s["micro"] for s in rec.steps), default=1)
-				if rec.acc["micro"] >= max(RANGE_STALL_MICRO, 4 * most):
-					rec.lr_range_stalled = len(rec.steps)
-					rec._stop_pending = True
+			if rec.lr_range and rec.lr_range_stalled is None and not rec.lr_range_replaced:
+				rec._range_stall_check()
 			return out
 
 		def next_(it):
@@ -1495,33 +1496,58 @@ class Recorder:
 		self._sync()
 		self._overhead_pre = self._now() - self._t_pre
 
+	def _range_stall_check(self):
+		"""After a backward in a range test: has the ramp's optimizer stopped stepping? Two causes
+		are read, nothing else (a script may run many backwards per step on purpose): a GradScaler
+		skipping every step (fp16 overflow at a high rate never calls step(), so the ramp would wait
+		for the timeout), and the script stepping another optimizer over the same weights (it
+		rebuilt its optimizer: the ramp no longer sets the rate). Either stops the probe."""
+		most = max((s["micro"] for s in self.steps), default=0)
+		limit = max(RANGE_STALL_MICRO, RANGE_STALL_FACTOR * most) if self.steps else RANGE_STALL_FIRST
+		if self.acc["micro"] < limit:
+			return
+		if self._range_overlap_steps:
+			self.lr_range_replaced = True
+			self._stop_pending = True
+		elif list(self._scalers):
+			self.lr_range_stalled = len(self.steps)
+			self._stop_pending = True
+
 	def _range_sample(self, opt) -> list:
 		"""The weights whose update the range test reads (probes/lr_range.py `follows_rate`): from the
 		optimizer whose rate it sets, not the model's (another optimizer's weights move at that one's
-		rate). The largest four up to 4M elements, else the smallest four."""
+		rate). The largest up to RANGE_SAMPLE_MAX elements, else the smallest; never one whose
+		values are all zero at the start (LoRA's B), whose update the review found grows with the
+		weight it has built, not the rate."""
 		if self._range_params is None:
 			self._range_params = []
 			with suppress(Exception):
 				ps = {id(p): p for g in opt.param_groups for p in g["params"] if p.requires_grad}
-				small = [p for p in ps.values() if p.numel() <= 4_000_000]
+				live = [p for p in ps.values() if bool(p.detach().abs().amax() > 0)]
+				small = [p for p in live if p.numel() <= RANGE_SAMPLE_MAX]
 				if small:
 					pick = sorted(small, key=lambda p: -p.numel())
 				else:
-					pick = sorted(ps.values(), key=lambda p: p.numel())
-				self._range_params = pick[:4]
+					pick = sorted(live, key=lambda p: p.numel())
+				self._range_params = pick[:RANGE_SAMPLE]
 		return self._range_params
 
 	def _range_note_other(self, opt):
-		"""Another optimizer stepped during a range test. Counted when it holds weights the ramp's
-		optimizer doesn't (Muon beside AdamW, a GAN's two): those moved at the script's own rates,
-		so the curve isn't the ramp's alone. A wrapper around the same weights (accelerate's) isn't
-		another. Noted as it steps: the script's optimizers are gone by the summary."""
-		if self.opt is None or id(opt) in self._range_others:
+		"""Another optimizer stepped during a range test, noted as it steps (the script's optimizers
+		are gone by the summary). One holding a weight (an `nn.Parameter`) the ramp's optimizer
+		doesn't is another optimizer (Muon beside AdamW, a GAN's two, even with a shared encoder):
+		those weights moved at the script's own rates, so the curve isn't the ramp's alone. One over
+		plain tensors (an attack's perturbation) isn't counted. One over only the ramp's weights is a
+		wrapper or a replacement: counted towards the stall rule, which tells them apart."""
+		if self.opt is None:
 			return
 		with suppress(Exception):
 			mine = {id(p) for g in self.opt.param_groups for p in g["params"]}
-			if not mine & {id(p) for g in opt.param_groups for p in g["params"]}:
+			theirs = [p for g in opt.param_groups for p in g["params"]]
+			if any(isinstance(p, nn.Parameter) and id(p) not in mine for p in theirs):
 				self._range_others.add(id(opt))
+			elif theirs and all(id(p) in mine for p in theirs):
+				self._range_overlap_steps += 1
 
 	def range_other_optimizers(self) -> int:
 		return len(self._range_others)
@@ -1543,14 +1569,17 @@ class Recorder:
 
 		try:
 			groups = opt.param_groups
-			if self._lr_scales is None:
+			scales = self._lr_scales
+			if scales is None:
 				base = [rate(g) for g in groups]
 				top = max(base, default=0.0)
-				self._lr_scales = [b / top if top > 0 else 1.0 for b in base]
+				scales = [b / top if top > 0 else 1.0 for b in base]
+				if top > 0:  # a hand-written warm-up from exactly 0: read the ratios at its next step
+					self._lr_scales = scales
 			lr = lr_at(len(self.steps), int(self.lr_range["steps"]), float(self.lr_range["start"]),
 				float(self.lr_range["end"]))  # fmt: skip
 			for i, g in enumerate(groups):
-				v = lr * (self._lr_scales[i] if i < len(self._lr_scales) else 1.0)
+				v = lr * (scales[i] if i < len(scales) else 1.0)
 				if torch.is_tensor(g.get("lr")):
 					g["lr"].fill_(v)
 				else:
@@ -1599,15 +1628,21 @@ class Recorder:
 		grad_norm, grad_bytes = self._grad_norm_of(opt)
 		if grad_norm is not None and not clean:
 			grad_norm = float(grad_norm)
-		utw = None
+		utw = upd = None
 		if self._sample:
-			ratios = []
+			ratios, sizes = [], []
 			for p, before in self._sample:
+				d = float(torch.linalg.vector_norm((p.detach() - before).float()))
+				sizes.append(d)
 				w = torch.linalg.vector_norm(before.float())
 				if w > 0:
-					ratios.append(float(torch.linalg.vector_norm((p.detach() - before).float()) / w))
+					ratios.append(d / float(w))
 			utw = statistics.fmean(ratios) if ratios else None
+			# the range test reads the update's own size: a ratio to a weight the updates built goes flat
+			upd = sum(sizes) if self.lr_range and sizes else None
 			self._sample = []
+		if self.lr_range:
+			self._range_overlap_steps = 0
 		opt_state = _unique_bytes(
 			t for s in opt.state.values() for t in s.values() if isinstance(t, torch.Tensor)
 		)
@@ -1662,6 +1697,7 @@ class Recorder:
 				"nonfinite": a["nonfinite"],
 				"grad_norm": grad_norm,
 				"utw": utw,
+				"range_upd": upd,
 				"grad_bytes": grad_bytes,
 				"opt_bytes": opt_state,
 				"peak": peak,

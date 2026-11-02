@@ -153,20 +153,56 @@ opt2 = torch.optim.SGD(model[2].parameters(), lr=1e-2)
 	assert ex["lr_range.other_optimizers"] == 1.0 and "lr_range.suggested_lr" not in ex
 
 
-def test_a_scaler_that_skips_every_step_stops_the_probe_not_the_timeout():
+@pytest.mark.parametrize("start", [40, 0])
+def test_a_scaler_that_skips_every_step_stops_the_probe_not_the_timeout(start):
 	import time
 
-	body = """if step >= 12:
-		loss = loss * float("inf")  # fp16 overflow from here on: the scaler skips every step
+	# fp16 overflow as it happens: a finite loss, infinite gradients, from step `start` on (0: from
+	# the first step, before any step is recorded)
+	opt = f"""opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+scaler = torch.amp.GradScaler("cpu")
+STEP = [0]
+for p in model.parameters():
+	p.register_hook(lambda g: g * float("inf") if STEP[0] >= {start} else g)
+"""
+	body = """STEP[0] = step
 	opt.zero_grad()
 	scaler.scale(loss).backward()
 	scaler.step(opt)
 	scaler.update()"""
-	opt = 'opt = torch.optim.Adam(model.parameters(), lr=1e-3)\nscaler = torch.amp.GradScaler("cpu")'
 	t = time.monotonic()
 	r = probe(script(opt, body, loops=10**9)).probe
-	assert time.monotonic() - t < 120 and r.status == "ok", r.error
+	assert time.monotonic() - t < 120, "ran to the timeout"
 	assert r.extras["lr_range.stalled"] == 1.0
+	if start:  # 40 steps span enough rates to check the ramp, so its divergence stands
+		assert r.status == "ok", r.error
+		assert r.extras["lr_range.checked"] == 1.0
+		last = lr_at(start - 1, RAMP["steps"], RAMP["start"], RAMP["end"])
+		assert r.extras["lr_range.diverged_lr"] == pytest.approx(last)
+
+
+def test_a_rebuilt_optimizer_isnt_read_as_a_divergence():
+	body = """if step == 30:
+		opt = torch.optim.Adam(model.parameters(), lr=1e-3)  # the script starts a new optimizer
+	opt.zero_grad()
+	loss.backward()
+	opt.step()"""
+	r = probe(script("opt = torch.optim.Adam(model.parameters(), lr=1e-3)", body)).probe
+	assert r.status == "ok", r.error
+	ex = r.extras
+	assert ex["lr_range.not_set"] == 1.0 and "lr_range.stalled" not in ex and "lr_range.diverged_lr" not in ex
+
+
+def test_weights_that_start_at_zero_dont_hide_a_ramp_that_took_effect():
+	# LoRA's B and zero-init output projections: their update-to-weight ratio goes flat
+	opt = """
+torch.nn.init.zeros_(model[2].weight)
+lora_b = torch.nn.Parameter(torch.zeros(64, 64))
+opt = torch.optim.AdamW([*model.parameters(), lora_b], lr=1e-3)
+"""
+	body = "opt.zero_grad()\n\t(loss + (lora_b.sum() * 1e-3) ** 2).backward()\n\topt.step()"
+	ex = probe(script(opt, body)).probe.extras
+	assert ex["lr_range.checked"] == 1.0 and curve(ex)
 
 
 def test_group_ratios_survive_a_warm_up_from_zero():

@@ -1012,8 +1012,8 @@ def test_the_lr_range_point_runs_only_with_its_flag_and_leaves_the_predictions_a
 			if spec.lr_range:
 				lrs = [lr_at(i) for i in range(STEPS)]
 				loss = [2.0 - 1.5 / (1 + math.exp(-2.5 * (math.log10(x) + 4))) for x in lrs]
-				series = {"lr": lrs, "loss": loss, "update_to_weight": [0.5 * x for x in lrs]}
-				r.probe = with_lr_range(r.probe, {"series": series}, spec.lr_range)
+				summary = {"series": {"lr": lrs, "loss": loss}, "lr_range_update": [0.5 * x for x in lrs]}
+				r.probe = with_lr_range(r.probe, summary, spec.lr_range)
 			return r
 
 	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": on}))
@@ -1131,3 +1131,31 @@ def test_the_cache_key_is_unchanged_without_a_range_test(monkeypatch):
 	plain = pipeline.cache_key(spec, "L4", "img")
 	ramp = pipeline.cache_key(replace(spec, lr_range={"start": 1e-7, "end": 1.0, "steps": 100}), "L4", "img")
 	assert "lr_range" not in bodies[0] and bodies[1]["lr_range"]["steps"] == 100 and plain != ramp
+
+
+def test_the_lr_range_timeout_is_capped_by_the_dollars_left_too(tmp_path, monkeypatch):
+	# three 30 s points on an L4 at US$0.80 an hour spend US$0.02; of US$0.06, US$0.04 is left: 180 s
+	runner = _Timeouts()
+	_range_job(tmp_path, monkeypatch, runner, budget=lambda: Budget(usd=0.06, wall_s=3600))
+	assert runner.timeouts["p1-lr"] == pytest.approx(180, rel=0.01)
+
+
+def test_a_cached_p1_still_gets_a_fresh_range_test(tmp_path, monkeypatch):
+	from preflight.runner import flags
+
+	cache = MemoryCache()
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": False}))
+	flags.reload()
+	try:
+		run_pipeline(
+			{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}},
+			_Ctx(),
+			deps(tmp_path, FakeRunner(), cache=cache),
+		)
+	finally:
+		flags.reload()
+	runner = FakeRunner()
+	rec = _range_job(tmp_path, monkeypatch, runner, cache=cache)
+	got = {p.id: p.status for p in rec.probes}
+	assert got.get("p1") == "cached" and got.get("p1-lr") == "ok", got
+	assert [c[0] for c in runner.calls] == ["p1-lr"]

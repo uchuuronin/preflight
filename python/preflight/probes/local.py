@@ -740,11 +740,13 @@ def with_lr_range(probe: Probe, summary: dict, ramp: dict) -> Probe:
 	probe ended with, so a script that stops itself on the diverging loss still leaves its curve.
 
 	A rate read from the ramp stands only when the ramp is known to have taken effect (A's review,
-	Nov 2): `lr_range.checked` when the updates grew with the rate (`follows_rate`); otherwise the
-	rates are dropped and the losses kept, with the reason: `lr_range.not_set` (setting the rate
-	failed, or the updates didn't follow it), `lr_range.unverified` (too few measured updates to
-	tell), `lr_range.other_optimizers` (that many more optimizers moved other weights at the
-	script's own rates). A scaler that stopped stepping (`lr_range.stalled`) marks where it diverged."""
+	Nov 2): `lr_range.checked` when the updates grew with the rate (`follows_rate`) and nothing
+	below applies; otherwise the rates are dropped and the losses kept, with every reason that
+	applies: `lr_range.not_set` (setting the rate failed, the updates didn't follow it, or the
+	script stepped another optimizer over the same weights instead), `lr_range.unverified` (too few
+	measured updates to tell), `lr_range.other_optimizers` (that many more optimizers moved other
+	weights at the script's own rates). A GradScaler that stopped stepping (`lr_range.stalled`)
+	marks the last rate applied as where it diverged, when the rates stand."""
 	from preflight.probes.lr_range import analyse, follows_rate, lr_at
 
 	def num(v) -> bool:
@@ -771,28 +773,33 @@ def with_lr_range(probe: Probe, summary: dict, ramp: dict) -> Probe:
 	stalled = summary.get("lr_range_stalled")
 	if num(stalled) and 0 <= stalled < steps:
 		extras["lr_range.stalled"] = 1.0
-		extras.setdefault("lr_range.diverged_lr", lr_at(int(stalled), steps, start, end))
+		if stalled >= 1:  # the step that overflowed ran at the last rate applied, the one before the stall
+			extras.setdefault("lr_range.diverged_lr", lr_at(int(stalled) - 1, steps, start, end))
 	# the updates' size against the rate, up to where it diverged (the blow-up's own steps aside)
 	stop = extras.get("lr_range.diverged_lr", math.inf)
 	lrs = [lr_at(i, steps, start, end) for i in range(min(steps, len(losses)))]
-	updates = as_list(series.get("update_to_weight"))[: len(lrs)]
+	updates = as_list(summary.get("lr_range_update"))[: len(lrs)]
 	kept = [(lr, u) for lr, u in zip(lrs, updates, strict=False) if lr < stop]
 	follows = follows_rate([a for a, _ in kept], [b for _, b in kept]) if kept else None
 	others = summary.get("lr_range_other_optimizers")
-	others = int(others) if num(others) and others > 0 else 0
-	if summary.get("lr_range_error") or follows is False:
-		reason = "lr_range.not_set"
-	elif others:
-		reason = "lr_range.other_optimizers"
-	elif follows is None:
-		reason = "lr_range.unverified"
-	else:
-		reason = None
-	if reason is None:
+	try:  # an untrusted count: a huge int doesn't convert, NaN and infinity aren't counts
+		others = float(others) if num(others) else 0.0
+	except OverflowError:
+		others = 1_000.0
+	others = int(min(others, 1_000.0)) if math.isfinite(others) and others >= 1 else 0  # 1,000: guess, a cap
+	replaced = summary.get("lr_range_replaced") is True or summary.get("lr_range_replaced") == 1
+	reasons = {}
+	if summary.get("lr_range_error") or follows is False or replaced:
+		reasons["lr_range.not_set"] = 1.0
+	if others:
+		reasons["lr_range.other_optimizers"] = float(others)
+	if follows is None and "lr_range.not_set" not in reasons:
+		reasons["lr_range.unverified"] = 1.0
+	if not reasons:
 		extras["lr_range.checked"] = 1.0
 	else:
 		# no rate read from the ramp stands, only the losses
-		extras[reason] = float(others) if reason == "lr_range.other_optimizers" else 1.0
+		extras.update(reasons)
 		for k in [k for k in extras if k.startswith("lr_range.lr.")] + [
 			"lr_range.suggested_lr", "lr_range.min_loss_lr", "lr_range.diverged_lr"]:  # fmt: skip
 			extras.pop(k, None)

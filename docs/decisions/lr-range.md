@@ -52,36 +52,47 @@ don't change it), the eval off.
 ## A's review (Nov 2) and what changed
 
 A reviewed `f909ac3` (`from-a.md`, ws-a): ready to merge off, six things before the flag goes on.
+The fixes then had their own read-only review, whose two blocking findings are fixed too.
 
 1. **"Checked" proved nothing.** It compared the rate the optimizer held with the one the
    recorder had just written, so it always matched, even for an optimizer that ignores its rate.
    The table above says "the ramp checked" under that old test; it doesn't show the rate took
    effect. Now `follows_rate` (`probes/lr_range.py`) reads the step's effect: the least-squares
-   slope of log(update / weight) on log(rate), from the recorder's update sample (the ramp's own
-   optimizer's weights, every step of a range test), up to the divergence. At least 0.5 is
-   `lr_range.checked`; below is `lr_range.not_set`; fewer than 8 measured steps or under two
-   decades of rate is `lr_range.unverified`. Only `checked` keeps the rates; the others keep the
-   losses alone. On CPU: Adam, a tensor rate and a fused Adam read as checked; a fixed-step
-   optimizer and transformers' Adafactor with `relative_step` don't.
+   slope of log(update size) on log(rate), up to the divergence. The update size is the summed
+   change of up to four of the ramp's own optimizer's weights, none that start at zero (a ratio
+   to the weight went flat on LoRA's B and zero-init projections, whose weight is the updates'
+   own sum: the second review's blocking finding). At least 0.5 is `lr_range.checked`; below
+   is `lr_range.not_set`; fewer than 8 measured steps or under two decades of rate is
+   `lr_range.unverified`. Only `checked` keeps the rates; the others keep the losses alone. On
+   CPU: Adam, AdamW with zero-init weights, a tensor rate and a fused Adam read as checked; a
+   fixed-step optimizer and transformers' Adafactor with `relative_step` read as not set.
+   Weights kept in bf16 with no fp32 copy round small updates to zero, so a ramp on them may read
+   as unverified.
 2. **Group ratios under a warm-up from 0:** the ratio is read from `initial_lr` when a scheduler
-   set it (a CPU test with two groups at 1e-3 and 2.5e-4 under a warm-up from 0 holds 0.25 every
-   step; it read 1.0 before).
-3. **A second optimizer** stepping other weights (Muon beside AdamW) is counted as it steps:
-   `lr_range.other_optimizers`, and the rates are dropped. A wrapper around the same weights
-   (accelerate's) isn't counted; the HF Trainer test still reads checked.
+   set it, and a hand-written warm-up from exactly 0 is read again at its next step (a CPU test
+   with two groups at 1e-3 and 2.5e-4 under a warm-up from 0 holds 0.25 every step; it read 1.0
+   before).
+3. **A second optimizer** holding a weight the ramp's doesn't (Muon beside AdamW, a GAN's two,
+   even with a shared encoder) is counted as it steps: `lr_range.other_optimizers`, and the rates
+   are dropped. One over plain tensors (an attack's perturbation) isn't counted. One over only the
+   ramp's weights that steps instead of it means the script rebuilt its optimizer: `not_set`,
+   and the probe stops.
 4. **`p1-lr` reads as an ordinary ok probe** in the engine's filters: asked of B (the engine's
    owner) in `from-d.md`. Harmless while its measured fields are None, which they are.
 5. **Contract drift:** the golden pretrain record (`scripts/make_golden.py`, A's, and the schema
    example and web fixture made from it) has `lr_range_divergence_lr` on an ordinary probe and a
    finding `lr.headroom`; the code writes `lr_range.diverged_lr` on `p1-lr`. Asked of A.
 6. **Smaller:** a GradScaler that skips every step (fp16 overflow) no longer runs the probe to its
-   timeout: once a step's backwards pass 16, or 4 times the most any step took, the probe stops
-   (`lr_range.stalled`, its rate taken as the divergence). The point's timeout is capped at what
-   the job has left, in time and dollars. A `p1` answered from the cache now gets its range test
-   too (it was skipped). The check app's printout no longer prints whole loss lists.
+   timeout: once a step's backwards reach the larger of 16 and 4 times the most any step took (64
+   before the first step), with a scaler seen, the probe stops (`lr_range.stalled`; the last rate
+   applied is the divergence, when the rates stand). The point's timeout is capped at what the job
+   has left, in time and dollars. A `p1` answered from the cache now gets its range test too (it
+   was skipped). The check app reads its single-rate runs' losses directly (they keep no rates,
+   so the curve was empty: the second review's other blocking finding) and no longer prints
+   whole loss lists.
 
-Tests added for each, and for the cache key unchanged with no range test, a budget refusal and
-`nproc > 1`.
+Tests added for each, and for the cache key unchanged with no range test, a budget refusal, the
+dollar cap and `nproc > 1` (that guard was already there).
 
 ## What's next
 

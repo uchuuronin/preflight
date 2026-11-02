@@ -26,11 +26,13 @@ The suggestion is a starting point for the script's own schedule, not a measured
 test runs from the model's first steps, without the script's warm-up or decay.
 
 Whether the rate took effect (A's review, Nov 2): the rate the optimizer holds proves nothing (the
-recorder just wrote it), so `follows_rate` reads the step's effect instead, the update's size
-against the weights' (the recorder's update-to-weight sample) against the rate. Over the ramp's
+recorder just wrote it), so `follows_rate` reads the step's effect instead: the update's size (the
+summed change of a few of the ramp's optimizer's weights, none that start at zero) against the
+rate. Over the ramp's
 decades it grows with the rate for SGD and Adam alike; an optimizer that ignores the rate it's given
-(Adafactor with `relative_step`) leaves it flat. A step mixed precision skipped joins its loss to the
-next step's; a scaler that skips every step stops the probe (the recorder's stall rule).
+(Adafactor with `relative_step`) leaves it flat. Weights kept in bf16 with no fp32 copy round small
+updates to zero, so a ramp on them may read as unverified. A step mixed precision skipped joins its
+loss to the next step's; a scaler that skips every step stops the probe (the recorder's stall rule).
 """
 
 import math
@@ -172,6 +174,16 @@ def follows_rate(lrs: list, updates: list) -> bool | None:
 	sxx = sum((x - mx) ** 2 for x in xs)
 	slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=True)) / sxx
 	return slope >= UPDATE_SLOPE
+
+
+def losses(extras: dict[str, float]) -> list[float]:
+	"""The stored losses in step order, with or without their rates (they're dropped unless the ramp
+	is checked, and a run held at one rate can't be: its updates span no rates)."""
+	out, j = [], 0
+	while f"lr_range.loss.{j:03d}" in extras:
+		out.append(extras[f"lr_range.loss.{j:03d}"])
+		j += 1
+	return out
 
 
 def curve(extras: dict[str, float]) -> list[tuple[float, float]]:

@@ -2,6 +2,8 @@
 
 import math
 
+import pytest
+
 from preflight.probes.lr_range import LR_END, LR_START, STEPS, analyse, curve, lr_at
 
 
@@ -97,7 +99,8 @@ RAMP = {"start": LR_START, "end": LR_END, "steps": STEPS}
 def _summary(updates, **kw):
 	pts = synthetic()
 	return {
-		"series": {"loss": [v for _, v in pts], "lr": [x for x, _ in pts], "update_to_weight": updates},
+		"series": {"loss": [v for _, v in pts], "lr": [x for x, _ in pts]},
+		"lr_range_update": updates,
 		**kw,
 	}
 
@@ -146,15 +149,44 @@ def test_a_stalled_scaler_marks_where_it_diverged():
 	s = _summary([0.5 * x for x in lrs], lr_range_stalled=n)
 	s["series"] = {k: v[:n] for k, v in s["series"].items()}
 	ex = with_lr_range(_probe(), s, RAMP).extras
-	assert ex["lr_range.stalled"] == 1.0 and ex["lr_range.diverged_lr"] == lr_at(n)
+	# the step that overflowed ran at the last rate applied, the one before the stall
+	assert ex["lr_range.stalled"] == 1.0 and ex["lr_range.diverged_lr"] == lr_at(n - 1)
 	assert ex["lr_range.checked"] == 1.0
+	# stalled before any step: no rate was applied, so none is the divergence
+	s0 = _summary([], lr_range_stalled=0)
+	s0["series"] = {"loss": [], "lr": []}
+	ex0 = with_lr_range(_probe(), s0, RAMP).extras
+	assert ex0["lr_range.stalled"] == 1.0 and "lr_range.diverged_lr" not in ex0
+
+
+def test_a_replaced_optimizer_and_every_reason_that_applies_are_kept():
+	from preflight.probes.local import with_lr_range
+
+	lrs = [lr_at(i) for i in range(STEPS)]
+	ex = with_lr_range(_probe(), _summary([0.5 * x for x in lrs], lr_range_replaced=1), RAMP).extras
+	assert ex["lr_range.not_set"] == 1.0 and "lr_range.checked" not in ex
+	both = with_lr_range(_probe(), _summary([1e-3] * STEPS, lr_range_other_optimizers=2), RAMP).extras
+	assert both["lr_range.not_set"] == 1.0 and both["lr_range.other_optimizers"] == 2.0
+
+
+def test_the_losses_are_read_back_without_their_rates():
+	from preflight.probes.local import with_lr_range
+	from preflight.probes.lr_range import losses
+
+	held = {"start": 1e-3, "end": 1e-3, "steps": 50}  # the GPU check's confirmation runs: one rate
+	s = {"series": {"loss": [2.0 - i / 100 for i in range(50)]}, "lr_range_update": [1e-4] * 50}
+	ex = with_lr_range(_probe(), s, held).extras
+	assert ex["lr_range.unverified"] == 1.0 and not curve(ex)
+	assert losses(ex) == pytest.approx([2.0 - i / 100 for i in range(50)])
 
 
 def test_a_hostile_summary_reads_as_unverified_not_a_crash():
 	from preflight.probes.local import with_lr_range
 
-	for bad in ({}, {"series": "x"}, {"series": {"update_to_weight": "x", "loss": [True, "a"]}},
-		{"lr_range_stalled": True, "lr_range_other_optimizers": "2"}):  # fmt: skip
+	for bad in ({}, {"series": "x"}, {"lr_range_update": "x", "series": {"loss": [True, "a"]}},
+		{"lr_range_stalled": True, "lr_range_other_optimizers": "2"},
+		{"lr_range_other_optimizers": float("inf"), "lr_range_stalled": float("nan")},
+		{"lr_range_other_optimizers": 10**400, "lr_range_stalled": 10**400}):  # fmt: skip
 		ex = with_lr_range(_probe(), bad, RAMP).extras
 		assert ex["lr_range"] == 1.0 and "lr_range.checked" not in ex
-		assert all(isinstance(v, float) for v in ex.values() if v is not None)
+		assert all(type(v) is float for v in ex.values())

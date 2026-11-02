@@ -847,6 +847,7 @@ def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
 		spec = _spec(fetched, sm, p, deps, eval_off=True)
 	except OverrideError:
 		return None
+	# a floor of 1 s [guess] so the timeout is never 0
 	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS},
 		timeout_s=max(1.0, min(spec.timeout_s, left_s)))  # fmt: skip
 	if spec.nproc > 1:
