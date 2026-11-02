@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { t } from "../../lib/i18n";
-import { type BoardingEvent, boardingState, type ModelCallSeen, modelsRan, STAGES } from "../boarding";
+import { type BoardingEvent, boardingState, eventFromStatus, type ModelCallSeen, modelsRan, STAGES } from "../boarding";
 import { go, href } from "../route";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
@@ -34,7 +34,29 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		return () => es.close();
 	}, [jobId]);
 
-	const { last, done, failed, cancelled, open, error, at: idx } = boardingState(events);
+	const { last, done, failed, cancelled, open, error, at: idx, note } = boardingState(events);
+	const ended = done || failed;
+
+	// The stream lost: ask the job itself every 10 s until it has ended, so the page still learns it's
+	// done (or why it stopped) if the stream doesn't come back.
+	useEffect(() => {
+		if (!lost || ended || !jobId) return;
+		let gone = false;
+		const ask = () =>
+			fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}`, { credentials: "same-origin" })
+				.then((r) => (r.ok ? r.json() : null))
+				.then((st) => {
+					const ev = eventFromStatus(st);
+					if (!gone && ev) setEvents((all) => [...all, ev]);
+				})
+				.catch(() => {});
+		void ask();
+		const id = setInterval(ask, 10_000);
+		return () => {
+			gone = true;
+			clearInterval(id);
+		};
+	}, [lost, ended, jobId]);
 
 	// A model's tag shows only once the record says it was called (its provenance), never just
 	// because the job reached that leg. Re-read when the record changes (record_rev).
@@ -95,6 +117,10 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 						</li>
 					))}
 				</ol>
+				{/* The runner's own words on the leg the job is on (a GPU wait), said politely as they change. */}
+				<p className="pf-hint pf-stage__note" role="status" aria-live="polite">
+					{!failed && !done && note ? note : ""}
+				</p>
 				{error ? (
 					<div className="pf-error" role="alert">
 						<p>{error.message}</p>
@@ -102,7 +128,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 					</div>
 				) : null}
 				{!jobId ? <p className="pf-hint">{t("boarding.no_job")}</p> : null}
-				{lost && !done ? <p className="pf-hint">{t("boarding.lost")}</p> : null}
+				{lost && !ended ? <p className="pf-hint">{t("boarding.lost")}</p> : null}
 				<div className="pf-cta">
 					<button type="button" className="pf-btn pf-btn--primary" disabled={!done || !open} onClick={() => open && go("cockpit", open)}>
 						{t("boarding.open")}

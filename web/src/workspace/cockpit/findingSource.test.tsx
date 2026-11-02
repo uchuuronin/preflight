@@ -14,9 +14,9 @@ describe("who found a finding", () => {
 		expect(line({ source: "rule", code: "eval.no_grad", title: "Muse Glimmer on probe p1: oom" })).toBe("Found by a rule check");
 	});
 	it("labels a diagnosis by what checked it, as A's claim check writes it", () => {
-		expect(line({ source: "spark_diagnosis", code: "diagnosis.mismatch", title: "Reserved climbs", evidence: [{ metric: "memory.reserved", value: 9.1e9 }], detail: "Muse Spark wrote: Spark Open checked it against nothing" })).toBe("Muse Spark diagnosis");
+		expect(line({ source: "spark_diagnosis", code: "diagnosis.mismatch", title: "Reserved climbs", evidence: [{ metric: "memory.reserved", value: 9.1e9 }], detail: "Muse Spark wrote: Spark Open checked it against nothing" })).toBe("Found by Muse Spark diagnosis");
 		expect(line({ source: "spark_diagnosis", code: "diagnosis.mismatch", title: "Reserved climbs", evidence: [{ metric: "memory.reserved", value: 9.1e9 }, { metric: "spark_open_check", value: "p1.step_log[12].reserved" }] })).toBe(
-			"Muse Spark diagnosis, checked by Muse Spark Open",
+			"Found by Muse Spark diagnosis, checked by Muse Spark Open",
 		);
 		expect(line({ source: "spark_diagnosis", code: "diagnosis.abstain", title: "Not backed by a probe number: abstain, or run a probe (Reserved climbs)" })).toBe("Unsupported: run a probe");
 	});
