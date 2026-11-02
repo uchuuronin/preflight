@@ -1,0 +1,45 @@
+torch 2.5.1+rocm6.2 hip 6.2.41133-dd7f95766 AMD Instinct MI300X
+preflight: running probes as root: an unprivileged uid can't reach /root/preflight/.venv-amd/bin/python and its packages (install Preflight where other users can read it to probe as one)
+running probes as this user: a fresh uid can't reach /root/preflight/.venv-amd/bin/python and its packages
+preflight: the probes ran on cpu, not a GPU
+{
+  "record": "out/records/vWQsLR9H8yODBVhjS92QdA.json",
+  "lens": "finetune",
+  "backend": "cpu",
+  "gpu": null,
+  "probes": [
+    {
+      "probe": "p1",
+      "status": "error",
+      "knobs": {
+        "batch_size": 4,
+        "seq_len": 1024
+      },
+      "step_s": null,
+      "peak_bytes": null,
+      "error": "requirements.txt didn't install: ERROR: Cannot install datasets==3.1.0 because these package versions have conflicting dependencies.\nERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts. Step: installing requirements.txt. By hand: pin versions that install together, or install them yourself and run `preflight run train.py` on your machine."
+    },
+    {
+      "probe": "p2",
+      "status": "error",
+      "knobs": {
+        "batch_size": 2,
+        "seq_len": 1024
+      },
+      "step_s": null,
+      "peak_bytes": null,
+      "error": "skipped: requirements.txt didn't install (see the first probe). Step: installing requirements.txt. By hand: pin versions that install together, or install them yourself and run `preflight run train.py` on your machine."
+    },
+    {
+      "probe": "p3",
+      "status": "error",
+      "knobs": {
+        "batch_size": 4,
+        "seq_len": 512
+      },
+      "step_s": null,
+      "peak_bytes": null,
+      "error": "skipped: requirements.txt didn't install (see the first probe). Step: installing requirements.txt. By hand: pin versions that install together, or install them yourself and run `preflight run train.py` on your machine."
+    }
+  ]
+}
