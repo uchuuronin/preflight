@@ -104,9 +104,42 @@ annotation URL, the named-address filters) wasn't exercised on real output, as n
 annotated. Whether the annotation rule leaves enough sources to be useful is the open question
 for turning it on.
 
+## The third run, with Meta's documented format (Chiya, Nov 2, 17:33: "one more try")
+
+Meta's search-grounding page (dev.meta.ai/docs/search-grounding, read Nov 2) documents
+`"include": ["web_search_call.results"]`, which returns each search call's `results` (title, URL,
+snippet: "every source the model considered"), and says the `url_citation` annotations are only the
+sources the model cites inline. Our prompt asks for a JSON answer at the end, so an answer with no
+inline citations is plausible, which would explain the second run's empty annotations. So the
+request now asks for the results (and `search_context_size: "low"`, also documented), and code keeps
+a source when the search returned its URL: an annotation for it, or an entry in a search call's
+`results`. A page open's results don't count (they're the page the model chose), and everything in
+the earlier checks still applies.
+
+`d-spark-search-validate-3` (GitHub 41538652971, Nov 2, 22:36 UTC, `ws-d` `9b6ddb1`; the same 10
+cases, 8 calls) [measured]:
+
+- Every call ok. Annotations: none, again. Results: every search call carried them (8 to 12 each,
+  12 to 31 a call), in the documented shape.
+- The known pyarrow issue: "found", with **2 sources kept**, both in the search's results:
+  transformers pull request #49582 ("Fix numpy/pyarrow conflict in the XPU Docker image") and
+  radixark/miles_diffusion #307 ("ci: pin pyarrow 25 in the hosted CPU suite"); the model's reasons
+  say both describe this exact ImportError (I couldn't open them from here). A third the model
+  opened (NVIDIA-NeMo/Automodel #4244) wasn't in the results and was dropped.
+- The other 6 sent cases: "none found", as in both earlier runs (4 are kinds production skips).
+- The planted link: in no results list and never repeated, so that check stays inconclusive.
+- Cost: US$0.148 for the 8 calls [derived: tokens at the list and cached rates plus the search fee
+  at the second-hand rate].
+
+**What this says for Tuesday noon:** citation checking works on Meta's API with the documented
+format, and on the one real known issue in our set it kept two relevant-looking sources and made
+none up; recall across the three runs went 1, 0 (the annotation rule alone), 2 sources. One known
+issue is a small set. It stays off until B's re-check of the fixes and C's data-use line; then it's
+the PM's call.
+
 ## Before `harness.spark_search` goes on
 
-1. A's re-check of the fixes above, and the validation re-run on them.
+1. B's re-check of the fixes above (Chiya, Nov 2, 17:33: B instead of A).
 2. C's data-use line: a failed probe's error (its last 2,500 characters, with URL queries, common
    secret shapes such as `TOKEN=` values and API keys, and home folder names masked), its error code, the job's lens and library versions go
    to Muse Spark on Meta's API, and the model's search queries go to a web search. Never for a
