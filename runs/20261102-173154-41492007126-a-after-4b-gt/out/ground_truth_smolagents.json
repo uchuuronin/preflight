@@ -1,0 +1,94 @@
+{
+  "script": "smolagents",
+  "entrypoint": "examples/agent_from_any_llm.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ImportError",
+    "error": "ImportError: Using `low_cpu_mem_usage=True` or a `device_map` requires Accelerate: `pip install 'accelerate>=0.26.0'`\n",
+    "seconds": 3.678616948,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 9.1
+  },
+  "recorder": {
+    "status": "error",
+    "error": "A library in the script needs Accelerate, which is not installed in the probe image. ImportError: Using `low_cpu_mem_usage=True` or a `device_map` requires Accelerate: `pip install 'accelerate>=0.26.0'` at src/smolagents/models.py:963, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 7.047,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3700092928.0
+    },
+    "step_log": [],
+    "log_tail": "'t installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports mlx_lm, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports selenium, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports soundfile, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports websocket, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: kept the image's huggingface-hub 0.36.2 (asked for 'huggingface-hub>=0.31.2')\n[preflight] requirements: kept the image's requests 2.34.2 (asked for 'requests>=2.32.3')\n[preflight] requirements: kept the image's jinja2 3.1.6 (asked for 'jinja2>=3.1.4')\n[preflight] requirements: kept the image's pillow 13.0.0 (asked for 'pillow>=10.0.1')\n[preflight] requirements: kept the image's python-dotenv 1.2.4 (asked for 'python-dotenv')\n[preflight] requirements: installing rich>=13.9.4\nChose model: 'transformers'\nThe cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.\n\r0it [00:00, ?it/s]\r0it [00:00, ?it/s]\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T17:32:31Z",
+      "duration_s": 7.047,
+      "error": "A library in the script needs Accelerate, which is not installed in the probe image. ImportError: Using `low_cpu_mem_usage=True` or a `device_map` requires Accelerate: `pip install 'accelerate>=0.26.0'` at src/smolagents/models.py:963, before the first optimizer step (stage: running script)",
+      "error_code": "missing_package",
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 11.149750000000001,
+        "max_w": 11.233,
+        "samples": 8
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3700092928.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 7.047,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "vllm": "0.6.4.post1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "serving",
+  "image": "serving"
+}
