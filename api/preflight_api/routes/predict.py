@@ -107,10 +107,16 @@ async def predict_cells(ref: str, request: Request) -> dict:
 		raise ApiError(422, "invalid_request", f"Send up to {MAX_CELLS} settings as cells.") from e
 	if not _take(edge.ip_key(edge.client_ip(request)), len(body.cells)):
 		raise ApiError(
-			429, "rate_limited", "Too many requests from here; try again shortly.", retryable=True, retry_after=2
+			429,
+			"rate_limited",
+			"Too many requests from here; try again shortly.",
+			retryable=True,
+			retry_after=2,
 		)
 	try:
-		raw = await asyncio.to_thread(resolve_record, ref, request.app.state.samples, request.app.state.records)
+		raw = await asyncio.to_thread(
+			resolve_record, ref, request.app.state.samples, request.app.state.records
+		)
 	except StoreBusy as e:
 		raise ApiError(
 			503, "record_store_busy", "Records are a moment behind; try again.", retryable=True, retry_after=2

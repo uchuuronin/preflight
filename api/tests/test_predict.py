@@ -44,7 +44,14 @@ def test_the_engine_predicts_where_the_grids_dont(monkeypatch):
 	(extrapolated across GPUs), where the web's grids abstained."""
 	_env(monkeypatch, True)
 	with client() as c:
-		r = ask(c, [{"batch_size": 4, "lr": 0.0002}, {"batch_size": 4, "lr": 0.0001}, {"batch_size": 4, "gpu_type": "A10"}])
+		r = ask(
+			c,
+			[
+				{"batch_size": 4, "lr": 0.0002},
+				{"batch_size": 4, "lr": 0.0001},
+				{"batch_size": 4, "gpu_type": "A10"},
+			],
+		)
 	assert r.status_code == 200, r.text
 	a, b, gpu = r.json()["cells"]
 	assert a["time.step"]["status"] == "predicted"
