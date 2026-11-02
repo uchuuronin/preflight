@@ -1,0 +1,131 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-O7unrdiCGopunPTPyym3BH
+✓ Created objects.
+bs2-lr0.0001: submitted
+bs2-lr0.0002: submitted
+bs4-lr0.0001: submitted
+bs4-lr0.0002: submitted
+bs2-lr0.0001: done
+bs4-lr0.0001: done
+bs4-lr0.0002: done
+bs2-lr0.0002: done
+{
+ "spent_usd": 0.0053,
+ "cap_usd": 3.0,
+ "gpu": "L4",
+ "cells": {
+  "bs2-lr0.0001": {
+   "job_status": "done",
+   "record_id": "01M6EKMH3K0V2NKQ8ZRFMKR7KP",
+   "error_code": null,
+   "minutes": 20.4,
+   "usd": 0.0013,
+   "measured": {
+    "at_cell": [
+     [
+      "p1",
+      "error"
+     ]
+    ],
+    "probe": "p1",
+    "status": "error",
+    "steps": 0,
+    "step_s_mean": null,
+    "step_s_p50": null,
+    "train_peak_bytes": null,
+    "peak_allocated_bytes": null,
+    "knobs": {
+     "batch_size": 2,
+     "lr": 0.0001,
+     "gpu_type": "L4"
+    }
+   },
+   "gpu": null
+  },
+  "bs4-lr0.0001": {
+   "job_status": "done",
+   "record_id": "01M6EKMJMKSFBKJAG5SKWSAJJ1",
+   "error_code": null,
+   "minutes": 20.4,
+   "usd": 0.0012,
+   "measured": {
+    "at_cell": [
+     [
+      "p1",
+      "error"
+     ]
+    ],
+    "probe": "p1",
+    "status": "error",
+    "steps": 0,
+    "step_s_mean": null,
+    "step_s_p50": null,
+    "train_peak_bytes": null,
+    "peak_allocated_bytes": null,
+    "knobs": {
+     "batch_size": 4,
+     "lr": 0.0001,
+     "gpu_type": "L4"
+    }
+   },
+   "gpu": null
+  },
+  "bs4-lr0.0002": {
+   "job_status": "done",
+   "record_id": "01M6EKMNV8Z6CG1TAC38Z2C82W",
+   "error_code": null,
+   "minutes": 20.4,
+   "usd": 0.0014,
+   "measured": {
+    "at_cell": [
+     [
+      "p1",
+      "error"
+     ]
+    ],
+    "probe": "p1",
+    "status": "error",
+    "steps": 0,
+    "step_s_mean": null,
+    "step_s_p50": null,
+    "train_peak_bytes": null,
+    "peak_allocated_bytes": null,
+    "knobs": {
+     "batch_size": 4,
+     "lr": 0.0002,
+     "gpu_type": "L4"
+    }
+   },
+   "gpu": null
+  },
+  "bs2-lr0.0002": {
+   "job_status": "done",
+   "record_id": "01M6EKMH8XTK8Z4F9WNZA4V3NX",
+   "error_code": null,
+   "minutes": 34.6,
+   "usd": 0.0014,
+   "measured": {
+    "at_cell": [
+     [
+      "p1",
+      "error"
+     ]
+    ],
+    "probe": "p1",
+    "status": "error",
+    "steps": 0,
+    "step_s_mean": null,
+    "step_s_p50": null,
+    "train_peak_bytes": null,
+    "peak_allocated_bytes": null,
+    "knobs": {
+     "batch_size": 2,
+     "lr": 0.0002,
+     "gpu_type": "L4"
+    }
+   },
+   "gpu": null
+  }
+ }
+}
+Stopping app - uncaught exception raised locally: SystemExit(0).
