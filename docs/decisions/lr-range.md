@@ -23,7 +23,7 @@ don't change it), the eval off.
 | Suggested (steepest fall) | 7.9e-5, 0.8 times its own | 2.5e-4, 0.4 times its own |
 | Lowest loss at | 7.7e-4 | 3.4e-3 |
 | Diverged at | 7.6e-3 | 1.0 (the ramp's last step) |
-| 50 steps at the suggested rate | trains: loss 1.287 to 1.216 (first 10 steps' mean to last 10's), no divergence | trains: 8.74 to 6.01, no divergence |
+| 50 steps at the suggested rate | loss 1.287 to 1.216 (first 10 steps' mean to last 10's), no divergence | 8.74 to 6.01, no divergence |
 | 50 steps at its own rate | 1.275 to 1.215 | 7.87 to 6.03 |
 | GPU time (range, suggested, own) | 179 s, 100 s, 97 s | 124 s, 65 s, 64 s |
 
