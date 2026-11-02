@@ -1,0 +1,21 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-c8U6ak1Jnb9tCC1NtZjzrC
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/lr_range_app.p
+│   y
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+└── ✓ Created Function range_and_confirm.
+[lr range] finetune_lora_hf: 2 files, waiting for an A10, else an L4
+{"status": "ok", "error": "", "error_code": null, "steps": 71.0, "suggested_lr": 7.924828983539173e-05, "min_loss_lr": 0.0007742636826811273, "diverged_lr": 0.012328467394420665, "flat": null, "checked": 1.0, "not_set": null, "unverified": null, "other_optimizers": null, "stalled": null, "gpu_s": 164.749, "usd": 0.05034}
+{"lr": 7.924828983539173e-05, "status": "ok", "error": "", "steps": 50, "diverged": false, "checked": null, "first10_mean": 1.2834961891174317, "last10_mean": 1.2158127456903458, "trains": true, "gpu_s": 95.072, "usd": 0.02905}
+{"script": "finetune_lora_hf", "gpu": "A10", "lens": "finetune", "own_lr": 0.0001, "container_s": 356.1, "container_usd": 0.1088, "suggested": 7.924828983539173e-05, "trains_at_suggested": true, "trains_at_own": true}
+[lr range] pretrain_nanogpt: 1 files, waiting for an A10, else an L4
+{"lr": 0.0001, "status": "ok", "error": "", "steps": 50, "diverged": false, "checked": null, "first10_mean": 1.274628158658743, "last10_mean": 1.2150070756673812, "trains": true, "gpu_s": 93.414, "usd": 0.028543}
+{"status": "ok", "error": "", "error_code": null, "steps": 96.0, "suggested_lr": 0.0002477076355991711, "min_loss_lr": 0.003944206059437656, "diverged_lr": 0.7220809018385461, "flat": null, "checked": 1.0, "not_set": null, "unverified": null, "other_optimizers": null, "stalled": null, "gpu_s": 117.911, "usd": 0.036028}
+{"lr": 0.0002477076355991711, "status": "ok", "error": "", "steps": 50, "diverged": false, "checked": null, "first10_mean": 8.743389797210693, "last10_mean": 6.007069110870361, "trains": true, "gpu_s": 61.397, "usd": 0.01876}
+{"lr": 0.0006, "status": "ok", "error": "", "steps": 50, "diverged": false, "checked": null, "first10_mean": 7.869470405578613, "last10_mean": 6.026615715026855, "trains": true, "gpu_s": 61.0, "usd": 0.018639}
+{"script": "pretrain_nanogpt", "gpu": "A10", "lens": "pretrain", "own_lr": 0.0006, "container_s": 240.3, "container_usd": 0.0734, "suggested": 0.0002477076355991711, "trains_at_suggested": true, "trains_at_own": true}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-c8U6ak1Jnb9tCC1NtZjzrC
