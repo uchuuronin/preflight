@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160646-41478227289-a-unseen-5-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41478227289",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-5 --gpus L4 --max-minutes 45 --repo https://github.com/EleutherAI/lm-evaluation-harness --commit ddd67220430a2470529f25fd5c05a576ca1057a0 --entrypoint lm_eval/__main__.py --args=--model,hf,--model_args,pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,,dtype=bfloat16,--tasks,arc_easy,,hellaswag,,piqa,--batch_size,auto",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:07:18Z"
+}
