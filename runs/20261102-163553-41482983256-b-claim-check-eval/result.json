@@ -1,0 +1,11 @@
+{
+	"name": "20261102-163553-41482983256-b-claim-check-eval",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41482983256",
+	"ref": "ws-b",
+	"sha": "d9f7634b5b32c2a66215b4f6942a4699fd8b0a7e",
+	"cmd": "modal run --env main python/preflight/corpus/claim_check_app.py::evaluate",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:41:31Z"
+}

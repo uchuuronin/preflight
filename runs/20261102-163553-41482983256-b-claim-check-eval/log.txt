@@ -1,0 +1,251 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-JNvPFYy6hSEwDtSr17CByT
+Building image im-79kmuANF0Lozq0aHKoF4J8
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install 'httpx>=0.27' 'numpy>=1.26' 'pydantic>=2.8,<3'
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Collecting httpx>=0.27
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpx/httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting numpy>=1.26
+  Downloading http://pypi-mirror.modal.local:5555/simple/numpy/numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+Collecting pydantic<3,>=2.8
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl.metadata (137 kB)
+Collecting annotated-types>=0.6.0 (from pydantic<3,>=2.8)
+  Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.50.2 (from pydantic<3,>=2.8)
+  Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (6.5 kB)
+Collecting typing-extensions>=4.16.0 (from pydantic<3,>=2.8)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting typing-inspection>=0.4.4 (from pydantic<3,>=2.8)
+  Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting anyio (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+Collecting certifi (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+Collecting httpcore==1.* (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/httpcore/httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting idna (from httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting h11>=0.16 (from httpcore==1.*->httpx>=0.27)
+  Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic/pydantic-2.14.2-py3-none-any.whl (490 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/pydantic-core/pydantic_core-2.50.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 245.2 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/httpx/httpx-0.28.1-py3-none-any.whl (73 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/httpcore/httpcore-1.0.9-py3-none-any.whl (78 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/numpy/numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.9/16.9 MB 225.4 MB/s  0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/annotated-types/annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/h11/h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-extensions/typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/typing-inspection/typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/anyio/anyio-4.16.0-py3-none-any.whl (134 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/idna/idna-3.20-py3-none-any.whl (69 kB)
+Downloading http://pypi-mirror.modal.local:5555/simple/certifi/certifi-2026.10.23-py3-none-any.whl (135 kB)
+Installing collected packages: typing-extensions, numpy, idna, h11, certifi, annotated-types, typing-inspection, pydantic-core, httpcore, anyio, pydantic, httpx
+
+Successfully installed annotated-types-0.8.0 anyio-4.16.0 certifi-2026.10.23 h11-0.16.0 httpcore-1.0.9 httpx-0.28.1 idna-3.20 numpy-2.4.6 pydantic-2.14.2 pydantic-core-2.50.2 typing-extensions-4.16.0 typing-inspection-0.4.4
+
+[notice] A new release of pip is available: 25.2 -> 26.2.2
+[notice] To update, run: pip install --upgrade pip
+Saving image...
+Image saved, took 1.17s
+
+Built image im-79kmuANF0Lozq0aHKoF4J8 in 7.43s
+
+
+Building image im-AiGJwLRZmwksDVsZY2QNT7
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PREFLIGHT_CLAIMS_ROOT=/root/claims
+Saving image...
+Image saved, took 638.87ms
+
+Built image im-AiGJwLRZmwksDVsZY2QNT7 in 1.27s
+
+
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/claim_check_ap
+│   p.py
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/zoo/agent_eval_spark/record_oct31.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/zoo/retrieval_st/record_nov1_l4.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/zoo/gnn_pyg/record_nov1_l4.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/zoo/grpo_trl/record_nov1_a10.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/zoo/vision_timm/record_nov1_l4.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/tests/fixtures/b-a-smoke-l4-main-4.rec
+│   ord.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/zoo/eval_sweep_reasoning/record_nov2_a
+│   10.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/pretrain.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/schema/examples/agent.json
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/schema/examples/finetune.json
+├── ✓ Uploaded PythonPackage:preflight
+└── ✓ Created Function evaluate_remote.
+{
+ "model": "meta-models/muse-spark-open-1026",
+ "usd": 0.357329,
+ "calls": 64,
+ "failed_calls": 0,
+ "skipped_at_cap": 0,
+ "summary": {
+  "true_pass": {
+   "k": 101,
+   "n": 107,
+   "rate": 0.9439252336448598,
+   "wilson95": [
+    0.8830303848234273,
+    0.9740496374963752
+   ]
+  },
+  "true_pass_right_field": {
+   "k": 76,
+   "n": 107,
+   "rate": 0.7102803738317757,
+   "wilson95": [
+    0.6182285373827988,
+    0.787756736347634
+   ]
+  },
+  "altered_caught": {
+   "k": 93,
+   "n": 102,
+   "rate": 0.9117647058823529,
+   "wilson95": [
+    0.8407554144604857,
+    0.9528844402424269
+   ]
+  },
+  "verdicts": {
+   "true": {
+    "not_a_measurement": 2,
+    "supported": 101,
+    "ambiguous": 4
+   },
+   "altered": {
+    "unsupported": 93,
+    "supported": 7,
+    "ambiguous": 1,
+    "not_a_measurement": 1
+   }
+  },
+  "by_kind": {
+   "bytes": {
+    "true_pass": {
+     "k": 24,
+     "n": 26,
+     "rate": 0.9230769230769231,
+     "wilson95": [
+      0.7585844622837095,
+      0.9786449115277238
+     ]
+    },
+    "altered_caught": {
+     "k": 20,
+     "n": 24,
+     "rate": 0.8333333333333334,
+     "wilson95": [
+      0.6414692935030095,
+      0.9332132367136705
+     ]
+    }
+   },
+   "seconds": {
+    "true_pass": {
+     "k": 37,
+     "n": 38,
+     "rate": 0.9736842105263158,
+     "wilson95": [
+      0.8650512388404787,
+      0.9953394123142312
+     ]
+    },
+    "altered_caught": {
+     "k": 35,
+     "n": 38,
+     "rate": 0.9210526315789473,
+     "wilson95": [
+      0.7920062854222853,
+      0.9727854044930122
+     ]
+    }
+   },
+   "fraction": {
+    "true_pass": {
+     "k": 26,
+     "n": 27,
+     "rate": 0.9629629629629629,
+     "wilson95": [
+      0.8171653406642414,
+      0.9934318540192149
+     ]
+    },
+    "altered_caught": {
+     "k": 25,
+     "n": 25,
+     "rate": 1.0,
+     "wilson95": [
+      0.8668077490609515,
+      0.9999999999999999
+     ]
+    }
+   },
+   "usd": {
+    "true_pass": {
+     "k": 12,
+     "n": 14,
+     "rate": 0.8571428571428571,
+     "wilson95": [
+      0.6005862050302965,
+      0.9599060787285351
+     ]
+    },
+    "altered_caught": {
+     "k": 11,
+     "n": 13,
+     "rate": 0.8461538461538461,
+     "wilson95": [
+      0.5776536898051745,
+      0.9567418216419186
+     ]
+    }
+   },
+   "rate": {
+    "true_pass": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.34238022750665303,
+      1.0
+     ]
+    },
+    "altered_caught": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.34238022750665303,
+      1.0
+     ]
+    }
+   }
+  }
+ },
+ "wall_s": 304.8
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-JNvPFYy6hSEwDtSr17CByT
