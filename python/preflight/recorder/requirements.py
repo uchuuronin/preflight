@@ -426,6 +426,45 @@ def _uv() -> list[str] | None:
 	return None
 
 
+UV_SHARE = 0.6  # guess: of the install's time limit, what uv's resolve may use before pip gets the rest
+
+
+def _uv_then_pip(runner, keep, target, constraints, links, cache, resolve_s, deadline) -> str | None:
+	"""uv pip compile under the image's pins, then `pip install --no-deps` of the pins the image doesn't have;
+	None when it installed, else why not (and pip resolves as usual after it)."""
+	import time
+
+	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}  # as pip's -I: the probe's path
+	cmd = [*runner, "pip", "compile", "-", "--python", sys.executable, "--only-binary", ":all:", "-c",
+		str(constraints), "--no-header", "--no-annotate", "--quiet", *links, *(["--cache-dir", cache] if cache else [])]  # fmt: skip
+	try:
+		r = subprocess.run(cmd, input="\n".join(keep) + "\n", capture_output=True, text=True,
+			timeout=max(1.0, resolve_s), cwd=target, env=env)  # fmt: skip
+	except subprocess.TimeoutExpired:
+		return f"uv's resolve took longer than {resolve_s:.0f} s"
+	except OSError as exc:
+		return f"uv didn't start ({type(exc).__name__})"
+	if r.returncode != 0:
+		return ((r.stderr or r.stdout or "").strip().splitlines() or [f"uv exited with {r.returncode}"])[-1]
+	have = installed()
+	pins = [ln.strip() for ln in r.stdout.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+	todo = [p for p in pins if (m := _LINE.match(p)) and _norm(m["name"]) not in have]
+	if any(not re.fullmatch(rf"{_NAME}==[A-Za-z0-9.+!_-]{{1,64}}", p) for p in todo):
+		return "uv's resolve wasn't plain pins"
+	if not todo:
+		return None
+	left = deadline - time.monotonic()
+	cmd = [sys.executable, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+		"--no-warn-script-location", "--only-binary", ":all:", "--no-deps", "--prefix", str(target), *links, *todo]  # fmt: skip
+	try:
+		r = subprocess.run(cmd, capture_output=True, text=True, timeout=max(1.0, left), cwd=target)
+	except subprocess.TimeoutExpired:
+		return f"pip took longer than {left:.0f} s installing uv's pins"
+	if r.returncode != 0:
+		return ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[-1]
+	return None
+
+
 def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, uv: bool = False,
 	find_links: str | None = None, log=None) -> str | None:  # fmt: skip
 	"""One install of keep into target with the image pinned; the installer's error tail, or None. uv
@@ -440,29 +479,17 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 	cache = cache if cache and os.access(cache, os.W_OK) else None
 	runner = _uv() if uv else None
 	if runner is not None:
-		cmd = [*runner, "pip", "install", "--python", sys.executable, "--prefix", str(target), "--only-binary",
-			":all:", "-c", str(constraints), "--no-progress", *links, *(["--cache-dir", cache] if cache else []),
-			*keep]  # fmt: skip
-		# without the probe's PYTHONPATH: it can name a directory the probe's uid can't list (as pip's -I)
-		env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-		try:
-			r = subprocess.run(
-				cmd, capture_output=True, text=True, timeout=max(1.0, timeout_s), cwd=target, env=env
-			)
-			if r.returncode == 0:
-				return None
-			why = ((r.stderr or r.stdout or "").strip().splitlines() or [f"uv exited with {r.returncode}"])[
-				-1
-			]
-		except subprocess.TimeoutExpired:
-			return f"uv took longer than {timeout_s:.0f} s"
-		except OSError as exc:
-			why = f"uv didn't start ({type(exc).__name__})"
+		# uv resolves (its resolver is the fast part); pip installs exactly what it chose that the image lacks,
+		# without resolving again. Not `uv pip install --prefix`: uv doesn't see the image's packages there and
+		# would put a second torch in the prefix (review, Nov 2)
+		why = _uv_then_pip(runner, keep, target, constraints, links, cache, timeout_s * UV_SHARE, deadline)
+		if why is None:
+			return None
 		if log is not None:
-			log(f"[preflight] requirements: uv didn't install them ({why[:200]}); trying pip")
+			log(f"[preflight] requirements: uv's route didn't install them ({why[:200]}); trying pip")
 		timeout_s = deadline - time.monotonic()
 		if timeout_s < 5:
-			return f"uv failed and no time was left for pip: {why[:500]}"
+			return f"no time was left for pip after uv's route: {why[:500]}"
 	# -I: pip walks every sys.path entry, and the probe's PYTHONPATH can name a directory its
 	# unprivileged uid can't list (Modal's /root, Nov 1: PermissionError, nothing installed)
 	cmd = [sys.executable, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",

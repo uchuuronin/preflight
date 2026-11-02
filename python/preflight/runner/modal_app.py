@@ -196,6 +196,7 @@ serving_image = (
 			"PREFLIGHT_WEIGHTS_HUB": f"{WEIGHTS_DIR}/hf/hub",
 			"PREFLIGHT_SANDBOX_DIR": "/tmp",
 			"PREFLIGHT_PROBE_UID": "61000",
+			"PREFLIGHT_PYG_INDEX": PYG_INDEX,  # read only with probes.extra_hosts (recorder/requirements.py)
 		}
 	)
 	.apt_install(*COMPILER_PACKAGES)
@@ -480,11 +481,10 @@ def _sandbox_factory(owner=None):
 		from preflight.probes.gpu_choice import modal_gpu
 		from preflight.runner.flags import flag
 
-		hosts = [
-			*EGRESS,
-			*(EXTRA_EGRESS if flag("probes.extra_hosts") else []),
-			*(h for h in extra_egress if h),
-		]
+		# probes.extra_hosts: a probe's sandbox only; an agent sample's (the one caller with extra_egress) keeps
+		# EGRESS and its tunnel
+		data = flag("probes.extra_hosts") and not extra_egress
+		hosts = [*EGRESS, *(EXTRA_EGRESS if data else []), *(h for h in extra_egress if h)]
 		return modal.Sandbox.create(
 			app=owner if owner is not None else app,
 			image=SANDBOX_IMAGES[image],

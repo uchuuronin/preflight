@@ -10,7 +10,6 @@
 	"probes.extra_hosts": false,
 	"probes.uv_install": false,
 	"runner.command_checkin": false,
-	"probes.extra_hosts": false,
 	"harness.spark_script_map": false,
 	"harness.spark_open_triage": false,
 	"harness.spark_diagnosis": false,

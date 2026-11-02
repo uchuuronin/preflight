@@ -151,6 +151,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_repo": True} if spec.install_repo else {}),  # absent: keys stay as they were
 		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
 		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
+		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip

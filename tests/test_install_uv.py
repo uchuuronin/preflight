@@ -26,24 +26,36 @@ def pip(monkeypatch, tmp_path):
 	return seen, state, tmp_path
 
 
-def test_uv_goes_first_with_the_same_constraints_and_wheels_only(pip, monkeypatch):
+def test_uv_resolves_and_pip_installs_only_what_the_image_lacks_without_resolving(pip, monkeypatch):
 	seen, _, work = pip
 	monkeypatch.setattr(R, "_uv", lambda: ["/usr/bin/uv"])
+	compiled = "litdata==0.2.30\ntorch==2.5.1\n# a comment\nboto3==1.35.0\n"
+	real = R.subprocess.run
+
+	def run(cmd, **kw):
+		if cmd[:3] == ["/usr/bin/uv", "pip", "compile"]:
+			seen.append(list(cmd))
+			assert kw["input"] == "litdata\n" and "PYTHONPATH" not in kw["env"]
+			return subprocess.CompletedProcess(cmd, 0, compiled, "")
+		return real(cmd, **kw)
+
+	monkeypatch.setattr(R.subprocess, "run", run)
 	assert R.install(work, work / "d", log=lambda m: None, uv=True)[0] is None
-	assert len(seen) == 1 and seen[0][:3] == ["/usr/bin/uv", "pip", "install"]
-	cmd = seen[0]
-	assert "--only-binary" in cmd and "-c" in cmd and "--prefix" in cmd and cmd[-1] == "litdata"
+	compile_cmd, pip_cmd = seen[-2], seen[-1]
+	assert "-c" in compile_cmd and "--only-binary" in compile_cmd
+	# torch is the image's: never installed again; the rest exactly as uv chose, with no second resolve
+	assert pip_cmd[0] == R.sys.executable and "--no-deps" in pip_cmd and "--prefix" in pip_cmd
+	assert pip_cmd[-2:] == ["litdata==0.2.30", "boto3==1.35.0"] and "torch==2.5.1" not in pip_cmd
 
 
-def test_pip_runs_when_uv_fails_or_isnt_there(pip, monkeypatch):
+def test_pip_resolves_as_before_when_uvs_route_fails_or_uv_isnt_there(pip, monkeypatch):
 	seen, state, work = pip
 	monkeypatch.setattr(R, "_uv", lambda: ["/usr/bin/uv"])
 	state["answer"] = lambda cmd: 1 if cmd[0] == "/usr/bin/uv" else 0
 	notes = []
 	assert R.install(work, work / "d1", log=notes.append, uv=True)[0] is None
-	assert [c[0] for c in seen][-2:] == ["/usr/bin/uv", R.sys.executable] and any(
-		"trying pip" in n for n in notes
-	)
+	assert seen[-2][0] == "/usr/bin/uv" and seen[-1][0] == R.sys.executable and "--no-deps" not in seen[-1]
+	assert any("trying pip" in n for n in notes)
 	monkeypatch.setattr(R, "_uv", lambda: None)
 	seen.clear()
 	assert R.install(work, work / "d2", log=lambda m: None, uv=True)[0] is None
@@ -75,16 +87,12 @@ def test_pygs_index_is_passed_and_its_packages_count_as_known(pip, monkeypatch):
 	assert R.repo_requirement_sets(work, "run.py", log=lambda m: None)[1] == []  # off: not installable
 
 
-def test_the_probe_spec_carries_them_and_the_cache_key_changes_only_for_pyg():
+def test_the_probe_spec_carries_them_and_each_changes_the_cache_key():
 	from preflight.probes.local import ProbeSpec
 	from preflight.runner.pipeline import cache_key
 
-	base = ProbeSpec(probe_id="p1", files={"t.py": "x"}, entrypoint="t.py", install_requirements=True)
-	uv = ProbeSpec(
-		probe_id="p1", files={"t.py": "x"}, entrypoint="t.py", install_requirements=True, install_uv=True
-	)
-	pyg = ProbeSpec(
-		probe_id="p1", files={"t.py": "x"}, entrypoint="t.py", install_requirements=True, install_pyg=True
-	)
-	# uv installs the same constraints; another index can install another build
-	assert cache_key(base, "L4", "i") == cache_key(uv, "L4", "i") != cache_key(pyg, "L4", "i")
+	kw = {"probe_id": "p1", "files": {"t.py": "x"}, "entrypoint": "t.py", "install_requirements": True}
+	keys = {
+		cache_key(ProbeSpec(**kw, **x), "L4", "i") for x in ({}, {"install_uv": True}, {"install_pyg": True})
+	}
+	assert len(keys) == 3  # another resolver can pick other versions, another index another build
