@@ -1,0 +1,310 @@
+{
+  "submitted": {
+    "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+    "status": "done",
+    "position": null,
+    "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+    "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 32
+  },
+  "events": [
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 0,
+      "at": "2026-11-02T16:06:33.588977Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 1,
+      "at": "2026-11-02T16:06:37.899747Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 2,
+      "at": "2026-11-02T16:06:38.027030Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 3,
+      "at": "2026-11-02T16:06:39.491153Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 4,
+      "at": "2026-11-02T16:06:42.151675Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 5,
+      "at": "2026-11-02T16:06:57.040514Z",
+      "stage": "skeleton",
+      "message": "map refined by Muse Spark",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 6,
+      "at": "2026-11-02T16:06:57.180782Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 7,
+      "at": "2026-11-02T16:06:57.222146Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 8,
+      "at": "2026-11-02T16:07:57.812740Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (1 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 9,
+      "at": "2026-11-02T16:08:57.929601Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (2 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 10,
+      "at": "2026-11-02T16:09:58.165330Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (3 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 11,
+      "at": "2026-11-02T16:10:58.273901Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (4 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 12,
+      "at": "2026-11-02T16:11:58.395662Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (5 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 13,
+      "at": "2026-11-02T16:12:58.498877Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (6 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 14,
+      "at": "2026-11-02T16:13:58.537413Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (7 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 15,
+      "at": "2026-11-02T16:14:58.650339Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (8 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 16,
+      "at": "2026-11-02T16:15:58.771713Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (9 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 17,
+      "at": "2026-11-02T16:16:58.906633Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (10 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 18,
+      "at": "2026-11-02T16:17:59.030673Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (11 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 19,
+      "at": "2026-11-02T16:18:59.069515Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (12 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 20,
+      "at": "2026-11-02T16:19:59.184519Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (13 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 21,
+      "at": "2026-11-02T16:21:00.064607Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (14 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 22,
+      "at": "2026-11-02T16:22:00.189143Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (15 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 23,
+      "at": "2026-11-02T16:23:00.303124Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (16 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 24,
+      "at": "2026-11-02T16:24:00.438843Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (17 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 25,
+      "at": "2026-11-02T16:25:00.563654Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (18 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 26,
+      "at": "2026-11-02T16:26:00.607421Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (19 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "seq": 27,
+      "at": "2026-11-02T16:26:57.808505Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (20 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 28,
+      "at": "2026-11-02T16:26:57.926598Z",
+      "stage": "probing",
+      "progress": 0.333,
+      "level": "info",
+      "probe_id": "p2",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 29,
+      "at": "2026-11-02T16:26:57.963727Z",
+      "stage": "probing",
+      "progress": 0.667,
+      "level": "info",
+      "probe_id": "p3",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 30,
+      "at": "2026-11-02T16:27:00.219104Z",
+      "stage": "predicting",
+      "message": "measured; predicting",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "share_token": "sgLyMpjS7Jg9AjqCbesfHA",
+      "seq": 31,
+      "at": "2026-11-02T16:27:32.435921Z",
+      "stage": "predicting",
+      "message": "predicted",
+      "level": "info",
+      "record_rev": 3
+    },
+    {
+      "job_id": "01M6EG6BBMEGQZTVH2YQGY33PR",
+      "record_id": "01M6EG6JNE7JGKPJZGCDFZMNC9",
+      "seq": 32,
+      "at": "2026-11-02T16:27:32.523777Z",
+      "stage": "done",
+      "progress": 1.0,
+      "level": "info"
+    }
+  ],
+  "error": null
+}

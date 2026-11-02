@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160611-41478097108-a-unseen-2-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41478097108",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-2 --gpus L4 --max-minutes 45 --repo https://github.com/Lightning-AI/litgpt --commit 4738993a5e0190b851162a52173729827d3884e7 --entrypoint litgpt/pretrain.py --args=--config,config_hub/pretrain/debug.yaml",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:27:38Z"
+}
