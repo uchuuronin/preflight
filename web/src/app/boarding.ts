@@ -64,6 +64,18 @@ export interface BoardingState {
 	error: ErrorCopy | null;
 	/** The leg the job is on, or the one it stopped on after a failure or cancel (index into STAGES). */
 	at: number;
+	/** What the runner last said about the leg it's on (A, Nov 2: "waiting for a free L4 GPU (3 min so far)"), while it's on it. */
+	note: string | null;
+}
+
+/**
+ * The job as GET /v1/jobs/{id} reports it, turned into the event the stream would have sent at its
+ * end, for when the stream is lost (Nov 2: a check-in's boarding page lost its stream and never
+ * learned the job was done, so "Open the cockpit" stayed off). Null while the job is still going.
+ */
+export function eventFromStatus(st: { status?: string; share_token?: string | null; error_code?: string | null; error?: string | null } | null): BoardingEvent | null {
+	if (!st || !st.status || !TERMINAL.has(st.status)) return null;
+	return { stage: st.status as JobEvent["stage"], share_token: st.share_token ?? null, error_code: st.error_code ?? null, message: st.error ?? null } as BoardingEvent;
 }
 
 export function boardingState(events: readonly BoardingEvent[]): BoardingState {
@@ -91,5 +103,7 @@ export function boardingState(events: readonly BoardingEvent[]): BoardingState {
 		if (i >= 0) at = i;
 	}
 	if (failed && at < 0) at = 0;
-	return { last, done, failed, cancelled, open, error, at };
+	// The runner's own words on the leg it's on (a GPU wait, say); gone once a later event moves on.
+	const note = last && !TERMINAL.has(last.stage) && last.message ? (eventText(last.message)?.text ?? null) : null;
+	return { last, done, failed, cancelled, open, error, at, note };
 }

@@ -1,5 +1,16 @@
 # Status: D (usability add-ons)
 
+## Decisions while Chiya is out (Nov 2, 11:15 to about 17:00 ET)
+
+| # | When (ET) | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- | --- |
+| A1 | 11:30 | Added `harness.spark_search` and `probes.lr_range` to `flags.json`, both off | Chiya's items 1 and 3 each name a new flag, off | none | Remove the two keys |
+| A2 | 11:35 | Before building item 1, a probe script (`scripts/spark_search_probe.py`) asks Meta's Responses API one question with `web_search`, `web_search_preview` and no tool, to learn whether Muse Spark can search and how it cites | Meta's docs I can reach don't say whether a search tool exists or how citations come back; building on a guess would waste the cap | a few cents of Meta credit (counted against item 1's US$1) | Delete the script |
+| A3 | 11:40 | Item 1 built as a Responses API call with Meta's `web_search` tool (`harness/search_grounding.py`, `ModelClient.respond`), wired after triage in `runner/pipeline.py` behind `harness.spark_search` (off) | A2's probe showed Muse Spark searches and returns `url_citation` annotations. Code keeps a source only if the response annotates its URL (and any attempt to open it completed); with none left the finding says "no known issue found". That stops a made-up link only if Meta annotates nothing but search results, which the validation tests with a planted fake link. Never for a private or verify job; never for Preflight's own failures that name no library (budget, no GPU, sandbox ended, timeout, too few steps); once per distinct error per job; the error's URL queries, key-shaped strings and home folder names masked before sending | none (no call while the flag is off) | Revert the commit; the flag stays off either way |
+| A4 | 11:40 | Validation cases are every distinct failed probe in the non-unseen records on `remote-runs` (10; 7 reach the model, 3 are skips), frozen in `tests/fixtures/spark_search_cases.json` | Chiya named the zoo's real failures; the records hold the exact error text the pipeline would send. Unseen runs excluded by name | none | Delete the fixture |
+| A5 | 11:50 | Item 2's check, "does `preflight watch` work on a CPU run", runs as `scripts/d_watch_cpu_check.py` through `remote-run.yml` on GitHub's CPU runner (it installs CPU torch, as CI's torch job does), not on my workspace | My workspace has no torch and can't reach PyTorch's wheel index; the runner can, with no GPU and no model call | none (a GitHub runner's minutes) | Delete the script |
+| A6 | 12:00 | The in-flight shot goes into `video-plan.md` as shot 9b, after the exports, needing B's GPU test, and taking its 10 s from shot 13 only if 13 is cut | My CPU check showed `watch` works on a CPU but no alert fired (CLI records carry no predicted bands: the CLI never fills predictions), so the shot needs a stopgap step and a GPU test; the plan is full at about 2:55, and 13 is the shot most likely cut | none | Delete the 9b row and its section |
+
 ## Decisions overnight (Nov 2; Chiya offline 00:16 to about 05:30 ET)
 
 | # | When (ET) | What | Why | Cost | How to undo |
@@ -29,6 +40,64 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 02:56 UTC | L4 (asked) | about 20 (cap) | at most about 0.60 [guess]; 0.0179 of Muse Spark by the record | `d-eval-sweep-l4` (GitHub 41380341849): cancelled while probing, no measurement |
 | Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
 | Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
+| Nov 2, 16:19 UTC | none (Meta API) | about 1 | about 0.053 of Muse Spark [derived: tokens at list price; any search-tool fee unknown] | `d-spark-search-probe` (41480275641): `web_search` and `web_search_preview` both work, with `url_citation` annotations; no tool, no citations |
+| Nov 2, 16:52 UTC | none (Meta API) | about 2 | 0.107 of Muse Spark [derived: tokens at list price; any search-tool fee unknown] | `d-spark-search-validate` (41485593441): 8 calls on the zoo's failures, 1 source kept, 0 made up or irrelevant (`docs/decisions/spark-search.md`) |
+| Nov 2, 16:52 UTC | none (GitHub CPU runner) | about 3 | 0 | `d-watch-cpu-check` (41485598315): `preflight watch` on `zoo/notebook_tiny` on CPU works; no alert, as CLI records have no bands |
+
+## Mon Nov 2, 12:05 ET (item 2: the in-flight shot's steps; needs B's GPU test)
+
+`d-watch-cpu-check` (GitHub 41485598315, no spend) ran `preflight run` and `preflight watch` on `zoo/notebook_tiny/tiny_train.py` on a CPU [measured]: both work and the live record streams (50,000 steps in 28.6 s); but with `batch_size` raised from 64 to 1024 (2.4 times as long) no alert fired. The review of these docs found why: `preflight run` never fills predictions (only the hosted runner does), so no CLI record has `time.step`, `time.total` or `memory.peak` bands, on any device, and `watch` alerts only against those. I wrote my first draft as "a CPU record has no bands"; that was wrong, and is corrected. Asked of A in `from-d.md`; the shot's steps carry a stopgap one-liner (`with_predictions(..., enabled=True)`, checked on a copy of a committed record). The exact steps (8, from a clone to the alert) are in `docs/demo/video-plan.md`, "Shot 9b", marked "needs B's GPU test"; asked of B in `from-d.md`. The shot also needs `c.inflight` on in production, which waits on C's README line (C's `from-c.md`).
+
+CI on `03d0e5f` (item 1's push): green, all seven jobs.
+
+Review (read-only, git-free copy, against both runs' raw outputs): the CLI-predictions finding above; the dropped pages' "completed" status (the run kept only that a status was present); "one hit in five" (production sends three of those errors); the data-use line's "one per failed probe" (it's once per distinct error); the CPU check's torch build (CUDA build on a CPU) and 2.3 (2.4 over the whole run); step 8's "at once" (a tiny model's batch may not move reserved memory or step time; step 5 now makes a bigger change). All corrected.
+
+This push sends: `docs/decisions/spark-search.md` (new), `docs/demo/video-plan.md` (shot 9b), `docs/requests/from-d.md` (A's review and the CLI predictions, C's data-use line, B's GPU test), this file.
+
+## Mon Nov 2, 11:55 ET (item 1: validated; A reviews, C's data-use line next)
+
+The validation ran (`d-spark-search-validate`, GitHub 41485593441, US$0.107 [derived]); the hand judgement is `docs/decisions/spark-search.md`. 8 failed probes sent (the 3 Preflight-own kinds production skips included, to test "none found"): 7 "none found", all right or acceptable by my judgement; 1 "found" (pyarrow needs NumPy 2), keeping Apache Arrow's install page, which documents the cause. Links in findings: 1, relevant; made up: 0; irrelevant: 0; weak citations: 0. The code dropped 2 sources the model had opened but the response didn't annotate; their titles match the error, so that cost recall, not accuracy. The planted made-up link was never repeated by the model, so that check was inconclusive. Item 1's spend: about US$0.16 of its US$1 (the probe and this run).
+
+Check passed for the flag's own bar ("none found" rather than weak). Before the PM turns `harness.spark_search` on: A's review and C's data-use line, both asked in `docs/requests/from-d.md`. It rides A's redeploy, off.
+
+CI on `03d0e5f`: green (above).
+
+## Mon Nov 2, 11:45 ET (item 1: Muse Spark search grounding, built; validation next)
+
+`2c532df` (pushed 11:35) sent: `flags.json` (`harness.spark_search`, `probes.lr_range`, both off), `scripts/spark_search_probe.py`, this file.
+
+Built, behind `harness.spark_search` (off): when a probe fails with an error, Muse Spark searches the web through Meta's Responses API (`web_search`) for a known library or version issue matching it and answers with at most 3 sources or "no known issue found". Code keeps only sources the response annotates with a `url_citation` (and drops one whose page failed to open); any other named source is dropped and counted in the finding's evidence (`search.dropped_unannotated`). Whether Meta annotates only real search results is tested by a planted made-up link in the validation. Findings: `search.known_issue` (with `citations`) or `search.none_found`, `source: "model"`, one per distinct error in a job, every call in the record's provenance and cost. Not for a private or verify job, nor Preflight's own failures that name no library; one search per distinct error per job; URL queries, key-shaped strings and home folder names in the error are masked first. Whether a cited issue truly matches is the model's call under a strict prompt, so it's judged by hand on the zoo's failures next (`scripts/spark_search_validate.py`).
+
+Before the flag can go on: the data-use line must say a failed probe's error text (the end of it, up to 2,500 characters, with URL queries, common secret shapes and home folder names masked), its code, the job's lens and its library versions go to Muse Spark on Meta's API, and the model's search queries go to a web search. I'll ask C for it once the validation passes.
+
+This push sends:
+- `python/preflight/harness/search_grounding.py` (new) and `tests/test_d_search_grounding.py` (new)
+- `python/preflight/harness/spark.py`: `ModelClient.respond()` for the Responses API; `_post` takes a path
+- `python/preflight/runner/pipeline.py`: `_search` after `_triage`, behind the flag; `tests/test_pipeline.py`: one test (off, on, private)
+- `scripts/spark_search_validate.py` (new) and `tests/fixtures/spark_search_cases.json` (new)
+- `scripts/d_watch_cpu_check.py` (new; item 2's CPU check)
+- this file
+
+Review (read-only, git-free copy): one high finding (an opened page counted as retrieved even if the open failed) and medium ones (annotation trust untested, non-library errors sent, no scrubbing, verify jobs searched, cancellation ignored); all fixed as above. Its re-check found `scrub()` masking names the search needs (`hf_hub_download`, `pad_token = ...`) and missing environment-variable secrets (`DB_PASSWORD=`, `GITHUB_TOKEN=`); both fixed, with tests for each. It also reviewed `scripts/d_watch_cpu_check.py` (write the output after every case, take the record's path from the CLI, keep the run's secrets out of the subprocesses' environment); fixed. Local checks: ruff clean; `pytest tests` 1,460 passed, with the 13 torch-needing sandbox and overhead tests failing here as before my change (no torch in my workspace; CI has it).
+
+## Mon Nov 2, 11:10 ET (Chiya's answers; the video plan's statuses)
+
+`f48b589` CI green. Merged `main` `f7f10b0`. Chiya (10:57): the 14 overnight decisions stand. The
+unseen runs are on today, so I touch no engine or harness code.
+
+- **Closed:** PF102 now opens the Nov 2 live record. **Explained:** the two empty L4 eval runs were
+  Modal failing to schedule an L4; A's capacity fix falls back to an A10 with the wait shown (A to
+  confirm in `from-a.md`).
+- **Video plan** (`docs/demo/video-plan.md`), statuses now: shot 5 opens from `/s/` once C confirms
+  `workers/` (today, a preview first); shot 6 waits on A's triage re-run (Tue noon); shot 12 needs
+  C's deploy today (the "Private mode" tick; the flag is on in `main` and A's runner) and C's private
+  check-in record id; shot 13 waits on B's table (likely tonight).
+- **X post:** switches to the `/s/` link when C confirms `workers/`.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the merge of `main`, the video plan's statuses, two requests and this entry.
+
+Cloud runs: none.
 
 ## Mon Nov 2, 09:00 ET (check-in: the $8 cap is deployed; three requests closed)
 

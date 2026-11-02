@@ -37,8 +37,9 @@ REASONING_EFFORT = "medium"
 GB = 1e9
 
 SYSTEM = """You check a training run's plots against the numbers they were drawn from.
-You get two plots of one record (the memory timeline: allocated, reserved and device-used memory
-per step, in GB; and the loss per step) and, as JSON, the raw probe numbers behind them.
+You get up to two plots of one record (the memory timeline: allocated, reserved and device-used
+memory per step, in GB; and the loss per step; a plot with nothing to draw is left out) and, as
+JSON, the raw probe numbers behind them.
 Check one against the other. A finding is a place where the plot and the numbers disagree: a
 spike, plateau, trend or gap the plot shows that the numbers don't bear out, or a number the plot
 should show but doesn't (a peak above the device's memory, a step the plot skips). Also flag
@@ -117,7 +118,9 @@ def _png(fig) -> bytes:
 
 
 def render(rec: FlightRecord) -> dict[str, bytes]:
-	"""The memory timeline and the loss curve as PNGs, drawn from exactly what numbers() sends."""
+	"""The memory timeline and the loss curve as PNGs, drawn from exactly what numbers() sends. A
+	plot with nothing to draw (no step memory, no loss) is left out: an empty plot is nothing to
+	check, and Muse Spark would be paid to read it."""
 	import matplotlib
 
 	matplotlib.use("Agg")
@@ -125,6 +128,7 @@ def render(rec: FlightRecord) -> dict[str, bytes]:
 
 	nums = numbers(rec)["probes"]
 	out = {}
+	drawn = False
 	fig, ax = plt.subplots(figsize=(8, 4))
 	for pid, n in nums.items():
 		rows = n["step_log"]
@@ -137,25 +141,30 @@ def render(rec: FlightRecord) -> dict[str, bytes]:
 			ys = [r[key] / GB if r[key] is not None else math.nan for r in rows]
 			if any(not math.isnan(y) for y in ys):
 				ax.plot(x, ys, style, label=f"{pid} {key.replace('_bytes', '').replace('_', ' ')}")
+				drawn = True
 		total = n["memory"]["device_total_bytes"]
 		if total:
 			ax.axhline(total / GB, color="grey", linewidth=0.8, label=f"{pid} device total")
 	ax.set_xlabel("step (step_log index)")
 	ax.set_ylabel("GB")
 	ax.set_title("Memory timeline")
-	ax.legend(fontsize=7)
-	out["memory_timeline"] = _png(fig)
+	if drawn:  # the device total alone is a line, not a timeline
+		ax.legend(fontsize=7)
+		out["memory_timeline"] = _png(fig)
 	plt.close(fig)
+	drawn = False
 	fig, ax = plt.subplots(figsize=(8, 4))
 	for pid, n in nums.items():
 		loss = n["stability"]["series"]["loss"]
-		if loss:
+		if any(v is not None for v in loss):
 			ax.plot(range(len(loss)), [math.nan if v is None else v for v in loss], label=pid)
+			drawn = True
 	ax.set_xlabel("step (index in stability.series.loss)")
 	ax.set_ylabel("loss")
 	ax.set_title("Loss")
-	ax.legend(fontsize=7)
-	out["loss"] = _png(fig)
+	if drawn:
+		ax.legend(fontsize=7)
+		out["loss"] = _png(fig)
 	plt.close(fig)
 	return out
 
@@ -197,6 +206,9 @@ def diagnose_record(client, rec: FlightRecord) -> tuple[list[Finding], list, dic
 		pngs = render(rec)
 	except ImportError:  # no matplotlib where this runs: no plots, so no call
 		stats["no_renderer"] = 1
+		return [], [], stats
+	if not pngs:  # finished probes, but nothing to plot (no step memory, no loss): no call
+		stats["no_plots"] = 1
 		return [], [], stats
 	content = [{"type": "text", "text": "Raw probe numbers:\n" + json.dumps(nums, separators=(",", ":"))}]
 	for name, png in pngs.items():

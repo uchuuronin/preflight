@@ -62,6 +62,23 @@ TEMPLATES: dict[str, Template] = {
 			keep_eval=True,
 		),
 		Template(
+			# The finding's two eval fixes together, raced only when neither passes verify alone
+			# (Chiya, Nov 2: the LoRA eval OOM needs both). The batch comes from the engine's combined
+			# move (stack.py), the cell the guide offers, so the race and the guide agree.
+			"eval.no_grad_and_batch",
+			"Evaluation without gradients, in smaller batches",
+			_TRAIN,
+			"eval_batch_size",
+			"Make every evaluation forward pass that runs outside Hugging Face Trainer's own "
+			"`evaluate()` (custom loops and callbacks included) run without building a gradient "
+			"graph: wrap it in `torch.no_grad()` (or `torch.inference_mode()`), and keep only "
+			"detached numbers (`.item()`) from it. Also set the evaluation batch size to {value}. "
+			"Change only these two things; the training batch size, gradient accumulation, the "
+			"evaluation data and every other setting stay as they are.",
+			metric="memory.eval_peak",
+			keep_eval=True,
+		),
+		Template(
 			"eval.reduce_batch",
 			"Smaller evaluation batch",
 			_TRAIN,
@@ -246,6 +263,10 @@ def task_for(template_id: str, value: object | None = None, measured: str | None
 	return text
 
 
+# Templates that stack others: raced only when none of their parts passes verify alone.
+STACKS: dict[str, tuple[str, ...]] = {"eval.no_grad_and_batch": ("eval.wrap_no_grad", "eval.reduce_batch")}
+
+
 def verify_options(template_id: str) -> dict:
 	"""What verify.check is told for a fix from this template."""
 	t = TEMPLATES[template_id]
@@ -253,5 +274,5 @@ def verify_options(template_id: str) -> dict:
 		"metric": t.metric,
 		"may_change": t.may_change,
 		"keep_eval": t.keep_eval,
-		"no_grad": t.id == "eval.wrap_no_grad",
+		"no_grad": t.id in ("eval.wrap_no_grad", "eval.no_grad_and_batch"),
 	}

@@ -1,0 +1,163 @@
+{
+ "by": "D, Nov 2",
+ "what": "Every distinct failed probe in the non-unseen records on remote-runs (unseen runs excluded by name), for scripts/spark_search_validate.py",
+ "cases": [
+  {
+   "case": "a-smoke-l4-main-3:p1",
+   "run": "20261028-051157-40636560937-a-smoke-l4-main-3",
+   "lens": "finetune",
+   "probe": {
+    "id": "p1",
+    "status": "error",
+    "steps": 0,
+    "error": "The probe sandbox ended without a result",
+    "error_code": "recorder"
+   },
+   "libraries": {}
+  },
+  {
+   "case": "a-smoke-l4-main-4:p1-eval",
+   "run": "20261028-055114-40640376141-a-smoke-l4-main-4",
+   "lens": "finetune",
+   "probe": {
+    "id": "p1-eval",
+    "status": "oom",
+    "steps": 3,
+    "error": "Ran out of GPU memory during the eval pass. OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB. GPU 0 has a total capacity of 22.06 GiB of which 484.69 MiB is free. Process 1 has 21.58 GiB memory in use. Of the allocated memory 20.10 GiB is allocated by PyTorch, and 1.25 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environmen at train.py:79, after step 3",
+    "error_code": "oom.eval"
+   },
+   "libraries": {
+    "torch": "2.5.1",
+    "transformers": "4.46.3",
+    "peft": "0.13.2",
+    "trl": "0.12.1",
+    "accelerate": "1.1.1",
+    "datasets": "3.1.0"
+   }
+  },
+  {
+   "case": "a-smoke-retrieval-st-l4:p1",
+   "run": "20261101-055446-41278712794-a-smoke-retrieval-st-l4",
+   "lens": "retrieval",
+   "probe": {
+    "id": "p1",
+    "status": "error",
+    "steps": 0,
+    "error": "requirements.txt didn't install:   File \"/usr/local/lib/python3.11/site-packages/pip/_internal/metadata/importlib/_envs.py\", line 103, in find_legacy_editables\n    for child in path.iterdir():\n  File \"/usr/local/lib/python3.11/pathlib.py\", line 931, in iterdir\n    for name in os.listdir(self):\n                ^^^^^^^^^^^^^^^^\nPermissionError: [Errno 13] Permission denied: '/root'",
+    "error_code": "missing_package.install"
+   },
+   "libraries": {}
+  },
+  {
+   "case": "a-smoke-retrieval-st-l4:p2",
+   "run": "20261101-055446-41278712794-a-smoke-retrieval-st-l4",
+   "lens": "retrieval",
+   "probe": {
+    "id": "p2",
+    "status": "error",
+    "steps": 0,
+    "error": "skipped: requirements.txt didn't install (see the first probe)",
+    "error_code": "missing_package.install"
+   },
+   "libraries": {}
+  },
+  {
+   "case": "a-smoke-vision-timm-l4:p2",
+   "run": "20261101-110303-41300131134-a-smoke-vision-timm-l4",
+   "lens": "vision",
+   "probe": {
+    "id": "p2",
+    "status": "error",
+    "steps": 0,
+    "error": "skipped: the job's probe budget ($0.60, 15 min) is spent",
+    "error_code": "budget"
+   },
+   "libraries": {
+    "torch": "2.5.1",
+    "transformers": "4.46.3",
+    "peft": "0.13.2",
+    "trl": "0.14.0",
+    "accelerate": "1.1.1",
+    "datasets": "3.1.0",
+    "timm": "1.0.12"
+   }
+  },
+  {
+   "case": "a-smoke-serving-vllm:p1",
+   "run": "20261101-160956-41324883012-a-smoke-serving-vllm",
+   "lens": "serving",
+   "probe": {
+    "id": "p1",
+    "status": "error",
+    "steps": 0,
+    "error": "A library in the script needs NumPy, which is not installed in the probe image. ImportError: pyarrow requires NumPy 2.0 or newer, found 1.26.4 at pyarrow/lib.pyx:42, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package"
+   },
+   "libraries": {
+    "torch": "2.5.1",
+    "transformers": "4.46.3",
+    "vllm": "0.6.4.post1",
+    "datasets": "3.1.0"
+   }
+  },
+  {
+   "case": "a-smoke-serving-vllm-2:p1",
+   "run": "20261101-162722-41326407788-a-smoke-serving-vllm-2",
+   "lens": "serving",
+   "probe": {
+    "id": "p1",
+    "status": "timeout",
+    "steps": 0,
+    "error": "Timed out after 600 s before the first optimizer step (last stage: running script)",
+    "error_code": "timeout"
+   },
+   "libraries": {}
+  },
+  {
+   "case": "a-smoke-serving-vllm-3:p1",
+   "run": "20261101-180454-41334716223-a-smoke-serving-vllm-3",
+   "lens": "serving",
+   "probe": {
+    "id": "p1",
+    "status": "error",
+    "steps": 0,
+    "error": "The probe sandbox ended without a result. Step: starting Preflight's recorder. By hand: check the Python that runs probes imports torch (`python -c 'import torch'`), then `preflight run serve.py`.",
+    "error_code": "recorder"
+   },
+   "libraries": {}
+  },
+  {
+   "case": "a-notebook-checkin-1:p1",
+   "run": "20261102-031112-41381671178-a-notebook-checkin-1",
+   "lens": "finetune",
+   "probe": {
+    "id": "p1",
+    "status": "error",
+    "steps": 0,
+    "error": "script finished after 0 optimizer steps; a probe needs at least 2. Step: counting the training steps (the script ended after fewer than two). By hand: give the script more steps (raise max_steps or the epochs), then `preflight run colab_lora.py`.",
+    "error_code": "too_few_steps"
+   },
+   "libraries": {
+    "torch": "2.5.1",
+    "transformers": "4.46.3",
+    "peft": "0.13.2",
+    "trl": "0.14.0",
+    "accelerate": "1.1.1",
+    "datasets": "3.1.0"
+   }
+  },
+  {
+   "case": "a-notebook-checkin-2:p2",
+   "run": "20261102-053326-41394704676-a-notebook-checkin-2",
+   "lens": "pretrain",
+   "probe": {
+    "id": "p2",
+    "status": "error",
+    "steps": 0,
+    "error": "skipped: the job's probe budget ($0.60, 15 min) is spent. Step: staying inside the job's budget. By hand: probe fewer settings, or probe on your machine with `preflight run tiny_train.py`.",
+    "error_code": "budget"
+   },
+   "libraries": {}
+  }
+ ]
+}

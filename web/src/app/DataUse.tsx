@@ -54,6 +54,13 @@ export function dataUseLines(retention: typeof RETENTION = RETENTION): string[] 
 	if (flag("harness.spark_open_triage")) lines.push(t("datause.triage"));
 	// Private triage on the check-in desk (NewFlight.tsx) is offered only with both flags on.
 	if (flag("harness.spark_open_triage") && flag("harness.glimmer_private")) lines.push(t(flag("harness.spark_script_map") ? "datause.glimmer_map" : "datause.glimmer"));
+	// Muse Spark's diagnosis of a finished record (A's harness/diagnosis.py, behind its flag).
+	if (flag("harness.spark_diagnosis")) lines.push(t("datause.diagnosis"));
+	// Spark Open's check of each diagnosis claim: its own flag, and the diagnosis flag too, since A's
+	// runner runs the check under harness.spark_diagnosis today (pipeline._diagnose). Never quieter
+	// than the runner: api/tests/test_spark_flag_shared.py holds the two together.
+	if (flag("harness.spark_claim_check") || flag("harness.spark_diagnosis")) lines.push(t("datause.claim_check"));
+	if (flag("harness.spark_search")) lines.push(t("datause.search"));
 	if (flag("c.guide.live")) lines.push(t("datause.guide"));
 	if (flag("c.fix_loop")) lines.push(t("datause.fix"));
 	lines.push(t("datause.record"));
