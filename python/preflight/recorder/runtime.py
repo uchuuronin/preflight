@@ -26,6 +26,7 @@ so the last step's logging, save and eval still run and get measured.
 StopProbe is a BaseException, so a script's `except Exception` can't swallow it.
 """
 
+import copy
 import functools
 import gc
 import importlib.abc
@@ -57,6 +58,11 @@ PROFILE_ACTIVE = 3  # guess: enough steps for a stable kernel table; check on zo
 PRETRAIN_EVAL_CAP = 8
 # synchronised steps after the timed ones, for the phase split (data/forward/backward/optimizer):
 # timed steps carry no recorder sync points, so their host-side phase timings mean nothing on a GPU
+# a serving probe's new tokens per prompt (Chiya, Nov 1): 32 prompts at a script's 4,096 tokens
+# decoded for 272 s on an A10 and ran past the probe's 600 s on an L4 (a-serving-debug-1). The
+# script's own cap stays the record's max_new_tokens; extras.serving_probe_max_tokens says the probe
+# stopped sooner, so B's simulation extrapolates to the script's length
+SERVING_PROBE_MAX_TOKENS = 1024
 OUTPUT_WATCH = 64  # derived: generate calls watched for identical outputs; each costs one small read
 LENS_STATS_BATCHES = 64  # derived: enough batches to average a sampler's varying graph sizes
 PHASE_STEPS = (
@@ -165,6 +171,40 @@ def _sample_prompts(args: tuple, kwargs: dict, n: int) -> tuple[tuple, dict]:
 		if k in kwargs:
 			kwargs[k] = cut(kwargs[k])
 	return tuple(args), kwargs
+
+
+def _cap_new_tokens(args: tuple, kwargs: dict, cap: int) -> tuple[tuple, dict, int | None, int | None]:
+	"""vLLM generate's sampling params with max_tokens at most cap, copied (the script's own objects
+	are left alone): (args, kwargs, the script's largest max_tokens, the cap applied or None when no
+	prompt asked for more). No sampling params means vLLM's default of 16 tokens: nothing to cap."""
+	args = list(args)
+	where = ("kw", None) if "sampling_params" in kwargs else ("arg", 1) if len(args) > 1 else (None, None)
+	sp = kwargs["sampling_params"] if where[0] == "kw" else args[1] if where[0] == "arg" else None
+	if sp is None:
+		return tuple(args), kwargs, None, None
+	many = isinstance(sp, list | tuple)
+	items = list(sp) if many else [sp]
+	asked = [getattr(x, "max_tokens", None) for x in items]
+
+	def over(a) -> bool:  # None: vLLM decodes to the model's context length, the longest of all
+		return a is None or (isinstance(a, int) and a > cap)
+
+	if not any(over(a) for a in asked):
+		return tuple(args), kwargs, None, None
+	out = []
+	for x, a in zip(items, asked, strict=True):
+		if over(a):
+			x = x.clone() if hasattr(x, "clone") else copy.copy(x)
+			x.max_tokens = cap
+		out.append(x)
+	new = out if many else out[0]
+	if where[0] == "kw":
+		kwargs = {**kwargs, "sampling_params": new}
+	else:
+		args[1] = new
+	# the script's own cap: None when any prompt had none (to the context length)
+	script = None if any(a is None for a in asked) else max(a for a in asked if isinstance(a, int))
+	return tuple(args), kwargs, script, cap
 
 
 def _lens_stats(batch) -> dict[str, float]:
@@ -1069,8 +1109,12 @@ class Recorder:
 			def generate(self_, *args, **kwargs):
 				rec._maybe_stop()
 				rec._gen_call_starts()
+				script_cap = probe_cap = None
 				if rec.generate_sample:
 					args, kwargs = _sample_prompts(args, kwargs, rec.generate_sample)
+					args, kwargs, script_cap, probe_cap = _cap_new_tokens(
+						args, kwargs, SERVING_PROBE_MAX_TOKENS
+					)
 				rec._sync()
 				t0 = rec._now()
 				rec._generating += 1  # beam_search calls generate once a step: those inner calls don't count
@@ -1082,16 +1126,19 @@ class Recorder:
 				with suppress(Exception):
 					sp = kwargs.get("sampling_params", args[1] if len(args) > 1 else None)
 					sp = sp[0] if isinstance(sp, list) and sp else sp
-					cap = getattr(sp, "max_tokens", None)
+					cap = script_cap if probe_cap else getattr(sp, "max_tokens", None)
 					lengths, trunc = [], []
 					for o in outs:
 						for c in o.outputs:
 							lengths.append(len(c.token_ids))
 							reason = getattr(c, "finish_reason", None)  # needs no cap to read
-							trunc.append(reason == "length" if reason is not None else None)
-					rec.gens.append(
-						{"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap, "backend": "vllm"}
-					)
+							# stopped at the probe's cap, not the script's: how it would have ended isn't known
+							cut = probe_cap and reason == "length" and len(c.token_ids) >= probe_cap
+							trunc.append(
+								None if cut else (reason == "length" if reason is not None else None)
+							)
+					rec.gens.append({"seconds": dt, "lengths": lengths, "truncated": trunc, "cap": cap,
+						"probe_cap": probe_cap, "backend": "vllm"})  # fmt: skip
 				rec.acc["generate"] += dt
 				if not rec._generating:
 					rec._gen_calls_done += 1
@@ -1634,6 +1681,15 @@ class Recorder:
 		known = [t for g in self.gens for t in g["truncated"] if t is not None]
 		if self.gens and known:  # how many sequences truncation_rate is over (those whose ending is known)
 			out["generation_ending_known"] = float(len(known))
+		probe_caps = [g["probe_cap"] for g in self.gens if g.get("probe_cap")]
+		if probe_caps:  # the serving probe stopped each reply at this many tokens, not the script's cap
+			out["serving_probe_max_tokens"] = float(max(probe_caps))
+			capped = [g for g in self.gens if g.get("probe_cap")]
+			n = sum(len(g["truncated"]) for g in capped)
+			# the share of replies still running at the cap, for B's extrapolation past it
+			cut = sum(1 for g in capped for t in g["truncated"] if t is None)
+			if n:
+				out["serving_probe_capped_fraction"] = cut / n
 		if self.checkpoints.get("saves"):
 			ck = self.checkpoints
 			out["checkpoint_saves_seen"] = ck["saves"]
