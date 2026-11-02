@@ -4,12 +4,13 @@
 
 When a probe fails with an error, Muse Spark searches the web (the Responses API's `web_search`
 tool) for known library or version issues that match it, and answers with at most 3 sources, or
-"no known issue found". Code keeps a source only if the response carries a `url_citation`
-annotation for its URL, and drops it if the model's attempt to open that page didn't complete. A
-source without one is dropped and counted (`search.dropped_unannotated`); if none survive, the
-answer is "no known issue found". That rests on Meta annotating only what its search returned,
-which D's validation checks with a planted made-up link (`scripts/spark_search_validate.py`); the
-cited links themselves are checked by hand there too.
+"no known issue found". Code keeps a source only if the search returned its URL: a `url_citation`
+annotation for it, or (asked for with `include`, Meta's documented format) an entry in the search
+call's `results`; and drops it if the model's attempt to open that page didn't complete. A source
+neither lists is dropped and counted (`search.dropped_unannotated`); if none survive, the finding
+says so. That rests on Meta listing only what its search returned, which D's validation checks
+with a planted made-up link (`scripts/spark_search_validate.py`); the cited links themselves are
+checked by hand there too.
 
 Matching is the model's judgement, held to a strict prompt: cite only a source about the same error
 in the same library, else answer none. That is checked by hand on the zoo's real failures
@@ -48,7 +49,9 @@ from preflight.schema.record import Citation, Evidence, Finding
 
 ERROR_CHARS = 2500  # guess: the end of the recorded error, the exception line and its last frames
 MAX_SOURCES = 3  # Chiya's spec (Nov 2): at most 3 sources
-MAX_TOOL_CALLS = 4  # guess: searches and page opens a question may make (the validation's used 1 to 4)
+# guess: searches and page opens a question may make (the validation's used 1 to 4); not in Meta's
+# docs, but taken without an error (d-spark-search-validate-2)
+MAX_TOOL_CALLS = 4
 # guess: US$2.50 per 1,000 web-search queries, second-hand (eesel.ai's summary of Meta's pricing page,
 # read Nov 2; Meta's own page not reached); billed on top of tokens, and the usage doesn't carry it
 SEARCH_USD_PER_QUERY = 2.50 / 1000
@@ -240,6 +243,20 @@ def _own(url: str) -> bool:
 	return any(host == h or host.endswith("." + h) for h in OWN_HOSTS)
 
 
+def returned(data: dict) -> dict[str, str]:
+	"""Every URL the search returned (`web_search_call.results`, sent back when the request asks
+	for them: Meta's documented way to see the sources the model considered, dev.meta.ai/docs/
+	search-grounding, read Nov 2): {as matched: as given}."""
+	got: dict[str, str] = {}
+	for item in data.get("output") or []:
+		if not isinstance(item, dict) or not str(item.get("type") or "").endswith("search_call"):
+			continue
+		for r in item.get("results") or []:
+			if isinstance(r, dict) and isinstance(r.get("url"), str):
+				got.setdefault(_exact(r["url"]), r["url"])
+	return got
+
+
 def annotations(data: dict) -> dict[str, str]:
 	"""Every URL the response carries a `url_citation` annotation for: {as matched: as given}."""
 	got: dict[str, str] = {}
@@ -339,7 +356,10 @@ def kept_sources(answer: Answer, data: dict, error_text: str = "") -> tuple[list
 	exactly that URL (stored as the annotation gives it), no failed open of it, nothing the error
 	text names (`named_keys`), not on Preflight's own host. None at all when the model opened a page
 	the error names off the public hosts: the error steered the search."""
-	got, bad, named = annotations(data), failed_opens(data), named_keys(error_text)
+	# what the search returned: the model's inline citations, and the results Meta lists (an answer
+	# ending in a JSON object may cite nothing inline: the second validation run had no annotations)
+	got = {**returned(data), **annotations(data)}
+	bad, named = failed_opens(data), named_keys(error_text)
 	if any(not _public(_host(u)) and _is_named(u, named) for u in opened(data)):
 		return [], list(answer.sources)  # a library's own page on a public host is a fair open
 	keep, dropped = [], []
@@ -396,7 +416,10 @@ def ground_failure(
 	body = {
 		"instructions": SYSTEM,
 		"input": user,
-		"tools": [{"type": "web_search"}],
+		# Meta's documented options (dev.meta.ai/docs/search-grounding): the low context size bounds
+		# the results added to the input; the include lists what the search returned
+		"tools": [{"type": "web_search", "search_context_size": "low"}],
+		"include": ["web_search_call.results"],
 		"max_tool_calls": MAX_TOOL_CALLS,
 	}
 	before = len(client.calls)

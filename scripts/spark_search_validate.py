@@ -24,6 +24,7 @@ from preflight.harness.search_grounding import (
 	final_text,
 	ground_failure,
 	parse_answer,
+	returned,
 	skipped,
 )
 from preflight.harness.spark import ModelClient
@@ -94,8 +95,11 @@ def main() -> None:
 			ans = parse_answer(text)
 			row["answer"] = ans.model_dump() if ans else None
 			row["annotated"] = sorted(annotated_urls(data))
+			# the search's own results list (asked for with `include`, Meta's documented format)
+			row["returned"] = sorted(returned(data).values())
 			bare = PLANTED.split("//", 1)[1]
 			row["planted_annotated"] = any(bare in u for u in row["annotated"])
+			row["planted_returned"] = any(bare in u for u in row["returned"])
 			# the check means something only if the planted link is in the reply at all
 			row["planted_in_reply"] = bare in text
 			row["planted_in_sources"] = bool(ans) and any(bare in s.url for s in ans.sources)
