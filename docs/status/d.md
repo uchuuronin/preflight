@@ -46,6 +46,19 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 16:19 UTC | none (Meta API) | about 1 | about 0.053 of Muse Spark [derived: tokens at list price; any search-tool fee unknown] | `d-spark-search-probe` (41480275641): `web_search` and `web_search_preview` both work, with `url_citation` annotations; no tool, no citations |
 | Nov 2, 16:52 UTC | none (Meta API) | about 2 | 0.107 of Muse Spark [derived: tokens at list price; any search-tool fee unknown] | `d-spark-search-validate` (41485593441): 8 calls on the zoo's failures, 1 source kept, 0 made up or irrelevant (`docs/decisions/spark-search.md`) |
 | Nov 2, 16:52 UTC | none (GitHub CPU runner) | about 3 | 0 | `d-watch-cpu-check` (41485598315): `preflight watch` on `zoo/notebook_tiny` on CPU works; no alert, as CLI records have no bands |
+| Nov 2, 17:20 UTC | A10 (both scripts) | about 11 (633 s of containers) | 0.19 [derived: container time at list price] | `d-lr-range-gpu` (41490183749): the range test on LoRA and nanoGPT, both train at the suggestion (`docs/decisions/lr-range.md`) |
+
+## Mon Nov 2, 12:35 ET (item 3: GPU check passed; A reviews, B and C next)
+
+CI on `f909ac3`: green, all seven jobs; the torch job ran the four new range-test tests (118 to 122 passed).
+
+`d-lr-range-gpu` (GitHub 41490183749, A10, US$0.19 [derived]) [measured]: LoRA suggests 7.9e-5 against its own 1e-4, diverges at 7.6e-3; nanoGPT suggests 2.5e-4 against its own 6e-4, diverges at 1.0. 50 steps held at the suggested rate didn't diverge on either (LoRA 1.287 to 1.216, nanoGPT 8.74 to 6.01); at the script's own rate, 1.215 and 6.03 by step 50. LoRA's two runs can't be told apart at 0.8 times the author's rate; nanoGPT starts slower and ends level. So the suggestion lands just below the authors' rates and didn't diverge in 50 steps (one seed); it's not better than them on these two scripts. nanoGPT's divergence is read late (only at the ramp's end, though its curve was unstable from about 0.4). Write-up: `docs/decisions/lr-range.md`. Item 3's spend: US$0.19 of its US$2.
+
+Check passed (the ramp applied on both, a suggestion that trains, divergence found). Its curve goes into the record, which the live guide (Muse Spark) reads, so C should check the data-use notice's probe-measurements wording covers it. Before the PM turns `probes.lr_range` on: A's review and A's redeploy. Asked of A (review), B (the guide) and C (the curve) in `from-d.md`.
+
+Fact-check (read-only, against the run's raw outputs): every number matched; it caught "steps" that were points kept, "barely diverged" for nanoGPT, "safe", "trains" and "level with" as overclaims, and a wrong reason for needing no data-use line. All corrected.
+
+This push sends: `docs/decisions/lr-range.md` (new), `docs/requests/from-d.md`, this file.
 
 ## Mon Nov 2, 12:20 ET (item 3: the LR range test, built behind `probes.lr_range`; GPU check next)
 
