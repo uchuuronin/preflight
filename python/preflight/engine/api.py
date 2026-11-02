@@ -1496,6 +1496,35 @@ def total_steps(record: FlightRecord, knob_values: dict | None = None) -> tuple[
 	return _total_steps(record, _values(record, knob_values))
 
 
+def _probe_dataset_len(record: FlightRecord, values: dict) -> float | None:
+	"""The training set's rows per epoch as the probes' loaders saw them (A's `train_dataset_len`), for a record
+	whose script map has none (C, Nov 1: the live LoRA record, written before the runner backfilled it). The same
+	rules as the runner's backfill (runner/pipeline.py `_with_dataset_size`, review, Nov 1): no patched probe (a
+	patch may subsample), an oom probe only past its first step (before it the latest loader may be an eval one), ok
+	before cached before oom. Not when the query packs differently from the probe: packing changes the row count."""
+	rank = {"ok": 0, "cached": 1, "oom": 2}
+	ps = sorted(
+		(
+			p
+			for p in record.probes
+			if p.status in rank
+			and not (p.extras or {}).get("patched")
+			and (p.status != "oom" or (p.steps or 0) >= 1)
+			and (p.extras or {}).get("train_dataset_len")
+		),
+		key=lambda p: rank[p.status],
+	)
+	if not ps:
+		return None
+	p = ps[0]
+	pv = _probe_values(record, p)
+	if "packing" in values and bool(values.get("packing")) != bool(pv.get("packing", values.get("packing"))):
+		return None
+	if values.get("packing") and values.get("seq_len") != pv.get("seq_len", values.get("seq_len")):
+		return None
+	return float(p.extras["train_dataset_len"])
+
+
 def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]:
 	sm = record.job.script_map
 	tr = sm.training if sm else None
@@ -1506,16 +1535,7 @@ def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]
 	epochs = values.get("epochs") or (tr.epochs if tr else None) or 1.0
 	n = values.get("n_examples") or (data.n_examples if data else None)
 	if not n:
-		# C, Nov 1: the live LoRA record's script map has no dataset size, but every probe recorded the training
-		# set's length as the script loaded it (A's `train_dataset_len`)
-		n = next(
-			(
-				p.extras["train_dataset_len"]
-				for p in record.probes
-				if p.status in (*OK_PROBE, "oom") and (p.extras or {}).get("train_dataset_len")
-			),
-			None,
-		)
+		n = _probe_dataset_len(record, values)
 	if not n:
 		return None, "the run's length isn't known: no max_steps, and no dataset size to divide by the batch"
 	per_step = (

@@ -1220,3 +1220,31 @@ def test_the_run_length_falls_back_on_the_probes_dataset_length():
 	steps, why = api.total_steps(rec)
 	assert why == "" and steps == pytest.approx(3170, abs=1)
 	assert api.predict(rec).root["time.total"].status != "abstain"
+
+
+def test_the_probe_dataset_length_follows_the_runner_s_rules():
+	"""Review, Nov 1: the fallback took the first probe in list order. Patched probes (a patch may subsample) and an
+	oom probe before its first step (its latest loader may be an eval one) don't count; ok comes first; a query that
+	packs differently from the probe abstains (packing changes the row count)."""
+	path = Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+	rec = FlightRecord.model_validate(json.loads(path.read_text()))
+
+	def with_probes(fn):
+		return rec.model_copy(update={"probes": [fn(p) for p in rec.probes]})
+
+	patched = with_probes(
+		lambda p: p.model_copy(update={"extras": {**p.extras, "patched": 1.0, "train_dataset_len": 64.0}})
+	)
+	assert api.total_steps(patched)[0] is None
+	eval_first = rec.model_copy(
+		update={
+			"probes": [
+				rec.probes[0].model_copy(
+					update={"steps": 0, "extras": {**rec.probes[0].extras, "train_dataset_len": 2000.0}}
+				),
+				*rec.probes[1:],
+			]
+		}
+	)
+	assert api.total_steps(eval_first)[0] == pytest.approx(3170, abs=1)
+	assert api.total_steps(rec, {"packing": True})[0] is None
