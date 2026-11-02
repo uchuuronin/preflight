@@ -35,7 +35,7 @@ Narration at about 2.5 words a second; every line is also a burned-in caption. A
 | 7b | (1:24) | The LoRA script checked in with `learning_rate=1e-3` (ten times its author's 1e-4); its cockpit's range-test curve: loss against learning rate, the script's rate marked past the curve's lowest point, the suggested rate marked lower down | "Set the learning rate ten times too high and a hundred quick steps on a rising rate show it: past the bottom of the curve. Preflight suggests one where the loss falls fastest." | "Learning-rate range test · measured on an A10" | **Needs by Tuesday noon:** B's re-check of the range test's fixes, `probes.lr_range` on and the runner redeployed (A, the PM), and C's curve in the cockpit; the GPU check passed (section below). About 10 s; it takes 9b's slot if 9b is cut, otherwise it's not in the 3-minute cut |
 | 8 | 1:26 | The guide panel: "Start the tour"; the guide proposes one knob move and moves it on the map; Accept | "Ask the guide, and Muse Spark moves the knobs that matter for your goal, one at a time, and you decide each move." | "Muse Spark (Meta)" | **Works now** (`c.guide.live` on). If the live guide is refused (its daily cap), the panel falls back to the rule-based tour: then drop the label and the line |
 | 9 | 1:40 | Scroll to the exports: the Slurm file, the run command, the Weights & Biases helper | "Take the plan with you: a batch file, the command, and your settings and predictions in Weights and Biases." | | **Works now** (`c.exports` on in `flags.production.json`) |
-| 9b | (1:50) | Terminal beside the cockpit: `preflight watch` running the real script; the cockpit's in-flight panel follows the live record; an alert line appears in both | "Run it for real and Preflight watches. The moment the run leaves its predicted band, it says so." | the app's "Predicted" band; no Meta model (no model call here) | **Needs B's GPU test.** `c.inflight` is on in production (PM, 4:25 PM). `watch` runs and streams on a CPU; no alert fired then because `preflight run` filled no predictions, which B has fixed (on `main`; steps below). Goes in only if ready by Tue Nov 3, noon ET, taking its 10 s from shot 13 if that's cut; otherwise not in the 3-minute cut |
+| 9b | (1:50) | Terminal beside the cockpit: `preflight watch` running the real script; the cockpit's in-flight panel follows the live record; an alert line appears in both | "Run it for real and Preflight watches. The moment the run leaves its predicted band, it says so." | the app's "Predicted" band; no Meta model (no model call here) | **Works on a GPU** (D's A10 check, Nov 2: both alerts fired with step 5's change; on a CPU the step alert can't fire). **Needs by Tue noon:** Chiya's laptop check, else Colab on a T4; otherwise cut (section below) |
 | 10 | 1:50 | Hard cut to the agent sample measured on Oct 31 (PF331): the agent map, then the caching finding open | "Not every job is a training run. Here a coding agent on Muse Spark ran 130 programming tasks through Preflight's proxy, and not one input token came from the cache." | "Agent eval on Muse Spark (Meta) · measured" · "0 of 905,739 input tokens from cache, 130 tasks, two runs" | **Works now** (sample PF331 says Measured; its record holds 0 of 246,463 for 30 tasks; the 130-task total is A's status, so it's a caption, not the screen) |
 | 11 | 2:05 | The GRPO sample measured on an L4 (PF510): the RL band | "In this GRPO run, 15 of 20 prompts had no reward spread at all, so they teach nothing." | "GRPO on an L4 · measured · 15 of 20 prompts with no reward spread" | **Works now** (sample PF510 says Measured; `engine.rl` on in `flags.production.json`) |
 | 12 | 2:15 | New flight with "Private mode" ticked; then the record of a private check-in: its triage finding | "For code that mustn't leave, private mode triages on Muse Glimmer, Meta's open weights, on our own GPU." | "Muse Glimmer (Meta's open weights, on Preflight's own GPU)" | **Needs by Tuesday:** one private check-in whose record shows a Glimmer triage finding; C posts its record id after today's deploy (Chiya, Nov 2). Done already: `harness.glimmer_private` is on in `main` (the PM's 5:15 merge, with C's data-use line) and in A's runner, which holds Glimmer's secret; the "Private mode" tick reaches the live site with C's deploy today. Glimmer's cold start is 5 to 8 min (A's runs), so check in ahead and film the record. If not ready, replace it with a captioned card over the agent sample: "The same 26 tasks: Muse Spark 23, Muse Glimmer 15, Muse Spark Open 14 ended on a tool call (measured, an upper bound on passes)", labelled "Muse Glimmer (Meta's open weights, on our own GPU)", and the line "We ran the same agent on Meta's open weights too, on our own GPU." (A's `a-pareto-*` runs; the card is a measured result, not a live-site flow) |
@@ -81,13 +81,45 @@ CPU), Nov 2; no spend) [measured]:
 record the CLI makes has bands, on any device (found by D's read-only review; asked of A in
 `from-d.md`). On a laptop today the shot can show the live record following the run, not an alert.
 
-**For the alert** (B's test first; Chiya films the same steps on a machine with an NVIDIA GPU, or
-the shot is cut). From a clone of the repository:
+**On a GPU it works: the steps below, checked on an A10** (`d-watch-gpu-9b`, GitHub 41539605466,
+Nov 2, 22:43 UTC, `ws-d` `406fa38`, US$0.10 [derived: 315 s of container at list price])
+[measured]:
+
+- The record got bands: its GPU setting is the card it ran on (A10), `time.step` measured at 1.4 to
+  2.2 ms a step, `memory.peak` 0.27 to 0.36 GiB. (On a CPU, `time.step` abstains: "the probes ran
+  without a known GPU".)
+- With step 5's change, **both alerts fired**: `step 201: peak memory 0.40 GiB, above the predicted
+  0.27–0.36 GiB`, then `step 401: 0.00329 s a step, above the predicted 0.0014–0.00216 s`, about
+  1.5 s into the run.
+- Speed: about 1,250 steps a second unchanged, 300 with the change, so about 18,000 changed steps
+  make a minute on an A10.
+- **One false alarm to know about:** the unchanged script, watched as a control, also alerted once:
+  `step 401: 0.000784 s a step, below the predicted 0.0014–0.00216 s`. The real run steps faster
+  than the probe's timed steps on this tiny model, so "below the band" fires with no change. Don't
+  film the unchanged run, and don't say the alert means something is wrong; it means the run left
+  its band. Told B.
+
+**The decision (Chiya, Nov 2, 17:33: "propose a way to film it on a real GPU run, or cut it";
+decide by Tue Nov 3, noon ET):**
+
+1. **First, your laptop's RTX 4070, 5 minutes:** steps 1 to 4. If step 4 prints a `time.step` range,
+   film there: a real GPU, a local file, the cockpit following it live. By the code it should: the
+   engine treats the card the probes ran on as no move even when it's outside its GPU table
+   (`_gpu_move` in `engine/api.py`), so the step time stays measured; that's read from the code,
+   not run on that card.
+2. **If it abstains: Colab with a T4** (free; the T4 is in the GPU table), steps 1 to 5 and 7 in
+   Colab's terminal. The alert lines appear live in that terminal; the cockpit can't follow a file
+   on Colab, so download the live record when it stops and open it in the in-flight panel (it reads
+   once), and caption that part "the run's record, opened after". Not checked on a T4.
+3. **If neither gives a step range by Tue noon: cut 9b** (its 10 s goes to 7b if that's ready, else
+   to shot 13 as planned).
+
+From a clone of the repository:
 
 1. `pip install -e ".[probe]"` (the repository isn't public until Nov 3 to 4; after that,
    `pip install "preflight[probe] @ git+https://github.com/uchuuronin/preflight"`).
 2. `mkdir film && cp zoo/notebook_tiny/tiny_train.py film/`, and in `film/tiny_train.py` set
-   `max_steps = 200000` (a guess for about a minute on a GPU; B's test sets the real number).
+   `max_steps = 18000` (about a minute on an A10 with step 5's change; another GPU differs).
 3. `preflight run film/tiny_train.py`: it prints the record's path, `records/<share>.json`.
 4. Check the record has bands (`preflight run` fills them since B's fix, on `main` from the
    PM's 4:25 PM merge, Nov 2):
@@ -98,21 +130,20 @@ the shot is cut). From a clone of the repository:
    (a tiny model's batch alone may not: memory is reserved in 2 MiB blocks and launch time
    dominates): in `film/tiny_train.py`, `nn.Linear(32, 256), nn.ReLU(), nn.Linear(256, 1)` to
    `nn.Linear(32, 8192), nn.ReLU(), nn.Linear(8192, 1)` and `batch_size = 64` to
-   `batch_size = 4096`. B's test confirms which change fires.
+   `batch_size = 4096`. On the A10 this fired both alerts (above).
 6. Open `https://preflight-cqn.pages.dev` in Chrome or Edge (they follow the file; other browsers
    read it once), go to the Logbook and open "Watch a real run" (needs `c.inflight` on in
    production).
 7. In a terminal beside it: `preflight watch records/<share>.json film/tiny_train.py --window 200`.
    It prints the live record's path (`records/<new>.json`). In the browser, choose that file (not
    the `.live.jsonl`); the cockpit follows it, rereading every 3 s.
-8. Expect `[preflight] step N: peak memory ... GiB, above the predicted ...` after the first
-   window, and `... s a step, above the predicted ...` after two windows running; the in-flight
-   panel shows the same alert. Film from step 7 to the alert.
+8. Expect `[preflight] step 201: peak memory ... GiB, above the predicted ...` after the first
+   window, and `step 401: ... s a step, above the predicted ...` after the second (as on the A10);
+   the in-flight panel shows the same alerts. Film from step 7 to the alerts.
 
-**Needs, in order:** B's GPU test (do steps 1 to 8 give bands and an alert, which change fires,
-how many steps make about a minute); `c.inflight` on in production (on since the PM's 4:25 PM
-merge, Nov 2; live once C deploys); then Chiya's take. The stopgap step is gone: `preflight run`
-fills predictions (B's fix, on `main`).
+**Needs, in order:** the laptop check (decision step 1), else Colab; `c.inflight` on in production
+(on since the PM's 4:25 PM merge, Nov 2; live once C deploys); then Chiya's take. The GPU test is
+done (above), and the stopgap step is gone: `preflight run` fills predictions (B's fix, on `main`).
 
 ## Before filming (Tue Nov 3, evening)
 

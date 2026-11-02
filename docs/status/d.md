@@ -13,6 +13,11 @@
 | B11 | 16:30 | The PM's 4:25 list gives D "A's review items on search grounding": fixed (no retries on `/responses`, the search fee recorded, `max_tool_calls` 4, at most 2 searches a job and none started after 120 s, the error text marked as data and its own addresses and Preflight's host never cited, the exact annotated URL stored); flag still off | The PM's order; A's six items | none yet | Revert the commit |
 | B12 | 16:30 | The search fee is US$2.50 per 1,000 queries, cited from eesel.ai's summary of Meta's pricing page, not Meta's own page (my fetch can't reach it) | Recording $0 for a fee we know exists is worse than a cited figure; the tag says where it's from | none | Change `SEARCH_USD_PER_QUERY` |
 | B13 | 16:30 | Shot 9b's stopgap step (filling predictions by hand) replaced by a check that the record has bands, after B's CLI fix reached `main`; checked on a CPU (memory band yes, step-time band no) | The 12:53 list's "the in-flight steps once B's GPU test and the CLI predictions fix land": the fix landed; B's GPU test of the shot's own script hasn't | none | Restore the step from git |
+| B14 | 17:35 | The planted-rate run's container capped at 27 min (US$0.495 at the A10's list price); 100 held steps, not 50 | Chiya's US$0.50 cap; 100 steps show a gap 50 might not | US$0.14 spent | None needed |
+| B15 | 17:40 | Search's third try used Meta's documented format (`include` the searches' results, low context); a source counts when a search's `results` list it | Meta's search-grounding page documents it; annotations are only inline citations | US$0.148 | Drop `include` and the results check |
+| B16 | 17:45 | Shot 7b (the planted bad rate) added to the video plan, needing the flag on and C's curve by Tue noon | It caught the rate and suggested a sane one, Chiya's condition | none | Remove the row |
+| B17 | 17:45 | Ran shot 9b's own steps on an A10 myself (`watch_gpu_app.py`, an ephemeral app like the range test's) rather than wait for B | Chiya asked for a proposal by Tue noon; a checked proposal beats a guessed one; under US$0.33 | US$0.10 | None needed |
+| B18 | 17:50 | Shot 9b proposal: film on Chiya's laptop GPU if its record gets a step range, else Colab on a T4 with the record opened after, else cut | The A10 check shows a GPU record gets the bands and both alerts fire | none | Cut 9b |
 | B1 | 12:55 | Merged `main` `7ba177b` into `ws-d` (no conflicts) | The PM's "main is ready" (12:53) | none | Revert the merge commit |
 | B1b | 13:20 | Merged `main` `12058ca` into `ws-d`; one conflict in `runner/sources.py` (A's new `data` parameter for `probes.repo_install` against my `_git_read`/`_clone_read`), kept both | The PM's 1:15 "main is ready" | none | Revert the merge commit |
 | B2 | 13:00 | Big repositories (Chiya's new item 1) are read as the entry point plus its import closure only with a new flag, `runner.read_closure` (off); with it off, the refusals now say how big the source is and carry `submission.too_large`, not `syntax_error` | Her 11:15 rule: runner and harness changes behind new flags, off, for A's one redeploy. The message fix is a plain bug fix, so it isn't flagged | none | Leave the flag off, or revert the commit |
@@ -64,6 +69,38 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 18:21 UTC | none (Meta API) | about 2 | 0.110 of Muse Spark [derived: tokens at list price] | `d-bigrepo-spark-map` (41499720563): Muse Spark's script map on the three big repositories, flag on |
 | Nov 2, 21:24 UTC | A10 (both scripts) | about 10 (596 s of containers) | 0.18 [derived: container time at list price] | `d-lr-range-gpu-2` (41528070349): the range test with the new "checked"; both scripts checked, the same suggestions (`docs/decisions/lr-range.md`) |
 | Nov 2, 21:37 UTC | none (Meta API) | about 1 | 0.142 of Muse Spark [derived: tokens at the list and cached rates plus 18 searches' fee, US$0.045, at US$2.50 per 1,000, second-hand] | `d-spark-search-validate-2` (41529989287): the fixed search on the same cases; Meta takes `max_tool_calls`; no annotations this time, so the known issue's three sources were dropped (`docs/decisions/spark-search.md`) |
+| Nov 2, 22:36 UTC | A10 | about 8 (469 s of container) | 0.14 [derived: container time at list price] | `d-lr-range-planted-1e-3` (41538650072): the LoRA script at 1e-3; caught past the curve's lowest point (`docs/decisions/lr-range.md`) |
+| Nov 2, 22:36 UTC | none (Meta API) | about 1 | 0.148 of Muse Spark [derived: tokens at the list and cached rates plus the search fee, second-hand] | `d-spark-search-validate-3` (41538652971): Meta's documented format; results on every search, the known issue kept 2 sources |
+| Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
+| Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
+
+## Mon Nov 2, 17:50 ET (Chiya's 17:33 and 17:39: a planted bad rate, search's citations, shot 9b)
+
+1. **Range test, a planted bad rate** (LoRA at 1e-3, ten times its author's; A10, US$0.14 of the
+   US$0.50 cap): caught. The script's rate sits past the curve's lowest point, 12.6 times the
+   suggestion (7.9e-5, 0.8 times the author's own). 100 held steps: no blow-up at 1e-3, but its
+   loss stayed above the suggested rate's in every 10-step block after the first, by 0.02 to 0.05.
+   Added to the video plan as shot 7b; it needs the flag on and C's curve by Tue noon.
+2. **Search grounding's citations.** Third try, Meta's documented format: results came back on
+   every search; still no inline citations; the known issue kept 2 sources from the results.
+   Chiya, 17:39: log per request whether a search happened, and re-run once with the first run's
+   request. Done: every request had a `web_search_call`; with the first run's request, inline
+   citations came back (2, both kept). The one case that can cite made exactly 4 tool calls,
+   the cap I'd added, in both runs without citations, and 5 and 7 in the two runs with them: the
+   cap is the likely cause (one case, so a hypothesis). Not "stays off for no citations": it works
+   on Meta's API; off until B's re-check and C's data-use line. Search spend today: about US$0.62
+   [derived, fee second-hand].
+3. **Shot 9b on a GPU** (A10, US$0.10): the record gets a step range there, and step 5's change
+   fires both alerts within about 1.5 s; about 18,000 changed steps make a minute. One false
+   "below the band" alert on the unchanged control (told B). Proposal: Chiya's laptop GPU first
+   (by the code its record should get a step range), else Colab on a T4, else cut, by Tue noon.
+4. B re-checks my fixes instead of A: both requests moved to B.
+
+This push sends: `python/preflight/harness/search_grounding.py` (the documented format, the trace,
+the first shape), `scripts/spark_search_validate.py`, `python/preflight/runner/lr_range_app.py`
+(`--lr`, `--confirm-steps`), `python/preflight/runner/watch_gpu_app.py` (new),
+`tests/test_d_search_grounding.py`, `docs/decisions/spark-search.md`, `docs/decisions/lr-range.md`,
+`docs/demo/video-plan.md` (shots 7b and 9b), `docs/requests/from-d.md`, this file.
 
 ## Mon Nov 2, 16:45 ET (both re-runs: the range test checked on a GPU; search's request checked on Meta's API)
 
