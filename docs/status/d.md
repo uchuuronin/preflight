@@ -6,7 +6,40 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 
 | Date | GPU | Minutes | Dollars | What |
 |---|---|---|---|---|
-| | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
+| Nov 2, 02:56 UTC | L4 (asked) | about 20 (cap) | at most about 0.60 [guess]; 0.0179 of Muse Spark by the record | `d-eval-sweep-l4` (GitHub 41380341849): cancelled while probing, no measurement |
+| Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
+| Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
+
+## Mon Nov 2, 00:15 ET (the eval-sweep record measured on an A10; a notebook that trains for A)
+
+`56a2d32` CI green. Merged `main` `cfcf83c`. `197e650` CI **red**: ruff formats notebooks too, and
+the new `train_mlp.ipynb` had spaces; fixed (formatted, its recorded conversion regenerated, both
+notebook suites and the CPU probe re-run), in this push.
+
+- **Eval-sweep record, item 19: done on the third try**, on an A10 (Chiya allowed an A10 or the L40S
+  for one more try under $1). `d-eval-sweep-a10` (GitHub 41391396558), record
+  `01M6DA13XWGBRY2X5P2XHMP9TS`: one probe, ok, 177.9 s on the A10, after 83.8 s waiting for the GPU
+  (the recorder's `gpu_wait_s`) [measured]. It caught the planted no-thinking-cap bug: "8 of 16
+  generated sequences ran to max_new_tokens=2048 without ending (95% interval 28%–72%)"
+  (`generation.truncated`) [measured], beside the static `eval.activation_dump`. Every estimate
+  abstains (the record's reasons: no probe timed a step; fewer than two probe sizes). Cost by the record: US$0.1203 (US$0.0545 GPU [derived:
+  GPU seconds at list price], US$0.0470 sandbox [guess rate], US$0.0189 model calls [measured]).
+  Committed as `zoo/eval_sweep_reasoning/record_nov2_a10.json` with a placeholder share token, as A
+  does. The two L4 runs stay unexplained (one cancelled while probing, one `recorder` after
+  1,280 s); A is adding a "waiting for a GPU" event. Item 19's spend in all: at most about US$1.36
+  [guess: the first L4 run's GPU time is unknown].
+- **Modal logs:** I can't read them; my only way in is `remote-run.yml`, and a log-reading script
+  would be a new kind of run. Told Chiya where to look in the dashboard.
+- **`d.notebook`:** A's check-in showed notebooks are converted and run; it used a fixture with no
+  optimizer, so `too_few_steps` was right. New fixture `train_mlp.ipynb` (a small MLP, an AdamW
+  step every batch, no downloads); A's converter's output is recorded beside it, both notebook test
+  suites pass, and the converted script probes cleanly on a CPU (three probes ok) [measured]. A has
+  the command to run it through the deployed runner. The README draft's notebook rows say so.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the notebook formatting fix, the eval-sweep record and this entry.
+
+Cloud runs: `d-eval-sweep-a10` (above), A10, US$0.12 by the record.
 
 ## Sun Nov 1, 22:50 ET (eval-sweep record: two runs, no measurement; stopped and asked)
 
