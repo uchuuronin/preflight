@@ -135,3 +135,12 @@ def test_a_training_memory_fix_reads_trainings_peak_before_the_windows_eval():
 		"tokens_per_step": 8192, "train_peak_before_eval_bytes": 60 * GIB}})  # fmt: skip
 	res = check(before, after)
 	assert res["before"] == 80 * GIB and res["after"] == 60 * GIB and res["checks"][0]["ok"] is True
+
+
+def test_a_training_fix_is_judged_on_training_when_the_windows_eval_runs_out_both_times():
+	def side(train_peak):
+		return record(probe={"status": "oom", "error_code": "oom.eval", "memory": {"peak_allocated_bytes": 99 * GIB},
+			"extras": {"samples_per_step": 4, "tokens_per_step": 8192, "train_peak_before_eval_bytes": train_peak}})  # fmt: skip
+
+	res = check(side(80 * GIB), side(60 * GIB))
+	assert res["checks"][0]["ok"] is True and res["before"] == 80 * GIB and res["after"] == 60 * GIB

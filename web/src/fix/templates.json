@@ -14,7 +14,7 @@
 				"gnn"
 			],
 			"knob": "eval_no_grad",
-			"metric": "memory.peak",
+			"metric": "memory.eval_peak",
 			"needs_value": false,
 			"verifiable": true
 		},
@@ -30,7 +30,7 @@
 				"gnn"
 			],
 			"knob": "eval_batch_size",
-			"metric": "memory.peak",
+			"metric": "memory.eval_peak",
 			"needs_value": true,
 			"verifiable": true
 		},

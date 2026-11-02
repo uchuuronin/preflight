@@ -647,7 +647,7 @@ def test_the_fix_running_out_at_the_eval_says_the_eval_still_ran_out(tmp_path):
 	runner = LossRunner(outcomes={"v1": ("oom", "oom.eval")})
 	rec = run_pipeline(_on(parent, "verify", knobs={"eval_batch_size": 16}), _Ctx(), _deps(tmp_path, runner))
 	f = rec.findings[-1]
-	assert f.code == "verify.failed" and "eval still ran out" in f.title
+	assert f.code == "verify.failed" and f.title == "The eval ran out of memory with the change"
 
 
 def test_a_probes_eval_off_rerun_runs_the_patched_code(tmp_path):
@@ -671,3 +671,17 @@ def test_trainings_peak_before_the_eval_reaches_the_probes_extras():
 
 	assert _extras({"train_peak_before_eval_bytes": 7.5e9})["train_peak_before_eval_bytes"] == 7.5e9
 	assert "train_peak_before_eval_bytes" not in _extras({"train_peak_before_eval_bytes": None})
+
+
+def test_a_training_knobs_verify_runs_no_extra_eval():
+	"""Review, Nov 2: an eval pulled into a batch-size verify would fail it on a script whose eval runs
+	out at both settings, which is the record's own problem, not the change's."""
+	import tempfile
+
+	with tempfile.TemporaryDirectory() as d:
+		parent = _eval_parent(Path(d))
+		runner = LossRunner()
+		run_pipeline(_on(parent, "verify", knobs={"batch_size": 4}), _Ctx(), _deps(Path(d), runner))
+		assert all(
+			"eval_every = 200\n" in c["files"]["train.py"] and c["eval_batches"] == 0 for c in runner.calls
+		)

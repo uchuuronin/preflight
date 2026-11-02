@@ -85,6 +85,13 @@ def verify_race(only: str = "", attempt: str = "a") -> None:
 
 	race = json.loads(RACE.read_text())
 	cands = [c for c in race["candidates"] if not only or c["id"] in only.split(",")]
+	# Fixes race only on the first one's metric, as the web's candidates.ts: an eval fix's eval peak
+	# and a training fix's training peak aren't the same number (review, Nov 2).
+	first = verify_options(cands[0]["template_id"])["metric"] if cands else None
+	dropped = [c["id"] for c in cands if verify_options(c["template_id"])["metric"] != first]
+	cands = [c for c in cands if c["id"] not in dropped]
+	if dropped:
+		print(f"not raced (another metric than {first}): {', '.join(dropped)}", flush=True)
 	svc = modal.Cls.from_name("preflight-runner", "JobStoreService", environment_name="main")()
 	vol = modal.Volume.from_name("preflight-records", environment_name="main")
 	spent, results = 0.0, []
@@ -155,10 +162,7 @@ def verify_race(only: str = "", attempt: str = "a") -> None:
 		results.append(out)
 		print(json.dumps(out, indent=1), flush=True)
 	passed = [r for r in results if (r.get("verify") or {}).get("status") == "passed"]
-	# The winner: a passing fix with the lowest memory after it, compared only on one metric (an
-	# eval fix's eval peak and a training fix's training peak aren't the same number).
-	metric = passed and min(passed, key=lambda r: r["verify"]["after"] or float("inf"))["verify"]["metric"]
-	same = [r for r in passed if r["verify"]["metric"] == metric]
-	winner = min(same, key=lambda r: r["verify"]["after"] or float("inf")) if same else None
+	# The winner: a passing fix with the lowest value after it, all on one metric (above).
+	winner = min(passed, key=lambda r: r["verify"]["after"] or float("inf")) if passed else None
 	print(json.dumps({"spent_usd": round(spent, 4), "winner": winner and winner["id"],
 		"results": [{k: r.get(k) for k in ("id", "template_id", "job_status", "usd")} | {"verify": (r.get("verify") or {}).get("status")} for r in results]}, indent=1))  # fmt: skip

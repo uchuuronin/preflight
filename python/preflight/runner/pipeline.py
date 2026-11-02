@@ -631,11 +631,19 @@ def _followup_plan(rec: FlightRecord, mode: str, knobs: dict, plan_knobs: dict, 
 		plan.append(point_probe(rec, f"{vid}-seed", base, role="verify_seed", **steps))
 	from preflight.probes.plan import pull_verify_eval
 
+	# A patch (a fix may touch the eval) or an eval knob changed: every side ends with one eval, so
+	# an eval fix reads before and after. A training knob's verify stays as it was: an eval running
+	# out at both settings would be the record's own problem, not the change's (review, Nov 2).
+	eval_change = patched or any(k in EVAL_KNOBS for k in differs)
 	for p in plan:
 		p.seed = record_jobs.VERIFY_SEED_2 if p.role == "verify_seed" else record_jobs.VERIFY_SEED
 		p.seed_force = True
-		pull_verify_eval(rec, p)  # every side, so an eval fix reads before and after
+		if eval_change:
+			pull_verify_eval(rec, p)
 	return plan
+
+
+EVAL_KNOBS = ("eval_batch_size", "eval_no_grad", "eval_every")
 
 
 # N_TRAIN_NODES, NUM_TRAIN_SAMPLES, N_TRAIN: counts of training rows only, never NUM_TRAIN_EPOCHS or

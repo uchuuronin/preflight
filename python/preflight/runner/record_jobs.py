@@ -192,7 +192,9 @@ def verify_finding(
 	if _eval_oom(plan):
 		# A's verify design (Nov 1): the window ends with one eval on every side, and running out
 		# there is the side's result, never re-run with the eval off
-		return finding("error", "verify.failed", "The eval still ran out of memory with the change",
+		both = base is not None and _eval_oom(base)
+		return finding("error", "verify.failed",
+			"The eval ran out of memory with and without the change" if both else "The eval ran out of memory with the change",
 			detail=plan.error or "oom.eval",
 			evidence=[Evidence(metric="probe.eval.peak_allocated_bytes",
 				value=plan.eval.peak_allocated_bytes if plan.eval else None, probe_id=plan.id)])  # fmt: skip
