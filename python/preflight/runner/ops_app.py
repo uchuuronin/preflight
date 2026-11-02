@@ -353,7 +353,10 @@ def smoke(
 		if nb.suffix != ".ipynb" or Path(__file__).resolve().parents[3] not in nb.parents:
 			raise SystemExit(f"{notebook!r} isn't an .ipynb file in this checkout")
 		source = {"kind": "notebook", "files": {nb.name: nb.read_text()}}
-	if dir:  # any directory in this checkout, checked in as a visitor's upload (Monday's unseen scripts)
+	if (entrypoint or args) and not dir:
+		raise SystemExit("--entrypoint and --args go with --dir (a sample or notebook names its own)")
+	if dir:  # any directory in this checkout, checked in as a visitor's upload (Monday's unseen scripts);
+		# _read_tree reads the text files the runner reads (data files such as .csv aren't sent)
 		from preflight.runner.sources import _read_tree
 
 		root = Path(__file__).resolve().parents[3]
@@ -484,12 +487,13 @@ GT_FUNCTIONS = {
 
 def _split_args(args: str) -> list[str]:
 	"""A script's arguments from one flag value. remote-run.yml's command allows no quotes, so
-	`--args=--epochs=1,--lr=3e-4` (commas, no spaces) is the form that gets through it; a value with
-	spaces is split as a shell would."""
+	`--args=--epochs=1,--lr=3e-4` (commas, no spaces) is the form that gets through it, and `,,` a
+	comma inside a value; a value with spaces is split as a shell would."""
 	import shlex
 
 	if "," in args and " " not in args:
-		return [a for a in args.split(",") if a]
+		# ",," is a comma inside a value (--layers=1,,2,,3 gives --layers=1,2,3): a single comma separates
+		return [a.replace("\0", ",") for a in args.replace(",,", "\0").split(",") if a]
 	return shlex.split(args)
 
 
