@@ -76,7 +76,7 @@ from preflight.schema.script_map import ScriptMap
 
 from . import record_jobs
 from .records import RecordReader, RecordWriter
-from .sources import Fetched, fetch
+from .sources import Fetched, extra_lines, fetch
 from .worker import JobContext, PermanentError
 
 log = logging.getLogger("preflight.pipeline")
@@ -149,6 +149,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"seed_force": spec.seed_force,
 		"install_requirements": spec.install_requirements,
 		**({"install_repo": True} if spec.install_repo else {}),  # absent: keys stay as they were
+		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
@@ -303,6 +304,7 @@ def _spec(
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
 		install_repo=deps.install_requirements and _repo_install_on(),
+		extra_packages=extra_lines(fetched.source) if deps.install_requirements else (),
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
@@ -402,6 +404,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if source.get("kind") == "record":
 		origin = record_jobs.resolve(source, reader=deps.reader, blobs=deps.blobs)
 		source = origin.fetch_source
+	if req.extra_packages:  # 0.6.3: checked against the list by fetch, and kept on the record's source
+		# added to the record's own (a probe from a record that already installs some), in order, once each
+		had = source.get("extra_packages") or []
+		source = {**source, "extra_packages": list(dict.fromkeys([*had, *req.extra_packages]))}
 	_emit(ctx, "fetching")
 	fetched = fetch(source, blobs=deps.blobs)
 	if origin is not None and origin.parent is not None:
@@ -421,6 +427,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if followup and origin.parent is not None:
 		# the parent's map and knobs carry over (no Muse Spark call): a new record, same script
 		rec = record_jobs.derive(origin.parent, ids)
+		if fetched.source.extra_packages != rec.job.source.extra_packages:  # this job added packages
+			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
+			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
 		sm = rec.job.script_map or values_from_args(
 			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
 		)
@@ -781,9 +790,9 @@ def _reading_findings(fetched: Fetched) -> list:
 			else ""
 		)
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
-			title="Read the entry point and what it imports, not the whole repository",
-			detail=(f"The repository has {p['repo_files']:,} text files ({_mb(p['repo_bytes'])}), more than Preflight "
-				f"reads whole, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
+			title="Read the entry point and what it imports, as asked" if p.get("asked")
+				else "Read the entry point and what it imports, not the whole repository",
+			detail=(f"{_why_partial(p)}, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
 				f"({_mb(p['bytes'])} in all){left}. The map and the findings cover what was read, and the probes run "
 				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
 			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
@@ -800,6 +809,13 @@ def _reading_findings(fetched: Fetched) -> list:
 				f"it imports ({_mb(m['bytes'])}). Settings in other files aren't on the map."),
 			evidence=[Evidence(metric="map.files_read", value=float(m["files"]))]))  # fmt: skip
 	return out
+
+
+def _why_partial(p: dict) -> str:
+	size = f"{p['repo_files']:,} text files ({_mb(p['repo_bytes'])})"
+	if p.get("asked"):  # Source.scope "entrypoint"
+		return f"You asked Preflight to start from the entry point (the source has {size})"
+	return f"The repository has {size}, more than Preflight reads whole"
 
 
 def _triage_client(deps: Deps, private: bool):
@@ -1078,7 +1094,8 @@ def _probe_points(
 			# an import that failed before the first step fails the same way at every point: skip the
 			# rest and their triage (unseen runs, Nov 2: three probes and three paid triage calls each)
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
-				error=f"skipped: the script couldn't import a package (see {gone.id})", error_code="missing_package"))  # fmt: skip
+				error=f"skipped: the script couldn't import a package (see {gone.id})", error_code="missing_package",
+				missing_module=gone.missing_module, missing_package=gone.missing_package))  # fmt: skip
 			continue
 		if any(q.error_code == "missing_package.install" for q in probes):
 			# the same requirements fail the same way at every point: don't pay for it again

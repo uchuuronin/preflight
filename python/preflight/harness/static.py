@@ -54,7 +54,7 @@ class ScriptParseError(ValueError):
 class SourceTooLarge(ScriptParseError):
 	"""The entry point alone is more Python than the static reader reads: not a syntax error."""
 
-	code = "submission.too_large"
+	code = "map.too_large"
 
 
 def mapped_files(
@@ -65,7 +65,7 @@ def mapped_files(
 	other text files (harness/closure.py; D, Nov 2: torchtune's repository is over 2 MB of Python).
 	The second value says what was left out, or None when nothing was. The closure needs
 	runner.read_closure on (`closure`, default: the flag); off, over the budget is refused, saying
-	how big it is (a SourceTooLarge, code submission.too_large, never a syntax error)."""
+	how big it is (a SourceTooLarge, code map.too_large, never a syntax error)."""
 	py = {p: s for p, s in files.items() if p.endswith(".py")}
 	sizes = {p: len(s.encode("utf-8", "surrogatepass")) for p, s in py.items()}
 	total = sum(sizes.values())

@@ -203,6 +203,8 @@ class ProbeSpec:
 	# probes.repo_install: with no requirements.txt, install what the repo declares and the known
 	# packages it imports, and put a src/ layout on the path (recorder/requirements.repo_requirements)
 	install_repo: bool = False
+	# JobRequest.extra_packages (0.6.3): the lines to install beside the requirements (a list's own pins)
+	extra_packages: tuple[str, ...] = ()
 	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
 	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
@@ -244,7 +246,9 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 	if entrypoint not in files:
 		raise InvalidSubmission(f"the entrypoint {entrypoint!r} is not among the submitted files")
 	if len(files) > MAX_FILES:
-		raise InvalidSubmission(f"{len(files)} files submitted; the limit is {MAX_FILES} files")
+		raise InvalidSubmission(
+			f"{len(files)} files submitted; the limit is {MAX_FILES} files", code="submission.too_large"
+		)
 	total = 0
 	for rel, text in files.items():
 		p = PurePosixPath(rel)
@@ -263,12 +267,14 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 			) from None
 		if size > MAX_FILE_BYTES:
 			raise InvalidSubmission(
-				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB"
+				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB",
+				code="submission.too_large",
 			)
 		total += size
 	if total > MAX_TOTAL_BYTES:
 		raise InvalidSubmission(
-			f"submission is {total / 2**20:.1f} MB; the cap is {MAX_TOTAL_BYTES // 2**20} MB"
+			f"submission is {total / 2**20:.1f} MB; the cap is {MAX_TOTAL_BYTES // 2**20} MB",
+			code="submission.too_large",
 		)
 
 
@@ -662,6 +668,37 @@ def _rl(raw: dict | None) -> RLSignals | None:
 	return RLSignals(**raw)
 
 
+# the recorder's missing-import messages (recorder/errors.py): "The script imports X, which is not installed",
+# and a library's own check, "A library in the script needs X, which is not installed" (X a PyPI name there)
+_MISSING = re.compile(r"The script imports ([A-Za-z_][A-Za-z0-9_.]{0,199}), which is not installed")
+_NEEDS = re.compile(
+	r"A library in the script needs ([A-Za-z0-9][A-Za-z0-9._-]{0,99}), which is not installed"
+)
+
+
+def _missing(code: str | None, error: str | None) -> dict:
+	"""Probe.missing_module and .missing_package (0.6.3) for a missing import: the module as Python named
+	it, and the PyPI name on Preflight's list that provides it (absent when it isn't on the list)."""
+	if code != "missing_package" or not error:
+		return {}
+	from preflight.recorder.requirements import known_packages, package_for_module
+
+	m = _MISSING.search(error)
+	if m is not None:
+		mod = m.group(1).rstrip(".")
+		pkg = package_for_module(mod)
+		return {"missing_module": mod, **({"missing_package": pkg} if pkg else {})}
+	m = _NEEDS.search(error)  # a PyPI name: on the list, it's both (accelerate asked for by Trainer)
+	if m is None:
+		return {}
+	name = m.group(1).rstrip(".")
+	line = known_packages().get(re.sub(r"[-_.]+", "-", name).lower())
+	return {
+		"missing_module": name,
+		**({"missing_package": re.match(r"[A-Za-z0-9._-]+", line)[0]} if line else {}),
+	}
+
+
 def _probe_model(
 	spec: ProbeSpec,
 	status: str,
@@ -689,6 +726,7 @@ def _probe_model(
 		duration_s=round(duration, 3),
 		error=error,
 		error_code=code,
+		**_missing(code, error),
 		memory=Memory(
 			peak_allocated_bytes=mem.get("peak"),
 			peak_reserved_bytes=mem.get("reserved"),
@@ -902,6 +940,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"lr_range": spec.lr_range,
 				"install_requirements": spec.install_requirements,
 				"install_repo": spec.install_repo,
+				"extra_packages": list(spec.extra_packages),
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,
 			}

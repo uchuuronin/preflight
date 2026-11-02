@@ -92,7 +92,7 @@ def test_an_entry_point_over_the_budget_alone_is_refused_accurately():
 		ScriptParseError, match=r"big\.py alone is .* MB of Python, more than Preflight maps"
 	) as exc:
 		mapped_files({"big.py": "x = 1\n" * 600_000}, "big.py")
-	assert exc.value.code == "submission.too_large"
+	assert exc.value.code == "map.too_large"  # 0.6.3: the map's limit, not the read limit (C)
 
 
 def test_the_record_says_what_was_read(closure_on):
@@ -117,7 +117,7 @@ def test_with_the_flag_off_over_the_budget_is_refused_saying_how_big():
 	files = {**REPO, **{f"vendor/m{i}.py": pad * 100 for i in range(25)}}
 	with pytest.raises(ScriptParseError, match=r"the source is 2\.\d\d MB of Python in 34 files") as exc:
 		map_static(files, entrypoint="train.py")
-	assert exc.value.code == "submission.too_large"
+	assert exc.value.code == "map.too_large"  # 0.6.3: the map's limit, not the read limit (C)
 
 
 def test_a_hostile_dotted_name_stays_cheap():
@@ -176,7 +176,7 @@ def test_a_non_python_entry_point_over_the_budget_is_refused_saying_why(closure_
 	files = {"launch.sh": "python train.py\n", **{f"m{i}.py": pad * 100 for i in range(25)}}
 	with pytest.raises(ScriptParseError, match=r"launch\.sh isn't a Python file") as exc:
 		mapped_files(files, "launch.sh")
-	assert exc.value.code == "submission.too_large"
+	assert exc.value.code == "map.too_large"  # 0.6.3: the map's limit, not the read limit (C)
 
 
 def test_a_module_beats_a_folder_of_the_same_name_without_init():

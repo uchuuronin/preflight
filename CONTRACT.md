@@ -1,4 +1,4 @@
-# Preflight contract v0.6.2
+# Preflight contract v0.6.3
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,14 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.3 (Nov 2, additive; C's check-in help, Chiya's go): `JobRequest.extra_packages` (up to 10 PyPI
+  names from Preflight's list, `recorder.requirements.known_packages()`; installed after the code's own
+  requirements, wheels only, the image's stack pinned; a name off the list fails the job with
+  `missing_package.not_allowed`, or `.no_wheels`), kept on the record as `Source.extra_packages`;
+  `Source.scope` (`repo` or `entrypoint`: read only the entry point, the source's own modules it imports and
+  its requirements files, at any size); `Probe.missing_module` and `Probe.missing_package` on a missing
+  import. New job code `map.too_large` for the map's 2 MB (was `submission.too_large`, which now means only
+  the read limit). 0.6.2 records load unchanged.
 - 0.6.2 (Nov 1, additive; C's request, approved by Chiya): `JobRequest.private` (default false). The
   visitor chose private mode: with `harness.glimmer_private` on, triage runs on Muse Glimmer on
   Preflight's own GPU (B's Modal host) instead of Muse Spark Open on Baseten. 0.6.1 records load unchanged.

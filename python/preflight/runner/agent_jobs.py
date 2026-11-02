@@ -131,10 +131,15 @@ def sandbox_sampler(create_sandbox, upstream: str, api_key: str, *, rate=None, f
 				)  # off until checked
 				repo = flag("probes.repo_install") if install_repo is None else install_repo
 
+				from .sources import extra_lines
+
+				extra = list(extra_lines(getattr(fetched, "source", None)))  # JobRequest.extra_packages
+
 				def launch(env):
 					return _SandboxProc(sb, {"files": fetched.files, "entrypoint": fetched.entrypoint,
 						"args": list(fetched.args or []), "env": env, "timeout_s": limit,
-						**({"keep_error": True} if keep else {}), **({"install_repo": True} if repo else {})})  # fmt: skip
+						**({"keep_error": True} if keep else {}), **({"install_repo": True} if repo else {}),
+						**({"extra_packages": extra} if extra else {})})  # fmt: skip
 
 				return run_sample(None, cwd=None, proxy=proxy, population=getattr(agent, "n_tasks", None), k=k,
 					skip_keys=skip_keys, offered_first=tuple(offered_first), run_id=run_id, timeout_s=limit,

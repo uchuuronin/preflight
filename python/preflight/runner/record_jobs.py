@@ -71,6 +71,10 @@ def refetch(src: Source, blobs) -> dict:
 	base: dict = {"args": list(src.args)}
 	if src.entrypoint and not (src.kind == "sample" and "/" in src.entrypoint):
 		base["entrypoint"] = src.entrypoint  # a sample's tree is read from its own directory
+	if src.scope == "entrypoint" and "entrypoint" in base:  # 0.6.3: read the same files the first time read
+		base["scope"] = "entrypoint"
+	if src.extra_packages:  # and install the same extra packages
+		base["extra_packages"] = list(src.extra_packages)
 	if src.kind in ("sample", "template"):
 		return {"kind": src.kind, "uri": src.uri, **base}
 	if src.kind == "repo":

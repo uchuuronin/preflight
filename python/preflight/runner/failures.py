@@ -26,6 +26,20 @@ STEPS: dict[str, tuple[str, str]] = {
 		"do what the message says if it names a way, check in the folder that holds the script, "
 		"or probe it on your machine: `preflight run <your script>`",
 	),
+	"map.too_large": (
+		"mapping the script",
+		"check in again starting from the script you run (only that file and what it imports), or probe it "
+		"on your machine: `preflight run <your script>`",
+	),
+	"missing_package.not_allowed": (
+		"checking the extra packages",
+		"pick packages from Preflight's list, or add the package (with its version) to a requirements.txt "
+		"next to your script",
+	),
+	"missing_package.no_wheels": (
+		"checking the extra packages",
+		"run `preflight run <your script>` on a machine where it's built and installed",
+	),
 	"submission.invalid": (
 		"reading the job request",
 		"check the script in again from the page; if you built the request yourself, compare it with the API's JobRequest",
