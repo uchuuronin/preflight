@@ -1,0 +1,11 @@
+{
+	"name": "20261102-045902-41391382671-b-grpo-entropy-check",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41391382671",
+	"ref": "ws-b",
+	"sha": "8b7e3a244938ffa739fa53d8ee88d45a74f9adcd",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script grpo_trl --bare-steps 2 --recorder-steps 10 --warmup 2 --budget-min 20 --first-gpu A10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T05:07:04Z"
+}
