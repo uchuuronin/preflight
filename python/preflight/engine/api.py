@@ -97,6 +97,7 @@ FEATURES = {
 	"serving": False,
 	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
 	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
+	"carry_free_knobs": False,  # flags.json engine.carry_free_knobs: after the freeze (Nov 2), off until checked
 }  # the defaults when the caller passes no flags (scripts, tests); keep them the same as flags.json
 # the flags.json key for each feature: fill_predictions(record, flags=flag) reads them for that call
 FLAG_OF = {
@@ -104,6 +105,7 @@ FLAG_OF = {
 	"serving": "engine.serving",
 	"steptime_cross_gpu": "engine.steptime_cross_gpu",
 	"divergence": "engine.divergence",
+	"carry_free_knobs": "engine.carry_free_knobs",
 }
 _FEATURES_NOW: contextvars.ContextVar[dict[str, bool] | None] = contextvars.ContextVar(
 	"preflight_features", default=None
@@ -313,6 +315,52 @@ _MATCH_IGNORES = frozenset(
 )
 
 
+# After the freeze (Nov 2; C's grid probes: lr 2e-4 cells abstained): knobs that change neither a step's memory nor its
+# time nor the run's length, only what the run learns. The engine carries step time and memory across them, as it does
+# for the learning rate, and the grids say so (Grid.independent_of), under engine.carry_free_knobs. Kept out: kl_beta
+# (at 0 TRL loads no reference model), lora_dropout (at 0 PEFT drops the dropout and its saved mask), temperature and
+# loss_type (they change how long generations run). Each one's knob spec must be free of memory, time and cost
+# (tests/test_engine_free_knobs.py).
+FREE_KNOBS = frozenset(
+	{
+		"lr",
+		"lr_schedule",
+		"warmup",
+		"warmup_steps",
+		"weight_decay",
+		"grad_clip",
+		"lora_alpha",
+		"clip_low",
+		"clip_high",
+		"seed",
+	}
+)
+# the readouts a grid's target family follows, for Grid.independent_of; a target not here lists no knob
+_GRID_READOUTS = {"memory": {"memory"}, "time": {"time"}, "cost": {"time", "cost"}}
+
+
+def _ignored() -> frozenset:
+	"""Knobs a probe match and the off-probe check pass over: run length and the learning rate always, the other
+	free knobs when engine.carry_free_knobs is on."""
+	return _MATCH_IGNORES | FREE_KNOBS if feature("carry_free_knobs") else _MATCH_IGNORES
+
+
+def independent_of(record: FlightRecord, target_id: str, axes: list[str]) -> list[str]:
+	"""The record's knobs this target doesn't depend on, off the grid's axes: the grid answers at any value of them.
+	Empty unless engine.carry_free_knobs is on."""
+	if not feature("carry_free_knobs"):
+		return []
+	family = target_id.split(".", 1)[0]  # memory.*, time.*, cost.*; risk.oom follows memory
+	need = _GRID_READOUTS.get(family) or ({"memory"} if target_id == "risk.oom" else None)
+	if not need:
+		return []
+	return sorted(
+		k.id
+		for k in record.knobs
+		if k.id in FREE_KNOBS and k.id not in axes and not (need & knobs.knob_spec(k.id).affects)
+	)
+
+
 MEDIAN_SE = math.sqrt(math.pi / 2)  # cited: a sample median's standard error is sqrt(pi/2) x sigma / sqrt(k)
 LENGTH_DRAWS = 4000  # derived: 4,000 simulated steps put the padded-length summaries within about 1%
 TOKEN_PHASES = (
@@ -496,7 +544,7 @@ def _matching_probe(record: FlightRecord, values: dict, ok=OK_PROBE):
 	for p in record.probes:
 		if p.status in ok:
 			pv = _probe_values(record, p)
-			if all(_same(pv.get(k), v) for k, v in values.items() if k not in _MATCH_IGNORES):
+			if all(_same(pv.get(k), v) for k, v in values.items() if k not in _ignored()):
 				return p
 	return None
 
@@ -549,7 +597,13 @@ def _off_probe(record: FlightRecord, values: dict, also_ok: frozenset = frozense
 		return []
 	out = []
 	for kid, v in values.items():
-		if kid in SHAPE_KNOBS or kid in RUN_KNOBS or kid in also_ok or kid.startswith("fanout."):
+		if (
+			kid in SHAPE_KNOBS
+			or kid in RUN_KNOBS
+			or kid in also_ok
+			or kid.startswith("fanout.")
+			or kid in _ignored()
+		):
 			continue
 		if not any(_same(v, pv.get(kid)) for pv in runs):
 			out.append(kid)
@@ -2270,8 +2324,19 @@ def predict_as_run(record: FlightRecord, probe) -> Prediction:
 	)
 
 
+def _fit_view(record: FlightRecord) -> FlightRecord:
+	"""The record as the fits see it: without the learning-rate range test's probe (D's ask, from A's review, Nov 2).
+	`p1-lr` runs at p1's knobs with its measured fields cleared, so it would count twice as an ok probe at p1's settings;
+	it stays on the record, where its curve is read."""
+	if not any(any(k.startswith("lr_range.") for k in (p.extras or {})) for p in record.probes):
+		return record
+	keep = [p for p in record.probes if not any(k.startswith("lr_range.") for k in (p.extras or {}))]
+	return record.model_copy(update={"probes": keep})
+
+
 def predict(record: FlightRecord, knob_values: dict | None = None) -> Prediction:
 	"""Every target for this lens at these knob values (others at their current values)."""
+	record = _fit_view(record)
 	return _predict_values(record, _values(record, knob_values))
 
 
@@ -2994,6 +3059,7 @@ def build_grids(
 				model_id=max(set(models), key=models.count) if models else "none",
 				scale=scale,
 				fixed=fixed,
+				independent_of=independent_of(record, t, knob_ids) or None,
 			)
 		)
 	return out
@@ -3411,6 +3477,7 @@ def clearing_pairs(record: FlightRecord, max_pairs: int = MAX_CLEARING_PAIRS) ->
 
 def predictions_for(record: FlightRecord, max_axes: int = 2) -> Predictions:
 	"""Targets, estimates at the current knobs, and grids over the gridded knobs (two at a time)."""
+	record = _fit_view(record)
 	targets = targets_for(record)
 	est = predict(record).root
 	gridded = [k.id for k in record.knobs if k.gridded]

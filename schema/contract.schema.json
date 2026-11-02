@@ -2663,6 +2663,22 @@
 					"title": "Fixed",
 					"type": "object"
 				},
+				"independent_of": {
+					"anyOf": [
+						{
+							"items": {
+								"type": "string"
+							},
+							"type": "array"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "Knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere",
+					"title": "Independent Of"
+				},
 				"sidecar": {
 					"anyOf": [
 						{

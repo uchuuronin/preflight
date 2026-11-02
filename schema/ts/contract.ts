@@ -1165,6 +1165,10 @@ export interface Grid {
 		[k: string]: (boolean | number | string) | undefined;
 	};
 	/**
+	 * Knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere
+	 */
+	independent_of?: string[] | null;
+	/**
 	 * Set when the grid is too large to inline
 	 */
 	sidecar?: string | null;
