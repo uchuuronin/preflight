@@ -91,7 +91,7 @@
    "used_for_tuning": false,
    "$what": "lm-evaluation-harness, L4",
    "$first_attempt": "refused at submission, no record: \"the source is larger than Preflight reads\" (a-unseen-5-checkin 41478227289)",
-   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'"
+   "$ground_truth": "none: the ground-truth rig was refused the same way, so there was no full run"
   },
   {
    "script": "unseen-6",
@@ -101,7 +101,7 @@
    "used_for_tuning": false,
    "$what": "vLLM throughput benchmark, L4",
    "$first_attempt": "refused at submission, no record (a-unseen-6-checkin 41478294041)",
-   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'"
+   "$ground_truth": "none: the ground-truth rig was refused the same way, so there was no full run"
   },
   {
    "script": "unseen-7",
