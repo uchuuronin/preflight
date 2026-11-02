@@ -254,5 +254,5 @@ def test_every_known_module_maps_to_a_requirement_line():
 def test_a_relative_import_never_reads_above_the_checkout(tmp_path, missing):
 	missing.add("outside_mod")
 	(tmp_path / "outside.py").write_text("import outside_mod\n")
-	work = _tree(tmp_path / "work", {"run.py": "from ...... import outside\n"})
+	work = _tree(tmp_path / "work", {"run.py": "from .. import outside\n"})
 	assert R.missing_imports(work, "run.py") == set()
