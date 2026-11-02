@@ -835,6 +835,7 @@ def _agent_sample(
 	timeout_s: float | None = None,
 	install_repo: bool = False,
 	keep_error: bool = False,
+	notes: bool = False,
 ) -> dict:
 	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
 	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
@@ -867,7 +868,8 @@ def _agent_sample(
 		upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
 		key, override = os.environ["META_API_KEY"], None
 	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
-		key, max_usd_total=max_usd, model_override=override, install_repo=install_repo or None, keep_error=keep_error or None, **extra)  # fmt: skip
+		key, max_usd_total=max_usd, model_override=override, install_repo=install_repo or None, keep_error=keep_error or None,
+		replies=notes or None, single_task=notes or None, **extra)  # fmt: skip
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip
@@ -939,6 +941,7 @@ def agent_sample(
 	edit_hex: str = "",
 	install_repo: bool = False,
 	keep_error: bool = False,
+	notes: bool = False,
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
 	--full: a half of the full benchmark (--k 250, then --k 250 --skip-from the first half's output
@@ -978,7 +981,7 @@ def agent_sample(
 		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
 	fn = agent_sample_hosted_full if full else agent_sample_hosted
 	res = fn.remote(files, entry, k, max_usd, skip, provider, label_mbpp, install_repo=install_repo,
-		keep_error=keep_error)  # fmt: skip
+		keep_error=keep_error, notes=notes)  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/agent_sample_{script}{'' if provider == 'meta' else '_' + provider}.json").write_text(
 		json.dumps(res, indent=2)
