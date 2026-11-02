@@ -108,3 +108,24 @@ def test_packing_and_document_repetition_fire_only_on_text():
 		"pretrain", False, "none", 1.0
 	)  # nothing padded: nothing wasted
 	assert {"data.no_packing", "data.repetition"} <= _findings("pretrain", False, "longest", 8.0)
+
+
+def test_a_serving_repo_whose_own_package_wraps_vllm_is_serving():
+	files = {
+		"serve.py": "from mypkg import Server\nServer('m').run()\n",
+		"mypkg/__init__.py": "from .server import Server\n",
+		"mypkg/server.py": (
+			"from transformers import AutoTokenizer\nfrom vllm import LLM\n\nclass Server:\n"
+			"\tdef __init__(self, m):\n\t\tself.tok = AutoTokenizer.from_pretrained(m)\n\t\tself.llm = LLM(m)\n\n"
+			"\tdef run(self):\n\t\treturn self.llm.generate(['hi'])\n"
+		),
+	}
+	assert map_static(files, entrypoint="serve.py").lens == "serving"
+
+
+def test_a_module_beside_the_entrypoint_is_found_first():
+	files = {
+		"examples/train.py": "from model import Net\nimport torch\nnet = Net()\n",
+		"examples/model.py": "import torch_geometric\nfrom torch_geometric.nn import SAGEConv\n\nclass Net:\n\tpass\n",
+	}
+	assert map_static(files, entrypoint="examples/train.py").lens == "gnn"

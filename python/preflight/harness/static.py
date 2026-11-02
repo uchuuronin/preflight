@@ -1029,13 +1029,14 @@ def _distributed(f: Facts, by_id: dict[str, ScriptKnob]) -> str:
 	return "none"
 
 
-def _module_paths(mod: str, trees: dict) -> list[str]:
-	"""The repo files a dotted module name can be: a module, a package's __init__, either under src/."""
+def _module_paths(mod: str, trees: dict, here: str = "") -> list[str]:
+	"""The repo files a dotted module name can be: a module or a package's __init__, looked up from the entrypoint's
+	own folder first (Python puts the script's folder on the path; review, Nov 2), then the repo root, then src/."""
 	stem = mod.replace(".", "/")
 	out = []
-	for root in ("", "src/"):
+	for root in dict.fromkeys((f"{here}/" if here else "", "", "src/")):
 		for cand in (f"{root}{stem}.py", f"{root}{stem}/__init__.py"):
-			if cand in trees:
+			if cand in trees and cand not in out:
 				out.append(cand)
 	return out
 
@@ -1073,47 +1074,50 @@ def _all_imports(tree: ast.Module) -> list[tuple[str, int, list[str]]]:
 def entry_imports(f: Facts, entrypoint: str) -> set[str]:
 	"""What the job itself imports: every import in the entrypoint, then the module-level imports of the repo files
 	it reaches. B, Nov 2 (the unseen runs): a library repo imports vLLM somewhere, so reading every file's imports
-	sent BEIR (retrieval) and a smolagents example (an API agent) to the serving lens and an API agent to a GPU."""
+	sent BEIR (retrieval) and a smolagents example (an API agent) to the serving lens and an API agent to a GPU.
+
+	A package's __init__ that re-exports its submodules (`from .vllm import VLLMEmbed`) is followed only into the
+	ones whose names the job's code uses: BEIR's models package re-exports a vLLM embedder beside the SentenceBERT
+	the example builds."""
+	here = entrypoint.rsplit("/", 1)[0] if "/" in entrypoint else ""
 	seen, todo, out = set(), [entrypoint], set()
+	used: set[str] = set()
 	while todo:
 		path = todo.pop()
 		if path in seen or path not in f.trees:
 			continue
 		seen.add(path)
 		tree = f.trees[path]
+		is_init = path.endswith("__init__.py")
+		if not is_init:
+			used |= set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", f.sources[path].text))
 		pkg = path.rsplit("/", 1)[0].split("/") if "/" in path else []
 		for mod, level, names in _all_imports(tree) if path == entrypoint else _top_level_imports(tree):
+			if is_init and names and "*" not in names and not (set(names) & used):
+				continue  # a re-export the job never names
 			full = mod
 			if level:  # relative: from the file's own package
 				base = pkg[: len(pkg) - (level - 1)] if level > 1 else pkg
 				full = ".".join([*base, *([mod] if mod else [])])
-			if full and not level:
+			local = _module_paths(full, f.trees, here) if full else []
+			if full and not level and not local:
 				out.add(full)
-			local = _module_paths(full, f.trees) if full else []
-			if not local and not level:
-				out.add(full)
-			for p in local:
-				todo.append(p)
+			todo.extend(local)
 			for n in names:  # "from pkg import sub": sub may be a module
-				todo.extend(_module_paths(f"{full}.{n}" if full else n, f.trees))
+				if not is_init or n in used or n == "*":
+					todo.extend(_module_paths(f"{full}.{n}" if full else n, f.trees, here))
 	return out
 
 
 def _job_framework(f: Facts, reach: Facts, entrypoint: str) -> str:
-	"""The entrypoint's own imports first; then what it reaches in the repo, where vLLM is read last, since a library
-	often ships a vLLM backend beside the one the job uses (BEIR's models package imports one beside SentenceBERT)."""
+	"""The entrypoint's own imports first; then what it reaches in the repo (entry_imports)."""
 	own = Facts(
 		**{**f.__dict__, "imports": {m for m, lvl, _ in _all_imports(f.trees[entrypoint]) if m and not lvl}}
 	)
 	fw = _framework(own)
-	if fw not in ("plain_pytorch", "other") or reach.imports == own.imports:
+	if fw not in ("plain_pytorch", "other"):
 		return fw
-	fw = _framework(
-		Facts(**{**reach.__dict__, "imports": {i for i in reach.imports if i.split(".")[0] != "vllm"}})
-	)
-	if fw in ("plain_pytorch", "other") and _has(reach, "vllm"):
-		return "vllm"
-	return fw
+	return _framework(reach)
 
 
 def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:

@@ -197,7 +197,7 @@ D found that most `engine.*` flags switched nothing. Checked in the code on ws-b
 
 | Flag | `flags.json` | Production | What it gates |
 | --- | --- | --- | --- |
-| `engine.memory` | off | on | **Every prediction**, not only memory. The runner fills the record's predictions (memory, time, cost, risk, the grids and the model cards) only with it on (`runner/pipeline.py::with_predictions`); off, the record keeps its measurements and has no predictions. |
+| `engine.memory` | off | on | **Every prediction**, not only memory. The runner fills the record's predictions (memory, time, cost, risk, the grids and the model cards) only with it on (`runner/pipeline.py::with_predictions`); off, the record keeps its measurements and has no predictions. Since Nov 2 the CLI's `preflight run` fills them without the flag (unless `--no-predictions`), so `preflight watch` has bands; its engine switches still come from `flags.json`, so `engine.rl` is off there unless `PREFLIGHT_ENV=production` is set. |
 | `engine.steptime_cross_gpu` | on | on (from `flags.json`) | Moving to a GPU with no probe: on, step time takes the held-out cross-GPU band (about ±45%) and shows it past ±50%, labelled rough; another vendor abstains with "no AMD measurements". Off, the usual abstain. |
 | `engine.rl` | off | off | The RL lens's three extra readouts: zero-spread groups, rollout time and truncation. Memory, step time and cost on the RL lens don't depend on it. |
 | `engine.serving` | off | off | The serving lens's readouts: throughput, time to first token (p95), time per token and KV capacity. |

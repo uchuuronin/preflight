@@ -536,8 +536,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		patched_for=patched_for,
 	)
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
-	rec, triaged = _triage(rec, results, deps, private=req.private)
-	rec, grounded = _search(rec, results, deps, private=req.private, verify=req.mode == "verify", ctx=ctx)
+	# review, Nov 2: a probe-more from the record page sends no `private`, so a record a private job touched keeps
+	# its new logs off Baseten and Meta too
+	held = req.private or _private_history(rec)
+	rec, triaged = _triage(rec, results, deps, private=held)
+	rec, grounded = _search(rec, results, deps, private=held, verify=req.mode == "verify", ctx=ctx)
 	triaged = [*triaged, *grounded]
 	kept = rec.probes
 	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
@@ -555,7 +558,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
 		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
 			for q in probes]  # fmt: skip
-	if req.private:
+	if held:
 		# B, Nov 2 (A's review): a private job's probes and findings carry the mark on the record, so no later job
 		# on it (a probe-more, a verify) sends their numbers or text to Meta or Baseten
 		from preflight.schema import Evidence
