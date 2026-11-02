@@ -1,0 +1,4 @@
+{"repo": "torchtune", "cost_usd": 0.036843, "error": null, "merged": "pretrain"}
+{"repo": "lm-evaluation-harness", "cost_usd": 0.035963, "error": null, "merged": "eval"}
+{"repo": "vllm", "cost_usd": 0.037065, "error": null, "merged": "serving"}
+spent US$0.1099 at list price

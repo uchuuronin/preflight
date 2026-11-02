@@ -1,0 +1,11 @@
+{
+	"name": "20261102-182108-41499720563-d-bigrepo-spark-map",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41499720563",
+	"ref": "ws-d",
+	"sha": "ad6290e886e1da1a8116df7fcb8812a6c91a8e0f",
+	"cmd": "python scripts/d_bigrepo_spark_map.py",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T18:22:33Z"
+}

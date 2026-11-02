@@ -1,0 +1,223 @@
+{
+ "spent_usd": 0.109871,
+ "rows": [
+  {
+   "repo": "torchtune",
+   "entry": "recipes/lora_finetune_single_device.py",
+   "read": {
+    "files": 736,
+    "partial": null,
+    "map_partial": {
+     "files": 196,
+     "imported": 195,
+     "bytes": 1665503,
+     "skipped": 0,
+     "timed_out": false,
+     "repo_files": 498,
+     "python_files": 498,
+     "python_bytes": 3957539
+    }
+   },
+   "static": {
+    "lens": "pretrain",
+    "framework": "plain_pytorch",
+    "produced_by": "adapter",
+    "knobs": [
+     [
+      "gpus",
+      2
+     ],
+     [
+      "temperature",
+      1.0
+     ]
+    ],
+    "risks": []
+   },
+   "merged": {
+    "lens": "pretrain",
+    "framework": "plain_pytorch",
+    "produced_by": "muse_spark",
+    "knobs": [
+     [
+      "gpus",
+      2
+     ],
+     [
+      "temperature",
+      1.0
+     ]
+    ],
+    "risks": [
+     "No evaluation loop, only training loss is logged.",
+     "Single-device only, no distributed training support.",
+     "Mid-epoch checkpoint resume is not fully supported.",
+     "fp16 precision is explicitly unsupported."
+    ]
+   },
+   "calls": [
+    {
+     "ok": true,
+     "in": 19002,
+     "out": 3080,
+     "usd": 0.036843,
+     "s": 11.891
+    }
+   ],
+   "cost_usd": 0.036843,
+   "last_error": null
+  },
+  {
+   "repo": "lm-evaluation-harness",
+   "entry": "lm_eval/__main__.py",
+   "read": {
+    "files": 48,
+    "partial": {
+     "files": 48,
+     "imported": 46,
+     "bytes": 448856,
+     "skipped": 0,
+     "timed_out": false,
+     "repo_files": 15449,
+     "repo_bytes": 12300182
+    },
+    "map_partial": null
+   },
+   "static": {
+    "lens": "pretrain",
+    "framework": "plain_pytorch",
+    "produced_by": "adapter",
+    "knobs": [],
+    "risks": []
+   },
+   "merged": {
+    "lens": "eval",
+    "framework": "other",
+    "produced_by": "muse_spark",
+    "knobs": [],
+    "risks": [
+     "Job is evaluation-only, not pretraining; no optimizer or training loop exists.",
+     "Task configs can execute arbitrary unsafe code, gated only by confirm_run_unsafe_code flag.",
+     "Model backend is pluggable, model architecture cannot be determined from entrypoint alone."
+    ]
+   },
+   "calls": [
+    {
+     "ok": true,
+     "in": 20905,
+     "out": 2939,
+     "usd": 0.035963,
+     "s": 14.986
+    }
+   ],
+   "cost_usd": 0.035963,
+   "last_error": null
+  },
+  {
+   "repo": "vllm",
+   "entry": "vllm/benchmarks/throughput.py",
+   "read": {
+    "files": 163,
+    "partial": {
+     "files": 163,
+     "imported": 160,
+     "bytes": 2097069,
+     "skipped": 206,
+     "timed_out": false,
+     "repo_files": 6510,
+     "repo_bytes": 74619333
+    },
+    "map_partial": null
+   },
+   "static": {
+    "lens": "serving",
+    "framework": "vllm",
+    "produced_by": "adapter",
+    "knobs": [
+     [
+      "batch_size",
+      1
+     ],
+     [
+      "max_new_tokens",
+      16
+     ],
+     [
+      "pin_memory",
+      true
+     ],
+     [
+      "precision",
+      "auto"
+     ],
+     [
+      "seq_len",
+      1024
+     ],
+     [
+      "temperature",
+      1.0
+     ]
+    ],
+    "risks": []
+   },
+   "merged": {
+    "lens": "serving",
+    "framework": "vllm",
+    "produced_by": "muse_spark",
+    "knobs": [
+     [
+      "batch_size",
+      1
+     ],
+     [
+      "group_size",
+      1
+     ],
+     [
+      "max_new_tokens",
+      16
+     ],
+     [
+      "n_tasks",
+      1000
+     ],
+     [
+      "pin_memory",
+      true
+     ],
+     [
+      "precision",
+      "auto"
+     ],
+     [
+      "seq_len",
+      1024
+     ],
+     [
+      "temperature",
+      1.0
+     ]
+    ],
+    "risks": [
+     "Static map invented Qwen3-0.6B model and training hyperparameters not present in this throughput benchmark file.",
+     "Static map reported temperature, pin_memory and precision knobs from unrelated files, not this entrypoint.",
+     "Static map reported agent_loop; this is offline serving throughput with vLLM generate/chat, not an agent loop.",
+     "Multimodal token counts are inaccurate for non vllm-chat backends per in-file warning.",
+     "No training occurs; elapsed-time throughput only, so training knobs like lr and epochs do not apply."
+    ]
+   },
+   "calls": [
+    {
+     "ok": true,
+     "in": 20747,
+     "out": 2619,
+     "usd": 0.037065,
+     "s": 13.536
+    }
+   ],
+   "cost_usd": 0.037065,
+   "last_error": null
+  }
+ ]
+}
