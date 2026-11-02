@@ -136,9 +136,14 @@ export function measuredCell(cell: Pick<PlanCell, "knobs">, src: ProbeSource, en
 	const want: Record<string, unknown> = { ...current, ...cell.knobs };
 	const gpu = want.gpu_type ?? src.env?.gpu?.name;
 	const compared = src.knobs.map((k) => k.id).filter((id) => id !== "max_steps" && id !== "gpu_type");
+	// A probe that names no GPU ran on the record's, unless the record also holds probes that name
+	// another GPU (a follow-up from another GPU keeps the probes it came from): then it can't be told.
+	const home = current.gpu_type ?? src.env?.gpu?.name;
+	const mixed = src.probes.some((p) => p.knobs?.gpu_type !== undefined && !same(p.knobs.gpu_type, home));
 	const atSetting = (p: (typeof src.probes)[number]) => {
 		const has: Record<string, unknown> = { ...current, ...(p.knobs ?? {}) };
-		return same(has.gpu_type ?? src.env?.gpu?.name, gpu) && compared.every((id) => same(has[id], want[id]));
+		if (p.knobs?.gpu_type === undefined && mixed) return false;
+		return same(p.knobs?.gpu_type ?? home, gpu) && compared.every((id) => same(has[id], want[id]));
 	};
 	const here = src.probes.filter(atSetting);
 	if (here.some((p) => p.status !== "ok" && p.status !== "cached")) return null;

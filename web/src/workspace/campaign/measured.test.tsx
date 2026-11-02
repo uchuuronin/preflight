@@ -31,6 +31,10 @@ describe("campaign runs timed by a probe at their setting (PM, Nov 2)", () => {
 		// a probe at another value of a knob the run doesn't set isn't at the run's setting
 		const other = { ...record, probes: record.probes.map((p) => (p.id === "p1" ? { ...p, knobs: { ...p.knobs, num_workers: 4 } } : p)) };
 		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 1024 } }, other)).toBeNull();
+		// a record that also holds a probe on another GPU: a probe naming no GPU can't be placed
+		const mixed = { ...record, probes: [...record.probes, { ...p1, id: "p9", knobs: { ...p1.knobs, gpu_type: "L4" } }] };
+		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 1024 } }, mixed)).toBeNull();
+		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 1024, gpu_type: "L4" } }, mixed)!.model_id).toBe("probe:p9");
 	});
 	it("leaves a run with no probe at its setting to the engine", () => {
 		expect(measuredCell({ knobs: { batch_size: 8, seq_len: 512, seed: 0 } }, record)).toBeNull();

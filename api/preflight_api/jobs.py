@@ -105,7 +105,7 @@ def way_past(code: str | None, *, said: str = "") -> str | None:
 		.strip()
 		.rstrip(".")
 	)
-	options = [o.strip() for o in re.split(r",\s*(?:or\s+)?|\s+or\s+", text) if o.strip()]
+	options = [o.strip() for o in re.split(r",\s*(?:or\s+)?", text) if o.strip()]
 	said_l = said.lower()
 	keep = [o for o in options if not any(w in said_l for w in ("midnight", "sample") if w in o.lower())]
 	if not keep:
