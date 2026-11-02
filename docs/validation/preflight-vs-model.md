@@ -48,15 +48,16 @@ A re-ran the nine with `probes.repo_install` on in each ops run only (A's status
 
 ## With the zoo scripts' full runs: it rests on 6 scripts for OOM, 4 for memory and step time
 
-Muse Spark was asked the same way about the zoo scripts B ran to their end after the freeze (`ask-model@1`, run `b-ask-model-zoo`, $0.11; each sample's own measured outputs left out, as the runner now does), for the GPU the full run got, and scored by the frozen scorer on `tests/fixtures/validation/zoo_gt/manifest_zoo_after_freeze_nov2.json`. Compared **by script on the same A10** (Preflight's `@L4` moved-GPU runs aside):
+Muse Spark was asked the same way about the zoo scripts B ran to their end after the freeze (`ask-model@1`, run `b-ask-model-zoo`, $0.11; each sample's own measured outputs left out, as the runner now does), for the GPU the full run got. Both answer files are scored together (`ask_model_nov2.json` for the zoo LoRA and BEIR, `ask_model_zoo_nov2.json` for the rest) with `corpus/ask_model_score.py` on the frozen scorer's rules, on `tests/fixtures/validation/zoo_gt/manifest_zoo_after_freeze_nov2.json`. Compared **by script on Modal's "A10"** (gnn and retrieval on an A10, vision and nanoGPT on an A10G; Preflight's `@L4` moved-GPU runs aside):
 
 | Row | Scripts | Preflight | Asking Muse Spark |
 |---|---|---|---|
 | Peak memory within 10% | 4 (gnn, retrieval, vision, nanoGPT) | 2 of 4 (vision, nanoGPT) | 0 of 4 |
 | Step time within 15%, same GPU | 4 (the same) | 1 of 4 (gnn) | 0 of 4 |
+| 90% intervals that cover, on these four | 8 (memory and step) | 3 of 8 | 4 of 8 |
 | OOM | 6 (the four, the zoo LoRA, BEIR); 2 ran out | LoRA caught, BEIR missed (no probe) | LoRA caught (97%), BEIR missed (15%) |
 
-What the model said: nanoGPT 11.5 GiB (it peaked at 18.9 GiB) and 1.15 s a step (0.70); gnn 5.5 GiB (8.0) and 1.1 s (0.061); retrieval 1.3 GiB (2.3) and 0.06 s (0.031); vision 3.8 GiB (3.3) and 0.85 s (0.150). Its memory guesses land closer than its step times, which run 1.6 to 18 times too slow. **Preflight is ahead on memory and step time on these four, and they tie on OOM, but on 4 scripts the intervals overlap (Wilson 2 of 4: 15% to 85%; 0 of 4: 0% to 49%), so this still can't rank them with confidence.** Answers: `python/preflight/corpus/reports/ask_model_zoo_nov2.json`.
+**Too few to rank.** On 4 scripts the hit counts' intervals overlap (Wilson 2 of 4: 15% to 85%; 0 of 4: 0% to 49%), the model's intervals cover slightly more often (4 of 8 against 3 of 8), the step-time difference is one script, and two of the four full runs got a different card from the one named. What the model said: nanoGPT 11.5 GiB (it peaked at 18.9 GiB) and 1.15 s a step (0.70); gnn 5.5 GiB (8.0) and 1.1 s (0.061); retrieval 1.3 GiB (2.3) and 0.06 s (0.031); vision 3.8 GiB (3.3) and 0.85 s (0.150). Its memory guesses land closer than its step times, which run 1.6 to 18 times too slow. Answers: `python/preflight/corpus/reports/ask_model_zoo_nov2.json`.
 
 The model's answers: `python/preflight/corpus/reports/ask_model_nov2.json` (prompt `ask-model@1`, hash `211e2e084350`, $0.32). The `grpo_trl` case is left out of the scoring: its sample directory holds that run's own record, which the model read (its 27.6 s step is the measured p50).
 
