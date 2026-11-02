@@ -341,7 +341,24 @@ def test_the_public_demo_never_probes_above_its_ceiling(tmp_path, monkeypatch):
 
 def test_a_mistyped_ceiling_still_caps(monkeypatch):
 	monkeypatch.setenv("PREFLIGHT_GPU_CEILING", "NOT-A-GPU")
-	assert choose_probe_gpu(200.0) == "A100-SXM-80GB"
+	assert choose_probe_gpu(200.0) == "L40S"
+
+
+def test_the_l40s_ceiling_keeps_dearer_gpus_out_and_probes_the_webs_a100_default_on_it(tmp_path, monkeypatch):
+	# Chiya, Nov 1: the web asks for an A100-80GB by default; the demo probes on an L40S at most, and the
+	# A100-40GB (40 GB, under the L40S's 48, but $2.10 an hour against $1.95) stays out too
+	from preflight.probes.gpu_choice import under_ceiling
+
+	monkeypatch.setenv("PREFLIGHT_GPU_CEILING", "L40S")
+	assert under_ceiling("L4") and under_ceiling("A10") and under_ceiling("L40S")
+	assert not under_ceiling("A100-SXM-40GB") and not under_ceiling("A100-SXM-80GB")
+	assert choose_probe_gpu(200.0) == "L40S" and next_gpu("L40S") is None
+	runner = LossRunner()
+	ctx = _Ctx()
+	run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}, "gpu": "A100-SXM-80GB"}, ctx,
+		_deps(tmp_path, runner))  # fmt: skip
+	assert {c["gpu"] for c in runner.calls} == {"L40S"}
+	assert any("cross-GPU" in (e.get("message") or "") for e in ctx.events)
 
 
 def test_verify_fails_a_run_whose_loss_went_nan(tmp_path):
