@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160502-41477906940-a-unseen-9-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41477906940",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-9 --gpus L4 --max-minutes 45 --repo https://github.com/KellerJordan/cifar10-airbench --commit 4c1b6d1e3889b037efadcfd5c0ea65b246592362 --entrypoint airbench94_muon.py ",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:25:22Z"
+}
