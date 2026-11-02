@@ -33,6 +33,8 @@ import { OrbitGlance } from "../../workspace/map/OrbitGlance";
 import { FindingsBand, FindingsChip } from "../../workspace/cockpit/Findings";
 import { GridProvider } from "../../workspace/provider/GridProvider";
 import { loadRecord } from "../../workspace/record/load";
+import { LIVE_REF, useLive } from "../../workspace/live/liveFile";
+import { LivePanel } from "../../workspace/live/LivePanel";
 import { isFixture, targetFor } from "../../workspace/record/model";
 import type { LoadedRecord } from "../../workspace/record/types";
 import { useWorkspace, WorkspaceProvider } from "../../workspace/state";
@@ -45,6 +47,10 @@ type Load = { kind: "loading" } | { kind: "ready"; record: LoadedRecord } | { ki
 export function CockpitScreen({ recordRef }: { recordRef: string }) {
 	const [load, setLoad] = useState<Load>({ kind: "loading" });
 	const provider = useMemo(() => new GridProvider(), []);
+	// A live record picked again (another run) is a new record: reload. Its rewrites as the run goes
+	// on only change the live probe, which LivePanel reads straight from the file.
+	const liveId = useLive().record?.record_id;
+	const reloadKey = recordRef === LIVE_REF ? `${recordRef}:${liveId ?? ""}` : recordRef;
 	useEffect(() => {
 		let alive = true;
 		setLoad({ kind: "loading" });
@@ -52,13 +58,14 @@ export function CockpitScreen({ recordRef }: { recordRef: string }) {
 			.then((record) => {
 				if (!alive) return;
 				setLoad({ kind: "ready", record });
-				logFlight(recordRef, record);
+				if (recordRef !== LIVE_REF) logFlight(recordRef, record); // a live file isn't a link to reopen
 			})
 			.catch((e: unknown) => alive && setLoad({ kind: "error", message: e instanceof Error ? e.message : String(e) }));
 		return () => {
 			alive = false;
 		};
-	}, [recordRef]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [reloadKey]);
 
 	if (load.kind === "loading") {
 		return (
@@ -79,7 +86,7 @@ export function CockpitScreen({ recordRef }: { recordRef: string }) {
 		);
 	}
 	return (
-		<WorkspaceProvider key={recordRef} record={load.record} recordRef={recordRef} provider={provider}>
+		<WorkspaceProvider key={reloadKey} record={load.record} recordRef={recordRef} provider={provider}>
 			<Cockpit />
 		</WorkspaceProvider>
 	);
@@ -149,6 +156,7 @@ function Cockpit() {
 						<p className={`pf-statusline is-${line.tone}`} aria-live="polite">
 							{line.text}
 						</p>
+						<LivePanel />
 						<CostLine />
 						<FindingsChip />
 						<ProbeHere />

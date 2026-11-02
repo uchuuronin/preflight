@@ -5,6 +5,7 @@
  */
 import { flag } from "../../lib/flags";
 import { t } from "../../lib/i18n";
+import { LIVE_REF, liveRecord } from "../live/liveFile";
 import type { FlightRecord, Lens, LoadedRecord } from "./types";
 import { normaliseRecord } from "./types";
 
@@ -140,6 +141,12 @@ export async function loadRecord(ref: string): Promise<LoadedRecord> {
 	// A sample listed only behind a flag opens only with it on.
 	const sample = SAMPLES.find((s) => s.id === ref && (!s.flag || flag(s.flag)));
 	if (sample) return normaliseRecord(await sample.load());
+	// A live record from `preflight watch`, opened from a file on this machine (live/liveFile.ts)
+	if (ref === LIVE_REF && flag("c.inflight")) {
+		const rec = liveRecord();
+		if (!rec) throw new Error(t("live.error.none"));
+		return normaliseRecord(rec);
+	}
 	const url = `${API_BASE}/v1/records/${encodeURIComponent(ref)}`;
 	let res = await fetch(url, { credentials: "same-origin" });
 	if (res.status === 503) {
