@@ -1,0 +1,12 @@
+{
+ "rows": 48,
+ "chunks": 7,
+ "rows_sent": 48,
+ "labelled": 40,
+ "counted_usd": 0.1987,
+ "stopped_at_chunk": null,
+ "worst_call_usd": 0.126,
+ "budget_usd": 0.3,
+ "wall_s": 118.1,
+ "worker_error": null
+}
