@@ -137,6 +137,48 @@ none up; recall across the three runs went 1, 0 (the annotation rule alone), 2 s
 issue is a small set. It stays off until B's re-check of the fixes and C's data-use line; then it's
 the PM's call.
 
+## The fourth run: the first run's request again (Chiya, Nov 2, 17:39)
+
+Chiya: "No citations from one changed-shape run isn't a result yet." So every request now logs a
+trace (`search_trace`: whether a `web_search_call` happened, searches, page opens, the searches'
+results, URLs cited inline; also in the finding's evidence as `search.trace.*`), and
+`ground_failure(..., shape="first")` re-sends the first run's request exactly (03d0e5f: its prompt,
+no error block, the bare `web_search` tool, no `include` or `max_tool_calls`).
+
+`d-spark-search-first-shape` (GitHub 41539601183, Nov 2, 22:43 UTC, `ws-d` `406fa38`; the same
+cases, 8 calls, US$0.169 [derived, fee second-hand]) [measured]:
+
+- **Every request searched:** a `web_search_call` in all 8, 2 or 3 searches each.
+- **Citations came back:** the known pyarrow issue answered "found" with 2 sources, both cited
+  inline (2 URLs annotated) and both kept: NVIDIA-NeMo/Automodel #4244 and pytorch/torchtitan #5372
+  (the model's reasons say both describe this ImportError; I couldn't open them from here). It made
+  7 tool calls: 3 searches and 4 page opens.
+- The other 6 sent cases answered "none found", and a "none found" answer cites nothing, so no
+  citations there is expected: across all four runs, the pyarrow case is the only one where
+  citations could appear.
+- The planted link: never repeated, so still inconclusive.
+
+**Reading the four runs on the one case that could cite** [measured counts; the cause is my
+inference]:
+
+| Run | Request | Tool calls on the pyarrow case | Cited inline | Kept |
+| --- | --- | --- | --- | --- |
+| 1 (03d0e5f) | first shape | 2 searches, 3 opens = 5 | 1 URL | 1 |
+| 2 (5dcf16a) | data block, `max_tool_calls` 4 | 1 search, 3 opens = 4 | none | 0 |
+| 3 (9b6ddb1) | as 2, plus `include` results, low context | 1 search, 3 opens = 4 | none | 2 (from results) |
+| 4 (406fa38) | first shape again | 3 searches, 4 opens = 7 | 2 | 2 |
+
+Runs 2 and 3 stopped at exactly the 4 tool calls `max_tool_calls` allows, and neither cited
+inline; runs 1 and 4, with no cap, cited. The likeliest reading is that the cap, not Meta's
+variance, cut the model off before it wrote a cited answer. That rests on one case in four runs,
+so it's a hypothesis to test, not a finding: one run with the current request and a higher cap
+(about US$0.15) would test it. Either way, with the documented `include` the citation check has
+something to check against even when nothing is cited inline (run 3).
+
+**For Tuesday noon:** the search works on Meta's API and, on the one real known issue in this set,
+kept 1, 0, 2 and 2 sources across the four runs, none made up. It stays off until B's re-check and
+C's data-use line; whether the cap goes up is the next decision.
+
 ## Before `harness.spark_search` goes on
 
 1. B's re-check of the fixes above (Chiya, Nov 2, 17:33: B instead of A).

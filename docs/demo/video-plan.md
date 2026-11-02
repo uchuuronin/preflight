@@ -1,6 +1,6 @@
 # The 3-minute video: shot list and voice-over (filmed Tue Nov 3, evening)
 
-By D, Mon Nov 2, overnight (Chiya's list, item 3); statuses updated Mon Nov 2, 11:10 ET; shot 9b added 12:05 ET, its stopgap step replaced 16:30 ET. This is the plan of record for Tuesday. It
+By D, Mon Nov 2, overnight (Chiya's list, item 3); statuses updated Mon Nov 2, 11:10 ET; shot 9b added 12:05 ET, its stopgap step replaced 16:30 ET; shot 7b added 17:45 ET. This is the plan of record for Tuesday. It
 replaces the plan A and plan B shot lists in `storyboard.md` and `fallback-cut.md`, which stay as
 the earlier drafts; the 45-second cut in `storyboard.md` is unchanged.
 
@@ -32,6 +32,7 @@ Narration at about 2.5 words a second; every line is also a burned-in caption. A
 | 5 | 0:47 | Cockpit of the Oct 28 record (`ICDYrfHQ2nBNbv3mlRHHMg`): the map draws, the memory ring fills past the line, the red finding "runs out of memory" | "In 189 seconds of probing, for about four cents of GPU at list price, it caught the crash before the real run." | "189 s of probing · $0.042 of GPU at list price · 20.4 of 22.06 GiB · one script" | **Needs by Tuesday:** that record opening on the live site (check it with the browser before filming). Once C confirms `workers/` is deployed (today, a preview first), open it from its share page, `/s/ICDYrfHQ2nBNbv3mlRHHMg`. If it doesn't open, use A's fresh production record from shot 4 and re-take every spoken number from it |
 | 6 | 1:02 | Click the Eval loop node: its detail sheet shows the rule checks' findings and the triage finding with its quoted log line | "Muse Spark Open says what went wrong, and quotes the line it read; code checks the quote is really in the log." | "Muse Spark Open (Meta's open model, on Baseten)" over the app's own "Found by Muse Spark Open triage" | **Needs by Tuesday noon:** A's production LoRA triage re-run, with its finding quoting the out-of-memory line (A, by Tue Nov 3, noon ET; Chiya, Nov 2). If not, cut and give 12 s to shot 7 |
 | 7 | 1:14 | The knob dock: drag "Eval batch" down; the ring drops under the line, the dials move; press "Possible outcomes" | "Move a setting and the whole run answers at once, with its range." | the app's "Predicted" on the dials | **Works now** (`c.hops` on in `flags.production.json`) |
+| 7b | (1:24) | The LoRA script checked in with `learning_rate=1e-3` (ten times its author's 1e-4); its cockpit's range-test curve: loss against learning rate, the script's rate marked past the curve's lowest point, the suggested rate marked lower down | "Set the learning rate ten times too high and a hundred quick steps on a rising rate show it: past the bottom of the curve. Preflight suggests one where the loss falls fastest." | "Learning-rate range test · measured on an A10" | **Needs by Tuesday noon:** B's re-check of the range test's fixes, `probes.lr_range` on and the runner redeployed (A, the PM), and C's curve in the cockpit; the GPU check passed (section below). About 10 s; it takes 9b's slot if 9b is cut, otherwise it's not in the 3-minute cut |
 | 8 | 1:26 | The guide panel: "Start the tour"; the guide proposes one knob move and moves it on the map; Accept | "Ask the guide, and Muse Spark moves the knobs that matter for your goal, one at a time, and you decide each move." | "Muse Spark (Meta)" | **Works now** (`c.guide.live` on). If the live guide is refused (its daily cap), the panel falls back to the rule-based tour: then drop the label and the line |
 | 9 | 1:40 | Scroll to the exports: the Slurm file, the run command, the Weights & Biases helper | "Take the plan with you: a batch file, the command, and your settings and predictions in Weights and Biases." | | **Works now** (`c.exports` on in `flags.production.json`) |
 | 9b | (1:50) | Terminal beside the cockpit: `preflight watch` running the real script; the cockpit's in-flight panel follows the live record; an alert line appears in both | "Run it for real and Preflight watches. The moment the run leaves its predicted band, it says so." | the app's "Predicted" band; no Meta model (no model call here) | **Needs B's GPU test.** `c.inflight` is on in production (PM, 4:25 PM). `watch` runs and streams on a CPU; no alert fired then because `preflight run` filled no predictions, which B has fixed (on `main`; steps below). Goes in only if ready by Tue Nov 3, noon ET, taking its 10 s from shot 13 if that's cut; otherwise not in the 3-minute cut |
@@ -41,6 +42,26 @@ Narration at about 2.5 words a second; every line is also a burned-in caption. A
 | 13 | 2:27 | Checks page: scroll "Each check": the caught OOM and the misses | "Every prediction is checked against real runs, misses included." | "Held-out checks on real runs" | **Needs by Tuesday:** B regenerates the validation table once the unseen runs are scored (likely Mon Nov 2, night). If its checks still say "not measured", cut the shot and give its 10 s to shot 14 |
 | 14 | 2:37 | Copy the cockpit's address, open it in a new tab: the same flight opens | "Every flight is a link anyone can open." | | **Works now** (the link is the page's address). The share page's preview card needs `workers/` in the deploy; not shown here |
 | 15 | 2:45 | End card, about 10 s | "Preflight. Fly the run before you pay for it." | link · repository · "Built Oct 26 to Nov 4" | **Works now** |
+
+## Shot 7b: a planted bad learning rate (Chiya, Nov 2, 17:33)
+
+`d-lr-range-planted-1e-3` (GitHub 41538650072, Nov 2, 22:36 UTC, `ws-d` `9b6ddb1`, an A10, US$0.14
+[derived: 469 s of container at list price]) [measured]: the LoRA zoo script with its
+`learning_rate=1e-4` changed to `1e-3`, then the range test and 100 steps held at each rate.
+
+- **It catches it.** The range test reads the curve the same way as on the unchanged script (the
+  ramp sets the rate, not the script): suggested 7.9e-5, lowest loss at 7.7e-4, divergence at
+  1.0e-2, and the ramp checked. The script's 1e-3 is **past the curve's lowest point**, 12.6 times
+  the suggestion and 10 times below where it diverges.
+- **The suggestion is sane:** 7.9e-5 is 0.8 times the author's own 1e-4.
+- **What 1e-3 costs here, honestly:** not a blow-up. Over 100 steps on the same batches, the loss
+  at 1e-3 sat above the suggested rate's in every 10-step block after the first, by 0.02 to 0.05
+  (last 10 steps' mean 1.225 against 1.174); neither diverged. So the beat says "past the bottom
+  of the curve", not "it would crash", and shows no loss numbers spoken.
+
+What the screen needs: a hosted record of that check-in with `probes.lr_range` on (its probe
+`p1-lr`) and C's drawing of the curve with the script's rate and the suggestion marked. Until both
+exist, the beat isn't filmable.
 
 ## Shot 9b: the in-flight steps (Chiya's list, Nov 2, item 2)
 
