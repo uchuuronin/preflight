@@ -368,7 +368,12 @@ def repo_requirement_sets(
 	names = {_norm(m["name"]) for m in plain}
 	every = {_norm(m["name"]) for x in declared_lines if (m := _LINE.match(x.strip()))}
 	imported: list[str] = []
-	for mod in sorted(missing_imports(workdir, entrypoint)):
+	missing = missing_imports(workdir, entrypoint)
+	if pyg and "torch_geometric" in missing:
+		# PyG imports its compiled extensions at run time (T.ToSparseTensor needs torch_sparse; OGB arxiv, Nov 2), so
+		# the static scan never sees them: with PyG's index at hand they come with torch_geometric
+		missing = missing | {"torch_scatter", "torch_sparse"}
+	for mod in sorted(missing):
 		if mod in NO_WHEELS and pyg:  # PyG's own index has its wheels
 			if _norm(mod) not in names:
 				imported.append(_norm(mod))

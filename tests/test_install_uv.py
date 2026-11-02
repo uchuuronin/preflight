@@ -96,3 +96,15 @@ def test_the_probe_spec_carries_them_and_each_changes_the_cache_key():
 		cache_key(ProbeSpec(**kw, **x), "L4", "i") for x in ({}, {"install_uv": True}, {"install_pyg": True})
 	}
 	assert len(keys) == 3  # another resolver can pick other versions, another index another build
+
+
+def test_with_pygs_index_torch_geometric_brings_its_run_time_extensions(tmp_path, monkeypatch):
+	import importlib.util
+
+	(tmp_path / "gnn.py").write_text("import torch_geometric.transforms as T\nT.ToSparseTensor()\n")
+	monkeypatch.setattr(
+		importlib.util, "find_spec", lambda name, *a, **k: None if name.startswith("torch_") else object()
+	)
+	_, imported = R.repo_requirement_sets(tmp_path, "gnn.py", log=lambda m: None, pyg=True)
+	assert imported == ["torch-geometric", "torch-scatter", "torch-sparse"]
+	assert R.repo_requirement_sets(tmp_path, "gnn.py", log=lambda m: None)[1] == ["torch-geometric"]
