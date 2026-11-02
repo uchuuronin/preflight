@@ -49,6 +49,15 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 8 | yes (torch-geometric and its declared deps; ogb's master.csv now read) | no | `Tensor.to_symmetric`: torch_sparse, which has no wheels on PyPI (the probe's egress is PyPI and Hugging Face only) | `a-after-8-gt` 41491722160, `-2` 41493786662 |
 | 9 | yes (torchvision) | no: the script starts, then downloads CIFAR-10 from torchvision's own host at about 37 kB/s (28% in 22 min) | data from a host other than PyPI or Hugging Face: slow here, and blocked in a production probe (its egress is PyPI and Hugging Face only) | `a-after-9-gt` 41491655356 (45 min on the A10) |
 
+### Evening trials (Chiya's 5:39 PM items, flags on in each ops process only)
+
+| Script | What was tried | Result | Run |
+| --- | --- | --- | --- |
+| 5, lm-evaluation-harness | **check in by command** (`runner.command_checkin`): lm-eval installed from requirements.txt with uv, its three source-only dependencies built | **installs and runs to the end** on the A10: all 53,345 loglikelihood requests in 4 min 18 s, bare run 359 s wall, peak 9.57 GB allocated / 12.49 GB reserved [measured], no OOM. The recorder's probe kept nothing (`too_few_steps`): loglikelihood scoring makes no generate call, so the eval probe sees no unit of work. The wrapper's `sys.exit(None)` read as an exit (fixed) | `a-trial-lmeval-cmd-gt` 41545760648 |
+| 6, vLLM bench | by command | not tried: the serving image's vLLM 0.6.4 has no `bench` subcommand, so vllm is off the command list | n/a |
+| 2, LitGPT | install check on CPU, pip against uv (`probes.uv_install`) | **neither installs**: pip ran out at 420 s; uv's resolve overflowed its stack, then pip ran out (fixed: a 64 MiB stack, and "no solution" now ends the install with uv's reason). The cause isn't the resolver: LitGPT at that commit asks for torch>=2.7 and lightning>=2.6.1, and the image has torch 2.5.1 | `a-trial-litgpt-install-pip` 41545743492, `-uv` 41545748477 |
+| 8, OGB arxiv | install check, uv and PyG's index (`probes.extra_hosts`) | **installs in 12.9 s**, every import the scan sees present; torch_sparse, which PyG imports at run time, wasn't among them (fixed: torch_geometric now brings torch-scatter and torch-sparse from PyG's index) | `a-trial-ogb-install-pyg` 41545754612 |
+
 ## Decisions today (Chiya out until about 5 PM ET; her autonomy, Nov 2 11:16 AM ET)
 
 | When (ET) | Decision | Why | Cost | How to undo |

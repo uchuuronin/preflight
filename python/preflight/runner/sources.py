@@ -512,7 +512,9 @@ found = [e for e in entry_points(group="console_scripts") if e.name == {name!r}]
 if not found:
     raise SystemExit("the command {name} isn't installed")
 sys.argv = [{name!r}, *sys.argv[2:]]
-sys.exit(found[0].load()())
+code = found[0].load()()
+if code:  # a console script's return is its exit code; none is success, so no SystemExit on the way out
+    sys.exit(code)
 '''
 
 
