@@ -8,6 +8,29 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 22:50 ET (eval-sweep record: two runs, no measurement; stopped and asked)
+
+`0eaa25d` CI green.
+
+Item 19, the eval-sweep record, on an L4 through `remote-run.yml` (`ops_app.py::smoke` on
+`zoo/eval_sweep_reasoning`, visitor `d-eval`, ref `main` `c084bee`):
+
+| Run | Result | Spend |
+| --- | --- | --- |
+| `d-eval-sweep-l4` (GitHub 41380341849), 20-minute cap | Mapped (Muse Spark refined the map), then "probing" for 19.5 min with no event; cancelled at the cap. Record `01M6D30EYGANSVKSA2SG4EBSAE`: no probe results, only the static `eval.activation_dump` finding | The record's provenance: US$0.0179 of Muse Spark [measured] (its cost block says US$0); Modal's bill unknown, at most about US$0.58 if a GPU and sandbox ran the whole time [guess] |
+| `d-eval-sweep-l4-2` (GitHub 41382389659), 30-minute cap | Done, but its one probe ended "The probe sandbox ended without a result. Step: starting Preflight's recorder" (`recorder`) after 1,279.8 s, with 0 steps. Spark Open's triage: `infrastructure`, quoting "The probe sandbox ended without a result". Record `01M6D493CJCMMMV0C0P75FT5QH` (share `hXW24O9aS_aAHOZG5i4lrg`): memory estimates and `risk.oom` extrapolated from the static map; time and cost abstain | Record: US$0.6423: US$0.2844 GPU [derived: 1,279.8 s at the L4's US$0.80 an hour, queue included], US$0.3377 sandbox [guess rate], US$0.0202 model calls [measured] |
+
+The second run ended as A's first eval-sweep smoke did on Nov 1 at 04:30 UTC ("The probe sandbox
+ended without a result" after about 1,280 s), and its step says the recorder was still starting, so
+A's `fda1762` stop never came into play. My reading [guess]: the runner or the model download
+inside the probe, not the eval hooks; asked A. Per my plan I've stopped rather than retry: asked A (`from-d.md`)
+and Chiya. Today's eval spend: at most about US$1.24 [guess: the first run's GPU time is unknown].
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): this entry and the request to A.
+
+Cloud runs: the two above.
+
 ## Sun Nov 1, 22:00 ET (items 42 and 19 taken over from A; the 8 PM README mirrored)
 
 `0afe0c5` CI green. Merged `main` `c084bee` (round seven).
@@ -42,7 +65,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 entry): the merge of `main` `c084bee`, the packaging commit (CLI hints, `failures.py`, README
 draft), the request to A and this entry.
 
-Cloud runs: `d-eval-sweep-l4` (above), L4, result and cost in the next entry.
+Cloud runs: `d-eval-sweep-l4` (above), L4; result and cost in the next entry (22:50).
 
 ## Sun Nov 1, 21:45 ET (check-in: Glimmer measured, so its wording moves; stale model rows fixed)
 
