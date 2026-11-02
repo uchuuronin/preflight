@@ -378,3 +378,21 @@ def test_a_page_opens_results_dont_count_as_returned():
 	data["output"][2]["results"] = [{"type": "text_result", "title": "t", "url": made_up, "snippet": "s"}]
 	f, _ = ground_failure(client(data), probe(), {})
 	assert f.code == "search.none_found"
+
+
+def test_the_first_runs_request_can_be_sent_again_and_every_request_is_traced():
+	seen: list = []
+	data = response(answer("found", ISSUE), cited=[ISSUE], opened=[ISSUE])
+	f, _ = ground_failure(client(data, seen), probe(), {"torch": "2.5.1"}, "finetune", shape="first")
+	body = seen[0][1]
+	assert (
+		body["tools"] == [{"type": "web_search"}] and "include" not in body and "max_tool_calls" not in body
+	)
+	assert "<error>" not in body["input"] and "data" not in body["instructions"]
+	ev = {e.metric: e.value for e in f.evidence}
+	assert ev["search.trace.web_search_call"] == 1.0 and ev["search.trace.searches"] == 1.0
+	assert ev["search.trace.opens"] == 1.0 and ev["search.trace.annotations"] == 1.0
+	import pytest
+
+	with pytest.raises(ValueError):
+		ground_failure(client(data), probe(), {}, shape="other")

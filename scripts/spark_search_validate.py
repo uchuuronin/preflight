@@ -17,6 +17,7 @@ tokens [cap US$1, Chiya's list]; the search tool's own fee, if any, isn't in the
 """
 
 import json
+import sys
 from pathlib import Path
 
 from preflight.harness.search_grounding import (
@@ -25,6 +26,7 @@ from preflight.harness.search_grounding import (
 	ground_failure,
 	parse_answer,
 	returned,
+	search_trace,
 	skipped,
 )
 from preflight.harness.spark import ModelClient
@@ -38,6 +40,9 @@ PLANTED = "https://github.com/huggingface/transformers/issues/987654321"  # made
 
 
 def main() -> None:
+	# `--shape first`: the first run's request again (03d0e5f), to tell Meta's variance from the shape's
+	shape = sys.argv[sys.argv.index("--shape") + 1] if "--shape" in sys.argv else "current"
+	name = "search_validate.json" if shape == "current" else f"search_validate_{shape}.json"
 	cases = json.loads(CASES.read_text())["cases"]
 	oom = next(c for c in cases if c["probe"]["error_code"] == "oom.eval")
 	planted = {**oom, "case": "planted-link", "probe": {**oom["probe"],
@@ -65,7 +70,9 @@ def main() -> None:
 		row: dict = {"case": c["case"], "error_code": c["probe"]["error_code"], "lens": c["lens"],
 			"production_skips": skipped(probe)}  # fmt: skip
 		try:
-			f, calls = ground_failure(client, probe, c["libraries"], c["lens"], skip_codes=("budget",))
+			f, calls = ground_failure(
+				client, probe, c["libraries"], c["lens"], skip_codes=("budget",), shape=shape
+			)
 		except Exception as exc:  # recorded, never fatal: the next case still runs
 			row["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
 			f, calls = None, []
@@ -94,6 +101,8 @@ def main() -> None:
 			text = final_text(data)
 			ans = parse_answer(text)
 			row["answer"] = ans.model_dump() if ans else None
+			# per request: did a web_search_call happen, how many searches, opens, results, citations
+			row["trace"] = search_trace(data)
 			row["annotated"] = sorted(annotated_urls(data))
 			# the search's own results list (asked for with `include`, Meta's documented format)
 			row["returned"] = sorted(returned(data).values())
@@ -123,14 +132,10 @@ def main() -> None:
 			row["text"] = text[:4000]
 		rows.append(row)
 		print(json.dumps({k: row.get(k) for k in ("case", "cost_usd", "seconds")} | {
-			"code": (row["finding"] or {}).get("code"), "n": len((row["finding"] or {}).get("citations") or [])
-		}), flush=True)  # fmt: skip
-		Path("out/search_validate.json").write_text(
-			json.dumps({"spent_usd": round(spent, 6), "rows": rows}, indent=1)
-		)
-	Path("out/search_validate.json").write_text(
-		json.dumps({"spent_usd": round(spent, 6), "rows": rows}, indent=1)
-	)
+			"code": (row["finding"] or {}).get("code"), "n": len((row["finding"] or {}).get("citations") or []),
+			"trace": row.get("trace")}), flush=True)  # fmt: skip
+		Path("out", name).write_text(json.dumps({"spent_usd": round(spent, 6), "rows": rows}, indent=1))
+	Path("out", name).write_text(json.dumps({"spent_usd": round(spent, 6), "rows": rows}, indent=1))
 	print(f"spent US${spent:.4f} at list price (tokens only)")
 
 

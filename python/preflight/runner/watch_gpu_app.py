@@ -11,10 +11,13 @@ without a known GPU), so the step alert can't fire on camera. This runs the shot
   C. "alert": B's record watched against the shot's step 5 change (hidden 256 -> 8192, batch 64 ->
      4096), stopped with SIGTERM after WATCH_S if it hasn't finished
 
-Writes out/watch_gpu.json: per case, the record's GPU and gpu_type knob, its time.step / time.total /
-memory.peak estimates or why they abstained, steps a second, every `[preflight]` line and the alerts.
+Writes out/watch_gpu.json: the record's GPU and gpu_type knob, its time.step / time.total /
+memory.peak estimates or why they abstained (the first row); per watch, steps a second, the last 40
+`[preflight]` lines and every alert.
 Its own app ("preflight-runner-d-watch"), an A10 only, the runner's probe image with this checkout's
-code. Cap: the container's timeout (15 min) at the A10's US$1.10 an hour is US$0.275 [derived].
+code, and the repository's flags.json as PREFLIGHT_FLAGS (as a clone's `preflight run` reads it; the
+image ships no flag file). Each row is printed as it's made, so a timeout keeps what ran. Cap: the
+container's timeout (18 min) at the A10's US$1.10 an hour is US$0.33 [derived].
 """
 
 import json
@@ -25,14 +28,14 @@ import modal
 from preflight.runner.modal_app import APP_NAME, probe_image
 
 app = modal.App(APP_NAME + "-d-watch")
-TIMEOUT_S = 15 * 60
+TIMEOUT_S = 18 * 60
 WATCH_S = 150  # guess: long enough for a few windows and both alerts; the shot films about a minute
 FILM_STEPS = 200_000  # guess: the video plan's number for about a minute on a GPU; measured here
 USD_PER_H = 1.10  # cited: probes/gpu_choice.py's A10 list price
 
 
 @app.function(image=probe_image, gpu="A10", timeout=TIMEOUT_S)
-def film_and_alert(src: str) -> dict:
+def film_and_alert(src: str, flags_json: str = "{}") -> dict:
 	import os
 	import re
 	import signal
@@ -43,7 +46,8 @@ def film_and_alert(src: str) -> dict:
 
 	t0 = time.monotonic()
 	env = {k: v for k, v in os.environ.items() if not k.startswith(("MODAL_", "META_", "BASETEN_"))
-		and not any(w in k.upper() for w in ("TOKEN", "SECRET", "KEY", "PASSWORD"))} | {"PYTHONUNBUFFERED": "1"}  # fmt: skip
+		and not any(w in k.upper() for w in ("TOKEN", "SECRET", "KEY", "PASSWORD"))} | {"PYTHONUNBUFFERED": "1",
+		"PREFLIGHT_FLAGS": flags_json}  # fmt: skip
 
 	def cli(*args: str, limit: float) -> dict:
 		started = time.monotonic()
@@ -69,8 +73,10 @@ def film_and_alert(src: str) -> dict:
 		rec = load_record(path.read_text())
 		out: dict = {"gpu": rec.env.gpu.name if rec.env and rec.env.gpu else None,
 			"backend": rec.env.backend if rec.env else None}  # fmt: skip
-		k = rec.knob("gpu_type")
-		out["gpu_type_knob"] = k.current if k is not None else None
+		try:
+			out["gpu_type_knob"] = rec.knob("gpu_type").current
+		except KeyError:
+			out["gpu_type_knob"] = None
 		for key in ("time.step", "time.total", "memory.peak"):
 			e = rec.predictions.estimates.get(key) if rec.predictions else None
 			out[key] = None if e is None else {"status": e.status, "lo": e.lo, "hi": e.hi, "reason": e.reason}
@@ -98,6 +104,8 @@ def film_and_alert(src: str) -> dict:
 			"nn.Linear(32, 8192), nn.ReLU(), nn.Linear(8192, 1)", alert_src)  # fmt: skip
 		changed = {"max_steps": film_src != src, "batch": "batch_size = 4096" in alert_src,
 			"hidden": "nn.Linear(32, 8192)" in alert_src}  # fmt: skip
+		if not all(changed.values()):
+			return {"failed": f"the script's text didn't take the shot's changes: {changed}"}
 		film, alert = tmp / "film" / "tiny_train.py", tmp / "alert" / "tiny_train.py"
 		for f, text in ((film, film_src), (alert, alert_src)):
 			f.parent.mkdir()
@@ -105,6 +113,7 @@ def film_and_alert(src: str) -> dict:
 		records = tmp / "records"
 		pre = cli("run", str(film), "--out", str(records), "--require-gpu", limit=420)
 		row: dict = {
+			"case": "A-run",
 			"changed": changed,
 			"run": {k: pre[k] for k in ("exit", "seconds")},
 			"run_stderr": pre["stderr"][-1500:],
@@ -118,6 +127,9 @@ def film_and_alert(src: str) -> dict:
 			rows.append(row)
 			return {"rows": rows, "container_s": round(time.monotonic() - t0, 1)}
 		rows.append(row)
+		print(json.dumps(row, default=str)[:4000], flush=True)
+		if pre["exit"] != 0:
+			return {"rows": rows, "container_s": round(time.monotonic() - t0, 1)}
 		for case, script in (("B-film", film), ("C-alert", alert)):
 			out = records / case
 			w = cli("watch", str(parent), str(script), "--out", str(out), "--window", "200", limit=WATCH_S)
@@ -130,6 +142,10 @@ def film_and_alert(src: str) -> dict:
 			except Exception as exc:
 				r["live_error"] = f"{type(exc).__name__}: {exc}"[:300]
 			rows.append(r)
+			print(
+				json.dumps({k: v for k, v in r.items() if k != "preflight_lines"}, default=str)[:4000],
+				flush=True,
+			)
 	s = round(time.monotonic() - t0, 1)
 	return {"rows": rows, "container_s": s, "container_usd": round(s * USD_PER_H / 3600, 4)}
 
@@ -141,7 +157,7 @@ def check():
 	Path("out").mkdir(exist_ok=True)
 	print("[watch gpu] waiting for an A10", flush=True)
 	try:
-		res = film_and_alert.remote(src)
+		res = film_and_alert.remote(src, (root / "flags.json").read_text())
 	except Exception as exc:  # recorded
 		res = {"failed": f"{type(exc).__name__}: {str(exc)[:500]}"}
 	Path("out/watch_gpu.json").write_text(json.dumps(res, indent=1, default=str))
