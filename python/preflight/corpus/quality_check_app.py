@@ -20,16 +20,11 @@ import modal
 
 DOCS = 200_000  # guess: enough documents that the smallest bin has thousands
 SETS = (
-	(
-		"HuggingFaceFW/fineweb-edu",
-		"sample-10BT",
-		10e9,
-	),  # cited: the dataset card, "sample-10BT": 10B GPT-2 tokens
-	(
-		"HuggingFaceFW/fineweb-edu-score-2",
-		"sample-10BT",
-		10e9,
-	),  # cited: the score-2 card's sample of the same size
+	# cited: the dataset card, "sample-10BT": 10B GPT-2 tokens
+	("HuggingFaceFW/fineweb-edu", "sample-10BT", 10e9),
+	# the looser set has no sample config (Nov 2 run: "BuilderConfig 'sample-10BT' not found"): one Common Crawl dump,
+	# scaled to the documents read, since the dump's own token total isn't on its card
+	("HuggingFaceFW/fineweb-edu-score-2", "CC-MAIN-2025-05", None),
 )
 BUDGETS = ((1, None), (3, None), (3, {"int_score 4": 4.0, "int_score 5": 4.0}))
 
@@ -65,11 +60,13 @@ def check_remote(docs: int = DOCS) -> dict:
 			row["read_s"] = round(time.monotonic() - t0, 1)
 			row["sample"] = {"docs": p.docs, "tokens": p.tokens, "missing": p.missing, "low": sorted(p.low)}
 			row["tables"] = []
+			unique = total or sum(p.tokens.values())
+			row["dataset_tokens"] = unique
 			for passes, weights in BUDGETS:
-				rows = Q.table(p, passes * total, total, weights)
+				rows = Q.table(p, passes * unique, total, weights)
 				row["tables"].append(
 					{
-						"budget_tokens": passes * total,
+						"budget_tokens": passes * unique,
 						"weights": weights,
 						"rows": [r.__dict__ for r in rows],
 					}
