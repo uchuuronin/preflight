@@ -38,10 +38,25 @@ def error_line(stderr_tail: str, *, follow: bool = False) -> str | None:
 		line = lines[i].strip()
 		if _EXC.match(line):
 			if follow and line.endswith(":"):
-				nxt = next((x.strip() for x in lines[i + 1 :] if x.strip()), "")
-				line = f"{line} {nxt}".strip()
+				line = f"{line} {_api_error(lines[i + 1 :])}".strip()
 			return line[:ERROR_LINE_CHARS]
 	return None
+
+
+_API_ERROR = re.compile(r"Error code: (\d{3})\b")
+_API_CODE = re.compile(r"""['"](?:code|type)['"]\s*:\s*['"]([a-z][a-z0-9_.]{0,47})['"]""")
+
+
+def _api_error(rest: list[str]) -> str:
+	"""From the line after an SDK's "Error while generating output:", only an API error's status and its
+	code (openai's `Error code: 400 - {'error': {'code': 'unpriced_model', ...}}` → "Error code: 400
+	(unpriced_model)"): never the message, which can echo a key or the script's own text (review, Nov 2)."""
+	nxt = next((x.strip() for x in rest if x.strip()), "")
+	m = _API_ERROR.match(nxt)
+	if m is None:
+		return ""
+	c = _API_CODE.search(nxt)
+	return f"Error code: {m.group(1)}" + (f" ({c.group(1)})" if c else "")
 
 
 def main() -> int:

@@ -794,6 +794,9 @@ class AgentProxy:
 		err = obj.get("error") if isinstance(obj.get("error"), dict) else {}
 		code = str(err.get("code") or err.get("type") or "")[:64]
 		key = (status, code, model[:128] if isinstance(model, str) else None)
+		if status == 404:  # anyone can reach the tunnel's address; not the script's calls
+			_reply(h, status, obj, **kw)
+			return
 		with self._lock:
 			if key in self._own or len(self._own) < MAX_OWN_REPLIES:
 				self._own[key] = self._own.get(key, 0) + 1

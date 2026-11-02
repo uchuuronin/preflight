@@ -77,16 +77,19 @@ def test_only_a_script_with_no_task_list_is_one_task():
 	assert not one_task(None)
 
 
-def test_the_error_line_takes_the_message_on_the_next_line_only_when_asked():
+def test_the_error_line_takes_only_an_api_errors_status_and_code_from_the_next_line():
 	tail = (
 		'Traceback (most recent call last):\n  File "run.py", line 9\n'
 		"smolagents.utils.AgentGenerationError: Error while generating output:\n"
-		"Error code: 400 - {'error': {'code': 'unpriced_model'}}\n"
+		"Error code: 400 - {'error': {'type': 'preflight_unpriced_model', 'code': 'unpriced_model', 'message': 'x'}}\n"
 	)
-	assert error_line(tail) == "smolagents.utils.AgentGenerationError: Error while generating output:"
-	assert error_line(tail, follow=True).endswith(
-		"output: Error code: 400 - {'error': {'code': 'unpriced_model'}}"
-	)
+	head = "smolagents.utils.AgentGenerationError: Error while generating output:"
+	assert error_line(tail) == head
+	assert error_line(tail, follow=True) == f"{head} Error code: 400 (preflight_unpriced_model)"
+	# a provider's message can echo a key, and a line that isn't an API error is the script's own output
+	key = "openai.AuthenticationError: Error code: 401 - {'error': {'message': 'Incorrect API key: sk-abc***xyz'}}"
+	assert "sk-" not in error_line(f"{head}\n{key.split(': ', 1)[1]}\n", follow=True)
+	assert error_line("ValueError: bad:\nTHE NEXT PRINTED ROW: ssn 123\n", follow=True) == "ValueError: bad:"
 
 
 def test_the_sample_names_the_proxys_answers_only_with_the_flag():
@@ -102,7 +105,8 @@ def test_the_sample_names_the_proxys_answers_only_with_the_flag():
 			return []
 
 		def own_replies(self):
-			return [(400, "unpriced_model", "muse-spark-1.3", 2), (429, "sample_complete", None, 1)]
+			return [(404, "not_found", None, 9), (400, "unpriced_model", "muse-spark-1.3\n<b>x</b>", 2),
+				(429, "sample_complete", None, 1)]  # fmt: skip
 
 	class Proc:
 		def __init__(self):
@@ -120,7 +124,8 @@ def test_the_sample_names_the_proxys_answers_only_with_the_flag():
 	px = Proxy()
 	s = run_sample(None, cwd=None, proxy=px, population=None, env={}, launch=lambda env: Proc(), note_replies=True,
 		single=True)  # fmt: skip
-	assert "proxy answered 400 unpriced_model (muse-spark-1.3) x2, 429 sample_complete" in s.selection
+	assert "proxy answered 400 unpriced_model (muse-spark-1.3bx/b) x2, 429 sample_complete" in s.selection
+	assert "404" not in s.selection and "<" not in s.selection
 	assert px.kw.get("single") is True
 	off = run_sample(None, cwd=None, proxy=px, population=None, env={}, launch=lambda env: Proc())
 	assert "proxy answered" not in off.selection and "single" not in px.kw

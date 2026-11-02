@@ -28,6 +28,7 @@ A script that reads PREFLIGHT_SAMPLE_TASKS can stop by itself.
 
 import os
 import random
+import re
 import signal
 import subprocess
 import time
@@ -103,8 +104,10 @@ class _LocalProc:
 
 
 def _own_reply(status: int, code: str, model: str | None, n: int) -> str:
-	"""400 unpriced_model (muse-spark-1.3) x2"""
-	return f"{status} {code or 'error'}" + (f" ({model[:40]})" if model else "") + (f" x{n}" if n > 1 else "")
+	"""400 unpriced_model (muse-spark-1.3) x2; a model name is the script's, so only its plain characters"""
+	name = re.sub(r"[^\w./:-]", "", model or "")[:24]
+	code = re.sub(r"[^a-z0-9_.]", "", code or "")[:32] or "error"
+	return f"{status} {code}" + (f" ({name})" if name else "") + (f" x{n}" if n > 1 else "")
 
 
 def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: int | None,
@@ -202,11 +205,12 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		"stalled": f", stopped after {stall_s:.0f} s with no model calls"}.get(cut, "")  # fmt: skip
 	parts.insert(1, f"script wall {wall:.0f} s{why}")  # how it ended survives the 200-character cut
 	failed = (getattr(proc, "report", None) or {}).get("error") if ended == "exited" else None
+	own = proxy.own_replies() if note_replies and hasattr(proxy, "own_replies") else []
+	own = [r for r in own if r[0] != 404]  # a stray request at the tunnel's address, not the script's
+	if own:  # what the script heard from the proxy itself, which its SDK may not say
+		parts.insert(2, "proxy answered " + ", ".join(_own_reply(*r) for r in own[:2]))
 	if failed:  # probes.agent_error_line: why a script that made no calls stopped, ahead of the rest
 		parts.insert(2, f"script failed: {failed}")
-	own = proxy.own_replies() if note_replies and hasattr(proxy, "own_replies") else []
-	if own:  # what the script heard from the proxy itself, ahead of its own error (which may not say)
-		parts.insert(2, "proxy answered " + ", ".join(_own_reply(*r) for r in own[:3]))
 	if cut == "stalled" and waiting:
 		w = at_cut.get("peak_concurrent") or 1
 		parts.insert(2, f"{len(waiting)} ended on a tool call, up to {min(w, len(waiting))} may be stuck")
