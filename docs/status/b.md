@@ -197,9 +197,9 @@ Scored with `scripts/score_validation.py` (dry run on the zoo today: `tests/fixt
 - "Fits" on L4 and A10 fine-tunes: 19 held-out runs can't show P(OOM) below 2.5%, so nothing reads "fits"; a choice for Chiya (`from-b.md`).
 
 ## Next (Sun Nov 1, evening)
-- Spark Open labels the whole corpus (up to $10): a 48-row pilot first, then the rest, then the agreement with Wilson intervals.
+- Spark Open labelled the whole corpus: done, $8.79 of the $10 (`corpus/DATASHEET.md`).
 - The top-up, once the PM clears the list; then refit the cross-GPU band and the GBDT residual, rescore leave-one-GPU-out with five GPUs, and post the table as it comes out.
-- LC-PFN: the port is built and matches the package's code; the CPU check on the published checkpoints runs next (`lcpfn_app.py::check`, about $0.02).
+- LC-PFN: ported and checked on the published checkpoints (quantiles to 1e-6); `lossforecast.ensemble` combines it with the power law. Not in `predict()` yet: it needs a runner hook (A) and a check on real probe losses.
 - Serving calibration when A's capped vLLM record lands (the simulation now carries capped outputs past the cap).
 
 ## Earlier (Sun Nov 1)
@@ -255,6 +255,9 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-glimmer-deploy` (GitHub run 41331603537, pre-approved): `modal deploy` of `preflight-glimmer`; endpoint `https://shuureiyashi99--preflight-glimmer-glimmer-serve.us-east.modal.run`, proxy auth on, min 0 and max 1 containers, scaled to zero after 120 s idle; no container started by the deploy | none | 1 | $0.00. **Glimmer total about $0.44 of the $2** |
 | Nov 1 | `b-spark-open-labels` (GitHub run 41333478249, pre-approved up to $1): Muse Spark Open labelled 64 of 73 failed corpus rows (80 calls; 16 failed: 8 at the 8,192-token output cap, $0.28 of the spend, 6 timeouts at 20 s, 2 re-asks cut off); agreement with B's rule labels: out-of-memory rows 11 of 17, 65% (Wilson 41% to 83%), the real test; diverged runs 41 of 41 (a non-finite step is in the evidence); 52 of 58 in all | Baseten API | about 9 (wall) | $0.54 of the $1 (37,471 tokens in, 115,463 out) |
 | Nov 1 | `b-spark-open-relabel` (GitHub run 41340028097, under $0.50): the 9 unanswered rows with a 16,384-token cap and 90 s; 8 answered, 1 ran past the cap twice. Final agreement: out-of-memory rows 15 of 21, 71% (Wilson 50% to 86%); diverged runs 44 of 44; 59 of 65 in all, 91% (81% to 96%) | Baseten API | about 5 (wall) | $0.17 (10 calls; labels $0.70 in all) |
+| Nov 1 | `b-lcpfn-check` (GitHub run 41365962299, CPU): the port (`corpus/lcpfn.py`) on both published checkpoints in torch 2.8.0, loaded with `weights_only=True`: the package's quantiles reproduced to 1e-6 on both; a falling loss seen for 200 of 2,000 steps forecast at 2.15 (1.92 to 2.39) against the true 2.09 | CPU x 2 | 8 s (function), about 3 (wall) | about $0.01 |
+| Nov 1 | `b-spark-all-pilot` (GitHub run 41365960062, budget $0.30): 48 rows in 7 batches, 40 answered; one batch failed twice at the 12,000-token cap | Baseten API | 2 (wall) | $0.20 |
+| Nov 1 | `b-spark-all-labels` (GitHub run 41366240357, budget $9.30): all 2,339 rows in 293 batches, 1,997 answered; agreement in `corpus/DATASHEET.md` | Baseten API | 14 (wall) | $8.59 recorded. **Whole-corpus labels $8.79 of the $10** |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 
