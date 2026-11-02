@@ -52,6 +52,28 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 16:52 UTC | none (Meta API) | about 2 | 0.107 of Muse Spark [derived: tokens at list price; any search-tool fee unknown] | `d-spark-search-validate` (41485593441): 8 calls on the zoo's failures, 1 source kept, 0 made up or irrelevant (`docs/decisions/spark-search.md`) |
 | Nov 2, 16:52 UTC | none (GitHub CPU runner) | about 3 | 0 | `d-watch-cpu-check` (41485598315): `preflight watch` on `zoo/notebook_tiny` on CPU works; no alert, as CLI records have no bands |
 | Nov 2, 17:20 UTC | A10 (both scripts) | about 11 (633 s of containers) | 0.19 [derived: container time at list price] | `d-lr-range-gpu` (41490183749): the range test on LoRA and nanoGPT, both train at the suggestion (`docs/decisions/lr-range.md`) |
+| Nov 2, 18:21 UTC | none (Meta API) | about 2 | 0.110 of Muse Spark [derived: tokens at list price] | `d-bigrepo-spark-map` (41499720563): Muse Spark's script map on the three big repositories, flag on |
+
+## Mon Nov 2, 13:40 ET (item 1: Muse Spark's map on the three repositories)
+
+CI on `ad6290e`: green, all seven jobs.
+
+`d-bigrepo-spark-map` (GitHub 41499720563, US$0.110 [derived], three calls of 19,002 to 20,905 input tokens, all ok) [measured], with `runner.read_closure` on, each repository fetched and mapped as a check-in would:
+
+| Repository | Static map | With Muse Spark | Judged |
+| --- | --- | --- | --- |
+| lm-evaluation-harness | `pretrain`, no knobs | `eval`, framework `other`; risks name it evaluation-only | Right lens now; no knobs (likely because its settings are command-line flags; the run doesn't show why) |
+| vLLM | `serving`, `vllm`; knobs batch_size 1, max_new_tokens 16, seq_len 1024, temperature, pin_memory, precision | the same, plus group_size and n_tasks; its risks say the static map's temperature, pin_memory and precision came from files other than the entry point, and that it invented a Qwen3-0.6B model and training settings and an agent loop | Right lens; the merged map still keeps the knobs Muse Spark flagged, so its knobs can't be trusted as the benchmark's settings |
+| torchtune | `pretrain`, knobs gpus 2 and temperature | unchanged: `pretrain`, the same two knobs (though its own risks say single-device only) | Wrong lens, and no real knobs. The repository was read whole and its YAML configs were among the mapped files, but nothing links the recipe to the config its command names (`qwen2_5/1.5B_lora_single_device` in the unseen list's command; this run passed no arguments) |
+
+So the fix ends the refusals, but two of three still map poorly, and the records say what was read, not that the map is right. That's the mapper's reading of big code (A's, with Muse Spark), not the reading: three follow-ups, none built:
+- **Settings from imported files:** with a closure, the static map's knobs can come from library code (Muse Spark says so of three of vLLM's), and the merge keeps them. Knobs should come from the entry point and the files its settings flow through, not every file read.
+- **Configs named on the command line:** torchtune's settings are in a YAML file its command names; linking the recipe to that file (from the arguments) would give the map its knobs.
+- **Lens on recipes:** the static reader calls a LoRA recipe `pretrain`, and Muse Spark kept it.
+
+Item 1's spend: US$0.11 of its US$1. Told A in `from-d.md`. Fact-check (read-only, against the run's output): numbers matched; it caught "library defaults" naming knobs the output doesn't attribute, "honest about what they read", the torchtune config cause (the configs were read; nothing links them), and the lm-eval reason as stated fact. Corrected.
+
+This push sends: `docs/status/d.md`, `docs/requests/from-d.md`.
 
 ## Mon Nov 2, 13:25 ET (Chiya's new item 1: repositories too big to read; built behind `runner.read_closure`)
 
