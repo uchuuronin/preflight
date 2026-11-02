@@ -421,8 +421,15 @@ def ground_failure(
 			id=f"search.{probe.id}",
 			severity="info",
 			code="search.none_found",
-			title=f"No known issue found for probe {probe.id}'s error",
-			detail="Muse Spark searched for a known library or version issue matching this error and found none.",
+			title=f"No known issue found for probe {probe.id}'s error"
+			if not dropped
+			else f"No checked source for probe {probe.id}'s error",
+			detail=(
+				"Muse Spark searched for a known library or version issue matching this error and found none."
+				if not dropped
+				else f"Muse Spark named {len(dropped)} source{'s' if len(dropped) != 1 else ''} for this error, but "
+				"none could be checked against what its search returned, so none is shown."
+			),
 			source="model",
 			evidence=ev,
 		), calls

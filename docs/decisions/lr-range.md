@@ -98,10 +98,19 @@ The fixes then had their own read-only review, whose two blocking findings are f
 Tests added for each, and for the cache key unchanged with no range test, a budget refusal, the
 dollar cap and `nproc > 1` (that guard was already there).
 
+**The GPU check re-run with the new test** (`d-lr-range-gpu-2`, GitHub 41528070349, Nov 2, 21:24
+UTC, `ws-d` `7263013`, an A10 both times) [measured]: both scripts read **checked** now under the
+real test (the updates grew with the ramp). Suggestions as before: LoRA 7.9e-5 (own 1e-4),
+nanoGPT 2.5e-4 (own 6e-4). Divergence read at 1.2e-2 for LoRA (7.6e-3 before) and 0.72 for
+nanoGPT (1.0 before): one run each, so the divergence point moves between runs by about a factor
+of 1.5. 50 steps at the suggestion didn't diverge on either (LoRA 1.283 to 1.216, nanoGPT 8.74 to
+6.01), nor at the scripts' own rates. The confirmation runs' losses now come back (they were empty
+after the first round of fixes). Cost: US$0.18 for 596 s of A10 containers [derived: container
+time at list price]; item 3's spend is US$0.37 of its US$2.
+
 ## What's next
 
-- A's re-check of the fixes, and a re-run of the GPU check with the new test (the old "checked"
-  above doesn't count).
+- A's re-check of the fixes.
 - B: read `lr_range.suggested_lr`, `lr_range.diverged_lr` and the curve (`lr_range.lr.NNN`,
   `lr_range.loss.NNN`, `probes.lr_range.curve()`) into the guide; C: draw the curve with the
   suggested and diverged rates marked. Both asked in `from-d.md`.

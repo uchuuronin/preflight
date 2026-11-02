@@ -79,9 +79,25 @@ A reviewed `03d0e5f` (`from-a.md`): ready to merge off, six things before it goe
    viewer: the reason item 3 matters.
 6. **Tests** for each, in `tests/test_d_search_grounding.py` and `tests/test_pipeline.py`.
 
-Not yet checked against Meta's real API: whether it takes `max_tool_calls`, and whether its search
-actions are typed `search` (the fee counts on that). The validation is re-run on this code before
-the flag goes on.
+**The validation re-run on this code** (`d-spark-search-validate-2`, GitHub 41529989287, Nov 2,
+21:37 UTC, `ws-d` `5dcf16a`; the same 10 cases, 7 sent) [measured]:
+
+- Meta took `max_tool_calls`: every call ok, 1 to 4 searches each (no call over 4; whether Meta
+  enforces the cap isn't shown). Its search actions are typed `search`, so the fee is counted.
+- 6 of 7 answered "none found", as in the first run, all right by my judgement (the same cases).
+- The known issue (pyarrow needs NumPy 2) went the other way: the model searched, opened three
+  GitHub pull requests whose titles name this exact conflict, and answered "found" with them;
+  **but this time the response carried no `url_citation` annotation at all**, so code dropped all
+  three and the finding showed none. The first run kept one source. So whether Meta annotates is
+  not stable between runs, and with the annotation rule that costs recall (0 of 1 here). The
+  finding used to say "found none" then, which wasn't true; it now says the model named sources
+  that couldn't be checked.
+- The planted link again wasn't repeated, so that check stays inconclusive.
+- Cost: US$0.142 for the 7 calls [derived: tokens at list price plus the search fee at the
+  second-hand rate above].
+
+So the code is checked against Meta's API; whether the annotation rule leaves enough sources to be
+useful is the open question for turning it on.
 
 ## Before `harness.spark_search` goes on
 

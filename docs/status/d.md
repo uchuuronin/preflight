@@ -62,6 +62,26 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 16:52 UTC | none (GitHub CPU runner) | about 3 | 0 | `d-watch-cpu-check` (41485598315): `preflight watch` on `zoo/notebook_tiny` on CPU works; no alert, as CLI records have no bands |
 | Nov 2, 17:20 UTC | A10 (both scripts) | about 11 (633 s of containers) | 0.19 [derived: container time at list price] | `d-lr-range-gpu` (41490183749): the range test on LoRA and nanoGPT, both train at the suggestion (`docs/decisions/lr-range.md`) |
 | Nov 2, 18:21 UTC | none (Meta API) | about 2 | 0.110 of Muse Spark [derived: tokens at list price] | `d-bigrepo-spark-map` (41499720563): Muse Spark's script map on the three big repositories, flag on |
+| Nov 2, 21:24 UTC | A10 (both scripts) | about 10 (596 s of containers) | 0.18 [derived: container time at list price] | `d-lr-range-gpu-2` (41528070349): the range test with the new "checked"; both scripts checked, the same suggestions (`docs/decisions/lr-range.md`) |
+| Nov 2, 21:37 UTC | none (Meta API) | about 1 | 0.142 of Muse Spark [derived: tokens at list price plus the search fee, US$2.50 per 1,000, second-hand] | `d-spark-search-validate-2` (41529989287): the fixed search on the same cases; Meta takes `max_tool_calls`; no annotations this time, so the known issue's three sources were dropped (`docs/decisions/spark-search.md`) |
+
+## Mon Nov 2, 16:55 ET (both re-runs: the range test checked on a GPU; search checked on Meta's API)
+
+CI on `5dcf16a`: green, all seven jobs.
+
+- `d-lr-range-gpu-2` (A10, US$0.18 [derived]): both zoo scripts read **checked** under the new test,
+  with the same suggestions (LoRA 7.9e-5, nanoGPT 2.5e-4); details in `docs/decisions/lr-range.md`.
+  Item 3's spend: US$0.37 of its US$2.
+- `d-spark-search-validate-2` (Meta API, US$0.142 [derived, fee second-hand]): Meta takes
+  `max_tool_calls`, and its search actions are typed `search`. 6 of 7 "none found" as before; the
+  known pyarrow issue's three sources (GitHub pull requests naming the exact conflict) were all
+  dropped because this response carried no citation annotations at all (the first run kept one).
+  So recall under the annotation rule is the open question for turning it on; told A. The
+  finding no longer says "found none" when it dropped sources it couldn't check.
+
+This push sends: `harness/search_grounding.py` (the dropped-sources wording),
+`tests/test_d_search_grounding.py`, `docs/decisions/spark-search.md`, `docs/decisions/lr-range.md`,
+`docs/requests/from-d.md`, this file.
 
 ## Mon Nov 2, 16:35 ET (the PM's 4:25 list: A's search grounding review fixed; main merged; shot 9b)
 
