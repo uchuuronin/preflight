@@ -107,9 +107,9 @@ def score(curves_path: Path, pfn_path: Path, jobs: int = 1) -> dict:
 					continue
 				lo, mid, hi = v
 				t["scored"] += 1
-				t["covered"] += lo <= truth <= hi
+				t["covered"] += int(bool(lo <= truth <= hi))  # the power law's ends are numpy floats
 				if mid > 0:
-					t["log_err"].append(abs(math.log(mid / truth)))
+					t["log_err"].append(float(abs(math.log(mid / truth))))
 		row = {}
 		for m, t in tally.items():
 			n, k = t["scored"], t["covered"]
