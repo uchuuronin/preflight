@@ -255,3 +255,37 @@ def test_the_scorer_predicts_under_the_flags_it_is_given():
 	finally:
 		api.predict = orig
 	assert seen and all(seen) and api.feature("rl") == before  # on for the scoring only
+
+
+def test_the_cross_gpu_row_counts_its_gpu_types_and_names_the_lowest():
+	from preflight.corpus import validate
+
+	assert validate._ordinal(5) == "5th" and validate._ordinal(2) == "2nd" and validate._ordinal(13) == "13th"
+	cs = [
+		{"tgt": "A10", "k1": 1.0, "actual": 1.0},
+		{"tgt": "A10", "k1": 1.0, "actual": 1.0},
+		{"tgt": "T4", "k1": 2.0, "actual": 1.0},
+		{"tgt": "T4", "k1": 1.0, "actual": 1.0},
+	]
+	assert validate._lowest(cs) == "T4, 1 of 2"
+
+
+def test_every_row_says_whether_it_was_measured_simulated_or_not_run_yet():
+	# Nov 2 overnight list: each row's Status column says what its number stands on
+	m = json.loads((FIX / "manifest_nov2.json").read_text())
+	rows, _ = V.build(m, FIX, None)
+	status = {r.metric: r.cells()[6] for r in rows}
+	assert V.HEADER[6] == "Status" and all(len(r.cells()) == len(V.HEADER) for r in rows)
+	assert set(status.values()) <= {"measured", "simulated", "not yet run", "test suite"}
+	assert status["Agent run total cost"] == "measured" and status["Peak memory error"] == "not yet run"
+	assert status["GNN + GBDT ensemble vs GBDT alone"] == "simulated"
+	assert status["Knob response"] == "measured"  # read from the stranger test's own file
+	agent = _row(rows, "Agent run total cost")
+	assert agent.hits == 1 and "the full run cost $6.66" in agent.note
+
+
+def test_the_knob_row_reads_the_stranger_tests_file(tmp_path):
+	(tmp_path / "k.json").write_text(json.dumps({"knob_ms": [100, 500], "cpu_slowdown": 4}))
+	ms, src = V.knob_ms("k.json", tmp_path)
+	assert ms == [100.0, 500.0] and "cpu slowdown 4x" in src
+	assert V.knob_ms([1, 2], tmp_path) == ([1.0, 2.0], "")

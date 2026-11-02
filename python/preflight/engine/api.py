@@ -2862,6 +2862,72 @@ def local_values(knob: Knob) -> list:
 	return sorted({float(f"{v:.4g}") for v in vals} | {float(knob.current)})
 
 
+def probed_values(record: FlightRecord, knob: Knob) -> list:
+	"""Every value of this knob a probe ran at (ok, cached, or out of memory: each one measured)."""
+	out = []
+	for p in record.probes:
+		if p.status in (*OK_PROBE, "oom"):
+			v = _probe_values(record, p).get(knob.id)
+			if v is not None and not any(_same(v, w) for w in out):
+				out.append(v)
+	return out
+
+
+def _with_probed(record: FlightRecord, knobs_: list[Knob], axes: list[list]) -> list[list]:
+	"""Each axis with every probed value of its knob and its current value in (PM, Nov 2: the pretrain sample probed
+	batch 8 and 12, but its batch grid's ladder around 12 skipped 8, so the probed setting read "not trusted").
+	Inside the cell budget: when the extra stops push a grid over it, the stops farthest from the current value that
+	no probe ran at go first."""
+	out = []
+	for k, ax in zip(knobs_, axes, strict=True):
+		if k.kind in ("bool", "categorical"):
+			out.append(ax)
+			continue
+		keep = [*probed_values(record, k), k.current]
+		lo, hi = k.domain.min, k.domain.max
+		extra = [
+			(int(v) if k.kind == "int" else float(v))
+			for v in keep
+			if isinstance(v, int | float) and not isinstance(v, bool)
+			and (k.kind != "int" or float(v).is_integer())  # review: int(8.5) is a value no probe ran at
+			and (lo is None or v >= lo) and (hi is None or v <= hi)
+		]  # fmt: skip
+		vals = list(ax)
+		for v in extra:
+			if not any(_same(v, w) for w in vals):
+				vals.append(v)
+		out.append(sorted(vals))
+
+	def droppable(j: int) -> list:
+		protected = [*probed_values(record, knobs_[j]), knobs_[j].current]
+		return [v for v in out[j] if not any(_same(v, w) for w in protected)]
+
+	while math.prod(len(a) for a in out) > MAX_GRID_CELLS:
+		# drop one unprobed stop from the longest axis that still has one (review: not just the longest, which may
+		# be all probed values), the stop farthest (in log) from the current value
+		open_ = [j for j in range(len(out)) if knobs_[j].kind not in ("bool", "categorical") and droppable(j)]
+		if not open_:
+			break
+		i = max(open_, key=lambda j: len(out[j]))
+		k = knobs_[i]
+		cands = droppable(i)
+		cur = (
+			float(k.current)
+			if isinstance(k.current, int | float) and not isinstance(k.current, bool)
+			else 0.0
+		)
+
+		def dist(v, cur=cur):
+			try:
+				return abs(math.log(float(v) / cur)) if v > 0 and cur > 0 else abs(float(v) - cur)
+			except (TypeError, ValueError):
+				return 0.0
+
+		drop = max(cands, key=dist)
+		out[i] = out[i][: out[i].index(drop)] + out[i][out[i].index(drop) + 1 :]
+	return out
+
+
 def build_grids(
 	record: FlightRecord, knob_ids: list[str], targets: list[str] | None = None, local: bool = False
 ) -> list[Grid]:
@@ -2871,6 +2937,7 @@ def build_grids(
 	axes_knobs = [record.knob(k) for k in knob_ids]
 	per = 8 if len(knob_ids) <= 2 else 5
 	axes = [local_values(k) if local else axis_values(k, per) for k in axes_knobs]
+	axes = _with_probed(record, axes_knobs, axes)
 	cells = math.prod(len(a) for a in axes)
 	if cells > MAX_GRID_CELLS:
 		raise ValueError(f"{cells} cells is over the inline limit of {MAX_GRID_CELLS}")

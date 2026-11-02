@@ -1,8 +1,26 @@
 # Status · B (prediction engine and corpus)
 
-Updated Sun Nov 1, 11 AM ET, on `ws-b` (merges, not rebases, for pushed commits).
+Updated Mon Nov 2, about 1 AM ET, on `ws-b` (merges, not rebases, for pushed commits).
 
 **Unseen scripts:** B has not opened `unseen-scripts.md` in the Project, and won't before Monday's scoring.
+
+## Decisions overnight (Nov 2, under Chiya's 12:16 AM autonomy note)
+
+| # | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 1 | **Grid fix:** every 1-D grid axis (and every grid) now holds each probed value of its knob and the knob's current value, inside the 16,384-cell budget; when the extra stops push a grid over it, the unprobed stops farthest from the current value go first (0755724, review fixes 717312c). | The PM's bug: the pretrain sample probed batch 8 and 12, but its batch axis was [2, 3, 6, 12, 24, 48, 96], so the probed batch 8 read "not trusted". | none | revert 0755724 and 717312c, refill `schema/examples/pretrain.json` |
+| 2 | **Records changed by the sweep:** only `schema/examples/pretrain.json` (refilled; its five 1-D batch grids gain 8, which is now trusted (memory and P(OOM) abstain only at 48 and 96; time and cost grids at 2, 48 and 96, and no longer at 3)). `campaign-grid.record.json` gains 8 too, but its stored grids already hold it, so it needed no refill. The other 14 of the 16 records (examples, web fixtures, zoo) have no off-grid probed value. | The PM asked which records changed. | none | as 1 |
+| 3 | **`finetune.json` not refilled.** | A refill makes eval batch 4 read "fits" there, which breaks C's guide test "says honestly that nothing safe can be moved" (`web/src/guide/guide.test.ts`); that's C's call. | none | refill it with `PREFLIGHT_GOLDEN_ENGINE=1 uv run python scripts/make_golden.py` once C updates the test |
+| 4 | **Validation readiness:** the scorer run on every full run we have, on table 50ea0fb14a; the table is in `docs/validation/table-nov2.md` and between the markers in `README.md` and `docs/readme-final.md`. A new **Status** column says measured, simulated or not yet run (ab6e310). | Overnight item 2. | none | revert ab6e310 |
+| 5 | **The agent row, on A's 500-task MBPP run:** the 30-task sample's 90% interval, $5.90 to $13.71 (point $7.15), holds the whole run's **$6.66** (the 30 sampled, $0.43, plus the other 470, $6.23, run 41383158427; all 470 ended done). Hit, 1 of 1. The point is 7% high. | Overnight item 3: written either way. | none | drop `agent_total_usd` from the manifest |
+| 6 | **Knob response row from C's stranger test**, run in B's container on a local build of main cfcf83c (18 of 18 checks passed): p95 198 ms at 4x CPU slowdown, 9 of 9 under 400 ms. The manifest's `knob_ms` now takes the test's own file, as C asked. | The deployed site isn't reachable from here; main's own build is the same web code. | none | drop `knob_ms` from the manifest |
+| 7 | **The GRPO A10 run counts as calibration for every row** in the validation manifest. | Its record's only probe is that 50-step run, so predicting it from itself tests nothing, and it calibrated the rollout band. | none | change its `calibrates` |
+| 8 | **`engine.serving` stays off.** | No vLLM full run has finished (A's serving debug run of Nov 1 hit its 420 s limit at 24 of 1,024 prompts, with 251 KV preemptions), so the serving rows have nothing to score and the simulation is checked against no measured throughput. | none | the PM flips it once a vLLM full run scores within 15% |
+| 9 | **`engine.divergence` stays off.** | The classifier misses held out: AUROC 0.66 (95% 0.56 to 0.76) against 0.85; lead 138 steps (3 to 269). The threshold rules (D6) give the warning either way. | none | none needed |
+| 10 | **LC-PFN is not wired; no loss forecast ships.** Held out on the divergence sweep's 676 runs that didn't diverge (seen for 60 or 150 of 600 steps; LC-PFN on Modal, CPU, run 41397869309): the power law's 90% band covers 24% and 23%; LC-PFN's 93% (Wilson 90 to 95%) at 60 steps but 74% (70 to 77%) at 150; the ensemble 92% and 89.6% of the curves it answers, abstaining on 380 and 129 (40% and 72% over all 676). Report: `corpus/reports/loss_coverage_nov2.json`; the card is in `engine/lossforecast.py`. | Overnight item 6: wired only where its held-out coverage meets the 90% band. It does at 60 steps alone, on one model family, and falls as the probe sees more, so I didn't wire that one case. The forecast was never in `predict`, so nothing shown changes. | about $0.01 | none needed; to revisit, rerun `scripts/loss_coverage.py` on other job types |
+| 11 | **Datasheet labelling write-up:** already on `ws-b` (213ba35, pushed Nov 1): model-written labels, 62% memory agreement, divergence 89% against a 94% always-"stable" baseline, 39 of 41 failure kinds, nothing trains on them. | Overnight item 4. | none | — |
+| 12 | **RL entropy hook memory probe:** done before midnight under the PM's approval (A10, about $0.15, 80b8684): no OOM; 21.46 GB allocated and 22.91 GB reserved of 23.68 GB. | Overnight item 5. | $0.15 (Nov 2's standing yes) | — |
+| 13 | **Option (b) for the fits floor and table 50ea0fb14a** were landed before midnight on Chiya's and the PM's calls (Nov 1, 9:47 PM and 11:58 PM); listed so the morning sees them in one place. | — | — | the old table is saved; revert the install commit |
 
 ## Plan items B owns (updated Sun Nov 1, 1 AM ET)
 
@@ -262,6 +280,7 @@ Every run through `remote-run.yml` or `amd-run.yml`, with its GPU, minutes and d
 | Nov 1 | `b-topup-seed0` (GitHub run 41376298722, the same caps): H100 199 more (492 in all), L40S 99 more (392) | H100, L40S | 25 (wall) | $3.68 |
 | Nov 1 | `b-topup-export` (GitHub run 41378563052): failed, the one-list read ran past 15 minutes | CPU | 16 (wall) | about $0.02 |
 | Nov 1 | `b-topup-export-2` (GitHub run 41380335963): every GPU's rows, per GPU, gzipped | CPU | 6 (wall) | about $0.02. **Top-up total about $16.54 of the $25** |
+| Nov 2 | `b-grpo-entropy-check` (GitHub run 41391382671, Chiya's yes, under $1): zoo/grpo_trl through ground_truth with the TRL 0.14 entropy hook, 2 bare and 12 recorder steps; no OOM, peak 21.46 GB allocated and 22.91 GB reserved of 23.68 GB; rl.entropy 12 values, 0.33 to 0.50 nats (rl_entropy_exact) | A10 x 1 | 8 (wall), about 450 GPU-s | about $0.15 |
 
 **Measured:** phase 0 and phase 1's first run, plus A's sitting and both ground-truth attempts, cost **at most $1.55 combined**, from Modal's monthly total ($1.91 for October, all credits). Phase 1's resume adds $1.37 by the bound.
 

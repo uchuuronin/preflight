@@ -10,6 +10,8 @@ Codes match by their longest known prefix; an unknown code falls back to its fam
 generic line, so a new code never goes out with no step.
 """
 
+from preflight.runner.queue import VISITOR_DAILY_JOBS as _DAILY
+
 STEPS: dict[str, tuple[str, str]] = {
 	# the job, before any probe
 	"submission": (
@@ -19,6 +21,51 @@ STEPS: dict[str, tuple[str, str]] = {
 		"`preflight run train.py`",
 	),
 	"submission.files_gone": ("reading the uploaded files", "upload the files again"),
+	"submission.invalid": (
+		"reading the job request",
+		"check the script in again from the page; if you built the request yourself, compare it with the API's JobRequest",
+	),
+	"submission.sample_unknown": ("finding the sample", "pick a sample from the list on the page"),
+	"submission.record_unknown": (
+		"finding the record",
+		"open the record from its link again, or check the script in afresh",
+	),
+	"submission.no_sample": (
+		"sampling the agent's tasks",
+		"check the script in once first, then ask for more tasks",
+	),
+	"submission.sample_full": (
+		"sampling the agent's tasks",
+		"the record holds every task it can sample; to measure more, run the benchmark yourself, or "
+		"`preflight run agent.py --agent-max-usd 5` on your machine for a 30-task sample of your own",
+	),
+	"submission.not_agent": (
+		"choosing how to probe the script",
+		"more tasks are for agent runs; probe a training script's settings instead",
+	),
+	"submission.not_gpu_job": (
+		"choosing how to probe the script",
+		"an agent run is measured by sampling tasks: ask for more tasks instead of a GPU probe",
+	),
+	"patch.does_not_apply": (
+		"applying the fix",
+		"the fix doesn't apply to the code as it is (the code changed, or the fix changes nothing): "
+		"check the script in again, then ask for the fix",
+	),
+	"patch.not_allowed": (
+		"applying the fix",
+		"a fix may only edit the script's own text files; apply it by hand (`git apply fix.patch`) and probe the result",
+	),
+	# the demo's limits (runner/queue.py QueueFull codes): not a failure of the script
+	"limit.visitor_daily": (
+		f"the demo's daily limit ({_DAILY} probe jobs a visitor a day)",
+		"come back after midnight ET, open a sample meanwhile, or probe on your machine with `preflight run train.py`",
+	),
+	"limit.daily_spend": (
+		"the demo's daily GPU budget",
+		"come back after midnight ET, open a sample meanwhile, or probe on your machine with `preflight run train.py`",
+	),
+	"queue_full": ("waiting for a place in the queue", "submit again in a minute or two"),
 	"submission.code_changed": (
 		"checking the record's code",
 		"check the record in again from the code as it is now",

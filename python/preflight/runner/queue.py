@@ -188,6 +188,26 @@ class JobStore(Protocol):
 	def events(self, job_id: str, after: int = -1) -> list[JobEvent]: ...
 
 
+GPU_WAIT_PREFIX = "waiting for a free "  # the probing message a GPU wait starts with (pipeline.py)
+
+
+def _waiting_for_gpu(job) -> dict | None:
+	"""The GPU a running job's probe is waiting for and since when, from its latest events."""
+	if job.status != "running" or not job.events:
+		return None
+	last = job.events[-1]
+	msg = str(last.get("message") or "")
+	if last.get("stage") != "probing" or not msg.startswith(GPU_WAIT_PREFIX):
+		return None
+	since = last.get("at")
+	for ev in reversed(job.events):  # the first notice of this wait
+		m = str(ev.get("message") or "")
+		if ev.get("stage") != "probing" or not m.startswith(GPU_WAIT_PREFIX):
+			break
+		since = ev.get("at")
+	return {"gpu": msg.removeprefix(GPU_WAIT_PREFIX).split(" ", 1)[0], "since": since}
+
+
 def body_hash(request: dict) -> str:
 	return hashlib.sha256(json.dumps(request, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -655,10 +675,13 @@ class InMemoryJobStore:
 			return self._job(job_id).status
 
 	def info(self, job_id: str) -> dict:
-		"""What GET /v1/jobs/{id} shows: status, queue position, where the record is, and why it failed."""
+		"""What GET /v1/jobs/{id} shows: status, queue position, where the record is, and why it failed.
+		waiting_for_gpu: while a running job's probe waits for a GPU, {"gpu", "since"} (the runner's
+		probing events, sandbox_runner.notify), so a queue wait doesn't read as a hang (D, Nov 1)."""
 		with self._lock:
 			job = self._job(job_id)
 			return {
+				"waiting_for_gpu": _waiting_for_gpu(job),
 				"job_id": job.job_id,
 				"status": job.status,
 				"position": self._position(job_id),

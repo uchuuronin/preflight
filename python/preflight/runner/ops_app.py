@@ -327,13 +327,17 @@ def smoke(
 	modal_env: str = "",
 	visitor: str = "smoke",
 	notebook: str = "",
+	dir: str = "",
+	entrypoint: str = "",
+	args: str = "",
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
 	Probes stay on `gpus` (comma-separated): L4 by default, since team runs use T4 or L4 unless
 	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder (to an
 	A100). --visitor: the queue's visitor (3 probe jobs a day each). --notebook path: check in an
-	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are). The job
+	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are).
+	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload. The job
 	is cancelled after `max_minutes`, or if this run fails partway. The job store is looked up in
 	the environment `modal run --env` names (modal_env overrides it). Writes out/smoke.json (every
 	event and the final status, or the error) and out/record.json (the flight record), which
@@ -349,6 +353,18 @@ def smoke(
 		if nb.suffix != ".ipynb" or Path(__file__).resolve().parents[3] not in nb.parents:
 			raise SystemExit(f"{notebook!r} isn't an .ipynb file in this checkout")
 		source = {"kind": "notebook", "files": {nb.name: nb.read_text()}}
+	if (entrypoint or args) and not dir:
+		raise SystemExit("--entrypoint and --args go with --dir (a sample or notebook names its own)")
+	if dir:  # any directory in this checkout, checked in as a visitor's upload (Monday's unseen scripts);
+		# _read_tree reads the text files the runner reads (data files such as .csv aren't sent)
+		from preflight.runner.sources import _read_tree
+
+		root = Path(__file__).resolve().parents[3]
+		src = (root / dir).resolve()
+		if root not in src.parents or not src.is_dir():
+			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
+		source = {"kind": "upload", "files": _read_tree(src), **({"entrypoint": entrypoint} if entrypoint else {}),
+			**({"args": _split_args(args)} if args else {})}  # fmt: skip
 	request = {
 		"source": source,
 		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
@@ -469,6 +485,18 @@ GT_FUNCTIONS = {
 }  # fmt: skip
 
 
+def _split_args(args: str) -> list[str]:
+	"""A script's arguments from one flag value. remote-run.yml's command allows no quotes, so
+	`--args=--epochs=1,--lr=3e-4` (commas, no spaces) is the form that gets through it, and `,,` a
+	comma inside a value; a value with spaces is split as a shell would."""
+	import shlex
+
+	if "," in args and " " not in args:
+		# ",," is a comma inside a value (--layers=1,,2,,3 gives --layers=1,2,3): a single comma separates
+		return [a.replace("\0", ",") for a in args.replace(",,", "\0").split(",") if a]
+	return shlex.split(args)
+
+
 @ops.local_entrypoint()
 def ground_truth(
 	script: str = "",
@@ -485,7 +513,7 @@ def ground_truth(
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
 	modal run --env main python/preflight/runner/ops_app.py::ground_truth --script vision_timm --bare-steps 300
-	modal run ... ::ground_truth --dir validation/unseen/s3 --entrypoint main.py --args "--epochs 1" \\
+	modal run ... ::ground_truth --dir validation/unseen/s3 --entrypoint main.py --args=--epochs=1 \\
 		--install-requirements --first-gpu A10
 
 	--script: a zoo script; --dir: any directory in this checkout (Monday's unseen scripts, from the
@@ -495,7 +523,6 @@ def ground_truth(
 	L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
 	Writes out/ground_truth_<name>.json."""
 	import json
-	import shlex
 
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
@@ -523,7 +550,7 @@ def ground_truth(
 	name = script or src.name
 	print(f"[ground truth] {name}: {entry}, lens {p['lens']}, {image} image, {len(files)} files; "
 		f"waiting for an {first}, else the {'L4' if first == 'A10' else 'A10'} (Modal queues it)", flush=True)  # fmt: skip
-	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(shlex.split(args)),
+	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(_split_args(args)),
 		install_requirements, sample, p["generate_calls"])  # fmt: skip
 	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
@@ -946,6 +973,115 @@ def triage(share: str, probe: str = "p1-eval", provider: str = "glimmer"):
 		f"[triage] {len(res.get('calls', []))} calls, ${res.get('usd', 0):.4f}, {res.get('wall_s')} s",
 		flush=True,
 	)
+
+
+# ---------------------------------------------------------------- the judging warm pool, without changing it
+
+
+@ops.local_entrypoint()
+def warm_pool_dry_run(modal_env: str = "main"):
+	"""modal run --env main python/preflight/runner/ops_app.py::warm_pool_dry_run
+	What the tick will do for judging (item 45), changing nothing: each hour from Nov 4 22:00 to
+	Nov 9 02:00 ET, the warm workers it wants and the probe GPU an L4 job gets; the deployed
+	run_worker's handle (that it can be scaled) and what the tick last set. Writes out/warm_pool.json."""
+	import datetime as dt
+	import time
+	import zoneinfo
+
+	from preflight.runner.judging import judging_gpu, warm_workers, window
+
+	et = zoneinfo.ZoneInfo("America/New_York")
+	t = dt.datetime(2026, 11, 4, 22, tzinfo=et)
+	rows, prev = [], None
+	while t <= dt.datetime(2026, 11, 9, 2, tzinfo=et):
+		ts = t.timestamp()
+		state = (warm_workers(ts), judging_gpu("L4", None, ts), judging_gpu("L4", ["L4"], ts))
+		if state != prev:  # the hours where something changes
+			rows.append({"et": t.isoformat(), "warm_workers": state[0], "l4_job_probes_on": state[1],
+				"l4_only_job_probes_on": state[2]})  # fmt: skip
+			prev = state
+		t += dt.timedelta(hours=1)
+	fn = modal.Function.from_name(APP_NAME, "run_worker", environment_name=modal_env)
+	try:  # a lazy handle has every method: hydrate it to know the deployed function exists (review)
+		fn.hydrate()
+		scalable = any(hasattr(fn, a) for a in ("update_autoscaler", "autoscaler"))
+	except Exception as exc:
+		scalable = f"not found: {type(exc).__name__}"
+	try:
+		last = modal.Dict.from_name("preflight-jobs", environment_name=modal_env).get("warm_workers")
+	except Exception as exc:
+		last = f"unread: {type(exc).__name__}"
+	out = {"window": window(), "changes": rows, "run_worker_scalable": scalable, "tick_last_set": last,
+		"now_wants": warm_workers(time.time())}  # fmt: skip
+	Path("out").mkdir(exist_ok=True)
+	Path("out/warm_pool.json").write_text(json.dumps(out, indent=2))
+	print(f"[warm] {json.dumps(out)}", flush=True)
+
+
+# ---------------------------------------------------------------- a private job's triage, as the worker runs it
+
+
+@ops.function(
+	image=worker_image,
+	secrets=[
+		modal.Secret.from_name("preflight-meta"),
+		modal.Secret.from_name("preflight-baseten"),
+		modal.Secret.from_name("preflight-glimmer"),
+	],
+	timeout=12 * 60,
+)
+def private_triage_check_hosted(record_json: str) -> dict:
+	"""The worker's own private-job triage (pipeline._triage, private=True) on a zoo record's failed
+	probes, with the worker's clients (modal_app._glimmer_client, _triage_client) and the same
+	secrets as run_worker, and harness.glimmer_private on in this process only (production keeps it
+	off). Passes when Glimmer made every call and Baseten none."""
+	import json as _json
+
+	from preflight.probes.local import ProbeResult
+	from preflight.runner import flags
+	from preflight.runner.modal_app import _glimmer_client, _triage_client
+	from preflight.runner.pipeline import Deps, _triage
+	from preflight.schema import Env, load_record
+
+	rec = load_record(record_json)
+	if not _ours(rec):
+		return {"error": "only a sample (zoo) record, not derived and without arguments"}
+	os.environ["PREFLIGHT_FLAGS"] = _json.dumps(
+		{"harness.glimmer_private": True, "harness.spark_open_triage": True}
+	)
+	flags.reload()
+	failed = [
+		p for p in rec.probes if p.status not in ("ok", "cached") and p.error and not p.extras.get("patched")
+	]
+	results = [ProbeResult(probe=p, env=Env(backend="cpu", provider="modal"), summary={}, kernels=None, arch=None,
+		trace_file=None, log_tail="", workdir=Path("/tmp")) for p in failed[:1]]  # fmt: skip
+	glimmer, spark = _glimmer_client(), _triage_client()
+	deps = Deps(records=None, runner=None, glimmer=glimmer, triage=spark)
+	out, findings = _triage(rec, results, deps, private=True)
+	made = out.provenance[len(rec.provenance) :]
+	return {"glimmer_configured": glimmer is not None, "probe": failed[0].id if failed else None,
+		"findings": [{"code": f.code, "title": f.title, "detail": f.detail} for f in findings],
+		"calls": [{"provider": c.provider, "ok": c.ok, "latency_s": c.latency_s, "cost_usd": c.cost_usd} for c in made],
+		"baseten_calls": len(spark.calls) if spark else 0,
+		"pass": bool(findings) and all(c.provider == "modal-glimmer" for c in made) and not (spark and spark.calls)}  # fmt: skip
+
+
+@ops.local_entrypoint()
+def private_triage_check(share: str):
+	"""modal run --env main python/preflight/runner/ops_app.py::private_triage_check --share <token>"""
+	import re
+	import sys
+
+	if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", share):
+		print("[private] a share token, please", flush=True)
+		sys.exit(2)
+	data = b"".join(records_vol.read_file(f"{share}.json")).decode()
+	res = private_triage_check_hosted.remote(data)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/private_triage_check.json").write_text(json.dumps(res, indent=2))
+	print(f"[private] {'PASS' if res.get('pass') else 'FAIL'}: {json.dumps(res)[:1500]}", flush=True)
+	if not res.get("pass"):
+		raise SystemExit(1)
 
 
 # ---------------------------------------------------------------- Glimmer vs Spark Open agreement (paid: ask first)

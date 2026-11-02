@@ -508,7 +508,13 @@ def _triage_client():
 
 @app.function(
 	image=worker_image,
-	secrets=[modal.Secret.from_name("preflight-meta"), modal.Secret.from_name("preflight-baseten")],
+	# preflight-glimmer: a private job's triage (harness.glimmer_private), key from the secret store
+	# only; without it a private check-in got no triage at all (C, Nov 1)
+	secrets=[
+		modal.Secret.from_name("preflight-meta"),
+		modal.Secret.from_name("preflight-baseten"),
+		modal.Secret.from_name("preflight-glimmer"),
+	],
 	volumes={RECORDS_DIR: records_vol, UPLOADS_DIR: _read_only(uploads_vol)},
 	timeout=WORKER_TIMEOUT_S,
 	max_containers=MAX_RUNNING,

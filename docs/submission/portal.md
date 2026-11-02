@@ -45,10 +45,10 @@ and labs planning a grid of runs both lose time this way.
 builds a model of how the job behaves. Then you fly the run in the browser:
 your job drawn as a map, four readouts (memory, time, cost, risk) with ranges, and knobs that move
 everything at once. Every number says how it was made: Measured, Predicted, Extrapolated, or Not
-trusted when Preflight is too far from anything it measured to give one. TODO(PM): at
-submission, say what the live app offers: checking in your own script needs `runner.queue`, and
-the plan to take away (settings, an edit script, a Slurm batch file, the command) needs
-`c.exports`; until those are on, the site opens samples and shared records.
+trusted when Preflight is too far from anything it measured to give one. On the live site you can
+check in your own repository or script (3 probe jobs a day while the site's GPU budget lasts), ask
+the guide, and take the plan away: the settings, an edit script, a Slurm batch file, the command
+and a Weights & Biases helper. Or open a sample or a shared record, at no cost.
 
 **What it caught in our test scripts.** We wrote one script per job type with problems planted
 on purpose, and ran them for real:
@@ -60,6 +60,9 @@ on purpose, and ran them for real:
   calls at list price, not one of 905,739 input tokens came from the cache.
 - A GRPO run on an L4 with a planted group setting: 15 of 20 prompts had no reward spread at all,
   so they teach nothing, and 95.3% of each step went to generating rollouts.
+- An evaluation sweep of reasoning models with no cap on thinking: in one probe on an A10, 8 of 16
+  generated answers ran to the 2,048-token cap without finishing, so they'd be cut off and scored
+  wrong.
 
 **How it works.** Probes run in Modal GPU sandboxes; an agent proxy counts every model call's
 tokens. A prediction engine (analytical models, learned corrections, conformal intervals and
@@ -68,16 +71,21 @@ computed in the browser from that record. A campaign mode plans a whole grid of 
 cluster's calendar.
 
 **Honest about what it doesn't know.** Predictions are checked against real full runs, hit or
-miss, in the README's validation table (scored Mon Nov 2). What misses is said: step time on a GPU
-Preflight never measured lands within 20% for 60% of held-out queries, under the 90% target, and
-the divergence classifier, refitted on 720 runs, scores a held-out AUROC of 0.66 (0.56 to
+miss, in the README's validation table (scored Mon Nov 2). What misses is said: across five GPU
+types (A10, H100, L4, L40S, T4), step time on a GPU Preflight never measured lands within 20% for
+57% of 6,694 held-out cases (rows from a Nov 1 top-up included, which the published corpus
+doesn't hold yet), under the 90% target, so it is shown with a wide band and labelled rough; and the divergence classifier, refitted on 720 runs, scores a held-out AUROC of 0.66 (0.56 to
 0.76) against a 0.85 target, so it is switched off. There are no
 AMD measurements yet, and every AMD figure says so.
 
 **The corpus published with a datasheet.** The 2,339 rows of GPU measurements behind the learned
 models and the held-out checks are a dataset on Hugging Face, public with the repository from
 Nov 3 to 4 (https://huggingface.co/datasets/chaoschia/preflight-corpus), with a datasheet that
-says how they were made, what they cover and where they are biased.
+says how they were made, what they cover and where they are biased. Muse Spark Open was asked to
+label every row (which part of memory dominates its peak, or whether and how a run diverged) for
+$8.79 of calls; set against our rule labels it agreed on 1,117 of 1,522 rows compared, and the
+datasheet says where it falls short: on divergence runs it did worse than simply answering
+"stable".
 
 **Built during the hackathon.** Everything in the repository was built Oct 26 to Nov 4, 2026; the
 first commit is `11a0ce9`, Oct 26, 22:25 ET.
@@ -91,11 +99,17 @@ first commit is `11a0ce9`, Oct 26, 22:25 ET.
   worktrees, edits only, and a fix is meant to land only when Preflight's own re-probe verifies
   it, never on Muse Code's exit code. In a clean smoke run Muse Code produced the correct patch in
   19 seconds; gating on the re-probe isn't wired end to end yet.
-- **Muse Spark Open** on Baseten is built to triage each probe's log (next section); it hasn't
-  run on a real job yet.
+- **Muse Spark Open** on Baseten triages each probe's log on the live site (next section), and
+  labelled the whole corpus.
+- **Muse Glimmer**, Meta's open weights on our own GPU, is built to triage private jobs (next
+  section), switched off on the live site.
+- **All three in one agent evaluation.** On the same 26 clean programming tasks, run through
+  Preflight's proxy, the task ended on a tool call (an upper bound on passes) 23 times with Muse
+  Spark ($0.39 of calls), 15 with Muse Glimmer (about $0.22 of its GPU's time, cold start aside)
+  and 14 with Muse Spark Open ($0.33 of calls).
 
-TODO(PM): at submission, say which of these are on in the live app (the guide is behind
-`c.guide.live`, the fix loop behind `c.fix_loop`; see the README's Status section).
+On the live site: the script map, the guide and Spark Open's triage are on; the fix loop and
+Glimmer's private mode are built and switched off.
 
 ## Best Build on Meta Open Weight Models
 
@@ -115,7 +129,9 @@ script with its planted eval bug (`a-triage-lora-prod`, GitHub run 41336726935),
 Baseten for $0.0184; the eval probe's call said "unclear", because the out-of-memory was in the
 probe's recorded error rather than its output. Triage now reads that error too, and on all 11
 failed probes in our test scripts' records Spark Open quoted a line every time
-(`a-triage-agreement`). TODO(PM): add the production re-run's ID once A posts it.
+(`a-triage-agreement`). Spark Open also labelled the corpus: it was sent all 2,339 rows,
+answered for 1,997, and the datasheet sets its labels against ours, misses included. TODO(PM): add the
+production re-run's ID once A posts it.
 
 **Muse Glimmer, Meta's open weights on our own GPU, for private mode.** With its flag on, a
 private job gets triage from Muse Glimmer (Apache 2.0) on an A100-40GB on Modal that Preflight
@@ -129,9 +145,9 @@ cost $0.33 together.
 The guide is an agent operating a real tool: Muse Spark calls the same actions a visitor has
 (set a knob, highlight a part of the map, compare, propose a fix) and walks a tour of the levers
 that matter for the visitor's goal, one move at a time, waiting for Apply, Revert or Pin. In
-smoke run it called tools in all 5 rounds. The fix loop is the other agent: Muse Code races
-fixes, and Preflight's own re-probe is to pick the winner by measurement (not wired end to end
-yet). TODO(PM): say which is live.
+smoke run it called tools in all 5 rounds, and it is on in the live site. The fix loop is the
+other agent: Muse Code races fixes, and Preflight's own re-probe is to pick the winner by
+measurement; it is built and switched off, as that gating isn't wired end to end yet.
 
 ## Challenges
 

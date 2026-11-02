@@ -1,0 +1,90 @@
+{
+ "curves": 676,
+ "tail": 10,
+ "by_seen": {
+  "60": {
+   "power": {
+    "covered": 111,
+    "scored": 465,
+    "abstained": 211,
+    "coverage": 0.23870967741935484,
+    "coverage_all_curves": 0.16420118343195267,
+    "wilson95": [
+     0.20220384240055542,
+     0.27949728400743573
+    ],
+    "median_abs_log_err": 0.17437145798423698,
+    "meets_90": false
+   },
+   "lcpfn": {
+    "covered": 627,
+    "scored": 676,
+    "abstained": 0,
+    "coverage": 0.9275147928994083,
+    "coverage_all_curves": 0.9275147928994083,
+    "wilson95": [
+     0.9054591951556257,
+     0.9447390275338874
+    ],
+    "median_abs_log_err": 0.06807950826879784,
+    "meets_90": true
+   },
+   "ensemble": {
+    "covered": 272,
+    "scored": 296,
+    "abstained": 380,
+    "coverage": 0.918918918918919,
+    "coverage_all_curves": 0.40236686390532544,
+    "wilson95": [
+     0.8821933014737887,
+     0.9449104652148085
+    ],
+    "median_abs_log_err": 0.0769716773758774,
+    "meets_90": true
+   }
+  },
+  "150": {
+   "power": {
+    "covered": 147,
+    "scored": 636,
+    "abstained": 40,
+    "coverage": 0.23113207547169812,
+    "coverage_all_curves": 0.21745562130177515,
+    "wilson95": [
+     0.20004254495869983,
+     0.2654500465492844
+    ],
+    "median_abs_log_err": 0.10193581551375068,
+    "meets_90": false
+   },
+   "lcpfn": {
+    "covered": 499,
+    "scored": 676,
+    "abstained": 0,
+    "coverage": 0.7381656804733728,
+    "coverage_all_curves": 0.7381656804733728,
+    "wilson95": [
+     0.7037453447238929,
+     0.7698944955979466
+    ],
+    "median_abs_log_err": 0.036971891482067074,
+    "meets_90": false
+   },
+   "ensemble": {
+    "covered": 490,
+    "scored": 547,
+    "abstained": 129,
+    "coverage": 0.8957952468007313,
+    "coverage_all_curves": 0.7248520710059172,
+    "wilson95": [
+     0.8673719243287361,
+     0.9186981745469316
+    ],
+    "median_abs_log_err": 0.04338150581950233,
+    "meets_90": false
+   }
+  }
+ },
+ "lcpfn_errors": 0,
+ "lcpfn_wired": false
+}

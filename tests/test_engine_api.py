@@ -1309,3 +1309,67 @@ def test_a_term_the_faketensor_trace_disagrees_with_is_named():
 	for row in ft.DATA["cases"].values():
 		for d in row["terms"].values():
 			assert d["n"] > 0 and 0 <= d["wilson_95"][0] <= d["wilson_95"][1] <= 1
+
+
+def test_every_grid_axis_holds_each_probed_value_and_the_current_one():
+	"""PM, Nov 2: the pretrain sample probed batch 8 and 12, but its batch grid's ladder around 12 ([2, 3, 6, 12,
+	...]) skipped 8, so the probed setting read "not trusted" though predict gives a measured 10.6 GB. Every grid
+	axis now holds each value a probe ran at, and the current value, inside the cell budget."""
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	k = rec.knob("batch_size")
+	assert 8 in api.probed_values(rec, k) and 8 not in api.local_values(k)
+	g = next(g for g in api.build_grids(rec, ["batch_size"], targets=["memory.peak"], local=True))
+	assert 8 in g.axes[0].values and 12 in g.axes[0].values
+	for path in [
+		*root.glob("schema/examples/*.json"),
+		*root.glob("web/src/workspace/fixtures/*.record.json"),
+	]:
+		r = FlightRecord.model_validate(json.loads(path.read_text()))
+		for grid in api.fill_predictions(r).predictions.grids:
+			for ax in grid.axes:
+				knob = r.knob(ax.knob_id)
+				for v in api.probed_values(r, knob):
+					if isinstance(v, bool) or not isinstance(v, int | float):
+						continue
+					if (knob.domain.min is None or v >= knob.domain.min) and (
+						knob.domain.max is None or v <= knob.domain.max
+					):
+						assert any(api._same(v, w) for w in ax.values), (path.name, grid.id, v)
+
+
+def test_extra_stops_stay_inside_the_cell_budget():
+	from preflight.schema.encoding import MAX_GRID_CELLS
+
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	k = rec.knob("batch_size")
+	big = [list(range(1, 200))]  # an axis far over budget on its own
+	out = api._with_probed(rec, [k], big)
+	assert 8 in out[0] and 12 in out[0] and len(out[0]) <= MAX_GRID_CELLS
+	two = api._with_probed(rec, [k, k], [list(range(1, 200)), list(range(1, 200))])
+	assert len(two[0]) * len(two[1]) <= MAX_GRID_CELLS and all(8 in a and 12 in a for a in two)
+
+
+def test_a_fully_probed_long_axis_leaves_the_trimming_to_the_others(monkeypatch):
+	# review, Nov 2: when the longest axis is all probed values, the stops to drop come from a shorter axis
+	from preflight.schema.encoding import MAX_GRID_CELLS
+
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	batch, seq = rec.knob("batch_size"), rec.knob("seq_len")
+	monkeypatch.setattr(
+		api, "probed_values", lambda record, k: list(range(1, 129)) if k.id == "batch_size" else []
+	)
+	out = api._with_probed(rec, [batch, seq], [list(range(1, 129)), list(range(64, 263))])
+	assert out[0] == list(range(1, 129))  # every stop was probed, so none goes
+	assert len(out[0]) * len(out[1]) <= MAX_GRID_CELLS
+	assert seq.current in out[1]  # the current value is added, and kept while the others are trimmed
+
+
+def test_a_half_integer_probe_on_an_int_knob_adds_nothing(monkeypatch):
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	k = rec.knob("batch_size")
+	monkeypatch.setattr(api, "probed_values", lambda record, knob: [8.5])
+	assert 8 not in api._with_probed(rec, [k], [[2, 4, 16]])[0]

@@ -1,12 +1,129 @@
 # Status: D (usability add-ons)
 
+## Decisions overnight (Nov 2; Chiya offline 00:16 to about 05:30 ET)
+
+| # | When (ET) | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 00:00 | Third eval-sweep try on an A10 rather than the L40S | Chiya allowed either for one more try under $1; the A10 is cheaper (US$1.10 an hour against the L40S's US$1.95 [cited: `probes/gpu_choice.py`]) and A's ground truths ran on it | US$0.12 by the record | Nothing to undo; the record is `zoo/eval_sweep_reasoning/record_nov2_a10.json` (delete the file to drop it) |
+| 2 | 00:15 | Item 19 marked done with that A10 record; no further L4 tries | It measured the planted bug (8 of 16 cut off); the two L4 failures are A's runner question, asked in `from-d.md` | none | Re-open item 19 in this file (the 00:15 entry) and add a line to the item-19 request in `from-d.md` |
+| 3 | 00:20 | Didn't read Modal's logs | My only route is `remote-run.yml`, and a log-reading script would be a new kind of run, which still needs a yes; A is adding a "waiting for a GPU" event | none | Say yes and I add a read-only `scripts/` log reader |
+| 4 | 01:10 | Ran the stranger audit on the deployed commit served by Vite in production mode, not the live host | The live host is refused by my workspace's network allowlist; the dev server has the same code and flags, with the API mocked (not the built bundle) | none (local) | Re-run `docs/audit/scripts/stranger.mjs` against the live URL from a machine that can reach it |
+| 5 | 01:10 | Committed four audit screenshots (about 178 KB) and the audit log under `docs/audit/nov2-stranger/` | C needs the evidence for S1 and S2, and my scratch folder isn't visible to C | none | `git rm docs/audit/nov2-stranger/*.jpg docs/audit/nov2-stranger/*.png` |
+| 6 | 01:20 | Re-ran CI's failed `python` job on `49e36af` instead of changing code | It failed in A's `tests/test_agent_recorder.py::test_parallel_calls_cant_spend_past_the_cap` with "Connection reset by peer", a network flake in a file my push didn't touch; the re-run passed | none | Nothing to undo; A can harden the test |
+| 7 | 01:45 | Wrote `docs/demo/video-plan.md` as the plan of record for Tuesday's 3-minute video, superseding the plan A and B shot lists in `storyboard.md` and `fallback-cut.md` (kept as drafts; the 45-second cut there is unchanged) | Chiya's item 3 asks for live-site flows that work today with every Meta model labelled, which the older plans predate (the guide, triage and Glimmer) | none | Point the PM back at `storyboard.md` and delete `video-plan.md` |
+| 8 | 02:00 | In the portal and numbers table, replaced "60% within 20% on an unseen GPU" (four GPUs) with B's five-GPU result, 57% of 6,694 cases | Chiya's item 4 names the five-GPU table; it's B's newer, wider measurement (`calibration-l4-phase1.md`, "The Nov 1 top-up") | none | Restore the 60% row and sentence from git |
+| 9 | 02:05 | The X post links the cockpit, not the share page, with two variants (with and without the triage shot) | `deploy.yml` doesn't ship `workers/`, so `/s/<token>` isn't live; a cockpit link opens but previews as text | none | Swap in the `/s/` link once `workers/` deploys (TODO(PM) in the file) |
+
+
 ## Cloud runs
 
 Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars.
 
 | Date | GPU | Minutes | Dollars | What |
 |---|---|---|---|---|
-| | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
+| Nov 2, 02:56 UTC | L4 (asked) | about 20 (cap) | at most about 0.60 [guess]; 0.0179 of Muse Spark by the record | `d-eval-sweep-l4` (GitHub 41380341849): cancelled while probing, no measurement |
+| Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
+| Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
+
+## Mon Nov 2, 02:05 ET (overnight: video plan, submission refresh, X post)
+
+`49e36af` CI green on its second attempt (decision 6).
+
+- **Video plan** (item 3): `docs/demo/video-plan.md`, 15 shots, about 2:55, each with its
+  voice-over line, on-screen label and status. Works now: the script, home, check-in, Boarding's
+  Muse Spark and Spark Open tags, the knobs and possible outcomes, the live guide (Muse Spark), the
+  exports, the measured agent and GRPO samples, the link and the end card. Needs by Tuesday: the
+  Oct 28 record's share link opening on the live site (A); A's production triage re-run (shot 6);
+  `harness.glimmer_private` on with one private check-in triaged by Glimmer (shot 12; otherwise a
+  captioned card of the three Pareto arms keeps Glimmer labelled); B's scored checks page (shot
+  13). Each "needs" row says what replaces
+  it if it isn't ready by Tue Nov 3, noon ET.
+- **Submission drafts** (item 4): `portal.md` now says what the live site offers (check-in, the
+  guide, the exports) and drops three stale TODOs; adds the eval sweep's catch (8 of 16 cut off,
+  A10, D's run); the five-GPU cross-GPU result (57% of 6,694, B) in place of the four-GPU 60%; the
+  corpus labelling (Spark Open: 1,117 of 1,522 agree, worse than "always stable" on divergence runs,
+  $8.79); and the three Pareto arms on the same 26 tasks (Muse Spark 23, Glimmer 15, Spark Open 14
+  ended on a tool call; $0.39, about $0.22 of GPU, $0.33). Each is a row in the numbers table with
+  its source.
+- **X post** (item 5): `docs/submission/x-post.md`, two variants (262 and 269 characters), linking
+  the cockpit until `workers/` deploys (decision 9).
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the video plan, the portal and numbers table, the X post, and this entry.
+
+Cloud runs: none.
+
+## Mon Nov 2, 01:15 ET (overnight: stranger audit of `cfcf83c`)
+
+`a86b0ec` CI green (all seven jobs, `workers` included now).
+
+- **Stranger audit** (overnight item 2) after C's deploy of `main` `cfcf83c` (deploy run
+  41385425843): 100 of 104 states clean [measured, Chromium] on that commit served by Vite in
+  production mode (decision 4 above); every detail state opened a sheet, and every check-in state
+  reached "Your flight record is ready.". Every sample, opened and with a node's sheet open; check-in through
+  Boarding to "Your flight record is ready"; desktop and phone, dusk and day. Two bugs, both C's,
+  filed: S1, a contrast failure on "Tight: measure first" in the day theme (3.99:1); S2, overlapping
+  and cut-off map nodes with a detail sheet open. None in D's code. `docs/audit/nov2-stranger/`,
+  script `docs/audit/scripts/stranger.mjs`.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the audit script, its README and screenshots, the request to C and this entry.
+
+Cloud runs: none.
+
+## Mon Nov 2, 00:15 ET (the eval-sweep record measured on an A10; a notebook that trains for A)
+
+`56a2d32` CI green. Merged `main` `cfcf83c`. `197e650` CI **red**: ruff formats notebooks too, and
+the new `train_mlp.ipynb` had spaces; fixed (formatted, its recorded conversion regenerated, both
+notebook suites and the CPU probe re-run), in this push.
+
+- **Eval-sweep record, item 19: done on the third try**, on an A10 (Chiya allowed an A10 or the L40S
+  for one more try under $1). `d-eval-sweep-a10` (GitHub 41391396558), record
+  `01M6DA13XWGBRY2X5P2XHMP9TS`: one probe, ok, 177.9 s on the A10, after 83.8 s waiting for the GPU
+  (the recorder's `gpu_wait_s`) [measured]. It caught the planted no-thinking-cap bug: "8 of 16
+  generated sequences ran to max_new_tokens=2048 without ending (95% interval 28%–72%)"
+  (`generation.truncated`) [measured], beside the static `eval.activation_dump`. Every estimate
+  abstains (the record's reasons: no probe timed a step; fewer than two probe sizes). Cost by the record: US$0.1203 (US$0.0545 GPU [derived:
+  GPU seconds at list price], US$0.0470 sandbox [guess rate], US$0.0189 model calls [measured]).
+  Committed as `zoo/eval_sweep_reasoning/record_nov2_a10.json` with a placeholder share token, as A
+  does. The two L4 runs stay unexplained (one cancelled while probing, one `recorder` after
+  1,280 s); A is adding a "waiting for a GPU" event. Item 19's spend in all: at most about US$1.36
+  [guess: the first L4 run's GPU time is unknown].
+- **Modal logs:** I can't read them; my only way in is `remote-run.yml`, and a log-reading script
+  would be a new kind of run. Told Chiya where to look in the dashboard.
+- **`d.notebook`:** A's check-in showed notebooks are converted and run; it used a fixture with no
+  optimizer, so `too_few_steps` was right. New fixture `train_mlp.ipynb` (a small MLP, an AdamW
+  step every batch, no downloads); A's converter's output is recorded beside it, both notebook test
+  suites pass, and the converted script probes cleanly on a CPU (three probes ok) [measured]. A has
+  the command to run it through the deployed runner. The README draft's notebook rows say so.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the notebook formatting fix, the eval-sweep record and this entry.
+
+Cloud runs: `d-eval-sweep-a10` (above), A10, US$0.12 by the record.
+
+## Sun Nov 1, 22:50 ET (eval-sweep record: two runs, no measurement; stopped and asked)
+
+`0eaa25d` CI green.
+
+Item 19, the eval-sweep record, on an L4 through `remote-run.yml` (`ops_app.py::smoke` on
+`zoo/eval_sweep_reasoning`, visitor `d-eval`, ref `main` `c084bee`):
+
+| Run | Result | Spend |
+| --- | --- | --- |
+| `d-eval-sweep-l4` (GitHub 41380341849), 20-minute cap | Mapped (Muse Spark refined the map), then "probing" for 19.5 min with no event; cancelled at the cap. Record `01M6D30EYGANSVKSA2SG4EBSAE`: no probe results, only the static `eval.activation_dump` finding | The record's provenance: US$0.0179 of Muse Spark [measured] (its cost block says US$0); Modal's bill unknown, at most about US$0.58 if a GPU and sandbox ran the whole time [guess] |
+| `d-eval-sweep-l4-2` (GitHub 41382389659), 30-minute cap | Done, but its one probe ended "The probe sandbox ended without a result. Step: starting Preflight's recorder" (`recorder`) after 1,279.8 s, with 0 steps. Spark Open's triage: `infrastructure`, quoting "The probe sandbox ended without a result". Record `01M6D493CJCMMMV0C0P75FT5QH` (share `hXW24O9aS_aAHOZG5i4lrg`): memory estimates and `risk.oom` extrapolated from the static map; time and cost abstain | Record: US$0.6423: US$0.2844 GPU [derived: 1,279.8 s at the L4's US$0.80 an hour, queue included], US$0.3377 sandbox [guess rate], US$0.0202 model calls [measured] |
+
+The second run ended as A's first eval-sweep smoke did on Nov 1 at 04:30 UTC ("The probe sandbox
+ended without a result" after about 1,280 s), and its step says the recorder was still starting, so
+A's `fda1762` stop never came into play. My reading [guess]: the runner or the model download
+inside the probe, not the eval hooks; asked A. Per my plan I've stopped rather than retry: asked A (`from-d.md`)
+and Chiya. Today's eval spend: at most about US$1.24 [guess: the first run's GPU time is unknown].
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): this entry and the request to A.
+
+Cloud runs: the two above.
 
 ## Sun Nov 1, 22:00 ET (items 42 and 19 taken over from A; the 8 PM README mirrored)
 
@@ -42,7 +159,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 entry): the merge of `main` `c084bee`, the packaging commit (CLI hints, `failures.py`, README
 draft), the request to A and this entry.
 
-Cloud runs: `d-eval-sweep-l4` (above), L4, result and cost in the next entry.
+Cloud runs: `d-eval-sweep-l4` (above), L4; result and cost in the next entry (22:50).
 
 ## Sun Nov 1, 21:45 ET (check-in: Glimmer measured, so its wording moves; stale model rows fixed)
 

@@ -279,7 +279,7 @@ Monotonicity also means a below-probe underestimate can't hide an OOM on the sam
 | T4 | 454 | 51% (47% to 56%) | 59% (54% to 63%) |
 | All | 6,694 | 3,826, 57% (56% to 58%) | 3,849, 57% (56% to 59%) |
 
-- **K1 didn't improve.** Its point estimate is 57%, against 60% on four GPUs, and the H100, the one type it had never been scored on, is its worst target.
+- **K1 didn't improve.** Its point estimate is 57%, against 60% on four GPUs. The H100, the one type it had never been scored on, lands at 52%, and the T4 is its lowest at 51%.
 - **The GBDT residual is level with K1 held out, not better.** It gains on the L4, L40S and T4, but loses ten points on the H100. Its rule ("used only once it beats K1 held out") isn't met, so `engine/steptime_gbdt.py` stays unused.
 - These intervals treat pairs as independent; they share architectures, so the honest ones are wider.
 

@@ -490,6 +490,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	with contextlib.suppress(AttributeError, TypeError):
 		ctx.budget = budget  # the worker reports what the job spent to the day's GPU cap (queue.py)
 	budget.waited = lambda: float(getattr(deps.runner, "queued_s", 0.0) or 0.0)
+	from .queue import GPU_WAIT_PREFIX
+
+	if hasattr(deps.runner, "notify"):  # a probe waiting for a GPU says so, apart from running (D, Nov 1)
+		deps.runner.notify = lambda kind, g, waited: _emit(ctx, "probing", level="info", message=(
+			f"{GPU_WAIT_PREFIX}{g} GPU ({waited / 60:.0f} min so far)" if kind == "waiting" and waited >= 60
+			else f"{GPU_WAIT_PREFIX}{g} GPU" if kind == "waiting"
+			else f"{g} GPU ready after {waited / 60:.0f} min; probe running" if waited >= 60
+			else f"{g} GPU ready; probe running"))  # fmt: skip
 	patched_for: dict = {}
 	if fixed is not None:
 		# C's fix loop: probe runs the patched code; verify runs the setting on it and the base
@@ -695,8 +703,8 @@ def _triage_client(deps: Deps, private: bool):
 	to Baseten instead: it isn't triaged."""
 	from .flags import flag
 
-	if private and flag("harness.glimmer_private"):
-		return deps.glimmer
+	if private:  # never Baseten: Glimmer with its flag on, else no triage (review, Nov 2)
+		return deps.glimmer if flag("harness.glimmer_private") else None
 	return deps.triage
 
 

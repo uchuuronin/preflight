@@ -10,6 +10,18 @@ checkpoints ported, Nov 1), and `ensemble` combines the two from plain numbers. 
 
 Known limit (review, Oct 31): with strongly autocorrelated noise (AR 0.8) the band covered 20 of 30, against 89 of 100
 with independent noise. It stays out of `predict` until it covers on real probe losses.
+
+Model card, held out on real losses (Nov 2; corpus/reports/loss_coverage_nov2.json): the divergence sweep's 676 runs
+that didn't diverge (one small-GPT family, 600 steps, L4 and A10), seen for 60 or 150 steps, the truth the mean of the
+last 10 steps. 90% bands that answered, covered:
+	seen 60: power law 111 of 465 (24%, Wilson 20 to 28%), 211 abstained; LC-PFN 627 of 676 (93%, 90 to 95%);
+		ensemble 272 of 296 (92%, 88 to 95%), 380 abstained
+	seen 150: power law 147 of 636 (23%, 20 to 27%), 40 abstained; LC-PFN 499 of 676 (74%, 70 to 77%);
+		ensemble 490 of 547 (89.6%, 86 to 92%), 129 abstained
+The power law's band is far too narrow on curves that flatten (the curves flatten; why the fit misses was not tested), and LC-PFN's
+covers at 60 steps but not at 150, so neither half meets the 90% band in general: the loss forecast stays out of
+`predict`, and no loss readout ships. Not wired for the 60-step case alone: one model family, and coverage that falls
+as the probe sees more steps is not a band to trust.
 """
 
 from __future__ import annotations
