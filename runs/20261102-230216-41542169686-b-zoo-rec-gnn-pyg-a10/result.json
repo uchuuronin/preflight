@@ -1,0 +1,11 @@
+{
+	"name": "20261102-230216-41542169686-b-zoo-rec-gnn-pyg-a10",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41542169686",
+	"ref": "ws-b",
+	"sha": "33a9499e6ec3c3e67f0e253fc1ad98c94163e796",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/gnn_pyg --gpus A10 --visitor b-zoo-rec-4 --max-minutes 25",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:04:21Z"
+}
