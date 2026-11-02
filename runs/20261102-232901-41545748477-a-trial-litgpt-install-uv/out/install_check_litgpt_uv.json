@@ -1,0 +1,26 @@
+{
+  "uv": true,
+  "pyg": false,
+  "seconds": 420.5,
+  "error": "pip took longer than 298 s",
+  "missing_before": [
+    "bitsandbytes",
+    "jsonargparse",
+    "lightning",
+    "lightning_utilities",
+    "litdata",
+    "pytest",
+    "sentencepiece",
+    "torchmetrics"
+  ],
+  "missing_after": [
+    "bitsandbytes",
+    "jsonargparse",
+    "lightning",
+    "lightning_utilities",
+    "litdata",
+    "pytest",
+    "sentencepiece",
+    "torchmetrics"
+  ]
+}
