@@ -11,8 +11,13 @@ import { hasKey, t } from "../lib/i18n";
 import type { Finding } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
 import { ensureSaved } from "../guide/limits";
-import { candidatesFor, template, USD_PER_CANDIDATE } from "./candidates";
+import { liveCandidates, template, USD_PER_CANDIDATE } from "./candidates";
 import { cancelRace, getRace, POLL_MS, type RaceCandidate, type RaceView, startRace } from "./race";
+
+/** Muse Code's summary as plain text: its Markdown links point into its sandbox (`[train.py](/fix/wt/c1/train.py:74)`, live, Nov 2), so only their words are kept. */
+export function plainSaid(text: string): string {
+	return text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+}
 
 function Lane({ c, running, elapsed }: { c: { template_id: string; value?: unknown } & Partial<RaceCandidate>; running: boolean; elapsed: number }) {
 	const title = template(c.template_id)?.title ?? c.template_id;
@@ -39,7 +44,7 @@ function Lane({ c, running, elapsed }: { c: { template_id: string; value?: unkno
 			{!running && c.status === "patched" ? (
 				<>
 					{c.files?.length ? <p className="pf-dim">{t("fix.files", { files: c.files.join(", ") })}</p> : null}
-					{c.final ? <p className="pf-fix__said">{t("fix.said", { text: c.final })}</p> : null}
+					{c.final ? <p className="pf-fix__said">{t("fix.said", { text: plainSaid(c.final) })}</p> : null}
 					<details className="pf-fix__diff">
 						<summary>{t("fix.diff")}</summary>
 						<pre>{c.diff}</pre>
@@ -72,7 +77,7 @@ export function FixRace({ finding }: { finding: Finding }) {
 	const [error, setError] = useState<{ code: string; message: string } | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
-	const cands = candidatesFor(finding, { record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective, limits: state.limits });
+	const cands = liveCandidates(finding, { record, provider, knobs: state.knobs, pinned: state.pinned, objective: state.objective, limits: state.limits });
 	const running = race?.status === "running";
 
 	useEffect(() => {

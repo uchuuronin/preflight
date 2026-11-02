@@ -565,3 +565,11 @@ def test_a_stack_is_its_parts_on_one_metric():
 	text = task_for("eval.no_grad_and_batch", 8)
 	assert "torch.no_grad()" in text and "evaluation batch size to 8" in text
 	assert verify_options("eval.no_grad_and_batch")["no_grad"] is True
+
+
+def test_a_stack_is_checked_against_limits_on_every_knob_it_sets():
+	"""A frozen eval_no_grad rules out the stack, not only a frozen eval batch (review, Nov 2)."""
+	from preflight_api.fix.templates import knobs_set
+
+	assert knobs_set("eval.no_grad_and_batch", 8) == [("eval_batch_size", 8), ("eval_no_grad", True)]
+	assert knobs_set("eval.wrap_no_grad", None) == [("eval_no_grad", True)]

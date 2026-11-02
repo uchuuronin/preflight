@@ -27,7 +27,7 @@ from .. import edge
 from ..errors import ApiError
 from ..fix import run
 from ..fix.service import Race, new_patch_id, now, public
-from ..fix.templates import TEMPLATES, applied_value, task_for
+from ..fix.templates import TEMPLATES, applied_value, knobs_set, task_for
 from ..flags import flag
 from ..guide.record_view import RecordView
 from ..jobs import visitor_of
@@ -150,8 +150,9 @@ async def start_race(request: Request) -> dict:
 	if held is not None:
 		for c in cands:
 			t = TEMPLATES[c["template_id"]]
-			value = applied_value(c["template_id"], c.get("value"))  # what the fix really sets
-			if t.knob and (t.knob in held.frozen or (value is not None and not held.allows(t.knob, value))):
+			# what the fix really sets, every knob of it (a stack sets two)
+			sets = knobs_set(c["template_id"], c.get("value"))
+			if any(k in held.frozen or (v is not None and not held.allows(k, v)) for k, v in sets):
 				raise ApiError(
 					422,
 					"outside_limits",

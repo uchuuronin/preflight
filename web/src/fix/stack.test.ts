@@ -5,7 +5,7 @@ import { bestCombo } from "../guide/combos";
 import { GridProvider } from "../workspace/provider/GridProvider";
 import { currentKnobs } from "../workspace/record/model";
 import { type FlightRecord, normaliseRecord } from "../workspace/record/types";
-import { candidatesFor, stackedCandidate } from "./candidates";
+import { candidatesFor, liveCandidates, stackedCandidate } from "./candidates";
 
 const live = normaliseRecord(liveRaw as unknown as FlightRecord);
 const provider = new GridProvider();
@@ -33,5 +33,16 @@ describe("stacking the eval fixes when neither passes alone (Chiya, Nov 2)", () 
 		const race = raceRaw as { round1: unknown[]; stack: { template_id: string; value: unknown } };
 		expect(race.round1).toEqual(candidatesFor(evalFinding, ctx));
 		expect(race.stack).toEqual(stackedCandidate(evalFinding, ctx));
+	});
+
+	it("live, where nothing is verified, races the stack beside the single fix when no single move clears", () => {
+		expect(liveCandidates(evalFinding, ctx)).toEqual([...candidatesFor(evalFinding, ctx), stackedCandidate(evalFinding, ctx)]);
+	});
+});
+
+describe("Muse Code's summary on screen", () => {
+	it("keeps a link's words and drops its sandbox path", async () => {
+		const { plainSaid } = await import("./FixRace");
+		expect(plainSaid("averaging in [train.py](/fix/wt/c1/train.py:74). Done.")).toBe("averaging in train.py. Done.");
 	});
 });

@@ -1,0 +1,77 @@
+{
+ "n": 720,
+ "diverged": 44,
+ "families": 24,
+ "auroc": {
+  "point": 0.9694055944055944,
+  "lo": 0.9425905679301977,
+  "hi": 0.9847902323463821
+ },
+ "lead_steps": {
+  "point": 162.5,
+  "lo": 27.0,
+  "hi": 293.0
+ },
+ "bins": [
+  [
+   0.0,
+   0.05,
+   580,
+   0.00463663920843869,
+   0.0034482758620689655
+  ],
+  [
+   0.05,
+   0.2,
+   57,
+   0.1048721237034656,
+   0.05263157894736842
+  ],
+  [
+   0.2,
+   0.5,
+   32,
+   0.321431585721772,
+   0.1875
+  ],
+  [
+   0.5,
+   0.8,
+   25,
+   0.6784709735474062,
+   0.48
+  ],
+  [
+   0.8,
+   0.95,
+   13,
+   0.8727350197782666,
+   0.6153846153846154
+  ],
+  [
+   0.95,
+   1.0,
+   13,
+   0.975533980962283,
+   1.0
+  ]
+ ],
+ "false_alarms": {
+  "stable": 676,
+  "alarms": 68
+ },
+ "enough": true,
+ "early_onset_warned": {
+  "warned": 15,
+  "of": 15
+ },
+ "learning_rate_alone_auroc": 0.9246570736955352,
+ "lowest_diverged_lr": 0.072834,
+ "at_usual_lr": {
+  "lr_at_most": 0.03,
+  "runs": 465,
+  "diverged": 0
+ },
+ "verdict": "meets the row on the sweep, but not shipped: no run at a usual learning rate diverged, so the warning can't be checked where users train",
+ "design": "prior on settings (+5 fp16 interactions) max the Nov 1 step model; scored once"
+}
