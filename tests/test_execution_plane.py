@@ -485,6 +485,53 @@ def test_a_probe_past_its_own_limit_is_stopped_by_the_runner_and_says_timeout(mo
 	assert r.probe.status == "timeout" and r.probe.error_code == "timeout" and "s limit" in r.probe.error
 
 
+def test_modals_own_capacity_wait_in_create_is_told_bounded_and_falls_back(monkeypatch):
+	# review, Nov 2: a GPU sandbox's create itself waits up to 21 min for scheduling, then raises
+	# "Insufficient capacity": three probes ended "without a result" about 1,280 s in, no wait recorded
+	import time as _time
+	from dataclasses import replace
+
+	from preflight.runner import sandbox_runner
+
+	monkeypatch.setattr(sandbox_runner, "WAIT_NOTE_S", 0.05)
+
+	class ResourceExhaustedError(Exception):
+		pass
+
+	made = []
+
+	def create(gpu):
+		if gpu == "L4":
+			_time.sleep(0.3)  # Modal waiting for an L4
+			raise ResourceExhaustedError("Insufficient capacity to create sandbox.")
+		made.append(FakeSandbox(gpu))
+		return made[-1]
+
+	told = []
+	with SandboxRunner(create, schedule_wait_s=5.0, wait_cap_s=10.0) as run:
+		run.notify = lambda kind, gpu, waited: told.append((kind, gpu))
+		r = run(replace(spec("p1"), gpu_fallback=("A10",)), "L4", should_stop=lambda: False)
+	assert r.probe.status == "ok" and run.ran_on == ["A10"] and run.unscheduled == ["L4"]
+	assert ("waiting", "L4") in told  # the wait inside create is told
+	# no fallback: NoGPU, naming Modal's reason, with the wait recorded
+	with SandboxRunner(create, schedule_wait_s=5.0, wait_cap_s=10.0) as run:
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+	assert r.probe.error_code == "gpu.unavailable" and "Insufficient capacity" in r.probe.error
+	assert r.probe.extras["gpu_wait_s"] >= 0.25
+
+	def slow_create(gpu):  # a create still waiting past the job's wait cap is abandoned, then ended
+		box = FakeSandbox(gpu)
+		made.append(box)
+		_time.sleep(0.5)
+		return box
+
+	with SandboxRunner(slow_create, schedule_wait_s=0.1, wait_cap_s=0.2) as run:
+		r = run(spec("p2"), "L4", should_stop=lambda: False)
+	assert r.probe.error_code == "gpu.unavailable"
+	_time.sleep(0.6)
+	assert made[-1].terminated  # ended when its create came back, never left running
+
+
 def test_a_failed_start_check_is_named_on_the_probe_that_lost_its_result():
 	# Nov 1 to 2: three probes ended "without a result" about 1,280 s in with no GPU wait recorded
 	class NoReady(FakeSandbox):
