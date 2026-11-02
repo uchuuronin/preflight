@@ -399,3 +399,44 @@ def test_seconds_to_midnight_et_is_right_on_a_dst_day():
 
 	nov1_0030_edt = 1793507400.0  # 2026-11-01 00:30 EDT; clocks fall back at 02:00, so the day has 25 h
 	assert seconds_to_midnight_et(nov1_0030_edt) == 24 * 3600 + 30 * 60
+
+
+def test_info_says_when_a_running_job_waits_for_a_gpu_apart_from_running():
+	# D, Nov 1: 19.5 minutes in "probing" with no events, waiting for an L4, read as a hang
+	from preflight.runner.queue import GPU_WAIT_PREFIX
+
+	store = InMemoryJobStore()
+	sub = store.submit({"source": {"kind": "sample"}}, visitor="v", idempotency_key="k")
+	lease = store.lease("w")
+	store.emit(sub.job_id, stage="probing")
+	assert store.info(sub.job_id)["waiting_for_gpu"] is None  # probing, not waiting
+	store.emit(sub.job_id, stage="probing", message=f"{GPU_WAIT_PREFIX}L4 GPU")
+	first = store.events(sub.job_id)[-1].model_dump(mode="json")["at"]
+	store.emit(sub.job_id, stage="probing", message=f"{GPU_WAIT_PREFIX}L4 GPU (3 min so far)")
+	w = store.info(sub.job_id)["waiting_for_gpu"]
+	assert w == {"gpu": "L4", "since": first}  # since the wait's first notice
+	store.emit(sub.job_id, stage="probing", message="L4 GPU ready after 3 min; probe running")
+	assert store.info(sub.job_id)["waiting_for_gpu"] is None  # running now
+	store.complete(lease, record_id="R1")
+	assert store.info(sub.job_id)["waiting_for_gpu"] is None
+
+
+def test_the_pipeline_turns_the_runners_wait_notices_into_probing_events(tmp_path):
+	from preflight.runner.queue import GPU_WAIT_PREFIX
+	from test_record_jobs import SCRIPT, LossRunner, _Ctx, _deps
+
+	class Waits(LossRunner):
+		notify = None
+
+		def __call__(self, spec, gpu, *, should_stop):
+			self.notify("waiting", gpu, 90.0)
+			self.notify("up", gpu, 150.0)
+			return super().__call__(spec, gpu, should_stop=should_stop)
+
+	from preflight.runner.pipeline import run_pipeline
+
+	ctx = _Ctx()
+	run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, ctx, _deps(tmp_path, Waits()))
+	msgs = [e.get("message") or "" for e in ctx.events if e["stage"] == "probing"]
+	assert any(m.startswith(GPU_WAIT_PREFIX) and "(2 min so far)" in m for m in msgs)
+	assert any(m.endswith("probe running") and "after 2 min" in m for m in msgs)

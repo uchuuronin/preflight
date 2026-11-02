@@ -1,6 +1,15 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Sun Nov 1, 16:55 ET.
+Updated Mon Nov 2, 00:40 ET.
+
+## Decisions overnight (Chiya's autonomy, Nov 2 12:16 AM ET)
+
+| When (ET) | Decision | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 00:20 | Formatted with CI's own ruff (0.17.3, from uv.lock) instead of the local 0.16.9 | CI's format check failed on a notebook the local ruff left alone (ed85b1b); fixed in 1e2067c | none | none needed |
+| 00:25 | GPU waits shown as `probing` events ("waiting for a free L4 GPU …", "… ready; probe running") plus `waiting_for_gpu: {gpu, since}` in GET /v1/jobs/{id}, not a new stage | a new stage is a contract change; the status passthrough and the free-text message need none | none | revert the commit; the key is additive, C may ignore it |
+| 00:25 | A private job is never triaged on Baseten: with `harness.glimmer_private` off it gets no triage (it used to fall back to Spark Open) | the contract's privacy promise (0.6.2), found by review | none | `pipeline._triage_client`: return `deps.triage` for private jobs again |
+| 00:25 | The runner holds the probe's own time limit (past it the sandbox ends, the probe reads `timeout`) | two probes ran to the sandbox's 30 min with no log (serving, eval) | none | `sandbox_runner.py` watcher: drop the limit check |
 
 - **Now:** the Pareto sweep (Muse Spark arm, then Spark Open, on its own $1 ledger); the redeploy gated on the new probe-user startup check (a tiny torch.compile and the vLLM and datasets imports as uid 61000), then the serving probe again on the fixed image.
 - **Done since Oct 27:** every lens's recorder and probe path, the agent proxy and sampler, run hygiene and measured findings, `JobRequest.patch`, the HF Trainer/TRL/Lightning/torchtitan adapter checks, the Muse Spark script-map gate; LoRA ground truth on L4, GRPO 50-step ground truth on A10, DDP and FSDP on 2 × A10; the production runner deployed and left running.
