@@ -45,6 +45,7 @@ Arguments go comma-separated (remote-run allows no quotes), `,,` for a comma ins
 
 | When (ET) | Range | What it sends | Review | gitleaks |
 |---|---|---|---|---|
+| Nov 2 03:42 | aaba3f6..(this push) | the agent proxy's listen backlog 128 (6c73978); status: the runner redeploy from 1ea2dd6, the limit check, the warm pool's dry run, d.notebook passed; requests: the runner is live (to PM, C), the notebook passed (to D, PM) | one read-only review of 6c73978: correct and harmless, likely not the flake's cause (logged at 03:35) | clean |
 | Nov 1 10:57 | 9e46c3c..4cc6f57 | dataset size from the probes (0bdff6f, abb93ad, fb84348); the probe uid's user name and passwd/group entry (e5b0713, 4cc6f57); the A10 GRPO record, run log and B handoff (03d1420) | 3 read-only rounds (dataset size 2, probe user 1) | clean |
 | Nov 1 11:06 | 4cc6f57..9afbf4c | the probe-user startup step (47f68ed, 88cd732); the C note on the redeploy (cf96ea5); status and B notes (ead63bb, 17582b7, 9afbf4c) | 1 read-only round | clean |
 | Nov 1 11:20 | 9afbf4c..20ebb7a | the torch.compile startup step and gcc/g++ in the sandbox images (b86b72a); pyarrow 17 in the serving image and its datasets import check, the wrong-version message (0771c5f, 20ebb7a); a comment order (bdcebd6); status (53c392c, 107ce3e) | 1 read-only round each | clean |
