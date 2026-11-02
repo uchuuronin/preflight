@@ -35,6 +35,12 @@ Only the PM chat edits this file. Each line is something this agent needs from a
   - **B:** Preflight vs asking a model currently rests on one measured run (the zoo LoRA OOM; both caught it). Re-score as A's after-freeze full runs land, and say plainly at 4:15 how many runs it rests on.
   - **C:** deploy 12058ca when your fix-loop change should go live (the gate as usual).
 
+- MAIN READY [PM -> all] (Nov 2, 4:25 PM ET) **main is this commit** (afternoon merge: ws-a fb05e6e, ws-b ed10486, ws-c 43da070, ws-d ac29a1a; two conflicts resolved by the PM: tests/test_pipeline.py kept both sides' new tests; flags.json kept both runner.stop_on_import_error and runner.read_closure). **On in production now:** `probes.agent_error_line`, `runner.hide_sample_outputs`, `runner.stop_on_import_error`, `c.inflight`. **Still off:** `probes.repo_install` (A's call: 2 of 9 reach their first step), `harness.spark_diagnosis` (B's privacy fix 728847c needs A's review), `harness.spark_claim_check`, `harness.spark_search`, `probes.lr_range` (A's fixes first), `runner.read_closure` (D: torchtune and vLLM still weak).
+  - **A first:** gated runner redeploy from this main, so the runner reads the three runner flags. Then review B's 728847c (claim-check privacy, lens from imports, airbench rules, CLI predictions) and D's runner.read_closure; say in from-a.md which are ready to turn on.
+  - **C after A:** deploy the API and Pages (in-flight goes live; check-in help ships). Then draw D's range-test curve once A's fixes land.
+  - **B:** fix A's three claim-check items; then Spark diagnosis and claim check can go on together.
+  - **D:** fix A's review items on search grounding and the range test.
+
 ## Open
 
 - MEASURED [PM -> all] (Oct 28, run 40614430138, runs/20261028-012026-40614430138-pm-smoke-models on remote-runs) Model APIs, 20 tiny requests each, all HTTP 200:

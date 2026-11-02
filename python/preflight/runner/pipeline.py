@@ -309,6 +309,18 @@ def _spec(
 	)
 
 
+def _import_knobs(knobs: dict) -> tuple:
+	"""The knobs that can change what a script imports (quantization, attention, optimizer, precision:
+	any value that isn't a number); points that differ only in sizes import the same packages."""
+	return tuple(
+		sorted(
+			(k, str(v))
+			for k, v in (knobs or {}).items()
+			if isinstance(v, bool) or not isinstance(v, int | float)
+		)
+	)
+
+
 def _repo_install_on() -> bool:
 	"""probes.repo_install (off): a repo with no requirements.txt gets what it declares and the known
 	packages it imports (Nov 2: the unseen scripts stopped at their imports)."""
@@ -542,8 +554,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if lr_probe is not None:
 			probes.append(lr_probe)  # in the record only: not a result, so never triaged or searched
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
-	rec, triaged = _triage(rec, results, deps, private=req.private)
-	rec, grounded = _search(rec, results, deps, private=req.private, verify=req.mode == "verify", ctx=ctx)
+	# review, Nov 2: a probe-more from the record page sends no `private`, so a record a private job touched keeps
+	# its new logs off Baseten and Meta too
+	held = req.private or _private_history(rec)
+	rec, triaged = _triage(rec, results, deps, private=held)
+	rec, grounded = _search(rec, results, deps, private=held, verify=req.mode == "verify", ctx=ctx)
 	triaged = [*triaged, *grounded]
 	kept = rec.probes
 	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
@@ -561,6 +576,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
 		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
 			for q in probes]  # fmt: skip
+	if held:
+		# B, Nov 2 (A's review): a private job's probes and findings carry the mark on the record, so no later job
+		# on it (a probe-more, a verify) sends their numbers or text to Meta or Baseten
+		from preflight.schema import Evidence
+
+		probes = [q.model_copy(update={"extras": {**q.extras, "private_job": 1.0}}) for q in probes]
+		triaged = [f.model_copy(update={"evidence": [*f.evidence, Evidence(metric="private_job", value=1.0)]})
+			for f in triaged]  # fmt: skip
 	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.gpu_usd, overhead_usd=budget.overhead_usd,
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	from .measured_rules import hygiene_findings
@@ -577,9 +600,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	)
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
-	if req.mode != "verify" and not req.private:
+	touched = req.private or _private_history(out)
+	if req.mode != "verify" and not touched:
 		out = _diagnose(out, deps)
-	out = _claim_check(out, deps, private=req.private)
+	out = _claim_check(out, deps, private=touched)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
@@ -920,6 +944,14 @@ def _tested_node(probe, nodes: set[str]) -> str | None:
 	return "eval" if is_eval and "eval" in nodes else None
 
 
+def _private_history(rec: FlightRecord) -> bool:
+	"""Whether any probe or finding on the record came from a private job (marked by the pipeline): then nothing on
+	it goes to a hosted model, in this job or any later one (B, Nov 2, from A's review of the claim check)."""
+	return any(p.extras.get("private_job") for p in rec.probes) or any(
+		e.metric == "private_job" for f in rec.findings for e in f.evidence
+	)
+
+
 def _claim_check(rec: FlightRecord, deps: Deps, *, private: bool) -> FlightRecord:
 	"""Every number a model-written finding states, checked against the record's raw probe numbers (harness/claim_check.py);
 	one with no supporting number reads "unsupported: run a probe". Off unless harness.spark_claim_check is on. Spark
@@ -1028,9 +1060,12 @@ def _probe_points(
 ) -> tuple[list[Probe], list[ProbeResult], str, float]:
 	"""Run the planned points in order; returns their probes, fresh results, the GPU they settled on
 	and what discarded attempts cost."""
+	from .flags import flag
+
 	probes: list[Probe] = []
 	results: list[ProbeResult] = []
 	discarded_usd = 0.0
+	stop_on_import = flag("runner.stop_on_import_error")  # off until its check passes
 	for i, p in enumerate(plan):
 		ctx.check()
 		_emit(ctx, "probing", rec, rev, probe_id=p.probe_id, progress=round(i / len(plan), 3))
@@ -1038,6 +1073,19 @@ def _probe_points(
 			# no GPU could be scheduled within the job's wait cap: the next point would wait for nothing
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
 				error="skipped: no GPU could be scheduled (see the first probe)", error_code="gpu.unavailable"))  # fmt: skip
+			continue
+		gone = next((q for q in probes if q.error_code == "missing_package" and not q.steps), None)
+		if (
+			gone is not None
+			and stop_on_import
+			# the same code: a patched point (C's fix loop) may import something else
+			and (p.probe_id in (patched_for or {})) == (gone.id in (patched_for or {}))
+			and _import_knobs(p.knobs) == _import_knobs(gone.knobs)
+		):
+			# an import that failed before the first step fails the same way at every point: skip the
+			# rest and their triage (unseen runs, Nov 2: three probes and three paid triage calls each)
+			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
+				error=f"skipped: the script couldn't import a package (see {gone.id})", error_code="missing_package"))  # fmt: skip
 			continue
 		if any(q.error_code == "missing_package.install" for q in probes):
 			# the same requirements fail the same way at every point: don't pay for it again

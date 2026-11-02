@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { t } from "../../lib/i18n";
 import { type BoardingEvent, boardingState, eventFromStatus, type ModelCallSeen, modelsRan, STAGES } from "../boarding";
 import { go, href } from "../route";
+import { CheckinHelp } from "../CheckinHelp";
+import { type ProbeSeen, troubleFromFailure, troubleFromProbes } from "../checkinTrouble";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
@@ -76,16 +78,24 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	// because the job reached that leg. Re-read when the record changes (record_rev).
 	const rev = events.reduce((n, e) => Math.max(n, e.record_rev ?? 0), 0);
 	const [calls, setCalls] = useState<ModelCallSeen[]>([]);
+	const [probes, setProbes] = useState<ProbeSeen[]>([]);
+	// The packages Preflight installs, by import name (GET /v1/packages, A's list), to fill the box.
+	const [known, setKnown] = useState<{ known: Record<string, string>; noWheels: string[] }>({ known: {}, noWheels: [] });
 	// A new job, or a new record, starts with no tags: the last one's model calls aren't this one's
 	// (D's audit 12, with D's fix: clear on the record too, which the same-page case needs).
-	useEffect(() => setCalls([]), [jobId, open]);
+	useEffect(() => {
+		setCalls([]);
+		setProbes([]);
+	}, [jobId, open]);
 	useEffect(() => {
 		if (!open) return;
 		let gone = false;
 		fetch(`${API_BASE}/v1/records/${encodeURIComponent(open)}`, { credentials: "same-origin" })
 			.then((r) => (r.ok ? r.json() : null))
-			.then((rec: { provenance?: ModelCallSeen[] } | null) => {
-				if (!gone && rec?.provenance) setCalls(rec.provenance);
+			.then((rec: { provenance?: ModelCallSeen[]; probes?: ProbeSeen[] } | null) => {
+				if (gone || !rec) return;
+				if (rec.provenance) setCalls(rec.provenance);
+				if (done && rec.probes) setProbes(rec.probes);
 			})
 			.catch(() => {});
 		return () => {
@@ -93,18 +103,36 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		};
 	}, [open, rev, done]);
 	const ran = modelsRan(calls);
-	const progress = done ? 100 : Math.max(0, idx) * 25;
+	const trouble = failed ? troubleFromFailure(last?.error_code, last?.message) : done ? troubleFromProbes(probes, known.known, known.noWheels) : null;
+	const installStop = trouble?.step === "install";
+	useEffect(() => {
+		if (!installStop) return;
+		let gone = false;
+		fetch(`${API_BASE}/v1/packages`, { credentials: "same-origin" })
+			.then((r) => (r.ok ? r.json() : null))
+			.then((j: { known?: Record<string, string>; no_wheels?: string[] } | null) => {
+				if (!gone && j?.known) setKnown({ known: j.known, noWheels: j.no_wheels ?? [] });
+			})
+			.catch(() => {});
+		return () => {
+			gone = true;
+		};
+	}, [installStop]);
+	// A finished job whose probes all stopped at an import measured nothing: the route stops at the probe leg.
+	const probeLeg = STAGES.findIndex((s) => s.key === "boarding.stage.probe");
+	const stopAt = installStop ? probeLeg : -1;
+	const progress = stopAt >= 0 ? stopAt * 25 : done ? 100 : Math.max(0, idx) * 25;
 
 	return (
 		<div className="pf-scroll">
 			<div className="pf-inner pf-boarding">
 				<span className="pf-eyebrow">{t("boarding.eyebrow")}</span>
-				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t("boarding.ready") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
+				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t(installStop ? "boarding.stopped_install" : "boarding.ready") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
 				{last?.queue_position ? <p className="pf-lede pf-lede--sm">{t("boarding.queue", { n: last.queue_position })}</p> : null}
 				<div className="pf-route">
 					<svg viewBox="0 0 900 260" preserveAspectRatio="none" aria-hidden="true">
 						<path className="pf-route__base" d="M30 230 C 260 -40, 640 -40, 870 230" />
-						<path className={`pf-route__done${failed ? " is-stopped" : ""}`} d="M30 230 C 260 -40, 640 -40, 870 230" pathLength={100} style={{ strokeDasharray: 100, strokeDashoffset: 100 - progress }} />
+						<path className={`pf-route__done${failed || stopAt >= 0 ? " is-stopped" : ""}`} d="M30 230 C 260 -40, 640 -40, 870 230" pathLength={100} style={{ strokeDasharray: 100, strokeDashoffset: 100 - progress }} />
 					</svg>
 					<span className="pf-route__end pf-route__end--from" style={{ left: "3.3%" }}>
 						{t("boarding.from")}
@@ -117,7 +145,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 					{STAGES.map((s, i) => (
 						<li
 							key={s.key}
-							className={`glass pf-stage${i < idx || done ? " is-done" : i === idx ? (failed ? " is-stopped" : " is-current") : ""}`}
+							className={`glass pf-stage${stopAt >= 0 ? (i < stopAt ? " is-done" : i === stopAt ? " is-stopped" : "") : i < idx || done ? " is-done" : i === idx ? (failed ? " is-stopped" : " is-current") : ""}`}
 							aria-current={i === idx && !done ? "step" : undefined}
 						>
 							<span className="pf-stage__dot" aria-hidden="true" />
@@ -141,6 +169,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 						{error.hint ? <p className="pf-dim">{error.hint}</p> : null}
 					</div>
 				) : null}
+				{trouble ? <CheckinHelp key={jobId ?? ""} trouble={trouble} jobId={jobId} /> : null}
 				{!jobId ? <p className="pf-hint">{t("boarding.no_job")}</p> : null}
 				{lost && !ended ? <p className="pf-hint">{t("boarding.lost")}</p> : null}
 				<div className="pf-cta">

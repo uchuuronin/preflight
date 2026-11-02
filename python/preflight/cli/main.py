@@ -82,6 +82,23 @@ def _write_demo(where: Path) -> Path:
 	return script
 
 
+def _predict(rec, ctx):
+	"""The record with the engine's predictions, as the hosted runner fills them (runner/pipeline.py run_job), when the
+	engine imports here (numpy installed). D found `preflight run` never filled them (Nov 2), so `preflight watch` had no
+	bands. A failed or slow fill keeps the measured record and says so; a prediction never costs the measurements."""
+	try:
+		import numpy  # noqa: F401  (the engine's one requirement beyond the schema)
+	except ImportError:
+		print("preflight: predictions skipped: the engine needs numpy (pip install numpy)", file=sys.stderr)
+		return rec
+	from preflight.runner.pipeline import with_predictions
+
+	out, failed = with_predictions(rec, ctx, enabled=True)
+	if failed:
+		print("preflight: predictions unavailable; the measurements stand", file=sys.stderr)
+	return out
+
+
 def main(argv: list[str] | None = None) -> int:
 	ap = argparse.ArgumentParser(prog="preflight", description=__doc__.split("\n\n")[0])
 	sub = ap.add_subparsers(dest="cmd", required=True)
@@ -105,6 +122,12 @@ def main(argv: list[str] | None = None) -> int:
 		type=float,
 		help="agent and API runs: sample 30 tasks through a local proxy holding your OPENAI_API_KEY, "
 		"spending at most this many dollars of it",
+	)
+	r.add_argument(
+		"--no-predictions",
+		action="store_true",
+		help="write only the measurements (by default the engine fills the predictions, so `preflight watch` has "
+		"bands to check the real run against)",
 	)
 	r.epilog = "Arguments for the script go after --, e.g. preflight run train.py -- --batch_size 16"
 	w = sub.add_parser(
@@ -144,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
 			f"preflight: probing {what}, {script}, on this machine (about a minute on a CPU)", file=sys.stderr
 		)
 		ns = argparse.Namespace(cmd="run", path=script, entrypoint=None, out=ns.dir / "records",
-			install_requirements=False, require_gpu=False, agent_max_usd=None, demo=True)  # fmt: skip
+			install_requirements=False, require_gpu=False, agent_max_usd=None, demo=True, no_predictions=False)  # fmt: skip
 	if ns.cmd == "watch":
 		from preflight.recorder import inflight
 
@@ -169,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
 		)
 		try:
 			rec = run_pipeline({"source": source}, ctx, d)
+			if not getattr(ns, "no_predictions", False):
+				rec = _predict(rec, ctx)
 		finally:
 			if run_dir is not None:
 				import shutil

@@ -755,6 +755,35 @@ def test_after_no_gpu_could_be_scheduled_the_jobs_other_points_are_skipped(tmp_p
 	assert len(runner.calls) == 1 and all(p.error_code == "gpu.unavailable" for p in rec.probes)
 
 
+class _ImportFails(FakeRunner):
+	"""Every point fails importing a package before its first step, as the unseen scripts did."""
+
+	def __call__(self, spec, gpu, *, should_stop):
+		r = super().__call__(spec, gpu, should_stop=should_stop)
+		r.probe = r.probe.model_copy(update={"status": "error", "error_code": "missing_package", "steps": 0,
+			"error": "The script imports torchvision, which is not installed"})  # fmt: skip
+		return r
+
+
+def test_after_an_import_failure_the_jobs_other_points_are_skipped_with_the_flag_on(tmp_path, monkeypatch):
+	from preflight.runner import flags
+
+	job = {"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}
+	off = _ImportFails()
+	run_pipeline(job, _Ctx(), deps(tmp_path / "off", off))
+	assert len(off.calls) > 1  # off: every point runs, as before
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"runner.stop_on_import_error": True}))
+	flags.reload()
+	try:
+		on = _ImportFails()
+		rec = run_pipeline(job, _Ctx(), deps(tmp_path / "on", on))
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+	assert len(on.calls) == 1 and all(p.error_code == "missing_package" for p in rec.probes)
+	assert all("skipped" in (p.error or "") for p in rec.probes[1:])
+
+
 def test_the_probes_dataset_size_fills_the_records_n_examples(tmp_path):
 	class Sized(FakeRunner):
 		def __call__(self, spec, gpu, *, should_stop):
@@ -1159,3 +1188,13 @@ def test_a_cached_p1_still_gets_a_fresh_range_test(tmp_path, monkeypatch):
 	got = {p.id: p.status for p in rec.probes}
 	assert got.get("p1") == "cached" and got.get("p1-lr") == "ok", got
 	assert [c[0] for c in runner.calls] == ["p1-lr"]
+
+
+def test_a_point_that_could_import_something_else_isnt_skipped():
+	from preflight.runner.pipeline import _import_knobs
+
+	assert _import_knobs({"batch_size": 8, "seq_len": 64}) == _import_knobs({"batch_size": 4, "seq_len": 32})
+	assert _import_knobs({"batch_size": 8, "quantization": "none"}) != _import_knobs(
+		{"batch_size": 8, "quantization": "4bit"}
+	)
+	assert _import_knobs({"gradient_checkpointing": True}) != _import_knobs({"gradient_checkpointing": False})
