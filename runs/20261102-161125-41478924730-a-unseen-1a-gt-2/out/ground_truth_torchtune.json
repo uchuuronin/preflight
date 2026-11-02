@@ -1,0 +1,91 @@
+{
+  "script": "torchtune",
+  "entrypoint": "recipes/lora_finetune_single_device.py",
+  "args": [
+    "--config",
+    "qwen2_5/1.5B_lora_single_device"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ImportError",
+    "error": "ImportError: \n        torchao not installed.\n        Please follow the instructions at https://pytorch.org/torchtune/main/install.html#pre-requisites\n        to install torchao.\n        \n",
+    "seconds": 0.1690615339999999,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 2.5
+  },
+  "recorder": {
+    "status": "error",
+    "error": "ImportError: \n        torchao not installed.\n        Please follow the instructions at https://pytorch.org/torchtune/main/install.html#pre-requisites\n        to install torchao.\n        . ImportError: \n        torchao not installed.\n        Please follow the instructions at https://pytorch.org/torchtune/main/install.html#pre-requisites\n        to install torchao.\n         at torchtune/__init__.py:34, before the first optimizer step (stage: running script)",
+    "error_code": "user_error",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 1.983,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n/tmp/pf-nuu9ukwl/work/torchtune/__init__.py:18: UserWarning: The 'torch' module has already been imported. Setting PYTORCH_CUDA_ALLOC_CONF may not have an effect.For best results, set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before importing 'torch'.\n  warnings.warn(\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T16:16:32Z",
+      "duration_s": 1.983,
+      "error": "ImportError: \n        torchao not installed.\n        Please follow the instructions at https://pytorch.org/torchtune/main/install.html#pre-requisites\n        to install torchao.\n        . ImportError: \n        torchao not installed.\n        Please follow the instructions at https://pytorch.org/torchtune/main/install.html#pre-requisites\n        to install torchao.\n         at torchtune/__init__.py:34, before the first optimizer step (stage: running script)",
+      "error_code": "user_error",
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 1.983,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": null,
+  "image": "probe"
+}
