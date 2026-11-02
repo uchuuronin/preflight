@@ -78,6 +78,7 @@ class Collector:
 	setup_s: float | None = None  # run start to the first optimizer step: imports, loading, data
 	windows: list = field(default_factory=list)
 	_w_start: float | None = None
+	_last_t: float | None = None  # when the last optimizer step ended
 	_base: int = 0  # the step the first window starts after
 	_out_of_band: dict = field(default_factory=dict)
 	_alerted: set = field(default_factory=set)
@@ -89,6 +90,7 @@ class Collector:
 		"""Called after every optimizer step. Windows start at the first step, so setup (imports,
 		loading the model and data) is kept out of step time."""
 		self.steps += 1
+		self._last_t = self.clock()
 		if self._w_start is None:
 			self._w_start = self.clock()
 			self.setup_s = self._w_start - (self.t0 if self.t0 is not None else self._w_start)
@@ -98,7 +100,9 @@ class Collector:
 			self._flush()
 
 	def _flush(self, partial: bool = False):
-		now = self.clock()
+		# a partial window ends at its last step, not at the stop: B's A10 run (Nov 2) counted the second between its
+		# last step and SIGTERM as step time, and raised a false total-time alert
+		now = self._last_t if partial and self._last_t is not None else self.clock()
 		n = (self.steps - self._base) % self.window if partial else self.window
 		if n <= 0 or self._w_start is None:
 			return None

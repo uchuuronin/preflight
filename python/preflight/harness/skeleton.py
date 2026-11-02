@@ -29,6 +29,8 @@ from .knob_meta import annotate
 from .static import PRECISION, PREQUANTISED, QUANT_FORMATS
 
 TRAINING_LENSES = ("finetune", "pretrain", "rl", "vision", "gnn", "retrieval")
+TEXT_LENSES = ("finetune", "pretrain", "rl")  # the lenses whose data is token sequences and documents
+NO_PADDING = ("", "none", "false", "no", "do_not_pad")  # how a map says a batch isn't padded
 
 GROUPS = {
 	**dict.fromkeys(
@@ -715,7 +717,13 @@ def read_time_findings(sm: ScriptMap, graph: Graph) -> list[Finding]:
 				"eval.reduce_batch",
 				[Evidence(metric="eval_batch_size", value=d.eval_batch_size, threshold=4 * d.batch_size)],
 			)
-		if d and d.packing is False:
+		# B, Nov 2 (airbench, CIFAR-10): packing is about token sequences, and only a padded batch wastes anything
+		if (
+			d
+			and d.packing is False
+			and sm.lens in TEXT_LENSES
+			and str(d.padding or "").lower() not in NO_PADDING
+		):
 			add(
 				"data.no_packing",
 				"warn",
@@ -736,7 +744,9 @@ def read_time_findings(sm: ScriptMap, graph: Graph) -> list[Finding]:
 			)
 		if tr and tr.precision == "fp32":
 			add("precision.fp32", "warn", "Trains in fp32", "model", "precision", "precision.bf16_autocast")
-		if tr and tr.epochs and tr.epochs > 1:
+		# repeating documents is a text-corpus cost (Muennighoff et al.); several epochs over images or a graph is the
+		# usual recipe, not a warning (B, Nov 2: "Every document is seen 8 times" on CIFAR-10)
+		if tr and tr.epochs and tr.epochs > 1 and sm.lens in TEXT_LENSES:
 			add(
 				"data.repetition",
 				"info",

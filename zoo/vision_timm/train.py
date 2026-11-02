@@ -10,7 +10,7 @@ Preflight must catch every one from a few minutes of probing.
      convolutions don't use the tensor cores' preferred NHWC layout under bf16 autocast.
 
 Read from the code: vision.no_channels_last, vision.cpu_augment.
-Also read, not planted: data.repetition (5 epochs; normal when fine-tuning on 1,034 images).
+Not raised: 5 epochs, normal when fine-tuning on 1,034 images (data.repetition is for text corpora since Nov 2).
 Found by the probe: the share of each step spent waiting on the loader (data wait against
 compute on the timeline), and the step time with and without channels-last.
 

@@ -68,13 +68,32 @@ def _gpu_name(device: str) -> str:
 	return "L4" if "L4" in device else "A10" if "A10" in device else device
 
 
-def _run(parent: Path, script: Path, out: Path) -> dict:
+def _last_step(out: Path) -> int:
+	"""The step of the live jsonl's last window, 0 before the first."""
+	for f in out.glob("*.live.jsonl"):
+		lines = f.read_text().splitlines()
+		if lines:
+			try:
+				return int(json.loads(lines[-1])["step"])
+			except (ValueError, KeyError):
+				return 0
+	return 0
+
+
+def _run(
+	parent: Path,
+	script: Path,
+	out: Path,
+	run_s: float = RUN_S,
+	total_steps: int = 60000,
+	stop_step: int | None = None,
+) -> dict:
 	import signal
 	import subprocess
 	import sys
 
 	cmd = [sys.executable, "-m", "preflight.recorder.inflight", str(parent), str(out), str(script),
-		"--total-steps", "60000", "--window", str(WINDOW)]  # fmt: skip
+		"--total-steps", str(total_steps), "--window", str(WINDOW)]  # fmt: skip
 	t0 = time.monotonic()
 	import os
 
@@ -86,12 +105,14 @@ def _run(parent: Path, script: Path, out: Path) -> dict:
 		cmd, cwd=script.parent, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
 	)
 	rewrites, last_mtime = 0, None
-	while time.monotonic() - t0 < RUN_S and p.poll() is None:
+	while time.monotonic() - t0 < run_s and p.poll() is None:
 		time.sleep(1)
 		for f in out.glob("*.json"):
 			m = f.stat().st_mtime
 			if m != last_mtime:
 				rewrites, last_mtime = rewrites + 1, m
+		if stop_step is not None and _last_step(out) >= stop_step:
+			break  # review, Nov 2: a fast load could reach the planted eval OOM inside the time limit
 	if p.poll() is None:
 		p.send_signal(signal.SIGTERM)
 	try:
@@ -185,3 +206,92 @@ def check():
 			indent=1,
 		)
 	)
+
+
+# --- The cleaner check (Nov 2, after run 9): a record whose probes ran on the same GPU -------------------------------
+#
+# 	modal run --env main python/preflight/corpus/inflight_check_app.py::check_a10
+#
+# The pretrain sample's bands came from hand-made probes, so all three alerts fired on plan. This one's parent is a
+# production record whose probes ran on an A10 (A's a-triage-lora-prod-2, the zoo LoRA sample, committed as
+# api/tests/fixtures/a-triage-lora-prod-2.record.json): its step band (1.25 to 1.57 s) and total band (72.6 to 82.9
+# min, 3,170 steps) come from the engine on those probes. The same script runs on an A10 under the collector, as the
+# record says, and is stopped before its first eval (step 200), where it is planted to run out of memory. On plan,
+# so any alert is a false alarm. Its peak memory band abstains (the eval OOM), so no memory alert can fire; the run's
+# peak is reported beside the probe's. Cap $1 (A10 at $1.10/h, about 8 minutes).
+
+LORA_RUN_S = 270  # guess: about a minute of loading, then about 145 steps at 1.45 s
+LORA_STOP_STEP = 180  # and stopped here at the latest: the eval at step 200 is planted to run out of memory
+
+LORA_FIXTURE = "api/tests/fixtures/a-triage-lora-prod-2.record.json"
+
+
+def _warm_lora():
+	from datasets import load_dataset
+	from huggingface_hub import snapshot_download
+
+	snapshot_download("Qwen/Qwen2.5-1.5B")
+	load_dataset("yahma/alpaca-cleaned", split="train")
+
+
+lora_image = (
+	modal.Image.debian_slim(python_version="3.11")
+	.pip_install(
+		"torch==2.5.1",
+		"numpy<2.3",
+		"pydantic>=2.8,<3",
+		"httpx>=0.27",
+		"datasets==3.1.0",
+		"transformers==4.46.3",
+		"peft==0.13.2",
+		"accelerate==1.1.1",
+	)
+	.run_function(_warm_lora)
+	.add_local_file(str(ROOT / LORA_FIXTURE), "/root/lora_parent.json")
+	.add_local_file(str(ROOT / "zoo/finetune_lora_hf/train.py"), "/root/lora/train.py")
+	.add_local_python_source("preflight")
+)
+
+
+@app.function(image=lora_image, gpu="A10", timeout=30 * 60)
+def check_a10_remote() -> dict:
+	import torch
+
+	from preflight.recorder.inflight import bands_from
+	from preflight.schema import load_record
+
+	parent = Path("/root/lora_parent.json")
+	rec = load_record(parent.read_text())
+	b = bands_from(rec)
+	probe = next(p for p in rec.probes if p.id == "p1")
+	parent_row = {
+		"record_id": rec.record_id,
+		"gpu": rec.knob("gpu_type").current,
+		"probe_p50_s": probe.step_time.p50_s,
+		"probe_peak_reserved_gb": round(probe.memory.peak_reserved_bytes / 1e9, 2),
+	}
+	bands = {
+		"step_s": b.step_s,
+		"peak_gb": b.peak_bytes,
+		"total_min": b.total_s and [round(x / 60, 1) for x in b.total_s],
+		"total_steps": b.total_steps,
+	}
+	run = _run(
+		parent,
+		Path("/root/lora/train.py"),
+		Path("/tmp/out_lora"),
+		LORA_RUN_S,
+		b.total_steps or 3170,
+		LORA_STOP_STEP,
+	)
+	return {"device": torch.cuda.get_device_name(0), "parent": parent_row, "bands": bands, **run}
+
+
+@app.local_entrypoint()
+def check_a10():
+	t0 = time.monotonic()
+	got = check_a10_remote.remote()
+	got["wall_s"] = round(time.monotonic() - t0, 1)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/inflight_check_a10.json").write_text(json.dumps(got, indent=1))
+	print(json.dumps({k: v for k, v in got.items() if k not in ("stderr_tail",)}, indent=1))

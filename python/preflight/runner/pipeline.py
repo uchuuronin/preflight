@@ -554,8 +554,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if lr_probe is not None:
 			probes.append(lr_probe)  # in the record only: not a result, so never triaged or searched
 	billed = deps.runner.billed_usd(_price) if hasattr(deps.runner, "billed_usd") else None
-	rec, triaged = _triage(rec, results, deps, private=req.private)
-	rec, grounded = _search(rec, results, deps, private=req.private, verify=req.mode == "verify", ctx=ctx)
+	# review, Nov 2: a probe-more from the record page sends no `private`, so a record a private job touched keeps
+	# its new logs off Baseten and Meta too
+	held = req.private or _private_history(rec)
+	rec, triaged = _triage(rec, results, deps, private=held)
+	rec, grounded = _search(rec, results, deps, private=held, verify=req.mode == "verify", ctx=ctx)
 	triaged = [*triaged, *grounded]
 	kept = rec.probes
 	# the GPU the points ran on (a fallback's, if the runner used one), else the one asked for
@@ -573,6 +576,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		# measured on patched code, not the record's: marked, so B's fits and the plan leave them out
 		probes = [q.model_copy(update={"extras": {**q.extras, "patched": 1.0}}) if q.id in patched_for else q
 			for q in probes]  # fmt: skip
+	if held:
+		# B, Nov 2 (A's review): a private job's probes and findings carry the mark on the record, so no later job
+		# on it (a probe-more, a verify) sends their numbers or text to Meta or Baseten
+		from preflight.schema import Evidence
+
+		probes = [q.model_copy(update={"extras": {**q.extras, "private_job": 1.0}}) for q in probes]
+		triaged = [f.model_copy(update={"evidence": [*f.evidence, Evidence(metric="private_job", value=1.0)]})
+			for f in triaged]  # fmt: skip
 	out = _merge(rec, [*kept, *probes], results, gpu, spent_usd=budget.gpu_usd, overhead_usd=budget.overhead_usd,
 		discarded_usd=discarded_usd, billed_usd=billed, new_ids={p.id for p in probes})  # fmt: skip
 	from .measured_rules import hygiene_findings
@@ -586,9 +597,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged]})
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
-	if req.mode != "verify" and not req.private:
+	touched = req.private or _private_history(out)
+	if req.mode != "verify" and not touched:
 		out = _diagnose(out, deps)
-	out = _claim_check(out, deps, private=req.private)
+	out = _claim_check(out, deps, private=touched)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
@@ -872,6 +884,14 @@ def _tested_node(probe, nodes: set[str]) -> str | None:
 	eval probe, or an eval-pass OOM, tested the eval node."""
 	is_eval = probe.id.endswith("-eval") or (probe.error_code or "").startswith("oom.eval")
 	return "eval" if is_eval and "eval" in nodes else None
+
+
+def _private_history(rec: FlightRecord) -> bool:
+	"""Whether any probe or finding on the record came from a private job (marked by the pipeline): then nothing on
+	it goes to a hosted model, in this job or any later one (B, Nov 2, from A's review of the claim check)."""
+	return any(p.extras.get("private_job") for p in rec.probes) or any(
+		e.metric == "private_job" for f in rec.findings for e in f.evidence
+	)
 
 
 def _claim_check(rec: FlightRecord, deps: Deps, *, private: bool) -> FlightRecord:

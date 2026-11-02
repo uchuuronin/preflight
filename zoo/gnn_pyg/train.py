@@ -14,7 +14,7 @@ Preflight must catch it from a few minutes of probing.
      accuracy can't show the trade-off here.
 
 Read from the code: none (the per-hop fan-out is read as knobs; the growth needs measuring).
-Also read, not planted: data.repetition (3 epochs; normal for node classification).
+Not raised: several epochs, normal for node classification (data.repetition is for text corpora since Nov 2).
 Found by the probe: peak memory per hop at the planted fan-out (memory growth per hop on the
 fit map), and whether a batch fits the GPU at all.
 
