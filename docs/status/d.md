@@ -74,6 +74,33 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
 
+## Mon Nov 2, 18:05 ET (the 6 PM check-in)
+
+`main` is still `8ec03bc` (the 4:25 PM merge), already in `ws-d`; nothing to merge.
+
+- (a) **Landed:** C's 12:45 deploy put share pages live (the Oct 28 record's `/s/` link, card and
+  badge pass `scripts/share_page_check.py`). Both X posts and shot 5 now use
+  `/s/ICDYrfHQ2nBNbv3mlRHHMg`; the TODOs are gone.
+- (b) **Landed:** C's private check-in, record 01M6EG0284PWZDRXGGQVVZYVND, triaged by Glimmer, and
+  "Found by Muse Glimmer" shows on it live. Shot 12 marked works now (its link stays private).
+- (c) **Landed:** A's `a-triage-lora-prod-2` (record 01M6EGH5YMCXPFPNY5SHPNSYV5, share
+  `Q3s5qyHKTNf-fCng4dwn6g`, an A10) quotes the out-of-memory line. Checked in Chromium on A's
+  committed copy (`api/tests/fixtures/a-triage-lora-prod-2.record.json`, the app served locally in
+  production mode with the record answered from the copy; the live host isn't reachable from here):
+  the Eval loop node's sheet shows the quote and "Found by Muse Spark Open triage", desk and phone.
+  The token is in shot 6, storyboard 12b and E, fallback 11b; the portal's TODO(PM) has the re-run's
+  ID; a one-record draft for Chiya is in `video-plan.md` (not applied: that record ran on an A10 and
+  its memory ring abstains).
+- (d) **Not landed:** no regenerated validation table yet (B scored the first attempts; only BEIR
+  measured something). Shot 13 keeps its Tuesday condition.
+- (e) **Landed:** A confirmed the empty L4 eval runs (Modal couldn't schedule an L4); closed.
+
+One more check-in is scheduled for Tue Nov 3, 9 AM ET for (d).
+
+This push sends: `docs/demo/video-plan.md` (shots 5, 6, 12, 13, the one-record draft),
+`docs/demo/storyboard.md`, `docs/demo/fallback-cut.md`, `docs/submission/x-post.md`,
+`docs/submission/portal.md`, `docs/requests/from-d.md`, this file.
+
 ## Mon Nov 2, 17:50 ET (Chiya's 17:33 and 17:39: a planted bad rate, search's citations, shot 9b)
 
 1. **Range test, a planted bad rate** (LoRA at 1e-3, ten times its author's; A10, US$0.14 of the
