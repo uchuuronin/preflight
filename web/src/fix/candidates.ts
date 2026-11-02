@@ -121,3 +121,26 @@ export function candidatesFor(finding: Finding, ctx: Ctx): Candidate[] {
 	}
 	return out;
 }
+
+const GPU_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
+
+/**
+ * What the live fix loop races for a finding (FixRace.tsx). The live site writes fixes but doesn't
+ * verify them, so it can't learn that every single fix fails before offering the stack. The
+ * engine's own reading stands in: when no single move on the run's own settings clears the failure
+ * (a bigger GPU doesn't count: it's a choice of card, not a fix to the script, as in the guide's
+ * pair search), the stack races beside the single fixes. On
+ * the LoRA sample this is what verify found on Nov 2: eval without gradients alone still ran out of
+ * memory, the stack passed (docs/status/c.md D8).
+ */
+export function liveCandidates(finding: Finding, ctx: Ctx): Candidate[] {
+	const round1 = candidatesFor(finding, ctx);
+	if (!round1.length || round1.length >= MAX_CANDIDATES) return round1;
+	const o = withinLimits(ctx.record, ctx.provider, ctx.limits ?? NO_LIMITS, ctx.knobs, { pinned: ctx.pinned });
+	const clears = [ctx.objective.kind ?? "min_time", "fit_memory" as const].some((kind) =>
+		ctx.provider.moves(ctx.record, { ...ctx.objective, kind }, o).some((m) => m.fit === "fits" && !GPU_KNOBS.has(m.knobId)),
+	);
+	if (clears) return round1;
+	const stack = stackedCandidate(finding, ctx);
+	return stack ? [...round1, stack] : round1;
+}
