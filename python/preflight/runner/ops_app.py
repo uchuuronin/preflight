@@ -692,16 +692,7 @@ def _mbpp_row_keys(n: int) -> dict[str, int]:
 	return keys
 
 
-@ops.function(
-	image=worker_image,
-	secrets=[
-		modal.Secret.from_name("preflight-meta"),
-		modal.Secret.from_name("preflight-baseten"),
-		modal.Secret.from_name("preflight-glimmer"),
-	],
-	timeout=AGENT_SAMPLE_TIMEOUT_S,
-)
-def agent_sample_hosted(
+def _agent_sample(
 	files: dict,
 	entrypoint: str,
 	k: int,
@@ -709,6 +700,7 @@ def agent_sample_hosted(
 	skip_keys: list | None = None,
 	provider: str = "meta",
 	label_mbpp: int = 0,
+	timeout_s: float | None = None,
 ) -> dict:
 	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
 	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
@@ -754,6 +746,7 @@ def agent_sample_hosted(
 		skip_keys=tuple(skip_keys or ()),
 		run_id="s2" if skip_keys else "s1",
 		inspect=ends.update,  # how each task ended, for scoring the sweep (no content)
+		timeout_s=timeout_s,  # None: the sampler's own 30 min; the full benchmark passes its own
 	)
 	usd = round(sum(t.cost_usd or 0 for t in s.tasks), 4)
 	print(f"[agent] {len(s.tasks)} tasks, ${usd} of model calls; {s.selection}", flush=True)
@@ -775,6 +768,28 @@ def agent_sample_hosted(
 	}
 
 
+_AGENT_SECRETS = [
+	modal.Secret.from_name("preflight-meta"),
+	modal.Secret.from_name("preflight-baseten"),
+	modal.Secret.from_name("preflight-glimmer"),
+]
+# the full benchmark runs in halves of 250 tasks (about 55 min each [estimate] at the script's 4
+# workers), since remote-run.yml stops a run at 120 min: a 2-hour container, the sampler's own 95
+AGENT_FULL_TIMEOUT_S = 2 * 3600
+AGENT_FULL_SAMPLE_S = 95 * 60
+
+
+@ops.function(image=worker_image, secrets=_AGENT_SECRETS, timeout=AGENT_SAMPLE_TIMEOUT_S)
+def agent_sample_hosted(*a, **kw) -> dict:
+	return _agent_sample(*a, **kw)
+
+
+@ops.function(image=worker_image, secrets=_AGENT_SECRETS, timeout=AGENT_FULL_TIMEOUT_S)
+def agent_sample_hosted_full(*a, **kw) -> dict:
+	"""A half of the full benchmark: k tasks inside the sampler's own 95 min."""
+	return _agent_sample(*a, timeout_s=AGENT_FULL_SAMPLE_S, **kw)
+
+
 @ops.local_entrypoint()
 def agent_sample(
 	script: str = "agent_eval_spark",
@@ -783,8 +798,11 @@ def agent_sample(
 	skip_from: str = "",
 	provider: str = "meta",
 	label_mbpp: int = 0,
+	full: bool = False,
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
+	--full: a half of the full benchmark (--k 250, then --k 250 --skip-from the first half's output
+	committed under zoo/), on a 2-hour container with the sampler's limit at 95 min.
 	Writes out/agent_sample_<script>.json: the sampled tasks (counts and timings, no content).
 	--skip-from zoo/<script>/<record>.json: sample tasks that record's agent sample doesn't hold."""
 	import json
@@ -799,14 +817,16 @@ def agent_sample(
 	skip = []
 	if skip_from:
 		prior = json.loads((Path(__file__).resolve().parents[3] / skip_from).read_text())
-		tasks = (prior.get("agent_sample") or {}).get("tasks", [])
+		# a record's agent_sample, or an earlier agent_sample run's own output (its "sample")
+		tasks = (prior.get("agent_sample") or prior.get("sample") or {}).get("tasks", [])
 		# a list, not a set: a key twice skips two tasks opened the same way (open_run counts them)
 		skip = [key for t in tasks if (key := task_key(t["task_id"]))]
 		if len(skip) < len(tasks):
 			print(f"[agent] {len(tasks) - len(skip)} task ids in {skip_from} have no key and may be sampled again",
 				flush=True)  # fmt: skip
 		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
-	res = agent_sample_hosted.remote(files, entry, k, max_usd, skip, provider, label_mbpp)
+	fn = agent_sample_hosted_full if full else agent_sample_hosted
+	res = fn.remote(files, entry, k, max_usd, skip, provider, label_mbpp)
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/agent_sample_{script}{'' if provider == 'meta' else '_' + provider}.json").write_text(
 		json.dumps(res, indent=2)
