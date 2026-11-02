@@ -2,7 +2,7 @@
 
 Updated Mon Nov 2, 03:30 ET.
 
-**Production runner: deployed from main 1ea2dd6** (`a-deploy-main-21`, GitHub 41412727746, Nov 2 08:24 UTC / 03:24 ET), after both startup checks passed (`a-startup-check-21` 41412104839, `a-startup-check-serving-7` 41412457816). It carries Glimmer's secret on the worker, private jobs never on Baseten, the Modal capacity fix, the runner-held probe limit, the GPU-wait events, the serving cap (1,024 tokens) and C's fix-loop verify path. The previous deploy was ws-a 530785e (03:09 UTC); rollback is `modal deploy --env main` from 530785e.
+**Production runner: deployed from main 1ea2dd6** (`a-deploy-main-21`, GitHub 41412727746, Nov 2 08:24 UTC / 03:24 ET), after both startup checks passed (`a-startup-check-21` 41412104839, `a-startup-check-serving-7` 41412457816). It carries Glimmer's secret on the worker, private jobs never on Baseten, the Modal capacity fix, the runner-held probe limit, the GPU-wait events, the serving cap (1,024 tokens) and C's fix-loop verify path. The limit check passed after it (`a-limit-check-2`, 41412867356): three probe jobs accepted, the fourth refused with `limit.visitor_daily`. The previous deploy was ws-a 530785e (03:09 UTC); rollback is `modal deploy --env main` from 530785e.
 
 ## Decisions overnight (Chiya's autonomy, Nov 2 12:16 AM ET)
 
