@@ -1,0 +1,11 @@
+{
+	"name": "20261102-161145-41479039229-a-triage-lora-prod-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41479039229",
+	"ref": "e1f22041c9d63e60d7cdd5d017c0c1c003f4a88b",
+	"sha": "e1f22041c9d63e60d7cdd5d017c0c1c003f4a88b",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/finetune_lora_hf --gpus L4,A10 --max-minutes 30 --visitor d-video",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:17:38Z"
+}
