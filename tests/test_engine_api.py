@@ -1349,3 +1349,27 @@ def test_extra_stops_stay_inside_the_cell_budget():
 	assert 8 in out[0] and 12 in out[0] and len(out[0]) <= MAX_GRID_CELLS
 	two = api._with_probed(rec, [k, k], [list(range(1, 200)), list(range(1, 200))])
 	assert len(two[0]) * len(two[1]) <= MAX_GRID_CELLS and all(8 in a and 12 in a for a in two)
+
+
+def test_a_fully_probed_long_axis_leaves_the_trimming_to_the_others(monkeypatch):
+	# review, Nov 2: when the longest axis is all probed values, the stops to drop come from a shorter axis
+	from preflight.schema.encoding import MAX_GRID_CELLS
+
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	batch, seq = rec.knob("batch_size"), rec.knob("seq_len")
+	monkeypatch.setattr(
+		api, "probed_values", lambda record, k: list(range(1, 129)) if k.id == "batch_size" else []
+	)
+	out = api._with_probed(rec, [batch, seq], [list(range(1, 129)), list(range(64, 263))])
+	assert out[0] == list(range(1, 129))  # every stop was probed, so none goes
+	assert len(out[0]) * len(out[1]) <= MAX_GRID_CELLS
+	assert seq.current in out[1]  # the current value is added, and kept while the others are trimmed
+
+
+def test_a_half_integer_probe_on_an_int_knob_adds_nothing(monkeypatch):
+	root = Path(__file__).resolve().parents[1]
+	rec = load_record((root / "schema/examples/pretrain.json").read_text())
+	k = rec.knob("batch_size")
+	monkeypatch.setattr(api, "probed_values", lambda record, knob: [8.5])
+	assert 8 not in api._with_probed(rec, [k], [[2, 4, 16]])[0]

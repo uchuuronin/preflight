@@ -2889,6 +2889,7 @@ def _with_probed(record: FlightRecord, knobs_: list[Knob], axes: list[list]) -> 
 			(int(v) if k.kind == "int" else float(v))
 			for v in keep
 			if isinstance(v, int | float) and not isinstance(v, bool)
+			and (k.kind != "int" or float(v).is_integer())  # review: int(8.5) is a value no probe ran at
 			and (lo is None or v >= lo) and (hi is None or v <= hi)
 		]  # fmt: skip
 		vals = list(ax)
@@ -2896,14 +2897,20 @@ def _with_probed(record: FlightRecord, knobs_: list[Knob], axes: list[list]) -> 
 			if not any(_same(v, w) for w in vals):
 				vals.append(v)
 		out.append(sorted(vals))
+
+	def droppable(j: int) -> list:
+		protected = [*probed_values(record, knobs_[j]), knobs_[j].current]
+		return [v for v in out[j] if not any(_same(v, w) for w in protected)]
+
 	while math.prod(len(a) for a in out) > MAX_GRID_CELLS:
-		# drop one unprobed stop from the longest axis, the one farthest (in log) from the current value
-		i = max(range(len(out)), key=lambda j: len(out[j]))
-		k = knobs_[i]
-		protected = [*probed_values(record, k), k.current]
-		cands = [v for v in out[i] if not any(_same(v, w) for w in protected)]
-		if not cands:
+		# drop one unprobed stop from the longest axis that still has one (review: not just the longest, which may
+		# be all probed values), the stop farthest (in log) from the current value
+		open_ = [j for j in range(len(out)) if knobs_[j].kind not in ("bool", "categorical") and droppable(j)]
+		if not open_:
 			break
+		i = max(open_, key=lambda j: len(out[j]))
+		k = knobs_[i]
+		cands = droppable(i)
 		cur = (
 			float(k.current)
 			if isinstance(k.current, int | float) and not isinstance(k.current, bool)
