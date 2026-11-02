@@ -1,0 +1,156 @@
+[
+ {
+  "app_id": "ap-G73jgQVsr3gQQodeFppJi2",
+  "description": "preflight-runner",
+  "state": "deployed",
+  "tasks": "6",
+  "created_at": "2026-11-01 12:54:58+00:00",
+  "stopped_at": null
+ },
+ {
+  "app_id": "ap-8Gb19vYszboZ7HxeanTlYx",
+  "description": "preflight-inflight-check",
+  "state": "ephemeral",
+  "tasks": "1",
+  "created_at": "2026-11-02 16:37:27+00:00",
+  "stopped_at": null
+ },
+ {
+  "app_id": "ap-JNvPFYy6hSEwDtSr17CByT",
+  "description": "preflight-claim-check-eval",
+  "state": "ephemeral",
+  "tasks": "1",
+  "created_at": "2026-11-02 16:36:10+00:00",
+  "stopped_at": null
+ },
+ {
+  "app_id": "ap-YRFDg9r7rgxvRSRekHUEwU",
+  "description": "preflight-api",
+  "state": "deployed",
+  "tasks": "1",
+  "created_at": "2026-11-01 16:44:16+00:00",
+  "stopped_at": null
+ },
+ {
+  "app_id": "ap-LvvBC7Ou7ZUsOmZyUUo553",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:36:27+00:00",
+  "stopped_at": "2026-11-02 16:36:56+00:00"
+ },
+ {
+  "app_id": "ap-rDTA194Lz49Wt3e1e6FXWd",
+  "description": "preflight-quality-check",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:36:12+00:00",
+  "stopped_at": "2026-11-02 16:39:11+00:00"
+ },
+ {
+  "app_id": "ap-kUHpVXN5WAMTAmXRRvXxlW",
+  "description": "preflight-ask-model",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:35:57+00:00",
+  "stopped_at": "2026-11-02 16:39:19+00:00"
+ },
+ {
+  "app_id": "ap-w2xER5yHAM9cgRWVklBMul",
+  "description": "preflight-fix",
+  "state": "ephemeral",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:32:51+00:00",
+  "stopped_at": null
+ },
+ {
+  "app_id": "ap-44rq8xyy9CmSO31a0IyI4K",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:32:23+00:00",
+  "stopped_at": "2026-11-02 16:35:08+00:00"
+ },
+ {
+  "app_id": "ap-RawF3D1tStHQTuyrV9H0eN",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:31:41+00:00",
+  "stopped_at": "2026-11-02 16:35:27+00:00"
+ },
+ {
+  "app_id": "ap-h9PaU0LgLnfkxUqO3V4ZG3",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:30:36+00:00",
+  "stopped_at": "2026-11-02 16:30:50+00:00"
+ },
+ {
+  "app_id": "ap-m7BSZ7zERQNxw8k2dmFiub",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:29:30+00:00",
+  "stopped_at": "2026-11-02 16:32:34+00:00"
+ },
+ {
+  "app_id": "ap-WBgPz8oj4iut3XO0Xe3E8h",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:29:13+00:00",
+  "stopped_at": "2026-11-02 16:34:23+00:00"
+ },
+ {
+  "app_id": "ap-CkpeEGnaAr5We2AihgQvZq",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:28:53+00:00",
+  "stopped_at": "2026-11-02 16:32:55+00:00"
+ },
+ {
+  "app_id": "ap-3pNKCjzEG8ZOChzFJ8C1zR",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:28:47+00:00",
+  "stopped_at": "2026-11-02 16:29:07+00:00"
+ },
+ {
+  "app_id": "ap-SBK6EWZQRwEOtBS6q2V5L5",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:27:25+00:00",
+  "stopped_at": "2026-11-02 16:27:39+00:00"
+ },
+ {
+  "app_id": "ap-ZffZczrAOmoKKpsiBKanvr",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:26:58+00:00",
+  "stopped_at": "2026-11-02 16:27:16+00:00"
+ },
+ {
+  "app_id": "ap-YnUB22tfg1NOVD2bMdiD61",
+  "description": "preflight-runner-ops",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:26:04+00:00",
+  "stopped_at": "2026-11-02 16:26:19+00:00"
+ },
+ {
+  "app_id": "ap-yDcDzEMgh0JqnBxpHjqMYP",
+  "description": "preflight-ask-model",
+  "state": "stopped",
+  "tasks": "0",
+  "created_at": "2026-11-02 16:21:21+00:00",
+  "stopped_at": "2026-11-02 16:39:10+00:00"
+ },
+ {
+  "ap
+to stop: []

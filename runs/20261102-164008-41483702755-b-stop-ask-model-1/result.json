@@ -1,0 +1,11 @@
+{
+	"name": "20261102-164008-41483702755-b-stop-ask-model-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41483702755",
+	"ref": "ws-b",
+	"sha": "322f7f0402882e61ae4f6ad550ad17aa15d570ff",
+	"cmd": "python scripts/modal_app_stop.py preflight-ask-model --before 2026-11-02T16:30:00Z",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:40:29Z"
+}
