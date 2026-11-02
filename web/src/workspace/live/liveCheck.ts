@@ -68,7 +68,8 @@ export function readLive(rec: FlightRecord): LiveReading | null {
 		const side = (w: (typeof windows)[number]) => (w.wall_s > hi ? "above" : w.wall_s < lo ? "below" : null);
 		const tail = windows.slice(-REPEAT_TO_ALERT);
 		const s = side(last);
-		if (s && tail.length === REPEAT_TO_ALERT && tail.every((w) => side(w) === s)) alerts.push({ kind: "step", step: last.index, value: last.wall_s, lo, hi, side: s });
+		// as A's streak: any window out of band counts, whichever side; the last one's side is said
+		if (s && tail.length === REPEAT_TO_ALERT && tail.every((w) => side(w) !== null)) alerts.push({ kind: "step", step: last.index, value: last.wall_s, lo, hi, side: s });
 	}
 	const lastPeak = last ? peakOf(last) : null;
 	if (last && bands.peak && lastPeak !== null && lastPeak > bands.peak[1]) alerts.push({ kind: "peak", step: last.index, value: lastPeak, lo: bands.peak[0], hi: bands.peak[1] });

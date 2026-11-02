@@ -902,6 +902,8 @@
 	"live.status.ok": "Finished: {step} steps.",
 	"live.status.oom": "Ran out of memory at step {step}.",
 	"live.status.stopped": "Stopped at step {step}.",
+	"live.status.error": "Stopped with an error at step {step}.",
+	"live.status.timeout": "Timed out at step {step}.",
 	"live.updated": "Updated {s} s ago.",
 	"live.step": "Step time {value} (predicted {lo} to {hi}).",
 	"live.step_alone": "Step time {value}.",

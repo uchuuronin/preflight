@@ -6,7 +6,7 @@ import { useId, useState } from "react";
 import { go } from "../../app/route";
 import { flag } from "../../lib/flags";
 import { t } from "../../lib/i18n";
-import { LIVE_REF, openLiveFile, pickAndFollow } from "./liveFile";
+import { canFollow, LIVE_REF, openLiveFile, pickAndFollow } from "./liveFile";
 
 export function WatchRun() {
 	const [error, setError] = useState<string | null>(null);
@@ -17,9 +17,13 @@ export function WatchRun() {
 	};
 	const choose = async () => {
 		setError(null);
+		if (!canFollow()) {
+			document.getElementById(fileId)?.click(); // no picker with a handle: a plain file input, in the same click
+			return;
+		}
 		const r = await pickAndFollow();
-		if (r === null) document.getElementById(fileId)?.click(); // no picker with a handle: a plain file input
-		else opened(r);
+		if (r === "wrong") setError(t("live.error.not_live"));
+		opened(r === "opened");
 	};
 	return (
 		<section className="glass pf-watch" aria-labelledby={`${fileId}-title`}>

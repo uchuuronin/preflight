@@ -69,3 +69,21 @@ describe("opening a live record", () => {
 		expect(() => asLiveRecord("{")).toThrow(/isn't JSON/);
 	});
 });
+
+describe("the watch command", () => {
+	it("carries the record's own arguments, quoted for the shell, so the collector's bands apply", async () => {
+		const { watchCommand } = await import("../export/WatchExport");
+		expect(watchCommand("train.py")).toBe("preflight watch preflight-record.json train.py");
+		expect(watchCommand("src/train.py", ["--epochs", "3", "--name", "it's mine"])).toBe(
+			"preflight watch preflight-record.json src/train.py -- --epochs 3 --name 'it'\\''s mine'",
+		);
+		expect(watchCommand("-rf; rm")).toBe("preflight watch preflight-record.json train.py");
+	});
+});
+
+describe("a step-time streak counts either side, as A's does", () => {
+	it("alerts after one window above and one below the band", () => {
+		const r = readLive(live(lora, [{ index: 20, wall_s: step.hi! * 1.5 }, { index: 40, wall_s: step.lo! * 0.5 }]))!;
+		expect(r.alerts.find((a) => a.kind === "step")).toMatchObject({ side: "below" });
+	});
+});

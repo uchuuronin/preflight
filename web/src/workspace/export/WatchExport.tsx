@@ -9,15 +9,23 @@ import type { FlightRecord } from "../record/types";
 /** The file name the command below uses; the share token stays out of file names. */
 export const WATCH_FILE = "preflight-record.json";
 
-export function watchCommand(entry: string | null | undefined): string {
-	const script = entry && /^[\w./-]+$/.test(entry) ? entry : "train.py";
-	return `preflight watch ${WATCH_FILE} ${script}`;
+/** One shell word, quoted only when it needs to be (POSIX single quotes). */
+function word(s: string): string {
+	return /^[\w./=:,+-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/** The command, with the arguments the record was predicted for, so the collector doesn't warn
+ * that its bands may not apply (inflight.py compares them). */
+export function watchCommand(entry: string | null | undefined, args: readonly string[] = []): string {
+	const script = entry && /^[\w.][\w./-]*$/.test(entry) ? entry : "train.py";
+	const tail = args.length ? ` -- ${args.map(word).join(" ")}` : "";
+	return `preflight watch ${WATCH_FILE} ${script}${tail}`;
 }
 
 export function WatchExport({ record }: { record: FlightRecord }) {
 	const [said, setSaid] = useState("");
 	const name = t("exports.watch.title");
-	const command = watchCommand(record.job.source?.entrypoint ?? record.job.script_map?.entrypoint);
+	const command = watchCommand(record.job.source?.entrypoint ?? record.job.script_map?.entrypoint, record.job.source?.args ?? []);
 	const say = (m: string) => {
 		setSaid("");
 		setTimeout(() => setSaid(m), 60);

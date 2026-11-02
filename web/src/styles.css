@@ -2285,7 +2285,6 @@ a {
 .pf-live { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: var(--pf-radius-md); border: 1px solid var(--pf-stroke); }
 .pf-live__head { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .pf-live__rows { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; font-size: var(--pf-text-sm); }
-.pf-live__alerts:empty { display: none; }
 .pf-live__alert { margin: 0; color: var(--pf-fail); font-weight: 600; }
 .pf-live__ok { margin: 0; font-size: var(--pf-text-sm); color: var(--pf-fg-dim); }
 .pf-watch { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--pf-radius-md); }

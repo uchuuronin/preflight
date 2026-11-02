@@ -54,49 +54,59 @@ export function asLiveRecord(text: string): FlightRecord {
 	return rec as FlightRecord;
 }
 
-async function read(file: File): Promise<void> {
-	if (state.modified === file.lastModified && state.name === file.name && state.record) return;
+/** True when this file is a live record (now on screen). */
+async function read(file: File, opening = false): Promise<boolean> {
+	if (!opening && state.modified === file.lastModified && state.name === file.name && state.record) return true;
 	try {
 		const record = asLiveRecord(await file.text());
 		set({ record, name: file.name, modified: file.lastModified, error: null });
+		return true;
 	} catch (e) {
 		// a file caught mid-write keeps the last good copy on screen (A writes it atomically, so this is rare)
-		set({ error: e instanceof Error ? e.message : String(e), ...(state.record ? {} : { name: file.name }) });
+		if (!opening) set({ error: e instanceof Error ? e.message : String(e) });
+		return false;
 	}
 }
 
 /** A file from an <input type="file">: read once. */
 export async function openLiveFile(file: File): Promise<boolean> {
 	stopFollowing();
-	await read(file);
-	return state.record !== null && state.error === null;
+	return read(file, true);
 }
 
-/** Pick the file with a handle the page can read again (Chromium). False where the browser has no picker. */
-export async function pickAndFollow(): Promise<boolean | null> {
-	const picker = (window as unknown as { showOpenFilePicker?: (o: unknown) => Promise<FileHandle[]> }).showOpenFilePicker;
-	if (typeof picker !== "function") return null;
+/** The browser can keep a handle on a picked file (Chromium): checked before any await, so a
+ * fallback file input still opens inside the visitor's click. */
+export function canFollow(): boolean {
+	return typeof (window as unknown as { showOpenFilePicker?: unknown }).showOpenFilePicker === "function";
+}
+
+/** Pick the file with a handle the page can read again (Chromium): "opened", "closed" (the
+ * visitor closed the picker) or "wrong" (not a live record; nothing changes). */
+export async function pickAndFollow(): Promise<"opened" | "closed" | "wrong"> {
+	const picker = (window as unknown as { showOpenFilePicker: (o: unknown) => Promise<FileHandle[]> }).showOpenFilePicker;
 	let picked: FileHandle[];
 	try {
 		picked = await picker({ types: [{ description: t("live.picker"), accept: { "application/json": [".json"] } }], multiple: false });
 	} catch {
-		return false; // the visitor closed the picker
+		return "closed";
 	}
+	const h = picked[0];
+	if (!h || !(await read(await h.getFile(), true))) return "wrong";
 	stopFollowing();
-	handle = picked[0] ?? null;
-	if (!handle) return false;
-	await read(await handle.getFile());
-	if (state.record === null) {
-		handle = null;
-		return false;
-	}
+	handle = h;
 	set({ following: true });
 	timer = setInterval(() => {
-		const h = handle;
-		if (!h) return;
-		h.getFile().then(read, () => set({ error: t("live.error.gone"), following: false }));
+		const cur = handle;
+		if (!cur) return;
+		cur.getFile().then(
+			(f) => void read(f),
+			() => {
+				stopFollowing(); // moved or deleted: stop asking
+				set({ error: t("live.error.gone") });
+			},
+		);
 	}, POLL_MS);
-	return true;
+	return "opened";
 }
 
 export function stopFollowing(): void {
