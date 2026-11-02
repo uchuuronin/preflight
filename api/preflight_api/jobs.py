@@ -80,7 +80,23 @@ def limit_of(e: BaseException) -> tuple[str, str] | None:
 		message = "Today's limit is reached: samples only until midnight ET."
 	elif message[-1] not in ".!?":
 		message += "."  # A's messages end without a full stop; ours follow with another sentence
-	return code, message
+	way = way_past(code)
+	return code, f"{message} {way}" if way and way.lower() not in message.lower() else message
+
+
+def way_past(code: str | None) -> str | None:
+	"""A's way past a refusal, as a sentence (preflight.runner.failures.describe, Nov 2: "come back
+	after midnight ET, open a sample meanwhile, or probe on your machine with `preflight run
+	train.py`"). None when A's package or the code isn't known."""
+	try:
+		from preflight.runner.failures import FALLBACK, describe
+	except Exception:
+		return None
+	step = describe(code)
+	if not code or step == FALLBACK:
+		return None
+	by_hand = step[1].strip().rstrip(".")
+	return f"{by_hand[:1].upper()}{by_hand[1:]}." if by_hand else None
 
 
 def retry_after(e: BaseException, default: int = 60) -> int:

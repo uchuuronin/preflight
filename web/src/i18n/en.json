@@ -80,7 +80,7 @@
 	"newflight.cost_hint": "One measured run: under 7 minutes on an L4 (28 Oct 2026, UTC).",
 	"newflight.check_in": "Check in",
 	"newflight.checking_in": "Checking in…",
-	"newflight.error.busy": "All probe GPUs are busy. Try again in {s} seconds, or open a sample meanwhile.",
+	"newflight.error.busy": "The queue can't take this job right now. Try again in {s} seconds, or open a sample meanwhile.",
 	"newflight.error.not_open": "Live probes aren't open yet. Open a sample to explore the cockpit.",
 	"newflight.error.generic": "Check-in didn't go through. Try again, or open a sample.",
 	"newflight.error.offline": "Preflight's server can't be reached right now. Samples still work.",
