@@ -1,0 +1,11 @@
+{
+	"name": "20261102-230516-41542580675-b-zoo-rec-vision-timm-a10",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41542580675",
+	"ref": "ws-b",
+	"sha": "33a9499e6ec3c3e67f0e253fc1ad98c94163e796",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/vision_timm --gpus A10 --visitor b-zoo-rec-6 --max-minutes 25",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:07:17Z"
+}
