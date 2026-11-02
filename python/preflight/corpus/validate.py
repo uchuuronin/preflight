@@ -282,9 +282,14 @@ def _share_row(metric, target, on, flags: list[tuple[str, bool | None]], share=W
 	)
 
 
+def _ordinal(n: int) -> str:
+	return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
 def cross_gpu_row(stores: list[Path]) -> Row:
 	"""Step time on a GPU the corpus never ran: train on the other GPUs, test on the one left out (K1 within 20%)."""
-	metric, target, on = "Step time, unmeasured GPU", "Within 20%", "Train on 3 GPU types, test on the 4th"
+	metric, target = "Step time, unmeasured GPU", "Within 20%"
+	on = "Train on all GPU types but one, test on the one left out"
 	if not stores:
 		return Row(metric, target, on, note="no corpus store given")
 	from preflight.corpus import calibrate as cal
@@ -296,6 +301,8 @@ def cross_gpu_row(stores: list[Path]) -> Row:
 		return Row(metric, target, on, note="no cross-GPU pairs in the store")
 	hits = sum(abs(c["k1"] / c["actual"] - 1) <= 0.20 for c in cs)
 	gpus = sorted({c["tgt"] for c in cs})
+	# Nov 1: five GPU types since the top-up, so the row says how many it trained and tested on
+	on = f"Train on {len(gpus) - 1} GPU types, test on the {_ordinal(len(gpus))}"
 	amd = any(g.startswith("MI") for g in gpus)
 	return Row(
 		metric,
