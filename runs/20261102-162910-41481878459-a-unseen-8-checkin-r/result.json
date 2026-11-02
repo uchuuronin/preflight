@@ -1,0 +1,11 @@
+{
+	"name": "20261102-162910-41481878459-a-unseen-8-checkin-r",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41481878459",
+	"ref": "257702bb7b4843caba2404977ab85df41d1484ef",
+	"sha": "257702bb7b4843caba2404977ab85df41d1484ef",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-8r --gpus L4,A10 --max-minutes 45 --repo https://github.com/snap-stanford/ogb --commit 61e9784ca76edeaa6e259ba0f836099608ff0586 --entrypoint examples/nodeproppred/arxiv/gnn.py --args=--use_sage,--runs,1,--epochs,500",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:32:37Z"
+}
