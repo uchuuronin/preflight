@@ -67,6 +67,7 @@ def measured(rec: dict, cell: dict, gpu: str) -> dict:
 		"at_cell": [(q.get("id"), q.get("status")) for q in probes],  # an eval-off re-run follows an eval OOM
 		"probe": p.get("id"),
 		"status": p.get("status"),
+		"error_code": p.get("error_code"),  # a code, never the message (which can quote the script)
 		"steps": p.get("steps"),
 		"step_s_mean": st.get("mean_s"),
 		"step_s_p50": st.get("p50_s"),
