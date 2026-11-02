@@ -11,7 +11,8 @@ help, and did nothing else change?" on its own.
 Spend: the jobs run one at a time, and the next is submitted only while what's spent so far plus
 A's per-job cap (US$0.60, the job store's spend check) stays under the cap; a job whose record has
 no final costs counts at that cap. Any job still running when the script stops, for any reason, is
-cancelled. GPU: the L4, pinned by the settings' gpu_type, so the fallback ladder doesn't apply.
+cancelled. GPU: --gpu (L4 or A10), pinned by the settings' gpu_type, so the fallback ladder doesn't apply
+and every side runs on it (the base's stored knobs still say L4: a label only).
 
 Nothing that reaches a record is printed: the log is published to the remote-runs branch, and a
 job id opens its record (GET /v1/jobs/{id}). Record ids are safe (records answer by token only).
@@ -79,8 +80,9 @@ def _pair(rec: dict) -> tuple[str | None, str | None]:
 
 @app.local_entrypoint()
 def verify_race(only: str = "", attempt: str = "a", gpu: str = "L4") -> None:
-	if gpu not in ("L4", "A10", "T4"):
-		raise SystemExit("gpu: L4, A10 or T4 (the standing yes)")
+	if gpu not in ("L4", "A10"):
+		# a T4 (14.7 GB, no bf16) can't run the script's bf16 setting comparably
+		raise SystemExit("gpu: L4 or A10")
 	sys.path.insert(0, str(ROOT / "api"))
 	from preflight_api import verify
 	from preflight_api.fix.templates import verify_options
