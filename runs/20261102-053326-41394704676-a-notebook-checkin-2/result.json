@@ -1,0 +1,11 @@
+{
+	"name": "20261102-053326-41394704676-a-notebook-checkin-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41394704676",
+	"ref": "ws-a",
+	"sha": "a9ba594c78cfda2026bc33694e778265633d3a10",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --notebook zoo/notebook_tiny/tiny_train.ipynb --visitor a-notebook-check-2 --gpus L4,A10 --max-minutes 25",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T05:55:54Z"
+}
