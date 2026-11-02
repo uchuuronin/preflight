@@ -208,11 +208,13 @@ def check_text(text: str, record, *, client=None) -> tuple[list[ClaimCheck], lis
 				"content": f"Text: {text[:2000]}\n\nNumbers and their candidate fields:\n{listing}",
 			},
 		]
+		before = len(getattr(client, "calls", []))
 		try:
 			picks, call = client.structured(msgs, _Picks, purpose="claim_check")
-			calls.append(call)
 		except Exception:  # the model's view is a refinement; the checks stand without it
-			picks = _Picks(picks=[])
+			picks, call = _Picks(picks=[]), None
+		# A's review, Nov 2: every billed attempt, a failed first answer or one that raised included (triage.py)
+		calls += client.calls[before:] if hasattr(client, "calls") else [c for c in (call,) if c is not None]
 		by_number = {p.number: p for p in picks.picks}
 		for c in ask:
 			p = by_number.get(c.number)
@@ -244,6 +246,11 @@ UNSUPPORTED = "unsupported: run a probe"
 # the findings a model wrote; a rule's numbers come from the probes by construction
 MODEL_SOURCES = ("spark_open_triage", "spark_diagnosis", "model")
 _NOTE = re.compile(r"\s*\((?:[^()]*?: unsupported: run a probe(?:; )?)+\)$")
+# A's review, Nov 2: a triage finding quotes its log line, '(log: "...")', already checked against the log; its
+# numbers (an OOM line's GiB) are the log's, not claims about the probe numbers
+_LOG_QUOTE = re.compile(r'\s*\(log: ".*?"\)', re.S)
+# a finding made in a private job (runner/pipeline.py marks it); its text never goes to a hosted model
+PRIVATE = "private_job"
 
 
 def annotate_findings(record, *, client=None) -> tuple[list, list]:
@@ -261,11 +268,18 @@ def annotate_findings(record, *, client=None) -> tuple[list, list]:
 			out.append(f)
 			continue
 		base = _NOTE.sub("", f.detail) if f.detail else f.detail  # an earlier check's note is not a claim
-		# a diagnosis already had Spark Open check its claims (diagnosis_check.py): code only here, no second bill
-		who = None if f.source == "spark_diagnosis" else client
-		checks, cs = check_text(" ".join(x for x in (f.title, base) if x), record, client=who)
+		text = _LOG_QUOTE.sub("", base) if base else base
+		# a diagnosis already had Spark Open check its claims (diagnosis_check.py): code only here, no second bill;
+		# a private job's finding is code only on every later job too (A's review, Nov 2)
+		private = any(e.metric == PRIVATE for e in f.evidence)
+		who = None if f.source == "spark_diagnosis" or private else client
+		checks, cs = check_text(" ".join(x for x in (f.title, text) if x), record, client=who)
 		calls += cs
 		ev = [e for e in f.evidence if not e.metric.startswith("claim_check.")]
+		# checked, whatever it found (an all-ambiguous or number-free finding too), so no later job sends it again
+		ev.append(
+			Evidence(metric="claim_check.checked", value="code only" if who is None else "Spark Open picked")
+		)
 		bad = []
 		for c in checks:
 			if c.verdict == "supported":

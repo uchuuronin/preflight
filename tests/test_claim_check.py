@@ -127,6 +127,100 @@ def test_annotate_marks_an_unsupported_number_and_leaves_rule_findings_alone():
 	by = {f.id: f for f in out}
 	assert calls == [] and by["r1"] == rule
 	assert by["t1"].detail == f"(999.9 GB: {UNSUPPORTED})"
-	assert [e.metric for e in by["t1"].evidence] == ["claim_check.unsupported"]
+	assert [e.metric for e in by["t1"].evidence] == ["claim_check.checked", "claim_check.unsupported"]
 	again, _ = annotate_findings(rec.model_copy(update={"findings": out}))  # checked once: kept as it was
 	assert {f.id: f for f in again}["t1"] == by["t1"]
+
+
+# ---------------------------------------------------------------- privacy and the pipeline (A's review, Nov 2)
+
+
+class _Picky:
+	"""A Spark Open stand-in: records what it was sent, bills every attempt, the first one failing."""
+
+	def __init__(self):
+		self.calls, self.sent = [], []
+
+	def structured(self, msgs, schema, **kw):
+		from datetime import UTC, datetime
+
+		from preflight.schema import ModelCall
+
+		self.sent.append(msgs[-1]["content"])
+		for ok in (False, True):  # a failed first answer, then the re-ask: both billed
+			self.calls.append(ModelCall(provider="baseten", model="m", purpose="claim_check", cost_usd=0.01,
+				at=datetime.now(UTC), ok=ok))  # fmt: skip
+		return _Picks(picks=[]), self.calls[-1]
+
+
+def _twins(rec):
+	"""The record with probe p1's reserved peak equal to its allocated one: one number, two fields."""
+	p = rec.probes[0]
+	mem = p.memory.model_copy(update={"peak_reserved_bytes": p.memory.peak_allocated_bytes})
+	return rec.model_copy(update={"probes": [p.model_copy(update={"memory": mem}), *rec.probes[1:]]})
+
+
+def _ambiguous_finding(rec, *, private=False):
+	from preflight.schema import Evidence, Finding
+
+	p = rec.probes[0]
+	num = f"{p.memory.peak_allocated_bytes / 1e9:.1f} GB"  # matches both twins, so Spark Open is asked
+	ev = [Evidence(metric="private_job", value=1.0)] if private else []
+	return Finding(id="t9", severity="info", code="triage.oom", title=f"Probe peaked near {num}",
+		detail='Out of memory. (log: "Tried to allocate 79.15 GiB")', source="spark_open_triage", evidence=ev)  # fmt: skip
+
+
+def test_a_quoted_log_line_is_not_a_claim_and_every_billed_attempt_is_kept():
+	from preflight.harness.claim_check import annotate_findings
+
+	rec = _twins(_rec())
+	rec = rec.model_copy(update={"findings": [_ambiguous_finding(rec)]})
+	client = _Picky()
+	out, calls = annotate_findings(rec, client=client)
+	(f,) = out
+	assert "79.15 GiB" not in " ".join(client.sent) and "unsupported" not in (f.detail or "")
+	assert len(calls) == 2 and sum(c.cost_usd for c in calls) == 0.02  # the failed first answer too
+
+
+def test_a_private_jobs_finding_never_reaches_a_hosted_model_on_any_later_job():
+	from preflight.harness.claim_check import annotate_findings
+
+	rec = _twins(_rec())
+	rec = rec.model_copy(update={"findings": [_ambiguous_finding(rec, private=True)]})
+	client = _Picky()
+	out, calls = annotate_findings(rec, client=client)  # a later, non-private job on the same record
+	assert client.sent == [] and calls == []
+	assert any(e.metric == "claim_check.checked" and e.value == "code only" for e in out[0].evidence)
+	again, _ = annotate_findings(rec.model_copy(update={"findings": out}), client=client)
+	assert client.sent == [] and again == out  # checked once, never sent
+
+
+def test_the_pipeline_keeps_a_record_with_private_history_off_meta_and_baseten(monkeypatch):
+	import json
+
+	from preflight.runner import flags, pipeline
+
+	rec = _twins(_rec())
+	marked = rec.model_copy(update={"probes": [rec.probes[0].model_copy(update={"extras": {"private_job": 1.0}}),
+		*rec.probes[1:]], "findings": [_ambiguous_finding(rec)]})  # fmt: skip
+	assert pipeline._private_history(marked) and not pipeline._private_history(rec)
+	client = _Picky()
+
+	class Deps:
+		triage = client
+		spark = None
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_claim_check": True}))
+	flags.reload()
+	try:
+		out = pipeline._claim_check(marked, Deps, private=pipeline._private_history(marked))
+		assert client.sent == [] and out.costs == marked.costs
+		on = pipeline._claim_check(
+			rec.model_copy(update={"findings": [_ambiguous_finding(rec)]}), Deps, private=False
+		)
+		assert client.sent and on.costs.llm_usd == round((rec.costs.llm_usd or 0) + 0.02, 6)
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+	off = pipeline._claim_check(rec, Deps, private=False)  # flag off: unchanged
+	assert off is rec
