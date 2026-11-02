@@ -1,0 +1,9 @@
+{
+ "$comment": "The AMD rows (Nov 2 evening): A's probes and full runs of two zoo scripts on a rented MI300X (RunPod, ROCm 6.4.4, torch 2.5.1+rocm6.2), run by the PM from main. Same GPU for record and full run. Scored after the freeze.",
+ "runs": [
+  {"script": "finetune_lora_hf@MI300X", "set": "zoo", "record": "finetune_lora_hf_mi300x.record.json", "ground_truth": "ground_truth_finetune_lora_hf_mi300x.json", "used_for_tuning": false,
+   "$record": "a-amd-lora-record-5: p1 ran the eval pass and fitted (192 GiB card)", "$ground_truth": "a-amd-lora-gt: 120 bare steps, before the first eval at step 200"},
+  {"script": "pretrain_nanogpt@MI300X", "set": "zoo", "record": "pretrain_nanogpt_mi300x.record.json", "ground_truth": "ground_truth_pretrain_nanogpt_mi300x.json", "used_for_tuning": false,
+   "$record": "a-amd-nanogpt-record-2", "$ground_truth": "a-amd-nanogpt-gt-2: 300 bare steps (fixed shapes)"}
+ ]
+}
