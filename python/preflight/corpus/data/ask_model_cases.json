@@ -190,6 +190,80 @@
    "gpu": "A10",
    "steps": 3,
    "$from": "a-gt-grpo-50-b (Nov 1): --bare-steps 3, ran on an A10; calibration for every Preflight row, so its model answer is reported apart"
+  },
+  {
+   "id": "pretrain_nanogpt",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/pretrain_nanogpt"
+   },
+   "gpu": "A10",
+   "steps": 300,
+   "$from": "B's after-freeze ground truth b-gt-pretrain-nanogpt (Nov 2), on an A10, --bare-steps 300"
+  },
+  {
+   "id": "gnn_pyg",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/gnn_pyg"
+   },
+   "gpu": "A10",
+   "steps": 300,
+   "$from": "B's after-freeze ground truth b-gt-gnn-pyg (Nov 2), on an A10, --bare-steps 300"
+  },
+  {
+   "id": "retrieval_st",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/retrieval_st"
+   },
+   "gpu": "A10",
+   "steps": 300,
+   "$from": "B's after-freeze ground truth b-gt-retrieval-st (Nov 2), on an A10, --bare-steps 300"
+  },
+  {
+   "id": "vision_timm",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/vision_timm"
+   },
+   "gpu": "A10",
+   "$from": "B's after-freeze ground truth b-gt-vision-timm (Nov 2), on an A10, the whole script"
+  },
+  {
+   "id": "eval_sweep_reasoning",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/eval_sweep_reasoning"
+   },
+   "gpu": "A10",
+   "$from": "B's after-freeze ground truth b-gt-eval-sweep-reasoning (Nov 2), on an A10, the whole script"
+  },
+  {
+   "id": "serving_vllm",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/serving_vllm"
+   },
+   "gpu": "A10",
+   "$from": "B's after-freeze ground truth b-gt-serving-vllm (Nov 2), on an A10, the whole script"
+  },
+  {
+   "id": "torchtitan_debug",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/torchtitan_debug"
+   },
+   "gpu": "A10",
+   "steps": 40,
+   "$from": "B's after-freeze ground truth b-gt-torchtitan-debug (Nov 2), on an A10, --bare-steps 40"
   }
  ]
 }
