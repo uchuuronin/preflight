@@ -425,6 +425,66 @@ def test_the_wait_for_a_gpu_is_logged_and_capped():
 	assert "L4 or A10" in r.probe.error and r.probe.cost.usd == 0 and run.unscheduled == ["L4", "A10"]
 
 
+def test_a_probe_waiting_for_a_gpu_says_so_as_it_waits_and_when_its_up(monkeypatch):
+	# D, Nov 1: an eval run sat 19.5 minutes in "probing" with no events, waiting for an L4
+	import time as _time
+
+	from preflight.runner import sandbox_runner
+
+	monkeypatch.setattr(sandbox_runner, "WAIT_NOTE_S", 0.1)
+
+	class Slow(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			if args == ("true",):
+				_time.sleep(0.45)  # Modal finding a GPU
+			return super().exec(*args, timeout=timeout)
+
+	told = []
+	with SandboxRunner(lambda g: Slow(g)) as run:
+		run.notify = lambda kind, gpu, waited: told.append((kind, gpu, round(waited, 1)))
+		r = run(spec("p1"), "L4", should_stop=lambda: False)
+		run(spec("p2"), "L4", should_stop=lambda: False)  # the same sandbox: nothing to wait for
+	kinds = [k for k, _, _ in told]
+	assert (
+		kinds[0] == "waiting" and kinds.count("waiting") >= 3 and kinds[-1] == "up" and kinds.count("up") == 1
+	)
+	assert all(g == "L4" for _, g, _ in told) and r.probe.extras["gpu_wait_s"] >= 0.4
+
+	def broken(kind, gpu, waited):
+		raise RuntimeError("the status line is down")
+
+	with SandboxRunner(lambda g: Slow(g)) as run:  # a notice that fails never stops the probe
+		run.notify = broken
+		assert run(spec("p1"), "L4", should_stop=lambda: False).probe.status == "ok"
+
+
+def test_a_probe_past_its_own_limit_is_stopped_by_the_runner_and_says_timeout(monkeypatch):
+	# serving and eval, Nov 1: the exec's timeout didn't end them; the sandbox's 30 min did, no log
+	import time as _time
+	from dataclasses import replace
+
+	from preflight.runner import sandbox_runner
+
+	monkeypatch.setattr(sandbox_runner, "EXEC_SLACK_S", 0)
+
+	class Hung(FakeProc):
+		def read(self):
+			while not self.sb.terminated:  # a probe that never returns until its sandbox is ended
+				_time.sleep(0.05)
+			raise RuntimeError("sandbox terminated")
+
+	class HungBox(FakeSandbox):
+		def exec(self, *args, timeout=None):
+			p = super().exec(*args, timeout=timeout)
+			return p if args == ("true",) else Hung(self)
+
+	with SandboxRunner(lambda g: HungBox(g)) as run:
+		t0 = _time.monotonic()
+		r = run(replace(spec("p1"), timeout_s=1.5), "L4", should_stop=lambda: False)
+	assert _time.monotonic() - t0 < 5
+	assert r.probe.status == "timeout" and r.probe.error_code == "timeout" and "s limit" in r.probe.error
+
+
 def test_the_jobs_wall_budget_doesnt_count_the_gpu_wait():
 	from preflight.runner.pipeline import Budget
 

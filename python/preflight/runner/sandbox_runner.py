@@ -40,6 +40,9 @@ SCHEDULE_WAIT_S = 120
 WAIT_CAP_S = 20 * 60
 
 
+WAIT_NOTE_S = 60.0  # how often a probe still waiting for a GPU says so
+
+
 class NoGPU(RuntimeError):
 	pass
 
@@ -68,6 +71,10 @@ class SandboxRunner:
 		self.ran_on: list[str] = []  # the GPU each probe ran on, in order
 		self.last_ran: str | None = None  # the GPU of the last probe (the pipeline reads it)
 		self.unscheduled: list[str] = []  # GPUs given up on after SCHEDULE_WAIT_S
+		# told while a probe waits for a GPU and when it's up: notify(kind, gpu, waited_s), kind
+		# "waiting" (at once, then every WAIT_NOTE_S) or "up", so a visitor reads "waiting for a GPU"
+		# where the status line went quiet for 19 minutes (D, Nov 1)
+		self.notify: Callable[[str, str, float], None] | None = None
 
 	def __enter__(self):
 		return self
@@ -75,7 +82,14 @@ class SandboxRunner:
 	def __exit__(self, *exc):
 		self.close()
 
-	def _ready(self, sb, wait_s: float | None) -> bool:
+	def _tell(self, kind: str, gpu: str, waited: float) -> None:
+		if self.notify is not None:
+			try:
+				self.notify(kind, gpu, waited)
+			except Exception:  # a status line never stops a probe
+				log.warning("wait notice failed", exc_info=True)
+
+	def _ready(self, sb, wait_s: float | None, gpu: str = "", since: float | None = None) -> bool:
 		"""The no-op exec returns once the container is up (after Modal's wait for a GPU)."""
 		box: dict = {}
 
@@ -88,7 +102,15 @@ class SandboxRunner:
 
 		t = threading.Thread(target=go, daemon=True)
 		t.start()
-		t.join(wait_s)
+		start = time.monotonic()  # the join's own clock, real time as t.join(wait_s) was
+		since = self._clock() if since is None else since
+		while True:  # joined in steps, so the wait is told as it goes
+			left = None if wait_s is None else wait_s - (time.monotonic() - start)
+			step = WAIT_NOTE_S if left is None else max(0.0, min(WAIT_NOTE_S, left))
+			t.join(step)
+			if not t.is_alive() or (left is not None and left <= step):
+				break
+			self._tell("waiting", gpu, self._clock() - since)
 		return bool(box.get("ok"))
 
 	def _sandbox(self, gpu: str, image: str = "probe", fallback: tuple[str, ...] = ()):
@@ -107,7 +129,8 @@ class SandboxRunner:
 			left = max(0.0, self._wait_cap_s - self.queued_s - (self._clock() - t))
 			# wait out the GPU queue before any clock starts: neither the probe's time limit nor its
 			# cost counts the minutes Modal spent finding a GPU (no container runs, nothing is billed)
-			if self._ready(sb, left if last else min(self._schedule_wait_s, left)):
+			self._tell("waiting", g, self._clock() - t)
+			if self._ready(sb, left if last else min(self._schedule_wait_s, left), g, t):
 				break
 			self.unscheduled.append(g)
 			with suppress_all():
@@ -125,6 +148,7 @@ class SandboxRunner:
 		self.last_wait_s = waited
 		if waited > 1:
 			log.info("%s scheduled after %.0f s of waiting", g, waited)
+		self._tell("up", g, waited)
 		self._started = self._clock()
 		return self._sb
 
@@ -168,9 +192,19 @@ class SandboxRunner:
 			self.ran_on.append(gpu)
 			return _timed(result_from_wire(spec, ""), spec, self._clock() - t0)
 		done = threading.Event()
+		overran = threading.Event()
+		limit_s = spec.timeout_s + EXEC_SLACK_S
+		started = time.monotonic()
 
-		def watch():  # a cancelled job or a lost lease ends the sandbox mid-probe
+		def watch():  # a cancelled job, a lost lease or the probe's own limit ends the sandbox mid-probe
 			while not done.wait(1.0):
+				# the exec's timeout didn't end two probes that ran past it (serving and eval, Nov 1: the
+				# sandbox's own 30 min did, about 1,280 s in, with no log), so the runner holds the limit too
+				if time.monotonic() - started > limit_s:
+					log.warning("stopping sandbox for %s: past its %.0f s limit", spec.probe_id, limit_s)
+					overran.set()
+					self.close()
+					return
 				if should_stop():
 					log.info("stopping sandbox for %s: job cancelled or lease lost", spec.probe_id)
 					self.close()
@@ -201,6 +235,9 @@ class SandboxRunner:
 		if ran != gpu and self._price is not None:
 			spec = replace(spec, gpu_usd_per_hour=self._price(ran))  # list price of the GPU that ran
 		r = _timed(result_from_wire(spec, out or ""), spec, self._clock() - t0)
+		if overran.is_set() and r.probe.status != "ok":
+			r.probe = r.probe.model_copy(update={"status": "timeout", "error_code": "timeout",
+				"error": f"The probe ran past its {spec.timeout_s:.0f} s limit and was stopped"})  # fmt: skip
 		if wait > 0:  # logged on the probe that waited: how long the GPU took to schedule
 			r.probe = r.probe.model_copy(update={"extras": {**r.probe.extras, "gpu_wait_s": round(wait, 1)}})
 		return r

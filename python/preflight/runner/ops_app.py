@@ -948,6 +948,72 @@ def triage(share: str, probe: str = "p1-eval", provider: str = "glimmer"):
 	)
 
 
+# ---------------------------------------------------------------- a private job's triage, as the worker runs it
+
+
+@ops.function(
+	image=worker_image,
+	secrets=[
+		modal.Secret.from_name("preflight-meta"),
+		modal.Secret.from_name("preflight-baseten"),
+		modal.Secret.from_name("preflight-glimmer"),
+	],
+	timeout=12 * 60,
+)
+def private_triage_check_hosted(record_json: str) -> dict:
+	"""The worker's own private-job triage (pipeline._triage, private=True) on a zoo record's failed
+	probes, with the worker's clients (modal_app._glimmer_client, _triage_client) and the same
+	secrets as run_worker, and harness.glimmer_private on in this process only (production keeps it
+	off). Passes when Glimmer made every call and Baseten none."""
+	import json as _json
+
+	from preflight.probes.local import ProbeResult
+	from preflight.runner import flags
+	from preflight.runner.modal_app import _glimmer_client, _triage_client
+	from preflight.runner.pipeline import Deps, _triage
+	from preflight.schema import Env, load_record
+
+	rec = load_record(record_json)
+	if not _ours(rec):
+		return {"error": "only a sample (zoo) record, not derived and without arguments"}
+	os.environ["PREFLIGHT_FLAGS"] = _json.dumps(
+		{"harness.glimmer_private": True, "harness.spark_open_triage": True}
+	)
+	flags.reload()
+	failed = [
+		p for p in rec.probes if p.status not in ("ok", "cached") and p.error and not p.extras.get("patched")
+	]
+	results = [ProbeResult(probe=p, env=Env(backend="cpu", provider="modal"), summary={}, kernels=None, arch=None,
+		trace_file=None, log_tail="", workdir=Path("/tmp")) for p in failed[:1]]  # fmt: skip
+	glimmer, spark = _glimmer_client(), _triage_client()
+	deps = Deps(records=None, runner=None, glimmer=glimmer, triage=spark)
+	out, findings = _triage(rec, results, deps, private=True)
+	made = out.provenance[len(rec.provenance) :]
+	return {"glimmer_configured": glimmer is not None, "probe": failed[0].id if failed else None,
+		"findings": [{"code": f.code, "title": f.title, "detail": f.detail} for f in findings],
+		"calls": [{"provider": c.provider, "ok": c.ok, "latency_s": c.latency_s, "cost_usd": c.cost_usd} for c in made],
+		"baseten_calls": len(spark.calls) if spark else 0,
+		"pass": bool(findings) and all(c.provider == "modal-glimmer" for c in made) and not (spark and spark.calls)}  # fmt: skip
+
+
+@ops.local_entrypoint()
+def private_triage_check(share: str):
+	"""modal run --env main python/preflight/runner/ops_app.py::private_triage_check --share <token>"""
+	import re
+	import sys
+
+	if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", share):
+		print("[private] a share token, please", flush=True)
+		sys.exit(2)
+	data = b"".join(records_vol.read_file(f"{share}.json")).decode()
+	res = private_triage_check_hosted.remote(data)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/private_triage_check.json").write_text(json.dumps(res, indent=2))
+	print(f"[private] {'PASS' if res.get('pass') else 'FAIL'}: {json.dumps(res)[:1500]}", flush=True)
+	if not res.get("pass"):
+		raise SystemExit(1)
+
+
 # ---------------------------------------------------------------- Glimmer vs Spark Open agreement (paid: ask first)
 
 
