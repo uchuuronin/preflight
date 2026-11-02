@@ -432,6 +432,18 @@ def _uv() -> list[str] | None:
 
 
 UV_SHARE = 0.6  # guess: of the install's time limit, what uv's resolve may use before pip gets the rest
+UV_STACK_BYTES = 64 * 2**20  # guess: well past what LitGPT's backtrack needed
+NO_SOLUTION = "no version set installs under the image's pinned stack: "
+
+
+def _no_solution(text: str) -> str:
+	"""uv's reason, cut to the lines that say which requirement conflicts with which pin."""
+	why = [
+		ln.strip(" ╰─▶")
+		for ln in text.splitlines()
+		if "requires" in ln or "depends on" in ln or "unsatisfiable" in ln
+	]
+	return " ".join(why)[:600] or text.splitlines()[-1][:600]
 
 
 def _uv_then_pip(
@@ -442,6 +454,8 @@ def _uv_then_pip(
 	import time
 
 	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}  # as pip's -I: the probe's path
+	# a deep backtrack overflowed uv 0.5's default resolver stack on LitGPT (Nov 2, a-trial-litgpt-install-uv)
+	env.update({"UV_STACK_SIZE": str(UV_STACK_BYTES), "RUST_MIN_STACK": str(UV_STACK_BYTES)})
 	cmd = [*runner, "pip", "compile", "-", "--python", sys.executable, "--only-binary", ":all:", "-c",
 		str(constraints), "--no-header", "--no-annotate", "--quiet", *links, *(["--cache-dir", cache] if cache else []),
 		*(a for n in sdists for a in ("--no-binary-package", n))]  # fmt: skip
@@ -453,7 +467,10 @@ def _uv_then_pip(
 	except OSError as exc:
 		return f"uv didn't start ({type(exc).__name__})"
 	if r.returncode != 0:
-		return ((r.stderr or r.stdout or "").strip().splitlines() or [f"uv exited with {r.returncode}"])[-1]
+		text = (r.stderr or r.stdout or "").strip()
+		if "No solution found" in text:  # unsatisfiable under the image's pins: pip would only spend the time
+			return NO_SOLUTION + _no_solution(text)
+		return (text.splitlines() or [f"uv exited with {r.returncode}"])[-1]
 	have = installed()
 	pins = [ln.strip() for ln in r.stdout.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
 	todo = [p for p in pins if (m := _LINE.match(p)) and _norm(m["name"]) not in have]
@@ -494,8 +511,8 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 		why = _uv_then_pip(
 			runner, keep, target, constraints, links, cache, timeout_s * UV_SHARE, deadline, sdists
 		)
-		if why is None:
-			return None
+		if why is None or why.startswith(NO_SOLUTION):
+			return why
 		if log is not None:
 			log(f"[preflight] requirements: uv's route didn't install them ({why[:200]}); trying pip")
 		timeout_s = deadline - time.monotonic()
