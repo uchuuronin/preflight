@@ -256,11 +256,14 @@ def annotate_findings(record, *, client=None) -> tuple[list, list]:
 
 	out, calls = [], []
 	for f in record.findings:
-		if f.source not in MODEL_SOURCES:
+		# review, Nov 2: a finding checked on an earlier job keeps its check (no second model call for it)
+		if f.source not in MODEL_SOURCES or any(e.metric.startswith("claim_check.") for e in f.evidence):
 			out.append(f)
 			continue
 		base = _NOTE.sub("", f.detail) if f.detail else f.detail  # an earlier check's note is not a claim
-		checks, cs = check_text(" ".join(x for x in (f.title, base) if x), record, client=client)
+		# a diagnosis already had Spark Open check its claims (diagnosis_check.py): code only here, no second bill
+		who = None if f.source == "spark_diagnosis" else client
+		checks, cs = check_text(" ".join(x for x in (f.title, base) if x), record, client=who)
 		calls += cs
 		ev = [e for e in f.evidence if not e.metric.startswith("claim_check.")]
 		bad = []

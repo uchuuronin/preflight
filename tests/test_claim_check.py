@@ -128,5 +128,5 @@ def test_annotate_marks_an_unsupported_number_and_leaves_rule_findings_alone():
 	assert calls == [] and by["r1"] == rule
 	assert by["t1"].detail == f"(999.9 GB: {UNSUPPORTED})"
 	assert [e.metric for e in by["t1"].evidence] == ["claim_check.unsupported"]
-	again, _ = annotate_findings(rec.model_copy(update={"findings": out}))  # idempotent: no doubled evidence
-	assert len({f.id: f for f in again}["t1"].evidence) == 1
+	again, _ = annotate_findings(rec.model_copy(update={"findings": out}))  # checked once: kept as it was
+	assert {f.id: f for f in again}["t1"] == by["t1"]

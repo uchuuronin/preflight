@@ -35,7 +35,10 @@ def test_a_malformed_answer_scores_nothing():
 		]
 	}
 	rows = {r.metric: r for r in S.build(m, FIX, {"finetune_lora_hf": bad})}
-	assert rows["OOM prediction"].n is None
+	assert (
+		rows["OOM prediction"].hits == 0 and rows["OOM prediction"].n == 1
+	)  # held like an abstain: a missed OOM
+	assert rows["Peak memory error"].n is None
 
 
 def test_side_by_side_keeps_the_rows_aligned():
@@ -43,3 +46,13 @@ def test_side_by_side_keeps_the_rows_aligned():
 	model = S.build(m, FIX, {"finetune_lora_hf": _answer()})
 	text = S.side_by_side(model, model)
 	assert text.count("\n") == 2 + len(S.ROWS)
+
+
+def test_no_answer_on_a_run_that_ran_out_is_a_missed_oom():
+	m = {
+		"runs": [
+			{"script": "finetune_lora_hf", "set": "zoo", "ground_truth": "ground_truth_finetune_lora_hf.json"}
+		]
+	}
+	rows = {r.metric: r for r in S.build(m, FIX, {})}
+	assert rows["OOM prediction"].hits == 0 and rows["OOM prediction"].n == 1

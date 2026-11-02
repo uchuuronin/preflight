@@ -21,13 +21,18 @@ MAX_USD = 2.0  # cited: PM, Nov 2, item 2 (Meta credit, cap $2)
 # guess: a case's worst cost with its re-ask (60k characters in, 4k tokens out, twice) at harness/spark.py's prices, with room
 WORST_CALL_USD = 0.25
 
+# review, Nov 2: in the container this file sits at /root/<name>.py, with no repo above it; the local paths below are
+# only read where the app is launched
+_HERE = Path(__file__).resolve()
+ROOT = _HERE.parents[3] if len(_HERE.parents) > 3 else Path("/root")
+
 app = modal.App(APP_NAME)
 image = (
 	modal.Image.debian_slim(python_version="3.11")
 	.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26", "httpx>=0.27")
 	.env({"PREFLIGHT_ZOO": "/root/zoo"})  # review, Nov 2: the zoo samples, as runner/modal_app.py ships them
-	.add_local_dir(str(Path(__file__).resolve().parents[3] / "zoo"), "/root/zoo")
+	.add_local_dir(str(ROOT / "zoo"), "/root/zoo")
 	.add_local_python_source("preflight")
 )
 

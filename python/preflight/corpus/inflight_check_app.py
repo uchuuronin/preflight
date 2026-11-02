@@ -25,7 +25,10 @@ from pathlib import Path
 
 import modal
 
-ROOT = Path(__file__).resolve().parents[3]
+# review, Nov 2: in the container this file sits at /root/<name>.py, with no repo above it; the local paths below are
+# only read where the app is launched
+_HERE = Path(__file__).resolve()
+ROOT = _HERE.parents[3] if len(_HERE.parents) > 3 else Path("/root")
 RUN_S = 240  # guess: long enough for several 10-step windows at about a second a step
 WINDOW = 10  # steps per window: the collector's default is 20; 10 gives more windows in 4 minutes
 BATCH_B = (

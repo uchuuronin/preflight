@@ -53,6 +53,9 @@ def scored_from_answer(run: dict, base: Path, answer: dict | None) -> V.Scored:
 	if gt_path is None or not gt_path.exists():
 		s.notes.append(f"{s.script}: not measured, no ground truth yet")
 		return s
+	gt = json.loads(gt_path.read_text())
+	# review, Nov 2: no answer is held like Preflight's abstain: a run that ran out still counts, as a missed OOM
+	s.oom_actual = V.ran_out(gt)
 	if answer is None:
 		s.notes.append(f"{s.script}: the model gave no answer")
 		return s
@@ -60,12 +63,10 @@ def scored_from_answer(run: dict, base: Path, answer: dict | None) -> V.Scored:
 	if why:
 		s.notes.append(f"{s.script}: malformed answer ({why})")
 		return s
-	gt = json.loads(gt_path.read_text())
 	bare = gt.get("bare") or {}
 	m = answer["peak_memory_gib"]
 	mem = _Est(m["point"] * GIB, m["lo"] * GIB, m["hi"] * GIB)
 	peak = bare.get("peak_reserved_bytes")
-	s.oom_actual = V.ran_out(gt)
 	if bare.get("ended") in V.FINISHED and peak:
 		s.memory = V._within(mem.point, peak, 0.10)
 		s.memory_inside = V._inside(mem, peak)
@@ -81,13 +82,12 @@ def scored_from_answer(run: dict, base: Path, answer: dict | None) -> V.Scored:
 
 
 def build(manifest: dict, base: Path, answers: dict[str, dict]) -> list[V.Row]:
-	by_script = {
-		r.get("script"): answers.get(r.get("ask_model_id") or r.get("script"))
-		for r in manifest.get("runs", [])
-	}
+	# per run, not per script (review, Nov 2: two runs of one script are two answers); validate.build passes the
+	# manifest's own run dicts, so each run object is its own key
+	by_run = {id(r): answers.get(r.get("ask_model_id") or r.get("script")) for r in manifest.get("runs", [])}
 
 	def fake(run, base_):
-		return scored_from_answer(run, base_, by_script.get(run.get("script")))
+		return scored_from_answer(run, base_, by_run.get(id(run)))
 
 	with mock.patch.object(V, "score_run", fake):
 		rows, _ = V.build(manifest, base, None, None)

@@ -19,7 +19,10 @@ WORST_CALL_USD = (
 	0.01  # guess: one short pick call (a sentence and a field list) at Spark Open's list price, with room
 )
 
-ROOT = Path(__file__).resolve().parents[3]
+# review, Nov 2: in the container this file sits at /root/<name>.py, with no repo above it; the local paths below are
+# only read where the app is launched
+_HERE = Path(__file__).resolve()
+ROOT = _HERE.parents[3] if len(_HERE.parents) > 3 else Path("/root")
 app = modal.App("preflight-claim-check-eval")
 image = (
 	modal.Image.debian_slim(python_version="3.11")
