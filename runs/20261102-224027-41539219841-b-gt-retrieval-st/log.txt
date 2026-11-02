@@ -1,0 +1,252 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-5zcw05xpi3bGVUB5NKPR26
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+├── ✓ Created Function triage_agreement_hosted.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+└── ✓ Created Function startup_check_serving_image.
+[ground truth] retrieval_st: train.py, lens retrieval, probe image, 3 files; waiting for an L4, else the A10 (Modal queues it)
+[ground truth] container up on the A10; 3 files of retrieval_st
+[ground truth 22:40:51] bare run of retrieval_st: 300 optimizer steps, at most 750 s
+[preflight] requirements: installing sentence-transformers==3.3.1
+[bare] running /tmp/gt-dcou2nyu/train.py for 300 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+0it [00:00, ?it/s]0it [00:00, ?it/s]
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/datasets--sentence-transformers--natural-questions/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/datasets--sentence-transformers--natural-questions/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/datasets--sentence-transformers--natural-questions/.no_exist'
+
+[1AGenerating train split:   0%|          | 0/100231 [00:00<?, ? examples/s]
+[1AGenerating train split:   1%|          | 1000/100231 [00:00<00:39, 2485.27 examples/s]
+[1AGenerating train split:  52%|█████▏    | 52000/100231 [00:00<00:00, 134898.51 examples/s]
+[1AGenerating train split: 100%|██████████| 100231/100231 [00:00<00:00, 228958.67 examples/s]Generating train split: 100%|██████████| 100231/100231 [00:00<00:00, 165753.90 examples/s]
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/models--sentence-transformers--all-MiniLM-L6-v2/.no_exist'
+Ignored error while writing commit hash to /tmp/gt-caches-dr5q55oq/hf/hub/models--sentence-transformers--all-MiniLM-L6-v2/refs/main: [Errno 30] Read-only file system: '/tmp/gt-caches-dr5q55oq/hf/hub/models--sentence-transformers--all-MiniLM-L6-v2/refs/main'.
+Detected kernel version 4.19.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+
+[1A  0%|          | 0/12279 [00:00<?, ?it/s]
+[1A  0%|          | 1/12279 [00:00<2:45:53,  1.23it/s]
+[1A  0%|          | 4/12279 [00:00<37:08,  5.51it/s]  
+[1A  0%|          | 7/12279 [00:01<20:53,  9.79it/s]
+[1A  0%|          | 11/12279 [00:01<13:36, 15.03it/s]
+[1A  0%|          | 15/12279 [00:01<10:41, 19.12it/s]
+[1A  0%|          | 19/12279 [00:01<09:09, 22.33it/s]
+[1A  0%|          | 23/12279 [00:01<08:17, 24.64it/s]
+[1A  0%|          | 27/12279 [00:01<07:45, 26.33it/s]
+[1A  0%|          | 31/12279 [00:01<07:24, 27.57it/s]
+[1A  0%|          | 35/12279 [00:01<07:10, 28.47it/s]
+[1A  0%|          | 39/12279 [00:02<07:02, 29.00it/s]
+[1A  0%|          | 43/12279 [00:02<07:00, 29.07it/s]
+[1A  0%|          | 46/12279 [00:02<06:57, 29.29it/s][bare] step 50 at 12 s
+
+[1A  0%|          | 50/12279 [00:02<06:53, 29.58it/s]
+[1A  0%|          | 54/12279 [00:02<06:48, 29.94it/s]
+[1A  0%|          | 58/12279 [00:02<06:46, 30.08it/s]
+[1A  1%|          | 62/12279 [00:02<06:41, 30.43it/s]
+[1A  1%|          | 66/12279 [00:02<06:39, 30.59it/s]
+[1A  1%|          | 70/12279 [00:03<06:39, 30.59it/s]
+[1A  1%|          | 74/12279 [00:03<06:38, 30.67it/s]
+[1A  1%|          | 78/12279 [00:03<06:36, 30.81it/s]
+[1A  1%|          | 82/12279 [00:03<06:38, 30.60it/s]
+[1A  1%|          | 86/12279 [00:03<06:41, 30.38it/s]
+[1A  1%|          | 90/12279 [00:03<06:40, 30.42it/s]
+[1A  1%|          | 94/12279 [00:03<06:42, 30.28it/s]
+[1A  1%|          | 98/12279 [00:03<06:41, 30.33it/s][bare] step 100 at 14 s
+                                                  
+[1A
+[1A  1%|          | 100/12279 [00:04<06:41, 30.33it/s]
+[1A  1%|          | 102/12279 [00:04<06:46, 29.93it/s]
+[1A  1%|          | 106/12279 [00:04<06:44, 30.08it/s]
+[1A  1%|          | 110/12279 [00:04<06:42, 30.23it/s]
+[1A  1%|          | 114/12279 [00:04<06:38, 30.54it/s]
+[1A  1%|          | 118/12279 [00:04<06:39, 30.40it/s]
+[1A  1%|          | 122/12279 [00:04<06:39, 30.40it/s]
+[1A  1%|          | 126/12279 [00:04<06:41, 30.29it/s]
+[1A  1%|          | 130/12279 [00:05<06:46, 29.91it/s]
+[1A  1%|          | 134/12279 [00:05<06:47, 29.82it/s]
+[1A  1%|          | 137/12279 [00:05<06:50, 29.55it/s]
+[1A  1%|          | 140/12279 [00:05<06:52, 29.40it/s]
+[1A  1%|          | 143/12279 [00:05<06:53, 29.37it/s]
+[1A  1%|          | 146/12279 [00:05<06:52, 29.40it/s]
+[1A  1%|          | 149/12279 [00:05<06:54, 29.26it/s][bare] step 150 at 16 s
+
+[1A  1%|          | 152/12279 [00:05<06:55, 29.19it/s]
+[1A  1%|▏         | 155/12279 [00:05<06:59, 28.91it/s]
+[1A  1%|▏         | 158/12279 [00:06<06:58, 28.98it/s]
+[1A  1%|▏         | 162/12279 [00:06<06:53, 29.33it/s]
+[1A  1%|▏         | 165/12279 [00:06<06:54, 29.22it/s]
+[1A  1%|▏         | 168/12279 [00:06<06:52, 29.33it/s]
+[1A  1%|▏         | 171/12279 [00:06<06:55, 29.15it/s]
+[1A  1%|▏         | 174/12279 [00:06<06:58, 28.96it/s]
+[1A  1%|▏         | 177/12279 [00:06<06:57, 28.96it/s]
+[1A  1%|▏         | 180/12279 [00:06<06:58, 28.94it/s]
+[1A  1%|▏         | 183/12279 [00:06<06:55, 29.13it/s]
+[1A  2%|▏         | 186/12279 [00:06<06:58, 28.86it/s]
+[1A  2%|▏         | 189/12279 [00:07<06:55, 29.13it/s]
+[1A  2%|▏         | 192/12279 [00:07<06:59, 28.80it/s]
+[1A  2%|▏         | 195/12279 [00:07<06:55, 29.06it/s]
+[1A  2%|▏         | 198/12279 [00:07<06:52, 29.31it/s][bare] step 200 at 17 s
+                                                   
+[1A
+[1A  2%|▏         | 200/12279 [00:07<06:52, 29.31it/s]
+[1A  2%|▏         | 201/12279 [00:07<06:58, 28.89it/s]
+[1A  2%|▏         | 205/12279 [00:07<06:49, 29.50it/s]
+[1A  2%|▏         | 208/12279 [00:07<06:49, 29.50it/s]
+[1A  2%|▏         | 211/12279 [00:07<06:51, 29.30it/s]
+[1A  2%|▏         | 214/12279 [00:07<06:49, 29.48it/s]
+[1A  2%|▏         | 217/12279 [00:08<06:47, 29.57it/s]
+[1A  2%|▏         | 220/12279 [00:08<06:51, 29.34it/s]
+[1A  2%|▏         | 224/12279 [00:08<06:44, 29.77it/s]
+[1A  2%|▏         | 227/12279 [00:08<06:52, 29.21it/s]
+[1A  2%|▏         | 230/12279 [00:08<06:52, 29.22it/s]
+[1A  2%|▏         | 233/12279 [00:08<06:56, 28.92it/s]
+[1A  2%|▏         | 236/12279 [00:08<06:53, 29.10it/s]
+[1A  2%|▏         | 239/12279 [00:08<06:55, 29.00it/s]
+[1A  2%|▏         | 242/12279 [00:08<06:55, 28.95it/s]
+[1A  2%|▏         | 246/12279 [00:09<06:49, 29.35it/s]
+[1A  2%|▏         | 249/12279 [00:09<06:48, 29.44it/s][bare] step 250 at 19 s
+
+[1A  2%|▏         | 252/12279 [00:09<06:47, 29.51it/s]
+[1A  2%|▏         | 255/12279 [00:09<06:50, 29.32it/s]
+[1A  2%|▏         | 259/12279 [00:09<06:45, 29.67it/s]
+[1A  2%|▏         | 263/12279 [00:09<06:44, 29.68it/s]
+[1A  2%|▏         | 266/12279 [00:09<06:46, 29.52it/s]
+[1A  2%|▏         | 270/12279 [00:09<06:43, 29.76it/s]
+[1A  2%|▏         | 274/12279 [00:09<06:38, 30.14it/s]
+[1A  2%|▏         | 278/12279 [00:10<06:36, 30.30it/s]
+[1A  2%|▏         | 282/12279 [00:10<06:30, 30.71it/s]
+[1A  2%|▏         | 286/12279 [00:10<06:30, 30.69it/s]
+[1A  2%|▏         | 290/12279 [00:10<06:29, 30.78it/s]
+[1A  2%|▏         | 294/12279 [00:10<06:30, 30.73it/s]
+[1A  2%|▏         | 298/12279 [00:10<06:29, 30.80it/s][bare] step 300 at 21 s
+{'loss': 0.0035, 'grad_norm': 1.719951868057251, 'learning_rate': 1.6286644951140066e-06, 'epoch': 0.01}
+{'loss': 0.0036, 'grad_norm': 0.019431097432971, 'learning_rate': 3.2573289902280133e-06, 'epoch': 0.02}
+{"steps": 300, "ended": "steps", "error": null, "seconds": 20.791124617999998, "peak_allocated_bytes": 604105216, "peak_reserved_bytes": 725614592, "device": "NVIDIA A10", "timing": "cuda_events"}
+[ground truth 22:41:23] bare run ended (steps) after 32 s, 300 steps
+[ground truth 22:41:23] recorder run: 5 warmup + 30 timed steps, at most 1408 s
+[ground truth 22:41:44] recorder run ended (ok) after 35 steps
+{
+  "script": "retrieval_st",
+  "entrypoint": "train.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": {
+    "sync_overhead": {
+      "median": 0.98499,
+      "ci95": [
+        0.95475,
+        1.0018
+      ],
+      "pairs": 14,
+      "source": "measured"
+    },
+    "hook_overhead": {
+      "median": 1.12036,
+      "ci95": [
+        1.08223,
+        1.16821
+      ],
+      "pairs": 15,
+      "source": "measured"
+    },
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "retrieval",
+  "image": "probe",
+  "bare": {
+    "steps": 300,
+    "ended": "steps",
+    "error": null,
+    "seconds": 20.791124617999998,
+    "peak_allocated_bytes": 604105216,
+    "peak_reserved_bytes": 725614592,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 31.9
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 35,
+    "p50_s": 0.03674214553833008,
+    "peak_allocated_bytes": 596544000,
+    "seconds": 21.03,
+    "by_phase": {
+      "data": 0.1269811570751641,
+      "forward": 0.32465225732660924,
+      "backward": 0.37462649575097084,
+      "optimizer": 0.10451637449263386,
+      "other": 0.06922371535462186
+    },
+    "generation": null,
+    "extras": {
+      "params_total": 22713216.0,
+      "params_trainable": 22713216.0,
+      "tokens_per_step": 0.0,
+      "samples_per_step": 8.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 5218709504.0,
+      "train_loader_batches": 12279.0,
+      "epochs": 1.0,
+      "planned_steps": 12279.0,
+      "train_dataset_len": 98231.0
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0",
+        "sentence-transformers": "3.3.1"
+      },
+      "python": "3.11.12"
+    }
+  }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-5zcw05xpi3bGVUB5NKPR26
