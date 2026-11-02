@@ -1,0 +1,11 @@
+{
+	"name": "20261102-010800-41370815841-b-topup-dry",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41370815841",
+	"ref": "ws-b",
+	"sha": "acb31381e8745ba6243b4e2e7b48470bd44cacf3",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::main --kind grouped --n 300 --seed 1 --exclude-keys python/preflight/corpus/data/topup_nov1_exclude.txt --budgets H100-SXM-80GB=100,L40S=100,A10=100,L4=100,T4=100 --dry-run",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T01:09:41Z"
+}

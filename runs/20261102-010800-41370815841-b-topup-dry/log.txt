@@ -1,0 +1,25 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sDw9EBX27BXAsmahTSkEEL
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+└── ✓ Created Function read_rows.
+excluding 6 of 300 configs listed in python/preflight/corpus/data/topup_nov1_exclude.txt
+[H100-SXM-80GB] wave 0: $0.00 of $100.00 spent (container time, worst case for unsettled waves), 0 done, 294 to do, deadline 600 s, next wave 4 x 8
+[T4] wave 0: $0.64 of $100.00 spent (container time, worst case for unsettled waves), 75 done, 75 to do, deadline 193 s, next wave 4 x 8
+[L4] wave 0: $2.92 of $100.00 spent (container time, worst case for unsettled waves), 577 done, 281 to do, deadline 120 s, next wave 4 x 8
+[H100-SXM-80GB] finished
+[L40S] wave 0: $1.78 of $100.00 spent (container time, worst case for unsettled waves), 195 done, 294 to do, deadline 120 s, next wave 4 x 8
+[L40S] finished
+[A10] wave 0: $2.58 of $100.00 spent (container time, worst case for unsettled waves), 577 done, 281 to do, deadline 120 s, next wave 4 x 8
+[A10] finished
+[L4] finished
+[T4] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sDw9EBX27BXAsmahTSkEEL
