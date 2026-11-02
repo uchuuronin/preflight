@@ -886,6 +886,8 @@ def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
 	return result.probe
 
 
+SEARCH_MAX_QUESTIONS = 2  # guess: searches a job asks, in series, before the visitor gets the record
+SEARCH_JOB_S = 120.0  # guess: no new search starts after this long searching in one job
 SEARCH_LIBRARIES = ("torch", "transformers", "peft", "trl", "accelerate", "datasets", "bitsandbytes",
 	"vllm", "sentence-transformers", "torch_geometric", "torchvision", "timm", "numpy", "deepspeed")  # fmt: skip
 
@@ -898,7 +900,8 @@ def _search(
 	harness.spark_search is on and the Meta client is configured; never for a private job (its
 	error text would go to Meta and the web), nor a verify job (one question, as with the
 	diagnosis). One search per distinct error code in a job: several points that ran out of memory
-	the same way are one question. Every call is in the record's provenance."""
+	the same way are one question; at most SEARCH_MAX_QUESTIONS, none started past SEARCH_JOB_S
+	(A's review, Nov 2). Every call is in the record's provenance."""
 	from .flags import flag
 
 	if private or verify or deps.spark is None or not flag("harness.spark_search"):
@@ -906,6 +909,7 @@ def _search(
 	from preflight.harness.search_grounding import ground_failure, skipped
 
 	findings, calls, asked = [], [], set()
+	started = time.monotonic()
 	for r in results:
 		if not isinstance(r, ProbeResult) or skipped(r.probe):
 			continue
@@ -914,6 +918,8 @@ def _search(
 		key = r.probe.error_code or r.probe.error.splitlines()[0][:120]
 		if key in asked:
 			continue
+		if len(asked) >= SEARCH_MAX_QUESTIONS or time.monotonic() - started > SEARCH_JOB_S:
+			break
 		asked.add(key)
 		env = r.env or rec.env
 		libs = {k: v for k, v in (env.libraries if env is not None else {}).items() if k in SEARCH_LIBRARIES}

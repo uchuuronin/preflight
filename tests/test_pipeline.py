@@ -1198,3 +1198,66 @@ def test_a_point_that_could_import_something_else_isnt_skipped():
 		{"batch_size": 8, "quantization": "4bit"}
 	)
 	assert _import_knobs({"gradient_checkpointing": True}) != _import_knobs({"gradient_checkpointing": False})
+
+
+def _search_setup(tmp_path, monkeypatch):
+	import httpx
+
+	from preflight.harness.spark import ModelClient
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner import flags
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	seen = []
+
+	def handler(req):
+		seen.append(req.url.path)
+		return httpx.Response(200, json={"output": [], "usage": {"input_tokens": 10, "output_tokens": 1}})
+
+	codes = ("oom.train", "missing_package", "script_error")
+	runner = FakeRunner(outcomes={f"p{i}": ("error", c) for i, c in enumerate(codes)})
+	results = []
+	for i in range(3):
+		r = runner(
+			ProbeSpec(probe_id=f"p{i}", files={"train.py": SCRIPT}, entrypoint="train.py"),
+			"L4",
+			should_stop=None,
+		)
+		r.probe = r.probe.model_copy(update={"error": f"Error number {i}"})
+		results.append(r)
+	d = deps(tmp_path, FakeRunner())
+	d.spark = ModelClient(base_url="https://api.meta.ai/v1", api_key="t", model="muse-spark-1.3",
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_search": True}))
+	flags.reload()
+	return rec, results, d, seen
+
+
+def test_a_job_asks_at_most_two_searches(tmp_path, monkeypatch):
+	from preflight.runner import flags
+	from preflight.runner.pipeline import SEARCH_MAX_QUESTIONS, _search
+
+	rec, results, d, seen = _search_setup(tmp_path, monkeypatch)
+	try:
+		_search(rec, results, d, ctx=_Ctx())
+	finally:
+		flags.reload()
+	assert len(seen) == SEARCH_MAX_QUESTIONS == 2  # three distinct errors, two questions
+
+
+def test_a_cancelled_job_stops_searching(tmp_path, monkeypatch):
+	from preflight.runner import flags
+	from preflight.runner.pipeline import _search
+
+	class Stopping(_Ctx):
+		def should_stop(self):
+			return True
+
+	rec, results, d, seen = _search_setup(tmp_path, monkeypatch)
+	try:
+		_search(rec, results, d, ctx=Stopping())
+	finally:
+		flags.reload()
+	assert not seen
