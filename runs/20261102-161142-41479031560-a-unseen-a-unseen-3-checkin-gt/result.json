@@ -1,0 +1,11 @@
+{
+	"name": "20261102-161142-41479031560-a-unseen-a-unseen-3-checkin-gt",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41479031560",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/huggingface/open-r1 --commit 5b6ff22b3fb7aa069c54866e517f39dfc3160e09 --entrypoint src/open_r1/grpo.py --args=--config,recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml,--vllm_mode,colocate,--max_steps,50 --bare-steps 100000 --budget-min 45 --first-gpu A100 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:12:39Z"
+}
