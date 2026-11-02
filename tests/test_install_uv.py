@@ -127,3 +127,15 @@ def test_when_uv_finds_no_solution_pip_isnt_run_and_the_reason_is_said(pip, monk
 	monkeypatch.setattr(R.subprocess, "run", run)
 	err, _ = R.install(work, work / "d", log=lambda m: None, uv=True)
 	assert err.startswith(R.NO_SOLUTION) and "torch>=2.7" in err and len(seen) == 1
+
+
+def test_a_failed_install_names_the_pins_the_code_asks_past(pip, monkeypatch):
+	_, state, work = pip
+	(work / "requirements.txt").write_text("torch>=2.7\nlitdata\ntqdm>4\n")
+	monkeypatch.setattr(R, "installed", lambda: {"torch": "2.5.1+cu124", "tqdm": "4.70.1"})
+	state["answer"] = lambda cmd: 1
+	err, _ = R.install(work, work / "d", log=lambda m: None)
+	assert err.startswith(
+		"the code asks for torch>=2.7 (the image has 2.5.1), which the probe image can't change."
+	)
+	assert "tqdm" not in err.split(".")[0]  # a line the image's copy satisfies isn't named

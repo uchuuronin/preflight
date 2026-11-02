@@ -80,6 +80,28 @@ def plan(text: str, have: dict[str, str]) -> tuple[list[str], list[str]]:
 	return keep, notes
 
 
+def pin_conflicts(text: str, have: dict[str, str]) -> list[str]:
+	"""Requirement lines whose versions exclude the image's own copy ("torch>=2.7 (the image has 2.5.1)"):
+	plan() keeps the image's, so what needs the newer one can't resolve (LitGPT, Nov 2)."""
+	try:
+		from packaging.specifiers import InvalidSpecifier, SpecifierSet
+		from packaging.version import InvalidVersion, Version
+	except ImportError:
+		return []
+	out = []
+	for raw in text.splitlines():
+		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
+		if m is None or not m["spec"] or _norm(m["name"]) not in have:
+			continue
+		got = have[_norm(m["name"])].split("+", 1)[0]
+		try:
+			if not SpecifierSet(m["spec"].replace(" ", "")).contains(Version(got), prereleases=True):
+				out.append(f"{m['name']}{m['spec'].replace(' ', '')} (the image has {got})")
+		except (InvalidSpecifier, InvalidVersion):
+			continue
+	return out[:4]
+
+
 # ---------------------------------------------------------------- probes.repo_install (off)
 
 # A module a script imports, and the PyPI distribution that provides it, for the imports the image
@@ -621,6 +643,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 					+ ("installed" if e is None else f"didn't install: {e.splitlines()[-1][:200]}")
 				)
 	if err:
+		clash = pin_conflicts(text, have)
+		if clash:  # the likeliest reason, ahead of pip's or uv's tail: no installer fixes the image's own pin
+			err = f"the code asks for {'; '.join(clash)}, which the probe image can't change. {err}"
 		return err, []
 	(target / ".ok").write_text("ok")
 	return None, [*site_dirs(target), *roots]
