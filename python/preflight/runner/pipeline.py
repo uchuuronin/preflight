@@ -152,6 +152,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
 		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
 		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
+		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
@@ -309,6 +310,7 @@ def _spec(
 		extra_packages=extra_lines(fetched.source) if deps.install_requirements else (),
 		install_uv=deps.install_requirements and _flag("probes.uv_install"),
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
+		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
@@ -325,6 +327,16 @@ def _import_knobs(knobs: dict) -> tuple:
 			if isinstance(v, bool) or not isinstance(v, int | float)
 		)
 	)
+
+
+def _command_sdists(fetched: Fetched) -> tuple[str, ...]:
+	"""A check-in by command's own source-only dependencies (sources.COMMANDS), else none."""
+	from .sources import COMMANDS
+
+	src = fetched.source
+	if src is None or src.kind != "command" or not src.args:
+		return ()
+	return tuple((COMMANDS.get(src.args[0]) or {}).get("sdists", ()))
 
 
 def _command_lens(sm: ScriptMap, fetched: Fetched) -> ScriptMap:

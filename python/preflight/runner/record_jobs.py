@@ -82,7 +82,7 @@ def refetch(src: Source, blobs) -> dict:
 	if src.kind == "command":  # the command again (its args are the whole command line)
 		return {
 			"kind": "command",
-			"command": list(src.args),
+			"args": list(src.args),
 			**{k: v for k, v in base.items() if k == "extra_packages"},
 		}
 	if src.kind in UPLOAD_KINDS:

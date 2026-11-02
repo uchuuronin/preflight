@@ -429,14 +429,17 @@ def _uv() -> list[str] | None:
 UV_SHARE = 0.6  # guess: of the install's time limit, what uv's resolve may use before pip gets the rest
 
 
-def _uv_then_pip(runner, keep, target, constraints, links, cache, resolve_s, deadline) -> str | None:
+def _uv_then_pip(
+	runner, keep, target, constraints, links, cache, resolve_s, deadline, sdists=()
+) -> str | None:
 	"""uv pip compile under the image's pins, then `pip install --no-deps` of the pins the image doesn't have;
 	None when it installed, else why not (and pip resolves as usual after it)."""
 	import time
 
 	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}  # as pip's -I: the probe's path
 	cmd = [*runner, "pip", "compile", "-", "--python", sys.executable, "--only-binary", ":all:", "-c",
-		str(constraints), "--no-header", "--no-annotate", "--quiet", *links, *(["--cache-dir", cache] if cache else [])]  # fmt: skip
+		str(constraints), "--no-header", "--no-annotate", "--quiet", *links, *(["--cache-dir", cache] if cache else []),
+		*(a for n in sdists for a in ("--no-binary-package", n))]  # fmt: skip
 	try:
 		r = subprocess.run(cmd, input="\n".join(keep) + "\n", capture_output=True, text=True,
 			timeout=max(1.0, resolve_s), cwd=target, env=env)  # fmt: skip
@@ -455,7 +458,8 @@ def _uv_then_pip(runner, keep, target, constraints, links, cache, resolve_s, dea
 		return None
 	left = deadline - time.monotonic()
 	cmd = [sys.executable, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
-		"--no-warn-script-location", "--only-binary", ":all:", "--no-deps", "--prefix", str(target), *links, *todo]  # fmt: skip
+		"--no-warn-script-location", "--only-binary", ":all:", *(a for n in sdists for a in ("--no-binary", n)),
+		"--no-deps", "--prefix", str(target), *links, *todo]  # fmt: skip
 	try:
 		r = subprocess.run(cmd, capture_output=True, text=True, timeout=max(1.0, left), cwd=target)
 	except subprocess.TimeoutExpired:
@@ -466,7 +470,7 @@ def _uv_then_pip(runner, keep, target, constraints, links, cache, resolve_s, dea
 
 
 def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, uv: bool = False,
-	find_links: str | None = None, log=None) -> str | None:  # fmt: skip
+	find_links: str | None = None, log=None, sdists: tuple[str, ...] = ()) -> str | None:  # fmt: skip
 	"""One install of keep into target with the image pinned; the installer's error tail, or None. uv
 	(probes.uv_install): `uv pip install` first, with the same constraints, wheels only and prefix (its
 	resolver is much faster on a big stack: LitGPT's ran past 420 s in pip, Nov 2); pip after it if it
@@ -482,7 +486,9 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 		# uv resolves (its resolver is the fast part); pip installs exactly what it chose that the image lacks,
 		# without resolving again. Not `uv pip install --prefix`: uv doesn't see the image's packages there and
 		# would put a second torch in the prefix (review, Nov 2)
-		why = _uv_then_pip(runner, keep, target, constraints, links, cache, timeout_s * UV_SHARE, deadline)
+		why = _uv_then_pip(
+			runner, keep, target, constraints, links, cache, timeout_s * UV_SHARE, deadline, sdists
+		)
 		if why is None:
 			return None
 		if log is not None:
@@ -494,7 +500,7 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 	# unprivileged uid can't list (Modal's /root, Nov 1: PermissionError, nothing installed)
 	cmd = [sys.executable, "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
 		"--no-warn-script-location", "--only-binary", ":all:", "--prefix", str(target),
-		"-c", str(constraints), *links, *keep]  # fmt: skip
+		"-c", str(constraints), *(a for n in sdists for a in ("--no-binary", n)), *links, *keep]  # fmt: skip
 	if cache:  # shared across a run's probes
 		cmd[5:5] = ["--cache-dir", cache]
 	try:
@@ -508,7 +514,8 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 
 
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
-	extra: list[str] | None = None, uv: bool = False, pyg: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
+	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = ()
+) -> tuple[str | None, list[Path]]:  # fmt: skip
 	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
@@ -552,6 +559,7 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	shared = os.environ.get("PREFLIGHT_DEPS_DIR")
 	if shared and os.access(shared, os.W_OK):
 		extra_key = f"\0{os.environ.get(PYG_INDEX_ENV)}" if pyg else ""  # what PyG's index adds
+		extra_key += f"\0{','.join(sdists)}" if sdists else ""  # what building from source allows
 		key = hashlib.sha256(("\n".join(keep) + "\0" + pins + extra_key).encode()).hexdigest()[:24]
 		target = Path(shared) / key
 		if (target / ".ok").is_file():
@@ -565,7 +573,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	deadline = time.monotonic() + limit
 	log(f"[preflight] requirements: installing {', '.join(keep)}")
 	links = os.environ.get(PYG_INDEX_ENV) if pyg else None
-	how = {"uv": uv, "find_links": links, "log": log}
+	# a check-in by command's own pure-Python dependencies PyPI has only as source (sources.COMMANDS)
+	src_ok = tuple(n for n in sdists if re.fullmatch(_NAME, n))
+	how = {"uv": uv, "find_links": links, "log": log, "sdists": src_ok}
 	err = _pip(keep, target, constraints, limit, **how)
 	opt = [k for k in keep if k in optional]
 	if err and opt:  # one optional package can't sink the ones the repo declares

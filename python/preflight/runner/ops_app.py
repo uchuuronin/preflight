@@ -601,8 +601,10 @@ def ground_truth(
 		from preflight.runner.sources import _command
 
 		cmd = bytes.fromhex(command_hex).decode()
-		files, words, _lens = _command({"command": cmd}, on=True)
-		entrypoint, args = "preflight_command.py", " ".join(words)
+		import shlex
+
+		files, words, command_lens = _command({"command": cmd}, on=True)
+		entrypoint, args = "preflight_command.py", shlex.join(words)
 		install_requirements = True
 		print(f"[ground truth] by command: {cmd}", flush=True)
 	if sum(map(bool, (script, dir, repo, command_hex))) != 1:
@@ -642,6 +644,15 @@ def ground_truth(
 
 		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
 			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
+	opts = {k: v for k, v in (("uv", uv), ("pyg", pyg)) if v}
+	if command_hex:  # the tool's lens and source-only dependencies, as the pipeline gives them
+		from preflight.runner.sources import COMMANDS
+
+		opts["sdists"] = tuple(COMMANDS[words[0]].get("sdists", ()))
+		from preflight.runner.pipeline import EVAL_PROBE_CALLS, SERVING_PROBE_PROMPTS
+
+		p = {**p, "lens": command_lens, "generate_calls": EVAL_PROBE_CALLS if command_lens == "eval" else 0,
+			"generate_sample": SERVING_PROBE_PROMPTS if command_lens == "serving" else 0}  # fmt: skip
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
 	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
@@ -655,7 +666,7 @@ def ground_truth(
 		+ " (Modal queues it)", flush=True)  # fmt: skip
 	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(_split_args(args)),
 		install_requirements, sample, p["generate_calls"], install_repo,
-		install_opts={"uv": uv, "pyg": pyg} if (uv or pyg) else None)  # fmt: skip
+		install_opts=opts or None)  # fmt: skip
 	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{name}.json").write_text(json.dumps(res, indent=2))

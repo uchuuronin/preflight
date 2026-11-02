@@ -493,10 +493,14 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 
 # a console tool a visitor runs by name (Nov 2: lm_eval and `vllm bench` are commands, not scripts in a repo):
 # the PyPI package that provides it (None: the image has it) and the lens its run is. Only these names.
+# `sdists`: pure-Python dependencies PyPI has only as source, built for this tool alone (lm-eval's three).
+# Not vLLM: the serving image's vLLM (0.6.4) has no `bench` command (its CLI is serve, complete and chat),
+# so `vllm bench throughput` can't run here until the serving image moves on (review, Nov 2)
 COMMANDS = {
-	"lm_eval": {"package": "lm-eval", "module": "lm_eval", "lens": "eval"},
-	"vllm": {"package": None, "module": "vllm", "lens": "serving"},  # the serving image's vLLM
-}
+	"lm_eval": {"package": "lm-eval", "module": "lm_eval", "lens": "eval",
+		"sdists": ("sqlitedict", "rouge-score", "word2number")},
+}  # fmt: skip
+MAX_COMMAND_CHARS = 8_192  # before splitting: shlex is slow on a long unterminated quote
 COMMAND_ENTRY = "preflight_command.py"
 _COMMAND_SCRIPT = '''"""Runs the console command {name!r} as a script: Preflight's check in by command."""
 import sys
@@ -513,9 +517,10 @@ sys.exit(found[0].load()())
 
 
 def _command(source: dict, *, on: bool | None = None) -> tuple[dict[str, str], list[str], str]:
-	"""The files, arguments and lens of a check-in by command: `{"kind": "command", "command": "lm_eval --model
-	hf ..."}` (a string, split as a shell would, or a list). The package is installed from requirements.txt
-	like any upload's, under the same rules; nothing else is read."""
+	"""The files, arguments and lens of a check-in by command: `{"kind": "command", "args": ["lm_eval", "--model",
+	"hf", ...]}` (the whole command line as the source's args, so a Source validates it), or `"command":
+	"lm_eval --model hf ..."` (split as a shell would). The package installs from requirements.txt like any
+	upload's, under the same rules; nothing else is read."""
 	import shlex
 
 	from .flags import flag
@@ -523,7 +528,11 @@ def _command(source: dict, *, on: bool | None = None) -> tuple[dict[str, str], l
 	if not (flag("runner.command_checkin") if on is None else on):
 		raise InvalidSubmission("checking in by command isn't on here; check in the repository or a script",
 			code="submission.invalid")  # fmt: skip
-	raw = source.get("command")
+	raw = source.get("command") if source.get("command") is not None else source.get("args")
+	if isinstance(raw, str) and len(raw) > MAX_COMMAND_CHARS:
+		raise InvalidSubmission(
+			f"the command is over {MAX_COMMAND_CHARS:,} characters", code="submission.invalid"
+		)
 	try:
 		words = shlex.split(raw) if isinstance(raw, str) else raw
 	except ValueError as exc:
