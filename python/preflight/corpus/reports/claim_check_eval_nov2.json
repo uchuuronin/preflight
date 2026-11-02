@@ -1,0 +1,2453 @@
+{
+ "model": "meta-models/muse-spark-open-1026",
+ "usd": 0.357329,
+ "calls": 64,
+ "failed_calls": 0,
+ "skipped_at_cap": 0,
+ "summary": {
+  "true_pass": {
+   "k": 101,
+   "n": 107,
+   "rate": 0.9439252336448598,
+   "wilson95": [
+    0.8830303848234273,
+    0.9740496374963752
+   ]
+  },
+  "true_pass_right_field": {
+   "k": 76,
+   "n": 107,
+   "rate": 0.7102803738317757,
+   "wilson95": [
+    0.6182285373827988,
+    0.787756736347634
+   ]
+  },
+  "altered_caught": {
+   "k": 93,
+   "n": 102,
+   "rate": 0.9117647058823529,
+   "wilson95": [
+    0.8407554144604857,
+    0.9528844402424269
+   ]
+  },
+  "verdicts": {
+   "true": {
+    "not_a_measurement": 2,
+    "supported": 101,
+    "ambiguous": 4
+   },
+   "altered": {
+    "unsupported": 93,
+    "supported": 7,
+    "ambiguous": 1,
+    "not_a_measurement": 1
+   }
+  },
+  "by_kind": {
+   "bytes": {
+    "true_pass": {
+     "k": 24,
+     "n": 26,
+     "rate": 0.9230769230769231,
+     "wilson95": [
+      0.7585844622837095,
+      0.9786449115277238
+     ]
+    },
+    "altered_caught": {
+     "k": 20,
+     "n": 24,
+     "rate": 0.8333333333333334,
+     "wilson95": [
+      0.6414692935030095,
+      0.9332132367136705
+     ]
+    }
+   },
+   "seconds": {
+    "true_pass": {
+     "k": 37,
+     "n": 38,
+     "rate": 0.9736842105263158,
+     "wilson95": [
+      0.8650512388404787,
+      0.9953394123142312
+     ]
+    },
+    "altered_caught": {
+     "k": 35,
+     "n": 38,
+     "rate": 0.9210526315789473,
+     "wilson95": [
+      0.7920062854222853,
+      0.9727854044930122
+     ]
+    }
+   },
+   "fraction": {
+    "true_pass": {
+     "k": 26,
+     "n": 27,
+     "rate": 0.9629629629629629,
+     "wilson95": [
+      0.8171653406642414,
+      0.9934318540192149
+     ]
+    },
+    "altered_caught": {
+     "k": 25,
+     "n": 25,
+     "rate": 1.0,
+     "wilson95": [
+      0.8668077490609515,
+      0.9999999999999999
+     ]
+    }
+   },
+   "usd": {
+    "true_pass": {
+     "k": 12,
+     "n": 14,
+     "rate": 0.8571428571428571,
+     "wilson95": [
+      0.6005862050302965,
+      0.9599060787285351
+     ]
+    },
+    "altered_caught": {
+     "k": 11,
+     "n": 13,
+     "rate": 0.8461538461538461,
+     "wilson95": [
+      0.5776536898051745,
+      0.9567418216419186
+     ]
+    }
+   },
+   "rate": {
+    "true_pass": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.34238022750665303,
+      1.0
+     ]
+    },
+    "altered_caught": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.34238022750665303,
+      1.0
+     ]
+    }
+   }
+  }
+ },
+ "items": [
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.data.loader_wait_fraction",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 4.0% for this job.",
+   "number": "4.0%",
+   "verdict": "not_a_measurement",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.data.loader_wait_fraction",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 4.6% for this job.",
+   "number": "4.6%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 7.2 GB for this job.",
+   "number": "7.2 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.peak_allocated_bytes"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 5.7 GB for this job.",
+   "number": "5.7 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.step_time.first_step_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 5.71 s for this job.",
+   "number": "5.71 s",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.first_step_s"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.step_time.first_step_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 8.57 s for this job.",
+   "number": "8.57 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.step_time.by_phase.data",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 4.0% for this job.",
+   "number": "4.0%",
+   "verdict": "supported",
+   "picked": "probes.p2.data.loader_wait_fraction"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.step_time.by_phase.data",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 4.6% for this job.",
+   "number": "4.6%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 9.9 GB for this job.",
+   "number": "9.9 GB",
+   "verdict": "supported",
+   "picked": "probes.p2.memory.peak_allocated_bytes"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 7.9 GB for this job.",
+   "number": "7.9 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 75 MB for this job.",
+   "number": "75 MB",
+   "verdict": "supported",
+   "picked": "probes.p2.memory.by_term.gradients"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 0.1 GB for this job.",
+   "number": "0.1 GB",
+   "verdict": "supported",
+   "picked": "probes.p2.memory.by_term.gradients"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 6.4 GB for this job.",
+   "number": "6.4 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.extras.host_rss_peak_bytes"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 7.4 GB for this job.",
+   "number": "7.4 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.016 for this job.",
+   "number": "$0.016",
+   "verdict": "supported",
+   "picked": "probes.p1.cost.usd"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured $0.013 for this job.",
+   "number": "$0.013",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.throughput.mfu",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 62.6% for this job.",
+   "number": "62.6%",
+   "verdict": "supported",
+   "picked": "probes.p2.throughput.mfu"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p2.throughput.mfu",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 93.9% for this job.",
+   "number": "93.9%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 71 s for this job.",
+   "number": "71 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 82 s for this job.",
+   "number": "82 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 71 s for this job.",
+   "number": "71 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 57 s for this job.",
+   "number": "57 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.74 s for this job.",
+   "number": "0.74 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.mean_s"
+  },
+  {
+   "record": "schema/examples/finetune.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 1.11 s for this job.",
+   "number": "1.11 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.037 for this job.",
+   "number": "$0.037",
+   "verdict": "supported",
+   "picked": "probes.p1.cost.usd"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured $0.043 for this job.",
+   "number": "$0.043",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.duration_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 69 s for this job.",
+   "number": "69 s",
+   "verdict": "not_a_measurement",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.duration_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 55 s for this job.",
+   "number": "55 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.memory.by_term.optimizer",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 1.0 GB for this job.",
+   "number": "1.0 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.optimizer"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.memory.by_term.optimizer",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 1.5 GB for this job.",
+   "number": "1.5 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.step_time.by_phase.data",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 37.0% for this job.",
+   "number": "37.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.data.loader_wait_fraction"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.step_time.by_phase.data",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 42.5% for this job.",
+   "number": "42.5%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.memory.by_term.weights",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.5 GB for this job.",
+   "number": "0.5 GB",
+   "verdict": "supported",
+   "picked": "probes.p2.memory.by_term.gradients"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.memory.by_term.weights",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 0.4 GB for this job.",
+   "number": "0.4 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 20.0% for this job.",
+   "number": "20.0%",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.by_phase.forward"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 30.0% for this job.",
+   "number": "30.0%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.memory.peak_reserved_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 9.7 GB for this job.",
+   "number": "9.7 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.peak_reserved_bytes"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.memory.peak_reserved_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 11.2 GB for this job.",
+   "number": "11.2 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 64 s for this job.",
+   "number": "64 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 51 s for this job.",
+   "number": "51 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 69 s for this job.",
+   "number": "69 s",
+   "verdict": "supported",
+   "picked": "probes.p2.duration_s"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 104 s for this job.",
+   "number": "104 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 5.0% for this job.",
+   "number": "5.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.optimizer"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 5.8% for this job.",
+   "number": "5.8%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 5.0% for this job.",
+   "number": "5.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.optimizer"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p1.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 4.0% for this job.",
+   "number": "4.0%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.step_time.p95_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.28 s for this job.",
+   "number": "0.28 s",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.p95_s"
+  },
+  {
+   "record": "schema/examples/pretrain.json",
+   "field": "probes.p2.step_time.p95_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 0.42 s for this job.",
+   "number": "0.42 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[4].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.033 for this job.",
+   "number": "$0.033",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[4].cost_usd"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[4].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured $0.037 for this job.",
+   "number": "$0.037",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[4].latency_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 36 s for this job.",
+   "number": "36 s",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[4].latency_s"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[4].latency_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 29 s for this job.",
+   "number": "29 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[1].latency_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 31 s for this job.",
+   "number": "31 s",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[1].latency_s"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[1].latency_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 47 s for this job.",
+   "number": "47 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 412 s for this job.",
+   "number": "412 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 474 s for this job.",
+   "number": "474 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[2].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.142 for this job.",
+   "number": "$0.142",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[2].cost_usd"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[2].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured $0.114 for this job.",
+   "number": "$0.114",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[2].latency_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 96 s for this job.",
+   "number": "96 s",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[2].latency_s"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[2].latency_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 144 s for this job.",
+   "number": "144 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[3].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.685 for this job.",
+   "number": "$0.685",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[3].cost_usd"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[3].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured $0.787 for this job.",
+   "number": "$0.787",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[0].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.046 for this job.",
+   "number": "$0.046",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[0].cost_usd"
+  },
+  {
+   "record": "schema/examples/agent.json",
+   "field": "agent_sample.tasks[0].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured $0.037 for this job.",
+   "number": "$0.037",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1.step_time.by_phase.other",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 27.4% for this job.",
+   "number": "27.4%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.other"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1.step_time.by_phase.other",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 31.5% for this job.",
+   "number": "31.5%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 7.1 GB for this job.",
+   "number": "7.1 GB",
+   "verdict": "supported",
+   "picked": "probes.p2.extras.host_rss_peak_bytes"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 5.7 GB for this job.",
+   "number": "5.7 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.9% for this job.",
+   "number": "0.9%",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.by_phase.optimizer"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 1.4% for this job.",
+   "number": "1.4%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1-eval.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 189 s for this job.",
+   "number": "189 s",
+   "verdict": "supported",
+   "picked": "probes.p1-eval.duration_s"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1-eval.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 217 s for this job.",
+   "number": "217 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 1.68 s for this job.",
+   "number": "1.68 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.p50_s"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 1.34 s for this job.",
+   "number": "1.34 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p3.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 10.9% for this job.",
+   "number": "10.9%",
+   "verdict": "supported",
+   "picked": "probes.p3.step_time.by_phase.forward"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p3.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 16.4% for this job.",
+   "number": "16.4%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.step_time.by_phase.data",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.2% for this job.",
+   "number": "0.2%",
+   "verdict": "supported",
+   "picked": "probes.p1.data.loader_wait_fraction"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.step_time.by_phase.data",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 0.3% for this job.",
+   "number": "0.3%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1-eval.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 1.36 s for this job.",
+   "number": "1.36 s",
+   "verdict": "supported",
+   "picked": "probes.p1-eval.step_time.mean_s"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1-eval.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 1.09 s for this job.",
+   "number": "1.09 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 22 s for this job.",
+   "number": "22 s",
+   "verdict": "supported",
+   "picked": "probes.p2.duration_s"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p2.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 33 s for this job.",
+   "number": "33 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p3.memory.peak_reserved_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 18.6 GB for this job.",
+   "number": "18.6 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.peak_reserved_bytes"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p3.memory.peak_reserved_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 21.4 GB for this job.",
+   "number": "21.4 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1-eval.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 74 MB for this job.",
+   "number": "74 MB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.gradients"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1-eval.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 59 MB for this job.",
+   "number": "59 MB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1.throughput.tokens_per_s",
+   "kind": "rate",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 2,877 tokens/s for this job.",
+   "number": "2,877 tokens/s",
+   "verdict": "supported",
+   "picked": "probes.p1.throughput.tokens_per_s"
+  },
+  {
+   "record": "tests/fixtures/b-a-smoke-l4-main-4.record.json",
+   "field": "probes.p1.throughput.tokens_per_s",
+   "kind": "rate",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 4,316 tokens/s for this job.",
+   "number": "4,316 tokens/s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 22.3 GB for this job.",
+   "number": "22.3 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.peak_allocated_bytes"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 25.6 GB for this job.",
+   "number": "25.6 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 2.0 GB for this job.",
+   "number": "2.0 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.gradients"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 1.6 GB for this job.",
+   "number": "1.6 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.first_step_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 30 s for this job.",
+   "number": "30 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.first_step_s"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.first_step_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 45 s for this job.",
+   "number": "45 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 27 s for this job.",
+   "number": "27 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.mean_s"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 31 s for this job.",
+   "number": "31 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.memory.by_term.logits",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 1.2 GB for this job.",
+   "number": "1.2 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.logits"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.memory.by_term.logits",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 1.0 GB for this job.",
+   "number": "1.0 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 7.9 GB for this job.",
+   "number": "7.9 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.extras.host_rss_peak_bytes"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 11.8 GB for this job.",
+   "number": "11.8 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.rl.zero_spread_fraction",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 80.3% for this job.",
+   "number": "80.3%",
+   "verdict": "supported",
+   "picked": "probes.p1.rl.zero_spread_fraction"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.rl.zero_spread_fraction",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 92.3% for this job.",
+   "number": "92.3%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 1415 s for this job.",
+   "number": "1415 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 1132 s for this job.",
+   "number": "1132 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.p95_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 37 s for this job.",
+   "number": "37 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.p95_s"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.p95_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 56 s for this job.",
+   "number": "56 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.by_phase.reference",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 1.3% for this job.",
+   "number": "1.3%",
+   "verdict": "supported",
+   "picked": "probes.p1.generation.truncation_rate"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.by_phase.reference",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 1.4% for this job.",
+   "number": "1.4%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.step_time.by_phase.data",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.0% for this job.",
+   "number": "0.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.data.loader_wait_fraction"
+  },
+  {
+   "record": "zoo/grpo_trl/record_nov1_a10.json",
+   "field": "probes.p1.data.loader_wait_fraction",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.0% for this job.",
+   "number": "0.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.data.loader_wait_fraction"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p2.memory.by_term.optimizer",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 2 MB for this job.",
+   "number": "2 MB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.optimizer"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.optimizer",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 2 MB for this job.",
+   "number": "2 MB",
+   "verdict": "supported",
+   "picked": "probes.p3.memory.by_term.optimizer"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.optimizer",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 1 MB for this job.",
+   "number": "1 MB",
+   "verdict": "ambiguous",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.activations",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 2.6 GB for this job.",
+   "number": "2.6 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.peak_allocated_bytes"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.activations",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 3.9 GB for this job.",
+   "number": "3.9 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p2.step_time.by_phase.other",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 55.6% for this job.",
+   "number": "55.6%",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.by_phase.other"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p2.step_time.by_phase.other",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 63.9% for this job.",
+   "number": "63.9%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 2.2% for this job.",
+   "number": "2.2%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.optimizer"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 1.7% for this job.",
+   "number": "1.7%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 5.4 GB for this job.",
+   "number": "5.4 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.extras.host_rss_peak_bytes"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 8.2 GB for this job.",
+   "number": "8.2 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p2.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.08 s for this job.",
+   "number": "0.08 s",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.mean_s"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p2.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 0.09 s for this job.",
+   "number": "0.09 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.step_time.p95_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.10 s for this job.",
+   "number": "0.10 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.mean_s"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p1.step_time.p95_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 0.08 s for this job.",
+   "number": "0.08 s",
+   "verdict": "not_a_measurement",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p3.duration_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 15 s for this job.",
+   "number": "15 s",
+   "verdict": "supported",
+   "picked": "probes.p3.duration_s"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p3.duration_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 23 s for this job.",
+   "number": "23 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p3.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.07 s for this job.",
+   "number": "0.07 s",
+   "verdict": "supported",
+   "picked": "probes.p3.step_time.mean_s"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p3.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 0.08 s for this job.",
+   "number": "0.08 s",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.mean_s"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p3.cost.usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.003 for this job.",
+   "number": "$0.003",
+   "verdict": "supported",
+   "picked": "probes.p3.cost.usd"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p3.step_time.by_phase.other",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 52.2% for this job.",
+   "number": "52.2%",
+   "verdict": "supported",
+   "picked": "probes.p3.step_time.by_phase.other"
+  },
+  {
+   "record": "zoo/gnn_pyg/record_nov1_l4.json",
+   "field": "probes.p3.step_time.by_phase.other",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 78.3% for this job.",
+   "number": "78.3%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p3.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.04 s for this job.",
+   "number": "0.04 s",
+   "verdict": "supported",
+   "picked": "probes.p3.step_time.p50_s"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p3.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 0.05 s for this job.",
+   "number": "0.05 s",
+   "verdict": "supported",
+   "picked": "probes.p3.step_time.mean_s"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p3.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 90 MB for this job.",
+   "number": "90 MB",
+   "verdict": "supported",
+   "picked": "probes.p3.memory.by_term.gradients"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p3.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 72 MB for this job.",
+   "number": "72 MB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.cost.usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.003 for this job.",
+   "number": "$0.003",
+   "verdict": "ambiguous",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.cost.usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured $0.004 for this job.",
+   "number": "$0.004",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 34.0% for this job.",
+   "number": "34.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.forward"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 39.1% for this job.",
+   "number": "39.1%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.04 s for this job.",
+   "number": "0.04 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.mean_s"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 0.03 s for this job.",
+   "number": "0.03 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 13 s for this job.",
+   "number": "13 s",
+   "verdict": "supported",
+   "picked": "probes.p3.duration_s"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 19 s for this job.",
+   "number": "19 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.data.loader_wait_fraction",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 8.3% for this job.",
+   "number": "8.3%",
+   "verdict": "supported",
+   "picked": "probes.p1.data.loader_wait_fraction"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.data.loader_wait_fraction",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 9.6% for this job.",
+   "number": "9.6%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.step_time.by_phase.backward",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 40.1% for this job.",
+   "number": "40.1%",
+   "verdict": "supported",
+   "picked": "probes.p2.step_time.by_phase.backward"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.step_time.by_phase.backward",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 32.1% for this job.",
+   "number": "32.1%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 18.6% for this job.",
+   "number": "18.6%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.optimizer"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.optimizer",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 27.9% for this job.",
+   "number": "27.9%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.5 GB for this job.",
+   "number": "0.5 GB",
+   "verdict": "ambiguous",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p2.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 0.6 GB for this job.",
+   "number": "0.6 GB",
+   "verdict": "supported",
+   "picked": "probes.p2.memory.peak_reserved_bytes"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.weights",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 91 MB for this job.",
+   "number": "91 MB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.weights"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.weights",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 73 MB for this job.",
+   "number": "73 MB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.6 GB for this job.",
+   "number": "0.6 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.peak_allocated_bytes"
+  },
+  {
+   "record": "zoo/retrieval_st/record_nov1_l4.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 0.9 GB for this job.",
+   "number": "0.9 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.optimizer",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.2 GB for this job.",
+   "number": "0.2 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.optimizer"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 35 s for this job.",
+   "number": "35 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 28 s for this job.",
+   "number": "28 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.18 s for this job.",
+   "number": "0.18 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.mean_s"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.p50_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 0.26 s for this job.",
+   "number": "0.26 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 94 MB for this job.",
+   "number": "94 MB",
+   "verdict": "ambiguous",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.memory.by_term.gradients",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 0.1 GB for this job.",
+   "number": "0.1 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.by_term.weights"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 3.3 GB for this job.",
+   "number": "3.3 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.memory.peak_allocated_bytes"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.memory.peak_allocated_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 2.7 GB for this job.",
+   "number": "2.7 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.first_step_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 2.20 s for this job.",
+   "number": "2.20 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.first_step_s"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.first_step_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 3.30 s for this job.",
+   "number": "3.30 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.data.loader_wait_fraction",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 52.3% for this job.",
+   "number": "52.3%",
+   "verdict": "supported",
+   "picked": "probes.p1.data.loader_wait_fraction"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.data.loader_wait_fraction",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 60.1% for this job.",
+   "number": "60.1%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 0.18 s for this job.",
+   "number": "0.18 s",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.p50_s"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.mean_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 0.14 s for this job.",
+   "number": "0.14 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.throughput.samples_per_s",
+   "kind": "rate",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 354 tokens/s for this job.",
+   "number": "354 tokens/s",
+   "verdict": "supported",
+   "picked": "probes.p1.throughput.samples_per_s"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.throughput.samples_per_s",
+   "kind": "rate",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 532 tokens/s for this job.",
+   "number": "532 tokens/s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 16.8% for this job.",
+   "number": "16.8%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.forward"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.forward",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 19.3% for this job.",
+   "number": "19.3%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.008 for this job.",
+   "number": "$0.008",
+   "verdict": "supported",
+   "picked": "probes.p1.cost.usd"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured $0.006 for this job.",
+   "number": "$0.006",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.backward",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 28.2% for this job.",
+   "number": "28.2%",
+   "verdict": "supported",
+   "picked": "probes.p1.step_time.by_phase.backward"
+  },
+  {
+   "record": "zoo/vision_timm/record_nov1_l4.json",
+   "field": "probes.p1.step_time.by_phase.backward",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 42.3% for this job.",
+   "number": "42.3%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.rl.truncation_rate",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 50.0% for this job.",
+   "number": "50.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.generation.truncation_rate"
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.rl.truncation_rate",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 57.5% for this job.",
+   "number": "57.5%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.extras.gpu_wait_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 84 s for this job.",
+   "number": "84 s",
+   "verdict": "supported",
+   "picked": "probes.p1.extras.gpu_wait_s"
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.extras.gpu_wait_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 67 s for this job.",
+   "number": "67 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.generation.truncation_rate",
+   "kind": "fraction",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 50.0% for this job.",
+   "number": "50.0%",
+   "verdict": "supported",
+   "picked": "probes.p1.generation.truncation_rate"
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.generation.truncation_rate",
+   "kind": "fraction",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 75.0% for this job.",
+   "number": "75.0%",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 178 s for this job.",
+   "number": "178 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.cost.gpu_seconds",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 205 s for this job.",
+   "number": "205 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 178 s for this job.",
+   "number": "178 s",
+   "verdict": "supported",
+   "picked": "probes.p1.duration_s"
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.duration_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 142 s for this job.",
+   "number": "142 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.054 for this job.",
+   "number": "$0.054",
+   "verdict": "supported",
+   "picked": "probes.p1.cost.usd"
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.cost.usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured $0.082 for this job.",
+   "number": "$0.082",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 7.4 GB for this job.",
+   "number": "7.4 GB",
+   "verdict": "supported",
+   "picked": "probes.p1.extras.host_rss_peak_bytes"
+  },
+  {
+   "record": "zoo/eval_sweep_reasoning/record_nov2_a10.json",
+   "field": "probes.p1.extras.host_rss_peak_bytes",
+   "kind": "bytes",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 8.5 GB for this job.",
+   "number": "8.5 GB",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[8].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.007 for this job.",
+   "number": "$0.007",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[8].cost_usd"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[8].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured $0.008 for this job.",
+   "number": "$0.008",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[22].cost_usd"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[26].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.009 for this job.",
+   "number": "$0.009",
+   "verdict": "ambiguous",
+   "picked": null
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[26].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured $0.007 for this job.",
+   "number": "$0.007",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[8].cost_usd"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[17].latency_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 3.48 s for this job.",
+   "number": "3.48 s",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[17].latency_s"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[17].latency_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 5.22 s for this job.",
+   "number": "5.22 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[27].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.036 for this job.",
+   "number": "$0.036",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[27].cost_usd"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[27].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured $0.041 for this job.",
+   "number": "$0.041",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[2].cost_usd",
+   "kind": "usd",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured $0.017 for this job.",
+   "number": "$0.017",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[2].cost_usd"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[2].cost_usd",
+   "kind": "usd",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured $0.013 for this job.",
+   "number": "$0.013",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[16].latency_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 5.37 s for this job.",
+   "number": "5.37 s",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[16].latency_s"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[16].latency_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.5,
+   "text": "The probe measured 8.05 s for this job.",
+   "number": "8.05 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[7].latency_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 5.34 s for this job.",
+   "number": "5.34 s",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[7].latency_s"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[7].latency_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": 0.15,
+   "text": "The probe measured 6.14 s for this job.",
+   "number": "6.14 s",
+   "verdict": "unsupported",
+   "picked": null
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[15].latency_s",
+   "kind": "seconds",
+   "planted": "true",
+   "shift": 0.0,
+   "text": "The probe measured 3.71 s for this job.",
+   "number": "3.71 s",
+   "verdict": "supported",
+   "picked": "agent_sample.tasks[15].latency_s"
+  },
+  {
+   "record": "zoo/agent_eval_spark/record_oct31.json",
+   "field": "agent_sample.tasks[15].latency_s",
+   "kind": "seconds",
+   "planted": "altered",
+   "shift": -0.2,
+   "text": "The probe measured 2.97 s for this job.",
+   "number": "2.97 s",
+   "verdict": "unsupported",
+   "picked": null
+  }
+ ],
+ "wall_s": 304.8
+}

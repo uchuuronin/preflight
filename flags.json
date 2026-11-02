@@ -7,6 +7,7 @@
 	"harness.spark_script_map": false,
 	"harness.spark_open_triage": false,
 	"harness.spark_diagnosis": false,
+	"harness.spark_claim_check": false,
 	"harness.glimmer_private": false,
 	"runner.queue": false,
 	"runner.hide_sample_outputs": false,

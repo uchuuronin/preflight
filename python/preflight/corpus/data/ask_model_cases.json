@@ -1,0 +1,195 @@
+{
+ "$comment": "Cases for corpus/ask_model.py (Preflight vs asking a model, Nov 2). Each is a job exactly as its full run ran it; no answer is in here.",
+ "cases": [
+  {
+   "id": "unseen-1a",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/pytorch/torchtune",
+    "commit": "bd2a0fc7c31430972728494fa01aaeeb0ebf1ba1",
+    "entrypoint": "recipes/lora_finetune_single_device.py",
+    "args": [
+     "--config",
+     "qwen2_5/1.5B_lora_single_device"
+    ]
+   },
+   "gpu": "L4",
+   "steps": 300,
+   "$from": "A's ground_truth command on remote-runs (Nov 2): repo, commit, entrypoint, args and first GPU; steps from --bare-steps or the script's own --max_steps"
+  },
+  {
+   "id": "unseen-1b",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/pytorch/torchtune",
+    "commit": "bd2a0fc7c31430972728494fa01aaeeb0ebf1ba1",
+    "entrypoint": "recipes/lora_finetune_single_device.py",
+    "args": [
+     "--config",
+     "qwen2_5/7B_lora_single_device"
+    ]
+   },
+   "gpu": "A100-SXM-80GB",
+   "steps": 300,
+   "$from": "A's ground_truth command on remote-runs (Nov 2): repo, commit, entrypoint, args and first GPU; steps from --bare-steps or the script's own --max_steps"
+  },
+  {
+   "id": "unseen-2",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/Lightning-AI/litgpt",
+    "commit": "4738993a5e0190b851162a52173729827d3884e7",
+    "entrypoint": "litgpt/pretrain.py",
+    "args": [
+     "--config",
+     "config_hub/pretrain/debug.yaml"
+    ]
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; the run length is the config's own"
+  },
+  {
+   "id": "unseen-3",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/huggingface/open-r1",
+    "commit": "5b6ff22b3fb7aa069c54866e517f39dfc3160e09",
+    "entrypoint": "src/open_r1/grpo.py",
+    "args": [
+     "--config",
+     "recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml",
+     "--vllm_mode",
+     "colocate",
+     "--max_steps",
+     "50"
+    ]
+   },
+   "gpu": "A100-SXM-80GB",
+   "steps": 50,
+   "$from": "A's ground_truth command on remote-runs (Nov 2): repo, commit, entrypoint, args and first GPU; steps from --bare-steps or the script's own --max_steps"
+  },
+  {
+   "id": "unseen-5",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/EleutherAI/lm-evaluation-harness",
+    "commit": "ddd67220430a2470529f25fd5c05a576ca1057a0",
+    "entrypoint": "lm_eval/__main__.py",
+    "args": [
+     "--model",
+     "hf",
+     "--model_args",
+     "pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,dtype=bfloat16",
+     "--tasks",
+     "arc_easy,hellaswag,piqa",
+     "--batch_size",
+     "auto"
+    ]
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's ground_truth command on remote-runs (Nov 2): repo, commit, entrypoint, args and first GPU; steps from --bare-steps or the script's own --max_steps"
+  },
+  {
+   "id": "unseen-6",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/vllm-project/vllm",
+    "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+    "entrypoint": "vllm/benchmarks/throughput.py",
+    "args": [
+     "--model",
+     "microsoft/Phi-3.5-mini-instruct",
+     "--dataset-name",
+     "random",
+     "--input-len",
+     "512",
+     "--output-len",
+     "256",
+     "--num-prompts",
+     "500"
+    ]
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's ground_truth command on remote-runs (Nov 2): repo, commit, entrypoint, args and first GPU; steps from --bare-steps or the script's own --max_steps"
+  },
+  {
+   "id": "unseen-7",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/beir-cellar/beir",
+    "commit": "ef83d29307061c65d04b035b4f4e7c18bd8374af",
+    "entrypoint": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
+    "args": []
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; steps from the script's own --epochs (full-batch: one step an epoch) where it names them"
+  },
+  {
+   "id": "unseen-8",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/snap-stanford/ogb",
+    "commit": "61e9784ca76edeaa6e259ba0f836099608ff0586",
+    "entrypoint": "examples/nodeproppred/arxiv/gnn.py",
+    "args": [
+     "--use_sage",
+     "--runs",
+     "1",
+     "--epochs",
+     "500"
+    ]
+   },
+   "gpu": "L4",
+   "steps": 500,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; steps from the script's own --epochs (full-batch: one step an epoch) where it names them"
+  },
+  {
+   "id": "unseen-9",
+   "set": "unseen",
+   "source": {
+    "kind": "repo",
+    "uri": "https://github.com/KellerJordan/cifar10-airbench",
+    "commit": "4c1b6d1e3889b037efadcfd5c0ea65b246592362",
+    "entrypoint": "airbench94_muon.py",
+    "args": []
+   },
+   "gpu": "L4",
+   "steps": null,
+   "$from": "A's check-in command on remote-runs (Nov 2): repo, commit, entrypoint, args and GPU; steps from the script's own --epochs (full-batch: one step an epoch) where it names them"
+  },
+  {
+   "id": "finetune_lora_hf",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/finetune_lora_hf"
+   },
+   "gpu": "L4",
+   "steps": 210,
+   "$from": "a-gt-lora-l4-5 (Oct 31): --bare-steps 210 on an L4"
+  },
+  {
+   "id": "grpo_trl",
+   "set": "zoo",
+   "source": {
+    "kind": "sample",
+    "uri": "zoo/grpo_trl"
+   },
+   "gpu": "A10",
+   "steps": 3,
+   "$from": "a-gt-grpo-50-b (Nov 1): --bare-steps 3, ran on an A10; calibration for every Preflight row, so its model answer is reported apart"
+  }
+ ]
+}

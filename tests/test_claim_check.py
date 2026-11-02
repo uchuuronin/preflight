@@ -102,3 +102,31 @@ def test_a_number_ending_a_sentence_keeps_its_unit_and_dev_is_not_a_version():
 
 	assert _kind_of("probes.p1.generation.truncation_rate") == "fraction"
 	assert _kind_of("probes.p1.throughput.tokens_per_s") == "rate"
+
+
+def test_a_zero_reads_true_at_the_precision_written():
+	from preflight.harness.claim_check import candidates
+
+	(n,) = numbers_in("loader waits 0.0% of the step")
+	raw = {"probes.p1.data.loader_wait_fraction": 0.0004, "probes.p1.data.other_fraction": 0.002}
+	assert candidates(n, raw) == ["probes.p1.data.loader_wait_fraction"]  # 0.04% rounds to 0.0%; 0.2% doesn't
+
+
+def test_annotate_marks_an_unsupported_number_and_leaves_rule_findings_alone():
+	from preflight.harness.claim_check import UNSUPPORTED, annotate_findings
+	from preflight.schema import Finding
+
+	rec = _rec()
+	model = Finding(id="t1", severity="warn", code="triage.oom", title="Eval ran out at 999.9 GB",
+		source="spark_open_triage")  # fmt: skip
+	rule = Finding(
+		id="r1", severity="warn", code="eval.no_grad", title="Eval keeps 999.9 GB of grads", source="rule"
+	)
+	rec = rec.model_copy(update={"findings": [model, rule]})
+	out, calls = annotate_findings(rec)
+	by = {f.id: f for f in out}
+	assert calls == [] and by["r1"] == rule
+	assert by["t1"].detail == f"(999.9 GB: {UNSUPPORTED})"
+	assert [e.metric for e in by["t1"].evidence] == ["claim_check.unsupported"]
+	again, _ = annotate_findings(rec.model_copy(update={"findings": out}))  # checked once: kept as it was
+	assert {f.id: f for f in again}["t1"] == by["t1"]
