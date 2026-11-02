@@ -64,3 +64,78 @@ def test_the_notice_and_the_runner_read_the_same_triage_flag():
 	assert m.group(1) in gated, f"the triage notice reads {m.group(1)}, which no runner gate reads"
 	silent = {f for f in gated if f not in notice and prod.get(f) is True}
 	assert not silent, f"on in production without a data-use line: {silent}"
+
+
+# ---- Muse Spark's diagnosis, its claim check and its search (PM, Nov 2): one notice line each,
+# shown only under its flag, and never quieter than the runner that sends the data.
+
+
+def _notice_conditions() -> dict[str, set[str]]:
+	"""Each data-use line's key, and every flag in the condition that shows it."""
+	src = (ROOT / "web/src/app/DataUse.tsx").read_text()
+	out: dict[str, set[str]] = {}
+	for cond, key in re.findall(r"if \((.*?)\) lines\.push\(t\(\s*\"(datause\.[a-z_]+)\"", src):
+		out[key] = set(re.findall(r'flag\("([a-z0-9_.]+)"\)', cond))
+	return out
+
+
+def _runner_gates(call: str) -> set[str]:
+	"""The flags read by every runner function that makes `call`."""
+	gated: set[str] = set()
+	for path in (ROOT / "python/preflight/runner").glob("*.py"):
+		text = path.read_text()
+		for fn in re.finditer(r"\ndef (\w+)\(.*?(?=\ndef |\Z)", text, re.S):
+			body = fn.group(0)
+			if call in body:
+				flags = set(re.findall(r'flag\("([a-z0-9_.]+)"\)', body))
+				assert flags, f"{path.name}:{fn.group(1)} calls {call} with no flag check"
+				gated |= flags
+	return gated
+
+
+@pytest.mark.parametrize(
+	"key,flag",
+	[
+		("datause.diagnosis", "harness.spark_diagnosis"),
+		("datause.claim_check", "harness.spark_claim_check"),
+		("datause.search", "harness.spark_search"),
+		("datause.fix", "c.fix_loop"),
+	],
+)
+def test_each_line_has_its_flag_off_by_default(key, flag):
+	cond = _notice_conditions()
+	assert key in cond, f"the notice has no line {key}"
+	assert flag in cond[key], f"{key} isn't shown under {flag}"
+	assert json.loads((ROOT / "flags.json").read_text()).get(flag) is False, (
+		f"{flag} must be in flags.json, off"
+	)
+
+
+def test_the_diagnosis_line_reads_the_runners_flag():
+	gates = _runner_gates("diagnose_record(")
+	assert gates, "no runner function calls the diagnosis; find its gate and check it here"
+	assert gates <= _notice_conditions()["datause.diagnosis"], f"the runner gates the diagnosis on {gates}"
+
+
+def test_the_claim_check_line_shows_whenever_the_runner_checks():
+	"""Spark Open gets each finding's numbers whenever the runner runs the claim check, so the line
+	shows under every flag that gates it (today harness.spark_diagnosis, in pipeline._diagnose)."""
+	gates = _runner_gates("check_diagnosis(")
+	assert gates, "no runner function calls the claim check; find its gate and check it here"
+	cond = _notice_conditions()["datause.claim_check"]
+	assert gates & cond, f"the claim check runs under {gates}; the notice's line under {cond}"
+	missing = {g for g in gates if g.startswith("harness.spark") and g not in cond}
+	assert not missing, f"the claim check runs under {missing} with no notice line"
+
+
+def test_the_search_line_shows_whenever_the_runner_searches():
+	"""A search by Muse Spark is a model tool A's harness would add (web_search); the retrieval
+	lens's own index search (probes, recorder) isn't one."""
+	harness = ROOT / "python/preflight/harness"
+	searching = [p.name for p in harness.rglob("*.py") if re.search(r"web_search|search_web", p.read_text())]
+	if not searching:
+		pytest.skip("no Muse Spark search in A's harness yet: the line waits on harness.spark_search")
+	gates = _runner_gates("web_search") | _runner_gates("search_web")
+	assert "harness.spark_search" in gates, (
+		f"the runner searches under {gates}, the notice under harness.spark_search"
+	)

@@ -508,3 +508,93 @@ def race_sample() -> None:
 	print(json.dumps(res, indent=1))
 	patched = [c for c in res.get("candidates", []) if c["status"] == "patched"]
 	raise SystemExit(0 if patched and not res.get("error") else 1)
+
+
+@app.local_entrypoint()
+def race_stack(attempt: str = "a", gpu: str = "A10") -> None:
+	"""The Nov 2 race (PM's order: one race, US$1 cap): the fix loop as the web runs it, on the LoRA
+	zoo script's eval finding (races/nov2_stack.json). Round 1 races the single fix candidatesFor
+	offers and verifies it; only when none passes does round 2 race the stacked eval fixes, the
+	eval batch from the guide's combined move (web/src/fix/candidates.ts stackedCandidate), and
+	verify that. The winner is the passing candidate with the lowest eval peak.
+
+		modal run --env main api/fix_app.py::race_stack
+
+	Spend: before each step, what's spent so far plus that step's worst case must stay under the
+	cap. Muse Code's worst case is its stop_usd plus one usage event past it (the box stops only
+	once the reported spend is over); it counts at what it reported plus the price table's gap
+	to the bill, or at that worst case when it reported nothing. A verify job counts at its
+	record's costs (A's US$0.60 job cap when it has none). Verify jobs go to the
+	deployed runner's job store; nothing that reaches a record is printed."""
+	import json
+	import sys
+
+	sys.path.insert(0, str(ROOT / "api"))  # this runs on the caller's machine, from the repo
+	import verify_race_app as vr
+	from preflight_api.fix import run
+
+	if gpu not in ("L4", "A10"):
+		raise SystemExit("gpu: L4 or A10")
+	cap = 1.0  # Source: the PM's order, Nov 2 11:16 ("One race, cap $1").
+	# Source: measured, Oct 31 (this module's smoke test): the table read US$2.91 for a US$3.01 bill,
+	# 3.4% under; 4% covers it.
+	bill_gap = 1.04
+	# Source: guess, one Muse Code usage event's worth past the stop (the box checks after each).
+	overshoot = 0.02
+	spec = json.loads((ROOT / "api" / "preflight_api" / "fix" / "races" / "nov2_stack.json").read_text())
+	check = startup_check_fix.remote()
+	if not check.get("ok"):
+		print(json.dumps(check, indent=1)[:6000])
+		raise SystemExit("startup check failed; no model call made")
+	svc = modal.Cls.from_name("preflight-runner", "JobStoreService", environment_name="main")()
+	vol = modal.Volume.from_name("preflight-records", environment_name="main")
+	spent, rounds = 0.0, []
+
+	def one_round(n: int, cands: list[dict]) -> list[dict]:
+		nonlocal spent
+		stop = run.stop_usd(len(cands))
+		if spent + stop + overshoot + vr.JOB_CAP_USD * len(cands) > cap:
+			rounds.append({"round": n, "status": "not_run", "why": f"cap: US${spent:.4f} spent"})
+			return []
+		res = race_fix.remote(spec["record_ref"], cands, spec["finding"], stop)
+		muse = res.get("usd_from_reported_tokens")
+		spent += muse * bill_gap if muse else stop + overshoot
+		out = {"round": n, "muse_usd": muse, "seconds": res.get("seconds"), "error": res.get("error"),
+			"stopped_at_cap": res.get("stopped_at_cap"), "verified": []}  # fmt: skip
+		rounds.append(out)
+		for i, c in enumerate(res.get("candidates") or []):
+			info = {
+				"id": f"r{n}c{i + 1}",
+				"template_id": c["template_id"],
+				"value": c.get("value"),
+				"diff": c.get("diff") or "",
+			}
+			print(f"round {n} {info['id']} ({c['template_id']}): {c['status']}", flush=True)
+			if c["status"] != "patched" or not info["diff"]:
+				out["verified"].append(
+					{"id": info["id"], "template_id": c["template_id"], "status": c["status"]}
+				)
+				continue
+			if spent + vr.JOB_CAP_USD > cap:
+				out["verified"].append(
+					{"id": info["id"], "status": "not_run", "why": f"cap: US${spent:.4f} spent"}
+				)
+				continue
+			v, cost = vr.verify_one(svc, vol, info, gpu=gpu, visitor=f"c.fix_verify.nov2.{attempt}",
+				name=f"c-fix-stack-{info['id']}-nov2-{attempt}", record_ref=spec["record_ref"])  # fmt: skip
+			spent += cost
+			v["value"] = c.get("value")
+			v["diff_lines"] = info["diff"].count("\n")
+			out["verified"].append(v)
+			print(json.dumps(v, indent=1), flush=True)
+		return [v for v in out["verified"] if (v.get("verify") or {}).get("status") == "passed"]
+
+	passed = one_round(1, spec["round1"])
+	if not passed:
+		passed = one_round(2, [spec["stack"]])
+	winner = min(passed, key=lambda r: r["verify"]["after"] or float("inf")) if passed else None
+	print(json.dumps({"spent_usd": round(spent, 4), "cap_usd": cap,
+		"winner": winner and {k: winner.get(k) for k in ("id", "template_id", "value", "verify")},
+		"rounds": [{**r, "verified": [{k: v.get(k) for k in ("id", "template_id", "value", "status", "why", "job_status", "usd", "record_id")}
+			| {"verify": (v.get("verify") or {}).get("status")} for v in r.get("verified", [])]} for r in rounds]}, indent=1))  # fmt: skip
+	raise SystemExit(0 if winner else 1)

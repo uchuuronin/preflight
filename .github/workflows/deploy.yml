@@ -53,6 +53,27 @@ jobs:
         working-directory: web
         run: npm ci --no-audit --no-fund && npm run build
       - if: steps.has.outputs.web == 'true'
+        # D's Pages Functions (/s/<token>, /card/<token>, /badge/<token>) ship with the app, and the
+        # hero cards as files, in one step so a share page never names a card that wasn't deployed
+        # (workers/README.md). Chiya, Nov 2: share pages on, behind the same stranger gate.
+        name: Share pages, cards and badges (D's workers/) beside the app
+        run: |
+          set -euo pipefail
+          cp -r workers/functions/. web/functions/
+          mkdir -p web/dist/cards && cp workers/static/cards/*.png web/dist/cards/
+          for f in workers/static/cards/*.png; do test -f "web/dist/cards/$(basename "$f")"; done
+      - if: steps.has.outputs.web == 'true'
+        # The gate covers the share pages too: D's tests (routes against a mocked API, the hero cards
+        # current), and the Functions bundle the deploy uploads builds and stays under the Workers
+        # Free plan's 3 MB compressed script limit (D's bundle is about 1.1 MB gzipped, Nov 1).
+        name: Share pages tested, and the Functions bundle builds within the size limit
+        run: |
+          set -euo pipefail
+          (cd workers && npm ci --no-audit --no-fund && npm test && npm run hero-cards:check)
+          (cd web && ../workers/node_modules/.bin/wrangler pages functions build --outdir ../fnbuild)
+          size=$(cat fnbuild/* 2>/dev/null | gzip -c | wc -c); echo "functions bundle, gzipped: $size bytes"
+          test "$size" -lt 3000000
+      - if: steps.has.outputs.web == 'true'
         name: Stranger test on the built app (e2e/stranger.mjs)
         working-directory: web
         run: |
@@ -78,6 +99,16 @@ jobs:
         working-directory: web
         run: npm ci --no-audit --no-fund && npm run build
       - if: steps.has.outputs.web == 'true'
+        # D's Pages Functions (/s/<token>, /card/<token>, /badge/<token>) ship with the app, and the
+        # hero cards as files, in one step so a share page never names a card that wasn't deployed
+        # (workers/README.md). Chiya, Nov 2: share pages on, behind the same stranger gate.
+        name: Share pages, cards and badges (D's workers/) beside the app
+        run: |
+          set -euo pipefail
+          cp -r workers/functions/. web/functions/
+          mkdir -p web/dist/cards && cp workers/static/cards/*.png web/dist/cards/
+          for f in workers/static/cards/*.png; do test -f "web/dist/cards/$(basename "$f")"; done
+      - if: steps.has.outputs.web == 'true'
         id: branch
         run: |
           if [ "$TARGET" = "production" ]; then echo "name=main" >> "$GITHUB_OUTPUT"; else echo "name=preview" >> "$GITHUB_OUTPUT"; fi
@@ -91,6 +122,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: web
+          # the same Wrangler the gate built the Functions bundle with (workers/package-lock.json)
+          wranglerVersion: "4.151.0"
           command: pages deploy dist --project-name=preflight --branch=${{ steps.branch.outputs.name }}
 
   api:

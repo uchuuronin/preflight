@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boardingState, type BoardingEvent, metaModelName, modelsRan, STAGES } from "./boarding";
+import { boardingState, type BoardingEvent, eventFromStatus, metaModelName, modelsRan, STAGES } from "./boarding";
 
 const ev = (seq: number, stage: BoardingEvent["stage"], more: Partial<BoardingEvent> = {}): BoardingEvent => ({
 	job_id: "01JOB",
@@ -100,5 +100,22 @@ describe("model tags on the route (audit finding 12)", () => {
 		expect(modelsRan([{ model: "gpt-x", purpose: "triage" }]).flat()).toEqual([]);
 		expect(modelsRan([{ model: "meta-models/muse-spark-open-1026", purpose: "claim_check" }])[triage]).toEqual(["Muse Spark Open"]);
 		expect(metaModelName("muse-spark-open-1026")).toBe("Muse Spark Open");
+	});
+});
+
+describe("the runner's words on the leg, and the job's end without the stream (Nov 2)", () => {
+	it("shows the latest message on the leg the job is on, and drops it once the job moves on", () => {
+		const wait = { stage: "probing", message: "waiting for a free L4 GPU (3 min so far)", level: "info" } as BoardingEvent;
+		expect(boardingState([wait]).note).toBe("waiting for a free L4 GPU (3 min so far)");
+		expect(boardingState([wait, { stage: "triage" } as BoardingEvent]).note).toBeNull();
+		expect(boardingState([wait, { stage: "done", share_token: "tok" } as BoardingEvent]).note).toBeNull();
+	});
+	it("turns the job's own status into its last event once it has ended, and nothing before", () => {
+		expect(eventFromStatus({ status: "running" })).toBeNull();
+		expect(eventFromStatus(null)).toBeNull();
+		const done = eventFromStatus({ status: "done", share_token: "tok" })!;
+		expect(boardingState([{ stage: "probing" } as BoardingEvent, done])).toMatchObject({ done: true, open: "tok" });
+		const failed = eventFromStatus({ status: "failed", error_code: "gpu.unavailable", error: "no GPU" })!;
+		expect(boardingState([failed]).failed).toBe(true);
 	});
 });
