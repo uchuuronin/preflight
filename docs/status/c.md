@@ -1,5 +1,17 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Decisions overnight (Nov 2, from 00:18 ET; Chiya offline until about 5:30)
+
+| # | When (ET) | What | Why | Cost | How to undo |
+|---|---|---|---|---|---|
+| 1 | 23:52 | Deployed production from main **cfcf83c** (deploy run 41385425843; stranger, API, web green) | PM's 23:58 order named cfcf83c; main had already moved there when C dispatched | $0 (the API's ledger container keeps billing as before) | Re-run deploy.yml from the earlier main (c084bee or 50db9b6) |
+| 2 | 22:43 | Checked zoo/finetune_lora_hf in on the live site with fresh probes (record 01M6D5N3VSJZ4EFEHW7MDDK6Z3) | No re-warm was coming (PM); needed a record filled by the redeployed runner | about US$0.21 (GPU 0.080, model calls 0.035, sandbox estimate 0.095) | Nothing to undo; retention deletes it in 30 days |
+| 3 | 00:08 | Ran `c-record-export-lora-nov2` (GitHub run 41392263194): the record copied out by id, share token replaced, then copied over PF102's fixture (ea3aa35) | PM item 4: refresh PF102 from the new live record; the workspace can't reach the live site | CPU only, about US$0.01 | `git revert ea3aa35` |
+| 4 | 00:05 | Restored the reviewed record export (13ffbad's checks) after C's rewrite had dropped them (6938e01) | The review found the rewrite could publish another record's link | $0 | `git revert 6938e01` (not advised) |
+| 5 | 00:00 | The API's PF102 sample reads the live record too (09bad48), as the web does since 8debb8f | Otherwise the live guide on PF102 read the golden's numbers while the screen showed the live record's | $0 | Revert the two lines in api/preflight_api/stores.py and api/app.py |
+| 6 | 00:40 | "Not measured here" replaces "Not trusted" on the readouts, the provenance tag, the dock key, the memory bar and the status line; the dial face wraps the longer words; a new reason "between measured points; no precomputed value here" for a setting inside every moved knob's probed range | PM, Nov 2 00:11 | $0 | Revert the commit "Abstention wording" |
+| 7 | 00:40 | D's free-tier chip ("Not trusted yet") left to D, asked in from-c.md | D owns addons/; one string | $0 | n/a |
+
 ## Sun Nov 1, night (main c084bee, the 9:47 PM order)
 
 - **PF102** (B, from-b.md) opens `fixtures/lora-live-nov1.record.json`, the measured record of zoo/finetune_lora_hf on an L4, and says "measured"; the golden's hand-made probes are gone from the departures board. The file still has the predictions written before the runner redeploy; the new record (01M6D5N3VSJZ4EFEHW7MDDK6Z3) is asked of A as a repo file with a placeholder token (from-c.md), since it can't reach this workspace any other way without its token.

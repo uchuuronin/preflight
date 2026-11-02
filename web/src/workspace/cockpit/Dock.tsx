@@ -1,7 +1,7 @@
 /**
  * The knob dock: one capsule per knob (label, value, a dot when pinned, a glow when the guide
  * is on it). Pressing one opens its control above the dock: a slider over the values the
- * model can answer, with fits / tight / fails / not trusted drawn on each tick, or a choice
+ * model can answer, with fits / tight / fails / not measured here drawn on each tick, or a choice
  * row; plus pin and, for code knobs, what changing it involves.
  */
 import { memo, useId, useMemo, useState } from "react";

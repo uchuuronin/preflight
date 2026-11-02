@@ -64,6 +64,10 @@ export function statusLine(record: LoadedRecord, est: Prediction, knobs: Readonl
 		return { tone: "tight", text: `${t("status.tight", { gpu, risk: trusted(risk) ? fmt(risk.point, "probability") : "" })}${tail}` };
 	}
 	if (fit === "fits") return { tone: "fits", text: `${t("status.fits", { gpu })}${tail}` };
-	if (!run.length) return { tone: "unknown", text: t("status.untrusted") };
+	if (!run.length) {
+		// Inside the probed range with no precomputed value is a gap, not "too far" (PM, Nov 2).
+		const gap = [mem, time, cost, risk].some((e) => e?.status === "abstain" && e.reason === "between_measured");
+		return { tone: "unknown", text: t(gap ? "status.between_measured" : "status.untrusted") };
+	}
 	return { tone: "unknown", text: tail.trim() };
 }

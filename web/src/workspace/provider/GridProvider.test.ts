@@ -196,3 +196,22 @@ describe("moves follow B's cut-offs and the measure-first rule", () => {
 		expect(m?.relative).toBeCloseTo((m?.delta ?? 0) / base, 6);
 	});
 });
+
+describe("why a readout has no number (PM, Nov 2)", () => {
+	it("calls a probed setting with no usable cell a gap between measured points, not beyond them", async () => {
+		const pre = normaliseRecord((await import("../../../../schema/examples/pretrain.json")).default as unknown as FlightRecord);
+		const k = pre.knobs.find((x) => x.id === "batch_size")!;
+		expect(k.probed_range).toEqual({ min: 8, max: 12 });
+		const p = provider.predict(pre, { ...currentKnobs(pre), batch_size: 8 });
+		const abstaining = Object.values(p).filter((e) => e?.status === "abstain");
+		expect(abstaining.length).toBeGreaterThan(0);
+		for (const e of abstaining) expect(e!.reason).not.toMatch(/^outside_/);
+		expect(abstaining.some((e) => e!.reason === "between_measured")).toBe(true);
+	});
+
+	it("still says beyond what was measured outside the probed range", async () => {
+		const pre = normaliseRecord((await import("../../../../schema/examples/pretrain.json")).default as unknown as FlightRecord);
+		const p = provider.predict(pre, { ...currentKnobs(pre), batch_size: 2 });
+		expect(Object.values(p).some((e) => e?.reason === "between_measured")).toBe(false);
+	});
+});

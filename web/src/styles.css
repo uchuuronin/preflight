@@ -2277,3 +2277,7 @@ a {
 /* Private triage on the check-in desk (harness.glimmer_private): the box, then what it changes. */
 .pf-private { gap: 6px; }
 .pf-private__hint { display: flex; flex-direction: column; gap: 4px; padding-left: 24px; }
+/* "Not measured here" (PM, Nov 2) is longer than "Not trusted": it wraps inside the dial face and
+   under the dial instead of running into the next readout. */
+.pf-dial__text b.is-abstain { max-width: 64px; font-size: 12px; line-height: 1.15; white-space: normal; }
+.pf-dial__status .pf-prov--abstain { white-space: normal; text-align: center; max-width: 100%; }

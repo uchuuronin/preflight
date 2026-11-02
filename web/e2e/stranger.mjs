@@ -60,13 +60,13 @@ try {
 	check("four readouts", dials.length >= 4, { dials: dials.length });
 	check(
 		"every dial has a status word",
-		dials.every((d) => /Measured|Predicted|Extrapolated|Not trusted|Illustrative/.test(d.status)),
+		dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here|Illustrative/.test(d.status)),
 		{ dials },
 	);
 
 	// One plain status line above the readouts, from the readouts.
 	const status = (await page.locator(".pf-statusline").textContent())?.trim() ?? "";
-	check("a status line says where the run stands", /memory|Fits|finishes|Not trusted/.test(status), { status });
+	check("a status line says where the run stands", /memory|Fits|finishes|Not measured/.test(status), { status });
 
 	// What was measured: a capsule opens a drawer of probe chips, Escape closes it.
 	// The capsule is the tag that opens a drawer (aria-controls); the outcomes toggle (c.hops) shares its look.

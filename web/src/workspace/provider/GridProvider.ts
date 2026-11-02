@@ -170,11 +170,18 @@ export function interpolate(
 	const specs = new Map(record.knobs.map((k) => [k.id, k]));
 	const perAxis: Array<Array<[number, number]>> = [];
 	let extrapolated = false;
+	/** Every axis's value inside its knob's probed range (numbers only: a categorical has no "between"). */
+	const between = () =>
+		grid.axes.every((a) => {
+			const k = specs.get(a.knob_id);
+			const v = knobs[a.knob_id];
+			return typeof v === "number" && !!k?.probed_range && inProbedRange(record, k, v);
+		});
 	for (const axis of grid.axes) {
 		const v = knobs[axis.knob_id];
 		if (v === undefined) return abstained(target, grid.model_id, "knob_missing");
 		const b = bracket(axis.values, v, axis.scale === "log");
-		if (!b) return abstained(target, grid.model_id, "outside_grid");
+		if (!b) return abstained(target, grid.model_id, between() ? "between_measured" : "outside_grid");
 		if (!inProbedRange(record, specs.get(axis.knob_id), v)) extrapolated = true;
 		perAxis.push(b);
 	}
@@ -195,7 +202,9 @@ export function interpolate(
 		for (const [i, w] of perAxis[axis]) walk(axis + 1, offset + i * strides[axis], weight * w);
 	};
 	walk(0, 0, 1);
-	if (abstain) return abstained(target, grid.model_id, "outside_trusted_range");
+	// A setting inside every knob's probed range that still has no usable cell is a gap in the
+	// grid (B is filling those), not a setting beyond what was measured (PM, Nov 2).
+	if (abstain) return abstained(target, grid.model_id, between() ? "between_measured" : "outside_trusted_range");
 	if (![point, lo, hi].every(Number.isFinite)) return abstained(target, grid.model_id, "off_scale");
 	return {
 		point,
@@ -208,6 +217,13 @@ export function interpolate(
 		level: 0.9,
 		...(extrapolated ? { reason: "outside_probed_range" } : {}),
 	};
+}
+
+/** Every knob moved off the record's setting is a number inside its probed range: the probes
+ * bracket this setting, and only the precomputed values are missing (PM, Nov 2). */
+function movedWithinProbed(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
+	const moved = record.knobs.filter((k) => !same(knobs[k.id], k.current));
+	return moved.length > 0 && moved.every((k) => typeof knobs[k.id] === "number" && !!k.probed_range && inProbedRange(record, k, knobs[k.id]!));
 }
 
 function atCurrent(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
@@ -247,7 +263,7 @@ export class GridProvider implements PredictionProvider {
 				if (target.id === fail && !onGridPoints(grid, full)) deriveRisk = true;
 				continue;
 			}
-			out[target.id] = abstained(target, grids[0]?.model_id ?? atHere?.model_id ?? "none", "off_grid");
+			out[target.id] = abstained(target, grids[0]?.model_id ?? atHere?.model_id ?? "none", movedWithinProbed(record, full) ? "between_measured" : "off_grid");
 		}
 		// Between grid points, P(OOM) comes from interpolated memory, never from interpolating
 		// the probability itself (record/oom.ts).

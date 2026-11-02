@@ -2,7 +2,7 @@
  * The readouts as dials. Time and cost are buttons: pressing one makes it the aim (pressing
  * the current aim again switches to "most headroom"). Throughput and risk are meters.
  * Every dial shows its interval as a band behind the needle arc and says in a word where the
- * number comes from (measured, predicted, extrapolated, not trusted); an abstaining estimate
+ * number comes from (measured, predicted, extrapolated, not measured here); an abstaining estimate
  * shows a hatched track, never a number. Scales are fixed per record (record/scale.ts).
  */
 import { fmt } from "../../lib/fmt";
@@ -181,10 +181,10 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 	const title = [spec.reason, scaleNote].filter(Boolean).join("\n");
 	const value = ok ? spec.format(point) : t("readout.abstain_short");
 	const valueRef = useRef<HTMLElement>(null);
-	useTweenedText(valueRef, ok ? point : null, spec.format, { classFor: sizeClass });
+	useTweenedText(valueRef, ok ? point : null, spec.format, { classFor: (text) => (ok ? sizeClass(text) : "is-abstain") });
 	const aria = ok
 		? `${t("dial.aria", { label: spec.label, value, lo: spec.format(lo), hi: spec.format(hi) })}. ${statusWord(est, illustrative)}${at.off ? `. ${t("dial.off_scale")}` : ""}`
-		: t("dial.aria_abstain", { label: spec.label });
+		: t("dial.aria_abstain", { label: spec.label, why: spec.reason || t("provenance.abstain.help") });
 	const face = (
 		<>
 			<svg viewBox="0 0 100 100" aria-hidden="true">
@@ -213,7 +213,7 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 				) : null}
 			</svg>
 			<span className="pf-dial__text">
-				<b ref={valueRef} className={sizeClass(value)}>
+				<b ref={valueRef} className={ok ? sizeClass(value) : "is-abstain"}>
 					{value}
 				</b>
 				<small>{spec.unit}</small>
@@ -282,7 +282,7 @@ function useDialSpecs(): DialSpec[] {
 	const riskT = targetFor(record, "risk") ?? (fail ? target(record, fail) : undefined);
 	const riskEst = riskT ? estimates[riskT.id] : undefined;
 
-	return [
+	const specs: DialSpec[] = [
 		{
 			id: "time",
 			label: t("dial.time"),
@@ -352,6 +352,13 @@ function useDialSpecs(): DialSpec[] {
 			...(trusted(riskEst) ? { note: t(RISK_NOTE[oomStatus(riskEst.point)]) } : {}),
 		},
 	];
+	// An abstaining readout says why, in its tooltip and its label: "between measured points" is
+	// not "beyond what was measured" (PM, Nov 2).
+	return specs.map((s) =>
+		s.est?.status === "abstain"
+			? { ...s, reason: abstainText(s.est.reason), ...(s.est.reason === "between_measured" && !s.note ? { note: t("dial.between_short") } : {}) }
+			: s,
+	);
 }
 
 /**
