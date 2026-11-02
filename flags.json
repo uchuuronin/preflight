@@ -30,6 +30,5 @@
 	"d.freetier": false,
 	"d.notebook": false,
 	"d.exports_cli": false,
-	"harness.spark_search": false,
 	"probes.lr_range": false
 }
