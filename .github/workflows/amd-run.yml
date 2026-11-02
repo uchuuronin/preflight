@@ -96,7 +96,7 @@ jobs:
           # (RunPod, Nov 2: datasets==3.1.0 couldn't resolve). Without it, the venv reuses the image's torch.
           if [ -n "$TORCH_ROCM" ]; then
             SITE=""
-            TORCH_STEP="(.venv-amd/bin/python -c 'import torch, sys; sys.exit(0 if torch.version.hip else 1)' 2>/dev/null || VIRTUAL_ENV=.venv-amd uv pip install -q torch==2.5.1+rocm$TORCH_ROCM --index-url https://download.pytorch.org/whl/rocm$TORCH_ROCM && VIRTUAL_ENV=.venv-amd uv pip install -q numpy)"
+            TORCH_STEP="(.venv-amd/bin/python -c 'import torch, sys; sys.exit(0 if torch.version.hip else 1)' 2>/dev/null || VIRTUAL_ENV=.venv-amd uv pip install -q torch==2.5.1+rocm$TORCH_ROCM --index-url https://download.pytorch.org/whl/rocm$TORCH_ROCM && VIRTUAL_ENV=.venv-amd uv pip install -q numpy pip)"
           else
             SITE="--system-site-packages"
             TORCH_STEP="true"
