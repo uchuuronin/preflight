@@ -1,0 +1,11 @@
+{
+	"name": "20261102-172022-41490183749-d-lr-range-gpu",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41490183749",
+	"ref": "ws-d",
+	"sha": "f909ac3ee70894a6575afe368fa5b0d7db5c94de",
+	"cmd": "modal run --env main python/preflight/runner/lr_range_app.py::check --scripts finetune_lora_hf,pretrain_nanogpt",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T17:31:23Z"
+}
