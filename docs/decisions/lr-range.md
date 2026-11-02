@@ -110,10 +110,10 @@ time at list price]; item 3's spend is US$0.37 of its US$2.
 
 **A planted bad rate** (Chiya, Nov 2, 17:33; `d-lr-range-planted-1e-3`, GitHub 41538650072, an
 A10, US$0.14 [derived]) [measured]: the LoRA script with `learning_rate` 1e-3, ten times its
-author's. The reading is the same as on the unchanged script (suggested 7.9e-5, lowest loss 7.7e-4,
-divergence 1.0e-2, checked); the script's 1e-3 sits past the lowest point, 12.6 times the
+author's. The reading is the same as on the unchanged script (suggested 7.9e-5, smoothed lowest loss at 7.7e-4 (the raw curve's lowest point is at 3.4e-4; it's noisy),
+divergence 1.0e-2, checked); the script's 1e-3 sits past the smoothed curve's lowest point, 12.6 times the
 suggestion. 100 steps held at each: neither diverged; at 1e-3 the loss stayed above the suggested
-rate's in every 10-step block after the first, by 0.02 to 0.05 (one seed, the same batches). So it
+rate's in every 10-step block after the first, by 0.01 to 0.05 (one seed, the same batches). So it
 catches the rate as too high and suggests a sane one; what the too-high rate cost in 100 steps was
 a slower fall, not a blow-up. This run: US$0.14 of its US$0.50 cap; the range test's three GPU runs
 total US$0.51. Video: shot 7b in `docs/demo/video-plan.md`.

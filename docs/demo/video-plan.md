@@ -50,12 +50,12 @@ Narration at about 2.5 words a second; every line is also a burned-in caption. A
 `learning_rate=1e-4` changed to `1e-3`, then the range test and 100 steps held at each rate.
 
 - **It catches it.** The range test reads the curve the same way as on the unchanged script (the
-  ramp sets the rate, not the script): suggested 7.9e-5, lowest loss at 7.7e-4, divergence at
+  ramp sets the rate, not the script): suggested 7.9e-5, the smoothed curve's lowest loss at 7.7e-4 (the raw curve's at 3.4e-4), divergence at
   1.0e-2, and the ramp checked. The script's 1e-3 is **past the curve's lowest point**, 12.6 times
   the suggestion and 10 times below where it diverges.
 - **The suggestion is sane:** 7.9e-5 is 0.8 times the author's own 1e-4.
 - **What 1e-3 costs here, honestly:** not a blow-up. Over 100 steps on the same batches, the loss
-  at 1e-3 sat above the suggested rate's in every 10-step block after the first, by 0.02 to 0.05
+  at 1e-3 sat above the suggested rate's in every 10-step block after the first, by 0.01 to 0.05
   (last 10 steps' mean 1.225 against 1.174); neither diverged. So the beat says "past the bottom
   of the curve", not "it would crash", and shows no loss numbers spoken.
 
@@ -86,11 +86,11 @@ Nov 2, 22:43 UTC, `ws-d` `406fa38`, US$0.10 [derived: 315 s of container at list
 [measured]:
 
 - The record got bands: its GPU setting is the card it ran on (A10), `time.step` measured at 1.4 to
-  2.2 ms a step, `memory.peak` 0.27 to 0.36 GiB. (On a CPU, `time.step` abstains: "the probes ran
+  2.2 ms a step, `memory.peak` extrapolated at 0.27 to 0.36 GiB (no probe ran the optimizer step). (On a CPU, `time.step` abstains: "the probes ran
   without a known GPU".)
 - With step 5's change, **both alerts fired**: `step 201: peak memory 0.40 GiB, above the predicted
   0.27–0.36 GiB`, then `step 401: 0.00329 s a step, above the predicted 0.0014–0.00216 s`, about
-  1.5 s into the run.
+  1.3 s into the run [derived: 401 steps at 300 a second; the log has no timestamps].
 - Speed: about 1,250 steps a second unchanged, 300 with the change, so about 18,000 changed steps
   make a minute on an A10.
 - **One false alarm to know about:** the unchanged script, watched as a control, also alerted once:

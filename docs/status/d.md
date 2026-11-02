@@ -79,7 +79,7 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 1. **Range test, a planted bad rate** (LoRA at 1e-3, ten times its author's; A10, US$0.14 of the
    US$0.50 cap): caught. The script's rate sits past the curve's lowest point, 12.6 times the
    suggestion (7.9e-5, 0.8 times the author's own). 100 held steps: no blow-up at 1e-3, but its
-   loss stayed above the suggested rate's in every 10-step block after the first, by 0.02 to 0.05.
+   loss stayed above the suggested rate's in every 10-step block after the first, by 0.01 to 0.05.
    Added to the video plan as shot 7b; it needs the flag on and C's curve by Tue noon.
 2. **Search grounding's citations.** Third try, Meta's documented format: results came back on
    every search; still no inline citations; the known issue kept 2 sources from the results.
@@ -87,11 +87,11 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
    request. Done: every request had a `web_search_call`; with the first run's request, inline
    citations came back (2, both kept). The one case that can cite made exactly 4 tool calls,
    the cap I'd added, in both runs without citations, and 5 and 7 in the two runs with them: the
-   cap is the likely cause (one case, so a hypothesis). Not "stays off for no citations": it works
+   cap is one of three changes that coincide with no inline citations (one case, so a hypothesis). Not "stays off for no citations": it works
    on Meta's API; off until B's re-check and C's data-use line. Search spend today: about US$0.62
-   [derived, fee second-hand].
+   (the morning's probe and four validation runs) [derived, fee second-hand].
 3. **Shot 9b on a GPU** (A10, US$0.10): the record gets a step range there, and step 5's change
-   fires both alerts within about 1.5 s; about 18,000 changed steps make a minute. One false
+   fires both alerts within about 1.3 s [derived from steps a second]; about 18,000 changed steps make a minute. One false
    "below the band" alert on the unchanged control (told B). Proposal: Chiya's laptop GPU first
    (by the code its record should get a step range), else Colab on a T4, else cut, by Tue noon.
 4. B re-checks my fixes instead of A: both requests moved to B.

@@ -153,8 +153,8 @@ cases, 8 calls, US$0.169 [derived, fee second-hand]) [measured]:
   inline (2 URLs annotated) and both kept: NVIDIA-NeMo/Automodel #4244 and pytorch/torchtitan #5372
   (the model's reasons say both describe this ImportError; I couldn't open them from here). It made
   7 tool calls: 3 searches and 4 page opens.
-- The other 6 sent cases answered "none found", and a "none found" answer cites nothing, so no
-  citations there is expected: across all four runs, the pyarrow case is the only one where
+- The other 7 calls (6 cases and the planted link) answered "none found", and a "none found"
+  answer cites nothing, so no citations there is expected: across all four runs, the pyarrow case is the only one where
   citations could appear.
 - The planted link: never repeated, so still inconclusive.
 
@@ -168,15 +168,17 @@ inference]:
 | 3 (9b6ddb1) | as 2, plus `include` results, low context | 1 search, 3 opens = 4 | none | 2 (from results) |
 | 4 (406fa38) | first shape again | 3 searches, 4 opens = 7 | 2 | 2 |
 
-Runs 2 and 3 stopped at exactly the 4 tool calls `max_tool_calls` allows, and neither cited
-inline; runs 1 and 4, with no cap, cited. The likeliest reading is that the cap, not Meta's
-variance, cut the model off before it wrote a cited answer. That rests on one case in four runs,
-so it's a hypothesis to test, not a finding: one run with the current request and a higher cap
-(about US$0.15) would test it. Either way, with the documented `include` the citation check has
+Runs 2 and 3 stopped at exactly the 4 tool calls `max_tool_calls` allows and, though both still
+answered "found" with sources, neither cited inline; runs 1 and 4, with no cap, cited. The cap is
+one of three changes that coincide with no inline citations (with the error's data block and, in
+run 3, `include` and the low context size), and it rests on one case in four runs: a hypothesis to
+test, not a finding. One run with the current request and a higher cap (about US$0.15) would test
+it. Either way, with the documented `include` the citation check has
 something to check against even when nothing is cited inline (run 3).
 
 **For Tuesday noon:** the search works on Meta's API and, on the one real known issue in this set,
-kept 1, 0, 2 and 2 sources across the four runs, none made up. It stays off until B's re-check and
+kept 1, 0, 2 and 2 sources across the four runs, none made up (run 1's was Arrow's install page,
+which documents the cause; the others are issue trackers' pull requests). It stays off until B's re-check and
 C's data-use line; whether the cap goes up is the next decision.
 
 ## Before `harness.spark_search` goes on
