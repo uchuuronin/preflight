@@ -1,0 +1,11 @@
+{
+	"name": "20261102-162101-41480545899-b-ask-model-1",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41480545899",
+	"ref": "ws-b",
+	"sha": "f824e01f20ddd9c40a212e38fa4d69eacc1a4481",
+	"cmd": "modal run --env main python/preflight/corpus/ask_model_app.py::ask --cases python/preflight/corpus/data/ask_model_cases.json",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:36:12Z"
+}
