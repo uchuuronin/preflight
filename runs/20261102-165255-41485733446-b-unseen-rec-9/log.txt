@@ -1,0 +1,8 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-esTaiATw8tx9xziZqvaeiZ
+✓ Created objects.
+scanned 12 of 42 records
+wrote out/unseen-9-first.record.json (41204 bytes), share token replaced
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-esTaiATw8tx9xziZqvaeiZ
