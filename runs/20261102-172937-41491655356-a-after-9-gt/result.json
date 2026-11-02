@@ -1,0 +1,11 @@
+{
+	"name": "20261102-172937-41491655356-a-after-9-gt",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41491655356",
+	"ref": "538863c8a9ecd1889525227e1989fc109a370bae",
+	"sha": "538863c8a9ecd1889525227e1989fc109a370bae",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/KellerJordan/cifar10-airbench --commit 4c1b6d1e3889b037efadcfd5c0ea65b246592362 --entrypoint airbench94_muon.py   --bare-steps 100000 --budget-min 45 --first-gpu L4 --install-requirements --install-repo",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T18:14:10Z"
+}
