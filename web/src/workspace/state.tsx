@@ -231,11 +231,12 @@ export function WorkspaceProvider({
 	const estimates = useMemo(() => rated.predict(record, state.knobs), [rated, record, state.knobs]);
 	const tableEstimates = useMemo(() => (state.rate ? engineBase.predict(record, state.knobs) : estimates), [state.rate, engineBase, record, state.knobs, estimates]);
 	// The setting the visitor lands on: ask the engine once the knobs settle, if the grids can't say.
+	// (`estimates` already holds the engine's answer once it has one, so this stops asking by itself.)
 	useEffect(() => {
-		if (!engineOn(ref) || !needsEngine(baseProvider.predict(record, state.knobs))) return;
+		if (!engineOn(ref) || !needsEngine(estimates)) return;
 		const id = setTimeout(() => void askEngine(ref, record, [state.knobs]), ENGINE_SETTLE_MS);
 		return () => clearTimeout(id);
-	}, [ref, record, baseProvider, state.knobs]);
+	}, [ref, record, estimates, state.knobs]);
 
 	// Knob latency is measured to the frame after the new readouts commit, which is what the
 	// person sees; the contract's target is under 400 ms at p95.

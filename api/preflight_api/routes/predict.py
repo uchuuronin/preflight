@@ -24,25 +24,26 @@ from ..stores import StoreBusy, resolve_record
 
 router = APIRouter(prefix="/v1")
 
-# Source: derived, a campaign's runs on one calendar (the planner's own cap is 512) arrive a page at a
-# time; 64 settings at about 3 ms each (measured Nov 2 on the LoRA record) is about 0.2 s of CPU.
-MAX_CELLS = 64
-MAX_KNOBS = 32  # source: guess, records carry about 20 knobs
-# Its own bucket, not the ledger's: the ledger counts guide turns, which this mustn't spend. Source:
-# guess, a visitor dragging a knob lands on a new setting at most a few times a second.
+# Source: derived, the web asks for one setting at a time (the one the visitor lands on); 16 leaves
+# room for a page of runs. About 3 ms a setting on the LoRA record, about 4 ms on the agent sample
+# (measured Nov 2), so a full request is well under 0.1 s of CPU.
+MAX_CELLS = 16
+# Its own bucket, not the ledger's: the ledger counts guide turns, which this mustn't spend. One token
+# a setting, taken before the record is read. Source: guess, a visitor dragging a knob lands on a new
+# setting at most a few times a second.
 BURST = 30
 REFILL_PER_S = 3.0
 _buckets: dict[str, tuple[float, float]] = {}  # ip key -> (tokens, at); one container's view
 
 
-def _take(ip: str, now: float | None = None) -> bool:
+def _take(ip: str, n: int = 1, now: float | None = None) -> bool:
 	now = time.monotonic() if now is None else now
 	tokens, at = _buckets.get(ip, (BURST, now))
 	tokens = min(BURST, tokens + (now - at) * REFILL_PER_S)
-	if tokens < 1:
+	if tokens < n:
 		_buckets[ip] = (tokens, now)
 		return False
-	_buckets[ip] = (tokens - 1, now)
+	_buckets[ip] = (tokens - n, now)
 	if len(_buckets) > 10_000:  # bounded: drop the oldest half
 		for k, _ in sorted(_buckets.items(), key=lambda kv: kv[1][1])[:5_000]:
 			_buckets.pop(k, None)
@@ -55,7 +56,7 @@ class PredictBody(BaseModel):
 
 def _clean(knobs: dict, ids: set[str]) -> dict:
 	"""Only the record's own knobs, finite numbers, short strings: anything else isn't a setting."""
-	if len(knobs) > MAX_KNOBS:
+	if len(knobs) > len(ids):
 		raise ApiError(422, "invalid_request", "That setting names more knobs than the record has.")
 	out = {}
 	for k, v in knobs.items():
@@ -70,9 +71,14 @@ def _clean(knobs: dict, ids: set[str]) -> dict:
 
 
 def _predict_all(raw: dict, cells: list[dict]) -> list[dict]:
-	from preflight.engine.api import predict
+	from preflight.engine import api
 	from preflight.schema import FlightRecord
 
+	# The engine's models as the runner has them (engine.rl, engine.memory, ...: runner/pipeline.py
+	# sets the same from flags), so this answers as the record's own predictions were made. A context
+	# variable, and this runs in its own worker thread, so nothing else sees it.
+	api._FEATURES_NOW.set(api.features_from(flag))
+	predict = api.predict
 	rec = FlightRecord.model_validate(raw)
 	ids = {k.id for k in rec.knobs}
 	out = []
@@ -90,9 +96,19 @@ def _predict_all(raw: dict, cells: list[dict]) -> list[dict]:
 
 
 @router.post("/records/{ref}/predict")
-async def predict_cells(ref: str, body: PredictBody, request: Request) -> dict:
+async def predict_cells(ref: str, request: Request) -> dict:
+	# 404 while off, before the body is read, so the route doesn't show; the web caches a 404 as
+	# "no engine here" and stops asking (a 503 would be asked again on every landing).
 	if not flag("c.engine_fallback"):
 		raise ApiError(404, "not_found", "Not found.")
+	try:
+		body = PredictBody.model_validate_json(await request.body())
+	except ValueError as e:
+		raise ApiError(422, "invalid_request", f"Send up to {MAX_CELLS} settings as cells.") from e
+	if not _take(edge.ip_key(edge.client_ip(request)), len(body.cells)):
+		raise ApiError(
+			429, "rate_limited", "Too many requests from here; try again shortly.", retryable=True, retry_after=2
+		)
 	try:
 		raw = await asyncio.to_thread(resolve_record, ref, request.app.state.samples, request.app.state.records)
 	except StoreBusy as e:
@@ -101,10 +117,6 @@ async def predict_cells(ref: str, body: PredictBody, request: Request) -> dict:
 		) from e
 	if raw is None:
 		raise ApiError(404, "record_not_found", "No flight record matches this link.")
-	if not _take(edge.ip_key(edge.client_ip(request))):
-		raise ApiError(
-			429, "rate_limited", "Too many requests from here; try again shortly.", retryable=True, retry_after=2
-		)
 	try:
 		cells = await asyncio.to_thread(_predict_all, raw, body.cells)
 	except ApiError:

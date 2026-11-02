@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import raw from "../fixtures/lora-live-nov1.record.json";
 import { currentKnobs } from "../record/model";
 import { type FlightRecord, normaliseRecord, type Prediction } from "../record/types";
-import { askEngine, mergeEngine, needsEngine, resetEngineCache, withEngine } from "./engineFallback";
+import { askEngine, engineVersion, mergeEngine, needsEngine, resetEngineCache, withEngine } from "./engineFallback";
 import { GridProvider } from "./GridProvider";
 
 let on = true;
@@ -44,6 +44,8 @@ describe("the engine where the grids hold no value (Chiya, Nov 2)", () => {
 		const e: Prediction = { "time.step": engineStep as never, "memory.peak": { point: 99 } as never, "risk.oom": { point: 0.5, status: "predicted" } as never };
 		const m = mergeEngine(g, e);
 		expect(m["time.step"]).toEqual(engineStep);
+		expect(mergeEngine({ "risk.oom": { point: null, unit: "p", status: "abstain", reason: "off_grid" } as never }, { "risk.oom": { point: 1, unit: "p", status: "measured" } as never })["risk.oom"]?.status).toBe("predicted");
+		expect(mergeEngine({ "time.step": { point: null, unit: "s", status: "abstain", reason: "off_grid" } as never }, { "time.step": { point: 1, unit: "ms", status: "predicted" } as never })["time.step"]?.status).toBe("abstain");
 		expect(m["memory.peak"]?.point).toBe(9); // the grid's value stands
 		expect(m["risk.oom"]?.status).toBe("abstain"); // an abstention for another reason stands
 	});
@@ -68,10 +70,13 @@ describe("the engine where the grids hold no value (Chiya, Nov 2)", () => {
 		await askEngine("lora-qwen", record, [knobs]);
 		await askEngine("lora-qwen", record, [knobs]);
 		expect(busy).toHaveBeenCalledTimes(2);
+		const v = engineVersion();
+		await askEngine("lora-qwen", record, [knobs]);
+		expect(engineVersion()).toBe(v); // a busy reply doesn't re-render, so it can't loop
 		await askEngine("live", record, [knobs]);
 		on = false;
 		await askEngine("lora-qwen", record, [at({ lr: 0.0003 })]);
-		expect(busy).toHaveBeenCalledTimes(2);
+		expect(busy).toHaveBeenCalledTimes(3);
 		expect(withEngine(grid, "lora-qwen")).toBe(grid);
 	});
 });

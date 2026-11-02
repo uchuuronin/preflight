@@ -21,12 +21,19 @@ import type { PredictionProvider } from "./PredictionProvider";
 /** Abstentions that mean "no grid value here", not "the engine can't say". */
 const OFF_GRID = new Set(["off_grid", "between_measured"]);
 /** The API's own cap per request (api/preflight_api/routes/predict.py MAX_CELLS). */
-const MAX_CELLS = 64;
+const MAX_CELLS = 16;
 /** A ref the API can't resolve: a live file read from the visitor's own disk. */
 const LOCAL_REFS = new Set(["live", ""]);
 
 type Entry = Prediction | "pending" | "failed";
-const cache = new Map<string, Entry>();
+// Per loaded record, so a record revised by a later probe starts afresh, and a record no longer open
+// takes its answers with it.
+let caches = new WeakMap<LoadedRecord, Map<string, Entry>>();
+function cacheOf(record: LoadedRecord): Map<string, Entry> {
+	let c = caches.get(record);
+	if (!c) caches.set(record, (c = new Map()));
+	return c;
+}
 const listeners = new Set<() => void>();
 let version = 0;
 
@@ -46,7 +53,7 @@ export function engineVersion(): number {
 
 /** Tests only. */
 export function resetEngineCache(): void {
-	cache.clear();
+	caches = new WeakMap();
 	bump();
 }
 
@@ -71,13 +78,19 @@ export function needsEngine(p: Prediction): boolean {
 	return Object.values(p).some((e) => e?.status === "abstain" && OFF_GRID.has(String(e.reason ?? "")));
 }
 
-/** The grid's prediction, with the engine's estimate for each target the grids abstained on. */
+/**
+ * The grid's prediction, with the engine's estimate for each target the grids abstained on. Never
+ * "measured": the engine matches a probe ignoring knobs that don't change cost (lr, epochs), so at lr
+ * 2e-4 it calls the lr 1e-4 probe's out-of-memory measured; here "measured" means a probe ran this
+ * very setting (GridProvider), so the engine's reads as predicted.
+ */
 export function mergeEngine(grid: Prediction, engine: Prediction): Prediction {
 	const out: Prediction = { ...grid };
 	for (const [id, e] of Object.entries(grid)) {
 		if (e?.status !== "abstain" || !OFF_GRID.has(String(e.reason ?? ""))) continue;
 		const got = engine[id];
-		if (got && got.status !== "abstain" && typeof got.point === "number") out[id] = got;
+		if (!got || got.status === "abstain" || typeof got.point !== "number" || got.unit !== e.unit) continue;
+		out[id] = got.status === "measured" ? { ...got, status: "predicted" } : got;
 	}
 	return out;
 }
@@ -91,7 +104,7 @@ export function withEngine(base: PredictionProvider, ref: string | null | undefi
 		predict(record, knobs) {
 			const p = base.predict(record, knobs);
 			if (!needsEngine(p)) return p;
-			const hit = cache.get(keyOf(ref, settingOf(record, knobs)));
+			const hit = cacheOf(record).get(keyOf(ref, settingOf(record, knobs)));
 			return hit && hit !== "pending" && hit !== "failed" ? mergeEngine(p, hit) : p;
 		},
 		sensitivity: (record, objective, opts) => base.sensitivity(record, objective, opts),
@@ -105,6 +118,7 @@ export function withEngine(base: PredictionProvider, ref: string | null | undefi
  */
 export async function askEngine(ref: string, record: LoadedRecord, settings: readonly Readonly<Record<string, KnobValue>>[]): Promise<void> {
 	if (!engineOn(ref)) return;
+	const cache = cacheOf(record);
 	const todo: { key: string; setting: Record<string, KnobValue> }[] = [];
 	for (const s of settings) {
 		const setting = settingOf(record, s);
@@ -113,6 +127,9 @@ export async function askEngine(ref: string, record: LoadedRecord, settings: rea
 		cache.set(key, "pending");
 		todo.push({ key, setting });
 	}
+	// Only an answer re-renders: a busy or offline reply clears its settings without a bump, so they
+	// are asked again when the visitor next lands on them, never in a loop of renders and retries.
+	let answered = false;
 	for (let i = 0; i < todo.length; i += MAX_CELLS) {
 		const page = todo.slice(i, i + MAX_CELLS);
 		try {
@@ -123,14 +140,15 @@ export async function askEngine(ref: string, record: LoadedRecord, settings: rea
 				body: JSON.stringify({ cells: page.map((x) => x.setting) }),
 			});
 			if (res.status === 429 || res.status >= 500) {
-				page.forEach((x) => cache.delete(x.key)); // busy, not wrong: asked again on the next landing
+				page.forEach((x) => cache.delete(x.key));
 				continue;
 			}
 			const json = res.ok ? ((await res.json()) as { cells?: Prediction[] }) : null;
 			page.forEach((x, j) => cache.set(x.key, json?.cells?.[j] ?? "failed"));
+			answered = true;
 		} catch {
-			page.forEach((x) => cache.delete(x.key)); // offline: try again later
+			page.forEach((x) => cache.delete(x.key));
 		}
 	}
-	if (todo.length) bump();
+	if (answered) bump();
 }
