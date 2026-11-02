@@ -327,13 +327,17 @@ def smoke(
 	modal_env: str = "",
 	visitor: str = "smoke",
 	notebook: str = "",
+	dir: str = "",
+	entrypoint: str = "",
+	args: str = "",
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
 	Probes stay on `gpus` (comma-separated): L4 by default, since team runs use T4 or L4 unless
 	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder (to an
 	A100). --visitor: the queue's visitor (3 probe jobs a day each). --notebook path: check in an
-	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are). The job
+	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are).
+	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload. The job
 	is cancelled after `max_minutes`, or if this run fails partway. The job store is looked up in
 	the environment `modal run --env` names (modal_env overrides it). Writes out/smoke.json (every
 	event and the final status, or the error) and out/record.json (the flight record), which
@@ -349,6 +353,15 @@ def smoke(
 		if nb.suffix != ".ipynb" or Path(__file__).resolve().parents[3] not in nb.parents:
 			raise SystemExit(f"{notebook!r} isn't an .ipynb file in this checkout")
 		source = {"kind": "notebook", "files": {nb.name: nb.read_text()}}
+	if dir:  # any directory in this checkout, checked in as a visitor's upload (Monday's unseen scripts)
+		from preflight.runner.sources import _read_tree
+
+		root = Path(__file__).resolve().parents[3]
+		src = (root / dir).resolve()
+		if root not in src.parents or not src.is_dir():
+			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
+		source = {"kind": "upload", "files": _read_tree(src), **({"entrypoint": entrypoint} if entrypoint else {}),
+			**({"args": _split_args(args)} if args else {})}  # fmt: skip
 	request = {
 		"source": source,
 		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
@@ -469,6 +482,17 @@ GT_FUNCTIONS = {
 }  # fmt: skip
 
 
+def _split_args(args: str) -> list[str]:
+	"""A script's arguments from one flag value. remote-run.yml's command allows no quotes, so
+	`--args=--epochs=1,--lr=3e-4` (commas, no spaces) is the form that gets through it; a value with
+	spaces is split as a shell would."""
+	import shlex
+
+	if "," in args and " " not in args:
+		return [a for a in args.split(",") if a]
+	return shlex.split(args)
+
+
 @ops.local_entrypoint()
 def ground_truth(
 	script: str = "",
@@ -485,7 +509,7 @@ def ground_truth(
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
 	modal run --env main python/preflight/runner/ops_app.py::ground_truth --script vision_timm --bare-steps 300
-	modal run ... ::ground_truth --dir validation/unseen/s3 --entrypoint main.py --args "--epochs 1" \\
+	modal run ... ::ground_truth --dir validation/unseen/s3 --entrypoint main.py --args=--epochs=1 \\
 		--install-requirements --first-gpu A10
 
 	--script: a zoo script; --dir: any directory in this checkout (Monday's unseen scripts, from the
@@ -495,7 +519,6 @@ def ground_truth(
 	L40S. budget_min: the whole measurement ends inside it; keep it under the run's own time limit.
 	Writes out/ground_truth_<name>.json."""
 	import json
-	import shlex
 
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
@@ -523,7 +546,7 @@ def ground_truth(
 	name = script or src.name
 	print(f"[ground truth] {name}: {entry}, lens {p['lens']}, {image} image, {len(files)} files; "
 		f"waiting for an {first}, else the {'L4' if first == 'A10' else 'A10'} (Modal queues it)", flush=True)  # fmt: skip
-	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(shlex.split(args)),
+	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(_split_args(args)),
 		install_requirements, sample, p["generate_calls"])  # fmt: skip
 	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
