@@ -441,6 +441,7 @@
 	"lens.vision": "Vision",
 	"finding.source.rule": "Found by a rule check",
 	"finding.source.spark_open_triage": "Found by Muse Spark Open triage",
+	"finding.source.glimmer_triage": "Found by Muse Glimmer",
 	"finding.source.spark_diagnosis": "Diagnosed by Muse Spark",
 	"finding.source.model": "Flagged by a prediction model",
 	"findings.title": "Findings",
