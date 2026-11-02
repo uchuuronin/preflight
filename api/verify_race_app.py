@@ -78,7 +78,9 @@ def _pair(rec: dict) -> tuple[str | None, str | None]:
 
 
 @app.local_entrypoint()
-def verify_race(only: str = "", attempt: str = "a") -> None:
+def verify_race(only: str = "", attempt: str = "a", gpu: str = "L4") -> None:
+	if gpu not in ("L4", "A10", "T4"):
+		raise SystemExit("gpu: L4, A10 or T4 (the standing yes)")
 	sys.path.insert(0, str(ROOT / "api"))
 	from preflight_api import verify
 	from preflight_api.fix.templates import verify_options
@@ -102,10 +104,12 @@ def verify_race(only: str = "", attempt: str = "a") -> None:
 		req = {
 			"source": {"kind": "record", "record_ref": "sample:lora-qwen"},
 			"mode": "verify",
-			"knobs": KNOBS,
+			# the GPU, pinned by the setting's gpu_type: an L4 queued past the job's 20-minute wait on
+			# Nov 2 (gpu.unavailable), while A10s schedule in seconds (A's status, Nov 1)
+			"knobs": {**KNOBS, "gpu_type": gpu},
 			"patch": c["diff"],
-			"gpu": "L4",
-			"constraints": {"gpu_types": ["L4", "A10"]},
+			"gpu": gpu,
+			"constraints": {"gpu_types": [gpu]},
 			"purpose": "c.fix_verify",
 		}
 		t0 = time.monotonic()
