@@ -1,0 +1,8 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-UWFZTQiXJ12UsOsKrD9FBb
+✓ Created objects.
+scanned 2 of 26 records
+wrote out/race-a10-c1.record.json (166615 bytes), share token replaced
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-UWFZTQiXJ12UsOsKrD9FBb
