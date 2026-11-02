@@ -1,0 +1,11 @@
+{
+	"name": "20261102-160755-41478422939-a-unseen-3-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41478422939",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor unseen-3 --gpus A100-SXM-80GB --max-minutes 45 --repo https://github.com/huggingface/open-r1 --commit 5b6ff22b3fb7aa069c54866e517f39dfc3160e09 --entrypoint src/open_r1/grpo.py --args=--config,recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml,--vllm_mode,colocate,--max_steps,50",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:11:22Z"
+}
