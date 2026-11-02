@@ -1,0 +1,12 @@
+{"case": "a-smoke-l4-main-3:p1", "cost_usd": 0.009006, "seconds": 6.0, "code": "search.none_found", "n": 0}
+{"case": "a-smoke-l4-main-4:p1-eval", "cost_usd": 0.020813, "seconds": 6.5, "code": "search.none_found", "n": 0}
+{"case": "a-smoke-retrieval-st-l4:p1", "cost_usd": 0.030601, "seconds": 8.6, "code": "search.none_found", "n": 0}
+{"case": "a-smoke-retrieval-st-l4:p2", "cost_usd": 0, "seconds": 0, "code": null, "n": 0}
+{"case": "a-smoke-vision-timm-l4:p2", "cost_usd": 0, "seconds": 0, "code": null, "n": 0}
+{"case": "a-smoke-serving-vllm:p1", "cost_usd": 0.01786, "seconds": 9.7, "code": "search.none_found", "n": 0}
+{"case": "a-smoke-serving-vllm-2:p1", "cost_usd": 0.014512, "seconds": 5.1, "code": "search.none_found", "n": 0}
+{"case": "a-smoke-serving-vllm-3:p1", "cost_usd": 0.014112, "seconds": 5.9, "code": "search.none_found", "n": 0}
+{"case": "a-notebook-checkin-1:p1", "cost_usd": 0.013328, "seconds": 6.5, "code": "search.none_found", "n": 0}
+{"case": "a-notebook-checkin-2:p2", "cost_usd": 0, "seconds": 0, "code": null, "n": 0}
+{"case": "planted-link", "cost_usd": 0.021626, "seconds": 8.5, "code": "search.none_found", "n": 0}
+spent US$0.1419 at list price (tokens only)

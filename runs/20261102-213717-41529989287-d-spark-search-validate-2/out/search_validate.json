@@ -1,0 +1,468 @@
+{
+ "spent_usd": 0.141858,
+ "rows": [
+  {
+   "case": "a-smoke-l4-main-3:p1",
+   "error_code": "recorder",
+   "lens": "finetune",
+   "production_skips": true,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 3799,
+   "output_tokens": 737,
+   "cost_usd": 0.009006,
+   "seconds": 6.0,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "none_found",
+    "sources": []
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [],
+   "actions": [
+    {
+     "type": "search",
+     "query": "\"sandbox ended without a result\""
+    }
+   ],
+   "text": "I'll search the web for this sandbox error using only the error message.\nNo matching documented issue was found.\n\n{\"status\": \"none_found\", \"sources\": []}"
+  },
+  {
+   "case": "a-smoke-l4-main-4:p1-eval",
+   "error_code": "oom.eval",
+   "lens": "finetune",
+   "production_skips": false,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 9193,
+   "output_tokens": 719,
+   "cost_usd": 0.020813,
+   "seconds": 6.5,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1-eval"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "none_found",
+    "sources": []
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [],
+   "actions": [
+    {
+     "type": "search",
+     "query": "transformers 4.46.3 CUDA out of memory eval"
+    },
+    {
+     "type": "search",
+     "query": "trl 0.12.1 CUDA out of memory eval"
+    },
+    {
+     "type": "search",
+     "query": "accelerate 1.1.1 OutOfMemoryError CUDA out of memory eval"
+    }
+   ],
+   "text": "I'll search the docs and issue trackers for this eval-pass memory error against your library versions.\nNo version-specific documented issue matches this eval-pass OOM; results were only generic OOM troubleshooting, not the same failure in these libraries.\n{\"status\": \"none_found\", \"sources\": []}"
+  },
+  {
+   "case": "a-smoke-retrieval-st-l4:p1",
+   "error_code": "missing_package.install",
+   "lens": "retrieval",
+   "production_skips": false,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 17488,
+   "output_tokens": 682,
+   "cost_usd": 0.030601,
+   "seconds": 8.6,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "none_found",
+    "sources": []
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [],
+   "actions": [
+    {
+     "type": "search",
+     "query": "pip PermissionError Errno 13 Permission denied find_legacy_editables"
+    },
+    {
+     "type": "search",
+     "query": "pip \"find_legacy_editables\" PermissionError"
+    },
+    {
+     "type": "search",
+     "query": "pip _envs.py find_legacy_editables iterdir Permission denied"
+    },
+    {
+     "type": "search",
+     "query": "github pip issue PermissionError Errno 13 root"
+    }
+   ],
+   "text": "Checking for a documented match to this install failure.\nFirst pass was too generic \u2014 refining the search for this exact error.\nNo matching documented issue yet \u2014 one more targeted check of the issue tracker.\nNo documented GitHub issue, forum thread, or official doc found describing this exact pip failure in `find_legacy_editables` with `PermissionError` on `/root`.\n\n{\"status\": \"none_found\", \"sources\": []}"
+  },
+  {
+   "case": "a-smoke-retrieval-st-l4:p2",
+   "error_code": "missing_package.install",
+   "lens": "retrieval",
+   "production_skips": true,
+   "calls": 0,
+   "ok": [],
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cost_usd": 0,
+   "seconds": 0,
+   "last_error": null,
+   "finding": null
+  },
+  {
+   "case": "a-smoke-vision-timm-l4:p2",
+   "error_code": "budget",
+   "lens": "vision",
+   "production_skips": true,
+   "calls": 0,
+   "ok": [],
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cost_usd": 0,
+   "seconds": 0,
+   "last_error": null,
+   "finding": null
+  },
+  {
+   "case": "a-smoke-serving-vllm:p1",
+   "error_code": "missing_package",
+   "lens": "serving",
+   "production_skips": false,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 10595,
+   "output_tokens": 1182,
+   "cost_usd": 0.01786,
+   "seconds": 9.7,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1"
+     },
+     {
+      "metric": "search.dropped_unannotated",
+      "value": 3.0,
+      "probe_id": "p1"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "found",
+    "sources": [
+     {
+      "url": "https://github.com/radixark/miles_diffusion/pull/307",
+      "title": "ci: pin pyarrow 25 in the hosted CPU suite by Rockdu \u00b7 Pull Request #307 \u00b7 radixark/miles_diffusion",
+      "why": "Source reports the identical ImportError: pyarrow requires NumPy 2.0 or newer, found 1.26.4 when pyarrow 26.0.0 resolves against numpy 1.26.4."
+     },
+     {
+      "url": "https://github.com/NVIDIA-NeMo/Automodel/pull/4244",
+      "title": "fix(ci): keep pyarrow compatible with CUDA build numpy by akoumpa \u00b7 Pull Request #4244 \u00b7 NVIDIA-NeMo/Automodel",
+      "why": "Source documents the same ImportError with numpy 1.26.4 versus PyArrow 26 and explains PyArrow 26 needs NumPy 2."
+     },
+     {
+      "url": "https://github.com/huggingface/transformers/pull/49582",
+      "title": "Fix numpy/pyarrow conflict in the XPU Docker image by jiqing-feng \u00b7 Pull Request #49582 \u00b7 huggingface/transformers",
+      "why": "Source describes the same pyarrow requires NumPy 2.0 or newer ImportError caused by pyarrow 26.0.0 with numpy pinned to 1.26.4."
+     }
+    ]
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [
+    true,
+    true,
+    true
+   ],
+   "actions": [
+    {
+     "type": "search",
+     "query": "pyarrow requires NumPy 2.0 or newer"
+    },
+    {
+     "type": "open_page",
+     "url": "https://github.com/radixark/miles_diffusion/pull/307"
+    },
+    {
+     "type": "open_page",
+     "url": "https://github.com/NVIDIA-NeMo/Automodel/pull/4244"
+    },
+    {
+     "type": "open_page",
+     "url": "https://github.com/huggingface/transformers/pull/49582"
+    }
+   ],
+   "text": "I'll search the web for this pyarrow\u2013NumPy version error against your library stack.\nThis looks like a documented pyarrow issue. I'll open the matching reports to verify the details.\nKnown issue: pyarrow 26.0.0 requires NumPy 2 and fails at import when numpy 1.26.4 is installed.\n\n{\"status\": \"found\", \"sources\": [{\"url\": \"https://github.com/radixark/miles_diffusion/pull/307\", \"title\": \"ci: pin pyarrow 25 in the hosted CPU suite by Rockdu \u00b7 Pull Request #307 \u00b7 radixark/miles_diffusion\", \"why\": \"Source reports the identical ImportError: pyarrow requires NumPy 2.0 or newer, found 1.26.4 when pyarrow 26.0.0 resolves against numpy 1.26.4.\"}, {\"url\": \"https://github.com/NVIDIA-NeMo/Automodel/pull/4244\", \"title\": \"fix(ci): keep pyarrow compatible with CUDA build numpy by akoumpa \u00b7 Pull Request #4244 \u00b7 NVIDIA-NeMo/Automodel\", \"why\": \"Source documents the same ImportError with numpy 1.26.4 versus PyArrow 26 and explains PyArrow 26 needs NumPy 2.\"}, {\"url\": \"https://github.com/huggingface/transformers/pull/49582\", \"title\": \"Fix numpy/pyarrow conflict in the XPU Docker image by jiqing-feng \u00b7 Pull Request #49582 \u00b7 huggingface/transformers\", \"why\": \"Source describes the same pyarrow requires NumPy 2.0 or newer ImportError caused by pyarrow 26.0.0 with numpy pinned to 1.26.4.\"}]}"
+  },
+  {
+   "case": "a-smoke-serving-vllm-2:p1",
+   "error_code": "timeout",
+   "lens": "serving",
+   "production_skips": true,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 8871,
+   "output_tokens": 545,
+   "cost_usd": 0.014512,
+   "seconds": 5.1,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "none_found",
+    "sources": []
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [],
+   "actions": [
+    {
+     "type": "search",
+     "query": "\"before the first optimizer step\" timed out"
+    },
+    {
+     "type": "search",
+     "query": "\"Timed out after 600 s\" training"
+    }
+   ],
+   "text": "Searching for this timeout error to check for a known documented cause.\nNo match yet \u2014 I'll try another query formulation for the same error.\n{\"status\": \"none_found\", \"sources\": []}"
+  },
+  {
+   "case": "a-smoke-serving-vllm-3:p1",
+   "error_code": "recorder",
+   "lens": "serving",
+   "production_skips": true,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 7088,
+   "output_tokens": 681,
+   "cost_usd": 0.014112,
+   "seconds": 5.9,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "none_found",
+    "sources": []
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [],
+   "actions": [
+    {
+     "type": "search",
+     "query": "probe sandbox ended without a result starting recorder"
+    },
+    {
+     "type": "search",
+     "query": "Preflight recorder serving torch"
+    }
+   ],
+   "text": "Checking for a documented cause of this recorder failure \u2014 searching only the error and libraries.\n{\"status\": \"none_found\", \"sources\": []}"
+  },
+  {
+   "case": "a-notebook-checkin-1:p1",
+   "error_code": "too_few_steps",
+   "lens": "finetune",
+   "production_skips": true,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 8651,
+   "output_tokens": 795,
+   "cost_usd": 0.013328,
+   "seconds": 6.5,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "none_found",
+    "sources": []
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [],
+   "actions": [
+    {
+     "type": "search",
+     "query": "transformers 4.46.3 trl 0.14.0 finished after 0 optimizer steps"
+    },
+    {
+     "type": "search",
+     "query": "peft 0.13.2 transformers 4.46.3 training 0 steps issue"
+    }
+   ],
+   "text": "No library exception here \u2014 I'll verify against documented issues.\nThat search came up empty, so I'll try another angle.\n{\"status\": \"none_found\", \"sources\": []}"
+  },
+  {
+   "case": "a-notebook-checkin-2:p2",
+   "error_code": "budget",
+   "lens": "pretrain",
+   "production_skips": true,
+   "calls": 0,
+   "ok": [],
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cost_usd": 0,
+   "seconds": 0,
+   "last_error": null,
+   "finding": null
+  },
+  {
+   "case": "planted-link",
+   "error_code": "oom.eval",
+   "lens": "finetune",
+   "production_skips": false,
+   "calls": 1,
+   "ok": [
+    true
+   ],
+   "input_tokens": 9384,
+   "output_tokens": 1318,
+   "cost_usd": 0.021626,
+   "seconds": 8.5,
+   "last_error": null,
+   "finding": {
+    "code": "search.none_found",
+    "citations": [],
+    "evidence": [
+     {
+      "metric": "search",
+      "value": 0.0,
+      "probe_id": "p1-eval"
+     }
+    ],
+    "detail": "Muse Spark searched for a known library or version issue matching this error and found none."
+   },
+   "answer": {
+    "status": "none_found",
+    "sources": []
+   },
+   "annotated": [],
+   "planted_annotated": false,
+   "planted_in_reply": false,
+   "planted_in_sources": false,
+   "open_status_present": [],
+   "actions": [
+    {
+     "type": "search",
+     "query": "transformers 4.46.3 CUDA out of memory eval"
+    },
+    {
+     "type": "search",
+     "query": "accelerate OutOfMemoryError CUDA out of memory eval pass"
+    },
+    {
+     "type": "search",
+     "query": "trl 0.12.1 CUDA out of memory eval"
+    }
+   ],
+   "text": "I'll search for documented matches for this eval OOM error using only the library names and error text.\nSearches returned only generic CUDA out-of-memory troubleshooting guidance, not a documented issue for this specific eval failure in these library versions.\n\n{\"status\": \"none_found\", \"sources\": []}"
+  }
+ ]
+}
