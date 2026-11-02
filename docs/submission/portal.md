@@ -108,11 +108,21 @@ Code then checks that quoted line really is in the log (at least 8 characters) b
 for a probe that didn't finish, the result appears as a finding beside the probe's own error, and
 every call is kept in the record's provenance (`python/preflight/harness/triage.py`).
 
-How it runs today, as it is: it is wired into the job pipeline behind its own flag,
-`harness.spark_open_triage`, which is off; calls run one after another after the probes, up to
-30 seconds each, outside the job's probe time budget. TODO(PM): before submitting, either turn the
-flag on with the data-use line and add the first real run's ID and call log here (the prize needs
-the partner to verify real calls), or keep this paragraph as it is.
+How it runs today: on in production since Nov 1 (`harness.spark_open_triage`, with its line in
+the data-use notice). Calls run one after another after the probes, outside the job's probe time
+budget, and every call is in the record's provenance. The first real run, on our LoRA fine-tune
+script with its planted eval bug (`a-triage-lora-prod`, GitHub run 41336726935), made 4 calls on
+Baseten for $0.0184; the eval probe's call said "unclear", because the out-of-memory was in the
+probe's recorded error rather than its output. Triage now reads that error too, and on all 11
+failed probes in our test scripts' records Spark Open quoted a line every time
+(`a-triage-agreement`). TODO(PM): add the production re-run's ID once A posts it.
+
+**Muse Glimmer, Meta's open weights on our own GPU, for private mode.** With its flag on, a
+private job gets triage from Muse Glimmer (Apache 2.0) on an A100-40GB on Modal that Preflight
+deploys, scaled to zero when idle, so the job's logs go to no outside model provider. It is built
+and hosted, behind `harness.glimmer_private` (off). On the same 11 failed probes it named the same
+category as Spark Open 9 times. One call that waited through a cold start cost $0.24; the 11 calls
+cost $0.33 together.
 
 ## Best Agentic Use-Case
 
@@ -135,4 +145,4 @@ yet). TODO(PM): say which is live.
 ## What's next
 
 AMD measurements once the AMD Developer Cloud account clears; the full-run validation table from
-Mon Nov 2; Muse Glimmer for a private mode on the user's own GPU, once its terms are confirmed.
+Mon Nov 2; private mode with Muse Glimmer switched on for visitors.

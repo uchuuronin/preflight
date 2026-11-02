@@ -1,5 +1,14 @@
 # Status: C (workspace, guide, fix loop, control plane)
 
+## Sun Nov 1, night (main c084bee, the 9:47 PM order)
+
+- **PF102** (B, from-b.md) opens `fixtures/lora-live-nov1.record.json`, the measured record of zoo/finetune_lora_hf on an L4, and says "measured"; the golden's hand-made probes are gone from the departures board. The file still has the predictions written before the runner redeploy; C refreshes it from the new live record after the check-in.
+- **New Flight's GPU starts on "Not sure"** (was A100-SXM-80GB): the runner picks (`choose_probe_gpu`).
+- **Private triage box** on the check-in desk, shown only with `harness.spark_open_triage` and `harness.glimmer_private` both on (off in production): sends `private: true`; says Glimmer reads this check-in's probe logs on our GPU, that the first triage after a quiet spell can take several minutes (about 5 to 8 on Nov 1, measured: 286 to 459 s), that later probes from the record go to Spark Open, and (with their flags) that Muse Spark still builds the map and its diagnosis is skipped. Review found the worker holds no Glimmer secret, so a private job is untriaged in production today: in from-c.md for A before Monday.
+- Checks: web 536 tests, tsc clean; production-flags build: stranger 18/18; c.hops and c.exports sweep (10 samples, 2 widths, reduced motion) no errors.
+- Review (read-only, 1 round) of e151491: 3 private-copy findings and 3 test/wording findings, all fixed in 5206488.
+- Push under the standing yes, `2b89a2f..` this commit, to ws-c: 3665f10 (status, CI and ledger), the merge of main c084bee, e151491 (PF102, GPU default, private box), 5206488 (review fixes, the A request), this commit (status). gitleaks clean (commits and tree). No runs.
+
 ## Sun Nov 1, evening (before the 8 PM flags)
 
 - **c.hops and c.exports for strangers** (PM, 18:20): checked on a production build with both flags on (VITE_FLAGS), every sample (10), at 1440 px and 390 px, and with reduced motion: no page errors, no sideways scroll; "Possible outcomes" toggles by keyboard, moves one outcome per frame on the time and cost dials (5 distinct frames in 2.5 s) and, with reduced motion, draws every outcome at once and stays still; off again puts the dials back. Knob to readout with outcomes on, 4x CPU slowdown: max 200 ms (lora-qwen, pretrain). Exports: every Download hands over its file (plan, edits, sbatch, W&B), the sbatch files pass `bash -n`, and `preflight_wandb.py` runs against the real wandb 0.31.0 offline for all 10 samples (config, 4 to 25 summary keys, tag).
@@ -9,6 +18,8 @@
 - `api/ledger_report_app.py`: reads the spend ledger's snapshot (Modal Dict `preflight-ledger`) and prints sums and counts only, for the Muse Spark total.
 - Review (read-only) of the above: (1) "about N of M rows" was an upper bound said as an estimate: now "no more than"; (2) a row scan that stopped early (sampled or out of time) was said as the whole dataset: the rows sentence now needs every row read; (3) from a seq_len between a grid's values every cell counted one step, so the ranking could pick the shorter sequence again: steps now count the grid values passed; (4) the W&B text mentioned the record's link where a plan has none: only said with a link. Ledger: runs counted only where they spent; the docstring says the day shown is `day_et`.
 - Push under the standing yes, `0242ff0..` this commit, to ws-c: fdc5cad (ranking, rows sentence, W&B, stranger fix, ledger report), this commit (review fixes, status). No runs yet.
+- CI green on 2b89a2f (run 41364184733, all seven jobs).
+- **Ledger read** (GitHub run 41364190456, `modal run --env main api/ledger_report_app.py::report` from 2b89a2f, CPU only, no model call, about $0): day 2026-11-01 ET, Muse Spark US$0.0952 settled over 7 runs that spent (most on one run US$0.0453), 20 turns, 6 visitors, Muse Code US$0, no open reservations. The live guide went on at 12:46 today, so this is its whole live spend; the guide-smoke runs and my local tests don't go through the ledger.
 
 ## Sun Nov 1, morning (07:00 on)
 

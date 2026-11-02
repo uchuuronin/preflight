@@ -928,7 +928,47 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 		# Nov 1: A's A10 GRPO record carried no GPU, and the readout said "tight, 69%" for the knob's L4 unannounced
 		note = f"the probe's GPU isn't in the record, so this is for {gpu} from the GPU knob, with a guessed CUDA context"
 		res = replace(res, peak=_with_note(res.peak, note), oom=_with_note(res.oom, note))
+	disagree = _faketensor_disagreements(arch, setup)
+	if disagree and res.peak.status != "abstain":
+		# PM, Nov 1: a term the FakeTensor trace disagrees with is named, never hidden
+		case, worse = disagree
+		listed = ", ".join(f"{t} {r:.3g}x" for t, r in worse.items())
+		peak_note = (
+			f"the analytical split disagrees with a FakeTensor trace of {case} on {listed} (engine / trace)"
+		)
+		terms = dict(res.terms or {})
+		for t, r in worse.items():
+			if f"memory.{t}" in terms:
+				terms[f"memory.{t}"] = _with_note(
+					terms[f"memory.{t}"],
+					f"the analytical {t} term is {r:.3g}x a FakeTensor trace of {case}"
+					+ ("; the probes calibrate the total" if probed else ""),
+				)
+		res = replace(res, peak=_with_note(res.peak, peak_note), terms=terms or res.terms)
 	return res
+
+
+def _faketensor_disagreements(arch, setup) -> tuple[str, dict[str, float]] | None:
+	"""(the traced case, {term: engine / trace}) for the terms that miss by more than 20% on the zoo model this
+	record runs (scripts/faketensor_memory_check.py), matched on its shape, method, checkpointing and optimizer
+	family; None for any other model (review, Nov 1: a Qwen case said nothing about another model or optimizer)."""
+	from preflight.engine import _faketensor_check as ft
+
+	if not isinstance(arch, memory.TransformerArch):
+		return None
+	opt = str(setup.optimizer).lower()
+	family = "adafactor" if "adafactor" in opt else "adamw" if opt.startswith("adam") else None
+	key = {
+		"model": [arch.n_layers, arch.d_model, arch.vocab_size],
+		"method": setup.method,
+		"checkpointing": setup.grad_checkpointing != "none",
+		"optimizer": family,
+	}
+	for case, row in ft.DATA["cases"].items():
+		if row["key"] == key:
+			worse = {t: d["median_ratio"] for t, d in row["terms"].items() if not d["agrees"]}
+			return (case, worse) if worse else None
+	return None
 
 
 # the terms that grow with batch and length absorb what the model misses; the rest are set by the model's size
@@ -2689,6 +2729,28 @@ def _with_rollout(record: FlightRecord, values: dict, step: _StepResult) -> _Ste
 	return replace(step, est=est, sigma=sigma, phases=ph)
 
 
+def _rl_signals(record: FlightRecord, values: dict, p) -> str | None:
+	"""What the probe's TRL logs say about the run: KL to the reference and where its trend goes by the last step,
+	the policy's entropy, the mean reward. None when the probe logged none of them."""
+	if p is None or not p.rl:
+		return None
+	steps_total, _ = _total_steps(record, values)
+	seen = int(p.steps or 0) or len(p.rl.kl) or len(p.rl.reward_mean)
+	parts = [
+		rl.kl_trend(p.rl.kl, seen, steps_total),
+		rl.entropy_trend(
+			p.rl.entropy,
+			bool((p.extras or {}).get("rl_entropy_estimated")),
+			bool((p.extras or {}).get("rl_entropy_exact")),
+		),
+		rl.reward_trend(p.rl.reward_mean),
+	]
+	if not p.rl.entropy:
+		parts.append("no policy entropy was logged")
+	parts = [x for x in parts if x]
+	return "training signals: " + "; ".join(parts) if len(parts) > (0 if p.rl.entropy else 1) else None
+
+
 def _rl_targets(record: FlightRecord, values: dict) -> dict:
 	out = {"time.rollout": _rollout(record, values)}
 	p = _rl_probe(record, values) or next((q for q in record.probes if q.status in OK_PROBE and q.rl), None)
@@ -2710,6 +2772,10 @@ def _rl_targets(record: FlightRecord, values: dict) -> dict:
 			why += f"; the probe measured {p.rl.zero_spread_fraction:.0%} at its group size of {int(k)}"
 		status = "predicted" if k and int(g) == int(k) else "extrapolated"
 		out["rl.zero_spread"] = _est(iv.point, iv.lo, iv.hi, "fraction", status, mid, why)
+	signals = _rl_signals(record, values, p)
+	if signals and "rl.zero_spread" in out:
+		# A's item 14 (PM, Nov 1): the probe's logged KL, entropy and reward, on the RL lens's risk readout
+		out["rl.zero_spread"] = _with_note(out["rl.zero_spread"], signals)
 	sample = _lengths(p) if p is not None else None
 	cap = values.get("max_completion_len") or (
 		p.generation.max_new_tokens if p is not None and p.generation else None

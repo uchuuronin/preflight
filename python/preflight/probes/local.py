@@ -157,6 +157,7 @@ EXTRAS_KEYS = (
 	"rl_groups",
 	"rl_reward_functions",
 	"rl_entropy_estimated",  # 1: rl.entropy is the mean -log p of the sampled completion tokens (TRL logged none; not TRL 0.14)
+	"rl_entropy_exact",  # 1: rl.entropy is the policy's own, from its logits on the update's forward (TRL 0.14)
 	# hygiene: what the script's own checkpoints hold, for a resume that matches
 	"checkpoint_saves_seen",
 	"checkpoint_has_optimizer",

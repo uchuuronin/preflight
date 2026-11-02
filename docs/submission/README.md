@@ -33,6 +33,12 @@ Placeholders are marked TODO(PM).
 | 461 of 575 | Held-out step-time queries within 15% on the same GPU (corpus) | measured | `docs/status/b.md` |
 | 60% | Held-out step-time queries within 20% on a GPU the model never saw, under the 90% target | measured | `docs/status/b.md` (leave-one-GPU-out) |
 | 2,339 rows | The published corpus (corpus@0.3.0): 1,519 kernel configs, 100 Hugging Face jobs, 720 divergence runs; on Hugging Face, private until Nov 3 to 4 | cited (the datasheet) | `python/preflight/corpus/DATASHEET.md`; https://huggingface.co/datasets/chaoschia/preflight-corpus (commit `0aac218`) |
+| $0.0184 | Spark Open's 4 triage calls on the first real production run | measured (recorded cost) | A's `a-triage-lora-prod`, GitHub run 41336726935, `docs/status/a.md` |
+| 11 of 11 | Failed probes in the test scripts' records where Spark Open quoted a log line | measured | A's `a-triage-agreement`, GitHub run 41372018640 |
+| 9 of 11 | The same failed probes where Muse Glimmer named the same category as Spark Open | measured | the same run |
+| $0.33 | Muse Glimmer's 11 triage calls in that run, likely including one cold start | measured (recorded cost $0.3316) | the same run |
+| A100-40GB | The GPU Muse Glimmer is hosted on, on Modal | cited | A's Glimmer runs, `docs/status/a.md`; B's app, `python/preflight/glimmer/` |
+| $0.24, 411 s | One Muse Glimmer triage call, and the cold start it waited through | measured (recorded cost $0.2398) | A's `a-triage-glimmer-5`, GitHub run 41364641243 |
 | AUROC 0.66 (0.56 to 0.76) | The divergence classifier after a refit on 720 runs, held out by settings family, still under its 0.85 target, so it is off and not used (lead 138 steps, 3 to 269) | measured (B's fit report) | `python/preflight/corpus/reports/divergence_nov1.json` (`1cfa689`) |
 | 3,000 characters | How much of each probe's log Spark Open triage reads | cited (code) | `python/preflight/harness/triage.py`, `TAIL_CHARS` |
 | 8 characters | The shortest quoted log line code accepts from triage | cited (code) | `python/preflight/harness/triage.py` |
