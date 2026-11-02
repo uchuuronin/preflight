@@ -25,7 +25,7 @@ sample_more start from an existing record (runner/record_jobs.py) and write a
 new record derived from it: probe runs one profiled point at the guide's
 setting; verify runs that setting and the current one for VERIFY_STEPS at one
 fixed seed and records whether the loss holds; sample_more is for agent runs.
-GPUs: never above PREFLIGHT_GPU_CEILING (the public demo: A100-80GB), and a
+GPUs: never above PREFLIGHT_GPU_CEILING (the public demo: L40S, Nov 1), and a
 step up after an OOM only while the job's dollar budget holds it.
 """
 
@@ -478,6 +478,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		gpu = judging_gpu(chosen, allowed, time.time())
 		judged = gpu != chosen
 	cap = gpu_ceiling()
+	if cap and allowed and not any(under_ceiling(g, cap) for g in allowed) and gpu == cap:
+		# every GPU the visitor allows is above the cap: probed on the cap, said as for a request (review)
+		_emit(ctx, "harnessing", rec, rev, level="warn",
+			message=f"probes here run on GPUs up to {cap}; {', '.join(allowed)} numbers come from the cross-GPU model")  # fmt: skip
 	if not under_ceiling(gpu, cap):
 		_emit(ctx, "harnessing", rec, rev, level="warn",
 			message=f"probes here run on GPUs up to {cap}; {gpu} numbers come from the cross-GPU model")  # fmt: skip

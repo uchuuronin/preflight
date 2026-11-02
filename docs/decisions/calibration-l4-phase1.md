@@ -254,3 +254,41 @@ Chiya asked for the cause of the two A100 underestimates (40% and 16% low), foun
 - The Nov 2 scripts test the fix on users' jobs.
 
 Monotonicity also means a below-probe underestimate can't hide an OOM on the same card when the smallest probe fit there. Moving to a smaller card at the same time breaks that, and the floor doesn't raise P(OOM) either. The OOM-relevant misses are the ones above the probes, and on smaller cards.
+
+
+## The Nov 1 top-up: a fifth GPU type, and the refit (Chiya, Nov 1, 6 PM ET: up to $25)
+
+**What ran:** grouped configs only, on Modal. The H100 (new) and the L40S ran seeds 0 and 1, and the A10, L4 and T4 ran seed 1 (59 new groups). Every config with an A100 row was excluded on every GPU (`python/preflight/corpus/data/topup_nov1_exclude.txt`, 95 keys), so the cross-GPU holdout was never run again, calibrated on or re-scored. The PM checked the list before the run. Spend by the sweep's container-time ledger, about $16.50 (the L4's last, timed-out wave included):
+
+| GPU | Configs run | Spend |
+| --- | --- | --- |
+| H100 | 492 (its whole list) | $8.85 |
+| L40S | 392 (its whole list) | $3.82 |
+| A10 | 280 (its whole list) | $1.58 |
+| L4 | 89 of 281 (its sixth wave timed out waiting for an L4, under its cap) | about $1.92 |
+| T4 | 62 of 75 | $0.33 |
+
+**Leave-one-GPU-out cross-GPU step time** (`scripts/fit_steptime_gbdt.py`, the same fixed hyperparameters): 6,694 cases over 848 configs, up from 2,286 over 566. Within 20% of the measured step (Wilson 95%):
+
+| Held-out GPU | Cases | K1 | K1 + GBDT |
+| --- | --- | --- | --- |
+| A10 | 1,843 | 62% (60% to 64%) | 62% (60% to 64%) |
+| H100 (new) | 1,374 | 52% (49% to 54%) | 42% (39% to 44%) |
+| L4 | 1,435 | 62% (59% to 64%) | 65% (62% to 67%) |
+| L40S | 1,588 | 54% (51% to 56%) | 59% (57% to 61%) |
+| T4 | 454 | 51% (47% to 56%) | 59% (54% to 63%) |
+| All | 6,694 | 3,826, 57% (56% to 58%) | 3,849, 57% (56% to 59%) |
+
+- **K1 didn't improve.** Its point estimate is 57%, against 60% on four GPUs, and the H100, the one type it had never been scored on, is its worst target.
+- **The GBDT residual is level with K1 held out, not better.** It gains on the L4, L40S and T4, but loses ten points on the H100. Its rule ("used only once it beats K1 held out") isn't met, so `engine/steptime_gbdt.py` stays unused.
+- These intervals treat pairs as independent; they share architectures, so the honest ones are wider.
+
+**The rebuilt table (version 50ea0fb14a, installed on ws-b; 67ab8edae6 before):**
+
+- **Cross-GPU band** (`time.step.cross`; `engine.steptime_cross_gpu` is on in `flags.json`, so production GPU moves use it): leave-one-GPU-out coverage 6,030 of 6,694 (90.1%). The pooled half-width widens from 0.45 to 0.51, and the H100's own cell is 0.64 (about x0.5 to x1.9), so a move to an H100 reads a wider range than before.
+- **Memory:** coverage 818 of 904 (90.5%). The pool that decides P(OOM) where a cell's floor is too high now holds 904 runs, up from 487. On the live LoRA record: 7.7 GiB fits (0.06%), eval batch 4 at `seq_len` 512 stays tight (1.5%).
+- **Step time:** coverage 784 of 865 (90.6%).
+- **P(OOM) bins:** below 5%, 2 OOMs in 1,100, verified. Above 95%, 15 in 17, still unverified, so it reads "15 of 17 similar runs did".
+- **Holdout:** carried forward, not re-scored.
+
+The published corpus (0.3.0) doesn't hold the top-up rows; they are in the Modal volume and `remote-runs` (`b-topup-export-2`).
