@@ -1,0 +1,66 @@
+{
+  "script": "litgpt",
+  "entrypoint": "litgpt/pretrain.py",
+  "args": [
+    "--config",
+    "config_hub/pretrain/debug.yaml"
+  ],
+  "gpu": null,
+  "backend": "cpu",
+  "bare": {
+    "failed": "requirements: ERROR: Cannot install lm-eval==0.0.1, lm-eval==0.2.0, lm-eval==0.3.0, lm-eval==0.4.1, lm-eval==0.4.10, lm-eval==0.4.11, lm-eval==0.4.12, lm-eval==0.4.13, lm-eval==0.4.2, lm-eval==0.4.3, lm-eval==0.4.4, lm-eval==0.4.5, lm-eval==0.4.7, lm-eval==0.4.8, lm-eval==0.4.9, lm-eval==0.4.9.1 and lm-eval==0.4.9.2 because these package versions have conflicting dependencies.\nERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts",
+    "wall_s": 5.1
+  },
+  "recorder": {
+    "status": "error",
+    "error": "the repo didn't install: ERROR: Cannot install lm-eval==0.0.1, lm-eval==0.2.0, lm-eval==0.3.0, lm-eval==0.4.1, lm-eval==0.4.10, lm-eval==0.4.11, lm-eval==0.4.12, lm-eval==0.4.13, lm-eval==0.4.2, lm-eval==0.4.3, lm-eval==0.4.4, lm-eval==0.4.5, lm-eval==0.4.7, lm-eval==0.4.8, lm-eval==0.4.9, lm-eval==0.4.9.1 and lm-eval==0.4.9.2 because these package versions have conflicting dependencies.\nERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts",
+    "error_code": "missing_package.install",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 8.335,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "g litdata\n[preflight] requirements: the script imports litserve, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports lm_eval: installing lm-eval\n[preflight] requirements: the script imports pytest, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports sentencepiece: installing sentencepiece\n[preflight] requirements: the script imports torchmetrics, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports zstandard, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: kept the image's huggingface-hub 0.36.2 (asked for 'huggingface-hub>=0.30,<1.4')\n[preflight] requirements: kept the image's psutil 6.1.0 (asked for 'psutil==7.2.2')\n[preflight] requirements: kept the image's safetensors 0.4.5 (asked for 'safetensors>=0.4.3')\n[preflight] requirements: kept the image's tokenizers 0.20.3 (asked for 'tokenizers>=0.21')\n[preflight] requirements: kept the image's torch 2.5.1 (asked for 'torch>=2.7')\n[preflight] requirements: kept the image's tqdm 4.70.1 (asked for 'tqdm>4.66')\n[preflight] requirements: installing jsonargparse[signatures]>=4.37,<=4.41; python_version>='3.10', lightning>=2.6.1, jsonargparse, lightning-utilities, litdata, lm-eval, sentencepiece\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-02T17:31:29Z",
+      "duration_s": 8.335,
+      "error": "the repo didn't install: ERROR: Cannot install lm-eval==0.0.1, lm-eval==0.2.0, lm-eval==0.3.0, lm-eval==0.4.1, lm-eval==0.4.10, lm-eval==0.4.11, lm-eval==0.4.12, lm-eval==0.4.13, lm-eval==0.4.2, lm-eval==0.4.3, lm-eval==0.4.4, lm-eval==0.4.5, lm-eval==0.4.7, lm-eval==0.4.8, lm-eval==0.4.9, lm-eval==0.4.9.1 and lm-eval==0.4.9.2 because these package versions have conflicting dependencies.\nERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts",
+      "error_code": "missing_package.install",
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 8.335,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cpu",
+      "provider": "local",
+      "nodes": 1,
+      "libraries": {}
+    }
+  },
+  "overhead": null,
+  "lens": "finetune",
+  "image": "probe"
+}
