@@ -1,0 +1,11 @@
+{
+	"name": "20261102-025620-41380335963-b-topup-export-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41380335963",
+	"ref": "ws-b",
+	"sha": "ef5c17e5d54ce0abaa831fe96c4934628e19ae77",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::export --kind kernels",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T02:58:00Z"
+}
