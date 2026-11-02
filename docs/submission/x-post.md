@@ -7,13 +7,11 @@ post's link goes on the submission.
 
 ## The link
 
-The share pages (`/s/<token>`, with a preview card) need `workers/` in the deploy, and
-`deploy.yml` doesn't copy it yet (C's item in `docs/requests/from-d.md`). Until it does, the post
-links the cockpit itself, which opens the record but previews as plain text:
-`https://preflight-cqn.pages.dev/#/cockpit/ICDYrfHQ2nBNbv3mlRHHMg` (A's Oct 28 record; check it
-opens on the live site before posting). TODO(PM): once `workers/` deploys, use
-`https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg` instead: its card is pre-rendered
-(`workers/hero-cards.json`), so the post previews with an image.
+Share pages are live (C deployed `workers/` with production from `7ba177b`, Nov 2, 12:45 ET; the
+Oct 28 record's `/s/` link, card and badge pass `scripts/share_page_check.py`). Both posts link
+`https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg` (A's Oct 28 record): its card is
+pre-rendered (`workers/hero-cards.json`), so the post previews with an image. Open it once on the
+live site before posting.
 
 ## Post A: the bug alone (262 characters, a link counted as X's 23)
 
@@ -24,21 +22,23 @@ We planted a bug in this fine-tune. At step 200, its first evaluation, it runs o
 
 Preflight ran a few real steps on one L4 and caught it in 189 seconds, for $0.042 of GPU at list price.
 
-Fly your ML job before you pay for it: https://preflight-cqn.pages.dev/#/cockpit/ICDYrfHQ2nBNbv3mlRHHMg
+Fly your ML job before you pay for it: https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg
 ```
 
 ## Post B: with Meta's open model (269 characters)
 
-Use this one if the cut keeps shot E (Spark Open's triage on A's production record). TODO(PM): the
-Oct 28 record predates triage, so for this post link A's triaged production record once its
-re-run quotes the line, or a click finds no Spark Open finding.
+Use this one if the cut keeps shot E (Spark Open's triage on A's production record). The Oct 28
+record it links predates triage, so a click finds no Spark Open finding there; the triage is in A's
+re-run (`/s/Q3s5qyHKTNf-fCng4dwn6g`, an A10, Nov 2), shown in the video. To link the triaged record instead, its
+numbers differ (an A10, not an L4): see the one-record draft in `docs/demo/video-plan.md`, a draft
+for Chiya, not applied.
 
 ```text
 We planted a bug in this fine-tune: at step 200 it runs out of memory.
 
 Preflight ran a few real steps on one L4 and caught it in 189 seconds, for $0.042 of GPU at list price. Muse Spark Open, Meta's open model, reads every probe's log.
 
-Try it: https://preflight-cqn.pages.dev/#/cockpit/ICDYrfHQ2nBNbv3mlRHHMg
+Try it: https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg
 ```
 
 Paste exactly what is in the block (one line per paragraph). Add the hackathon's hashtag and

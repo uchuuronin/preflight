@@ -870,19 +870,26 @@ def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
 	if not flag("probes.lr_range") or sm.lens not in LR_RANGE_LENSES or not plan or ctx.should_stop():
 		return None
 	first = next((q for q in probes if q.id == plan[0].probe_id), None)
-	if first is None or first.status != "ok" or not first.steps:
-		return None
+	if first is None or first.status not in ("ok", "cached") or not first.steps:
+		return None  # a p1 from the cache ran too (A's review, Nov 2)
 	# the point's time: its first probe's, scaled to the ramp's steps [guess: setup plus steps]
 	per_step = (first.step_time.mean_s if first.step_time else None) or 1.0
 	est_s = (first.duration_s or 60.0) + STEPS * per_step
-	if not budget.allows((_price(gpu) + deps.overhead_usd_per_h) * est_s / 3600, est_s):
+	usd_per_s = (_price(gpu) + deps.overhead_usd_per_h) / 3600
+	if not budget.allows(usd_per_s * est_s, est_s):
 		return None
+	# it may run past its estimate, never past what the job has left (A's review, Nov 2)
+	left_s = budget.left_s()
+	if usd_per_s > 0:
+		left_s = min(left_s, (budget.usd - budget.spent_usd) / usd_per_s)
 	p = replace(plan[0], probe_id=f"{plan[0].probe_id}-lr", warmup=STEPS, timed=0, profile=False)
 	try:
 		spec = _spec(fetched, sm, p, deps, eval_off=True)
 	except OverrideError:
 		return None
-	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS})
+	# a floor of 1 s [guess] so the timeout is never 0
+	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS},
+		timeout_s=max(1.0, min(spec.timeout_s, left_s)))  # fmt: skip
 	if spec.nproc > 1:
 		return None  # a guard (no plan runs ranks today): each rank would stop on its own loss
 	result, cached = _run_point(spec, gpu, deps, ctx)
@@ -895,6 +902,8 @@ def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
 	return result.probe
 
 
+SEARCH_MAX_QUESTIONS = 2  # guess: searches a job asks, in series, before the visitor gets the record
+SEARCH_JOB_S = 120.0  # guess: no new search starts after this long searching in one job
 SEARCH_LIBRARIES = ("torch", "transformers", "peft", "trl", "accelerate", "datasets", "bitsandbytes",
 	"vllm", "sentence-transformers", "torch_geometric", "torchvision", "timm", "numpy", "deepspeed")  # fmt: skip
 
@@ -907,7 +916,8 @@ def _search(
 	harness.spark_search is on and the Meta client is configured; never for a private job (its
 	error text would go to Meta and the web), nor a verify job (one question, as with the
 	diagnosis). One search per distinct error code in a job: several points that ran out of memory
-	the same way are one question. Every call is in the record's provenance."""
+	the same way are one question; at most SEARCH_MAX_QUESTIONS, none started past SEARCH_JOB_S
+	(A's review, Nov 2). Every call is in the record's provenance."""
 	from .flags import flag
 
 	if private or verify or deps.spark is None or not flag("harness.spark_search"):
@@ -915,6 +925,7 @@ def _search(
 	from preflight.harness.search_grounding import ground_failure, skipped
 
 	findings, calls, asked = [], [], set()
+	started = time.monotonic()
 	for r in results:
 		if not isinstance(r, ProbeResult) or skipped(r.probe):
 			continue
@@ -923,6 +934,8 @@ def _search(
 		key = r.probe.error_code or r.probe.error.splitlines()[0][:120]
 		if key in asked:
 			continue
+		if len(asked) >= SEARCH_MAX_QUESTIONS or (asked and time.monotonic() - started > SEARCH_JOB_S):
+			break
 		asked.add(key)
 		env = r.env or rec.env
 		libs = {k: v for k, v in (env.libraries if env is not None else {}).items() if k in SEARCH_LIBRARIES}
