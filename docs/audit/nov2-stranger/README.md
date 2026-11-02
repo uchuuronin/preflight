@@ -28,3 +28,16 @@ and day. 104 states.
 **Fine:** the check-in flow from the desk to Boarding's "Your flight record is ready." at both sizes
 and themes (checked by the script in all four; `checkin-flow-phone-day.jpg`), with "Muse Spark" tagged on "Reading your script" from
 the record's provenance; no page errors, no overflow and no raw template text anywhere.
+
+## Again after C's deploy of `1ea2dd6` (Nov 2, 04:10 ET)
+
+The same 104 states, on `1ea2dd6` (deploy run 41407801361) served the same way, with
+`d.notebook` held off as it is in that deploy: **100 of 104 clean** [measured, Chromium,
+`audit-1ea2dd6.log`]. S1 and S2 are unchanged (the same four contrast failures; S2 still in
+`gnn-detail-desk-dusk` by eye). Nothing new. The readouts now say "Not measured here" where they
+said "Not trusted", as C intended.
+
+**Ahead of the next deploy:** `main` `6f49c9c` turns `d.notebook` on, so I ran it too with the
+Notebook tab's states added (`NOTEBOOK=1`: upload `train_mlp.ipynb`, wait for its "runs as"
+preview): **104 of 108 clean** [measured, Chromium, `audit-6f49c9c-notebook.log`], all four notebook states
+clean; the only failures are S1's four.

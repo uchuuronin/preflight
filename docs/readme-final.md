@@ -27,7 +27,7 @@ is live at <https://preflight-cqn.pages.dev>.
 | Muse Spark reads each script (the script map) | Boarding's "Reading your script", and the cockpit's job map | `harness.spark_script_map`, on in `flags.production.json` (Chiya, Nov 1) |
 | Predictions with intervals and abstention: memory, step time, cost, risk | The cockpit's four readouts, the knobs and the flight plan | `engine.memory`, on in production (Chiya, Oct 30); it gates the whole prediction step (`runner/pipeline.py`) |
 | Campaign calendar | The campaign sample (illustrative numbers, B's planner on a 12-run grid) | `c.campaign_calendar`, on in production (Chiya, Nov 1) |
-| Checking in your own repo or script | New flight's Repo link and Upload tabs: Preflight runs a few probe steps of your job on a rented GPU, sandboxed, and opens the record in the cockpit (the Notebook tab, `d.notebook`, is off in production) | `runner.queue`, on in production (Chiya, Nov 1). Demo limits: 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site (US$10 a day through Nov 4) [cited: `python/preflight/runner/queue.py`]. Past either, the site opens samples and shared records only until midnight ET |
+| Checking in your own repo or script | New flight's Repo link and Upload tabs: Preflight runs a few probe steps of your job on a rented GPU, sandboxed, and opens the record in the cockpit and a Notebook tab for a Jupyter notebook (`d.notebook`, on in production since Nov 2: a training notebook checked in end to end, A's `a-notebook-checkin-3`) | `runner.queue`, on in production (Chiya, Nov 1). Demo limits: 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site (US$10 a day through Nov 4) [cited: `python/preflight/runner/queue.py`]. Past either, the site opens samples and shared records only until midnight ET |
 | The guide (Muse Spark moves the knobs with tool calls) | The cockpit's guide panel | `c.guide.live`, on in production (Chiya, Nov 1). Smoke runs pass: GitHub run 41273350602, 5 rounds, all called tools [measured], US$0.019 [derived: reported tokens at list prices]. Its spend limits: US$0.40 a tour [derived], and US$10 a day for the whole site [guess: the code's value, pending Chiya's answer], with round limits per visitor and per address (`api/preflight_api/ledger.py`). If the live guide fails before it answers, the rule-based tour starts in its place (`web/src/guide/GuidePanel.tsx`) |
 | Fit map: which settings fit, with the out-of-memory frontier | The cockpit's Fit view: drag your run across the map | `c.fit_map`, on in production (Chiya, Nov 1) |
 | RL readouts: the share of prompt groups with no reward spread, rollout time | The GRPO lens | `engine.rl`, on in production (Chiya, Nov 1); calibrated on A's GRPO runs (L4 smoke runs and a 50-step run on an A10) |
@@ -45,8 +45,7 @@ is live at <https://preflight-cqn.pages.dev>.
 | --- | --- | --- |
 | The fix loop (Muse Code races candidate fixes) | `c.fix_loop` | Route `/v1/patches` on `main`; in a clean smoke run (41250977670) Muse Code produced the correct patch in 19 s [measured], US$0.09 [derived: reported tokens at list price]. Gating a fix on Preflight's re-probe isn't wired end to end yet (it needs A's runner to apply the patch) |
 | The CLI re-check item in the exports | `d.exports_cli` | Built on `main`; on once the repository is public (Nov 3 to 4) |
-| Notebook check-in | `d.notebook` | Built on `main`. A's check-in of a test notebook through the deployed runner was converted and ran to the end, each probe ending `too_few_steps` as it should, since that notebook's loop has no optimizer (`a-notebook-checkin-1`, Nov 2); on once A's check-in of a notebook that trains passes |
-| Private mode: log triage by Muse Glimmer | `harness.glimmer_private` | Hosted on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys, scaled to zero when idle), behind its flag. Triage cost US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`]. Same category as Spark Open on 9 of 11 failed zoo probes [measured, `a-triage-agreement`] |
+| Private mode: log triage by Muse Glimmer | `harness.glimmer_private` | Hosted on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys, scaled to zero when idle), behind its flag: built and checked through the production runner, and off until the data-use notice describes it. A private check-in's probe logs are triaged by Glimmer and never sent to Baseten. Triage cost US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`]. Same category as Spark Open on 9 of 11 failed zoo probes [measured, `a-triage-agreement`] |
 
 **Not used, or not measured**
 
@@ -219,8 +218,8 @@ A "within" target is a hit when at least 90% of runs are within it; intervals ar
 ## Add-ons
 
 Smaller features, each behind its own flag in `flags.json`. On in production since Nov 1: detail
-level, costs in your currency, free GPUs and the exports; the notebook tab and the exports' CLI item
-stay off. `docs/audit/scripts/addons.mjs` checks that each still renders where it belongs, with no
+level, costs in your currency, free GPUs and the exports; since Nov 2, the notebook tab. The
+exports' CLI item stays off. `docs/audit/scripts/addons.mjs` checks that each still renders where it belongs, with no
 errors, no accessibility violations inside it and nothing under 24 px, and that it is gone with
 its flag off: 20 of 20 states pass on `main` `50db9b6` [measured, Chromium, Nov 1].
 
@@ -229,7 +228,7 @@ its flag off: 20 of 20 states pass on `main` `50db9b6` [measured, Chromium, Nov 
 | Detail level (D1) | "New to this" shows the few knobs that matter most for the goal, in plain words, with a glossary card in each knob's control; knobs that a warning names stay in view | `d.expertise` |
 | Show costs in (D3) | Dollar figures in one of 30 currencies at the European Central Bank's dated reference rates, picked from the browser's region or set in the Logbook; regions without a rate stay in US dollars | `d.currency` |
 | Free GPUs (D4) | Whether the plan finishes inside one free session on Google Colab, Kaggle, Modal's starter credit or Lightning AI, and how often to save a checkpoint if not | `d.freetier` |
-| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run | `d.notebook` (off until A's check-in of a notebook that trains passes) |
+| Notebook (D5) | A check-in tab for a Jupyter notebook: it previews the script and requirements that would run | `d.notebook`, on in production since Nov 2 (a training notebook checked in end to end, A's `a-notebook-checkin-3`) |
 | Take it with you | The plan, an edit script for the changed settings, a Slurm batch file and the run command, built from the settings on screen, and the record's link once it has one | `c.exports`; the "Check it again on your machine" item also needs `d.exports_cli` |
 
 ## Develop

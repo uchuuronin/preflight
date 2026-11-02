@@ -144,3 +144,64 @@ def test_a_training_fix_is_judged_on_training_when_the_windows_eval_runs_out_bot
 
 	res = check(side(80 * GIB), side(60 * GIB))
 	assert res["checks"][0]["ok"] is True and res["before"] == 80 * GIB and res["after"] == 60 * GIB
+
+
+def test_tokens_are_compared_over_the_steps_both_sides_ran():
+	"""Nov 2 race: the base ran out at the window's eval after 20 steps, the fix ran 24; without
+	packing each batch has its own length, so a mean over different steps differs by itself."""
+	tokens = [
+		4644,
+		5464,
+		4548,
+		6236,
+		2836,
+		5172,
+		4952,
+		4332,
+		4984,
+		3600,
+		3004,
+		4732,
+		4688,
+		4388,
+		5500,
+		3636,
+		6044,
+		6124,
+		6364,
+		5180,
+		5768,
+		6404,
+		4912,
+		4968,
+	]
+
+	def log(n):
+		return [
+			{"index": i + 1, "kind": "timed", "wall_s": 1.0, "tokens": t} for i, t in enumerate(tokens[:n])
+		]
+
+	def side(n, **p):
+		rec = record(
+			probe={
+				"step_log": log(n),
+				"extras": {"samples_per_step": 4, "tokens_per_step": sum(tokens[:n]) / n},
+				**p,
+			}
+		)
+		rec["job"] = {"script_map": {"training": {"lr": 2e-4, "warmup_steps": 100, "epochs": 1}}}
+		return rec
+
+	res = check(side(20), side(24, memory={"peak_allocated_bytes": 60 * GIB}))
+	tok = next(c for c in res["checks"] if c["id"] == "tokens_seen")
+	assert tok["ok"] is True and tok["before"] == tok["after"] == sum(tokens[:20])
+	# the other way: different tokens over the shared steps (a truncation change) fails
+	shorter = side(24, memory={"peak_allocated_bytes": 60 * GIB})
+	shorter["probes"][0]["step_log"] = [
+		{**st, "tokens": min(st["tokens"], 5000)} for st in shorter["probes"][0]["step_log"]
+	]
+	tok = next(c for c in check(side(20), shorter)["checks"] if c["id"] == "tokens_seen")
+	assert tok["ok"] is False
+	# too few shared steps: the step-by-step path doesn't decide
+	few = next(c for c in check(side(3), side(24))["checks"] if c["id"] == "tokens_seen")
+	assert few["detail"] != "tokens over the steps both sides ran; run length from lr_schedule"

@@ -13,6 +13,8 @@
 | 7 | 01:45 | Wrote `docs/demo/video-plan.md` as the plan of record for Tuesday's 3-minute video, superseding the plan A and B shot lists in `storyboard.md` and `fallback-cut.md` (kept as drafts; the 45-second cut there is unchanged) | Chiya's item 3 asks for live-site flows that work today with every Meta model labelled, which the older plans predate (the guide, triage and Glimmer) | none | Point the PM back at `storyboard.md` and delete `video-plan.md` |
 | 8 | 02:00 | In the portal and numbers table, replaced "60% within 20% on an unseen GPU" (four GPUs) with B's five-GPU result, 57% of 6,694 cases | Chiya's item 4 names the five-GPU table; it's B's newer, wider measurement (`calibration-l4-phase1.md`, "The Nov 1 top-up") | none | Restore the 60% row and sentence from git |
 | 9 | 02:05 | The X post links the cockpit, not the share page, with two variants (with and without the triage shot) | `deploy.yml` doesn't ship `workers/`, so `/s/<token>` isn't live; a cockpit link opens but previews as text | none | Swap in the `/s/` link once `workers/` deploys (TODO(PM) in the file) |
+| 10 | 04:10 | Audited the deployed `1ea2dd6` with `d.notebook` held off (`VITE_FLAGS`), and `main` `6f49c9c` with it on, rather than only one | The first is what visitors have now; the second is what the next deploy brings, with the Notebook tab C ships | none (local) | Nothing to undo |
+| 11 | 04:15 | `readme-final.md` takes the PM's 03:55 `README.md` edits: the notebook tab on in production (A's `a-notebook-checkin-3`) and Glimmer's private mode "off until the data-use notice describes it"; my behind-a-flag notebook row is gone | `readme-final.md` stays the source of truth until Tuesday's swap (Chiya), so it must carry the PM's changes | none | Revert the commit |
 
 
 ## Cloud runs
@@ -24,6 +26,22 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 02:56 UTC | L4 (asked) | about 20 (cap) | at most about 0.60 [guess]; 0.0179 of Muse Spark by the record | `d-eval-sweep-l4` (GitHub 41380341849): cancelled while probing, no measurement |
 | Nov 2, 03:19 UTC | L4 | about 22 | 0.6423 by the record | `d-eval-sweep-l4-2` (41382389659): probe ended `recorder` after 1,280 s, no measurement |
 | Nov 2, 04:59 UTC | A10 | about 5 | 0.1203 by the record | `d-eval-sweep-a10` (41391396558): the eval-sweep record, one probe ok |
+
+## Mon Nov 2, 04:20 ET (overnight: the PM's two merges; audit of C's deploy)
+
+`6c05323` CI green. The PM's 2:40 merge took `ws-d` `6c05323` into `main` `1ea2dd6`; the 03:55
+merge made `main` `6f49c9c` (`d.notebook` on; Glimmer's private mode held for its data-use line).
+`ws-d` now equals `main` `6f49c9c`.
+
+- **Stranger audit** after C's deploy of `1ea2dd6`: 100 of 104 clean, S1 and S2 unchanged, nothing
+  new; and `6f49c9c` with the Notebook tab: 104 of 108 clean, the notebook states all clean
+  (decision 10; `docs/audit/nov2-stranger/README.md`).
+- **README draft** follows the PM's edits (decision 11).
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the audit script's notebook states, the two audit logs, the README draft and this entry.
+
+Cloud runs: none.
 
 ## Mon Nov 2, 02:05 ET (overnight: video plan, submission refresh, X post)
 

@@ -22,6 +22,8 @@ mkdirSync(outDir, { recursive: true });
 const axe = readFileSync(axePath, "utf8");
 const record = JSON.parse(readFileSync(fileURLToPath(new URL("../../../api/tests/fixtures/a-smoke-l4-main-4.record.json", import.meta.url)), "utf8"));
 const TOKEN = "auditshare0001";
+// NOTEBOOK=1 adds the Notebook tab's states, for a build with `d.notebook` on.
+const notebook = process.env.NOTEBOOK === "1" ? readFileSync(fileURLToPath(new URL("../../../web/src/addons/notebook/fixtures/train_mlp.ipynb", import.meta.url))) : null;
 const sse = (events) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
 const BOARD = [
 	{ stage: "queued", queue_position: 0 },
@@ -58,6 +60,19 @@ const PAGES = [
 			await p.locator("input[type=url]").fill("not a link");
 		},
 	},
+	...(process.env.NOTEBOOK === "1"
+		? [
+				{
+					name: "checkin-notebook",
+					hash: "#/new",
+					act: async (p) => {
+						await p.getByRole("tab", { name: "Notebook" }).click();
+						await p.locator('input[type=file][accept=".ipynb"]').setInputFiles({ name: "train_mlp.ipynb", mimeType: "application/json", buffer: notebook });
+						await p.getByRole("status").filter({ hasText: "runs as" }).waitFor({ timeout: 8000 });
+					},
+				},
+			]
+		: []),
 	{
 		name: "checkin-flow",
 		hash: "#/new",

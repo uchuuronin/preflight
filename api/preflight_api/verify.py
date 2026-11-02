@@ -41,6 +41,9 @@ THROUGHPUT_FLOOR = 0.90
 # Source: guess, same seed and same effective batch differ by bf16 non-determinism only, well
 # under 1% of the loss over the first steps; replaced by A's repeat-run spread on the zoo.
 LOSS_TOLERANCE = 0.01
+# Source: derived, the steps of a verify window before its eval (A's VERIFY_STEPS 20, eval two steps
+# before the end): fewer shared steps can miss a change that bites only on later, longer samples.
+MIN_SHARED_STEPS = 16
 # Source: derived, tokens per step are integers; 0.5% covers padding-length rounding.
 TOKENS_TOLERANCE = 0.005
 LOWER_IS_BETTER = ("memory.", "time.", "cost.", "risk.")
@@ -134,6 +137,24 @@ def _metric(rec: dict, probe: dict, metric: str) -> float | None:
 	est = ((rec.get("predictions") or {}).get("estimates") or {}).get(metric) or {}
 	v = est.get("point")
 	return float(v) if isinstance(v, int | float) else None
+
+
+def _common_step_tokens(pb: dict, pa: dict) -> tuple[float, float] | None:
+	"""Tokens summed over the step indices both probes logged, when both logged tokens for each."""
+
+	def by_index(p: dict) -> dict[int, float]:
+		out = {}
+		for st in p.get("step_log") or []:
+			i, n = st.get("index"), st.get("tokens")
+			if isinstance(i, int) and isinstance(n, int | float):
+				out[i] = float(n)
+		return out
+
+	b, a = by_index(pb), by_index(pa)
+	shared = sorted(set(b) & set(a))
+	if len(shared) < MIN_SHARED_STEPS:
+		return None  # too few steps to stand for the run: the means below decide, or "not measured"
+	return sum(b[i] for i in shared), sum(a[i] for i in shared)
 
 
 def _series(probe: dict, name: str) -> list[float]:
@@ -239,7 +260,22 @@ def check(
 	checks.append(_check("effective_batch", None if eb is None or ea is None else eb == ea, eb, ea))
 
 	tb, ta = tokens_seen(before, pb), tokens_seen(after, pa)
-	if tb is None and ta is None and total_steps(before) is None and total_steps(after) is None:
+	common = _common_step_tokens(pb, pa)
+	if tb is None and ta is None and total_steps(before) is None and total_steps(after) is None and common:
+		# A run sized by epochs, not max_steps, whose sides ran different numbers of steps (one ran
+		# out at the window's eval): the tokens of the steps both ran, step by step. Without packing
+		# each batch has its own length, so a mean over different steps differs by itself (Nov 2).
+		tb, ta = common
+		checks.append(
+			_check(
+				"tokens_seen",
+				_same(tb, ta, TOKENS_TOLERANCE),
+				tb,
+				ta,
+				"tokens over the steps both sides ran; run length from lr_schedule",
+			)
+		)
+	elif tb is None and ta is None and total_steps(before) is None and total_steps(after) is None:
 		# A run sized by epochs, not max_steps: neither side's length is known, so compare tokens per
 		# step; lr_schedule below holds the run length (epochs, max_steps) to the same on both sides.
 		tb = (pb.get("extras") or {}).get("tokens_per_step")
