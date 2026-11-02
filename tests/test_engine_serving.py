@@ -227,7 +227,10 @@ def test_a_probe_that_hit_its_cap_extrapolates_through_the_fit(monkeypatch):
 	assert here.status != "abstain" and "fitted through the cap" not in here.reason
 	far = api.predict(rec, {"max_new_tokens": 4096}).root
 	tp = far["serving.throughput"]
-	assert tp.status == "extrapolated" and "3 of the probe's 32 outputs hit its 1,024-token cap" in tp.reason
+	assert (
+		tp.status == "extrapolated"
+		and "3 of the probe's 32 outputs were still running at its 1,024-token cap" in tp.reason
+	)
 	assert np.log(tp.hi / tp.point) >= serving.Z90 * serving.SIGMA_UNCALIBRATED - 1e-9
 	# longer replies keep the batch running longer, so time to first token for the batch doesn't shrink
 	assert far["serving.ttft_p95"].point >= api.predict(rec).root["serving.ttft_p95"].point * 0.99
@@ -244,3 +247,47 @@ def test_a_calibration_on_other_hardware_keeps_the_wide_band(monkeypatch):
 	there = api.predict(rec, {"gpu_type": "A100-SXM-80GB"}).root["serving.throughput"]
 	assert np.log(there.hi / there.point) > np.log(here.hi / here.point)
 	assert "other hardware" in there.reason
+
+
+def test_a_serving_cap_shape_reads_the_probe_cap_from_its_extra(monkeypatch):
+	"""A's branch a-serving-cap (Nov 1): every reply stops at extras.serving_probe_max_tokens (1,024) while
+	generation.max_new_tokens keeps the script's 4,096, and replies cut at the probe's cap count as ending unknown
+	(generation_ending_known), so truncation_rate is over the others. The engine reads the probe's cap and the share
+	still running there, so at the script's own 4,096 the replies run past 1,024 and the readout says it's a fit."""
+	from preflight.schema.record import Domain, Knob
+
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	base = _serve_record()
+	upd = {
+		"sequences": 32,
+		"new_tokens_mean": 520.0,
+		"new_tokens_p95": 1024,
+		"max_new_tokens": 4096,
+		"truncation_rate": 0.0,
+	}
+	probes = [
+		p.model_copy(
+			update={
+				"generation": p.generation.model_copy(update=upd),
+				"extras": {**p.extras, "serving_probe_max_tokens": 1024.0, "generation_ending_known": 26.0},
+			}
+		)
+		for p in base.probes
+	]
+	knob = Knob(id="max_new_tokens", label_key="k", kind="int", current=4096, domain=Domain(min=1, max=8192))
+	rec = base.model_copy(update={"probes": probes, "knobs": [*base.knobs, knob]})
+	p0 = rec.probes[0]
+	cap, share = api._probe_cap(p0)
+	assert cap == 1024 and share == pytest.approx(6 / 32)
+	tp = api.predict(rec).root["serving.throughput"]
+	assert (
+		tp.status == "extrapolated"
+		and "6 of the probe's 32 outputs were still running at its 1,024-token cap" in tp.reason
+	)
+	batches, _ = api._serve_workload(rec, {}, p0)
+	assert max(r.output for b in batches for r in b) > 1024  # the script's 4,096 lets them run on
+	cal, _ = api._serve_workload(rec, {}, p0, probe_cap=cap)
+	assert max(r.output for b in cal for r in b) <= 1024  # the calibration replays the probe as it ran
+	# the explicit extra wins over the derived share
+	p1 = p0.model_copy(update={"extras": {**p0.extras, "serving_probe_capped_fraction": 0.25}})
+	assert api._probe_cap(p1) == (1024.0, 0.25)
