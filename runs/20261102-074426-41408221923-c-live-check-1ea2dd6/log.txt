@@ -1,0 +1,10 @@
+ok   index loads: HTTP 200
+ok   index names its bundle: /assets/index-XcryI1WL.js
+ok   abstain label is 'Not measured here'
+ok   no 'Not trusted' readout label
+ok   between-measured reason shipped
+ok   PF102 says measured on an L4
+ok   private-triage copy shipped (flag off)
+ok   PF102 is the Nov 2 live record
+ok   PF102 carries B's pair grids
+ok   API answers: HTTP 200 {"status":"ok","guide":"muse_spark","llm_spend_today_usd":0.0,"llm_spend_cap_usd":10.0,"samples_only":false}
