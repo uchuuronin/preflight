@@ -4037,6 +4037,34 @@
 					"description": "Stable code for the failure; the UI shows t('error.<code>') and its hint",
 					"title": "Error Code"
 				},
+				"missing_module": {
+					"anyOf": [
+						{
+							"maxLength": 200,
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: on a missing_package failure, the import the script couldn't find (as Python named it)",
+					"title": "Missing Module"
+				},
+				"missing_package": {
+					"anyOf": [
+						{
+							"maxLength": 100,
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: the PyPI name that provides missing_module when it's on Preflight's list (an extra package the visitor can add); absent when it isn't, or for a submodule (`a.b`)",
+					"title": "Missing Package"
+				},
 				"memory": {
 					"anyOf": [
 						{
@@ -4833,6 +4861,40 @@
 					},
 					"title": "Args",
 					"type": "array"
+				},
+				"scope": {
+					"anyOf": [
+						{
+							"enum": [
+								"repo",
+								"entrypoint"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: what was read. repo (or absent): the whole source, or its entry point's imports when it's too big to read whole (runner.read_closure). entrypoint (needs entrypoint): only that file, the source's own modules it imports (transitively) and its requirements files, at any size",
+					"title": "Scope"
+				},
+				"extra_packages": {
+					"anyOf": [
+						{
+							"items": {
+								"type": "string"
+							},
+							"maxItems": 10,
+							"type": "array"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: the job's extra packages (JobRequest.extra_packages), as PyPI names on the list",
+					"title": "Extra Packages"
 				}
 			},
 			"required": [
@@ -5466,7 +5528,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.6.3",
+			"default": "0.6.4",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -5618,5 +5680,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.3/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.6.4/FlightRecord"
 }

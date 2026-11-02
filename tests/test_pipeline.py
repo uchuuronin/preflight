@@ -1041,7 +1041,8 @@ def test_the_lr_range_point_runs_only_with_its_flag_and_leaves_the_predictions_a
 			if spec.lr_range:
 				lrs = [lr_at(i) for i in range(STEPS)]
 				loss = [2.0 - 1.5 / (1 + math.exp(-2.5 * (math.log10(x) + 4))) for x in lrs]
-				r.probe = with_lr_range(r.probe, {"series": {"lr": lrs, "loss": loss}}, spec.lr_range)
+				summary = {"series": {"lr": lrs, "loss": loss}, "lr_range_update": [0.5 * x for x in lrs]}
+				r.probe = with_lr_range(r.probe, summary, spec.lr_range)
 			return r
 
 	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": on}))
@@ -1083,6 +1084,112 @@ def test_the_lr_range_point_runs_only_with_its_flag_and_leaves_the_predictions_a
 	assert strip(rec) == strip(plain) and strip(rec)
 
 
+def _range_job(tmp_path, monkeypatch, runner, **kw):
+	from preflight.runner import flags
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": True}))
+	flags.reload()
+	try:
+		return run_pipeline(
+			{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}},
+			_Ctx(),
+			deps(tmp_path, runner, **kw),
+		)
+	finally:
+		flags.reload()
+
+
+class _Timeouts(FakeRunner):
+	def __init__(self, *a, **kw):
+		super().__init__(*a, **kw)
+		self.timeouts = {}
+
+	def __call__(self, spec, gpu, *, should_stop):
+		self.timeouts[spec.probe_id] = spec.timeout_s
+		return super().__call__(spec, gpu, should_stop=should_stop)
+
+
+def test_the_lr_range_point_is_refused_past_the_budget_and_capped_at_what_is_left(tmp_path, monkeypatch):
+	# the point's estimate: p1's 30 s plus 100 steps at 1 s (no step time) = 130 s
+	runner = _Timeouts()
+	rec = _range_job(tmp_path, monkeypatch, runner, budget=lambda: Budget(usd=0.60, wall_s=120))
+	assert [p.id for p in rec.probes] == ["p1", "p2", "p3"] and "p1-lr" not in runner.timeouts
+	runner = _Timeouts()
+	_range_job(tmp_path / "b", monkeypatch, runner, budget=lambda: Budget(usd=0.60, wall_s=200))
+	assert "p1-lr" in runner.timeouts and runner.timeouts["p1-lr"] <= 200
+	assert runner.timeouts["p1-lr"] < runner.timeouts["p1"]
+
+
+def test_the_lr_range_point_follows_a_p1_from_the_cache(tmp_path, monkeypatch):
+	cache = MemoryCache()
+	_range_job(tmp_path, monkeypatch, FakeRunner(), cache=cache)  # fills the cache
+	runner = FakeRunner()
+	rec = _range_job(tmp_path, monkeypatch, runner, cache=cache)
+	got = {p.id: p.status for p in rec.probes}
+	assert got.get("p1") == "cached" and got.get("p1-lr") == "cached", got
+	assert not runner.calls  # every point, the range test's too, from the cache
+
+
+def test_the_lr_range_point_isnt_run_on_several_ranks(tmp_path, monkeypatch):
+	from dataclasses import replace
+
+	from preflight.runner import pipeline
+
+	real = pipeline._spec
+
+	def two_ranks(*a, **kw):
+		spec = real(*a, **kw)
+		return replace(spec, nproc=2) if spec.probe_id.endswith("-lr") else spec
+
+	monkeypatch.setattr(pipeline, "_spec", two_ranks)
+	runner = FakeRunner()
+	_range_job(tmp_path, monkeypatch, runner)
+	assert runner.calls and not any(c[0].endswith("-lr") for c in runner.calls)
+
+
+def test_the_cache_key_is_unchanged_without_a_range_test(monkeypatch):
+	from dataclasses import replace
+
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner import pipeline
+
+	spec = ProbeSpec(probe_id="p1", files={"train.py": SCRIPT}, entrypoint="train.py")
+	bodies = []
+	dumps = pipeline.json.dumps
+	monkeypatch.setattr(pipeline.json, "dumps", lambda obj, **kw: bodies.append(obj) or dumps(obj, **kw))
+	plain = pipeline.cache_key(spec, "L4", "img")
+	ramp = pipeline.cache_key(replace(spec, lr_range={"start": 1e-7, "end": 1.0, "steps": 100}), "L4", "img")
+	assert "lr_range" not in bodies[0] and bodies[1]["lr_range"]["steps"] == 100 and plain != ramp
+
+
+def test_the_lr_range_timeout_is_capped_by_the_dollars_left_too(tmp_path, monkeypatch):
+	# three 30 s points on an L4 at US$0.80 an hour spend US$0.02; of US$0.06, US$0.04 is left: 180 s
+	runner = _Timeouts()
+	_range_job(tmp_path, monkeypatch, runner, budget=lambda: Budget(usd=0.06, wall_s=3600))
+	assert runner.timeouts["p1-lr"] == pytest.approx(180, rel=0.01)
+
+
+def test_a_cached_p1_still_gets_a_fresh_range_test(tmp_path, monkeypatch):
+	from preflight.runner import flags
+
+	cache = MemoryCache()
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"probes.lr_range": False}))
+	flags.reload()
+	try:
+		run_pipeline(
+			{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}},
+			_Ctx(),
+			deps(tmp_path, FakeRunner(), cache=cache),
+		)
+	finally:
+		flags.reload()
+	runner = FakeRunner()
+	rec = _range_job(tmp_path, monkeypatch, runner, cache=cache)
+	got = {p.id: p.status for p in rec.probes}
+	assert got.get("p1") == "cached" and got.get("p1-lr") == "ok", got
+	assert [c[0] for c in runner.calls] == ["p1-lr"]
+
+
 def test_a_point_that_could_import_something_else_isnt_skipped():
 	from preflight.runner.pipeline import _import_knobs
 
@@ -1091,3 +1198,89 @@ def test_a_point_that_could_import_something_else_isnt_skipped():
 		{"batch_size": 8, "quantization": "4bit"}
 	)
 	assert _import_knobs({"gradient_checkpointing": True}) != _import_knobs({"gradient_checkpointing": False})
+
+
+def _search_setup(tmp_path, monkeypatch):
+	import httpx
+
+	from preflight.harness.spark import ModelClient
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner import flags
+
+	rec = run_pipeline(
+		{"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, _Ctx(), deps(tmp_path, FakeRunner())
+	)
+	seen = []
+
+	def handler(req):
+		seen.append(req.url.path)
+		return httpx.Response(200, json={"output": [], "usage": {"input_tokens": 10, "output_tokens": 1}})
+
+	codes = ("oom.train", "missing_package", "script_error")
+	runner = FakeRunner(outcomes={f"p{i}": ("error", c) for i, c in enumerate(codes)})
+	results = []
+	for i in range(3):
+		r = runner(
+			ProbeSpec(probe_id=f"p{i}", files={"train.py": SCRIPT}, entrypoint="train.py"),
+			"L4",
+			should_stop=None,
+		)
+		r.probe = r.probe.model_copy(update={"error": f"Error number {i}"})
+		results.append(r)
+	d = deps(tmp_path, FakeRunner())
+	d.spark = ModelClient(base_url="https://api.meta.ai/v1", api_key="t", model="muse-spark-1.3",
+		transport=httpx.MockTransport(handler))  # fmt: skip
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_search": True}))
+	flags.reload()
+	return rec, results, d, seen
+
+
+def test_a_job_asks_at_most_two_searches(tmp_path, monkeypatch):
+	from preflight.runner import flags
+	from preflight.runner.pipeline import SEARCH_MAX_QUESTIONS, _search
+
+	rec, results, d, seen = _search_setup(tmp_path, monkeypatch)
+	try:
+		_search(rec, results, d, ctx=_Ctx())
+	finally:
+		flags.reload()
+	assert len(seen) == SEARCH_MAX_QUESTIONS == 2  # three distinct errors, two questions
+
+
+def test_a_cancelled_job_stops_searching(tmp_path, monkeypatch):
+	from preflight.runner import flags
+	from preflight.runner.pipeline import _search
+
+	class Stopping(_Ctx):
+		def should_stop(self):
+			return True
+
+	rec, results, d, seen = _search_setup(tmp_path, monkeypatch)
+	try:
+		_search(rec, results, d, ctx=Stopping())
+	finally:
+		flags.reload()
+	assert not seen
+
+
+def test_searching_stops_between_questions_on_a_cancel_or_the_time_limit(tmp_path, monkeypatch):
+	from preflight.runner import flags, pipeline
+	from preflight.runner.pipeline import _search
+
+	class StopAfterOne(_Ctx):
+		n = 0
+
+		def should_stop(self):
+			self.n += 1
+			return self.n > 1
+
+	rec, results, d, seen = _search_setup(tmp_path, monkeypatch)
+	try:
+		_search(rec, results, d, ctx=StopAfterOne())
+		assert len(seen) == 1
+		seen.clear()
+		monkeypatch.setattr(pipeline, "SEARCH_JOB_S", -1.0)  # past the limit after the first
+		_search(rec, results, d, ctx=_Ctx())
+		assert len(seen) == 1
+	finally:
+		flags.reload()

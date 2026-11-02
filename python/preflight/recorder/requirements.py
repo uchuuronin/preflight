@@ -107,6 +107,73 @@ KNOWN_MODULES = {
 NO_WHEELS = {"torch_sparse", "torch_scatter", "torch_cluster", "torch_spline_conv", "pyg_lib"}
 MAX_SCANNED_FILES = 400  # guess: a repo's import closure from its entrypoint; bounds the scan
 
+# ---------------------------------------------------------------- JobRequest.extra_packages (0.6.3)
+
+MAX_EXTRA_PACKAGES = 10
+
+
+def known_packages() -> dict[str, str]:
+	"""{PyPI name, normalized: the line the probe installs} for every package on KNOWN_MODULES' list:
+	the only names a visitor can add as extra packages (C's check-in help; GET /v1/packages)."""
+	return {_norm(_LINE.match(line)["name"]): line for line in KNOWN_MODULES.values()}
+
+
+def package_for_module(module: str | None) -> str | None:
+	"""The PyPI name that provides an import the probe couldn't find, when it's on the list; None for a
+	submodule (`a.b` missing means `a` is there, at a version without `b`) or a module off the list."""
+	if not module or "." in module or module not in KNOWN_MODULES:
+		return None
+	return _LINE.match(KNOWN_MODULES[module])["name"]
+
+
+class PackageRefused(ValueError):
+	"""Extra packages the probe won't install: `code` is missing_package.not_allowed or .no_wheels."""
+
+	def __init__(self, code: str, names: list[str]):
+		self.code, self.names = code, names
+		listed = ", ".join(names)
+		if code == "missing_package.no_wheels":
+			msg = f"{listed}: PyPI has no ready-built version for this machine, so Preflight can't install it"
+		elif code == "submission.invalid":
+			msg = f"a job installs at most {MAX_EXTRA_PACKAGES} extra packages ({listed}, with the record's own)"
+		else:
+			msg = f"Preflight installs only packages from its list; {listed} isn't on it"
+		super().__init__(msg)
+
+
+def extra_requirements(names) -> list[str]:
+	"""The lines to install for a job's extra packages, in order, deduplicated. A name is a PyPI name
+	on the list (or the module it provides: `sklearn` for scikit-learn), without a version: the list's
+	own line carries any pin. Raises PackageRefused naming every name refused (no-wheel ones first)."""
+	if not names:
+		return []
+	if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+		raise PackageRefused("missing_package.not_allowed", ["the extra packages (a list of names)"])
+	if (
+		len(names) > 2 * MAX_EXTRA_PACKAGES
+	):  # a record's own and a request's at most; the count is checked below
+		raise PackageRefused("submission.invalid", [f"{len(names)} asked for"])
+	known = known_packages()
+	no_wheels = {_norm(m) for m in NO_WHEELS}
+	out, refused, unbuilt = [], [], []
+	for raw in names:
+		name = raw.strip()
+		shown = name[:64] if re.fullmatch(_NAME, name) else repr(name[:64])
+		line = None
+		if re.fullmatch(_NAME, name):
+			line = known.get(_norm(name)) or (KNOWN_MODULES.get(name) if name in KNOWN_MODULES else None)
+		if line is None:
+			(unbuilt if re.fullmatch(_NAME, name) and _norm(name) in no_wheels else refused).append(shown)
+		elif line not in out:
+			out.append(line)
+	if unbuilt:
+		raise PackageRefused("missing_package.no_wheels", unbuilt)
+	if refused:
+		raise PackageRefused("missing_package.not_allowed", refused)
+	if len(out) > MAX_EXTRA_PACKAGES:  # counted once each, `sklearn` and `scikit-learn` as one
+		raise PackageRefused("submission.invalid", [f"{len(out)} asked for"])
+	return out
+
 
 def _imports(text: str) -> tuple[set[str], set[tuple[int, str]]]:
 	"""(absolute imports as dotted names, relative ones as (level, dotted name)) in a file, outside try
@@ -352,19 +419,21 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float) -> 
 	return None
 
 
-def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None
-) -> tuple[str | None, list[Path]]:  # fmt: skip
+def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
+	extra: list[str] | None = None) -> tuple[str | None, list[Path]]:  # fmt: skip
 	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
 	repo (probes.repo_install): with no requirements.txt, install what the repo declares and the known
 	packages its code imports (repo_requirement_sets), and put a src/ layout's packages on the path.
 	The imported ones are optional: if everything together won't install, the declared ones go alone,
-	then each imported package on its own, all inside the one time limit."""
+	then each imported package on its own, all inside the one time limit.
+	extra: the job's extra packages (extra_requirements' lines), installed with the rest under the same
+	rules (the image's stack wins, wheels only), with or without a requirements.txt."""
 	import time
 
 	req = workdir / "requirements.txt"
-	extra = [r for r in _roots(workdir) if r != workdir] if repo else []
+	roots = [r for r in _roots(workdir) if r != workdir] if repo else []
 	optional: list[str] = []
 	if req.is_file():
 		text = req.read_text(encoding="utf-8", errors="replace")
@@ -377,14 +446,18 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 			)
 			decl, optional = [], []
 		text = "\n".join([*decl, *optional])
+	elif extra:
+		text = ""
 	else:
-		return None, extra
+		return None, roots
+	if extra:  # first, so the requirements' own cap (MAX_REQUIREMENTS) never drops them
+		text = "\n".join([*extra, text])
 	have = installed()
 	keep, notes = plan(text, have)
 	for n in notes:
 		log(f"[preflight] requirements: {n}")
 	if not keep:
-		return None, extra
+		return None, roots
 	pins = "".join(f"{n}=={v.split('+', 1)[0]}\n" for n, v in sorted(have.items()))
 	shared = os.environ.get("PREFLIGHT_DEPS_DIR")
 	if shared and os.access(shared, os.W_OK):
@@ -392,7 +465,7 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		target = Path(shared) / key
 		if (target / ".ok").is_file():
 			log("[preflight] requirements: already installed for this job")
-			return None, [*site_dirs(target), *extra]
+			return None, [*site_dirs(target), *roots]
 		shutil.rmtree(target, ignore_errors=True)  # a half-finished install from a killed probe
 	target.mkdir(parents=True, exist_ok=True)
 	constraints = target / "constraints.txt"
@@ -425,4 +498,4 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	if err:
 		return err, []
 	(target / ".ok").write_text("ok")
-	return None, [*site_dirs(target), *extra]
+	return None, [*site_dirs(target), *roots]

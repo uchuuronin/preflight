@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.6.3. Generated; do not edit.
+ * Preflight contract v0.6.4. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -111,6 +111,26 @@ export interface Source {
 	content_hash?: string | null;
 	entrypoint?: string | null;
 	args?: string[];
+	/**
+	 * 0.6.3: what was read. repo (or absent): the whole source, or its entry point's imports when it's too big to read whole (runner.read_closure). entrypoint (needs entrypoint): only that file, the source's own modules it imports (transitively) and its requirements files, at any size
+	 */
+	scope?: ("repo" | "entrypoint") | null;
+	/**
+	 * 0.6.3: the job's extra packages (JobRequest.extra_packages), as PyPI names on the list
+	 */
+	extra_packages?:
+		| []
+		| [string]
+		| [string, string]
+		| [string, string, string]
+		| [string, string, string, string]
+		| [string, string, string, string, string]
+		| [string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string]
+		| null;
 }
 /**
  * This interface was referenced by `PreflightContract`'s JSON-Schema
@@ -672,6 +692,14 @@ export interface Probe {
 	 * Stable code for the failure; the UI shows t('error.<code>') and its hint
 	 */
 	error_code?: string | null;
+	/**
+	 * 0.6.3: on a missing_package failure, the import the script couldn't find (as Python named it)
+	 */
+	missing_module?: string | null;
+	/**
+	 * 0.6.3: the PyPI name that provides missing_module when it's on Preflight's list (an extra package the visitor can add); absent when it isn't, or for a submodule (`a.b`)
+	 */
+	missing_package?: string | null;
 	memory?: Memory | null;
 	step_time?: StepTime | null;
 	throughput?: Throughput | null;
@@ -1663,6 +1691,22 @@ export interface JobRequest {
 	 * 0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten
 	 */
 	private?: boolean;
+	/**
+	 * 0.6.3: PyPI names (no versions or URLs) the probe installs after the code's own requirements; only names on Preflight's list (recorder.requirements.known_packages), wheels only, the image's pinned stack wins. A name off the list fails the job with missing_package.not_allowed (.no_wheels for a package PyPI has no wheels for). Kept on the record's source, so later probes of it install them too
+	 */
+	extra_packages?:
+		| []
+		| [string]
+		| [string, string]
+		| [string, string, string]
+		| [string, string, string, string]
+		| [string, string, string, string, string]
+		| [string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string]
+		| [string, string, string, string, string, string, string, string, string, string]
+		| null;
 }
 /**
  * target_id -> Estimate, for one knob setting.
@@ -1699,4 +1743,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.6.3";
+export const SCHEMA_VERSION = "0.6.4";

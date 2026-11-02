@@ -34,6 +34,8 @@ def spec_from_wire(text: str) -> ProbeSpec:
 	d["out_dir"] = None
 	if "gpu_fallback" in d:
 		d["gpu_fallback"] = tuple(d["gpu_fallback"] or ())
+	if "extra_packages" in d:
+		d["extra_packages"] = tuple(x for x in d["extra_packages"] or () if isinstance(x, str))
 	return ProbeSpec(**d)
 
 

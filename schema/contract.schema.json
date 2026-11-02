@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.3/contract",
+	"$id": "https://preflight.dev/schema/0.6.4/contract",
 	"title": "PreflightContract",
-	"description": "Preflight contract v0.6.3. Generated; do not edit.",
+	"description": "Preflight contract v0.6.4. Generated; do not edit.",
 	"type": "object",
 	"properties": {
 		"FlightRecord": {
@@ -2089,7 +2089,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"schema_version": {
-					"default": "0.6.3",
+					"default": "0.6.4",
 					"pattern": "^\\d+\\.\\d+\\.\\d+$",
 					"title": "Schema Version",
 					"type": "string"
@@ -3263,6 +3263,25 @@
 					"description": "0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten",
 					"title": "Private",
 					"type": "boolean"
+				},
+				"extra_packages": {
+					"anyOf": [
+						{
+							"items": {
+								"maxLength": 100,
+								"minLength": 1,
+								"type": "string"
+							},
+							"maxItems": 10,
+							"type": "array"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: PyPI names (no versions or URLs) the probe installs after the code's own requirements; only names on Preflight's list (recorder.requirements.known_packages), wheels only, the image's pinned stack wins. A name off the list fails the job with missing_package.not_allowed (.no_wheels for a package PyPI has no wheels for). Kept on the record's source, so later probes of it install them too",
+					"title": "Extra Packages"
 				}
 			},
 			"required": [
@@ -4661,6 +4680,34 @@
 					"description": "Stable code for the failure; the UI shows t('error.<code>') and its hint",
 					"title": "Error Code"
 				},
+				"missing_module": {
+					"anyOf": [
+						{
+							"maxLength": 200,
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: on a missing_package failure, the import the script couldn't find (as Python named it)",
+					"title": "Missing Module"
+				},
+				"missing_package": {
+					"anyOf": [
+						{
+							"maxLength": 100,
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: the PyPI name that provides missing_module when it's on Preflight's list (an extra package the visitor can add); absent when it isn't, or for a submodule (`a.b`)",
+					"title": "Missing Package"
+				},
 				"memory": {
 					"anyOf": [
 						{
@@ -5457,6 +5504,40 @@
 					},
 					"title": "Args",
 					"type": "array"
+				},
+				"scope": {
+					"anyOf": [
+						{
+							"enum": [
+								"repo",
+								"entrypoint"
+							],
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: what was read. repo (or absent): the whole source, or its entry point's imports when it's too big to read whole (runner.read_closure). entrypoint (needs entrypoint): only that file, the source's own modules it imports (transitively) and its requirements files, at any size",
+					"title": "Scope"
+				},
+				"extra_packages": {
+					"anyOf": [
+						{
+							"items": {
+								"type": "string"
+							},
+							"maxItems": 10,
+							"type": "array"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.3: the job's extra packages (JobRequest.extra_packages), as PyPI names on the list",
+					"title": "Extra Packages"
 				}
 			},
 			"required": [

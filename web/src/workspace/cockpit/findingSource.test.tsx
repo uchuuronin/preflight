@@ -22,6 +22,14 @@ describe("who found a finding", () => {
 	});
 });
 
+describe("Muse Spark's web search", () => {
+	it("says the search found it, for a known issue and for none found, and leaves prediction models as they were", () => {
+		expect(line({ source: "model", code: "search.known_issue", title: "Known issue: bitsandbytes on this CUDA" })).toBe("Muse Spark searched the web");
+		expect(line({ source: "model", code: "search.none_found", title: "No known issue matched" })).toBe("Muse Spark searched the web");
+		expect(line({ source: "model", code: "divergence.risk", title: "Loss may diverge" })).toBe("Flagged by a prediction model");
+	});
+});
+
 describe("a finding's sources", () => {
 	it("are links that open apart from the cockpit, and only web addresses link", () => {
 		const { container } = render(

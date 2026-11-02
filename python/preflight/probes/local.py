@@ -203,6 +203,8 @@ class ProbeSpec:
 	# probes.repo_install: with no requirements.txt, install what the repo declares and the known
 	# packages it imports, and put a src/ layout on the path (recorder/requirements.repo_requirements)
 	install_repo: bool = False
+	# JobRequest.extra_packages (0.6.3): the lines to install beside the requirements (a list's own pins)
+	extra_packages: tuple[str, ...] = ()
 	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
 	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
@@ -244,7 +246,9 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 	if entrypoint not in files:
 		raise InvalidSubmission(f"the entrypoint {entrypoint!r} is not among the submitted files")
 	if len(files) > MAX_FILES:
-		raise InvalidSubmission(f"{len(files)} files submitted; the limit is {MAX_FILES} files")
+		raise InvalidSubmission(
+			f"{len(files)} files submitted; the limit is {MAX_FILES} files", code="submission.too_large"
+		)
 	total = 0
 	for rel, text in files.items():
 		p = PurePosixPath(rel)
@@ -263,12 +267,14 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 			) from None
 		if size > MAX_FILE_BYTES:
 			raise InvalidSubmission(
-				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB"
+				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB",
+				code="submission.too_large",
 			)
 		total += size
 	if total > MAX_TOTAL_BYTES:
 		raise InvalidSubmission(
-			f"submission is {total / 2**20:.1f} MB; the cap is {MAX_TOTAL_BYTES // 2**20} MB"
+			f"submission is {total / 2**20:.1f} MB; the cap is {MAX_TOTAL_BYTES // 2**20} MB",
+			code="submission.too_large",
 		)
 
 
@@ -662,6 +668,37 @@ def _rl(raw: dict | None) -> RLSignals | None:
 	return RLSignals(**raw)
 
 
+# the recorder's missing-import messages (recorder/errors.py): "The script imports X, which is not installed",
+# and a library's own check, "A library in the script needs X, which is not installed" (X a PyPI name there)
+_MISSING = re.compile(r"The script imports ([A-Za-z_][A-Za-z0-9_.]{0,199}), which is not installed")
+_NEEDS = re.compile(
+	r"A library in the script needs ([A-Za-z0-9][A-Za-z0-9._-]{0,99}), which is not installed"
+)
+
+
+def _missing(code: str | None, error: str | None) -> dict:
+	"""Probe.missing_module and .missing_package (0.6.3) for a missing import: the module as Python named
+	it, and the PyPI name on Preflight's list that provides it (absent when it isn't on the list)."""
+	if code != "missing_package" or not error:
+		return {}
+	from preflight.recorder.requirements import known_packages, package_for_module
+
+	m = _MISSING.search(error)
+	if m is not None:
+		mod = m.group(1).rstrip(".")
+		pkg = package_for_module(mod)
+		return {"missing_module": mod, **({"missing_package": pkg} if pkg else {})}
+	m = _NEEDS.search(error)  # a PyPI name: on the list, it's both (accelerate asked for by Trainer)
+	if m is None:
+		return {}
+	name = m.group(1).rstrip(".")
+	line = known_packages().get(re.sub(r"[-_.]+", "-", name).lower())
+	return {
+		"missing_module": name,
+		**({"missing_package": re.match(r"[A-Za-z0-9._-]+", line)[0]} if line else {}),
+	}
+
+
 def _probe_model(
 	spec: ProbeSpec,
 	status: str,
@@ -689,6 +726,7 @@ def _probe_model(
 		duration_s=round(duration, 3),
 		error=error,
 		error_code=code,
+		**_missing(code, error),
 		memory=Memory(
 			peak_allocated_bytes=mem.get("peak"),
 			peak_reserved_bytes=mem.get("reserved"),
@@ -737,40 +775,72 @@ def with_lr_range(probe: Probe, summary: dict, ramp: dict) -> Probe:
 	(probes/lr_range.py), marked `lr_range`, and none of the measurements a fit would read (its
 	steps ran at rates the script never uses, so its loss and timings aren't the script's). The
 	rates are the ramp's own (`ramp`: start, end, steps), which the recorder set; read whatever the
-	probe ended with, so a script that stops itself on the diverging loss still leaves its curve."""
-	from preflight.probes.lr_range import analyse, lr_at
+	probe ended with, so a script that stops itself on the diverging loss still leaves its curve.
+
+	A rate read from the ramp stands only when the ramp is known to have taken effect (A's review,
+	Nov 2): `lr_range.checked` when the updates grew with the rate (`follows_rate`) and nothing
+	below applies; otherwise the rates are dropped and the losses kept, with every reason that
+	applies: `lr_range.not_set` (setting the rate failed, the updates didn't follow it, or the
+	script stepped another optimizer over the same weights instead), `lr_range.unverified` (too few
+	measured updates to tell), `lr_range.other_optimizers` (that many more optimizers moved other
+	weights at the script's own rates). A GradScaler that stopped stepping (`lr_range.stalled`)
+	marks the last rate applied as where it diverged, when the rates stand."""
+	from preflight.probes.lr_range import analyse, follows_rate, lr_at
+
+	def num(v) -> bool:
+		return isinstance(v, int | float) and not isinstance(v, bool)
+
+	def as_list(v) -> list:
+		return v if isinstance(v, list) else []
 
 	summary = summary if isinstance(summary, dict) else {}
 	series = summary.get("series")
 	series = series if isinstance(series, dict) else {}
-	losses = series.get("loss")
-	losses = losses if isinstance(losses, list) else []
-	bad = summary.get("lr_range_nonfinite")
-	bad = bad if isinstance(bad, list) else []
+	losses = as_list(series.get("loss"))
+	bad = as_list(summary.get("lr_range_nonfinite"))
 	steps, start, end = int(ramp["steps"]), float(ramp["start"]), float(ramp["end"])
 	pts = []
 	for i, loss in enumerate(losses[:steps]):
-		val = float(loss) if isinstance(loss, int | float) and not isinstance(loss, bool) else None
+		val = float(loss) if num(loss) else None
 		pts.append((lr_at(i, steps, start, end), val, bool(bad[i]) if i < len(bad) else False))
 	extras = {**probe.extras, "lr_range": 1.0}
 	try:
 		extras.update(analyse(pts))
 	except (ValueError, ArithmeticError, OverflowError, TypeError):
 		extras["lr_range.flat"] = 1.0
-	# the rate the optimizer held after each step (group 0, read by the recorder) against the ramp: a
-	# constant ratio (group 0's share of the largest rate) says the ramp was really applied
-	held = series.get("lr")
-	held = held if isinstance(held, list) else []
-	ratios = [h / lr_at(i, steps, start, end) for i, h in enumerate(held[:steps])
-		if isinstance(h, int | float) and not isinstance(h, bool) and h > 0]  # fmt: skip
-	if summary.get("lr_range_error") or not ratios or max(ratios) > min(ratios) * (1 + 1e-6):
-		# the rate wasn't (always) the ramp's: no rate read from the ramp stands, only the losses
-		extras["lr_range.not_set"] = 1.0
+	stalled = summary.get("lr_range_stalled")
+	if num(stalled) and 0 <= stalled < steps:
+		extras["lr_range.stalled"] = 1.0
+		if stalled >= 1:  # the step that overflowed ran at the last rate applied, the one before the stall
+			extras.setdefault("lr_range.diverged_lr", lr_at(int(stalled) - 1, steps, start, end))
+	# the updates' size against the rate, up to where it diverged (the blow-up's own steps aside)
+	stop = extras.get("lr_range.diverged_lr", math.inf)
+	lrs = [lr_at(i, steps, start, end) for i in range(min(steps, len(losses)))]
+	updates = as_list(summary.get("lr_range_update"))[: len(lrs)]
+	kept = [(lr, u) for lr, u in zip(lrs, updates, strict=False) if lr < stop]
+	follows = follows_rate([a for a, _ in kept], [b for _, b in kept]) if kept else None
+	others = summary.get("lr_range_other_optimizers")
+	try:  # an untrusted count: a huge int doesn't convert, NaN and infinity aren't counts
+		others = float(others) if num(others) else 0.0
+	except OverflowError:
+		others = 1_000.0
+	others = int(min(others, 1_000.0)) if math.isfinite(others) and others >= 1 else 0  # 1,000: guess, a cap
+	replaced = summary.get("lr_range_replaced") is True or summary.get("lr_range_replaced") == 1
+	reasons = {}
+	if summary.get("lr_range_error") or follows is False or replaced:
+		reasons["lr_range.not_set"] = 1.0
+	if others:
+		reasons["lr_range.other_optimizers"] = float(others)
+	if follows is None and "lr_range.not_set" not in reasons:
+		reasons["lr_range.unverified"] = 1.0
+	if not reasons:
+		extras["lr_range.checked"] = 1.0
+	else:
+		# no rate read from the ramp stands, only the losses
+		extras.update(reasons)
 		for k in [k for k in extras if k.startswith("lr_range.lr.")] + [
 			"lr_range.suggested_lr", "lr_range.min_loss_lr", "lr_range.diverged_lr"]:  # fmt: skip
 			extras.pop(k, None)
-	else:
-		extras["lr_range.checked"] = 1.0
 	return probe.model_copy(update={"extras": extras, "memory": None, "step_time": None, "throughput": None,
 		"stability": None, "data": None, "eval": None, "step_log": [], "power": None, "rl": None})  # fmt: skip
 
@@ -902,6 +972,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"lr_range": spec.lr_range,
 				"install_requirements": spec.install_requirements,
 				"install_repo": spec.install_repo,
+				"extra_packages": list(spec.extra_packages),
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,
 			}
