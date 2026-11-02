@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../lib/i18n";
 import type { KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
-import { bestCombo, comboKeys, comboVisit, comboWords, singleClears } from "./combos";
+import { beat, bestCombo, bestSingleRisk, comboKeys, comboVisit, comboWords, singleClears } from "./combos";
 import { valueText } from "./GuidePanel";
 import { withinLimits, NO_LIMITS } from "./limits";
 import { isFailing } from "./ruleTour";
@@ -119,7 +119,7 @@ export function LiveGuideSection({
 		const lim = withinLimits(record, provider, state.limits ?? NO_LIMITS, state.knobs, { pinned: state.pinned });
 		const objective = { kind: state.objective.kind ?? "min_time" } as const;
 		if (singleClears(record, provider, objective, lim)) return null;
-		return bestCombo(record, provider, state.knobs, objective, { pinned: lim.pinned ?? state.pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: turnedDown });
+		return bestCombo(record, provider, state.knobs, objective, { ...beat(bestSingleRisk(record, provider, objective, lim)), pinned: lim.pinned ?? state.pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: turnedDown });
 	}, [view, proposal, record, provider, state.knobs, state.limits, state.pinned, state.objective.kind, turnedDown]);
 	const words = combo ? comboWords(record, state.knobs, combo) : null;
 	const knob = proposal ? knobs.get(proposal.knobId) : undefined;
@@ -161,10 +161,16 @@ export function LiveGuideSection({
 			{combo && words && !busy ? (
 				<div className="pf-guide__approval" role="group" aria-label={t("guide.combo.label")}>
 					<p>{t(comboKeys(combo).textKey, words)}</p>
+					{words.rows_cut ? <p className="pf-guide__why">{words.rows_cut}</p> : null}
 					<div className="pf-guide__actions">
+						{combo.fit === "tight" ? (
+							<button type="button" className="pf-btn pf-btn--primary pf-btn--small" onClick={() => void run((g) => g.ask(t("guide.combo.measure_ask", words)))}>
+								{t("guide.combo.measure")}
+							</button>
+						) : null}
 						<button
 							type="button"
-							className="pf-btn pf-btn--primary pf-btn--small"
+							className={`pf-btn pf-btn--small${combo.fit === "fits" ? " pf-btn--primary" : ""}`}
 							onClick={() => {
 								for (const c of combo.changes) actions.setKnob(c.knobId, c.to, "user");
 							}}

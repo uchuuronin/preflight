@@ -511,3 +511,56 @@ def test_a_hosted_looking_id_from_the_script_is_not_priced_by_its_last_part(setu
 	r = httpx.post(f"{_url(proxy, 't9')}/chat/completions", json={"model": "evil/muse-spark-1.3",
 		"messages": [{"role": "user", "content": "do it"}]}, timeout=10)  # fmt: skip
 	assert r.status_code != 200 and not prov.seen  # refused as unpriced, never forwarded
+
+
+def test_a_self_hosted_upstream_is_priced_by_gpu_time_with_its_own_headers_and_redirects_kept_home():
+	"""The Pareto's third arm (Nov 1): Muse Glimmer on Modal, Modal-Key auth, a 303 past 150 s."""
+	seen = []
+	ok = {"id": "g", "object": "chat.completion", "model": "muse-glimmer",
+		"choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}],
+		"usage": {"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12}}  # fmt: skip
+
+	def handler(request):
+		seen.append((request.method, request.url.host, request.headers.get("modal-key"),
+			request.headers.get("authorization")))  # fmt: skip
+		if request.method == "POST":
+			return httpx.Response(
+				303,
+				headers={
+					"location": "https://glimmer.example/v1/chat/completions?__modal_function_call_id=fc"
+				},
+			)
+		return httpx.Response(200, json=ok)
+
+	proxy = AgentProxy("https://glimmer.example/v1", "glimmer", model_override="muse-glimmer",
+		upstream_headers={"Modal-Key": "mk", "Modal-Secret": "ms"}, usd_per_second=0.01, follow_redirects=3,
+		max_usd_total=1.0, timeout_s=10.0, transport=httpx.MockTransport(handler))  # fmt: skip
+	proxy.start()
+	try:
+		r = httpx.post(f"{_url(proxy, 'g1')}/chat/completions", json={"model": "muse-spark-1.3",
+			"messages": [{"role": "user", "content": "hi"}]}, headers={"MODAL-KEY": "the-scripts"}, timeout=10)  # fmt: skip
+		assert r.status_code == 200
+		assert [s[0] for s in seen] == ["POST", "GET"] and all(s[2] == "mk" for s in seen)
+		assert all(s[3] == "Bearer glimmer" for s in seen)  # the visitor's key never goes upstream
+		t = proxy.task("g1")
+		call = proxy.calls("g1")[-1]
+		assert t.cost_usd == pytest.approx(call.seconds * 0.01, abs=1e-6) and t.cost_usd > 0
+		# the worst case reserved per call: the client timeout, once per hop it may follow
+		assert proxy._worst_case_usd({}, b"") == pytest.approx(10.0 * 2 * 0.01)
+	finally:
+		proxy.stop()
+
+	def away(request):
+		if request.url.host == "glimmer.example":
+			return httpx.Response(303, headers={"location": "https://elsewhere.example/x"})
+		seen.append(("LEAKED", request.headers.get("modal-key")))
+		return httpx.Response(200, json=ok)
+
+	p2 = AgentProxy("https://glimmer.example/v1", "glimmer", upstream_headers={"Modal-Key": "mk"}, usd_per_second=0.01,
+		follow_redirects=3, timeout_s=10.0, transport=httpx.MockTransport(away))  # fmt: skip
+	p2.start()
+	try:
+		assert _chat(p2, "g2").status_code == 502
+		assert not any(s[0] == "LEAKED" for s in seen)
+	finally:
+		p2.stop()

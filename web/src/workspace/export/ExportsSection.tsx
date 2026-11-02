@@ -8,6 +8,7 @@ import { AddonBoundary } from "../../components/AddonBoundary";
 import { flag } from "../../lib/flags";
 import { t } from "../../lib/i18n";
 import { useExportsPanels } from "../../registry";
+import { isFixture } from "../record/model";
 import { useWorkspace } from "../state";
 import { exportPlan } from "./plan";
 import { WandbExport } from "./WandbExport";
@@ -31,7 +32,7 @@ export function ExportsSection() {
 					<p.component record={record} knobs={state.knobs} estimates={estimates} plan={plan} />
 				</AddonBoundary>
 			))}
-			<WandbExport plan={plan} />
+			<WandbExport plan={plan} illustrative={isFixture(record)} />
 		</section>
 	);
 }

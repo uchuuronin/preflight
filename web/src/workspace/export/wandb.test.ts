@@ -31,3 +31,17 @@ describe("the Weights & Biases export", () => {
 		expect(data.readouts.every((r) => /^[A-Za-z0-9_]*$/.test(String(r.unit)))).toBe(true);
 	});
 });
+
+describe("a sample's Weights & Biases file", () => {
+	it("says its numbers are illustrative, in the file and in the run's summary", () => {
+		const text = wandbFile(plan, true);
+		expect(embedded(text).illustrative).toBe(true);
+		expect(text).toMatch(/illustrative, not measured on your job/);
+		expect(text).toContain('run.summary["preflight/illustrative"] = PLAN["illustrative"]');
+		expect(embedded(wandbFile(plan)).illustrative).toBe(false);
+		expect(wandbFile(plan)).not.toMatch(/From a Preflight sample/);
+		// The link is mentioned only where there is one.
+		expect(wandbFile(plan)).toMatch(/link to this Preflight record/);
+		expect(wandbFile({ ...plan, shareUrl: null })).not.toMatch(/link to this Preflight record/);
+	});
+});

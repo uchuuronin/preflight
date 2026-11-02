@@ -8,8 +8,9 @@ saves what a modern torch can read with `weights_only=True`: each model's state 
 package's own quantile predictions on a fixed curve, so the port in the runner can be checked against them.
 
     modal run --env main python/preflight/corpus/lcpfn_app.py::fetch
+    modal run --env main python/preflight/corpus/lcpfn_app.py::check   # the port (corpus/lcpfn.py) against them
 
-Writes out/lcpfn_fetch.json. The weights stay in the `preflight-lcpfn` volume, never in git.
+Writes out/lcpfn_fetch.json and out/lcpfn_check.json. The weights stay in the `preflight-lcpfn` volume, never in git.
 """
 
 from __future__ import annotations
@@ -116,6 +117,78 @@ def fetch_weights() -> dict:
 		out["models"][stem] = {k: v for k, v in meta.items() if k not in ("modules", "state_keys")}
 	vol.commit()
 	return out
+
+
+# the port's check (Nov 1): the runner's torch, CPU wheels; corpus/lcpfn.py loads the saved state dicts with
+# weights_only=True and must give the package's own quantiles on the reference curve
+CHECK_TOLERANCE = (
+	1e-4  # guess: the meta keeps the curve to 6 decimals; the port matched the package's own code to 2.4e-6
+)
+port_image = (
+	modal.Image.debian_slim(python_version="3.11")
+	.pip_install("torch==2.8.0", "numpy", index_url="https://download.pytorch.org/whl/cpu")
+	.add_local_python_source("preflight")
+)
+
+
+@app.function(image=port_image, volumes={MOUNT: vol}, timeout=10 * 60, cpu=2, memory=4096)
+def check_port() -> dict:
+	import torch
+
+	from preflight.corpus import lcpfn
+
+	out: dict = {"torch": str(torch.__version__), "models": {}}
+	for name in NAMES:
+		stem = name.removesuffix(".pt")
+		meta = json.loads((Path(MOUNT) / f"{stem}.meta.json").read_text())
+		row: dict = {}
+		try:
+			model = lcpfn.load(Path(MOUNT) / f"{stem}.state.pt", meta)
+		except (
+			Exception
+		) as exc:  # a key or shape the port doesn't have: report it, with the original's structure
+			row["load_error"] = f"{type(exc).__name__}: {exc}"[:2000]
+			row["modules"] = meta.get("modules", "")[:4000]
+			out["models"][stem] = row
+			continue
+		try:
+			ref = meta["reference"]
+			x = torch.arange(1, REFERENCE_STEPS + 1, dtype=torch.float32)
+			y = torch.tensor(ref["y_train"], dtype=torch.float32)
+			q = model.predict_quantiles(x[: ref["x_seen"]], y, x[ref["x_seen"] :], list(ref["qs"]))[-1]
+			got = [round(float(v), 6) for v in q]
+			diff = max(abs(a - b) for a, b in zip(got, ref["quantiles_at_100"], strict=True))
+			# a loss curve through the whole path: a falling power law seen for 200 of 2,000 steps
+			steps = torch.arange(1, 201, dtype=torch.float32)
+			loss = (2.0 + 4.0 * steps**-0.5).tolist()
+			fc = lcpfn.forecast_loss(model, loss, last_step=2000)
+			row.update(
+				{
+					"quantiles_at_100": got,
+					"package_quantiles_at_100": ref["quantiles_at_100"],
+					"max_abs_diff": diff,
+					"matches": diff <= CHECK_TOLERANCE,
+					"loss_forecast_at_2000": None if fc is None else [fc.lo, fc.mid, fc.hi],
+					"loss_true_at_2000": 2.0 + 4.0 * 2000**-0.5,
+				}
+			)
+		except Exception as exc:  # review, Nov 1: one model's failure fills its own row, not the whole run
+			row["check_error"] = f"{type(exc).__name__}: {exc}"[:2000]
+		out["models"][stem] = row
+	return out
+
+
+@app.local_entrypoint()
+def check():
+	"""modal run --env main python/preflight/corpus/lcpfn_app.py::check  (CPU, about a minute)"""
+	t0 = time.monotonic()
+	got = check_port.remote()
+	got["wall_s"] = round(time.monotonic() - t0, 1)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/lcpfn_check.json").write_text(json.dumps(got, indent=1))
+	print(json.dumps(got, indent=1))
+	if not all(m.get("matches") for m in got["models"].values()):
+		raise SystemExit("the port doesn't match the package's quantiles")
 
 
 @app.local_entrypoint()
