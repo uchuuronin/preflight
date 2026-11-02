@@ -1,0 +1,11 @@
+{
+	"name": "20261102-232859-41545743492-a-trial-litgpt-install-pip",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41545743492",
+	"ref": "9bbb0966b9d03a0b3bec03fd4b122a0a666d04f2",
+	"sha": "9bbb0966b9d03a0b3bec03fd4b122a0a666d04f2",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::install_check --repo https://github.com/Lightning-AI/litgpt --commit 4738993a5e0190b851162a52173729827d3884e7 --entrypoint litgpt/pretrain.py",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T23:38:34Z"
+}
