@@ -1,0 +1,13 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-pg4fYyjfIMheotjK2heMu5
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/lcpfn_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function fetch_weights.
+├── ✓ Created Function check_port.
+└── ✓ Created Function coverage_quantiles.
+1352 forecasts, 0 errors, 60.9 s
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-pg4fYyjfIMheotjK2heMu5
