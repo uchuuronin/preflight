@@ -61,7 +61,9 @@ def check_remote(docs: int = DOCS) -> dict:
 			row["sample"] = {"docs": p.docs, "tokens": p.tokens, "missing": p.missing, "low": sorted(p.low)}
 			row["tables"] = []
 			unique = total or sum(p.tokens.values())
-			row["dataset_tokens"] = unique
+			row["budget_base_tokens"] = (
+				unique  # the dataset's total, or the documents read when its total isn't known
+			)
 			for passes, weights in BUDGETS:
 				rows = Q.table(p, passes * unique, total, weights)
 				row["tables"].append(
