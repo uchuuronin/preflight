@@ -31,6 +31,7 @@ from .routes import health as health_routes
 from .routes import jobs as jobs_routes
 from .routes import limits as limits_routes
 from .routes import patches as patch_routes
+from .routes import predict as predict_routes
 from .routes import records as records_routes
 from .session_limits import SessionLimits, default_session_limits
 from .stores import LocalRecordStore, RecordStore, SampleStore
@@ -192,5 +193,6 @@ def create_app(
 	app.include_router(limits_routes.router)
 	app.include_router(jobs_routes.router)
 	app.include_router(patch_routes.router)
+	app.include_router(predict_routes.router)
 	app.state.addons = mount_addons(app, addons_dir)
 	return app

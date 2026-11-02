@@ -24,6 +24,7 @@
 	"c.campaign_calendar": false,
 	"c.inflight": false,
 	"c.checkin_help": false,
+	"c.engine_fallback": false,
 	"d.expertise": false,
 	"d.currency": false,
 	"engine.memory": false,

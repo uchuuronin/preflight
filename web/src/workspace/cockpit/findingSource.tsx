@@ -12,12 +12,17 @@
  *   rather than the detail, whose words Muse Spark wrote), or turns the finding into
  *   `diagnosis.abstain` ("Not backed by a probe number: abstain, or run a probe"), which also covers
  *   claims the check didn't reach (its claim, time or dollar limits).
+ * - Muse Spark's web search (D, harness/search_grounding.py) writes `source: "model"` with a code
+ *   `search.known_issue` or `search.none_found`; "model" alone reads as a prediction model, so the
+ *   code says who. none_found also covers sources dropped by Preflight's checks, so the line names
+ *   the search, never "nothing found".
  */
 import { t } from "../../lib/i18n";
 import type { Finding } from "../record/types";
 
 export function findingSourceKey(f: Pick<Finding, "source" | "title" | "code" | "evidence"> & Partial<Pick<Finding, "detail">>): string {
 	if (f.source === "spark_open_triage" && f.title.startsWith("Muse Glimmer ")) return "finding.source.glimmer_triage";
+	if (f.source === "model" && f.code.startsWith("search.")) return "finding.source.spark_search";
 	if (f.source === "spark_diagnosis") {
 		if (f.code === "diagnosis.abstain") return "finding.source.spark_diagnosis_abstain";
 		if ((f.evidence ?? []).some((e) => e.metric === "spark_open_check")) return "finding.source.spark_diagnosis_checked";
