@@ -1,0 +1,11 @@
+{
+	"name": "20261102-162706-41481571061-a-unseen-a-unseen-7-checkin-gt",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41481571061",
+	"ref": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"sha": "8cb5480a897f04e61dfdafe5f07015f19c14d0ab",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/beir-cellar/beir --commit ef83d29307061c65d04b035b4f4e7c18bd8374af --entrypoint examples/retrieval/evaluation/dense/evaluate_sbert.py  --bare-steps 100000 --budget-min 45 --first-gpu L4 --install-requirements",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T16:27:44Z"
+}
