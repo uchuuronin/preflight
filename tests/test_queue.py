@@ -430,7 +430,7 @@ def test_the_pipeline_turns_the_runners_wait_notices_into_probing_events(tmp_pat
 
 		def __call__(self, spec, gpu, *, should_stop):
 			self.notify("waiting", gpu, 90.0)
-			self.notify("up", gpu, 150.0)
+			self.notify("up", gpu, 170.0)
 			return super().__call__(spec, gpu, should_stop=should_stop)
 
 	from preflight.runner.pipeline import run_pipeline
@@ -439,4 +439,4 @@ def test_the_pipeline_turns_the_runners_wait_notices_into_probing_events(tmp_pat
 	run_pipeline({"source": {"kind": "upload", "files": {"train.py": SCRIPT}}}, ctx, _deps(tmp_path, Waits()))
 	msgs = [e.get("message") or "" for e in ctx.events if e["stage"] == "probing"]
 	assert any(m.startswith(GPU_WAIT_PREFIX) and "(2 min so far)" in m for m in msgs)
-	assert any(m.endswith("probe running") and "after 2 min" in m for m in msgs)
+	assert any(m.endswith("probe running") and "after 3 min" in m for m in msgs)
