@@ -782,7 +782,13 @@ def _lens(f: Facts, framework: str, hf_id: str | None) -> str:
 		return "retrieval"
 	if framework in ("pyg", "dgl"):
 		return "gnn"
-	if framework == "timm" or _has(f, "torchvision.models"):
+	# B, Nov 2 (the unseen runs): airbench imports torchvision and its transforms, not torchvision.models, and builds
+	# its own conv net, so it read as pretraining; a torchvision import with a conv layer is a vision job
+	if (
+		framework == "timm"
+		or _has(f, "torchvision.models", "torchvision.datasets", "torchvision.transforms")
+		or (_has(f, "torchvision") and any("Conv2d" in s.text for s in f.sources.values()))
+	):
 		return "vision"
 	if framework == "hf_generate":
 		return "eval"
@@ -1023,6 +1029,93 @@ def _distributed(f: Facts, by_id: dict[str, ScriptKnob]) -> str:
 	return "none"
 
 
+def _module_paths(mod: str, trees: dict) -> list[str]:
+	"""The repo files a dotted module name can be: a module, a package's __init__, either under src/."""
+	stem = mod.replace(".", "/")
+	out = []
+	for root in ("", "src/"):
+		for cand in (f"{root}{stem}.py", f"{root}{stem}/__init__.py"):
+			if cand in trees:
+				out.append(cand)
+	return out
+
+
+def _top_level_imports(tree: ast.Module) -> list[tuple[str, int, list[str]]]:
+	"""(module, level, names) for imports at module level, in if/try blocks too, not inside a def or class: a
+	library's optional backend is imported inside the function that uses it."""
+	out = []
+
+	def visit(body):
+		for node in body:
+			if isinstance(node, ast.Import):
+				out.extend((a.name, 0, []) for a in node.names)
+			elif isinstance(node, ast.ImportFrom):
+				out.append((node.module or "", node.level, [a.name for a in node.names]))
+			elif isinstance(node, ast.If | ast.Try | ast.With):
+				for part in ("body", "orelse", "finalbody", "handlers"):
+					for sub in getattr(node, part, []) or []:
+						visit(sub.body if isinstance(sub, ast.ExceptHandler) else [sub])
+
+	visit(tree.body)
+	return out
+
+
+def _all_imports(tree: ast.Module) -> list[tuple[str, int, list[str]]]:
+	out = []
+	for node in ast.walk(tree):
+		if isinstance(node, ast.Import):
+			out.extend((a.name, 0, []) for a in node.names)
+		elif isinstance(node, ast.ImportFrom):
+			out.append((node.module or "", node.level, [a.name for a in node.names]))
+	return out
+
+
+def entry_imports(f: Facts, entrypoint: str) -> set[str]:
+	"""What the job itself imports: every import in the entrypoint, then the module-level imports of the repo files
+	it reaches. B, Nov 2 (the unseen runs): a library repo imports vLLM somewhere, so reading every file's imports
+	sent BEIR (retrieval) and a smolagents example (an API agent) to the serving lens and an API agent to a GPU."""
+	seen, todo, out = set(), [entrypoint], set()
+	while todo:
+		path = todo.pop()
+		if path in seen or path not in f.trees:
+			continue
+		seen.add(path)
+		tree = f.trees[path]
+		pkg = path.rsplit("/", 1)[0].split("/") if "/" in path else []
+		for mod, level, names in _all_imports(tree) if path == entrypoint else _top_level_imports(tree):
+			full = mod
+			if level:  # relative: from the file's own package
+				base = pkg[: len(pkg) - (level - 1)] if level > 1 else pkg
+				full = ".".join([*base, *([mod] if mod else [])])
+			if full and not level:
+				out.add(full)
+			local = _module_paths(full, f.trees) if full else []
+			if not local and not level:
+				out.add(full)
+			for p in local:
+				todo.append(p)
+			for n in names:  # "from pkg import sub": sub may be a module
+				todo.extend(_module_paths(f"{full}.{n}" if full else n, f.trees))
+	return out
+
+
+def _job_framework(f: Facts, reach: Facts, entrypoint: str) -> str:
+	"""The entrypoint's own imports first; then what it reaches in the repo, where vLLM is read last, since a library
+	often ships a vLLM backend beside the one the job uses (BEIR's models package imports one beside SentenceBERT)."""
+	own = Facts(
+		**{**f.__dict__, "imports": {m for m, lvl, _ in _all_imports(f.trees[entrypoint]) if m and not lvl}}
+	)
+	fw = _framework(own)
+	if fw not in ("plain_pytorch", "other") or reach.imports == own.imports:
+		return fw
+	fw = _framework(
+		Facts(**{**reach.__dict__, "imports": {i for i in reach.imports if i.split(".")[0] != "vllm"}})
+	)
+	if fw in ("plain_pytorch", "other") and _has(reach, "vllm"):
+		return "vllm"
+	return fw
+
+
 def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 	if entrypoint not in files:
 		raise ScriptParseError(f"entrypoint {entrypoint} is not among the submitted files")
@@ -1030,9 +1123,11 @@ def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 	_collect_knobs(f)
 	knobs = _knobs(f)
 	by_id = {k.id: k for k in knobs}
-	framework = _framework(f)
+	# the job's own imports decide its framework and lens, not every file in the repo (B, Nov 2)
+	reach = Facts(**{**f.__dict__, "imports": entry_imports(f, entrypoint)})
+	framework = _job_framework(f, reach, entrypoint)
 	hf_id, pcall, ppath = _pretrained(f)
-	lens = _lens(f, framework, hf_id)
+	lens = _lens(reach, framework, hf_id)
 	model = _model(f, hf_id, pcall, ppath)
 	data = _data(f, by_id)
 	loop = _loop(f, framework)
