@@ -428,7 +428,7 @@ def ground_failure(
 				"Muse Spark searched for a known library or version issue matching this error and found none."
 				if not dropped
 				else f"Muse Spark named {len(dropped)} source{'s' if len(dropped) != 1 else ''} for this error, but "
-				"none could be checked against what its search returned, so none is shown."
+				"none passed Preflight's checks on sources, so none is shown."
 			),
 			source="model",
 			evidence=ev,

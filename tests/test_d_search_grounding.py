@@ -352,8 +352,6 @@ def test_odd_spellings_of_a_named_host_are_caught_and_readthedocs_owners_are_apa
 
 def test_sources_that_cant_be_checked_arent_called_none_found():
 	f, _ = ground_failure(client(response(answer("found", ISSUE), opened=[ISSUE])), probe(), {})
-	assert (
-		f.code == "search.none_found" and "none could be checked" in f.detail and "found none" not in f.detail
-	)
+	assert f.code == "search.none_found" and "none passed" in f.detail and "found none" not in f.detail
 	f, _ = ground_failure(client(response(answer("none_found"))), probe(), {})
 	assert "found none" in f.detail

@@ -82,22 +82,27 @@ A reviewed `03d0e5f` (`from-a.md`): ready to merge off, six things before it goe
 **The validation re-run on this code** (`d-spark-search-validate-2`, GitHub 41529989287, Nov 2,
 21:37 UTC, `ws-d` `5dcf16a`; the same 10 cases, 7 sent) [measured]:
 
-- Meta took `max_tool_calls`: every call ok, 1 to 4 searches each (no call over 4; whether Meta
-  enforces the cap isn't shown). Its search actions are typed `search`, so the fee is counted.
-- 6 of 7 answered "none found", as in the first run, all right by my judgement (the same cases).
-- The known issue (pyarrow needs NumPy 2) went the other way: the model searched, opened three
-  GitHub pull requests whose titles name this exact conflict, and answered "found" with them;
+- Meta took `max_tool_calls` (no call refused): every call ok, 1 to 4 searches each, and no call
+  over 4 tool calls counting page opens (whether Meta enforces the cap isn't shown). Its search
+  actions are typed `search`, so the fee is counted.
+- 6 of 7 answered "none found", as in the first run, all right by my judgement (the same cases;
+  four of them are kinds production skips, so production would ask 3 of these cases).
+- The known issue (pyarrow needs NumPy 2) went the other way: the model searched, tried to open three
+  GitHub pull requests (one, transformers #49582, titled for this exact conflict; the model's own
+  reasons say all three describe it), and answered "found" with them;
   **but this time the response carried no `url_citation` annotation at all**, so code dropped all
   three and the finding showed none. The first run kept one source. So whether Meta annotates is
   not stable between runs, and with the annotation rule that costs recall (0 of 1 here). The
   finding used to say "found none" then, which wasn't true; it now says the model named sources
-  that couldn't be checked.
+  that didn't pass Preflight's checks.
 - The planted link again wasn't repeated, so that check stays inconclusive.
-- Cost: US$0.142 for the 7 calls [derived: tokens at list price plus the search fee at the
-  second-hand rate above].
+- Cost: US$0.142 for the 8 calls (the 7 cases and the planted link) [derived: tokens at the list
+  and cached rates plus 18 searches' fee, US$0.045, at the second-hand rate above].
 
-So the code is checked against Meta's API; whether the annotation rule leaves enough sources to be
-useful is the open question for turning it on.
+So the request's shape is checked against Meta's API; the citation path (exact match, the stored
+annotation URL, the named-address filters) wasn't exercised on real output, as nothing was
+annotated. Whether the annotation rule leaves enough sources to be useful is the open question
+for turning it on.
 
 ## Before `harness.spark_search` goes on
 
