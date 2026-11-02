@@ -1,0 +1,11 @@
+{
+	"name": "20261102-174157-41493588241-c-campaign-probes-nov2-a10",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41493588241",
+	"ref": "ws-c",
+	"sha": "23db25af3ba5cf1c4b2b4632dc1170944a96be41",
+	"cmd": "modal run --env main api/campaign_probe_app.py::grid_probes --gpu A10 --attempt b",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-02T17:46:42Z"
+}

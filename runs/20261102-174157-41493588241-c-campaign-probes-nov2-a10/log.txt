@@ -1,0 +1,151 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-L91VgWEOZl6Y6b7CXpZCuH
+✓ Created objects.
+bs2-lr0.0001: submitted
+bs2-lr0.0002: submitted
+bs4-lr0.0001: submitted
+bs4-lr0.0002: submitted
+bs2-lr0.0002: done
+bs2-lr0.0001: done
+bs4-lr0.0001: done
+bs4-lr0.0002: done
+{
+ "spent_usd": 0.476,
+ "cap_usd": 3.0,
+ "gpu": "A10",
+ "cells": {
+  "bs2-lr0.0002": {
+   "job_status": "done",
+   "record_id": "01M6ENNQDWNRZT02YD583B34PR",
+   "error_code": null,
+   "minutes": 2.8,
+   "usd": 0.0909,
+   "measured": {
+    "at_cell": [
+     [
+      "p1-eval",
+      "oom"
+     ],
+     [
+      "p1",
+      "ok"
+     ]
+    ],
+    "probe": "p1",
+    "status": "ok",
+    "error_code": null,
+    "steps": 14,
+    "step_s_mean": 0.8256382658132806,
+    "step_s_p50": 0.822413330078125,
+    "train_peak_bytes": 9610934272,
+    "peak_allocated_bytes": 9610934272,
+    "knobs": {
+     "batch_size": 2,
+     "lr": 0.0002,
+     "gpu_type": "A10"
+    }
+   },
+   "gpu": "A10"
+  },
+  "bs2-lr0.0001": {
+   "job_status": "done",
+   "record_id": "01M6ENNPTKQZ4SF26EYJGGHKFD",
+   "error_code": null,
+   "minutes": 3.6,
+   "usd": 0.1161,
+   "measured": {
+    "at_cell": [
+     [
+      "p1-eval",
+      "oom"
+     ],
+     [
+      "p1",
+      "ok"
+     ]
+    ],
+    "probe": "p1",
+    "status": "ok",
+    "error_code": null,
+    "steps": 14,
+    "step_s_mean": 0.9905143606742157,
+    "step_s_p50": 1.028116455078125,
+    "train_peak_bytes": 9610934272,
+    "peak_allocated_bytes": 9610934272,
+    "knobs": {
+     "batch_size": 2,
+     "lr": 0.0001,
+     "gpu_type": "A10"
+    }
+   },
+   "gpu": "A10"
+  },
+  "bs4-lr0.0001": {
+   "job_status": "done",
+   "record_id": "01M6ENNQ83SM005EHXE6PRAQ0M",
+   "error_code": null,
+   "minutes": 4.1,
+   "usd": 0.1319,
+   "measured": {
+    "at_cell": [
+     [
+      "p1-eval",
+      "oom"
+     ],
+     [
+      "p1",
+      "ok"
+     ]
+    ],
+    "probe": "p1",
+    "status": "ok",
+    "error_code": null,
+    "steps": 14,
+    "step_s_mean": 1.6062249391390602,
+    "step_s_p50": 1.6394239501953125,
+    "train_peak_bytes": 15717870080,
+    "peak_allocated_bytes": 15717870080,
+    "knobs": {
+     "batch_size": 4,
+     "lr": 0.0001,
+     "gpu_type": "A10"
+    }
+   },
+   "gpu": "A10"
+  },
+  "bs4-lr0.0002": {
+   "job_status": "done",
+   "record_id": "01M6ENNRSJ6X1N4WDWH77WY9KS",
+   "error_code": null,
+   "minutes": 4.4,
+   "usd": 0.137,
+   "measured": {
+    "at_cell": [
+     [
+      "p1-eval",
+      "oom"
+     ],
+     [
+      "p1",
+      "ok"
+     ]
+    ],
+    "probe": "p1",
+    "status": "ok",
+    "error_code": null,
+    "steps": 14,
+    "step_s_mean": 1.5950776511390645,
+    "step_s_p50": 1.6341739501953125,
+    "train_peak_bytes": 15717870080,
+    "peak_allocated_bytes": 15717870080,
+    "knobs": {
+     "batch_size": 4,
+     "lr": 0.0002,
+     "gpu_type": "A10"
+    }
+   },
+   "gpu": "A10"
+  }
+ }
+}
+Stopping app - uncaught exception raised locally: SystemExit(0).
