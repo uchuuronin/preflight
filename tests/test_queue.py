@@ -391,7 +391,7 @@ def test_the_ledger_survives_a_restart_and_judging_days_get_thirty_dollars():
 	again = InMemoryJobStore.restore(saved, clock=lambda: ET_NOON_NOV1)
 	with pytest.raises(QueueFull):
 		again.submit({**REQ, "n": 9}, visitor="v", idempotency_key="k9")
-	assert daily_gpu_cap_usd("2026-11-04") == 10.0 and daily_gpu_cap_usd("2026-11-05") == 30.0
+	assert daily_gpu_cap_usd("2026-11-04") == 10.0 and daily_gpu_cap_usd("2026-11-05") == 8.0
 
 
 def test_seconds_to_midnight_et_is_right_on_a_dst_day():

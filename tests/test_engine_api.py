@@ -1122,7 +1122,7 @@ def test_a_query_is_sized_by_the_dataset_s_longest_row_when_the_recorder_found_i
 
 
 def test_a_partial_scan_never_sizes_a_query_below_seq_len():
-	"""Review, Nov 1: 1,000 rows of 5M scanned, longest 520, read 'unlikely' for a run that may meet 1,024."""
+	"""Review, Nov 1: 1,000 rows of 5M scanned, longest 520, read P(OOM) 2.5% for a run that may meet 1,024."""
 	plain = api.predict(_lora_l4(), {"eval_batch_size": 4}).root["memory.peak"]
 	part = {"dataset_max_tokens": 520, "dataset_rows_scanned": 1000, "dataset_rows_total": 5_000_000}
 	p = api.predict(_lora_l4(**part), {"eval_batch_size": 4}).root["memory.peak"]
@@ -1151,7 +1151,7 @@ def test_the_eval_wedge_carries_the_measured_context():
 
 def test_when_no_single_move_clears_an_oom_the_record_carries_grids_over_pairs_that_do():
 	"""Chiya, Nov 1: on the LoRA zoo record every single fix still read 0.97; eval batch 4 with seq_len 512 reads
-	17.5 GiB, unlikely. The guide reads such a combined move off a 2-D local grid."""
+	17.5 GiB, P(OOM) 2.5%, tight. The guide reads such a combined move off a 2-D local grid."""
 	from preflight.schema.encoding import decode_f16
 
 	rec = _lora_l4()
@@ -1205,3 +1205,77 @@ def test_pair_grids_are_named_apart_from_a_record_s_own_2d_grids():
 	two = [g for g in grids if len(g.axes) == 2]
 	assert two and all(g.id.endswith(api.CLEARING_GRID_SUFFIX) for g in two)
 	assert len({g.id for g in grids}) == len(grids)
+
+
+def test_the_run_length_falls_back_on_the_probes_dataset_length():
+	"""C, Nov 1: the live LoRA record's time and cost abstained ("no dataset size"), though every probe recorded
+	train_dataset_len 50,724 (planned_steps 3,170 at batch 4 x grad_accum 4)."""
+	rec = FlightRecord.model_validate(
+		json.loads(
+			(
+				Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+			).read_text()
+		)
+	)
+	steps, why = api.total_steps(rec)
+	assert why == "" and steps == pytest.approx(3170, abs=1)
+	assert api.predict(rec).root["time.total"].status != "abstain"
+
+
+def test_the_probe_dataset_length_follows_the_runner_s_rules():
+	"""Review, Nov 1: the fallback took the first probe in list order. Patched probes (a patch may subsample) and an
+	oom probe before its first step (its latest loader may be an eval one) don't count; ok comes first; a query that
+	packs differently from the probe abstains (packing changes the row count)."""
+	path = Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+	rec = FlightRecord.model_validate(json.loads(path.read_text()))
+
+	def with_probes(fn):
+		return rec.model_copy(update={"probes": [fn(p) for p in rec.probes]})
+
+	patched = with_probes(
+		lambda p: p.model_copy(update={"extras": {**p.extras, "patched": 1.0, "train_dataset_len": 64.0}})
+	)
+	assert api.total_steps(patched)[0] is None
+	eval_first = rec.model_copy(
+		update={
+			"probes": [
+				rec.probes[0].model_copy(
+					update={"steps": 0, "extras": {**rec.probes[0].extras, "train_dataset_len": 2000.0}}
+				),
+				*rec.probes[1:],
+			]
+		}
+	)
+	assert api.total_steps(eval_first)[0] == pytest.approx(3170, abs=1)
+	steps, why = api.total_steps(rec, {"packing": True})
+	assert steps is None and "packing changes the row count" in why
+	# packing set in the script map, no knob: a seq_len move abstains too
+	data = rec.job.script_map.data.model_copy(update={"packing": True})
+	sm = rec.job.script_map.model_copy(update={"data": data})
+	packed = rec.model_copy(
+		update={
+			"job": rec.job.model_copy(update={"script_map": sm}),
+			"knobs": [k for k in rec.knobs if k.id != "packing"],
+		}
+	)
+	assert api.total_steps(packed, {"seq_len": 512})[0] is None
+	assert api.total_steps(packed)[0] == pytest.approx(3170, abs=1)
+
+
+def test_a_cell_with_no_run_over_the_margin_reads_p_oom_from_the_whole_pool():
+	"""Chiya, Nov 1 (option b): 19 L4 fine-tune runs can't show P(OOM) below 2.5%, so with none of them over the
+	margin, the 487 held-out runs decide, and the reason says so. 7.7 GiB on a 22 GiB L4 fits; 17.5 GiB is tight."""
+	path = Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+	rec = FlightRecord.model_validate(json.loads(path.read_text()))
+	small = api.predict(rec, {"eval_batch_size": 4, "seq_len": 128}).root["risk.oom"]
+	assert small.point < 0.01 and small.reason.startswith("fits: ")
+	assert "from all 487 held-out runs; none of the 19 L4 finetune runs went over" in small.reason
+	close = api.predict(rec, {"eval_batch_size": 4, "seq_len": 512}).root["risk.oom"]
+	assert (
+		0.01 <= close.point < 0.05
+		and close.reason.startswith("tight: ")
+		and "fits needs below 1%" in close.reason
+	)
+	# a cell with a run over the margin keeps its own count
+	big = api.predict(rec, {"eval_batch_size": 4, "seq_len": 1024}).root["risk.oom"]
+	assert big.reason.startswith("fails: ") and "487" not in big.reason

@@ -272,6 +272,49 @@ def lengths(
 	return np.maximum(1, np.rint(x)).astype(int)
 
 
+def _norm_ppf(q: float) -> float:
+	lo, hi = -10.0, 10.0
+	for _ in range(80):
+		mid = (lo + hi) / 2
+		if 0.5 * math.erfc(-mid / math.sqrt(2)) < q:
+			lo = mid
+		else:
+			hi = mid
+	return (lo + hi) / 2
+
+
+def _norm_cdf(z: float) -> float:
+	return 0.5 * math.erfc(-z / math.sqrt(2))
+
+
+def censored_lognormal(capped_mean: float, cap: float, hit: float) -> tuple[float, float] | None:
+	"""(mu, sigma) of the log-normal whose lengths, cut at `cap`, have mean `capped_mean` with a share `hit` at the
+	cap: what a probe's outputs say about how long they would run uncut. P(X >= cap) = hit fixes mu given sigma,
+	and E[min(X, cap)] = capped_mean fixes sigma (bisection on sign; the capped mean falls from the cap towards cap x hit as sigma grows). None when no
+	log-normal matches: nothing or everything hit the cap, or the mean is not below the cap."""
+	if not 0 < hit < 1 or capped_mean <= 0 or cap <= 0 or capped_mean >= cap:
+		return None
+	z = _norm_ppf(1 - hit)
+	lc = math.log(cap)
+
+	def capped(sigma: float) -> float:
+		mu = lc - sigma * z
+		body = math.exp(mu + sigma * sigma / 2) * _norm_cdf((lc - mu - sigma * sigma) / sigma)
+		return body + cap * hit
+
+	lo, hi = 1e-3, 4.0
+	if not (capped(lo) - capped_mean) * (capped(hi) - capped_mean) < 0:
+		return None
+	for _ in range(100):
+		mid = (lo + hi) / 2
+		if (capped(mid) - capped_mean) * (capped(lo) - capped_mean) > 0:
+			lo = mid
+		else:
+			hi = mid
+	sigma = (lo + hi) / 2
+	return lc - sigma * z, sigma
+
+
 def workload(
 	n: int,
 	prompt_mean: float,
@@ -281,11 +324,19 @@ def workload(
 	rate_per_s: float | None = None,
 	max_output: int | None = None,
 	seed: int = 0,
+	output_fit: tuple[float, float] | None = None,
 ) -> list[Request]:
-	"""n requests: all at once (an offline batch, as an eval sweep sends them) or Poisson at `rate_per_s`."""
+	"""n requests: all at once (an offline batch, as an eval sweep sends them) or Poisson at `rate_per_s`. With
+	`output_fit` (mu, sigma), outputs come from that log-normal (censored_lognormal) instead of the mean and p95."""
 	rng = np.random.default_rng(seed)
 	p = lengths(prompt_mean, prompt_p95 or prompt_mean * 2, n, rng)
-	o = lengths(output_mean, output_p95 or output_mean * 2, n, rng, max_output)
+	if output_fit is not None:
+		x = rng.lognormal(output_fit[0], output_fit[1], n)
+		if max_output:
+			x = np.minimum(x, max_output)
+		o = np.maximum(1, np.rint(x)).astype(int)
+	else:
+		o = lengths(output_mean, output_p95 or output_mean * 2, n, rng, max_output)
 	t = np.cumsum(rng.exponential(1 / rate_per_s, n)) if rate_per_s else np.zeros(n)
 	return [Request(float(a), int(b), int(c)) for a, b, c in zip(t, p, o, strict=True)]
 

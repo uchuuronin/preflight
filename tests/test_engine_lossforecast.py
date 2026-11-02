@@ -39,3 +39,26 @@ def test_it_abstains_when_it_should():
 	assert f.status == "abstain"  # a band wider than +-50%
 	ys, _ = _curve(noise=0.0, n=100)
 	assert L.forecast(ys, last_step=50).point == pytest.approx(ys[49])  # already past it: the loss seen there
+
+
+def test_the_ensemble_is_never_surer_than_either_half():
+	from preflight.engine import lossforecast as lf
+
+	power = lf.Forecast(2.10, 2.00, 2.25, "extrapolated", "power law")
+	got = lf.ensemble(power, (1.95, 2.05, 2.30), "LC-PFN")
+	assert got.status == "extrapolated" and got.point == pytest.approx(2.075)
+	assert got.lo == pytest.approx(1.95) and got.hi == pytest.approx(2.30) and "LC-PFN" in got.reason
+	# one half missing: the other alone
+	assert lf.ensemble(power, None) is power
+	alone = lf.ensemble(lf.Forecast(None, None, None, "abstain", "only 12 loss values"), (1.9, 2.0, 2.2))
+	assert alone.point == 2.0 and "the power law abstained" in alone.reason
+	# halves that disagree widen the band past +-50%: abstain
+	wide = lf.ensemble(power, (0.9, 1.0, 1.1))
+	assert wide.status == "abstain" and "wider than" in wide.reason
+
+
+def test_a_power_law_too_wide_to_trust_keeps_the_ensemble_abstained():
+	from preflight.engine import lossforecast as lf
+
+	wide = lf.Forecast(None, None, None, "abstain", "the 90% band is wider than +-50%", (1.0, 0.3, 2.0))
+	assert lf.ensemble(wide, (1.9, 2.0, 2.1)) is wide

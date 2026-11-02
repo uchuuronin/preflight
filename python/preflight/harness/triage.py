@@ -11,7 +11,7 @@ visitor's script printed, so the runner calls this only with harness.spark_open_
 the data-use notice must disclose (as harness.spark_script_map is).
 """
 
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,10 @@ class Triage(BaseModel):
 SYSTEM = ("You triage the output of a short probe run of a machine-learning script. Say what happened, "
 	"from the log only: a category from the list, one plain sentence, and the one log line it rests on, "
 	"copied exactly. Never guess beyond the log; use 'unclear' when it doesn't say.")  # fmt: skip
+# the answer's shape in words too: a model served without guided decoding (Glimmer on vLLM, Nov 1)
+# doesn't see the response_format schema, and answered with the probe's error code as the category
+ANSWER = ('Answer with JSON only: {"category": one of ' + ", ".join(f'"{c}"' for c in get_args(Category))
+	+ ', "summary": "<one sentence>", "evidence_line": "<the log line, copied exactly, or empty>"}')  # fmt: skip
 
 
 def _who(client) -> str:
@@ -48,7 +52,7 @@ def triage_probe(client, probe, log_tail: str, node_id: str | None = None) -> tu
 		tail += "\n[the probe's recorded error]\n" + probe.error[:ERROR_CHARS]
 	status = f"status {probe.status}" + (f", error code {probe.error_code}" if probe.error_code else "")
 	msgs = [{"role": "system", "content": SYSTEM},
-		{"role": "user", "content": f"Probe {probe.id}: {status}, {probe.steps} optimizer steps.\nLog tail:\n{tail}"}]  # fmt: skip
+		{"role": "user", "content": f"Probe {probe.id}: {status}, {probe.steps} optimizer steps.\nLog tail:\n{tail}\n\n{ANSWER}"}]  # fmt: skip
 	before = len(client.calls)
 	try:
 		t, _ = client.structured(msgs, Triage, purpose="triage", reasoning_effort="low")

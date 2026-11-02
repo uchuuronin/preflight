@@ -8,6 +8,73 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 |---|---|---|---|---|
 | | | | | None yet. D's checks run locally in CI; no GPU needed so far. |
 
+## Sun Nov 1, 20:15 (the draft mirrors the 8 PM README)
+
+`b3c5c4d` CI green. Chiya (20:07): `main` `d5062bc` has `readme-final.md` as `README.md`, with
+`c.hops`, `c.exports`, `d.expertise`, `d.currency` and `d.freetier` on in production and
+`d.notebook` off until A's real notebook check-in passes. `d5062bc` isn't on GitHub yet (main is
+still `50db9b6` at 20:12), so I mirrored the change from her description: three rows move to "On in
+production" (possible outcomes, the exports with the Weights & Biases helper, and the three add-ons),
+"Behind a flag" keeps the notebook tab and the exports' CLI item, and the Add-ons section says
+which are on. Once `d5062bc` lands I'll diff the draft against `README.md` and match its wording.
+The cap after Nov 4 gets its number once A's $8 is deployed.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the draft's tables and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, 18:45 (D's four flags checked for strangers before the 8 PM change)
+
+`b8963a9` CI green. Chiya (18:20): A's redeploy is confirmed with the limits live, so the README's
+limits TODO(PM) is gone. The GPU cap after Nov 4 is $8 a day, not $30 (Chiya), but
+`runner/queue.py` still says $30, so the README gives only the $10 through Nov 4 and "a daily GPU
+spend cap" otherwise (Chiya allowed either wording); A is asked to change the code.
+
+**Checked** on `main` `50db9b6` [measured, Chromium], before the free-tier fix: `addons.mjs` passes
+20 of 20 add-on states (desk and phone, dusk and day, flag on and off). On a production-mode build
+with the four flags added, the home page, New flight, the logbook and seven sample cockpits load at
+both sizes with no page or console errors (only the missing API behind the dev server). After the
+fix: 252 of 252 add-on tests and the typecheck pass, and the production-mode build shows the
+free-tier line with its status word [measured].
+
+| Flag | Ready for strangers? | Basis |
+| --- | --- | --- |
+| `d.expertise` | **Yes** | The dial and glossary cards on every sample cockpit; the dial's order stays frozen (zoo check unchanged on the engine goldens) |
+| `d.currency` | **Yes** | Every price converts through the ECB's reference rates of Oct 26, 2026, shipped with the app (`rates.json`, no network call), with the source and date shown |
+| `d.freetier` | **Yes, with tonight's fix** | Its "Needs N GiB" line gave a number with no status word; it now says where it comes from, as the readouts do: "(illustrative)" on a sample, the estimate's own word on a real record (new test). Its session limits are cited per tier, with the dates read |
+| `d.notebook` | **Code ready; one run short** | The API accepts kind `notebook`, the runner converts it, and A's deployed `d73b4e1` has that path; D's parity test against A's converter passes. No notebook check-in has run end to end on the deployed runner in A's status: asked A to confirm, ideally with one real check-in before 8 PM. Until A confirms, I'd leave it off |
+
+**Also seen, not D's flag:** the PF102 sample (Qwen2.5-1.5B LoRA, engine-filled golden) reads
+"Runs out of memory on L4: peaks at 117 GiB", labelled Illustrative; the real run peaks at 20.4
+GiB. Asked B and the PM (`from-d.md`).
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the free-tier status word and its test, the README's limits sentence, the kit's limits
+lines, the requests to A and B, and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
+## Sun Nov 1, 18:20 (round six merged)
+
+`b43c386` CI green. Merged `main` `50db9b6` (round six; a fast-forward, since `main` already held
+`ws-d`). On it: add-on tests 251 of 251, typecheck clean, worker tests 18 of 18, hero card up to
+date, ruff clean on the GNN script [measured].
+
+- **Limits sentence:** the TODO(PM) stays (Chiya, 18:11) until A confirms. A's status already
+  reports the redeploy with the limits (`a-deploy-main-19`, 20:20 UTC, from `ws-a` `d73b4e1`,
+  which contains `9a2bb82` and `5a78a60`); the TODO now says so, so the PM can check it at the
+  8 PM swap. The builder kit's two limits lines say the same, as A's report, and keep the "watch
+  for more than 3 check-ins" fallback until A confirms.
+- **Triage shot:** that redeploy also has A's fix `b300684` (triage reads the probe's recorded
+  error), so A's re-run of the production LoRA triage can now quote the OOM line. No re-run is
+  posted yet.
+
+**This push to `origin/ws-d` sends** (gitleaks clean; reviewed read-only; CI result in the next
+entry): the TODO wording, the kit's two limits lines and this entry.
+
+Cloud runs: none. GPU minutes 0, dollars 0.
+
 ## Sun Nov 1, 16:05 (the corpus on Hugging Face, linked)
 
 `ca58c59` CI green.

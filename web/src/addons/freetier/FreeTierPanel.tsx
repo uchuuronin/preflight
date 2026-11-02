@@ -6,6 +6,8 @@
 import { fmt } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import type { WorkspaceContextValue } from "../../registry";
+import { provenanceKey } from "../../workspace/components/StatusMark";
+import { isFixture } from "../../workspace/record/model";
 import { canonicalGpu, checkPreset, gpuMemoryBytes, type Verdict } from "./check";
 import { PRESETS, type Preset, type Source } from "./presets";
 
@@ -36,13 +38,14 @@ function chip(v: Verdict, p: Preset): string {
 	return t(`addon.freetier.chip.${v.kind}`);
 }
 
-function say(v: Verdict, p: Preset, current: string | null, gpu: string | null): string {
+/** The memory need says where its number comes from, as the readouts do (a sample's is illustrative). */
+function say(v: Verdict, p: Preset, current: string | null, gpu: string | null, memStatus: string): string {
 	switch (v.kind) {
 		case "sessions":
 			return t("addon.freetier.say.sessions", { every: fmt(v.saveEveryS, "s") });
 		case "no_memory": {
 			const on = gpu && p.gpus.includes(gpu) ? gpu : (p.gpus.find((g) => gpuMemoryBytes(g) === v.haveBytes) ?? p.gpus[0] ?? "");
-			return t("addon.freetier.say.no_memory", { need: fmt(v.needBytes, "bytes"), gpu: short(on), have: fmt(v.haveBytes, "bytes") });
+			return t("addon.freetier.say.no_memory", { need: fmt(v.needBytes, "bytes"), status: memStatus, gpu: short(on), have: fmt(v.haveBytes, "bytes") });
 		}
 		case "other_gpu":
 			return t("addon.freetier.say.other_gpu", { current: current ?? "", gpus: gpuList(p) });
@@ -65,6 +68,8 @@ export function FreeTierPanel({ record, knobs, estimates }: WorkspaceContextValu
 	const raw = typeof knobs.gpu_type === "string" ? knobs.gpu_type : (record.env?.gpu?.name ?? null);
 	const gpu = canonicalGpu(raw);
 	const input = { gpu, memory: estimates["memory.peak"], time: estimates["time.total"], cost: estimates["cost.total"] };
+	const mem = estimates["memory.peak"];
+	const memStatus = mem ? t(provenanceKey(mem.status, isFixture(record))).toLowerCase() : "";
 	const usesBf16 = typeof knobs.precision === "string" && knobs.precision.toLowerCase().includes("bf16");
 	return (
 		<section className="pf-addon-freetier" aria-labelledby="pf-addon-freetier-title">
@@ -84,7 +89,7 @@ export function FreeTierPanel({ record, knobs, estimates }: WorkspaceContextValu
 								<span className="pf-addon-freetier__meta">{t("addon.freetier.cap", { h: p.sessionCapS / 3600 })}</span>
 								<span className={CHIP[v.kind]}>{chip(v, p)}</span>
 							</div>
-							<p className="pf-addon-freetier__say">{say(v, p, raw ? short(gpu ?? raw) : null, gpu)}</p>
+							<p className="pf-addon-freetier__say">{say(v, p, raw ? short(gpu ?? raw) : null, gpu, memStatus)}</p>
 							{"overCredit" in v && v.overCredit && p.monthlyCreditUsd !== undefined ? (
 								<p className="pf-addon-freetier__say">{t("addon.freetier.over_credit", { credit: fmt(p.monthlyCreditUsd, "usd") })}</p>
 							) : null}

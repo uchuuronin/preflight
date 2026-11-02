@@ -187,19 +187,57 @@ def test_grids_skip_the_serving_simulation(monkeypatch):
 	assert calls
 
 
-def test_raising_max_new_tokens_past_a_cap_the_probe_hit_abstains(monkeypatch):
+def _capped_record(t, cap=512, sequences=64, mean=180.0):
 	from preflight.schema.record import Domain, Knob
 
-	monkeypatch.setitem(api.FEATURES, "serving", True)
 	base = _serve_record()
-	probes = [
-		p.model_copy(update={"generation": p.generation.model_copy(update={"truncation_rate": 0.1})})
-		for p in base.probes
-	]
-	knob = Knob(id="max_new_tokens", label_key="k", kind="int", current=512, domain=Domain(min=1, max=8192))
-	rec = base.model_copy(update={"probes": probes, "knobs": [*base.knobs, knob]})
-	tp = api.predict(rec, {"max_new_tokens": 2048}).root["serving.throughput"]
-	assert tp.status == "abstain" and "hit its 512-token cap" in tp.reason
+	upd = {"truncation_rate": t, "max_new_tokens": cap, "sequences": sequences, "new_tokens_mean": mean}
+	probes = [p.model_copy(update={"generation": p.generation.model_copy(update=upd)}) for p in base.probes]
+	knob = Knob(id="max_new_tokens", label_key="k", kind="int", current=cap, domain=Domain(min=1, max=8192))
+	return base.model_copy(update={"probes": probes, "knobs": [*base.knobs, knob]})
+
+
+def test_raising_max_new_tokens_past_a_cap_most_outputs_hit_abstains(monkeypatch):
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	for t in (None, 0.6):
+		tp = api.predict(_capped_record(t), {"max_new_tokens": 2048}).root["serving.throughput"]
+		assert tp.status == "abstain" and "hit its 512-token cap" in tp.reason
+
+
+def test_the_censored_fit_recovers_the_lengths_past_the_cap():
+	rng = np.random.default_rng(0)
+	x = rng.lognormal(5.5, 0.7, 200_000)
+	cap = 400.0
+	fit = serving.censored_lognormal(float(np.minimum(x, cap).mean()), cap, float((x >= cap).mean()))
+	assert (
+		fit is not None and fit[0] == pytest.approx(5.5, abs=0.02) and fit[1] == pytest.approx(0.7, abs=0.02)
+	)
+	assert (
+		serving.censored_lognormal(100.0, 400.0, 0.0) is None
+		and serving.censored_lognormal(500.0, 400.0, 0.1) is None
+	)
+
+
+def test_a_probe_that_hit_its_cap_extrapolates_through_the_fit(monkeypatch):
+	"""PM, Nov 1: A's vLLM probe caps new tokens at 1,024 with 32 prompts in one call. Some outputs hitting the cap
+	no longer blocks a higher cap: the lengths past it come from a log-normal fitted through the cap, labelled."""
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	rec = _capped_record(3 / 32, cap=1024, sequences=32, mean=420.0)
+	here = api.predict(rec).root["serving.throughput"]
+	assert here.status != "abstain" and "fitted through the cap" not in here.reason
+	far = api.predict(rec, {"max_new_tokens": 4096}).root
+	tp = far["serving.throughput"]
+	assert (
+		tp.status == "extrapolated"
+		and "3 of the probe's 32 outputs were still running at its 1,024-token cap" in tp.reason
+	)
+	assert np.log(tp.hi / tp.point) >= serving.Z90 * serving.SIGMA_UNCALIBRATED - 1e-9
+	# longer replies keep the batch running longer, so time to first token for the batch doesn't shrink
+	assert far["serving.ttft_p95"].point >= api.predict(rec).root["serving.ttft_p95"].point * 0.99
+	# and the workload carries outputs past 1,024
+	_, _ = api._serve_workload(rec, {}, rec.probes[0])
+	batches, _ = api._serve_workload(rec, {"max_new_tokens": 4096}, rec.probes[0])
+	assert max(r.output for b in batches for r in b) > 1024
 
 
 def test_a_calibration_on_other_hardware_keeps_the_wide_band(monkeypatch):
@@ -209,3 +247,87 @@ def test_a_calibration_on_other_hardware_keeps_the_wide_band(monkeypatch):
 	there = api.predict(rec, {"gpu_type": "A100-SXM-80GB"}).root["serving.throughput"]
 	assert np.log(there.hi / there.point) > np.log(here.hi / here.point)
 	assert "other hardware" in there.reason
+
+
+def test_a_serving_cap_shape_reads_the_probe_cap_from_its_extra(monkeypatch):
+	"""A's branch a-serving-cap (Nov 1): every reply stops at extras.serving_probe_max_tokens (1,024) while
+	generation.max_new_tokens keeps the script's 4,096, and replies cut at the probe's cap count as ending unknown
+	(generation_ending_known), so truncation_rate is over the others. The engine reads the probe's cap and the share
+	still running there, so at the script's own 4,096 the replies run past 1,024 and the readout says it's a fit."""
+	from preflight.schema.record import Domain, Knob
+
+	monkeypatch.setitem(api.FEATURES, "serving", True)
+	base = _serve_record()
+	upd = {
+		"sequences": 32,
+		"new_tokens_mean": 520.0,
+		"new_tokens_p95": 1024,
+		"max_new_tokens": 4096,
+		"truncation_rate": 0.0,
+	}
+	probes = [
+		p.model_copy(
+			update={
+				"generation": p.generation.model_copy(update=upd),
+				"extras": {**p.extras, "serving_probe_max_tokens": 1024.0, "generation_ending_known": 26.0},
+			}
+		)
+		for p in base.probes
+	]
+	knob = Knob(id="max_new_tokens", label_key="k", kind="int", current=4096, domain=Domain(min=1, max=8192))
+	rec = base.model_copy(update={"probes": probes, "knobs": [*base.knobs, knob]})
+	p0 = rec.probes[0]
+	cap, share = api._probe_cap(p0)
+	assert cap == 1024 and share == pytest.approx(6 / 32)
+	tp = api.predict(rec).root["serving.throughput"]
+	assert (
+		tp.status == "extrapolated"
+		and "6 of the probe's 32 outputs were still running at its 1,024-token cap" in tp.reason
+	)
+	batches, _ = api._serve_workload(rec, {}, p0)
+	assert max(r.output for b in batches for r in b) > 1024  # the script's 4,096 lets them run on
+	cal, _ = api._serve_workload(rec, {}, p0, probe_cap=cap)
+	assert max(r.output for b in cal for r in b) <= 1024  # the calibration replays the probe as it ran
+	# the explicit extra wins over the derived share
+	p1 = p0.model_copy(update={"extras": {**p0.extras, "serving_probe_capped_fraction": 0.25}})
+	assert api._probe_cap(p1) == (1024.0, 0.25)
+
+
+def test_a_script_capped_below_the_probe_keeps_its_own_cap_and_rate():
+	"""Review, Nov 1: with the script's cap at 256 under the probe's 1,024, the script's own truncation counts."""
+	base = _serve_record()
+	upd = {"max_new_tokens": 256, "truncation_rate": 0.4}
+	p = base.probes[0].model_copy(
+		update={
+			"generation": base.probes[0].generation.model_copy(update=upd),
+			"extras": {**base.probes[0].extras, "serving_probe_max_tokens": 1024.0},
+		}
+	)
+	assert api._probe_cap(p) == (256.0, 0.4)
+	# every reply cut at the probe's cap: A writes no generation_ending_known, so the share is all of them
+	q = base.probes[0].model_copy(
+		update={
+			"generation": base.probes[0].generation.model_copy(update={"max_new_tokens": 4096}),
+			"extras": {**base.probes[0].extras, "serving_probe_max_tokens": 1024.0},
+		}
+	)
+	assert api._probe_cap(q) == (1024.0, 1.0)
+
+
+def test_equal_caps_count_cut_replies_whichever_way_they_were_recorded():
+	"""Re-check, Nov 1: script and probe both at 1,024; 6 of 32 cut, counted as unknown or as known truncations."""
+	base = _serve_record()
+	for known, rate in ((26.0, 0.0), (32.0, 6 / 32)):
+		p = base.probes[0].model_copy(
+			update={
+				"generation": base.probes[0].generation.model_copy(
+					update={"max_new_tokens": 1024, "sequences": 32, "truncation_rate": rate}
+				),
+				"extras": {
+					**base.probes[0].extras,
+					"serving_probe_max_tokens": 1024.0,
+					"generation_ending_known": known,
+				},
+			}
+		)
+		assert api._probe_cap(p) == (1024.0, pytest.approx(6 / 32))

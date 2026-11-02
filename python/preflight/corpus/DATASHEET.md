@@ -69,6 +69,21 @@ The HF jobs are 10 groups of five on real Hugging Face checkpoints, LoRA in bf16
 
 Two passes (Chiya, Nov 1). The first answered 64 of 73 rows: of its 16 failed calls, 8 ran into the 8,192-token output cap (an answer that never closed its JSON), 6 timed out at 20 s, and 2 re-asks were cut off when the row's 30 s ran out. The second asked only those 9 rows again with a 16,384-token cap and 90 s, and answered 8; one row ran past the cap on both tries and stays unanswered. 7 out-of-memory rows have no rule label (5 CNN rows have no analytical model, and 2 HF rows didn't record their model shape when they failed), so 65 of the 73 rows are compared. 90 calls in all, 42,454 input and 153,953 output tokens, $0.70 ($0.538 for the first pass and $0.167 for the second, under its $0.50). Every call, failed or not, is in `corpus/provenance/spark_open_labels_nov1.jsonl` with its tokens and cost; each row's label and reason are in `corpus/reports/spark_labels_nov1_rows.jsonl` and the agreement in `corpus/reports/spark_labels_nov1.json`. A timed-out call is logged at $0, though Baseten may have billed it.
 
+**Whole-corpus labels by Muse Spark Open** (Nov 1, evening; Chiya: Baseten credit, up to $10). Every one of the 2,339 published rows was sent in batches of 8 rows of one kind (`scripts/spark_label_all.py`; same model and effort, rows as `r1` to `r8`, never the corpus key) with one question per kind: for a memory row, fitted or out of memory, which memory use is the largest part of its peak; for a divergence run, whether it stayed stable and, if not, how it failed. Neither the rule label nor the hindsight label was ever in the prompt. 1,997 rows were answered; 342 were not: 328 in 41 batches whose answer ran to the 12,000-token output cap twice, padding its JSON with whitespace, and 14 left out of 2 batches that otherwise answered. The 111 failed calls cost $5.86 of the $8.59.
+
+| Task | Compared | Agree | Rate (Wilson 95%) | Where they differ |
+| --- | --- | --- | --- | --- |
+| Memory rows, all | 881 | 545 | 62% (59% to 65%) | the rule (the engine's largest analytical term, not a measurement) says logits for 440 rows; Spark Open says activations for 136 and model state for 103 of them |
+| Out-of-memory rows | 21 | 16 | 76% (55% to 89%) | the same 21 as the first pass, which had 15 |
+| Fitted rows | 860 | 529 | 62% (58% to 65%) | as for all memory rows |
+| Divergence runs, the label | 641 | 572 | 89% (87% to 91%) | Spark Open calls 66 of 600 stable runs a blow-up. **Always answering "stable" scores 600 of the same 641, 94% (91% to 95%)**, so on stable runs Spark Open does worse than that baseline |
+| Diverged or not | 640 | 574 | 90% (87% to 92%) | the 66 false blow-ups |
+| The runs whose loss stayed finite | 606 | 539 | 89% (86% to 91%) | the harder test: a non-finite loss stops a run early, so those runs read off the evidence |
+| How it failed, where both say it diverged | 41 | 39 | 95% (84% to 99%) | 2 non-finite runs called collapse |
+| All compared | 1,522 | 1,117 | 73% (71% to 76%) | |
+
+Batching didn't change Spark Open's answer much: on the 67 rows both passes answered, the batched label matches the single-row one for 63, 94% (86% to 98%). 571 rows have no rule label (569 CNN and MLP rows have no analytical model; 2 HF rows didn't record their shape), so they are labelled and not compared. 363 calls (111 failed), 741,716 input and 1,845,364 output tokens, $8.59 recorded, plus the 48-row pilot's $0.20: **$8.79 of the $10**. Every call is in `corpus/provenance/spark_open_labels_all_nov1.jsonl`; each row's label and reason in `corpus/reports/spark_labels_all_nov1_rows.jsonl.gz` and the agreement in `corpus/reports/spark_labels_all_nov1.json`. Read the memory agreement as Spark Open against the engine's analytical split, not against a measured one; the corpus measures only the peak.
+
 **Personal or sensitive data.** None.
 
 ## Collection
