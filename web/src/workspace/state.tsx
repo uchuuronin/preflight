@@ -11,14 +11,19 @@ import {
 	useMemo,
 	useReducer,
 	useRef,
+	useSyncExternalStore,
 	type ReactNode,
 } from "react";
 import { type Limits, NO_LIMITS } from "../guide/limits";
 import { currentKnobs } from "./record/model";
 import type { KnobValue, LoadedRecord, Objective, ObjectiveKind, Prediction } from "./record/types";
+import { askEngine, engineOn, engineVersion, needsEngine, subscribeEngine, withEngine } from "./provider/engineFallback";
 import type { PredictionProvider } from "./provider/PredictionProvider";
 import { loadRate, type RateOverride, saveRate, withRate } from "./rate";
 import { recordKnobLatency } from "./telemetry";
+
+/** Source: guess, a knob drag lands several times a second; the engine is asked once it settles. */
+const ENGINE_SETTLE_MS = 300;
 
 export interface Snapshot {
 	id: string;
@@ -219,9 +224,18 @@ export function WorkspaceProvider({
 	const changeStart = useRef<number | null>(null);
 	// Every reader (dials, timeline, guide, limits) goes through this provider, so the visitor's rate
 	// reaches every dollar at once.
-	const rated = useMemo(() => withRate(baseProvider, state.rate), [baseProvider, state.rate]);
+	// Where the grids hold no value, the engine's own prediction once it has answered (engineFallback.ts).
+	const engineV = useSyncExternalStore(subscribeEngine, engineVersion, engineVersion);
+	const engineBase = useMemo(() => withEngine(baseProvider, ref), [baseProvider, ref, engineV]); // eslint-disable-line react-hooks/exhaustive-deps
+	const rated = useMemo(() => withRate(engineBase, state.rate), [engineBase, state.rate]);
 	const estimates = useMemo(() => rated.predict(record, state.knobs), [rated, record, state.knobs]);
-	const tableEstimates = useMemo(() => (state.rate ? baseProvider.predict(record, state.knobs) : estimates), [state.rate, baseProvider, record, state.knobs, estimates]);
+	const tableEstimates = useMemo(() => (state.rate ? engineBase.predict(record, state.knobs) : estimates), [state.rate, engineBase, record, state.knobs, estimates]);
+	// The setting the visitor lands on: ask the engine once the knobs settle, if the grids can't say.
+	useEffect(() => {
+		if (!engineOn(ref) || !needsEngine(baseProvider.predict(record, state.knobs))) return;
+		const id = setTimeout(() => void askEngine(ref, record, [state.knobs]), ENGINE_SETTLE_MS);
+		return () => clearTimeout(id);
+	}, [ref, record, baseProvider, state.knobs]);
 
 	// Knob latency is measured to the frame after the new readouts commit, which is what the
 	// person sees; the contract's target is under 400 ms at p95.
