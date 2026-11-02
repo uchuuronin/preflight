@@ -55,6 +55,5 @@ Found by Muse Spark Open triage, quotes the log line.")
 
 ## Reply under the post (optional)
 
-Every number in Preflight says how it was made: measured, predicted, or not trusted when it's too
-far from anything measured. Built Oct 26 to Nov 4 for the Meta hackathon, on Muse Spark, Muse Spark
+Every number in Preflight says how it was made: measured, predicted, or not measured here. Built Oct 26 to Nov 4 for the Meta hackathon, on Muse Spark, Muse Spark
 Open and Muse Glimmer. Code: https://github.com/uchuuronin/preflight (public from Nov 3 to 4)

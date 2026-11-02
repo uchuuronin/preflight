@@ -67,7 +67,7 @@ a shared record's link. Or check in your own repo or script under New flight.
 
 **Share a flight** (once `workers/` is in the deploy; TODO(PM)): post
 `https://TODO-PM-HOST/s/<share token>`. Link previews show the record's headline numbers, each with
-its status word (Measured, Predicted, Extrapolated, Not trusted or Illustrative), as text, with a
+its status word (Measured, Predicted, Extrapolated, Not measured here or Illustrative), as text, with a
 card image for the records whose card is pre-rendered, and the link opens the flight in the
 cockpit.
 For a README badge:
