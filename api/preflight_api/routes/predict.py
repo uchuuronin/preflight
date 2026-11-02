@@ -74,7 +74,7 @@ def _predict_all(raw: dict, cells: list[dict]) -> list[dict]:
 	from preflight.engine import api
 	from preflight.schema import FlightRecord
 
-	# The engine's models as the runner has them (engine.rl, engine.memory, ...: runner/pipeline.py
+	# The engine's models as the runner has them (engine.rl, engine.serving, ...: runner/pipeline.py
 	# sets the same from flags), so this answers as the record's own predictions were made. A context
 	# variable, and this runs in its own worker thread, so nothing else sees it.
 	api._FEATURES_NOW.set(api.features_from(flag))
