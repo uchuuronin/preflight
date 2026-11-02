@@ -89,7 +89,7 @@ def test_install_adds_the_extra_packages_with_or_without_a_requirements_file(tmp
 	assert err is None and seen[-1][-2:] == ["timm", "torchao<0.8"] and "--only-binary" in seen[-1]
 	(tmp_path / "requirements.txt").write_text("einops\n")
 	err, _ = R.install(tmp_path, tmp_path / "d2", log=lambda m: None, extra=["timm"])
-	assert err is None and seen[-1][-2:] == ["einops", "timm"]
+	assert err is None and seen[-1][-2:] == ["timm", "einops"]  # the extra packages first
 	monkeypatch.setattr(R, "installed", lambda: {"timm": "1.0", "einops": "0.8"})
 	n = len(seen)  # the image's own copy wins: nothing left to install
 	assert (
@@ -123,7 +123,9 @@ def test_the_probe_spec_carries_the_lines_and_the_cache_key_changes_only_when_se
 
 def test_the_job_request_takes_up_to_ten_names():
 	rec = {"kind": "upload", "files": {"t.py": "x"}}
-	assert JobRequest(source=rec).extra_packages == []
+	assert JobRequest(source=rec).extra_packages is None
+	# absent stays absent: a queued request's body (and its idempotency hash) is as before
+	assert "extra_packages" not in JobRequest(source=rec).model_dump(exclude_none=True)
 	assert JobRequest(source=rec, extra_packages=["timm"]).extra_packages == ["timm"]
 	with pytest.raises(ValueError):
 		JobRequest(source=rec, extra_packages=["timm"] * 11)
@@ -230,3 +232,82 @@ def test_the_maps_limit_has_its_own_code_and_every_new_code_its_own_step():
 	assert SourceTooLarge.code == "map.too_large"
 	for code in ("map.too_large", "missing_package.not_allowed", "missing_package.no_wheels"):
 		assert code in STEPS
+
+
+# ---------------------------------------------------------------- review fixes (Nov 2)
+
+
+def test_the_extra_packages_go_before_a_long_requirements_file(tmp_path, monkeypatch):
+	seen = []
+	monkeypatch.setattr(
+		R.subprocess, "run", lambda cmd, **kw: seen.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", "")
+	)
+	monkeypatch.setattr(R, "installed", lambda: {})
+	monkeypatch.delenv("PREFLIGHT_DEPS_DIR", raising=False)
+	(tmp_path / "requirements.txt").write_text("".join(f"pkg{i}\n" for i in range(60)))
+	assert R.install(tmp_path, tmp_path / "d", log=lambda m: None, extra=["timm"])[0] is None
+	assert "timm" in seen[-1]  # the requirements' cap (50) drops the file's tail, never them
+
+
+def test_a_library_asking_for_a_package_names_it_too():
+	from preflight.probes.local import _missing
+
+	msg = "A library in the script needs accelerate, which is not installed in the probe image"
+	assert _missing("missing_package", msg) == {"missing_module": "accelerate"}  # not on the list
+	assert _missing("missing_package", msg.replace("accelerate", "timm")) == {
+		"missing_module": "timm", "missing_package": "timm"}  # fmt: skip
+
+
+def test_the_upload_limits_are_the_read_limit_code():
+	from preflight.probes.local import MAX_FILES, validate_files
+
+	with pytest.raises(InvalidSubmission) as exc:
+		validate_files({f"f{i}.py": "" for i in range(MAX_FILES + 1)}, entrypoint="f0.py")
+	assert exc.value.code == "submission.too_large"
+
+
+def test_a_sample_record_read_again_with_scope_keeps_working():
+	src = Source(kind="sample", uri="sample://zoo/x", entrypoint="sub/train.py", scope="entrypoint")
+	assert "scope" not in record_jobs.refetch(src, None)  # no entry point to start from: read whole
+
+
+def test_the_pipeline_installs_them_keeps_them_and_a_later_job_adds_to_them(tmp_path):
+	from pathlib import Path
+
+	from preflight.probes.local import ProbeResult
+	from preflight.runner.pipeline import Deps, _Ctx, run_pipeline
+	from preflight.runner.records import LocalRecordWriter
+	from preflight.runner.remote_store import DirBlobs, externalise_files
+	from preflight.schema import Env, Probe
+
+	specs = []
+
+	def runner(spec, gpu, *, should_stop):
+		specs.append(spec)
+		probe = Probe(id=spec.probe_id, knobs=spec.knobs, status="ok", steps=7, duration_s=30.0)
+		return ProbeResult(probe=probe, env=Env(backend="cuda", provider="modal", gpu={"name": gpu}), summary={},
+			kernels=None, arch=None, trace_file=None, log_tail="", workdir=Path("."))  # fmt: skip
+
+	store = LocalRecordWriter(tmp_path / "records")
+	deps = Deps(
+		records=store, runner=runner, reader=store, install_requirements=True, blobs=DirBlobs(tmp_path / "up")
+	)
+	script = "import torch\nbatch_size = 8\nmodel = torch.nn.Linear(4, 4)\nopt = torch.optim.SGD(model.parameters(), 0.1)\n"
+	req = externalise_files({"source": {"kind": "upload", "files": {"train.py": script}}, "extra_packages": ["timm"]},
+		deps.blobs)  # fmt: skip
+	rec = run_pipeline(req, _Ctx(), deps)
+	assert (
+		rec.job.source.extra_packages == ["timm"]
+		and specs
+		and all(s.extra_packages == ("timm",) for s in specs)
+	)
+	store.put(rec)
+	specs.clear()
+	ref = {"kind": "record", "record_ref": rec.share_token}
+	again = run_pipeline({"source": ref, "mode": "probe", "knobs": {"batch_size": 4}, "extra_packages": ["einops"]},
+		_Ctx(), deps)  # fmt: skip
+	assert again.job.source.extra_packages == ["timm", "einops"]  # the record's first, then the new
+	assert specs and all(s.extra_packages == ("timm", "einops") for s in specs)
+	specs.clear()
+	plain = run_pipeline({"source": ref, "mode": "probe", "knobs": {"batch_size": 2}}, _Ctx(), deps)
+	assert plain.job.source.extra_packages == ["timm"] and all(s.extra_packages == ("timm",) for s in specs)

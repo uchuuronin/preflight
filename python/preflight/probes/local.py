@@ -246,7 +246,9 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 	if entrypoint not in files:
 		raise InvalidSubmission(f"the entrypoint {entrypoint!r} is not among the submitted files")
 	if len(files) > MAX_FILES:
-		raise InvalidSubmission(f"{len(files)} files submitted; the limit is {MAX_FILES} files")
+		raise InvalidSubmission(
+			f"{len(files)} files submitted; the limit is {MAX_FILES} files", code="submission.too_large"
+		)
 	total = 0
 	for rel, text in files.items():
 		p = PurePosixPath(rel)
@@ -265,12 +267,14 @@ def validate_files(files: dict[str, str], *, entrypoint: str) -> None:
 			) from None
 		if size > MAX_FILE_BYTES:
 			raise InvalidSubmission(
-				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB"
+				f"{rel} is {size / 2**20:.1f} MB; files are capped at {MAX_FILE_BYTES // 2**20} MB",
+				code="submission.too_large",
 			)
 		total += size
 	if total > MAX_TOTAL_BYTES:
 		raise InvalidSubmission(
-			f"submission is {total / 2**20:.1f} MB; the cap is {MAX_TOTAL_BYTES // 2**20} MB"
+			f"submission is {total / 2**20:.1f} MB; the cap is {MAX_TOTAL_BYTES // 2**20} MB",
+			code="submission.too_large",
 		)
 
 
@@ -664,8 +668,12 @@ def _rl(raw: dict | None) -> RLSignals | None:
 	return RLSignals(**raw)
 
 
-# the recorder's missing-import message (recorder/errors.py): "The script imports X, which is not installed"
+# the recorder's missing-import messages (recorder/errors.py): "The script imports X, which is not installed",
+# and a library's own check, "A library in the script needs X, which is not installed" (X a PyPI name there)
 _MISSING = re.compile(r"The script imports ([A-Za-z_][A-Za-z0-9_.]{0,199}), which is not installed")
+_NEEDS = re.compile(
+	r"A library in the script needs ([A-Za-z0-9][A-Za-z0-9._-]{0,99}), which is not installed"
+)
 
 
 def _missing(code: str | None, error: str | None) -> dict:
@@ -673,14 +681,22 @@ def _missing(code: str | None, error: str | None) -> dict:
 	it, and the PyPI name on Preflight's list that provides it (absent when it isn't on the list)."""
 	if code != "missing_package" or not error:
 		return {}
+	from preflight.recorder.requirements import known_packages, package_for_module
+
 	m = _MISSING.search(error)
+	if m is not None:
+		mod = m.group(1).rstrip(".")
+		pkg = package_for_module(mod)
+		return {"missing_module": mod, **({"missing_package": pkg} if pkg else {})}
+	m = _NEEDS.search(error)  # a PyPI name: on the list, it's both (accelerate asked for by Trainer)
 	if m is None:
 		return {}
-	from preflight.recorder.requirements import package_for_module
-
-	mod = m.group(1).rstrip(".")
-	pkg = package_for_module(mod)
-	return {"missing_module": mod, **({"missing_package": pkg} if pkg else {})}
+	name = m.group(1).rstrip(".")
+	line = known_packages().get(re.sub(r"[-_.]+", "-", name).lower())
+	return {
+		"missing_module": name,
+		**({"missing_package": re.match(r"[A-Za-z0-9._-]+", line)[0]} if line else {}),
+	}
 
 
 def _probe_model(

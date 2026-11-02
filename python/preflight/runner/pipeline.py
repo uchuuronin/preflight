@@ -405,7 +405,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		origin = record_jobs.resolve(source, reader=deps.reader, blobs=deps.blobs)
 		source = origin.fetch_source
 	if req.extra_packages:  # 0.6.3: checked against the list by fetch, and kept on the record's source
-		source = {**source, "extra_packages": list(req.extra_packages)}
+		# added to the record's own (a probe from a record that already installs some), in order, once each
+		had = source.get("extra_packages") or []
+		source = {**source, "extra_packages": list(dict.fromkeys([*had, *req.extra_packages]))}
 	_emit(ctx, "fetching")
 	fetched = fetch(source, blobs=deps.blobs)
 	if origin is not None and origin.parent is not None:
@@ -788,7 +790,8 @@ def _reading_findings(fetched: Fetched) -> list:
 			else ""
 		)
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
-			title="Read the entry point and what it imports, not the whole repository",
+			title="Read the entry point and what it imports, as asked" if p.get("asked")
+				else "Read the entry point and what it imports, not the whole repository",
 			detail=(f"{_why_partial(p)}, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
 				f"({_mb(p['bytes'])} in all){left}. The map and the findings cover what was read, and the probes run "
 				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),

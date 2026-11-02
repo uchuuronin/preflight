@@ -1689,8 +1689,6 @@ export interface JobRequest {
 	private?: boolean;
 	/**
 	 * 0.6.3: PyPI names (no versions or URLs) the probe installs after the code's own requirements; only names on Preflight's list (recorder.requirements.known_packages), wheels only, the image's pinned stack wins. A name off the list fails the job with missing_package.not_allowed (.no_wheels for a package PyPI has no wheels for). Kept on the record's source, so later probes of it install them too
-	 *
-	 * @maxItems 10
 	 */
 	extra_packages?:
 		| []
@@ -1703,7 +1701,8 @@ export interface JobRequest {
 		| [string, string, string, string, string, string, string]
 		| [string, string, string, string, string, string, string, string]
 		| [string, string, string, string, string, string, string, string, string]
-		| [string, string, string, string, string, string, string, string, string, string];
+		| [string, string, string, string, string, string, string, string, string, string]
+		| null;
 }
 /**
  * target_id -> Estimate, for one knob setting.

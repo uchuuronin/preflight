@@ -424,7 +424,7 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 	scope = source.get("scope")
 	if scope not in (None, "repo", "entrypoint"):
 		raise InvalidSubmission("source.scope is repo or entrypoint", code="submission.invalid")
-	only_entry = scope == "entrypoint"
+	only_entry = scope == "entrypoint" and kind != "notebook"  # a notebook is one file already
 	want = source.get("entrypoint")
 	if only_entry and not (isinstance(want, str) and want):
 		raise InvalidSubmission("reading only the entry point needs source.entrypoint, the script you run",

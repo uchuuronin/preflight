@@ -444,8 +444,8 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		text = ""
 	else:
 		return None, roots
-	if extra:
-		text = "\n".join([text, *extra])
+	if extra:  # first, so the requirements' own cap (MAX_REQUIREMENTS) never drops them
+		text = "\n".join([*extra, text])
 	have = installed()
 	keep, notes = plan(text, have)
 	for n in notes:

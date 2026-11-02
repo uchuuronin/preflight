@@ -99,8 +99,8 @@ class JobRequest(Strict):
 		description="0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on "
 		"Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten",
 	)
-	extra_packages: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
-		default_factory=list,
+	extra_packages: list[Annotated[str, Field(min_length=1, max_length=100)]] | None = Field(
+		default=None,
 		max_length=10,
 		description="0.6.3: PyPI names (no versions or URLs) the probe installs after the code's own "
 		"requirements; only names on Preflight's list (recorder.requirements.known_packages), wheels only, "
