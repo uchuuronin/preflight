@@ -144,11 +144,21 @@ def _kind_of(path: str) -> str:
 	return "count"
 
 
+def _scale(n: Number) -> float:
+	"""A zero's tolerance is absolute: half a unit in its last place, in base units ("0.0%" is within 0.0005)."""
+	unit = re.search(
+		r"(TiB|GiB|MiB|KiB|TB|GB|MB|KB|ms|sec|seconds|s|minutes|min|m|hours|hrs|hr|h|%)$", n.text
+	)
+	return UNITS[unit.group(1).lower()][1] if unit and unit.group(1).lower() in UNITS else 1.0
+
+
 def candidates(n: Number, raw: dict[str, float]) -> list[str]:
 	"""Raw fields of the number's kind whose value rounds to it as written."""
 	tol = max(n.rel, 1e-9)
-	if n.value == 0:  # "0%": fields that are exactly zero
-		return [path for path, v in raw.items() if _kind_of(path) == n.kind and v == 0]
+	if (
+		n.value == 0
+	):  # "0%", "0.0%": fields that round to zero at the precision written (B, Nov 2: planted claims)
+		return [path for path, v in raw.items() if _kind_of(path) == n.kind and abs(v) <= n.rel * _scale(n)]
 	return [
 		path
 		for path, v in raw.items()
@@ -225,4 +235,44 @@ def check_findings(record, *, client=None) -> tuple[dict[str, list[ClaimCheck]],
 		if checks:
 			out[f.id] = checks
 		calls += cs
+	return out, calls
+
+
+# ---------------------------------------------------------------- annotating findings (B, Nov 2; flag harness.spark_claim_check)
+
+UNSUPPORTED = "unsupported: run a probe"
+# the findings a model wrote; a rule's numbers come from the probes by construction
+MODEL_SOURCES = ("spark_open_triage", "spark_diagnosis", "model")
+_NOTE = re.compile(r"\s*\((?:[^()]*?: unsupported: run a probe(?:; )?)+\)$")
+
+
+def annotate_findings(record, *, client=None) -> tuple[list, list]:
+	"""The record's findings with every model-written number checked: each number gets an Evidence line
+	(`claim_check.supported` naming its field, or `claim_check.unsupported`), and a finding with an unsupported number
+	says so at the end of its detail ("21.9 GB: unsupported: run a probe"). Returns the findings and the model calls.
+	`client` (Spark Open) only picks among fields the code already found; without it an ambiguous number stays
+	ambiguous and is neither marked supported nor unsupported."""
+	from preflight.schema import Evidence
+
+	out, calls = [], []
+	for f in record.findings:
+		if f.source not in MODEL_SOURCES:
+			out.append(f)
+			continue
+		base = _NOTE.sub("", f.detail) if f.detail else f.detail  # an earlier check's note is not a claim
+		checks, cs = check_text(" ".join(x for x in (f.title, base) if x), record, client=client)
+		calls += cs
+		ev = [e for e in f.evidence if not e.metric.startswith("claim_check.")]
+		bad = []
+		for c in checks:
+			if c.verdict == "supported":
+				ev.append(Evidence(metric="claim_check.supported", value=f"{c.number} = {c.field}"))
+			elif c.verdict == "unsupported":
+				ev.append(Evidence(metric="claim_check.unsupported", value=f"{c.number}: {UNSUPPORTED}"))
+				bad.append(c.number)
+		detail = base or None
+		if bad:
+			note = "; ".join(f"{n}: {UNSUPPORTED}" for n in bad)
+			detail = f"{detail} ({note})" if detail else f"({note})"
+		out.append(f.model_copy(update={"evidence": ev, "detail": detail}))
 	return out, calls

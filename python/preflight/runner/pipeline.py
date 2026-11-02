@@ -558,6 +558,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	# or Baseten for a diagnosis (private mode, contract 0.6.2)
 	if req.mode != "verify" and not req.private:
 		out = _diagnose(out, deps)
+	out = _claim_check(out, deps, private=req.private)
 	if req.mode == "verify":
 		by_id = {p.id: p for p in probes}
 		vid = plan[0].probe_id
@@ -757,6 +758,34 @@ def _tested_node(probe, nodes: set[str]) -> str | None:
 	eval probe, or an eval-pass OOM, tested the eval node."""
 	is_eval = probe.id.endswith("-eval") or (probe.error_code or "").startswith("oom.eval")
 	return "eval" if is_eval and "eval" in nodes else None
+
+
+def _claim_check(rec: FlightRecord, deps: Deps, *, private: bool) -> FlightRecord:
+	"""Every number a model-written finding states, checked against the record's raw probe numbers (harness/claim_check.py);
+	one with no supporting number reads "unsupported: run a probe". Off unless harness.spark_claim_check is on. Spark
+	Open only picks among fields the code found; a private job's text never goes to Baseten, so there it is code only."""
+	from .flags import flag
+
+	if not flag("harness.spark_claim_check"):
+		return rec
+	from preflight.harness.claim_check import annotate_findings
+
+	try:
+		findings, calls = annotate_findings(rec, client=None if private else deps.triage)
+	except Exception:  # the check never costs the visitor their record
+		log.warning("job %s: claim check failed", rec.record_id, exc_info=True)
+		return rec
+	added = round(sum(c.cost_usd for c in calls), 6)
+	costs = rec.costs
+	if added:
+		breakdown = dict(costs.breakdown or {})
+		breakdown["model_calls"] = round(breakdown.get("model_calls", 0) + added, 6)
+		costs = costs.model_copy(
+			update={"llm_usd": round((costs.llm_usd or 0) + added, 6), "breakdown": breakdown}
+		)
+	return rec.model_copy(
+		update={"findings": findings, "provenance": [*rec.provenance, *calls], "costs": costs}
+	)
 
 
 def _diagnose(rec: FlightRecord, deps: Deps) -> FlightRecord:
