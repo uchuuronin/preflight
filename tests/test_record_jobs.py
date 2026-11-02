@@ -39,7 +39,7 @@ class LossRunner:
 
 	def __call__(self, spec, gpu, *, should_stop):
 		self.calls.append({"id": spec.probe_id, "gpu": gpu, "knobs": dict(spec.knobs), "seed": spec.seed,
-			"force": spec.seed_force,
+			"force": spec.seed_force, "eval_batches": spec.eval_batches,
 			"timed": spec.timed, "files": dict(spec.files)})  # fmt: skip
 		status, code = self.outcomes.get(spec.probe_id, ("ok", None))
 		loss = self.loss
@@ -47,7 +47,8 @@ class LossRunner:
 			series = {"loss": [loss(spec.knobs, s, spec.seed) for s in range(spec.timed)]}
 		except TypeError:
 			series = {"loss": [loss(spec.knobs, s) for s in range(spec.timed)]}
-		series = series if status == "ok" else {}
+		# an eval that runs out of memory comes after the training steps, which keep their loss
+		series = series if status == "ok" or (code or "").startswith("oom.eval") else {}
 		probe = Probe(id=spec.probe_id, knobs=spec.knobs, status=status, error_code=code,
 			steps=spec.warmup + spec.timed, duration_s=30.0, stability={"series": series},
 			cost={"gpu_seconds": 30.0, "usd": 30.0 * spec.gpu_usd_per_hour / 3600})  # fmt: skip
@@ -624,3 +625,86 @@ def test_a_knob_whose_line_loses_it_never_lands_on_a_sibling_with_the_same_liter
 	patched = apply_patch(files, diff)
 	with _pytest.raises(OverrideError):
 		apply_overrides(patched, relocate_knobs(sm, files, patched), {"batch_size": 7})
+
+
+# ---------------------------------------------------------------- verify windows end with one eval (A's design, Nov 1)
+
+EVAL_SCRIPT = SCRIPT + "eval_batch_size = 32\neval_every = 200\n"
+
+
+def _eval_parent(tmp_path):
+	runner = LossRunner()
+	d = _deps(tmp_path, runner)
+	request = externalise_files({"source": {"kind": "upload", "files": {"train.py": EVAL_SCRIPT}}}, d.blobs)
+	rec = run_pipeline(request, _Ctx(), d)
+	d.records.put(rec)
+	return rec
+
+
+def test_every_verify_side_runs_one_eval_two_steps_before_the_window_ends(tmp_path):
+	parent = _eval_parent(tmp_path)
+	assert {k.id for k in parent.knobs} >= {"eval_every", "eval_batch_size"}
+	runner = LossRunner()
+	run_pipeline(_on(parent, "verify", knobs={"eval_batch_size": 8}), _Ctx(), _deps(tmp_path, runner))
+	assert [c["id"] for c in runner.calls] == ["v1", "v1-base", "v1-seed"]
+	for c in runner.calls:
+		assert "eval_every = 20\n" in c["files"]["train.py"], c["id"]  # 2 warm-up + 20 timed - 2
+		assert c["eval_batches"] > 0
+	assert "eval_batch_size = 8\n" in runner.calls[0]["files"]["train.py"]
+	assert "eval_batch_size = 32\n" in runner.calls[1]["files"]["train.py"]
+
+
+def test_the_current_settings_running_out_at_the_eval_is_before_failed_and_never_rerun(tmp_path):
+	parent = _eval_parent(tmp_path)
+	runner = LossRunner(outcomes={"v1-base": ("oom", "oom.eval"), "v1-seed": ("oom", "oom.eval")})
+	rec = run_pipeline(_on(parent, "verify", knobs={"eval_batch_size": 8}), _Ctx(), _deps(tmp_path, runner))
+	assert [c["id"] for c in runner.calls] == ["v1", "v1-base", "v1-seed"]  # no eval-off re-run
+	base = next(p for p in rec.probes if p.id == "v1-base")
+	assert base.status == "oom" and base.error_code == "oom.eval" and not base.extras.get("eval_off")
+	f = rec.findings[-1]
+	assert f.code == "verify.passed", (f.code, f.title, f.detail)  # the loss before the eval still compared
+
+
+def test_the_fix_running_out_at_the_eval_says_the_eval_still_ran_out(tmp_path):
+	parent = _eval_parent(tmp_path)
+	runner = LossRunner(outcomes={"v1": ("oom", "oom.eval")})
+	rec = run_pipeline(_on(parent, "verify", knobs={"eval_batch_size": 16}), _Ctx(), _deps(tmp_path, runner))
+	f = rec.findings[-1]
+	assert f.code == "verify.failed" and f.title == "The eval ran out of memory with the change"
+
+
+def test_a_probes_eval_off_rerun_runs_the_patched_code(tmp_path):
+	"""A's review, Nov 1: the re-run after an eval OOM ran the record's own code under a patch."""
+	parent = _eval_parent(tmp_path)
+
+	class EvalOomFirst(LossRunner):
+		def __call__(self, spec, gpu, *, should_stop):
+			first = not any(c["id"] == spec.probe_id for c in self.calls)
+			self.outcomes = {spec.probe_id: ("oom", "oom.eval")} if first else {}
+			return super().__call__(spec, gpu, should_stop=should_stop)
+
+	runner = EvalOomFirst()
+	run_pipeline(_on(parent, "probe", knobs={"batch_size": 4}, patch=PATCH), _Ctx(), _deps(tmp_path, runner))
+	assert len(runner.calls) == 2 and runner.calls[0]["id"] == runner.calls[1]["id"]
+	assert all("bias=False" in c["files"]["train.py"] for c in runner.calls)
+
+
+def test_trainings_peak_before_the_eval_reaches_the_probes_extras():
+	from preflight.probes.local import _extras
+
+	assert _extras({"train_peak_before_eval_bytes": 7.5e9})["train_peak_before_eval_bytes"] == 7.5e9
+	assert "train_peak_before_eval_bytes" not in _extras({"train_peak_before_eval_bytes": None})
+
+
+def test_a_training_knobs_verify_runs_no_extra_eval():
+	"""Review, Nov 2: an eval pulled into a batch-size verify would fail it on a script whose eval runs
+	out at both settings, which is the record's own problem, not the change's."""
+	import tempfile
+
+	with tempfile.TemporaryDirectory() as d:
+		parent = _eval_parent(Path(d))
+		runner = LossRunner()
+		run_pipeline(_on(parent, "verify", knobs={"batch_size": 4}), _Ctx(), _deps(Path(d), runner))
+		assert all(
+			"eval_every = 200\n" in c["files"]["train.py"] and c["eval_batches"] == 0 for c in runner.calls
+		)

@@ -102,10 +102,24 @@ def tokens_seen(rec: dict, probe: dict) -> float | None:
 
 
 def _metric(rec: dict, probe: dict, metric: str) -> float | None:
+	mem = probe.get("memory") or {}
+	extras = probe.get("extras") or {}
+	train_peak = extras.get("train_peak_before_eval_bytes")
+	eval_oom = probe.get("status") == "oom" and str(probe.get("error_code") or "").startswith("oom.eval")
+	if metric == "memory.peak" and eval_oom and isinstance(train_peak, int | float) and train_peak > 0:
+		# the window's eval ran out after training was measured: a training fix is judged on training
+		return float(train_peak)
 	if probe.get("status") == "oom" and metric.startswith(("memory.", "risk.")):
 		return math.inf  # ran out of memory: worse than any measured peak
-	mem = probe.get("memory") or {}
+	if metric == "memory.eval_peak":
+		# an eval fix is judged on the eval pass itself (A's verify design, Nov 1)
+		v = (probe.get("eval") or {}).get("peak_allocated_bytes")
+		return float(v) if isinstance(v, int | float) and v > 0 else None
 	if metric == "memory.peak":
+		# a verify window ends with one eval, whose graph can outlive it into the last steps:
+		# training's own peak is the steps before it, when the probe measured that
+		if isinstance(train_peak, int | float) and train_peak > 0:
+			return float(train_peak)
 		v = mem.get("peak_allocated_bytes") or mem.get("peak_reserved_bytes")
 		return float(v) if v else None
 	if metric.startswith("memory."):
@@ -312,6 +326,8 @@ def main(argv: list[str]) -> int:
 	ap.add_argument("before")
 	ap.add_argument("after")
 	ap.add_argument("--metric", default="memory.peak")
+	ap.add_argument("--before-probe", help="the probe to read before (default: the last that ran)")
+	ap.add_argument("--after-probe", help="the probe to read after (default: the last that ran)")
 	ap.add_argument(
 		"--may-change",
 		default="",
@@ -326,7 +342,8 @@ def main(argv: list[str]) -> int:
 	with open(a.after) as f:
 		after = json.load(f)
 	may = tuple(x.strip() for x in a.may_change.split(",") if x.strip())
-	res = check(before, after, metric=a.metric, may_change=may, keep_eval=a.keep_eval, no_grad=a.no_grad)
+	res = check(before, after, metric=a.metric, before_probe=a.before_probe, after_probe=a.after_probe,
+		may_change=may, keep_eval=a.keep_eval, no_grad=a.no_grad)  # fmt: skip
 	if a.json:
 		print(json.dumps(res, indent=2, default=str))
 	else:

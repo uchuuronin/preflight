@@ -25,7 +25,7 @@ export function provenanceKey(status: EstimateStatus, illustrative: boolean): st
 	return illustrative && status !== "abstain" ? "provenance.illustrative" : `provenance.${status}`;
 }
 
-/** Measured / predicted / extrapolated / not trusted, as a short word with its line style. */
+/** Measured / predicted / extrapolated / not measured here, as a short word with its line style. */
 export function Provenance({ status }: { status: EstimateStatus }) {
 	const ws = useOptionalWorkspace();
 	const key = provenanceKey(status, ws ? isFixture(ws.record) : false);

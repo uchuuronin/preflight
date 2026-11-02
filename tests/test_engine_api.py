@@ -1211,11 +1211,7 @@ def test_the_run_length_falls_back_on_the_probes_dataset_length():
 	"""C, Nov 1: the live LoRA record's time and cost abstained ("no dataset size"), though every probe recorded
 	train_dataset_len 50,724 (planned_steps 3,170 at batch 4 x grad_accum 4)."""
 	rec = FlightRecord.model_validate(
-		json.loads(
-			(
-				Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
-			).read_text()
-		)
+		json.loads((Path(__file__).resolve().parent / "fixtures/lora_live_nov1_record.json").read_text())
 	)
 	steps, why = api.total_steps(rec)
 	assert why == "" and steps == pytest.approx(3170, abs=1)
@@ -1226,7 +1222,7 @@ def test_the_probe_dataset_length_follows_the_runner_s_rules():
 	"""Review, Nov 1: the fallback took the first probe in list order. Patched probes (a patch may subsample) and an
 	oom probe before its first step (its latest loader may be an eval one) don't count; ok comes first; a query that
 	packs differently from the probe abstains (packing changes the row count)."""
-	path = Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+	path = Path(__file__).resolve().parent / "fixtures/lora_live_nov1_record.json"
 	rec = FlightRecord.model_validate(json.loads(path.read_text()))
 
 	def with_probes(fn):
@@ -1265,7 +1261,7 @@ def test_the_probe_dataset_length_follows_the_runner_s_rules():
 def test_a_cell_with_no_run_over_the_margin_reads_p_oom_from_the_whole_pool():
 	"""Chiya, Nov 1 (option b): 19 L4 fine-tune runs can't show P(OOM) below 2.5%, so with none of them over the
 	margin, all the held-out runs decide (904 since the Nov 1 top-up), and the reason says so. 7.7 GiB on a 22 GiB L4 fits; 17.5 GiB is tight."""
-	path = Path(__file__).resolve().parents[1] / "web/src/workspace/fixtures/lora-live-nov1.record.json"
+	path = Path(__file__).resolve().parent / "fixtures/lora_live_nov1_record.json"
 	rec = FlightRecord.model_validate(json.loads(path.read_text()))
 	small = api.predict(rec, {"eval_batch_size": 4, "seq_len": 128}).root["risk.oom"]
 	assert small.point < 0.01 and small.reason.startswith("fits: ")

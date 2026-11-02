@@ -16,9 +16,10 @@ cancelled. GPU: the L4, pinned by the settings' gpu_type, so the fallback ladder
 Nothing that reaches a record is printed: the log is published to the remote-runs branch, and a
 job id opens its record (GET /v1/jobs/{id}). Record ids are safe (records answer by token only).
 
-Eval fixes need the eval inside the verify window: A's verify probes run without the eval cadence
-(pipeline._followup_plan, cadence False), so c1 and c2 can't move memory there until A pulls the
-eval into both sides. Run them with `--only c1,c2` once that's on the runner.
+Every verify side now ends with one eval (A's design from from-a.md, built by C on Nov 2:
+probes/plan.py pull_verify_eval, no eval-off re-run for verify sides, the patched code on every
+re-run), and the eval templates are judged on the eval pass (verify.py memory.eval_peak), so all
+three candidates can run once the runner is deployed from a main with that change.
 
 	modal run --env main api/verify_race_app.py::verify_race
 """
@@ -84,6 +85,13 @@ def verify_race(only: str = "", attempt: str = "a") -> None:
 
 	race = json.loads(RACE.read_text())
 	cands = [c for c in race["candidates"] if not only or c["id"] in only.split(",")]
+	# Fixes race only on the first one's metric, as the web's candidates.ts: an eval fix's eval peak
+	# and a training fix's training peak aren't the same number (review, Nov 2).
+	first = verify_options(cands[0]["template_id"])["metric"] if cands else None
+	dropped = [c["id"] for c in cands if verify_options(c["template_id"])["metric"] != first]
+	cands = [c for c in cands if c["id"] not in dropped]
+	if dropped:
+		print(f"not raced (another metric than {first}): {', '.join(dropped)}", flush=True)
 	svc = modal.Cls.from_name("preflight-runner", "JobStoreService", environment_name="main")()
 	vol = modal.Volume.from_name("preflight-records", environment_name="main")
 	spent, results = 0.0, []
@@ -154,7 +162,7 @@ def verify_race(only: str = "", attempt: str = "a") -> None:
 		results.append(out)
 		print(json.dumps(out, indent=1), flush=True)
 	passed = [r for r in results if (r.get("verify") or {}).get("status") == "passed"]
-	# The winner: a passing fix with the lowest memory after it (the race's own target).
+	# The winner: a passing fix with the lowest value after it, all on one metric (above).
 	winner = min(passed, key=lambda r: r["verify"]["after"] or float("inf")) if passed else None
 	print(json.dumps({"spent_usd": round(spent, 4), "winner": winner and winner["id"],
 		"results": [{k: r.get(k) for k in ("id", "template_id", "job_status", "usd")} | {"verify": (r.get("verify") or {}).get("status")} for r in results]}, indent=1))  # fmt: skip

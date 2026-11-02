@@ -208,7 +208,7 @@ export function GuidePanel() {
 		const from = active.from;
 		// Clear the suggestion first, so putting the knob back isn't read as the visitor's own move.
 		actions.propose(null);
-		if (outcome !== "apply" && outcome !== "pin" && from !== undefined) actions.setKnob(move.knobId, from, "user");
+		if (outcome !== "apply" && outcome !== "pin" && from !== undefined) actions.setKnob(move.knobId, from, "user", { putBack: true });
 		if (outcome === "pin" || outcome === "keep") actions.pin(move.knobId, true);
 		if (outcome === "decline") actions.decline(move.knobId, move.to);
 		const v = new Set(visited);
@@ -267,7 +267,8 @@ export function GuidePanel() {
 	useEffect(() => {
 		const fit = fitOf(record, estimates, state.knobs);
 		const change = state.lastChange;
-		if (change?.by === "user" && fit === "fails" && prevFit.current !== "fails") {
+		// Putting a knob back after a suggestion (Not this, Keep, a guide revert) is not crossing the limit: no nudge.
+		if (change?.by === "user" && !change.putBack && fit === "fails" && prevFit.current !== "fails") {
 			const from = prevKnobs.current[change.knobId];
 			if (from !== undefined) setCliff({ knobId: change.knobId, from });
 		} else if (fit !== "fails") setCliff(null);
@@ -368,6 +369,7 @@ export function GuidePanel() {
 			delta: step?.move && goalTarget ? fmtDelta(step.move.delta, goalTarget.unit) : "",
 			target: goalTarget ? t(goalTarget.label_key).toLowerCase() : "",
 			peak: trusted(peak) ? fmt(peak.point, "bytes") : t("value.none"),
+			peakTrusted: trusted(peak) ? "1" : "",
 			cap: cap ? fmt(cap, "bytes") : "",
 			risk: trusted(risk) ? fmt(risk.point, "probability") : "",
 			chance: step?.move?.risk !== null && step?.move?.risk !== undefined ? fmt(step.move.risk, "probability") : "",
@@ -466,11 +468,13 @@ export function GuidePanel() {
 			{cliff ? (
 				<div className="pf-guide__cliff" role="status">
 					<p>
-						{t("guide.cliff", {
+						{/* The peak can be untrusted where the setting fails (past what was measured): say the limit alone then. */}
+						{t(vars.peakTrusted ? "guide.cliff" : "guide.cliff_no_peak", {
 							knob: t(knobs.get(cliff.knobId)?.label_key ?? cliff.knobId),
 							value: valueText(knobs.get(cliff.knobId), state.knobs[cliff.knobId]),
 							peak: vars.peak,
-							cap: vars.cap,
+							// Not vars.cap: an RL record's step vars reuse "cap" for the probe's token cap.
+							cap: fmt(capacityBytes(record, state.knobs) ?? 0, "bytes"),
 						})}
 					</p>
 					<button type="button" className="pf-btn pf-btn--small" onClick={() => actions.setKnob(cliff.knobId, cliff.from, "user")}>

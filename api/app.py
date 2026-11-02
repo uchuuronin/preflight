@@ -34,6 +34,7 @@ RECORDS_DIR = "/records"
 SAMPLE_FILES = [
 	"web/src/workspace/fixtures/dev-finetune.record.json",
 	"schema/examples/finetune.json",
+	"web/src/workspace/fixtures/lora-live-nov1.record.json",
 	"schema/examples/pretrain.json",
 	"schema/examples/agent.json",
 	"web/src/workspace/fixtures/agent-eval-oct31.record.json",

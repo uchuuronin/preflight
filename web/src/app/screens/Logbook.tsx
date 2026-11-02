@@ -10,6 +10,7 @@ import { clearLogbook, type LogEntry, readLogbook } from "../logbook";
 import { Plane } from "../Plane";
 import { href } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
+import { WatchRun } from "../../workspace/live/WatchRun";
 
 const WORD: Record<NonNullable<LogEntry["worst"]>, { cls: string; key: string }> = {
 	critical: { cls: "fails", key: "logbook.status.needs_fix" },
@@ -75,6 +76,7 @@ export function Logbook({ active }: { active: boolean }) {
 						</button>
 					) : null}
 				</section>
+				<WatchRun />
 				<section className="pf-passes" aria-label={t("logbook.title")}>
 					<h2 className="pf-h2">{t("logbook.title")}</h2>
 					{entries.length === 0 ? (

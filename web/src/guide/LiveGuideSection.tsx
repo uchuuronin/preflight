@@ -100,7 +100,7 @@ export function LiveGuideSection({
 		const { knobId, from, to } = proposal;
 		// Clear the suggestion first, so putting the knob back isn't read as the visitor's own move.
 		actions.propose(null);
-		if (action === "declined" || action === "kept") actions.setKnob(knobId, from, "user");
+		if (action === "declined" || action === "kept") actions.setKnob(knobId, from, "user", { putBack: true });
 		if (action === "kept" || action === "pinned") actions.pin(knobId, true);
 		if (action === "declined") actions.decline(knobId, to);
 		const value = action === "applied" || action === "pinned" || action === "declined" ? to : from;

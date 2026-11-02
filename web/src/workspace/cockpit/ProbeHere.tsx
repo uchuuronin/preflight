@@ -33,6 +33,10 @@ export function ProbeHere() {
 		return target && estimates[target.id]?.status === "abstain";
 	});
 	if (!abstaining.length) return null;
+	const reasonOf = (r: (typeof READOUTS)[number]) => {
+		const target = record.predictions.targets.find((x) => x.readout === r);
+		return target ? estimates[target.id]?.reason : undefined;
+	};
 
 	const run = async () => {
 		setError(null);
@@ -63,7 +67,11 @@ export function ProbeHere() {
 
 	return (
 		<div className="pf-probehere" role="group" aria-label={t("probehere.label")}>
-			<p className="pf-probehere__why">{t("probehere.why", { what: abstaining.map((r) => t(`probehere.readout.${r}`)).join(", ") })}</p>
+			<p className="pf-probehere__why">
+				{t(abstaining.every((r) => reasonOf(r) === "between_measured") ? "probehere.why_between" : "probehere.why", {
+					what: abstaining.map((r) => t(`probehere.readout.${r}`)).join(", "),
+				})}
+			</p>
 			<button type="button" className="pf-btn pf-btn--primary pf-btn--small" disabled={busy} onClick={run}>
 				{busy ? t("probehere.sending") : t("probehere.go")}
 			</button>

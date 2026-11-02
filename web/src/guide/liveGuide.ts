@@ -273,7 +273,7 @@ export function traceText(out: ToolOut): string {
 			);
 		case "predict":
 			return Object.entries(out.readouts)
-				.map(([k, r]) => `${k}=${r.point === null ? "not trusted" : fmt(r.point, r.unit)}`)
+				.map(([k, r]) => `${k}=${r.point === null ? "not measured here" : fmt(r.point, r.unit)}`)
 				.join(", ");
 		case "highlight":
 			return out.nodes.join(", ");
@@ -357,7 +357,7 @@ export class LiveTour {
 			if (out.reverts?.length) {
 				const { actions } = this.ctx();
 				actions.propose(null);
-				for (const r of out.reverts) if (r.value !== null) actions.setKnob(r.knob_id, r.value, "user");
+				for (const r of out.reverts) if (r.value !== null) actions.setKnob(r.knob_id, r.value, "user", { putBack: true });
 			}
 			this.view = {
 				text: out.text || (out.withheld ? "" : this.view.text),

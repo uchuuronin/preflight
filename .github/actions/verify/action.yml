@@ -18,7 +18,7 @@ inputs:
     description: Flight record of the verify run after the fix (JSON)
     required: true
   metric:
-    description: Target the fix was for (memory.peak, time.step, throughput.tokens_per_s, ...)
+    description: Target the fix was for (memory.peak, memory.eval_peak for an eval fix, time.step, throughput.tokens_per_s, ...)
     default: memory.peak
   may-change:
     description: Comma-separated checks the fix is allowed to move (e.g. throughput_floor for gradient checkpointing)

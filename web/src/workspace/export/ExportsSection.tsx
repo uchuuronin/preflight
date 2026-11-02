@@ -12,6 +12,7 @@ import { isFixture } from "../record/model";
 import { useWorkspace } from "../state";
 import { exportPlan } from "./plan";
 import { WandbExport } from "./WandbExport";
+import { WatchExport } from "./WatchExport";
 
 function appBase(): string | null {
 	return typeof window === "undefined" ? null : window.location.origin + window.location.pathname;
@@ -33,6 +34,8 @@ export function ExportsSection() {
 				</AddonBoundary>
 			))}
 			<WandbExport plan={plan} illustrative={isFixture(record)} />
+			{/* A sample has no real run to watch; a live record is already one. */}
+			{flag("c.inflight") && !isFixture(record) && record.job.source?.kind !== "inflight" ? <WatchExport record={record} /> : null}
 		</section>
 	);
 }

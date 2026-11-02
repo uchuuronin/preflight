@@ -15,6 +15,7 @@
 	"c.fix_loop": false,
 	"c.exports": false,
 	"c.campaign_calendar": false,
+	"c.inflight": false,
 	"d.expertise": false,
 	"d.currency": false,
 	"engine.memory": false,

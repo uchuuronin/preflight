@@ -132,6 +132,11 @@ def _losses(p: Probe) -> list[float]:
 	return [v for v in _series(p) if v is not None]
 
 
+def _eval_oom(p: Probe) -> bool:
+	"""Ran out of memory in the eval pass (A's error code), after training steps."""
+	return p.status == "oom" and (p.error_code or "").startswith("oom.eval")
+
+
 def _diverged(p: Probe) -> bool:
 	"""A NaN or inf loss anywhere, or a step with no finite loss: the run didn't train cleanly."""
 	st = p.stability
@@ -184,6 +189,15 @@ def verify_finding(
 		return Finding(id=fid, severity=severity, code=code, title=title, detail=detail, node_id=node,
 			evidence=list(evidence), source="rule")  # fmt: skip
 
+	if _eval_oom(plan):
+		# A's verify design (Nov 1): the window ends with one eval on every side, and running out
+		# there is the side's result, never re-run with the eval off
+		both = base is not None and _eval_oom(base)
+		return finding("error", "verify.failed",
+			"The eval ran out of memory with and without the change" if both else "The eval ran out of memory with the change",
+			detail=plan.error or "oom.eval",
+			evidence=[Evidence(metric="probe.eval.peak_allocated_bytes",
+				value=plan.eval.peak_allocated_bytes if plan.eval else None, probe_id=plan.id)])  # fmt: skip
 	if plan.status not in ("ok", "cached") or steps == 0:
 		why = plan.error or plan.status
 		return finding("error", "verify.failed", "The verify run didn't finish", detail=why)
@@ -198,7 +212,10 @@ def verify_finding(
 			evidence=[Evidence(metric="probe.stability.loss", value=_losses(plan)[-1], probe_id=plan.id)])  # fmt: skip
 
 	def usable(p):
-		return p is not None and p.status in ("ok", "cached") and _losses(p) and not _diverged(p)
+		# the current settings running out at the window's eval still trained up to it: their loss
+		# steps before the eval are compared (A's verify design, Nov 1)
+		ran = p is not None and (p.status in ("ok", "cached") or _eval_oom(p))
+		return ran and _losses(p) and not _diverged(p)
 
 	if not usable(base) or not usable(other_seed):
 		bad = base if not usable(base) else other_seed
