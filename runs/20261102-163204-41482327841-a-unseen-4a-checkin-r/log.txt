@@ -1,0 +1,69 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-44rq8xyy9CmSO31a0IyI4K
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+└── ✓ Created Function triage_agreement_hosted.
+[edit] examples/agent_from_any_llm.py: 'from smolagents import (' -> 'import os\n\nfrom smolagents import ('
+[edit] examples/agent_from_any_llm.py: 'chosen_inference = "inference_client"' -> 'chosen_inference = "openai"'
+[edit] examples/agent_from_any_llm.py: '    model = OpenAIModel(model_id="gpt-4o")' -> '    model = OpenAIModel(model_id=os.environ.get("MUSE_SPARK_MODEL", "muse-spark-1.3"), api_base=os.environ["META_API_BASE"], api_key=os.environ["META_API_KEY"])'
+[smoke] https://github.com/huggingface/smolagents at 96f33faaf028479119ec8d34507b47694cf14e34, edited, as an upload of 167 files
+submitted {'job_id': '01M6EHNSVXFRCNHXV8RQTN3DJW', 'created': True, 'position': 0}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "seq": 0, "at": "2026-11-02T16:32:28.541988Z", "stage": "queued", "queue_position": 0, "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "seq": 1, "at": "2026-11-02T16:32:30.591878Z", "stage": "admitted", "message": "attempt 1", "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "seq": 2, "at": "2026-11-02T16:32:30.766468Z", "stage": "fetching", "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "seq": 3, "at": "2026-11-02T16:32:31.512614Z", "stage": "mapping", "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "share_token": "FqbLJo2yU2BYvRzyooEhTA", "seq": 4, "at": "2026-11-02T16:32:33.643880Z", "stage": "skeleton", "message": "skeleton from the static reader", "level": "info", "record_rev": 1}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "share_token": "FqbLJo2yU2BYvRzyooEhTA", "seq": 5, "at": "2026-11-02T16:32:48.079662Z", "stage": "skeleton", "message": "map refined by Muse Spark", "level": "info", "record_rev": 2}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "share_token": "FqbLJo2yU2BYvRzyooEhTA", "seq": 6, "at": "2026-11-02T16:32:48.257287Z", "stage": "harnessing", "level": "info", "record_rev": 2}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "share_token": "FqbLJo2yU2BYvRzyooEhTA", "seq": 7, "at": "2026-11-02T16:32:48.433183Z", "stage": "probing", "progress": 0.0, "level": "info", "probe_id": "p1", "record_rev": 2}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "seq": 8, "at": "2026-11-02T16:33:48.721668Z", "stage": "probing", "message": "waiting for a free L4 GPU (1 min so far)", "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "seq": 9, "at": "2026-11-02T16:34:48.726893Z", "stage": "probing", "message": "waiting for a free L4 GPU (2 min so far)", "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "seq": 10, "at": "2026-11-02T16:34:54.030663Z", "stage": "probing", "message": "A10 GPU ready after 2 min; probe running", "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "share_token": "FqbLJo2yU2BYvRzyooEhTA", "seq": 11, "at": "2026-11-02T16:34:58.034418Z", "stage": "probing", "message": "no L4 could be scheduled; this job's points run on A10", "level": "warn", "record_rev": 2}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "share_token": "FqbLJo2yU2BYvRzyooEhTA", "seq": 12, "at": "2026-11-02T16:35:00.536155Z", "stage": "predicting", "message": "measured; predicting", "level": "info"}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "share_token": "FqbLJo2yU2BYvRzyooEhTA", "seq": 13, "at": "2026-11-02T16:35:02.658014Z", "stage": "predicting", "message": "predicted", "level": "info", "record_rev": 3}
+{"job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW", "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG", "seq": 14, "at": "2026-11-02T16:35:02.835049Z", "stage": "done", "progress": 1.0, "level": "info"}
+{
+  "waiting_for_gpu": null,
+  "job_id": "01M6EHNSVXFRCNHXV8RQTN3DJW",
+  "status": "done",
+  "position": null,
+  "record_id": "01M6EHNXCV9HQBKXDBYYPPBHFG",
+  "share_token": "FqbLJo2yU2BYvRzyooEhTA",
+  "error": null,
+  "retryable": null,
+  "error_code": null,
+  "last_seq": 14
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-44rq8xyy9CmSO31a0IyI4K
