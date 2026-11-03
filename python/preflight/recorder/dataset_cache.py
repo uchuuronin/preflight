@@ -21,7 +21,10 @@ DATASETS = ("CIFAR10", "CIFAR100", "MNIST", "FashionMNIST", "ogbn-arxiv")
 URL_FILES = {"ogbn-arxiv": "http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip"}
 # each URL_FILES archive's sha256, pinned from the fill job's own download (OGB publishes no checksum, and its host is
 # plain HTTP): the cache serves an archive only when its copy matches, so a tampered or error-page file never is
-URL_SHA256: dict[str, str] = {}
+URL_SHA256: dict[str, str] = {
+	# a-fill-datasets-ogb-1 (GitHub 41682933741, Nov 3): 83,058,288 bytes from snap.stanford.edu
+	"http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip": "49f85c801589ecdcc52cfaca99693aaea7b8af16a9ac3f41dd85a5f3193fe276",
+}
 
 
 def resources() -> list[tuple[str, list[str], str]]:
