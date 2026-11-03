@@ -1,0 +1,1598 @@
+[
+ {
+  "name": "zoo/agent_eval_spark",
+  "entry": "run.py",
+  "files": 6,
+  "before": {
+   "lens": "agent",
+   "framework": "openai_client",
+   "model": {},
+   "loop": {
+    "kind": "agent_loop",
+    "location": {
+     "file": "run.py",
+     "line": 154,
+     "expr": null
+    },
+    "step_call": "client.chat.completions.create"
+   },
+   "knobs": {
+    "concurrency": 4,
+    "context_limit": 26000,
+    "max_new_tokens": 1024,
+    "max_turns": 40,
+    "n_tasks": 500,
+    "temperature": 0.2
+   },
+   "_where": {
+    "concurrency": "run.py",
+    "context_limit": "run.py",
+    "max_new_tokens": "run.py",
+    "max_turns": "run.py",
+    "n_tasks": "run.py",
+    "temperature": "run.py"
+   }
+  },
+  "before_s": 0.01,
+  "after": {
+   "lens": "agent",
+   "framework": "openai_client",
+   "model": {},
+   "loop": {
+    "kind": "agent_loop",
+    "location": {
+     "file": "run.py",
+     "line": 154,
+     "expr": null
+    },
+    "step_call": "client.chat.completions.create"
+   },
+   "knobs": {
+    "concurrency": 4,
+    "context_limit": 26000,
+    "max_new_tokens": 1024,
+    "max_turns": 40,
+    "n_tasks": 500,
+    "temperature": 0.2
+   },
+   "_where": {
+    "concurrency": "run.py",
+    "context_limit": "run.py",
+    "max_new_tokens": "run.py",
+    "max_turns": "run.py",
+    "n_tasks": "run.py",
+    "temperature": "run.py"
+   }
+  },
+  "after_s": 0.01,
+  "same": true
+ },
+ {
+  "name": "zoo/eval_sweep_reasoning",
+  "entry": "run.py",
+  "files": 3,
+  "before": {
+   "lens": "eval",
+   "framework": "hf_generate",
+   "model": {},
+   "loop": {
+    "kind": "eval_loop",
+    "location": {
+     "file": "run.py",
+     "line": 85,
+     "expr": null
+    },
+    "step_call": "model.generate"
+   },
+   "knobs": {
+    "dump_hidden_states": true,
+    "eval_batch_size": 8,
+    "max_new_tokens": 2048,
+    "temperature": 0.6
+   },
+   "_where": {
+    "dump_hidden_states": "run.py",
+    "eval_batch_size": "run.py",
+    "max_new_tokens": "run.py",
+    "temperature": "run.py"
+   }
+  },
+  "before_s": 0.0,
+  "after": {
+   "lens": "eval",
+   "framework": "hf_generate",
+   "model": {},
+   "loop": {
+    "kind": "eval_loop",
+    "location": {
+     "file": "run.py",
+     "line": 85,
+     "expr": null
+    },
+    "step_call": "model.generate"
+   },
+   "knobs": {
+    "dump_hidden_states": true,
+    "eval_batch_size": 8,
+    "max_new_tokens": 2048,
+    "temperature": 0.6
+   },
+   "_where": {
+    "dump_hidden_states": "run.py",
+    "eval_batch_size": "run.py",
+    "max_new_tokens": "run.py",
+    "temperature": "run.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/finetune_lora_hf",
+  "entry": "train.py",
+  "files": 2,
+  "before": {
+   "lens": "finetune",
+   "framework": "hf_trainer",
+   "model": {
+    "name": "Qwen2.5-1.5B",
+    "hf_id": "Qwen/Qwen2.5-1.5B"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "train.py",
+     "line": 109,
+     "expr": "trainer.train()"
+    },
+    "step_call": "trainer.train()"
+   },
+   "knobs": {
+    "batch_size": 4,
+    "checkpoint_every": 500,
+    "epochs": 1,
+    "eval_batch_size": 32,
+    "eval_every": 200,
+    "grad_accum": 4,
+    "log_every": 10,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "lora_r": 16,
+    "lr": 0.0001,
+    "precision": "bf16",
+    "seq_len": 1024,
+    "warmup_steps": 50
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "checkpoint_every": "train.py",
+    "epochs": "train.py",
+    "eval_batch_size": "train.py",
+    "eval_every": "train.py",
+    "grad_accum": "train.py",
+    "log_every": "train.py",
+    "lora_alpha": "train.py",
+    "lora_dropout": "train.py",
+    "lora_r": "train.py",
+    "lr": "train.py",
+    "precision": "train.py",
+    "seq_len": "train.py",
+    "warmup_steps": "train.py"
+   }
+  },
+  "before_s": 0.0,
+  "after": {
+   "lens": "finetune",
+   "framework": "hf_trainer",
+   "model": {
+    "name": "Qwen2.5-1.5B",
+    "hf_id": "Qwen/Qwen2.5-1.5B"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "train.py",
+     "line": 109,
+     "expr": "trainer.train()"
+    },
+    "step_call": "trainer.train()"
+   },
+   "knobs": {
+    "batch_size": 4,
+    "checkpoint_every": 500,
+    "epochs": 1,
+    "eval_batch_size": 32,
+    "eval_every": 200,
+    "grad_accum": 4,
+    "log_every": 10,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "lora_r": 16,
+    "lr": 0.0001,
+    "precision": "bf16",
+    "seq_len": 1024,
+    "warmup_steps": 50
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "checkpoint_every": "train.py",
+    "epochs": "train.py",
+    "eval_batch_size": "train.py",
+    "eval_every": "train.py",
+    "grad_accum": "train.py",
+    "log_every": "train.py",
+    "lora_alpha": "train.py",
+    "lora_dropout": "train.py",
+    "lora_r": "train.py",
+    "lr": "train.py",
+    "precision": "train.py",
+    "seq_len": "train.py",
+    "warmup_steps": "train.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/gnn_pyg",
+  "entry": "train.py",
+  "files": 3,
+  "before": {
+   "lens": "gnn",
+   "framework": "pyg",
+   "model": {
+    "name": "SAGEConv"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "train.py",
+     "line": 131,
+     "expr": "opt.step()"
+    },
+    "step_call": "opt.step()",
+    "optimizer_var": "opt"
+   },
+   "knobs": {
+    "batch_size": 1024,
+    "epochs": 3,
+    "fanout.hop1": 15,
+    "fanout.hop2": 25,
+    "fanout.hop3": 25,
+    "lr": 0.003
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "epochs": "train.py",
+    "fanout.hop1": "train.py",
+    "fanout.hop2": "train.py",
+    "fanout.hop3": "train.py",
+    "lr": "train.py"
+   }
+  },
+  "before_s": 0.01,
+  "after": {
+   "lens": "gnn",
+   "framework": "pyg",
+   "model": {
+    "name": "SAGEConv"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "train.py",
+     "line": 131,
+     "expr": "opt.step()"
+    },
+    "step_call": "opt.step()",
+    "optimizer_var": "opt"
+   },
+   "knobs": {
+    "batch_size": 1024,
+    "epochs": 3,
+    "fanout.hop1": 15,
+    "fanout.hop2": 25,
+    "fanout.hop3": 25,
+    "lr": 0.003
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "epochs": "train.py",
+    "fanout.hop1": "train.py",
+    "fanout.hop2": "train.py",
+    "fanout.hop3": "train.py",
+    "lr": "train.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/grpo_trl",
+  "entry": "train.py",
+  "files": 3,
+  "before": {
+   "lens": "rl",
+   "framework": "trl",
+   "model": {
+    "name": "Qwen2.5-0.5B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-0.5B-Instruct"
+   },
+   "loop": {
+    "kind": "trl_trainer",
+    "location": {
+     "file": "train.py",
+     "line": 116,
+     "expr": "trainer.train()"
+    },
+    "step_call": "trainer.train()"
+   },
+   "knobs": {
+    "batch_size": 1,
+    "checkpoint_every": 500,
+    "epochs": 1,
+    "grad_accum": 4,
+    "group_size": 8,
+    "kl_beta": 0.04,
+    "log_every": 5,
+    "lr": 1e-06,
+    "max_completion_len": 512,
+    "max_prompt_len": 256,
+    "optimizer": "adafactor"
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "checkpoint_every": "train.py",
+    "epochs": "train.py",
+    "grad_accum": "train.py",
+    "group_size": "train.py",
+    "kl_beta": "train.py",
+    "log_every": "train.py",
+    "lr": "train.py",
+    "max_completion_len": "train.py",
+    "max_prompt_len": "train.py",
+    "optimizer": "train.py"
+   }
+  },
+  "before_s": 0.0,
+  "after": {
+   "lens": "rl",
+   "framework": "trl",
+   "model": {
+    "name": "Qwen2.5-0.5B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-0.5B-Instruct"
+   },
+   "loop": {
+    "kind": "trl_trainer",
+    "location": {
+     "file": "train.py",
+     "line": 116,
+     "expr": "trainer.train()"
+    },
+    "step_call": "trainer.train()"
+   },
+   "knobs": {
+    "batch_size": 1,
+    "checkpoint_every": 500,
+    "epochs": 1,
+    "grad_accum": 4,
+    "group_size": 8,
+    "kl_beta": 0.04,
+    "log_every": 5,
+    "lr": 1e-06,
+    "max_completion_len": 512,
+    "max_prompt_len": 256,
+    "optimizer": "adafactor"
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "checkpoint_every": "train.py",
+    "epochs": "train.py",
+    "grad_accum": "train.py",
+    "group_size": "train.py",
+    "kl_beta": "train.py",
+    "log_every": "train.py",
+    "lr": "train.py",
+    "max_completion_len": "train.py",
+    "max_prompt_len": "train.py",
+    "optimizer": "train.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/notebook_tiny",
+  "entry": "tiny_train.py",
+  "files": 1,
+  "before": {
+   "lens": "pretrain",
+   "framework": "plain_pytorch",
+   "model": {},
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "tiny_train.py",
+     "line": 20,
+     "expr": "opt.step()"
+    },
+    "step_call": "opt.step()",
+    "optimizer_var": "opt"
+   },
+   "knobs": {
+    "batch_size": 64,
+    "lr": 0.003,
+    "max_steps": 200
+   },
+   "_where": {
+    "batch_size": "tiny_train.py",
+    "lr": "tiny_train.py",
+    "max_steps": "tiny_train.py"
+   }
+  },
+  "before_s": 0.0,
+  "after": {
+   "lens": "pretrain",
+   "framework": "plain_pytorch",
+   "model": {},
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "tiny_train.py",
+     "line": 20,
+     "expr": "opt.step()"
+    },
+    "step_call": "opt.step()",
+    "optimizer_var": "opt"
+   },
+   "knobs": {
+    "batch_size": 64,
+    "lr": 0.003,
+    "max_steps": 200
+   },
+   "_where": {
+    "batch_size": "tiny_train.py",
+    "lr": "tiny_train.py",
+    "max_steps": "tiny_train.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/pretrain_nanogpt",
+  "entry": "train.py",
+  "files": 1,
+  "before": {
+   "lens": "pretrain",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "GPT"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "train.py",
+     "line": 156,
+     "expr": "optimizer.step()"
+    },
+    "step_call": "optimizer.step()",
+    "optimizer_var": "optimizer"
+   },
+   "knobs": {
+    "batch_size": 12,
+    "checkpoint_every": 20000,
+    "d_model": 768,
+    "grad_clip": 1.0,
+    "lr": 0.0006,
+    "max_steps": 60000,
+    "n_head": 12,
+    "n_layer": 12,
+    "num_workers": 0,
+    "precision": "float32",
+    "seq_len": 1024,
+    "warmup_steps": 2000,
+    "weight_decay": 0.1
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "checkpoint_every": "train.py",
+    "d_model": "train.py",
+    "grad_clip": "train.py",
+    "lr": "train.py",
+    "max_steps": "train.py",
+    "n_head": "train.py",
+    "n_layer": "train.py",
+    "num_workers": "train.py",
+    "precision": "train.py",
+    "seq_len": "train.py",
+    "warmup_steps": "train.py",
+    "weight_decay": "train.py"
+   }
+  },
+  "before_s": 0.01,
+  "after": {
+   "lens": "pretrain",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "GPT"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "train.py",
+     "line": 156,
+     "expr": "optimizer.step()"
+    },
+    "step_call": "optimizer.step()",
+    "optimizer_var": "optimizer"
+   },
+   "knobs": {
+    "batch_size": 12,
+    "checkpoint_every": 20000,
+    "d_model": 768,
+    "grad_clip": 1.0,
+    "lr": 0.0006,
+    "max_steps": 60000,
+    "n_head": 12,
+    "n_layer": 12,
+    "num_workers": 0,
+    "precision": "float32",
+    "seq_len": 1024,
+    "warmup_steps": 2000,
+    "weight_decay": 0.1
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "checkpoint_every": "train.py",
+    "d_model": "train.py",
+    "grad_clip": "train.py",
+    "lr": "train.py",
+    "max_steps": "train.py",
+    "n_head": "train.py",
+    "n_layer": "train.py",
+    "num_workers": "train.py",
+    "precision": "train.py",
+    "seq_len": "train.py",
+    "warmup_steps": "train.py",
+    "weight_decay": "train.py"
+   }
+  },
+  "after_s": 0.01,
+  "same": true
+ },
+ {
+  "name": "zoo/retrieval_st",
+  "entry": "train.py",
+  "files": 3,
+  "before": {
+   "lens": "retrieval",
+   "framework": "sentence_transformers",
+   "model": {
+    "name": "all-MiniLM-L6-v2",
+    "hf_id": "sentence-transformers/all-MiniLM-L6-v2"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "train.py",
+     "line": 69,
+     "expr": "SentenceTransformerTrainer(model=model, args=args, train_dataset=train, loss=loss).train()"
+    },
+    "step_call": "SentenceTransformerTrainer(model=model, args=args, train_dataset=train, loss=loss).train()"
+   },
+   "knobs": {
+    "batch_size": 8,
+    "encode_batch_size": 256,
+    "epochs": 1,
+    "log_every": 100,
+    "lr": 2e-05,
+    "precision": "bf16"
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "encode_batch_size": "train.py",
+    "epochs": "train.py",
+    "log_every": "train.py",
+    "lr": "train.py",
+    "precision": "train.py"
+   }
+  },
+  "before_s": 0.0,
+  "after": {
+   "lens": "retrieval",
+   "framework": "sentence_transformers",
+   "model": {
+    "name": "all-MiniLM-L6-v2",
+    "hf_id": "sentence-transformers/all-MiniLM-L6-v2"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "train.py",
+     "line": 69,
+     "expr": "SentenceTransformerTrainer(model=model, args=args, train_dataset=train, loss=loss).train()"
+    },
+    "step_call": "SentenceTransformerTrainer(model=model, args=args, train_dataset=train, loss=loss).train()"
+   },
+   "knobs": {
+    "batch_size": 8,
+    "encode_batch_size": 256,
+    "epochs": 1,
+    "log_every": 100,
+    "lr": 2e-05,
+    "precision": "bf16"
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "encode_batch_size": "train.py",
+    "epochs": "train.py",
+    "log_every": "train.py",
+    "lr": "train.py",
+    "precision": "train.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/serving_vllm",
+  "entry": "serve.py",
+  "files": 2,
+  "before": {
+   "lens": "serving",
+   "framework": "vllm",
+   "model": {
+    "name": "Qwen2.5-7B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-7B-Instruct"
+   },
+   "loop": {
+    "kind": "eval_loop",
+    "location": {
+     "file": "serve.py",
+     "line": 66,
+     "expr": null
+    },
+    "step_call": "llm.generate"
+   },
+   "knobs": {
+    "gpu_memory_utilization": 0.9,
+    "max_batched_tokens": 8192,
+    "max_model_len": 32768,
+    "max_new_tokens": 4096,
+    "max_num_seqs": 256,
+    "temperature": 0.7
+   },
+   "_where": {
+    "gpu_memory_utilization": "serve.py",
+    "max_batched_tokens": "serve.py",
+    "max_model_len": "serve.py",
+    "max_new_tokens": "serve.py",
+    "max_num_seqs": "serve.py",
+    "temperature": "serve.py"
+   }
+  },
+  "before_s": 0.0,
+  "after": {
+   "lens": "serving",
+   "framework": "vllm",
+   "model": {
+    "name": "Qwen2.5-7B-Instruct",
+    "hf_id": "Qwen/Qwen2.5-7B-Instruct"
+   },
+   "loop": {
+    "kind": "eval_loop",
+    "location": {
+     "file": "serve.py",
+     "line": 66,
+     "expr": null
+    },
+    "step_call": "llm.generate"
+   },
+   "knobs": {
+    "gpu_memory_utilization": 0.9,
+    "max_batched_tokens": 8192,
+    "max_model_len": 32768,
+    "max_new_tokens": 4096,
+    "max_num_seqs": 256,
+    "temperature": 0.7
+   },
+   "_where": {
+    "gpu_memory_utilization": "serve.py",
+    "max_batched_tokens": "serve.py",
+    "max_model_len": "serve.py",
+    "max_new_tokens": "serve.py",
+    "max_num_seqs": "serve.py",
+    "temperature": "serve.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/torchtitan_debug",
+  "entry": "train.py",
+  "files": 5,
+  "before": {
+   "lens": "pretrain",
+   "framework": "other",
+   "model": {},
+   "loop": {},
+   "knobs": {},
+   "_where": {}
+  },
+  "before_s": 0.0,
+  "after": {
+   "lens": "pretrain",
+   "framework": "other",
+   "model": {},
+   "loop": {},
+   "knobs": {},
+   "_where": {}
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "zoo/vision_timm",
+  "entry": "train.py",
+  "files": 3,
+  "before": {
+   "lens": "vision",
+   "framework": "timm",
+   "model": {
+    "name": "resnet50.a1_in1k"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "train.py",
+     "line": 96,
+     "expr": "opt.step()"
+    },
+    "step_call": "opt.step()",
+    "optimizer_var": "opt"
+   },
+   "knobs": {
+    "batch_size": 64,
+    "epochs": 5,
+    "image_size": 224,
+    "lr": 0.001,
+    "num_workers": 2
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "epochs": "train.py",
+    "image_size": "train.py",
+    "lr": "train.py",
+    "num_workers": "train.py"
+   }
+  },
+  "before_s": 0.02,
+  "after": {
+   "lens": "vision",
+   "framework": "timm",
+   "model": {
+    "name": "resnet50.a1_in1k"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "train.py",
+     "line": 96,
+     "expr": "opt.step()"
+    },
+    "step_call": "opt.step()",
+    "optimizer_var": "opt"
+   },
+   "knobs": {
+    "batch_size": 64,
+    "epochs": 5,
+    "image_size": 224,
+    "lr": 0.001,
+    "num_workers": 2
+   },
+   "_where": {
+    "batch_size": "train.py",
+    "epochs": "train.py",
+    "image_size": "train.py",
+    "lr": "train.py",
+    "num_workers": "train.py"
+   }
+  },
+  "after_s": 0.0,
+  "same": true
+ },
+ {
+  "name": "unseen-1 torchtune",
+  "entry": "recipes/lora_finetune_single_device.py",
+  "files": 736,
+  "before": {
+   "lens": "finetune",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "Qwen3Attention"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "recipes/lora_finetune_single_device.py",
+     "line": 652,
+     "expr": "self._optimizer.step()"
+    },
+    "step_call": "self._optimizer.step()",
+    "optimizer_var": "self._optimizer"
+   },
+   "knobs": {
+    "gpus": 2,
+    "temperature": 1.0
+   },
+   "_where": {
+    "gpus": "recipes/configs/dev/11B_lora_multi_dataset.yaml",
+    "temperature": "torchtune/rlhf/sequence_processing.py"
+   }
+  },
+  "before_s": 1.2,
+  "after": {
+   "lens": "finetune",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "Qwen3Attention"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "recipes/lora_finetune_single_device.py",
+     "line": 652,
+     "expr": "self._optimizer.step()"
+    },
+    "step_call": "self._optimizer.step()",
+    "optimizer_var": "self._optimizer"
+   },
+   "knobs": {
+    "gpus": 2,
+    "temperature": 1.0
+   },
+   "_where": {
+    "gpus": "recipes/configs/dev/11B_lora_multi_dataset.yaml",
+    "temperature": "torchtune/rlhf/sequence_processing.py"
+   }
+  },
+  "after_s": 1.39,
+  "same": true
+ },
+ {
+  "name": "unseen-2 litgpt",
+  "entry": "litgpt/pretrain.py",
+  "files": 218,
+  "before": {
+   "lens": "pretrain",
+   "framework": "lightning",
+   "model": {
+    "name": "stablelm-zephyr-3b",
+    "hf_id": "stabilityai/stablelm-zephyr-3b"
+   },
+   "loop": {
+    "kind": "lightning",
+    "location": {
+     "file": "tests/test_trainer_support.py",
+     "line": 66,
+     "expr": "trainer.fit(lit_model, data)"
+    },
+    "step_call": "trainer.fit(lit_model, data)"
+   },
+   "knobs": {
+    "attn": "eager",
+    "batch_size": 4,
+    "checkpoint_every": 200,
+    "d_model": 4096,
+    "epochs": 5,
+    "eval_every": 200,
+    "lora_alpha": 8,
+    "lora_dropout": 0.1,
+    "lora_r": 0,
+    "lr": 0.003,
+    "max_new_tokens": 100,
+    "max_steps": 100,
+    "n_head": 32,
+    "n_layer": 16,
+    "num_workers": 4,
+    "pin_memory": true,
+    "seq_len": 4096,
+    "temperature": 0.8,
+    "tensor_parallel": 1,
+    "weight_decay": 0.02
+   },
+   "_where": {
+    "attn": "tests/convert/test_lit_checkpoint.py",
+    "batch_size": "extensions/xla/finetune/adapter.py",
+    "checkpoint_every": "extensions/xla/finetune/adapter.py",
+    "d_model": "litgpt/config.py",
+    "epochs": "extensions/xla/finetune/adapter.py",
+    "eval_every": "extensions/xla/finetune/adapter.py",
+    "lora_alpha": "tests/test_lora.py",
+    "lora_dropout": "tests/test_lora.py",
+    "lora_r": "litgpt/lora.py",
+    "lr": "extensions/xla/finetune/adapter.py",
+    "max_new_tokens": "litgpt/finetune/adapter.py",
+    "max_steps": "litgpt/args.py",
+    "n_head": "litgpt/config.py",
+    "n_layer": "litgpt/config.py",
+    "num_workers": "litgpt/data/alpaca.py",
+    "pin_memory": "litgpt/data/lit_data.py",
+    "seq_len": "litgpt/config.py",
+    "temperature": "extensions/xla/finetune/adapter.py",
+    "tensor_parallel": "litgpt/finetune/lora.py",
+    "weight_decay": "extensions/xla/finetune/adapter.py"
+   }
+  },
+  "before_s": 1.12,
+  "after": {
+   "lens": "pretrain",
+   "framework": "lightning",
+   "model": {
+    "name": "LoRALayer"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "litgpt/pretrain.py",
+     "line": 361,
+     "expr": "optimizer.step()"
+    },
+    "step_call": "optimizer.step()",
+    "optimizer_var": "optimizer"
+   },
+   "knobs": {
+    "batch_size": 4,
+    "checkpoint_every": 1000,
+    "d_model": 4096,
+    "lora_alpha": 1,
+    "lora_dropout": 0.0,
+    "lora_r": 0,
+    "max_steps": 100,
+    "n_head": 32,
+    "n_layer": 16,
+    "num_workers": 8,
+    "pin_memory": true,
+    "seq_len": 4096
+   },
+   "_where": {
+    "batch_size": "litgpt/args.py",
+    "checkpoint_every": "litgpt/args.py",
+    "d_model": "litgpt/config.py",
+    "lora_alpha": "litgpt/lora.py",
+    "lora_dropout": "litgpt/lora.py",
+    "lora_r": "litgpt/lora.py",
+    "max_steps": "litgpt/args.py",
+    "n_head": "litgpt/config.py",
+    "n_layer": "litgpt/config.py",
+    "num_workers": "litgpt/data/tinystories.py",
+    "pin_memory": "litgpt/data/tinystories.py",
+    "seq_len": "litgpt/config.py"
+   }
+  },
+  "after_s": 0.8,
+  "same": false
+ },
+ {
+  "name": "unseen-3 open-r1",
+  "entry": "src/open_r1/grpo.py",
+  "files": 72,
+  "before": {
+   "lens": "rl",
+   "framework": "trl",
+   "model": {},
+   "loop": {
+    "kind": "trl_trainer",
+    "location": {
+     "file": "src/open_r1/grpo.py",
+     "line": 132,
+     "expr": "trainer.train(resume_from_checkpoint=checkpoint)"
+    },
+    "step_call": "trainer.train(resume_from_checkpoint=checkpoint)"
+   },
+   "knobs": {
+    "batch_size": 64,
+    "gpus": 1,
+    "group_size": 4,
+    "max_new_tokens": 16384,
+    "temperature": 0.6
+   },
+   "_where": {
+    "batch_size": "scripts/pass_rate_filtering/compute_pass_rate.py",
+    "gpus": "slurm/compute_pass_rate.slurm",
+    "group_size": "scripts/generate_reasoning.py",
+    "max_new_tokens": "scripts/generate_reasoning.py",
+    "temperature": "scripts/generate_reasoning.py"
+   }
+  },
+  "before_s": 0.09,
+  "after": {
+   "lens": "rl",
+   "framework": "trl",
+   "model": {},
+   "loop": {
+    "kind": "trl_trainer",
+    "location": {
+     "file": "src/open_r1/grpo.py",
+     "line": 132,
+     "expr": "trainer.train(resume_from_checkpoint=checkpoint)"
+    },
+    "step_call": "trainer.train(resume_from_checkpoint=checkpoint)"
+   },
+   "knobs": {
+    "gpus": 1
+   },
+   "_where": {
+    "gpus": "slurm/compute_pass_rate.slurm"
+   }
+  },
+  "after_s": 0.16,
+  "same": false
+ },
+ {
+  "name": "unseen-4 smolagents",
+  "entry": "examples/agent_from_any_llm.py",
+  "files": 167,
+  "before": {
+   "lens": "agent",
+   "framework": "openai_client",
+   "model": {},
+   "loop": {
+    "kind": "agent_loop",
+    "location": {
+     "file": "examples/open_deep_research/scripts/mdconvert.py",
+     "line": 756,
+     "expr": null
+    },
+    "step_call": "client.chat.completions.create"
+   },
+   "knobs": {
+    "concurrency": 8,
+    "max_new_tokens": 1000,
+    "temperature": 0.5
+   },
+   "_where": {
+    "concurrency": "examples/open_deep_research/run_gaia.py",
+    "max_new_tokens": "examples/agent_from_any_llm.py",
+    "temperature": "tests/test_agents.py"
+   }
+  },
+  "before_s": 0.85,
+  "after": {
+   "lens": "agent",
+   "framework": "openai_client",
+   "model": {},
+   "loop": {
+    "kind": "agent_loop",
+    "location": {
+     "file": "src/smolagents/models.py",
+     "line": 1611,
+     "expr": null
+    },
+    "step_call": "self.client.chat.completions.create"
+   },
+   "knobs": {
+    "max_new_tokens": 1000
+   },
+   "_where": {
+    "max_new_tokens": "examples/agent_from_any_llm.py"
+   }
+  },
+  "after_s": 0.68,
+  "same": false
+ },
+ {
+  "name": "unseen-5 lm-eval",
+  "entry": "lm_eval/__main__.py",
+  "files": 48,
+  "before": {
+   "lens": "eval",
+   "framework": "other",
+   "model": {},
+   "loop": {},
+   "knobs": {},
+   "_where": {}
+  },
+  "before_s": 0.24,
+  "after": {
+   "lens": "eval",
+   "framework": "other",
+   "model": {},
+   "loop": {},
+   "knobs": {},
+   "_where": {}
+  },
+  "after_s": 0.5,
+  "same": true
+ },
+ {
+  "name": "unseen-6 vllm bench",
+  "entry": "vllm/benchmarks/throughput.py",
+  "files": 162,
+  "before": {
+   "lens": "serving",
+   "framework": "vllm",
+   "model": {
+    "name": "Qwen3-0.6B",
+    "hf_id": "Qwen/Qwen3-0.6B"
+   },
+   "loop": {
+    "kind": "agent_loop",
+    "location": {
+     "file": "vllm/benchmarks/throughput.py",
+     "line": 289,
+     "expr": null
+    },
+    "step_call": "llm.wait_for_completion"
+   },
+   "knobs": {
+    "max_new_tokens": 16,
+    "pin_memory": true,
+    "precision": "auto",
+    "temperature": 1.0
+   },
+   "_where": {
+    "max_new_tokens": "vllm/sampling_params.py",
+    "pin_memory": "vllm/utils/torch_utils.py",
+    "precision": "vllm/config/model.py",
+    "temperature": "vllm/sampling_params.py"
+   }
+  },
+  "before_s": 1.27,
+  "after": {
+   "lens": "serving",
+   "framework": "vllm",
+   "model": {
+    "name": "Qwen3-0.6B",
+    "hf_id": "Qwen/Qwen3-0.6B"
+   },
+   "loop": {
+    "kind": "agent_loop",
+    "location": {
+     "file": "vllm/benchmarks/throughput.py",
+     "line": 289,
+     "expr": null
+    },
+    "step_call": "llm.wait_for_completion"
+   },
+   "knobs": {
+    "max_new_tokens": 16,
+    "pin_memory": true,
+    "precision": "auto",
+    "temperature": 1.0
+   },
+   "_where": {
+    "max_new_tokens": "vllm/sampling_params.py",
+    "pin_memory": "vllm/utils/torch_utils.py",
+    "precision": "vllm/config/model.py",
+    "temperature": "vllm/sampling_params.py"
+   }
+  },
+  "after_s": 2.33,
+  "same": true
+ },
+ {
+  "name": "unseen-7 beir",
+  "entry": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
+  "files": 110,
+  "before": {
+   "lens": "retrieval",
+   "framework": "sentence_transformers",
+   "model": {
+    "name": "unicoil-d2q-msmarco-passage",
+    "hf_id": "castorini/unicoil-d2q-msmarco-passage"
+   },
+   "loop": {
+    "kind": "other",
+    "location": {
+     "file": "beir/retrieval/models/tldr.py",
+     "line": 61,
+     "expr": "self.model.fit(\n            self.encoder_model.encode(sentences, batch_size=batch_size, **kwargs),\n            epochs=epochs,\n            warmup_epochs=warmup_epochs,\n            batch_size=batch_size,\n            output_folder=self.output_folder,\n            print_every=print_every,\n        )"
+    },
+    "step_call": "self.model.fit(\n            self.encoder_model.encode(sentences, batch_size=batch_size, **kwargs),\n            epochs=epochs,\n            warmup_epochs=warmup_epochs,\n            batch_size=batch_size,\n            output_folder=self.output_folder,\n            print_every=print_every,\n        )"
+   },
+   "knobs": {
+    "attn": "flash_attention_2",
+    "batch_size": 80,
+    "encode_batch_size": 128,
+    "epochs": 1,
+    "seq_len": 512,
+    "temperature": 1,
+    "warmup_steps": 1000
+   },
+   "_where": {
+    "attn": "examples/retrieval/evaluation/dense/evaluate_huggingface.py",
+    "batch_size": "examples/retrieval/evaluation/sparse/evaluate_anserini_docT5query.py",
+    "encode_batch_size": "examples/benchmarking/benchmark_sbert.py",
+    "epochs": "examples/retrieval/training/train_sbert_BM25_hardnegs.py",
+    "seq_len": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
+    "temperature": "examples/retrieval/evaluation/sparse/evaluate_anserini_docT5query_parallel.py",
+    "warmup_steps": "examples/retrieval/training/train_msmarco_v3_margin_MSE.py"
+   }
+  },
+  "before_s": 0.24,
+  "after": {
+   "lens": "retrieval",
+   "framework": "sentence_transformers",
+   "model": {
+    "name": "SpladeNaver"
+   },
+   "loop": {
+    "kind": "other",
+    "location": {
+     "file": "beir/retrieval/models/tldr.py",
+     "line": 61,
+     "expr": "self.model.fit(\n            self.encoder_model.encode(sentences, batch_size=batch_size, **kwargs),\n            epochs=epochs,\n            warmup_epochs=warmup_epochs,\n            batch_size=batch_size,\n            output_folder=self.output_folder,\n            print_every=print_every,\n        )"
+    },
+    "step_call": "self.model.fit(\n            self.encoder_model.encode(sentences, batch_size=batch_size, **kwargs),\n            epochs=epochs,\n            warmup_epochs=warmup_epochs,\n            batch_size=batch_size,\n            output_folder=self.output_folder,\n            print_every=print_every,\n        )"
+   },
+   "knobs": {
+    "batch_size": 128,
+    "seq_len": 512
+   },
+   "_where": {
+    "batch_size": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
+    "seq_len": "examples/retrieval/evaluation/dense/evaluate_sbert.py"
+   }
+  },
+  "after_s": 0.19,
+  "same": false
+ },
+ {
+  "name": "unseen-8 ogb",
+  "entry": "examples/nodeproppred/arxiv/gnn.py",
+  "files": 211,
+  "before": {
+   "lens": "gnn",
+   "framework": "pyg",
+   "model": {
+    "name": "GCNConv"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "examples/lsc/mag240m/gnn.py",
+     "line": 249,
+     "expr": "trainer.fit(model, datamodule=datamodule)"
+    },
+    "step_call": "trainer.fit(model, datamodule=datamodule)"
+   },
+   "knobs": {
+    "batch_size": 128,
+    "epochs": 25,
+    "eval_batch_size": 4,
+    "eval_every": 10,
+    "lr": 0.0001,
+    "max_steps": 100000,
+    "n_layer": 3,
+    "num_workers": 0,
+    "seq_len": 5
+   },
+   "_where": {
+    "batch_size": "examples/graphproppred/code2/main_pyg.py",
+    "epochs": "examples/graphproppred/code2/main_pyg.py",
+    "eval_batch_size": "examples/linkproppred/biokg/run.py",
+    "eval_every": "examples/linkproppred/citation2/cluster_gcn.py",
+    "lr": "examples/linkproppred/biokg/run.py",
+    "max_steps": "examples/linkproppred/biokg/run.py",
+    "n_layer": "examples/linkproppred/citation2/cluster_gcn.py",
+    "num_workers": "examples/graphproppred/code2/main_pyg.py",
+    "seq_len": "examples/graphproppred/code2/main_pyg.py"
+   }
+  },
+  "before_s": 1.41,
+  "after": {
+   "lens": "gnn",
+   "framework": "pyg",
+   "model": {
+    "name": "GCNConv"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "examples/nodeproppred/arxiv/gnn.py",
+     "line": 86,
+     "expr": "optimizer.step()"
+    },
+    "step_call": "optimizer.step()",
+    "optimizer_var": "optimizer"
+   },
+   "knobs": {
+    "epochs": 500,
+    "lr": 0.01,
+    "n_layer": 3
+   },
+   "_where": {
+    "epochs": "examples/nodeproppred/arxiv/gnn.py",
+    "lr": "examples/nodeproppred/arxiv/gnn.py",
+    "n_layer": "examples/nodeproppred/arxiv/gnn.py"
+   }
+  },
+  "after_s": 0.38,
+  "same": false
+ },
+ {
+  "name": "unseen-9 airbench",
+  "entry": "airbench94_muon.py",
+  "files": 15,
+  "before": {
+   "lens": "vision",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "CifarNet"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "airbench/utils.py",
+     "line": 317,
+     "expr": "optimizer.step()"
+    },
+    "step_call": "optimizer.step()",
+    "optimizer_var": "optimizer"
+   },
+   "knobs": {
+    "batch_size": 2000,
+    "lr": 0.24
+   },
+   "_where": {
+    "batch_size": "airbench/utils.py",
+    "lr": "airbench94_muon.py"
+   }
+  },
+  "before_s": 0.12,
+  "after": {
+   "lens": "vision",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "CifarNet"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "airbench94_muon.py",
+     "line": 405,
+     "expr": "opt.step()"
+    },
+    "step_call": "opt.step()",
+    "optimizer_var": "opt"
+   },
+   "knobs": {
+    "batch_size": 2000,
+    "lr": 0.24
+   },
+   "_where": {
+    "batch_size": "airbench94_muon.py",
+    "lr": "airbench94_muon.py"
+   }
+  },
+  "after_s": 0.04,
+  "same": false
+ },
+ {
+  "name": "F1 word_language_model",
+  "entry": "word_language_model/main.py",
+  "files": 196,
+  "before": {
+   "lens": "finetune",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "t5-base",
+    "hf_id": "t5-base"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "distributed/ddp-tutorial-series/multigpu.py",
+     "line": 91,
+     "expr": "trainer.train(total_epochs)"
+    },
+    "step_call": "trainer.train(total_epochs)"
+   },
+   "knobs": {
+    "batch_size": 2,
+    "checkpoint_every": 2000,
+    "d_model": 16,
+    "epochs": 2,
+    "eval_batch_size": 10,
+    "eval_every": 20,
+    "gpus": 1,
+    "image_size": 256,
+    "lr": 0.25,
+    "max_steps": 500,
+    "n_head": 4,
+    "n_layer": 2,
+    "pin_memory": true,
+    "seq_len": 16,
+    "temperature": 1.0,
+    "weight_decay": 0.0
+   },
+   "_where": {
+    "batch_size": "distributed/tensor_parallelism/fsdp_tp_example.py",
+    "checkpoint_every": "fast_neural_style/neural_style/neural_style.py",
+    "d_model": "distributed/FSDP2/model.py",
+    "epochs": "distributed/FSDP/T5_training.py",
+    "eval_batch_size": "word_language_model/main.py",
+    "eval_every": "gat/main.py",
+    "gpus": "distributed/ddp-tutorial-series/slurm/sbatch_run.sh",
+    "image_size": "fast_neural_style/neural_style/neural_style.py",
+    "lr": "distributed/tensor_parallelism/tensor_parallel_example.py",
+    "max_steps": "distributed/rpc/batch/reinforce.py",
+    "n_head": "distributed/FSDP2/model.py",
+    "n_layer": "distributed/FSDP2/model.py",
+    "pin_memory": "distributed/ddp-tutorial-series/multigpu.py",
+    "seq_len": "distributed/FSDP2/model.py",
+    "temperature": "word_language_model/generate.py",
+    "weight_decay": "distributed/FSDP/configs/training.py"
+   }
+  },
+  "before_s": 0.26,
+  "after": {
+   "lens": "pretrain",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "PositionalEncoding"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "word_language_model/main.py",
+     "line": 191,
+     "expr": "optimizer.step()"
+    },
+    "step_call": "optimizer.step()",
+    "optimizer_var": "optimizer"
+   },
+   "knobs": {
+    "batch_size": 20,
+    "epochs": 40,
+    "eval_batch_size": 10,
+    "gpus": 1,
+    "lr": 20
+   },
+   "_where": {
+    "batch_size": "word_language_model/main.py",
+    "epochs": "word_language_model/main.py",
+    "eval_batch_size": "word_language_model/main.py",
+    "gpus": "distributed/ddp-tutorial-series/slurm/sbatch_run.sh",
+    "lr": "word_language_model/main.py"
+   }
+  },
+  "after_s": 0.06,
+  "same": false
+ },
+ {
+  "name": "F3 pytorch-cifar",
+  "entry": "main.py",
+  "files": 22,
+  "before": {
+   "lens": "vision",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "VGG"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "main.py",
+     "line": 154,
+     "expr": "scheduler.step()"
+    },
+    "step_call": "scheduler.step()",
+    "optimizer_var": "scheduler"
+   },
+   "knobs": {
+    "batch_size": 128,
+    "lr": 0.1,
+    "num_workers": 2
+   },
+   "_where": {
+    "batch_size": "main.py",
+    "lr": "main.py",
+    "num_workers": "main.py"
+   }
+  },
+  "before_s": 0.06,
+  "after": {
+   "lens": "vision",
+   "framework": "plain_pytorch",
+   "model": {
+    "name": "VGG"
+   },
+   "loop": {
+    "kind": "plain",
+    "location": {
+     "file": "main.py",
+     "line": 154,
+     "expr": "scheduler.step()"
+    },
+    "step_call": "scheduler.step()",
+    "optimizer_var": "scheduler"
+   },
+   "knobs": {
+    "batch_size": 128,
+    "lr": 0.1,
+    "num_workers": 2
+   },
+   "_where": {
+    "batch_size": "main.py",
+    "lr": "main.py",
+    "num_workers": "main.py"
+   }
+  },
+  "after_s": 0.2,
+  "same": true
+ },
+ {
+  "name": "F2 text_classification (notebook)",
+  "entry": "text_classification.py",
+  "files": 2,
+  "before": {
+   "lens": "finetune",
+   "framework": "hf_trainer",
+   "model": {
+    "name": "distilbert-base-uncased",
+    "hf_id": "distilbert-base-uncased"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "text_classification.py",
+     "line": 134,
+     "expr": "trainer.train()"
+    },
+    "step_call": "trainer.train()"
+   },
+   "knobs": {
+    "batch_size": 16,
+    "epochs": 5,
+    "eval_batch_size": 16,
+    "lr": 2e-05,
+    "weight_decay": 0.01
+   },
+   "_where": {
+    "batch_size": "text_classification.py",
+    "epochs": "text_classification.py",
+    "eval_batch_size": "text_classification.py",
+    "lr": "text_classification.py",
+    "weight_decay": "text_classification.py"
+   }
+  },
+  "before_s": 0.01,
+  "after": {
+   "lens": "finetune",
+   "framework": "hf_trainer",
+   "model": {
+    "name": "distilbert-base-uncased",
+    "hf_id": "distilbert-base-uncased"
+   },
+   "loop": {
+    "kind": "hf_trainer",
+    "location": {
+     "file": "text_classification.py",
+     "line": 134,
+     "expr": "trainer.train()"
+    },
+    "step_call": "trainer.train()"
+   },
+   "knobs": {
+    "batch_size": 16,
+    "epochs": 5,
+    "eval_batch_size": 16,
+    "lr": 2e-05,
+    "weight_decay": 0.01
+   },
+   "_where": {
+    "batch_size": "text_classification.py",
+    "epochs": "text_classification.py",
+    "eval_batch_size": "text_classification.py",
+    "lr": "text_classification.py",
+    "weight_decay": "text_classification.py"
+   }
+  },
+  "after_s": 0.01,
+  "same": true
+ }
+]

@@ -71,6 +71,8 @@ def mapped_files(
 	sizes = {p: len(s.encode("utf-8", "surrogatepass")) for p, s in py.items()}
 	total = sum(sizes.values())
 	if total <= MAX_SOURCE_BYTES:
+		if len(py) > 1 and entrypoint in py and _map_closure():
+			return _closure_only(files, py, sizes, entrypoint), None
 		return files, None
 	limit = f"more than Preflight maps ({MAX_SOURCE_BYTES // 2**20} MB)"
 	if sizes.get(entrypoint, 0) > MAX_SOURCE_BYTES:
@@ -93,6 +95,29 @@ def mapped_files(
 	info["python_files"] = len(py)
 	info["python_bytes"] = total
 	return {**{p: s for p, s in files.items() if not p.endswith(".py")}, **got}, info
+
+
+def _map_closure() -> bool:
+	from preflight.runner.flags import flag
+
+	return flag("harness.map_closure")
+
+
+def _closure_only(
+	files: dict[str, str], py: dict[str, str], sizes: dict[str, int], entrypoint: str
+) -> dict[str, str]:
+	"""harness.map_closure (off; the re-validation, Nov 3): a repo that fits is mapped from the entry point and the
+	Python files it imports, not every file, so a model, a loop or a knob in code the job never runs isn't read as
+	the job's (the framework and lens already follow the entry point's imports, entry_imports). The other text
+	files stay. Not a "partial" read: nothing was left out for size, so the map says nothing about it."""
+	from .closure import import_closure
+
+	got, _ = import_closure(py, lambda paths: {p: py[p] for p in paths}, entrypoint,
+		max_files=len(py), max_bytes=MAX_SOURCE_BYTES, sizes=sizes)  # fmt: skip
+	return {
+		**{p: s for p, s in files.items() if not p.endswith(".py")},
+		**{p: s for p, s in got.items() if p in py},
+	}
 
 
 def _mb(n: int) -> str:
@@ -766,6 +791,15 @@ def _short_calls(f: Facts) -> set[str]:
 	return {fn.rsplit(".", 1)[-1] for fn, _, _ in f.calls}
 
 
+# an API client's method passed, not called (smolagents' models.py: `self.retryer(self.client.chat.completions.create,
+# **kwargs)`): seen only from the job's own files (harness.map_closure), where another example's call no longer answers
+_API_REF = re.compile(r"\.(?:chat\.completions|responses|messages)\.create\b")
+
+
+def _api_refs(f: Facts) -> bool:
+	return _map_closure() and any(_API_REF.search(s.text) for s in f.sources.values())
+
+
 def _framework(f: Facts) -> str:
 	trainers = set(f.trainer_vars.values()) | {s for s in _short_calls(f) if s.endswith("Trainer")}
 	if _has(f, "trl") or trainers & (set(RL_TRAINERS) | {"SFTTrainer", "RewardTrainer"}):
@@ -784,7 +818,11 @@ def _framework(f: Facts) -> str:
 		return "lightning"
 	if _has(f, "transformers") and ("Trainer" in trainers or "Trainer" in f.names):
 		return "hf_trainer"
-	if _has(f, "openai", "anthropic", "litellm") or any(fn.endswith(AGENT_CALLS) for fn, _, _ in f.calls):
+	if (
+		_has(f, "openai", "anthropic", "litellm")
+		or any(fn.endswith(AGENT_CALLS) for fn, _, _ in f.calls)
+		or _api_refs(f)
+	):
 		return "openai_client"
 	if _has(f, "timm"):
 		return "timm"
@@ -1040,6 +1078,15 @@ def _loop(f: Facts, framework: str) -> LoopInfo | None:
 			return LoopInfo(
 				kind="agent_loop", location=CodeLocation(file=path, line=call.lineno), step_call=fn
 			)
+	if framework == "openai_client" and _map_closure():  # an API method passed, not called (_api_refs)
+		for path, src in f.sources.items():
+			m = _API_REF.search(src.text)
+			if m:
+				line = src.text.count("\n", 0, m.start()) + 1
+				name = re.search(r"[\w.]*$", src.text[: m.start()]).group(0) + m.group(0)
+				return LoopInfo(
+					kind="agent_loop", location=CodeLocation(file=path, line=line), step_call=name
+				)
 	for fn, call, path in f.calls:
 		if fn.endswith(".generate"):
 			return LoopInfo(
