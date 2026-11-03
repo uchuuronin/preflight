@@ -6,11 +6,12 @@
  */
 import { describe, expect, it } from "vitest";
 import en from "../i18n/en.json";
+import { template } from "../fix/candidates";
 import { GridProvider } from "../workspace/provider/GridProvider";
 import { SAMPLES } from "../workspace/record/load";
 import { currentKnobs, objectiveTarget } from "../workspace/record/model";
 import { normaliseRecord } from "../workspace/record/types";
-import { campaignVisit, nextStep, rlVisit, SAMPLE_VISIT } from "./ruleTour";
+import { campaignVisit, isGpuMove, nextStep, rlVisit, SAMPLE_VISIT } from "./ruleTour";
 
 const provider = new GridProvider();
 const AIMS = ["min_cost", "min_time"] as const;
@@ -47,7 +48,12 @@ describe("the rule-based tour keeps to its aim", () => {
 							continue;
 						}
 						const others = provider.moves(record, objective).filter((o) => o.fit === "fits" && o.clearsFailure && !visited.has(o.knobId));
-						for (const o of others) expect(sign * o.delta).toBeGreaterThanOrEqual(sign * m.delta);
+						// A GPU move only when nothing on this GPU clears it (PM, Nov 3); the cheapest within its group.
+						if (isGpuMove(m)) expect(others.filter((o) => !isGpuMove(o)).map((o) => o.knobId)).toEqual([]);
+						// A finding's own fix comes first among the moves on this GPU, so compare like with like.
+						const own = new Set(record.findings.map((f) => template(f.fix_template)?.knob ?? f.knob_id).filter(Boolean));
+						const group = (o: { knobId: string }) => `${isGpuMove(o)}:${own.has(o.knobId)}`;
+						for (const o of others.filter((o) => group(o) === group(m))) expect(sign * o.delta).toBeGreaterThanOrEqual(sign * m.delta);
 					} else break;
 				}
 			});
