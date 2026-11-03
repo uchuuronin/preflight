@@ -590,7 +590,6 @@ STEP_TIME_UNREAD = frozenset(
 		"use_vllm",
 		"kv_cache_dtype",
 		"gpu_memory_utilization",
-		"eval_batch_size",
 		"fsdp_mode",
 		"deepspeed_config",
 		"index_m",
@@ -601,7 +600,7 @@ STEP_TIME_UNREAD = frozenset(
 		"request_rate",
 		"max_new_tokens",
 	}
-)  # memory reads use_vllm and the KV and parallel knobs; eval passes are timed at the probe's eval batch; the
+)  # memory reads use_vllm and the KV and parallel knobs; the
 # strategy comes from the script map; the serving knobs feed only the serving simulator; max_new_tokens sizes memory
 # only, off the work axis (knobs.work_units reads seq_len or max_model_len) (review, Nov 3)
 
@@ -1771,10 +1770,13 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
 		)
 
-	unmodelled = set(_unmodelled_moves(record, values, "time"))
+	unmodelled_moves = _unmodelled_moves(record, values, "time")
+	unmodelled = set(unmodelled_moves)
 	off = [
 		k
-		for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"}))
+		for k in _off_probe(
+			record, values, also_ok=frozenset({"grad_accum", "eval_batch_size"})
+		)  # eval batch: no step effect; passes timed as probed
 		if k not in _PRECISION_KNOBS and k not in STEP_TIME_UNREAD and k not in unmodelled
 	]  # an unmodelled knob is said below, as unmodelled for time, never as carried too (review)
 	if off and status in ("predicted", "measured"):
@@ -1788,12 +1790,14 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		status = "extrapolated"
 		reasons.append(past)
 
-	moves = [m for m in _unmodelled_moves(record, values, "time") if m != "gpus"]
+	moves = [m for m in unmodelled_moves if m != "gpus"]
 	if moves:
 		sigma *= UNMODELLED_WIDEN
 		lt = replace(lt, intact=False) if lt is not None else None
 		status = "extrapolated" if status != "abstain" else status
-		reasons.append(f"{', '.join(moves)} isn't modelled for time yet; held at its probed effect")
+		reasons.append(
+			f"{', '.join(moves)} {'isn' if len(moves) == 1 else 'aren'}'t modelled for time yet; held at its probed effect"
+		)
 	h = memory.Z90 * sigma
 	if rough and h > memory.ABSTAIN_HALF_WIDTH:
 		# Chiya, Oct 31 (option b): the held-out cross-GPU band is shown past +-50%, labelled, beside the probe offer

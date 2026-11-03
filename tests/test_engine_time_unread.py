@@ -69,3 +69,11 @@ def test_checkpointing_named_none_adds_no_recompute():
 		and not api._checkpointing_on(0)
 		and api._checkpointing_on("unsloth")
 	)
+
+
+def test_eval_batch_is_neither_widened_nor_carried_and_two_moves_read_plural():
+	assert "eval_batch_size" not in api.STEP_TIME_UNREAD
+	rec = _rec("pretrain_nanogpt.record.json")
+	cur = api._current(rec)
+	t = api.predict(rec, {"n_layer": cur["n_layer"] * 2, "d_model": cur["d_model"] * 2}).root["time.step"]
+	assert "aren't modelled for time yet" in (t.reason or "") or t.status == "abstain"
