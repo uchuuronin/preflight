@@ -1,0 +1,11 @@
+{
+	"name": "20261103-003704-41554116831-amd-b-amd-grouped",
+	"exit_code": 0,
+	"workflow": "amd-run",
+	"run_id": "41554116831",
+	"ref": "a132c0ae7048c8af63d2bd9922745e06916a99e6",
+	"sha": "a132c0ae7048c8af63d2bd9922745e06916a99e6",
+	"cmd": "python -m preflight.corpus.sweep run --kind grouped --configs python/preflight/corpus/data/amd_grouped.jsonl --gpu MI300X --out /root/corpus --copy-to out/corpus --budget-usd 12.5 --usd-per-hour 2.40 --billing uptime --droplet-started 2026-11-02T22:40:00Z",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T02:21:44Z"
+}
