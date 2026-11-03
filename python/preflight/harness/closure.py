@@ -17,7 +17,7 @@ repository's top, `src/`. Imports under `if TYPE_CHECKING:` aren't followed. Imp
 
 The repository is untrusted: a dotted name, an import's names and a file's imports are capped, and
 a path is only built under folders the repository has, so a hostile file can't make the work grow
-faster than its own size.
+faster than its own size (paths over MAX_PATH aren't followed).
 
 `read(paths)` returns {path: text} for the paths asked (one batch per breadth-first layer, so a git
 object store is read once per layer, never whole).
@@ -35,6 +35,9 @@ MAX_LINE = 4_000  # guess: characters in a line before a file's imports aren't f
 # guess: import resolutions in the whole walk, each a few dict lookups (MAX_PARTS deep at most), so the
 # walk's work is bounded by the bytes read and this, not a clock
 MAX_LOOKUPS = 200_000
+# guess: characters in a file's path; longer ones aren't followed (each lookup builds and hashes paths, so a
+# 1 MB path made 127,000 lookups cost 105 s of CPU, review Nov 3); real repositories' paths are under 300
+MAX_PATH = 1_024
 
 
 def _type_checking(node: ast.AST) -> bool:
@@ -113,7 +116,19 @@ def import_closure(
 	many imported files were found but left out for the budget (`skipped`, a floor: what they
 	import is never seen), and `cut`: "lookups" when the lookup budget ran out (the rest of the walk
 	is skipped and counted), else None."""
-	have = set(paths)
+	have = {p for p in paths if len(p) <= MAX_PATH}
+	if len(entry) > MAX_PATH:  # read, never followed
+		text = read([entry]).get(entry)
+		got = {entry: text} if text is not None else {}
+		n = len(text.encode("utf-8", "surrogatepass")) if text is not None else 0
+		return got, {
+			"files": len(got),
+			"imported": 0,
+			"bytes": n,
+			"skipped": 0,
+			"cut": None,
+			"repo_files": len(have),
+		}
 	dirs: set[str] = set()
 	for p in have:
 		parts = p.split("/")
@@ -149,15 +164,13 @@ def import_closure(
 				continue
 			out[p] = text
 			total += n
-			if not p.endswith(".py") or p in PROJECT_FILES:
+			if cut or not p.endswith(".py") or p in PROJECT_FILES:  # after a cut, read but not parsed
 				continue
 			pkg = p.rsplit("/", 1)[0] if "/" in p else ""
 			for parts, level, names in _imports(p, text):
-				if cut:
-					break
 				lookups += (1 + len(names)) * (1 if level else len(roots))  # _resolve's calls and names tried
 				if lookups > max_lookups:
-					cut = "lookups"  # files later in this layer are still read; their imports aren't followed
+					cut = "lookups"  # files later in this layer are still read; their imports aren't parsed
 					break
 				if level:
 					up = pkg.split("/") if pkg else []

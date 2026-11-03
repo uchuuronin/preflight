@@ -220,3 +220,28 @@ def test_the_cut_is_by_lookups_not_a_clock_so_two_reads_match():
 	assert a == b and ia == ib and ia["cut"] == "lookups" and ia["skipped"] > 0
 	full, info = import_closure(repo, read, "main.py", max_files=999, max_bytes=10**7)
 	assert len(full) == 101 and info["cut"] is None and info["skipped"] == 0
+
+
+def test_a_very_long_path_isnt_followed_and_a_cut_is_said_as_a_cut():
+	from preflight.harness.closure import MAX_PATH
+
+	long = "d/" * (MAX_PATH // 2) + "m.py"
+	repo = {"main.py": "import d\n", long: "", "d/__init__.py": ""}
+	got, info = import_closure(
+		repo, lambda ps: {p: repo[p] for p in ps}, "main.py", max_files=9, max_bytes=999
+	)
+	assert long not in got and "d/__init__.py" in got and info["repo_files"] == 2
+	from preflight.runner.pipeline import _reading_findings
+	from preflight.runner.sources import Fetched
+
+	partial = {
+		"files": 3,
+		"imported": 2,
+		"bytes": 10,
+		"skipped": 4,
+		"cut": "lookups",
+		"repo_files": 9,
+		"repo_bytes": 99,
+	}
+	f = Fetched(files={"main.py": ""}, entrypoint="main.py", source=None, partial=partial)
+	assert "when the import lookups ran out" in _reading_findings(f)[0].detail

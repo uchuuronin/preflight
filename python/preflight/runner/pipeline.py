@@ -834,10 +834,11 @@ def _reading_findings(fetched: Fetched) -> list:
 	out = []
 	p = fetched.partial
 	if p:
+		why = (
+			"when the import lookups ran out (200,000)" if p.get("cut") == "lookups" else "for the size limit"
+		)
 		left = (
-			f"; at least {p['skipped']:,} more imported files were left out for the size limit"
-			if p.get("skipped")
-			else ""
+			f"; at least {p['skipped']:,} more imported files were left out {why}" if p.get("skipped") else ""
 		)
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
 			title="Read the entry point and what it imports, as asked" if p.get("asked")
