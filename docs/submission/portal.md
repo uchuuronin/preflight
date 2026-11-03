@@ -72,10 +72,10 @@ computed in the browser from that record. A campaign mode plans a whole grid of 
 cluster's calendar.
 
 **Honest about what it doesn't know.** Predictions are checked against real full runs, hit or
-miss, in the README's validation table (scored Mon Nov 2). What misses is said: across five GPU
+miss, in the README's validation table (scored Nov 2; final table Nov 3). What misses is said: across five GPU
 types (A10, H100, L4, L40S, T4), step time on a GPU Preflight never measured lands within 20% for
-57% of 6,694 held-out cases (rows from a Nov 1 top-up included, which the published corpus
-doesn't hold yet), under the 90% target, so it is shown with a wide band and labelled rough; and the divergence classifier, refitted on 720 runs, scores a held-out AUROC of 0.66 (0.56 to
+57% of 6,694 held-out cases (the Nov 1 top-up included, which corpus
+0.4.0 holds), under the 90% target, so it is shown with a wide band and labelled rough; and the divergence classifier, refitted on 720 runs, scores a held-out AUROC of 0.66 (0.56 to
 0.76) against a 0.85 target, so it is switched off. On an MI300X,
 step time from its own probe lands within 15% (2 of 2 runs), but from NVIDIA corpus rows it is 22% within 20%
 (NVIDIA torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software differ), 254 of 1,147 pairs, so a move across vendors isn't shown.
@@ -113,8 +113,8 @@ first commit is `11a0ce9`, Oct 26, 22:25 ET.
   Spark ($0.39 of calls), 15 with Muse Glimmer (about $0.22 of its GPU's time, cold start aside)
   and 14 with Muse Spark Open ($0.33 of calls).
 
-On the live site, all of it is on: the script map, the guide, the diagnosis, the fix loop, Spark
-Open's triage and number check, and Glimmer's private triage.
+On the live site, all of it is on: the script map, the guide, the diagnosis, Muse Spark's search grounding on failed
+probes, the fix loop, Spark Open's triage and number check, and Glimmer's private triage.
 
 ## Best Build on Meta Open Weight Models
 
