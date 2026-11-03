@@ -95,7 +95,7 @@ unchanged; the fix loop's runner image adds only pydantic, numpy and httpx, all 
 
 Not from a package index: the fix loop's image installs **Muse Code** with Meta's own installer (`curl -fsSL https://dev.meta.ai/install.sh | bash`, `api/fix_app.py`); it is Meta's command-line tool, used under Meta's terms, and nothing of it is in this repository.
 
-Models and data the bug-zoo scripts download at run time are listed with their licences in the README (`docs/readme-final.md`, Licences); none is bundled, apart from the torchtitan test files above. Three are share-alike: `roneneldan/TinyStories` (CDLA-Sharing 1.0, `zoo/pretrain_nanogpt`, which can also run on random tokens), `databricks/databricks-dolly-15k` (CC BY-SA 3.0, `zoo/serving_vllm`) and `sentence-transformers/natural-questions` (CC BY-SA 3.0, `zoo/retrieval_st`).
+Models and data the bug-zoo scripts download at run time are listed with their licences in the README (`README.md`, Licences); none is bundled, apart from the torchtitan test files above. Three are share-alike: `roneneldan/TinyStories` (CDLA-Sharing 1.0, `zoo/pretrain_nanogpt`, which can also run on random tokens), `databricks/databricks-dolly-15k` (CC BY-SA 3.0, `zoo/serving_vllm`) and `sentence-transformers/natural-questions` (CC BY-SA 3.0, `zoo/retrieval_st`).
 
 ## Every package
 

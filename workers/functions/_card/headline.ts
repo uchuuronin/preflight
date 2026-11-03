@@ -50,6 +50,10 @@ export interface RecordLike {
 	probes?: Probe[] | null;
 	predictions?: { estimates?: Record<string, Estimate> | null } | null;
 	models?: Array<{ id?: string; fixture?: boolean }> | null;
+	/** B's run cost breakdown: the money at risk if the run is launched as it is. */
+	job_cost?: { at_risk_usd?: Estimate | null } | null;
+	/** What Preflight spent making this record: GPU and model calls. */
+	costs?: { gpu_usd?: number | null; llm_usd?: number | null } | null;
 }
 
 const LENS: Record<string, string> = {
@@ -203,4 +207,32 @@ export function headline(rec: RecordLike): Headline {
 		lines: lines.slice(0, 4),
 		illustrative: lines.some((l) => l.status === "Illustrative"),
 	};
+}
+
+/** Dollars for the at-risk line: cents, or "under US$0.01" (a sub-cent figure isn't worth its digits). */
+function money(x: number): string {
+	return x < 0.005 ? "under US$0.01" : formatValue(x, "usd");
+}
+
+/**
+ * The share page's one money line (Chiya, Nov 3): "At risk if run as is: US$X (range, status) ·
+ * spent to find out: US$Y". Both from the record: the run cost's at-risk estimate (chance of
+ * failure x the cost up to the failure point, B's `job_cost.at_risk_usd`) and what Preflight spent
+ * making the record (`costs`, GPU and model calls). Null unless both exist: an abstaining or missing
+ * at-risk figure, an illustrative one, or no recorded spend gives no line.
+ */
+export function atRiskLine(rec: RecordLike): string | null {
+	const e = rec.job_cost?.at_risk_usd;
+	if (!e || e.status === "abstain" || !num(e.point)) return null;
+	const fixtures = new Set((rec.models ?? []).filter((m) => m.fixture && m.id).map((m) => m.id as string));
+	// Illustrative numbers, on this figure or anywhere on the card: a sample's spend isn't anyone's money.
+	if ((e.model_id && fixtures.has(e.model_id)) || headline(rec).illustrative) return null;
+	const spent = (num(rec.costs?.gpu_usd) ? rec.costs!.gpu_usd! : 0) + (num(rec.costs?.llm_usd) ? rec.costs!.llm_usd! : 0);
+	if (!(spent > 0)) return null;
+	const point = money(e.point);
+	const lo = num(e.lo) ? money(e.lo) : point;
+	const hi = num(e.hi) ? money(e.hi) : point;
+	const status = (e.status ?? "predicted").toLowerCase();
+	const inside = lo === hi ? status : `${lo === "under US$0.01" ? "US$0" : lo} to ${hi}, ${status}`;
+	return `At risk if run as is: ${point} (${inside}) · spent to find out: ${money(spent)}`;
 }

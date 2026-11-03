@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { duration, formatValue, headline, type RecordLike } from "../functions/_card/headline";
+import { atRiskLine, duration, formatValue, headline, type RecordLike } from "../functions/_card/headline";
 import { HERO_CARDS } from "../functions/_card/hero";
 import { renderPng } from "../functions/_card/render";
 import { badge, cardPng, sharePage } from "../functions/_card/routes";
@@ -117,6 +117,55 @@ describe("headline", () => {
 		expect(formatValue(0.9777, "usd")).toBe("US$0.98");
 		expect(formatValue(0.97, "probability")).toBe("97%");
 		expect(formatValue(2.5e6, "tokens")).toBe("2.5M tokens");
+	});
+});
+
+describe("the at-risk line", () => {
+	// Real records: the Nov 1 LoRA run on an L4 (B's at-risk estimate, predicted) and the Nov 2 GNN
+	// run on an A10 (at risk under a cent); the Oct 28 smoke run carries no run cost at all.
+	const lora = read("web/src/workspace/fixtures/lora-live-nov1.record.json");
+	const gnn = read("web/src/workspace/fixtures/gnn_pyg-a10-nov2.record.json");
+
+	it("says the money at risk with its range and status, then what finding out cost", () => {
+		expect(atRiskLine(lora)).toBe("At risk if run as is: US$0.08 (US$0.07 to US$0.08, predicted) · spent to find out: US$0.11");
+	});
+
+	it("starts a range at US$0 when only its low end is under a cent", () => {
+		const e = { ...lora.job_cost!.at_risk_usd!, point: 0.02, lo: 0.001, hi: 0.05 };
+		expect(atRiskLine({ ...lora, job_cost: { at_risk_usd: e } })).toBe("At risk if run as is: US$0.02 (US$0 to US$0.05, predicted) · spent to find out: US$0.11");
+	});
+
+	it("says a sub-cent figure as under a cent rather than in tiny digits", () => {
+		expect(atRiskLine(gnn)).toBe("At risk if run as is: under US$0.01 (extrapolated) · spent to find out: US$0.04");
+	});
+
+	it("gives no line unless both figures exist", () => {
+		expect(atRiskLine(smoke)).toBeNull(); // no run cost on the record
+		expect(atRiskLine(grpo)).toBeNull(); // its at-risk estimate abstains
+		expect(atRiskLine({ ...lora, costs: { gpu_usd: 0, llm_usd: 0 } })).toBeNull(); // nothing spent
+		expect(atRiskLine({ ...lora, costs: null })).toBeNull();
+	});
+
+	it("gives no line for illustrative numbers", () => {
+		const id = lora.job_cost?.at_risk_usd?.model_id;
+		expect(id).toBeTruthy();
+		expect(atRiskLine({ ...lora, models: [{ id: id as string, fixture: true }] })).toBeNull();
+		// A sample whose other numbers are illustrative gets no line either.
+		const others = Object.values(lora.predictions?.estimates ?? {}).map((x) => x?.model_id).filter((x): x is string => !!x && x !== id);
+		expect(atRiskLine({ ...lora, models: others.map((m) => ({ id: m, fixture: true })) })).toBeNull();
+	});
+
+	it("is on the share page, in its text and its preview's description, when it exists", async () => {
+		const req = new Request("https://preflight.example/s/" + TOKEN);
+		const html = await (await sharePage(req, ENV, TOKEN, api(lora))).text();
+		expect(html).toContain("<p>At risk if run as is: US$0.08 (US$0.07 to US$0.08, predicted) · spent to find out: US$0.11</p>");
+		expect(html).toMatch(/<meta name="description" content="[^"]*At risk if run as is: US\$0\.08/);
+		// It comes before the link, so it is read first, and the page still sends people on.
+		expect(html.indexOf("At risk if run as is")).toBeLessThan(html.indexOf("Open this flight in Preflight"));
+		// The card image doesn't carry the line, so its alt text doesn't either.
+		expect(html).not.toMatch(/og:image:alt" content="[^"]*At risk/);
+		const plain = await (await sharePage(req, ENV, TOKEN, api(smoke))).text();
+		expect(plain).not.toContain("At risk if run as is");
 	});
 });
 
