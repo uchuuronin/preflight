@@ -43,7 +43,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 		return () => es.close();
 	}, [jobId]);
 
-	const { last, done, failed, cancelled, open, error, at: idx, note } = boardingState(events);
+	const { last, done, failed, cancelled, open, error, at: idx, note, free } = boardingState(events);
 	const ended = done || failed;
 
 	// The stream lost: ask the job itself every 10 s until it has ended, so the page still learns it's
@@ -129,6 +129,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 				<span className="pf-eyebrow">{t("boarding.eyebrow")}</span>
 				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t(installStop ? "boarding.stopped_install" : "boarding.ready") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
 				{last?.queue_position ? <p className="pf-lede pf-lede--sm">{t("boarding.queue", { n: last.queue_position })}</p> : null}
+				{free ? <p className="pf-lede pf-lede--sm">{t("boarding.free_resend")}</p> : null}
 				<div className="pf-route">
 					<svg viewBox="0 0 900 260" preserveAspectRatio="none" aria-hidden="true">
 						<path className="pf-route__base" d="M30 230 C 260 -40, 640 -40, 870 230" />

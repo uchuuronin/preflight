@@ -56,7 +56,14 @@ describe("the check-in desk and intake panels", () => {
 
 	it("starts on Not sure for the GPU, so a visitor who doesn't know isn't sent to an A100", () => {
 		render(<NewFlight onSample={() => {}} />);
-		expect(screen.getByRole("button", { name: en["newflight.gpu.unsure"] }).getAttribute("aria-pressed")).toBe("true");
+		const unsure = screen.getByRole("button", { name: new RegExp(`^${en["newflight.gpu.unsure"]}`) });
+		expect(unsure.textContent).toBe(`${en["newflight.gpu.unsure"]} ${en["newflight.default"]}`);
+		expect(unsure.getAttribute("aria-pressed")).toBe("true");
+		// The starting picks say they're defaults, not choices already made.
+		const cheap = screen.getByRole("button", { name: new RegExp(`^${en["goal.min_cost"]}`) });
+		expect(cheap.textContent).toBe(`${en["goal.min_cost"]} ${en["newflight.default"]}`);
+		expect(cheap.getAttribute("aria-pressed")).toBe("true");
+		expect(screen.getByRole("button", { name: en["goal.min_time"] }).textContent).not.toContain(en["newflight.default"]);
 		expect(screen.getByRole("button", { name: "A100-SXM-80GB" }).getAttribute("aria-pressed")).toBe("false");
 	});
 

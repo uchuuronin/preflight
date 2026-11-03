@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import { t } from "../../lib/i18n";
 import { isFixture } from "../record/model";
 import type { EstimateStatus } from "../record/types";
@@ -25,14 +26,38 @@ export function provenanceKey(status: EstimateStatus, illustrative: boolean): st
 	return illustrative && status !== "abstain" ? "provenance.illustrative" : `provenance.${status}`;
 }
 
-/** Measured / predicted / extrapolated / not measured here, as a short word with its line style. */
+/**
+ * Measured / predicted / extrapolated / not measured here, as a short word with its line style. The
+ * word explains itself in one line on hover, on keyboard focus and on a tap (Chiya, Nov 2: four words
+ * are a lot to learn, and a title attribute never shows on a phone).
+ */
 export function Provenance({ status }: { status: EstimateStatus }) {
 	const ws = useOptionalWorkspace();
 	const key = provenanceKey(status, ws ? isFixture(ws.record) : false);
+	const tip = useId();
+	const [open, setOpen] = useState(false);
 	return (
-		<span className={`pf-prov pf-prov--${status}`} title={t(`${key}.help`)}>
-			<span className="pf-prov__line" aria-hidden="true" />
-			{t(key)}
+		<span className={`pf-prov-wrap${open ? " is-open" : ""}`}>
+			<button
+				type="button"
+				className={`pf-prov pf-prov--${status}`}
+				aria-describedby={tip}
+				aria-expanded={open}
+				onClick={(e) => {
+					e.stopPropagation(); // a tap on the word inside a clickable dial explains the word, nothing else
+					setOpen((o) => !o);
+				}}
+				onBlur={() => setOpen(false)}
+				onKeyDown={(e) => {
+					if (e.key === "Escape") setOpen(false);
+				}}
+			>
+				<span className="pf-prov__line" aria-hidden="true" />
+				{t(key)}
+			</button>
+			<span id={tip} role="tooltip" className="pf-prov__tip">
+				{t(`${key}.help`)}
+			</span>
 		</span>
 	);
 }

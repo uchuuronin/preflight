@@ -13,6 +13,12 @@ after A's redeploy, before it goes on). The two ways past a stopped check-in, ea
 
     modal run --env main api/checkin_help_app.py::send --which packages
     modal run --env main api/checkin_help_app.py::send --which scope
+    modal run --env main api/checkin_help_app.py::look --which packages
+
+`look` is the diagnosis live check (PM, Nov 2 9:13 PM, item 3): it finds the newest record this script
+made for `which` (by its description, among the newest records on the volume), opens its cockpit on the
+live site in a headless browser and prints each finding's title and the line that says who found it, as
+a visitor sees them. The share token stays in memory: it is never printed.
 
 Spend: one job a run, under A's per-job cap (US$0.60); a job still running at the time limit is cancelled.
 Each run has its own visitor (the job store's daily limit is per visitor). Printed: the job's status,
@@ -85,6 +91,12 @@ REQUESTS = {
 		"description": "C's check-in help test: a repo too big to read whole, from one file",
 	},
 }
+
+
+SITE = "https://preflight-cqn.pages.dev"
+# Source: a version from before this conversation's cutoff, pinned so the check doesn't drift.
+PLAYWRIGHT = "playwright==1.47.0"
+NEWEST = 80  # records to read when looking for this script's own
 
 
 def summary(rec: dict | None) -> dict:
@@ -170,3 +182,63 @@ def send(which: str = "packages", attempt: str = "a") -> None:
 		"record": summary(rec),
 	}
 	print(json.dumps(out, indent=1))
+
+
+def _own_record(vol, which: str) -> tuple[str, dict] | None:
+	"""The newest record whose job this script sent for `which` (matched by its description)."""
+	want = REQUESTS[which]["description"]
+	entries = [e for e in vol.listdir("/") if e.path.endswith(".json")]
+	entries.sort(key=lambda e: e.mtime, reverse=True)
+	import verify_race_app as vr
+
+	for e in entries[:NEWEST]:
+		token = e.path.rsplit("/", 1)[-1][: -len(".json")]
+		rec = vr._read_record(vol, token)
+		if rec and (rec.get("job") or {}).get("description") == want:
+			return token, rec
+	return None
+
+
+@app.local_entrypoint()
+def look(which: str = "packages") -> None:
+	import subprocess
+
+	sys.path.insert(0, str(ROOT / "api"))
+	if which not in REQUESTS:
+		raise SystemExit(f"which: {', '.join(REQUESTS)}")
+	vol = modal.Volume.from_name("preflight-records", environment_name="main")
+	found = _own_record(vol, which)
+	if not found:
+		raise SystemExit(f"{which}: no record of this script's among the newest {NEWEST}")
+	token, rec = found
+	print(json.dumps({"which": which, "record": summary(rec)["findings"]}, indent=1), flush=True)
+	subprocess.run(["uv", "pip", "install", "--python", sys.executable, "-q", PLAYWRIGHT], check=True)  # noqa: S603, S607  fixed args
+	subprocess.run([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"], check=True,
+		stdout=subprocess.DEVNULL)  # fmt: skip
+	from playwright.sync_api import sync_playwright
+
+	# The band lists the findings that sit off the map (Findings.tsx); one on a node shows in its
+	# detail instead, so a finding missing from `shown` may be on the map.
+	# Playwright's errors quote the page's address, which holds the share token: only the error's
+	# type is printed.
+	try:
+		with sync_playwright() as pw:
+			browser = pw.chromium.launch()
+			page = browser.new_page(viewport={"width": 1440, "height": 900})
+			page.goto(f"{SITE}/#/cockpit/{token}", wait_until="networkidle")
+			page.wait_for_selector(".pf-dial-wrap", timeout=60_000)  # the cockpit is up
+			page.wait_for_timeout(3_000)  # the findings band renders with the map's layout
+			shown = page.evaluate(
+				"""() => [...document.querySelectorAll('.pf-findings__list > li')].map((li) => ({
+					title: (li.querySelector('b')?.textContent || '').trim().slice(0, 120),
+					source: (li.querySelector('.pf-findings__source')?.textContent || '').trim(),
+				}))"""
+			)
+			chip = page.evaluate(
+				"() => (document.querySelector('.pf-findings-chip')?.textContent || '').trim()"
+			)
+			browser.close()
+	except Exception as e:
+		print(json.dumps({"which": which, "browser_failed": type(e).__name__}))
+		raise SystemExit(1) from None
+	print(json.dumps({"which": which, "shown": shown, "chip": chip[:200]}, indent=1))

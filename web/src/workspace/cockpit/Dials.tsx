@@ -17,7 +17,7 @@ import { FAILS_AT, FITS_BELOW, oomStatus } from "../record/terms";
 import { bounds, trusted } from "../status";
 import { flag } from "../../lib/flags";
 import { outcomes, setHops, useHops, useHopsOwner } from "../hops";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { durMs, useTweenedText } from "../../lib/tween";
 import { duskTokens } from "../../theme/tokens";
 import { abstainText } from "./abstain";
@@ -414,6 +414,7 @@ export function Dials() {
 					/>
 				))}
 			{flag("c.hops") ? <HopsToggle /> : null}
+			<KnobsJump />
 			{extra.map((r) => {
 				const tg = target(record, r.targetId);
 				if (!tg) return null;
@@ -429,15 +430,52 @@ export function Dials() {
 	);
 }
 
+/** The knob rail's id, for the jump beside the dials (Dock.tsx). */
+export const KNOBS_ID = "pf-knobs";
+
+/**
+ * "Knobs ↓" beside the dials, shown while the knob rail is below the fold (Chiya and the PM, Nov 2:
+ * on a laptop the rail sits under the map and a visitor may never scroll to it; the rail stays put).
+ * It scrolls the rail into view and puts focus on its first knob.
+ */
+export function KnobsJump() {
+	const [away, setAway] = useState(false);
+	useEffect(() => {
+		const rail = document.getElementById(KNOBS_ID);
+		if (!rail || typeof IntersectionObserver === "undefined") return;
+		const io = new IntersectionObserver(([e]) => setAway(!e?.isIntersecting), { threshold: 0.5 });
+		io.observe(rail);
+		return () => io.disconnect();
+	}, []);
+	if (!away) return null;
+	const jump = () => {
+		const rail = document.getElementById(KNOBS_ID);
+		if (!rail) return;
+		const still = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+		rail.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "end" });
+		rail.querySelector<HTMLElement>(".pf-dock__row button")?.focus({ preventScroll: true });
+	};
+	return (
+		<button type="button" className="pf-tag pf-tag--button pf-knobs-jump" onClick={jump}>
+			{t("dials.jump_knobs")}
+			<span aria-hidden="true"> ↓</span>
+		</button>
+	);
+}
+
 /** "Possible outcomes": the time and cost dials and the memory band show one outcome per frame. */
 export function HopsToggle() {
 	const hops = useHopsOwner();
+	const help = useId();
+	// Its legend is always there (PM, Nov 2): off, it says what the button does; on, how to read the frames.
 	return (
 		<div className="pf-hops">
-			<button type="button" className={`pf-tag pf-tag--button${hops.on ? " is-on" : ""}`} aria-pressed={hops.on} onClick={() => setHops(!hops.on)}>
+			<button type="button" className={`pf-tag pf-tag--button${hops.on ? " is-on" : ""}`} aria-pressed={hops.on} aria-describedby={help} onClick={() => setHops(!hops.on)}>
 				{t("hops.toggle")}
 			</button>
-			{hops.on ? <span className="pf-hops__help">{t(hops.frame === null ? "hops.help_still" : "hops.help")}</span> : null}
+			<span id={help} className="pf-hops__help">
+				{t(!hops.on ? "hops.help_off" : hops.frame === null ? "hops.help_still" : "hops.help")}
+			</span>
 		</div>
 	);
 }

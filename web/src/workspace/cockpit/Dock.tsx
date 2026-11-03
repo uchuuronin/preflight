@@ -18,7 +18,7 @@ import { RangeTestCurve } from "./RangeTest";
 import { Info } from "../components/Info";
 import { FitMark } from "../components/StatusMark";
 import { AddonBoundary } from "../../components/AddonBoundary";
-import { WakeStrip } from "./Dials";
+import { KNOBS_ID, WakeStrip } from "./Dials";
 
 type ValueStatus = Fit | "abstain";
 
@@ -208,7 +208,7 @@ export function Dock() {
 	const shown = showAll ? ordered : view.shown;
 	const labelOf = (k: Knob) => view.labelKeys[k.id] ?? k.label_key;
 	return (
-		<div className="pf-dock">
+		<div className="pf-dock" id={KNOBS_ID}>
 			{active ? <Control key={active.id} knob={active} labelKey={labelOf(active)} ranked={ranked} /> : null}
 			<div className="glass pf-dock__row" role="group" aria-label={t("rail.knobs")}>
 				{shown.map((k) => (

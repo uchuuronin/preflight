@@ -28,6 +28,14 @@ const NOTEBOOK_TAB = "notebook.intake";
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
 
+// Each row starts on one pick, marked "(default)" so it reads as a starting point rather than a choice
+// already made (Chiya and the PM, Nov 2); the visitor can check in without touching either.
+const DEFAULT_GOAL: ObjectiveKind = "min_cost";
+
+function DefaultMark() {
+	return <span className="pf-choice__default">{t("newflight.default")}</span>;
+}
+
 const GOALS: Array<{ kind: ObjectiveKind; key: string }> = [
 	{ kind: "min_cost", key: "goal.min_cost" },
 	{ kind: "min_time", key: "goal.min_time" },
@@ -47,7 +55,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const extraIntake = useAppPanels("intake");
 	const [intake, setIntake] = useState<Intake>("repo");
 	const [repo, setRepo] = useState("");
-	const [goal, setGoal] = useState<ObjectiveKind>("min_cost");
+	const [goal, setGoal] = useState<ObjectiveKind>(DEFAULT_GOAL);
 	// "Not sure" by default: the runner picks the GPU (pipeline.choose_probe_gpu; PM, Nov 1: the
 	// demo probes go no higher than an L40S).
 	const [gpu, setGpu] = useState<string | null>(null);
@@ -346,6 +354,12 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									{GOALS.map((g) => (
 										<button key={g.kind} type="button" aria-pressed={goal === g.kind} onClick={() => setGoal(g.kind)}>
 											{t(g.key)}
+											{g.kind === DEFAULT_GOAL ? (
+												<>
+													{" "}
+													<DefaultMark />
+												</>
+											) : null}
 										</button>
 									))}
 								</div>
@@ -361,7 +375,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 										</button>
 									))}
 									<button type="button" aria-pressed={gpu === null} onClick={() => setGpu(null)}>
-										{t("newflight.gpu.unsure")}
+										{t("newflight.gpu.unsure")} <DefaultMark />
 									</button>
 								</div>
 							</div>

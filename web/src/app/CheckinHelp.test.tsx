@@ -1,8 +1,9 @@
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const on = new Set<string>();
 vi.mock("../lib/flags", () => ({ flag: (n: string) => on.has(n) }));
+vi.mock("./route", () => ({ go: vi.fn() }));
 
 import { CheckinHelp } from "./CheckinHelp";
 import { rememberRequest } from "./checkinTrouble";
@@ -13,6 +14,7 @@ describe("check-in help on Boarding", () => {
 	afterEach(() => {
 		cleanup();
 		on.clear();
+		vi.unstubAllGlobals();
 	});
 	it("says the step and what's missing, and how to fix it by hand while the runner can't take extra packages", () => {
 		const { container } = render(<CheckinHelp trouble={install} jobId="j1" />);
@@ -40,5 +42,27 @@ describe("check-in help on Boarding", () => {
 		expect(container.textContent).toContain("bigger than Preflight reads: at most 2,000 files and 25 MB of text");
 		expect((container.querySelector("input") as HTMLInputElement).value).toBe("lm_eval/__main__.py");
 		expect((getByRole("button", { name: "Check in from this file" }) as HTMLButtonElement).disabled).toBe(false);
+	});
+
+	const resend = async (flags: string[]) => {
+		for (const f of flags) on.add(f);
+		rememberRequest("j4", { source: { kind: "upload", files: { "train.py": "import einops" }, entrypoint: "train.py" } } as never);
+		const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ job_id: "j5" }), { status: 202 }));
+		vi.stubGlobal("fetch", fetch);
+		const { getByRole } = render(<CheckinHelp trouble={{ step: "install", missing: [{ module: "einops", pkg: "einops" }] }} jobId="j4" />);
+		await act(async () => {
+			fireEvent.click(getByRole("button", { name: "Check in again with these packages" }));
+		});
+		return JSON.parse(fetch.mock.calls[0][1].body as string);
+	};
+	it("names the job it follows with A's free resend on, so an import stop's resend can be free", async () => {
+		const body = await resend(["c.checkin_help", "runner.free_resend"]);
+		expect(body.resend_of).toBe("j4");
+		expect(body.extra_packages).toEqual(["einops"]);
+	});
+	it("sends no resend_of with the free resend off: the API's schema would refuse the field", async () => {
+		const body = await resend(["c.checkin_help"]);
+		expect(body).not.toHaveProperty("resend_of");
+		expect(body.extra_packages).toEqual(["einops"]);
 	});
 });

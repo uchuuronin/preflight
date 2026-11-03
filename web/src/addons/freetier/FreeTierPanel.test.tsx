@@ -50,7 +50,7 @@ describe("FreeTierPanel", () => {
 		const colab = row("Google Colab (free)");
 		expect(colab.getByText("Won't fit")).toBeTruthy();
 		// The dev record is a sample (fixture models), so its need is illustrative, as on the readouts.
-		expect(colab.getByText(/Needs 15.4 GiB at its peak \(illustrative\); a T4 has 14.7 GiB/)).toBeTruthy();
+		expect(colab.getByText(/Needs 15.4 GiB at its peak \(example numbers\); a T4 has 14.7 GiB/)).toBeTruthy();
 	});
 
 	it("says where the memory need comes from on a real record: the estimate's own status", () => {

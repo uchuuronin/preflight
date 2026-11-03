@@ -41,7 +41,7 @@ describe("samples never read as measured", () => {
 		expect(provenanceKey("measured", false)).toBe("provenance.measured");
 	});
 
-	it("says Illustrative under a reading on a sample, Measured on a live record", () => {
+	it("says Example numbers under a reading on a sample, Measured on a live record", () => {
 		expect(isFixture(sample)).toBe(true);
 		expect(isFixture(live)).toBe(false);
 		inCockpit(sample, <Provenance status="measured" />);
@@ -51,10 +51,10 @@ describe("samples never read as measured", () => {
 		expect(screen.getByText(en["provenance.measured"])).toBeTruthy();
 	});
 
-	it("labels a sample's probes illustrative and shows none of their made-up costs", () => {
+	it("labels a sample's probes as examples and shows none of their made-up costs", () => {
 		inCockpit(sample, <Measured />);
 		const capsule = screen.getByRole("button", { expanded: false });
-		expect(capsule.textContent).toMatch(/illustrative probes/);
+		expect(capsule.textContent).toMatch(/example probes/);
 		expect(capsule.textContent).not.toMatch(/\$/);
 		fireEvent.click(capsule);
 		const drawer = screen.getByRole("complementary");
