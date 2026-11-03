@@ -21,10 +21,13 @@ export function FitMark({ fit, label }: { fit: Fit; label?: string }) {
 	);
 }
 
-/** The word for where a number comes from; on a sample (a fixture record) every number that
- * isn't an abstention is illustrative, whatever its status, since nothing about it was measured. */
+/**
+ * The word for where a number comes from. A sample (a fixture record) says once, in a banner over the
+ * cockpit, that its numbers are examples (PM, Nov 3: one banner, not a word on every dial); each
+ * number keeps its own status, but none says "Measured", since no real run measured it.
+ */
 export function provenanceKey(status: EstimateStatus, illustrative: boolean): string {
-	return illustrative && status !== "abstain" ? "provenance.illustrative" : `provenance.${status}`;
+	return illustrative && status === "measured" ? "provenance.sample_probe" : `provenance.${status}`;
 }
 
 /** Where the open tip sits: fixed to the window, kept inside it, below the word or above near the bottom. */

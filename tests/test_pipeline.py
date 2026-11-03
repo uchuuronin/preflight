@@ -984,7 +984,8 @@ def test_spark_search_grounds_failed_probes_only_with_its_flag_and_never_for_pri
 		seen.append(req.url.path)
 		text = json.dumps({"status": "found", "sources": [{"url": url, "title": "OOM", "why": "same error"}]})
 		return httpx.Response(200, json={"output": [
-			{"type": "web_search_call", "action": {"type": "search", "query": "q"}},
+			{"type": "web_search_call", "action": {"type": "search", "query": "q"},
+				"results": [{"type": "text_result", "title": "OOM", "url": url}]},
 			{"type": "message", "content": [{"type": "output_text", "text": text,
 				"annotations": [{"type": "url_citation", "url": url}]}]},
 		], "usage": {"input_tokens": 1000, "output_tokens": 100}})  # fmt: skip

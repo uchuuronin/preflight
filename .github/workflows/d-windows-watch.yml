@@ -1,0 +1,122 @@
+# D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
+# Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts.
+# Runs only when this file changes on ws-d. Everything lives on D:, as the laptop's steps keep
+# everything on E:. No secrets are used. The job fails if any checked step failed, after every
+# step has reported and the logs are uploaded.
+name: d-windows-watch
+
+on:
+  push:
+    branches: [ws-d]
+    paths: [.github/workflows/d-windows-watch.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    # windows-2022 has a D: drive; the laptop's E: plays its part
+    runs-on: windows-2022
+    timeout-minutes: 40
+    steps:
+      - name: "0. Folders on D:, before anything uses them"
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force D:\pf9b\tmp, D:\pf9b\film, D:\pf9b\pip-cache | Out-Null
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: src
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - name: "1. A fresh venv on D:"
+        shell: pwsh
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp' }
+        run: |
+          python -m venv D:\pf9b\venv
+          D:\pf9b\venv\Scripts\python.exe --version
+      - name: "2. torch (CPU here; the laptop takes the CUDA wheel)"
+        shell: pwsh
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PIP_CACHE_DIR: 'D:\pf9b\pip-cache' }
+        run: D:\pf9b\venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: "3. Preflight (from this checkout; the laptop installs from the public repository)"
+        shell: pwsh
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PIP_CACHE_DIR: 'D:\pf9b\pip-cache' }
+        run: |
+          D:\pf9b\venv\Scripts\python.exe -m pip install "${{ github.workspace }}\src[probe]"
+          D:\pf9b\venv\Scripts\python.exe -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+          D:\pf9b\venv\Scripts\preflight.exe --help
+      - name: "4. The script, copied, with its steps raised"
+        shell: pwsh
+        run: |
+          $f = 'D:\pf9b\film\tiny_train.py'
+          Copy-Item "${{ github.workspace }}\src\zoo\notebook_tiny\tiny_train.py" $f
+          (Get-Content $f) -replace 'max_steps = 200\b', 'max_steps = 2000' | Set-Content $f
+          if (-not (Select-String $f -Pattern 'max_steps = 2000' -Quiet)) { throw 'edit not applied: max_steps' }
+      - name: "5. preflight run"
+        id: run
+        continue-on-error: true
+        timeout-minutes: 10
+        shell: pwsh
+        working-directory: D:\pf9b
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8 }
+        run: |
+          D:\pf9b\venv\Scripts\preflight.exe run film\tiny_train.py *> D:\pf9b\run.log
+          $code = $LASTEXITCODE
+          Get-Content D:\pf9b\run.log -Tail 80
+          $rec = Get-ChildItem D:\pf9b\records\*.json -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($rec) { "record=$($rec.FullName)" >> $env:GITHUB_OUTPUT }
+          exit $code
+      - name: "6. The record's bands"
+        id: bands
+        continue-on-error: true
+        shell: pwsh
+        working-directory: D:\pf9b
+        run: |
+          D:\pf9b\venv\Scripts\python.exe -c "import sys; from preflight.schema import load_record; r = load_record(open(sys.argv[1], encoding='utf-8').read()); print({k: (e.status, e.lo, e.hi, e.reason) for k, e in r.predictions.estimates.items() if k in ('time.step', 'memory.peak')}); print([(p.id, p.status, (p.error or '')[:300]) for p in r.probes])" "${{ steps.run.outputs.record }}"
+      - name: "7. preflight watch, unchanged"
+        id: watch
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: pwsh
+        working-directory: D:\pf9b
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8 }
+        run: |
+          D:\pf9b\venv\Scripts\preflight.exe watch "${{ steps.run.outputs.record }}" film\tiny_train.py --window 200 *> D:\pf9b\watch.log
+          $code = $LASTEXITCODE
+          Get-Content D:\pf9b\watch.log -Tail 40
+          Get-ChildItem D:\pf9b\records | Select-Object Name, Length
+          exit $code
+      - name: "8. preflight watch, changed (hidden 8192, batch 4096; few steps on a CPU)"
+        id: watch2
+        continue-on-error: true
+        timeout-minutes: 12
+        shell: pwsh
+        working-directory: D:\pf9b
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8 }
+        run: |
+          $f = 'D:\pf9b\film\tiny_train.py'
+          (Get-Content $f) -replace 'nn.Linear\(32, 256\), nn.ReLU\(\), nn.Linear\(256, 1\)', 'nn.Linear(32, 8192), nn.ReLU(), nn.Linear(8192, 1)' -replace 'batch_size = 64\b', 'batch_size = 4096' -replace 'max_steps = 2000\b', 'max_steps = 400' | Set-Content $f
+          foreach ($p in 'nn.Linear\(32, 8192\)', 'batch_size = 4096', 'max_steps = 400') {
+            if (-not (Select-String $f -Pattern $p -Quiet)) { throw "edit not applied: $p" }
+          }
+          D:\pf9b\venv\Scripts\preflight.exe watch "${{ steps.run.outputs.record }}" film\tiny_train.py --window 200 *> D:\pf9b\watch2.log
+          $code = $LASTEXITCODE
+          Get-Content D:\pf9b\watch2.log -Tail 40
+          exit $code
+      - name: "Logs and records"
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d-windows-watch
+          path: |
+            D:\pf9b\*.log
+            D:\pf9b\records
+          if-no-files-found: warn
+      - name: "Outcomes (fails if any checked step failed)"
+        if: always()
+        shell: pwsh
+        run: |
+          $o = @{ run = '${{ steps.run.outcome }}'; bands = '${{ steps.bands.outcome }}'; watch = '${{ steps.watch.outcome }}'; watch_changed = '${{ steps.watch2.outcome }}' }
+          $o.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name): $($_.Value)" }
+          if ($o.Values | Where-Object { $_ -ne 'success' }) { exit 1 }

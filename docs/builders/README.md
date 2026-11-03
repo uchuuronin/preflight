@@ -11,41 +11,61 @@ hesitates or gets stuck; every one of those places becomes an onboarding fix.
 | [observation-sheet.md](observation-sheet.md) | the observer | during the session, one copy per builder |
 | [form.md](form.md) | the builder | straight after the session |
 
-## Tonight's session (Sun Nov 1): ready to hand over
+## The session on the final product (from Tue Nov 3)
+
+Updated by D, Tue Nov 3, to the production flags at the freeze (`flags.production.json`).
 
 - **Link:** <https://preflight-cqn.pages.dev> (already in the brief).
-- **What's on in production** (`flags.production.json`, Chiya, Nov 1): check-in (`runner.queue`)
-  with the Repo link and Upload tabs, and the live guide on Muse Spark (`c.guide.live`). The
-  Notebook tab is off (`d.notebook` isn't in production), so a builder with a notebook downloads it
-  as a `.py` and uploads that. Checked on a local build with the production flags, Nov 1: the
-  check-in desk shows exactly two tabs, Repo link and Upload.
-- **Demo limits:** 3 probe jobs per visitor per day, and a daily GPU spend cap for the whole site,
-  $10 a day through Nov 4 and $8 a day from Nov 5 [cited: `python/preflight/runner/queue.py`]. The limits have been live
-  since A's redeploy of Nov 1 (`a-deploy-main-19`, 20:20 UTC; confirmed by Chiya, 18:20 ET); the
-  $8 from Nov 5 is in the runner A deployed from `1ea2dd6` (Nov 2, 08:24 UTC). A builder past either sees "samples only until
-  midnight ET"; when jobs in flight hold the day's budget, the desk says the GPUs are busy and to
-  retry in about 2 minutes. Either is outside the builder's control: note it word for word and
-  go on with a sample.
-- **Cost:** about $0.20 a check-in, a lower bound [derived: one measured run, Oct 28, A's status
-  file: $0.086 of GPU and $0.018 of Muse Spark [measured], plus about $0.10 of sandbox CPU and
-  memory [guess]]. The GPU cap counts the GPU only; the live guide has its own daily cap. One
-  builder with up to 3 check-ins is about $0.60 or more [derived].
-- **The guide is live tonight on Muse Spark** (it moves knobs with tool calls). The tasks don't
-  mention it, so the observer can see whether the builder finds it unprompted.
+- **What's on in production:**
+  - The check-in desk has three tabs: Repo link, Upload and Notebook. A notebook goes in as it
+    is; no `.py` export is needed.
+  - Check-ins install the repo's declared dependencies when there's no `requirements.txt`, and
+    take extra packages on request.
+  - An evaluation can be checked in by command (`lm_eval ...`).
+  - "Private triage" is a tick box on the desk.
+  - In the cockpit: the live guide on Muse Spark; the fix loop ("Fix it with Muse Code") with
+    Preflight's verify run; Muse Spark's diagnosis of the record's plots; Spark Open's triage of
+    failed probes; the fit map; and share links.
+  - The Logbook has "Watch a real run" (in-flight mode).
+- **Demo limits:**
+  - 3 probe jobs per visitor per day, plus one free resend a day of the same code after a check-in
+    that stopped at a missing package before measuring anything.
+  - A daily GPU spend cap for the whole site: $10 a day through Nov 4 and $8 a day from Nov 5
+    [cited: `python/preflight/runner/queue.py`].
+  - A builder past a limit sees "samples only until midnight ET". When jobs in flight hold the
+    day's budget, the desk says the GPUs are busy and to retry in about 2 minutes.
+  - Either is outside the builder's control: note it word for word and go on with a sample.
+- **Cost:** a job may spend up to $0.60 [cited: `JOB_BUDGET_USD`].
+  - One measured run cost about $0.10 of GPU and Muse Spark: $0.086 and $0.018, Oct 28 [measured,
+    A's status file].
+  - Add the sandbox's CPU and memory, about $0.10 [guess].
+  - So one builder with up to 3 check-ins is about $0.60 or more [derived].
+  - The guide, the fix loop and the model calls have their own caps.
+- **The guide and the fix loop are live.** The brief mentions both in one line; the tasks don't,
+  so the observer notes whether the builder goes to them.
+- **Known rough spots** (D's stranger walkthrough, Nov 2, `from-d.md`). The observer doesn't point
+  these out, and ticks the sheet's rows when a builder hits one, so C knows which ones real people
+  trip on:
+  - four measured samples (GRPO, retrieval, GNN, vision) open with blank time and cost dials;
+  - the required "Got it" box sits below the samples list, away from the "Check in" button;
+  - the out-of-memory finding's own fix ("Eval without gradients") doesn't clear the
+    out-of-memory dial;
+  - Escape doesn't close an open knob;
+  - the header gives a whole run's cost for a run it says will fail.
 - **Files to send:** the builder gets [brief.md](brief.md) the day before (or now), then
   [tasks.md](tasks.md) at the start and [form.md](form.md) at the end. The observer keeps
   [observation-sheet.md](observation-sheet.md).
-- **If no one can watch live:** ask the builder to record their screen and think aloud (only with
-  their yes); the observer fills the sheet from the recording, times from the recording's clock.
+- **If no one can watch live:** ask the builder to record their screen and think aloud, only if
+  they say yes. The observer fills the sheet from the recording and takes times from the
+  recording's clock.
 
 ## Before the session
 
-- Ask the builder to bring one training script they know: a public GitHub repo or a `.py` file (a
-  notebook downloaded as `.py` works), up to 5 MB, loading data from Hugging Face. No keys or
-  passwords in the code.
+- Ask the builder to bring one training script they know: a public GitHub repo, a `.py` file or a
+  Jupyter notebook, up to 5 MB, loading data from Hugging Face. No keys or passwords in the code.
 - Open the link once yourself and check that the home page loads and New flight shows the desk.
-- The demo limits are live (A's redeploy, 20:20 UTC). If a builder gets a 4th check-in through,
-  note it as a bug.
+- If a builder gets a 4th paid check-in through in a day, note it as a bug (the free resend
+  after a check-in that measured nothing isn't one).
 
 ## During the session
 

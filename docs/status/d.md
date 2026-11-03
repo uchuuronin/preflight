@@ -75,6 +75,50 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 
+## Tue Nov 3, 08:55 ET (search: B's last must-fix)
+
+`b48ba5c` (items 4 to 6) is pushed, CI green. Merged main `a25369a`. (This morning's two earlier
+headings and their `from-d.md` posts said 09:30 and 10:30 ET; the pushes were at 08:19 and 08:27.)
+
+Search grounding: a source is now kept only if a search's own results list it; an inline citation
+alone, or a page the model opened, no longer counts, and titles come from search results only
+(B's re-check, `from-b.md`). B's exact case is a test that fails on `4be42a8`. A read-only review
+found no must-fix; its points are in (a title test that bites, a nesting test that bites, results
+only from a typed search action). Full suite: 1,696 passed. B re-checks next. Nothing spent.
+
+This push sends: `python/preflight/harness/search_grounding.py`, `tests/test_d_search_grounding.py`,
+`tests/test_pipeline.py`, `docs/decisions/spark-search.md`, `docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 08:25 ET (the PM's 08:07 list, items 4 to 6)
+
+Pushed `8aacf81` (items 1 to 3, after a read-only fact-check; its two must-fixes in: Glimmer's
+weights live in a Modal volume, and Spark Open's number check is skipped for private check-ins).
+
+4. `docs/submission.md`: the checklist; `docs/submission/` drafts brought up to the freeze.
+5. `docs/builders/`: the kit, brief, tasks and observation sheet on the final product.
+6. `docs/demo/video-plan.md`: the freeze's shot list, the timed voice-over and the 45-second cut,
+   with the fix loop's new shot 8b; 9b and 6b open until noon.
+
+Nothing spent. This push sends: `docs/submission.md`, `docs/submission/` (README, portal,
+meta-and-partners, gallery), `docs/builders/`, `docs/demo/video-plan.md`, `docs/requests/from-d.md`,
+this file.
+
+## Tue Nov 3, 08:15 ET (the PM's 08:07 list, items 1 to 3)
+
+Merged main `555b5af` into `ws-d` (fast-forward). `9018a58` (the walkthrough) is on main.
+
+1. `readme-final.md`: Meta's open-weights models in their own row at the top of "On in
+   production"; the README's check-in row; B's corpus 0.4.0; the TODO gone; the licence section
+   complete. Diff and the four open questions for the PM in `from-d.md`.
+2. Licence check: CI fails on GPL, AGPL and SSPL in the Python, API and web checks (planted
+   packages caught) [measured]; three gaps for C (workers and root unchecked, unlicensed packages
+   pass, "GPLv3" missed by the web check).
+3. Share pages under `wrangler pages dev` on the production build: with no keys, a generic
+   preview and a redirect to the cockpit; with C's API run locally, the page, badge and hero card
+   work and the link opens the record at both widths [measured]. Nothing for C.
+
+Nothing spent. This push sends: `docs/readme-final.md`, `docs/requests/from-d.md`, this file.
+
 ## Mon Nov 2, 22:30 ET (Chiya's 21:02 list: the stranger walkthrough; readme-final)
 
 Pushed `593be8b` at 21:04 (CI green): the search RESULT line for Tuesday noon in `from-d.md`, and

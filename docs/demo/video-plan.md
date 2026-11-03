@@ -1,8 +1,95 @@
-# The 3-minute video: shot list and voice-over (filmed Tue Nov 3, evening)
+# The 3-minute video: shot list and voice-over (recorded Wed Nov 4)
 
-By D, Mon Nov 2, overnight (Chiya's list, item 3); statuses updated Mon Nov 2, 11:10 ET; shot 9b added 12:05 ET, its stopgap step replaced 16:30 ET; shot 7b added 17:45 ET; shot 6b added 20:15 ET. This is the plan of record for Tuesday. It
+By D, Mon Nov 2, overnight (Chiya's list, item 3); statuses updated Mon Nov 2, 11:10 ET; shot 9b added 12:05 ET, its stopgap step replaced 16:30 ET; shot 7b added 17:45 ET; shot 6b added 20:15 ET. The plan of record is now the section "At the freeze" below. This plan
 replaces the plan A and plan B shot lists in `storyboard.md` and `fallback-cut.md`, which stay as
-the earlier drafts; the 45-second cut in `storyboard.md` is unchanged.
+the earlier drafts; the 45-second cut in `storyboard.md` is the fallback if shot 8b isn't filmed.
+
+## At the freeze (Tue Nov 3): the plan of record for Wednesday's recording
+
+By D, Tue Nov 3, 08:25 ET (the PM's 08:07 item 6, plan only). This section supersedes the shot
+table under "Shots" below, which stays as Monday's version with each shot's history. The rules
+below still hold. One change since Monday: **the fix loop is on in production**
+(`c.fix_loop`, Nov 2), so Muse Code gets a shot (8b), the agentic beat the plan was missing.
+Two shots stay open until noon today, as the rules say: 9b (Chiya's device) and 6b (C's record).
+
+### Shot list against the freeze
+
+What each shot needs on the production flags at the freeze (`flags.production.json`, main
+`555b5af`). "Works" means its flow is on in production and was seen working (the source is in
+Monday's table below); "Chiya's live test" means D can't reach the live site to see it.
+
+| # | Time | Shot | At the freeze | For Wednesday |
+| --- | --- | --- | --- | --- |
+| 1 | 0:00 | The LoRA script in an editor, zoom to `EVAL_EVERY = 200` | Works (no app) | |
+| 2 | 0:08 | Live site home, "Start a preflight" | Works | |
+| 3 | 0:14 | New flight: repo link, goal, GPU, the data-use panel, "Got it", "Check in" | Works (D's walk, Nov 2: "Got it" sits below the samples list at 1366 px; scroll to it on camera) | Film a fresh check-in |
+| 4 | 0:26 | Boarding: "Reading your script" (Muse Spark), "Checking the logs" (Spark Open) | Works | Cut the GPU wait |
+| 5 | 0:38 | The Oct 28 record's cockpit: the ring past the line, "runs out of memory" | The share route works on a production build under `wrangler pages dev` (D, Nov 3, with a stand-in record); this record not yet opened in a browser | Open `/s/ICDYrfHQ2nBNbv3mlRHHMg` in Chiya's live test |
+| 6 | 0:52 | The triage finding with its quoted log line | Works on A's committed copy (D, Nov 2) | Open `/s/Q3s5qyHKTNf-fCng4dwn6g` live |
+| 6b | 1:01 | A finding "Found by Muse Spark diagnosis, checked by Muse Spark Open" | Live since C's 8:07 PM deploy; C's live check (D39) found "Plots and numbers agree" on the einops resend's record | C sends that record's link by noon, or cut (its 8 s go to shot 8b) |
+| 7 | 1:09 | Drag "Eval batch" down; the ring drops, the dials move | Works | |
+| 8 | 1:17 | The guide: one knob move, Apply | Works (`c.guide.live`); if the guide's daily cap is hit, the rule-based tour shows instead: drop the Muse Spark label and line | |
+| 8b | 1:28 | **New:** the eval finding's "Fix it with Muse Code": candidates race; verify rejects the fix that still runs out of memory and keeps the stacked fix at eval batch 8 | On in production (Nov 2); C's race on the LoRA sample: the single fix rejected, the stacked fix passed, eval peak 10.4 GiB, loss within 0.11%, US$0.39 [measured] | Film one race on the LoRA sample (PF102, `lora-qwen`) on an A10, as C's measured race was (`api/preflight_api/fix/races/nov2_stack.json`), so the caption's 10.4 GiB is that race's; about US$0.39 [derived from C's race]; cut the wait. On another record, caption only what the filmed race shows |
+| 9 | 1:44 | The exports: batch file, command, W&B helper | Works (`c.exports`) | |
+| 9b | 1:51 | `preflight watch` beside the cockpit; an alert in both | Works on a GPU (D's A10 check, Nov 2) | Chiya's call by noon: her RTX 4070, else a Colab T4, else cut (its 10 s go to shots 10 and 11, 5 s each) |
+| 10 | 2:01 | PF331, the agent sample: the caching finding | Works (sample says Measured) | |
+| 11 | 2:13 | PF510, the GRPO sample: the RL band | Works (sample says Measured) | |
+| 12 | 2:22 | New flight with "Private triage"; a private record's "Found by Muse Glimmer" | Works (C's record 01M6EG0284PWZDRXGGQVVZYVND) | Ask C for its link |
+| 13 | 2:33 | Checks page, "Each check" | Works, but it still reads "1 of 2 runs measured · engine 006bc57 · 31 Oct" (B's checks weren't regenerated) | Keep only with the line below changed to what the page shows; else cut (its 9 s go to shot 14 and the end card) |
+| 14 | 2:42 | The share link opened in a new tab | Works: use the `/s/` link, now live, rather than the address bar | |
+| 15 | 2:50 | End card | Works | Repository public first |
+
+Cut at the freeze: **7b** (the range test: `probes.lr_range` is off), and **search grounding**
+(off; Chiya decides at noon from the one result, and it wasn't in the cut).
+
+### Voice-over with times
+
+About 2.5 words a second; each line is also a burned-in caption (at least 2 s, white on a dark
+band). Spoken numbers come from the submission's numbers table, each said as the table says.
+Total 2:58.
+
+| Time | Shot | Voice-over | Words | Caption beside it (on-screen label) |
+| --- | --- | --- | --- | --- |
+| 0:00 to 0:08 | 1 | "This fine-tune looks fine. At step 200, its first evaluation, it runs out of memory." | 15 | "A real training script, with a planted bug" |
+| 0:08 to 0:14 | 2 | "Preflight flies your training run before you pay for it." | 10 | "Built Oct 26 to Nov 4" |
+| 0:14 to 0:26 | 3 | "Point it at your code and say what matters. It tells you exactly what it sends." | 16 | |
+| 0:26 to 0:38 | 4 | "Muse Spark reads the script. A few real steps run on a real GPU, and Muse Spark Open reads every probe's log." | 22 | "Muse Spark (Meta)", then "Muse Spark Open (Meta's open model, on Baseten)" |
+| 0:38 to 0:52 | 5 | "In 189 seconds of probing, for about four cents of GPU at list price, it caught the crash before the real run." | 22 | "189 s of probing · $0.042 of GPU at list price · 20.4 of 22.06 GiB · one script" |
+| 0:52 to 1:01 | 6 | "Muse Spark Open says what went wrong and quotes the line it read; code checks the quote is real." | 19 | "Muse Spark Open (Meta's open model, on Baseten)" |
+| 1:01 to 1:09 | 6b | "Muse Spark reads the run's plots against the raw numbers, and every number it cites is checked." | 17 | "Muse Spark (Meta) · diagnosis, every number checked" |
+| 1:09 to 1:17 | 7 | "Move a setting and the whole run answers at once, with its range." | 13 | the app's "Predicted" |
+| 1:17 to 1:28 | 8 | "Ask the guide, and Muse Spark moves the knobs that matter for your goal, one at a time. You decide each move." | 22 | "Muse Spark (Meta)" |
+| 1:28 to 1:44 | 8b | "Or let Muse Code write the fix. Preflight runs each candidate for real: the one that still runs out of memory is rejected, the one that fits is kept." | 29 | "Muse Code (Meta) · verified by Preflight's own re-probe · eval peak 10.4 GiB · one script" |
+| 1:44 to 1:51 | 9 | "Take the plan with you: a batch file, the command, and your settings." | 13 | |
+| 1:51 to 2:01 | 9b | "Run it for real and Preflight watches. When the run leaves its predicted band, it says so." | 17 | the app's "Predicted" band |
+| 2:01 to 2:13 | 10 | "Not just training. A coding agent on Muse Spark ran 130 tasks through Preflight, and not one input token came from the cache." | 23 | "Agent eval on Muse Spark (Meta) · measured · 0 of 905,739 input tokens from cache, 130 tasks, two runs" |
+| 2:13 to 2:22 | 11 | "In this GRPO run, 15 of 20 prompts had no reward spread at all, so they teach nothing." | 18 | "GRPO on an L4 · measured · 15 of 20 prompts with no reward spread" |
+| 2:22 to 2:33 | 12 | "For code that mustn't leave, private mode triages on Muse Glimmer, Meta's open weights, on our own GPU." | 18 | "Muse Glimmer (Meta's open weights, on Preflight's own GPU)" |
+| 2:33 to 2:42 | 13 | "Predictions are checked against real runs, held out, misses included." | 10 | "Held-out checks on real runs" |
+| 2:42 to 2:50 | 14 | "Every flight is a link anyone can open." | 8 | |
+| 2:50 to 2:58 | 15 | "Preflight. Built October 26 to November 4. Fly the run before you pay for it." | 15 | link · repository · "Built Oct 26 to Nov 4" |
+
+If 6b is cut, shots 7 and 8 move up 8 s (1:01 to 1:09, 1:09 to 1:20) and 8b runs 1:20 to 1:44 with the same line, said more slowly. If 9b is cut, shot 10
+runs 1:51 to 2:08 and shot 11 2:08 to 2:22, with the same lines.
+
+### The 45-second X clip: the cut
+
+From the takes above; no extra filming. Same format as `storyboard.md`'s 45-second cut (1920 x
+1080, 30 fps, H.264, captions burned in, sound off must still work). It replaces that cut's
+order, adding the fix loop (shot 8b), the strongest agentic beat.
+
+| # | Time | From shot | Voice-over | Caption |
+| --- | --- | --- | --- | --- |
+| A | 0:00 to 0:07 | 1 | "This fine-tune looks fine. At step 200, its first evaluation, it runs out of memory." | 0:00 to 0:03 "Your GPU job, flown before you run it"; then "At step 200, its first evaluation, it runs out of memory" |
+| B | 0:07 to 0:18 | 5 | "Preflight ran a few real steps and caught it in 189 seconds, for about four cents of GPU at list price." | "Caught in 189 s of probing · $0.042 of GPU at list price · one script" |
+| C | 0:18 to 0:23 | 7 | "Move a setting; the whole run answers." | "Every reading carries its range" |
+| E | 0:23 to 0:29 | 6 | "Muse Spark Open, Meta's open model, quotes the log line." | "Muse Spark Open (Meta's open model, on Baseten)" |
+| F | 0:29 to 0:40 | 8b | "Muse Code writes fixes; Preflight runs them for real and keeps the one that fits." | "Muse Code (Meta) · verified by Preflight's re-probe" |
+| D | 0:40 to 0:45 | 15 | "Preflight. Fly the run before you pay for it." | link · "Built Oct 26 to Nov 4 for the Meta hackathon" |
+
+77 words in 45 s. If shot 8b isn't filmed, use `storyboard.md`'s cut as it is. The X post is
+`docs/submission/x-post.md`'s Post B (it names Spark Open; the clip adds Muse Code on screen, and
+the post's text needs no change).
 
 ## Rules
 
@@ -19,7 +106,7 @@ the earlier drafts; the 45-second cut in `storyboard.md` is unchanged.
 - **A shot that isn't ready by Tue Nov 3, noon ET is cut, not faked.** Its time goes to the shot
   named in its row.
 
-## Shots
+## Shots (Monday's version, kept for each shot's history)
 
 Narration at about 2.5 words a second; every line is also a burned-in caption. About 2:55.
 
@@ -173,7 +260,7 @@ From a clone of the repository:
 (on since the PM's 4:25 PM merge, Nov 2; live once C deploys); then Chiya's take. The GPU test is
 done (above), and the stopgap step is gone: `preflight run` fills predictions (B's fix, on `main`).
 
-## Before filming (Tue Nov 3, evening)
+## Before filming (Wed Nov 4)
 
 - [ ] Each "needs" row above is ready, or cut as its row says.
 - [ ] Every number spoken or captioned is in the submission's numbers table.
@@ -185,8 +272,8 @@ done (above), and the stopgap step is gone: `preflight run` fills predictions (B
 
 ## What is left out, and why
 
-- **The fix loop (Muse Code):** `c.fix_loop` is off in production, and gating a fix on the re-probe
-  isn't wired end to end, so it's not a live-site flow today.
+- **The range test (7b):** `probes.lr_range` is off in production.
+- **Search grounding:** off; not in the cut.
 - **The campaign calendar:** on in production, but its sample is illustrative; three minutes don't
   hold it with the stories above. It's in the README.
 - **The divergence warning:** its classifier misses (AUROC 0.66 against 0.85) and isn't used.

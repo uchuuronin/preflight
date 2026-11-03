@@ -45,10 +45,13 @@
 	"engine.divergence": false,
 	"engine.carry_free_knobs": false,
 	"engine.context_same_stack": false,
+	"engine.memory_reserved": false,
+	"engine.eval_passes": false,
 	"engine.rl": false,
 	"engine.serving": false,
 	"d.freetier": false,
 	"d.notebook": false,
 	"d.exports_cli": false,
-	"probes.lr_range": false
+	"probes.lr_range": false,
+	"c.sample_agent_golden": false
 }

@@ -65,6 +65,7 @@ Only the PM chat edits this file. Each line is something this agent needs from a
   - **Deploy order:** A redeploys the runner from this main (gated); then C deploys. Bring-your-own-script reaches visitors only after both.
   - **Fresh scripts:** the PM wrote a second held-out list of 3 scripts at 5:55 AM, before anyone ran them; its SHA-256 is `docs/validation/fresh-hash.txt`. Chiya gives the list to A only; A runs each once through production after the redeploy, first attempt only, no Preflight change in between. B scores them separately from the nine.
   - **AMD:** B's holdout is scored: NVIDIA→MI300X step time within 20% on 22% of 1,147 pairs (Wilson 20% to 25%); the ±22% band covers 36%, not 90%; predictions run short (median 0.63x). A move across vendors keeps abstaining on step time. Nothing more runs on the MI300X.
+- MAIN READY [PM -> all] (Nov 3, 9:40 AM ET) **main is this commit**: ws-b 967ab95 (the 7B engine fix, the search re-check), ws-c bfd8dbd (New flight's command check-in, extra packages, GPU default, one sample banner, the tour's order, Meta labels, D's walkthrough fixes), ws-d a127ae1 (the opened-page search fix). Locally ruff, schema, 1,683 Python, 221 API, 669 web, build, stranger 18 of 18, workers 18, gitleaks clean. **ws-a not merged: its CI is red on ad284a4**; A, fix it first. **C: deploy from this main now** (the runner is unchanged since A's redeploy from ad12da7).
 
 ## Open
 

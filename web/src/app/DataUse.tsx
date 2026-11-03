@@ -72,19 +72,43 @@ export function dataUseLines(retention: typeof RETENTION = RETENTION): string[] 
 	return lines;
 }
 
+/** Who reads the code or its logs in this build, by the flags that send it to them. */
+export function readersOf(): string[] {
+	const who: string[] = [];
+	if (flag("harness.spark_script_map") || flag("harness.spark_diagnosis") || flag("harness.spark_search") || flag("c.guide.live")) who.push(t("datause.who.spark"));
+	if (flag("harness.spark_open_triage") || flag("harness.spark_claim_check") || flag("harness.spark_diagnosis")) who.push(t("datause.who.spark_open"));
+	if (flag("harness.spark_open_triage") && flag("harness.glimmer_private")) who.push(t("datause.who.glimmer"));
+	if (flag("c.fix_loop")) who.push(t("datause.who.code"));
+	return who;
+}
+
+/**
+ * The two lines a visitor reads before ticking "Got it", with every detail folded under them (D's
+ * walkthrough, Nov 2: fifteen bullets and six names, and the box sat a screen below Check in). It sits
+ * on the check-in desk, right above the button.
+ */
 export function DataUseNotice({ onChange }: { onChange: (accepted: boolean) => void }) {
 	const id = useId();
 	const [accepted, setAccepted] = useState(readSeen);
+	const who = readersOf();
 	return (
-		<section className="glass pf-datause" aria-labelledby={`${id}-title`}>
+		<section className="pf-datause" aria-labelledby={`${id}-title`}>
 			<b id={`${id}-title`} className="pf-datause__title">
 				{t("datause.title")}
 			</b>
-			<ul className="pf-datause__list">
-				{dataUseLines().map((line) => (
-					<li key={line}>{line}</li>
-				))}
-			</ul>
+			<p className="pf-hint">{t("datause.summary.run")}</p>
+			{who.length ? <p className="pf-hint">{t("datause.summary.read", { who: listWords(who) })}</p> : null}
+			<p className="pf-hint">
+				{RETENTION.recordDays ? t("datause.summary.kept", { days: String(RETENTION.recordDays) }) : t("datause.retention.unset")}
+			</p>
+			<details className="pf-datause__more">
+				<summary>{t("datause.more")}</summary>
+				<ul className="pf-datause__list">
+					{dataUseLines().map((line) => (
+						<li key={line}>{line}</li>
+					))}
+				</ul>
+			</details>
 			<label className="pf-datause__ok">
 				<input
 					id={DATA_USE_OK_ID}
@@ -101,6 +125,11 @@ export function DataUseNotice({ onChange }: { onChange: (accepted: boolean) => v
 			</label>
 		</section>
 	);
+}
+
+/** "a", "a and b", "a, b and c" */
+function listWords(names: readonly string[]): string {
+	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} ${t("checkin.and")} ${names[names.length - 1]}`;
 }
 
 export function dataUseAccepted(): boolean {

@@ -7,10 +7,10 @@ const line = (f: Parameters<typeof findingSourceKey>[0]) => t(findingSourceKey(f
 
 describe("who found a finding", () => {
 	it("names Muse Glimmer for a private check-in's triage, as the live record titles it (Nov 2)", () => {
-		expect(line({ source: "spark_open_triage", code: "triage.oom", title: "Muse Glimmer on probe p1-eval: oom" })).toBe("Found by Muse Glimmer");
+		expect(line({ source: "spark_open_triage", code: "triage.oom", title: "Muse Glimmer on probe p1-eval: oom" })).toBe("Found by Muse Glimmer, on Preflight's own GPU");
 	});
 	it("keeps Spark Open's line for its own triage, and other sources as they were", () => {
-		expect(line({ source: "spark_open_triage", code: "triage.oom", title: "Spark Open on probe p3: oom" })).toBe("Found by Muse Spark Open triage");
+		expect(line({ source: "spark_open_triage", code: "triage.oom", title: "Spark Open on probe p3: oom" })).toBe("Found by Muse Spark Open triage, on Baseten");
 		expect(line({ source: "rule", code: "eval.no_grad", title: "Muse Glimmer on probe p1: oom" })).toBe("Found by a rule check");
 	});
 	it("labels a diagnosis by what checked it, as A's claim check writes it", () => {

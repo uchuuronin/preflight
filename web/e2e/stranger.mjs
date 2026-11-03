@@ -53,14 +53,14 @@ try {
 	const dials = await page.locator(".pf-dial-wrap").evaluateAll((els) =>
 		els.map((d) => ({
 			label: d.querySelector(".pf-dial__label")?.textContent ?? "",
-			status: d.querySelector(".pf-prov")?.textContent ?? "",
+			status: [...d.querySelectorAll(".pf-prov, .pf-dial__note")].map((n) => n.textContent).join(" "),
 			value: d.querySelector(".pf-dial__text b")?.textContent ?? "",
 		})),
 	);
 	check("four readouts", dials.length >= 4, { dials: dials.length });
 	check(
 		"every dial has a status word",
-		dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here|Ran out of memory here|Example numbers/.test(d.status)),
+		dials.every((d) => /Measured|Predicted|Extrapolated|Not measured here|Ran out of memory here|Sample probe/.test(d.status)),
 		{ dials },
 	);
 

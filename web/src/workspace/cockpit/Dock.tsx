@@ -63,7 +63,19 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 	}, []);
 
 	return (
-		<div ref={box} className="glass pf-control" role="group" aria-labelledby={`${id}-title`}>
+		<div
+			ref={box}
+			className="glass pf-control"
+			role="group"
+			aria-labelledby={`${id}-title`}
+			onKeyDown={(e) => {
+				// Escape closes the knob, from the slider too, and puts focus back on its capsule (D's walkthrough).
+				if (e.key !== "Escape" || e.defaultPrevented) return;
+				e.preventDefault();
+				actions.openKnob(null, "user");
+				requestAnimationFrame(() => document.querySelector<HTMLElement>(`.pf-dock__row [data-knob="${CSS.escape(knob.id)}"]`)?.focus());
+			}}
+		>
 			<div className="pf-control__head">
 				<b id={`${id}-title`}>{label}</b>
 				<span>
@@ -73,7 +85,7 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 							? t("dock.frozen_hint")
 							: pinned
 								? t("knob.pinned_hint", { value: valueText(knob, value) })
-								: t(`knob.hint.${knob.group ?? "other"}`)}
+								: t(hasKey(`knob.hint.${knob.group ?? "other"}`) ? `knob.hint.${knob.group ?? "other"}` : "knob.hint.other")}
 				</span>
 			</div>
 			{pinned ? (
@@ -172,7 +184,7 @@ const Capsule = memo(function Capsule({
 	onPick: () => void;
 }) {
 	return (
-		<button type="button" className={`pf-knob${guideOn ? " is-guide" : ""}`} aria-pressed={active} onClick={onPick}>
+		<button type="button" className={`pf-knob${guideOn ? " is-guide" : ""}`} data-knob={knob.id} aria-pressed={active} onClick={onPick}>
 			{pinned ? <span className="pf-knob__pin" aria-label={t("knob.pinned")} /> : null}
 			{t(labelKey)} <b>{valueText(knob, value)}</b>
 			{knob.needs_code ? <span className="pf-knob__code">{t("knob.needs_code")}</span> : null}

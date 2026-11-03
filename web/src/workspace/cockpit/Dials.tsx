@@ -86,10 +86,15 @@ export function deltaText(from: number, to: number, format: (v: number) => strin
  * True when a change is big enough to mark: more than 1% of the old value, or for a probability
  * more than one point (a share of a chance near zero means nothing).
  */
+/** Source: judgment, D's walkthrough: 2-point moves on unrelated knobs read as noise; 5 points is a real change. */
+const RISK_WAKE_MIN = 0.05;
+
 export function worthMarking(from: number, to: number, scale: DialScale | null): boolean {
 	const d = Math.abs(to - from);
 	if (!(d > 0)) return false;
-	if (scale?.source === "probability") return d > WAKE_MIN;
+	// A chance moves by more than noise before it's marked: knobs that can't touch memory moved the
+	// out-of-memory chance by 2 points (D's walkthrough, Nov 2), inside the engine's own spread.
+	if (scale?.source === "probability") return d >= RISK_WAKE_MIN;
 	return from === 0 || d > WAKE_MIN * Math.abs(from);
 }
 
@@ -163,7 +168,8 @@ export function sizeClass(text: string): string | undefined {
 
 function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => void; goalOn: boolean; wake?: Wake | undefined }) {
 	const est = spec.est;
-	const illustrative = isFixture(useWorkspace().record);
+	const { record: rec, estimates: all } = useWorkspace();
+	const illustrative = isFixture(rec);
 	const ok = trusted(est) && !!spec.scale;
 	const scale = spec.scale;
 	const point = ok ? est.point : 0;
@@ -181,7 +187,12 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 	const title = [spec.reason, scaleNote].filter(Boolean).join("\n");
 	// The engine abstains at a setting a probe ran out of memory at: that was measured (review, Nov 2).
 	const failedHere = !ok && /\bran out of memory\b/i.test(est?.reason ?? "");
-	const value = ok ? spec.format(point) : t(failedHere ? "readout.abstain_failed" : "readout.abstain_short");
+	// The engine knows the step but not how many steps the run has (D's walkthrough, Nov 2: four
+	// measured samples looked as if nothing was measured): say that, with the measured step under it.
+	const lengthUnknown = !ok && !failedHere && /run's length isn't known/i.test(est?.reason ?? "");
+	const stepEst = all["time.step"];
+	const stepNote = lengthUnknown && trusted(stepEst) ? t("dial.step_known", { step: fmt(stepEst.point, stepEst.unit) }) : null;
+	const value = ok ? spec.format(point) : t(failedHere ? "readout.abstain_failed" : lengthUnknown ? "readout.length_unknown" : "readout.abstain_short");
 	const valueRef = useRef<HTMLElement>(null);
 	useTweenedText(valueRef, ok ? point : null, spec.format, { classFor: (text) => (ok ? sizeClass(text) : "is-abstain") });
 	const aria = ok
@@ -241,11 +252,17 @@ function Dial({ spec, onGoal, goalOn, wake }: { spec: DialSpec; onGoal?: () => v
 			)}
 			<span className="pf-dial__label">{spec.label}</span>
 			<span className="pf-dial__status">
-				{failedHere ? <span className="pf-prov pf-prov--abstain">{t("readout.abstain_failed")}</span> : <Provenance status={est?.status ?? "abstain"} />}
+				{failedHere ? (
+					<span className="pf-prov pf-prov--abstain">{t("readout.abstain_failed")}</span>
+				) : stepNote ? null : (
+					<Provenance status={est?.status ?? "abstain"} />
+				)}
 				{at.off ? <span className="pf-dial__off">{t("dial.off_scale_short")}</span> : null}
 			</span>
+			{stepNote ? <span className="pf-dial__note">{stepNote}</span> : null}
 			{spec.note ? <span className={`pf-dial__note${spec.noteRisk ? " is-risk" : spec.noteTight ? " is-tight" : spec.noteFits ? " is-fits" : ""}`}>{spec.note}</span> : null}
-			{goalOn ? <span className="pf-dial__goal">{t("dial.your_goal")}</span> : null}
+			{/* No "Your goal" under a dial with no number (D's walkthrough): the aim still shows as pressed. */}
+			{goalOn && ok ? <span className="pf-dial__goal">{t("dial.your_goal")}</span> : null}
 		</div>
 	);
 }
@@ -285,6 +302,14 @@ function useDialSpecs(): DialSpec[] {
 	const riskT = targetFor(record, "risk") ?? (fail ? target(record, fail) : undefined);
 	const riskEst = riskT ? estimates[riskT.id] : undefined;
 
+	// A run likely to run out of memory: its whole-run time and cost are what it would take if it didn't
+	// stop (D's walkthrough 13), so the two dials say so under the number.
+	// The out-of-memory target itself, not the first risk readout (an agent's is runaway, review).
+	const oomEst = fail ? estimates[fail] : undefined;
+	const stops = fail === "risk.oom" && trusted(oomEst) && oomEst.point >= FAILS_AT;
+	// Only under a number: an abstaining dial keeps its own note (between measured points).
+	const stopNote = (e: Estimate | undefined) => (stops && trusted(e) ? { note: t("dial.if_it_fits") } : {});
+
 	const specs: DialSpec[] = [
 		{
 			id: "time",
@@ -297,6 +322,7 @@ function useDialSpecs(): DialSpec[] {
 			better: "lower",
 			hops: true,
 			format: (v) => fmt(v, "s_short"),
+			...stopNote(timeEst),
 		},
 		{
 			id: "cost",
@@ -310,6 +336,7 @@ function useDialSpecs(): DialSpec[] {
 			hops: true,
 			format: (v) => fmt(v, "usd"),
 			...(costEst?.reason && costEst.status !== "abstain" ? { reason: abstainText(costEst.reason) } : {}),
+			...stopNote(costEst),
 		},
 		tpsEst || !tokensEst
 			? {

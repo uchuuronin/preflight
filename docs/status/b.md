@@ -4,6 +4,18 @@ Updated Mon Nov 2, about 1 AM ET, on `ws-b` (merges, not rebases, for pushed com
 
 **Unseen scripts:** B has not opened `unseen-scripts.md` in the Project, and won't before Monday's scoring.
 
+## Decisions Tue Nov 3 (from 8 AM ET; the PM's 8:04 list)
+
+| # | What | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 39 | **D's search fixes, final re-check on main ad12da7:** must-fixes (a) bounded scan, (b) failed calls' fee, (c) no model text: pass; (d) a page only opened can be cited: **fail**, re-tested (a completed `open_page`, annotated, is kept and titled from the open). Posted; `harness.spark_search` shouldn't ship until (d) is fixed. | PM's item 1, by 9 AM, for Chiya's noon call. | none | — |
+| 40 | **The reserved pool, predicted from a corpus margin (`engine.memory_reserved`, off):** reserved/allocated by family and size on the corpus calibration split; raises a prediction only where the probes' ratio is under it. Scored once on the zoo and AMD pairs: gnn and retrieval unchanged (gnn's probes already exceed every margin; retrieval's peak is its own eval), vision raised from 10% over (hit) to 15% over (miss); OOM unchanged, false alarms 0 of 9 both ways. Left off: it moves no miss and costs a hit. | PM's item 2. | none | delete the flag and `_reserved_margin.py` |
+| 41 | **Eval runs by command (`engine.eval_passes`, off):** total = the eval probe's time before its first batch + passes x per-pass p50; on unseen 5, 735 s (484 to 1,148) against 363 s, 102% over and outside its band, because lm_eval scores the longest requests first. Stays off; asked A to record the request count (missing today, so production abstains) and, better, total tokens. | PM's item 3. | none | delete the flag and `_eval_passes_total` |
+| 42 | **D's "no_grad doesn't clear the OOM" (PF102):** no engine change: no_grad already cuts eval activations 78.3 to 2.8 GiB; at eval batch 32 the logits keep the L4 failing (C's race agrees), and with eval batch 8 the peak is training at the dataset's 1,024-token rows (30.7 GiB). The 10.4 GiB is a 20-step verify's eval peak. Code-only combination that clears: no_grad + eval batch 8 + seq_len 512, 17.5 GiB, 1.5%. Logged gap, not fixed: checkpointing barely moves the probe-calibrated prediction. | PM's 8:38 item 1. | none | — |
+| 43 | **PF101's four identical knobs:** the sample's map has no layer shape (a parameter-count-only model), so lora_r and eval_no_grad had no effect; on such a map those shape knobs now count as unmodelled (memory abstains, time says held). fp16 and packing were right. Bug fix, under the freeze. | PM's 8:38 item 2. | none | revert the commit |
+| 44 | **Blank time and cost on four samples:** the engine needs max_steps or epochs x rows; the three Nov 1 samples predate A's `train_dataset_len`; the Nov 2 A10 records predict them (retrieval 468 s, GNN 34 s, vision 12 s). Asked C to refill from those; GRPO needs A to read TRL's loader. | PM's 8:38 item 3. | none | — |
+| 45 | **D's opened-page fix (ws-d 7e5e517): pass.** Only a search action's own results can be cited, titles from search results only; this morning's case is dropped; D's 37 search tests and 43 search and pipeline tests pass. All four must-fixes pass; search can ship on B's side. | PM's 8:38: by 11:30 for Chiya's noon call. | none | — |
+
 ## Decisions today (Nov 2, from 11:15 AM ET; Chiya out until about 5 PM)
 
 | # | What | Why | Cost | How to undo |

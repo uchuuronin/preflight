@@ -34,18 +34,18 @@ const inCockpit = (record: typeof sample, node: React.ReactNode) =>
 afterEach(cleanup);
 
 describe("samples never read as measured", () => {
-	it("uses the illustrative word for every status but an abstention", () => {
-		expect(provenanceKey("measured", true)).toBe("provenance.illustrative");
-		expect(provenanceKey("predicted", true)).toBe("provenance.illustrative");
+	it("never says Measured on a sample: its probe is the sample's own (the banner says the rest)", () => {
+		expect(provenanceKey("measured", true)).toBe("provenance.sample_probe");
+		expect(provenanceKey("predicted", true)).toBe("provenance.predicted");
 		expect(provenanceKey("abstain", true)).toBe("provenance.abstain");
 		expect(provenanceKey("measured", false)).toBe("provenance.measured");
 	});
 
-	it("says Example numbers under a reading on a sample, Measured on a live record", () => {
+	it("says Sample probe under a measured reading on a sample, Measured on a live record", () => {
 		expect(isFixture(sample)).toBe(true);
 		expect(isFixture(live)).toBe(false);
 		inCockpit(sample, <Provenance status="measured" />);
-		expect(screen.getByText(en["provenance.illustrative"])).toBeTruthy();
+		expect(screen.getByText(en["provenance.sample_probe"])).toBeTruthy();
 		cleanup();
 		inCockpit(live, <Provenance status="measured" />);
 		expect(screen.getByText(en["provenance.measured"])).toBeTruthy();

@@ -67,6 +67,9 @@ describe("a wake's text and threshold", () => {
 		// A probability moving off zero is measured against the dial's span.
 		expect(worthMarking(0, 0.05, scale)).toBe(true);
 		expect(worthMarking(0, 0.005, scale)).toBe(false);
+		// A chance moving 2 points is inside the engine's spread, not a change (D's walkthrough).
+		expect(worthMarking(1, 0.98, scale)).toBe(false);
+		expect(worthMarking(1, 0.9, scale)).toBe(true);
 	});
 });
 

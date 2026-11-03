@@ -1,0 +1,311 @@
+[
+ {
+  "script": "finetune_lora_hf",
+  "set": "zoo_gt",
+  "ended": "oom",
+  "truth_gb": 23.37,
+  "oom_actual": true,
+  "before": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": 1.0
+  },
+  "after": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": 1.0
+  }
+ },
+ {
+  "script": "agent_eval_spark",
+  "set": "zoo_gt",
+  "ended": null,
+  "truth_gb": null,
+  "oom_actual": null,
+  "before": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": null
+  },
+  "after": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": null
+  }
+ },
+ {
+  "script": "grpo_trl",
+  "set": "zoo_gt",
+  "ended": "steps",
+  "truth_gb": 19.57,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 23.5,
+   "hi_gb": 26.15,
+   "p_oom": 0.3596685082872928,
+   "err": 0.201,
+   "within10": false,
+   "inside": false
+  },
+  "after": {
+   "point_gb": 23.5,
+   "hi_gb": 26.15,
+   "p_oom": 0.3596685082872928,
+   "err": 0.201,
+   "within10": false,
+   "inside": false
+  }
+ },
+ {
+  "script": "unseen-7",
+  "set": "zoo_gt",
+  "ended": "oom",
+  "truth_gb": 23.09,
+  "oom_actual": true,
+  "before": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": null
+  },
+  "after": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": null
+  }
+ },
+ {
+  "script": "gnn_pyg",
+  "set": "zoo_gt",
+  "ended": "finished",
+  "truth_gb": 8.54,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 5.23,
+   "hi_gb": 5.98,
+   "p_oom": 0.0005524861878453039,
+   "err": -0.387,
+   "within10": false,
+   "inside": false
+  },
+  "after": {
+   "point_gb": 5.23,
+   "hi_gb": 5.98,
+   "p_oom": 0.0005524861878453039,
+   "err": -0.387,
+   "within10": false,
+   "inside": false
+  }
+ },
+ {
+  "script": "retrieval_st",
+  "set": "zoo_gt",
+  "ended": "finished",
+  "truth_gb": 2.43,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 1.04,
+   "hi_gb": 1.18,
+   "p_oom": 0.007042253521126761,
+   "err": -0.573,
+   "within10": false,
+   "inside": false
+  },
+  "after": {
+   "point_gb": 1.04,
+   "hi_gb": 1.18,
+   "p_oom": 0.007042253521126761,
+   "err": -0.573,
+   "within10": false,
+   "inside": false
+  }
+ },
+ {
+  "script": "vision_timm",
+  "set": "zoo_gt",
+  "ended": "finished",
+  "truth_gb": 3.59,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 3.95,
+   "hi_gb": 4.52,
+   "p_oom": 0.003816793893129771,
+   "err": 0.1,
+   "within10": true,
+   "inside": true
+  },
+  "after": {
+   "point_gb": 4.13,
+   "hi_gb": 4.91,
+   "p_oom": 0.003816793893129771,
+   "err": 0.148,
+   "within10": false,
+   "inside": true
+  }
+ },
+ {
+  "script": "pretrain_nanogpt",
+  "set": "zoo_gt",
+  "ended": "steps",
+  "truth_gb": 20.25,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 20.58,
+   "hi_gb": 22.91,
+   "p_oom": 0.09285714285714286,
+   "err": 0.016,
+   "within10": true,
+   "inside": true
+  },
+  "after": {
+   "point_gb": 20.58,
+   "hi_gb": 22.91,
+   "p_oom": 0.09285714285714286,
+   "err": 0.016,
+   "within10": true,
+   "inside": true
+  }
+ },
+ {
+  "script": "serving_vllm",
+  "set": "zoo_gt",
+  "ended": null,
+  "truth_gb": null,
+  "oom_actual": null,
+  "before": {
+   "point_gb": 266.76,
+   "hi_gb": 339.45,
+   "p_oom": 0.9994475138121547
+  },
+  "after": {
+   "point_gb": 266.76,
+   "hi_gb": 339.45,
+   "p_oom": 0.9994475138121547
+  }
+ },
+ {
+  "script": "eval_sweep_reasoning",
+  "set": "zoo_gt",
+  "ended": null,
+  "truth_gb": null,
+  "oom_actual": null,
+  "before": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": null
+  },
+  "after": {
+   "point_gb": null,
+   "hi_gb": null,
+   "p_oom": null
+  }
+ },
+ {
+  "script": "gnn_pyg@L4",
+  "set": "zoo_gt",
+  "ended": "finished",
+  "truth_gb": 8.54,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 5.42,
+   "hi_gb": 6.2,
+   "p_oom": 0.0005524861878453039,
+   "err": -0.365,
+   "within10": false,
+   "inside": false
+  },
+  "after": {
+   "point_gb": 5.42,
+   "hi_gb": 6.2,
+   "p_oom": 0.0005524861878453039,
+   "err": -0.365,
+   "within10": false,
+   "inside": false
+  }
+ },
+ {
+  "script": "retrieval_st@L4",
+  "set": "zoo_gt",
+  "ended": "finished",
+  "truth_gb": 2.43,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 1.52,
+   "hi_gb": 1.73,
+   "p_oom": 0.007042253521126761,
+   "err": -0.372,
+   "within10": false,
+   "inside": false
+  },
+  "after": {
+   "point_gb": 1.52,
+   "hi_gb": 1.73,
+   "p_oom": 0.007042253521126761,
+   "err": -0.372,
+   "within10": false,
+   "inside": false
+  }
+ },
+ {
+  "script": "vision_timm@L4",
+  "set": "zoo_gt",
+  "ended": "finished",
+  "truth_gb": 3.59,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 4.55,
+   "hi_gb": 5.2,
+   "p_oom": 0.003816793893129771,
+   "err": 0.267,
+   "within10": false,
+   "inside": false
+  },
+  "after": {
+   "point_gb": 4.58,
+   "hi_gb": 5.36,
+   "p_oom": 0.003816793893129771,
+   "err": 0.275,
+   "within10": false,
+   "inside": false
+  }
+ },
+ {
+  "script": "finetune_lora_hf@MI300X",
+  "set": "amd",
+  "ended": "oom",
+  "truth_gb": 199.32,
+  "oom_actual": true,
+  "before": {
+   "point_gb": 305.43,
+   "hi_gb": 326.67,
+   "p_oom": 0.9871794871794872
+  },
+  "after": {
+   "point_gb": 305.43,
+   "hi_gb": 326.67,
+   "p_oom": 0.9871794871794872
+  }
+ },
+ {
+  "script": "pretrain_nanogpt@MI300X",
+  "set": "amd",
+  "ended": "steps",
+  "truth_gb": 20.25,
+  "oom_actual": false,
+  "before": {
+   "point_gb": 21.06,
+   "hi_gb": 23.44,
+   "p_oom": 0.002242152466367713,
+   "err": 0.04,
+   "within10": true,
+   "inside": true
+  },
+  "after": {
+   "point_gb": 21.06,
+   "hi_gb": 23.44,
+   "p_oom": 0.002242152466367713,
+   "err": 0.04,
+   "within10": true,
+   "inside": true
+  }
+ }
+]

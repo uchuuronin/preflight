@@ -1,6 +1,6 @@
 # Portal answers (Cerebral Valley, Indie Developer track)
 
-Draft by D, Sun Nov 1. Every number is in `README.md`'s table with its source. Check the field
+Draft by D, Sun Nov 1; updated Tue Nov 3 to the product at the freeze. Every number is in `README.md`'s table with its source. Check the field
 names and length limits against the live form; lengths here are counted in characters.
 
 ## Project name
@@ -17,15 +17,16 @@ Indie Developer. Build for Your World.
 
 ## Links
 
-- Live app: TODO(PM)
+- Live app: https://preflight-cqn.pages.dev
 - Repository: https://github.com/uchuuronin/preflight (public at submission)
-- Demo video (3 minutes): TODO(PM)
-- X post (45 seconds): TODO(PM)
-- The corpus, with its datasheet: https://huggingface.co/datasets/chaoschia/preflight-corpus (public with the repository on Nov 3 to 4)
+- Demo video (3 minutes): Chiya adds the link on Wed Nov 4
+- X post (45 seconds): Chiya adds the link on Wed Nov 4
+- A shared flight record: https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg
+- The corpus, with its datasheet: https://huggingface.co/datasets/chaoschia/preflight-corpus (public with the repository)
 
 ## Team
 
-TODO(PM): every team member, as on the registration.
+Chiya fills this in: every team member, as on the registration.
 
 ## Short description (332 characters)
 
@@ -79,11 +80,11 @@ doesn't hold yet), under the 90% target, so it is shown with a wide band and lab
 step time from its own probe lands within 15% (2 of 2 runs), but from NVIDIA corpus rows it lands within 20% on only
 22% of 1,147 pairs, so a move across vendors isn't shown.
 
-**The corpus published with a datasheet.** The 2,339 rows of GPU measurements behind the learned
-models and the held-out checks are a dataset on Hugging Face, public with the repository from
-Nov 3 to 4 (https://huggingface.co/datasets/chaoschia/preflight-corpus), with a datasheet that
-says how they were made, what they cover and where they are biased. Muse Spark Open was asked to
-label every row (which part of memory dominates its peak, or whether and how a run diverged) for
+**The corpus published with a datasheet.** The 4,255 rows of GPU measurements behind the learned
+models and the held-out checks (corpus 0.4.0, an MI300X slice included) are a dataset on Hugging
+Face, public with the repository (https://huggingface.co/datasets/chaoschia/preflight-corpus),
+with a datasheet that says how they were made, what they cover and where they are biased. Muse
+Spark Open was asked to label every row of the first 2,339 (which part of memory dominates its peak, or whether and how a run diverged) for
 $8.79 of calls; set against our rule labels it agreed on 1,117 of 1,522 rows compared, and the
 datasheet says where it falls short: on divergence runs it did worse than simply answering
 "stable".
@@ -96,26 +97,28 @@ first commit is `11a0ce9`, Oct 26, 22:25 ET.
 - **Muse Spark** reads each script with structured output and draws the job map; it is the guide
   that moves the cockpit's knobs through tool calls (the Responses API); and it is the model inside
   the agent evaluation Preflight measured.
-- **Muse Code**, headless, is the fix loop: it races candidate fixes in parallel sandboxed
-  worktrees, edits only, and a fix is meant to land only when Preflight's own re-probe verifies
-  it, never on Muse Code's exit code. In a clean smoke run Muse Code produced the correct patch in
-  19 seconds; gating on the re-probe isn't wired end to end yet.
-- **Muse Spark Open** on Baseten triages each probe's log on the live site (next section), and
-  labelled the whole corpus.
-- **Muse Glimmer**, Meta's open weights on our own GPU, is built to triage private jobs (next
-  section), switched off on the live site.
+- **Muse Spark** also reads each finished record's memory timeline and loss plot, as images, with
+  the raw probe numbers beside them, and reports where the two disagree (the diagnosis).
+- **Muse Code**, headless, is the fix loop: it writes candidate fixes in sandboxes, edits only, and
+  a fix lands only when Preflight's own re-probe verifies it, never on Muse Code's exit code. On
+  the LoRA script's eval out-of-memory, verify rejected Muse Code's single fix (the eval still ran
+  out of memory) and passed the stacked fix at the guide's eval batch of 8: eval peak 10.4 GiB,
+  loss within 0.11% ($0.39 of the race at list price).
+- **Muse Spark Open** on Baseten triages each failed probe's log on the live site, checks the
+  numbers in model-written findings (code alone for a private check-in, within a US$0.10 cap a job; next section), and labelled the corpus.
+- **Muse Glimmer**, Meta's open weights on our own GPU, triages private check-ins on the live site
+  (next section).
 - **All three in one agent evaluation.** On the same 26 clean programming tasks, run through
   Preflight's proxy, the task ended on a tool call (an upper bound on passes) 23 times with Muse
   Spark ($0.39 of calls), 15 with Muse Glimmer (about $0.22 of its GPU's time, cold start aside)
   and 14 with Muse Spark Open ($0.33 of calls).
 
-On the live site: the script map, the guide and Spark Open's triage are on; the fix loop and
-Glimmer's private mode are built and switched off.
+On the live site, all of it is on: the script map, the guide, the diagnosis, the fix loop, Spark
+Open's triage and number check, and Glimmer's private triage.
 
 ## Best Build on Meta Open Weight Models
 
-**Muse Spark Open (`meta-models/muse-spark-open-1026` on Baseten) is built to triage each
-probe's log.** After a job's probes, Preflight sends Spark Open the last 3,000 characters of each probe's output
+**Muse Spark Open (`meta-models/muse-spark-open-1026` on Baseten) triages each probe's log.** After a job's probes, Preflight sends Spark Open the last 3,000 characters of each probe's output
 with its status. Spark Open answers with structured output, at low reasoning effort: a category
 from a fixed list (out of memory, missing package, data error, NaN or divergence, timeout, script
 error, infrastructure, unclear), one plain sentence, and the log line it rests on, copied exactly.
@@ -136,10 +139,16 @@ production re-run (`a-triage-lora-prod-2`, GitHub run 41479039229, Nov 2, record
 01M6EGH5YMCXPFPNY5SHPNSYV5) quotes the line: "Ran out of GPU memory during the eval pass.
 OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB.".
 
-**Muse Glimmer, Meta's open weights on our own GPU, for private mode.** With its flag on, a
-private job gets triage from Muse Glimmer (Apache 2.0) on an A100-40GB on Modal that Preflight
-deploys, scaled to zero when idle, so the job's logs go to no outside model provider. It is built
-and hosted, behind `harness.glimmer_private` (off). On the same 11 failed probes it named the same
+**Spark Open also checks the numbers in every model-written finding** (`harness.spark_claim_check`,
+on in production since Nov 2): code finds the record fields each number could mean, and Spark Open
+only picks among them. On planted claims, true numbers passed 101 of 107 times and altered ones
+were caught 93 of 102 (`python/preflight/harness/claim_check.py`).
+
+**Muse Glimmer, Meta's open weights on our own GPU, for private mode.** A check-in with "Private
+triage" ticked gets its triage from Muse Glimmer (Apache 2.0) on an A100-40GB on Modal that
+Preflight deploys, scaled to zero when idle, so the job's logs go to no outside model provider. It
+is on in production since Nov 2 (`harness.glimmer_private`); the first triage after a quiet spell
+waits 5 to 8 minutes while it starts. On the same 11 failed probes it named the same
 category as Spark Open 9 times. One call that waited through a cold start cost $0.24; the 11 calls
 cost $0.33 together.
 
@@ -149,8 +158,9 @@ The guide is an agent operating a real tool: Muse Spark calls the same actions a
 (set a knob, highlight a part of the map, compare, propose a fix) and walks a tour of the levers
 that matter for the visitor's goal, one move at a time, waiting for Apply, Revert or Pin. In
 smoke run it called tools in all 5 rounds, and it is on in the live site. The fix loop is the
-other agent: Muse Code races fixes, and Preflight's own re-probe is to pick the winner by
-measurement; it is built and switched off, as that gating isn't wired end to end yet.
+other agent: Muse Code writes fixes, and Preflight's own re-probe picks the winner by measurement;
+on the LoRA script's eval out-of-memory it rejected the fix that didn't work and passed the one
+that did. Both are on in the live site.
 
 ## Challenges
 
@@ -164,4 +174,5 @@ measurement; it is built and switched off, as that gating isn't wired end to end
 ## What's next
 
 A cross-vendor step-time model that holds on the MI300X (its corpus slice, measured Nov 2, shows the roofline
-reading 0.63x); the full-run validation table from Mon Nov 2; private mode with Muse Glimmer switched on for visitors.
+reading 0.63x); more full runs behind the validation table, whose rows still rest on a few runs
+each; and harnessing more unseen scripts on their first try (0 of 9 so far).
