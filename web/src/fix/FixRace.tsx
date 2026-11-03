@@ -2,8 +2,8 @@
  * The fix loop on screen: Muse Code writes up to three fixes for one finding side by side, each
  * in its own lane, and each comes back as a change the visitor can read. The click on "Write the
  * fixes" is the approval: the cost cap is shown on the button's line, from what the API reserves.
- * Nothing here calls a fix verified: verify runs through A's job store once its runner applies a
- * patch, and until then every lane says the fix hasn't been run.
+ * A lane says what verify found for its fix (verified.ts): the race's own verdict when the API sends
+ * one, else Preflight's dated check of the same fix on this sample; otherwise that it hasn't been run.
  */
 import { useEffect, useState } from "react";
 import { fmt } from "../lib/fmt";
@@ -14,13 +14,27 @@ import { ensureSaved } from "../guide/limits";
 import { SAMPLES } from "../workspace/record/load";
 import { FIXABLE_SAMPLES, liveCandidates, template, USD_PER_CANDIDATE, whyNoFix } from "./candidates";
 import { cancelRace, getRace, POLL_MS, type RaceCandidate, type RaceView, startRace } from "./race";
+import { type Verdict, verdictFor } from "./verified";
+
+/** "Rejected: the re-run still ran out of memory." or "Passed: eval peak 10.4 GiB, loss within 0.11%." */
+export function verdictText(v: Verdict): string {
+	if (!v.passed) return t(v.reason === "oom" ? "fix.verdict.rejected_oom" : "fix.verdict.rejected");
+	if (v.evalPeakBytes !== undefined && v.lossDelta !== undefined)
+		return t("fix.verdict.passed_eval", { peak: fmt(v.evalPeakBytes, "bytes"), loss: new Intl.NumberFormat("en-GB", { style: "percent", maximumFractionDigits: 2 }).format(v.lossDelta) });
+	return t("fix.verdict.passed");
+}
+
+/** "2 Nov", the site's day format. */
+function fmtDay(iso: string): string {
+	return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+}
 
 /** Muse Code's summary as plain text: its Markdown links point into its sandbox (`[train.py](/fix/wt/c1/train.py:74)`, live, Nov 2), so only their words are kept. */
 export function plainSaid(text: string): string {
 	return text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
 }
 
-function Lane({ c, running, elapsed }: { c: { template_id: string; value?: unknown } & Partial<RaceCandidate>; running: boolean; elapsed: number }) {
+function Lane({ c, running, elapsed, verdict }: { c: { template_id: string; value?: unknown } & Partial<RaceCandidate>; running: boolean; elapsed: number; verdict: Verdict | null }) {
 	const title = template(c.template_id)?.title ?? c.template_id;
 	const status = running ? "writing" : (c.status ?? "failed");
 	return (
@@ -50,7 +64,14 @@ function Lane({ c, running, elapsed }: { c: { template_id: string; value?: unkno
 						<summary>{t("fix.diff")}</summary>
 						<pre>{c.diff}</pre>
 					</details>
-					<p className="pf-fix__unverified">{t("fix.not_verified")}</p>
+					{verdict ? (
+						<p className={`pf-fix__verdict ${verdict.passed ? "is-passed" : "is-rejected"}`}>
+							{verdict.checkedOn ? <span className="pf-dim">{t("fix.verdict.checked_on", { date: fmtDay(verdict.checkedOn) })} </span> : null}
+							{verdictText(verdict)}
+						</p>
+					) : (
+						<p className="pf-fix__unverified">{t("fix.not_verified")}</p>
+					)}
 				</>
 			) : null}
 		</li>
@@ -162,7 +183,7 @@ export function FixRace({ finding }: { finding: Finding }) {
 					</p>
 					<ol className="pf-fix__lanes">
 						{lanes.map((c, i) => (
-							<Lane key={`${c.template_id}-${i}`} c={c as RaceCandidate} running={running} elapsed={elapsed} />
+							<Lane key={`${c.template_id}-${i}`} c={c as RaceCandidate} running={running} elapsed={elapsed} verdict={verdictFor(recordRef, c as RaceCandidate)} />
 						))}
 					</ol>
 					{running ? (
