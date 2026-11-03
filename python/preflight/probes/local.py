@@ -132,6 +132,11 @@ EXTRAS_KEYS = (
 	"train_loader_batches",
 	"epochs",
 	"planned_steps",
+	"trainer_dataset_len",  # rows of the dataset a HF or TRL trainer holds (B, Nov 3: GRPO's run length)
+	# probes.eval_units: lm-eval's whole request count, its scoring tokens, and its generate requests (B, Nov 3)
+	"eval_requests",
+	"eval_request_tokens",
+	"eval_generate_requests",
 	"train_dataset_len",  # rows the training loader draws per epoch (examples, pairs, images, input nodes)
 	# the training set's row lengths in tokens, as the script tokenised them (B, Oct 30), over
 	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
