@@ -114,7 +114,11 @@ def _turn_evidence(state: GuideState) -> list[Any]:
 
 def _fingerprint(setting: Any) -> str:
 	return json.dumps(
-		[setting.knobs, sorted(setting.pinned), setting.objective.model_dump(exclude_none=True, exclude={"description"})],
+		[
+			setting.knobs,
+			sorted(setting.pinned),
+			setting.objective.model_dump(exclude_none=True, exclude={"description"}),
+		],
 		sort_keys=True,
 		default=str,
 	)
