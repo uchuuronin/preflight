@@ -9,7 +9,8 @@ in a channel), each wanting the daily allowance of 3 probe jobs and submitting t
 takes it (a refusal is retried after its Retry-After). Eight workers (MAX_RUNNING) lease jobs and run them for a
 drawn duration; CPU-only jobs, so no GPU waits are modelled. Job length is a guess: lognormal, median 200 s,
 95th percentile about 600 s (today's check-ins ran 1.5 to 8 minutes end to end, Nov 2). Prints, per cap: queue
-wait of the jobs taken (p50, p95, max), refusals, and how long the last job finished after the first arrival.
+wait of the jobs taken (p50, p95, max), the wait from a job's first try (refusals included) to its start,
+refusals, and how long the last job finished after the first arrival.
 """
 
 import argparse
@@ -33,6 +34,11 @@ def run(cap: int, visitors: int, seed: int) -> dict:
 	want = {f"v{i}": Q.VISITOR_DAILY_JOBS for i in range(visitors)}
 	next_try = {f"v{i}": t for i, t in enumerate(arrive)}
 	submitted: dict[str, float] = {}
+	first_try: dict[
+		tuple[str, int], float
+	] = {}  # (visitor, job n) -> the first time it was sent, refused or not
+	by_job: dict[str, tuple[str, int]] = {}
+	from_first = []
 	waits, refused, running = [], 0, {}
 	sent = {v: 0 for v in want}
 	t0, t, last_end = now[0], 0.0, 0.0
@@ -40,10 +46,12 @@ def run(cap: int, visitors: int, seed: int) -> dict:
 		now[0] = t0 + t
 		for v in want:
 			if want[v] and next_try[v] <= t:
+				first_try.setdefault((v, sent[v]), t)
 				try:
 					s = store.submit({"source": {"kind": "sample", "uri": "sample://zoo/x"}, "n": sent[v]}, visitor=v,
 						idempotency_key=f"{v}-{sent[v]}")  # fmt: skip
 					submitted[s.job_id] = t
+					by_job[s.job_id] = (v, sent[v])
 					sent[v] += 1
 					want[v] -= 1
 					next_try[v] = t  # the next one at once, if the queue takes it
@@ -64,11 +72,19 @@ def run(cap: int, visitors: int, seed: int) -> dict:
 			if lease is None:
 				break
 			waits.append(t - submitted[lease.job_id])
+			from_first.append(
+				t - first_try[by_job[lease.job_id]]
+			)  # the visitor's own wait, refusals included
 			running[lease.job_id] = (lease, t + rng.lognormvariate(math.log(JOB_MEDIAN_S), JOB_SIGMA))
 		t += TICK_S
 	waits.sort()
-	p = lambda q: waits[min(len(waits) - 1, int(q * len(waits)))]  # noqa: E731
-	return {"cap": cap, "jobs": len(waits), "wait_p50_s": p(0.5), "wait_p95_s": p(0.95), "wait_max_s": waits[-1],
+	from_first.sort()
+
+	def p(xs, q):
+		return xs[min(len(xs) - 1, int(q * len(xs)))]
+
+	return {"cap": cap, "jobs": len(waits), "wait_p50_s": p(waits, 0.5), "wait_p95_s": p(waits, 0.95),
+		"wait_max_s": waits[-1], "first_try_p50_s": p(from_first, 0.5), "first_try_p95_s": p(from_first, 0.95),
 		"refusals": refused, "last_done_s": last_end}  # fmt: skip
 
 
@@ -77,12 +93,15 @@ def main() -> int:
 	ap.add_argument("--visitors", type=int, default=20)
 	ap.add_argument("--seeds", type=int, default=20)
 	a = ap.parse_args()
-	print(f"{a.visitors} visitors x {Q.VISITOR_DAILY_JOBS} jobs, {Q.MAX_RUNNING} workers, {a.seeds} seeds (medians over seeds)")
+	print(
+		f"{a.visitors} visitors x {Q.VISITOR_DAILY_JOBS} jobs, {Q.MAX_RUNNING} workers, {a.seeds} seeds (medians over seeds)"
+	)
 	for cap in (1, 2, 3, 5):
 		rows = [run(cap, a.visitors, s) for s in range(a.seeds)]
 		med = {k: statistics.median(r[k] for r in rows) for k in rows[0] if k != "cap"}
 		print(f"cap {cap}: {med['jobs']:.0f} jobs, queue wait p50 {med['wait_p50_s']:.0f} s, p95 {med['wait_p95_s']:.0f} s, "
-			f"max {med['wait_max_s']:.0f} s; refusals {med['refusals']:.0f}; last job done at {med['last_done_s'] / 60:.0f} min")  # fmt: skip
+			f"max {med['wait_max_s']:.0f} s; from the first try to start p50 {med['first_try_p50_s']:.0f} s, "
+			f"p95 {med['first_try_p95_s']:.0f} s; refusals {med['refusals']:.0f}; last job done at {med['last_done_s'] / 60:.0f} min")  # fmt: skip
 	return 0
 
 
