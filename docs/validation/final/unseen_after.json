@@ -1,0 +1,53 @@
+{
+ "$comment": "the nine after the freeze: A's ops runs, install flags on, no hand edits (from-a.md, Nov 3); reaching the first step counts",
+ "runs": [
+  {
+   "script": "unseen-1",
+   "set": "unseen",
+   "harnessed_without_edits": false
+  },
+  {
+   "script": "unseen-2",
+   "set": "unseen",
+   "harnessed_without_edits": false
+  },
+  {
+   "script": "unseen-3",
+   "set": "unseen",
+   "harnessed_without_edits": false
+  },
+  {
+   "script": "unseen-4",
+   "set": "unseen",
+   "harnessed_without_edits": true,
+   "$run": "a-after-4a-full-3 41499457976"
+  },
+  {
+   "script": "unseen-5",
+   "set": "unseen",
+   "harnessed_without_edits": false
+  },
+  {
+   "script": "unseen-6",
+   "set": "unseen",
+   "harnessed_without_edits": false
+  },
+  {
+   "script": "unseen-7",
+   "set": "unseen",
+   "harnessed_without_edits": true,
+   "$run": "a-all3-7 41559542255"
+  },
+  {
+   "script": "unseen-8",
+   "set": "unseen",
+   "harnessed_without_edits": true,
+   "$run": "a-all3-8 41559534537"
+  },
+  {
+   "script": "unseen-9",
+   "set": "unseen",
+   "harnessed_without_edits": false
+  }
+ ]
+}

@@ -1,0 +1,102 @@
+{
+ "$comment": "the nine, first attempts",
+ "runs": [
+  {
+   "script": "unseen-1",
+   "set": "unseen",
+   "job_type": "finetune",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "torchtune LoRA 1.5B, L4 (1a)",
+   "$first_attempt": "failed at mapping, no record: \"Python source is too large to map (over 2 MB)\" (a-unseen-1a-checkin 41478160460)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "ask_model_id": "unseen-1a"
+  },
+  {
+   "script": "unseen-2",
+   "set": "unseen",
+   "job_type": "pretrain",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "LitGPT pretrain debug, L4",
+   "$first_attempt": "record 01M6EG6JNE7JGKPJZGCDFZMNC9: no L4 in 20 min (gpu.unavailable), no probe ran (a-unseen-2-checkin 41478097108)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "files/tests/fixtures/validation/unseen/unseen-2-first.record.json"
+  },
+  {
+   "script": "unseen-3",
+   "set": "unseen",
+   "job_type": "rl",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "open-r1 GRPO, A100",
+   "$first_attempt": "record 01M6EG9JEXR64QDNXEAS9YKGSV: 3 probes missing_package (open_r1, a src/ layout) (a-unseen-3-checkin 41478422939)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "files/tests/fixtures/validation/unseen/unseen-3-first.record.json"
+  },
+  {
+   "script": "unseen-4",
+   "set": "unseen",
+   "job_type": "agent",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "smolagents with Muse Spark, edited per the list (4a)",
+   "$first_attempt": "record 01M6EGB5J6HPPM7ZNW6EABCEKT: read as a serving job, no L4 in 20 min (a-unseen-4a-checkin 41478513589); the list's Change is a hand edit",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "files/tests/fixtures/validation/unseen/unseen-4a-first.record.json"
+  },
+  {
+   "script": "unseen-5",
+   "set": "unseen",
+   "job_type": "eval",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "lm-evaluation-harness, L4",
+   "$first_attempt": "refused at submission, no record: \"the source is larger than Preflight reads\" (a-unseen-5-checkin 41478227289)",
+   "$ground_truth": "none: the ground-truth rig was refused the same way, so there was no full run"
+  },
+  {
+   "script": "unseen-6",
+   "set": "unseen",
+   "job_type": "serving",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "vLLM throughput benchmark, L4",
+   "$first_attempt": "refused at submission, no record (a-unseen-6-checkin 41478294041)",
+   "$ground_truth": "none: the ground-truth rig was refused the same way, so there was no full run"
+  },
+  {
+   "script": "unseen-7",
+   "set": "unseen",
+   "job_type": "retrieval",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "BEIR dense retrieval, L4",
+   "$first_attempt": "record 01M6EG5HHP3F6Q0MF20D7ZPFX3: no L4 in 20 min, no probe ran (a-unseen-7-checkin 41478031647)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "files/tests/fixtures/validation/unseen/unseen-7-first.record.json"
+  },
+  {
+   "script": "unseen-8",
+   "set": "unseen",
+   "job_type": "gnn",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "OGB arxiv GraphSAGE, L4",
+   "$first_attempt": "record 01M6EG4WGGQF9GZZ3KKB5DRRDS: no L4 in 20 min, no probe ran (a-unseen-8-checkin 41477966998)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "files/tests/fixtures/validation/unseen/unseen-8-first.record.json"
+  },
+  {
+   "script": "unseen-9",
+   "set": "unseen",
+   "job_type": "vision",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "airbench94 Muon, L4",
+   "$first_attempt": "record 01M6EG4CQ56Z1RFJ9PXDH3N5A2: 3 probes missing_package (torchvision) (a-unseen-9-checkin 41477906940)",
+   "$ground_truth": "none: the full run stopped before its first step (A's status, Nov 2), so nothing measured to score; its file is left out, since the scorer would read a run that never started as 'didn't run out of memory'",
+   "record": "files/tests/fixtures/validation/unseen/unseen-9-first.record.json"
+  }
+ ]
+}

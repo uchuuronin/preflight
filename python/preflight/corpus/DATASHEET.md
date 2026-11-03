@@ -52,7 +52,7 @@ The HF jobs are 10 groups of five on real Hugging Face checkpoints, LoRA in bf16
 
 **Splits** (the `split` field).
 - **Calibration:** every NVIDIA timing row off the A100 boards, used leave-one-architecture-out for coverage.
-- **Cross-GPU holdout:** every A100 row and every MI300X row, never calibrated on and scored once (`docs/decisions/calibration-l4-phase1.md`; the MI300X: `corpus/reports/amd_cross_nov2.json`, NVIDIA to MI300X step time within 20% on 254 of 1,147 pairs, 22%).
+- **Cross-GPU holdout:** every A100 row and every MI300X row, never calibrated on and scored once (`docs/decisions/calibration-l4-phase1.md`; the MI300X: `corpus/reports/amd_cross_nov2.json`, NVIDIA to MI300X step time 22% within 20% (NVIDIA torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software differ), 254 of 1,147 pairs).
 - **Not in calibration:** the synthetic `lora` family (lens `finetune_synthetic`). Its scores are reported, but users send real models.
 - **Divergence:** the 1,026 divergence runs of both kinds, which score the divergence classifier only.
 
