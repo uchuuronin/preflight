@@ -328,6 +328,17 @@ describe("the repo link's entry point and arguments (PM, Nov 3)", () => {
 		expect(body.source).toEqual({ kind: "repo", uri: "https://github.com/pytorch/examples" });
 	});
 
+	it("takes a path with a space, as the runner does", async () => {
+		const body = await send("Chapter 3/train.py", "");
+		expect(body.source.entrypoint).toBe("Chapter 3/train.py");
+	});
+
+	it("won't send a hidden or dotted path the repo reader never keeps", async () => {
+		expect(await send("src/.cfg/x.py", "")).toBeNull();
+		cleanup();
+		expect(await send("a/./b.py", "")).toBeNull();
+	});
+
 	it("takes ./ off the front of the path", async () => {
 		const body = await send("./mnist/main.py", "");
 		expect(body.source.entrypoint).toBe("mnist/main.py");

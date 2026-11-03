@@ -123,7 +123,8 @@ For a **Repo link**, two optional fields under the repository:
 
 - **Entry point:** the script to run, as its path in the repo (`examples/train.py`). Leave it empty
   and Preflight picks `train.py`, `main.py`, `run.py`, `finetune.py` or `pretrain.py` at the top of
-  the repo, or the only `.py` file. Fill it in whenever the repo holds more than one script.
+  the repo, or the only `.py` file. Fill it in whenever the repo holds more than one script, and
+  always for a large repo (over 2,000 files or 25 MB of text), where Preflight doesn't guess.
 - **Arguments:** the flags you'd type after `python <entry point>`, such as `--epochs 6 --lr 3e-4`.
   They run as written, without a shell: no pipes (`|`), redirects (`>`), variables or chained
   commands. Quote an argument that has a space in it. Up to 64 arguments.
@@ -135,8 +136,10 @@ its word-level language model:
 - Entry point: `word_language_model/main.py`
 - Arguments: `--accel --epochs 6`
 
-Preflight reads the repo (for a large one, just the entry point and the repo's own modules it
-imports), then probes the script with those flags. If the entry point isn't in the repo, the check-in stops before any GPU time.
+Preflight reads the repo (for a large one, the entry point and what it uses: the repo's modules it
+imports, its requirements and files named in the arguments), then probes the script with those
+flags. If the entry point isn't in the repo, the check-in stops before any GPU time, but it still
+uses one of the day's check-ins, so check the path first.
 
 ### Extra packages
 

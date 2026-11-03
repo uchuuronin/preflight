@@ -64,6 +64,10 @@ describe("nothingMeasured", () => {
 	it("is nothing when any probe measured (or came from the cache), or there are no probes", () => {
 		expect(nothingMeasured([{ status: "ok" }, { status: "error", error_code: "oom" }])).toBeNull();
 		expect(nothingMeasured([{ status: "cached" }])).toBeNull();
+		// running out of memory is the answer at that setting; steps taken are measured; a live run is still going
+		expect(nothingMeasured([{ status: "oom", error_code: "oom" }])).toBeNull();
+		expect(nothingMeasured([{ status: "error", error_code: "script_exit", steps: 40 }])).toBeNull();
+		expect(nothingMeasured([{ status: "running" }])).toBeNull();
 		expect(nothingMeasured([])).toBeNull();
 	});
 	it("takes the job's own stop code when the runner sends one", () => {

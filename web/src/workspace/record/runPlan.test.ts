@@ -16,6 +16,10 @@ describe("runPlan, a map's step count that counts epochs (B's engine fix, Nov 3)
 		expect(runPlan(gnn, { ...base, epochs: epochs * 2 }).totalSteps).toBe(steps * 2);
 		expect(runPlan(gnn, { ...base, batch_size: Number(base.batch_size) * 2 }).totalSteps).toBe(Math.ceil(steps / 2));
 	});
+	it("epochs 0 is no steps, as in B's engine", () => {
+		expect(runPlan(gnn, { ...currentKnobs(gnn), epochs: 0 }).totalSteps).toBe(0);
+	});
+
 	it("never rescales a trainer's enforced step cap", () => {
 		const hf = { ...gnn, job: { ...gnn.job, script_map: { ...gnn.job.script_map!, framework: "hf_trainer" } } } as typeof gnn;
 		const base = currentKnobs(hf);

@@ -39,7 +39,7 @@ describe("check-in help on Boarding", () => {
 		on.add("c.checkin_help");
 		rememberRequest("j3", { source: { kind: "repo", uri: "https://github.com/a/b", entrypoint: "lm_eval/__main__.py" } } as never);
 		const { container, getByRole } = render(<CheckinHelp trouble={{ step: "read", limit: "repo" }} jobId="j3" />);
-		expect(container.textContent).toContain("bigger than Preflight reads whole (2,000 files, 25 MB of text)");
+		expect(container.textContent).toContain("more than Preflight reads whole: 2,000 files and 25 MB of text");
 		expect((container.querySelector("input") as HTMLInputElement).value).toBe("lm_eval/__main__.py");
 		expect((getByRole("button", { name: "Check in from this file" }) as HTMLButtonElement).disabled).toBe(false);
 	});
@@ -77,6 +77,7 @@ describe("a check-in that measured nothing (PM, Nov 3)", () => {
 		const body = { source: { kind: "repo", uri: "https://github.com/karpathy/nanoGPT" } } as never;
 		rememberRequest("j9", body);
 		on.add("runner.free_resend");
+		on.add("c.checkin_help");
 		const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ job_id: "j10" }), { status: 202 }));
 		vi.stubGlobal("fetch", fetch);
 		const { container, getByRole } = render(<CheckinHelp trouble={{ step: "measure", code: "gpu.unavailable" }} jobId="j9" />);
@@ -87,8 +88,11 @@ describe("a check-in that measured nothing (PM, Nov 3)", () => {
 		});
 		expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({ source: { kind: "repo", uri: "https://github.com/karpathy/nanoGPT" }, resend_of: "j9" });
 	});
-	it("names the repo's own module, not requirements.txt", () => {
-		const { container } = render(<CheckinHelp trouble={{ step: "measure", code: "missing_module.local" }} jobId="jx" />);
+	it("names the repo's own module, not requirements.txt, and sends no identical resend that would stop the same way", () => {
+		rememberRequest("jx", { source: { kind: "repo", uri: "https://github.com/karpathy/nanoGPT" } } as never);
+		on.add("c.checkin_help");
+		const { container, queryByRole } = render(<CheckinHelp trouble={{ step: "measure", code: "missing_module.local" }} jobId="jx" />);
+		expect(queryByRole("button", { name: "Try again" })).toBeNull();
 		expect(container.textContent).toContain("whole repository");
 		expect(container.textContent).toContain("Check in again from New flight.");
 	});

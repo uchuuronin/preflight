@@ -136,10 +136,12 @@ export function runPlan(record: LoadedRecord, knobs: Readonly<Record<string, Kno
 		// the knob and the map agree on the record's own epochs (its own values stay unchanged).
 		const base = currentKnobs(record);
 		const curEpochs = num(base.epochs);
-		const e = num(knobs.epochs);
-		if (e !== null && tr.epochs && curEpochs !== null && curEpochs === tr.epochs && !HARD_STEP_CAPS.has(record.job.script_map?.framework ?? "")) {
-			const per = (v: Readonly<Record<string, KnobValue>>) => (num(v.batch_size) ?? 1) * (num(v.grad_accum) ?? 1) * (num(v.gpus) ?? record.env?.gpu?.count ?? 1);
-			const totalSteps = Math.ceil(tr.max_steps * (e / tr.epochs) * (per(base) / per(knobs)) - 1e-9);
+		// Epochs 0 is no steps (B: ratio 0); num() drops it, so it's read raw here.
+		const e = typeof knobs.epochs === "number" && Number.isFinite(knobs.epochs) && knobs.epochs >= 0 ? knobs.epochs : null;
+		if (e !== null && !("max_steps" in knobs) && tr.epochs && curEpochs !== null && curEpochs === tr.epochs && !HARD_STEP_CAPS.has(record.job.script_map?.framework ?? "")) {
+			// B's _n_gpus: max(1, the count), so a count of 0 reads as one card.
+			const per = (v: Readonly<Record<string, KnobValue>>) => (num(v.batch_size) ?? 1) * (num(v.grad_accum) ?? 1) * Math.max(1, num(v.gpus) ?? record.env?.gpu?.count ?? 1);
+			const totalSteps = Math.max(0, Math.ceil(tr.max_steps * (e / tr.epochs) * (per(base) / per(knobs)) - 1e-9));
 			return { totalSteps, evalEvery, checkpointEvery, source: "script" };
 		}
 		return { totalSteps: tr.max_steps, evalEvery, checkpointEvery, source: "script" };

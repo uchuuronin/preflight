@@ -113,13 +113,15 @@ export type EntryCheck = { ok: true; path: string | null } | { ok: false; reason
 /**
  * The repo link's Entry point (contract `source.entrypoint`): empty lets Preflight pick (train.py,
  * main.py, run.py, ... or the only .py file); otherwise a relative path to a .py file in the repo,
- * with no "..", no leading "/" and no spaces. The runner checks the file exists.
+ * with no "..", no leading "/" and no hidden folders. The runner checks the file exists.
  */
 export function entryPath(text: string): EntryCheck {
 	const p = text.trim().replace(/^\.\//, "");
 	if (!p) return { ok: true, path: null };
 	if (p.length > MAX_ENTRY_CHARS) return { ok: false, reason: "too_long" };
-	if (!/^[A-Za-z0-9_][A-Za-z0-9_.\-/]*$/.test(p) || p.split("/").some((s) => s === ".." || s === "")) return { ok: false, reason: "path" };
+	// A's `probes.local._PATH_OK` (letters, digits, . _ - / and spaces), and only a path the repo reader keeps:
+	// no hidden folder or file (sources._wanted), no "." or ".." step, no empty step (review, Nov 3).
+	if (!/^[A-Za-z0-9._\-/ ]+$/.test(p) || p.split("/").some((s) => s === "" || s === "." || s === ".." || s.startsWith(".") || s !== s.trim())) return { ok: false, reason: "path" };
 	if (!p.endsWith(".py")) return { ok: false, reason: "not_py" };
 	return { ok: true, path: p };
 }

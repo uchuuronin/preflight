@@ -8,7 +8,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { flag } from "../lib/flags";
 import { errorCopy } from "../lib/errors";
 import { t } from "../lib/i18n";
-import { fromFile, MAX_EXTRA_PACKAGES, parsePackages, rememberRequest, requestFor, type Trouble, withPackages } from "./checkinTrouble";
+import { fromFile, MAX_EXTRA_PACKAGES, parsePackages, rememberRequest, requestFor, TRANSIENT_STOPS, type Trouble, withPackages } from "./checkinTrouble";
 import { go } from "./route";
 
 const API_BASE = "";
@@ -111,7 +111,9 @@ export function CheckinHelp({ trouble, jobId }: { trouble: Trouble; jobId: strin
 				<b id={ids.hint}>{t("checkin.stop.measure")}</b>
 				<p>{trouble.code ? why.message : t("checkin.measure.unknown")}</p>
 				{trouble.code && why.hint ? <p className="pf-dim">{why.hint}</p> : null}
-				{body ? (
+				{/* The same request again only where it can end differently (a GPU free now); otherwise the
+				    change the hint names comes first, on New flight (review, Nov 3). */}
+				{on && body && trouble.code && TRANSIENT_STOPS.has(trouble.code) ? (
 					<button type="button" className="pf-btn pf-btn--primary" disabled={busy} onClick={() => void send(body)}>
 						{t("checkin.measure.again")}
 					</button>
