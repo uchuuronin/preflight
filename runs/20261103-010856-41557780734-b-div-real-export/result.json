@@ -1,0 +1,11 @@
+{
+	"name": "20261103-010856-41557780734-b-div-real-export",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41557780734",
+	"ref": "ws-b",
+	"sha": "f314950848dca33e8f1109d24c551aaabde0860a",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::export --kind divergence_real",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T01:10:09Z"
+}
