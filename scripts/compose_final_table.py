@@ -84,7 +84,7 @@ FOOTER = (
 	"Composed by `scripts/compose_final_table.py`: every row but the unseen one is the frozen scorer's (56c2141's "
 	"`validate.py` and `score_validation.py`, today's engine and production flags) on `docs/validation/final/main.json`; "
 	"the three unseen lines are counted from `unseen_first.json`, `unseen_after.json`{fresh} (each script's "
-	"`harnessed_without_edits`, over all nine, where the scorer counts only scripts that produced a record: its row "
+	"`harnessed_without_edits`, over every script on its list, where the scorer counts only scripts that produced a record: its row "
 	'read 0 of 6 for the first attempts and "not measured" after the freeze, whose ops runs made no Preflight record); '
 	"the cross-GPU row's AMD text and the memory and step-time notes are written by the script. **Don't re-run "
 	"`score_validation.py --readme` (`into_readme`) over this block**: it would put back a single-manifest table. "
@@ -130,7 +130,10 @@ def main(argv: list[str] | None = None) -> int:
 			"fixes designed on these nine (A's item-8 ops rerun on the A10 with every bring-your-own-script fix on, the "
 			"list's own arguments, no hand edits; Nov 3): 4 (smolagents, its first model call), 7 (BEIR, ran out of memory), "
 			"8 (OGB arxiv, all 500 epochs; its probe measures) and 9 (airbench, its probe measures) reach their first step; "
-			"through production 8 (OGB) still stops at its dataset download after A's 10:52 AM deploy (its host is plain HTTP, which A reads as the cause, the sandbox opening only HTTPS [A's reading, not checked]; `a-fresh-live-ogb-2-checkin` 41668696736) and 7 (BEIR) isn't re-checked there; not a validation, "
+			"through production 7 (BEIR) gets as far, out of memory on the A10 (`a-fresh-live-beir-checkin` 41675905714), and "
+			"8 (OGB) stopped at its dataset download after A's 10:52 AM deploy (its host is plain HTTP, which A reads as the "
+			"cause, the sandbox opening only HTTPS [A's reading, not checked]; `a-fresh-live-ogb-2-checkin` 41668696736); "
+			"OGB's archive is served from Preflight's dataset volume since A's 1:05 PM deploy, not yet re-checked; not a validation, "
 			"since the fixes were made for them",
 		),
 	]
@@ -142,7 +145,13 @@ def main(argv: list[str] | None = None) -> int:
 				k3,
 				n3,
 				"measured",
-				"a second held-out list (the PM's, hash in `docs/validation/fresh-hash.txt`), each run once through production",
+				"a second held-out list (the PM's, hash in `docs/validation/fresh-hash.txt`), each pinned before its probe "
+				"and run once through production (A's runs, Nov 3): none reaches its first step. F1 (pytorch/examples "
+				"word_language_model): the list's command passes `--cuda`, which the script at that commit renamed "
+				"`--accel`; F2 (Hugging Face's text-classification notebook): its interactive `notebook_login()` cell "
+				"stops it, labelled a missing package, wrongly; F3 (pytorch-cifar): its progress bar asks the terminal "
+				"its size, and a probe has no terminal. The full runs as listed stop at the same lines, so there is "
+				"no memory, time or out-of-memory to score",
 			)
 		)
 	body = compose(main_md, [u for u in unseen if u[2]])

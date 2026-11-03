@@ -159,11 +159,12 @@ describe("the check-in desk and intake panels", () => {
 		expect(document.activeElement).toBe(screen.getByRole("button", { name: "Check in" }));
 	});
 
-	it("states the measured run, with no dollar promise, once the notice is ticked", () => {
+	it("states the measured check-in time, with no dollar promise, once the notice is ticked", () => {
 		render(<NewFlight onSample={() => {}} />);
 		fireEvent.click(screen.getByRole("checkbox"));
 		const hint = screen.getByText(en["newflight.cost_hint"]);
-		expect(hint.textContent).toMatch(/measured/i);
+		// The production check-ins' range (4 min 59 s and 10 min 21 s), not the first smoke run's time.
+		expect(hint.textContent).toMatch(/about 5 to 11 minutes/);
 		expect(hint.textContent).not.toMatch(/\$|US\$|£/);
 	});
 });
