@@ -1,0 +1,11 @@
+{
+	"name": "20261103-171352-41682158503-c-stranger-b40012b",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41682158503",
+	"ref": "main",
+	"sha": "b40012bb8ae6f7592e255a6400acc8f875336b23",
+	"cmd": "python scripts/stranger_live.py https://preflight-cqn.pages.dev Held-out,held_out,serving,diverg,range_test",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T17:16:04Z"
+}
