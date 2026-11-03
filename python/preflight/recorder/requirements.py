@@ -131,28 +131,47 @@ def torch_asks(files: dict[str, str]) -> list[str]:
 	return out
 
 
+def _torch_specs(asks: list[str]):
+	"""Each ask's clauses, local labels (+cu124) dropped: a CUDA build label is not a torch version."""
+	from packaging.specifiers import InvalidSpecifier, SpecifierSet
+
+	for a in asks:
+		with contextlib.suppress(InvalidSpecifier):
+			yield from SpecifierSet(re.sub(r"\+[0-9A-Za-z.]+", "", a[len("torch") :]))
+
+
 def torch_fits(asks: list[str], version: str) -> bool:
 	"""Whether every torch requirement admits this version (no asks: it does)."""
 	try:
-		from packaging.specifiers import InvalidSpecifier, SpecifierSet
 		from packaging.version import Version
 	except ImportError:
 		return True
-	for a in asks:
-		try:
-			if not SpecifierSet(a[len("torch") :]).contains(Version(version), prereleases=True):
-				return False
-		except InvalidSpecifier:
-			continue
-	return True
+	return all(s.contains(Version(version), prereleases=True) for s in _torch_specs(asks))
 
 
 def torch_too_old(asks: list[str], version: str) -> str | None:
-	"""The plain stop when the code's own torch requirement excludes the image's: "needs torch>=2.7;
-	Preflight's probe image has 2.5.1" (the PM, Nov 3), else None."""
-	if torch_fits(asks, version):
+	"""The plain stop when the code's own torch requirement asks for a newer torch than the image's: "needs
+	torch>=2.7; Preflight's probe image has torch 2.5.1" (the PM, Nov 3), else None. Only an ask that rules
+	the image's version out from below (>=, >, ~=, or == a newer one): an older pin, a != or a < runs as it
+	did, with the image's torch (review, Nov 3)."""
+	try:
+		from packaging.version import InvalidVersion, Version
+	except ImportError:
 		return None
-	return f"needs {', '.join(asks[:2])}; Preflight's probe image has torch {version}"
+	have = Version(version)
+	newer = False
+	for s in _torch_specs(asks):
+		if s.contains(have, prereleases=True):
+			continue
+		try:
+			bound = Version(s.version.removesuffix(".*"))
+		except InvalidVersion:
+			return None
+		if s.operator in (">=", ">", "~=") or (s.operator in ("==", "===") and bound > have):
+			newer = True
+		else:
+			return None  # an older pin, a cap or an exclusion: not a newer torch
+	return f"needs {', '.join(asks[:2])}; Preflight's probe image has torch {version}" if newer else None
 
 
 # ---------------------------------------------------------------- probes.repo_install (off)
@@ -488,11 +507,25 @@ def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TI
 			log(f"[preflight] requirements: the repo's build didn't list its dependencies: {tail[:300]}")
 			return []
 		try:
-			items = json.loads(report.read_text(encoding="utf-8", errors="replace")).get("install") or []
-			reqs = (items[0].get("metadata") or {}).get("requires_dist") or [] if len(items) == 1 else []
-		except (ValueError, AttributeError, IndexError, RecursionError):
-			reqs = []
-	out = [x.strip() for x in reqs if isinstance(x, str) and "extra" not in x.partition(";")[2]]
+			doc = json.loads(report.read_text(encoding="utf-8", errors="replace"))
+		except (ValueError, RecursionError):
+			doc = None
+	# the report is the visitor's build's output: only a list of one item whose requires_dist is a list of strings
+	items = doc.get("install") if isinstance(doc, dict) else None
+	meta = (
+		items[0].get("metadata")
+		if isinstance(items, list) and len(items) == 1 and isinstance(items[0], dict)
+		else None
+	)
+	reqs = meta.get("requires_dist") if isinstance(meta, dict) else None
+	if not isinstance(reqs, list):
+		log("[preflight] requirements: the repo's build gave no dependency list Preflight could read")
+		return []
+	out = [
+		x.strip()
+		for x in reqs[: MAX_REQUIREMENTS * 4]
+		if isinstance(x, str) and "extra" not in x.partition(";")[2]
+	]
 	log(f"[preflight] requirements: the repo's setup.py builds its list in code; its build lists {len(out)} "
 		"dependencies (read by running it in this sandbox)")  # fmt: skip
 	return out
@@ -705,6 +738,7 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	said plainly (torch_too_old), before any install."""
 	import time
 
+	started = time.monotonic() if build else None  # the build's own read counts against the install's limit
 	req = workdir / "requirements.txt"
 	roots = [r for r in _roots(workdir) if r != workdir] if repo else []
 	optional: list[str] = []
@@ -752,7 +786,8 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	constraints = target / "constraints.txt"
 	constraints.write_text(pins)
 	limit = REPO_INSTALL_TIMEOUT_S if repo and not req.is_file() else INSTALL_TIMEOUT_S
-	deadline = time.monotonic() + limit
+	deadline = (started if started is not None else time.monotonic()) + limit
+	limit = deadline - time.monotonic()
 	log(f"[preflight] requirements: installing {', '.join(keep)}")
 	links = os.environ.get(PYG_INDEX_ENV) if pyg else None
 	# a check-in by command's own pure-Python dependencies PyPI has only as source (sources.COMMANDS)

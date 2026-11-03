@@ -134,3 +134,34 @@ def test_a_torch_the_image_cant_give_stops_before_any_install(tmp_path, monkeypa
 	monkeypatch.setattr(R, "_pip", lambda *a, **k: (_ for _ in ()).throw(AssertionError("installed")))
 	err, dirs = R.install(tmp_path, tmp_path / "deps", log=lambda m: None, torch_stop=True)
 	assert err == "needs torch>=2.8; Preflight's probe image has torch 2.5.1" and dirs == []
+
+
+def test_the_stop_is_only_for_a_newer_torch_review():
+	assert R.torch_too_old(["torch==2.4.0"], "2.5.1") is None  # an older pin runs on the image's, as before
+	assert R.torch_too_old(["torch==2.5.1+cu124"], "2.5.1") is None  # a CUDA label isn't a version
+	assert (
+		R.torch_too_old(["torch<2.5"], "2.5.1") is None and R.torch_too_old(["torch!=2.5.1"], "2.5.1") is None
+	)
+	assert R.torch_too_old(["torch==2.7.1"], "2.5.1") and R.torch_too_old(["torch~=2.6"], "2.5.1")
+	assert R.torch_fits(["torch==2.5.1+cu124"], "2.5.1")
+
+
+def test_a_hostile_report_installs_nothing_from_it(tmp_path, monkeypatch):
+	for doc in ({"install": {"a": 1}}, {"install": [{"metadata": {"requires_dist": "torch"}}]}, [1, 2], "x"):
+
+		def run(cmd, doc=doc, **kw):
+			Path(cmd[cmd.index("--report") + 1]).write_text(json.dumps(doc))
+			return subprocess.CompletedProcess(cmd, 0, "", "")
+
+		monkeypatch.setattr(R.subprocess, "run", run)
+		assert R.requires_from_build(tmp_path, log=lambda m: None) == []
+
+
+def test_torch27_s_pins_key_its_cache_and_the_default_key_doesn_t_move():
+	import preflight.runner.pipeline as P
+	from preflight.probes.local import ProbeSpec
+
+	base = ProbeSpec(probe_id="p", files={"train.py": "x"}, entrypoint="train.py")
+	new = ProbeSpec(probe_id="p", files={"train.py": "x"}, entrypoint="train.py", image="torch27")
+	assert P._image_pins("probe") == "" and P._image_pins("torch27").startswith("@")
+	assert P.cache_key(base, "L4", "img") != P.cache_key(new, "L4", "img")

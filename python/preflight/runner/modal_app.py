@@ -36,6 +36,7 @@ from pathlib import Path
 
 import modal
 
+from preflight.runner.images import PROBE_NEW_PACKAGES  # modal-free: pipeline.cache_key reads it too
 from preflight.runner.ownership import decide_ownership
 from preflight.runner.queue import MAX_RUNNING
 
@@ -207,22 +208,6 @@ serving_image = (
 # probes.torch_new (off; the PM, Nov 3): code whose own requirements ask for torch 2.6 or later (LitGPT's
 # torch>=2.7, unseen 2) probes here; the stack moves with torch, and the image's name keys its probes' cache
 # (pipeline.cache_key), so the default image's cache stays as it is
-PROBE_NEW_PACKAGES = [
-	"torch==2.7.1",
-	"torchvision==0.22.1",  # torch 2.7.1's
-	"uv==0.5.11",
-	"transformers==4.52.3",
-	"accelerate==1.7.0",
-	"peft==0.15.2",
-	"trl==0.18.0",
-	"datasets==3.6.0",
-	"safetensors==0.5.3",
-	"psutil==6.1.0",
-	"nvidia-ml-py==12.560.30",
-	"pydantic>=2.8,<3",
-	"numpy>=1.26,<2.3",
-	"httpx>=0.27",
-]
 PYG_INDEX_NEW = "https://data.pyg.org/whl/torch-2.7.0+cu126.html"  # PyPI's torch 2.7.1 is built for CUDA 12.6
 probe_new_image = (
 	_base.apt_install("git")

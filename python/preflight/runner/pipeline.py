@@ -157,7 +157,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
-		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
+		"image": image if spec.image == "probe" else f"{image}+{spec.image}" + _image_pins(spec.image),
 	}  # fmt: skip
 	if (
 		spec.generate_sample
@@ -286,6 +286,15 @@ def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
 		return True
 	# only an eval may need it: a GRPO script with an optional `import vllm` (use_vllm) needs trl
 	return sm.lens == "eval" and any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
+
+
+def _image_pins(image: str) -> str:
+	"""A sandbox image's own pins in its probes' cache key, for the images image_tag doesn't hash: torch27's."""
+	if image != "torch27":
+		return ""
+	from .images import PROBE_NEW_PACKAGES
+
+	return "@" + hashlib.sha256("\n".join(PROBE_NEW_PACKAGES).encode()).hexdigest()[:12]
 
 
 def _image(sm: ScriptMap, files: dict[str, str]) -> str:
