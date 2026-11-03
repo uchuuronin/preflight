@@ -366,7 +366,7 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 					fails: n.phase === "eval" && failing,
 					finding: finding ? finding.title : null,
 					// Above for the upper nodes, so the chip falls outside the ring rather than over the nodes inside it.
-					chipAbove: n.shape !== "diamond" && n.y < FRAME.cy - n.size, // a diamond places its own chip
+					chipAbove: n.shape !== "diamond" && n.y < FRAME.cy - n.size / 2, // a diamond places its own chip
 				},
 				draggable: false,
 				zIndex: 2,

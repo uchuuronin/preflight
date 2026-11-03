@@ -10,7 +10,11 @@
 import { chromium } from "playwright";
 
 const BASE = (process.env.BASE ?? "http://127.0.0.1:4190").replace(/\/$/, "");
-const TERMS = new RegExp(process.env.TERMS ?? "^$", "gi");
+if (!process.env.TERMS || /(^\||\|\||\|$)/.test(process.env.TERMS)) {
+	console.error("TERMS: one pattern, no empty alternative (a leading, doubled or trailing |)");
+	process.exit(2);
+}
+const TERMS = new RegExp(process.env.TERMS, "gi");
 const SAMPLES = (process.env.SAMPLES ?? "lora-7b,lora-qwen,pretrain,agent-eval,campaign-grid,grpo,retrieval,gnn,vision").split(",");
 
 const browser = await chromium.launch();

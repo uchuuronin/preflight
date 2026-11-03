@@ -304,8 +304,11 @@ function useDialSpecs(): DialSpec[] {
 
 	// A run likely to run out of memory: its whole-run time and cost are what it would take if it didn't
 	// stop (D's walkthrough 13), so the two dials say so under the number.
-	const stops = trusted(riskEst) && riskEst.point >= FAILS_AT;
-	const stopNote = stops ? { note: t("dial.if_it_fits") } : {};
+	// The out-of-memory target itself, not the first risk readout (an agent's is runaway, review).
+	const oomEst = fail ? estimates[fail] : undefined;
+	const stops = fail === "risk.oom" && trusted(oomEst) && oomEst.point >= FAILS_AT;
+	// Only under a number: an abstaining dial keeps its own note (between measured points).
+	const stopNote = (e: Estimate | undefined) => (stops && trusted(e) ? { note: t("dial.if_it_fits") } : {});
 
 	const specs: DialSpec[] = [
 		{
@@ -319,7 +322,7 @@ function useDialSpecs(): DialSpec[] {
 			better: "lower",
 			hops: true,
 			format: (v) => fmt(v, "s_short"),
-			...stopNote,
+			...stopNote(timeEst),
 		},
 		{
 			id: "cost",
@@ -333,7 +336,7 @@ function useDialSpecs(): DialSpec[] {
 			hops: true,
 			format: (v) => fmt(v, "usd"),
 			...(costEst?.reason && costEst.status !== "abstain" ? { reason: abstainText(costEst.reason) } : {}),
-			...stopNote,
+			...stopNote(costEst),
 		},
 		tpsEst || !tokensEst
 			? {
