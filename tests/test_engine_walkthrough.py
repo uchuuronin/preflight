@@ -34,3 +34,21 @@ def test_shape_knobs_are_unmodelled_on_a_script_map_with_no_layer_shape():
 		/ "lora-live-nov1.record.json"
 	)
 	assert not api._generic_shape(FlightRecord.model_validate_json(qwen.read_text()))
+
+
+def test_a_seq_len_past_the_scans_cut_is_extrapolated_not_a_silent_no_change():
+	# C, Nov 3 (D's item 6): PF102 at seq_len 2,048 read the same time as at 1,024; its rows were scanned at 1,024
+	sample = (
+		Path(__file__).resolve().parents[1]
+		/ "web"
+		/ "src"
+		/ "workspace"
+		/ "fixtures"
+		/ "lora-live-nov1.record.json"
+	)
+	rec = FlightRecord.model_validate_json(sample.read_text())
+	base = api.predict(rec).root["time.step"]
+	long = api.predict(rec, {"seq_len": 2048}).root["time.step"]
+	assert base.status == "predicted" and "scanned at" not in (base.reason or "")
+	assert long.status == "extrapolated" and "aren't measured" in long.reason
+	assert api.predict(rec, {"seq_len": 512}).root["time.step"].status == "predicted"
