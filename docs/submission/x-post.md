@@ -1,64 +1,72 @@
-# X post for the 45-second cut
+# X post for the 45-second clip
 
-Draft by D, Sun Nov 1, refreshed Tue Nov 3, for the 45-second X clip in `docs/demo/video-plan.md`
-("The 45-second X clip: the cut"); `storyboard.md`'s 45-second cut is its fallback if shot 8b isn't
-filmed. Every number is in the submission's numbers table (`README.md` here), and
-each is also in the video's captions. The Most Viral prize counts engagement through Nov 8; the
-post's link goes on the submission.
+By D, rewritten Tue Nov 3, 17:00 ET, for the new concept (Chiya's pick, the PM's 16:08): "The
+cheapest place for your training run to crash". The clip is `docs/demo/video-plan.md`, "The
+45-second X clip". The Most Viral prize counts engagement through Nov 8; the first post's link goes
+on the submission.
 
-## The link
+Character counts are X's, a link counted as 23. Every number is from a record named in the video
+plan's table: the reply's 10.4 GiB and $0.39 are C's Nov 2 fix race (GitHub run 41482457185,
+records 01M6EHR42KZR8F3MWZJKAQBWNW and 01M6EHYYCM3JRHXKJ9XM5EPJ41), the race the clip shows.
 
-Share pages are live (C deployed `workers/` with production from `7ba177b`, Nov 2, 12:45 ET; the
-Oct 28 record's `/s/` link, card and badge pass `scripts/share_page_check.py`). Both posts link
-`https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg` (A's Oct 28 record): its card is
-pre-rendered (`workers/hero-cards.json`), so the post previews with an image. Open it once on the
-live site before posting.
+## The first post: the hook and the clip (253 characters)
 
-## Post A: the bug alone (262 characters, a link counted as X's 23)
-
-Only if the clip loses its triage beat (the clip's row E, from shot 6): with `storyboard.md`'s
-fallback cut, if that cut drops it too.
+Attach the 45-second clip; X shows the video instead of a link card.
 
 ```text
-We planted a bug in this fine-tune. At step 200, its first evaluation, it runs out of memory.
+The cheapest place for your training run to crash.
 
-Preflight ran a few real steps on one L4 and caught it in 189 seconds, for $0.042 of GPU at list price.
+Preflight runs a few real steps of your job on a real GPU, models the hours from minutes, and shows you the crash before the long run does.
 
-Fly your ML job before you pay for it: https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg
+Crash it here, not on your GPU bill: https://preflight-cqn.pages.dev
 ```
 
-## Post B: with Meta's open model (269 characters)
-
-The post for the 45-second X clip (`video-plan.md`), which keeps row E (shot 6, Spark Open's
-triage on A's production record) and adds row F (shot 8b, Muse Code's fixes) on screen; the text
-needs no change for F. The Oct 28
-record it links predates triage, so a click finds no Spark Open finding there; the triage is in A's
-re-run (`/s/Q3s5qyHKTNf-fCng4dwn6g`, an A10, Nov 2), shown in the video. To link the triaged record instead, its
-numbers differ (an A10, not an L4): see the one-record draft in `docs/demo/video-plan.md`, a draft
-for Chiya, not applied.
+## The reply, under it (278 characters)
 
 ```text
-We planted a bug in this fine-tune: at step 200 it runs out of memory.
+Built Oct 26 to Nov 4 for the Meta hackathon:
 
-Preflight ran a few real steps on one L4 and caught it in 189 seconds, for $0.042 of GPU at list price. Muse Spark Open, Meta's open model, reads every probe's log.
-
-Try it: https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg
+Muse Spark reads your script and draws the job.
+Muse Spark Open reads every probe's log.
+Muse Code writes fixes; Preflight re-runs each. Here the single fix still crashed and the stacked fix passed (10.4 GiB eval peak, $0.39 race).
 ```
 
-Paste exactly what is in the block (one line per paragraph). Add the hackathon's hashtag and
-handles if the rules ask for them, and check the count after (X allows 280).
+## A second reply (196 characters)
+
+```text
+Private jobs get their logs read by Muse Glimmer, Meta's open weights, on our own GPU.
+
+Every number says how it was made: measured, predicted, or not measured here.
+
+Code: https://github.com/uchuuronin/preflight
+```
+
+Paste exactly what is in each block (one line per paragraph). Check the count in X's box after
+adding any tag or handle (X allows 280 a post). The repository link works once it's public.
+
+## Tags and handles: check before posting (for Chiya)
+
+D found **no required hashtag or handle** in what D could read: the event page
+(cerebralvalley.ai/e/meta-ai-developer-hackathon), the hackathon's GitHub repository front page,
+and our own judging playbook all say only that Most Viral is judged on X engagement through Nov 8
+and that the post's link is submitted on the platform. The official rules file
+(`info/grading criteria.md` in the hackathon's GitHub repository) and the portal's own Most Viral
+field weren't reachable from D's sandbox. Chiya: check those two before posting. If they name a
+hashtag or handles (Meta's or Cerebral Valley's accounts, say), add them to the **first post**, and
+recount: there are 27 characters to spare.
 
 ## Video alt text
 
-A Python training script zooms to its evaluation setting. Preflight's cockpit then draws the
-job as a map; a memory ring fills past its limit and a red finding says the evaluation runs out
-of memory, 20.4 of 22.06 GiB, caught in 189 seconds of probing. Dragging a setting moves the ring and the dials together. A finding on the evaluation step,
-labelled Found by Muse Spark Open triage, quotes the log line. Muse Code writes candidate fixes,
-and Preflight re-runs them and keeps the one that fits. The end card shows the link and the
-repository. (With `storyboard.md`'s fallback cut, drop the sentence about Muse Code and, if
-that cut drops the triage, the one before it.)
+Black screen; a real CUDA out-of-memory error types out: "OutOfMemoryError: CUDA out of memory.
+Tried to allocate 530.00 MiB. GPU 0 has a total capacity of 22.06 GiB of which 484.69 MiB is free."
+A title card reads "Preflight: the cheapest place for your training run to crash". In the app, a
+GitHub repository is checked in and the job draws itself as a map. Dragging the run's timeline to
+step 200, the evaluation step turns red: it runs out of memory, measured. Muse Code writes fixes;
+Preflight re-runs them: the single fix still crashes and is rejected, the stacked fix passes. The
+readouts before and after, each with its range. The exported config, patch and Slurm batch file.
+End card: "Crash it here, not on your GPU bill", with the link.
 
-## Reply under the post (optional)
+## The earlier posts
 
-Every number in Preflight says how it was made: measured, predicted, or not measured here. Built Oct 26 to Nov 4 for the Meta hackathon, on Muse Spark, Muse Spark
-Open and Muse Glimmer. Code: https://github.com/uchuuronin/preflight (public from Nov 3 to 4)
+The two Nov 1 drafts (the bug alone, and with Muse Spark Open) are replaced by these; they stay in
+the file's history.

@@ -2,7 +2,7 @@
 
 By D, Mon Nov 2, overnight (Chiya's list, item 3); statuses updated Mon Nov 2, 11:10 ET; shot 9b added 12:05 ET, its stopgap step replaced 16:30 ET; shot 7b added 17:45 ET; shot 6b added 20:15 ET. The plan of record is now the section "At the freeze" below. This plan
 replaces the plan A and plan B shot lists in `storyboard.md` and `fallback-cut.md`, which stay as
-the earlier drafts; the 45-second cut in `storyboard.md` is the fallback if shot 8b isn't filmed.
+the earlier drafts. The 45-second X clip has its own section below (new concept, Nov 3).
 
 ## At the freeze (Tue Nov 3): the plan of record for Wednesday's recording
 
@@ -72,24 +72,75 @@ Total 2:58.
 If 6b is cut, shots 7 and 8 move up 8 s (1:01 to 1:09, 1:09 to 1:20) and 8b runs 1:20 to 1:44 with the same line, said more slowly. If 9b is cut, shot 10
 runs 1:51 to 2:08 and shot 11 2:08 to 2:22, with the same lines.
 
-### The 45-second X clip: the cut
+### The 45-second X clip: "The cheapest place for your training run to crash"
 
-From the takes above; no extra filming. Same format as `storyboard.md`'s 45-second cut (1920 x
-1080, 30 fps, H.264, captions burned in, sound off must still work). It replaces that cut's
-order, adding the fix loop (shot 8b), the strongest agentic beat.
+By D, Tue Nov 3, 17:00 ET (Chiya's pick, the PM's 16:08). It replaces the earlier 45-second cut
+(its rows A to F); the 3-minute plan above keeps its shots. Plan only; filmed Wed Nov 4.
 
-| # | Time | From shot | Voice-over | Caption |
+**The voice.** Hook: "The cheapest place for your training run to crash." Opener: "Your GPU is a
+terrible place to discover a typo." Promise: "Model the hours from minutes." Sign-off: "Crash it
+here, not on your GPU bill." Dry, short sentences; no exclamation marks.
+
+**Format.** 1920 x 1080, 30 fps, H.264; a 1080 x 1350 crop for the X feed if Chiya wants one.
+Captions burned in on a dark band under the frame (white, at least 2 s each), so it works with the
+sound off. About 2.5 words a second.
+
+**Rules for this cut** (on top of the Rules below):
+
+- **Two kinds of picture, never mixed.** Seconds 0 to 8 and the end card are motion graphics: title
+  cards that are clearly not the app. Seconds 8 to 39 are screen recordings of the live app,
+  untouched: no mock-ups, no stamps, badges or arrows added on top. A zoom or a crop is fine; a
+  word the app doesn't show is not.
+- **Every number on screen or in the voice-over is from a record**, named in the table. Numbers
+  the app shows (its ranges) stay the app's; the voice-over only says measured ones.
+- **The cold open is real error text**, typed out as it was logged; no invented bill, price or
+  "GPU hours wasted" figure anywhere.
+- **Full model names**, each as the app or the caption says it at the moment it works: Muse Spark,
+  Muse Spark Open, Muse Glimmer, Muse Code. Glimmer isn't in this cut (it's in the 3-minute
+  video, shot 12); the reply under the post names it.
+
+| Time | Picture | Voice-over | Caption (dark band) | Source |
 | --- | --- | --- | --- | --- |
-| A | 0:00 to 0:07 | 1 | "This fine-tune looks fine. At step 200, its first evaluation, it runs out of memory." | 0:00 to 0:03 "Your GPU job, flown before you run it"; then "At step 200, its first evaluation, it runs out of memory" |
-| B | 0:07 to 0:18 | 5 | "Preflight ran a few real steps and caught it in 189 seconds, for about four cents of GPU at list price." | "Caught in 189 s of probing · $0.042 of GPU at list price · one script" |
-| C | 0:18 to 0:23 | 7 | "Move a setting; the whole run answers." | "Every reading carries its range" |
-| E | 0:23 to 0:29 | 6 | "Muse Spark Open, Meta's open model, quotes the log line." | "Muse Spark Open (Meta's open model, on Baseten)" |
-| F | 0:29 to 0:40 | 8b | "Muse Code writes fixes; Preflight runs them for real and keeps the one that fits." | "Muse Code (Meta) · verified by Preflight's re-probe" |
-| D | 0:40 to 0:45 | 15 | "Preflight. Fly the run before you pay for it." | link · "Built Oct 26 to Nov 4 for the Meta hackathon" |
+| 0:00 to 0:04 | Black. Monospace text types out, line by line, at the speed of a log: `OutOfMemoryError: CUDA out of memory.` / `Tried to allocate 530.00 MiB.` / `GPU 0 has a total capacity of 22.06 GiB of which 484.69 MiB is free.` The cursor blinks once after the last line. | "Your GPU is a terrible place to discover a typo." (10 words) | none: the text is the picture | The LoRA zoo script's eval probe, record 01M60H0R28WQS4R3XM0G38BAJP (A's production run, Oct 28, share `ICDYrfHQ2nBNbv3mlRHHMg`), probe `p1-eval`, status oom: its logged error, word for word, cut into three lines |
+| 0:04 to 0:08 | Title card: "Preflight" set in the app's serif, then the hook under it. A slow sky gradient behind (the app's colours, below), a thin flight-path line drawn left to right. Clearly a graphic, not a screen. | "Preflight. The cheapest place for your training run to crash." (10 words) | none: the card carries the words | n/a |
+| 0:08 to 0:16 | The live site, New flight: Repo link with `github.com/uchuuronin/preflight`, Entry point `zoo/finetune_lora_hf/train.py`, "Check in". Hard cut past the wait to Boarding ("Reading your script", "Checking the logs"), then the cockpit's map assembling. | "Point it at your repo. Muse Spark reads the script; real steps run on a real GPU." (17 words) | "Muse Spark (Meta) reads the script" over Boarding's first stage, then "Muse Spark Open (Meta's open model, on Baseten) reads each probe's log" over the second | Film a fresh check-in on Wed (one of Chiya's 3 jobs a day; about 5 to 11 minutes [measured: production's two LoRA check-ins], cut). Fallback: the Oct 28 record's share link, opened, with the check-in from shot 3's take |
+| 0:16 to 0:24 | The cockpit's run timeline ("The whole run, step by step"): drag the playhead from step 0 to step 200; the eval node goes red at the first eval, with whatever status word the app puts on a measured out-of-memory (film it as it is). | "Model the hours from minutes. At step 200, the first eval runs out of memory. Measured, not guessed." (18 words) | "Step 200: the first eval runs out of memory · measured on a real GPU" | The filmed record: its `p1-eval` probe ran out of memory, so the app marks it measured. If the fallback is used, the Oct 28 record (the same probe, the same message) |
+| 0:24 to 0:32 | The eval finding, "Fix it with Muse Code", the fixes writing side by side. Then the verify results the app shows for this record's patches: the single fix "Verify failed", the stacked fix "Verified". See the open question below. | "Muse Code writes the fixes. Preflight runs each one for real: one still crashes, rejected. The stacked fix passes." (19 words) | "Muse Code (Meta) · each fix re-run on a real A10 · single fix rejected · stacked fix passed, eval peak 10.4 GiB · race cost $0.39" | C's race, Nov 2 (GitHub run 41482457185, `docs/status/c.md` D8): round 1, `torch.no_grad()` alone, verify failed (record 01M6EHR42KZR8F3MWZJKAQBWNW); round 2, no_grad with eval batch 8, verify passed, eval peak 10.4 GiB (record 01M6EHYYCM3JRHXKJ9XM5EPJ41); US$0.39 for the race [measured]. Caption these numbers only over this race; another race gets only what it shows |
+| 0:32 to 0:39 | The same cockpit before and after: the readouts at the record's own setting ("Likely runs out of memory", the dials marked "If it didn't run out of memory"), then after applying the guide's combined move (eval batch 8 and no_grad): the ring back under the line, each dial with its range. One cut between the two, no split screen. | "Before and after. Every readout comes with its range." (9 words) | none, so the app's own labels and ranges are read as they are | The filmed record, on screen only (predicted ranges are the app's; nothing here is spoken) |
+| 0:39 to 0:45 | "Take this plan with you": the Plan (the settings as JSON), "Muse Code patches for this record", the "Slurm batch file", each opened for a beat. Cut to the end card: "Crash it here, not on your GPU bill." with the link and "Built Oct 26 to Nov 4 for the Meta hackathon". | "Take the config, patch and batch file. Crash it here, not on your GPU bill." (15 words) | end card: `preflight-cqn.pages.dev` · github.com/uchuuronin/preflight · "Built Oct 26 to Nov 4" | The exports panel on the filmed record (`c.exports`, on in production) |
 
-77 words in 45 s. If shot 8b isn't filmed, use `storyboard.md`'s cut as it is. The X post is
-`docs/submission/x-post.md`'s Post B (it names Spark Open; the clip adds Muse Code on screen, and
-the post's text needs no change).
+98 words in 45 s, about 2.2 a second; no line is faster than 2.5 a second.
+
+**Open, for C by Wed 10 AM (or the shot changes):** the live race lanes say "Not verified: Preflight
+hasn't run this fix yet" (`FixRace.tsx`), and verify results appear in the exports panel's "Muse
+Code patches for this record" as "Verified" or "Verify failed", once A's job store has run them.
+D hasn't seen C's Nov 2 race in the app. C: is there a record whose cockpit shows both patches
+with their verify results (the LoRA sample, or the two verify records above)? If yes, film 0:24 to
+0:32 there. If not, film the race lanes writing, then open the two verify records' cockpits (the
+failed one's eval out of memory, the passed one's eval peak), and let the caption carry
+"rejected" and "passed". Either way, no "REJECTED" or "PASSED" stamp drawn on the app.
+
+**Making the graphics** (the cold open, the title card, the end card; the skills from the team's
+Skills Audit doc, "Video" and "Animation and motion"):
+
+- **`hyperframes`** (read first): the three cards as HTML rendered to video at 1920 x 1080, 30 fps,
+  so the type matches the app exactly. `hyperframes-registry` before hand-building anything: its
+  kinetic-type and terminal-style blocks for the typing cold open, and its titles for the card.
+  `hyperframes-cli` to check frames and render.
+- **`media-use`** for the sound: a low, quiet music bed, and soft key clicks under the cold open
+  that stop with the cursor. Nothing loud on the "crash".
+- **`animation-vocabulary`** to name the motions for whoever edits: a per-character "typewriter"
+  reveal at a steady rate (no randomised jitter) for the error text; an "ease-out" fade and slight
+  rise for the title; a "draw-on" stroke for the flight path.
+- The screen recordings themselves (8 to 39 s) get no graphics, only cuts, a zoom where the text is
+  small, and the caption band.
+
+**The look**, from the app's own tokens (`web/src/theme/tokens.ts`), so the cards and the app read
+as one film: the night sky gradient from `#0A0720` through `#563A88` and `#7A4389` towards peach;
+text `#FFF4EE`; accent peach `#FFB98F` (the hook's key word); failure `#FF7A5C` (only on the error
+text in the cold open, nowhere else on the cards); type: Instrument Serif for "Preflight" and the
+hook, Instrument Sans for captions, JetBrains Mono for the error text (the same OFL fonts the share
+cards bundle).
 
 ## Rules
 

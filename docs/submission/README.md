@@ -12,7 +12,7 @@ The links only Chiya can add (the video, the X post) say so where they go; the c
 | `portal.md` | Answers for the Cerebral Valley portal, Indie Developer track. The field names follow the usual form; check them against the live form. |
 | `gallery.md` | The gallery blurb, in two lengths. |
 | `meta-and-partners.md` | Each Meta model and partner tool, where it is used, and what it does today. |
-| `x-post.md` | The X post for the 45-second cut (`docs/demo/video-plan.md`, "At the freeze"; `storyboard.md`'s cut is the fallback), with alt text. |
+| `x-post.md` | The X post for the 45-second clip (`docs/demo/video-plan.md`, "The 45-second X clip", Nov 3's "cheapest place to crash" concept): the first post, two replies, the tags to check, alt text. |
 
 ## Numbers these drafts may use
 

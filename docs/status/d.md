@@ -76,6 +76,25 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 17:00 ET (the 45-second clip and X post, new concept; notes for C's Help page)
+
+The 45-second X clip rewritten for Chiya's pick, "The cheapest place for your training run to
+crash", to the PM's 16:08 script (time, screen, voice-over) in `docs/demo/video-plan.md`, and the
+X post rewritten to match in `docs/submission/x-post.md` (a 253-character first post with the
+clip, two replies). Every number is from a record: the cold open's error text from the Oct 28
+record 01M60H0R28WQS4R3XM0G38BAJP, the fix race's 10.4 GiB and $0.39 from C's race (run
+41482457185). One open question for C: where the app shows the two verify results, since the race
+lanes say "Not verified". No required hashtag or handle found; Chiya to check the rules file and
+the portal before posting. The graphics plan names the skills from the team's Skills Audit doc
+(hyperframes, hyperframes-registry, hyperframes-cli, media-use, animation-vocabulary) and the
+app's own colours and fonts. The two outside drafts weren't among this session's attachments. A
+read-only review checked times, wording, numbers, counts and labels; its fixes are in. CI on the
+3:50 push failed once on the stranger test's knob timing (590 ms at 4x CPU slowdown, my push
+changed no web code) and passed on a re-run. Corrections for C's Help page posted at 16:15.
+
+This push sends: `docs/demo/video-plan.md`, `docs/submission/x-post.md`,
+`docs/submission/README.md`, this file.
+
 ## Tue Nov 3, 15:50 ET (B's corrections and block; the 12 repos through New flight)
 
 B's fact-check of readme-final and the submission docs applied (about 30 corrections, most
