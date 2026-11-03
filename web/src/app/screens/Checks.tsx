@@ -5,6 +5,10 @@
  * behind an "i". A separate screen, never part of the cockpit.
  */
 import data from "../../coverage/coverage.json";
+import askRaw from "../../coverage/ask_model.json";
+
+/** B's comparison (docs/validation/preflight-vs-model.md): the same code asked to Muse Spark without probes. */
+const ask = askRaw as { model: string; rows: Array<{ id: string; of: number; preflight: number; model: number }> };
 import { type MetricSummary, verdict, type Verdict } from "../../coverage/verdict";
 import { fmt, fmtRange } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
@@ -108,6 +112,35 @@ export function Checks() {
 							</div>
 						);
 					})}
+				</section>
+				<section className="pf-checks__ask" aria-labelledby="pf-checks-ask">
+					<h2 className="pf-h2" id="pf-checks-ask">
+						{t("checks.ask.title", { model: ask.model })}
+					</h2>
+					<p className="pf-dim">{t("checks.ask.lede", { model: ask.model })}</p>
+					<div className="glass pf-checks__table" role="table" aria-labelledby="pf-checks-ask">
+						<div className="pf-checks__row pf-checks__row--ask pf-checks__row--head" role="row">
+							<span role="columnheader">{t("checks.col.metric")}</span>
+							<span role="columnheader">{t("checks.ask.col.scored")}</span>
+							<span role="columnheader">{t("checks.ask.col.preflight")}</span>
+							<span role="columnheader">{t("checks.ask.col.model", { model: ask.model })}</span>
+						</div>
+						{ask.rows.map((r) => (
+							<div key={r.id} className="pf-checks__row pf-checks__row--ask" role="row">
+								<b role="rowheader">{t(`checks.ask.row.${r.id}`)}</b>
+								<span className="pf-dim" role="cell" data-label={t("checks.ask.col.scored")}>
+									{t(`checks.ask.of.${r.id}`, { n: fmt(r.of, "count") })}
+								</span>
+								<span role="cell" data-label={t("checks.ask.col.preflight")}>
+									{t("checks.result", { hits: fmt(r.preflight, "count"), n: fmt(r.of, "count") })}
+								</span>
+								<span role="cell" data-label={t("checks.ask.col.model", { model: ask.model })}>
+									{t("checks.result", { hits: fmt(r.model, "count"), n: fmt(r.of, "count") })}
+								</span>
+							</div>
+						))}
+					</div>
+					<p className="pf-dim pf-checks__note">{t("checks.ask.note")}</p>
 				</section>
 				<section className="pf-checks__list" aria-label={t("checks.each")}>
 					<h2 className="pf-h2">{t("checks.each")}</h2>
