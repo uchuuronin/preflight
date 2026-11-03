@@ -1453,9 +1453,9 @@ META_VARIANT_MAX_TOKENS = 16  # each variant's answer: enough to see it worked, 
 
 @ops.function(image=worker_image, secrets=_AGENT_SECRETS, timeout=20 * 60)
 def _meta_variants(files: dict, entrypoint: str) -> dict:
-	"""Run the script against a local stand-in that records its first model request and refuses it, then
-	send that request to Meta's API as it was and with one field removed at a time. Prints each variant's
-	status and Meta's error code and message (our own run of a public example; our key is redacted)."""
+	"""Run the script against a local stand-in that records its first chat request and refuses it, then
+	send that request to Meta's API as it was and with fields removed. Prints each variant's status and
+	Meta's error code and message (our own run of a public example; our key is redacted before any cut)."""
 	import http.server
 	import subprocess
 	import sys
@@ -1469,7 +1469,10 @@ def _meta_variants(files: dict, entrypoint: str) -> dict:
 	class H(http.server.BaseHTTPRequestHandler):
 		def do_POST(self):
 			n = int(self.headers.get("Content-Length") or 0)
-			got.setdefault("body", json.loads(self.rfile.read(n)))
+			raw = self.rfile.read(min(n, 4 * 2**20))
+			if self.path.split("?", 1)[0].endswith("/chat/completions"):
+				with contextlib.suppress(ValueError):
+					got.setdefault("body", json.loads(raw))
 			data = b'{"error": {"code": "recorded", "message": "stand-in"}}'
 			self.send_response(400)
 			self.send_header("Content-Type", "application/json")
@@ -1497,51 +1500,58 @@ def _meta_variants(files: dict, entrypoint: str) -> dict:
 		"--disable-pip-version-check",
 		str(work) + "[openai]",
 	]
-	subprocess.run(pip, check=False, capture_output=True, timeout=600)
-	env = {
-		**os.environ,
-		"META_API_BASE": f"http://127.0.0.1:{srv.server_address[1]}/v1",
-		"META_API_KEY": "stand-in",
-	}
-	subprocess.run(
-		[sys.executable, entrypoint], cwd=work, env=env, capture_output=True, timeout=300, check=False
-	)
-	srv.shutdown()
+	# the script never sees our keys: only the stand-in's address and a dummy key
+	env = {k: v for k, v in os.environ.items() if not k.startswith(("META_", "BASETEN_", "GLIMMER_"))}
+	env.update({"META_API_BASE": f"http://127.0.0.1:{srv.server_address[1]}/v1", "META_API_KEY": "stand-in"})
+	try:
+		subprocess.run(pip, check=False, capture_output=True, timeout=400)
+		subprocess.run(
+			[sys.executable, entrypoint], cwd=work, env=env, capture_output=True, timeout=180, check=False
+		)
+	except subprocess.TimeoutExpired:
+		print("[meta] the install or the script ran past its limit", flush=True)
+	finally:
+		srv.shutdown()
 	body = got.get("body")
 	if not isinstance(body, dict):
-		return {"error": "the script made no model request"}
-	key, base = (
-		os.environ["META_API_KEY"],
-		(os.environ.get("META_API_BASE") or "https://api.meta.ai/v1").rstrip("/"),
-	)
+		return {"error": "the script made no chat request"}
+	key = os.environ["META_API_KEY"]
+	base = (os.environ.get("META_API_BASE") or "https://api.meta.ai/v1").rstrip("/")
+
+	def clean(v, n):
+		return str(v or "").replace(key, "<key>")[:n]
+
 	shape = {k: (v if k in ("model", "tool_choice", "stop", "stream", "max_tokens") else type(v).__name__)
 		for k, v in body.items()}  # fmt: skip
-	print(f"[meta] the request: {json.dumps(shape)[:600]}; tools {len(body.get('tools') or [])}", flush=True)
-	drop = [None, "stop", "tool_choice", ("stop", "tool_choice"), "tools"]
+	print(
+		f"[meta] the request: {clean(json.dumps(shape), 600)}; tools {len(body.get('tools') or [])}",
+		flush=True,
+	)
 	out = []
-	for d in drop:
-		names = (d,) if isinstance(d, str) else (d or ())
-		req = {k: v for k, v in body.items() if k not in names}
-		if "tools" in names:
-			req.pop("tool_choice", None)
-		req["max_tokens"] = META_VARIANT_MAX_TOKENS
-		r = httpx.post(
-			f"{base}/chat/completions", json=req, headers={"Authorization": f"Bearer {key}"}, timeout=120
-		)
+	for names in ((), ("stop",), ("tool_choice",), ("stop", "tool_choice"), ("tools", "tool_choice")):
+		req = {k: v for k, v in body.items() if k not in names and k != "max_completion_tokens"}
+		req.update({"max_tokens": META_VARIANT_MAX_TOKENS, "stream": False})
+		label = "as sent" if not names else "without " + " and ".join(names)
 		try:
-			err = (r.json() or {}).get("error") or {}
-		except ValueError:
-			err = {}
-		msg = str(err.get("message") or "")[:240].replace(key, "<key>") if isinstance(err, dict) else ""
-		code = (err.get("code") or err.get("type")) if isinstance(err, dict) else None
-		label = "as sent" if d is None else "without " + " and ".join(names)
-		row = {"variant": label, "status": r.status_code, "code": code, "message": msg}
-		if r.status_code == 200:
-			u = r.json().get("usage") or {}
-			row["tokens"] = (u.get("prompt_tokens"), u.get("completion_tokens"))
+			r = httpx.post(
+				f"{base}/chat/completions", json=req, headers={"Authorization": f"Bearer {key}"}, timeout=90
+			)
+		except httpx.HTTPError as exc:
+			row = {"variant": label, "status": None, "code": type(exc).__name__, "message": ""}
+		else:
+			try:
+				data = r.json()
+			except ValueError:
+				data = None
+			err = data.get("error") if isinstance(data, dict) and isinstance(data.get("error"), dict) else {}
+			row = {"variant": label, "status": r.status_code, "code": clean(err.get("code") or err.get("type"), 80),
+				"message": clean(err.get("message"), 240)}  # fmt: skip
+			if r.status_code == 200 and isinstance(data, dict):
+				u = data.get("usage") or {}
+				row["tokens"] = [u.get("prompt_tokens"), u.get("completion_tokens")]
 		print(f"[meta] {json.dumps(row)}", flush=True)
 		out.append(row)
-	return {"shape": shape, "variants": out}
+	return {"shape": json.loads(clean(json.dumps(shape), 4000) or "{}"), "variants": out}
 
 
 @ops.local_entrypoint()
