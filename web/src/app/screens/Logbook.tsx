@@ -11,7 +11,7 @@ import { Plane } from "../Plane";
 import { href } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { WatchRun } from "../../workspace/live/WatchRun";
-import { SAMPLES } from "../../workspace/record/load";
+import { RETIRED_SAMPLES, SAMPLES } from "../../workspace/record/load";
 
 const WORD: Record<NonNullable<LogEntry["worst"]>, { cls: string; key: string }> = {
 	critical: { cls: "fails", key: "logbook.status.needs_fix" },
@@ -26,8 +26,11 @@ export function Logbook({ active }: { active: boolean }) {
 	useEffect(() => {
 		if (active) setEntries(readLogbook());
 	}, [active]);
-	const caught = entries.filter((e) => e.worst === "error" || e.worst === "critical").length;
-	const lenses = new Set(entries.map((e) => e.lens)).size;
+	// The profile counts the visitor's own flights; opened samples are listed but not counted as theirs
+	// (D's walkthrough, Nov 2: ten samples read as "6 failures caught").
+	const own = entries.filter((e) => !SAMPLES.some((s) => s.id === e.ref) && !(e.ref in RETIRED_SAMPLES));
+	const caught = own.filter((e) => e.worst === "error" || e.worst === "critical").length;
+	const lenses = new Set(own.map((e) => e.lens)).size;
 	return (
 		<div className="pf-scroll">
 			<div className="pf-inner pf-log">
@@ -41,7 +44,7 @@ export function Logbook({ active }: { active: boolean }) {
 					</div>
 					<div className="pf-stats">
 						<div className="pf-stat">
-							<b>{entries.length}</b>
+							<b>{own.length}</b>
 							<small>{t("logbook.stat.flights")}</small>
 						</div>
 						<div className="pf-stat">

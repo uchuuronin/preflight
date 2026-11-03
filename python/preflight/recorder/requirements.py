@@ -103,6 +103,77 @@ def pin_conflicts(text: str, have: dict[str, str]) -> list[str]:
 	return out[:4]
 
 
+# ---------------------------------------------------------------- probes.torch_new (off)
+
+# the probe images' torch: the default image's, and the newer image's (runner/modal_app.py PROBE_NEW_PACKAGES)
+IMAGE_TORCH = "2.5.1"
+NEW_IMAGE_TORCH = "2.7.1"
+
+
+def torch_asks(files: dict[str, str]) -> list[str]:
+	"""The torch requirements the code's own files state (requirements.txt, pyproject.toml, setup.cfg, a
+	literal setup.py list), without a marker: "torch>=2.7" from LitGPT's pyproject.toml, Nov 2."""
+	import tempfile
+
+	lines = []
+	if "requirements.txt" in files:
+		lines += files["requirements.txt"].splitlines()
+	with tempfile.TemporaryDirectory() as tmp:
+		for name in ("pyproject.toml", "setup.cfg", "setup.py"):
+			if name in files:
+				(Path(tmp) / name).write_text(files[name], encoding="utf-8", errors="replace")
+		lines += declared(Path(tmp))
+	out = []
+	for raw in lines:
+		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
+		if m and _norm(m["name"]) == "torch" and m["spec"] and not m["marker"]:
+			out.append(f"torch{m['spec'].replace(' ', '')}")
+	return out
+
+
+def _torch_specs(asks: list[str]):
+	"""Each ask's clauses, local labels (+cu124) dropped: a CUDA build label is not a torch version."""
+	from packaging.specifiers import InvalidSpecifier, SpecifierSet
+
+	for a in asks:
+		with contextlib.suppress(InvalidSpecifier):
+			yield from SpecifierSet(re.sub(r"\+[0-9A-Za-z.]+", "", a[len("torch") :]))
+
+
+def torch_fits(asks: list[str], version: str) -> bool:
+	"""Whether every torch requirement admits this version (no asks: it does)."""
+	try:
+		from packaging.version import Version
+	except ImportError:
+		return True
+	return all(s.contains(Version(version), prereleases=True) for s in _torch_specs(asks))
+
+
+def torch_too_old(asks: list[str], version: str) -> str | None:
+	"""Said plainly when the code's own torch requirement asks for a newer torch than the image's: "asks for
+	torch>=2.7; Preflight's probe image has torch 2.5.1" (the PM, Nov 3), else None; a note, never a stop. Only an ask that rules
+	the image's version out from below (>=, >, ~=, or == a newer one): an older pin, a != or a < runs as it
+	did, with the image's torch (review, Nov 3)."""
+	try:
+		from packaging.version import InvalidVersion, Version
+	except ImportError:
+		return None
+	have = Version(version)
+	newer = False
+	for s in _torch_specs(asks):
+		if s.contains(have, prereleases=True):
+			continue
+		try:
+			bound = Version(s.version.removesuffix(".*"))
+		except InvalidVersion:
+			return None
+		if s.operator in (">=", ">", "~=") or (s.operator in ("==", "===") and bound > have):
+			newer = True
+		else:
+			return None  # an older pin, a cap or an exclusion: not a newer torch
+	return f"asks for {', '.join(asks[:2])}; Preflight's probe image has torch {version}" if newer else None
+
+
 # ---------------------------------------------------------------- probes.repo_install (off)
 
 # A module a script imports, and the PyPI distribution that provides it, for the imports the image
@@ -373,13 +444,132 @@ def declared(workdir: Path) -> list[str]:
 	return []
 
 
+def built_in_code(workdir: Path) -> bool:
+	"""Whether the repo declares dependencies that only running its build can list: a setup.py that
+	passes install_requires something other than a literal list (open-r1's `deps_list(...)`, Nov 2), or a
+	pyproject.toml whose dependencies are `dynamic`."""
+	import ast
+	import tomllib
+
+	py = workdir / "pyproject.toml"
+	if py.is_file():
+		with contextlib.suppress(
+			tomllib.TOMLDecodeError, AttributeError, RecursionError, MemoryError, OSError
+		):
+			proj = tomllib.loads(py.read_text(encoding="utf-8", errors="replace")).get("project", {})
+			if isinstance(proj, dict) and "dependencies" in (proj.get("dynamic") or []):
+				return True
+	setup = workdir / "setup.py"
+	if not setup.is_file():
+		return False
+	try:
+		tree = ast.parse(setup.read_text(encoding="utf-8", errors="replace"))
+	except (SyntaxError, ValueError, RecursionError, MemoryError, OSError):
+		return False
+	return any(isinstance(n, ast.keyword) and n.arg == "install_requires" for n in ast.walk(tree))
+
+
+BUILD_TIMEOUT_S = (
+	120.0  # guess: pip's metadata build of one project (open-r1's took 6 s with setuptools fetched)
+)
+MAX_BUILD_REPORT = 4 * 2**20  # guess: bytes of pip's report read back; one project's metadata is a few kB
+
+
+def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> list[str]:
+	"""probes.repo_install_exec (off): the requirements the repo's own build lists, by pip's metadata-only
+	build (`pip install --dry-run --no-deps --report`). That runs the visitor's setup.py, so it is only
+	called inside the probe's sandbox, where their training code runs too. Nothing is installed here, so
+	the repo's own code stays the copy the probe imports (an installed copy would shadow a patched file);
+	the lines go through the usual install (the image's stack pinned, wheels only). Extras are left out.
+	[] when the build fails, saying why."""
+	import json
+	import tempfile
+
+	with tempfile.TemporaryDirectory() as tmp:
+		report = Path(tmp) / "report.json"
+		cmd = [sys.executable, "-I", "-m", "pip", "install", "--dry-run", "--no-deps", "--ignore-installed",
+			"--disable-pip-version-check", "--no-input", "--quiet", "--report", str(report), str(workdir)]  # fmt: skip
+		env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+		try:
+			r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=tmp, env=env)
+		except subprocess.TimeoutExpired:
+			log(
+				f"[preflight] requirements: the repo's build didn't list its dependencies in {timeout_s:.0f} s"
+			)
+			return []
+		except OSError as exc:
+			log(f"[preflight] requirements: pip didn't start to read the repo's build ({type(exc).__name__})")
+			return []
+		if r.returncode != 0 or not report.is_file() or report.stat().st_size > MAX_BUILD_REPORT:
+			tail = ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[
+				-1
+			]
+			log(f"[preflight] requirements: the repo's build didn't list its dependencies: {tail[:300]}")
+			return []
+		try:
+			doc = json.loads(report.read_text(encoding="utf-8", errors="replace"))
+		except (ValueError, RecursionError):
+			doc = None
+	# the report is the visitor's build's output: only a list of one item whose requires_dist is a list of strings
+	items = doc.get("install") if isinstance(doc, dict) else None
+	meta = (
+		items[0].get("metadata")
+		if isinstance(items, list) and len(items) == 1 and isinstance(items[0], dict)
+		else None
+	)
+	reqs = meta.get("requires_dist") if isinstance(meta, dict) else None
+	if not isinstance(reqs, list):
+		log("[preflight] requirements: the repo's build gave no dependency list Preflight could read")
+		return []
+	out = [
+		x.strip()
+		for x in reqs[: MAX_REQUIREMENTS * 4]
+		if isinstance(x, str) and "extra" not in x.partition(";")[2]
+	]
+	log(f"[preflight] requirements: the repo's setup.py builds its list in code; its build lists {len(out)} "
+		"dependencies (read by running it in this sandbox)")  # fmt: skip
+	return out
+
+
+def own_metadata(workdir: Path, target: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> bool:
+	"""probes.repo_install_exec: the repo's own package metadata, by an editable install with no dependencies
+	into the probe's prefix, for code that reads its own version (lm-evaluation-harness's lm_eval/__init__.py
+	calls importlib.metadata.version("lm_eval"): a-all4-5s, Nov 3). Editable, so nothing of the repo is copied:
+	its working copy stays what the probe imports. Runs the repo's build, so only in the probe's sandbox;
+	a failure is said and the probe runs on."""
+	# --ignore-installed: never uninstall the image's own copy of the same project (a trl or peft checkout; review)
+	cmd = [sys.executable, "-I", "-m", "pip", "install", "--no-deps", "--ignore-installed", "--no-input",
+		"--disable-pip-version-check", "--no-warn-script-location", "--quiet", "--prefix", str(target), "-e", str(workdir)]  # fmt: skip
+	cache = os.environ.get("PREFLIGHT_PIP_CACHE")
+	if cache and os.access(cache, os.W_OK):
+		cmd[4:4] = ["--cache-dir", cache]
+	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+	try:
+		target.mkdir(parents=True, exist_ok=True)
+		r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=target, env=env)
+	except (subprocess.TimeoutExpired, OSError) as exc:
+		log(f"[preflight] requirements: the repo's own metadata wasn't written ({type(exc).__name__})")
+		return False
+	if r.returncode != 0:
+		tail = ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[-1]
+		log(f"[preflight] requirements: the repo's own metadata wasn't written: {tail[:300]}")
+		return False
+	log(
+		"[preflight] requirements: wrote the repo's own package metadata (an editable install, no dependencies)"
+	)
+	return True
+
+
 def repo_requirement_sets(
-	workdir: Path, entrypoint: str, *, log=print, pyg: bool = False
+	workdir: Path, entrypoint: str, *, log=print, pyg: bool = False, build: bool = False
 ) -> tuple[list[str], list[str]]:
 	"""(what the repo declares, what its code imports that the image lacks, by KNOWN_MODULES only) for a
 	repo that ships no requirements.txt (probes.repo_install). Noted, never guessed: a module Preflight
-	doesn't know, and one with no wheels on PyPI."""
+	doesn't know, and one with no wheels on PyPI. build (probes.repo_install_exec): when the declared
+	list is built in code (built_in_code), the list the repo's build gives (requires_from_build)."""
 	declared_lines = list(declared(workdir))
+	if not declared_lines and build and built_in_code(workdir):
+		declared_lines = requires_from_build(workdir, log=log)
 	if declared_lines:
 		log(
 			f"[preflight] requirements: the repo declares {len(declared_lines)} dependencies (pyproject.toml, setup.cfg or setup.py)"
@@ -559,8 +749,8 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 
 
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
-	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = ()
-) -> tuple[str | None, list[Path]]:  # fmt: skip
+	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = (),
+	build: bool = False, torch_note: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
 	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
@@ -571,9 +761,13 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	extra: the job's extra packages (extra_requirements' lines), installed with the rest under the same
 	rules (the image's stack wins, wheels only), with or without a requirements.txt.
 	uv (probes.uv_install): uv before pip. pyg (probes.extra_hosts): PyG's wheel index too, so torch-sparse
-	and the other NO_WHEELS packages install, and a repo's imports of them count as known."""
+	and the other NO_WHEELS packages install, and a repo's imports of them count as known. build
+	(probes.repo_install_exec): a setup.py that builds its list in code is run to read it (requires_from_build).
+	torch_note (probes.torch_new): when what's installed asks for a newer torch than the image's, say so plainly
+	(torch_too_old) and run on with the image's (the PM, Nov 3; never a stop: review)."""
 	import time
 
+	started = time.monotonic() if build else None  # the build's own read counts against the install's limit
 	req = workdir / "requirements.txt"
 	roots = [r for r in _roots(workdir) if r != workdir] if repo else []
 	optional: list[str] = []
@@ -581,7 +775,7 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		text = req.read_text(encoding="utf-8", errors="replace")
 	elif repo and entrypoint:
 		try:
-			decl, optional = repo_requirement_sets(workdir, entrypoint, log=log, pyg=pyg)
+			decl, optional = repo_requirement_sets(workdir, entrypoint, log=log, pyg=pyg, build=build)
 		except Exception as exc:  # a repo that can't be read for requirements runs as it would without them
 			log(
 				f"[preflight] requirements: couldn't read the repo's requirements ({type(exc).__name__}); none installed"
@@ -595,10 +789,20 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	if extra:  # first, so the requirements' own cap (MAX_REQUIREMENTS) never drops them
 		text = "\n".join([*extra, text])
 	have = installed()
+	if torch_note and "torch" in have:
+		asks = [f"torch{m['spec'].replace(' ', '')}" for raw in text.splitlines()
+			if (m := _LINE.fullmatch(raw.split(' #', 1)[0].strip())) and _norm(m['name']) == 'torch' and m['spec'] and not m['marker']]  # fmt: skip
+		newer = torch_too_old(asks, have["torch"].split("+", 1)[0])
+		if newer:  # said plainly and run on: a pin pip freeze wrote (torch==2.6.0) often runs on a near torch (review)
+			log(f"[preflight] requirements: the code {newer}, and runs on it")
 	keep, notes = plan(text, have)
 	for n in notes:
 		log(f"[preflight] requirements: {n}")
 	if not keep:
+		project = (workdir / "pyproject.toml").is_file() or (workdir / "setup.py").is_file()
+		# every dependency is the image's already: the repo's own metadata still (review)
+		if build and repo and project and own_metadata(workdir, target, log=log, timeout_s=BUILD_TIMEOUT_S):
+			return None, [*site_dirs(target), *roots]
 		return None, roots
 	pins = "".join(f"{n}=={v.split('+', 1)[0]}\n" for n, v in sorted(have.items()))
 	shared = os.environ.get("PREFLIGHT_DEPS_DIR")
@@ -615,7 +819,8 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	constraints = target / "constraints.txt"
 	constraints.write_text(pins)
 	limit = REPO_INSTALL_TIMEOUT_S if repo and not req.is_file() else INSTALL_TIMEOUT_S
-	deadline = time.monotonic() + limit
+	deadline = (started if started is not None else time.monotonic()) + limit
+	limit = deadline - time.monotonic()
 	log(f"[preflight] requirements: installing {', '.join(keep)}")
 	links = os.environ.get(PYG_INDEX_ENV) if pyg else None
 	# a check-in by command's own pure-Python dependencies PyPI has only as source (sources.COMMANDS)
@@ -648,5 +853,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		if clash:  # the likeliest reason, ahead of pip's or uv's tail: no installer fixes the image's own pin
 			err = f"the code asks for {'; '.join(clash)}, which the probe image can't change. {err}"
 		return err, []
+	if build and repo and ((workdir / "pyproject.toml").is_file() or (workdir / "setup.py").is_file()):
+		own_metadata(
+			workdir, target, log=log, timeout_s=min(BUILD_TIMEOUT_S, max(5.0, deadline - time.monotonic()))
+		)
 	(target / ".ok").write_text("ok")
 	return None, [*site_dirs(target), *roots]

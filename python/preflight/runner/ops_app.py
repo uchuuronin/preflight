@@ -21,13 +21,16 @@ import modal
 
 from preflight.runner.modal_app import (
 	APP_NAME,
+	DATASETS_DIR,
 	REMOTE_PKG,
 	SERVICE_NAME,
 	WEIGHTS_DIR,
 	ZOO_MODELS,
 	_read_only,
+	datasets_vol,
 	image_tag,
 	probe_image,
+	probe_new_image,
 	records_vol,
 	serving_image,
 	titan_image,
@@ -38,6 +41,109 @@ from preflight.runner.probe_user import PROBE_USER_IMPORTS
 from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
 
 ops = modal.App(APP_NAME + "-ops")
+
+
+FILL_DEADLINE_S = 3300.0  # the container's downloads, inside the function's hour (from its start)
+
+
+def _fetch_archive(url: str, dst: Path, md5: str, started: float) -> dict:
+	"""One archive from one URL into dst, kept only when its md5 matches; what happened."""
+	import hashlib as hl
+	import time
+	import urllib.request
+
+	t0, h, n = time.monotonic(), hl.md5(), 0
+	tmp = dst.with_suffix(".part")
+	try:
+		req = urllib.request.Request(url, headers={"User-Agent": "preflight-dataset-cache"})
+		with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
+			while chunk := r.read(1 << 20):
+				f.write(chunk)
+				h.update(chunk)
+				n += len(chunk)
+				if (
+					time.monotonic() - started > FILL_DEADLINE_S
+				):  # a slow host: say how slow, before the container ends
+					raise TimeoutError(
+						f"{n / 1024 / (time.monotonic() - t0):.0f} kB/s, {n:,} bytes when the container's {FILL_DEADLINE_S:.0f} s ran out"
+					)
+	except Exception as exc:  # one host down doesn't stop the rest
+		tmp.unlink(missing_ok=True)
+		return {"status": f"failed: {type(exc).__name__}: {exc}"[:300]}
+	s = time.monotonic() - t0
+	if h.hexdigest() != md5:
+		tmp.unlink(missing_ok=True)
+		return {"status": "md5 mismatch: not kept", "bytes": n}
+	tmp.rename(dst)
+	return {"status": "kept", "bytes": n, "seconds": round(s, 1), "kB_per_s": round(n / 1024 / max(s, 1e-3))}
+
+
+@ops.function(image=probe_image, volumes={DATASETS_DIR: datasets_vol}, timeout=3600)  # CPU
+def fill_dataset_cache(only: str = "") -> list[dict]:
+	"""probes.dataset_cache: download torchvision's CIFAR-10/100, MNIST and FashionMNIST archives into the
+	datasets volume by md5 (recorder/dataset_cache.py), each checked against torchvision's own md5 before it's
+	kept; one already there is skipped. only: comma-separated dataset names."""
+	import time
+
+	from preflight.recorder.dataset_cache import resources
+
+	want = {x for x in only.split(",") if x}
+	started = time.monotonic()  # the deadline is the container's, not each archive's (review)
+	root = Path(DATASETS_DIR) / "by-md5"
+	root.mkdir(parents=True, exist_ok=True)
+	out = []
+	for name, urls, md5 in resources():
+		if want and name not in want:
+			continue
+		dst = root / md5
+		if dst.is_file():
+			out.append(
+				{"dataset": name, "url": urls[0], "status": "already there", "bytes": dst.stat().st_size}
+			)
+			continue
+		for url in urls:  # each mirror torchvision lists, in its order, until one gives the right file
+			row = _fetch_archive(url, dst, md5, started)
+			out.append({"dataset": name, "url": url, **row})
+			print(f"[datasets] {name} {url}: {row}", flush=True)
+			if row["status"] == "kept":
+				datasets_vol.commit()
+				break
+	return out
+
+
+@ops.local_entrypoint()
+def fill_datasets(only: str = ""):
+	"""modal run --env main python/preflight/runner/ops_app.py::fill_datasets [--only CIFAR10,MNIST]
+	Writes out/fill_datasets.json; exits non-zero unless every archive asked for is in the volume."""
+	import sys
+
+	from preflight.recorder.dataset_cache import DATASETS
+
+	names = [n for n in (only.split(",") if only else DATASETS) if n]
+	unknown = [n for n in names if n not in DATASETS]
+	if unknown:
+		raise SystemExit(f"not datasets the cache holds: {unknown} (it holds {list(DATASETS)})")
+	calls = [
+		(n, fill_dataset_cache.spawn(n)) for n in names
+	]  # one container a dataset: a slow host holds up its own
+	res = []
+	for n, c in calls:
+		try:
+			res += c.get()
+		except Exception as exc:  # a container killed at its hour: the others' results still count
+			res.append({"dataset": n, "status": f"failed: {type(exc).__name__}: {exc}"[:300]})
+	Path("out").mkdir(exist_ok=True)
+	Path("out/fill_datasets.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps(res, indent=2), flush=True)
+	# a file is in when one of its mirrors gave it (a row per mirror tried, the file named by its URL's last part)
+	files = {(r["dataset"], r.get("url", "").rsplit("/", 1)[-1]) for r in res}
+	got = {
+		(r["dataset"], r.get("url", "").rsplit("/", 1)[-1])
+		for r in res
+		if r["status"] in ("kept", "already there")
+	}
+	if not res or files - got:
+		sys.exit(1)
 
 
 @ops.function(image=probe_image, volumes={WEIGHTS_DIR: weights_vol}, timeout=3600)
@@ -187,6 +293,25 @@ def probe_user_check_serving_image() -> dict:
 	from preflight.probes.local import probe_user_check
 
 	return probe_user_check(PROBE_USER_IMPORTS["serving"])
+
+
+@ops.function(image=probe_new_image, timeout=600)  # CPU, as startup_check_probe: probes.torch_new's image
+def startup_check_probe_new() -> dict:
+	"""The torch 2.7.1 probe image (probes.torch_new): its pins import, and a tiny loop runs through run_probe."""
+	import importlib.metadata as md
+
+	r = startup_check_probe.local()
+	r["versions"] = {
+		n: md.version(n) for n in ("torch", "torchvision", "transformers", "trl", "accelerate", "peft")
+	}
+	return r
+
+
+@ops.function(image=probe_new_image, timeout=600)
+def probe_user_check_probe_new_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["torch27"])
 
 
 @ops.function(image=titan_image, timeout=600)
@@ -459,6 +584,12 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 	print(f"[ground truth] container up on the {_gpu_name()}; {len(files)} files of {script}", flush=True)
 	remote.link_weights()
 	remote.deps_dir()
+	if (install_opts or {}).get(
+		"dataset_cache"
+	):  # the bare run reads it from the environment (recorder/bare.py)
+		import os
+
+		os.environ["PREFLIGHT_DATASET_CACHE"] = DATASETS_DIR
 	# the probe image has no zoo (Oct 31: "has no train.py"): the files come from the checkout
 	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
 		budget_s=budget_s, files=files, entrypoint=entrypoint, args=tuple(args),
@@ -468,7 +599,8 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 
 # weights read-only: an unseen third-party script runs as root in the bare run, and must not be
 # able to change the shared weights production probes read (review, Nov 1)
-_GT = {"image": None, "volumes": {WEIGHTS_DIR: _read_only(weights_vol)}, "timeout": GROUND_TRUTH_TIMEOUT_S}
+_GT = {"image": None, "volumes": {WEIGHTS_DIR: _read_only(weights_vol), DATASETS_DIR: _read_only(datasets_vol)},
+	"timeout": GROUND_TRUTH_TIMEOUT_S}  # fmt: skip
 
 
 @ops.function(**{**_GT, "image": probe_image}, gpu=GROUND_TRUTH_GPUS)
@@ -488,6 +620,16 @@ def ground_truth_serving_on_l4(*a, **kw) -> dict:
 
 @ops.function(**{**_GT, "image": serving_image}, gpu=GROUND_TRUTH_GPUS[::-1])
 def ground_truth_serving_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": probe_new_image}, gpu=GROUND_TRUTH_GPUS)  # probes.torch_new
+def ground_truth_torch27_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": probe_new_image}, gpu=GROUND_TRUTH_GPUS[::-1])
+def ground_truth_torch27_on_a10(*a, **kw) -> dict:
 	return _ground_truth(*a, **kw)
 
 
@@ -518,6 +660,7 @@ GT_FUNCTIONS = {
 	("probe", "L4"): ground_truth_on_l4, ("probe", "A10"): ground_truth_on_a10,
 	("serving", "L4"): ground_truth_serving_on_l4, ("serving", "A10"): ground_truth_serving_on_a10,
 	("titan", "L4"): ground_truth_titan_on_l4, ("titan", "A10"): ground_truth_titan_on_a10,
+	("torch27", "L4"): ground_truth_torch27_on_l4, ("torch27", "A10"): ground_truth_torch27_on_a10,
 }  # fmt: skip
 
 
@@ -575,6 +718,10 @@ def ground_truth(
 	pyg: bool = False,
 	eval_units: bool = False,
 	sdists: str = "",
+	build: bool = False,
+	torch_new: bool = False,
+	dataset_cache: bool = False,
+	flags: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -592,6 +739,14 @@ def ground_truth(
 	Writes out/ground_truth_<name>.json."""
 	import json
 
+	if flags:  # flags on in this process only, comma-separated (the workflow takes no quotes): the reader's and mapper's
+		import os
+
+		from preflight.runner import flags as F
+
+		os.environ["PREFLIGHT_FLAGS"] = json.dumps(dict.fromkeys((n for n in flags.split(",") if n), True))
+		F.reload()
+		print(f"[ground truth] flags on here: {flags}", flush=True)
 	from preflight.harness.static import ScriptParseError
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
@@ -626,9 +781,23 @@ def ground_truth(
 	if command_hex:
 		src = Path(words[0])
 	elif repo:
+		from preflight.runner.flags import flag
 		from preflight.runner.sources import _clone
 
-		files, sha = _clone(repo, commit or None, data=install_repo)
+		if (
+			flag("runner.read_closure") and entrypoint
+		):  # a repository too big to read whole, as the runner reads it
+			from preflight.runner.sources import _clone_read
+
+			files, sha, part = _clone_read(repo, commit or None, entrypoint, data=install_repo)
+			print(
+				f"[ground truth] read the entry point's closure: {part}"
+				if part
+				else "[ground truth] read it whole",
+				flush=True,
+			)
+		else:
+			files, sha = _clone(repo, commit or None, data=install_repo)
 		if edit_hex:
 			files = _apply_edits(files, edit_hex)
 		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
@@ -646,7 +815,11 @@ def ground_truth(
 
 		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
 			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
-	opts = {k: v for k, v in (("uv", uv), ("pyg", pyg)) if v}
+	opts = {
+		k: v for k, v in (("uv", uv), ("pyg", pyg), ("build", build)) if v
+	}  # build: probes.repo_install_exec
+	if dataset_cache:  # probes.dataset_cache: torchvision's datasets from the volume, in both runs
+		opts["dataset_cache"] = True
 	if sdists:  # names of source-only packages allowed to build (commas, as the workflow allows)
 		opts["sdists"] = tuple(n for n in sdists.split(",") if n)
 	if eval_units:  # probes.eval_units in this process only: the recorder probe's scoring batches
@@ -661,6 +834,14 @@ def ground_truth(
 
 		p = {**p, "lens": command_lens, "generate_calls": EVAL_PROBE_CALLS if command_lens == "eval" else 0,
 			"generate_sample": SERVING_PROBE_PROMPTS if command_lens == "serving" else 0}  # fmt: skip
+	if torch_new:  # probes.torch_new in this process only: the image pick and the plain note
+		from preflight.recorder.requirements import IMAGE_TORCH, torch_asks, torch_too_old
+
+		asks = torch_asks(files)
+		if p["image"] == "probe" and torch_too_old(asks, IMAGE_TORCH):
+			p = {**p, "image": "torch27"}
+		opts["torch_note"] = True
+		print(f"[ground truth] torch asks {asks}: {p['image']} image", flush=True)
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
 	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
@@ -1364,6 +1545,29 @@ def startup_check_serving_image() -> dict:
 	if p.returncode == 0:
 		out.update(json.loads(p.stdout.strip().splitlines()[-1]))
 	return out
+
+
+@ops.local_entrypoint()
+def startup_check_torch_new():
+	"""modal run --env main python/preflight/runner/ops_app.py::startup_check_torch_new
+	Writes out/startup_check_torch_new.json; exits non-zero unless the torch 2.7.1 probe image (probes.torch_new)
+	runs the check loop as the probe uid."""
+	import sys
+
+	res = startup_check_probe_new.remote()
+	res["probe_user"] = probe_user_check_probe_new_image.remote()
+	res["ok"] = (
+		res.get("status") == "ok"
+		and res.get("steps", 0) > 0
+		and bool(res.get("reachable_by_probe_uid"))
+		and str(res.get("versions", {}).get("torch", "")).startswith("2.7.1")
+		and _probe_user_ok(res["probe_user"], "torch27")
+	)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/startup_check_torch_new.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps(res, indent=2), flush=True)
+	if not res["ok"]:
+		sys.exit(1)
 
 
 @ops.local_entrypoint()

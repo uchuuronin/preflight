@@ -172,7 +172,8 @@ def main(spec_path: str) -> int:
 			extra = [x for x in spec.get("extra_packages") or [] if isinstance(x, str)]
 			err, dirs = install(Path(workdir), Path(spec["deps"]), repo=bool(spec.get("install_repo")),
 				entrypoint=spec.get("entrypoint"), extra=extra, uv=bool(spec.get("install_uv")),
-				pyg=bool(spec.get("install_pyg")),
+				pyg=bool(spec.get("install_pyg")), build=bool(spec.get("install_exec")),
+				torch_note=bool(spec.get("torch_note")),
 				sdists=tuple(x for x in spec.get("install_sdists") or () if isinstance(x, str)))  # fmt: skip
 			_write(str(done), {"error": err, "dirs": [str(d) for d in dirs]})
 		else:
@@ -212,7 +213,15 @@ def main(spec_path: str) -> int:
 		generate_calls=int(spec.get("generate_calls") or 0),
 		lr_range=spec.get("lr_range") or None,  # D's range test, behind probes.lr_range
 		eval_units=int(spec.get("eval_units") or 0),  # probes.eval_units
+		step_clock=bool(spec.get("step_clock")),  # probes.step_clock
 	).install()
+	if spec.get(
+		"dataset_cache"
+	):  # probes.dataset_cache: torchvision's datasets from the volume, when mounted
+		from .dataset_cache import CACHE_DIR, patch
+
+		if os.path.isdir(CACHE_DIR):
+			rec._importer.on("torchvision.datasets.utils", lambda mod: patch(mod, CACHE_DIR))
 
 	status, code, error = "ok", None, None
 	too_few = "script finished after {n} optimizer steps; a probe needs at least 2"

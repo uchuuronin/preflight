@@ -154,13 +154,31 @@ export function likelyFails(ctx: Pick<TourContext, "record" | "provider" | "knob
 	return riskNow(ctx) >= FAILS_AT;
 }
 
+/** The GPU model itself (not how many): the GPU fix's reason fits only these. */
+const GPU_TYPE_KNOBS = new Set(["gpu_type", "gpu"]);
+
+/** Knobs that change the hardware rather than the job. */
+const GPU_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
+export const isGpuMove = (m: Pick<Move, "knobId">): boolean => GPU_KNOBS.has(m.knobId);
+
+/**
+ * The fitting moves, ranked for the aim. While the run fails, every move on the current GPU (a
+ * finding's own fix among them) comes before any GPU change (PM, Nov 3: the LoRA sample's first step was
+ * L4 → B300 while its own eval fix clears it): a GPU move is offered only when nothing on this GPU clears
+ * the failure.
+ */
 function candidates(ctx: TourContext, pinned: ReadonlySet<string>): Move[] {
 	const failing = isFailing(ctx);
-	return ctx.provider
+	const ranked = ctx.provider
 		.moves(ctx.record, ctx.objective, opts(ctx, pinned))
 		.filter((m) => m.fit === "fits")
 		.filter((m) => !ctx.visited.has(m.knobId))
 		.filter((m) => failing || !changesResults(m.knobId, ctx.record));
+	if (!failing) return ranked;
+	// Stable: the aim's ranking within each group, so the first on-GPU move is the cheapest one that
+	// clears it, a finding's own fix included (review, Nov 3: putting it first could make "costs your
+	// aim the least" untrue).
+	return [...ranked].sort((a, b) => Number(isGpuMove(a)) - Number(isGpuMove(b)));
 }
 
 /** The best "tight" setting worth measuring: beats the best "fits" move by PROBE_WORTH. */
@@ -339,6 +357,26 @@ export function nextStep(ctx: TourContext): TourStep {
 			whyKey: "guide.rule.aim_unpredicted.why",
 		};
 	}
+	// A GPU change only when nothing on this GPU clears it (PM, Nov 3): a combination of moves on this
+	// GPU (the LoRA sample's eval without gradients, eval batch 8 and a 512-token sequence, B's pair grids)
+	// comes first, a tight one included, measured against the best single move on this GPU.
+	// Once: a declined combination leads on to the GPU change, rather than to the next combination
+	// from the same pair grids (review, Nov 3).
+	const triedCombo = [...ctx.visited].some((v) => v.startsWith("combo:"));
+	if (failing && top && isGpuMove(top) && !triedCombo) {
+		const o = opts(ctx, ctx.pinned);
+		const noGpu = new Set([...(o.pinned ?? []), ...GPU_KNOBS]);
+		const onGpu = { ...o, pinned: noGpu };
+		const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { ...beat(bestSingleRisk(ctx.record, ctx.provider, ctx.objective, onGpu)), pinned: noGpu, ...(o.allow ? { allow: o.allow } : {}), visited: ctx.visited });
+		if (combo && !combo.changes.some((c) => GPU_KNOBS.has(c.knobId))) {
+			return {
+				kind: "combo",
+				combo,
+				nodes: [...new Set(combo.changes.flatMap((c) => nodesForKnob(ctx.record, c.knobId)))],
+				...comboKeys(combo),
+			};
+		}
+	}
 	if (top) {
 		const fixing = top.clearsFailure || failing;
 		// Knob-specific fix lines say the run would stop; they fit only when it likely would.
@@ -348,7 +386,13 @@ export function nextStep(ctx: TourContext): TourStep {
 			move: top,
 			nodes: nodesForKnob(ctx.record, top.knobId),
 			textKey: specific ? keyFor(top.knobId, "line", fixing) : "guide.rule.generic.fix.line",
-			whyKey: byMemory ? "guide.rule.fix_by_memory.why" : specific ? keyFor(top.knobId, "why", fixing) : "guide.rule.generic.fix.why",
+			whyKey: byMemory
+				? "guide.rule.fix_by_memory.why"
+				: fixing && GPU_TYPE_KNOBS.has(top.knobId)
+					? "guide.rule.gpu_type.fix.why"
+					: specific
+						? keyFor(top.knobId, "why", fixing)
+						: "guide.rule.generic.fix.why",
 		};
 	}
 	if (failing) {

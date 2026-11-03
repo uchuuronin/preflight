@@ -20,8 +20,8 @@ finish soonest or most headroom) and the GPU you'd use. Wait for it to finish an
 
 **Done when** the map of the builder's own job is on screen.
 
-**Observer watches:** which tab they choose (Repo link or Upload; tonight there is no Notebook
-tab); the data-use notice
+**Observer watches:** which tab they choose (Repo link, Upload or Notebook); whether they tick
+"Private triage" thinking it's the required box; the data-use notice
 and the "Got it" tick; any error on the desk, word for word; what they do while it measures; the
 time from pressing "Check in" to their map.
 
@@ -38,5 +38,6 @@ and tell us whether the change did what you expected.
 
 **Observer watches:** where they look for findings (the map, the detail sheet, the "finding off
 the map" chip, the guide, the dock); whether they open the guide, and what happens when they do;
+whether they press "Fix it with Muse Code", and whether they read the verify result;
 whether they understand why it was flagged; whether they trust the number that changed;
 whether they'd change their real run because of it.

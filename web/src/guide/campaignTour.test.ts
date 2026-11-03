@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import campaignRaw from "../workspace/fixtures/campaign-grid.record.json";
+import campaignRaw from "../workspace/fixtures/campaign-grid-golden.record.json";
 import { planFromRecord } from "../workspace/campaign/plan";
 import { GridProvider } from "../workspace/provider/GridProvider";
 import { currentKnobs } from "../workspace/record/model";

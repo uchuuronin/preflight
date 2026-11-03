@@ -325,12 +325,14 @@ a {
 .pf-dim { color: var(--pf-fg-dim); }
 .pf-hint { margin: 0; font-size: var(--pf-text-sm); line-height: 1.5; color: var(--pf-fg-dim); }
 /* Data-use notice: its own glass strip under the desk and the departures board (app/DataUse.tsx). */
-.pf-datause { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 14px 22px; border-radius: 24px; font-size: 12.5px; line-height: 1.45; }
+.pf-datause { display: flex; flex-direction: column; gap: 4px; padding: 12px 0 0; border-top: 1px solid var(--pf-stroke); font-size: 12.5px; line-height: 1.45; }
+.pf-datause .pf-hint { margin: 0; }
 .pf-datause__title { flex: none; font-size: 13px; }
-.pf-datause__list { display: flex; flex-wrap: wrap; gap: 4px 18px; flex: 1 1 520px; min-width: 0; margin: 0; padding: 0; list-style: none; color: var(--pf-fg-dim); }
+.pf-datause__more summary { cursor: pointer; color: var(--pf-fg-dim); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+.pf-datause__list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; color: var(--pf-fg-dim); }
 .pf-datause__list li { position: relative; padding-left: 12px; }
 .pf-datause__list li::before { content: ""; position: absolute; left: 0; top: 0.6em; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
-.pf-datause__ok { flex: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.pf-datause__ok { flex: none; align-self: flex-start; margin-top: 4px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
 .pf-datause__ok input { width: 16px; height: 16px; accent-color: var(--pf-accent); }
 .pf-guide__fine { margin: 0; font-size: 11px; color: var(--pf-fg-dim); }
 .pf-notice { margin: 0; max-width: 80ch; font-size: 12px; line-height: 1.5; color: var(--pf-fg-dim); }
@@ -503,9 +505,10 @@ button.pf-prov:hover { color: var(--pf-fg); }
 }
 .pf-hero .pf-display { font-size: clamp(52px, 9vw, 128px); }
 
+/* Above the eyebrow, not on it (D's walkthrough: it hid "SIM" at 1366 px). */
 .pf-hero__plane {
 	position: absolute;
-	top: 132px;
+	top: 56px;
 	color: var(--pf-fg);
 	pointer-events: none;
 	transition: left 0.3s linear;
@@ -1221,6 +1224,7 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	white-space: normal;
 }
 .pf-onode__chip.is-fails { color: var(--pf-fail); }
+.pf-onode__chip.is-above { top: auto; bottom: calc(100% - 12px); }
 .pf-onode__chip.is-fails::before { content: "✕ "; }
 .pf-onode--diamond .pf-onode__chip { left: auto; right: 0; top: 100%; transform: translate(50%, -50%) rotate(-45deg) scale(1.25) translateY(16px); transform-origin: 50% 0; max-width: 130px; }
 
@@ -1418,7 +1422,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-trace li.is-error .pf-trace__result { color: var(--pf-fail); }
 
 /* The knob dock */
-.pf-dock { align-self: center; width: min(1000px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+/* scroll-margin: clear of the fixed nav when a jump lands on it (D's walkthrough). */
+.pf-dock { align-self: center; width: min(1000px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; scroll-margin-top: 96px; }
 .pf-dock__row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 6px; border-radius: 30px; }
 .pf-dock__key { display: flex; justify-content: center; }
 
@@ -2242,8 +2247,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 
 /* HOPs: one possible outcome per frame (workspace/hops.ts); all at once, faint, with reduced motion */
 .pf-hops { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; max-width: 140px; }
-/* Pinned to the window's lower left while the rail is out of view, so it's there wherever the dials end. */
-.pf-knobs-jump { position: fixed; left: 16px; bottom: 16px; z-index: 40; background: var(--pf-glass-solid); box-shadow: 0 6px 18px rgb(0 0 0 / 0.25); }
+/* Pinned to the window's bottom centre while the rail is out of view, so it's there wherever the dials end. */
+.pf-knobs-jump { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 40; background: var(--pf-glass-solid); box-shadow: 0 6px 18px rgb(0 0 0 / 0.25); }
 .pf-choice__default { font-weight: 400; opacity: 0.72; }
 .pf-hops__help { font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
 .pf-dial__hop { fill: none; stroke: var(--pf-accent); stroke-width: 14; }
@@ -2417,8 +2422,27 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-live__head { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .pf-live__rows { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; font-size: var(--pf-text-sm); }
 .pf-live__alert { margin: 0; color: var(--pf-fail); font-weight: 600; }
+.pf-live__note { margin: 0; font-size: var(--pf-text-sm); color: var(--pf-fg); }
 .pf-live__ok { margin: 0; font-size: var(--pf-text-sm); color: var(--pf-fg-dim); }
 .pf-watch { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--pf-radius-md); }
 .pf-watch__steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .pf-watch__steps code { font-family: var(--pf-font-mono); font-size: 12px; overflow-wrap: anywhere; }
 .pf-watch .pf-btn { align-self: flex-start; }
+
+/* Samples say once that their numbers are examples (PM, Nov 3), not under every dial. */
+.pf-sample-banner {
+	margin: 0 0 12px;
+	padding: 10px 14px;
+	border-radius: var(--pf-radius-sm);
+	border: 1px dashed var(--pf-stroke-strong);
+	background: var(--pf-glass);
+	color: var(--pf-fg);
+	font-size: var(--pf-text-sm);
+}
+.pf-sample-banner b { font-weight: 600; }
+
+/* On a phone the cockpit's header tags may wrap rather than run off the screen (the probes tag
+   names its count, cost and failures). */
+@media (max-width: 560px) {
+	.pf-cockpit__head .pf-tag { white-space: normal; max-width: 100%; flex-wrap: wrap; height: auto; min-height: 30px; text-align: left; }
+}

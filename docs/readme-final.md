@@ -12,7 +12,7 @@ over from earlier work.
 
 ## Status
 
-As of Sun Nov 1 (round five). Every feature ships behind a flag that is off until its check
+As of Tue Nov 3 (after the freeze). Every feature ships behind a flag that is off until its check
 passes (`flags.json`); `flags.production.json` turns on what the public site runs. The public site
 is live at <https://preflight-cqn.pages.dev>.
 
@@ -20,6 +20,7 @@ is live at <https://preflight-cqn.pages.dev>.
 
 | What | Where it shows | Source |
 | --- | --- | --- |
+| **Meta's open-weights models:** Muse Spark Open (on Baseten) and Muse Glimmer (Apache 2.0, on Preflight's own GPU) | Muse Spark Open: a failed probe's "Found by Muse Spark Open triage" finding, and the number check on model-written findings (code alone checks them for a private check-in). Muse Glimmer: the same triage for a check-in with "Private triage" ticked | Spark Open: `harness.spark_open_triage` (Nov 1) and `harness.spark_claim_check` (Nov 2), on in production. Triage reads each failed probe's log tail and quotes the line it read, and code checks the quote is in the log; the claim check passed true numbers 101 of 107 times and caught altered ones 93 of 102 [measured: B's b-claim-check-eval]. Glimmer: `harness.glimmer_private`, on in production (Nov 2), on an A100-40GB on Modal, so a private check-in's logs never reach Baseten; it agreed with Spark Open's triage category on 9 of 11 failed probes (82%, Wilson 95% 52% to 95%) [measured: A's a-triage-agreement]; the first triage after a quiet spell waits 5 to 8 minutes while it starts. More under [Meta models and partner tools](#meta-models-and-partner-tools) |
 | Muse Spark reads each script (the script map) | Boarding's "Reading your script", and the cockpit's job map | `harness.spark_script_map`, on in `flags.production.json` (Chiya, Nov 1) |
 | Predictions with intervals and abstention: memory, step time, cost, risk | The cockpit's four readouts, the knobs and the flight plan | `engine.memory`, on in production (Chiya, Oct 30); it gates the whole prediction step (`runner/pipeline.py`) |
 | Campaign calendar | The campaign sample (illustrative numbers, B's planner on a 12-run grid) | `c.campaign_calendar`, on in production (Chiya, Nov 1) |
@@ -38,6 +39,7 @@ is live at <https://preflight-cqn.pages.dev>.
 | Clearer failed check-ins: a job stops paying for points that can't import, an agent script's last error line is kept, and samples never send their own measured answers | Boarding and the record | `runner.stop_on_import_error`, `probes.agent_error_line`, `runner.hide_sample_outputs`, on in production (Nov 2) |
 | Muse Spark diagnosis: one call per finished record reads its memory timeline and loss plot with the raw probe numbers and reports where they disagree, each claim checked against the numbers | The record's Findings, "Found by Muse Spark diagnosis" | `harness.spark_diagnosis`, on in production (Nov 2, with the claim check). No call when no plot has anything drawn; a record a private check-in touched is never diagnosed |
 | Settings between the grids' cells: where a grid holds no value, the cockpit asks the engine (CPU only, no model) and shows its estimate with its own status | Dials, timeline and guide readouts | `c.engine_fallback`, on in production (Nov 2). On the LoRA record, lr 2e-4 reads 1.709 s a step predicted, and the A10 1.236 s extrapolated, where it read "off grid" [measured: C's API test] |
+| Bring your own script: installs the repo's declared dependencies (pyproject.toml, setup.py) when there's no requirements.txt, extra packages on request, a big repo read from its entry point, an evaluation run by command (`lm_eval ...`), and one free resend a day after a check-in that stopped before measuring anything | New flight and Boarding | `probes.repo_install`, `probes.extra_hosts`, `c.checkin_help`, `runner.command_checkin`, `probes.eval_units`, `runner.free_resend`, on in production (Nov 3). On the nine unseen scripts after the freeze, with fixes designed on them: 3 of 9 reach their first step with the install fixes, and lm-evaluation-harness by command measures, its probe's peak equal to the full run's [measured: A's ops runs]. The first attempts stay 0 of 9 |
 | The `preflight` CLI (`map`, `run`) | Your own machine | On `main`; the `pip install git+...` line works once the repository is public |
 
 **Behind a flag, off for now**
@@ -54,7 +56,6 @@ is live at <https://preflight-cqn.pages.dev>.
 | GBDT correction for an unmeasured GPU | Ties the analytical model held out on five GPU types (57%, 56% to 59%, against K1's 57%, 56% to 58% [measured, corpus, Nov 1]) and is worst on the H100 (42%), so it isn't used | `docs/decisions/calibration-l4-phase1.md` |
 | Step time on an unmeasured GPU | Used, with its range, but 57% (56% to 58%) of held-out queries land within 20% over five GPU types and 6,694 config pairs [measured, corpus, Nov 1], under the 90% target; the H100, never scored before Nov 1, lands at 52%, and the T4 lowest at 51%. The range is honest about that: it covers 90% of held-out pairs, and for an H100 with no probe it runs from about 0.5x to 1.9x the replayed step | `docs/decisions/calibration-l4-phase1.md` (leave-one-GPU-out on the corpus) |
 | Serving model | Built, switched off (`engine.serving`) until its validation row passes | `python/preflight/engine/api.py` |
-| Muse Glimmer | Apache 2.0. B hosts it on Preflight's own GPU (an A100-40GB on Modal) for a private mode, `harness.glimmer_private`, on in production since Nov 2: a private check-in's probe logs are triaged by Glimmer and never sent to Baseten. It agreed with Spark Open's triage category on 9 of 11 failed probes (82%, Wilson 95% 52% to 95%) [measured: A's a-triage-agreement]; the first triage after a quiet spell waits 5 to 8 minutes for Glimmer to start | `docs/decisions/glimmer-host.md` |
 | Full-run validation | Scored on Mon Nov 2 (the table below) | B's scorer |
 
 ## Try it
@@ -158,8 +159,8 @@ owns which path are in [CONTRACT.md](CONTRACT.md).
 | **Muse Code** (headless) | Fix loop: candidate fixes raced in parallel worktrees inside a sandbox, edits only; the API key reaches Muse Code on stdin only, never in its environment or files; each fix is gated on Preflight's own re-probe and verify, not on Muse Code's exit code (`api/preflight_api/fix/`) | `c.fix_loop`, on in production (Nov 2): every fix is verified by a re-run on Preflight's runner with a fixed-seed loss check; on the LoRA sample's eval OOM the single fix was rejected and the stacked fix passed (eval peak 10.4 GiB, loss within 0.11%) [measured: C's race, US$0.39] |
 | **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | Triage on in production (`harness.spark_open_triage`, Nov 1). The claim check (`harness/claim_check.py`, `harness.spark_claim_check`, on in production Nov 2): every number in a model-written finding is checked against the record's raw probe numbers, and Spark Open only picks among fields the code found; on planted claims true numbers passed 101 of 107 (94%, Wilson 88% to 98%) and altered ones were caught 93 of 102 (91%, 84% to 96%) [measured: B's b-claim-check-eval, US$0.36]; capped at US$0.10 a job, and a record a private check-in touched is checked by code only |
 | **Muse Glimmer** | Private mode's triage on Preflight's own GPU, and one of three models in the agent model sweep's price table | `harness.glimmer_private`, on in production (Nov 2); hosted by B on Modal (`docs/decisions/glimmer-host.md`) |
-| **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run so far (Oct 28 to Nov 1, `docs/status/a.md`); the runner (job store), the API and the fix app are deployed in production and stay up since Nov 1 |
-| **AMD Developer Cloud** | ROCm probes through the CLI on an MI300X, and the AMD half of the corpus (`python/preflight/corpus/`, `.github/workflows/amd-run.yml`) | The AMD Developer Cloud account stayed on a verification hold, so the AMD runs used a rented MI300X (RunPod, ROCm 6.4.4, torch 2.5.1+rocm6.2) through `amd-run.yml` on Nov 2: the LoRA and nanoGPT zoo scripts' records and bare runs (records `a-amd-*` on the `remote-runs` branch). LoRA's planted eval bug runs out of memory there too: B's full run (`b-amd-lora-gt-eval`) ran out of memory at the first eval, step 200 ("HIP out of memory ... 178 GiB allocated by PyTorch"; 199.3 GB, 185.6 GiB, reserved at its peak, of the 206 GB, 192 GiB, card) [measured], the same outcome as on the L4 and A10. The AMD LoRA rows are labelled "loss NaN on this stack (bf16, rocm6.2), timing and memory only": every LoRA log there shows `loss 0.0, grad_norm nan` after a first loss of 430; nanoGPT trains normally (loss 10.98 falling to 9.30) and is scored as a normal run. B's scored AMD rows go in the validation table |
+| **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run (`docs/status/a.md`); the runner (job store), the API and the fix app are deployed in production and stay up since Nov 1 |
+| **AMD Developer Cloud** | ROCm probes through the CLI on an MI300X, and the AMD half of the corpus (`python/preflight/corpus/`, `.github/workflows/amd-run.yml`) | The AMD Developer Cloud account stayed on a verification hold, so the AMD runs used a rented MI300X (RunPod, ROCm 6.4.4, torch 2.5.1+rocm6.2) through `amd-run.yml` on Nov 2: the LoRA and nanoGPT zoo scripts' records and bare runs (records `a-amd-*` on the `remote-runs` branch). LoRA's planted eval bug runs out of memory there too: B's full run (`b-amd-lora-gt-eval`) ran out of memory at the first eval, step 200 ("HIP out of memory ... 178 GiB allocated by PyTorch"; 199.3 GB, 185.6 GiB, reserved at its peak, of the 206 GB, 192 GiB, card) [measured], the same outcome as on the L4 and A10. The AMD LoRA rows are labelled "loss NaN on this stack (bf16, rocm6.2), timing and memory only": every LoRA log there shows `loss 0.0, grad_norm nan` after a first loss of 430; nanoGPT trains normally (loss 10.98 falling to 9.30) and is scored as a normal run. B's 300-config sweep scored NVIDIA to MI300X step time within 20% on 22% of 1,147 pairs (Wilson 20% to 25%), with predictions running short, so a move across vendors shows no step time [measured: b-amd-grouped]. B's scored AMD rows go in the validation table |
 | **Cloudflare Pages** | The web app, the `/v1` edge function that forwards to the API with a shared secret and the visitor's address for quotas (`web/functions/`), and share cards (`workers/`) | Live at <https://preflight-cqn.pages.dev>, with share pages and cards (`/s/<share token>`) |
 
 ## What a run costs to measure
@@ -168,19 +169,18 @@ One run so far (A, Oct 28, job `a-smoke-l4-main-4`, the LoRA fine-tune zoo scrip
 flight record in 6 min 45 s [measured], with 386 s of probe time on one L4 [measured]; that is
 over the plan's 5-minute target. GPU $0.0858 [derived: measured probe time at the L4 list rate]
 and Muse Spark $0.0178 [derived: reported tokens at list prices]. The sandbox's CPU and memory
-are not in that total yet; Modal's bill replaces the estimate.
-TODO(PM): replace with the validation table's "Cost of one Preflight run" row once scored.
+are not in that total yet; Modal's bill replaces the estimate. The validation table's "Cost of one Preflight run" row isn't scored.
 
 ## The corpus published with a datasheet
 
 The measurements behind Preflight's learned models and its held-out checks are published as a
-dataset: [huggingface.co/datasets/chaoschia/preflight-corpus](https://huggingface.co/datasets/chaoschia/preflight-corpus) (Hugging Face commit `0aac218`). It holds
-`preflight-corpus-0.3.0.jsonl.gz` (corpus@0.3.0: 2,339 rows, 1,519 kernel configs, 100 Hugging
-Face jobs and 720 divergence runs [cited: the datasheet]), `SHA256SUMS` and a dataset card. The
-datasheet, after *Datasheets for Datasets*, says how it was made, what it covers and where it is
-biased: [`python/preflight/corpus/DATASHEET.md`](python/preflight/corpus/DATASHEET.md). The
-measurements are Apache 2.0, like the repository. **The dataset is private until it goes public
-with the repository on Nov 3 to 4.**
+dataset: [huggingface.co/datasets/chaoschia/preflight-corpus](https://huggingface.co/datasets/chaoschia/preflight-corpus).
+The final file is `preflight-corpus-0.4.0.jsonl.gz` (corpus 0.4.0: 4,255 rows, 3,129 timing
+configs, 100 Hugging Face jobs and 1,026 divergence runs, the MI300X slice included [cited: the
+datasheet]), with `SHA256SUMS` and a dataset card. The datasheet, after *Datasheets for Datasets*,
+says how it was made, what it covers and where it is biased:
+[`python/preflight/corpus/DATASHEET.md`](python/preflight/corpus/DATASHEET.md). The measurements
+are Apache 2.0, like the repository.
 
 ## Validation
 
@@ -336,7 +336,18 @@ See [CONTRACT.md](CONTRACT.md) for the shared interfaces and who owns which path
 
 - **Preflight:** Apache License 2.0 ([LICENSE](LICENSE)).
 - **Dependencies:** every bundled package and its licence is in
-  [docs/licences.md](docs/licences.md); CI fails on GPL, AGPL and SSPL.
+  [docs/licences.md](docs/licences.md); CI fails on a GPL, AGPL or SSPL dependency of the Python
+  package, the API or the web app.
+- **Share cards** (`workers/functions/_card/`): resvg-wasm 2.6.2, vendored unmodified under
+  MPL-2.0 (file-level copyleft, its `LICENSE` beside it), and the fonts Instrument Sans,
+  Instrument Serif and JetBrains Mono under the SIL Open Font License 1.1, each with its OFL text.
+  The web app loads the same fonts from Google Fonts.
+- **Meta's models:** Muse Spark and Muse Spark Open (on Baseten) are called through their hosted
+  APIs, and Muse Code is Meta's command-line tool, installed by Meta's installer into the fix
+  loop's image, all under Meta's and Baseten's terms. Muse Glimmer's weights (Apache 2.0) are
+  downloaded from Meta's Hugging Face repository into a Modal volume of Preflight's (B serves an
+  FP8 copy made from them); none are in this repository.
+- **The corpus:** the measurements are Apache 2.0, like the repository.
 - **torchtitan test files** (`zoo/torchtitan_debug/`): torchtitan's own debug config, test
   tokenizer and `c4_test` slice, from its v0.1.0 tag, under BSD-3-Clause (`LICENSE.txt` beside
   them). The `c4_test` slice is text from C4 by AllenAI, released under ODC-BY 1.0; Common
@@ -354,4 +365,5 @@ See [CONTRACT.md](CONTRACT.md) for the shared interfaces and who owns which path
 | `serving_vllm` | Qwen/Qwen2.5-7B-Instruct (Apache 2.0) | databricks/databricks-dolly-15k (CC BY-SA 3.0) |
 | `retrieval_st` | sentence-transformers/all-MiniLM-L6-v2 (Apache 2.0) | sentence-transformers/natural-questions (CC BY-SA 3.0, from Google's Natural Questions) |
 | `gnn_pyg` | none (trained from scratch) | synthetic graph made in the script |
+| `notebook_tiny` | none (a small MLP trained from scratch) | random tensors made in the script |
 | `vision_timm` | timm/resnet50.a1_in1k (Apache 2.0) | AI-Lab-Makerere/beans (MIT) |

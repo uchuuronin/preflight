@@ -152,10 +152,13 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
 		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
 		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
+		**({"install_exec": True} if spec.install_exec else {}),  # a list read from the build installs more
+		**({"dataset_cache": True} if spec.dataset_cache else {}),  # no download in the measured time
+		**({"step_clock": True} if spec.step_clock else {}),  # a probe that reports more
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
-		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
+		"image": image if spec.image == "probe" else f"{image}+{spec.image}" + _image_pins(spec.image),
 	}  # fmt: skip
 	if (
 		spec.generate_sample
@@ -286,6 +289,38 @@ def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
 	return sm.lens == "eval" and any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
 
 
+_TORCHVISION = re.compile(r"^\s*(?:from|import)\s+torchvision\b", re.M)
+
+
+def _uses_torchvision(files: dict[str, str]) -> bool:
+	return any(_TORCHVISION.search(t) for n, t in files.items() if n.endswith(".py"))
+
+
+def _image_pins(image: str) -> str:
+	"""A sandbox image's own pins in its probes' cache key, for the images image_tag doesn't hash: torch27's."""
+	if image != "torch27":
+		return ""
+	from .images import PROBE_NEW_PACKAGES
+
+	return "@" + hashlib.sha256("\n".join(PROBE_NEW_PACKAGES).encode()).hexdigest()[:12]
+
+
+def _image(sm: ScriptMap, files: dict[str, str]) -> str:
+	"""The sandbox image: "serving" for vLLM (its own image); with probes.torch_new, "torch27" when the code's
+	own torch requirement rules out the probe image's 2.5.1 and admits 2.7.1 (LitGPT's torch>=2.7, Nov 2);
+	else "probe"."""
+	if _uses_vllm(sm, files):
+		return "serving"
+	if _flag("probes.torch_new"):
+		from preflight.recorder.requirements import IMAGE_TORCH, torch_asks, torch_too_old
+
+		# any ask that rules the image's 2.5.1 out from below (>=2.6, ==2.6.0, ~=2.6, >=2.8): the newer image, the
+		# nearest torch Preflight has; an exact pin it doesn't match runs on 2.7.1, as one runs on 2.5.1 today (review)
+		if torch_too_old(torch_asks(files), IMAGE_TORCH):
+			return "torch27"
+	return "probe"
+
+
 def _spec(
 	fetched: Fetched, sm: ScriptMap, p: PlannedProbe, deps: Deps, *, eval_off: bool = False
 ) -> ProbeSpec:
@@ -314,9 +349,14 @@ def _spec(
 		extra_packages=extra_lines(fetched.source) if deps.install_requirements else (),
 		install_uv=deps.install_requirements and _flag("probes.uv_install"),
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
+		install_exec=deps.install_requirements and _repo_install_on() and _flag("probes.repo_install_exec"),
+		torch_note=deps.install_requirements and _flag("probes.torch_new"),
+		# only code that imports torchvision: the flag re-keys no other job's probes (review, Nov 3)
+		dataset_cache=_flag("probes.dataset_cache") and _uses_torchvision(fetched.files),
+		step_clock=_flag("probes.step_clock"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
-		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
+		image=_image(sm, fetched.files),
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
 	)
@@ -339,6 +379,14 @@ def _command_sdists(fetched: Fetched) -> tuple[str, ...]:
 	from .sources import COMMANDS
 
 	src = fetched.source
+	if (
+		_flag("probes.repo_install_exec")
+		and "lm_eval/__init__.py" in fetched.files
+		and fetched.entrypoint.startswith("lm_eval/")
+	):
+		# lm-evaluation-harness checked in as its repo (unseen 5): the same source-only dependencies its command
+		# path builds (sqlitedict has no wheel), behind the flag that already runs a repo's build code
+		return tuple(COMMANDS["lm_eval"].get("sdists", ()))
 	if src is None or src.kind != "command" or not src.args:
 		return ()
 	return tuple((COMMANDS.get(src.args[0]) or {}).get("sdists", ()))
@@ -462,17 +510,18 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if fetched.source.extra_packages != rec.job.source.extra_packages:  # this job added packages
 			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
 			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
-		sm = rec.job.script_map or values_from_args(
-			fetched.files,
-			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
-			fetched.args,
-		)
+		if rec.job.script_map:
+			sm = rec.job.script_map
+		else:
+			mapped, fetched = _map_or_skip(fetched)
+			sm = values_from_args(fetched.files, _command_lens(mapped, fetched), fetched.args)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message=f"continuing from record {origin.parent.share_token}")
 	else:
+		mapped, fetched = _map_or_skip(fetched)
 		sm = values_from_args(
 			fetched.files,
-			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			_command_lens(mapped, fetched),
 			fetched.args,
 		)
 		rec = _skeleton(fetched, sm, request)
@@ -487,7 +536,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 
 		# the job's code goes to Muse Spark only with harness.spark_script_map on: the data-use notice
 		# discloses it under that flag, so the key being set is not enough (D's review, Chiya, Nov 1)
-		if deps.spark is not None and not followup and flag("harness.spark_script_map"):
+		mappable = not followup and not fetched.map_skipped  # a skipped map isn't refined (probe_without_map)
+		if deps.spark is not None and mappable and flag("harness.spark_script_map"):
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:
@@ -653,7 +703,9 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
-	keep = [f for f in keep if not f.id.startswith("source.partial")]
+	keep = [
+		f for f in keep if not f.id.startswith(("source.partial", "source.map_skipped"))
+	]  # said afresh below
 	out = out.model_copy(
 		update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *_reading_findings(fetched)]}
 	)
@@ -823,6 +875,31 @@ def _n_files(n: int, word: str) -> str:
 	return f"the 1 {word}" if n == 1 else f"the {n:,} {word}s"
 
 
+def _map_or_skip(fetched: Fetched) -> tuple[ScriptMap, Fetched]:
+	"""The static map. With runner.probe_without_map (off; the PM, Nov 3), when the whole source doesn't map
+	(over 2 MB of Python, a file the reader can't parse, the reader's own failure), the entry point alone is
+	mapped and the job probes on as usual, the plain recorder on every file, saying the map was skipped and
+	why (_reading_findings), not "syntax error". When the entry point itself doesn't map, that error stands."""
+	try:
+		return map_static(fetched.files, entrypoint=fetched.entrypoint), fetched
+	except Exception as exc:
+		if isinstance(exc, InvalidSubmission) or not _flag("runner.probe_without_map"):
+			raise
+		entry = fetched.files.get(fetched.entrypoint)
+		if entry is None:
+			raise
+		try:
+			sm = map_static({fetched.entrypoint: entry}, entrypoint=fetched.entrypoint)
+		except Exception:
+			raise exc from None
+		code = getattr(exc, "code", None)
+		why = (
+			str(exc) if code == "map.too_large"
+			else f"the static reader couldn't read it ({str(exc)[:240] or type(exc).__name__})"
+		)  # fmt: skip
+		return sm, replace(fetched, map_skipped=why)
+
+
 def _reading_findings(fetched: Fetched) -> list:
 	"""Say so when Preflight read part of the source (D, Nov 2): a repository too big to read whole
 	is read as its entry point and the files it imports (runner/sources.py), and over 2 MB of Python
@@ -832,12 +909,21 @@ def _reading_findings(fetched: Fetched) -> list:
 	from preflight.schema import Evidence, Finding
 
 	out = []
+	if fetched.map_skipped:
+		out.append(Finding(id="source.map_skipped", severity="info", code="source.partial", source="rule",
+			title="Probed without a map of the whole source",
+			detail=(f"Preflight didn't map the whole source: {fetched.map_skipped}. So the map shows only what "
+				f"{fetched.entrypoint} itself sets, and the job's kind, its model and the GPU it needs were read from "
+				"that file alone too, so they may be off. The probes ran the code as it is with the plain recorder: "
+				"what they measured stands, but knobs set in other files aren't on the map."),
+			evidence=[Evidence(metric="source.files", value=float(len(fetched.files)))]))  # fmt: skip
 	p = fetched.partial
 	if p:
+		why = (
+			"when the import lookups ran out (200,000)" if p.get("cut") == "lookups" else "for the size limit"
+		)
 		left = (
-			f"; at least {p['skipped']:,} more imported files were left out for the size limit"
-			if p.get("skipped")
-			else ""
+			f"; at least {p['skipped']:,} more imported files were left out {why}" if p.get("skipped") else ""
 		)
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
 			title="Read the entry point and what it imports, as asked" if p.get("asked")
@@ -847,8 +933,8 @@ def _reading_findings(fetched: Fetched) -> list:
 				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
 			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
 				Evidence(metric="source.repo_files", value=float(p["repo_files"]))]))  # fmt: skip
-	try:
-		_, m = mapped_files(fetched.files, fetched.entrypoint)
+	try:  # with the map skipped, its finding above says it: no partial-map finding beside it
+		_, m = (None, None) if fetched.map_skipped else mapped_files(fetched.files, fetched.entrypoint)
 	except ValueError:
 		m = None
 	if m:

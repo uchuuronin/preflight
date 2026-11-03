@@ -9,6 +9,11 @@
 	"probes.agent_single_task": false,
 	"probes.extra_hosts": false,
 	"probes.uv_install": false,
+	"probes.repo_install_exec": false,
+	"probes.torch_new": false,
+	"probes.dataset_cache": false,
+	"probes.step_clock": false,
+	"harness.lens_by_entry": false,
 	"runner.command_checkin": false,
 	"probes.eval_units": false,
 	"runner.free_resend": false,
@@ -22,6 +27,7 @@
 	"runner.hide_sample_outputs": false,
 	"runner.stop_on_import_error": false,
 	"runner.read_closure": false,
+	"runner.probe_without_map": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,
@@ -46,5 +52,6 @@
 	"d.freetier": false,
 	"d.notebook": false,
 	"d.exports_cli": false,
-	"probes.lr_range": false
+	"probes.lr_range": false,
+	"c.sample_agent_golden": false
 }

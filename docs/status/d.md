@@ -74,6 +74,86 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
+| Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
+
+## Tue Nov 3, 10:30 ET (shot 9b: the laptop steps)
+
+`docs/demo/shot-9b-laptop.md`: thirteen typed steps on native Windows, all on E: (venv, CUDA torch,
+Preflight from the public repository's zip, the script, `preflight run`, the ranges, the change,
+`preflight watch` with the cockpit following), what to see and what to do at each failure, and a
+WSL2 route with its distribution on E: (`wsl --install --location`) if A's fix isn't on `main`.
+Windows runner runs 4 and 5: with the first seven gaps stubbed every probe failed with `WinError
+10106` (the probe's environment); with all nine stubbed, `preflight run` measured and `watch`
+followed it [measured]. A tenth risk, read in the code, for A: the live record's replace can fail
+on Windows while the browser reads it. A read-only review of the steps; its fixes are in (the
+script's loss lines thinned so the alerts stay on screen, Python 3.12.10 or 3.11.9 as the last
+Windows installers, a GPU check that can print `False`, the A10 run's differences said).
+
+This push sends: `docs/demo/shot-9b-laptop.md`, `docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 09:55 ET (shot 9b on Chiya's Windows laptop)
+
+Shot 9b is filmed on Chiya's RTX 4070 laptop (Windows), Wednesday; the steps go in
+`docs/demo/shot-9b-laptop.md` by 6 PM. Native Windows first (the PM, 09:38).
+
+- **A GitHub Windows runner** (`.github/workflows/d-windows-watch.yml`, runs only when its own file
+  changes on `ws-d`; free): `preflight run` fails on Windows, at `os.geteuid`, then the time-zone
+  database, then `os.killpg`; `preflight watch` runs (against an empty record) [measured]. With six
+  more found by reading the code, nine Windows gaps, posted to A for a guarded fix before 3 PM. A
+  fourth run with the first seven stubbed checks whether a measurement then completes.
+- **The same steps on Linux:** on this sandbox's CPU from a fresh venv, `preflight run` and `watch`
+  work; no alert, as a CPU record has no step band [measured]. On an A10 (`d-watch-gpu-9b-2`,
+  GitHub 41650324681, US$0.10 [derived: 315 s of container at list price]): with the change, both
+  alerts fire (peak memory at step 201, step time at step 401); the unchanged run now gives only a
+  "note", no alert (B's fix since Nov 2) [measured].
+- **The laptop's card** isn't in the GPU table; step time still works on the card the probes ran on
+  (checked by relabelling an L4 record) [measured]. Asked B to add consumer RTX cards.
+
+This push sends: `.github/workflows/d-windows-watch.yml`, `docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 08:55 ET (search: B's last must-fix)
+
+`b48ba5c` (items 4 to 6) is pushed, CI green. Merged main `a25369a`. (This morning's two earlier
+headings and their `from-d.md` posts said 09:30 and 10:30 ET; the pushes were at 08:19 and 08:27.)
+
+Search grounding: a source is now kept only if a search's own results list it; an inline citation
+alone, or a page the model opened, no longer counts, and titles come from search results only
+(B's re-check, `from-b.md`). B's exact case is a test that fails on `4be42a8`. A read-only review
+found no must-fix; its points are in (a title test that bites, a nesting test that bites, results
+only from a typed search action). Full suite: 1,696 passed. B re-checks next. Nothing spent.
+
+This push sends: `python/preflight/harness/search_grounding.py`, `tests/test_d_search_grounding.py`,
+`tests/test_pipeline.py`, `docs/decisions/spark-search.md`, `docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 08:25 ET (the PM's 08:07 list, items 4 to 6)
+
+Pushed `8aacf81` (items 1 to 3, after a read-only fact-check; its two must-fixes in: Glimmer's
+weights live in a Modal volume, and Spark Open's number check is skipped for private check-ins).
+
+4. `docs/submission.md`: the checklist; `docs/submission/` drafts brought up to the freeze.
+5. `docs/builders/`: the kit, brief, tasks and observation sheet on the final product.
+6. `docs/demo/video-plan.md`: the freeze's shot list, the timed voice-over and the 45-second cut,
+   with the fix loop's new shot 8b; 9b and 6b open until noon.
+
+Nothing spent. This push sends: `docs/submission.md`, `docs/submission/` (README, portal,
+meta-and-partners, gallery), `docs/builders/`, `docs/demo/video-plan.md`, `docs/requests/from-d.md`,
+this file.
+
+## Tue Nov 3, 08:15 ET (the PM's 08:07 list, items 1 to 3)
+
+Merged main `555b5af` into `ws-d` (fast-forward). `9018a58` (the walkthrough) is on main.
+
+1. `readme-final.md`: Meta's open-weights models in their own row at the top of "On in
+   production"; the README's check-in row; B's corpus 0.4.0; the TODO gone; the licence section
+   complete. Diff and the four open questions for the PM in `from-d.md`.
+2. Licence check: CI fails on GPL, AGPL and SSPL in the Python, API and web checks (planted
+   packages caught) [measured]; three gaps for C (workers and root unchecked, unlicensed packages
+   pass, "GPLv3" missed by the web check).
+3. Share pages under `wrangler pages dev` on the production build: with no keys, a generic
+   preview and a redirect to the cockpit; with C's API run locally, the page, badge and hero card
+   work and the link opens the record at both widths [measured]. Nothing for C.
+
+Nothing spent. This push sends: `docs/readme-final.md`, `docs/requests/from-d.md`, this file.
 
 ## Mon Nov 2, 22:30 ET (Chiya's 21:02 list: the stranger walkthrough; readme-final)
 

@@ -4,11 +4,13 @@
 
 When a probe fails with an error, Muse Spark searches the web (the Responses API's `web_search`
 tool) for known library or version issues that match it, and answers with at most 3 sources, or
-"no known issue found". Code keeps a source only if the search returned its URL: a `url_citation`
-annotation for it, or (asked for with `include`, Meta's documented format) an entry in the search
-call's `results`; and drops it if the model's attempt to open that page didn't complete. A source
-neither lists is dropped and counted (`search.dropped_unannotated`); if none survive, the finding
-says so. That rests on Meta listing only what its search returned, which D's validation checks
+"no known issue found". Code keeps a source only if a search returned its URL: an entry in a
+search call's `results` (asked for with `include`, Meta's documented format). A `url_citation`
+annotation alone isn't enough, nor is a page open's result: the model can cite a page it opened
+itself, which no search returned (B's re-check, Nov 2). A source is also dropped if the model's
+attempt to open that page didn't complete. A source no search returned is dropped and counted
+(`search.dropped_unannotated`); if none survive, the finding says so. That rests on Meta listing
+only what its search returned, which D's validation checks
 with a planted made-up link (`scripts/spark_search_validate.py`); the cited links themselves are
 checked by hand there too.
 
@@ -24,7 +26,7 @@ followed by punctuation; and drops every source if the model opened a page the e
 the public hosts. That
 narrows steering; it can't stop an error that sends the search to a page its author wrote on a
 public host (an issue opened on a real tracker), so a citation is a lead to check, not a verdict.
-The URL stored is the annotation's, matched exactly (fragment, user and query included; a trailing
+The URL stored is the search result's, matched exactly (fragment, user and query included; a trailing
 slash, the default port and percent-escape case aside). Spend:
 at most MAX_TOOL_CALLS searches a question, the search fee (SEARCH_USD_PER_QUERY each) added to the
 call's recorded cost, no retries (`ModelClient.respond`), and the pipeline asks at most
@@ -283,44 +285,29 @@ def returned(data: dict) -> dict[str, str]:
 		if not isinstance(item, dict) or not str(item.get("type") or "").endswith("search_call"):
 			continue
 		action = item.get("action")
-		if isinstance(action, dict) and action.get("type") not in (None, "search"):
-			continue  # a page open's results are the page the model chose, not the search's
+		if not isinstance(action, dict) or action.get("type") != "search":
+			continue  # a page open's results are the page the model chose, not the search's; an untyped
+			# item can't be told apart from one, so it doesn't count either
 		for r in item.get("results") or []:
 			if isinstance(r, dict) and isinstance(r.get("url"), str):
 				got.setdefault(_exact(r["url"]), r["url"])
 	return got
 
 
-def annotations(data: dict) -> dict[str, str]:
-	"""Every URL the response carries a `url_citation` annotation for: {as matched: as given}."""
-	got: dict[str, str] = {}
-	for item in data.get("output") or []:
-		if not isinstance(item, dict):
-			continue
-		for part in item.get("content") or []:
-			if not isinstance(part, dict):
-				continue
-			for a in part.get("annotations") or []:
-				if isinstance(a, dict) and a.get("type") == "url_citation" and isinstance(a.get("url"), str):
-					got.setdefault(_exact(a["url"]), a["url"])
-	return got
-
-
 def search_titles(data: dict) -> dict[str, str]:
-	"""A title for each URL the search returned, from the search itself (its results' titles, then
-	the annotations'), never the model's answer: {as matched: title}."""
+	"""A title for each URL a search returned, from that search's own results only: never a page
+	open's (the page the model chose to read) nor an annotation's, nor the model's answer (B's
+	re-check, Nov 2): {as matched: title}."""
 	got: dict[str, str] = {}
 	for item in data.get("output") or []:
-		if not isinstance(item, dict):
+		if not isinstance(item, dict) or not str(item.get("type") or "").endswith("search_call"):
 			continue
-		if str(item.get("type") or "").endswith("search_call"):
-			for r in item.get("results") or []:
-				if isinstance(r, dict) and isinstance(r.get("url"), str) and isinstance(r.get("title"), str):
-					got.setdefault(_exact(r["url"]), r["title"])
-		for part in item.get("content") or []:
-			for a in (part.get("annotations") or []) if isinstance(part, dict) else []:
-				if isinstance(a, dict) and isinstance(a.get("url"), str) and isinstance(a.get("title"), str):
-					got.setdefault(_exact(a["url"]), a["title"])
+		action = item.get("action")
+		if not isinstance(action, dict) or action.get("type") != "search":
+			continue
+		for r in item.get("results") or []:
+			if isinstance(r, dict) and isinstance(r.get("url"), str) and isinstance(r.get("title"), str):
+				got.setdefault(_exact(r["url"]), r["title"])
 	clean = {k: "".join(c for c in v if unicodedata.category(c) not in ("Cc", "Cf")) for k, v in got.items()}
 	return {k: " ".join(v.split())[:200] for k, v in clean.items() if v.strip()}
 
@@ -389,7 +376,7 @@ def parse_answer(text: str) -> Answer | None:
 		try:
 			obj, _ = dec.raw_decode(text, i)
 			return Answer.model_validate(obj)
-		except (ValueError, ValidationError):
+		except (ValueError, ValidationError, RecursionError):
 			continue
 	return None
 
@@ -405,13 +392,15 @@ def opened(data: dict) -> list[str]:
 
 
 def kept_sources(answer: Answer, data: dict, error_text: str = "") -> tuple[list[Source], list[Source]]:
-	"""(sources kept, at most 3; the others, dropped). Kept: https, no user part, the search returned
-	exactly that URL (an annotation for it, or an entry in a search's `results`; stored as given there), no failed open of it, nothing the error
-	text names (`named_keys`), not on Preflight's own host. None at all when the model opened a page
-	the error names off the public hosts: the error steered the search."""
-	# what the search returned: the model's inline citations, and the results Meta lists (an answer
-	# ending in a JSON object may cite nothing inline: the second validation run had no annotations)
-	got = {**returned(data), **annotations(data)}
+	"""(sources kept, at most 3; the others, dropped). Kept: https, no user part, a search returned
+	exactly that URL (an entry in a search's `results`; stored as given there), no failed open of it,
+	nothing the error text names (`named_keys`), not on Preflight's own host. None at all when the
+	model opened a page the error names off the public hosts: the error steered the search."""
+	# only what a search returned (B's re-check, Nov 2): an inline citation alone isn't enough, as the
+	# model can cite a page it opened itself, which no search returned; the request always asks for
+	# the results (`include: ["web_search_call.results"]`), and every source kept in the validation
+	# runs with it was among them
+	got = returned(data)
 	titles = search_titles(data)
 	bad, named = failed_opens(data), named_keys(error_text)
 	if any(not _public(_host(u)) and _is_named(u, named) for u in opened(data)):
@@ -485,7 +474,8 @@ def ground_failure(
 	None, with no call, for a probe that finished or failed in Preflight's own way (`skipped`).
 	None, with its calls, when the call failed, nothing was searched, or the reply had no answer.
 	`shape="first"` sends the first validation run's request instead (comparison runs only); the
-	reply is read the same way. Every request logs its `search_trace`, and a finding carries it."""
+	reply is read the same way, so, as that request asks for no search results, it can keep no
+	source now (runs 1 and 4 kept theirs through inline citations, which no longer count). Every request logs its `search_trace`, and a finding carries it."""
 	if shape not in ("current", "first"):
 		raise ValueError(f"shape {shape!r}: current or first")
 	if skipped(probe, skip_codes):
