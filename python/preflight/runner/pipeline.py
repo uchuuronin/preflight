@@ -492,15 +492,16 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
 		sm = rec.job.script_map or values_from_args(
 			fetched.files,
-			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			_command_lens(_map_or_skip(fetched)[0], fetched),
 			fetched.args,
 		)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message=f"continuing from record {origin.parent.share_token}")
 	else:
+		mapped, fetched = _map_or_skip(fetched)
 		sm = values_from_args(
 			fetched.files,
-			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			_command_lens(mapped, fetched),
 			fetched.args,
 		)
 		rec = _skeleton(fetched, sm, request)
@@ -515,7 +516,12 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 
 		# the job's code goes to Muse Spark only with harness.spark_script_map on: the data-use notice
 		# discloses it under that flag, so the key being set is not enough (D's review, Chiya, Nov 1)
-		if deps.spark is not None and not followup and flag("harness.spark_script_map"):
+		if (
+			deps.spark is not None
+			and not followup
+			and flag("harness.spark_script_map")
+			and not fetched.map_skipped
+		):
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:
@@ -851,6 +857,31 @@ def _n_files(n: int, word: str) -> str:
 	return f"the 1 {word}" if n == 1 else f"the {n:,} {word}s"
 
 
+def _map_or_skip(fetched: Fetched) -> tuple[ScriptMap, Fetched]:
+	"""The static map. With runner.probe_without_map (off; the PM, Nov 3), when the whole source doesn't map
+	(over 2 MB of Python, a file the reader can't parse, the reader's own failure), the entry point alone is
+	mapped and the job probes on as usual, the plain recorder on every file, saying the map was skipped and
+	why (_reading_findings), not "syntax error". When the entry point itself doesn't map, that error stands."""
+	try:
+		return map_static(fetched.files, entrypoint=fetched.entrypoint), fetched
+	except Exception as exc:
+		if isinstance(exc, InvalidSubmission) or not _flag("runner.probe_without_map"):
+			raise
+		entry = fetched.files.get(fetched.entrypoint)
+		if entry is None:
+			raise
+		try:
+			sm = map_static({fetched.entrypoint: entry}, entrypoint=fetched.entrypoint)
+		except Exception:
+			raise exc from None
+		code = getattr(exc, "code", None)
+		why = (
+			str(exc) if code == "map.too_large"
+			else f"the static reader couldn't read it ({str(exc)[:240] or type(exc).__name__})"
+		)  # fmt: skip
+		return sm, replace(fetched, map_skipped=why)
+
+
 def _reading_findings(fetched: Fetched) -> list:
 	"""Say so when Preflight read part of the source (D, Nov 2): a repository too big to read whole
 	is read as its entry point and the files it imports (runner/sources.py), and over 2 MB of Python
@@ -860,6 +891,14 @@ def _reading_findings(fetched: Fetched) -> list:
 	from preflight.schema import Evidence, Finding
 
 	out = []
+	if fetched.map_skipped:
+		out.append(Finding(id="source.map_skipped", severity="info", code="source.partial", source="rule",
+			title="Probed without a map of the whole source",
+			detail=(f"Preflight didn't map the whole source: {fetched.map_skipped}. So the map shows only what "
+				f"{fetched.entrypoint} itself sets, and the probes ran the code as it is with the plain recorder: "
+				"what they measured stands, but knobs set in other files aren't on the map."),
+			evidence=[Evidence(metric="source.files", value=float(len(fetched.files)))]))  # fmt: skip
+		return out  # the partial-map finding below would say the same thing again
 	p = fetched.partial
 	if p:
 		why = (

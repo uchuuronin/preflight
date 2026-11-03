@@ -25,6 +25,7 @@
 	"runner.hide_sample_outputs": false,
 	"runner.stop_on_import_error": false,
 	"runner.read_closure": false,
+	"runner.probe_without_map": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,
