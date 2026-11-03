@@ -2453,8 +2453,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-desk__more { border-top: 1px solid var(--pf-stroke); border-bottom: 1px solid var(--pf-stroke); }
 .pf-desk__more > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; cursor: pointer; list-style: none; font-size: var(--pf-text-sm); font-weight: 600; }
 .pf-desk__more > summary::-webkit-details-marker { display: none; }
-.pf-desk__more > summary::before { content: "▸"; color: var(--pf-fg-dim); font-weight: 400; }
-.pf-desk__more[open] > summary::before { content: "▾"; }
+.pf-desk__more > summary::before { content: "▸" / ""; color: var(--pf-fg-dim); font-weight: 400; }
+.pf-desk__more[open] > summary::before { content: "▾" / ""; }
 .pf-desk__more > summary .pf-dim { font-weight: 400; font-size: 12.5px; }
 .pf-desk__more > summary:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 2px; border-radius: var(--pf-radius-sm); }
 .pf-desk__more-body { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 16px; }

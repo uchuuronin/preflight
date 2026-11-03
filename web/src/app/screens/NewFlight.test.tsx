@@ -380,5 +380,9 @@ describe("Optional flight details (Chiya, Nov 3)", () => {
 		for (const label of [/^Entry point/, /^Arguments/, /^Extra packages/]) expect(fold.contains(screen.getByLabelText(label))).toBe(true);
 		fireEvent.change(screen.getByLabelText(/^Extra packages/), { target: { value: "torch==2.4" } });
 		expect(fold.open).toBe(true);
+		// and stays open while it does: closing it would hide why Check in is grey
+		fold.open = false;
+		fireEvent(fold, new Event("toggle"));
+		expect(fold.open).toBe(true);
 	});
 });

@@ -449,7 +449,19 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						</div>
 						{/* What most check-ins leave empty, folded away (Chiya, Nov 3: less clutter): open by the visitor, or by
 						    itself when a field in it has something to say. */}
-						<details className="pf-desk__more" open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
+						<details
+							className="pf-desk__more"
+							open={moreOpen}
+							onToggle={(e) => {
+								// Stays open while a field in it has a message: closed, Check in would be grey for a hidden reason (review).
+								const el = e.currentTarget;
+								if (!el.open && (entryBad || argsBad || pkgBad)) {
+									el.open = true;
+									return;
+								}
+								setMoreOpen(el.open);
+							}}
+						>
 							<summary>
 								<span>{t("newflight.more.title")}</span>
 								<span className="pf-dim">{t(intake === "repo" ? "newflight.more.what_repo" : "newflight.more.what")}</span>
