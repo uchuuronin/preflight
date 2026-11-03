@@ -76,6 +76,16 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 11:40 ET (readme-final on main `68c8c81`; Wednesday's check)
+
+Merged main `68c8c81` (a fast-forward). `readme-final.md` rebuilt from main's README (the PM's 15
+corrections from B, A's flags, Glimmer under "On in production", corpus 0.4.0), with D's additions
+put back; the five lines that change when the repository goes public are in `from-d.md` with their
+replacements. Scheduled a check for Wed 07:30 ET: A's Windows fix on `main`, re-run on the Windows
+runner with no stubs, then native or WSL2 for shot 9b; and shot 13's line once C has B's strings.
+
+This push sends: `docs/readme-final.md`, `docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 10:30 ET (shot 9b: the laptop steps)
 
 `docs/demo/shot-9b-laptop.md`: thirteen typed steps on native Windows, all on E: (venv, CUDA torch,
