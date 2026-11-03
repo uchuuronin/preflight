@@ -50,8 +50,8 @@ MAX_ATTEMPTS = 2  # derived: one retry for our own failures; visitor failures ar
 MAX_QUEUED = 200  # guess: global queue cap; replaced by the load test before judging (Nov 4)
 # load-tested (scripts/queue_load_test.py, Nov 2: 20 visitors x 3 jobs on a copy of this store, simulated clock,
 # CPU-only jobs of a guessed length): at 3, queue wait p95 652 s, a job's wait from its first try to its start p95
-# 1,077 s, 100 refusals; 2 and 1 trade queue wait for refusals (154, 239) with that first-try wait no shorter. With
-# the daily limit at 3 jobs this cap never refuses anyone: every refusal is the in-flight budget hold's
+# 1,077 s, 100 refusals; 2 and 1 trade queue wait for refusals (154, 239) with that first-try wait about the same. With
+# the daily limit at 3 jobs (runner.free_resend off) this cap never refuses anyone: every refusal is the in-flight hold's
 MAX_QUEUED_PER_VISITOR = 3
 MAX_EVENTS_PER_JOB = 300
 RECENT_DONE = 2_000  # finished jobs kept in memory for status and event reads
