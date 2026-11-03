@@ -22,6 +22,23 @@ export const GLOSSARY: Readonly<Record<string, Term>> = content.terms;
  * glossary.test.ts fails when A declares a knob this table doesn't cover.
  */
 export const KNOB_TERMS: Readonly<Record<string, string>> = {
+	// B's list, Nov 3: knobs that had no label on the site, pointed at the nearest term.
+	dtype: "precision",
+	torch_dtype: "precision",
+	ptdtype: "precision",
+	tf32: "precision",
+	compile: "torch_compile",
+	prefetch_factor: "dataloader_workers",
+	pin_memory: "dataloader_workers",
+	group_by_length: "packing",
+	nodes: "gpu_count",
+	inter_node_gbps: "gpu_count",
+	pipeline_parallel: "tensor_parallel",
+	rl_iterations: "max_steps",
+	request_rate: "concurrency",
+	max_batched_tokens: "concurrency",
+	deepspeed_config: "zero_fsdp",
+	dump_attentions: "dump_hidden_states",
 	// fine-tune and pretrain
 	batch_size: "batch_size",
 	seq_len: "sequence_length",
