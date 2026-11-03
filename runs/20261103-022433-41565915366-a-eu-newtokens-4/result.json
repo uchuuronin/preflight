@@ -1,0 +1,11 @@
+{
+	"name": "20261103-022433-41565915366-a-eu-newtokens-4",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41565915366",
+	"ref": "48fb44ceefb7b10dee0bc563fed4ef3036b0dc56",
+	"sha": "48fb44ceefb7b10dee0bc563fed4ef3036b0dc56",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --dir tests/fixtures/ops/lmeval_new_tokens --entrypoint run.py --bare-steps 100000 --budget-min 20 --first-gpu A10 --install-requirements --uv --eval-units --sdists sqlitedict,rouge-score,word2number",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T02:27:03Z"
+}

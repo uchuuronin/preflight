@@ -1,0 +1,152 @@
+{
+  "script": "lmeval_new_tokens",
+  "entrypoint": "run.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "finished",
+    "error": null,
+    "seconds": 21.449172804999996,
+    "peak_allocated_bytes": 3690723328,
+    "peak_reserved_bytes": 3711959040,
+    "device": "NVIDIA A10G",
+    "timing": "cuda_events",
+    "wall_s": 64.1
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 54.066,
+    "by_phase": {},
+    "rl": {
+      "response_length": {
+        "mean": 1.0,
+        "p95": 1.0,
+        "max": 1.0,
+        "n": 8
+      },
+      "truncation_rate": null,
+      "zero_spread_fraction": null,
+      "pass_rate_per_prompt": [],
+      "group_size": null,
+      "entropy": [],
+      "kl": [],
+      "clip_fraction": [],
+      "reward_mean": []
+    },
+    "generation": {
+      "calls": 1,
+      "seconds_total": 0.6734999180000045,
+      "sequences": 8,
+      "new_tokens_mean": 1.0,
+      "new_tokens_p95": 1.0,
+      "new_tokens_max": 1.0,
+      "max_new_tokens": null,
+      "truncation_rate": null,
+      "backend": "hf"
+    },
+    "extras": {
+      "host_rss_peak_bytes": 7193767936.0
+    },
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n[preflight] requirements: installing lm-eval\n[preflight] requirements: uv's route didn't install them (For more information, try '--help'.); trying pip\nThe cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.\n\r0it [00:00, ?it/s]\r0it [00:00, ?it/s]\nDetected kernel version 4.19.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.\n\rRunning generate_until requests:   0%|          | 0/8 [00:00<?, ?it/s]\rRunning generate_until requests:  12%|\u2588\u258e        | 1/8 [00:00<00:04,  1.45it/s]\rRunning generate_until requests: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 8/8 [00:00<00:00, 11.60it/s]\n[lmeval-check] lm_eval's responses, tokens each: [0, 0, 0, 0, 0, 0, 0, 0]; mean 0.0\n[lmeval-check] first response: ''\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "ok",
+      "steps": 0,
+      "started_at": "2026-11-03T02:26:02Z",
+      "duration_s": 54.066,
+      "error": null,
+      "error_code": null,
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": {
+        "response_length": {
+          "mean": 1.0,
+          "p95": 1.0,
+          "max": 1.0,
+          "n": 8
+        },
+        "truncation_rate": null,
+        "zero_spread_fraction": null,
+        "pass_rate_per_prompt": [],
+        "group_size": null,
+        "entropy": [],
+        "kl": [],
+        "clip_fraction": [],
+        "reward_mean": []
+      },
+      "power": {
+        "mean_w": 13.732556962025317,
+        "max_w": 58.359,
+        "samples": 79
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": {
+        "calls": 1,
+        "seconds_total": 0.6734999180000045,
+        "sequences": 8,
+        "new_tokens_mean": 1.0,
+        "new_tokens_p95": 1.0,
+        "new_tokens_max": 1.0,
+        "max_new_tokens": null,
+        "truncation_rate": null,
+        "backend": "hf"
+      },
+      "extras": {
+        "host_rss_peak_bytes": 7193767936.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 54.066,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": {
+    "sync_overhead": null,
+    "hook_overhead": null,
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "pretrain",
+  "image": "probe"
+}
