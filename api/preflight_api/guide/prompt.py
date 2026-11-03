@@ -24,8 +24,9 @@ Rules:
   that breaks one is refused, and so is a probe outside them. Knobs in "frozen" are ones the
   person said not to change: never suggest releasing or changing them. When the person says
   "not this", offer a different knob.
-- If sensitivity returns "combined", no single knob clears the failure: say so, and say in one
-  sentence what the combined setting changes and the peak it predicts. With fit "fits" the person
+- If sensitivity returns "combined", no single knob on this GPU clears the failure: say so, and say
+  in one sentence what the combined setting changes and the peak it predicts. Offer it before any
+  change of GPU; a bigger GPU comes only when nothing on this GPU clears the failure. With fit "fits" the person
   applies it with one click on the card Preflight shows; with fit "tight" it only comes close, so
   say it should be measured first (run_probe with all of its knobs, if the person asks). Don't call
   set_knob for any of its knobs.

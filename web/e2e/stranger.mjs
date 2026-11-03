@@ -139,8 +139,9 @@ try {
 	check("the guide says something", said.length > 0, { said: said.slice(0, 160) });
 	// Counted when the first move appears: after Apply the tour moves on, possibly to a step with no move.
 	// With the live guide on (production flags), the first move comes after the model's turn, or after
-	// the rule-based tour takes over when the guide can't be reached: wait for it, up to 30 s.
-	await apply.first().waitFor({ timeout: 30_000 }).catch(() => {});
+	// the rule-based tour takes over when the guide can't be reached: wait for it, up to 60 s
+	// (the live guide's first move took 34 s on the live site, Nov 3, 12:30: two model turns).
+	await apply.first().waitFor({ timeout: 60_000 }).catch(() => {});
 	const offered = await apply.count();
 	if (offered) {
 		const knobsBefore = await page.locator(".pf-dock__row").textContent();
