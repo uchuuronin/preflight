@@ -265,10 +265,27 @@ def live_record(parent, summary: dict, *, status: str, error: str | None = None,
 	)
 
 
-def _atomic(path: Path, text: str):
+ATOMIC_TRIES = 8  # guess: about 1.3 s of retries in all, past a browser's or antivirus's brief read
+
+
+def _atomic(path: Path, text: str, *, final: bool = True) -> bool:
+	"""Write the record whole. On Windows, os.replace onto a file another process has open (a
+	browser following the live record, antivirus) raises PermissionError: retry a few times; a
+	running write that still can't land is skipped (the next one carries the same data), and only
+	the final write raises. Linux replaces regardless, so the first try lands there."""
 	tmp = path.with_suffix(path.suffix + ".tmp")
-	tmp.write_text(text)
-	os.replace(tmp, path)
+	tmp.write_text(text, encoding="utf-8")
+	for i in range(ATOMIC_TRIES):
+		try:
+			os.replace(tmp, path)
+			return True
+		except PermissionError:
+			if i == ATOMIC_TRIES - 1:
+				if final:
+					raise
+				return False
+			time.sleep(0.01 * 2**i)
+	return False
 
 
 WRITE_EVERY_S = 5.0  # derived: the live record (the parent's probes and all) is rewritten at most this often
@@ -311,12 +328,12 @@ def main(argv: list[str] | None = None) -> int:
 	from preflight.schema import load_record
 	from preflight.schema.record import new_share_token, new_ulid
 
-	parent = load_record(ns.record.read_text())
+	parent = load_record(ns.record.read_text(encoding="utf-8"))
 	ns.out.mkdir(parents=True, exist_ok=True)
 	ids = (new_ulid(), new_share_token())
 	rec_path = ns.out / f"{ids[1]}.json"
 	log_path = ns.out / f"{ids[1]}.live.jsonl"
-	log = log_path.open("a", buffering=1)
+	log = log_path.open("a", buffering=1, encoding="utf-8")
 
 	import torch
 
@@ -332,7 +349,11 @@ def main(argv: list[str] | None = None) -> int:
 		now = time.monotonic()
 		if now - last_write[0] >= WRITE_EVERY_S:
 			last_write[0] = now
-			_atomic(rec_path, live_record(parent, col.summary(), status="running", ids=ids).model_dump_json())
+			_atomic(
+				rec_path,
+				live_record(parent, col.summary(), status="running", ids=ids).model_dump_json(),
+				final=False,
+			)
 
 	def peak():
 		return torch.cuda.max_memory_allocated(), torch.cuda.max_memory_reserved()  # counters, no sync

@@ -76,6 +76,23 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 12:25 ET (the Windows fixes, taken from A)
+
+Chiya, 11:52: D takes the nine gaps and the tenth risk off A. Merged main `8f29b3b`. Each fix is
+guarded so Linux is unchanged (geteuid, tzdata on Windows only, `kill_tree`, `resource`, the
+sandbox default, the `O_` flags, the agent sampler's kill, the probe's Windows environment, the
+live record's replace retried, UTF-8 throughout), 18 tests in `tests/test_d_windows.py`. A
+read-only review found no must-fix; its should-fixes are in (`PYTHONIOENCODING` for the probe, the
+probe's own two replaces retried, step 5 fails on any status but ok, a stronger UTF-8 test) and
+one is noted as a known gap (a process left running after a probe exits survives on Windows).
+The Windows runner check now stubs nothing; its result goes to A in `from-d.md`, and A gives one
+read-only review before the 2:30 PM push. Local suite: all pass but
+`test_requirements_are_installed_before_the_script_runs`, which fails the same way without these
+changes (my workspace can't reach the package index; CI can).
+
+This push sends: the fixes above, `pyproject.toml`, both `uv.lock` files, `docs/licences.md`,
+the Windows workflow, `docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 11:40 ET (readme-final on main `68c8c81`; Wednesday's check)
 
 Merged main `68c8c81` (a fast-forward). `readme-final.md` rebuilt from main's README (the PM's 15

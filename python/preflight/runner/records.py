@@ -94,7 +94,7 @@ def _created_at(p: Path) -> float | None:
 		with p.open("rb") as f:
 			head = f.read(8192).decode("utf-8", "replace")
 		m = _CREATED.search(head)  # dumps put it near the top
-		at = m.group(1) if m else json.loads(p.read_text()).get("created_at")
+		at = m.group(1) if m else json.loads(p.read_text(encoding="utf-8")).get("created_at")
 		return datetime.fromisoformat(str(at).replace("Z", "+00:00")).timestamp() if at else None
 	except (OSError, ValueError, AttributeError, TypeError):
 		return None

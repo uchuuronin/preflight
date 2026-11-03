@@ -35,8 +35,15 @@ def _what_installed(spec: dict) -> str:
 
 def _write(out_path: str, result: dict) -> None:
 	tmp = out_path + ".tmp"
-	Path(tmp).write_text(json.dumps(result, default=str))
-	os.replace(tmp, out_path)
+	Path(tmp).write_text(json.dumps(result, default=str), encoding="utf-8")
+	for i in range(8):  # Windows: PermissionError while antivirus or the parent has the file open
+		try:
+			os.replace(tmp, out_path)
+			return
+		except PermissionError:
+			if i == 7:
+				raise
+			time.sleep(0.01 * 2**i)
 
 
 # Limits on the visitor's code, set in this process before it runs (inherited by all it starts).
@@ -52,8 +59,12 @@ RLIMITS = {
 
 
 def set_limits() -> dict:
-	"""Lower each limit to ours (never raise one); returns what was applied, for the log."""
-	import resource
+	"""Lower each limit to ours (never raise one); returns what was applied, for the log. Windows has
+	no rlimits (no `resource` module): nothing is applied there."""
+	try:
+		import resource
+	except ImportError:
+		return {}
 
 	applied = {}
 	for name, want in RLIMITS.items():
