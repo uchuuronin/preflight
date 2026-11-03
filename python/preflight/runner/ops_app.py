@@ -1444,3 +1444,117 @@ def install_check(repo: str, commit: str = "", entrypoint: str = "", uv: bool = 
 	Path(f"out/install_check_{repo.rstrip('/').rsplit('/', 1)[-1]}_{'uv' if uv else 'pip'}.json").write_text(
 		json.dumps(res, indent=2)
 	)
+
+
+# ---------------------------------------------------------------- which field Meta refuses (unseen 4, after freeze)
+
+META_VARIANT_MAX_TOKENS = 16  # each variant's answer: enough to see it worked, a fraction of a cent
+
+
+@ops.function(image=worker_image, secrets=_AGENT_SECRETS, timeout=20 * 60)
+def _meta_variants(files: dict, entrypoint: str) -> dict:
+	"""Run the script against a local stand-in that records its first model request and refuses it, then
+	send that request to Meta's API as it was and with one field removed at a time. Prints each variant's
+	status and Meta's error code and message (our own run of a public example; our key is redacted)."""
+	import http.server
+	import subprocess
+	import sys
+	import tempfile
+	import threading
+
+	import httpx
+
+	got: dict = {}
+
+	class H(http.server.BaseHTTPRequestHandler):
+		def do_POST(self):
+			n = int(self.headers.get("Content-Length") or 0)
+			got.setdefault("body", json.loads(self.rfile.read(n)))
+			data = b'{"error": {"code": "recorded", "message": "stand-in"}}'
+			self.send_response(400)
+			self.send_header("Content-Type", "application/json")
+			self.send_header("Content-Length", str(len(data)))
+			self.end_headers()
+			self.wfile.write(data)
+
+		def log_message(self, *a):
+			pass
+
+	srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+	threading.Thread(target=srv.serve_forever, daemon=True).start()
+	work = Path(tempfile.mkdtemp(prefix="pf-meta-"))
+	for rel, text in files.items():
+		p = (work / rel).resolve()
+		if work.resolve() in p.parents:
+			p.parent.mkdir(parents=True, exist_ok=True)
+			p.write_text(text)
+	pip = [
+		sys.executable,
+		"-m",
+		"pip",
+		"install",
+		"-q",
+		"--disable-pip-version-check",
+		str(work) + "[openai]",
+	]
+	subprocess.run(pip, check=False, capture_output=True, timeout=600)
+	env = {
+		**os.environ,
+		"META_API_BASE": f"http://127.0.0.1:{srv.server_address[1]}/v1",
+		"META_API_KEY": "stand-in",
+	}
+	subprocess.run(
+		[sys.executable, entrypoint], cwd=work, env=env, capture_output=True, timeout=300, check=False
+	)
+	srv.shutdown()
+	body = got.get("body")
+	if not isinstance(body, dict):
+		return {"error": "the script made no model request"}
+	key, base = (
+		os.environ["META_API_KEY"],
+		(os.environ.get("META_API_BASE") or "https://api.meta.ai/v1").rstrip("/"),
+	)
+	shape = {k: (v if k in ("model", "tool_choice", "stop", "stream", "max_tokens") else type(v).__name__)
+		for k, v in body.items()}  # fmt: skip
+	print(f"[meta] the request: {json.dumps(shape)[:600]}; tools {len(body.get('tools') or [])}", flush=True)
+	drop = [None, "stop", "tool_choice", ("stop", "tool_choice"), "tools"]
+	out = []
+	for d in drop:
+		names = (d,) if isinstance(d, str) else (d or ())
+		req = {k: v for k, v in body.items() if k not in names}
+		if "tools" in names:
+			req.pop("tool_choice", None)
+		req["max_tokens"] = META_VARIANT_MAX_TOKENS
+		r = httpx.post(
+			f"{base}/chat/completions", json=req, headers={"Authorization": f"Bearer {key}"}, timeout=120
+		)
+		try:
+			err = (r.json() or {}).get("error") or {}
+		except ValueError:
+			err = {}
+		msg = str(err.get("message") or "")[:240].replace(key, "<key>") if isinstance(err, dict) else ""
+		code = (err.get("code") or err.get("type")) if isinstance(err, dict) else None
+		label = "as sent" if d is None else "without " + " and ".join(names)
+		row = {"variant": label, "status": r.status_code, "code": code, "message": msg}
+		if r.status_code == 200:
+			u = r.json().get("usage") or {}
+			row["tokens"] = (u.get("prompt_tokens"), u.get("completion_tokens"))
+		print(f"[meta] {json.dumps(row)}", flush=True)
+		out.append(row)
+	return {"shape": shape, "variants": out}
+
+
+@ops.local_entrypoint()
+def meta_variants(repo: str, commit: str, entrypoint: str, edit_hex: str = ""):
+	"""Which field of a script's first request Meta's API refuses (unseen 4: smolagents' tool-calling agent):
+
+	modal run --env main python/preflight/runner/ops_app.py::meta_variants --repo https://github.com/huggingface/smolagents \\
+		--commit <sha> --entrypoint examples/agent_from_any_llm.py --edit-hex <the list's Change>"""
+	from preflight.runner.sources import _clone
+
+	files, sha = _clone(repo, commit or None)
+	files = _apply_edits(files, edit_hex) if edit_hex else files
+	print(f"[meta] {repo} at {sha}: {len(files)} files", flush=True)
+	res = _meta_variants.remote(files, entrypoint)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/meta_variants.json").write_text(json.dumps(res, indent=2))
