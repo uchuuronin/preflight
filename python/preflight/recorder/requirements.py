@@ -531,6 +531,31 @@ def requires_from_build(workdir: Path, *, log=print, timeout_s: float = BUILD_TI
 	return out
 
 
+def own_metadata(workdir: Path, target: Path, *, log=print, timeout_s: float = BUILD_TIMEOUT_S) -> bool:
+	"""probes.repo_install_exec: the repo's own package metadata, by an editable install with no dependencies
+	into the probe's prefix, for code that reads its own version (lm-evaluation-harness's lm_eval/__init__.py
+	calls importlib.metadata.version("lm_eval"): a-all4-5s, Nov 3). Editable, so nothing of the repo is copied:
+	its working copy stays what the probe imports. Runs the repo's build, so only in the probe's sandbox;
+	a failure is said and the probe runs on."""
+	cmd = [sys.executable, "-I", "-m", "pip", "install", "--no-deps", "--no-input", "--disable-pip-version-check",
+		"--no-warn-script-location", "--quiet", "--prefix", str(target), "-e", str(workdir)]  # fmt: skip
+	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+	try:
+		target.mkdir(parents=True, exist_ok=True)
+		r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=target, env=env)
+	except (subprocess.TimeoutExpired, OSError) as exc:
+		log(f"[preflight] requirements: the repo's own metadata wasn't written ({type(exc).__name__})")
+		return False
+	if r.returncode != 0:
+		tail = ((r.stderr or r.stdout or "").strip().splitlines() or [f"pip exited with {r.returncode}"])[-1]
+		log(f"[preflight] requirements: the repo's own metadata wasn't written: {tail[:300]}")
+		return False
+	log(
+		"[preflight] requirements: wrote the repo's own package metadata (an editable install, no dependencies)"
+	)
+	return True
+
+
 def repo_requirement_sets(
 	workdir: Path, entrypoint: str, *, log=print, pyg: bool = False, build: bool = False
 ) -> tuple[list[str], list[str]]:
@@ -820,5 +845,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 		if clash:  # the likeliest reason, ahead of pip's or uv's tail: no installer fixes the image's own pin
 			err = f"the code asks for {'; '.join(clash)}, which the probe image can't change. {err}"
 		return err, []
+	if build and repo and ((workdir / "pyproject.toml").is_file() or (workdir / "setup.py").is_file()):
+		own_metadata(
+			workdir, target, log=log, timeout_s=min(BUILD_TIMEOUT_S, max(5.0, deadline - time.monotonic()))
+		)
 	(target / ".ok").write_text("ok")
 	return None, [*site_dirs(target), *roots]

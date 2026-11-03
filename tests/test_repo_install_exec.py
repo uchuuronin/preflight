@@ -184,3 +184,16 @@ def test_lm_eval_s_own_repo_builds_the_same_source_only_packages_as_its_command(
 	assert P._command_sdists(f) == ()
 	monkeypatch.setattr(P, "_flag", lambda name: name == "probes.repo_install_exec")
 	assert P._command_sdists(f) == tuple(COMMANDS["lm_eval"]["sdists"])
+
+
+def test_the_repo_s_own_metadata_is_an_editable_no_deps_install(tmp_path, monkeypatch):
+	seen = []
+
+	def run(cmd, **kw):
+		seen.append(cmd)
+		return subprocess.CompletedProcess(cmd, 0, "", "")
+
+	monkeypatch.setattr(R.subprocess, "run", run)
+	assert R.own_metadata(tmp_path, tmp_path / "deps", log=lambda m: None)
+	cmd = seen[0]
+	assert "--no-deps" in cmd and cmd[cmd.index("-e") + 1] == str(tmp_path) and "--prefix" in cmd
