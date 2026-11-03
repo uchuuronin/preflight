@@ -1,0 +1,107 @@
+{
+  "script": "vllm",
+  "entrypoint": "vllm/benchmarks/throughput.py",
+  "args": [
+    "--model",
+    "microsoft/Phi-3.5-mini-instruct",
+    "--dataset-name",
+    "random",
+    "--input-len",
+    "512",
+    "--output-len",
+    "256",
+    "--num-prompts",
+    "500"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ModuleNotFoundError",
+    "error": "ModuleNotFoundError: No module named 'vllm.logging_utils'\n",
+    "seconds": 1.0945891580000051,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10G",
+    "timing": "cuda_events",
+    "wall_s": 59.7
+  },
+  "recorder": {
+    "status": "error",
+    "error": "The script imports vllm.logging_utils, which is not installed in the probe image. ModuleNotFoundError: No module named 'vllm.logging_utils' at vllm/logger.py:22, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 57.561,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3475779584.0
+    },
+    "step_log": [],
+    "log_tail": "mports moonep, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports openai_harmony, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports outlines_core, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports pybase64, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports torchcodec, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports triton_kernels, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports xgrammar, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\nThe cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.\n\r0it [00:00, ?it/s]\r0it [00:00, ?it/s]\n/tmp/pf-h_q_cs8v/work/vllm/__init__.py:7: RuntimeWarning: Failed to read commit hash:\nNo module named 'vllm._version'\n  from .version import __version__, __version_tuple__  # isort:skip\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T13:51:37Z",
+      "duration_s": 57.561,
+      "error": "The script imports vllm.logging_utils, which is not installed in the probe image. ModuleNotFoundError: No module named 'vllm.logging_utils' at vllm/logger.py:22, before the first optimizer step (stage: running script)",
+      "error_code": "missing_package",
+      "missing_module": "vllm.logging_utils",
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 16.3665,
+        "max_w": 16.487,
+        "samples": 2
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3475779584.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 57.561,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "vllm": "0.6.4.post1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "serving",
+  "image": "serving"
+}
