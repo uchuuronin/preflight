@@ -1,0 +1,11 @@
+{
+	"name": "20261103-215806-41726520974-a-reval-F1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41726520974",
+	"ref": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"sha": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor reval-f1 --max-minutes 35 --repo https://github.com/pytorch/examples --commit acc295dc7b90714f1bf47f06004fc19a7fe235c4 --entrypoint word_language_model/main.py --args=--accel,--epochs,6",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T22:02:05Z"
+}

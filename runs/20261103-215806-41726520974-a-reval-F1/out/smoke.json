@@ -1,0 +1,200 @@
+{
+  "submitted": {
+    "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+    "created": true,
+    "position": 0
+  },
+  "info": {
+    "waiting_for_gpu": null,
+    "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+    "status": "done",
+    "position": null,
+    "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+    "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+    "error": null,
+    "retryable": null,
+    "error_code": null,
+    "last_seq": 17
+  },
+  "events": [
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "seq": 0,
+      "at": "2026-11-03T21:58:27.805411Z",
+      "stage": "queued",
+      "queue_position": 0,
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "seq": 1,
+      "at": "2026-11-03T21:58:30.855240Z",
+      "stage": "admitted",
+      "message": "attempt 1",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "seq": 2,
+      "at": "2026-11-03T21:58:31.245095Z",
+      "stage": "fetching",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "seq": 3,
+      "at": "2026-11-03T21:58:35.266385Z",
+      "stage": "mapping",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 4,
+      "at": "2026-11-03T21:58:36.769274Z",
+      "stage": "skeleton",
+      "message": "skeleton from the static reader",
+      "level": "info",
+      "record_rev": 1
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 5,
+      "at": "2026-11-03T21:58:58.897522Z",
+      "stage": "skeleton",
+      "message": "map refined by Muse Spark",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 6,
+      "at": "2026-11-03T21:58:59.274696Z",
+      "stage": "harnessing",
+      "level": "info",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 7,
+      "at": "2026-11-03T21:58:59.405030Z",
+      "stage": "probing",
+      "progress": 0.0,
+      "level": "info",
+      "probe_id": "p1",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "seq": 8,
+      "at": "2026-11-03T21:59:59.797650Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (1 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "seq": 9,
+      "at": "2026-11-03T22:00:59.809870Z",
+      "stage": "probing",
+      "message": "waiting for a free L4 GPU (2 min so far)",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "seq": 10,
+      "at": "2026-11-03T22:01:21.248533Z",
+      "stage": "probing",
+      "message": "A10 GPU ready after 2 min; probe running",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 11,
+      "at": "2026-11-03T22:01:28.239286Z",
+      "stage": "probing",
+      "message": "no L4 could be scheduled; this job's points run on A10",
+      "level": "warn",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 12,
+      "at": "2026-11-03T22:01:28.362692Z",
+      "stage": "probing",
+      "progress": 0.333,
+      "level": "info",
+      "probe_id": "p2",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 13,
+      "at": "2026-11-03T22:01:32.458238Z",
+      "stage": "probing",
+      "progress": 0.667,
+      "level": "info",
+      "probe_id": "p3",
+      "record_rev": 2
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 14,
+      "at": "2026-11-03T22:01:53.627572Z",
+      "stage": "probing",
+      "message": "no probe reached its first step: nothing was measured",
+      "level": "info",
+      "record_rev": 2,
+      "error_code": "user_error",
+      "nothing_measured": true
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 15,
+      "at": "2026-11-03T22:01:54.355814Z",
+      "stage": "predicting",
+      "message": "measured; predicting",
+      "level": "info"
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "share_token": "Uq4Bpp_m3zRv4s_zua97Gw",
+      "seq": 16,
+      "at": "2026-11-03T22:01:55.918863Z",
+      "stage": "predicting",
+      "message": "predicted",
+      "level": "info",
+      "record_rev": 3
+    },
+    {
+      "job_id": "01M6HPQDPXY8X7HAK91829HY2M",
+      "record_id": "01M6HPQNGK3CYWEJZ4TWE51WGX",
+      "seq": 17,
+      "at": "2026-11-03T22:01:56.128276Z",
+      "stage": "done",
+      "progress": 1.0,
+      "level": "info",
+      "error_code": "user_error",
+      "nothing_measured": true
+    }
+  ],
+  "error": null
+}
