@@ -1907,6 +1907,24 @@ def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]
 	tr = sm.training if sm else None
 	data = sm.data if sm else None
 	steps = values.get("max_steps") or (tr.max_steps if tr else None)
+	if steps and "max_steps" not in values and "epochs" in values and tr and tr.epochs:
+		# the map's step count beside an epochs knob, with no max_steps in the code's knobs, counts the epochs
+		# (the GNN sample's 471 = 3 epochs of 157, read from a comment): it scales with epochs and the examples a
+		# step takes, so moving epochs or the batch moves the run (D's walkthrough, Nov 3: GNN epochs changed nothing)
+		cur = _current(record)
+
+		def per(v: dict) -> float:
+			return (
+				float(v.get("batch_size", 1) or 1) * float(v.get("grad_accum", 1) or 1) * _n_gpus(v, record)
+			)
+
+		ratio = (
+			float(values["epochs"] or tr.epochs)
+			/ float(cur.get("epochs") or tr.epochs)
+			* per(cur)
+			/ per(values)
+		)
+		return float(math.ceil(float(steps) * ratio - 1e-9)), ""
 	if steps:
 		return float(steps), ""
 	epochs = values.get("epochs") or (tr.epochs if tr else None) or 1.0
