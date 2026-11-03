@@ -1,0 +1,105 @@
+{
+  "script": "open-r1",
+  "entrypoint": "src/open_r1/grpo.py",
+  "args": [
+    "--config",
+    "recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml",
+    "--vllm_mode",
+    "colocate",
+    "--max_steps",
+    "50"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ModuleNotFoundError",
+    "error": "ModuleNotFoundError: No module named 'async_lru'\n",
+    "seconds": 3.6001396029999997,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 8.0
+  },
+  "recorder": {
+    "status": "error",
+    "error": "The script imports async_lru, which is not installed in the probe image. ModuleNotFoundError: No module named 'async_lru' at src/open_r1/utils/competitive_programming/cf_scoring.py:6, before the first optimizer step (stage: running script)",
+    "error_code": "missing_package",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 6.546,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3865849856.0
+    },
+    "step_log": [],
+    "log_tail": "mize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n[preflight] requirements: the script imports aiofiles, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports async_lru, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports dotenv: installing python-dotenv\n[preflight] requirements: the script imports e2b_code_interpreter, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports jieba, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports latex2sympy2_extended: installing latex2sympy2-extended\n[preflight] requirements: the script imports math_verify: installing math-verify\n[preflight] requirements: the script imports morphcloud, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: installing python-dotenv, latex2sympy2-extended, math-verify\nThe cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.\n\r0it [00:00, ?it/s]\r0it [00:00, ?it/s]\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T01:25:36Z",
+      "duration_s": 6.546,
+      "error": "The script imports async_lru, which is not installed in the probe image. ModuleNotFoundError: No module named 'async_lru' at src/open_r1/utils/competitive_programming/cf_scoring.py:6, before the first optimizer step (stage: running script)",
+      "error_code": "missing_package",
+      "missing_module": "async_lru",
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 15.972999999999999,
+        "max_w": 15.988,
+        "samples": 10
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3865849856.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 6.546,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "rl",
+  "image": "probe"
+}
