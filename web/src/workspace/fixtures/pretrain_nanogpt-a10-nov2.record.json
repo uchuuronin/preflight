@@ -2563,7 +2563,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.checkpoint_every",
@@ -2606,7 +2612,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.checkpoint_every",
@@ -2649,7 +2661,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.checkpoint_every",
@@ -2692,7 +2710,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.checkpoint_every",
@@ -2735,7 +2759,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.gpu_type",
@@ -2772,7 +2802,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.gpu_type",
@@ -2809,7 +2845,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.gpu_type",
@@ -2846,7 +2888,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.gpu_type",
@@ -2883,7 +2931,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.gpu_type",
@@ -2920,7 +2974,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.max_steps",
@@ -2963,7 +3023,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.max_steps",
@@ -3006,7 +3072,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.max_steps",
@@ -3049,7 +3121,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.max_steps",
@@ -3092,7 +3170,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.max_steps",
@@ -3135,7 +3219,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.num_workers",
@@ -3177,7 +3267,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.num_workers",
@@ -3197,9 +3293,9 @@
 						"scale": "linear"
 					}
 				],
-				"point": "/2LhYuFi4WLhYuFi",
-				"lo": "LmJfYV9hX2FfYV9h",
-				"hi": "6mNoZGhkaGRoZGhk",
+				"point": "/2L/Yv9i/2L/Yv9i",
+				"lo": "LmLTYNNg02DTYNNg",
+				"hi": "6mMSZRJlEmUSZRJl",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
 				"scale": 64.0,
@@ -3219,7 +3315,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.num_workers",
@@ -3239,9 +3341,9 @@
 						"scale": "linear"
 					}
 				],
-				"point": "YUxOTE5MTkxOTE5M",
-				"lo": "vEu5SrlKuUq5SrlK",
-				"hi": "9EyDTYNNg02DTYNN",
+				"point": "YUxhTGFMYUxhTGFM",
+				"lo": "vEsKSgpKCkoKSgpK",
+				"hi": "9ExYTlhOWE5YTlhO",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -3261,7 +3363,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.num_workers",
@@ -3281,9 +3389,9 @@
 						"scale": "linear"
 					}
 				],
-				"point": "9UvUS9RL1EvUS9RL",
-				"lo": "CEsdSh1KHUodSh1K",
-				"hi": "gUwDTQNNA00DTQNN",
+				"point": "9Uv1S/VL9Uv1S/VL",
+				"lo": "CEt9SX1JfUl9SX1J",
+				"hi": "gUzFTcVNxU3FTcVN",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -3303,7 +3411,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.num_workers",
@@ -3345,7 +3459,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.packing",
@@ -3383,7 +3503,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.packing",
@@ -3399,9 +3525,9 @@
 						"scale": "categorical"
 					}
 				],
-				"point": "/2LhYg==",
-				"lo": "LmK/YA==",
-				"hi": "6mP9ZA==",
+				"point": "/2L/Yg==",
+				"lo": "LmLTYA==",
+				"hi": "6mMSZQ==",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
 				"scale": 64.0,
@@ -3421,7 +3547,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.packing",
@@ -3437,9 +3569,9 @@
 						"scale": "categorical"
 					}
 				],
-				"point": "YUxOTA==",
-				"lo": "vEvxSQ==",
-				"hi": "9Ew+Tg==",
+				"point": "YUxhTA==",
+				"lo": "vEsKSg==",
+				"hi": "9ExYTg==",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -3459,7 +3591,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.packing",
@@ -3475,9 +3613,9 @@
 						"scale": "categorical"
 					}
 				],
-				"point": "9UvUSw==",
-				"lo": "CEtmSQ==",
-				"hi": "gUysTQ==",
+				"point": "9Uv1Sw==",
+				"lo": "CEt9SQ==",
+				"hi": "gUzFTQ==",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -3497,7 +3635,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.packing",
@@ -3535,7 +3679,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.batch_size",
@@ -3578,7 +3728,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.batch_size",
@@ -3621,7 +3777,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.batch_size",
@@ -3664,7 +3826,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.batch_size",
@@ -3707,7 +3875,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.batch_size",
@@ -3750,7 +3924,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.gradient_checkpointing",
@@ -3788,7 +3968,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.gradient_checkpointing",
@@ -3826,7 +4012,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.gradient_checkpointing",
@@ -3864,7 +4056,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.gradient_checkpointing",
@@ -3902,7 +4100,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.gradient_checkpointing",
@@ -3940,7 +4144,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.seq_len",
@@ -3983,7 +4193,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.seq_len",
@@ -4026,7 +4242,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.seq_len",
@@ -4069,7 +4291,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.seq_len",
@@ -4112,7 +4340,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.seq_len",
@@ -4155,7 +4389,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.d_model",
@@ -4198,7 +4438,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.d_model",
@@ -4219,9 +4465,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "4WLhYuFi/2LhYuFi4WI=",
-				"lo": "X2FfYV9hLmJfYV9hX2E=",
-				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"point": "/2L/Yv9i/2L/Yv9i/2I=",
+				"lo": "02DTYNNgLmLTYNNg02A=",
+				"hi": "EmUSZRJl6mMSZRJlEmU=",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
 				"scale": 64.0,
@@ -4241,7 +4487,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.d_model",
@@ -4262,9 +4514,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "TkxOTE5MYUxOTE5MTkw=",
-				"lo": "uUq5SrlKvEu5SrlKuUo=",
-				"hi": "g02DTYNN9EyDTYNNg00=",
+				"point": "YUxhTGFMYUxhTGFMYUw=",
+				"lo": "CkoKSgpKvEsKSgpKCko=",
+				"hi": "WE5YTlhO9ExYTlhOWE4=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -4284,7 +4536,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.d_model",
@@ -4305,9 +4563,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "1EvUS9RL9UvUS9RL1Es=",
-				"lo": "HUodSh1KCEsdSh1KHUo=",
-				"hi": "A00DTQNNgUwDTQNNA00=",
+				"point": "9Uv1S/VL9Uv1S/VL9Us=",
+				"lo": "fUl9SX1JCEt9SX1JfUk=",
+				"hi": "xU3FTcVNgUzFTcVNxU0=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -4327,7 +4585,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.d_model",
@@ -4370,7 +4634,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.grad_clip",
@@ -4392,8 +4662,8 @@
 					}
 				],
 				"point": "y2TLZMtky2TLZMtky2Q=",
-				"lo": "HmQeZB5kTmQeZB5kHmQ=",
-				"hi": "lGWUZZRlVWWUZZRllGU=",
+				"lo": "TmROZE5kTmROZE5kTmQ=",
+				"hi": "VWVVZVVlVWVVZVVlVWU=",
 				"abstain": "AA==",
 				"model_id": "memory-analytical@0.3.1",
 				"scale": 16777216.0,
@@ -4413,7 +4683,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.grad_clip",
@@ -4434,12 +4709,12 @@
 						"scale": "log"
 					}
 				],
-				"point": "4WLhYuFi/2LhYuFi4WI=",
-				"lo": "X2FfYV9hLmJfYV9hX2E=",
-				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"point": "/2b/Zv9m/2b/Zv9m/2Y=",
+				"lo": "LmYuZi5mLmYuZi5mLmY=",
+				"hi": "6mfqZ+pn6mfqZ+pn6mc=",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
-				"scale": 64.0,
+				"scale": 32.0,
 				"fixed": {
 					"checkpoint_every": 20000,
 					"gpu_type": "A10",
@@ -4456,7 +4731,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.grad_clip",
@@ -4477,9 +4757,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "TkxOTE5MYUxOTE5MTkw=",
-				"lo": "uUq5SrlKvEu5SrlKuUo=",
-				"hi": "g02DTYNN9EyDTYNNg00=",
+				"point": "YUxhTGFMYUxhTGFMYUw=",
+				"lo": "vEu8S7xLvEu8S7xLvEs=",
+				"hi": "9Ez0TPRM9Ez0TPRM9Ew=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -4499,7 +4779,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.grad_clip",
@@ -4520,9 +4805,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "1EvUS9RL9UvUS9RL1Es=",
-				"lo": "HUodSh1KCEsdSh1KHUo=",
-				"hi": "A00DTQNNgUwDTQNNA00=",
+				"point": "9Uv1S/VL9Uv1S/VL9Us=",
+				"lo": "CEsISwhLCEsISwhLCEs=",
+				"hi": "gUyBTIFMgUyBTIFMgUw=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -4542,7 +4827,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.grad_clip",
@@ -4585,7 +4875,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.lr",
@@ -4628,7 +4923,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.lr",
@@ -4671,7 +4971,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.lr",
@@ -4714,7 +5019,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.lr",
@@ -4757,7 +5067,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.lr",
@@ -4800,7 +5115,12 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.n_head",
@@ -4843,7 +5163,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.n_head",
@@ -4864,9 +5190,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "4WLhYuFi/2LhYuFi4WI=",
-				"lo": "X2FfYV9hLmJfYV9hX2E=",
-				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"point": "/2L/Yv9i/2L/Yv9i/2I=",
+				"lo": "02DTYNNgLmLTYNNg02A=",
+				"hi": "EmUSZRJl6mMSZRJlEmU=",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
 				"scale": 64.0,
@@ -4886,7 +5212,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.n_head",
@@ -4907,9 +5239,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "TkxOTE5MYUxOTE5MTkw=",
-				"lo": "uUq5SrlKvEu5SrlKuUo=",
-				"hi": "g02DTYNN9EyDTYNNg00=",
+				"point": "YUxhTGFMYUxhTGFMYUw=",
+				"lo": "CkoKSgpKvEsKSgpKCko=",
+				"hi": "WE5YTlhO9ExYTlhOWE4=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -4929,7 +5261,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.n_head",
@@ -4950,9 +5288,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "1EvUS9RL9UvUS9RL1Es=",
-				"lo": "HUodSh1KCEsdSh1KHUo=",
-				"hi": "A00DTQNNgUwDTQNNA00=",
+				"point": "9Uv1S/VL9Uv1S/VL9Us=",
+				"lo": "fUl9SX1JCEt9SX1JfUk=",
+				"hi": "xU3FTcVNgUzFTcVNxU0=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -4972,7 +5310,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.n_head",
@@ -5015,7 +5359,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.n_layer",
@@ -5058,7 +5408,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.n_layer",
@@ -5079,9 +5435,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "4WLhYuFi/2LhYuFi4WI=",
-				"lo": "X2FfYV9hLmJfYV9hX2E=",
-				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"point": "/2L/Yv9i/2L/Yv9i/2I=",
+				"lo": "02DTYNNgLmLTYNNg02A=",
+				"hi": "EmUSZRJl6mMSZRJlEmU=",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
 				"scale": 64.0,
@@ -5101,7 +5457,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.n_layer",
@@ -5122,9 +5484,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "TkxOTE5MYUxOTE5MTkw=",
-				"lo": "uUq5SrlKvEu5SrlKuUo=",
-				"hi": "g02DTYNN9EyDTYNNg00=",
+				"point": "YUxhTGFMYUxhTGFMYUw=",
+				"lo": "CkoKSgpKvEsKSgpKCko=",
+				"hi": "WE5YTlhO9ExYTlhOWE4=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -5144,7 +5506,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.n_layer",
@@ -5165,9 +5533,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "1EvUS9RL9UvUS9RL1Es=",
-				"lo": "HUodSh1KCEsdSh1KHUo=",
-				"hi": "A00DTQNNgUwDTQNNA00=",
+				"point": "9Uv1S/VL9Uv1S/VL9Us=",
+				"lo": "fUl9SX1JCEt9SX1JfUk=",
+				"hi": "xU3FTcVNgUzFTcVNxU0=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -5187,7 +5555,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.n_layer",
@@ -5230,7 +5604,13 @@
 					"warmup_steps": 2000,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.warmup_steps",
@@ -5252,8 +5632,8 @@
 					}
 				],
 				"point": "y2TLZMtky2TLZMtky2Q=",
-				"lo": "HmQeZB5kTmQeZB5kHmQ=",
-				"hi": "lGWUZZRlVWWUZZRllGU=",
+				"lo": "TmROZE5kTmROZE5kTmQ=",
+				"hi": "VWVVZVVlVWVVZVVlVWU=",
 				"abstain": "AA==",
 				"model_id": "memory-analytical@0.3.1",
 				"scale": 16777216.0,
@@ -5273,7 +5653,12 @@
 					"n_layer": 12,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.warmup_steps",
@@ -5294,12 +5679,12 @@
 						"scale": "log"
 					}
 				],
-				"point": "4WLhYuFi/2LhYuFi4WI=",
-				"lo": "X2FfYV9hLmJfYV9hX2E=",
-				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"point": "/2b/Zv9m/2b/Zv9m/2Y=",
+				"lo": "LmYuZi5mLmYuZi5mLmY=",
+				"hi": "6mfqZ+pn6mfqZ+pn6mc=",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
-				"scale": 64.0,
+				"scale": 32.0,
 				"fixed": {
 					"checkpoint_every": 20000,
 					"gpu_type": "A10",
@@ -5316,7 +5701,12 @@
 					"n_layer": 12,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.warmup_steps",
@@ -5337,9 +5727,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "TkxOTE5MYUxOTE5MTkw=",
-				"lo": "uUq5SrlKvEu5SrlKuUo=",
-				"hi": "g02DTYNN9EyDTYNNg00=",
+				"point": "YUxhTGFMYUxhTGFMYUw=",
+				"lo": "vEu8S7xLvEu8S7xLvEs=",
+				"hi": "9Ez0TPRM9Ez0TPRM9Ew=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -5359,7 +5749,12 @@
 					"n_layer": 12,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.warmup_steps",
@@ -5380,9 +5775,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "1EvUS9RL9UvUS9RL1Es=",
-				"lo": "HUodSh1KCEsdSh1KHUo=",
-				"hi": "A00DTQNNgUwDTQNNA00=",
+				"point": "9Uv1S/VL9Uv1S/VL9Us=",
+				"lo": "CEsISwhLCEsISwhLCEs=",
+				"hi": "gUyBTIFMgUyBTIFMgUw=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -5402,7 +5797,12 @@
 					"n_layer": 12,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.warmup_steps",
@@ -5445,7 +5845,12 @@
 					"n_layer": 12,
 					"weight_decay": 0.1,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.memory.peak.weight_decay",
@@ -5467,8 +5872,8 @@
 					}
 				],
 				"point": "y2TLZMtky2TLZMtky2Q=",
-				"lo": "HmQeZB5kTmQeZB5kHmQ=",
-				"hi": "lGWUZZRlVWWUZZRllGU=",
+				"lo": "TmROZE5kTmROZE5kTmQ=",
+				"hi": "VWVVZVVlVWVVZVVlVWU=",
 				"abstain": "AA==",
 				"model_id": "memory-analytical@0.3.1",
 				"scale": 16777216.0,
@@ -5488,7 +5893,12 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps"
+				]
 			},
 			{
 				"id": "g.time.total.weight_decay",
@@ -5509,12 +5919,12 @@
 						"scale": "log"
 					}
 				],
-				"point": "4WLhYuFi/2LhYuFi4WI=",
-				"lo": "X2FfYV9hLmJfYV9hX2E=",
-				"hi": "aGRoZGhk6mNoZGhkaGQ=",
+				"point": "/2b/Zv9m/2b/Zv9m/2Y=",
+				"lo": "LmYuZi5mLmYuZi5mLmY=",
+				"hi": "6mfqZ+pn6mfqZ+pn6mc=",
 				"abstain": "AA==",
 				"model_id": "time-total@0.1.0",
-				"scale": 64.0,
+				"scale": 32.0,
 				"fixed": {
 					"checkpoint_every": 20000,
 					"gpu_type": "A10",
@@ -5531,7 +5941,12 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps"
+				]
 			},
 			{
 				"id": "g.cost.total.weight_decay",
@@ -5552,9 +5967,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "TkxOTE5MYUxOTE5MTkw=",
-				"lo": "uUq5SrlKvEu5SrlKuUo=",
-				"hi": "g02DTYNN9EyDTYNNg00=",
+				"point": "YUxhTGFMYUxhTGFMYUw=",
+				"lo": "vEu8S7xLvEu8S7xLvEs=",
+				"hi": "9Ez0TPRM9Ez0TPRM9Ew=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -5574,7 +5989,12 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.weight_decay",
@@ -5595,9 +6015,9 @@
 						"scale": "log"
 					}
 				],
-				"point": "1EvUS9RL9UvUS9RL1Es=",
-				"lo": "HUodSh1KCEsdSh1KHUo=",
-				"hi": "A00DTQNNgUwDTQNNA00=",
+				"point": "9Uv1S/VL9Uv1S/VL9Us=",
+				"lo": "CEsISwhLCEsISwhLCEs=",
+				"hi": "gUyBTIFMgUyBTIFMgUw=",
 				"abstain": "AA==",
 				"model_id": "cost-gpu-hours@0.1.0",
 				"scale": 1.0,
@@ -5617,7 +6037,12 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps"
+				]
 			},
 			{
 				"id": "g.risk.oom.weight_decay",
@@ -5660,7 +6085,12 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"precision": "fp32"
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps"
+				]
 			},
 			{
 				"id": "g.memory.peak.precision",
@@ -5699,7 +6129,13 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"weight_decay": 0.1
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.time.total.precision",
@@ -5738,7 +6174,13 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"weight_decay": 0.1
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.total.precision",
@@ -5777,7 +6219,13 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"weight_decay": 0.1
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.cost.gpu_hours.precision",
@@ -5816,7 +6264,13 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"weight_decay": 0.1
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			},
 			{
 				"id": "g.risk.oom.precision",
@@ -5855,7 +6309,13 @@
 					"n_layer": 12,
 					"warmup_steps": 2000,
 					"weight_decay": 0.1
-				}
+				},
+				"independent_of": [
+					"grad_clip",
+					"lr",
+					"warmup_steps",
+					"weight_decay"
+				]
 			}
 		]
 	},
