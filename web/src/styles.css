@@ -602,6 +602,29 @@ button.pf-prov:hover { color: var(--pf-fg); }
 /* Each panel at its own height: stretched to the samples list, the form's Check in button sat a screen below the
    last field (Chiya, Nov 2: too much scrolling). */
 .pf-checkin__grid { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+/* Chiya's layout (Nov 3): the form on the left, the samples and then the documentation card on the right,
+   and one panel across both for where the code goes and Check in. On a phone: the form, the
+   documentation card, the samples, then the panel. */
+@media (min-width: 900px) {
+	.pf-checkin__grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 20px; align-items: start; }
+	.pf-checkin__grid > .pf-desk { grid-column: 1; grid-row: 1 / span 2; }
+	.pf-checkin__grid > .pf-departures { grid-column: 2; grid-row: 1; }
+	.pf-checkin__grid > .pf-checkin__doc { grid-column: 2; grid-row: 2; }
+}
+@media (max-width: 899.98px) {
+	.pf-checkin__grid > * { flex-basis: 100%; }
+	.pf-checkin__grid > .pf-checkin__doc { order: 1; }
+	.pf-checkin__grid > .pf-departures { order: 2; }
+}
+.pf-checkin__doc { padding: 16px 20px; border-radius: var(--pf-radius-lg); font-size: var(--pf-text-sm); }
+.pf-checkin__confirm { margin-top: 20px; padding: 18px 20px; border-radius: var(--pf-radius-lg); display: flex; flex-direction: column; gap: 10px; }
+.pf-checkin__confirm .pf-datause { border-top: 0; padding-top: 0; }
+.pf-desk__col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* One column (a phone): the aim, the GPU, then the goal box, as the inputs then the goal box (Chiya, Nov 3). */
+@container (max-width: 719.98px) {
+	.pf-desk__col { display: contents; }
+	.pf-desk__col > .pf-field { order: 2; }
+}
 
 .pf-desk {
 	flex: 1.6 1 460px;

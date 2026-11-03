@@ -431,6 +431,8 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						</div>
 						{/* Goal and GPU share a row where the desk is wide enough (Chiya, Nov 2: less scrolling). */}
 						<div className="pf-desk__pair">
+							{/* The aim and, under it, what you're trying to do: the left column beside the GPU choices (Chiya's mockup, Nov 3). */}
+							<div className="pf-desk__col">
 							<div className="pf-desk__row">
 								<span className="pf-desk__label" id={`${ids.describe}-goal`}>
 									{t("newflight.goal")}
@@ -448,6 +450,11 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 										</button>
 									))}
 								</div>
+							</div>
+							<div className="pf-field">
+								<label htmlFor={ids.describe}>{t("newflight.describe.label")}</label>
+								<textarea id={ids.describe} rows={2} placeholder={t("newflight.describe.placeholder")} value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
+							</div>
 							</div>
 							<div className="pf-desk__row">
 								<span className="pf-desk__label" id={`${ids.describe}-gpu`}>
@@ -497,33 +504,6 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 								</div>
 							</div>
 						) : null}
-						<div className="pf-field">
-							<label htmlFor={ids.describe}>{t("newflight.describe.label")}</label>
-							<textarea id={ids.describe} rows={2} placeholder={t("newflight.describe.placeholder")} value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
-						</div>
-						{error ? (
-							<p className="pf-error" role="alert">
-								{error}
-							</p>
-						) : null}
-						{/* "Got it" right above Check in (D's walkthrough: it sat a screen below, under Departures). */}
-						<DataUseNotice onChange={onDataUse} />
-						<div className="pf-desk__foot">
-							{accepted ? (
-								// Source: measured, A's run a-smoke-l4-main-4 (Oct 28): the LoRA zoo script from
-								// upload to record in 6 min 45 s on an L4 (docs/status/a.md). No dollar figure until
-								// the sandbox's CPU and memory cost is read off the bill.
-								<span className="pf-hint">{t("newflight.cost_hint")}</span>
-							) : (
-								// On a phone the box is two panels down: the hint takes the visitor there.
-								<button type="button" className="pf-link pf-hint" onClick={focusDataUse}>
-									{t("datause.needed")}
-								</button>
-							)}
-							<button ref={checkInBtn} type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
-								{busy ? t("newflight.checking_in") : t("newflight.check_in")}
-							</button>
-						</div>
 					</section>
 					<section className="glass pf-departures" aria-label={t("newflight.samples")}>
 						<div className="pf-departures__head">
@@ -548,7 +528,41 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						))}
 						<p className="pf-departures__foot">{t("newflight.departures.foot")}</p>
 					</section>
+					{/* The documentation link's own card, under the samples (Chiya's mockup, Nov 3); with the Help page. */}
+					{flag("c.help") ? (
+						<section className="glass pf-checkin__doc" aria-label={t("newflight.help_card")}>
+							<a className="pf-link" href="#/help">
+								{t("newflight.help_link")}
+							</a>
+						</section>
+					) : null}
 				</div>
+				{/* Where the code goes, "Got it" and Check in: one panel across both columns, last (Chiya's mockup). */}
+				<section className="glass pf-checkin__confirm" aria-label={t("datause.title")}>
+				{error ? (
+					<p className="pf-error" role="alert">
+						{error}
+					</p>
+				) : null}
+				{/* "Got it" right above Check in (D's walkthrough: it sat a screen below, under Departures). */}
+				<DataUseNotice onChange={onDataUse} />
+				<div className="pf-desk__foot">
+					{accepted ? (
+						// Source: measured, A's run a-smoke-l4-main-4 (Oct 28): the LoRA zoo script from
+						// upload to record in 6 min 45 s on an L4 (docs/status/a.md). No dollar figure until
+						// the sandbox's CPU and memory cost is read off the bill.
+						<span className="pf-hint">{t("newflight.cost_hint")}</span>
+					) : (
+						// On a phone the box is two panels down: the hint takes the visitor there.
+						<button type="button" className="pf-link pf-hint" onClick={focusDataUse}>
+							{t("datause.needed")}
+						</button>
+					)}
+					<button ref={checkInBtn} type="button" className="pf-btn pf-btn--primary" disabled={!canSubmit || busy || !accepted} onClick={() => void submit()}>
+						{busy ? t("newflight.checking_in") : t("newflight.check_in")}
+					</button>
+				</div>
+				</section>
 				<p className="pf-notice">{t("newflight.notice")}</p>
 			</div>
 		</div>
