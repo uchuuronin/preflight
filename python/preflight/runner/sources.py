@@ -162,9 +162,10 @@ def _drop_login_calls(code: str, names: set, mods: set) -> tuple[str, int]:
 				drop.append(st)
 	lines = code.splitlines(keepends=True)
 	taken = {}
+	others = {r for s in tree.body if s not in drop for r in range(s.lineno - 1, s.end_lineno)}
 	for st in drop:
 		rows = range(st.lineno - 1, st.end_lineno)
-		if any(r in taken for r in rows) or st.col_offset != 0:
+		if any(r in taken or r in others for r in rows) or st.col_offset != 0:
 			continue  # shares a line with another statement (`a = 1; notebook_login()`): left as it is
 		taken.update(dict.fromkeys(rows))
 		lines[st.lineno - 1] = "pass  # Preflight skipped this login call; public models need no login\n"

@@ -46,7 +46,8 @@ def test_only_hugging_faces_own_bare_login_calls_go_and_the_imports_stay():
 	assert sk == [1] and "hh.login()" not in got
 	# not Hugging Face's, or with a token: kept
 	for cell in ("import wandb\nwandb.login()", "wandb.login()", "client.login('u', 'p')",
-		"from huggingface_hub import login\nlogin(token=os.environ['HF_TOKEN'])", "def login():\n    pass\nlogin()"):  # fmt: skip
+		"from huggingface_hub import login\nlogin(token=os.environ['HF_TOKEN'])",
+		"from huggingface_hub import notebook_login\nnotebook_login(); x = 1", "def login():\n    pass\nlogin()"):  # fmt: skip
 		got, sk = conv(cell)
 		assert sk == [] and got.strip() == cell.strip(), cell
 	# a name imported in an earlier cell counts; one shadowed by another import doesn't

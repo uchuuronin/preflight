@@ -97,10 +97,18 @@ def _stream(
 
 		term = _probe_tty()
 		env = {**env, "COLUMNS": str(TTY_COLS), "LINES": str(TTY_ROWS)}
-	proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=cwd,
-		stdin=term[1] if term else None, start_new_session=True)  # fmt: skip
-	if term:
-		os.close(term[1])
+	try:
+		proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=cwd,
+			stdin=term[1] if term else None, start_new_session=True)  # fmt: skip
+	finally:
+		if term:  # the child holds the slave end now (or never started): ours closes either way
+			os.close(term[1])
+			if "proc" not in locals():
+				from preflight.probes.local import _TTYS
+
+				with contextlib.suppress(ValueError):
+					_TTYS.remove(term[0])
+				os.close(term[0])
 	fd = proc.stdout.fileno()
 	exited_at = None
 	code: int | None = None
