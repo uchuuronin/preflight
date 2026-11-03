@@ -60,6 +60,20 @@ def main(argv: list[str] | None = None) -> int:
 	os.chdir(workdir)
 	sys.path.insert(0, workdir)
 	sys.argv = [ns.script, *script_args]
+	cache = os.environ.get(
+		"PREFLIGHT_DATASET_CACHE"
+	)  # probes.dataset_cache, ops runs only (runner/ops_app.py)
+	if cache and os.path.isdir(cache):
+		try:
+			import torchvision.datasets.utils as tvu
+
+			from .dataset_cache import patch
+
+			patch(tvu, cache, log=lambda m: print(m, file=sys.stderr, flush=True))
+		except (
+			Exception
+		):  # a torchvision that doesn't load here (one built for another torch): the script's to find
+			pass
 	ended, error = "finished", None
 	t0 = time.perf_counter()
 	print(f"[bare] running {ns.script} for {ns.steps} optimizer steps", file=sys.stderr, flush=True)

@@ -85,6 +85,9 @@ SAFE_ENV = (
 	"HF_HOME",
 	"PREFLIGHT_PIP_CACHE",
 	"PREFLIGHT_DEPS_DIR",
+	# probes.extra_hosts: PyG's public wheel index (a URL, no secret). Without it a probe never saw the index, so
+	# torch-sparse didn't install and OGB's probe stopped where its full run finished (a-all4-8, Nov 3)
+	"PREFLIGHT_PYG_INDEX",
 	"HF_HUB_OFFLINE",
 	"HF_DATASETS_OFFLINE",
 	"TRANSFORMERS_OFFLINE",
@@ -104,6 +107,12 @@ VALID_STATUS = {"ok", "oom", "error", "timeout", "cancelled"}
 
 # Probe.extras keys B reads by name (docs/requests.md, B -> A); keep them stable
 EXTRAS_KEYS = (
+	# probes.step_clock: the GPU's SM clock over the timed steps (B, Nov 3)
+	"sm_clock_mhz_p50",
+	"sm_clock_mhz_min",
+	"sm_clock_mhz_max",
+	"sm_clock_timed_steps",
+	"sm_clock_readings",
 	# probes.eval_units: an eval probe's scoring batches (a forward under no_grad outside generate)
 	"eval_forward_batches",
 	"eval_forward_s_p50",
@@ -213,6 +222,13 @@ class ProbeSpec:
 	extra_packages: tuple[str, ...] = ()
 	install_uv: bool = False  # probes.uv_install: uv pip before pip
 	install_pyg: bool = False  # probes.extra_hosts: PyG's wheel index (the sandbox reaches data.pyg.org)
+	# probes.repo_install_exec: a setup.py that builds its list in code is run, in the sandbox, to read it
+	install_exec: bool = False
+	torch_note: bool = (
+		False  # probes.torch_new: say plainly when the code asks for a newer torch than the image's
+	)
+	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
+	step_clock: bool = False  # probes.step_clock: the GPU's SM clock on each timed step
 	install_sdists: tuple[
 		str, ...
 	] = ()  # a check-in by command's source-only dependencies (sources.COMMANDS)
@@ -987,6 +1003,10 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"extra_packages": list(spec.extra_packages),
 				"install_uv": spec.install_uv,
 				"install_pyg": spec.install_pyg,
+				"install_exec": spec.install_exec,
+				"torch_note": spec.torch_note,
+				"dataset_cache": spec.dataset_cache,
+				"step_clock": spec.step_clock,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,
 				"deps": str(box / "deps"),

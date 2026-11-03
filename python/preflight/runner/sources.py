@@ -49,6 +49,8 @@ class Fetched:
 	# (harness/closure.py): files and bytes read, imported files left out, the repository's files
 	partial: dict | None = None
 	lens: str | None = None  # a check-in by command: its tool's lens (COMMANDS), over the map's reading
+	# runner.probe_without_map: why the whole source wasn't mapped (the map is the entry point's alone)
+	map_skipped: str | None = None
 
 
 def content_hash(files: dict[str, str]) -> str:

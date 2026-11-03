@@ -142,7 +142,9 @@ def _bare(
 		try:
 			repo_kw = {"repo": True, "entrypoint": entrypoint} if install_repo else {}
 			how = {
-				k: v for k, v in (install_opts or {}).items() if k in ("uv", "pyg", "sdists")
+				k: v
+				for k, v in (install_opts or {}).items()
+				if k in ("uv", "pyg", "sdists", "build", "torch_note")
 			}  # the installer's own
 			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw, **how)  # fmt: skip
 		finally:
@@ -242,6 +244,8 @@ def measure(
 			timed=recorder_steps, timeout_s=left, alternate_sync=not (generate_sample or generate_calls),
 			install_requirements=install_requirements, install_repo=install_repo, generate_sample=generate_sample,
 			install_uv=bool((install_opts or {}).get("uv")), install_pyg=bool((install_opts or {}).get("pyg")),
+			install_exec=bool((install_opts or {}).get("build")), torch_note=bool((install_opts or {}).get("torch_note")),
+			dataset_cache=bool((install_opts or {}).get("dataset_cache")),
 			install_sdists=tuple((install_opts or {}).get("sdists", ())),
 			eval_units=int((install_opts or {}).get("eval_units") or 0),
 			generate_calls=generate_calls))  # fmt: skip

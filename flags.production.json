@@ -30,5 +30,11 @@
 	"probes.agent_proxy_replies": true,
 	"runner.free_resend": true,
 	"c.checkin_help": true,
-	"engine.carry_free_knobs": true
+	"engine.carry_free_knobs": true,
+	"runner.read_closure": true,
+	"probes.repo_install_exec": true,
+	"runner.probe_without_map": true,
+	"harness.lens_by_entry": true,
+	"probes.torch_new": true,
+	"probes.dataset_cache": true
 }
