@@ -232,7 +232,7 @@ def test_the_providers_note_fits_beside_a_long_error_line():
 		None, cwd=None, proxy=Proxy(), population=None, env={}, launch=lambda env: Proc(), note_replies=True
 	)
 	sel = both.selection
-	assert len(sel) <= 180 and sel.index("provider answered") < sel.index("proxy answered")
-	assert "script failed" not in sel or sel.index("proxy answered") < sel.index(
-		"script failed"
-	)  # the cause first
+	# the provider's refusal first; what fits of the proxy's note and the script's line after it, in that order
+	assert len(sel) <= 180 and "provider answered 400" in sel
+	at = [sel.find(x) for x in ("provider answered", "proxy answered", "script failed") if x in sel]
+	assert at == sorted(at)
