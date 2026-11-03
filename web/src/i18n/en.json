@@ -1224,5 +1224,6 @@
 	"datause.who.spark_open": "Muse Spark Open (on Baseten)",
 	"datause.who.glimmer": "Muse Glimmer (on Preflight's own GPU, if you pick private triage)",
 	"datause.who.code": "Muse Code (fixes, when you ask for one)",
-	"newflight.gpu.hint": "L4 or A10 starts on an L4; when none is free within two minutes it moves to an A10, then an L40S, and a script that runs out of memory may be measured on a bigger card."
+	"newflight.gpu.hint": "L4 or A10 starts on an L4; when none is free within two minutes it moves to an A10, then an L40S, and a script that runs out of memory may be measured on a bigger card.",
+	"dial.if_it_fits": "If it didn't run out of memory"
 }
