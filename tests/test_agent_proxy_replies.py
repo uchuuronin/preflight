@@ -179,3 +179,51 @@ def test_a_providers_error_is_kept_with_the_requests_shape_never_its_values(prox
 	assert shape == "keys max_tokens,messages,model,stop; roles system,user; content list:text,text"
 	assert "secret" not in shape and "end_code" not in shape
 	assert request_shape(b"[1]") == "not an object" and request_shape(b"{") == "not JSON"
+
+
+def test_the_providers_note_fits_beside_a_long_error_line():
+	class Proxy:
+		def open_run(self, run_id, **kw):
+			return "http://proxy/v1"
+
+		def run_stats(self, run_id):
+			return {}
+
+		def run_tasks(self, run_id):
+			return []
+
+		def own_replies(self):
+			return []
+
+		def provider_errors(self):
+			return [
+				(
+					400,
+					"invalid_request_error",
+					"muse-spark-1.3",
+					"keys messages,model,stop; roles system,user",
+					1,
+				)
+			]
+
+	class Proc:
+		def __init__(self):
+			self.report = {"ended": "exited", "code": 1,
+				"error": "smolagents.utils.AgentGenerationError: Error while generating output: Error code: 400"}  # fmt: skip
+
+		def poll(self):
+			return 1
+
+		def wait(self, timeout):
+			pass
+
+		def kill(self):
+			pass
+
+	s = run_sample(
+		None, cwd=None, proxy=Proxy(), population=None, env={}, launch=lambda env: Proc(), note_replies=True
+	)
+	assert (
+		"provider answered 400 invalid_request_error (muse-spark-1.3) to keys messages,model,stop"
+		in s.selection
+	)
