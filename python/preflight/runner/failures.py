@@ -133,6 +133,12 @@ STEPS: dict[str, tuple[str, str]] = {
 		"pin versions that install together, or install "
 		"them yourself and run `preflight run train.py` on your machine",
 	),
+	# runner.entrypoint_path (C, Nov 3): the repo's own module, not a package to install
+	"missing_module.local": (
+		"importing the repo's own modules",
+		'check in the whole repository (scope "repo"), or name the entry point the code runs from so its '
+		"folder is on the path; it isn't a package to add to requirements.txt",
+	),
 	"missing_package": (
 		"importing the script's packages",
 		"add the package (with its version) to "

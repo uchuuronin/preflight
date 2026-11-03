@@ -15,7 +15,16 @@ import shutil
 from pathlib import Path
 
 CACHE_DIR = "/datasets"  # the volume's mount in the probe sandbox (runner/modal_app.py)
-DATASETS = ("CIFAR10", "CIFAR100", "MNIST", "FashionMNIST")
+DATASETS = ("CIFAR10", "CIFAR100", "MNIST", "FashionMNIST", "ogbn-arxiv")
+# archives with no published md5, kept by their URL (CACHE_DIR/by-url/<sha256 of the URL>): OGB's, which it fetches over
+# plain HTTP, which the probe sandbox's allowlist doesn't open (a-fresh-live-ogb-2-checkin, Nov 3)
+URL_FILES = {"ogbn-arxiv": "http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip"}
+# each URL_FILES archive's sha256, pinned from the fill job's own download (OGB publishes no checksum, and its host is
+# plain HTTP): the cache serves an archive only when its copy matches, so a tampered or error-page file never is
+URL_SHA256: dict[str, str] = {
+	# a-fill-datasets-ogb-1 (GitHub 41682933741, Nov 3): 83,058,288 bytes from snap.stanford.edu
+	"http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip": "49f85c801589ecdcc52cfaca99693aaea7b8af16a9ac3f41dd85a5f3193fe276",
+}
 
 
 def resources() -> list[tuple[str, list[str], str]]:
@@ -30,7 +39,55 @@ def resources() -> list[tuple[str, list[str], str]]:
 	]
 	for cls in (D.MNIST, D.FashionMNIST):
 		out += [(cls.__name__, [f"{m}{name}" for m in cls.mirrors], md5) for name, md5 in cls.resources]
-	return out
+	return out + [(name, [url], None) for name, url in URL_FILES.items()]
+
+
+def url_key(url: str) -> str:
+	import hashlib
+
+	return hashlib.sha256(url.encode()).hexdigest()[:32]
+
+
+def cached_url(cache_dir: str | os.PathLike, url: str) -> Path | None:
+	"""The volume's copy of an archive kept by its URL (URL_FILES only), when it has one whose sha256 is the
+	pinned one (none pinned: never served)."""
+	import hashlib
+
+	want = URL_SHA256.get(url)
+	if url not in URL_FILES.values() or not want:
+		return None
+	p = Path(cache_dir) / "by-url" / url_key(url)
+	if not p.is_file():
+		return None
+	h = hashlib.sha256()
+	with open(p, "rb") as f:
+		while chunk := f.read(1 << 20):
+			h.update(chunk)
+	return p if h.hexdigest() == want else None
+
+
+def patch_ogb(url_mod, cache_dir: str | os.PathLike, log=print) -> None:
+	"""Wrap ogb.utils.url's decide_download (which opens the URL to read its size) and download_url, so an OGB
+	archive the volume has is copied, not fetched. The dataset modules import both names from it, after it has
+	run, so the wrappers are what they get."""
+	orig_decide, orig_download = url_mod.decide_download, url_mod.download_url
+
+	def decide_download(url, *a, **kw):
+		return True if cached_url(cache_dir, url) is not None else orig_decide(url, *a, **kw)
+
+	def download_url(url, folder, *a, **kw):
+		src = cached_url(cache_dir, url)
+		if src is None:
+			return orig_download(url, folder, *a, **kw)
+		dst = os.path.join(folder, url.rpartition("/")[2])
+		os.makedirs(folder, exist_ok=True)
+		if not (os.path.exists(dst) and os.path.getsize(dst) > 0):
+			shutil.copyfile(src, dst)
+		log(f"[preflight] dataset cache: {os.path.basename(dst)} from Preflight's copy, not downloaded")
+		return dst
+
+	decide_download.__wrapped__, download_url.__wrapped__ = orig_decide, orig_download
+	url_mod.decide_download, url_mod.download_url = decide_download, download_url
 
 
 def cached(cache_dir: str | os.PathLike, md5: str | None) -> Path | None:

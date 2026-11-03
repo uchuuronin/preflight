@@ -245,3 +245,73 @@ def test_a_very_long_path_isnt_followed_and_a_cut_is_said_as_a_cut():
 	}
 	f = Fetched(files={"main.py": ""}, entrypoint="main.py", source=None, partial=partial)
 	assert "when the import lookups ran out" in _reading_findings(f)[0].detail
+
+
+def test_files_the_code_may_open_are_read_but_not_followed():
+	"""B's must-fix 3 (Nov 3): `--config configs/a.yaml`, a vocab file named in the code, a file beside a module."""
+	repo = {
+		"train.py": "import mypkg.data\nopen('configs/base.yaml')\n",
+		"mypkg/__init__.py": "",
+		"mypkg/data.py": "VOCAB = 'vocab.json'\nimport os\n",
+		"mypkg/vocab.json": "{}",
+		"configs/a.yaml": "lr: 1\n",
+		"configs/base.yaml": "x: 1\n",
+		"configs/other.yaml": "unused: 1\n",
+		"README.md": "# docs",
+		"tools/evil.py": "import os\n",
+	}
+	got, info = import_closure(repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99,
+		max_bytes=10**6, args=["--config", "configs/a.yaml"])  # fmt: skip
+	assert {"configs/a.yaml", "configs/base.yaml", "mypkg/vocab.json"} <= set(got)
+	assert "configs/other.yaml" not in got and "README.md" not in got and "tools/evil.py" not in got
+	assert info["data_read"] == 3 and info["data_skipped"] == 0
+	got2, _ = import_closure(repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99,
+		max_bytes=10**6, args=["--config", "configs/a.yaml"])  # fmt: skip
+	assert got == got2  # still the same files on every read
+	_, small = import_closure(repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=4, max_bytes=10**6,
+		args=["--config", "configs/a.yaml"])  # fmt: skip
+	assert small["data_skipped"] > 0
+	repo2 = {"a/train.py": "open('../../etc/passwd')\n", "etc/passwd": "x"}
+	escaped, _ = import_closure(
+		repo2, lambda ps: {p: repo2[p] for p in ps}, "a/train.py", max_files=9, max_bytes=999
+	)
+	assert "etc/passwd" not in escaped  # a path that leaves the repository is never read
+
+
+def test_a_lazy_package_s_type_checking_imports_are_followed():
+	"""B's must-fix 4 (Nov 3): a transformers-style lazy __init__ names its real modules under TYPE_CHECKING."""
+	repo = {
+		"train.py": "from mylib import Trainer\n",
+		"mylib/__init__.py": "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from .trainer import Trainer\n",
+		"mylib/trainer.py": "class Trainer: ...\n",
+		"app.py": "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    import heavy\n",
+		"heavy.py": "",
+	}
+	got, _ = import_closure(
+		repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99, max_bytes=10**6
+	)
+	assert "mylib/trainer.py" in got
+	got, _ = import_closure(
+		repo, lambda ps: {p: repo[p] for p in ps}, "app.py", max_files=99, max_bytes=10**6
+	)
+	assert "heavy.py" not in got  # a module's own TYPE_CHECKING body still isn't followed
+
+
+def test_the_data_pass_keeps_the_budget_without_sizes_and_doesn_t_count_as_imports():
+	repo = {"train.py": "import util\n", "util.py": "", "tool.py": "", "big.json": "x" * 50, "b.json": "y"}
+	got, info = import_closure(repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99, max_bytes=30,
+		sizes={"train.py": 12, "util.py": 0, "tool.py": 0}, args=["tool.py"])  # fmt: skip
+	assert "big.json" not in got and info["bytes"] <= 30 and "big.json" in info["data_left_out"]
+	assert "tool.py" in got and info["imported"] == 1  # tool.py is read as named, not counted as an import
+
+
+def test_a_follow_up_on_a_record_read_before_the_data_pass_still_matches_its_code():
+	from preflight.runner.sources import content_hash
+
+	repo = {"train.py": "import util\n", "util.py": "", "notes.txt": "x"}
+	got, info = import_closure(
+		repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99, max_bytes=999
+	)
+	assert info["data_files"] == ["notes.txt"]
+	before = content_hash({k: v for k, v in got.items() if k not in info["data_files"]})
+	assert before == content_hash({"train.py": "import util\n", "util.py": ""})  # what the old read hashed

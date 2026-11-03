@@ -69,3 +69,17 @@ def test_a_follow_up_without_a_stored_map_still_says_so_and_a_partial_read_keeps
 	)
 	ids = [x.id for x in _reading_findings(f)]
 	assert ids == ["source.map_skipped", "source.partial.read"]
+
+
+def test_a_follow_up_probe_keeps_the_parent_s_map_skipped_finding(tmp_path, on):
+	from preflight.runner.remote_store import externalise_files
+	from test_record_jobs import _deps
+
+	d = _deps(tmp_path, FakeRunner())
+	parent = P.run_pipeline(externalise_files(_src(BROKEN), d.blobs), P._Ctx(), d)
+	assert any(f.id == "source.map_skipped" for f in parent.findings)
+	d.records.put(parent)  # the worker writes the final record (worker.run_one)
+	k = next(k for k in parent.job.script_map.knobs if k.kind in ("int", "float"))
+	again = P.run_pipeline({"mode": "probe", "source": {"kind": "record", "record_ref": parent.share_token},
+		"knobs": {k.id: k.current * 2}}, P._Ctx(), d)  # fmt: skip
+	assert any(f.id == "source.map_skipped" for f in again.findings)  # B's must-fix 5

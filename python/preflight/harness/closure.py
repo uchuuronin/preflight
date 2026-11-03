@@ -12,7 +12,8 @@ doesn't parse is kept but not followed. Resolution is the static, ordinary case:
 `from a.b import c` to `a/b.py` or `a/b/__init__.py` (and `a/b/c.py` for the `from` form), each
 package's `__init__.py` on the way, relative imports from the importing file's package, under the
 first of the roots Python would search that has the module: the entry point's own folder, the
-repository's top, `src/`. Imports under `if TYPE_CHECKING:` aren't followed. Imports made by string
+repository's top, `src/`. Imports under `if TYPE_CHECKING:` aren't followed, except in a package's `__init__.py`
+(a lazy package's real modules, B's must-fix 4). Imports made by string
 (importlib, registries, entry points in pyproject) aren't seen.
 
 The repository is untrusted: a dotted name, an import's names and a file's imports are capped, and
@@ -68,10 +69,54 @@ def _imports(path: str, text: str) -> list[tuple[list[str], int, list[str]]]:
 			names = [a.name for a in node.names if a.name != "*"][:MAX_NAMES]
 			out.append((parts, min(node.level or 0, MAX_PARTS), names))
 		elif _type_checking(node):
-			stack.extend(node.orelse)  # the `if TYPE_CHECKING:` body only runs under a type checker
+			stack.extend(node.orelse)  # the `if TYPE_CHECKING:` body only runs under a type checker,
+			if path.endswith(
+				"__init__.py"
+			):  # except a lazy package's: its body names the real modules (B, Nov 3)
+				stack.extend(node.body)
 		else:
 			stack.extend(ast.iter_child_nodes(node))
 	return out[:MAX_IMPORTS]
+
+
+DOCS = (".md", ".rst", ".html", ".ipynb")  # beside the code but not what it opens: never read as data
+MAX_STRINGS = 500  # guess: string literals a file is read for paths it may open
+
+
+def _path_strings(path: str, text: str) -> list[str]:
+	"""String literals in a file that could name a file it opens (a slash or a dot, no NUL, under 300 characters),
+	capped; [] when the file doesn't parse, or has a line over MAX_LINE once continuations are joined (the same
+	guard as _imports: a long dotted name hidden across short lines takes CPython's parser seconds)."""
+	if any(len(line) > MAX_LINE for line in text.replace("\\\r\n", "").replace("\\\n", "").splitlines()):
+		return []
+	try:
+		tree = ast.parse(text, filename=path)
+	except (SyntaxError, ValueError, RecursionError, MemoryError):
+		return []
+	out = []
+	for node in ast.walk(tree):
+		if isinstance(node, ast.Constant) and isinstance(node.value, str):
+			v = node.value.strip()
+			if 0 < len(v) < 300 and "\0" not in v and ("/" in v or "." in v) and "\n" not in v:
+				out.append(v)
+				if len(out) >= MAX_STRINGS:
+					break
+	return out
+
+
+def _as_repo_path(name: str, base: str) -> str | None:
+	"""A string as a path inside the repository, relative to `base` (a folder), or None if it leaves it."""
+	parts: list[str] = [p for p in base.split("/") if p] if not name.startswith("/") else []
+	for part in name.split("/"):
+		if part in ("", "."):
+			continue
+		if part == "..":
+			if not parts:
+				return None
+			parts.pop()
+		else:
+			parts.append(part)
+	return "/".join(parts) or None
 
 
 def _resolve(parts: list[str], names: list[str], prefix: str, have: set[str], dirs: set[str]) -> list[str]:
@@ -107,6 +152,7 @@ def import_closure(
 	max_bytes: int,
 	sizes: dict[str, int] | None = None,
 	max_lookups: int = MAX_LOOKUPS,
+	args: Iterable[str] = (),
 ) -> tuple[dict[str, str], dict]:
 	"""({path: text} of the entry point and what it imports, nearest first; what happened).
 
@@ -115,7 +161,13 @@ def import_closure(
 	Python files imported (`imported`, the entry point and project files not counted), bytes, how
 	many imported files were found but left out for the budget (`skipped`, a floor: what they
 	import is never seen), and `cut`: "lookups" when the lookup budget ran out (the rest of the walk
-	is skipped and counted), else None."""
+	is skipped and counted), else None.
+
+	Files the code may open (B, Nov 3: `--config configs/a.yaml`, a `data/vocab.json` beside a module) are read
+	too, after the imports and inside the same budget, but never followed: repo paths named in `args`, string
+	literals in the Python read that name a repo file (from the repo's top, the file's folder or the entry
+	point's), and the other text files in the folders already read. `data_read` counts them, `data_skipped` the
+	ones the budget left out."""
 	have = {p for p in paths if len(p) <= MAX_PATH}
 	if len(entry) > MAX_PATH:  # read, never followed
 		text = read([entry]).get(entry)
@@ -137,6 +189,15 @@ def import_closure(
 	roots = list(dict.fromkeys([entry_dir, "", *(["src"] if "src" in dirs else [])]))
 	out: dict[str, str] = {}
 	total, skipped, lookups, cut = 0, 0, 0, None
+	named: list[
+		str
+	] = []  # files the code may open: arguments first, then string literals (read after the imports)
+	for a in args:
+		for v in (a, a.partition("=")[2]):
+			for base in dict.fromkeys([entry_dir, ""]):
+				c = _as_repo_path(v, base) if v and len(v) < 300 else None
+				if c and c in have and c != entry:
+					named.append(c)
 	extra = [p for p in PROJECT_FILES if p in have and p != entry]
 	seen = {entry, *extra}
 	layer = [entry, *extra]
@@ -167,6 +228,11 @@ def import_closure(
 			if cut or not p.endswith(".py") or p in PROJECT_FILES:  # after a cut, read but not parsed
 				continue
 			pkg = p.rsplit("/", 1)[0] if "/" in p else ""
+			for lit in _path_strings(p, text):
+				for base in dict.fromkeys(["", pkg, entry_dir]):
+					c = _as_repo_path(lit, base)
+					if c and c in have and c not in seen and not c.endswith(".py"):
+						named.append(c)
 			for parts, level, names in _imports(p, text):
 				lookups += (1 + len(names)) * (1 if level else len(roots))  # _resolve's calls and names tried
 				if lookups > max_lookups:
@@ -186,6 +252,41 @@ def import_closure(
 						seen.add(c)
 						nxt.append(c)
 		layer = nxt
+	# the files the code may open, then the text files beside the Python read, inside what's left of the budget
+	folders = sorted({p.rsplit("/", 1)[0] if "/" in p else "" for p in out if p.endswith(".py")})
+	beside = sorted(
+		c
+		for c in have
+		if not c.endswith((".py", *DOCS)) and (c.rsplit("/", 1)[0] if "/" in c else "") in folders
+	)
+	# counted before the data pass: an argument naming a .py file is read as data, not as an import (review)
 	imported = sum(1 for p in out if p.endswith(".py") and p != entry and p not in PROJECT_FILES)
+	data_files: list[str] = []
+	left_out: list[str] = []
+	want, known = [], {}
+	for c in dict.fromkeys([*named, *beside]):
+		if c in out:
+			continue
+		size = (sizes or {}).get(c)
+		if len(out) + len(want) >= max_files or (size is not None and total + size > max_bytes):
+			left_out.append(c)
+			continue
+		want.append(c)
+		known[c] = size
+		total += size or 0
+	got = read(want) if want else {}
+	for c in want:
+		text = got.get(c)
+		if text is None:
+			continue
+		n = len(text.encode("utf-8", "surrogatepass"))
+		if known[c] is None:  # no size before the read: checked now, as the import walk does (review)
+			if total + n > max_bytes:
+				left_out.append(c)
+				continue
+			total += n
+		out[c] = text
+		data_files.append(c)
 	return out, {"files": len(out), "imported": imported, "bytes": total, "skipped": skipped,
-		"cut": cut, "repo_files": len(have)}  # fmt: skip
+		"cut": cut, "repo_files": len(have), "data_read": len(data_files), "data_skipped": len(left_out),
+		"data_files": data_files, "data_left_out": left_out[:5]}  # fmt: skip
