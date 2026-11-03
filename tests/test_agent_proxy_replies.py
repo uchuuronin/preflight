@@ -129,3 +129,37 @@ def test_the_sample_names_the_proxys_answers_only_with_the_flag():
 	assert px.kw.get("single") is True
 	off = run_sample(None, cwd=None, proxy=px, population=None, env={}, launch=lambda env: Proc())
 	assert "proxy answered" not in off.selection and "single" not in px.kw
+
+
+def test_a_long_selection_leaves_room_for_the_top_up_marker():
+	from preflight.engine.agent_cost import combine_samples
+	from preflight.recorder.agent_sampler import SELECTION_CHARS
+	from preflight.schema import AgentSample
+
+	class Proxy:
+		def open_run(self, run_id, **kw):
+			return "http://proxy/v1"
+
+		def run_stats(self, run_id):
+			return {}
+
+		def run_tasks(self, run_id):
+			return []
+
+	class Proc:
+		def __init__(self):
+			self.report = {"ended": "exited", "code": 1, "error": "ValueError: " + "x " * 200}
+
+		def poll(self):
+			return 1
+
+		def wait(self, timeout):
+			pass
+
+		def kill(self):
+			pass
+
+	s = run_sample(None, cwd=None, proxy=Proxy(), population=None, env={}, launch=lambda env: Proc())
+	assert len(s.selection) <= SELECTION_CHARS
+	both = combine_samples(s, AgentSample(tasks=[], population=None, selection="extra"))
+	assert both.selection.endswith("+ top-up of 0")

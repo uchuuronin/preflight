@@ -36,6 +36,9 @@ from pathlib import Path
 
 from preflight.schema import AgentSample
 
+# AgentSample.selection holds 200; a top-up appends " + top-up of N" (engine/agent_cost.combine_samples) and
+# its marker is how a sample is known to be topped up, so the first sample leaves it room (A, Nov 2)
+SELECTION_CHARS = 180
 DEFAULT_SAMPLE = 30  # cited: Chiya, Oct 27 (Contracts tab); B's engine.agent_cost.DEFAULT_SAMPLE
 TOP_UP_TASKS = 20  # cited: Chiya, Oct 27: 20 more when the cost range straddles the budget
 SAMPLE_SEED = 20261031  # derived: fixed, so a rerun samples the same tasks
@@ -215,8 +218,8 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 		w = at_cut.get("peak_concurrent") or 1
 		parts.insert(2, f"{len(waiting)} ended on a tool call, up to {min(w, len(waiting))} may be stuck")
 	selection = "; ".join(parts)
-	if len(selection) > 200:
-		selection = selection[:197].rsplit(" ", 1)[0] + "..."
+	if len(selection) > SELECTION_CHARS:
+		selection = selection[: SELECTION_CHARS - 3].rsplit(" ", 1)[0] + "..."
 	if inspect is not None:
 		# how each task ended, for an ops run's own scoring (counts and order only, never content): its
 		# opening rank, the last call's finish reason, and whether it ended waiting on a tool
