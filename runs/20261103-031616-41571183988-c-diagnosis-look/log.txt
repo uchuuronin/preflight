@@ -1,0 +1,48 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-ay9v2IRSSQmhmLNhgakHQD
+✓ Created objects.
+{
+ "which": "packages",
+ "record": [
+  {
+   "source": "rule",
+   "code": "precision.fp32",
+   "severity": "warn",
+   "checked_by_spark_open": false,
+   "title": "Trains in fp32"
+  },
+  {
+   "source": "spark_diagnosis",
+   "code": "diagnosis.consistent",
+   "severity": "info",
+   "checked_by_spark_open": true,
+   "title": "Plots and numbers agree"
+  }
+ ]
+}
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ systemctl restart hosted-compute-agent.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+{
+ "which": "packages",
+ "shown": [
+  {
+   "title": "Plots and numbers agree",
+   "source": "Found by Muse Spark diagnosis, checked by Muse Spark Open"
+  }
+ ],
+ "chip": "1 finding off the map"
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-ay9v2IRSSQmhmLNhgakHQD
