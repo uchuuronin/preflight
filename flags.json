@@ -39,6 +39,7 @@
 	"engine.divergence": false,
 	"engine.carry_free_knobs": false,
 	"engine.context_same_stack": false,
+	"engine.memory_reserved": false,
 	"engine.rl": false,
 	"engine.serving": false,
 	"d.freetier": false,

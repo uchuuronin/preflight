@@ -99,6 +99,7 @@ FEATURES = {
 	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
 	"carry_free_knobs": False,  # flags.json engine.carry_free_knobs: after the freeze (Nov 2), off until checked
 	"context_same_stack": False,  # flags.json engine.context_same_stack: after the freeze (Nov 2), off until checked
+	"memory_reserved": False,  # flags.json engine.memory_reserved: Nov 3, off until the PM turns it on
 }  # the defaults when the caller passes no flags (scripts, tests); keep them the same as flags.json
 # the flags.json key for each feature: fill_predictions(record, flags=flag) reads them for that call
 FLAG_OF = {
@@ -108,6 +109,7 @@ FLAG_OF = {
 	"divergence": "engine.divergence",
 	"carry_free_knobs": "engine.carry_free_knobs",
 	"context_same_stack": "engine.context_same_stack",
+	"memory_reserved": "engine.memory_reserved",
 }
 _FEATURES_NOW: contextvars.ContextVar[dict[str, bool] | None] = contextvars.ContextVar(
 	"preflight_features", default=None
@@ -884,6 +886,79 @@ def _sized(shape, values: dict, seq: float | None) -> tuple[knobs.Shape, dict]:
 	return replace(shape, seq=s), {**values, "seq_len": s}
 
 
+# Chiya, Nov 3: the reserved pool. The probes measure the allocator's reserved peak, but a short probe can stop before
+# the pool settles. The corpus margin (reserved over allocated, by family and size, fitted on the
+# calibration split by scripts/fit_reserved_margin.py into `_reserved_margin.py`, never the zoo) raises a prediction only where the probes' own
+# ratio is below it: the point to the family's median, the upper end to its 90th percentile.
+_MARGIN_FAMILY = {
+	"finetune": "hf",
+	"rl": "hf",
+	"pretrain": "gpt",
+	"eval": "gpt",
+	"vision": "cnn",
+	"retrieval": "encoder",
+}
+_MARGIN_SIZES = ((1e7, "<10M"), (1e8, "<100M"), (1e9, "<1B"), (float("inf"), ">=1B"))
+
+
+def _margins() -> dict:
+	from preflight.engine._reserved_margin import MARGINS
+
+	return MARGINS
+
+
+def _margin(lens: str, n_params: float | None) -> tuple[float, float, str]:
+	"""(median, q90, what it is) for this lens and size; a lens with no corpus family takes the widest family."""
+	t = _margins()
+	fam = _MARGIN_FAMILY.get(lens)
+	if fam is None:
+		m50 = max(c["median"] for c in t["by_family"].values())
+		m90 = max(c["q90"] for c in t["by_family"].values())
+		return m50, m90, f"no corpus family for {lens}, so the widest family's"
+	if n_params:
+		size = next(name for top, name in _MARGIN_SIZES if n_params < top)
+		c = t["by_size"].get(f"{fam}|{size}")
+		if c:
+			return c["median"], c["q90"], f"{fam} models {size}"
+	c = t["by_family"][fam]
+	return c["median"], c["q90"], f"{fam} models"
+
+
+def _probe_pool_ratio(record: FlightRecord) -> float | None:
+	"""Reserved over allocated at the probe with the largest reserved peak (the one the prediction leans on)."""
+	best = None
+	for p in record.probes:
+		m = p.memory
+		usable = p.status in OK_PROBE and m and m.peak_reserved_bytes and m.peak_allocated_bytes
+		if usable and (best is None or m.peak_reserved_bytes > best.peak_reserved_bytes):
+			best = m
+	return best.peak_reserved_bytes / best.peak_allocated_bytes if best else None
+
+
+def _with_reserved_margin(
+	record: FlightRecord, est: memory.MemoryEstimate, ctx: float, capacity: float, n_params: float | None
+) -> memory.MemoryEstimate:
+	if not feature("memory_reserved") or est.status in ("abstain", "measured") or not est.point:
+		return est
+	ratio = _probe_pool_ratio(record)
+	if ratio is None:
+		return est
+	m50, m90, what = _margin(record.job.lens, n_params)
+	f50, f90 = max(1.0, m50 / ratio), max(1.0, m90 / ratio)
+	if f90 <= 1.0:
+		return est
+	alloc = max(0.0, est.point - ctx)
+	point = ctx + alloc * f50
+	hi = max(est.hi or point, ctx + alloc * f90)
+	why = (
+		f"the probes' reserved pool is {ratio:.2f}x their allocated peak, under the corpus's {m50:.2f}x median and "
+		f"{m90:.2f}x 90th percentile for {what}, so the point and the upper end are raised to them"
+	)
+	p = memory.p_oom(point, est.sigma_log, capacity)
+	return replace(est, point=point, hi=hi, p_oom=p, oom_status=memory.oom_status(p),
+		reason="; ".join(x for x in (est.reason, why) if x))  # fmt: skip
+
+
 def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _MemoryResult:
 	mid = memory.MODEL_ID
 	gpu = _target_gpu(record, values)
@@ -962,6 +1037,9 @@ def _memory(record: FlightRecord, values: dict, eval_off: bool = False) -> _Memo
 	):
 		why = f"the peak comes at {est.breakdown.peak_moment}, which no probe ran; run a probe with {est.breakdown.peak_moment} in it"
 		est = replace(est, status="extrapolated", reason="; ".join(x for x in (est.reason, why) if x))
+	est = _with_reserved_margin(
+		record, est, ctx, capacity, arch.param_count() if hasattr(arch, "param_count") else None
+	)
 	cell = conformal.TABLE.lookup("memory.peak", gpu, lens)
 	if est.status != "abstain" and est.point and cell is not None and cell.residuals:
 		# P(OOM) from held-out residuals of the allocator peak (context is added outside the residual)
@@ -1213,6 +1291,7 @@ def _empirical_memory(
 			_band_note(cell) if cell is not None and not measured else None,
 		) if x),
 	)  # fmt: skip
+	est = _with_reserved_margin(record, est, ctx, capacity, None)
 	return _from_memory_estimate(est, mid)
 
 

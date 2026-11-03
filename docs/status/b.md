@@ -9,6 +9,7 @@ Updated Mon Nov 2, about 1 AM ET, on `ws-b` (merges, not rebases, for pushed com
 | # | What | Why | Cost | How to undo |
 | --- | --- | --- | --- | --- |
 | 39 | **D's search fixes, final re-check on main ad12da7:** must-fixes (a) bounded scan, (b) failed calls' fee, (c) no model text: pass; (d) a page only opened can be cited: **fail**, re-tested (a completed `open_page`, annotated, is kept and titled from the open). Posted; `harness.spark_search` shouldn't ship until (d) is fixed. | PM's item 1, by 9 AM, for Chiya's noon call. | none | — |
+| 40 | **The reserved pool, predicted from a corpus margin (`engine.memory_reserved`, off):** reserved/allocated by family and size on the corpus calibration split; raises a prediction only where the probes' ratio is under it. Scored once on the zoo and AMD pairs: gnn and retrieval unchanged (gnn's probes already exceed every margin; retrieval's peak is its own eval), vision raised from 10% over (hit) to 15% over (miss); OOM unchanged, false alarms 0 of 9 both ways. Left off: it moves no miss and costs a hit. | PM's item 2. | none | delete the flag and `_reserved_margin.py` |
 
 ## Decisions today (Nov 2, from 11:15 AM ET; Chiya out until about 5 PM)
 
