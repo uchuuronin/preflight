@@ -573,6 +573,8 @@ def ground_truth(
 	command_hex: str = "",
 	uv: bool = False,
 	pyg: bool = False,
+	eval_units: bool = False,
+	sdists: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -645,6 +647,12 @@ def ground_truth(
 		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
 			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
 	opts = {k: v for k, v in (("uv", uv), ("pyg", pyg)) if v}
+	if sdists:  # names of source-only packages allowed to build (commas, as the workflow allows)
+		opts["sdists"] = tuple(n for n in sdists.split(",") if n)
+	if eval_units:  # probes.eval_units in this process only: the recorder probe's scoring batches
+		from preflight.runner.pipeline import EVAL_FORWARD_UNITS
+
+		opts["eval_units"] = EVAL_FORWARD_UNITS
 	if command_hex:  # the tool's lens and source-only dependencies, as the pipeline gives them
 		from preflight.runner.sources import COMMANDS
 
@@ -1444,3 +1452,125 @@ def install_check(repo: str, commit: str = "", entrypoint: str = "", uv: bool = 
 	Path(f"out/install_check_{repo.rstrip('/').rsplit('/', 1)[-1]}_{'uv' if uv else 'pip'}.json").write_text(
 		json.dumps(res, indent=2)
 	)
+
+
+# ---------------------------------------------------------------- which field Meta refuses (unseen 4, after freeze)
+
+META_VARIANT_MAX_TOKENS = 16  # each variant's answer: enough to see it worked, a fraction of a cent
+
+
+@ops.function(image=worker_image, secrets=_AGENT_SECRETS, timeout=20 * 60)
+def _meta_variants(files: dict, entrypoint: str) -> dict:
+	"""Run the script against a local stand-in that records its first chat request and refuses it, then
+	send that request to Meta's API as it was and with fields removed. Prints each variant's status and
+	Meta's error code and message (our own run of a public example; our key is redacted before any cut)."""
+	import http.server
+	import subprocess
+	import sys
+	import tempfile
+	import threading
+
+	import httpx
+
+	got: dict = {}
+
+	def do_post(self):
+		n = int(self.headers.get("Content-Length") or 0)
+		raw = self.rfile.read(min(n, 4 * 2**20))
+		if self.path.split("?", 1)[0].endswith("/chat/completions"):
+			with contextlib.suppress(ValueError):
+				got.setdefault("body", json.loads(raw))
+		data = b'{"error": {"code": "recorded", "message": "stand-in"}}'
+		self.send_response(400)
+		self.send_header("Content-Type", "application/json")
+		self.send_header("Content-Length", str(len(data)))
+		self.end_headers()
+		self.wfile.write(data)
+
+	# built with type(), not a class statement: the ops app defines no classes (tests/test_stop_app.py)
+	H = type("H", (http.server.BaseHTTPRequestHandler,), {"do_POST": do_post, "log_message": lambda *a: None})
+	srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+	threading.Thread(target=srv.serve_forever, daemon=True).start()
+	work = Path(tempfile.mkdtemp(prefix="pf-meta-"))
+	for rel, text in files.items():
+		p = (work / rel).resolve()
+		if work.resolve() in p.parents:
+			p.parent.mkdir(parents=True, exist_ok=True)
+			p.write_text(text)
+	pip = [
+		sys.executable,
+		"-m",
+		"pip",
+		"install",
+		"-q",
+		"--disable-pip-version-check",
+		str(work) + "[openai]",
+	]
+	# the script never sees our keys: only the stand-in's address and a dummy key
+	env = {k: v for k, v in os.environ.items() if not k.startswith(("META_", "BASETEN_", "GLIMMER_"))}
+	env.update({"META_API_BASE": f"http://127.0.0.1:{srv.server_address[1]}/v1", "META_API_KEY": "stand-in"})
+	try:
+		subprocess.run(pip, check=False, capture_output=True, timeout=400)
+		subprocess.run(
+			[sys.executable, entrypoint], cwd=work, env=env, capture_output=True, timeout=180, check=False
+		)
+	except subprocess.TimeoutExpired:
+		print("[meta] the install or the script ran past its limit", flush=True)
+	finally:
+		srv.shutdown()
+	body = got.get("body")
+	if not isinstance(body, dict):
+		return {"error": "the script made no chat request"}
+	key = os.environ["META_API_KEY"]
+	base = (os.environ.get("META_API_BASE") or "https://api.meta.ai/v1").rstrip("/")
+
+	def clean(v, n):
+		return str(v or "").replace(key, "<key>")[:n]
+
+	shape = {k: (v if k in ("model", "tool_choice", "stop", "stream", "max_tokens") else type(v).__name__)
+		for k, v in body.items()}  # fmt: skip
+	print(
+		f"[meta] the request: {clean(json.dumps(shape), 600)}; tools {len(body.get('tools') or [])}",
+		flush=True,
+	)
+	out = []
+	for names in ((), ("stop",), ("tool_choice",), ("stop", "tool_choice"), ("tools", "tool_choice")):
+		req = {k: v for k, v in body.items() if k not in names and k != "max_completion_tokens"}
+		req.update({"max_tokens": META_VARIANT_MAX_TOKENS, "stream": False})
+		label = "as sent" if not names else "without " + " and ".join(names)
+		try:
+			r = httpx.post(
+				f"{base}/chat/completions", json=req, headers={"Authorization": f"Bearer {key}"}, timeout=90
+			)
+		except httpx.HTTPError as exc:
+			row = {"variant": label, "status": None, "code": type(exc).__name__, "message": ""}
+		else:
+			try:
+				data = r.json()
+			except ValueError:
+				data = None
+			err = data.get("error") if isinstance(data, dict) and isinstance(data.get("error"), dict) else {}
+			row = {"variant": label, "status": r.status_code, "code": clean(err.get("code") or err.get("type"), 80),
+				"message": clean(err.get("message"), 240)}  # fmt: skip
+			if r.status_code == 200 and isinstance(data, dict):
+				u = data.get("usage") or {}
+				row["tokens"] = [u.get("prompt_tokens"), u.get("completion_tokens")]
+		print(f"[meta] {json.dumps(row)}", flush=True)
+		out.append(row)
+	return {"shape": json.loads(clean(json.dumps(shape), 4000) or "{}"), "variants": out}
+
+
+@ops.local_entrypoint()
+def meta_variants(repo: str, commit: str, entrypoint: str, edit_hex: str = ""):
+	"""Which field of a script's first request Meta's API refuses (unseen 4: smolagents' tool-calling agent):
+
+	modal run --env main python/preflight/runner/ops_app.py::meta_variants --repo https://github.com/huggingface/smolagents \\
+		--commit <sha> --entrypoint examples/agent_from_any_llm.py --edit-hex <the list's Change>"""
+	from preflight.runner.sources import _clone
+
+	files, sha = _clone(repo, commit or None)
+	files = _apply_edits(files, edit_hex) if edit_hex else files
+	print(f"[meta] {repo} at {sha}: {len(files)} files", flush=True)
+	res = _meta_variants.remote(files, entrypoint)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/meta_variants.json").write_text(json.dumps(res, indent=2))

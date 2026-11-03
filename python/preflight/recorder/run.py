@@ -190,6 +190,13 @@ def main(spec_path: str) -> int:
 			sys.path.insert(i, str(d))  # after the script's own files, before the image
 		parts = [*(str(d) for d in dirs), os.environ.get("PYTHONPATH") or ""]
 		os.environ["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
+	if spec.get("install_repo"):
+		# probes.repo_install: as `python path/to/script.py` does, the script's own folder comes first, so it
+		# imports the modules beside it (OGB arxiv's gnn.py imports its logger.py; the full run did, the probe
+		# didn't: a-all3-8, Nov 2); after the installs, so the deps keep their place behind the repo's own files
+		entry_dir = os.path.normpath(os.path.dirname(os.path.join(workdir, spec["entrypoint"])))
+		if entry_dir != os.path.normpath(workdir):
+			sys.path.insert(0, entry_dir)
 	sys.argv = [spec["entrypoint"], *spec.get("args", [])]
 	if spec.get("seed") is not None:
 		_seed(int(spec["seed"]), force=bool(spec.get("seed_force")))
@@ -204,13 +211,23 @@ def main(spec_path: str) -> int:
 		generate_sample=int(spec.get("generate_sample") or 0),
 		generate_calls=int(spec.get("generate_calls") or 0),
 		lr_range=spec.get("lr_range") or None,  # D's range test, behind probes.lr_range
+		eval_units=int(spec.get("eval_units") or 0),  # probes.eval_units
 	).install()
 
 	status, code, error = "ok", None, None
 	too_few = "script finished after {n} optimizer steps; a probe needs at least 2"
+
+	def measured() -> bool:
+		"""Enough to keep: two optimizer steps, or (probes.eval_units) an eval that finished on its own
+		after at least one measured generate call or scoring batch (gsm8k at --limit 16: two calls, then done)."""
+		if len(rec.steps) >= 2:
+			return True
+		# an eval only: a script that took an optimizer step is a training run, judged by its steps
+		return bool(rec.eval_units) and not rec.steps and (rec._gen_calls_done >= 1 or bool(rec._fwd))
+
 	try:
 		runpy.run_path(os.path.join(workdir, spec["entrypoint"]), run_name="__main__")
-		if len(rec.steps) < 2:
+		if not measured():
 			status, code, error = "error", "too_few_steps", too_few.format(n=len(rec.steps))
 	except StopProbe:
 		pass
@@ -221,7 +238,7 @@ def main(spec_path: str) -> int:
 				"script_exit",
 				f"script exited with code {exc.code} after step {len(rec.steps)}",
 			)
-		elif len(rec.steps) < 2:
+		elif not measured():
 			status, code, error = "error", "too_few_steps", too_few.format(n=len(rec.steps))
 	except BaseException as exc:
 		n = len(rec.steps)

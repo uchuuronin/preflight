@@ -104,6 +104,12 @@ VALID_STATUS = {"ok", "oom", "error", "timeout", "cancelled"}
 
 # Probe.extras keys B reads by name (docs/requests.md, B -> A); keep them stable
 EXTRAS_KEYS = (
+	# probes.eval_units: an eval probe's scoring batches (a forward under no_grad outside generate)
+	"eval_forward_batches",
+	"eval_forward_s_p50",
+	"eval_forward_s_total",
+	"eval_forward_tokens_mean",
+	"eval_forward_rows_mean",
 	# training's peak allocated bytes up to the first eval pass (verify windows end with one; A, Nov 1)
 	"train_peak_before_eval_bytes",
 	"params_total",
@@ -210,6 +216,7 @@ class ProbeSpec:
 	install_sdists: tuple[
 		str, ...
 	] = ()  # a check-in by command's source-only dependencies (sources.COMMANDS)
+	eval_units: int = 0  # probes.eval_units: an eval probe's scoring batches before it ends (0: off)
 	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
 	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
@@ -981,6 +988,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"install_uv": spec.install_uv,
 				"install_pyg": spec.install_pyg,
 				"install_sdists": list(spec.install_sdists),
+				"eval_units": spec.eval_units,
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,
 			}

@@ -55,6 +55,17 @@ class JobEvent(Strict):
 		default=None,
 		description="On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
 	)
+	import_stop: bool | None = Field(
+		default=None,
+		description="0.6.5: every probe stopped at an import before its first step (or the job was refused for "
+		"a package); with runner.free_resend on, one resend of this job today doesn't count against the "
+		"visitor's daily probe jobs (JobRequest.resend_of names it)",
+	)
+	free_resend: bool | None = Field(
+		default=None,
+		description="0.6.5: on queued, this job is a free resend: it doesn't count against the visitor's daily "
+		"probe jobs (the daily GPU dollar cap still holds)",
+	)
 
 
 class JobRequest(Strict):
@@ -98,6 +109,12 @@ class JobRequest(Strict):
 		default=False,
 		description="0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on "
 		"Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten",
+	)
+	resend_of: str | None = Field(
+		default=None,
+		pattern=r"^[0-9A-HJKMNP-TV-Z]{26}$",
+		description="0.6.5: the job this one sends again (its job id), after it stopped at an import; with "
+		"runner.free_resend on, once a day per visitor it doesn't count against the daily probe jobs",
 	)
 	extra_packages: list[Annotated[str, Field(min_length=1, max_length=100)]] | None = Field(
 		default=None,

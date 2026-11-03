@@ -1,4 +1,4 @@
-# Preflight contract v0.6.4
+# Preflight contract v0.6.5
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,11 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.5 (Nov 2, additive; Chiya via the PM): `JobRequest.resend_of` (the job id this one sends again) and
+  two job events: `JobEvent.import_stop` (every probe stopped at an import before its first step) and
+  `JobEvent.free_resend` (on queued: this job doesn't count against the visitor's daily probe jobs). With
+  `runner.free_resend` on, one resend a visitor a day of their own job that stopped at an import (or was
+  refused for a package) is free; the daily GPU dollar cap is unchanged. 0.6.4 records load unchanged.
 - 0.6.4 (Nov 2, additive; B's, after the validation freeze, from Chiya's Nov 2 item 3): `Grid.independent_of`
   (optional, absent by default): the knobs a grid's target doesn't depend on (the learning rate and its peers for
   memory, time and cost), so a reader answers at any value of them instead of holding them at `fixed`. Emitted only

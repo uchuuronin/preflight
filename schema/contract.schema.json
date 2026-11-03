@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.4/contract",
+	"$id": "https://preflight.dev/schema/0.6.5/contract",
 	"title": "PreflightContract",
-	"description": "Preflight contract v0.6.4. Generated; do not edit.",
+	"description": "Preflight contract v0.6.5. Generated; do not edit.",
 	"type": "object",
 	"properties": {
 		"FlightRecord": {
@@ -2089,7 +2089,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"schema_version": {
-					"default": "0.6.4",
+					"default": "0.6.5",
 					"pattern": "^\\d+\\.\\d+\\.\\d+$",
 					"title": "Schema Version",
 					"type": "string"
@@ -3085,6 +3085,32 @@
 					"default": null,
 					"description": "On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
 					"title": "Error Code"
+				},
+				"import_stop": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.5: every probe stopped at an import before its first step (or the job was refused for a package); with runner.free_resend on, one resend of this job today doesn't count against the visitor's daily probe jobs (JobRequest.resend_of names it)",
+					"title": "Import Stop"
+				},
+				"free_resend": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.5: on queued, this job is a free resend: it doesn't count against the visitor's daily probe jobs (the daily GPU dollar cap still holds)",
+					"title": "Free Resend"
 				}
 			},
 			"required": [
@@ -3263,6 +3289,20 @@
 					"description": "0.6.2: the visitor chose private mode; with harness.glimmer_private on, triage runs on Muse Glimmer on Preflight's own GPU instead of Muse Spark Open on Baseten",
 					"title": "Private",
 					"type": "boolean"
+				},
+				"resend_of": {
+					"anyOf": [
+						{
+							"pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.5: the job this one sends again (its job id), after it stopped at an import; with runner.free_resend on, once a day per visitor it doesn't count against the daily probe jobs",
+					"title": "Resend Of"
 				},
 				"extra_packages": {
 					"anyOf": [

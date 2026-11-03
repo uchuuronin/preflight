@@ -141,8 +141,10 @@ def _bare(
 		}
 		try:
 			repo_kw = {"repo": True, "entrypoint": entrypoint} if install_repo else {}
-			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw,
-				**(install_opts or {}))  # fmt: skip
+			how = {
+				k: v for k, v in (install_opts or {}).items() if k in ("uv", "pyg", "sdists")
+			}  # the installer's own
+			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw, **how)  # fmt: skip
 		finally:
 			os.environ.update(saved)
 		if err:
@@ -241,6 +243,7 @@ def measure(
 			install_requirements=install_requirements, install_repo=install_repo, generate_sample=generate_sample,
 			install_uv=bool((install_opts or {}).get("uv")), install_pyg=bool((install_opts or {}).get("pyg")),
 			install_sdists=tuple((install_opts or {}).get("sdists", ())),
+			eval_units=int((install_opts or {}).get("eval_units") or 0),
 			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:

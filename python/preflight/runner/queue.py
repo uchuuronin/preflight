@@ -48,7 +48,11 @@ HEARTBEAT_S = 20  # cited: Contracts tab, gap 2 (renewed every 20 s)
 MAX_RUNNING = 8  # cited: Contracts tab, public demo limits (8 GPU containers)
 MAX_ATTEMPTS = 2  # derived: one retry for our own failures; visitor failures are never retried
 MAX_QUEUED = 200  # guess: global queue cap; replaced by the load test before judging (Nov 4)
-MAX_QUEUED_PER_VISITOR = 3  # guess: per-visitor backlog; replaced by the load test before judging (Nov 4)
+# load-tested (scripts/queue_load_test.py, Nov 2: 20 visitors x 3 jobs on a copy of this store, simulated clock,
+# CPU-only jobs of a guessed length): at 3, queue wait p95 652 s, a job's wait from its first try to its start p95
+# 1,077 s, 100 refusals; 2 and 1 trade queue wait for refusals (154, 239) with that first-try wait about the same. With
+# the daily limit at 3 jobs (runner.free_resend off) this cap never refuses anyone: every refusal is the in-flight hold's
+MAX_QUEUED_PER_VISITOR = 3
 MAX_EVENTS_PER_JOB = 300
 RECENT_DONE = 2_000  # finished jobs kept in memory for status and event reads
 
@@ -79,6 +83,9 @@ class QueueFull(RuntimeError):
 
 # Public demo limits (Chiya, Nov 1), counted per America/New_York calendar day
 VISITOR_DAILY_JOBS = 3  # probe jobs a visitor may submit in a day
+# runner.free_resend (off; Chiya, Nov 2): a resend after a job stopped at an import (no probe reached its first
+# step) is free, this many times a visitor a day; the daily GPU dollar cap still holds
+FREE_RESENDS_PER_DAY = 1
 JOB_BUDGET_USD = 0.60  # what a queued or running job may still spend (runner/pipeline.py JOB_BUDGET_USD)
 _ET = None
 
@@ -208,6 +215,20 @@ def _waiting_for_gpu(job) -> dict | None:
 	return {"gpu": msg.removeprefix(GPU_WAIT_PREFIX).split(" ", 1)[0], "since": since}
 
 
+def source_key(request: dict) -> str | None:
+	"""Which code a request runs: its source's kind, repo or upload, commit, record or sample; not the entry
+	point, the scope or the extra packages, which a resend changes to get past an import (runner.free_resend)."""
+	src = request.get("source") if isinstance(request, dict) else None
+	if not isinstance(src, dict):
+		return None
+	keep = {k: src.get(k) for k in ("kind", "uri", "commit", "files_ref", "record_ref")}
+	if (
+		src.get("files") is not None and keep["files_ref"] is None
+	):  # inline files, before the store moves them
+		keep["files"] = body_hash(src["files"]) if isinstance(src["files"], dict) else None
+	return body_hash(keep)
+
+
 def body_hash(request: dict) -> str:
 	return hashlib.sha256(json.dumps(request, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -232,6 +253,7 @@ class InMemoryJobStore:
 		visitor_daily_jobs: int = VISITOR_DAILY_JOBS,
 		daily_cap_usd: Callable[[str], float] = daily_gpu_cap_usd,
 		job_budget_usd: float = JOB_BUDGET_USD,
+		free_resend: bool | None = None,
 	):
 		self._clock = clock
 		self.max_running = max_running
@@ -252,6 +274,8 @@ class InMemoryJobStore:
 		self.visitor_daily_jobs = visitor_daily_jobs
 		self.daily_cap_usd = daily_cap_usd
 		self.job_budget_usd = job_budget_usd
+		self.free_resend = free_resend  # None: runner.free_resend's flag, read at each submit
+		self._import_stops: set[str] = set()  # live jobs whose probes all stopped at an import (this attempt)
 		# per ET day: {"spent": reported GPU dollars, "jobs": {visitor: probe jobs submitted}}
 		self._daily: dict[str, dict] = {}
 		self._lock = threading.RLock()
@@ -346,6 +370,8 @@ class InMemoryJobStore:
 
 	def _emit(self, job: Job, stage: str, **fields) -> JobEvent:
 		ev = JobEvent(job_id=job.job_id, seq=job.next_seq, at=self._iso(), stage=stage, **fields)
+		if ev.import_stop:  # held beside the job, not on it: a snapshot stays one an older build restores
+			self._import_stops.add(job.job_id)
 		if ev.share_token:  # the latest attempt's record: a retry writes a fresh one
 			job.share_token = ev.share_token
 		if ev.record_id:
@@ -371,6 +397,8 @@ class InMemoryJobStore:
 		"""Move a job out of the live set once it is terminal."""
 		self._jobs.pop(job.job_id, None)
 		self._done[job.job_id] = job
+		stopped = job.job_id in self._import_stops
+		self._import_stops.discard(job.job_id)
 		while len(self._done) > RECENT_DONE:
 			self._done.popitem(last=False)
 		self._index[job.job_id] = {
@@ -383,6 +411,10 @@ class InMemoryJobStore:
 			"error": job.error,
 			"retryable": job.retryable,
 			"error_code": job.error_code,
+			# runner.free_resend: every probe stopped at an import, or the job was refused for a package (it never
+			# reached a GPU probe either); and which code it ran, so a free resend is of the same code
+			"import_stop": stopped or (job.error_code or "").startswith("missing_package"),
+			"source_key": source_key(job.request),
 			"submitted_at": job.submitted_at,
 			"last_event": job.events[-1] if job.events else None,
 			"next_seq": job.next_seq,
@@ -400,6 +432,7 @@ class InMemoryJobStore:
 		if retryable and job.attempt < self.max_attempts:
 			job.status = "queued"
 			job.error = error
+			self._import_stops.discard(job.job_id)  # the next attempt may get past the import: its own marker
 			self._order.append(job.job_id)
 			self._emit(job, "queued", message=error, level="warn", queue_position=self._position(job.job_id))
 		else:
@@ -447,7 +480,8 @@ class InMemoryJobStore:
 			now = self._clock()
 			day = et_day(now)
 			today = self._daily.get(day, {"spent": 0.0, "jobs": {}})
-			if today["jobs"].get(visitor, 0) >= self.visitor_daily_jobs:
+			free = self._free_resend(request, visitor, today)
+			if not free and today["jobs"].get(visitor, 0) >= self.visitor_daily_jobs:
 				raise QueueFull(f"You've run today's {self.visitor_daily_jobs} probe jobs: samples only until midnight ET",
 					retry_after_s=seconds_to_midnight_et(now), code="limit.visitor_daily")  # fmt: skip
 			cap = self.daily_cap_usd(day)
@@ -476,12 +510,35 @@ class InMemoryJobStore:
 				self._keys[(visitor, idempotency_key)] = job.job_id
 				self._order.append(job.job_id)
 				t = self._today(day)
-				t["jobs"][visitor] = t["jobs"].get(visitor, 0) + 1
+				if free:
+					t.setdefault("free", {})[visitor] = t.setdefault("free", {}).get(visitor, 0) + 1
+				else:
+					t["jobs"][visitor] = t["jobs"].get(visitor, 0) + 1
 				pos = self._position(job.job_id)
-				self._emit(job, "queued", queue_position=pos)
+				self._emit(job, "queued", queue_position=pos, **({"free_resend": True} if free else {}))
 				return Submitted(job.job_id, True, pos)
 
 			return self._txn(do)
+
+	def _free_resend(self, request: dict, visitor: str, today: dict) -> bool:
+		"""runner.free_resend: the request sends again this visitor's own finished job that stopped at an import,
+		and today's free resend is unused. Off: never."""
+		if not self._free_resend_on():
+			return False
+		prev_id = request.get("resend_of") if isinstance(request, dict) else None
+		prev = self._index.get(prev_id) if isinstance(prev_id, str) else None
+		if not prev or prev.get("visitor") != visitor or not prev.get("import_stop"):
+			return False
+		if prev.get("source_key") != source_key(request):  # the same code sent again, not another script
+			return False
+		return today.get("free", {}).get(visitor, 0) < FREE_RESENDS_PER_DAY
+
+	def _free_resend_on(self) -> bool:
+		if self.free_resend is not None:
+			return self.free_resend
+		from .flags import flag
+
+		return flag("runner.free_resend")
 
 	def lease(self, worker: str) -> Lease | None:
 		with self._lock:
