@@ -1,0 +1,11 @@
+{
+	"name": "20261103-215801-41726513542-a-reval-8",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41726513542",
+	"ref": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"sha": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor reval-8 --max-minutes 35 --repo https://github.com/snap-stanford/ogb --commit 61e9784ca76edeaa6e259ba0f836099608ff0586 --entrypoint examples/nodeproppred/arxiv/gnn.py --args=--use_sage,--runs,1,--epochs,500",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T22:03:35Z"
+}
