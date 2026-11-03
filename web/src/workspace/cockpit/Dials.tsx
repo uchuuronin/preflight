@@ -439,11 +439,18 @@ export const KNOBS_ID = "pf-knobs";
  * It scrolls the rail into view and puts focus on its first knob.
  */
 export function KnobsJump() {
-	const [away, setAway] = useState(false);
+	// Where the rail is when under half of it shows: below the window, above it, or null (in view).
+	const [away, setAway] = useState<"below" | "above" | null>(null);
 	useEffect(() => {
 		const rail = document.getElementById(KNOBS_ID);
 		if (!rail || typeof IntersectionObserver === "undefined") return;
-		const io = new IntersectionObserver(([e]) => setAway(!e?.isIntersecting), { threshold: 0.5 });
+		const io = new IntersectionObserver(
+			([e]) => {
+				if (!e) return;
+				setAway(e.intersectionRatio >= 0.5 ? null : e.boundingClientRect.top < 0 ? "above" : "below");
+			},
+			{ threshold: [0, 0.5, 1] },
+		);
 		io.observe(rail);
 		return () => io.disconnect();
 	}, []);
@@ -452,13 +459,13 @@ export function KnobsJump() {
 		const rail = document.getElementById(KNOBS_ID);
 		if (!rail) return;
 		const still = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-		rail.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "end" });
+		rail.scrollIntoView({ behavior: still ? "auto" : "smooth", block: away === "below" ? "end" : "start" });
 		rail.querySelector<HTMLElement>(".pf-dock__row button")?.focus({ preventScroll: true });
 	};
 	return (
 		<button type="button" className="pf-tag pf-tag--button pf-knobs-jump" onClick={jump}>
 			{t("dials.jump_knobs")}
-			<span aria-hidden="true"> ↓</span>
+			<span aria-hidden="true">{away === "below" ? " ↓" : " ↑"}</span>
 		</button>
 	);
 }

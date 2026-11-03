@@ -351,8 +351,8 @@ describe("config", () => {
 		for (const [id, p] of Object.entries(plan.predicted as Record<string, { point: number }>)) expect(p.point).toBe(est[id]?.point);
 	});
 
-	it("marks a sample's numbers as illustrative", () => {
-		expect(JSON.parse(configText(input(gold, {}, { illustrative: true }))).note).toMatch(/illustrative/);
+	it("marks a sample's numbers as examples", () => {
+		expect(JSON.parse(configText(input(gold, {}, { illustrative: true }))).note).toMatch(/examples, not measured/);
 	});
 
 	it("says not verified when a code change has no passed patch, in the plan, the edits and the batch file", () => {

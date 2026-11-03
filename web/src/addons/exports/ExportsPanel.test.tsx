@@ -101,7 +101,7 @@ describe("ExportsPanel", () => {
 		expect(screen.getByText("Not verified: a code change here has no Muse Code patch that passed its verify run yet.")).toBeTruthy();
 	});
 
-	it("says a sample's numbers are illustrative", () => {
+	it("says a sample's numbers are examples", () => {
 		// A sample is a record whose every model is a fixture's; built here, so the test holds whether
 		// the golden record carries fixture or engine estimates.
 		const fixtureId = "golden-fixture@0";
@@ -114,11 +114,11 @@ describe("ExportsPanel", () => {
 			},
 		} as typeof gold;
 		render(<Panel record={sample} knobs={knobsOf(sample)} estimates={sample.predictions.estimates} />);
-		expect(screen.getByText(/This is a sample: its numbers are illustrative/)).toBeTruthy();
+		expect(screen.getByText(/This is a sample: its numbers are examples/)).toBeTruthy();
 		cleanup();
 		// A real run never says so.
 		render(<Panel record={real} knobs={knobsOf(real)} estimates={real.predictions.estimates} />);
-		expect(screen.queryByText(/This is a sample: its numbers are illustrative/)).toBeNull();
+		expect(screen.queryByText(/This is a sample: its numbers are examples/)).toBeNull();
 	});
 
 	it("copies, and says so to screen readers; says what to do if copying fails", async () => {

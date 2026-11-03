@@ -184,9 +184,25 @@ def send(which: str = "packages", attempt: str = "a") -> None:
 	print(json.dumps(out, indent=1))
 
 
+def _is_own(which: str, rec: dict) -> bool:
+	"""Whether a record is this script's job for `which`, by its source (a record keeps no description)."""
+	src = (rec.get("job") or {}).get("source") or {}
+	if which == "packages":
+		return (
+			src.get("kind") == "upload"
+			and src.get("entrypoint") == "train.py"
+			and src.get("extra_packages") == ["einops"]
+		)
+	want = REQUESTS[which]["source"]
+	return (
+		src.get("uri") == want["uri"]
+		and src.get("entrypoint") == want["entrypoint"]
+		and src.get("scope") == "entrypoint"
+	)
+
+
 def _own_record(vol, which: str) -> tuple[str, dict] | None:
-	"""The newest record whose job this script sent for `which` (matched by its description)."""
-	want = REQUESTS[which]["description"]
+	"""The newest record of this script's job for `which`, among the newest on the volume."""
 	entries = [e for e in vol.listdir("/") if e.path.endswith(".json")]
 	entries.sort(key=lambda e: e.mtime, reverse=True)
 	import verify_race_app as vr
@@ -194,7 +210,7 @@ def _own_record(vol, which: str) -> tuple[str, dict] | None:
 	for e in entries[:NEWEST]:
 		token = e.path.rsplit("/", 1)[-1][: -len(".json")]
 		rec = vr._read_record(vol, token)
-		if rec and (rec.get("job") or {}).get("description") == want:
+		if rec and _is_own(which, rec):
 			return token, rec
 	return None
 

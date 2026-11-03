@@ -33,10 +33,10 @@ describe("the Weights & Biases export", () => {
 });
 
 describe("a sample's Weights & Biases file", () => {
-	it("says its numbers are illustrative, in the file and in the run's summary", () => {
+	it("says its numbers are examples, in the file and in the run's summary", () => {
 		const text = wandbFile(plan, true);
 		expect(embedded(text).illustrative).toBe(true);
-		expect(text).toMatch(/illustrative, not measured on your job/);
+		expect(text).toMatch(/examples, not measured on your job/);
 		expect(text).toContain('run.summary["preflight/illustrative"] = PLAN["illustrative"]');
 		expect(embedded(wandbFile(plan)).illustrative).toBe(false);
 		expect(wandbFile(plan)).not.toMatch(/From a Preflight sample/);

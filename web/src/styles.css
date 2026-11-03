@@ -464,15 +464,11 @@ a {
 button.pf-prov { background: none; border: 0; padding: 2px 0; margin: 0; border-radius: 4px; }
 button.pf-prov:focus-visible { outline: 2px solid var(--pf-focus); outline-offset: 2px; }
 button.pf-prov:hover { color: var(--pf-fg); }
-/* The word's one-line explanation: on hover, on focus, and on a tap (a title never shows on a phone). */
-.pf-prov-wrap { position: relative; display: inline-flex; }
+/* The word's one-line explanation, in a layer fixed to the window (StatusMark.tsx places it). */
 .pf-prov__tip {
-	position: absolute;
-	top: calc(100% + 6px);
-	left: 0;
-	z-index: 30;
+	position: fixed;
+	z-index: 60;
 	width: max-content;
-	max-width: min(230px, 70vw);
 	padding: 7px 9px;
 	border-radius: var(--pf-radius-sm);
 	background: var(--pf-glass-solid);
@@ -485,14 +481,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	white-space: normal;
 	text-align: left;
 	pointer-events: none;
-	opacity: 0;
-	visibility: hidden;
-	transition: opacity 120ms ease;
 }
-.pf-prov-wrap:hover .pf-prov__tip,
-.pf-prov-wrap:focus-within .pf-prov__tip,
-.pf-prov-wrap.is-open .pf-prov__tip { opacity: 1; visibility: visible; }
-@media (prefers-reduced-motion: reduce) { .pf-prov__tip { transition: none; } }
+.pf-prov__tip.is-above { transform: translateY(-100%); }
 .pf-prov__line { width: 16px; height: 0; border-top: 2px solid currentColor; }
 .pf-prov--predicted .pf-prov__line { border-top-style: dashed; }
 .pf-prov--extrapolated .pf-prov__line { border-top-style: dotted; }

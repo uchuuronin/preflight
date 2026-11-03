@@ -435,7 +435,7 @@
 	"guide.rule.gpu.save.line": "Is a different GPU worth it? On {to}, {target_change}.",
 	"guide.rule.gpu.save.why": "A pricier GPU can be cheaper overall when it finishes fast enough. Predictions for a GPU that wasn't probed are extrapolated from its specs, so verify before you commit.",
 	"guide.rule.generic.fix.line": "Moving {knob} from {from} to {to} makes the run fit, and {change}.",
-	"guide.rule.generic.fix.why": "Of the moves that clear the predicted failure, this one costs your aim the least.",
+	"guide.rule.generic.fix.why": "Of the moves still open to you that make the run fit, this one costs your aim the least.",
 	"guide.rule.generic.save.line": "Moving {knob} from {from} to {to} {change}.",
 	"guide.rule.generic.save.why": "This is the knob whose best single move improves your aim the most without risking a failure.",
 	"guide.combo.line": "None of the single changes left clears the out-of-memory risk here. Together, {changes} bring peak memory to {combo_peak}, with a {combo_risk} chance of running out.",
@@ -551,7 +551,7 @@
 	"guide.probe_offer": "{knob} at {to} {would_change}, but it's tight: a {chance} chance of running out of memory. Measure it before you rely on it?",
 	"guide.probe_offer.why": "The guide only applies settings that fit. Tight means the prediction's range touches this GPU's limit, so one short real run settles it before the long one. Measuring costs a little GPU time and waits for your go-ahead.",
 	"guide.rule.gpu_type.fix.line": "On {to}, the run fits in memory, and {target_change}.",
-	"guide.rule.gpu_type.fix.why": "Of the moves that make the run fit, this one costs your aim the least. A GPU with more memory lifts the limit without touching your code.",
+	"guide.rule.gpu_type.fix.why": "Of the moves still open to you that make the run fit, this one costs your aim the least. A GPU with more memory lifts the limit without touching your code.",
 	"guide.rule.gpu_type.save.line": "Is a different GPU worth it? On {to}, {target_change}.",
 	"guide.rule.gpu_type.save.why": "A pricier GPU can be cheaper overall when it finishes fast enough. Predictions for a GPU that wasn't probed are extrapolated from its specs, so verify before you commit.",
 	"knob.epochs": "Epochs",
@@ -1189,5 +1189,6 @@
 	"boarding.free_resend": "This resend is free: your last check-in stopped before measuring anything.",
 	"hops.help_off": "Plays the run's likely outcomes, one per frame.",
 	"dials.jump_knobs": "Knobs",
-	"newflight.default": "(default)"
+	"newflight.default": "(default)",
+	"guide.rule.fix_by_memory.why": "Your aim has no prediction for the moves that make the run fit, so this one was picked on memory instead."
 }
