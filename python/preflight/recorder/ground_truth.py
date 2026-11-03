@@ -82,15 +82,27 @@ def _say(msg: str) -> None:
 	print(f"[ground truth {time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def _stream(cmd: list[str], *, env: dict, cwd: Path, timeout_s: float) -> tuple[int | None, str]:
+def _stream(
+	cmd: list[str], *, env: dict, cwd: Path, timeout_s: float, tty: bool = False
+) -> tuple[int | None, str]:
 	"""Run cmd with its output passed through as it comes (so a run's log shows where it is), and
 	return (exit code, or None when it ran past timeout_s and was killed; the output's tail).
 	The command runs in its own process group: a dataloader or compile worker that inherited the
 	pipe neither keeps us reading after the command exits nor outlives the kill."""
 	tail = collections.deque(maxlen=64)
 	deadline = time.monotonic() + timeout_s
+	term = None
+	if tty:  # probes.tty, as the recorder's probe gets it (rig --tty): a sized terminal on stdin
+		from preflight.probes.local import TTY_COLS, TTY_ROWS, _probe_tty
+
+		term = _probe_tty()
+		env = {**env, "COLUMNS": str(TTY_COLS), "LINES": str(TTY_ROWS)}
 	proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=cwd,
-		start_new_session=True)  # fmt: skip
+		stdin=term[1] if term else None, start_new_session=True)  # fmt: skip
+	if term:
+		os.close(term[1])
+		with contextlib.suppress(OSError):
+			os.write(term[0], b"\x04" * 16)
 	fd = proc.stdout.fileno()
 	exited_at = None
 	code: int | None = None
@@ -122,6 +134,14 @@ def _stream(cmd: list[str], *, env: dict, cwd: Path, timeout_s: float) -> tuple[
 			os.killpg(proc.pid, signal.SIGKILL)  # the command if still running, and any leftover worker
 		proc.wait()
 		proc.stdout.close()
+		if (
+			term
+		):  # the terminal's master end (_probe_tty keeps it for run_probe's cleanup: ours to close here)
+			from preflight.probes.local import _TTYS
+
+			with contextlib.suppress(ValueError):
+				_TTYS.remove(term[0])
+			os.close(term[0])
 	return code, b"".join(tail).decode("utf-8", "replace")
 
 
@@ -163,7 +183,9 @@ def _bare(
 		str(bare_steps),
 		*(["--", *args] if args else []),
 	]
-	code, tail = _stream(cmd, env=env, cwd=work, timeout_s=timeout_s)
+	code, tail = _stream(
+		cmd, env=env, cwd=work, timeout_s=timeout_s, tty=bool((install_opts or {}).get("tty"))
+	)
 	if out.exists():  # bare.py writes its result last, so a file here is a whole result
 		return json.loads(out.read_text())
 	if code is None:
@@ -248,6 +270,8 @@ def measure(
 			dataset_cache=bool((install_opts or {}).get("dataset_cache")),
 			install_sdists=tuple((install_opts or {}).get("sdists", ())),
 			eval_units=int((install_opts or {}).get("eval_units") or 0),
+			entry_path=bool((install_opts or {}).get("entry_path")), tty=bool((install_opts or {}).get("tty")),
+			torch_hint=bool((install_opts or {}).get("torch_hint")),
 			generate_calls=generate_calls))  # fmt: skip
 		_say(f"recorder run ended ({r.probe.status}) after {r.probe.steps} steps")
 	finally:

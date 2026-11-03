@@ -108,3 +108,17 @@ def test_the_windows_probe_environment_prints_utf8(monkeypatch, tmp_path):
 	monkeypatch.setattr(local.os, "name", "nt")
 	assert local.scrubbed_env(tmp_path)["PYTHONIOENCODING"] == "utf-8"
 	monkeypatch.setattr(local.os, "name", os.name)
+
+
+def test_the_full_runs_bare_run_gets_the_same_terminal_with_the_rigs_tty(tmp_path):
+	import sys
+
+	from preflight.probes import local
+	from preflight.recorder.ground_truth import _stream
+
+	(tmp_path / "t.py").write_text(STTY)
+	cmd = [sys.executable, str(tmp_path / "t.py")]
+	code, tail = _stream(cmd, env=dict(os.environ), cwd=tmp_path, timeout_s=30, tty=True)
+	assert code == 0 and "width 120" in tail and not local._TTYS
+	code, tail = _stream(cmd, env=dict(os.environ), cwd=tmp_path, timeout_s=30)
+	assert code != 0  # as before: no terminal
