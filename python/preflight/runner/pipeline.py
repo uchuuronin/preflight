@@ -536,12 +536,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 
 		# the job's code goes to Muse Spark only with harness.spark_script_map on: the data-use notice
 		# discloses it under that flag, so the key being set is not enough (D's review, Chiya, Nov 1)
-		if (
-			deps.spark is not None
-			and not followup
-			and flag("harness.spark_script_map")
-			and not fetched.map_skipped
-		):
+		mappable = not followup and not fetched.map_skipped  # a skipped map isn't refined (probe_without_map)
+		if deps.spark is not None and mappable and flag("harness.spark_script_map"):
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:
