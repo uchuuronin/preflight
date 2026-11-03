@@ -76,6 +76,14 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 18:55 ET (the clip's 0:08: Entry point is in the fold)
+
+C, 6:45 PM: New flight's Entry point, Arguments and Extra packages now sit in "Optional flight
+details", closed at first (ws-c `9d824155`, not on `main` yet). The clip's 0:08 row types the Entry
+point, so it now opens the fold first. Still waiting for C's "live with the LoRA refill" to film.
+
+This push sends: `docs/demo/video-plan.md`, this file.
+
 ## Tue Nov 3, 18:40 ET (Windows check on 2b62f25c passed)
 
 Run 41739673434 (main `2b62f25c`, the workflow from `8e4fcd54`): `preflight run` measured (three probes ok), `preflight watch` followed
