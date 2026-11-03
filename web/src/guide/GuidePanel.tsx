@@ -533,8 +533,22 @@ export function GuidePanel() {
 						// tour would start from its setting (review, Nov 3). A first answer cut off after a round of
 						// reading tools (live, Nov 3: the second turn timed out) still hands over at once.
 						// (`moved` comes from the tour itself: the state here may not have caught up with its last move.)
-						if (liveAnswered.current || autoStarted.current || moved) return;
+						if (liveAnswered.current || autoStarted.current) return;
 						autoStarted.current = true;
+						if (moved) {
+							// Muse Spark moved a knob before it failed, and its Apply / Not this went with it: put the
+							// knob back, then start the rule-based tour from the visitor's own setting (review, Nov 3).
+							requestAnimationFrame(() => {
+								const p = latest.current.state.proposal;
+								if (p) {
+									actions.propose(null);
+									actions.setKnob(p.knobId, p.from, "user", { putBack: true });
+								}
+								requestAnimationFrame(restart);
+							});
+							focusFirstMove();
+							return;
+						}
 						restart();
 						// The pressed button is gone: focus the tour's first move, so a screen reader hears it.
 						focusFirstMove();

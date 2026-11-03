@@ -129,12 +129,12 @@ For a **Repo link**, two optional fields under the repository:
   They run as written, without a shell: no pipes (`|`), redirects (`>`), variables or chained
   commands. Quote an argument that has a space in it. Up to 64 arguments.
 
-Example: [pytorch/examples](https://github.com/pytorch/examples) holds dozens of scripts. To check in
-its word-level language model:
+Example: a repo with several scripts, where the one to run is `experiments/lm/train.py`, reading
+its data from a folder beside it:
 
-- Repo link: `github.com/pytorch/examples`
-- Entry point: `word_language_model/main.py`
-- Arguments: `--accel --epochs 6 --data word_language_model/data/wikitext-2`
+- Repo link: `github.com/you/research`
+- Entry point: `experiments/lm/train.py`
+- Arguments: `--epochs 6 --data experiments/lm/data`
 
 Preflight reads the repo (for a large one, the entry point and what it uses: the repo's modules it
 imports, its requirements and files named in the arguments), then probes the script with those
@@ -148,8 +148,11 @@ Limits to know:
 - **One script, run with `python`.** The entry point must do its work when run as
   `python <entry point>`. A file that only defines functions, or a module meant to be imported, runs
   nothing; Preflight stops and says so.
+- **Data from the repo, Hugging Face or a few hosts.** Files over 8 MB aren't read from the repo, so
+  a big dataset has to come from Hugging Face. A probe can download only from Hugging Face, PyPI,
+  GitHub and a handful of dataset hosts; other sites (S3, Kaggle, a lab server) are blocked.
 - **No two-step flows.** "Download, then train" in two commands isn't supported: the script has to
-  fetch what it needs itself, or read it from Hugging Face.
+  fetch what it needs itself.
 - **No tools launched by name,** such as `litgpt pretrain` or `tune run`. Only `lm_eval` runs by name,
   on the **Run a command** tab.
 - **Notebooks in a repo** go through the **Notebook** tab (download the `.ipynb` and add it there).

@@ -28,7 +28,7 @@ const GITHUB_REPO = /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/;
 export function repoUri(text: string): string {
 	const t = text.trim();
 	const link = /^https?:\/\//.test(t) ? t : `https://${t}`;
-	const pin = /^(https?:\/\/(?:www\.)?github\.com\/[^/\s@]+\/[^/\s@]+?)(?:\.git)?@([A-Za-z0-9._-]+)\/?$/.exec(link);
+	const pin = /^(https?:\/\/(?:www\.)?github\.com\/[^/\s@]+\/[^/\s@]+?)(?:\.git)?@([A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*)\/?$/.exec(link);
 	return pin ? `${pin[1]}/tree/${pin[2]}` : link;
 }
 

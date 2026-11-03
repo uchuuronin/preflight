@@ -204,12 +204,15 @@ describe("a first answer cut off after a round of reading tools (live, Nov 3)", 
 		expect(screen.getAllByRole("button", { name: /^Apply / }).length).toBeGreaterThan(0);
 	});
 
-	it("doesn't, once Muse Spark has moved a knob: the visitor decides from there", async () => {
+	it("puts back a knob Muse Spark moved, then starts the rule-based tour from the visitor's setting", async () => {
 		twoRounds({ calls: [{ call_id: "c1", name: "set_knob", arguments: { knob_id: "eval_batch_size", value: 8 }, runs_in: "browser" }] });
-		mount();
+		const r = mount();
+		const before = r.ws!.state.knobs.eval_batch_size;
 		await start();
-		for (let i = 0; i < 6; i++) await frame();
-		expect(screen.queryAllByRole("button", { name: /^Apply / }).length).toBe(0);
+		for (let i = 0; i < 4; i++) await frame();
 		expect(document.querySelector(".pf-guide__notice")?.textContent).toMatch(/too long/);
+		// the rule tour's first step starts from the visitor's own eval batch, not Muse Spark's
+		expect(screen.getAllByRole("button", { name: /^Apply / }).length).toBeGreaterThan(0);
+		expect(r.ws!.state.proposal?.from).toBe(before);
 	});
 });

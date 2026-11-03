@@ -365,6 +365,7 @@ describe("a repo link with a commit pin (D's walkthrough, Nov 3)", () => {
 		expect(repoUri(`github.com/pytorch/examples@${sha}`)).toBe(`https://github.com/pytorch/examples/tree/${sha}`);
 		expect(repoUri(`https://github.com/karpathy/nanoGPT.git@v1`)).toBe("https://github.com/karpathy/nanoGPT/tree/v1");
 		expect(repoUri("github.com/karpathy/nanoGPT")).toBe("https://github.com/karpathy/nanoGPT");
+		expect(repoUri("github.com/o/r@feature/x")).toBe("https://github.com/o/r/tree/feature/x");
 		expect(repoUri(`https://github.com/karpathy/nanoGPT/commit/${sha}`)).toBe(`https://github.com/karpathy/nanoGPT/commit/${sha}`);
 	});
 });
