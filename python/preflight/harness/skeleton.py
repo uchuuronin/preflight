@@ -7,6 +7,7 @@ alone. Probes later fill measured numbers in; B fills probed ranges.
 """
 
 import itertools
+import re
 
 from preflight.probes.gpu_choice import canonical, choose_probe_gpu, estimate_need_gb, offered_gpus
 from preflight.schema import (
@@ -671,6 +672,9 @@ def skeleton_graph(sm: ScriptMap) -> Graph:
 # ---------------------------------------------------------------- findings from the code alone
 
 
+_NO_CHANNELS_LAST = re.compile(r"\b(no|not|without|missing)\b[^.;]{0,40}channels[-_ ]last|\bNCHW\b", re.I)
+
+
 def read_time_findings(sm: ScriptMap, graph: Graph) -> list[Finding]:
 	nodes = {n.id for n in graph.nodes}
 	out: list[Finding] = []
@@ -768,7 +772,9 @@ def read_time_findings(sm: ScriptMap, graph: Graph) -> list[Finding]:
 			detail=r,
 		)
 	if sm.lens == "vision":
-		if r := risk("channels_last"):
+		# B, Nov 2: Muse Spark's map writes "no channels-last", the static reader "No channels_last"; only a risk that
+		# says the format is missing counts (review: airbench's map mentions its own channels_last fp16 loader)
+		if r := next((x for x in sm.risks if _NO_CHANNELS_LAST.search(x)), None):
 			add(
 				"vision.no_channels_last",
 				"info",

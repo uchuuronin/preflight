@@ -129,3 +129,36 @@ def test_a_module_beside_the_entrypoint_is_found_first():
 		"examples/model.py": "import torch_geometric\nfrom torch_geometric.nn import SAGEConv\n\nclass Net:\n\tpass\n",
 	}
 	assert map_static(files, entrypoint="examples/train.py").lens == "gnn"
+
+
+def test_channels_last_is_read_from_its_use_not_from_a_comment_and_from_either_spelling():
+	"""B, Nov 2: vision_timm's header names the finding, which hid it from the static reader, and Muse Spark's map
+	writes "channels-last", which the rule didn't match: both made the zoo miss vision.no_channels_last."""
+	from preflight.harness.skeleton import skeleton_record
+	from preflight.harness.static import map_static
+	from preflight.schema import Source
+
+	body = (
+		"import timm, torch\nfrom torchvision import transforms\n"
+		"model = timm.create_model('resnet50')\nx = torch.randn(8, 3, 224, 224)\n"
+	)
+	for text, want in (
+		('"""Planted: vision.no_channels_last."""\n' + body, True),
+		(body + "model = model.to(memory_format=torch.channels_last)\n", False),
+	):
+		sm = map_static({"train.py": text}, entrypoint="train.py")
+		assert sm.lens == "vision"
+		codes = {f.code for f in skeleton_record(sm, Source(kind="upload")).findings}
+		assert ("vision.no_channels_last" in codes) is want, text[:40]
+	sm = map_static({"train.py": body}, entrypoint="train.py")
+	sm = sm.model_copy(
+		update={"risks": ["Model and inputs stay in default NCHW layout with no channels-last"]}
+	)
+	assert "vision.no_channels_last" in {f.code for f in skeleton_record(sm, Source(kind="upload")).findings}
+	# a map that mentions the script's own channels-last loader isn't a missing format (airbench's Spark map)
+	sm = sm.model_copy(
+		update={"risks": ["custom CUDA GPU dataloader with channels_last fp16", "converted to NHWC"]}
+	)
+	assert "vision.no_channels_last" not in {
+		f.code for f in skeleton_record(sm, Source(kind="upload")).findings
+	}
