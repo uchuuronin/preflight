@@ -92,7 +92,10 @@ export interface Job {
  * via the `definition` "Source".
  */
 export interface Source {
-	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight" | "record";
+	/**
+	 * 0.6.3 adds command: a console tool run by name (args holds the whole command; uri is command://<tool>), with runner.command_checkin on
+	 */
+	kind: "sample" | "repo" | "upload" | "notebook" | "template" | "cli" | "inflight" | "record" | "command";
 	/**
 	 * sample://name, https://github.com/..., upload://<hash>
 	 */
@@ -1193,7 +1196,7 @@ export interface Grid {
 		[k: string]: (boolean | number | string) | undefined;
 	};
 	/**
-	 * Knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere
+	 * 0.6.4: knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere
 	 */
 	independent_of?: string[] | null;
 	/**

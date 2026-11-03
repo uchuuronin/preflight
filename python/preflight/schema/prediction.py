@@ -113,7 +113,7 @@ class Grid(Strict):
 	)
 	independent_of: list[str] | None = Field(
 		default=None,
-		description="Knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of "
+		description="0.6.4: knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of "
 		"them, so a reader holds them nowhere",
 	)
 	sidecar: str | None = Field(

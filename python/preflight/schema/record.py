@@ -29,7 +29,12 @@ RECORD_REF = r"^(sample:[a-z0-9][a-z0-9_-]{0,39}|[A-Za-z0-9_-]{16,64})$"
 
 
 class Source(Strict):
-	kind: Literal["sample", "repo", "upload", "notebook", "template", "cli", "inflight", "record"]
+	kind: Literal[
+		"sample", "repo", "upload", "notebook", "template", "cli", "inflight", "record", "command"
+	] = Field(
+		description="0.6.3 adds command: a console tool run by name (args holds the whole command; "
+		"uri is command://<tool>), with runner.command_checkin on"
+	)
 	uri: str | None = Field(
 		default=None, description="sample://name, https://github.com/..., upload://<hash>"
 	)

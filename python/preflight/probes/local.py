@@ -205,6 +205,11 @@ class ProbeSpec:
 	install_repo: bool = False
 	# JobRequest.extra_packages (0.6.3): the lines to install beside the requirements (a list's own pins)
 	extra_packages: tuple[str, ...] = ()
+	install_uv: bool = False  # probes.uv_install: uv pip before pip
+	install_pyg: bool = False  # probes.extra_hosts: PyG's wheel index (the sandbox reaches data.pyg.org)
+	install_sdists: tuple[
+		str, ...
+	] = ()  # a check-in by command's source-only dependencies (sources.COMMANDS)
 	# GPUs the hosted runner may use instead when this one won't schedule (none when pinned or ruled out)
 	gpu_fallback: tuple[str, ...] = ()
 	out_dir: Path | None = None
@@ -973,6 +978,9 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"install_requirements": spec.install_requirements,
 				"install_repo": spec.install_repo,
 				"extra_packages": list(spec.extra_packages),
+				"install_uv": spec.install_uv,
+				"install_pyg": spec.install_pyg,
+				"install_sdists": list(spec.install_sdists),
 				"deps": str(box / "deps"),
 				"nproc": spec.nproc,
 			}

@@ -449,7 +449,8 @@ GROUND_TRUTH_GPUS = ["L4", "A10"]
 
 def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int, budget_s: float, files: dict,
 	entrypoint: str | None = None, args: tuple = (), install_requirements: bool = False,
-	generate_sample: int = 0, generate_calls: int = 0, install_repo: bool = False) -> dict:  # fmt: skip
+	generate_sample: int = 0, generate_calls: int = 0, install_repo: bool = False,
+	install_opts: dict | None = None) -> dict:  # fmt: skip
 	"""recorder/ground_truth.py on this function's GPU: a bare run (the full run), then a recorder
 	run alternating clean and synced steps, and the paired overhead. The AMD droplet runs the same."""
 	from preflight.probes import remote
@@ -462,7 +463,7 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
 		budget_s=budget_s, files=files, entrypoint=entrypoint, args=tuple(args),
 		install_requirements=install_requirements, generate_sample=generate_sample,
-		generate_calls=generate_calls, install_repo=install_repo)  # fmt: skip
+		generate_calls=generate_calls, install_repo=install_repo, install_opts=install_opts)  # fmt: skip
 
 
 # weights read-only: an unseen third-party script runs as root in the bare run, and must not be
@@ -569,6 +570,9 @@ def ground_truth(
 	commit: str = "",
 	edit_hex: str = "",
 	install_repo: bool = False,
+	command_hex: str = "",
+	uv: bool = False,
+	pyg: bool = False,
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -591,7 +595,19 @@ def ground_truth(
 	from preflight.runner.sources import _read_tree
 
 	root = Path(__file__).resolve().parents[3]
-	if sum(map(bool, (script, dir, repo))) != 1:
+	if (
+		command_hex
+	):  # runner.command_checkin's path, the flag on in this process only (hex: the workflow takes no quotes)
+		from preflight.runner.sources import _command
+
+		cmd = bytes.fromhex(command_hex).decode()
+		import shlex
+
+		files, words, command_lens = _command({"command": cmd}, on=True)
+		entrypoint, args = "preflight_command.py", shlex.join(words)
+		install_requirements = True
+		print(f"[ground truth] by command: {cmd}", flush=True)
+	if sum(map(bool, (script, dir, repo, command_hex))) != 1:
 		raise SystemExit(
 			"name one of a zoo script (--script), a directory in this checkout (--dir) or a repo (--repo)"
 		)
@@ -605,7 +621,9 @@ def ground_truth(
 		src = (root / dir).resolve()
 		if root not in src.parents or not src.is_dir():
 			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
-	if repo:
+	if command_hex:
+		src = Path(words[0])
+	elif repo:
 		from preflight.runner.sources import _clone
 
 		files, sha = _clone(repo, commit or None, data=install_repo)
@@ -613,7 +631,7 @@ def ground_truth(
 			files = _apply_edits(files, edit_hex)
 		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
 		print(f"[ground truth] {repo} at {sha}: {len(files)} files", flush=True)
-	else:
+	if not (repo or command_hex):
 		files = _read_tree(src)
 	try:
 		p = plan(files, entrypoint or None)
@@ -626,6 +644,15 @@ def ground_truth(
 
 		p = {"entrypoint": entrypoint_of(files, entrypoint or None), "lens": None, "image": "probe",
 			"generate_sample": 0, "generate_calls": 0}  # fmt: skip
+	opts = {k: v for k, v in (("uv", uv), ("pyg", pyg)) if v}
+	if command_hex:  # the tool's lens and source-only dependencies, as the pipeline gives them
+		from preflight.runner.sources import COMMANDS
+
+		opts["sdists"] = tuple(COMMANDS[words[0]].get("sdists", ()))
+		from preflight.runner.pipeline import EVAL_PROBE_CALLS, SERVING_PROBE_PROMPTS
+
+		p = {**p, "lens": command_lens, "generate_calls": EVAL_PROBE_CALLS if command_lens == "eval" else 0,
+			"generate_sample": SERVING_PROBE_PROMPTS if command_lens == "serving" else 0}  # fmt: skip
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
 	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
@@ -638,7 +665,8 @@ def ground_truth(
 		f"waiting for an {first}" + ("" if first == "A100" else f", else the {'L4' if first == 'A10' else 'A10'}")
 		+ " (Modal queues it)", flush=True)  # fmt: skip
 	res = fn.remote(name, bare_steps, recorder_steps, warmup, budget_min * 60, files, entry, tuple(_split_args(args)),
-		install_requirements, sample, p["generate_calls"], install_repo)  # fmt: skip
+		install_requirements, sample, p["generate_calls"], install_repo,
+		install_opts=opts or None)  # fmt: skip
 	res["lens"], res["image"] = p["lens"], image
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/ground_truth_{name}.json").write_text(json.dumps(res, indent=2))
@@ -818,6 +846,7 @@ def _agent_sample(
 	timeout_s: float | None = None,
 	install_repo: bool = False,
 	keep_error: bool = False,
+	notes: bool = False,
 ) -> dict:
 	"""The hosted agent path: the recorder's proxy here with the Meta key, behind a tunnel, and the
 	script in a CPU sandbox with no secrets. Returns the AgentSample and what it cost."""
@@ -850,7 +879,8 @@ def _agent_sample(
 		upstream = os.environ.get("META_API_BASE") or "https://api.meta.ai/v1"
 		key, override = os.environ["META_API_KEY"], None
 	sample = sandbox_sampler(lambda extra_egress, timeout_s: create("cpu", extra_egress, timeout_s=timeout_s), upstream,
-		key, max_usd_total=max_usd, model_override=override, install_repo=install_repo or None, keep_error=keep_error or None, **extra)  # fmt: skip
+		key, max_usd_total=max_usd, model_override=override, install_repo=install_repo or None, keep_error=keep_error or None,
+		replies=notes or None, single_task=notes or None, **extra)  # fmt: skip
 	sm = map_static(files, entrypoint=entrypoint)
 	print(f"[agent] {entrypoint}: lens {sm.lens}, population {getattr(sm.agent, 'n_tasks', None)}; sampling {k}",
 		flush=True)  # fmt: skip
@@ -922,6 +952,7 @@ def agent_sample(
 	edit_hex: str = "",
 	install_repo: bool = False,
 	keep_error: bool = False,
+	notes: bool = False,
 ):
 	"""modal run --env main python/preflight/runner/ops_app.py::agent_sample --script agent_eval_spark
 	--full: a half of the full benchmark (--k 250, then --k 250 --skip-from the first half's output
@@ -961,7 +992,7 @@ def agent_sample(
 		print(f"[agent] skipping the {len(skip)} tasks {skip_from} already holds", flush=True)
 	fn = agent_sample_hosted_full if full else agent_sample_hosted
 	res = fn.remote(files, entry, k, max_usd, skip, provider, label_mbpp, install_repo=install_repo,
-		keep_error=keep_error)  # fmt: skip
+		keep_error=keep_error, notes=notes)  # fmt: skip
 	Path("out").mkdir(exist_ok=True)
 	Path(f"out/agent_sample_{script}{'' if provider == 'meta' else '_' + provider}.json").write_text(
 		json.dumps(res, indent=2)
@@ -1346,3 +1377,70 @@ def startup_check_serving():
 	print(json.dumps(res, indent=2), flush=True)
 	if not res["ok"]:
 		sys.exit(1)
+
+
+# ---------------------------------------------------------------- install check (CPU, after freeze)
+
+
+@ops.function(image=probe_image, timeout=20 * 60)
+def _install_check(files: dict, entrypoint: str, uv: bool, pyg: bool, repo: bool) -> dict:
+	"""requirements.install as a probe runs it (the probe image's stack pinned, wheels only), timed, on
+	CPU: then which of the script's third-party imports still can't be found. Network: this function's
+	own, not the probe sandbox's allowlist (PyPI, Hugging Face, GitHub; data.pyg.org with extra_hosts)."""
+	import importlib
+	import site
+	import sys
+	import tempfile
+	import time
+
+	from preflight.recorder import requirements as R
+
+	work = Path(tempfile.mkdtemp(prefix="pf-install-"))
+	for rel, text in files.items():
+		p = (work / rel).resolve()
+		if work.resolve() in p.parents:
+			p.parent.mkdir(parents=True, exist_ok=True)
+			p.write_text(text)
+	before = sorted(R.missing_imports(work, entrypoint))
+	t0 = time.monotonic()
+	err, dirs = R.install(work, work.parent / "deps", log=lambda m: print(m, flush=True), repo=repo,
+		entrypoint=entrypoint, uv=uv, pyg=pyg)  # fmt: skip
+	took = round(time.monotonic() - t0, 1)
+	for d in dirs:
+		if "site-packages" in str(d):
+			site.addsitedir(str(d))
+		else:
+			sys.path.insert(0, str(d))
+	importlib.invalidate_caches()
+	after = sorted(R.missing_imports(work, entrypoint)) if err is None else before
+	out = {
+		"uv": uv,
+		"pyg": pyg,
+		"seconds": took,
+		"error": err,
+		"missing_before": before,
+		"missing_after": after,
+	}
+	print(json.dumps(out), flush=True)
+	return out
+
+
+@ops.local_entrypoint()
+def install_check(repo: str, commit: str = "", entrypoint: str = "", uv: bool = False, pyg: bool = False):
+	"""How a repo's install goes in the probe image, without a GPU (probes.uv_install, probes.extra_hosts):
+
+	modal run --env main python/preflight/runner/ops_app.py::install_check --repo https://github.com/Lightning-AI/litgpt \\
+		--commit <sha> --entrypoint litgpt/__main__.py --uv"""
+	from preflight.recorder.ground_truth import entrypoint_of
+	from preflight.runner.sources import _clone
+
+	files, sha = _clone(repo, commit or None, data=True)
+	entry = entrypoint_of(files, entrypoint or None)
+	print(
+		f"[install check] {repo} at {sha}: {len(files)} files, entry {entry}, uv {uv}, pyg {pyg}", flush=True
+	)
+	res = _install_check.remote(files, entry, uv, pyg, True)
+	Path("out").mkdir(exist_ok=True)
+	Path(f"out/install_check_{repo.rstrip('/').rsplit('/', 1)[-1]}_{'uv' if uv else 'pip'}.json").write_text(
+		json.dumps(res, indent=2)
+	)

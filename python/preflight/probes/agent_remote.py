@@ -28,14 +28,35 @@ _EXC = re.compile(r"^(?:[A-Za-z_][\w.]*\.)?[A-Za-z_]\w*(?:Error|Exception|Exit|I
 TAIL_BYTES = 8192  # of stderr, kept in memory as it streams: never a file that could fill the disk
 
 
-def error_line(stderr_tail: str) -> str | None:
+def error_line(stderr_tail: str, *, follow: bool = False) -> str | None:
 	"""The last line of a traceback that names the exception (e.g. "ModuleNotFoundError: No module
-	named 'smolagents'"), capped; None when there is none."""
-	for line in reversed(stderr_tail.splitlines()):
-		line = line.strip()
+	named 'smolagents'"), capped; None when there is none. follow (probes.agent_proxy_replies): a line
+	that ends in ':' takes the next non-empty line too, where an SDK puts the message (smolagents'
+	"AgentGenerationError: Error while generating output:" then the API's error)."""
+	lines = stderr_tail.splitlines()
+	for i in range(len(lines) - 1, -1, -1):
+		line = lines[i].strip()
 		if _EXC.match(line):
+			if follow and line.endswith(":"):
+				line = f"{line} {_api_error(lines[i + 1 :])}".strip()
 			return line[:ERROR_LINE_CHARS]
 	return None
+
+
+_API_ERROR = re.compile(r"Error code: (\d{3})\b")
+_API_CODE = re.compile(r"""['"](?:code|type)['"]\s*:\s*['"]([a-z][a-z0-9_.]{0,47})['"]""")
+
+
+def _api_error(rest: list[str]) -> str:
+	"""From the line after an SDK's "Error while generating output:", only an API error's status and its
+	code (openai's `Error code: 400 - {'error': {'code': 'unpriced_model', ...}}` → "Error code: 400
+	(unpriced_model)"): never the message, which can echo a key or the script's own text (review, Nov 2)."""
+	nxt = next((x.strip() for x in rest if x.strip()), "")
+	m = _API_ERROR.match(nxt)
+	if m is None:
+		return ""
+	c = _API_CODE.search(nxt)
+	return f"Error code: {m.group(1)}" + (f" ({c.group(1)})" if c else "")
 
 
 def main() -> int:
@@ -90,7 +111,7 @@ def main() -> int:
 		reader.join(timeout=5)
 		# an exception's own exit (a positive code); a killed script's tail may hold an old, handled one
 		if ended == "exited" and (proc.returncode or 0) > 0:
-			line = error_line(bytes(tail).decode("utf-8", "replace"))
+			line = error_line(bytes(tail).decode("utf-8", "replace"), follow=bool(job.get("error_follow")))
 			if line:
 				report["error"] = line
 	print(json.dumps(report), flush=True)

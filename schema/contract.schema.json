@@ -2676,7 +2676,7 @@
 						}
 					],
 					"default": null,
-					"description": "Knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere",
+					"description": "0.6.4: knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere",
 					"title": "Independent Of"
 				},
 				"sidecar": {
@@ -5420,6 +5420,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"kind": {
+					"description": "0.6.3 adds command: a console tool run by name (args holds the whole command; uri is command://<tool>), with runner.command_checkin on",
 					"enum": [
 						"sample",
 						"repo",
@@ -5428,7 +5429,8 @@
 						"template",
 						"cli",
 						"inflight",
-						"record"
+						"record",
+						"command"
 					],
 					"title": "Kind",
 					"type": "string"

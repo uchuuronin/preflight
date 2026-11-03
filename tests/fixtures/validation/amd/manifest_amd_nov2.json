@@ -8,7 +8,8 @@
    "ground_truth": "ground_truth_finetune_lora_hf_mi300x_eval.json",
    "used_for_tuning": false,
    "$record": "a-amd-lora-record-5: p1 ran the eval pass and fitted (192 GiB card)",
-   "$ground_truth": "b-amd-lora-gt-eval (run by Chiya, Nov 2, 7:13 PM ET): 210 bare steps asked; ran out of memory at the first eval, step 200 (HIP OOM, 178 GiB allocated of 192 GiB). A's 120-step run (a-amd-lora-gt) is kept beside it, ground_truth_finetune_lora_hf_mi300x.json"
+   "$ground_truth": "b-amd-lora-gt-eval (run by Chiya, Nov 2, 7:13 PM ET): 210 bare steps asked; ran out of memory at the first eval, step 200 (HIP OOM, 178 GiB allocated of 192 GiB). A's 120-step run (a-amd-lora-gt) is kept beside it, ground_truth_finetune_lora_hf_mi300x.json",
+   "$numerics": "numerics broken on this stack (loss NaN), timing and memory only (the PM, Nov 2: every AMD LoRA log shows loss 0.0, grad_norm nan after a first loss of 430, bf16 on torch 2.5.1+rocm6.2, ROCm 6.4.4)"
   },
   {
    "script": "pretrain_nanogpt@MI300X",

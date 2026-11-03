@@ -150,6 +150,9 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"install_requirements": spec.install_requirements,
 		**({"install_repo": True} if spec.install_repo else {}),  # absent: keys stay as they were
 		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
+		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
+		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
+		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
@@ -305,6 +308,9 @@ def _spec(
 		install_requirements=deps.install_requirements,
 		install_repo=deps.install_requirements and _repo_install_on(),
 		extra_packages=extra_lines(fetched.source) if deps.install_requirements else (),
+		install_uv=deps.install_requirements and _flag("probes.uv_install"),
+		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
+		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
@@ -321,6 +327,27 @@ def _import_knobs(knobs: dict) -> tuple:
 			if isinstance(v, bool) or not isinstance(v, int | float)
 		)
 	)
+
+
+def _command_sdists(fetched: Fetched) -> tuple[str, ...]:
+	"""A check-in by command's own source-only dependencies (sources.COMMANDS), else none."""
+	from .sources import COMMANDS
+
+	src = fetched.source
+	if src is None or src.kind != "command" or not src.args:
+		return ()
+	return tuple((COMMANDS.get(src.args[0]) or {}).get("sdists", ()))
+
+
+def _command_lens(sm: ScriptMap, fetched: Fetched) -> ScriptMap:
+	"""A check-in by command is its tool's lens (sources.COMMANDS): the map reads only the wrapper."""
+	return sm.model_copy(update={"lens": fetched.lens}) if fetched.lens else sm
+
+
+def _flag(name: str) -> bool:
+	from .flags import flag
+
+	return flag(name)
 
 
 def _repo_install_on() -> bool:
@@ -431,13 +458,17 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
 			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
 		sm = rec.job.script_map or values_from_args(
-			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+			fetched.files,
+			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			fetched.args,
 		)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message=f"continuing from record {origin.parent.share_token}")
 	else:
 		sm = values_from_args(
-			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+			fetched.files,
+			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			fetched.args,
 		)
 		rec = _skeleton(fetched, sm, request)
 		update = {"parent_id": origin.parent_id} if origin is not None else {}
@@ -455,7 +486,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:
-				sm = values_from_args(fetched.files, spark_sm, fetched.args)
+				sm = values_from_args(fetched.files, _command_lens(spark_sm, fetched), fetched.args)
 				rec = _skeleton(fetched, sm, request, base=rec)
 				if origin is not None:
 					rec = rec.model_copy(update={"parent_id": origin.parent_id})
