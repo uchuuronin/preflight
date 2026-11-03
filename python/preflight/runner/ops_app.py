@@ -454,7 +454,7 @@ def limit_check(modal_env: str = ""):
 @ops.local_entrypoint()
 def smoke(
 	sample: str = "sample://zoo/finetune_lora_hf",
-	gpus: str = "L4",
+	gpus: str = "",
 	max_minutes: int = 25,
 	modal_env: str = "",
 	visitor: str = "smoke",
@@ -469,9 +469,8 @@ def smoke(
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
-	Probes stay on `gpus` (comma-separated): L4 by default, since team runs use T4 or L4 unless
-	Chiya approves a bigger GPU, and without a constraint an OOM would step up the ladder (to an
-	A100). --visitor: the queue's visitor (3 probe jobs a day each). --notebook path: check in an
+	No GPU constraint by default, as a visitor's check-in sends none (the runner's own ladder and ceiling apply:
+	L4, then A10, never above GPU_CEILING); --gpus L4 (comma-separated) keeps the probes on the named GPUs. --visitor: the queue's visitor (3 probe jobs a day each). --notebook path: check in an
 	.ipynb from this checkout as kind notebook, as D's tab does (the name and outputs as they are).
 	--dir path [--entrypoint main.py] [--args=--epochs=1,--lr=3e-4]: any directory in this checkout as an upload.
 	--repo https://github.com/<owner>/<repo> --commit <40-hex> [--entrypoint ...] [--args=...]: a public
@@ -520,9 +519,12 @@ def smoke(
 			raise SystemExit(f"{dir!r} isn't a directory inside this checkout")
 		source = {"kind": "upload", "files": _read_tree(src), **({"entrypoint": entrypoint} if entrypoint else {}),
 			**({"args": _split_args(args)} if args else {})}  # fmt: skip
+	asked = [g.strip() for g in gpus.split(",") if g.strip()]
 	request = {
 		"source": source,
-		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
+		# no constraint by default, as a visitor sends (the re-validation, Nov 3: ["L4"] turned off the A10 fallback
+		# for unseen 2, 7 and 8); --gpus L4 asks for one, as a team run under Chiya's rule may
+		**({"constraints": {"gpu_types": asked}} if asked else {}),
 		**(
 			{"private": True} if private else {}
 		),  # --private: the job's private mode, as the web's toggle sends it
