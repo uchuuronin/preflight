@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 from preflight.harness.search_grounding import (
+	MAX_TOOL_CALLS,
 	annotated_urls,
 	final_text,
 	ground_failure,
@@ -44,7 +45,17 @@ def main() -> None:
 	shape = sys.argv[sys.argv.index("--shape") + 1] if "--shape" in sys.argv[:-1] else "current"
 	if shape not in ("current", "first"):
 		raise SystemExit(f"--shape {shape!r}: current or first")
+	# `--max-tool-calls N`: the cap sent with the current shape (the 4 tool calls hypothesis, Nov 2)
+	cap = (
+		int(sys.argv[sys.argv.index("--max-tool-calls") + 1])
+		if "--max-tool-calls" in sys.argv[:-1]
+		else MAX_TOOL_CALLS
+	)
+	if not 1 <= cap <= 16:  # guess: 16 keeps one call's search fee under US$0.04
+		raise SystemExit("--max-tool-calls runs from 1 to 16")
 	name = "search_validate.json" if shape == "current" else f"search_validate_{shape}.json"
+	if cap != MAX_TOOL_CALLS:
+		name = name.replace(".json", f"_cap{cap}.json")
 	cases = json.loads(CASES.read_text())["cases"]
 	oom = next(c for c in cases if c["probe"]["error_code"] == "oom.eval")
 	planted = {**oom, "case": "planted-link", "probe": {**oom["probe"],
@@ -73,7 +84,13 @@ def main() -> None:
 			"production_skips": skipped(probe)}  # fmt: skip
 		try:
 			f, calls = ground_failure(
-				client, probe, c["libraries"], c["lens"], skip_codes=("budget",), shape=shape
+				client,
+				probe,
+				c["libraries"],
+				c["lens"],
+				skip_codes=("budget",),
+				shape=shape,
+				max_tool_calls=cap,
 			)
 		except Exception as exc:  # recorded, never fatal: the next case still runs
 			row["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"

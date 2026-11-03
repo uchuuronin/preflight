@@ -181,6 +181,22 @@ kept 1, 0, 2 and 2 sources across the four runs, none made up (run 1's was Arrow
 which documents the cause; the others are issue trackers' pull requests). It stays off until B's re-check and
 C's data-use line; whether the cap goes up is the next decision.
 
+## B's re-review (Nov 2): three must-fixes, done
+
+B took the re-check off A (`from-b.md`, ws-b) and found three things before the flag can go on:
+
+1. **A denial of service on the worker:** `named_keys` ran on the whole raw error, and its address
+   pattern backtracks quadratically on long dotted text (40 KB of `a.` took 41 s). It now reads only
+   the error's end the model is sent (2,500 characters), each word at most 512 characters; the
+   same 40 KB now runs well under 2 s (tested). An address the model never saw can't steer it.
+2. **A failed call recorded at $0:** a timeout, an error status or a reply with no output may have
+   searched and billed already, unseen. Such a call now records the most its searches could cost
+   (`max_tool_calls` times the fee); a connection refused before sending records nothing more.
+3. **Model-written text in the record:** a finding's detail was the model's own title and reason,
+   shown on share links. A kept source's title is now the search's own (its results' title, else the
+   annotation's, else the page's host), and the model's reason is dropped: "Muse Spark's search
+   returned 2 sources it matched to this error: <title> (<host>); ...".
+
 ## Before `harness.spark_search` goes on
 
 1. B's re-check of the fixes above (Chiya, Nov 2, 17:33: B instead of A).

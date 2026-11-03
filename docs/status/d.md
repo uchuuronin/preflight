@@ -74,6 +74,33 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
 
+## Mon Nov 2, 20:20 ET (Chiya's 8:12 list)
+
+`main` `a132c0a` (the PM's 7:35 merge, contract 0.6.4) merged into `ws-d`, no conflicts.
+
+- **Range test:** B's re-review clears my side (A's items 1, 2, 3 and 6 fixed with tests; B fixed
+  item 4 on ws-b). What's left is A's (the golden's old key names) and C's (the curve). Nothing of
+  mine to push for it beyond what's on `ws-d`.
+- **Search, B's three must-fixes:** the quadratic address pattern now reads only what the model is
+  sent (40 KB of `a.`: from 41 s to well under 2 s, tested); a failed call that may have reached
+  Meta records its searches' most possible fee; the record shows the search's own titles and hosts,
+  not the model's words. `docs/decisions/spark-search.md`. Then the cap test: all 8 cases at
+  `max_tool_calls` 10 (about US$0.15 to 0.35 with the fee).
+- **Shot 9b:** the false "faster" alert is posted to B (`from-d.md`, in-flight's band). The device
+  plan stands: Chiya's RTX 4070 if she has time, else a Colab T4, decided by Tue noon.
+- **`readme-final.md`** mirrors the PM's README: the live share host and badge, the in-flight,
+  failed-check-in, diagnosis and engine-fallback rows, the claim check, Glimmer, Cloudflare, and the
+  AMD row as the PM's 7:35 correction has it (LoRA's eval runs out of memory at step 200, 191.3 GB of
+  192 GB; LoRA rows "loss NaN on this stack (bf16, rocm6.2), timing and memory only"; nanoGPT
+  normal). `README.md` itself still says "fits on 192 GB": asked the PM.
+- **Video:** shot 6b, about 8 s on a diagnosis finding with the claim check's mark, needing the
+  deploys and C's live check by Tue noon; otherwise not in the cut.
+
+This push sends: the merge of `main` `a132c0a`; `python/preflight/harness/search_grounding.py`,
+`scripts/spark_search_validate.py` (`--max-tool-calls`), `tests/test_d_search_grounding.py`,
+`docs/decisions/spark-search.md`, `docs/readme-final.md`, `docs/demo/video-plan.md` (6b, 9b),
+`docs/requests/from-d.md`, this file.
+
 ## Mon Nov 2, 18:05 ET (the 6 PM check-in)
 
 `main` is still `8ec03bc` (the 4:25 PM merge), already in `ws-d`; nothing to merge.

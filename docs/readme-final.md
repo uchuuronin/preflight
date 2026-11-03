@@ -1,10 +1,6 @@
 # Preflight
 
-<!-- TODO(PM): once the site is live and workers/ is in the deploy, uncomment the badge and
-replace TODO-PM-HOST with the live host. It reads A's Oct 28 record (a-smoke-l4-main-4) and shows
-its first headline number with its status word; until then it would be a broken image.
-[![Preflight flight record: the LoRA fine-tune, measured on an L4](https://TODO-PM-HOST/badge/ICDYrfHQ2nBNbv3mlRHHMg)](https://TODO-PM-HOST/s/ICDYrfHQ2nBNbv3mlRHHMg)
--->
+[![Preflight flight record: the LoRA fine-tune, measured on an L4](https://preflight-cqn.pages.dev/badge/ICDYrfHQ2nBNbv3mlRHHMg)](https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg)
 
 **A flight simulator for ML jobs.** Preflight measures a few minutes of your real training,
 evaluation, serving or agent job, builds a model of how it behaves, and lets you fly the whole
@@ -37,6 +33,10 @@ is live at <https://preflight-cqn.pages.dev>.
 | Verify a fix in your own CI | A GitHub Action (below) | No flag; usable from other repositories once this one is public |
 | Possible outcomes (HOPs) and exports: the plan, an edit script, a Slurm batch file, the run command and a W&B script | The cockpit's "Possible outcomes" toggle, and the exports band under the whole run | `c.hops` and `c.exports`, on in production (Chiya, Nov 1, 8 PM); checked by C on all 10 samples on a production build |
 | The add-ons: detail level, costs in your currency, free GPUs | The Logbook and the cockpit (below) | `d.expertise`, `d.currency`, `d.freetier`, on in production (Chiya, Nov 1, 8 PM); checked by D in Chromium, desktop and phone |
+| In-flight mode: watch a real run against its predicted bands | Logbook, "Watch a real run": open the live record that `preflight watch` writes on your machine; nothing is uploaded | `c.inflight`, on in production (Nov 2). On an A10 matching its probes the step band held over 159 steps with no false alert; on an A10G the run was 11% slower and the alerts fired [measured: B's runs b-inflight-a10-lora-3 and -2] |
+| Clearer failed check-ins: a job stops paying for points that can't import, an agent script's last error line is kept, and samples never send their own measured answers | Boarding and the record | `runner.stop_on_import_error`, `probes.agent_error_line`, `runner.hide_sample_outputs`, on in production (Nov 2) |
+| Muse Spark diagnosis: one call per finished record reads its memory timeline and loss plot with the raw probe numbers and reports where they disagree, each claim checked against the numbers | The record's Findings, "Found by Muse Spark diagnosis" | `harness.spark_diagnosis`, on in production (Nov 2, with the claim check). No call when no plot has anything drawn; a record a private check-in touched is never diagnosed |
+| Settings between the grids' cells: where a grid holds no value, the cockpit asks the engine (CPU only, no model) and shows its estimate with its own status | Dials, timeline and guide readouts | `c.engine_fallback`, on in production (Nov 2). On the LoRA record, lr 2e-4 reads 1.709 s a step predicted, and the A10 1.236 s extrapolated, where it read "off grid" [measured: C's API test] |
 | The `preflight` CLI (`map`, `run`) | Your own machine | On `main`; the `pip install git+...` line works once the repository is public |
 
 **Behind a flag, off for now**
@@ -52,11 +52,9 @@ is live at <https://preflight-cqn.pages.dev>.
 | What | Why | Source |
 | --- | --- | --- |
 | Divergence classifier | Still misses after a refit on 720 runs, held out by settings family: AUROC 0.66 (0.56 to 0.76) against a 0.85 target, with a lead of 138 steps (3 to 269) [measured: B's fit report], so `risk.divergence` stays off and is not used; the warning comes from the threshold rules | B's fit report, [`divergence_nov1.json`](python/preflight/corpus/reports/divergence_nov1.json) (`1cfa689`) |
-| AMD | No AMD measurements: the AMD Developer Cloud account is on a verification hold, so every AMD figure says "not measured" | `docs/status/b.md`, `docs/status/a.md` |
 | GBDT correction for an unmeasured GPU | Fails held out (51% within 20%, against 60% for the analytical model [measured, corpus]), so it isn't used | `docs/status/b.md` |
 | Step time on an unmeasured GPU | Used, with its range, but 60% of held-out queries land within 20% [measured, corpus], under the 90% target | `docs/status/b.md` (leave-one-GPU-out on the corpus) |
 | Serving model | Built, switched off (`engine.serving`) until its validation row passes | `python/preflight/engine/api.py` |
-| Claim check by Muse Spark Open | Module written, not wired in | `python/preflight/harness/claim_check.py` |
 | Full-run validation | Scored on Mon Nov 2 (the table below) | B's scorer |
 
 ## Try it
@@ -65,13 +63,13 @@ is live at <https://preflight-cqn.pages.dev>.
 the cockpit (samples use illustrative numbers unless they say measured, and cost nothing), or open
 a shared record's link. Or check in your own repo or script under New flight.
 
-**Share a flight** (once `workers/` is in the deploy; TODO(PM)): post
-`https://TODO-PM-HOST/s/<share token>`. Link previews show the record's headline numbers, each with
+**Share a flight:** post
+`https://preflight-cqn.pages.dev/s/<share token>`. Link previews show the record's headline numbers, each with
 its status word (Measured, Predicted, Extrapolated, Not measured here or Illustrative), as text, with a
 card image for the records whose card is pre-rendered, and the link opens the flight in the
 cockpit.
 For a README badge:
-`[![Preflight](https://TODO-PM-HOST/badge/<share token>)](https://TODO-PM-HOST/s/<share token>)`
+`[![Preflight](https://preflight-cqn.pages.dev/badge/<share token>)](https://preflight-cqn.pages.dev/s/<share token>)`
 (`workers/README.md`).
 
 **On your own machine, one command** (Python 3.11 or 3.12). In the environment that already has
@@ -161,8 +159,8 @@ owns which path are in [CONTRACT.md](CONTRACT.md).
 | **Muse Spark Open** (Baseten) | Triage: reads each probe's log tail and names the cause, quoting the line it read; code checks the quote is really in the log (`python/preflight/harness/triage.py`) | On in production (`harness.spark_open_triage`, Nov 1). First real run, A's `a-triage-lora-prod`: 4 calls on Baseten, US$0.0184 [measured]. Since A's fix (`b300684`, in A's redeploy of Nov 1, 20:20 UTC), triage also reads the probe's recorded error, and on the 11 failed probes in the zoo's records Spark Open quoted a line every time [measured, `a-triage-agreement`]. The claim check (`claim_check.py`) is written but not wired in |
 | **Muse Glimmer** (open weights, Apache 2.0) | Private mode: with its flag on, triages a private job's failed probes on Preflight's own GPU (an A100-40GB on Modal that Preflight deploys), so their logs go to no outside model provider; with no Glimmer to call, such a job isn't triaged rather than sent to Baseten (`python/preflight/runner/pipeline.py`); also one of three models in the agent model sweep | Behind `harness.glimmer_private`, off. Hosted (`python/preflight/glimmer/`, `docs/decisions/glimmer-host.md`); US$0.24 for one call that waited through a 411 s cold start [measured: US$0.2398, A's `a-triage-glimmer-5`], and US$0.33 for 11 calls in one run, likely including one cold start [measured: US$0.3316, A's `a-triage-agreement`] |
 | **Modal** | Probes in GPU sandboxes, the job store and API, the background corpus sweep, the fix loop's sandboxes | Every measured run so far (Oct 28 to Nov 1, `docs/status/a.md`); the runner (job store), the API and the fix app are deployed in production and stay up since Nov 1 |
-| **AMD Developer Cloud** | ROCm probes through the CLI on an MI300X, and the AMD half of the corpus (`python/preflight/corpus/`, `.github/workflows/amd-run.yml`) | No AMD measurements: the account is on a verification hold |
-| **Cloudflare Pages** | The web app, the `/v1` edge function that forwards to the API with a shared secret and the visitor's address for quotas (`web/functions/`), and share cards (`workers/`) | Live at <https://preflight-cqn.pages.dev>; share cards wait on `workers/` joining the deploy |
+| **AMD Developer Cloud** | ROCm probes through the CLI on an MI300X, and the AMD half of the corpus (`python/preflight/corpus/`, `.github/workflows/amd-run.yml`) | The AMD Developer Cloud account stayed on a verification hold, so the AMD runs used a rented MI300X (RunPod, ROCm 6.4.4, torch 2.5.1+rocm6.2) through `amd-run.yml` on Nov 2: the LoRA and nanoGPT zoo scripts' records and bare runs (records `a-amd-*` on the `remote-runs` branch). LoRA's planted eval bug runs out of memory there too: B's full run (`b-amd-lora-gt-eval`) hit a HIP out-of-memory at the first eval, step 200, peak 191.3 GB of 192 GB [measured], the same outcome as on the L4 and A10. The AMD LoRA rows are labelled "loss NaN on this stack (bf16, rocm6.2), timing and memory only": every LoRA log there shows `loss 0.0, grad_norm nan` after a first loss of 430; nanoGPT trains normally (loss 10.98 falling to 9.30) and is scored as a normal run. B's scored AMD rows go in the validation table |
+| **Cloudflare Pages** | The web app, the `/v1` edge function that forwards to the API with a shared secret and the visitor's address for quotas (`web/functions/`), and share cards (`workers/`) | Live at <https://preflight-cqn.pages.dev>, with share pages and cards (`/s/<share token>`) |
 
 ## What a run costs to measure
 
