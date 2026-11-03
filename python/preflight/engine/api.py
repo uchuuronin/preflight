@@ -100,6 +100,7 @@ FEATURES = {
 	"carry_free_knobs": False,  # flags.json engine.carry_free_knobs: after the freeze (Nov 2), off until checked
 	"context_same_stack": False,  # flags.json engine.context_same_stack: after the freeze (Nov 2), off until checked
 	"memory_reserved": False,  # flags.json engine.memory_reserved: Nov 3, off until the PM turns it on
+	"eval_passes": False,  # flags.json engine.eval_passes: Nov 3, off until checked
 }  # the defaults when the caller passes no flags (scripts, tests); keep them the same as flags.json
 # the flags.json key for each feature: fill_predictions(record, flags=flag) reads them for that call
 FLAG_OF = {
@@ -110,6 +111,7 @@ FLAG_OF = {
 	"carry_free_knobs": "engine.carry_free_knobs",
 	"context_same_stack": "engine.context_same_stack",
 	"memory_reserved": "engine.memory_reserved",
+	"eval_passes": "engine.eval_passes",
 }
 _FEATURES_NOW: contextvars.ContextVar[dict[str, bool] | None] = contextvars.ContextVar(
 	"preflight_features", default=None
@@ -1824,6 +1826,47 @@ class _TimeResult:
 	steps: float | None = None
 
 
+# Chiya, Nov 3: an eval by command (lm_eval's loglikelihood tasks) has no optimizer steps; A's eval probe (probes.eval_units)
+# times its scoring batches instead. Total = the probe's time before its first measured batch (load, tokenizing, two
+# warm-up batches) + scoring passes x the per-pass time, passes = the eval's requests / the rows a batch holds.
+EVAL_PASS_SIGMA = 0.30  # guess: log-space, as serving.SIGMA_UNCALIBRATED; no eval run has calibrated it
+MODEL_ID_EVAL = "eval-passes@0.1.0"
+
+
+def _eval_passes_total(record: FlightRecord) -> Estimate:
+	probe = next(
+		(p for p in record.probes if p.status in OK_PROBE and (p.extras or {}).get("eval_forward_batches")),
+		None,
+	)
+	if probe is None:
+		return _abstain(
+			"s", MODEL_ID_EVAL, "no eval probe timed a scoring batch; run a probe with probes.eval_units"
+		)
+	x = probe.extras
+	per, rows, n = x.get("eval_forward_s_p50"), x.get("eval_forward_rows_mean"), x.get("eval_forward_batches")
+	requests = x.get("eval_requests_total")
+	if not per or not rows or not requests:
+		why = "the probe timed scoring batches but didn't record how many requests the eval has, so the passes aren't known"
+		return _abstain("s", MODEL_ID_EVAL, why)
+	passes = math.ceil(requests / rows)
+	fixed = max(0.0, (probe.duration_s or 0.0) - (n + EVAL_WARMUP_BATCHES) * per)
+	pt = passes * per
+	h = memory.Z90 * EVAL_PASS_SIGMA
+	why = (
+		f"{passes:,} scoring passes ({requests:,.0f} requests at {rows:.0f} a batch) x {per:.2f} s a pass (the probe's "
+		f"{n:.0f} batches, p50) + {fixed:.0f} s before the first pass; an eval that scores its longest requests first "
+		"(lm_eval does) makes the probe's batches the slowest, so this leans long"
+	)
+	return _est(
+		pt + fixed, pt * math.exp(-h) + fixed, pt * math.exp(h) + fixed, "s", "predicted", MODEL_ID_EVAL, why
+	)
+
+
+EVAL_WARMUP_BATCHES = (
+	2  # cited: recorder/runtime.py, probes.eval_units runs two scoring batches before the measured ones
+)
+
+
 def _time(record: FlightRecord, values: dict) -> _TimeResult:
 	step = _step(record, values)
 	if feature("rl") and record.job.lens == "rl" and step.est.status != "abstain":
@@ -2485,6 +2528,8 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		return Prediction(_agent(record, values))
 	mem = _memory(record, values, eval_off=eval_off)
 	tm = _time(record, values)
+	if feature("eval_passes") and record.job.lens == "eval" and tm.total.status == "abstain":
+		tm = replace(tm, total=_eval_passes_total(record))
 	out = {
 		"memory.peak": mem.peak,
 		"risk.oom": mem.oom,
