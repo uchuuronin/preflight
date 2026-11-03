@@ -1390,9 +1390,9 @@ def with_predictions(
 			from preflight.engine.api import fill_predictions
 
 			# the engine reads no files: its switches come from the engine.* flags (from-b.md, B -> A)
-			api.FEATURES.update(
-				{k: flag(f"engine.{k}") for k in ("rl", "serving", "steptime_cross_gpu", "divergence")}
-			)
+			# every engine switch the engine names (api.FLAG_OF), so a new one reaches production when its flag goes on
+			# (B, Nov 2: engine.carry_free_knobs and engine.context_same_stack were missing from a fixed list)
+			api.FEATURES.update({name: flag(key) for name, key in api.FLAG_OF.items()})
 			# the engine returns a copy without re-validating: store-and-load it exactly as C's API
 			# will (nulls dropped, then parsed), and fail here rather than in the reader;
 			# dump_record also enforces the 1 MB gzipped budget

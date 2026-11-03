@@ -98,6 +98,7 @@ FEATURES = {
 	"steptime_cross_gpu": True,  # Chiya, Oct 31: on, with the rough band shown past +-50%
 	"divergence": False,  # flags.json engine.divergence: off until the sweep's held-out report meets its row
 	"carry_free_knobs": False,  # flags.json engine.carry_free_knobs: after the freeze (Nov 2), off until checked
+	"context_same_stack": False,  # flags.json engine.context_same_stack: after the freeze (Nov 2), off until checked
 }  # the defaults when the caller passes no flags (scripts, tests); keep them the same as flags.json
 # the flags.json key for each feature: fill_predictions(record, flags=flag) reads them for that call
 FLAG_OF = {
@@ -106,6 +107,7 @@ FLAG_OF = {
 	"steptime_cross_gpu": "engine.steptime_cross_gpu",
 	"divergence": "engine.divergence",
 	"carry_free_knobs": "engine.carry_free_knobs",
+	"context_same_stack": "engine.context_same_stack",
 }
 _FEATURES_NOW: contextvars.ContextVar[dict[str, bool] | None] = contextvars.ContextVar(
 	"preflight_features", default=None
@@ -618,16 +620,37 @@ CONTEXT_MAX_BYTES = (
 CONTEXT_AGREE_BYTES = 64 * 2**20  # guess: two steps within 64 MiB of each other agree on the context
 
 
+_BACKEND_OF = {"nvidia": "cuda", "amd": "rocm"}
+
+
+def _same_stack(record: FlightRecord, gpu: str) -> bool:
+	"""Whether a move to `gpu` keeps the probes' vendor and software stack: the same vendor, and the record's own
+	backend the one that vendor runs (CUDA for NVIDIA, ROCm for AMD). The script, its image and its libraries go with
+	it, so the memory outside the allocator is the probes' own measured context, not a guess (Chiya, Nov 2: on the zoo,
+	moving an L4 record to the A10 swapped a measured 0.27 GB for the guessed 0.81 GB)."""
+	src = _env_gpu(record)
+	if src is None or record.env is None:
+		return False
+	try:
+		a, b = gpus.get_gpu(src), gpus.get_gpu(gpu)
+	except KeyError:
+		return False
+	return a.vendor == b.vendor and record.env.backend == _BACKEND_OF.get(b.vendor)
+
+
 def _context_bytes(record: FlightRecord, gpu: str | None = None) -> float:
 	"""The device memory outside PyTorch's allocator (CUDA context, cuBLAS workspaces, other libraries), measured from
 	the probes' timed steps: whole-device use (cudaMemGetInfo, at the step boundary) less the step's reserved peak.
 	The largest gap that a second step agrees with (reviews, Nov 1): when the allocator hands memory back between the
 	peak and the boundary (GRPO frees its generation cache) a step's gap reads low or negative, so the steps that
 	released nothing show the whole context; another process's one-step spike on a shared GPU has no partner. C, Nov 1: a guessed 0.75 GiB on a GRPO probe's reserved peak read 23.8 GB on a
-	23.7 GB L4 for a run that fit. The guess stays where no probe logged whole-device use, and on any GPU other than
-	the probe's, whose driver and libraries take their own."""
-	if gpu is not None and gpu != _env_gpu(record):
+	23.7 GB L4 for a run that fit. The guess stays where no probe logged whole-device use, and on a GPU of another
+	vendor or stack; with engine.context_same_stack on (after the freeze, Nov 2), a move within the probes' vendor and
+	stack keeps their measured context (`_same_stack`)."""
+	moved = gpu is not None and gpu != _env_gpu(record)
+	if moved and not (feature("context_same_stack") and _same_stack(record, gpu)):
 		return float(memory.DEFAULT_CONTEXT_BYTES)
+	scale = _context_scale(record, gpu) if moved else 1.0
 	gaps = [
 		x.device_used_bytes - x.peak_reserved_bytes
 		for p in record.probes
@@ -639,13 +662,26 @@ def _context_bytes(record: FlightRecord, gpu: str | None = None) -> float:
 	if not gaps:
 		return float(memory.DEFAULT_CONTEXT_BYTES)
 	if len(gaps) == 1:
-		return float(gaps[0])
+		return float(gaps[0]) * scale
 	# the largest gap that a second step agrees with: a release after the peak only lowers a step's gap, and a
 	# co-tenant's one-step spike on a shared GPU has no partner (review, Nov 1)
 	for i, g in enumerate(gaps[:-1]):
 		if g - gaps[i + 1] <= CONTEXT_AGREE_BYTES:
-			return float(g)
-	return float(np.median(gaps))
+			return float(g) * scale
+	return float(np.median(gaps)) * scale
+
+
+def _context_scale(record: FlightRecord, gpu: str) -> float:
+	"""On a bigger card of the same stack, the measured context scaled up by the ratio of SMs (CUs on AMD), never
+	down: part of the CUDA context is reserved per SM (each SM's thread stacks), so an L4's 58 SMs read low for an
+	H100's 132 [guess: the share that grows with SMs isn't measured; scaling all of it is the safe side]. Review, Nov 2."""
+	try:
+		src, tgt = gpus.get_gpu(_env_gpu(record)), gpus.get_gpu(gpu)
+	except (KeyError, TypeError):
+		return 1.0
+	if not src.compute_units or not tgt.compute_units:
+		return 1.0
+	return max(1.0, tgt.compute_units / src.compute_units)
 
 
 def _capacity(record: FlightRecord, gpu: str) -> int:

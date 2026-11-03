@@ -70,12 +70,7 @@ IDS = [s[0] for s in SCRIPTS]
 
 # Planted problems A's reader should raise but can't yet, with why. Each is checked by a strict
 # xfail below, so the gap shows here until A's fix lands and the xfail then turns red.
-KNOWN_GAPS = {
-	("vision_timm", "vision.no_channels_last"): (
-		"A's reader looks for 'channels_last' anywhere in the file, comments and docstrings "
-		"included, so the header naming this finding hides it (request to A in from-d.md)"
-	),
-}
+KNOWN_GAPS: dict = {}  # vision_timm's vision.no_channels_last closed by B, Nov 2 (only a real use of the format counts)
 
 
 def _codes_in(doc: str, label: str) -> set[str]:
