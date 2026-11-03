@@ -27,3 +27,22 @@ describe("error copy for A's probe error codes", () => {
 		expect(eventText(null)).toBeNull();
 	});
 });
+
+describe("the repo's own module (A, Nov 3: missing_module.local)", () => {
+	it("says to check in the whole repository, not to add it to requirements.txt", () => {
+		const c = errorCopy("missing_module.local", "No module named 'helpers'");
+		expect(c.code).toBe("missing_module.local");
+		expect(c.hint).toMatch(/whole repository/);
+		expect(c.hint).toMatch(/won't help/);
+		expect(c.message).not.toMatch(/install/i);
+	});
+});
+
+describe("A's new stops (Nov 3)", () => {
+	it("names the notebook-only call and the too-old torch, with what to do", () => {
+		expect(errorCopy("notebook_only").hint).toMatch(/login cell/);
+		const torch = errorCopy("torch.too_old");
+		expect(torch.code).toBe("torch.too_old");
+		expect(torch.hint).toMatch(/torch>=2\.6/);
+	});
+});

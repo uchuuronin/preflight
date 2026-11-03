@@ -14,10 +14,11 @@ import { fmt } from "../lib/fmt";
 import { knobChoices, targetFor } from "../workspace/record/model";
 import type { KnobValue, LoadedRecord, Objective, Prediction } from "../workspace/record/types";
 import { fitOf } from "../workspace/status";
-import { beat, bestCombo, bestSingleRisk, singleClears } from "./combos";
-import { breaksLimit, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } from "./limits";
+import { beat, bestCombo, bestSingleRisk, type ComboMove, singleClears } from "./combos";
+import { breaksLimit, type Limits, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } from "./limits";
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
+import type { PredictionProvider } from "../workspace/provider/PredictionProvider";
 
 /** Knobs that change the GPU rather than the job (as ruleTour's GPU_KNOBS). */
 const GPU_MOVE_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
@@ -101,6 +102,33 @@ export type ToolOut =
 	  }
 	| { tool: "highlight"; call_id: string; nodes: string[] }
 	| { tool: "pin"; call_id: string; knob_id: string; pinned: boolean };
+
+/**
+ * The combination the guide offers, the same for its sensitivity tool and the card the visitor applies
+ * it from (live check, Nov 3: the guide named "the combined card" and none showed; the card had judged
+ * on every GPU while the tool judged on this one). No single knob on this GPU clears the failure: a
+ * combined setting on this GPU, before any GPU change. Once one is declined, any combination.
+ */
+export function guideCombo(
+	record: LoadedRecord,
+	provider: PredictionProvider,
+	knobs: Record<string, KnobValue>,
+	kind: Objective["kind"],
+	limits: Limits,
+	pinned: ReadonlySet<string>,
+	declined?: ReadonlySet<string>,
+): ComboMove | null {
+	const lim = withinLimits(record, provider, limits, knobs, { pinned });
+	const onGpu = { ...lim, pinned: new Set([...(lim.pinned ?? pinned), ...GPU_MOVE_KNOBS]) };
+	const objective = { kind: kind ?? "min_time" } as const;
+	if (!(declined?.size ?? 0))
+		return singleClears(record, provider, objective, onGpu)
+			? null
+			: bestCombo(record, provider, knobs, objective, { ...beat(bestSingleRisk(record, provider, objective, onGpu)), pinned: onGpu.pinned, ...(lim.allow ? { allow: lim.allow } : {}) });
+	return singleClears(record, provider, objective, lim)
+		? null
+		: bestCombo(record, provider, knobs, objective, { ...beat(bestSingleRisk(record, provider, objective, lim)), pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: declined });
+}
 
 export class GuideFallback extends Error {
 	constructor(
@@ -194,15 +222,7 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 			// No single knob on this GPU clears the failure, for the aim or for memory: a combined setting
 			// on this GPU may, and it comes before any GPU change (PM, Nov 3: the live guide offered PF102's
 			// L4 → B300 first). Once the person has declined a combination, the GPU change is back on the table.
-			const lim = withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned });
-			const onGpu = { ...lim, pinned: new Set([...(lim.pinned ?? pinned), ...GPU_MOVE_KNOBS]) };
-			const declined = (ctx.combosDeclined?.size ?? 0) > 0;
-			const combo =
-				failing && !declined && !singleClears(record, provider, { kind }, onGpu)
-					? bestCombo(record, provider, knobs, { kind }, { ...beat(bestSingleRisk(record, provider, { kind }, onGpu)), pinned: onGpu.pinned, ...(lim.allow ? { allow: lim.allow } : {}) })
-					: failing && !singleClears(record, provider, { kind }, lim)
-						? bestCombo(record, provider, knobs, { kind }, { ...beat(bestSingleRisk(record, provider, { kind }, lim)), pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}), ...(ctx.combosDeclined ? { visited: ctx.combosDeclined } : {}) })
-						: null;
+			const combo = failing ? guideCombo(record, provider, knobs, kind, ctx.limits ?? NO_LIMITS, pinned, ctx.combosDeclined) : null;
 			// With a combination on this GPU to offer, a GPU change isn't ranked beside it this round.
 			const shown = combo && !combo.changes.some((c) => GPU_MOVE_KNOBS.has(c.knobId)) ? moves.filter((m) => !GPU_MOVE_KNOBS.has(m.knobId)) : moves;
 			return {

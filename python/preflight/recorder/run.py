@@ -7,6 +7,7 @@ the parent can enforce. Writes a result JSON; never raises.
 
 import json
 import os
+import re
 import runpy
 import sys
 import time
@@ -31,6 +32,69 @@ def _what_installed(spec: dict) -> str:
 			f"{what} with the extra packages" if has_req or spec.get("install_repo") else "the extra packages"
 		)
 	return what
+
+
+_TORCH_REMOVED = {
+	"symeig",
+	"eig",
+	"lstsq",
+	"solve",
+	"matrix_rank",
+	"ffi",
+	"trainer",
+	"legacy",
+}  # older code, not newer
+
+
+def _typo(exc: BaseException, missing: str) -> bool:
+	"""The missing name is close to one the module has (`torch.nn.Relu` for ReLU): the code's own typo, not a torch
+	version (review, Nov 3)."""
+	import difflib
+
+	parent, _, name = missing.rpartition(".")
+	obj = getattr(exc, "obj", None)
+	if obj is None:
+		try:
+			import importlib
+
+			obj = importlib.import_module(parent)
+		except Exception:
+			return False
+	try:
+		have = [n for n in dir(obj) if not n.startswith("_")]
+	except Exception:
+		return False
+	lower = {n.lower() for n in have}
+	return name.lower() in lower or bool(difflib.get_close_matches(name, have, n=1, cutoff=0.85))
+
+
+def _newer_torch(exc: BaseException) -> str | None:
+	"""probes.torch_hint: a torch attribute or module this torch doesn't have (`torch.accelerator` is 2.6's), said as
+	a torch older than the code needs, with the route to the 2.7.1 image; None for anything else."""
+	msg = str(exc)
+	m = re.fullmatch(
+		r"module '(torch(?:\.[A-Za-z_][A-Za-z0-9_]*)*)' has no attribute '([A-Za-z_][A-Za-z0-9_]*)'", msg
+	)
+	missing = f"{m.group(1)}.{m.group(2)}" if m and isinstance(exc, AttributeError) else None
+	if (
+		missing is None
+		and isinstance(exc, ModuleNotFoundError)
+		and (getattr(exc, "name", "") or "").startswith("torch.")
+	):
+		missing = exc.name
+	if not missing or any(part.startswith("_") for part in missing.split(".")):
+		return None  # a private name (torch._six, torch._C._x) says nothing about the version the code needs
+	if missing.rsplit(".", 1)[-1] in _TORCH_REMOVED or _typo(exc, missing):
+		return None
+	try:
+		import torch
+
+		have = torch.__version__.split("+", 1)[0]
+	except Exception:
+		have = "this image's"
+	return (f"This code needs a newer torch than it declares: {missing[:120]} isn't in torch {have}, Preflight's probe "
+		"image. Declare the torch it needs in requirements.txt (torch>=2.6) and Preflight probes it on its torch 2.7.1 "
+		"image")  # fmt: skip
 
 
 def _local_missing(exc: BaseException, workdir: str, spec: dict) -> str | None:
@@ -312,6 +376,9 @@ def main(spec_path: str) -> int:
 		)
 		if local:  # the repo's own module, not a package to install (C, Nov 2: Boarding said "add it to requirements.txt")
 			code, msg = "missing_module.local", local
+		newer = _newer_torch(exc) if spec.get("torch_hint") and status == "error" else None
+		if newer:  # probes.torch_hint (F1, Nov 3: torch.accelerator on the image's 2.5.1)
+			code, msg = "torch.too_old", newer
 		error = f"{msg}. {detail}" + (f" at {where}" if where else "") + f", {when}"
 	finally:
 		rec.uninstall()

@@ -8,7 +8,7 @@ import { t } from "../../lib/i18n";
 import { type BoardingEvent, boardingState, eventFromStatus, type ModelCallSeen, modelsRan, STAGES } from "../boarding";
 import { go, href } from "../route";
 import { CheckinHelp } from "../CheckinHelp";
-import { type ProbeSeen, troubleFromFailure, troubleFromProbes } from "../checkinTrouble";
+import { nothingMeasured, type ProbeSeen, troubleFromFailure, troubleFromProbes } from "../checkinTrouble";
 
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
@@ -79,6 +79,8 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	const rev = events.reduce((n, e) => Math.max(n, e.record_rev ?? 0), 0);
 	const [calls, setCalls] = useState<ModelCallSeen[]>([]);
 	const [probes, setProbes] = useState<ProbeSeen[]>([]);
+	// The record read once the job is done: until then "ready" could turn into "nothing was measured" (review, Nov 3).
+	const [probesRead, setProbesRead] = useState(false);
 	// The packages Preflight installs, by import name (GET /v1/packages, A's list), to fill the box.
 	const [known, setKnown] = useState<{ known: Record<string, string>; noWheels: string[] }>({ known: {}, noWheels: [] });
 	// A new job, or a new record, starts with no tags: the last one's model calls aren't this one's
@@ -86,6 +88,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	useEffect(() => {
 		setCalls([]);
 		setProbes([]);
+		setProbesRead(false);
 	}, [jobId, open]);
 	useEffect(() => {
 		if (!open) return;
@@ -96,15 +99,26 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 				if (gone || !rec) return;
 				if (rec.provenance) setCalls(rec.provenance);
 				if (done && rec.probes) setProbes(rec.probes);
+				if (done) setProbesRead(true);
 			})
-			.catch(() => {});
+			.catch(() => {
+				if (!gone && done) setProbesRead(true);
+			})
+			.finally(() => {
+				if (!gone && done) setProbesRead(true);
+			});
 		return () => {
 			gone = true;
 		};
 	}, [open, rev, done]);
 	const ran = modelsRan(calls);
-	const trouble = failed ? troubleFromFailure(last?.error_code, last?.message) : done ? troubleFromProbes(probes, known.known, known.noWheels) : null;
+	const trouble = failed
+		? troubleFromFailure(last?.error_code, last?.message)
+		: done
+			? (troubleFromProbes(probes, known.known, known.noWheels) ?? nothingMeasured(probes, last?.error_code))
+			: null;
 	const installStop = trouble?.step === "install";
+	const measuredNothing = trouble?.step === "measure";
 	useEffect(() => {
 		if (!installStop) return;
 		let gone = false;
@@ -120,14 +134,14 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 	}, [installStop]);
 	// A finished job whose probes all stopped at an import measured nothing: the route stops at the probe leg.
 	const probeLeg = STAGES.findIndex((s) => s.key === "boarding.stage.probe");
-	const stopAt = installStop ? probeLeg : -1;
+	const stopAt = installStop || measuredNothing ? probeLeg : -1;
 	const progress = stopAt >= 0 ? stopAt * 25 : done ? 100 : Math.max(0, idx) * 25;
 
 	return (
 		<div className="pf-scroll">
 			<div className="pf-inner pf-boarding">
 				<span className="pf-eyebrow">{t("boarding.eyebrow")}</span>
-				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t(installStop ? "boarding.stopped_install" : "boarding.ready") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
+				<h1 className="pf-display pf-display--md">{!jobId ? t("boarding.idle") : done ? t(installStop ? "boarding.stopped_install" : measuredNothing ? "boarding.nothing_measured" : probesRead || !open ? "boarding.ready" : "boarding.reading") : cancelled ? t("boarding.cancelled") : failed ? t("boarding.failed") : t("boarding.measuring")}</h1>
 				{last?.queue_position ? <p className="pf-lede pf-lede--sm">{t("boarding.queue", { n: last.queue_position })}</p> : null}
 				{free ? <p className="pf-lede pf-lede--sm">{t("boarding.free_resend")}</p> : null}
 				<div className="pf-route">
@@ -174,7 +188,7 @@ export function Boarding({ jobId }: { jobId: string | null }) {
 				{!jobId ? <p className="pf-hint">{t("boarding.no_job")}</p> : null}
 				{lost && !ended ? <p className="pf-hint">{t("boarding.lost")}</p> : null}
 				<div className="pf-cta">
-					<button type="button" className="pf-btn pf-btn--primary" disabled={!done || !open} onClick={() => open && go("cockpit", open)}>
+					<button type="button" className={measuredNothing ? "pf-btn" : "pf-btn pf-btn--primary"} disabled={!done || !open} onClick={() => open && go("cockpit", open)}>
 						{t("boarding.open")}
 					</button>
 					<a className="pf-btn" href={href("new")}>

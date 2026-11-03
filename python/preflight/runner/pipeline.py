@@ -156,6 +156,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"dataset_cache": True} if spec.dataset_cache else {}),  # no download in the measured time
 		**({"step_clock": True} if spec.step_clock else {}),  # a probe that reports more
 		**({"entry_path": True} if spec.entry_path else {}),  # another path can import other code
+		**({"tty": True} if spec.tty else {}),  # a terminal can change what the script does
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -365,6 +366,8 @@ def _spec(
 		dataset_cache=_flag("probes.dataset_cache") and _uses_torchvision(fetched.files),
 		step_clock=_flag("probes.step_clock"),
 		entry_path=_flag("runner.entrypoint_path"),
+		tty=_flag("probes.tty"),
+		torch_hint=_flag("probes.torch_hint"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
 		image=_image(sm, fetched.files),
@@ -725,7 +728,12 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if fetched.map_skipped or not followup
 		else ("source.partial", IMAGE_OVERRIDES)
 	)
-	keep = [f for f in keep if not f.id.startswith(afresh)]
+	keep = [
+		f
+		for f in keep
+		if not f.id.startswith(afresh)
+		and f.id != "source.login_skipped"  # said afresh: every job fetches its source
+	]
 	read = [*_reading_findings(fetched), *_image_findings(sm, fetched)]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *read]})
 	# a verify job's record answers one question; a private job's numbers and plots never go to Meta
@@ -928,6 +936,15 @@ def _reading_findings(fetched: Fetched) -> list:
 	from preflight.schema import Evidence, Finding
 
 	out = []
+	if fetched.login_skipped:  # probes.skip_login_cells (F2, Nov 3)
+		n = fetched.login_skipped
+		out.append(Finding(id="source.login_skipped", severity="info", code="source.login_skipped", source="rule",
+			title="Preflight skipped your login cell",
+			detail=(f"Preflight skipped your login cell{'s' if n > 1 else ''} (notebook_login() or huggingface_hub.login(), "
+				"with no token; the imports stay): "
+				"it only runs inside a notebook or waits for a token, and public models need no login. A gated model "
+				"still needs access: log in with a token in the code."),
+			evidence=[Evidence(metric="source.login_cells", value=float(n))]))  # fmt: skip
 	if fetched.map_skipped:
 		out.append(Finding(id="source.map_skipped", severity="info", code="source.partial", source="rule",
 			title="Probed without a map of the whole source",

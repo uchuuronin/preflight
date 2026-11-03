@@ -10,9 +10,9 @@ import { t } from "../../lib/i18n";
 import { useAppPanels } from "../../registry";
 import { SAMPLES } from "../../workspace/record/load";
 import type { JobRequest, ObjectiveKind } from "../../workspace/record/types";
-import { go } from "../route";
+import { go, href } from "../route";
 import { MAX_EXTRA_PACKAGES, parsePackages, rememberRequest } from "../checkinTrouble";
-import { COMMANDS, commandWords } from "../command";
+import { argWords, COMMANDS, commandWords, entryPath } from "../command";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { DATA_USE_OK_ID, DataUseNotice, dataUseAccepted } from "../DataUse";
 import { ACCEPT, ACCEPT_SCRIPTS, checkinBytes, MAX_TOTAL_BYTES, type PickedFile, precheck, uploadSource } from "../upload";
@@ -62,6 +62,9 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const extraIntake = useAppPanels("intake");
 	const [intake, setIntake] = useState<Intake>("repo");
 	const [repo, setRepo] = useState("");
+	// Which script in the repo, and its flags (contract source.entrypoint and source.args; PM, Nov 3).
+	const [repoEntry, setRepoEntry] = useState("");
+	const [repoArgs, setRepoArgs] = useState("");
 	const [goal, setGoal] = useState<ObjectiveKind>(DEFAULT_GOAL);
 	// "Not sure" by default: the runner picks the GPU (pipeline.choose_probe_gpu; PM, Nov 1: the
 	// demo probes go no higher than an L40S).
@@ -82,7 +85,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const [entry, setEntry] = useState<string | undefined>();
 	const [reading, setReading] = useState(false);
 	const idem = useRef<{ key: string; body: string | null }>({ key: newKey(), body: null });
-	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId(), repoHint: useId(), repoError: useId(), privateHint: useId(), command: useId(), commandHint: useId(), commandError: useId(), packages: useId() };
+	const ids = { repo: useId(), describe: useId(), upload: useId(), entry: useId(), repoHint: useId(), repoError: useId(), privateHint: useId(), command: useId(), commandHint: useId(), commandError: useId(), packages: useId(), repoEntry: useId(), repoEntryHint: useId(), repoEntryError: useId(), repoArgs: useId(), repoArgsHint: useId(), repoArgsError: useId() };
 	// Uploads open with live probes (the same flag the API checks before taking a job).
 	const uploadsOpen = flag("runner.queue");
 	// A notebook tab (D's intake panel) previews what will run, so notebooks go through it there.
@@ -143,6 +146,16 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		return () => clearTimeout(id);
 	}, [repo]);
 	const repoBad = intake === "repo" && repoSettled && repo.trim() !== "" && !repoOk;
+	const repoEntryCheck = entryPath(repoEntry);
+	const repoArgWords = argWords(repoArgs);
+	const [entrySettled, setEntrySettled] = useState(false);
+	useEffect(() => {
+		setEntrySettled(false);
+		const id = setTimeout(() => setEntrySettled(true), REPO_PAUSE_MS);
+		return () => clearTimeout(id);
+	}, [repoEntry, repoArgs]);
+	const entryBad = intake === "repo" && entrySettled && !repoEntryCheck.ok;
+	const argsBad = intake === "repo" && entrySettled && !repoArgWords.ok;
 	const cmd = commandWords(command);
 	const [commandSettled, setCommandSettled] = useState(false);
 	useEffect(() => {
@@ -156,7 +169,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const pkgBad = pkgs.bad.length > 0 || pkgAsked > MAX_EXTRA_PACKAGES;
 	const canSubmit =
 		!pkgBad &&
-		(intake === "repo" ? repoOk : intake === "upload" ? uploadsOpen && check.ok : intake === "command" ? cmd.ok : uploadsOpen && handedSource !== null && !handedTooBig);
+		(intake === "repo" ? repoOk && repoEntryCheck.ok && repoArgWords.ok : intake === "upload" ? uploadsOpen && check.ok : intake === "command" ? cmd.ok : uploadsOpen && handedSource !== null && !handedTooBig);
 
 	const pick = async (list: FileList | null) => {
 		if (!list?.length) return;
@@ -193,7 +206,13 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 					? { kind: "command", args: cmd.words }
 					: intake === "upload" && check.ok
 						? check.source
-						: (handedSource ?? { kind: "repo", uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}` }),
+						: (handedSource ?? {
+								kind: "repo",
+								uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}`,
+								// Left empty: Preflight picks the script (train.py, main.py, ...) and runs it with no arguments.
+								...(repoEntryCheck.ok && repoEntryCheck.path ? { entrypoint: repoEntryCheck.path } : {}),
+								...(repoArgWords.ok && repoArgWords.words.length ? { args: repoArgWords.words } : {}),
+							}),
 			objective: { kind: goal, description: description.trim() || null },
 			gpu,
 			description: description.trim() || null,
@@ -281,6 +300,62 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									</div>
 									<p id={ids.repoHint} className="pf-hint">
 										{t("newflight.repo.hint")}
+									</p>
+									<div className="pf-field">
+										<label htmlFor={ids.repoEntry}>
+											{t("newflight.entry.label")} <span className="pf-dim">{t("newflight.optional")}</span>
+										</label>
+										<input
+											id={ids.repoEntry}
+											type="text"
+											spellCheck={false}
+											autoCapitalize="off"
+											autoCorrect="off"
+											placeholder={t("newflight.entry.placeholder")}
+											value={repoEntry}
+											aria-invalid={entryBad || undefined}
+											aria-describedby={entryBad ? `${ids.repoEntryError} ${ids.repoEntryHint}` : ids.repoEntryHint}
+											onChange={(e) => setRepoEntry(e.currentTarget.value)}
+											onBlur={() => setEntrySettled(true)}
+										/>
+									</div>
+									<div role="status" aria-live="polite">
+										{entryBad && !repoEntryCheck.ok ? (
+											<p id={ids.repoEntryError} className="pf-error pf-field__error">
+												{t(`newflight.entry.${repoEntryCheck.reason}`)}
+											</p>
+										) : null}
+									</div>
+									<p id={ids.repoEntryHint} className="pf-hint">
+										{t("newflight.entry.hint")}
+									</p>
+									<div className="pf-field">
+										<label htmlFor={ids.repoArgs}>
+											{t("newflight.args.label")} <span className="pf-dim">{t("newflight.optional")}</span>
+										</label>
+										<input
+											id={ids.repoArgs}
+											type="text"
+											spellCheck={false}
+											autoCapitalize="off"
+											autoCorrect="off"
+											placeholder={t("newflight.args.placeholder")}
+											value={repoArgs}
+											aria-invalid={argsBad || undefined}
+											aria-describedby={argsBad ? `${ids.repoArgsError} ${ids.repoArgsHint}` : ids.repoArgsHint}
+											onChange={(e) => setRepoArgs(e.currentTarget.value)}
+											onBlur={() => setEntrySettled(true)}
+										/>
+									</div>
+									<div role="status" aria-live="polite">
+										{argsBad && !repoArgWords.ok ? (
+											<p id={ids.repoArgsError} className="pf-error pf-field__error">
+												{t(`newflight.args.${repoArgWords.reason}`, { word: repoArgWords.word ?? "" })}
+											</p>
+										) : null}
+									</div>
+									<p id={ids.repoArgsHint} className="pf-hint">
+										{t("newflight.args.hint")}
 									</p>
 								</div>
 							) : intake === "command" ? (
@@ -532,7 +607,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 					{/* The documentation link's own card, under the samples (Chiya's mockup, Nov 3); with the Help page. */}
 					{flag("c.help") ? (
 						<section className="glass pf-checkin__doc" aria-label={t("newflight.help_card")}>
-							<a className="pf-link" href="#/help">
+							<a className="pf-link" href={href("help")}>
 								{t("newflight.help_link")}
 							</a>
 						</section>
