@@ -4,7 +4,7 @@ sample (PF420) can be rebuilt from them (PM, Nov 3: every sample measured).
 
 Each cell's job made a follow-up record; this prints, per cell, the probes that job planned at the
 cell's setting (the ones naming the A10 and the cell's knobs: `campaign_probe_app.measured`'s rule),
-as JSON between two marker lines. Records are found by their record id, scanned on a Modal worker
+as JSON between two marker lines, without their free-text error, log or trace. Records are found by their record id, scanned on a Modal worker
 with the volume mounted. Printed: probes only (knobs, timings, memory, step logs, error codes), never a
 share token or anything else of the record.
 
@@ -50,7 +50,8 @@ def scan() -> dict:
 			if (k := p.get("knobs") or {}).get("gpu_type") == GPU
 			and all(k.get(n) == v for n, v in cell.items())
 		]
-		out[rid] = probes
+		# A code, never the message, which can quote the script or a path (campaign_probe_app's rule).
+		out[rid] = [{k: v for k, v in p.items() if k not in ("error", "log", "trace")} for p in probes]
 		if len(out) == len(CELLS):
 			break
 	return out

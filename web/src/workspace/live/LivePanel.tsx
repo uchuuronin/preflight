@@ -95,7 +95,10 @@ export function LivePanel() {
 					{t("live.note.step_fast", { step: fmt(n.step, "count"), value: secs(n.value), lo: secs(n.lo), hi: secs(n.hi) })}
 				</p>
 			))}
-			{!r.alerts.length && !r.notes.length && r.stepS !== null ? <p className="pf-live__ok">{t("live.in_band")}</p> : null}
+			{/* Only when the latest window really is inside the band (one window out isn't yet an alert or a note). */}
+			{!r.alerts.length && !r.notes.length && r.stepS !== null && (!r.bands.step || (r.stepS >= r.bands.step[0] && r.stepS <= r.bands.step[1])) ? (
+				<p className="pf-live__ok">{t("live.in_band")}</p>
+			) : null}
 			{recordRef === LIVE_REF ? (
 				<p className="pf-hint">
 					{live.following ? t("live.following", { name: live.name ?? "" }) : t("live.read_once", { name: live.name ?? "" })}{" "}

@@ -95,10 +95,16 @@ describe("faster than the band is a note, not an alert (B's preflight watch, Nov
 		expect(slow.alerts.filter((a) => a.kind === "step")).toMatchObject([{ kind: "step", side: "above", step: 60 }]);
 	});
 	it("still alerts on memory over its band and a total past its band while steps are fast", () => {
-		const peakBand = lora.predictions!.estimates!["memory.peak"];
-		if (!peakBand || peakBand.hi == null) return;
-		const r = readLive(live(lora, [{ index: 20, wall_s: step.lo! * 0.5 }, { index: 40, wall_s: step.lo! * 0.5, peak: peakBand.hi * 2 }]))!;
+		const retr = retrRaw as unknown as FlightRecord;
+		const est = retr.predictions!.estimates!;
+		const peakBand = est["memory.peak"]!;
+		const rStep = est["time.step"]!;
+		expect(peakBand.hi).not.toBeNull();
+		const r = readLive(live(retr, [{ index: 20, wall_s: rStep.lo! * 0.5 }, { index: 40, wall_s: rStep.lo! * 0.5, peak: peakBand.hi! * 2 }]))!;
 		expect(r.alerts.map((a) => a.kind)).toContain("peak");
 		expect(r.notes.map((n) => n.kind)).toEqual(["step_fast"]);
+		// A total past its band still alerts with fast steps: a run so long that even this pace runs over.
+		const long = live(lora, [{ index: 20, wall_s: step.lo! * 0.9 }, { index: 40, wall_s: step.lo! * 0.9 }], "running", 1e7);
+		expect(readLive(long)!.alerts.map((a) => a.kind)).toContain("total");
 	});
 });
