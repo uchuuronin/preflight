@@ -1,0 +1,11 @@
+{
+	"name": "20261103-001341-41551310098-amd-b-amd-lora-gt-eval",
+	"exit_code": 0,
+	"workflow": "amd-run",
+	"run_id": "41551310098",
+	"ref": "main",
+	"sha": "0f5ce3637a8cb76f31c04d1550d3d3572fe109d7",
+	"cmd": "python -m preflight.recorder.ground_truth zoo/finetune_lora_hf out/gt_lora_mi300x_eval.json --bare-steps 210 --recorder-steps 40 --install-requirements --budget-min 30",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T00:18:19Z"
+}
