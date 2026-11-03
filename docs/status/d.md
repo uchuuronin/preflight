@@ -74,6 +74,27 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
+| Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
+
+## Tue Nov 3, 09:55 ET (shot 9b on Chiya's Windows laptop)
+
+Shot 9b is filmed on Chiya's RTX 4070 laptop (Windows), Wednesday; the steps go in
+`docs/demo/shot-9b-laptop.md` by 6 PM. Native Windows first (the PM, 09:38).
+
+- **A GitHub Windows runner** (`.github/workflows/d-windows-watch.yml`, runs only when its own file
+  changes on `ws-d`; free): `preflight run` fails on Windows, at `os.geteuid`, then the time-zone
+  database, then `os.killpg`; `preflight watch` runs (against an empty record) [measured]. With six
+  more found by reading the code, nine Windows gaps, posted to A for a guarded fix before 3 PM. A
+  fourth run with the first seven stubbed checks whether a measurement then completes.
+- **The same steps on Linux:** on this sandbox's CPU from a fresh venv, `preflight run` and `watch`
+  work; no alert, as a CPU record has no step band [measured]. On an A10 (`d-watch-gpu-9b-2`,
+  GitHub 41650324681, US$0.10 [derived: 315 s of container at list price]): with the change, both
+  alerts fire (peak memory at step 201, step time at step 401); the unchanged run now gives only a
+  "note", no alert (B's fix since Nov 2) [measured].
+- **The laptop's card** isn't in the GPU table; step time still works on the card the probes ran on
+  (checked by relabelling an L4 record) [measured]. Asked B to add consumer RTX cards.
+
+This push sends: `.github/workflows/d-windows-watch.yml`, `docs/requests/from-d.md`, this file.
 
 ## Tue Nov 3, 08:55 ET (search: B's last must-fix)
 

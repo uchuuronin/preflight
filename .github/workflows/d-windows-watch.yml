@@ -1,7 +1,7 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
 # Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts.
-# Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with os.geteuid
-# stubbed (and tzdata installed, a sandbox folder set), to list what else stops it on Windows. Everything lives on D:, as the laptop's steps keep
+# Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with every Linux-only call D found stubbed (and tzdata
+# installed, a sandbox folder set), to check nothing else stops it on Windows. Everything lives on D:, as the laptop's steps keep
 # everything on E:. No secrets are used. The job fails if any checked step failed, after every
 # step has reported and the logs are uploaded.
 name: d-windows-watch
@@ -66,10 +66,12 @@ jobs:
           D:\pf9b\venv\Scripts\preflight.exe run film\tiny_train.py *> D:\pf9b\run.log
           $code = $LASTEXITCODE
           Get-Content D:\pf9b\run.log -Tail 15
-          # the first Windows blocker is os.geteuid (cli/main.py); stub it to find the next ones
-          D:\pf9b\venv\Scripts\python.exe -c "import os, sys; os.geteuid = lambda: 1000; from preflight.cli.main import main; sys.exit(main(['run', 'film\\tiny_train.py']))" *> D:\pf9b\run-stubbed.log
+          # every Linux-only call D found on the path, stubbed, to see whether anything else stops a real
+          # measurement: a do-nothing `resource` module for the probe process, and in this one
+          Set-Content D:\pf9b\venv\Lib\site-packages\resource.py '# stand-in: no rlimits on Windows'
+          D:\pf9b\venv\Scripts\python.exe -c "import os, sys, signal; os.geteuid = lambda: 1000; signal.SIGKILL = signal.SIGTERM; import subprocess; os.killpg = lambda pid, sig: subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], capture_output=True); os.O_NOFOLLOW = 0; os.O_NONBLOCK = 0; from preflight.cli.main import main; sys.exit(main(['run', 'film\\tiny_train.py']))" *> D:\pf9b\run-stubbed.log
           $code = $LASTEXITCODE
-          "--- with os.geteuid stubbed:"
+          "--- with every Linux-only call stubbed:"
           Get-Content D:\pf9b\run-stubbed.log -Tail 120
           $rec = Get-ChildItem D:\pf9b\records\*.json -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($rec) { "record=$($rec.FullName)" >> $env:GITHUB_OUTPUT }
@@ -119,6 +121,7 @@ jobs:
           path: |
             D:\pf9b\*.log
             D:\pf9b\records
+            D:\pf9b\tmp\**\*.log
           if-no-files-found: warn
       - name: "Outcomes (fails if any checked step failed)"
         if: always()
