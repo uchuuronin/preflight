@@ -19,6 +19,9 @@ DATASETS = ("CIFAR10", "CIFAR100", "MNIST", "FashionMNIST", "ogbn-arxiv")
 # archives with no published md5, kept by their URL (CACHE_DIR/by-url/<sha256 of the URL>): OGB's, which it fetches over
 # plain HTTP, which the probe sandbox's allowlist doesn't open (a-fresh-live-ogb-2-checkin, Nov 3)
 URL_FILES = {"ogbn-arxiv": "http://snap.stanford.edu/ogb/data/nodeproppred/arxiv.zip"}
+# each URL_FILES archive's sha256, pinned from the fill job's own download (OGB publishes no checksum, and its host is
+# plain HTTP): the cache serves an archive only when its copy matches, so a tampered or error-page file never is
+URL_SHA256: dict[str, str] = {}
 
 
 def resources() -> list[tuple[str, list[str], str]]:
@@ -43,11 +46,21 @@ def url_key(url: str) -> str:
 
 
 def cached_url(cache_dir: str | os.PathLike, url: str) -> Path | None:
-	"""The volume's copy of an archive kept by its URL (URL_FILES only), when it has one."""
-	if url not in URL_FILES.values():
+	"""The volume's copy of an archive kept by its URL (URL_FILES only), when it has one whose sha256 is the
+	pinned one (none pinned: never served)."""
+	import hashlib
+
+	want = URL_SHA256.get(url)
+	if url not in URL_FILES.values() or not want:
 		return None
 	p = Path(cache_dir) / "by-url" / url_key(url)
-	return p if p.is_file() else None
+	if not p.is_file():
+		return None
+	h = hashlib.sha256()
+	with open(p, "rb") as f:
+		while chunk := f.read(1 << 20):
+			h.update(chunk)
+	return p if h.hexdigest() == want else None
 
 
 def patch_ogb(url_mod, cache_dir: str | os.PathLike, log=print) -> None:

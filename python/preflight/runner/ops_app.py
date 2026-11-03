@@ -465,6 +465,7 @@ def smoke(
 	repo: str = "",
 	commit: str = "",
 	edit_hex: str = "",
+	private: bool = False,
 ):
 	"""Submit one zoo script and follow it to the record: the G1 critical path in one command.
 
@@ -522,6 +523,9 @@ def smoke(
 	request = {
 		"source": source,
 		"constraints": {"gpu_types": [g.strip() for g in gpus.split(",") if g.strip()]},
+		**(
+			{"private": True} if private else {}
+		),  # --private: the job's private mode, as the web's toggle sends it
 	}
 	out = Path("out")
 	out.mkdir(exist_ok=True)

@@ -38,7 +38,7 @@ def test_a_missing_local_module_is_named_as_the_repo_s_own_not_a_package():
 	assert (
 		p.error_code == "missing_module.local" and p.missing_module == "helpers" and p.missing_package is None
 	)
-	assert "the repo's own module under tools/" in p.error
+	assert "the repo's own module (under tools/)" in p.error
 
 
 def test_its_failure_step_doesnt_send_the_visitor_to_requirements_txt():
@@ -46,3 +46,18 @@ def test_its_failure_step_doesnt_send_the_visitor_to_requirements_txt():
 
 	_step, way = STEPS["missing_module.local"]
 	assert "isn't a package to add to requirements.txt" in way
+
+
+def test_a_subpackage_of_the_same_name_isn_t_mistaken_for_a_missing_library(tmp_path):
+	from preflight.recorder.run import _local_missing
+
+	(tmp_path / "mypkg" / "datasets").mkdir(parents=True)
+	(tmp_path / "mypkg" / "__init__.py").write_text("")
+	(tmp_path / "mypkg" / "datasets" / "__init__.py").write_text("")
+	exc = ModuleNotFoundError("No module named 'datasets'", name="datasets")
+	assert (
+		_local_missing(exc, str(tmp_path), {"entrypoint": "train.py"}) is None
+	)  # Hugging Face's, not the repo's
+	(tmp_path / "tools" / "datasets").mkdir(parents=True)
+	(tmp_path / "tools" / "datasets" / "load.py").write_text("")
+	assert "under tools/" in _local_missing(exc, str(tmp_path), {"entrypoint": "train.py"})

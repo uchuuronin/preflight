@@ -443,7 +443,9 @@ class InMemoryJobStore:
 			"error_code": job.error_code,
 			# runner.free_resend: every probe stopped at an import, or the job was refused for a package (it never
 			# reached a GPU probe either); and which code it ran, so a free resend is of the same code
-			"import_stop": stopped or (job.error_code or "").startswith("missing_package"),
+			"import_stop": stopped
+			or (job.error_code or "").startswith("missing_package")
+			or job.error_code == "missing_module.local",
 			"source_key": source_key(job.request),
 			"submitted_at": job.submitted_at,
 			"last_event": job.events[-1] if job.events else None,

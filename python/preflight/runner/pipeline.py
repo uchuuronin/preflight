@@ -298,6 +298,14 @@ def _uses_torchvision(files: dict[str, str]) -> bool:
 	return any(_TORCHVISION.search(t) for n, t in files.items() if n.endswith(".py"))
 
 
+# a probe that stopped at an import: a package it lacked, or (runner.entrypoint_path) the repo's own module not on its path
+IMPORT_STOPS = ("missing_package", "missing_module.local")
+
+
+def _import_stop(code: str | None) -> bool:
+	return (code or "").startswith("missing_package") or code == "missing_module.local"
+
+
 def _image_pins(image: str) -> str:
 	"""A sandbox image's own pins in its probes' cache key, for the images image_tag doesn't hash: torch27's."""
 	if image != "torch27":
@@ -672,7 +680,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if (
 		_flag("runner.free_resend")
 		and probes
-		and all(q.steps == 0 and (q.error_code or "").startswith("missing_package") for q in probes)
+		and all(q.steps == 0 and _import_stop(q.error_code) for q in probes)
 	):
 		# every probe stopped at an import: a resend with the packages is free today (runner.free_resend)
 		_emit(
@@ -1235,7 +1243,7 @@ def _probe_points(
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
 				error="skipped: no GPU could be scheduled (see the first probe)", error_code="gpu.unavailable"))  # fmt: skip
 			continue
-		gone = next((q for q in probes if q.error_code == "missing_package" and not q.steps), None)
+		gone = next((q for q in probes if q.error_code in IMPORT_STOPS and not q.steps), None)
 		if (
 			gone is not None
 			and stop_on_import

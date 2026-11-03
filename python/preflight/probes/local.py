@@ -373,9 +373,12 @@ def kill_group(pid: int, *, exited: bool = False) -> None:
 	if hasattr(os, "killpg"):
 		os.killpg(pid, signal.SIGKILL)
 	elif not exited:
-		subprocess.run(
-			["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, timeout=30, check=False
-		)
+		with contextlib.suppress(
+			subprocess.TimeoutExpired, OSError
+		):  # a hung taskkill never ends the run (review)
+			subprocess.run(
+				["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, timeout=30, check=False
+			)
 
 
 def _no_dumps() -> None:

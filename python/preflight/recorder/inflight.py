@@ -274,16 +274,21 @@ REPLACE_WAIT_S = 0.05
 def _atomic(path: Path, text: str, *, tries: int = REPLACE_TRIES) -> bool:
 	"""Write the live record whole. On Windows os.replace raises PermissionError while another process has the
 	file open (the browser following the record, an antivirus scan): a few retries, then this write is skipped,
-	never the run stopped (D, Nov 3). UTF-8 always: Windows' default is cp1252. Whether it was written."""
+	never the run stopped (D, Nov 3); any other write error (a full disk, a deleted folder) skips it too, since this
+	runs inside the visitor's optimizer step (review). UTF-8 always: Windows' default is cp1252. Whether it was
+	written."""
 	tmp = path.with_suffix(path.suffix + ".tmp")
-	tmp.write_text(text, encoding="utf-8")
-	for i in range(tries):
-		try:
-			os.replace(tmp, path)
-			return True
-		except PermissionError:
-			if i + 1 < tries:
-				time.sleep(REPLACE_WAIT_S * (i + 1))
+	try:
+		tmp.write_text(text, encoding="utf-8")
+		for i in range(tries):
+			try:
+				os.replace(tmp, path)
+				return True
+			except PermissionError:
+				if i + 1 < tries:
+					time.sleep(REPLACE_WAIT_S * min(i + 1, 5))
+	except OSError:
+		pass
 	with contextlib.suppress(OSError):
 		tmp.unlink()
 	return False
@@ -422,14 +427,15 @@ def main(argv: list[str] | None = None) -> int:
 	finally:
 		handle.remove()
 		summary = col.finish()
-		# the last write is the run's result: retried for longer than a periodic one (about 10 s)
-		_atomic(
-			rec_path,
-			live_record(parent, summary, status=status, error=error, ids=ids).model_dump_json(),
-			tries=40,
-		)
+		# the last write is the run's result: retried for longer than a periodic one (about 9 s)
+		final = live_record(parent, summary, status=status, error=error, ids=ids).model_dump_json()
+		written = _atomic(rec_path, final, tries=40)
 		log.close()
-		say(f"{summary['steps']} steps, {len(summary['alerts'])} alerts; record {rec_path}")
+		if written:
+			say(f"{summary['steps']} steps, {len(summary['alerts'])} alerts; record {rec_path}")
+		else:  # review: never "record <path>" for a file that still reads "running"
+			say(f"{summary['steps']} steps, {len(summary['alerts'])} alerts; the final record couldn't be written to "
+				f"{rec_path} (another program held it open), so it still reads the last update")  # fmt: skip
 	return code
 
 

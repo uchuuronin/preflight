@@ -34,27 +34,32 @@ def _what_installed(spec: dict) -> str:
 
 
 def _local_missing(exc: BaseException, workdir: str, spec: dict) -> str | None:
-	"""runner.entrypoint_path: when the module Python couldn't import is the repo's own (a folder or file the source
-	has, anywhere in it), say that, not "not installed"; None otherwise."""
-	name = getattr(exc, "name", None) or ""
+	"""runner.entrypoint_path: when the module Python couldn't import is the repo's own top-level module (a folder of
+	Python files, or a file, that sits at an import root: not a subpackage of another package), say that, not "not
+	installed"; None otherwise (review: a `mypkg/datasets/` subpackage isn't Hugging Face's datasets)."""
+	name = (getattr(exc, "name", None) or "")[:200]
 	top = name.split(".")[0]
 	if not top or not top.isidentifier():
 		return None
 	root = Path(workdir)
-	entry_dir = (root / spec.get("entrypoint", "")).parent
-	for base in dict.fromkeys([entry_dir, root, root / "src"]):
-		if (base / top).is_dir() or (base / f"{top}.py").is_file():
-			return (f"The script imports {name}, the repo's own module, which Python couldn't find on its path "
-				f"(it's under {os.path.relpath(base, root) if base != root else 'the top of the repo'}/)")  # fmt: skip
-	try:  # elsewhere in the source: not read, or not on the path the script runs with
-		hits = [p for p in root.rglob(top) if p.is_dir()][:1] or [p for p in root.rglob(f"{top}.py")][:1]
+
+	def top_level(p: Path) -> bool:  # a module importable as `top` from p's folder, not inside a package
+		return not (p.parent / "__init__.py").is_file() and (p.suffix == ".py" or any(p.glob("*.py")))
+
+	try:
+		hits = sorted(
+			p
+			for p in [*root.rglob(top), *root.rglob(f"{top}.py")]
+			if (p.is_dir() or p.is_file()) and top_level(p)
+		)
 	except OSError:
 		hits = []
-	if hits:
-		where = os.path.relpath(hits[0].parent, root)
-		return (f"The script imports {name}, the repo's own module under {where}/, which isn't on the path "
-			"the script runs with")  # fmt: skip
-	return None
+	if not hits:
+		return None
+	where = os.path.relpath(hits[0].parent, root)
+	where = "the top of the repo" if where == "." else f"{where}/"
+	return (f"The script imports {name}, the repo's own module (under {where}), which isn't on the path the script "
+		"runs with")  # fmt: skip
 
 
 def _write(out_path: str, result: dict) -> None:
