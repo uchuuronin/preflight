@@ -19,6 +19,9 @@ import { breaksLimit, limitsForServer, limitsSaved, NO_LIMITS, withinLimits } fr
 import { changesResults, isFailing } from "./ruleTour";
 import type { ToolContext } from "./tools";
 
+/** Knobs that change the GPU rather than the job (as ruleTour's GPU_KNOBS). */
+const GPU_MOVE_KNOBS = new Set(["gpu_type", "gpu", "gpus", "gpu_count"]);
+
 /** Same origin: /v1 is served by the web app's own Pages Function (functions/v1). */
 const API_BASE = "";
 /** Safety stop for browser-tool rounds in one visitor action (the server caps rounds too). */
@@ -185,17 +188,25 @@ export function runBrowserCall(call: GuideCall, ctx: ToolContext, movedThisRound
 				.filter((m) => failing || !changesResults(m.knobId, record))
 				.slice(0, 8);
 			const top = Math.max(...moves.map((m) => Math.abs(m.relative ?? m.delta)), 1e-12);
-			// No single knob clears the failure, for the aim or for memory: a combined setting may.
+			// No single knob on this GPU clears the failure, for the aim or for memory: a combined setting
+			// on this GPU may, and it comes before any GPU change (PM, Nov 3: the live guide offered PF102's
+			// L4 → B300 first). Once the person has declined a combination, the GPU change is back on the table.
 			const lim = withinLimits(record, provider, ctx.limits ?? NO_LIMITS, knobs, { pinned });
+			const onGpu = { ...lim, pinned: new Set([...(lim.pinned ?? pinned), ...GPU_MOVE_KNOBS]) };
+			const declined = (ctx.combosDeclined?.size ?? 0) > 0;
 			const combo =
-				failing && !singleClears(record, provider, { kind }, lim)
-					? bestCombo(record, provider, knobs, { kind }, { ...beat(bestSingleRisk(record, provider, { kind }, lim)), pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}), ...(ctx.combosDeclined ? { visited: ctx.combosDeclined } : {}) })
-					: null;
+				failing && !declined && !singleClears(record, provider, { kind }, onGpu)
+					? bestCombo(record, provider, knobs, { kind }, { ...beat(bestSingleRisk(record, provider, { kind }, onGpu)), pinned: onGpu.pinned, ...(lim.allow ? { allow: lim.allow } : {}) })
+					: failing && !singleClears(record, provider, { kind }, lim)
+						? bestCombo(record, provider, knobs, { kind }, { ...beat(bestSingleRisk(record, provider, { kind }, lim)), pinned: lim.pinned ?? pinned, ...(lim.allow ? { allow: lim.allow } : {}), ...(ctx.combosDeclined ? { visited: ctx.combosDeclined } : {}) })
+						: null;
+			// With a combination on this GPU to offer, a GPU change isn't ranked beside it this round.
+			const shown = combo && !combo.changes.some((c) => GPU_MOVE_KNOBS.has(c.knobId)) ? moves.filter((m) => !GPU_MOVE_KNOBS.has(m.knobId)) : moves;
 			return {
 				tool: "sensitivity",
 				call_id: call.call_id,
 				...(combo ? { combined: { knobs: Object.fromEntries(combo.changes.map((c) => [c.knobId, c.to])), risk: combo.risk, peak_bytes: combo.peak, fit: combo.fit } } : {}),
-				ranked: moves.map((m) => {
+				ranked: shown.map((m) => {
 					const from = knobs[m.knobId];
 					const direction: "increase" | "decrease" | "change" =
 						typeof m.to === "number" && typeof from === "number" ? (m.to > from ? "increase" : "decrease") : "change";
