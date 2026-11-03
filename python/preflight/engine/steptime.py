@@ -37,7 +37,7 @@ SIGMA_SAME_GPU = 0.08  # simulated: A's D1, median of 5 timed steps within 15% i
 SIGMA_SAME_VENDOR = (
 	0.12  # simulated: S4c, K1 q90 0.101 x margin 2; per-GPU conformal on the corpus replaces it
 )
-SIGMA_CROSS_VENDOR = 0.22  # simulated: S4c, K1 q90 0.179 x margin 2; the AMD corpus slice replaces it
+SIGMA_CROSS_VENDOR = 0.22  # simulated: S4c, K1 q90 0.179 x margin 2; on the MI300X slice (Nov 2) its band covered 36%, not 90% (api.AMD_CROSS); no refit, a move across vendors abstains
 SIGMA_SECONDARY_SPECS = (
 	1.5  # guess: specs from a spec database; replaced by per-GPU conformal once that GPU is in the corpus
 )

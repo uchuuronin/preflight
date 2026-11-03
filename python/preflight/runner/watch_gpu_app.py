@@ -136,7 +136,7 @@ def film_and_alert(src: str, flags_json: str = "{}") -> dict:
 			w = cli("watch", str(parent), str(script), "--out", str(out), "--window", "200", limit=WATCH_S)
 			lines = [x for x in w["stderr"].splitlines() if x.startswith("[preflight]")]
 			r = {"case": case, "watch": {k: w[k] for k in ("exit", "seconds", "stopped")},
-				"preflight_lines": lines[-40:], "alerts": [x for x in lines if re.search(r"step \d+: ", x)],
+				"preflight_lines": lines[-40:], "alerts": [x for x in lines if re.search(r"step \d+: ", x) and not x.startswith("[preflight] note:")],
 				"stderr_tail": w["stderr"][-1200:]}  # fmt: skip
 			try:
 				r |= live(out, parent.stem)

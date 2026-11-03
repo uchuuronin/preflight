@@ -1,0 +1,13 @@
+{
+ "$comment": "Cost of one Preflight run (Chiya, Nov 2, 9:19 PM item 4): every production check-in of the LoRA sample (zoo/finetune_lora_hf, through ops_app.py::smoke, which submits to the deployed runner as a visitor would). Dollars: the record's own costs (GPU and model calls, from Modal's per-second GPU rates and the providers' token prices) plus the record's sandbox CPU and memory estimate; Modal's bill isn't split per job. Seconds: the job's own timer, from its queued event to its done event in the run log. Share tokens replaced with placeholders.",
+ "runs": [
+  {"script": "finetune_lora_hf", "set": "zoo", "job_type": "finetune", "record": "lora_checkin_nov1.record.json",
+   "$record": "remote-runs runs/20261101-182743-41336726935-a-triage-lora-prod (L4)",
+   "preflight_usd": 0.2077, "$preflight_usd": "gpu 0.07877 + model calls 0.036338 [measured, record] + sandbox CPU and memory 0.092599 [estimate, record]",
+   "preflight_s": 621.5, "$preflight_s": "queued 18:28:03.340Z to done 18:38:24.793Z [measured, job events]"},
+  {"script": "finetune_lora_hf", "set": "zoo", "job_type": "finetune", "record": "lora_checkin_nov2.record.json",
+   "$record": "remote-runs runs/20261102-161145-41479039229-a-triage-lora-prod-2 (A10, after a 2-min L4 wait; p2 and p3 cached)",
+   "preflight_usd": 0.1145, "$preflight_usd": "gpu 0.047491 + model calls 0.026104 [measured, record] + sandbox CPU and memory 0.04092 [estimate, record]",
+   "preflight_s": 299.3, "$preflight_s": "queued 16:12:28.150Z to done 16:17:27.403Z [measured, job events]"}
+ ]
+}

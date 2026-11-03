@@ -337,7 +337,7 @@ def cross_gpu_row(stores: list[Path]) -> Row:
 	return Row(
 		metric,
 		target,
-		on + ("" if amd else "; no AMD measurements"),
+		on + ("" if amd else "; NVIDIA GPUs (NVIDIA to MI300X is scored apart, below)"),
 		hits,
 		len(cs),
 		hits / len(cs) >= WITHIN_SHARE,

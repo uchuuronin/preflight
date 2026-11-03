@@ -1226,6 +1226,13 @@ def _with_note(est: Estimate, note: str) -> Estimate:
 
 # ---------------------------------------------------------------- step time
 
+# Chiya, Nov 2: the MI300X corpus slice (295 configs, `b-amd-grouped`), scored once from the NVIDIA rows of the same
+# configs; no refit on it, so a move across vendors still abstains, now saying what was measured
+AMD_CROSS = (
+	"measured on the MI300X (295 corpus configs, Nov 2): from NVIDIA rows of the same configs, K1 put the step within "
+	"20% on 254 of 1,147 pairs (22%) and inside its band on 411 (36%), reading about 0.63x the measured step"
+)
+
 
 @dataclass(frozen=True)
 class _StepResult:
@@ -1480,12 +1487,17 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			else None
 		)
 		if feature("steptime_cross_gpu") and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
-			# Chiya, Oct 31: abstain, labelled, until the AMD session measures; datasheets alone don't size the band
-			vendor = gpus.get_gpu(tgt_gpu).vendor
-			why = (
-				f"no {vendor.upper() if len(vendor) <= 3 else vendor.title()} measurements: {tgt_gpu} is another "
-				"vendor, and the corpus has no rows from it yet, so time across vendors isn't measured; run a probe there"
-			)
+			# Chiya, Oct 31: abstain, labelled; Nov 2: the AMD slice measured the move and K1 misses it (AMD_CROSS)
+			if tgt_gpu == "MI300X":  # the one AMD card measured; another AMD card falls to "not measured"
+				why = (
+					f"not shown across vendors: {tgt_gpu} is another vendor, and the move was {AMD_CROSS}, so it "
+					"isn't a usable estimate; run a probe there"
+				)
+			else:
+				why = (
+					f"not shown across vendors: {tgt_gpu} is another vendor, and this move isn't measured "
+					"(only NVIDIA to the MI300X is); run a probe there"
+				)
 			return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), sigma)
 		if cross is not None and cross.status != "abstain":
 			ratio = cross.point / current_probe.step_time.p50_s
@@ -3386,7 +3398,9 @@ _CARD_CAVEAT = {
 	steptime.MODEL_ID_CROSS: (
 		"Rough, no probe on this GPU: the band comes from corpus pairs, scored on GPUs left out, and is shown past "
 		"+-50% with a run-a-probe offer beside it. Calibrated on corpus models' op tables, not users' kernel tables; "
-		"checked on unseen scripts Nov 2. No AMD measurements: a move to another vendor's GPU abstains until corpus rows from it exist. The pairs share "
+		"checked on unseen scripts Nov 2. A move to another vendor's GPU abstains: "
+		+ AMD_CROSS
+		+ ". The pairs share "
 		"architectures: clustered by architecture, the 95% interval on coverage is 90% to 96%."
 	),
 }
@@ -3603,9 +3617,9 @@ def calibration_summary() -> dict:
 			for b in t.oom_bins
 		],
 		"oom_middle_verified": oom_model.middle_verified(t.oom_bins),
-		# Chiya, Nov 1: shown on every surface until AMD rows exist (the account is on a verification hold)
+		# Chiya, Nov 1: shown on every surface; Nov 2: the MI300X slice measured, not calibrated on (no refit)
 		"vendors_measured": sorted(vendors),
-		"amd": None if "amd" in vendors else "no AMD measurements",
+		"amd": None if "amd" in vendors else AMD_CROSS,
 	}
 
 

@@ -72,6 +72,7 @@ class Collector:
 	clock: object = time.monotonic
 	peak: object = None  # () -> (peak allocated, peak reserved) bytes so far, or None (no GPU)
 	alert: object = None  # (text) -> None
+	note: object = None  # (text) -> None: a faster-than-predicted stretch, said but not an alert
 	write: object = None  # (dict) -> None, one jsonl line
 	steps: int = 0
 	t0: float | None = None
@@ -119,13 +120,18 @@ class Collector:
 		return w
 
 	def _check(self, w) -> list[str]:
-		out = []
+		out, notes = [], []
 		b = self.bands
 		if b.step_s is not None:
 			lo, hi = b.step_s
 			side = "above" if w["step_s"] > hi else "below" if w["step_s"] < lo else None
-			self._streak("time.step", side, out,
-				f"step {w['step']}: {w['step_s']:.3g} s a step, {side} the predicted {lo:.3g}–{hi:.3g} s")  # fmt: skip
+			# D, Nov 2: a run stepping faster than its band (a tiny model whose probe timed its warm-up) isn't a problem
+			# to alert on; it is said as a note, and only a slower stretch is an alert. Each side keeps its own streak
+			# (review: a shared one let a fast window count toward a slow alert, and a note block the alert after it)
+			self._streak("time.step.above", side if side == "above" else None, out,
+				f"step {w['step']}: {w['step_s']:.3g} s a step, above the predicted {lo:.3g}–{hi:.3g} s")  # fmt: skip
+			self._streak("time.step.below", side if side == "below" else None, notes,
+				f"step {w['step']}: {w['step_s']:.3g} s a step, faster than the predicted {lo:.3g}–{hi:.3g} s")  # fmt: skip
 		if b.peak_bytes is not None and "peak_bytes" in w:
 			hi = b.peak_bytes[1]
 			over = w["peak_bytes"] > hi
@@ -145,6 +151,11 @@ class Collector:
 		for text in out:
 			if self.alert:
 				self.alert(text)
+		if notes:
+			w["notes"] = notes
+			for text in notes:
+				if self.note:
+					self.note(text)
 		return out
 
 	def _streak(self, key, side, out, text):
@@ -339,7 +350,7 @@ def main(argv: list[str] | None = None) -> int:
 		say(changed)
 		bands = Bands(None, bands.peak_bytes, None, bands.total_steps)
 	col = Collector(bands, window=max(1, ns.window), peak=peak if cuda else None,
-		alert=say, write=write)  # fmt: skip
+		alert=say, note=lambda t: say(f"note: {t}"), write=write)  # fmt: skip
 	if script_args != list(parent.job.source.args or []):
 		say(f"the record was predicted for arguments {parent.job.source.args or []}, this run has {script_args}: "
 			"its bands may not apply")  # fmt: skip
