@@ -49,7 +49,7 @@ missing to this list.
 | <https://github.com/uchuuronin/preflight> | Form, X post | Once public |
 | <https://huggingface.co/datasets/chaoschia/preflight-corpus> | Form, README, datasheet | 0.4.0 uploaded (Chiya, Nov 3); once public |
 | The video link | Form, X post | Wed |
-| Every relative link in `README.md` (final on `main`, `5bd09ed`) | README | To check once more before submitting |
+| Every relative link in `README.md` (final on `main`, `5bd09ed`) | README | All 14 file links and 10 in-page anchors resolve (D, Nov 3, on `main` `5bd09ed5`); check again if the README changes |
 
 ## Before pressing submit
 
