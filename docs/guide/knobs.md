@@ -1,7 +1,7 @@
 # Knobs and inputs
 
 Every setting a visitor can change in Preflight, what each one moves, and what the engine
-doesn't model yet. Written from the code as of Nov 3 (ws-b aac37763); every number carries a
+doesn't model yet. Written from the code as of Nov 3 (ws-b bc5f9483); every number carries a
 source tag: measured, derived, cited, simulated or guess.
 
 ## How to read this page
@@ -97,7 +97,8 @@ site shows the id.
 - What: how many examples go through at once during evaluation.
 - When: lower it when the peak comes during eval (the map shows an "Eval spike").
 - Moves: memory, when the eval pass sets the peak: up with the eval batch.
-- Not modelled: time and cost. Eval passes are timed at the probes' eval batch, so time holds.
+- Not modelled: time and cost. Each eval pass is counted at the probes' eval batch, so moving it
+  changes neither the number nor its band.
 
 **Encode batch** · `encode_batch_size`
 - What: how many passages a retrieval job encodes at once.
