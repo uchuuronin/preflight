@@ -50,7 +50,7 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 	// The editor opens above the rail, and on a laptop the rail sits at the fold: without this only its
 	// title showed (Chiya, Nov 2). Scrolled the least that brings it into view, once, when it opens.
 	const box = useRef<HTMLDivElement>(null);
-	const openedByGuide = useRef(proposed);
+	const openedByGuide = useRef(state.activeKnobBy === "guide");
 	useEffect(() => {
 		if (openedByGuide.current) return; // the guide's own move: the page stays where the person is reading
 		const still = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -119,7 +119,12 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 						>
 							{valueText(knob, v)}
 							{/* The same marks as the slider's ticks: a dot fits, a triangle is tight, a cross fails; hatching means not predicted. */}
-							{statuses[i] === "fails" || statuses[i] === "tight" || statuses[i] === "fits" ? <FitMark fit={statuses[i] as Fit} label="" /> : null}
+							{statuses[i] === "fails" || statuses[i] === "tight" || statuses[i] === "fits" ? (
+								<>
+									<FitMark fit={statuses[i] as Fit} label="" />
+									<span className="pf-visually-hidden">{t(`fit.${statuses[i]}`)}</span>
+								</>
+							) : null}
 						</button>
 					))}
 				</div>
@@ -209,7 +214,7 @@ export function Dock() {
 						active={state.activeKnob === k.id}
 						pinned={state.pinned.has(k.id)}
 						guideOn={guided.has(k.id)}
-						onPick={() => actions.openKnob(state.activeKnob === k.id ? null : k.id)}
+						onPick={() => actions.openKnob(state.activeKnob === k.id ? null : k.id, "user")}
 					/>
 				))}
 				{view.hidden.length ? (

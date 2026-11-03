@@ -587,7 +587,7 @@ export function GuidePanel() {
 				// step (Chiya, Nov 2).
 				<details className="pf-trace-fold">
 					<summary>{t("guide.trace")}</summary>
-					<ol className="pf-trace" aria-label={t("guide.trace")}>
+					<ol className="pf-trace">
 						{state.trace.slice(-4).map((e) => (
 							<li key={e.id} className={e.ok ? "" : "is-error"}>
 								<span className="pf-trace__call">

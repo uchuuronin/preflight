@@ -49,7 +49,7 @@ export function OrbitGlance() {
 					) : null}
 				</svg>
 				<div className="pf-glance__core">
-					<span className="pf-glance__num">{trusted(peak) ? fmt(peak.point, memT?.unit ?? "bytes") : t(fit === "fails" ? "map.core.oom" : fit === "tight" ? "map.core.tight" : "readout.abstain_short")}</span>
+					<span className={`pf-glance__num${trusted(peak) ? "" : " is-words"}`}>{trusted(peak) ? fmt(peak.point, memT?.unit ?? "bytes") : t(fit === "fails" ? "map.core.oom" : fit === "tight" ? "map.core.tight" : "readout.abstain_short")}</span>
 					{cap && memT?.unit === "bytes" ? <span className="pf-glance__cap">{t("glance.of", { cap: fmt(cap, "bytes") })}</span> : null}
 					{fit !== "unknown" ? <FitMark fit={fit} /> : null}
 				</div>

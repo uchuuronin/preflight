@@ -1092,6 +1092,7 @@ a {
 	transition: opacity 0.4s ease;
 }
 .pf-core__num { font-family: var(--pf-font-serif); font-size: var(--pf-text-3xl); line-height: 1; font-variant-numeric: tabular-nums; }
+.pf-core__num.is-words { font-size: var(--pf-text-2xl); line-height: 1.05; }
 .pf-core__cap { font-size: 11.5px; line-height: 1.3; color: var(--pf-fg-dim); }
 
 /* Every node sits in a fixed box (orbitLayout.ts NODE_BOX); only its button takes clicks. */
@@ -1166,7 +1167,7 @@ a {
 
 .pf-onode__chip {
 	position: absolute;
-	bottom: -12px;
+	top: calc(100% - 12px); /* hangs from the node's edge and grows downward, so a second line never covers the node's text */
 	left: 50%;
 	transform: translateX(-50%);
 	width: max-content;
@@ -1189,7 +1190,7 @@ a {
 }
 .pf-onode__chip.is-fails { color: var(--pf-fail); }
 .pf-onode__chip.is-fails::before { content: "✕ "; }
-.pf-onode--diamond .pf-onode__chip { left: auto; right: 0; bottom: 0; transform: translate(50%, 50%) rotate(-45deg) scale(1.25) translateY(16px); max-width: 130px; }
+.pf-onode--diamond .pf-onode__chip { left: auto; right: 0; top: 100%; transform: translate(50%, -50%) rotate(-45deg) scale(1.25) translateY(16px); transform-origin: 50% 0; max-width: 130px; }
 
 .pf-orbit__tps {
 	position: absolute;
@@ -1222,8 +1223,8 @@ a {
 /* An open node's sheet can be taller than the stage; it used to stretch the row, and the map and the
    dials (centred in it) dropped by a few hundred pixels on each open (Chiya, Nov 2). The sheet now takes
    the stage's height at most and scrolls inside, so the map holds still. */
-@media (min-width: 761px) {
-	.pf-deck.has-detail > .pf-side { max-height: clamp(540px, calc(100dvh - 400px), 1400px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
+@media (min-width: 1101px) {
+	.pf-deck.has-detail > .pf-side { max-height: clamp(540px, calc(100dvh - 400px), 1400px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 24px 6px 24px 24px; margin: -24px -6px -24px -24px; }
 	.pf-deck.has-detail > .pf-side > .pf-detail { flex: none; }
 }
 
@@ -1838,7 +1839,8 @@ a {
 	.pf-cockpit__head h1 { font-size: 28px; }
 	.pf-deck { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "stage" "dials" "side"; gap: 20px; }
 	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; }
-	.pf-dial-wrap { width: 112px; }
+	.pf-dial-wrap { width: 108px; }
+	.pf-dials { gap: 8px; }
 	/* No height to fill on a phone: the stage is the screen's width. */
 	.pf-stage-fill { height: auto; container-type: normal; display: block; }
 	.pf-stage-fill > .pf-orbit,
@@ -2035,6 +2037,7 @@ a {
 .pf-glance__mring { fill: none; stroke-width: 11; transition: stroke-dasharray var(--pf-dur-move) var(--pf-ease-move); }
 .pf-glance__core { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; pointer-events: none; }
 .pf-glance__num { font-family: var(--pf-font-serif); font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.pf-glance__num.is-words { font-size: 20px; line-height: 1.05; }
 .pf-glance__cap { max-width: 52%; font-size: 11px; line-height: 1.25; color: var(--pf-fg-dim); }
 .pf-glance__phases { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--pf-fg-dim); }
 .pf-glance__phase { position: relative; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 8px; isolation: isolate; }

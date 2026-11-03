@@ -148,7 +148,7 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 				) : null}
 			</svg>
 			<div className="pf-core">
-				<span ref={coreRef} className="pf-core__num">
+				<span ref={coreRef} className={`pf-core__num${data.coreValue === null ? " is-words" : ""}`}>
 					{data.coreNumber}
 				</span>
 				<span className="pf-core__cap">{data.coreCaption}</span>

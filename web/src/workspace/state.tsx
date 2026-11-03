@@ -60,6 +60,8 @@ export interface State {
 	proposal: Proposal | null;
 	focus: string | null;
 	activeKnob: string | null;
+	/** Who opened the active knob: the visitor's click, or the guide's move (the editor scrolls into view for the first only). */
+	activeKnobBy: "user" | "guide";
 	snapshots: Snapshot[];
 	ghost: string | null;
 	playhead: number;
@@ -79,7 +81,7 @@ type Action =
 	| { type: "highlight"; nodes: string[] }
 	| { type: "propose"; proposal: Proposal | null }
 	| { type: "focus"; node: string | null }
-	| { type: "activeKnob"; knobId: string | null }
+	| { type: "activeKnob"; knobId: string | null; by?: "user" | "guide" }
 	| { type: "snapshot"; snapshot: Snapshot }
 	| { type: "ghost"; id: string | null }
 	| { type: "playhead"; at: number }
@@ -133,7 +135,7 @@ function reducer(state: State, action: Action): State {
 		case "focus":
 			return { ...state, focus: action.node };
 		case "activeKnob":
-			return { ...state, activeKnob: action.knobId };
+			return { ...state, activeKnob: action.knobId, activeKnobBy: action.by ?? "guide" };
 		case "snapshot":
 			return { ...state, snapshots: [...state.snapshots, action.snapshot] };
 		case "ghost":
@@ -161,7 +163,7 @@ export interface WorkspaceActions {
 	highlight(nodes: string[]): void;
 	propose(proposal: Proposal | null): void;
 	focus(node: string | null): void;
-	openKnob(knobId: string | null): void;
+	openKnob(knobId: string | null, by?: "user" | "guide"): void;
 	snapshot(name?: string): Snapshot;
 	compare(a: string, b: string): Array<{ targetId: string; a: number | null; b: number | null }>;
 	showGhost(id: string | null): void;
@@ -212,6 +214,7 @@ export function WorkspaceProvider({
 		proposal: null,
 		focus: null,
 		activeKnob: null,
+		activeKnobBy: "user" as const,
 		snapshots: [],
 		ghost: null,
 		playhead: 0,
@@ -271,7 +274,7 @@ export function WorkspaceProvider({
 			highlight: (nodes) => dispatch({ type: "highlight", nodes }),
 			propose: (proposal) => dispatch({ type: "propose", proposal }),
 			focus: (node) => dispatch({ type: "focus", node }),
-			openKnob: (knobId) => dispatch({ type: "activeKnob", knobId }),
+			openKnob: (knobId, by = "guide") => dispatch({ type: "activeKnob", knobId, by }),
 			snapshot: (name) => {
 				const { state: s, estimates: e } = latest.current;
 				const snap: Snapshot = {
