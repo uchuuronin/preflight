@@ -428,6 +428,8 @@ a {
 .pf-link:hover { text-decoration-color: currentColor; }
 
 .pf-cta { display: flex; flex-wrap: wrap; gap: 12px; }
+/* A text link among the buttons (Home's manual link): its 44 px target with the text on the buttons' centre line. */
+.pf-cta > .pf-link { display: inline-flex; align-items: center; }
 
 /* Fit status: icon plus word, never colour alone */
 .pf-status {
@@ -609,16 +611,13 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	.pf-checkin__grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(440px, 1fr); grid-template-rows: auto 1fr; gap: 20px; align-items: start; }
 	.pf-checkin__grid > .pf-desk { grid-column: 1; grid-row: 1 / span 2; }
 	.pf-checkin__grid > .pf-departures { grid-column: 2; grid-row: 1; }
-	.pf-checkin__grid > .pf-checkin__doc { grid-column: 2; grid-row: 2; }
 }
 @media (max-width: 1239.98px) {
 	/* One column until the samples' column holds 440 px (its fixed columns take 276): the titles need the rest
 	   (review, Nov 3). As specific as .pf-desk's and .pf-departures' own flex, which came later. */
 	.pf-checkin__grid > *, .pf-checkin__grid > .pf-desk, .pf-checkin__grid > .pf-departures { flex-basis: 100%; }
-	.pf-checkin__grid > .pf-checkin__doc { order: 1; }
 	.pf-checkin__grid > .pf-departures { order: 2; }
 }
-.pf-checkin__doc { padding: 16px 20px; border-radius: var(--pf-radius-lg); font-size: var(--pf-text-sm); }
 .pf-checkin__confirm { padding: 18px 20px; border-radius: var(--pf-radius-lg); display: flex; flex-direction: column; gap: 10px; }
 .pf-checkin__confirm .pf-datause { border-top: 0; padding-top: 0; }
 
@@ -2488,6 +2487,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-doc__toc-list li.is-sub { padding-left: 14px; }
 .pf-doc__toc-list a { display: block; padding: 4px 0; color: var(--pf-fg-dim); text-decoration: none; line-height: 1.35; }
 .pf-doc__toc-list a:hover, .pf-doc__toc-list a:focus-visible { color: var(--pf-fg); text-decoration: underline; }
+/* The list scrolls, which clips a ring drawn outside the link: draw it inside (a11y pass, Nov 3). */
+.pf-doc__toc-list a:focus-visible { outline-offset: -2px; }
 .pf-doc__menu { display: none; }
 .pf-doc__body { max-width: 74ch; color: var(--pf-fg); font-size: 15px; line-height: 1.6; }
 .pf-doc__body h1 { font-family: var(--pf-font-serif); font-weight: 400; font-size: clamp(32px, 5vw, 44px); line-height: 1.1; margin: 0 0 20px; }
@@ -2513,4 +2514,6 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	.pf-doc__menu summary { cursor: pointer; font-weight: 600; }
 	.pf-doc__menu nav { margin-top: 8px; max-height: 60dvh; overflow: auto; }
 	.pf-doc__body { font-size: 15px; }
+	/* Below the sticky Contents bar (it ends at 112 px). */
+	.pf-doc__body h2, .pf-doc__body h3, .pf-doc__body h4 { scroll-margin-top: 124px; }
 }

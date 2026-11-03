@@ -53,13 +53,20 @@ class JobEvent(Strict):
 	retryable: bool | None = Field(default=None, description="On failed: whether resubmitting may succeed")
 	error_code: ErrorCode | None = Field(
 		default=None,
-		description="On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
+		description="On failed (and 0.6.6: on done with nothing_measured): a stable code in Probe.error_code's "
+		"families; the UI shows t('error.<code>')",
 	)
 	import_stop: bool | None = Field(
 		default=None,
 		description="0.6.5: every probe stopped at an import before its first step (or the job was refused for "
 		"a package); with runner.free_resend on, one resend of this job today doesn't count against the "
 		"visitor's daily probe jobs (JobRequest.resend_of names it)",
+	)
+	nothing_measured: bool | None = Field(
+		default=None,
+		description="0.6.6: on done, no probe reached its first step, so every readout abstains; error_code is the "
+		"first stopped probe's cause, and the record carries the job.nothing_measured finding. With "
+		"runner.nothing_measured on, a resend of this job today is free (JobRequest.resend_of), whatever the cause",
 	)
 	free_resend: bool | None = Field(
 		default=None,

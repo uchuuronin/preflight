@@ -1,4 +1,4 @@
-# Preflight contract v0.6.5
+# Preflight contract v0.6.6
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,13 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.6 (Nov 3, additive; the re-validation via the PM): `FlightRecord.made_by` (`runner_commit`, the git commit the
+  runner was deployed from, and `flags_on`, every flag on in it, sorted), written with `runner.made_by` on; and
+  `JobEvent.nothing_measured` on `done`: no probe reached its first step, so every readout abstains; `error_code` on
+  that `done` event is the first stopped probe's cause, and the record carries a `job.nothing_measured` finding. With
+  `runner.nothing_measured` on, such a job's resend is free (as an import stop's is, under `runner.free_resend`),
+  whatever the cause. 0.6.5 records load unchanged; a 0.6.5 build refuses a 0.6.6 record, so the API and the runner
+  deploy from the same merge.
 - 0.6.5 (Nov 2, additive; Chiya via the PM): `JobRequest.resend_of` (the job id this one sends again) and
   two job events: `JobEvent.import_stop` (every probe stopped at an import before its first step) and
   `JobEvent.free_resend` (on queued: this job doesn't count against the visitor's daily probe jobs). With

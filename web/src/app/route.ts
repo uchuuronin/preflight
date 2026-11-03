@@ -6,7 +6,7 @@
  *   #/cockpit/<ref>  a record by sample id or share token
  *   #/logbook        flights this browser opened
  *   #/checks         held-out checks of the engine on real runs (documentation, not in the nav)
- *   #/help           how to fill in a check-in: every input and knob (linked from New flight only)
+ *   #/help           how to fill in a check-in: every input and knob (linked from Home only)
  */
 import { useSyncExternalStore } from "react";
 

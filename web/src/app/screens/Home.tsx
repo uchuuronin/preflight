@@ -47,6 +47,12 @@ export function Home() {
 						<a className="pf-btn" href={href("cockpit", DEFAULT_SAMPLE)}>
 							{t("home.sample")}
 						</a>
+						{/* The Help page's one way in (Chiya, Nov 3): a quiet text link beside the two actions. */}
+						{flag("c.help") ? (
+							<a className="pf-link" href={href("help")}>
+								{t("home.manual")}
+							</a>
+						) : null}
 					</div>
 					<span className="pf-scroll-hint">
 						<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">

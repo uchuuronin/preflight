@@ -23,8 +23,9 @@ STEPS: dict[str, tuple[str, str]] = {
 	"submission.files_gone": ("reading the uploaded files", "upload the files again"),
 	"submission.too_large": (
 		"reading the source",
-		"do what the message says if it names a way, check in the folder that holds the script, "
-		"or probe it on your machine: `preflight run <your script>`",
+		"for a repository link, name the script you run as its entry point (Preflight then reads that file and "
+		"what it imports); for an upload, upload only the folder that holds the script; or probe it on your "
+		"machine: `preflight run <your script>`",
 	),
 	"map.too_large": (
 		"mapping the script",
@@ -252,4 +253,6 @@ def with_step(message: str, code: str | None, *, entrypoint: str | None = None) 
 	step, by_hand = describe(code)
 	if entrypoint and entrypoint != "train.py":
 		by_hand = by_hand.replace("train.py", entrypoint)
+	if entrypoint:  # the script the job runs, not a placeholder (the re-validation, Nov 3)
+		by_hand = by_hand.replace("<your script>", entrypoint)
 	return f"{message.rstrip('. ')}. Step: {step}. By hand: {by_hand}."

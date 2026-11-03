@@ -28,8 +28,8 @@ missing to this list.
 | Repository | <https://github.com/uchuuronin/preflight> | Chiya | **Public before submitting** (private today) |
 | Demo video, 3 minutes | The YouTube (or portal) link to the final cut | Chiya | Recorded Wed; `docs/demo/video-plan.md` |
 | A shared flight record | <https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg> (the LoRA fine-tune on an L4; its card is pre-rendered) | D | Ready; opens in Chiya's live test |
-| The corpus | <https://huggingface.co/datasets/chaoschia/preflight-corpus> | Chiya, B | **Upload 0.4.0, then make it public** (it holds 0.3.0, private, today) |
-| Licence | Apache License 2.0 (`LICENSE`); dependencies in `docs/licences.md`; CI fails on GPL, AGPL and SSPL, with three gaps open for C (`from-d.md`) | D | Ready |
+| The corpus | <https://huggingface.co/datasets/chaoschia/preflight-corpus> | Chiya, B | **Make it public** (0.4.0 uploaded by Chiya, Nov 3) |
+| Licence | Apache License 2.0 (`LICENSE`); dependencies in `docs/licences.md`; CI fails on GPL, AGPL and SSPL; CI also checks `workers/` and the root's node packages (C's D53) | D | Ready |
 | Built during the hackathon | "Everything in this repository was built during the Meta Global AI Developer Hackathon (Oct 26 to Nov 4, 2026). The first commit is `11a0ce9`, Oct 26, 22:25 ET; nothing was carried over from earlier work." (the README, under its opening paragraph) | D | Ready |
 | Best Build on Meta Open Weight Models | Flag it. `portal.md`, "Best Build on Meta Open Weight Models": Muse Spark Open on Baseten (triage, the number check, the corpus labels) and Muse Glimmer on our own GPU (private triage), both on in production | Chiya | Ready; Baseten verifies the calls are real, and every call is in the records' provenance |
 | Best Agentic Use-Case | Flag it. `portal.md`, "Best Agentic Use-Case": the guide (Muse Spark driving the cockpit with tool calls) and the fix loop (Muse Code fixes, Preflight's re-probe picks) | Chiya | Ready |
@@ -47,7 +47,7 @@ missing to this list.
 | <https://preflight-cqn.pages.dev/s/ICDYrfHQ2nBNbv3mlRHHMg> | Form, README badge, X post, video | The share route works on a production build under `wrangler pages dev` (D, Nov 3); the live record in Chiya's live test |
 | <https://preflight-cqn.pages.dev/badge/ICDYrfHQ2nBNbv3mlRHHMg> | README badge | As above |
 | <https://github.com/uchuuronin/preflight> | Form, X post | Once public |
-| <https://huggingface.co/datasets/chaoschia/preflight-corpus> | Form, README, datasheet | Once 0.4.0 is up and public |
+| <https://huggingface.co/datasets/chaoschia/preflight-corpus> | Form, README, datasheet | 0.4.0 uploaded (Chiya, Nov 3); once public |
 | The video link | Form, X post | Wed |
 | Every relative link in `docs/readme-final.md` | README | All resolve (D, Nov 3) |
 
@@ -56,7 +56,8 @@ missing to this list.
 - [ ] `docs/readme-final.md` copied over `README.md` on `main` (the PM's diff, `from-d.md`), and the
       four open questions there settled.
 - [ ] Repository public; no secrets in its history (CI's gitleaks job passes on `main`).
-- [ ] Corpus 0.4.0 on Hugging Face and public.
+- [x] Corpus 0.4.0 on Hugging Face (Chiya, Nov 3).
+- [ ] Corpus public.
 - [ ] Live app passes Chiya's live test: a sample, a check-in of a public repo, the guide, the
       fix loop, a share link.
 - [ ] Video uploaded, public or unlisted as the form allows, under 3 minutes, every Meta model

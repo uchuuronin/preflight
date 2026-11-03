@@ -144,7 +144,10 @@ def run_one(store: JobStore, worker: str, fn: JobFn, *, heartbeat_s: float = HEA
 
 		code = error_code(exc)
 		# the step it failed in and the way past it by hand (item 43)
-		msg = with_step(str(exc)[:700] or type(exc).__name__, code)[:1000]
+		entry = getattr(exc, "entrypoint", None)
+		msg = with_step(
+			str(exc)[:700] or type(exc).__name__, code, entrypoint=entry if isinstance(entry, str) else None
+		)[:1000]
 		_safe_fail(store, lease, msg, retryable=False, error_code=code, spent_usd=_spent(ctx))
 	except Exception:
 		log.exception("job %s failed with an internal error", lease.job_id)

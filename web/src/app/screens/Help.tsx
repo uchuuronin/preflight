@@ -1,7 +1,7 @@
 /**
  * Help: docs/guide/knobs.md (B and D), as a plain technical document in the site's colours and fonts,
- * with a table of contents on the left (a menu at the top on a phone). Reached from one place only, the
- * documentation card on New flight (Chiya, Nov 3); behind `c.help`. Static content: it changes nothing.
+ * with a table of contents on the left (a menu at the top on a phone). Reached from one place only, a
+ * text link on Home (Chiya, Nov 3); behind `c.help`. Static content: it changes nothing.
  */
 import { useMemo } from "react";
 import { t } from "../../lib/i18n";
@@ -50,7 +50,8 @@ function jump(e: React.MouseEvent, id: string): void {
 	e.preventDefault();
 	const el = document.getElementById(id);
 	if (!el) return;
+	// Close the phone's menu first: closing it mid-scroll moved the page under the jump (a11y pass, Nov 3).
+	(e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
 	const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 	el.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
-	(e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
 }
