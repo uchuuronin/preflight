@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.5/contract",
+	"$id": "https://preflight.dev/schema/0.6.6/contract",
 	"title": "PreflightContract",
-	"description": "Preflight contract v0.6.5. Generated; do not edit.",
+	"description": "Preflight contract v0.6.6. Generated; do not edit.",
 	"type": "object",
 	"properties": {
 		"FlightRecord": {
@@ -2089,7 +2089,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"schema_version": {
-					"default": "0.6.5",
+					"default": "0.6.6",
 					"pattern": "^\\d+\\.\\d+\\.\\d+$",
 					"title": "Schema Version",
 					"type": "string"
@@ -2233,6 +2233,18 @@
 					],
 					"default": null,
 					"description": "The run cost breakdown, written by B"
+				},
+				"made_by": {
+					"anyOf": [
+						{
+							"$ref": "#/$defs/MadeBy"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.6: the runner commit and flags that made it (A)"
 				}
 			},
 			"required": [
@@ -3083,7 +3095,7 @@
 						}
 					],
 					"default": null,
-					"description": "On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
+					"description": "On failed (and 0.6.6: on done with nothing_measured): a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
 					"title": "Error Code"
 				},
 				"import_stop": {
@@ -3098,6 +3110,19 @@
 					"default": null,
 					"description": "0.6.5: every probe stopped at an import before its first step (or the job was refused for a package); with runner.free_resend on, one resend of this job today doesn't count against the visitor's daily probe jobs (JobRequest.resend_of names it)",
 					"title": "Import Stop"
+				},
+				"nothing_measured": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.6: on done, no probe reached its first step, so every readout abstains; error_code is the first stopped probe's cause, and the record carries the job.nothing_measured finding. With runner.nothing_measured on, a resend of this job today is free (JobRequest.resend_of), whatever the cause",
+					"title": "Nothing Measured"
 				},
 				"free_resend": {
 					"anyOf": [
@@ -3826,6 +3851,36 @@
 				"r"
 			],
 			"title": "LoraInfo",
+			"type": "object"
+		},
+		"MadeBy": {
+			"additionalProperties": false,
+			"description": "0.6.6: what made this record (the re-validation, Nov 3): the runner's commit and the flags on in it.",
+			"properties": {
+				"runner_commit": {
+					"anyOf": [
+						{
+							"pattern": "^[0-9a-f]{7,40}$",
+							"type": "string"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "The git commit the runner was deployed from",
+					"title": "Runner Commit"
+				},
+				"flags_on": {
+					"description": "Every flag on in the runner when it made the record (flags.json, then its environment's overrides), sorted",
+					"items": {
+						"type": "string"
+					},
+					"title": "Flags On",
+					"type": "array"
+				}
+			},
+			"title": "MadeBy",
 			"type": "object"
 		},
 		"Memory": {

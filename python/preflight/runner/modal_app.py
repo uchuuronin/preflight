@@ -140,12 +140,32 @@ _base = modal.Image.debian_slim(python_version="3.11").env(
 # (Chiya, Oct 30) when the repo has it. Both are baked in, so changing a flag takes a deploy of
 # the runner as well as the API; tests/test_pipeline.py holds the two images to the same files.
 FLAG_ENV = "production"  # api/app.py's PREFLIGHT_ENV
+
+
+def _runner_commit() -> str | None:
+	"""The commit this runner is deployed from (0.6.6, FlightRecord.made_by): remote-run.yml's RUN_SHA, else the
+	checkout's HEAD; inside a running container, the value the image was built with."""
+	import re
+	import subprocess
+
+	sha = os.environ.get("PREFLIGHT_RUNNER_COMMIT") or os.environ.get("RUN_SHA") or ""
+	if not sha and _REPO is not None:
+		try:
+			sha = subprocess.run(["git", "-C", str(_REPO), "rev-parse", "HEAD"], capture_output=True, text=True,
+				timeout=10).stdout.strip()  # fmt: skip
+		except (OSError, subprocess.SubprocessError):
+			sha = ""
+	sha = sha.strip().lower()
+	return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else None
+
+
+RUNNER_COMMIT = _runner_commit()
 FLAG_OVERRIDE = FLAGS_SRC.parent / f"flags.{FLAG_ENV}.json"
 worker_image = (
 	_base.apt_install("git")
 	.pip_install("pydantic>=2.8,<3", "numpy>=1.26,<2.2", "httpx>=0.27")
 	.pip_install("matplotlib==3.9.2")  # harness/diagnosis.py renders the plots Muse Spark reads (item 31)
-	.env({"PREFLIGHT_ENV": FLAG_ENV})
+	.env({"PREFLIGHT_ENV": FLAG_ENV, **({"PREFLIGHT_RUNNER_COMMIT": RUNNER_COMMIT} if RUNNER_COMMIT else {})})
 	.add_local_dir(ZOO_SRC, "/root/zoo", ignore=_NOT_SOURCE)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 	.add_local_file(FLAGS_SRC, f"{REMOTE_PKG}/flags.json")

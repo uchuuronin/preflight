@@ -25,8 +25,9 @@ def _user_frame(tb, workdir: str) -> str | None:
 
 def _what_installed(spec: dict) -> str:
 	"""What a failed install was installing, for its message."""
-	has_req = Path("requirements.txt").is_file()
-	what = "requirements.txt" if has_req or not spec.get("install_repo") else "the repo"
+	req = spec.get("requirements") or "requirements.txt"
+	has_req = Path(req).is_file()
+	what = req if has_req or not spec.get("install_repo") else "the repo"
 	if spec.get("extra_packages"):
 		what = (
 			f"{what} with the extra packages" if has_req or spec.get("install_repo") else "the extra packages"
@@ -279,7 +280,7 @@ def main(spec_path: str) -> int:
 			err, dirs = install(Path(workdir), Path(spec["deps"]), repo=bool(spec.get("install_repo")),
 				entrypoint=spec.get("entrypoint"), extra=extra, uv=bool(spec.get("install_uv")),
 				pyg=bool(spec.get("install_pyg")), build=bool(spec.get("install_exec")),
-				torch_note=bool(spec.get("torch_note")),
+				torch_note=bool(spec.get("torch_note")), requirements=str(spec.get("requirements") or "requirements.txt"),
 				sdists=tuple(x for x in spec.get("install_sdists") or () if isinstance(x, str)))  # fmt: skip
 			_write(str(done), {"error": err, "dirs": [str(d) for d in dirs]})
 		else:

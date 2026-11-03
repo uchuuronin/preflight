@@ -373,7 +373,7 @@
 				}
 			],
 			"default": null,
-			"description": "On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
+			"description": "On failed (and 0.6.6: on done with nothing_measured): a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
 			"title": "Error Code"
 		},
 		"import_stop": {
@@ -388,6 +388,19 @@
 			"default": null,
 			"description": "0.6.5: every probe stopped at an import before its first step (or the job was refused for a package); with runner.free_resend on, one resend of this job today doesn't count against the visitor's daily probe jobs (JobRequest.resend_of names it)",
 			"title": "Import Stop"
+		},
+		"nothing_measured": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "0.6.6: on done, no probe reached its first step, so every readout abstains; error_code is the first stopped probe's cause, and the record carries the job.nothing_measured finding. With runner.nothing_measured on, a resend of this job today is free (JobRequest.resend_of), whatever the cause",
+			"title": "Nothing Measured"
 		},
 		"free_resend": {
 			"anyOf": [
@@ -412,5 +425,5 @@
 	"title": "JobEvent",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.5/JobEvent"
+	"$id": "https://preflight.dev/schema/0.6.6/JobEvent"
 }
