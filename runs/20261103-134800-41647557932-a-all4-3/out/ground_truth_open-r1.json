@@ -1,0 +1,72 @@
+{
+  "script": "open-r1",
+  "entrypoint": "src/open_r1/grpo.py",
+  "args": [
+    "--config",
+    "recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml",
+    "--vllm_mode",
+    "colocate",
+    "--max_steps",
+    "50"
+  ],
+  "gpu": null,
+  "backend": "cpu",
+  "bare": {
+    "failed": "requirements: the code asks for accelerate==1.4.0 (the image has 1.1.1); datasets>=3.2.0 (the image has 3.1.0); transformers==4.52.3 (the image has 4.46.3); trl==0.18.0 (the image has 0.14.0), which the probe image can't change. ERROR: Could not find a version that satisfies the requirement deepspeed==0.16.8 (from versions: 0.3.1.dev1, 0.3.1.dev2, 0.3.1.dev3, 0.3.1.dev4, 0.3.1.dev5)\nERROR: No matching distribution found for deepspeed==0.16.8",
+    "wall_s": 2.5
+  },
+  "recorder": {
+    "status": "error",
+    "error": "the repo didn't install: the code asks for accelerate==1.4.0 (the image has 1.1.1); datasets>=3.2.0 (the image has 3.1.0); transformers==4.52.3 (the image has 4.46.3); trl==0.18.0 (the image has 0.14.0), which the probe image can't change. ERROR: Could not find a version that satisfies the requirement deepspeed==0.16.8 (from versions: 0.3.1.dev1, 0.3.1.dev2, 0.3.1.dev3, 0.3.1.dev4, 0.3.1.dev5)\nERROR: No matching distribution found for deepspeed==0.16.8",
+    "error_code": "missing_package.install",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 4.515,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "imports e2b_code_interpreter, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports jieba, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: the script imports morphcloud, which isn't installed and isn't a package Preflight installs by name: add it to requirements.txt\n[preflight] requirements: kept the image's accelerate 1.1.1 (asked for 'accelerate==1.4.0')\n[preflight] requirements: kept the image's datasets 3.1.0 (asked for 'datasets>=3.2.0')\n[preflight] requirements: kept the image's huggingface-hub 0.36.2 (asked for 'huggingface-hub[cli,hf_xet]<1.0,>=0.30.2')\n[preflight] requirements: kept the image's packaging 26.3 (asked for 'packaging>=23.0')\n[preflight] requirements: kept the image's safetensors 0.4.5 (asked for 'safetensors>=0.3.3')\n[preflight] requirements: kept the image's transformers 4.46.3 (asked for 'transformers==4.52.3')\n[preflight] requirements: kept the image's trl 0.14.0 (asked for 'trl[vllm]==0.18.0')\n[preflight] requirements: installing bitsandbytes>=0.43.0, einops>=0.8.0, deepspeed==0.16.8, hf_transfer>=0.1.4, langdetect, latex2sympy2_extended>=1.0.6, math-verify==0.5.2, liger-kernel>=0.5.10, sentencepiece>=0.1.99, wandb>=0.19.1, async-lru>=2.0.5, python-dotenv\n[preflight] requirements: together they didn't install (ERROR: No matching distribution found for deepspeed==0.16.8); trying them apart\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T13:50:21Z",
+      "duration_s": 4.515,
+      "error": "the repo didn't install: the code asks for accelerate==1.4.0 (the image has 1.1.1); datasets>=3.2.0 (the image has 3.1.0); transformers==4.52.3 (the image has 4.46.3); trl==0.18.0 (the image has 0.14.0), which the probe image can't change. ERROR: Could not find a version that satisfies the requirement deepspeed==0.16.8 (from versions: 0.3.1.dev1, 0.3.1.dev2, 0.3.1.dev3, 0.3.1.dev4, 0.3.1.dev5)\nERROR: No matching distribution found for deepspeed==0.16.8",
+      "error_code": "missing_package.install",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 4.515,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cpu",
+      "provider": "local",
+      "nodes": 1,
+      "libraries": {}
+    }
+  },
+  "overhead": null,
+  "lens": "rl",
+  "image": "probe"
+}

@@ -1,0 +1,11 @@
+{
+	"name": "20261103-134800-41647557932-a-all4-3",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41647557932",
+	"ref": "cc2228a945e2dd96fde9403a4b16cef735a74f82",
+	"sha": "cc2228a945e2dd96fde9403a4b16cef735a74f82",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/huggingface/open-r1 --commit 5b6ff22b3fb7aa069c54866e517f39dfc3160e09 --entrypoint src/open_r1/grpo.py --args=--config,recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml,--vllm_mode,colocate,--max_steps,50 --bare-steps 100000 --budget-min 20 --first-gpu A10 --install-requirements --install-repo --pyg --build --torch-new --dataset-cache --flags runner.read_closure,harness.lens_by_entry,runner.probe_without_map,probes.repo_install,probes.extra_hosts,probes.eval_units ",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T13:50:31Z"
+}
