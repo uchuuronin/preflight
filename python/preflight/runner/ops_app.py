@@ -21,11 +21,13 @@ import modal
 
 from preflight.runner.modal_app import (
 	APP_NAME,
+	DATASETS_DIR,
 	REMOTE_PKG,
 	SERVICE_NAME,
 	WEIGHTS_DIR,
 	ZOO_MODELS,
 	_read_only,
+	datasets_vol,
 	image_tag,
 	probe_image,
 	probe_new_image,
@@ -39,6 +41,69 @@ from preflight.runner.probe_user import PROBE_USER_IMPORTS
 from preflight.runner.probe_user import probe_user_ok as _probe_user_ok
 
 ops = modal.App(APP_NAME + "-ops")
+
+
+@ops.function(image=probe_image, volumes={DATASETS_DIR: datasets_vol}, timeout=3600)  # CPU
+def fill_dataset_cache(only: str = "") -> list[dict]:
+	"""probes.dataset_cache: download torchvision's CIFAR-10/100, MNIST and FashionMNIST archives into the
+	datasets volume by md5 (recorder/dataset_cache.py), each checked against torchvision's own md5 before it's
+	kept; one already there is skipped. only: comma-separated dataset names."""
+	import hashlib as hl
+	import time
+	import urllib.request
+
+	from preflight.recorder.dataset_cache import resources
+
+	want = {x for x in only.split(",") if x}
+	root = Path(DATASETS_DIR) / "by-md5"
+	root.mkdir(parents=True, exist_ok=True)
+	out = []
+	for name, url, md5 in resources():
+		if want and name not in want:
+			continue
+		dst = root / md5
+		if dst.is_file():
+			out.append({"dataset": name, "url": url, "status": "already there", "bytes": dst.stat().st_size})
+			continue
+		t0, h, n = time.monotonic(), hl.md5(), 0
+		tmp = dst.with_suffix(".part")
+		try:
+			req = urllib.request.Request(url, headers={"User-Agent": "preflight-dataset-cache"})
+			with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
+				while chunk := r.read(1 << 20):
+					f.write(chunk)
+					h.update(chunk)
+					n += len(chunk)
+		except Exception as exc:  # one host down doesn't stop the rest
+			tmp.unlink(missing_ok=True)
+			out.append({"dataset": name, "url": url, "status": f"failed: {type(exc).__name__}: {exc}"[:300]})
+			print(f"[datasets] {name} {url}: {out[-1]['status']}", flush=True)
+			continue
+		s = time.monotonic() - t0
+		if h.hexdigest() != md5:
+			tmp.unlink(missing_ok=True)
+			out.append({"dataset": name, "url": url, "status": "md5 mismatch: not kept", "bytes": n})
+		else:
+			tmp.rename(dst)
+			out.append({"dataset": name, "url": url, "status": "kept", "bytes": n, "seconds": round(s, 1),
+				"kB_per_s": round(n / 1024 / max(s, 1e-3))})  # fmt: skip
+		print(f"[datasets] {name} {url}: {out[-1]}", flush=True)
+		datasets_vol.commit()
+	return out
+
+
+@ops.local_entrypoint()
+def fill_datasets(only: str = ""):
+	"""modal run --env main python/preflight/runner/ops_app.py::fill_datasets [--only CIFAR10,MNIST]
+	Writes out/fill_datasets.json; exits non-zero unless every archive asked for is in the volume."""
+	import sys
+
+	res = fill_dataset_cache.remote(only)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/fill_datasets.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps(res, indent=2), flush=True)
+	if not all(r["status"] in ("kept", "already there") for r in res):
+		sys.exit(1)
 
 
 @ops.function(image=probe_image, volumes={WEIGHTS_DIR: weights_vol}, timeout=3600)

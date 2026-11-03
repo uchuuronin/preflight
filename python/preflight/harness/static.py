@@ -27,6 +27,7 @@ bounded: over MAX_SOURCE_BYTES of Python, only the entry point and what it impor
 """
 
 import ast
+import itertools
 import re
 from dataclasses import dataclass, field
 
@@ -850,26 +851,31 @@ def _lens(f: Facts, framework: str, hf_id: str | None) -> str:
 # litgpt/pretrain.py loads a tokenizer from the Hub, so it read as fine-tuning; torchtune's
 # recipes/lora_finetune_single_device.py loads its model through its own config, so it read as pretraining;
 # lm-evaluation-harness's lm_eval/__main__.py has no training loop and read as pretraining
-ENTRY_PRETRAIN = ("pretrain",)
-ENTRY_FINETUNE = ("finetune", "fine_tune", "lora", "qlora", "sft")
+# whole words of the file name (split on anything not a letter or digit): "pretrained" is not "pretrain"
+ENTRY_PRETRAIN = frozenset({"pretrain", "pretraining"})
+ENTRY_FINETUNE = frozenset({"finetune", "finetuning", "lora", "qlora", "sft"})
 
 
 def _lens_by_entry(lens: str, reach: Facts, f: Facts, entrypoint: str) -> str:
-	"""A training lens corrected by the entry point's own name (pretrain, finetune, lora, sft), and an
-	lm_eval or lighteval job with no optimizer read as an eval; every other lens as the import rules read it."""
+	"""A training lens corrected by the entry point's own name, by whole words (pretrain; finetune, lora, sft,
+	fine_tune; fine-tuning words win when both appear), and an entry point inside lm_eval's or lighteval's own
+	package read as an eval; every other lens as the import rules read it. Not a job that imports lm_eval:
+	a fine-tune can run benchmarks in its loop, and the reader can't always see its optimizer (review, Nov 3)."""
 	from preflight.runner.flags import flag
 
 	if not flag("harness.lens_by_entry") or lens not in ("finetune", "pretrain"):
 		return lens
 	# lm-evaluation-harness's own entry point imports its package as local code, which the job's imports leave out
 	evals = ("lm_eval", "lighteval")
-	if (_has(reach, *evals) or entrypoint.split("/", 1)[0] in evals) and not f.optimizer_vars:
+	if entrypoint.split("/", 1)[0] in evals:
 		return "eval"
-	stem = entrypoint.rsplit("/", 1)[-1].lower().removesuffix(".py")
-	if any(w in stem for w in ENTRY_PRETRAIN):
-		return "pretrain"
-	if any(w in stem for w in ENTRY_FINETUNE):
+	words = re.split(r"[^a-z0-9]+", entrypoint.rsplit("/", 1)[-1].lower().removesuffix(".py"))
+	if set(words) & ENTRY_FINETUNE or any(
+		a == "fine" and b in ("tune", "tuning") for a, b in itertools.pairwise(words)
+	):
 		return "finetune"
+	if set(words) & ENTRY_PRETRAIN:
+		return "pretrain"
 	return lens
 
 

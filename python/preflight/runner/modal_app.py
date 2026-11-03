@@ -257,6 +257,10 @@ jobs_dict = modal.Dict.from_name("preflight-jobs", create_if_missing=True)
 cache_dict = modal.Dict.from_name("preflight-probe-cache", create_if_missing=True)
 records_vol = modal.Volume.from_name("preflight-records", create_if_missing=True)
 weights_vol = modal.Volume.from_name("preflight-weights", create_if_missing=True)
+# probes.dataset_cache (off): torchvision's CIFAR-10/100, MNIST and FashionMNIST archives by md5, filled by the ops
+# job fill_dataset_cache, mounted read-only in probe sandboxes (recorder/dataset_cache.py)
+datasets_vol = modal.Volume.from_name("preflight-datasets", create_if_missing=True)
+DATASETS_DIR = "/datasets"  # recorder/dataset_cache.CACHE_DIR
 # uploaded files, by content hash: kept out of the job state, which is saved on every change
 uploads_vol = modal.Volume.from_name("preflight-uploads", create_if_missing=True)
 
@@ -507,6 +511,9 @@ def _sandbox_factory(owner=None):
 		# EGRESS and its tunnel
 		data = flag("probes.extra_hosts") and not extra_egress
 		hosts = [*EGRESS, *(EXTRA_EGRESS if data else []), *(h for h in extra_egress if h)]
+		volumes = {WEIGHTS_DIR: _read_only(weights_vol)}
+		if flag("probes.dataset_cache") and not extra_egress:  # a probe's sandbox only, read-only
+			volumes[DATASETS_DIR] = _read_only(datasets_vol)
 		return modal.Sandbox.create(
 			app=owner if owner is not None else app,
 			image=SANDBOX_IMAGES[image],
@@ -514,7 +521,7 @@ def _sandbox_factory(owner=None):
 			timeout=timeout_s or 30 * 60,
 			idle_timeout=10 * 60,  # a sandbox orphaned by a dead worker stops billing within ten minutes
 			outbound_domain_allowlist=hosts,
-			volumes={WEIGHTS_DIR: _read_only(weights_vol)},
+			volumes=volumes,
 			workdir="/tmp",
 		)
 

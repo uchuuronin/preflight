@@ -218,6 +218,7 @@ class ProbeSpec:
 	torch_stop: bool = (
 		False  # probes.torch_new: stop, saying so, when the code's torch is newer than the image's
 	)
+	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
 	install_sdists: tuple[
 		str, ...
 	] = ()  # a check-in by command's source-only dependencies (sources.COMMANDS)
@@ -994,6 +995,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"install_pyg": spec.install_pyg,
 				"install_exec": spec.install_exec,
 				"torch_stop": spec.torch_stop,
+				"dataset_cache": spec.dataset_cache,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,
 				"deps": str(box / "deps"),

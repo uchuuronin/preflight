@@ -49,3 +49,23 @@ def test_over_two_mb_of_python_probes_the_entry_point(tmp_path, on):
 	rec = P.run_pipeline(_src(files), P._Ctx(), deps(tmp_path, FakeRunner()))
 	f = next(f for f in rec.findings if f.id == "source.map_skipped")
 	assert "MB of Python" in f.detail and rec.probes
+
+
+def test_a_follow_up_without_a_stored_map_still_says_so_and_a_partial_read_keeps_its_finding(tmp_path, on):
+	from preflight.runner.pipeline import _reading_findings
+	from preflight.runner.sources import Fetched
+
+	partial = {
+		"files": 3,
+		"imported": 2,
+		"bytes": 10,
+		"skipped": 0,
+		"cut": None,
+		"repo_files": 9,
+		"repo_bytes": 99,
+	}
+	f = Fetched(
+		files={"train.py": ""}, entrypoint="train.py", partial=partial, map_skipped="the source is 3 MB"
+	)
+	ids = [x.id for x in _reading_findings(f)]
+	assert ids == ["source.map_skipped", "source.partial.read"]

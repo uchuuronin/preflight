@@ -55,5 +55,18 @@ def test_lm_eval_s_own_entry_point_is_an_eval(on):
 	files = {"lm_eval/__main__.py": "from lm_eval.utils import go\ngo()\n", "lm_eval/__init__.py": "",
 		"lm_eval/utils.py": "import json\ndef go():\n    print(json.dumps({}))\n"}  # fmt: skip
 	assert _lens(files, "lm_eval/__main__.py") == "eval"
-	# a training script that also imports lm_eval keeps its training lens: it has an optimizer
-	assert _lens({"train.py": "import lm_eval\n" + TRAIN}, "train.py") != "eval"
+	# a training script that also imports lm_eval keeps its training lens (review: its optimizer may be unseen)
+	plain = TRAIN.replace("opt = torch.optim.AdamW(model.parameters(), lr=1e-3)\n", "")
+	assert _lens({"train.py": "import lm_eval\n" + plain}, "train.py") != "eval"
+
+
+def test_whole_words_only_and_fine_tuning_wins(on):
+	assert _lens({"finetune_from_pretrained.py": TRAIN}, "finetune_from_pretrained.py") == "finetune"
+	assert (
+		_lens({"pretrained_eval.py": TRAIN}, "pretrained_eval.py")
+		== S.map_static({"pretrained_eval.py": TRAIN}, entrypoint="pretrained_eval.py").lens
+	)  # "pretrained" isn't a word the rule reads
+	assert (
+		_lens({"explorations.py": TRAIN}, "explorations.py")
+		== S.map_static({"explorations.py": TRAIN}, entrypoint="explorations.py").lens
+	)

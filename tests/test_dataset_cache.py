@@ -1,0 +1,47 @@
+"""probes.dataset_cache (off; the PM, Nov 3): a torchvision download whose md5 the volume has is a copy."""
+
+import hashlib
+import types
+
+from preflight.recorder import dataset_cache as C
+
+
+def _utils(calls):
+	def download_url(url, root, filename=None, md5=None, max_redirect_hops=3):
+		calls.append(url)
+
+	def check_integrity(path, md5=None):
+		try:
+			return hashlib.md5(open(path, "rb").read()).hexdigest() == md5
+		except OSError:
+			return False
+
+	return types.SimpleNamespace(download_url=download_url, check_integrity=check_integrity)
+
+
+def test_a_cached_file_is_copied_and_anything_else_downloads(tmp_path):
+	body = b"cifar bytes"
+	md5 = hashlib.md5(body).hexdigest()
+	(tmp_path / "cache" / "by-md5").mkdir(parents=True)
+	(tmp_path / "cache" / "by-md5" / md5).write_bytes(body)
+	calls, said = [], []
+	u = _utils(calls)
+	C.patch(u, tmp_path / "cache", log=said.append)
+	u.download_url("https://x/cifar-10-python.tar.gz", str(tmp_path / "data"), md5=md5)
+	assert (tmp_path / "data" / "cifar-10-python.tar.gz").read_bytes() == body and calls == [] and said
+	u.download_url("https://x/other.tar.gz", str(tmp_path / "data"), md5="0" * 32)  # not in the volume
+	u.download_url("https://x/nomd5.tar.gz", str(tmp_path / "data"))  # no md5: never from the cache
+	assert calls == ["https://x/other.tar.gz", "https://x/nomd5.tar.gz"]
+
+
+def test_a_hostile_md5_never_reads_outside_the_cache(tmp_path):
+	assert C.cached(tmp_path, "../../etc/passwd") is None and C.cached(tmp_path, None) is None
+
+
+def test_the_spec_carries_it_only_when_set():
+	from preflight.probes.local import ProbeSpec
+	from preflight.runner.pipeline import cache_key
+
+	a = ProbeSpec(probe_id="p", files={"t.py": ""}, entrypoint="t.py")
+	b = ProbeSpec(probe_id="p", files={"t.py": ""}, entrypoint="t.py", dataset_cache=True)
+	assert a.dataset_cache is False and cache_key(a, "L4", "i") != cache_key(b, "L4", "i")

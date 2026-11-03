@@ -154,6 +154,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
 		**({"install_exec": True} if spec.install_exec else {}),  # a list read from the build installs more
 		**({"torch_stop": True} if spec.torch_stop else {}),  # a stop instead of a run
+		**({"dataset_cache": True} if spec.dataset_cache else {}),  # no download in the measured time
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -342,6 +343,7 @@ def _spec(
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
 		install_exec=deps.install_requirements and _repo_install_on() and _flag("probes.repo_install_exec"),
 		torch_stop=deps.install_requirements and _flag("probes.torch_new"),
+		dataset_cache=_flag("probes.dataset_cache"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
 		image=_image(sm, fetched.files),
@@ -490,11 +492,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if fetched.source.extra_packages != rec.job.source.extra_packages:  # this job added packages
 			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
 			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
-		sm = rec.job.script_map or values_from_args(
-			fetched.files,
-			_command_lens(_map_or_skip(fetched)[0], fetched),
-			fetched.args,
-		)
+		if rec.job.script_map:
+			sm = rec.job.script_map
+		else:
+			mapped, fetched = _map_or_skip(fetched)
+			sm = values_from_args(fetched.files, _command_lens(mapped, fetched), fetched.args)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message=f"continuing from record {origin.parent.share_token}")
 	else:
@@ -895,10 +897,10 @@ def _reading_findings(fetched: Fetched) -> list:
 		out.append(Finding(id="source.map_skipped", severity="info", code="source.partial", source="rule",
 			title="Probed without a map of the whole source",
 			detail=(f"Preflight didn't map the whole source: {fetched.map_skipped}. So the map shows only what "
-				f"{fetched.entrypoint} itself sets, and the probes ran the code as it is with the plain recorder: "
+				f"{fetched.entrypoint} itself sets, and the job's kind, its model and the GPU it needs were read from "
+				"that file alone too, so they may be off. The probes ran the code as it is with the plain recorder: "
 				"what they measured stands, but knobs set in other files aren't on the map."),
 			evidence=[Evidence(metric="source.files", value=float(len(fetched.files)))]))  # fmt: skip
-		return out  # the partial-map finding below would say the same thing again
 	p = fetched.partial
 	if p:
 		why = (
@@ -915,8 +917,8 @@ def _reading_findings(fetched: Fetched) -> list:
 				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
 			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
 				Evidence(metric="source.repo_files", value=float(p["repo_files"]))]))  # fmt: skip
-	try:
-		_, m = mapped_files(fetched.files, fetched.entrypoint)
+	try:  # with the map skipped, its finding above says it: no partial-map finding beside it
+		_, m = (None, None) if fetched.map_skipped else mapped_files(fetched.files, fetched.entrypoint)
 	except ValueError:
 		m = None
 	if m:
