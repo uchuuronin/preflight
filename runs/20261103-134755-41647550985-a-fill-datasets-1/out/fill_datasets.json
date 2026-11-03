@@ -1,0 +1,70 @@
+[
+  {
+    "dataset": "CIFAR10",
+    "url": "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz",
+    "status": "kept",
+    "bytes": 170498071,
+    "seconds": 1957.0,
+    "kB_per_s": 85
+  },
+  {
+    "dataset": "CIFAR100",
+    "url": "https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz",
+    "status": "kept",
+    "bytes": 169001437,
+    "seconds": 1939.5,
+    "kB_per_s": 85
+  },
+  {
+    "dataset": "MNIST",
+    "url": "http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz",
+    "status": "failed: HTTPError: HTTP Error 404: Not Found"
+  },
+  {
+    "dataset": "MNIST",
+    "url": "http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz",
+    "status": "failed: HTTPError: HTTP Error 404: Not Found"
+  },
+  {
+    "dataset": "MNIST",
+    "url": "http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz",
+    "status": "failed: HTTPError: HTTP Error 404: Not Found"
+  },
+  {
+    "dataset": "MNIST",
+    "url": "http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz",
+    "status": "failed: HTTPError: HTTP Error 404: Not Found"
+  },
+  {
+    "dataset": "FashionMNIST",
+    "url": "http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-images-idx3-ubyte.gz",
+    "status": "kept",
+    "bytes": 26421880,
+    "seconds": 3.2,
+    "kB_per_s": 8188
+  },
+  {
+    "dataset": "FashionMNIST",
+    "url": "http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/train-labels-idx1-ubyte.gz",
+    "status": "kept",
+    "bytes": 29515,
+    "seconds": 0.4,
+    "kB_per_s": 65
+  },
+  {
+    "dataset": "FashionMNIST",
+    "url": "http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-images-idx3-ubyte.gz",
+    "status": "kept",
+    "bytes": 4422102,
+    "seconds": 1.4,
+    "kB_per_s": 3045
+  },
+  {
+    "dataset": "FashionMNIST",
+    "url": "http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/t10k-labels-idx1-ubyte.gz",
+    "status": "kept",
+    "bytes": 5148,
+    "seconds": 0.3,
+    "kB_per_s": 17
+  }
+]
