@@ -23,11 +23,15 @@ LGPL = re.compile(r"\b(LGPL|Lesser General Public|Library General Public)", re.I
 SKIP = {"preflight", "preflight-api", "pip", "setuptools", "wheel"}
 # Packages that name no licence, each checked by hand: name -> why it's fine.
 NO_LICENCE_OK: dict[str, str] = {}
-LICENCE_FILE = re.compile(r"(^|/)(LICEN[CS]E|COPYING|NOTICE)[^/]*$", re.I)
+# A licence file: LICENSE, LICENCE or COPYING, any case, bare or with a text suffix or a licence name
+# (LICENSE.txt, LICENSE-MIT); not a module such as license.py, and not a NOTICE (attributions only).
+LICENCE_FILE = re.compile(r"(^|/)(LICEN[CS]E|COPYING)([-.][\w.-]*)?$", re.I)
 
 
 def has_licence_file(dist: metadata.Distribution) -> bool:
-	return any(LICENCE_FILE.search(str(f)) for f in dist.files or [])
+	if dist.metadata.get_all("License-File"):
+		return True
+	return any(LICENCE_FILE.search(str(f)) and not str(f).endswith(".py") for f in dist.files or [])
 
 
 def licences(dist: metadata.Distribution) -> list[str]:

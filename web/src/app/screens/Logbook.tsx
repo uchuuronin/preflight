@@ -11,7 +11,7 @@ import { Plane } from "../Plane";
 import { href } from "../route";
 import { AddonBoundary } from "../../components/AddonBoundary";
 import { WatchRun } from "../../workspace/live/WatchRun";
-import { SAMPLES } from "../../workspace/record/load";
+import { RETIRED_SAMPLES, SAMPLES } from "../../workspace/record/load";
 
 const WORD: Record<NonNullable<LogEntry["worst"]>, { cls: string; key: string }> = {
 	critical: { cls: "fails", key: "logbook.status.needs_fix" },
@@ -28,7 +28,7 @@ export function Logbook({ active }: { active: boolean }) {
 	}, [active]);
 	// The profile counts the visitor's own flights; opened samples are listed but not counted as theirs
 	// (D's walkthrough, Nov 2: ten samples read as "6 failures caught").
-	const own = entries.filter((e) => !SAMPLES.some((s) => s.id === e.ref));
+	const own = entries.filter((e) => !SAMPLES.some((s) => s.id === e.ref) && !(e.ref in RETIRED_SAMPLES));
 	const caught = own.filter((e) => e.worst === "error" || e.worst === "critical").length;
 	const lenses = new Set(own.map((e) => e.lens)).size;
 	return (

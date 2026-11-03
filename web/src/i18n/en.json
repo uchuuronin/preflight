@@ -1112,7 +1112,7 @@
 	"guide.campaign.finish": "The last run most likely ends {p50} UTC; in 80% of the simulated campaigns it ends between {p10} and {p90}. That's the band under the lanes.",
 	"guide.campaign.finish.why": "A finish date isn't one number: the planner runs the campaign thousands of times, each run's time drawn from its range and interruptions at the cluster's rate, and reports when the last run ends.",
 	"guide.campaign.finish_abstain": "The planner doesn't give a finish date for this grid: {finish_why}.",
-	"sample.campaign_grid": "Research grid: LoRA batch size and learning rate, four cells measured on an A10",
+	"sample.campaign_grid": "Research grid: LoRA batch size and learning rate on an A10, from four measured cells (each run's first eval runs out of memory as set)",
 	"rl.title": "Reward signal and completion length",
 	"rl.spread.title": "Prompts that teach nothing",
 	"rl.spread.measured": "{k} of {n} prompts had zero reward spread ({share}; 95% interval {lo} to {hi}).",
@@ -1229,5 +1229,6 @@
 	"sample.pretrain_a10": "Pretrain a GPT-2 (124M) on TinyStories, measured on an A10 (2 Nov)",
 	"sample.retrieval_a10": "Sentence encoder on Natural Questions pairs, measured on an A10 (2 Nov)",
 	"sample.gnn_a10": "GraphSAGE on a 200,000-node graph, measured on an A10 (2 Nov)",
-	"sample.vision_a10": "ResNet-50 fine-tune on leaf photos, measured on an A10 (2 Nov)"
+	"sample.vision_a10": "ResNet-50 fine-tune on leaf photos, measured on an A10 (2 Nov)",
+	"fix.none.sample_script": "Muse Code fixes this sample's script only on a check-in of your own: check in the script and the fix appears here."
 }

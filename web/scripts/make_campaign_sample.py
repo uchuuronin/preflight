@@ -60,6 +60,11 @@ def main(cells_path: str, base_path: str, out_path: str) -> None:
 			assert p["id"] not in ids, p["id"]
 			ids.add(p["id"])
 			raw["probes"].append(p)
+	# The record's own setting moves to the A10, where the cells ran, so the campaign's totals and its runs
+	# are priced on the same card (review, Nov 3: totals on the L4, runs on the A10).
+	for k in raw["knobs"]:
+		if k["id"] == "gpu_type":
+			k["current"] = "A10"
 	rec = fill_predictions(FlightRecord.model_validate(raw), flags=flags())
 	plan = planner.plan(rec, GRID, CLUSTER, start=START)
 	out = rec.model_dump(mode="json", exclude_none=True)
@@ -67,7 +72,7 @@ def main(cells_path: str, base_path: str, out_path: str) -> None:
 	card = plan.card.model_dump(mode="json", exclude_none=True)
 	out["models"] = [m for m in out.get("models", []) if m.get("id") != card["id"]] + [card]
 	out["record_id"] = "01M6ENNQ0CAMPA10GR1D000000"
-	out["job"]["title"] = "LoRA research grid: batch size and learning rate, measured on an A10"
+	out["job"]["title"] = "LoRA research grid on an A10: batch size and learning rate"
 	out.pop("share_token", None)  # share tokens never go in the repo (the model's default makes one)
 	with open(out_path, "w") as f:
 		json.dump(out, f, indent="\t", ensure_ascii=False)

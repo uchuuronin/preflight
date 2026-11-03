@@ -263,8 +263,8 @@ def look(which: str = "packages") -> None:
 @app.local_entrypoint()
 def handoff(which: str = "packages") -> None:
 	"""D's shot 6b (PM, Nov 3): the einops resend's record, a finished one whose diagnosis shows with its
-	labels. Its share link goes into the Modal Dict `preflight-handoff` (key `d.shot6b`, environment main)
-	for D to read; nothing about it is printed, so the run's log holds no token."""
+	labels. Its share link goes into the Modal Dict `preflight-handoff` (environment main)
+	for D to read (key `d.shot6b.<which>`); nothing about it is printed, so the run's log holds no token."""
 	sys.path.insert(0, str(ROOT / "api"))
 	if which not in REQUESTS:
 		raise SystemExit(f"which: {', '.join(REQUESTS)}")
@@ -272,7 +272,13 @@ def handoff(which: str = "packages") -> None:
 	found = _own_record(vol, which)
 	if not found:
 		raise SystemExit(f"{which}: no record of this script's among the newest {NEWEST}")
-	token, _rec = found
+	token, rec = found
+	# Only a record whose probes finished and whose diagnosis is on it: the shot shows its labels.
+	ran = all((p.get("status") in ("ok", "cached")) for p in rec.get("probes") or [])
+	diagnosed = any(f.get("source") == "spark_diagnosis" for f in rec.get("findings") or [])
+	if not (ran and diagnosed):
+		raise SystemExit(f"{which}: the newest record isn't a finished, diagnosed one; nothing stored")
+	key = f"d.shot6b.{which}"
 	box = modal.Dict.from_name("preflight-handoff", environment_name="main", create_if_missing=True)
-	box["d.shot6b"] = f"{SITE}/s/{token}"
-	print(json.dumps({"which": which, "stored": "preflight-handoff[d.shot6b]"}))
+	box[key] = f"{SITE}/s/{token}"
+	print(json.dumps({"which": which, "stored": f"preflight-handoff[{key}]"}))

@@ -173,7 +173,7 @@ try {
 
 	// ---------- a phone: nothing scrolls sideways
 	const phone = await browser.newPage({ viewport: PHONE, isMobile: true, hasTouch: true });
-	for (const path of ["/", "/#/new", "/#/cockpit/lora-7b"]) {
+	for (const path of ["/", "/#/new", "/#/cockpit/lora-qwen"]) {
 		await phone.goto(`${BASE}${path}`, { waitUntil: "load" });
 		await phone.waitForTimeout(800);
 		const over = await phone.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

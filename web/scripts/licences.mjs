@@ -10,6 +10,8 @@ import { join } from "node:path";
 const BAD = /(^|[^L])\b(A?GPL|SSPL)/i;
 // Packages that name no licence, each checked by hand: name -> why it's fine.
 const NO_LICENCE_OK = {};
+// A licence file: LICENSE, LICENCE or COPYING, any case, with or without a suffix (LICENSE-MIT, LICENSE.txt).
+const LICENCE_FILE = /^(licen[cs]e|copying)([.-][\w.-]*)?$/i;
 const unnamed = [];
 const found = [];
 const seen = new Set();
@@ -38,7 +40,7 @@ function walk(dir) {
 			if (!seen.has(key)) {
 				seen.add(key);
 				const l = licenceOf(pkg);
-				if (!l.trim() && !(pkg.name in NO_LICENCE_OK) && !existsSync(join(path, "LICENSE")) && !existsSync(join(path, "LICENSE.md")) && !existsSync(join(path, "LICENCE"))) unnamed.push(key);
+				if (!l.trim() && !(pkg.name in NO_LICENCE_OK) && !readdirSync(path).some((f) => LICENCE_FILE.test(f))) unnamed.push(key);
 				const options = l.replace(/[()]/g, "").split(/\s+OR\s+/i);
 				if (options.length && options.every((o) => BAD.test(o) && !/LGPL/i.test(o))) found.push(`${key}: ${l}`);
 			}

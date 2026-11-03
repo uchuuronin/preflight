@@ -122,9 +122,21 @@ export const SAMPLES: Sample[] = [
 
 export const DEFAULT_SAMPLE = "lora-qwen";
 
+/**
+ * Samples that left the list (PM, Nov 3: every sample measured), and the measured one an old link,
+ * logbook entry or bookmark opens instead.
+ */
+export const RETIRED_SAMPLES: Readonly<Record<string, string>> = { "lora-7b": "lora-qwen", agent: "agent-eval" };
+
+/** The ref to open: a retired sample's id becomes its replacement's, so every API call uses the one shown. */
+export function currentRef(ref: string): string {
+	return RETIRED_SAMPLES[ref] ?? ref;
+}
+
 export async function loadRecord(ref: string): Promise<LoadedRecord> {
+	const id = currentRef(ref);
 	// A sample listed only behind a flag opens only with it on.
-	const sample = SAMPLES.find((s) => s.id === ref && (!s.flag || flag(s.flag)));
+	const sample = SAMPLES.find((s) => s.id === id && (!s.flag || flag(s.flag)));
 	if (sample) return normaliseRecord(await sample.load());
 	// A live record from `preflight watch`, opened from a file on this machine (live/liveFile.ts)
 	if (ref === LIVE_REF && flag("c.inflight")) {

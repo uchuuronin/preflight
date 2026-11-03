@@ -143,7 +143,8 @@ class LocalRecordStore:
 #: without running anything. Ids match web/src/workspace/record/load.ts SAMPLES.
 SAMPLES: dict[str, str] = {
 	# Every sample the web lists is a measured run (PM, Nov 3). The hand-made LoRA 7B and agent records
-	# left the web's list but stay here, so old links, logbook entries and the fix loop's tests still open.
+	# left the web's list (the web opens PF102 and PF331 for their old ids) but stay here for API callers
+	# and the fix loop's tests.
 	"lora-7b": "web/src/workspace/fixtures/dev-finetune.record.json",
 	"agent": "schema/examples/agent.json",
 	# The live record of zoo/finetune_lora_hf on an L4, its share token removed (PF102, Nov 1).

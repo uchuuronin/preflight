@@ -3,6 +3,7 @@
  * capsule, and five stacked screens that rise and un-blur into place (D's design). Only the
  * active screen is interactive; the others are hidden from assistive tech.
  */
+import { currentRef, DEFAULT_SAMPLE } from "../workspace/record/load";
 import { flushSync } from "react-dom";
 import { useEffect, useState } from "react";
 import { t } from "../lib/i18n";
@@ -96,7 +97,7 @@ export function Shell() {
 				<span className="pf-nav__sep" aria-hidden="true" />
 				{TABS.map((tab) => {
 					const on = route.screen === tab.screen || (tab.screen === "new" && route.screen === "boarding");
-					const target = tab.screen === "cockpit" ? href("cockpit", cockpitRef ?? "lora-7b") : href(tab.screen);
+					const target = tab.screen === "cockpit" ? href("cockpit", cockpitRef ?? DEFAULT_SAMPLE) : href(tab.screen);
 					return (
 						<a key={tab.screen} className="pf-nav__tab" href={target} aria-current={on ? "page" : undefined}>
 							{t(tab.key)}
@@ -133,7 +134,7 @@ export function Shell() {
 				<Boarding jobId={route.screen === "boarding" ? route.param : null} />
 			</main>
 			<main className="pf-screen" data-pos={pos("cockpit")} aria-hidden={pos("cockpit") !== "active"} inert={pos("cockpit") !== "active"}>
-				{cockpitRef || route.screen === "cockpit" ? <CockpitScreen recordRef={cockpitRef ?? route.param ?? "lora-7b"} /> : null}
+				{cockpitRef || route.screen === "cockpit" ? <CockpitScreen recordRef={currentRef(cockpitRef ?? route.param ?? DEFAULT_SAMPLE)} /> : null}
 			</main>
 			<main className="pf-screen" data-pos={pos("logbook")} aria-hidden={pos("logbook") !== "active"} inert={pos("logbook") !== "active"}>
 				<Logbook active={route.screen === "logbook"} />

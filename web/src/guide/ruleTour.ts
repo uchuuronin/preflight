@@ -360,7 +360,10 @@ export function nextStep(ctx: TourContext): TourStep {
 	// A GPU change only when nothing on this GPU clears it (PM, Nov 3): a combination of moves on this
 	// GPU (the LoRA sample's eval without gradients, eval batch 8 and a 512-token sequence, B's pair grids)
 	// comes first, a tight one included, measured against the best single move on this GPU.
-	if (failing && top && isGpuMove(top)) {
+	// Once: a declined combination leads on to the GPU change, rather than to the next combination
+	// from the same pair grids (review, Nov 3).
+	const triedCombo = [...ctx.visited].some((v) => v.startsWith("combo:"));
+	if (failing && top && isGpuMove(top) && !triedCombo) {
 		const o = opts(ctx, ctx.pinned);
 		const noGpu = new Set([...(o.pinned ?? []), ...GPU_KNOBS]);
 		const onGpu = { ...o, pinned: noGpu };
