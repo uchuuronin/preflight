@@ -571,7 +571,9 @@ _NO_COMPILER = {"CC": "false", "CXX": "false", "LDSHARED": "false", "MAX_JOBS": 
 # so flash-attn's and apex's setup.py (CUDA_HOME is not None, then CUDA_HOME/bin/nvcc -V) failed where an unset
 # variable skips their CUDA parts (A's review, Nov 3). nvcc isn't shimmed for the same reason: torch finds CUDA_HOME
 # from `which nvcc`, and a shim would make it a folder with no bin/nvcc; a CUDA compile still needs the host
-# compiler, which fails
+# compiler, which fails. Known (review, Nov 3): pip's isolated build env doesn't see the image's torch, so a setup.py
+# that imports torch at its top (flash-attn's, apex's) fails at that import either way, as it did before these
+# changes; this matters only to a build that can see torch. A retry with --no-build-isolation is left past the freeze
 _NO_CUDA = ("CUDA_HOME", "CUDA_PATH")
 # and on PATH, ahead of the real ones, tools that fail: a setup.py or Makefile that calls gcc, make or cmake by name
 # gets an error, not a build (B's review, Nov 3); one that calls a compiler by its full path still can
