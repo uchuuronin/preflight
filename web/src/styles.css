@@ -2487,6 +2487,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-doc__toc-list li.is-sub { padding-left: 14px; }
 .pf-doc__toc-list a { display: block; padding: 4px 0; color: var(--pf-fg-dim); text-decoration: none; line-height: 1.35; }
 .pf-doc__toc-list a:hover, .pf-doc__toc-list a:focus-visible { color: var(--pf-fg); text-decoration: underline; }
+/* The list scrolls, which clips a ring drawn outside the link: draw it inside (a11y pass, Nov 3). */
+.pf-doc__toc-list a:focus-visible { outline-offset: -2px; }
 .pf-doc__menu { display: none; }
 .pf-doc__body { max-width: 74ch; color: var(--pf-fg); font-size: 15px; line-height: 1.6; }
 .pf-doc__body h1 { font-family: var(--pf-font-serif); font-weight: 400; font-size: clamp(32px, 5vw, 44px); line-height: 1.1; margin: 0 0 20px; }
@@ -2512,4 +2514,6 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	.pf-doc__menu summary { cursor: pointer; font-weight: 600; }
 	.pf-doc__menu nav { margin-top: 8px; max-height: 60dvh; overflow: auto; }
 	.pf-doc__body { font-size: 15px; }
+	/* Below the sticky Contents bar (it ends at 112 px). */
+	.pf-doc__body h2, .pf-doc__body h3, .pf-doc__body h4 { scroll-margin-top: 124px; }
 }

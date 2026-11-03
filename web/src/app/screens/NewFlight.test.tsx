@@ -304,6 +304,7 @@ describe("the repo link's entry point and arguments (PM, Nov 3)", () => {
 		const a = screen.getByLabelText(new RegExp(`^${en["newflight.args.label"]}`));
 		fireEvent.change(e, { target: { value: entry } });
 		fireEvent.change(a, { target: { value: args } });
+		fireEvent.blur(e);
 		fireEvent.blur(a);
 		const go = screen.getByRole("button", { name: "Check in" }) as HTMLButtonElement;
 		if (go.disabled) return null;

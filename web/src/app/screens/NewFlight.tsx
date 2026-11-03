@@ -160,14 +160,21 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 	const repoBad = intake === "repo" && repoSettled && repo.trim() !== "" && !repoOk;
 	const repoEntryCheck = entryPath(repoEntry);
 	const repoArgWords = argWords(repoArgs);
+	// Each field settles on its own: typing in one doesn't hide (and re-announce) the other's message (a11y pass, Nov 3).
 	const [entrySettled, setEntrySettled] = useState(false);
+	const [argsSettled, setArgsSettled] = useState(false);
 	useEffect(() => {
 		setEntrySettled(false);
 		const id = setTimeout(() => setEntrySettled(true), REPO_PAUSE_MS);
 		return () => clearTimeout(id);
-	}, [repoEntry, repoArgs]);
+	}, [repoEntry]);
+	useEffect(() => {
+		setArgsSettled(false);
+		const id = setTimeout(() => setArgsSettled(true), REPO_PAUSE_MS);
+		return () => clearTimeout(id);
+	}, [repoArgs]);
 	const entryBad = intake === "repo" && entrySettled && !repoEntryCheck.ok;
-	const argsBad = intake === "repo" && entrySettled && !repoArgWords.ok;
+	const argsBad = intake === "repo" && argsSettled && !repoArgWords.ok;
 	const cmd = commandWords(command);
 	const [commandSettled, setCommandSettled] = useState(false);
 	useEffect(() => {
@@ -356,7 +363,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 											aria-invalid={argsBad || undefined}
 											aria-describedby={argsBad ? `${ids.repoArgsError} ${ids.repoArgsHint}` : ids.repoArgsHint}
 											onChange={(e) => setRepoArgs(e.currentTarget.value)}
-											onBlur={() => setEntrySettled(true)}
+											onBlur={() => setArgsSettled(true)}
 										/>
 									</div>
 									<div role="status" aria-live="polite">
@@ -492,7 +499,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						</div>
 						<div className="pf-field">
 							<label htmlFor={ids.packages}>
-								{t("newflight.packages.label")} <span className="pf-choice__default">{t("newflight.optional")}</span>
+								{t("newflight.packages.label")} <span className="pf-dim">{t("newflight.optional")}</span>
 							</label>
 							<input
 								id={ids.packages}

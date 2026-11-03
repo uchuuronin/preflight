@@ -50,7 +50,8 @@ function jump(e: React.MouseEvent, id: string): void {
 	e.preventDefault();
 	const el = document.getElementById(id);
 	if (!el) return;
+	// Close the phone's menu first: closing it mid-scroll moved the page under the jump (a11y pass, Nov 3).
+	(e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
 	const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 	el.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
-	(e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
 }
