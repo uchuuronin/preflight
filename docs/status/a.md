@@ -1,8 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Mon Nov 2, 7:55 PM ET.
+Updated Tue Nov 3, 8:20 AM ET.
 
-**Production runner: deployed from main a132c0a** (`a-deploy-main-26`, GitHub 41554416912, Nov 3 00:40 UTC / Nov 2 7:40 PM ET), after both startup checks passed (`a-startup-check-26` 41553993474, `a-startup-check-serving-12` 41554253275); the limit check passed after it (`a-limit-check-7`, 41554506106). New in production with it: `harness.spark_diagnosis` and `harness.spark_claim_check` on (the PM's merge 2), check-in help's fields (contract 0.6.3/0.6.4), and the new probe image (torchvision 0.20.1, uv 0.5.11), so every probe is measured afresh. The previous deploy was 8ec03bc (22:38 UTC); rollback is `modal deploy --env main` from 8ec03bc.
+**Production runner: deployed from main ad12da7** (`a-deploy-main-27`, GitHub 41641834293, Nov 3 13:10 UTC / 8:10 AM ET), after both startup checks passed (`a-startup-check-27` 41641282975, `a-startup-check-serving-13` 41641618181); the limit check passed after it (`a-limit-check-8`, 41641950530: 3 jobs taken, the 4th refused `limit.visitor_daily`). New in production with it: `probes.repo_install`, `probes.extra_hosts`, `probes.eval_units`, `runner.command_checkin`, `probes.agent_proxy_replies` and `runner.free_resend` on (the PM's morning merge). The probe image is unchanged from a132c0a. The previous deploy was a132c0a (Nov 3 00:40 UTC); **rollback is `modal deploy --env main` from a132c0a**.
 
 ## Unseen validation runs (Nov 2): all nine posted
 
@@ -57,6 +57,13 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 6, vLLM bench | by command | not tried: the serving image's vLLM 0.6.4 has no `bench` subcommand, so vllm is off the command list | n/a |
 | 2, LitGPT | install check on CPU, pip against uv (`probes.uv_install`) | **neither installs**: pip ran out at 420 s; uv's resolve overflowed its stack, then pip ran out (code fix since, not yet rerun when written: a 64 MiB stack, and "no solution" ends the install with uv's reason). The cause isn't the resolver: LitGPT at that commit asks for torch>=2.7 and lightning>=2.6.1, and the image has torch 2.5.1 | `a-trial-litgpt-install-pip` 41545743492, `-uv` 41545748477 |
 | 8, OGB arxiv | install check, uv and PyG's index (`probes.extra_hosts`) | **installs in 12.9 s**, every import the scan sees present; torch_sparse, which PyG imports at run time, wasn't among them (fixed: torch_geometric now brings torch-scatter and torch-sparse from PyG's index) | `a-trial-ogb-install-pyg` 41545754612 |
+
+## Decisions Nov 3 (the PM's 8:04 AM list; decide and log)
+
+| When (ET) | Decision | Why | Cost | How to undo |
+| --- | --- | --- | --- | --- |
+| 8:10 | Redeployed the runner from main ad12da7 (`a-deploy-main-27`), gated: both startup checks, then the limit check | the PM's item 1: the morning merge's flags on | cents (CPU) [estimate] | `modal deploy --env main` from a132c0a |
+| 8:25 | `runner.read_closure`: the walk stops on a count of import lookups (200,000, a guess), beside the 600 files and 2 MB it had; the 30 s clock is gone. A cut is reported as `cut: "lookups"`, and the files it leaves out are counted in `skipped` | the PM's item 2: the clock could read different files on a slow day, so the same code could get a different content hash | none | revert ae305a80 |
 
 ## Decisions today (Chiya out until about 5 PM ET; her autonomy, Nov 2 11:16 AM ET)
 
