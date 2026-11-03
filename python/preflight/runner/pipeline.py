@@ -914,6 +914,18 @@ def _n_files(n: int, word: str) -> str:
 
 
 def _map_or_skip(fetched: Fetched) -> tuple[ScriptMap, Fetched]:
+	"""_map_or_skip_inner; a refusal carries the entry point, so its way past names the script the job runs (the
+	re-validation, Nov 3: "preflight run train.py" for recipes/lora_finetune_single_device.py)."""
+	try:
+		return _map_or_skip_inner(fetched)
+	except Exception as exc:
+		if getattr(exc, "entrypoint", None) is None:
+			with contextlib.suppress(AttributeError):
+				exc.entrypoint = fetched.entrypoint
+		raise
+
+
+def _map_or_skip_inner(fetched: Fetched) -> tuple[ScriptMap, Fetched]:
 	"""The static map. With runner.probe_without_map (off; the PM, Nov 3), when the whole source doesn't map
 	(over 2 MB of Python, a file the reader can't parse, the reader's own failure), the entry point alone is
 	mapped and the job probes on as usual, the plain recorder on every file, saying the map was skipped and
