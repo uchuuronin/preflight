@@ -197,3 +197,4 @@ def test_the_repo_s_own_metadata_is_an_editable_no_deps_install(tmp_path, monkey
 	assert R.own_metadata(tmp_path, tmp_path / "deps", log=lambda m: None)
 	cmd = seen[0]
 	assert "--no-deps" in cmd and cmd[cmd.index("-e") + 1] == str(tmp_path) and "--prefix" in cmd
+	assert "--ignore-installed" in cmd  # never uninstalls the image's own copy

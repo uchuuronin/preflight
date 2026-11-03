@@ -18,15 +18,18 @@ CACHE_DIR = "/datasets"  # the volume's mount in the probe sandbox (runner/modal
 DATASETS = ("CIFAR10", "CIFAR100", "MNIST", "FashionMNIST")
 
 
-def resources() -> list[tuple[str, str, str]]:
-	"""(dataset, url, md5) for every archive the cache holds: CIFAR-10/100, MNIST, FashionMNIST, as the
-	image's torchvision names them (its first mirror for MNIST)."""
+def resources() -> list[tuple[str, list[str], str]]:
+	"""(dataset, urls to try in order, md5) for every archive the cache holds: CIFAR-10/100, MNIST,
+	FashionMNIST, as the image's torchvision names them, every mirror it lists (MNIST's first, yann.lecun.com,
+	answered 404 on Nov 3)."""
 	from torchvision import datasets as D
 
-	out = [("CIFAR10", D.CIFAR10.url, D.CIFAR10.tgz_md5), ("CIFAR100", D.CIFAR100.url, D.CIFAR100.tgz_md5)]
+	out = [
+		("CIFAR10", [D.CIFAR10.url], D.CIFAR10.tgz_md5),
+		("CIFAR100", [D.CIFAR100.url], D.CIFAR100.tgz_md5),
+	]
 	for cls in (D.MNIST, D.FashionMNIST):
-		mirror = cls.mirrors[0]
-		out += [(cls.__name__, f"{mirror}{name}", md5) for name, md5 in cls.resources]
+		out += [(cls.__name__, [f"{m}{name}" for m in cls.mirrors], md5) for name, md5 in cls.resources]
 	return out
 
 

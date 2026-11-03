@@ -537,8 +537,12 @@ def own_metadata(workdir: Path, target: Path, *, log=print, timeout_s: float = B
 	calls importlib.metadata.version("lm_eval"): a-all4-5s, Nov 3). Editable, so nothing of the repo is copied:
 	its working copy stays what the probe imports. Runs the repo's build, so only in the probe's sandbox;
 	a failure is said and the probe runs on."""
-	cmd = [sys.executable, "-I", "-m", "pip", "install", "--no-deps", "--no-input", "--disable-pip-version-check",
-		"--no-warn-script-location", "--quiet", "--prefix", str(target), "-e", str(workdir)]  # fmt: skip
+	# --ignore-installed: never uninstall the image's own copy of the same project (a trl or peft checkout; review)
+	cmd = [sys.executable, "-I", "-m", "pip", "install", "--no-deps", "--ignore-installed", "--no-input",
+		"--disable-pip-version-check", "--no-warn-script-location", "--quiet", "--prefix", str(target), "-e", str(workdir)]  # fmt: skip
+	cache = os.environ.get("PREFLIGHT_PIP_CACHE")
+	if cache and os.access(cache, os.W_OK):
+		cmd[4:4] = ["--cache-dir", cache]
 	env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
 	try:
 		target.mkdir(parents=True, exist_ok=True)
@@ -795,6 +799,10 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	for n in notes:
 		log(f"[preflight] requirements: {n}")
 	if not keep:
+		project = (workdir / "pyproject.toml").is_file() or (workdir / "setup.py").is_file()
+		# every dependency is the image's already: the repo's own metadata still (review)
+		if build and repo and project and own_metadata(workdir, target, log=log, timeout_s=BUILD_TIMEOUT_S):
+			return None, [*site_dirs(target), *roots]
 		return None, roots
 	pins = "".join(f"{n}=={v.split('+', 1)[0]}\n" for n, v in sorted(have.items()))
 	shared = os.environ.get("PREFLIGHT_DEPS_DIR")

@@ -46,14 +46,44 @@ ops = modal.App(APP_NAME + "-ops")
 FILL_DEADLINE_S = 3300.0  # the container's downloads, inside the function's hour (from its start)
 
 
+def _fetch_archive(url: str, dst: Path, md5: str, started: float) -> dict:
+	"""One archive from one URL into dst, kept only when its md5 matches; what happened."""
+	import hashlib as hl
+	import time
+	import urllib.request
+
+	t0, h, n = time.monotonic(), hl.md5(), 0
+	tmp = dst.with_suffix(".part")
+	try:
+		req = urllib.request.Request(url, headers={"User-Agent": "preflight-dataset-cache"})
+		with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
+			while chunk := r.read(1 << 20):
+				f.write(chunk)
+				h.update(chunk)
+				n += len(chunk)
+				if (
+					time.monotonic() - started > FILL_DEADLINE_S
+				):  # a slow host: say how slow, before the container ends
+					raise TimeoutError(
+						f"{n / 1024 / (time.monotonic() - t0):.0f} kB/s, {n:,} bytes when the container's {FILL_DEADLINE_S:.0f} s ran out"
+					)
+	except Exception as exc:  # one host down doesn't stop the rest
+		tmp.unlink(missing_ok=True)
+		return {"status": f"failed: {type(exc).__name__}: {exc}"[:300]}
+	s = time.monotonic() - t0
+	if h.hexdigest() != md5:
+		tmp.unlink(missing_ok=True)
+		return {"status": "md5 mismatch: not kept", "bytes": n}
+	tmp.rename(dst)
+	return {"status": "kept", "bytes": n, "seconds": round(s, 1), "kB_per_s": round(n / 1024 / max(s, 1e-3))}
+
+
 @ops.function(image=probe_image, volumes={DATASETS_DIR: datasets_vol}, timeout=3600)  # CPU
 def fill_dataset_cache(only: str = "") -> list[dict]:
 	"""probes.dataset_cache: download torchvision's CIFAR-10/100, MNIST and FashionMNIST archives into the
 	datasets volume by md5 (recorder/dataset_cache.py), each checked against torchvision's own md5 before it's
 	kept; one already there is skipped. only: comma-separated dataset names."""
-	import hashlib as hl
 	import time
-	import urllib.request
 
 	from preflight.recorder.dataset_cache import resources
 
@@ -62,43 +92,22 @@ def fill_dataset_cache(only: str = "") -> list[dict]:
 	root = Path(DATASETS_DIR) / "by-md5"
 	root.mkdir(parents=True, exist_ok=True)
 	out = []
-	for name, url, md5 in resources():
+	for name, urls, md5 in resources():
 		if want and name not in want:
 			continue
 		dst = root / md5
 		if dst.is_file():
-			out.append({"dataset": name, "url": url, "status": "already there", "bytes": dst.stat().st_size})
+			out.append(
+				{"dataset": name, "url": urls[0], "status": "already there", "bytes": dst.stat().st_size}
+			)
 			continue
-		t0, h, n = time.monotonic(), hl.md5(), 0
-		tmp = dst.with_suffix(".part")
-		try:
-			req = urllib.request.Request(url, headers={"User-Agent": "preflight-dataset-cache"})
-			with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
-				while chunk := r.read(1 << 20):
-					f.write(chunk)
-					h.update(chunk)
-					n += len(chunk)
-					if (
-						time.monotonic() - started > FILL_DEADLINE_S
-					):  # a slow host: say how slow, before the container ends
-						raise TimeoutError(
-							f"{n / 1024 / (time.monotonic() - t0):.0f} kB/s, {n:,} bytes before the container's {FILL_DEADLINE_S:.0f} s ran out"
-						)
-		except Exception as exc:  # one host down doesn't stop the rest
-			tmp.unlink(missing_ok=True)
-			out.append({"dataset": name, "url": url, "status": f"failed: {type(exc).__name__}: {exc}"[:300]})
-			print(f"[datasets] {name} {url}: {out[-1]['status']}", flush=True)
-			continue
-		s = time.monotonic() - t0
-		if h.hexdigest() != md5:
-			tmp.unlink(missing_ok=True)
-			out.append({"dataset": name, "url": url, "status": "md5 mismatch: not kept", "bytes": n})
-		else:
-			tmp.rename(dst)
-			out.append({"dataset": name, "url": url, "status": "kept", "bytes": n, "seconds": round(s, 1),
-				"kB_per_s": round(n / 1024 / max(s, 1e-3))})  # fmt: skip
-		print(f"[datasets] {name} {url}: {out[-1]}", flush=True)
-		datasets_vol.commit()
+		for url in urls:  # each mirror torchvision lists, in its order, until one gives the right file
+			row = _fetch_archive(url, dst, md5, started)
+			out.append({"dataset": name, "url": url, **row})
+			print(f"[datasets] {name} {url}: {row}", flush=True)
+			if row["status"] == "kept":
+				datasets_vol.commit()
+				break
 	return out
 
 
@@ -126,7 +135,12 @@ def fill_datasets(only: str = ""):
 	Path("out").mkdir(exist_ok=True)
 	Path("out/fill_datasets.json").write_text(json.dumps(res, indent=2))
 	print(json.dumps(res, indent=2), flush=True)
-	if not all(r["status"] in ("kept", "already there") for r in res):
+	# a file is in when one of its mirrors gave it (a row per mirror tried, the file named by its URL's last part)
+	files = {(r["dataset"], r["url"].rsplit("/", 1)[-1]) for r in res}
+	got = {
+		(r["dataset"], r["url"].rsplit("/", 1)[-1]) for r in res if r["status"] in ("kept", "already there")
+	}
+	if not res or files - got:
 		sys.exit(1)
 
 
