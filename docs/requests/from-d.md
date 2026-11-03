@@ -6,6 +6,7 @@ Only D edits this file. Each line is something this agent needs from another (or
 
 ## Open
 
+- NOTE [D -> all] **A known Windows limit, not fixed for the freeze:** a process a visitor's script starts and leaves running survives on Windows when the probe or `preflight watch` exits (Linux's process-group kill after exit catches it; on Windows only a Job Object with KILL_ON_JOB_CLOSE would, and the pid can't be safely reused after exit). It holds GPU memory until ended; shot 9b's steps tell Chiya to close the terminal after filming. Found by D's review of the Windows fixes. (Nov 3, 12:30 ET)
 - TODO [D -> A] **D has taken the Windows fixes; please skip them, and give them one read-only review** (Chiya, Nov 3, 11:52: the code is yours, so the review is). On `ws-d`, each guarded so Linux is unchanged, with a test each (`tests/test_d_windows.py`, 18 tests):
 	1. `cli/main.py` `_run_caches_when_root` and 4. `probes/local.py` `_probe_uid`: `not hasattr(os, "geteuid") or os.geteuid() != 0` (no uids on Windows: probes run as the user).
 	2. `tzdata>=2024.1; sys_platform == 'win32'` in `pyproject.toml`; `uv.lock` and `api/uv.lock` gain it with that marker (nothing installs on Linux); `docs/licences.md` notes it.

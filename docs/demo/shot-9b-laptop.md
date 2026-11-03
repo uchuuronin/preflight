@@ -282,15 +282,20 @@ rereads the file every 3 seconds.
 When you have the shot, press **Ctrl+C** in PowerShell (the record says the run was interrupted),
 or let it finish. The last line is `[preflight] <n> steps, <k> alerts; record records\<new>.json`.
 
+**After filming, close the PowerShell window** (or end any `python.exe` left in Task Manager's
+Details tab): on Windows, a process the script started and left running isn't ended when the
+probe or the run exits, and it keeps the GPU's memory until it is.
+
 **If it fails:**
 - The browser says "That isn't a live record from preflight watch": you chose `<share>.json` or the
   `.live.jsonl`; choose `<new>.json`.
 - It says "Read <new>.json once": the browser can't follow files (not Chrome or Edge); use Chrome
   or Edge, or choose the file again to refresh.
 - The run stops with `PermissionError: [WinError 5]` while the browser follows it: Windows
-  wouldn't let Preflight replace the file while the browser or antivirus was reading it (D read
-  this risk in the code; asked A to retry the write). Move `<new>.json` and `<new>.live.jsonl` out
-  of `records` and redo step 13; choosing the file a few seconds later often avoids it.
+  wouldn't let Preflight replace the file while the browser or antivirus was reading it. Since
+  D's fix (Nov 3) Preflight retries for about a second and skips a running write that still can't
+  land, so this should only happen on the last write; if it does, move `<new>.json` and
+  `<new>.live.jsonl` out of `records` and redo step 13.
 - No alert in the terminal: check step 11's lines took, and that step 10 had a range.
 - The Logbook shows no "Watch a real run": tell C (`c.inflight` is on in production since Nov 2).
 
