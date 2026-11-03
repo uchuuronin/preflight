@@ -1,0 +1,11 @@
+{
+	"name": "20261103-142121-41652843880-a-all4-8-r",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41652843880",
+	"ref": "ad284a4b7b689acc895ba2ed9bcf3fd974e7185c",
+	"sha": "ad284a4b7b689acc895ba2ed9bcf3fd974e7185c",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/snap-stanford/ogb --commit 61e9784ca76edeaa6e259ba0f836099608ff0586 --entrypoint examples/nodeproppred/arxiv/gnn.py --args=--use_sage,--runs,1,--epochs,500 --bare-steps 100000 --budget-min 20 --first-gpu A10 --install-requirements --install-repo --pyg --build --torch-new --dataset-cache --flags runner.read_closure,harness.lens_by_entry,runner.probe_without_map,probes.repo_install,probes.extra_hosts,probes.eval_units ",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T14:24:05Z"
+}
