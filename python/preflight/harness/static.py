@@ -846,6 +846,33 @@ def _lens(f: Facts, framework: str, hf_id: str | None) -> str:
 	return "finetune" if hf_id else "pretrain"
 
 
+# harness.lens_by_entry (off; the PM, Nov 3): the unseen runs' three misreads the import rules leave. LitGPT's
+# litgpt/pretrain.py loads a tokenizer from the Hub, so it read as fine-tuning; torchtune's
+# recipes/lora_finetune_single_device.py loads its model through its own config, so it read as pretraining;
+# lm-evaluation-harness's lm_eval/__main__.py has no training loop and read as pretraining
+ENTRY_PRETRAIN = ("pretrain",)
+ENTRY_FINETUNE = ("finetune", "fine_tune", "lora", "qlora", "sft")
+
+
+def _lens_by_entry(lens: str, reach: Facts, f: Facts, entrypoint: str) -> str:
+	"""A training lens corrected by the entry point's own name (pretrain, finetune, lora, sft), and an
+	lm_eval or lighteval job with no optimizer read as an eval; every other lens as the import rules read it."""
+	from preflight.runner.flags import flag
+
+	if not flag("harness.lens_by_entry") or lens not in ("finetune", "pretrain"):
+		return lens
+	# lm-evaluation-harness's own entry point imports its package as local code, which the job's imports leave out
+	evals = ("lm_eval", "lighteval")
+	if (_has(reach, *evals) or entrypoint.split("/", 1)[0] in evals) and not f.optimizer_vars:
+		return "eval"
+	stem = entrypoint.rsplit("/", 1)[-1].lower().removesuffix(".py")
+	if any(w in stem for w in ENTRY_PRETRAIN):
+		return "pretrain"
+	if any(w in stem for w in ENTRY_FINETUNE):
+		return "finetune"
+	return lens
+
+
 def _const(f: Facts, *names):
 	for n in names:
 		for k, (v, *_rest) in f.consts.items():
@@ -1184,6 +1211,7 @@ def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 	framework = _job_framework(f, reach, entrypoint)
 	hf_id, pcall, ppath = _pretrained(f)
 	lens = _lens(reach, framework, hf_id)
+	lens = _lens_by_entry(lens, reach, f, entrypoint)
 	model = _model(f, hf_id, pcall, ppath)
 	data = _data(f, by_id)
 	loop = _loop(f, framework)

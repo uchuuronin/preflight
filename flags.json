@@ -11,6 +11,7 @@
 	"probes.uv_install": false,
 	"probes.repo_install_exec": false,
 	"probes.torch_new": false,
+	"harness.lens_by_entry": false,
 	"runner.command_checkin": false,
 	"probes.eval_units": false,
 	"runner.free_resend": false,
