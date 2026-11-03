@@ -75,6 +75,20 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 
+## Tue Nov 3, 10:30 ET (the PM's 08:07 list, items 4 to 6)
+
+Pushed `8aacf81` (items 1 to 3, after a read-only fact-check; its two must-fixes in: Glimmer's
+weights live in a Modal volume, and Spark Open's number check is skipped for private check-ins).
+
+4. `docs/submission.md`: the checklist; `docs/submission/` drafts brought up to the freeze.
+5. `docs/builders/`: the kit, brief, tasks and observation sheet on the final product.
+6. `docs/demo/video-plan.md`: the freeze's shot list, the timed voice-over and the 45-second cut,
+   with the fix loop's new shot 8b; 9b and 6b open until noon.
+
+Nothing spent. This push sends: `docs/submission.md`, `docs/submission/` (README, portal,
+meta-and-partners, gallery), `docs/builders/`, `docs/demo/video-plan.md`, `docs/requests/from-d.md`,
+this file.
+
 ## Tue Nov 3, 09:30 ET (the PM's 08:07 list, items 1 to 3)
 
 Merged main `555b5af` into `ws-d` (fast-forward). `9018a58` (the walkthrough) is on main.
