@@ -7,6 +7,7 @@ the parent can enforce. Writes a result JSON; never raises.
 
 import json
 import os
+import re
 import runpy
 import sys
 import time
@@ -31,6 +32,33 @@ def _what_installed(spec: dict) -> str:
 			f"{what} with the extra packages" if has_req or spec.get("install_repo") else "the extra packages"
 		)
 	return what
+
+
+def _newer_torch(exc: BaseException) -> str | None:
+	"""probes.torch_hint: a torch attribute or module this torch doesn't have (`torch.accelerator` is 2.6's), said as
+	a torch older than the code needs, with the route to the 2.7.1 image; None for anything else."""
+	msg = str(exc)
+	m = re.fullmatch(
+		r"module '(torch(?:\.[A-Za-z_][A-Za-z0-9_]*)*)' has no attribute '([A-Za-z_][A-Za-z0-9_]*)'", msg
+	)
+	missing = f"{m.group(1)}.{m.group(2)}" if m and isinstance(exc, AttributeError) else None
+	if (
+		missing is None
+		and isinstance(exc, ModuleNotFoundError)
+		and (getattr(exc, "name", "") or "").startswith("torch.")
+	):
+		missing = exc.name
+	if not missing:
+		return None
+	try:
+		import torch
+
+		have = torch.__version__.split("+", 1)[0]
+	except Exception:
+		have = "this image's"
+	return (f"This code needs a newer torch than it declares: {missing[:120]} isn't in torch {have}, Preflight's probe "
+		"image. Declare the torch it needs in requirements.txt (torch>=2.6) and Preflight probes it on its torch 2.7.1 "
+		"image")  # fmt: skip
 
 
 def _local_missing(exc: BaseException, workdir: str, spec: dict) -> str | None:
@@ -312,6 +340,9 @@ def main(spec_path: str) -> int:
 		)
 		if local:  # the repo's own module, not a package to install (C, Nov 2: Boarding said "add it to requirements.txt")
 			code, msg = "missing_module.local", local
+		newer = _newer_torch(exc) if spec.get("torch_hint") and status == "error" else None
+		if newer:  # probes.torch_hint (F1, Nov 3: torch.accelerator on the image's 2.5.1)
+			code, msg = "torch.too_old", newer
 		error = f"{msg}. {detail}" + (f" at {where}" if where else "") + f", {when}"
 	finally:
 		rec.uninstall()

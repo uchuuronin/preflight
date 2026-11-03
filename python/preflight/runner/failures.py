@@ -133,6 +133,16 @@ STEPS: dict[str, tuple[str, str]] = {
 		"pin versions that install together, or install "
 		"them yourself and run `preflight run train.py` on your machine",
 	),
+	"notebook_only": (
+		"running a notebook-only cell",
+		"remove the login cell (public models need none), or log in with a token in the code: `login(token=...)`",
+	),
+	# probes.torch_hint (F1, Nov 3)
+	"torch.too_old": (
+		"running the script on the probe image's torch",
+		"declare the torch it needs in requirements.txt (torch>=2.6): Preflight then probes it on its torch 2.7.1 "
+		"image; or run `preflight run` where that torch is installed",
+	),
 	# runner.entrypoint_path (C, Nov 3): the repo's own module, not a package to install
 	"missing_module.local": (
 		"importing the repo's own modules",

@@ -235,6 +235,10 @@ class ProbeSpec:
 	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
 	# runner.entrypoint_path: the script's own folder first on its path, as `python dir/main.py` puts it
 	entry_path: bool = False
+	# probes.tty: a terminal size and a pseudo-terminal on stdin, for code that asks for the width (F3's `stty size`)
+	tty: bool = False
+	# probes.torch_hint: a torch attribute only a newer torch has is said as that, not as the script's own error
+	torch_hint: bool = False
 	step_clock: bool = False  # probes.step_clock: the GPU's SM clock on each timed step
 	install_sdists: tuple[
 		str, ...
@@ -357,6 +361,9 @@ WINDOWS_KEEP = ("SYSTEMROOT", "WINDIR", "USERNAME", "PATHEXT", "COMSPEC")
 
 def _windows_env(home: Path) -> dict[str, str]:
 	out = {k: os.environ[k] for k in WINDOWS_KEEP if k in os.environ}
+	# D, Nov 3: Windows' console code page can't print every character a script logs (a UnicodeEncodeError in its
+	# print), and the probe's log is read as UTF-8
+	out["PYTHONIOENCODING"] = "utf-8"
 	for k, sub in (("USERPROFILE", ""), ("APPDATA", "AppData/Roaming"), ("LOCALAPPDATA", "AppData/Local"),
 			("TEMP", "tmp"), ("TMP", "tmp")):  # fmt: skip
 		p = home / sub if sub else home
@@ -364,6 +371,33 @@ def _windows_env(home: Path) -> dict[str, str]:
 			p.mkdir(parents=True, exist_ok=True)
 		out[k] = str(p)
 	return out
+
+
+TTY_COLS, TTY_ROWS = 120, 40  # guess: a laptop terminal's size, what progress bars read
+
+
+def _probe_tty() -> tuple[int, int] | None:
+	"""probes.tty (off; F3, Nov 3: kuangliu/pytorch-cifar's progress bar runs `stty size` at import and a probe has no
+	terminal): a pseudo-terminal pair whose slave end is the probe's stdin, sized TTY_COLS x TTY_ROWS. None on
+	Windows or where no pty can be opened (the probe runs as before)."""
+	try:
+		import fcntl
+		import pty
+		import struct
+		import termios
+	except ImportError:
+		return None
+	try:
+		master, slave = pty.openpty()
+	except OSError:
+		return None
+	with contextlib.suppress(OSError):
+		fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", TTY_ROWS, TTY_COLS, 0, 0))
+	_TTYS.append(master)
+	return master, slave
+
+
+_TTYS: list[int] = []  # the master ends, closed when the probe's run ends (run_probe's finally)
 
 
 def kill_group(pid: int, *, exited: bool = False) -> None:
@@ -1061,6 +1095,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"torch_note": spec.torch_note,
 				"dataset_cache": spec.dataset_cache,
 				"entry_path": spec.entry_path,
+				"torch_hint": spec.torch_hint,
 				"step_clock": spec.step_clock,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,
@@ -1088,17 +1123,26 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 			# one recorder per rank; --standalone: a rendezvous on this node only
 			launch = [python, "-m", "torch.distributed.run", "--standalone", f"--nproc_per_node={spec.nproc}",
 				"-m", "preflight.recorder.run", str(spec_path)]  # fmt: skip
+		term = _probe_tty() if spec.tty else None  # probes.tty: (master, slave), or None where there's no pty
+		if spec.tty:
+			env = {**env, "COLUMNS": str(TTY_COLS), "LINES": str(TTY_ROWS)}
 		proc = subprocess.Popen(
 			launch,
 			cwd=work,
 			env=env,
-			stdin=subprocess.DEVNULL,
+			stdin=term[1] if term else subprocess.DEVNULL,
 			stdout=subprocess.PIPE,
 			stderr=subprocess.STDOUT,
 			start_new_session=True,
 			**popen_kw,
 		)
 		plog = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
+		if term:
+			os.close(term[1])  # the probe holds the slave end now
+			with contextlib.suppress(
+				OSError
+			):  # a read of stdin gets end-of-file, as with /dev/null, not a hang
+				os.write(term[0], b"\x04" * 16)
 	except BaseException:
 		_PROBE_LOCK.release()
 		raise
@@ -1128,6 +1172,9 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		if uid is not None:
 			_kill_uid(uid)
 	finally:
+		while _TTYS:  # probes.tty: the pseudo-terminal's master end
+			with contextlib.suppress(OSError):
+				os.close(_TTYS.pop())
 		_PROBE_LOCK.release()
 	duration = time.monotonic() - t0
 	log_tail = plog.text()

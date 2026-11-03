@@ -51,6 +51,7 @@ class Fetched:
 	lens: str | None = None  # a check-in by command: its tool's lens (COMMANDS), over the map's reading
 	# runner.probe_without_map: why the whole source wasn't mapped (the map is the entry point's alone)
 	map_skipped: str | None = None
+	login_skipped: int = 0  # probes.skip_login_cells: the notebook's login cells left out
 
 
 def content_hash(files: dict[str, str]) -> str:
@@ -118,8 +119,36 @@ def _read_tree(root: Path) -> dict[str, str]:
 	return files
 
 
-def _notebook_to_script(text: str) -> str:
-	"""Code cells in order; shell and magic lines (!pip, %time) become comments."""
+LOGIN_CALLS = {"notebook_login", "login", "interpreter_login"}
+
+
+def _login_cell(code: str) -> bool:
+	"""probes.skip_login_cells (F2, Nov 3): a cell whose every statement imports from huggingface_hub or calls its login
+	(`notebook_login()`, `huggingface_hub.login()`): it can only run inside a notebook, or waits for a token."""
+	import ast
+
+	try:
+		tree = ast.parse(code)
+	except (SyntaxError, ValueError, RecursionError, MemoryError):
+		return False
+	calls = 0
+	for st in tree.body:
+		if isinstance(st, ast.ImportFrom) and (st.module or "").split(".")[0] == "huggingface_hub":
+			continue
+		if isinstance(st, ast.Import) and all(a.name.split(".")[0] == "huggingface_hub" for a in st.names):
+			continue
+		f = st.value.func if isinstance(st, ast.Expr) and isinstance(st.value, ast.Call) else None
+		name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else None
+		if name in LOGIN_CALLS:
+			calls += 1
+			continue
+		return False
+	return calls > 0
+
+
+def _notebook_to_script(text: str, *, skip_login: bool = False, skipped: list | None = None) -> str:
+	"""Code cells in order; shell and magic lines (!pip, %time) become comments. skip_login (probes.skip_login_cells):
+	a login-only cell (_login_cell) is left out, and its number appended to `skipped`."""
 	if not isinstance(text, str):
 		raise InvalidSubmission("the notebook is not text")
 	try:
@@ -140,7 +169,12 @@ def _notebook_to_script(text: str) -> str:
 			lines = src
 		else:
 			raise InvalidSubmission("a notebook cell's source is not text")
-		out.append("".join(("# " + ln) if ln.lstrip().startswith(("!", "%")) else ln for ln in lines))
+		code = "".join(("# " + ln) if ln.lstrip().startswith(("!", "%")) else ln for ln in lines)
+		if skip_login and _login_cell(code):
+			if skipped is not None:
+				skipped.append(len(out) + 1)
+			continue
+		out.append(code)
 	return "\n\n".join(out) + "\n"
 
 
@@ -436,6 +470,7 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 	extra = _extra_packages(source.get("extra_packages"))
 	partial = None
 	command_lens = None
+	login_skipped = 0  # probes.skip_login_cells: a notebook's login cells left out
 	if kind in ("sample", "template"):
 		files = _without_outputs(_read_tree(_sample(uri)))
 	elif kind in ("upload", "cli", "inflight"):
@@ -454,7 +489,11 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		stem = Path(name).with_suffix(".py").name
 		if stem in (".py", "..py") or not re.fullmatch(r"[^/\\\0]{1,200}", stem):
 			raise InvalidSubmission("the notebook's file name is not usable")
-		script = _notebook_to_script(text)
+		from .flags import flag
+
+		skipped: list = []
+		script = _notebook_to_script(text, skip_login=flag("probes.skip_login_cells"), skipped=skipped)
+		login_skipped = len(skipped)
 		files = {stem: script}
 		reqs = notebook_requirements(script)
 		if reqs:  # the notebook's !pip install lines, installed like any upload's requirements.txt
@@ -489,7 +528,15 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		scope="entrypoint" if only_entry else None,
 		extra_packages=extra or None,
 	)
-	return Fetched(files=files, entrypoint=entry, args=args, source=src, partial=partial, lens=command_lens)
+	return Fetched(
+		files=files,
+		entrypoint=entry,
+		args=args,
+		source=src,
+		partial=partial,
+		lens=command_lens,
+		login_skipped=login_skipped,
+	)
 
 
 # ---------------------------------------------------------------- check in by command (runner.command_checkin, off)
