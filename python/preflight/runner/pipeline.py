@@ -714,9 +714,14 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	out = _with_dataset_size(out, fetched.files)  # the record's own code: a patch may change the size
 	keep = [f for f in out.findings if not f.id.startswith(("hygiene.", "measured.rl."))]
 	keep = [f for f in keep if f.id not in {g.id for g in triaged}]
-	keep = [
-		f for f in keep if not f.id.startswith(("source.partial", "source.map_skipped"))
-	]  # said afresh below
+	# said afresh below; a follow-up that reused the stored map (so never mapped, B's must-fix 5, Nov 3) keeps its
+	# parent's map-skipped finding: its lens, model and GPU still came from the entry point alone
+	afresh = (
+		("source.partial", "source.map_skipped")
+		if fetched.map_skipped or not followup
+		else ("source.partial",)
+	)
+	keep = [f for f in keep if not f.id.startswith(afresh)]
 	out = out.model_copy(
 		update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *_reading_findings(fetched)]}
 	)
@@ -936,12 +941,19 @@ def _reading_findings(fetched: Fetched) -> list:
 		left = (
 			f"; at least {p['skipped']:,} more imported files were left out {why}" if p.get("skipped") else ""
 		)
+		# B, Nov 3: the files the code may open (named in its arguments or its code, or beside what was read)
+		if p.get("data_read") or p.get("data_skipped"):
+			left += f"; it also read {_n_files(p.get('data_read', 0), 'file')} the code may open"
+			if p.get("data_skipped"):
+				left += f" and left out {p['data_skipped']:,} more for the size limit"
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
 			title="Read the entry point and what it imports, as asked" if p.get("asked")
 				else "Read the entry point and what it imports, not the whole repository",
 			detail=(f"{_why_partial(p)}, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
 				f"({_mb(p['bytes'])} in all){left}. The map and the findings cover what was read, and the probes run "
-				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
+				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error, a file "
+				"it opens that wasn't read with a FileNotFoundError, and a package read only in part comes before an "
+				"installed copy of the same name."),
 			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
 				Evidence(metric="source.repo_files", value=float(p["repo_files"]))]))  # fmt: skip
 	try:  # with the map skipped, its finding above says it: no partial-map finding beside it
