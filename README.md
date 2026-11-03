@@ -6,7 +6,7 @@ run, or a whole campaign of runs, before you spend real GPU hours or API dollars
 
 Built for the Meta Global AI Developer Hackathon.
 
-**Live:** <https://preflight-cqn.pages.dev> · **The manual:** [every input and knob, explained](https://preflight-cqn.pages.dev/#/help)
+**Live:** <https://preflight-cqn.pages.dev> · **The manual:** [Technical Documentation](https://preflight-cqn.pages.dev/#/help)
 
 ## Contents
 
