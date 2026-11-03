@@ -110,40 +110,7 @@ CPU, or the CUDA or ROCm wheel on a GPU box.
 GPU time goes only to a few minutes of probes. Everything you explore afterwards is computed in the
 browser from the flight record.
 
-```mermaid
-flowchart LR
-	subgraph S1["① Measure · minutes on a real GPU"]
-		direction TB
-		IN(["Your code"]) --> MAP["Script map<br/><i>Muse Spark</i>"]
-		MAP --> PRB["Probes<br/>a few real steps"]
-		PRB -.->|if one fails| TRI["Triage<br/><i>Muse Spark Open · Glimmer</i>"]
-	end
-	subgraph S2["② Predict"]
-		direction TB
-		CORP[("Corpus<br/>4,255 runs")] -.-> ENG["Engine<br/>models + ranges"]
-		ENG --> REC[("Flight record")]
-	end
-	subgraph S3["③ Fly · in your browser"]
-		direction TB
-		COCK["Cockpit<br/>map · readouts · knobs"] --> OUT(["Plan · patch ·<br/>Slurm · link"])
-		COCK <-.-> G["Guide<br/><i>Muse Spark</i>"]
-		COCK -.-> FIX["Fixes, verified by a re-run<br/><i>Muse Code</i>"]
-	end
-	PRB --> ENG
-	REC --> COCK
-
-	classDef meta fill:#ece6ff,stroke:#6b4fd8,color:#24185c
-	classDef data fill:#fff3dc,stroke:#c9861a,color:#4d3305
-	classDef step fill:#ffffff,stroke:#8a8a99,color:#1d1d29
-	class MAP,TRI,G,FIX meta
-	class REC,CORP data
-	class IN,PRB,ENG,COCK,OUT step
-	style S1 fill:#f5f6fa,stroke:#c9cad6
-	style S2 fill:#f5f6fa,stroke:#c9cad6
-	style S3 fill:#f5f6fa,stroke:#c9cad6
-```
-
-Purple nodes are Meta models; orange nodes are data.
+![How Preflight works: measure, predict, fly](docs/readme-assets/how-it-works.svg)
 
 ## Meta models and partner tools
 
