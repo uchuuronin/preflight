@@ -1,0 +1,11 @@
+{
+	"name": "20261103-022403-41565861976-a-eu-arc-easy-4",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41565861976",
+	"ref": "48fb44ceefb7b10dee0bc563fed4ef3036b0dc56",
+	"sha": "48fb44ceefb7b10dee0bc563fed4ef3036b0dc56",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --command-hex 6c6d5f6576616c202d2d6d6f64656c206866202d2d6d6f64656c5f6172677320707265747261696e65643d48756767696e674661636554422f536d6f6c4c4d322d312e37422d496e7374727563742c64747970653d62666c6f61743136202d2d7461736b73206172635f65617379202d2d6c696d697420323030202d2d62617463685f73697a652038 --bare-steps 100000 --budget-min 20 --first-gpu A10 --uv --eval-units",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T02:26:55Z"
+}
