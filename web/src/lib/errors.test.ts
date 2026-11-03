@@ -37,3 +37,12 @@ describe("the repo's own module (A, Nov 3: missing_module.local)", () => {
 		expect(c.message).not.toMatch(/install/i);
 	});
 });
+
+describe("A's new stops (Nov 3)", () => {
+	it("names the notebook-only call and the too-old torch, with what to do", () => {
+		expect(errorCopy("notebook_only").hint).toMatch(/login cell/);
+		const torch = errorCopy("torch.too_old");
+		expect(torch.code).toBe("torch.too_old");
+		expect(torch.hint).toMatch(/torch>=2\.6/);
+	});
+});

@@ -39,7 +39,7 @@ describe("check-in help on Boarding", () => {
 		on.add("c.checkin_help");
 		rememberRequest("j3", { source: { kind: "repo", uri: "https://github.com/a/b", entrypoint: "lm_eval/__main__.py" } } as never);
 		const { container, getByRole } = render(<CheckinHelp trouble={{ step: "read", limit: "repo" }} jobId="j3" />);
-		expect(container.textContent).toContain("bigger than Preflight reads: at most 2,000 files and 25 MB of text");
+		expect(container.textContent).toContain("bigger than Preflight reads whole (2,000 files, 25 MB of text)");
 		expect((container.querySelector("input") as HTMLInputElement).value).toBe("lm_eval/__main__.py");
 		expect((getByRole("button", { name: "Check in from this file" }) as HTMLButtonElement).disabled).toBe(false);
 	});

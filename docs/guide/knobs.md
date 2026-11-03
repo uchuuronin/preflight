@@ -107,7 +107,8 @@ instead of guessing.
 Pick one tab:
 
 - **Repo link:** a public GitHub repository. The branch (or the default one) is pinned to its
-  current commit, so later pushes don't change your record.
+  current commit, so later pushes don't change your record. Two optional fields say what to run
+  (see **Entry point and arguments** below).
 - **Upload:** `.py` files plus requirements, configs and small text data. Up to 5 MB and 2,000
   files. Weights and large datasets come from Hugging Face. Choose which file to run.
 - **Notebook:** one notebook on its own. Its `pip` lines become its requirements.
@@ -115,6 +116,27 @@ Pick one tab:
   characters. There's no
   shell, so no pipes (`|`), redirects (`>`), variables or chained commands. The box names any word
   it can't take.
+
+### Entry point and arguments
+
+For a **Repo link**, two optional fields under the repository:
+
+- **Entry point:** the script to run, as its path in the repo (`examples/train.py`). Leave it empty
+  and Preflight picks `train.py`, `main.py`, `run.py`, `finetune.py` or `pretrain.py` at the top of
+  the repo, or the only `.py` file. Fill it in whenever the repo holds more than one script.
+- **Arguments:** the flags you'd type after `python <entry point>`, such as `--epochs 6 --lr 3e-4`.
+  They run as written, without a shell: no pipes (`|`), redirects (`>`), variables or chained
+  commands. Quote an argument that has a space in it. Up to 64 arguments.
+
+Example: [pytorch/examples](https://github.com/pytorch/examples) holds dozens of scripts. To check in
+its word-level language model:
+
+- Repo link: `github.com/pytorch/examples`
+- Entry point: `word_language_model/main.py`
+- Arguments: `--accel --epochs 6`
+
+Preflight reads the repo (for a large one, just the entry point and the repo's own modules it
+imports), then probes the script with those flags. If the entry point isn't in the repo, the check-in stops before any GPU time.
 
 ### Extra packages
 
