@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
 			"fixes designed on these nine (A's item-8 ops rerun on the A10 with every bring-your-own-script fix on, the "
 			"list's own arguments, no hand edits; Nov 3): 4 (smolagents, its first model call), 7 (BEIR, ran out of memory), "
 			"8 (OGB arxiv, all 500 epochs; its probe measures) and 9 (airbench, its probe measures) reach their first step; "
-			"through production 8 (OGB) still stops at its dataset download after A's 10:52 AM deploy (its host is plain HTTP; `a-fresh-live-ogb-2-checkin` 41668696736) and 7 (BEIR) isn't re-checked there; not a validation, "
+			"through production 8 (OGB) still stops at its dataset download after A's 10:52 AM deploy (its host is plain HTTP, and A reads the sandbox as allowing only HTTPS [not checked]; `a-fresh-live-ogb-2-checkin` 41668696736) and 7 (BEIR) isn't re-checked there; not a validation, "
 			"since the fixes were made for them",
 		),
 	]
