@@ -566,6 +566,34 @@ SHAPE_DEPENDENT = {
 }
 
 
+# knobs.py marks these modelled for time, but the step-time model never reads them: it reads the work per step
+# (batch, sequence, accumulation, image size, a GNN's fan-outs: knobs.work_units), precision, checkpointing, the
+# GPU, GPUs and nodes. Moved off every probe, the step was "carried" by the model while its point stayed put (nanoGPT's n_layer 12 to 24: 0.955 s to
+# 0.939 s). So such a move is said as unmodelled: held at its probed effect, wider, extrapolated (B, Nov 3: a bug
+# fix found writing the knobs guide; memory is unchanged)
+STEP_TIME_UNREAD = frozenset(
+	{
+		"n_layer",
+		"d_model",
+		"n_head",
+		"hidden_channels",
+		"gnn_layers",
+		"lora_r",
+		"quantization",
+		"optimizer",
+		"attn",
+		"eval_no_grad",
+		"num_workers",
+		"prefetch_factor",
+		"tensor_parallel",
+		"pipeline_parallel",
+		"use_vllm",
+		"kv_cache_dtype",
+		"gpu_memory_utilization",
+	}
+)  # fmt: skip (the last three: the serving simulator's, off)
+
+
 def _generic_shape(record: FlightRecord) -> bool:
 	try:
 		arch, _setup, _shape = knobs.setup_from(_script_map(record), _current(record))
@@ -582,7 +610,8 @@ def _unmodelled_moves(record: FlightRecord, values: dict, readout: str) -> list[
 		spec = knobs.knob_spec(kid)
 		if readout not in spec.affects or kid == "gpu_type":
 			continue
-		if readout in spec.modelled:
+		unread = readout == "time" and kid in STEP_TIME_UNREAD
+		if readout in spec.modelled and not unread:
 			if kid not in SHAPE_DEPENDENT.get(readout, ()):
 				continue
 			if generic is None:
@@ -1720,8 +1749,10 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		)
 
 	off = [
-		k for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"})) if k not in _PRECISION_KNOBS
-	]
+		k
+		for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"}))
+		if k not in _PRECISION_KNOBS and k not in STEP_TIME_UNREAD
+	]  # an unread knob is said below, as unmodelled for time
 	if off and status in ("predicted", "measured"):
 		status = "extrapolated"
 		reasons.append(
