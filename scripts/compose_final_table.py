@@ -56,6 +56,11 @@ def compose(main_md: str, unseen: list[tuple[str, int, int, str, str]]) -> str:
 				r.rstrip(" |")
 				+ f"; NVIDIA to MI300X, scored apart on the MI300X corpus slice (295 configs, 1,147 pairs): {AMD}; its sigma-0.22 band covers 36%, so a move across vendors abstains |"
 			)
+		if r.startswith("| Knob response |"):
+			r = r.replace(
+				"; stranger test: base https://preflight-cqn.pages.dev,",
+				"; C's live-site run (remote run 41655597938, 3 samples x 20 moves at 1366x768 and 390x844; C's own p95, 67.5 ms, takes the floor(0.95 n) sample): base https://preflight-cqn.pages.dev,",
+			)
 		if r.startswith("| Peak memory error |"):
 			r = r.rstrip(" |") + (
 				"; causes: gnn_pyg (39% under; @L4 36% under): the allocator's reserved pool grows for three epochs past "
