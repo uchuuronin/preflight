@@ -1,0 +1,111 @@
+{
+  "worker": {
+    "module": "ops_app",
+    "file": "/root/ops_app.py",
+    "runner_loaded_as": "/mc-6tqv0g1f/modal_app.py (module modal_app, tag probe-bf6dfea5daa1a4ee, PKG /opt/preflight/preflight, zoo /root/zoo)",
+    "zoo": "/root/zoo",
+    "zoo_samples": [
+      "README.md",
+      "agent_eval_spark",
+      "eval_sweep_reasoning",
+      "finetune_lora_hf",
+      "gnn_pyg",
+      "grpo_trl",
+      "notebook_tiny",
+      "pretrain_nanogpt",
+      "retrieval_st",
+      "serving_vllm",
+      "torchtitan_debug",
+      "vision_timm"
+    ],
+    "submitted": {
+      "job_id": "01M6FDBXQ6GP7VERXJQMNMN0AW",
+      "created": true,
+      "position": 0
+    },
+    "saves": 1,
+    "lens": "finetune",
+    "knobs": 20,
+    "imported": [
+      "preflight.runner.pipeline",
+      "preflight.runner.records",
+      "preflight.runner.sandbox_runner",
+      "preflight.runner.worker",
+      "preflight.runner.wire",
+      "preflight.runner.record_jobs",
+      "preflight.harness.spark",
+      "preflight.harness.mapper",
+      "preflight.probes.gpu_choice",
+      "preflight.probes.plan"
+    ],
+    "container_environment": "main",
+    "flags": {
+      "root": "/opt/preflight",
+      "env": "production",
+      "engine.memory": true
+    },
+    "job_store_would_claim_here": false,
+    "guard": "this container is app ap-VCsPVJV0oDFAJJOzmy2HoD, not the deployed preflight-runner in main (ap-G73jgQVsr3gQQodeFppJi2)",
+    "image_tag": "probe-bf6dfea5daa1a4ee"
+  },
+  "probe": {
+    "pkg_root": "/opt/preflight",
+    "reachable_by_probe_uid": true,
+    "euid": 0,
+    "probe_uid": "61000",
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 9,
+    "backend": "cpu",
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n/opt/preflight/preflight/recorder/runtime.py:1428: FutureWarning: `torch.distributed.reduce_op` is deprecated, please use `torch.distributed.ReduceOp` instead\n  mods = [o for o in gc.get_objects() if isinstance(o, nn.Module)]\n"
+  },
+  "sandbox": {
+    "entry": [
+      "python",
+      "-m",
+      "preflight.probes.remote"
+    ],
+    "created": true,
+    "import_stdout": "IMPORT /opt/preflight/preflight/__init__.py 2.5.1+cu124\n",
+    "import_stderr": "",
+    "import_exit": 0,
+    "probe_status": "ok",
+    "probe_steps": 9,
+    "probe_error": null,
+    "probe_error_code": null
+  },
+  "probe_user": {
+    "exit": 0,
+    "probe_uid": 61000,
+    "uid": 61000,
+    "gid": 61000,
+    "user": "preflight-probe",
+    "groups": [
+      44
+    ],
+    "passwd": "preflight-probe",
+    "group": "preflight-probe",
+    "compiled": 7.274379253387451
+  },
+  "serving_user": {
+    "exit": 0,
+    "probe_uid": 61000,
+    "uid": 61000,
+    "gid": 61000,
+    "user": "preflight-probe",
+    "groups": [
+      44
+    ],
+    "passwd": "preflight-probe",
+    "group": "preflight-probe",
+    "compiled": 7.274379253387451,
+    "imported": [
+      "vllm",
+      "datasets"
+    ]
+  },
+  "probe_user_ok": true,
+  "serving_user_ok": true,
+  "ok": true
+}
