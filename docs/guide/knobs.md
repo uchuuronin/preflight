@@ -7,8 +7,8 @@ each knob, see [`knobs-reference.md`](knobs-reference.md).
 
 Two terms used throughout:
 
-- **Probe:** a short, real run of your code (a few training steps, or a few tasks for an agent) on a
-  real GPU, timed and measured. A check-in runs a handful.
+- **Probe:** a short, real run of your code: a few training steps on a real GPU, timed and measured.
+  A check-in runs a handful. An agent job samples real tasks instead.
 - **The guide:** the co-pilot in the cockpit. Press **Start the tour** and it suggests one move at a
   time for your aim. It never touches a knob you've pinned or ruled out.
 
@@ -42,8 +42,8 @@ Pick **Lowest cost**. In **Your limits**, write "only A100, done within 72 hours
 memory first if the run would run out, then suggests moves that cut cost, one at a time. For each,
 press **Apply**, **Not this**, **Keep** (your value) or **Pin** (its value). Probes on the public
 site run on cards up to an L40S, so A100 time and cost are estimates from another card: they read
-**Extrapolated**, and the true value can be about 1.6 to 1.9 times higher or lower. A100 memory is
-recalculated from your probes for the bigger card, and also reads **Extrapolated**.
+**Extrapolated**, and the true value can be about 1.55 to 1.9 times higher or lower. The memory peak
+barely changes on the bigger card; the out-of-memory chance is worked out against its memory.
 
 **No training loop yet.**
 
@@ -177,8 +177,8 @@ To change it later, press a dial in the cockpit.
 ### Your GPU
 
 **L4 or A10** starts on an L4. If none is free within two minutes, it moves to an A10, then an L40S.
-A script that runs out of memory may be measured on a bigger card. From Nov 5 to 8 the default starts
-on an A10.
+A script that runs out of memory may be measured on a bigger card. From Nov 5 to 8, a job that would
+start on an L4 starts on an A10 when your allowed GPUs include it.
 
 You can also pick **L40S**, **A100-SXM-80GB** or **H100-SXM-80GB**, or press **Let Preflight
 pick** for the cheapest card with room to spare. Probes on the public site run on cards up to an
@@ -200,7 +200,8 @@ Free, no account. Limits:
   Days run midnight to midnight, US Eastern.
 - Past your 3 jobs, or once the site's daily GPU budget is spent, only samples and shared records
   open until midnight.
-- If a check-in stops at a missing import before measuring anything, one resend a day is free.
+- If a check-in stops before measuring anything, one resend a day is free: it doesn't count against
+  your 3 jobs, but the site's daily GPU budget still applies.
 
 A check-in of the LoRA sample on an L4 takes about 5 to 11 minutes (its two production check-ins
 took 4 min 59 s and 10 min 21 s); other jobs vary. Add any wait for a free GPU: the boarding screen
@@ -271,7 +272,7 @@ A knob the guide proposed shows the suggested value. Move it yourself and your v
 
 Knobs with a **Code** badge can only change by editing your script. Muse Code writes the change and
 a short verify run checks it before you get it. Nothing runs until you say so, and each verify run
-or probe counts toward your 3 jobs a day.
+or probe counts towards your 3 jobs a day.
 
 ### Not predicted here yet
 
@@ -477,9 +478,10 @@ time in data loading. *In Preflight:* time isn't modelled yet.
 #### GPU
 
 The card the run uses; each has its own memory, speed and hourly price. *In Preflight:* lists the 11
-cards Preflight can rent (or those your limits allow). Memory is recalculated for the card. Time on
-a card the probes didn't use is converted from the probed card: **Extrapolated**, rough, with a
-range of about 1.6 to 1.9 times either way. Cost is that time at the card's hourly price.
+cards Preflight can rent (or those your limits allow). The memory peak barely changes; the
+out-of-memory chance is worked out against the card's memory. Time on a card the probes didn't use
+is converted from the probed card: **Extrapolated**, rough, with a range of about 1.55 to 1.9 times
+either way. Cost is that time at the card's hourly price.
 
 #### GPUs
 
@@ -634,7 +636,8 @@ Preflight:* moves memory and step time when the script has no other batch size.
 #### HNSW links (M)
 
 For a graph search index: neighbours each vector links to. More links, better recall, more memory,
-slower build. *In Preflight:* not read yet; memory and time hold.
+slower build. *In Preflight:* not read yet: time holds, and memory shows **Not measured here** off the
+probed value.
 
 #### IVF lists
 

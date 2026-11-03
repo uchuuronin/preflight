@@ -49,7 +49,7 @@
 	"newflight.repo.hint": "Public repos only. To pin a commit, link to it (…/tree/<sha> or …/commit/<sha>). Otherwise Preflight pins the latest commit of the branch the link names, or of the default branch, when you check in.",
 	"newflight.entry.label": "Entry point",
 	"newflight.entry.placeholder": "examples/train.py",
-	"newflight.entry.hint": "The script to run, as its path in the repo. Leave it empty to use train.py, main.py or run.py at the top of the repo, or the only .py file. A large repo needs it filled in. A wrong path still uses one of today's check-ins.",
+	"newflight.entry.hint": "The script to run, as its path in the repo. Leave it empty to use train.py, main.py, run.py, finetune.py or pretrain.py at the top of the repo, or the only .py file. A large repo needs it filled in. A wrong path still uses one of today's check-ins.",
 	"newflight.entry.path": "A path inside the repo, like examples/train.py: no “..”, no leading “/”, no hidden folders.",
 	"newflight.entry.not_py": "The entry point is a Python file: its path ends in .py.",
 	"newflight.entry.too_long": "That path is longer than Preflight takes (512 characters).",
