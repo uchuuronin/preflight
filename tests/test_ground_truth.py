@@ -194,3 +194,23 @@ def test_a_full_run_takes_any_gpu_script_with_its_entrypoint_and_image():
 		entrypoint_of({"util.py": ""})
 	with pytest.raises(ValueError):
 		entrypoint_of({"train.py": ""}, "missing.py")
+
+
+def test_the_bare_run_passes_the_installer_only_its_own_options(tmp_path, monkeypatch):
+	import preflight.recorder.requirements as req
+
+	seen = {}
+
+	def install(workdir, target, *, log=print, **kw):
+		seen["kw"] = kw
+		return None, []
+
+	def stream(cmd, **kw):
+		Path(cmd[4]).write_text(json.dumps({"steps": 3, "walls_s": [None, 1.0, 1.0], "ended": "steps"}))
+		return 0, ""
+
+	monkeypatch.setattr(req, "install", install)
+	monkeypatch.setattr(gt, "_stream", stream)
+	gt._bare(tmp_path, 3, install_requirements=True, caches=tmp_path / "c", env={}, timeout_s=60,
+		install_opts={"uv": True, "sdists": ("a",), "eval_units": 8})  # fmt: skip
+	assert seen["kw"] == {"uv": True, "sdists": ("a",)}  # eval_units is the recorder's, not the installer's

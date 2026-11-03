@@ -48,7 +48,10 @@ HEARTBEAT_S = 20  # cited: Contracts tab, gap 2 (renewed every 20 s)
 MAX_RUNNING = 8  # cited: Contracts tab, public demo limits (8 GPU containers)
 MAX_ATTEMPTS = 2  # derived: one retry for our own failures; visitor failures are never retried
 MAX_QUEUED = 200  # guess: global queue cap; replaced by the load test before judging (Nov 4)
-MAX_QUEUED_PER_VISITOR = 3  # guess: per-visitor backlog; replaced by the load test before judging (Nov 4)
+# load-tested (scripts/queue_load_test.py, Nov 2: 20 visitors x 3 jobs on a copy of this store, simulated clock,
+# CPU-only jobs of a guessed length): at 3, queue wait p50 151 s, p95 652 s; 2 cuts the p95 to 522 s for 54% more
+# "busy, retry" refusals; 3 and 5 are the same, because the in-flight budget hold (16 jobs) binds first
+MAX_QUEUED_PER_VISITOR = 3
 MAX_EVENTS_PER_JOB = 300
 RECENT_DONE = 2_000  # finished jobs kept in memory for status and event reads
 
