@@ -1,0 +1,11 @@
+{
+	"name": "20261103-144214-41656267038-a-fill-datasets-1-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41656267038",
+	"ref": "f94792d9ffae7c180ad280d065eafe7d9046a351",
+	"sha": "f94792d9ffae7c180ad280d065eafe7d9046a351",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::fill_datasets",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T14:42:58Z"
+}
