@@ -1,10 +1,11 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
-# Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts.
-# Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with every Linux-only call D found stubbed, Windows'
-# own variables kept in the probe's environment (and tzdata
-# installed, a sandbox folder set), to check nothing else stops it on Windows. Everything lives on D:, as the laptop's steps keep
-# everything on E:. No secrets are used. The job fails if any checked step failed, after every
-# step has reported and the logs are uploaded.
+# Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts. It runs
+# A's Windows fixes (ws-a at cf4945fb, the copy kept; D's own copy passed the same check and was
+# withdrawn, Nov 3) with nothing stubbed: `preflight run` has to measure (every probe ok) and
+# `preflight watch` has to follow its record (a live record with steps). Runs only when this file
+# changes on ws-d. Everything lives on D:, as the laptop's steps keep everything on E:, but the
+# sandbox and time zones use Preflight's own defaults. No secrets are used. The job fails if any
+# checked step failed, after every step has reported and the logs are uploaded.
 name: d-windows-watch
 
 on:
@@ -28,6 +29,8 @@ jobs:
         with:
           path: src
           persist-credentials: false
+          # ws-a at cf4945fb (A's fixes a315c1f2 and 77c56899); main once A's fix is merged
+          ref: cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
@@ -45,7 +48,7 @@ jobs:
         shell: pwsh
         env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PIP_CACHE_DIR: 'D:\pf9b\pip-cache' }
         run: |
-          D:\pf9b\venv\Scripts\python.exe -m pip install "${{ github.workspace }}\src[probe]" tzdata
+          D:\pf9b\venv\Scripts\python.exe -m pip install "${{ github.workspace }}\src[probe]"
           D:\pf9b\venv\Scripts\python.exe -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
           D:\pf9b\venv\Scripts\preflight.exe --help
       - name: "4. The script, copied, with its steps raised"
@@ -55,28 +58,22 @@ jobs:
           Copy-Item "${{ github.workspace }}\src\zoo\notebook_tiny\tiny_train.py" $f
           (Get-Content $f) -replace 'max_steps = 200\b', 'max_steps = 2000' | Set-Content $f
           if (-not (Select-String $f -Pattern 'max_steps = 2000' -Quiet)) { throw 'edit not applied: max_steps' }
-      - name: "5. preflight run"
+      - name: "5. preflight run (every probe must measure)"
         id: run
         continue-on-error: true
         timeout-minutes: 10
         shell: pwsh
         working-directory: D:\pf9b
-        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8, PREFLIGHT_SANDBOX_DIR: 'D:\pf9b\sandbox' }
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp' }
         run: |
-          New-Item -ItemType Directory -Force D:\pf9b\sandbox | Out-Null
           D:\pf9b\venv\Scripts\preflight.exe run film\tiny_train.py *> D:\pf9b\run.log
           $code = $LASTEXITCODE
-          Get-Content D:\pf9b\run.log -Tail 15
-          # every Linux-only call D found on the path, stubbed, to see whether anything else stops a real
-          # measurement: a do-nothing `resource` module for the probe process, and in this one
-          Set-Content D:\pf9b\venv\Lib\site-packages\resource.py '# stand-in: no rlimits on Windows'
-          D:\pf9b\venv\Scripts\python.exe -c "import os, sys, signal; os.geteuid = lambda: 1000; signal.SIGKILL = signal.SIGTERM; import subprocess; os.killpg = lambda pid, sig: subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], capture_output=True); os.O_NOFOLLOW = 0; os.O_NONBLOCK = 0; import preflight.probes.local as L; L.SAFE_ENV = L.SAFE_ENV + ('SYSTEMROOT', 'WINDIR', 'USERPROFILE', 'USERNAME', 'APPDATA', 'LOCALAPPDATA', 'PATHEXT', 'COMSPEC', 'TEMP', 'TMP'); from preflight.cli.main import main; sys.exit(main(['run', 'film\\tiny_train.py']))" *> D:\pf9b\run-stubbed.log
-          $code = $LASTEXITCODE
-          "--- with every Linux-only call stubbed:"
-          Get-Content D:\pf9b\run-stubbed.log -Tail 120
+          Get-Content D:\pf9b\run.log -Tail 80
           $rec = Get-ChildItem D:\pf9b\records\*.json -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($rec) { "record=$($rec.FullName)" >> $env:GITHUB_OUTPUT }
-          exit $code
+          if ($code -ne 0) { exit $code }
+          $j = Get-Content D:\pf9b\run.log -Raw
+          if ($j -notmatch '"status": "ok"' -or $j -match '"status": "(?!ok")') { throw 'a probe did not measure' }
       - name: "6. The record's bands"
         id: bands
         continue-on-error: true
@@ -90,20 +87,23 @@ jobs:
         timeout-minutes: 8
         shell: pwsh
         working-directory: D:\pf9b
-        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8 }
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp' }
         run: |
           D:\pf9b\venv\Scripts\preflight.exe watch "${{ steps.run.outputs.record }}" film\tiny_train.py --window 200 *> D:\pf9b\watch.log
           $code = $LASTEXITCODE
           Get-Content D:\pf9b\watch.log -Tail 40
           Get-ChildItem D:\pf9b\records | Select-Object Name, Length
-          exit $code
+          if ($code -ne 0) { exit $code }
+          $live = Get-ChildItem D:\pf9b\records\*.json | Where-Object { $_.FullName -ne "${{ steps.run.outputs.record }}" } | Select-Object -First 1
+          if (-not $live) { throw 'no live record written' }
+          D:\pf9b\venv\Scripts\python.exe -c "import json, sys; r = json.load(open(sys.argv[1], encoding='utf-8')); p = r['probes'][-1]; print('live record', p['id'], p['status'], 'steps', p['steps']); sys.exit(0 if p['steps'] and p['steps'] > 0 else 1)" $live.FullName
       - name: "8. preflight watch, changed (hidden 8192, batch 4096; few steps on a CPU)"
         id: watch2
         continue-on-error: true
         timeout-minutes: 12
         shell: pwsh
         working-directory: D:\pf9b
-        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8 }
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp' }
         run: |
           $f = 'D:\pf9b\film\tiny_train.py'
           (Get-Content $f) -replace 'nn.Linear\(32, 256\), nn.ReLU\(\), nn.Linear\(256, 1\)', 'nn.Linear(32, 8192), nn.ReLU(), nn.Linear(8192, 1)' -replace 'batch_size = 64\b', 'batch_size = 4096' -replace 'max_steps = 2000\b', 'max_steps = 400' | Set-Content $f

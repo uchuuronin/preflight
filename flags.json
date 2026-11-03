@@ -28,6 +28,7 @@
 	"runner.stop_on_import_error": false,
 	"runner.read_closure": false,
 	"runner.probe_without_map": false,
+	"runner.entrypoint_path": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,
