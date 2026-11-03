@@ -1466,23 +1466,21 @@ def _meta_variants(files: dict, entrypoint: str) -> dict:
 
 	got: dict = {}
 
-	class H(http.server.BaseHTTPRequestHandler):
-		def do_POST(self):
-			n = int(self.headers.get("Content-Length") or 0)
-			raw = self.rfile.read(min(n, 4 * 2**20))
-			if self.path.split("?", 1)[0].endswith("/chat/completions"):
-				with contextlib.suppress(ValueError):
-					got.setdefault("body", json.loads(raw))
-			data = b'{"error": {"code": "recorded", "message": "stand-in"}}'
-			self.send_response(400)
-			self.send_header("Content-Type", "application/json")
-			self.send_header("Content-Length", str(len(data)))
-			self.end_headers()
-			self.wfile.write(data)
+	def do_post(self):
+		n = int(self.headers.get("Content-Length") or 0)
+		raw = self.rfile.read(min(n, 4 * 2**20))
+		if self.path.split("?", 1)[0].endswith("/chat/completions"):
+			with contextlib.suppress(ValueError):
+				got.setdefault("body", json.loads(raw))
+		data = b'{"error": {"code": "recorded", "message": "stand-in"}}'
+		self.send_response(400)
+		self.send_header("Content-Type", "application/json")
+		self.send_header("Content-Length", str(len(data)))
+		self.end_headers()
+		self.wfile.write(data)
 
-		def log_message(self, *a):
-			pass
-
+	# built with type(), not a class statement: the ops app defines no classes (tests/test_stop_app.py)
+	H = type("H", (http.server.BaseHTTPRequestHandler,), {"do_POST": do_post, "log_message": lambda *a: None})
 	srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
 	threading.Thread(target=srv.serve_forever, daemon=True).start()
 	work = Path(tempfile.mkdtemp(prefix="pf-meta-"))
