@@ -157,6 +157,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"step_clock": True} if spec.step_clock else {}),  # a probe that reports more
 		**({"entry_path": True} if spec.entry_path else {}),  # another path can import other code
 		**({"tty": True} if spec.tty else {}),  # a terminal can change what the script does
+		**({"requirements": spec.requirements} if spec.requirements != "requirements.txt" else {}),  # another file
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -316,7 +317,16 @@ def _image_pins(image: str) -> str:
 	return "@" + hashlib.sha256("\n".join(PROBE_NEW_PACKAGES).encode()).hexdigest()[:12]
 
 
-def _image(sm: ScriptMap, files: dict[str, str]) -> str:
+def _requirements(fetched) -> str:
+	"""probes.entry_requirements: the requirements file nearest the entry point; else the top's requirements.txt."""
+	if not _flag("probes.entry_requirements"):
+		return "requirements.txt"
+	from preflight.recorder.requirements import entry_requirements
+
+	return entry_requirements(fetched.files, fetched.entrypoint)
+
+
+def _image(sm: ScriptMap, files: dict[str, str], req: str = "requirements.txt") -> str:
 	"""The sandbox image: "serving" for vLLM (its own image); with probes.torch_new, "torch27" when the code's
 	own torch requirement rules out the probe image's 2.5.1 and admits 2.7.1 (LitGPT's torch>=2.7, Nov 2);
 	else "probe"."""
@@ -327,7 +337,7 @@ def _image(sm: ScriptMap, files: dict[str, str]) -> str:
 
 		# any ask that rules the image's 2.5.1 out from below (>=2.6, ==2.6.0, ~=2.6, >=2.8): the newer image, the
 		# nearest torch Preflight has; an exact pin it doesn't match runs on 2.7.1, as one runs on 2.5.1 today (review)
-		if torch_too_old(torch_asks(files), IMAGE_TORCH):
+		if torch_too_old(torch_asks(files, req), IMAGE_TORCH):
 			return "torch27"
 	return "probe"
 
@@ -368,9 +378,10 @@ def _spec(
 		entry_path=_flag("runner.entrypoint_path"),
 		tty=_flag("probes.tty"),
 		torch_hint=_flag("probes.torch_hint"),
+		requirements=_requirements(fetched),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
-		image=_image(sm, fetched.files),
+		image=_image(sm, fetched.files, _requirements(fetched)),
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
 	)
@@ -1000,14 +1011,14 @@ def _image_findings(sm: ScriptMap, fetched: Fetched) -> list:
 	"""probes.torch_new (B's review, Nov 3; the PM's fix): when the torch 2.7.1 image was picked and its packages
 	override any of the code's own pins, say each one: "measured on transformers 4.52.3; your code pins 4.46.3".
 	The title is that line; the engine adds it to the estimates' reasons (api._image_note)."""
-	if _image(sm, fetched.files) != "torch27":
+	if _image(sm, fetched.files, _requirements(fetched)) != "torch27":
 		return []
 	from preflight.recorder.requirements import image_overrides, overrides_note
 	from preflight.schema import Evidence, Finding
 
 	from .images import PROBE_NEW_PACKAGES
 
-	over = image_overrides(fetched.files, PROBE_NEW_PACKAGES)
+	over = image_overrides(fetched.files, PROBE_NEW_PACKAGES, _requirements(fetched))
 	if not over:
 		return []
 	note = overrides_note(over)

@@ -110,19 +110,37 @@ IMAGE_TORCH = "2.5.1"
 NEW_IMAGE_TORCH = "2.7.1"
 
 
-def _code_lines(files: dict[str, str]) -> list[str]:
-	"""The requirement lines the code's own files state (requirements.txt, pyproject.toml, setup.cfg, a
-	literal setup.py list)."""
+def entry_requirements(names, entrypoint: str | None) -> str:
+	"""probes.entry_requirements (F1, Nov 3: word_language_model/requirements.txt says torch>=2.6, and only the repo
+	top's was read): the requirements file nearest the entry point, from its own folder up to the top; the top's
+	"requirements.txt" when there's none nearer (or no entry point)."""
+	import posixpath
+
+	names = set(names)
+	d = posixpath.dirname(posixpath.normpath(entrypoint or "")) if entrypoint else ""
+	if d.startswith(("..", "/")):
+		return "requirements.txt"
+	while d:
+		cand = f"{d}/requirements.txt"
+		if cand in names:
+			return cand
+		d = posixpath.dirname(d)
+	return "requirements.txt"
+
+
+def _code_lines(files: dict[str, str], req: str = "requirements.txt") -> list[str]:
+	"""The requirement lines the code's own files state (req: requirements.txt, or the entry point's own,
+	entry_requirements; pyproject.toml, setup.cfg, a literal setup.py list)."""
+	import posixpath
 	import tempfile
 
 	lines = []
-	if "requirements.txt" in files:
-		for raw in files["requirements.txt"].splitlines():
+	if req in files:
+		for raw in files[req].splitlines():
 			m = re.fullmatch(r"\s*(?:-r|--requirement)[\s=]+(\S+)\s*", raw.split(" #", 1)[0])
-			if (
-				m and m[1] in files and m[1] != "requirements.txt"
-			):  # one level: base.txt beside it (B's review)
-				lines += files[m[1]].splitlines()
+			inc = posixpath.normpath(posixpath.join(posixpath.dirname(req), m[1])) if m else None
+			if m and inc in files and inc != req:  # one level: base.txt beside it (B's review)
+				lines += files[inc].splitlines()
 			else:
 				lines.append(raw)
 	with tempfile.TemporaryDirectory() as tmp:
@@ -133,18 +151,20 @@ def _code_lines(files: dict[str, str]) -> list[str]:
 	return lines
 
 
-def torch_asks(files: dict[str, str]) -> list[str]:
-	"""The torch requirements the code's own files state (requirements.txt, pyproject.toml, setup.cfg, a
+def torch_asks(files: dict[str, str], req: str = "requirements.txt") -> list[str]:
+	"""The torch requirements the code's own files state (requirements.txt or `req`, pyproject.toml, setup.cfg, a
 	literal setup.py list), without a marker: "torch>=2.7" from LitGPT's pyproject.toml, Nov 2."""
 	out = []
-	for raw in _code_lines(files):
+	for raw in _code_lines(files, req):
 		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
 		if m and _norm(m["name"]) == "torch" and m["spec"] and not m["marker"]:
 			out.append(f"torch{m['spec'].replace(' ', '')}")
 	return out
 
 
-def image_overrides(files: dict[str, str], packages: list[str]) -> list[tuple[str, str, str]]:
+def image_overrides(
+	files: dict[str, str], packages: list[str], req: str = "requirements.txt"
+) -> list[tuple[str, str, str]]:
 	"""(name, the image's version, the code's ask) for each of the code's own pins an image's packages
 	override (packages: "name==version" lines, PROBE_NEW_PACKAGES): torch 2.6.0 with transformers 4.46.3 and
 	TRL 0.14.0, probed on the torch 2.7.1 image, runs on transformers 4.52.3 and TRL 0.18.0 (B's review, Nov 3).
@@ -160,7 +180,7 @@ def image_overrides(files: dict[str, str], packages: list[str]) -> list[tuple[st
 		if sep:
 			have[_norm(name)] = ver.strip()
 	out, seen = [], set()
-	for raw in _code_lines(files):
+	for raw in _code_lines(files, req):
 		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
 		# a marker may not apply here; a local label (+cu124) isn't a version of the package
 		if m is None or not m["spec"] or m["marker"] or _norm(m["name"]) not in have:
@@ -1049,8 +1069,9 @@ def _project(workdir: Path) -> bool:
 
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
 	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = (),
-	build: bool = False, torch_note: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
-	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
+	build: bool = False, torch_note: bool = False, requirements: str = "requirements.txt",
+) -> tuple[str | None, list[Path]]:  # fmt: skip
+	"""Install workdir/requirements.txt (or `requirements`, the entry point's own: probes.entry_requirements). Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
 	repo (probes.repo_install): with no requirements.txt, install what the repo declares and the known
@@ -1070,7 +1091,10 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	own = (
 		target.parent / f"{target.name}-own"
 	)  # the repo's own metadata: this probe's prefix, never the shared one keyed by its deps
-	req = workdir / "requirements.txt"
+	rel = Path(requirements or "requirements.txt")
+	if rel.is_absolute() or ".." in rel.parts:
+		rel = Path("requirements.txt")
+	req = workdir / rel
 	roots = [r for r in _roots(workdir) if r != workdir] if repo else []
 	optional: list[str] = []
 	if req.is_file():

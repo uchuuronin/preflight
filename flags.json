@@ -32,6 +32,8 @@
 	"probes.tty": false,
 	"probes.skip_login_cells": false,
 	"probes.torch_hint": false,
+	"probes.entry_requirements": false,
+	"harness.map_closure": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,

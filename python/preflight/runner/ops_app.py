@@ -864,10 +864,22 @@ def ground_truth(
 
 		p = {**p, "lens": command_lens, "generate_calls": EVAL_PROBE_CALLS if command_lens == "eval" else 0,
 			"generate_sample": SERVING_PROBE_PROMPTS if command_lens == "serving" else 0}  # fmt: skip
+	from preflight.runner.flags import flag as _on
+
+	req = "requirements.txt"
+	if _on(
+		"probes.entry_requirements"
+	):  # (--flags) the requirements file nearest the entry point, in both runs
+		from preflight.recorder.requirements import entry_requirements
+
+		req = entry_requirements(files, p["entrypoint"])
+		if req != "requirements.txt":
+			opts["requirements"] = req
+		print(f"[ground truth] requirements from {req}", flush=True)
 	if torch_new:  # probes.torch_new in this process only: the image pick and the plain note
 		from preflight.recorder.requirements import IMAGE_TORCH, torch_asks, torch_too_old
 
-		asks = torch_asks(files)
+		asks = torch_asks(files, req)
 		if p["image"] == "probe" and torch_too_old(asks, IMAGE_TORCH):
 			p = {**p, "image": "torch27"}
 		opts["torch_note"] = True
