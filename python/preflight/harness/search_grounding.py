@@ -495,7 +495,19 @@ def ground_failure(
 	# the end the model is sent, scrubbed once: cut first with a margin, so a key across the cut is
 	# still masked, and nothing reads the whole error (the visitor's process writes it, up to 5 MB;
 	# scrub's patterns are quadratic on some long runs: B's review, Nov 2)
-	sent = scrub(probe.error[-SCRUB_CHARS:])[-ERROR_CHARS:]
+	window = probe.error[-SCRUB_CHARS:]
+	if len(probe.error) > SCRUB_CHARS:
+		# the cut may fall inside a key: drop the window's first run (a key has no spaces), since
+		# scrubbing can shrink what follows (a long URL query becomes `?<query>`) and pull the cut's
+		# start into what the model sees (second review, Nov 2)
+		parts = re.split(r"(\s)", window, maxsplit=1)
+		window = "".join(parts[1:]) if len(parts) > 1 else ""
+	sent = scrub(window)[-ERROR_CHARS:]
+	if not sent.strip() or named_keys(sent) == {EVERYTHING}:
+		# a run too long to scan (or one filling the whole window): every source would be ruled out,
+		# so the search isn't paid for
+		log.info("search %s: skipped, the error has a run over %d characters", probe.id, NAMED_TOKEN)
+		return None, []
 	error = re.sub(r"(?i)<\s*/\s*error\s*>", "< /error >", sent)
 	user = (
 		f"Lens: {lens or 'unknown'}. Libraries: {libs or 'unknown'}.\n"

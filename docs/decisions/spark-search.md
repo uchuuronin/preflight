@@ -187,11 +187,13 @@ B took the re-check off A (`from-b.md`, ws-b) and found three things before the 
 
 1. **A denial of service on the worker:** `named_keys` ran on the whole raw error, and its address
    pattern backtracks quadratically on long dotted text (40 KB of `a.` took 41 s). Nothing reads
-   the whole error now: the error is cut to its last 5,000 characters before scrubbing (a margin,
-   so a key across the cut is still masked), and only the 2,500 the model is sent are scanned for
-   addresses. A run of text over 512 characters with no space can't be scanned safely, so then
-   every source is ruled out rather than part of the run read (the first fix truncated such runs,
-   which let an address after one through: the second review). Tested: 40 KB of `a.` and 200 KB of
+   the whole error now: the error is cut to its last 5,000 characters before scrubbing, and the
+   cut's first run is dropped (a key has no spaces, and scrubbing can shrink what follows, which
+   would pull a cut key into view: the third review's case, tested), and only the 2,500 characters
+   the model is sent are scanned for addresses. When that text has a run over 512 characters with
+   no space, it can't be scanned safely, and every source would be ruled out, so no search is made
+   or paid for (the first fix truncated such runs, which let an address after one through: the
+   second review). Tested: 40 KB of `a.` and 200 KB of
    `_KEY` (a pattern the scrub is quadratic on) each run in under 2 s.
 2. **A failed call recorded at $0:** a timeout, an error status or a reply with no output may have
    searched and billed already, unseen. Such a call now records the most its searches could cost

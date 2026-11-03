@@ -410,8 +410,8 @@ def test_a_long_dotted_error_cant_stall_the_worker():
 	f, _ = ground_failure(
 		client(response(answer("found", ISSUE), cited=[ISSUE])), probe(error=OOM + evil), {}
 	)
-	# fast, and one unbroken run that long can't be read safely: every source ruled out
-	assert time.monotonic() - t < 2 and f.code == "search.none_found"
+	# fast, and one unbroken run that long can't be read safely: no search is paid for
+	assert time.monotonic() - t < 2 and f is None
 
 
 def test_a_failed_call_records_the_most_its_searches_could_cost():
@@ -463,8 +463,19 @@ def test_a_long_error_cant_stall_the_scrub_or_hide_an_address():
 	evil = "https://evil.example/fix"
 	err = OOM + "\nSee " + "=" * 600 + evil
 	assert named_keys(err) == {EVERYTHING}
-	f, _ = ground_failure(client(response(answer("found", evil), cited=[evil])), probe(error=err), {})
-	assert f.code == "search.none_found"
+	seen: list = []
+	f, calls = ground_failure(
+		client(response(answer("found", evil), cited=[evil]), seen), probe(error=err), {}
+	)
+	assert f is None and not calls and not seen  # nothing could be cited, so nothing is paid for
+
+
+def test_a_key_cut_at_the_window_edge_is_never_sent():
+	# the second review's case: a long URL query shrinks when scrubbed, pulling the cut into view
+	err = "log hf_" + "S" * 36 + " https://s3.example/o?" + "X" * 4953 + "\nOOM"
+	seen: list = []
+	ground_failure(client(response(answer("none_found")), seen), probe(error=err), {})
+	assert seen and "SSSSS" not in seen[0][1]["input"]
 
 
 def test_a_titles_control_characters_are_stripped_and_one_page_is_one_citation():
