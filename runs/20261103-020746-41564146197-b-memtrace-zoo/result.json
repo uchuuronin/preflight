@@ -1,0 +1,11 @@
+{
+	"name": "20261103-020746-41564146197-b-memtrace-zoo",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41564146197",
+	"ref": "ws-b",
+	"sha": "c4a37d7003593009b513d25f6db5558475ae59ab",
+	"cmd": "modal run --env main python/preflight/corpus/memtrace_app.py::trace --scripts gnn_pyg,retrieval_st",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T02:21:10Z"
+}
