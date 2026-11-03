@@ -111,6 +111,11 @@ class Grid(Strict):
 	fixed: dict[str, KnobValue] = Field(
 		default_factory=dict, description="Values every knob not on an axis is held at"
 	)
+	independent_of: list[str] | None = Field(
+		default=None,
+		description="0.6.4: knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of "
+		"them, so a reader holds them nowhere",
+	)
 	sidecar: str | None = Field(
 		default=None, pattern=r"^blob://", description="Set when the grid is too large to inline"
 	)
@@ -131,6 +136,8 @@ class Grid(Strict):
 			raise ValueError("a knob appears on two axes")
 		if set(axis_ids) & set(self.fixed):
 			raise ValueError("a knob cannot be both an axis and fixed")
+		if set(axis_ids) & set(self.independent_of or ()):
+			raise ValueError("a knob cannot be both an axis and one the target doesn't depend on")
 		if self.sidecar is not None:
 			return self
 		n = self.cells

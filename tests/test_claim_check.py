@@ -224,3 +224,97 @@ def test_the_pipeline_keeps_a_record_with_private_history_off_meta_and_baseten(m
 		flags.reload()
 	off = pipeline._claim_check(rec, Deps, private=False)  # flag off: unchanged
 	assert off is rec
+
+
+def test_a_jobs_spend_stops_at_its_cap_and_the_rest_are_code_only():
+	from preflight.harness.claim_check import annotate_findings
+
+	rec = _twins(_rec())
+	f1 = _ambiguous_finding(rec)
+	f2 = f1.model_copy(update={"id": "t10"})
+	rec = rec.model_copy(update={"findings": [f1, f2]})
+	client = _Picky()  # $0.02 a finding
+	out, calls = annotate_findings(rec, client=client, cap_usd=0.02)
+	assert len(client.sent) == 1 and sum(c.cost_usd for c in calls) == 0.02
+	assert [e.value for f in out for e in f.evidence if e.metric == "claim_check.checked"] == [
+		"Spark Open picked",
+		"code only",
+	]
+
+
+def test_a_diagnosis_is_checked_by_code_only_and_an_earlier_note_is_not_a_claim():
+	from preflight.harness.claim_check import UNSUPPORTED, annotate_findings
+
+	rec = _twins(_rec())
+	diag = _ambiguous_finding(rec).model_copy(update={"source": "spark_diagnosis"})
+	noted = _ambiguous_finding(rec).model_copy(
+		update={"id": "t11", "detail": f"Out of memory. (999.9 GB: {UNSUPPORTED})"}
+	)
+	rec = rec.model_copy(update={"findings": [diag, noted]})
+	client = _Picky()
+	out, _ = annotate_findings(rec, client=client)
+	by = {f.id: f for f in out}
+	assert len(client.sent) == 1 and "999.9" not in client.sent[0]  # only t11 is sent, without the old note
+	assert any(e.value == "code only" for e in by["t9"].evidence if e.metric == "claim_check.checked")
+	assert "999.9 GB" not in (by["t11"].detail or "")
+
+
+def test_the_pipeline_keeps_the_record_when_the_check_raises(monkeypatch):
+	import json
+
+	import preflight.harness.claim_check as cc
+	from preflight.runner import flags, pipeline
+
+	rec = _twins(_rec())
+	rec = rec.model_copy(update={"findings": [_ambiguous_finding(rec)]})
+
+	def boom(*a, **k):
+		raise RuntimeError("a bug in the check")
+
+	class Deps:
+		triage = _Picky()
+		spark = None
+
+	monkeypatch.setattr(cc, "annotate_findings", boom)
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_claim_check": True}))
+	flags.reload()
+	try:
+		assert pipeline._claim_check(rec, Deps, private=False) is rec
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+
+
+def test_baseten_down_bills_what_it_billed_and_the_finding_reads_code_only(monkeypatch):
+	import json
+	from datetime import UTC, datetime
+
+	from preflight.runner import flags, pipeline
+	from preflight.schema import ModelCall
+
+	rec = _twins(_rec())
+	rec = rec.model_copy(update={"findings": [_ambiguous_finding(rec)]})
+
+	class Broken:
+		def __init__(self):
+			self.calls = []
+
+		def structured(self, *a, **k):
+			self.calls.append(ModelCall(provider="baseten", model="m", purpose="claim_check", cost_usd=0.01,
+				at=datetime.now(UTC), ok=False))  # fmt: skip
+			raise RuntimeError("Baseten down")
+
+	class Deps:
+		triage = Broken()
+		spark = None
+
+	monkeypatch.setenv("PREFLIGHT_FLAGS", json.dumps({"harness.spark_claim_check": True}))
+	flags.reload()
+	try:
+		out = pipeline._claim_check(rec, Deps, private=False)
+	finally:
+		monkeypatch.delenv("PREFLIGHT_FLAGS")
+		flags.reload()
+	assert out is not rec and out.costs.llm_usd == round((rec.costs.llm_usd or 0) + 0.01, 6)
+	assert any(c.purpose == "claim_check" and not c.ok for c in out.provenance)
+	assert [e.value for e in out.findings[0].evidence if e.metric == "claim_check.checked"] == ["code only"]

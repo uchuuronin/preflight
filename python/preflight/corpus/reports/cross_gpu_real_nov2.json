@@ -1,0 +1,74 @@
+{
+ "record": "web/src/workspace/fixtures/lora-live-nov1.record.json",
+ "from_gpu": "L4",
+ "to_gpu": "A10",
+ "cells": [
+  {
+   "batch_size": 2,
+   "lr": 0.0001,
+   "record_id": "01M6ENNPTKQZ4SF26EYJGGHKFD",
+   "step_s": 1.03,
+   "mean_s": 0.99,
+   "status": "extrapolated",
+   "predicted_s": 0.7502398007609679,
+   "band": [
+    0.4721780878345869,
+    1.192049722652605
+   ],
+   "ratio": 0.7283881560786095,
+   "within_20": false,
+   "inside": true
+  },
+  {
+   "batch_size": 2,
+   "lr": 0.0002,
+   "record_id": "01M6ENNQDWNRZT02YD583B34PR",
+   "step_s": 0.82,
+   "mean_s": 0.83,
+   "status": "extrapolated",
+   "predicted_s": 0.7502398007609679,
+   "band": [
+    0.4721780878345869,
+    1.192049722652605
+   ],
+   "ratio": 0.9149265862938633,
+   "within_20": true,
+   "inside": true
+  },
+  {
+   "batch_size": 4,
+   "lr": 0.0001,
+   "record_id": "01M6ENNQ83SM005EHXE6PRAQ0M",
+   "step_s": 1.64,
+   "mean_s": 1.61,
+   "status": "extrapolated",
+   "predicted_s": 1.2356303199575884,
+   "band": [
+    0.7720262793640607,
+    1.9776299439653078
+   ],
+   "ratio": 0.7534331219253588,
+   "within_20": false,
+   "inside": true
+  },
+  {
+   "batch_size": 4,
+   "lr": 0.0002,
+   "record_id": "01M6ENNRSJ6X1N4WDWH77WY9KS",
+   "step_s": 1.63,
+   "mean_s": 1.6,
+   "status": "extrapolated",
+   "predicted_s": 1.2356303199575884,
+   "band": [
+    0.7720262793640607,
+    1.9776299439653078
+   ],
+   "ratio": 0.7580554110169254,
+   "within_20": false,
+   "inside": true
+  }
+ ],
+ "within_20": 1,
+ "inside": 4,
+ "n": 4
+}

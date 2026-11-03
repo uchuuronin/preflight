@@ -2470,6 +2470,22 @@
 					"title": "Fixed",
 					"type": "object"
 				},
+				"independent_of": {
+					"anyOf": [
+						{
+							"items": {
+								"type": "string"
+							},
+							"type": "array"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.4: knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere",
+					"title": "Independent Of"
+				},
 				"sidecar": {
 					"anyOf": [
 						{
@@ -5514,7 +5530,7 @@
 	"additionalProperties": false,
 	"properties": {
 		"schema_version": {
-			"default": "0.6.3",
+			"default": "0.6.4",
 			"pattern": "^\\d+\\.\\d+\\.\\d+$",
 			"title": "Schema Version",
 			"type": "string"
@@ -5666,5 +5682,5 @@
 	"title": "FlightRecord",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.3/FlightRecord"
+	"$id": "https://preflight.dev/schema/0.6.4/FlightRecord"
 }

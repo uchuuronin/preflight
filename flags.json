@@ -35,6 +35,7 @@
 	"engine.memory": false,
 	"engine.steptime_cross_gpu": true,
 	"engine.divergence": false,
+	"engine.carry_free_knobs": false,
 	"engine.rl": false,
 	"engine.serving": false,
 	"d.freetier": false,

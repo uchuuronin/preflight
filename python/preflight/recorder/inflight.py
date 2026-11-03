@@ -196,6 +196,48 @@ class Collector:
 		return out
 
 
+def _card(name: str) -> str:
+	return " ".join(name.lower().replace("nvidia", "").split())
+
+
+# review, Nov 2: cards PyTorch names apart but the GPU table resolves to one row; each is a different GPU here
+_VARIANTS = ("a10g", "4090 d")
+
+
+def card_change(
+	record_gpu: str | None,
+	device: str | None,
+	memory_bytes: int | None = None,
+	compute_units: int | None = None,
+) -> str | None:
+	"""A sentence when this run's card isn't the one the record's bands were measured on, else None.
+
+	B's A10 check (Nov 2): Modal's "A10" gave an A10G one run in two, which ran about 11% slower than the A10 the
+	record was probed on, and the engine resolves both to "A10". So a different table GPU, a MIG slice of a full card,
+	or a named variant of the same row (A10G against A10, RTX 4090 D against RTX 4090) is a different GPU: step and
+	total time aren't checked against bands from another card. The device's memory and compute units go to the
+	table's resolver, which splits names PyTorch reports alike (MI250 and MI250X). The record names the card as the
+	runner normalised it, so a probe that itself ran on an A10G reads as "A10" here; until the runner keeps the
+	device's own name, an A10G run against such a record says "different GPU" too, which is the safe side."""
+	if not record_gpu or not device:
+		return None
+	here, there = _card(device), _card(record_gpu)
+	try:
+		from preflight.engine import gpus
+
+		same_table = gpus.resolve(device, memory_bytes, compute_units) == gpus.resolve(record_gpu)
+	except Exception:  # an unknown name: compare the names alone
+		same_table = here == there
+	mig = " mig " in f" {here} " and " mig " not in f" {there} "
+	variant = any(v in here and v not in there for v in _VARIANTS)
+	if same_table and not mig and not variant:
+		return None
+	return (
+		f"different GPU: this run is on {device.strip()}, the record's bands were measured on {record_gpu}; "
+		"step and total time aren't checked against them (memory still is)"
+	)
+
+
 def live_record(parent, summary: dict, *, status: str, error: str | None = None, ids=None):
 	"""A new record of the real run: the parent's map, knobs and predictions, plus probe `live`."""
 	from preflight.runner.record_jobs import derive
@@ -284,7 +326,19 @@ def main(argv: list[str] | None = None) -> int:
 	def peak():
 		return torch.cuda.max_memory_allocated(), torch.cuda.max_memory_reserved()  # counters, no sync
 
-	col = Collector(bands_from(parent, ns.total_steps), window=max(1, ns.window), peak=peak if cuda else None,
+	bands = bands_from(parent, ns.total_steps)
+	record_gpu = parent.env.gpu.name if parent.env and parent.env.gpu else None
+	props = torch.cuda.get_device_properties(0) if cuda else None
+	changed = card_change(
+		record_gpu,
+		torch.cuda.get_device_name(0) if cuda else None,
+		props.total_memory if props else None,
+		props.multi_processor_count if props else None,
+	)
+	if changed:
+		say(changed)
+		bands = Bands(None, bands.peak_bytes, None, bands.total_steps)
+	col = Collector(bands, window=max(1, ns.window), peak=peak if cuda else None,
 		alert=say, write=write)  # fmt: skip
 	if script_args != list(parent.job.source.args or []):
 		say(f"the record was predicted for arguments {parent.job.source.args or []}, this run has {script_args}: "

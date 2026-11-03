@@ -317,7 +317,10 @@ def _run_divergence(cfg: CorpusConfig, device: torch.device, data_path: str | No
 	data = _text_tokens(data_path, gen)
 	precision = _DTYPES[p["precision"]]
 	amp = torch.autocast(device.type, dtype=precision) if precision != torch.float32 else nullcontext()
-	scaler = torch.amp.GradScaler(device.type, enabled=precision == torch.float16 and device.type == "cuda")
+	# the realistic sweep (Nov 2) runs fp16 with no scaler on purpose: a usual trigger of fp16 blow-ups
+	scaler = torch.amp.GradScaler(
+		device.type, enabled=precision == torch.float16 and device.type == "cuda" and p.get("scaler", True)
+	)
 	opt = torch.optim.AdamW(
 		model.parameters(), lr=p["lr"], betas=(0.9, p["beta2"]), weight_decay=p["weight_decay"]
 	)
@@ -403,7 +406,7 @@ def run_config(cfg: CorpusConfig, device: str = "cuda", data_path: str | None = 
 	try:
 		if cfg.kind == "kernels":
 			result = _run_kernels(cfg, dev)
-		elif cfg.kind == "divergence":
+		elif cfg.kind in ("divergence", "divergence_real"):
 			result = _run_divergence(cfg, dev, data_path)
 		elif cfg.kind == "hf":
 			from preflight.corpus.hf_worker import run_hf

@@ -32,6 +32,7 @@ from preflight.corpus.store import ResultStore
 DEFAULT_EST_SECONDS = {
 	"kernels": 45.0,
 	"divergence": 180.0,
+	"divergence_real": 180.0,
 	"hf": 120.0,
 }  # guess: per-config seconds before any finish; replaced by the running p90 after 3 configs (measured)
 DEFAULT_OVERHEAD = 1.25  # guess: container start and idle Modal bills; replaced by Modal's billed/elapsed ratio after the first wave

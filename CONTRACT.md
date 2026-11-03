@@ -1,4 +1,4 @@
-# Preflight contract v0.6.3
+# Preflight contract v0.6.4
 
 Four agents build Preflight in parallel against this contract. The code in
 `python/preflight/schema/` is the source of truth; this file is the map. Every
@@ -133,6 +133,10 @@ an `Idempotency-Key` on every write that spends money. UI strings through
 
 ## Changelog
 
+- 0.6.4 (Nov 2, additive; B's, after the validation freeze, from Chiya's Nov 2 item 3): `Grid.independent_of`
+  (optional, absent by default): the knobs a grid's target doesn't depend on (the learning rate and its peers for
+  memory, time and cost), so a reader answers at any value of them instead of holding them at `fixed`. Emitted only
+  with `engine.carry_free_knobs` on (off). A reader that doesn't know it can ignore it; 0.6.3 records load unchanged.
 - 0.6.3 (Nov 2, additive; C's check-in help, Chiya's go): `JobRequest.extra_packages` (up to 10 PyPI
   names from Preflight's list, `recorder.requirements.known_packages()`; installed after the code's own
   requirements, wheels only, the image's stack pinned; a name off the list fails the job with

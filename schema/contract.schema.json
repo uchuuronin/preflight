@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.3/contract",
+	"$id": "https://preflight.dev/schema/0.6.4/contract",
 	"title": "PreflightContract",
-	"description": "Preflight contract v0.6.3. Generated; do not edit.",
+	"description": "Preflight contract v0.6.4. Generated; do not edit.",
 	"type": "object",
 	"properties": {
 		"FlightRecord": {
@@ -2089,7 +2089,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"schema_version": {
-					"default": "0.6.3",
+					"default": "0.6.4",
 					"pattern": "^\\d+\\.\\d+\\.\\d+$",
 					"title": "Schema Version",
 					"type": "string"
@@ -2662,6 +2662,22 @@
 					"description": "Values every knob not on an axis is held at",
 					"title": "Fixed",
 					"type": "object"
+				},
+				"independent_of": {
+					"anyOf": [
+						{
+							"items": {
+								"type": "string"
+							},
+							"type": "array"
+						},
+						{
+							"type": "null"
+						}
+					],
+					"default": null,
+					"description": "0.6.4: knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere",
+					"title": "Independent Of"
 				},
 				"sidecar": {
 					"anyOf": [
