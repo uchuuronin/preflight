@@ -1,0 +1,11 @@
+{
+	"name": "20261103-013558-41560761153-d-spark-search-cap10",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41560761153",
+	"ref": "ws-d",
+	"sha": "4be42a83dcf4c24b1c7d4160e5ce5aafd5cf93b3",
+	"cmd": "python scripts/spark_search_validate.py --max-tool-calls 10",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T01:37:23Z"
+}
