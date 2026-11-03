@@ -1,0 +1,32 @@
+{
+ "$comment": "fresh scripts, once",
+ "runs": [
+  {
+   "script": "fresh-F1",
+   "set": "unseen",
+   "job_type": "pretrain",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "pytorch/examples word_language_model/main.py at acc295dc, `python main.py --cuda --epochs 6`",
+   "$first_attempt": "record 01M6H63PC8F1RJBT6W032WZS53 (share <share-token>): all three probes script_exit 2, `unrecognized arguments: --cuda` (the script at this commit has --accel); lens read finetune, not pretraining (a-fresh-F1-checkin 41681107764)"
+  },
+  {
+   "script": "fresh-F2",
+   "set": "unseen",
+   "job_type": "finetune",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "huggingface/notebooks examples/text_classification.ipynb at c31b9837, as a notebook",
+   "$first_attempt": "record 01M6H63RBXBK4TM14GZCNN9WED (share <share-token>): p1 stopped at the notebook's `notebook_login()` cell, mislabelled missing_package; p2, p3 skipped (a-fresh-F2-checkin 41681116541)"
+  },
+  {
+   "script": "fresh-F3",
+   "set": "unseen",
+   "job_type": "vision",
+   "harnessed_without_edits": false,
+   "used_for_tuning": false,
+   "$what": "kuangliu/pytorch-cifar main.py at 49b7aa97, `python main.py`",
+   "$first_attempt": "record 01M6H63QPQJ8AP4HCEKG98P2DK (share <share-token>): all three probes `ValueError` at utils.py:45, `os.popen('stty size')`: no terminal in a probe (a-fresh-F3-checkin 41681124867)"
+  }
+ ]
+}
