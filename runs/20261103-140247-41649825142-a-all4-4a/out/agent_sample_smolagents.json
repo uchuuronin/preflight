@@ -1,0 +1,15 @@
+{
+  "sample": {
+    "tasks": [],
+    "population": null,
+    "selection": "the first 0 tasks the script started; script wall 129 s, stopped after 120 s with no model calls; proxy answered 429 sample_complete (muse-spark-1.3); 1 calls refused past the...",
+    "rate_limit_rpm": null,
+    "rate_limit_tpm": null,
+    "ended": "stalled",
+    "concurrency": null
+  },
+  "usd": 0,
+  "task_ends": {},
+  "task_rows": {},
+  "provider": "meta"
+}
