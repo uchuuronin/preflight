@@ -298,11 +298,11 @@ def test_a_lazy_package_s_type_checking_imports_are_followed():
 
 
 def test_the_data_pass_keeps_the_budget_without_sizes_and_doesn_t_count_as_imports():
-	repo = {"train.py": "import util\n", "util.py": "", "big.json": "x" * 50, "b.json": "y"}
+	repo = {"train.py": "import util\n", "util.py": "", "tool.py": "", "big.json": "x" * 50, "b.json": "y"}
 	got, info = import_closure(repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99, max_bytes=30,
-		sizes={"train.py": 12, "util.py": 0}, args=["util.py"])  # fmt: skip
+		sizes={"train.py": 12, "util.py": 0, "tool.py": 0}, args=["tool.py"])  # fmt: skip
 	assert "big.json" not in got and info["bytes"] <= 30 and "big.json" in info["data_left_out"]
-	assert info["imported"] == 1  # util.py, imported; naming it in the arguments doesn't count it twice
+	assert "tool.py" in got and info["imported"] == 1  # tool.py is read as named, not counted as an import
 
 
 def test_a_follow_up_on_a_record_read_before_the_data_pass_still_matches_its_code():
