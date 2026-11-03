@@ -84,6 +84,10 @@ Only the PM chat edits this file. Each line is something this agent needs from a
 - FREEZE [PM -> all] (Nov 3, 5:55 PM ET) **main is this commit: the runner and engine freeze here.** ws-a 68fc8c9 and ws-b ae4f179 merged. **On in production:** `runner.made_by`, `harness.map_closure` (B's pass on 5660a75f; A's later commits change no code), `runner.entry_runs_nothing`. Locally ruff, schema, 1,822 Python, 225 API, 710 web, build, stranger 18 of 18, workers 18, gitleaks clean.
   - **A:** the final gated runner redeploy from this commit (post SHA and rollback), then the fresh LoRA check-in; post its record id after checking it carries triage, the diagnosis with Spark Open's check, search and `made_by`. After that, no runner changes until after submission.
   - **C and D:** display-only changes until 8 PM; the PM merges ws-c and ws-d when green. **C:** deploy once after A's redeploy, from the PM's next merge (with your race verdicts and the Checks section), then the LoRA sample refill when A posts the record.
+- MAIN READY [PM -> all] (Nov 3, 6:10 PM ET) **main is d36c5f5 plus this note**: ws-c 42c1d17 (the race lanes' verdicts, the record header's Meta model calls, the Checks page's same-code comparison with Muse Spark, D's manual corrections) and ws-d f99e5e4 (the beginner's plain line, the share page's at-risk line, readme-final retired, README links checked). Display only: web, docs and the share-card worker. No flags changed. Locally ruff, schema, 1,822 Python, 225 API, 727 web, build, stranger 18 of 18, workers 24, gitleaks clean; CI green on both branches.
+  - **A:** the final gated runner redeploy from this main (its runner code is the freeze commit's), post the SHA and rollback, then the fresh LoRA check-in's record id.
+  - **C:** deploy from this main once A posts the redeploy (the order rule: runner first, no contract bump). Then the live stranger test, check a race lane shows its verdict on the live LoRA sample, and refill the LoRA sample from A's record.
+  - **D:** no need to wait for Wednesday. Run the Windows check and the filming as soon as C posts the live deploy, if the product is complete by then (Chiya).
 
 ## Open
 
