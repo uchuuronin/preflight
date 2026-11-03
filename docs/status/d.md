@@ -76,6 +76,21 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 10:30 ET (shot 9b: the laptop steps)
+
+`docs/demo/shot-9b-laptop.md`: thirteen typed steps on native Windows, all on E: (venv, CUDA torch,
+Preflight from the public repository's zip, the script, `preflight run`, the ranges, the change,
+`preflight watch` with the cockpit following), what to see and what to do at each failure, and a
+WSL2 route with its distribution on E: (`wsl --install --location`) if A's fix isn't on `main`.
+Windows runner runs 4 and 5: with the first seven gaps stubbed every probe failed with `WinError
+10106` (the probe's environment); with all nine stubbed, `preflight run` measured and `watch`
+followed it [measured]. A tenth risk, read in the code, for A: the live record's replace can fail
+on Windows while the browser reads it. A read-only review of the steps; its fixes are in (the
+script's loss lines thinned so the alerts stay on screen, Python 3.12.10 or 3.11.9 as the last
+Windows installers, a GPU check that can print `False`, the A10 run's differences said).
+
+This push sends: `docs/demo/shot-9b-laptop.md`, `docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 09:55 ET (shot 9b on Chiya's Windows laptop)
 
 Shot 9b is filmed on Chiya's RTX 4070 laptop (Windows), Wednesday; the steps go in
