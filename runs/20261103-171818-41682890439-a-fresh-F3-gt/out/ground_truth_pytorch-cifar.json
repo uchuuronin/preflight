@@ -1,0 +1,98 @@
+{
+  "script": "pytorch-cifar",
+  "entrypoint": "main.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ValueError",
+    "error": "ValueError: not enough values to unpack (expected 2, got 0)\n",
+    "seconds": 0.19502686099999966,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 4.7
+  },
+  "recorder": {
+    "status": "error",
+    "error": "ValueError: not enough values to unpack (expected 2, got 0). ValueError: not enough values to unpack (expected 2, got 0) at utils.py:45, before the first optimizer step (stage: running script)",
+    "error_code": "user_error",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 3.677,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 3636375552.0
+    },
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\nstty: 'standard input': Inappropriate ioctl for device\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T17:18:52Z",
+      "duration_s": 3.677,
+      "error": "ValueError: not enough values to unpack (expected 2, got 0). ValueError: not enough values to unpack (expected 2, got 0) at utils.py:45, before the first optimizer step (stage: running script)",
+      "error_code": "user_error",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 20.566,
+        "max_w": 20.566,
+        "samples": 4
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 3636375552.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 3.677,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "vision",
+  "image": "probe"
+}
