@@ -1,0 +1,94 @@
+{
+  "script": "examples",
+  "entrypoint": "word_language_model/main.py",
+  "args": [
+    "--cuda",
+    "--epochs",
+    "6"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "SystemExit",
+    "error": "SystemExit: 2\n",
+    "seconds": 0.3083959390000004,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10G",
+    "timing": "cuda_events",
+    "wall_s": 3.9
+  },
+  "recorder": {
+    "status": "error",
+    "error": "script exited with code 2 after step 0",
+    "error_code": "script_exit",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 2.837,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\nusage: main.py [-h] [--data DATA] [--model MODEL] [--emsize EMSIZE]\n               [--nhid NHID] [--nlayers NLAYERS] [--lr LR] [--clip CLIP]\n               [--epochs EPOCHS] [--batch_size N] [--bptt BPTT]\n               [--dropout DROPOUT] [--tied] [--seed SEED] [--log-interval N]\n               [--save SAVE] [--onnx-export ONNX_EXPORT] [--nhead NHEAD]\n               [--dry-run] [--accel] [--use-optimizer]\nmain.py: error: unrecognized arguments: --cuda\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T17:18:46Z",
+      "duration_s": 2.837,
+      "error": "script exited with code 2 after step 0",
+      "error_code": "script_exit",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 2.837,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "finetune",
+  "image": "probe"
+}
