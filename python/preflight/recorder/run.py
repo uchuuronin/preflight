@@ -162,12 +162,6 @@ def main(spec_path: str) -> int:
 
 	os.chdir(workdir)
 	sys.path.insert(0, workdir)
-	entry_dir = os.path.dirname(os.path.join(workdir, spec["entrypoint"]))
-	if spec.get("install_repo") and entry_dir != workdir:
-		# probes.repo_install: as `python path/to/script.py` does, the script's own folder comes first, so it
-		# imports the modules beside it (OGB arxiv's gnn.py imports its logger.py; the full run did, the probe
-		# didn't: a-all3-8, Nov 2)
-		sys.path.insert(0, entry_dir)
 	if spec.get("install_requirements") and spec.get("deps"):
 		from .requirements import install
 
@@ -196,6 +190,13 @@ def main(spec_path: str) -> int:
 			sys.path.insert(i, str(d))  # after the script's own files, before the image
 		parts = [*(str(d) for d in dirs), os.environ.get("PYTHONPATH") or ""]
 		os.environ["PYTHONPATH"] = os.pathsep.join(p for p in parts if p)
+	if spec.get("install_repo"):
+		# probes.repo_install: as `python path/to/script.py` does, the script's own folder comes first, so it
+		# imports the modules beside it (OGB arxiv's gnn.py imports its logger.py; the full run did, the probe
+		# didn't: a-all3-8, Nov 2); after the installs, so the deps keep their place behind the repo's own files
+		entry_dir = os.path.normpath(os.path.dirname(os.path.join(workdir, spec["entrypoint"])))
+		if entry_dir != os.path.normpath(workdir):
+			sys.path.insert(0, entry_dir)
 	sys.argv = [spec["entrypoint"], *spec.get("args", [])]
 	if spec.get("seed") is not None:
 		_seed(int(spec["seed"]), force=bool(spec.get("seed_force")))
@@ -221,7 +222,8 @@ def main(spec_path: str) -> int:
 		after at least one measured generate call or scoring batch (gsm8k at --limit 16: two calls, then done)."""
 		if len(rec.steps) >= 2:
 			return True
-		return bool(rec.eval_units) and (rec._gen_calls_done >= 1 or bool(rec._fwd))
+		# an eval only: a script that took an optimizer step is a training run, judged by its steps
+		return bool(rec.eval_units) and not rec.steps and (rec._gen_calls_done >= 1 or bool(rec._fwd))
 
 	try:
 		runpy.run_path(os.path.join(workdir, spec["entrypoint"]), run_name="__main__")

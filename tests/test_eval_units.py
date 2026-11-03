@@ -62,7 +62,9 @@ def _probe(script, **kw):
 def test_scoring_batches_are_units_and_the_probe_stops_after_them():
 	p = _probe(SCORE, eval_units=3)
 	assert p.status == "ok", p.error
-	assert p.extras["eval_forward_batches"] == 3.0 and p.extras["eval_forward_tokens_mean"] == 64.0
+	assert (
+		p.extras["eval_forward_batches"] == 3.0
+	)  # after the two warm-up batches, left out and p.extras["eval_forward_tokens_mean"] == 64.0
 	assert p.extras["eval_forward_rows_mean"] == 4.0 and p.extras["eval_forward_s_p50"] >= 0
 
 
@@ -94,3 +96,29 @@ def test_with_repo_install_the_scripts_own_folder_is_on_its_path():
 	assert on.status == "ok", on.error
 	off = run_probe(ProbeSpec(**spec)).probe
 	assert off.status == "error" and off.error_code == "missing_package"  # as before: logger isn't found
+
+
+def test_a_training_runs_no_grad_forwards_are_not_scoring_batches():
+	script = """
+import torch
+from transformers.modeling_utils import PreTrainedModel
+
+class M(PreTrainedModel):
+    def __init__(self):
+        super().__init__()
+        self.lin = torch.nn.Linear(2, 2)
+    def forward(self, x):
+        return self.lin(x)
+
+m, ref = M(), M()
+opt = torch.optim.SGD(m.parameters(), 0.1)
+for _ in range(12):
+    with torch.no_grad():
+        ref(torch.ones(1, 2))  # a reference forward each step, as a GRPO or DPO loop does
+    opt.zero_grad()
+    m(torch.ones(1, 2)).sum().backward()
+    opt.step()
+"""
+	p = _probe(script, eval_units=3)
+	assert p.status == "ok", p.error
+	assert p.steps >= 3 and "eval_forward_batches" not in p.extras  # stopped by its steps, not the forwards

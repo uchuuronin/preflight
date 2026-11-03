@@ -109,6 +109,11 @@ def _step_has(field_name: str) -> bool:
 _STEP_HAS_RESERVED = _step_has("reserved_bytes")
 
 
+# probes.eval_units: scoring batches run before the measured ones and left out of their stats (CUDA warm-up;
+# lm_eval's batch_size=auto tries its largest batches first) [guess: two]
+EVAL_WARMUP_UNITS = 2
+
+
 class StopProbe(BaseException):
 	pass
 
@@ -974,10 +979,11 @@ class Recorder:
 
 		def factory(orig):
 			def call(model, *args, **kwargs):
-				if rec._fwd_depth or rec._generating or torch.is_grad_enabled():
+				# a training run's no_grad forwards (a reference model, its own eval) aren't scoring batches
+				if rec._fwd_depth or rec._generating or torch.is_grad_enabled() or rec.steps:
 					return orig(model, *args, **kwargs)
 				rec._maybe_stop()
-				if len(rec._fwd) >= rec.eval_units:
+				if len(rec._fwd) >= rec.eval_units + EVAL_WARMUP_UNITS:
 					raise StopProbe
 				rec._fwd_depth += 1
 				try:
@@ -1000,11 +1006,14 @@ class Recorder:
 
 	def _fwd_summary(self) -> dict:
 		"""The scoring batches' counts and times (probes.eval_units), as extras B can read by name."""
-		if not self._fwd:
+		kept = self._fwd[
+			EVAL_WARMUP_UNITS:
+		]  # the first ones: warm-up, and lm_eval's batch-size search at its largest
+		if not kept:
 			return {}
-		secs = [f["seconds"] for f in self._fwd]
-		toks = [f["tokens"] for f in self._fwd if f["tokens"]]
-		rows = [f["rows"] for f in self._fwd if f["rows"]]
+		secs = [f["seconds"] for f in kept]
+		toks = [f["tokens"] for f in kept if f["tokens"]]
+		rows = [f["rows"] for f in kept if f["rows"]]
 		out = {"eval_forward_batches": float(len(secs)), "eval_forward_s_p50": statistics.median(secs),
 			"eval_forward_s_total": sum(secs)}  # fmt: skip
 		if toks:
