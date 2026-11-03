@@ -76,6 +76,22 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 15:50 ET (B's corrections and block; the 12 repos through New flight)
+
+B's fact-check of readme-final and the submission docs applied (about 30 corrections, most
+already in after the rebuild on main), with B's final validation block copied byte for byte into
+readme-final, and every unseen-script count removed outside `docs/validation/` (Chiya, 2:30): the
+submission numbers row, the portal's "What's next" clause, the video plan's shot 13 status and
+readme-final's check-in row (now main's README's). The 12 held-out repos walked through C's new
+Entry point and Arguments fields on a local production build of ws-c `8b756b13`, up to the press
+with every write aborted in the browser: 7 go in as listed, 5 can't (torchtune's two commands,
+LitGPT's and vLLM's console commands, smolagents' edit, the notebook); the script runs from the
+repo's top, which breaks F1's default data path. Posted for C. `docs/guide/knobs.md` is C's now
+and isn't in this push.
+
+This push sends: `docs/readme-final.md`, `docs/submission.md`, `docs/submission/*`,
+`docs/demo/video-plan.md`, `docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 14:10 ET (second stranger walkthrough, for C)
 
 The walkthrough on a production build of `main` (`b40012bb`, re-checked on `6d40cd40`), posted for
