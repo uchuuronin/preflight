@@ -19,4 +19,9 @@ describe("a page from before a deploy", () => {
 		expect(reloadOnceForStaleChunk(120_000, store, reload)).toBe(true);
 		expect(reload).toHaveBeenCalledTimes(2);
 	});
+	it("never reloads without storage to remember it by", () => {
+		const reload = vi.fn();
+		expect(reloadOnceForStaleChunk(1_000, null, reload)).toBe(false);
+		expect(reload).not.toHaveBeenCalled();
+	});
 });

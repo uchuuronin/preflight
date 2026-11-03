@@ -140,7 +140,11 @@ export async function loadRecord(ref: string): Promise<LoadedRecord> {
 	const sample = SAMPLES.find((s) => s.id === id && (!s.flag || flag(s.flag)));
 	if (sample) {
 		try {
-			return normaliseRecord(await sample.load());
+			const raw = await sample.load();
+			// Vite's preload helper resolves to nothing once the page has chosen to reload for a gone
+			// chunk (staleChunk.ts): stay loading until it does, rather than show an error.
+			if (!raw) return new Promise<LoadedRecord>(() => {});
+			return normaliseRecord(raw);
 		} catch (e) {
 			// a page from before a deploy asks for a chunk the new one doesn't have: reload once
 			if (isStaleChunkError(e) && reloadOnceForStaleChunk()) return new Promise<LoadedRecord>(() => {});

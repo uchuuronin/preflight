@@ -9,12 +9,14 @@ const KEY = "pf.reloadedForChunk";
 const WINDOW_MS = 60_000;
 
 export function reloadOnceForStaleChunk(now = Date.now(), store: Pick<Storage, "getItem" | "setItem"> | null = safeSession(), reload = () => location.reload()): boolean {
+	// No storage (blocked cookies, a sandbox): no marker to stop a loop, so no reload.
+	if (!store) return false;
 	try {
-		const last = Number(store?.getItem(KEY) ?? 0);
+		const last = Number(store.getItem(KEY) ?? 0);
 		if (last && now - last < WINDOW_MS) return false;
-		store?.setItem(KEY, String(now));
+		store.setItem(KEY, String(now));
 	} catch {
-		return false; // no storage: don't risk a reload loop
+		return false;
 	}
 	reload();
 	return true;
@@ -29,8 +31,9 @@ function safeSession(): Storage | null {
 }
 
 export function installStaleChunkReload(): void {
+	// Only for a missing chunk: an add-on whose own code throws stays loadAddons's to skip and report.
 	window.addEventListener("vite:preloadError", (e) => {
-		if (reloadOnceForStaleChunk()) e.preventDefault();
+		if (isStaleChunkError((e as Event & { payload?: unknown }).payload) && reloadOnceForStaleChunk()) e.preventDefault();
 	});
 }
 
