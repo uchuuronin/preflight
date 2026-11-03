@@ -193,17 +193,197 @@
 			"memory_bytes": 11811160064,
 			"confidence": "datasheet"
 		},
+		"RTX-3050-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 4294967296,
+			"confidence": "derived"
+		},
+		"RTX-3050-Ti-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 4294967296,
+			"confidence": "derived"
+		},
+		"RTX-3060": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 12884901888,
+			"confidence": "derived"
+		},
+		"RTX-3060-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 6442450944,
+			"confidence": "derived"
+		},
+		"RTX-3060-Ti": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-3070": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-3070-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-3070-Ti": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-3070-Ti-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-3080-10GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 10737418240,
+			"confidence": "derived"
+		},
+		"RTX-3080-12GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 12884901888,
+			"confidence": "derived"
+		},
+		"RTX-3080-Laptop-16GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
+		"RTX-3080-Laptop-8GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-3080-Ti": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 12884901888,
+			"confidence": "derived"
+		},
+		"RTX-3080-Ti-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
 		"RTX-3090": {
 			"vendor": "nvidia",
 			"arch": "ampere",
 			"memory_bytes": 25769803776,
 			"confidence": "datasheet"
 		},
+		"RTX-3090-Ti": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 25769803776,
+			"confidence": "derived"
+		},
+		"RTX-4050-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 6442450944,
+			"confidence": "derived"
+		},
+		"RTX-4060": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-4060-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-4060-Ti-16GB": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
+		"RTX-4060-Ti-8GB": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-4070": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 12884901888,
+			"confidence": "derived"
+		},
+		"RTX-4070-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
+		"RTX-4070-Super": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 12884901888,
+			"confidence": "derived"
+		},
+		"RTX-4070-Ti": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 12884901888,
+			"confidence": "derived"
+		},
+		"RTX-4070-Ti-Super": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
+		"RTX-4080": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
+		"RTX-4080-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 12884901888,
+			"confidence": "derived"
+		},
+		"RTX-4080-Super": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
+		},
 		"RTX-4090": {
 			"vendor": "nvidia",
 			"arch": "ada",
 			"memory_bytes": 25393994138,
 			"confidence": "datasheet"
+		},
+		"RTX-4090-Laptop": {
+			"vendor": "nvidia",
+			"arch": "ada",
+			"memory_bytes": 17179869184,
+			"confidence": "derived"
 		},
 		"RTX-5090": {
 			"vendor": "nvidia",
@@ -306,8 +486,38 @@
 		"geforce gtx titan x": "TITAN-X-Maxwell",
 		"geforce rtx 2080": "RTX-2080",
 		"geforce rtx 2080 ti": "RTX-2080-Ti",
+		"geforce rtx 3050 laptop gpu": "RTX-3050-Laptop",
+		"geforce rtx 3050 ti laptop gpu": "RTX-3050-Ti-Laptop",
+		"geforce rtx 3060": "RTX-3060",
+		"geforce rtx 3060 laptop gpu": "RTX-3060-Laptop",
+		"geforce rtx 3060 ti": "RTX-3060-Ti",
+		"geforce rtx 3070": "RTX-3070",
+		"geforce rtx 3070 laptop gpu": "RTX-3070-Laptop",
+		"geforce rtx 3070 ti": "RTX-3070-Ti",
+		"geforce rtx 3070 ti laptop gpu": "RTX-3070-Ti-Laptop",
+		"geforce rtx 3080": "RTX-3080-10GB",
+		"geforce rtx 3080 12gb": "RTX-3080-12GB",
+		"geforce rtx 3080 laptop gpu": "RTX-3080-Laptop-16GB",
+		"geforce rtx 3080 laptop gpu 8gb": "RTX-3080-Laptop-8GB",
+		"geforce rtx 3080 ti": "RTX-3080-Ti",
+		"geforce rtx 3080 ti laptop gpu": "RTX-3080-Ti-Laptop",
 		"geforce rtx 3090": "RTX-3090",
+		"geforce rtx 3090 ti": "RTX-3090-Ti",
+		"geforce rtx 4050 laptop gpu": "RTX-4050-Laptop",
+		"geforce rtx 4060": "RTX-4060",
+		"geforce rtx 4060 laptop gpu": "RTX-4060-Laptop",
+		"geforce rtx 4060 ti": "RTX-4060-Ti-8GB",
+		"geforce rtx 4060 ti 16gb": "RTX-4060-Ti-16GB",
+		"geforce rtx 4070": "RTX-4070",
+		"geforce rtx 4070 laptop gpu": "RTX-4070-Laptop",
+		"geforce rtx 4070 super": "RTX-4070-Super",
+		"geforce rtx 4070 ti": "RTX-4070-Ti",
+		"geforce rtx 4070 ti super": "RTX-4070-Ti-Super",
+		"geforce rtx 4080": "RTX-4080",
+		"geforce rtx 4080 laptop gpu": "RTX-4080-Laptop",
+		"geforce rtx 4080 super": "RTX-4080-Super",
 		"geforce rtx 4090": "RTX-4090",
+		"geforce rtx 4090 laptop gpu": "RTX-4090-Laptop",
 		"geforce rtx 5090": "RTX-5090",
 		"gfx908": "MI100",
 		"gfx950": "MI355X",
@@ -366,8 +576,38 @@
 		"rtx pro 6000 blackwell": "RTX-PRO-6000-96GB",
 		"rtx-2080": "RTX-2080",
 		"rtx-2080-ti": "RTX-2080-Ti",
+		"rtx-3050-laptop": "RTX-3050-Laptop",
+		"rtx-3050-ti-laptop": "RTX-3050-Ti-Laptop",
+		"rtx-3060": "RTX-3060",
+		"rtx-3060-laptop": "RTX-3060-Laptop",
+		"rtx-3060-ti": "RTX-3060-Ti",
+		"rtx-3070": "RTX-3070",
+		"rtx-3070-laptop": "RTX-3070-Laptop",
+		"rtx-3070-ti": "RTX-3070-Ti",
+		"rtx-3070-ti-laptop": "RTX-3070-Ti-Laptop",
+		"rtx-3080-10gb": "RTX-3080-10GB",
+		"rtx-3080-12gb": "RTX-3080-12GB",
+		"rtx-3080-laptop-16gb": "RTX-3080-Laptop-16GB",
+		"rtx-3080-laptop-8gb": "RTX-3080-Laptop-8GB",
+		"rtx-3080-ti": "RTX-3080-Ti",
+		"rtx-3080-ti-laptop": "RTX-3080-Ti-Laptop",
 		"rtx-3090": "RTX-3090",
+		"rtx-3090-ti": "RTX-3090-Ti",
+		"rtx-4050-laptop": "RTX-4050-Laptop",
+		"rtx-4060": "RTX-4060",
+		"rtx-4060-laptop": "RTX-4060-Laptop",
+		"rtx-4060-ti-16gb": "RTX-4060-Ti-16GB",
+		"rtx-4060-ti-8gb": "RTX-4060-Ti-8GB",
+		"rtx-4070": "RTX-4070",
+		"rtx-4070-laptop": "RTX-4070-Laptop",
+		"rtx-4070-super": "RTX-4070-Super",
+		"rtx-4070-ti": "RTX-4070-Ti",
+		"rtx-4070-ti-super": "RTX-4070-Ti-Super",
+		"rtx-4080": "RTX-4080",
+		"rtx-4080-laptop": "RTX-4080-Laptop",
+		"rtx-4080-super": "RTX-4080-Super",
 		"rtx-4090": "RTX-4090",
+		"rtx-4090-laptop": "RTX-4090-Laptop",
 		"rtx-5090": "RTX-5090",
 		"rtx-a4000": "RTX-A4000",
 		"rtx-a5000": "RTX-A5000",
