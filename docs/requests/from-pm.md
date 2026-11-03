@@ -64,7 +64,7 @@ Only the PM chat edits this file. Each line is something this agent needs from a
   - **On in production:** `probes.repo_install`, `probes.extra_hosts`, `probes.eval_units`, `runner.command_checkin`, `probes.agent_proxy_replies`, `runner.free_resend`, `c.checkin_help`, `engine.carry_free_knobs`. Off: `probes.uv_install` (it got none of the nine further), `probes.agent_single_task`, `runner.read_closure` (until its cutoff is deterministic), `engine.context_same_stack`, `engine.divergence`, `engine.serving`, `harness.spark_search`, `probes.lr_range`.
   - **Deploy order:** A redeploys the runner from this main (gated); then C deploys. Bring-your-own-script reaches visitors only after both.
   - **Fresh scripts:** the PM wrote a second held-out list of 3 scripts at 5:55 AM, before anyone ran them; its SHA-256 is `docs/validation/fresh-hash.txt`. Chiya gives the list to A only; A runs each once through production after the redeploy, first attempt only, no Preflight change in between. B scores them separately from the nine.
-  - **AMD:** B's holdout is scored: NVIDIA→MI300X step time within 20% on 22% of 1,147 pairs (Wilson 20% to 25%); the ±22% band covers 36%, not 90%; predictions run short (median 0.63x). A move across vendors keeps abstaining on step time. The pod is terminated (Chiya).
+  - **AMD:** B's holdout is scored: NVIDIA→MI300X step time within 20% on 22% of 1,147 pairs (Wilson 20% to 25%); the ±22% band covers 36%, not 90%; predictions run short (median 0.63x). A move across vendors keeps abstaining on step time. Nothing more runs on the MI300X.
 
 ## Open
 
