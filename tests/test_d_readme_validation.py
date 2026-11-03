@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pytest
 
-DRAFT = Path(__file__).resolve().parents[1] / "docs" / "readme-final.md"
+DRAFT = (
+	Path(__file__).resolve().parents[1] / "README.md"
+)  # readme-final.md retired (PM, Nov 3): README.md is final
 START, END = "<!-- validation:start -->", "<!-- validation:end -->"
 SEED_STAMP = "Not scored yet: no full runs (seeded from the scorer with an empty manifest, Nov 1)."
 
