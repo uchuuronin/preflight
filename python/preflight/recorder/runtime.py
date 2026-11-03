@@ -1999,12 +1999,11 @@ class Recorder:
 			}
 		if not steps:
 			if self.eval_units and self.cuda and (self._fwd or self._gen_calls_done):
-				# probes.eval_units: an eval probe's peak, which no optimizer step carries (B reads memory.peak)
+				# probes.eval_units: an eval probe's peak, which no optimizer step carries. Allocated only: B's memory
+				# fits take a probe with a reserved peak as a training one (engine/api.py), so whether an eval's
+				# inference peak belongs in them is B's call (from-a.md)
 				with suppress(Exception):
-					out["memory"] = {
-						"peak": torch.cuda.max_memory_allocated(),
-						"reserved": torch.cuda.max_memory_reserved(),
-					}
+					out["memory"] = {"peak": torch.cuda.max_memory_allocated(), "weights": self._weights}
 			return out
 		if timed:
 			walls = sorted(s["wall"] for s in timed)
