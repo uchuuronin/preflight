@@ -1,0 +1,205 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sAF3XNQkYRYTmUkjOvMk7s
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/runner/ops_app.py
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.production.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/flags.json
+├── ✓ Uploaded /home/runner/work/preflight/preflight/zoo
+├── ✓ Uploaded /home/runner/work/preflight/preflight/python/preflight
+├── ✓ Created Function fill_dataset_cache.
+├── ✓ Created Function prefetch.
+├── ✓ Created Function startup_check_probe.
+├── ✓ Created Function probe_user_check_probe_image.
+├── ✓ Created Function ground_truth_on_l4.
+├── ✓ Created Function ground_truth_on_a10.
+├── ✓ Created Function ground_truth_on_a100.
+├── ✓ Created Function multi_gpu_on_l4x2.
+├── ✓ Created Function _install_check.
+├── ✓ Created Function probe_user_check_titan_image.
+├── ✓ Created Function ground_truth_titan_on_l4.
+├── ✓ Created Function ground_truth_titan_on_a10.
+├── ✓ Created Function startup_check_titan_image.
+├── ✓ Created Function titan_check_on_l4.
+├── ✓ Created Function startup_check_probe_new.
+├── ✓ Created Function probe_user_check_probe_new_image.
+├── ✓ Created Function ground_truth_torch27_on_l4.
+├── ✓ Created Function ground_truth_torch27_on_a10.
+├── ✓ Created Function probe_user_check_serving_image.
+├── ✓ Created Function ground_truth_serving_on_l4.
+├── ✓ Created Function ground_truth_serving_on_a10.
+├── ✓ Created Function ground_truth_serving_on_a100.
+├── ✓ Created Function startup_check_serving_image.
+├── ✓ Created Function startup_check_worker.
+├── ✓ Created Function startup_check_sandbox.
+├── ✓ Created Function agent_sample_hosted.
+├── ✓ Created Function agent_sample_hosted_full.
+├── ✓ Created Function diagnose_hosted.
+├── ✓ Created Function triage_hosted.
+├── ✓ Created Function private_triage_check_hosted.
+├── ✓ Created Function triage_agreement_hosted.
+└── ✓ Created Function _meta_variants.
+[ground truth] pretrain_nanogpt: train.py, lens pretrain, probe image, 1 files; waiting for an A10, else the L4 (Modal queues it)
+[ground truth] container up on the A10G; 1 files of pretrain_nanogpt
+[ground truth 19:14:03] bare run of pretrain_nanogpt: 60 optimizer steps, at most 450 s
+[bare] running /tmp/gt-27e7ugab/train.py for 60 optimizer steps
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+
+[1AGenerating train split:   0%|          | 0/2119719 [00:00<?, ? examples/s]
+[1AGenerating train split:   2%|▏         | 38000/2119719 [00:00<00:05, 373137.75 examples/s]
+[1AGenerating train split:   4%|▎         | 79000/2119719 [00:00<00:05, 392962.51 examples/s]
+[1AGenerating train split:   6%|▌         | 124000/2119719 [00:00<00:04, 412587.20 examples/s]
+[1AGenerating train split:   8%|▊         | 167000/2119719 [00:00<00:04, 404834.20 examples/s]
+[1AGenerating train split:  10%|▉         | 209000/2119719 [00:00<00:04, 409515.93 examples/s]
+[1AGenerating train split:  13%|█▎        | 272000/2119719 [00:00<00:04, 410603.81 examples/s]
+[1AGenerating train split:  15%|█▍        | 314000/2119719 [00:00<00:04, 408616.08 examples/s]
+[1AGenerating train split:  17%|█▋        | 358000/2119719 [00:00<00:04, 407000.58 examples/s]
+[1AGenerating train split:  19%|█▉        | 402000/2119719 [00:00<00:04, 413629.84 examples/s]
+[1AGenerating train split:  22%|██▏       | 462000/2119719 [00:01<00:04, 405408.86 examples/s]
+[1AGenerating train split:  24%|██▎       | 503000/2119719 [00:01<00:03, 405510.16 examples/s]
+[1AGenerating train split:  27%|██▋       | 563930/2119719 [00:01<00:03, 404605.30 examples/s]
+[1AGenerating train split:  29%|██▊       | 605930/2119719 [00:01<00:03, 405788.17 examples/s]
+[1AGenerating train split:  31%|███       | 649930/2119719 [00:01<00:03, 413986.65 examples/s]
+[1AGenerating train split:  34%|███▎      | 712930/2119719 [00:01<00:03, 411804.66 examples/s]
+[1AGenerating train split:  37%|███▋      | 775930/2119719 [00:01<00:03, 410626.41 examples/s]
+[1AGenerating train split:  39%|███▊      | 817930/2119719 [00:02<00:03, 411071.99 examples/s]
+[1AGenerating train split:  41%|████      | 860930/2119719 [00:02<00:03, 413688.31 examples/s]
+[1AGenerating train split:  43%|████▎     | 902930/2119719 [00:02<00:02, 411099.70 examples/s]
+[1AGenerating train split:  45%|████▍     | 947930/2119719 [00:02<00:02, 418367.14 examples/s]
+[1AGenerating train split:  47%|████▋     | 989930/2119719 [00:02<00:02, 414275.58 examples/s]
+[1AGenerating train split:  49%|████▉     | 1033930/2119719 [00:02<00:02, 417581.75 examples/s]
+[1AGenerating train split:  51%|█████     | 1075860/2119719 [00:02<00:02, 415377.36 examples/s]
+[1AGenerating train split:  53%|█████▎    | 1121860/2119719 [00:02<00:02, 425112.56 examples/s]
+[1AGenerating train split:  55%|█████▌    | 1165860/2119719 [00:02<00:02, 426788.39 examples/s]
+[1AGenerating train split:  58%|█████▊    | 1229860/2119719 [00:02<00:02, 424234.33 examples/s]
+[1AGenerating train split:  61%|██████    | 1288860/2119719 [00:03<00:02, 410781.20 examples/s]
+[1AGenerating train split:  63%|██████▎   | 1333860/2119719 [00:03<00:01, 418507.66 examples/s]
+[1AGenerating train split:  66%|██████▌   | 1397860/2119719 [00:03<00:01, 417832.04 examples/s]
+[1AGenerating train split:  68%|██████▊   | 1442860/2119719 [00:03<00:01, 419535.48 examples/s]
+[1AGenerating train split:  70%|███████   | 1488860/2119719 [00:03<00:01, 426137.90 examples/s]
+[1AGenerating train split:  73%|███████▎  | 1551860/2119719 [00:03<00:01, 422891.45 examples/s]
+[1AGenerating train split:  76%|███████▌  | 1614790/2119719 [00:03<00:01, 419374.74 examples/s]
+[1AGenerating train split:  78%|███████▊  | 1659790/2119719 [00:04<00:01, 423844.80 examples/s]
+[1AGenerating train split:  81%|████████  | 1721790/2119719 [00:04<00:00, 417696.06 examples/s]
+[1AGenerating train split:  84%|████████▍ | 1784790/2119719 [00:04<00:00, 417618.74 examples/s]
+[1AGenerating train split:  86%|████████▋ | 1828790/2119719 [00:04<00:00, 418263.77 examples/s]
+[1AGenerating train split:  88%|████████▊ | 1872790/2119719 [00:04<00:00, 421674.50 examples/s]
+[1AGenerating train split:  91%|█████████▏| 1936790/2119719 [00:04<00:00, 419521.96 examples/s]
+[1AGenerating train split:  94%|█████████▍| 2001790/2119719 [00:04<00:00, 419488.48 examples/s]
+[1AGenerating train split:  96%|█████████▋| 2044790/2119719 [00:04<00:00, 418003.14 examples/s]
+[1AGenerating train split:  99%|█████████▊| 2089790/2119719 [00:05<00:00, 418480.61 examples/s]Generating train split: 100%|██████████| 2119719/2119719 [00:05<00:00, 414714.05 examples/s]
+
+[1AGenerating validation split:   0%|          | 0/21990 [00:00<?, ? examples/s]Generating validation split: 100%|██████████| 21990/21990 [00:00<00:00, 407129.50 examples/s]
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-a9zdt1y7/hf/hub/models--gpt2/.no_exist'
+Could not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-a9zdt1y7/hf/hub/models--gpt2/.no_exist'
+[bare] step 50 at 90 s
+iter 0: loss 10.9837, 157.9 ms/iter
+iter 10: loss 10.8063, 607.3 ms/iter
+iter 20: loss 10.3250, 701.2 ms/iter
+iter 30: loss 9.7492, 700.5 ms/iter
+iter 40: loss 9.3033, 701.5 ms/iter
+iter 50: loss 9.0179, 702.2 ms/iter
+{"steps": 60, "ended": "steps", "error": null, "seconds": 98.14090094400001, "peak_allocated_bytes": 18735225856, "peak_reserved_bytes": 20254294016, "device": "NVIDIA A10G", "timing": "cuda_events"}
+[ground truth 19:15:46] bare run ended (steps) after 103 s, 60 steps
+[ground truth 19:15:46] recorder run: 5 warmup + 30 timed steps, at most 737 s
+{
+  "script": "pretrain_nanogpt",
+  "entrypoint": "train.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "overhead": {
+    "sync_overhead": {
+      "median": 0.99948,
+      "ci95": [
+        0.99721,
+        1.00114
+      ],
+      "pairs": 14,
+      "source": "measured"
+    },
+    "hook_overhead": {
+      "median": 1.05764,
+      "ci95": [
+        1.05434,
+        1.05888
+      ],
+      "pairs": 15,
+      "source": "measured"
+    },
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "pretrain",
+  "image": "probe",
+  "bare": {
+    "steps": 60,
+    "ended": "steps",
+    "error": null,
+    "seconds": 98.14090094400001,
+    "peak_allocated_bytes": 18735225856,
+    "peak_reserved_bytes": 20254294016,
+    "device": "NVIDIA A10G",
+    "timing": "cuda_events",
+    "wall_s": 103.1
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 35,
+    "p50_s": 0.7378637084960937,
+    "peak_allocated_bytes": 18735248896,
+    "seconds": 130.781,
+    "by_phase": {
+      "data": 0.041888672576929235,
+      "forward": 0.3254816009814331,
+      "backward": 0.5953612589576409,
+      "optimizer": 0.02982911789020142,
+      "other": 0.007439349593795455
+    },
+    "generation": null,
+    "extras": {
+      "params_total": 124475904.0,
+      "params_trainable": 124475904.0,
+      "tokens_per_step": 12288.0,
+      "samples_per_step": 12.0,
+      "micro_steps_per_step": 1.0,
+      "host_rss_peak_bytes": 7204016128.0,
+      "train_loader_batches": 176644.0,
+      "train_dataset_len": 2119719.0,
+      "dataset_max_tokens": 1024.0,
+      "dataset_p999_tokens": 1024.0,
+      "dataset_p50_tokens": 1024.0,
+      "dataset_mean_tokens": 1024.0,
+      "dataset_rows_scanned": 4268.0,
+      "dataset_rows_total": 2119719.0
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  }
+}
+[ground truth 19:17:57] recorder run ended (ok) after 35 steps
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sAF3XNQkYRYTmUkjOvMk7s
