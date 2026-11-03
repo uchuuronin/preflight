@@ -1,7 +1,8 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
 # Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts. It runs
-# main with A's Windows fixes merged (main at 6d40cd40, Nov 3; D's own copy passed the same check
-# and was withdrawn) with nothing stubbed: `preflight run` has to measure (every probe ok) and
+# main at 2b62f25c (the PM's pick, Nov 3, 18:29 ET; C's live deploy is 1f213cf6, with the same CLI),
+# which has A's Windows fixes (on main since 6d40cd40; D's own copy passed the same check and was
+# withdrawn), with nothing stubbed: `preflight run` has to measure (every probe ok) and
 # `preflight watch` has to follow its record (a live record with steps). Runs only when this file
 # changes on ws-d. Everything lives on D:, as the laptop's steps keep everything on E:, but the
 # sandbox and time zones use Preflight's own defaults. No secrets are used. The job fails if any
@@ -29,8 +30,8 @@ jobs:
         with:
           path: src
           persist-credentials: false
-          # main at 6d40cd40, with A's Windows fixes merged
-          ref: 6d40cd40c5412eb73aec7e402ab286d04202c076
+          # main at 2b62f25c (PM, Nov 3, 18:29 ET)
+          ref: 2b62f25c163563ef49b27dd095d0d4b42e2a57ad
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"

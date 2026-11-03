@@ -76,6 +76,16 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 18:35 ET (Windows check on main 2b62f25c)
+
+PM, 18:29: C's deploy of 1f213cf6 is live; run the Windows check now on main 2b62f25c, as the CLI
+didn't change; film only after C posts "live with the LoRA refill", as the clip's 0:24 needs the
+refilled sample. From 1f213cf6 to 2b62f25c only README.md, `api/record_dump_app.py` and docs
+changed (measured: git diff). `d-windows-watch.yml` now checks out 2b62f25c, nothing stubbed; this
+push starts it.
+
+This push sends: `.github/workflows/d-windows-watch.yml`, this file.
+
 ## Tue Nov 3, 18:20 ET (filming as soon as C's deploy is posted; shot 13 kept)
 
 Chiya, 18:12: no Wednesday 7:30 time; the Windows check and the filming run as soon as C posts the
