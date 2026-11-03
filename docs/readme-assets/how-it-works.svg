@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 530" width="1000" height="530" role="img" aria-labelledby="t d">
+	<title id="t">How Preflight works</title>
+	<desc id="d">Three steps. Measure: your code is mapped by Muse Spark and run for a few real steps on a GPU; a failed probe is triaged by Muse Spark Open or Muse Glimmer. Predict: the engine, trained on a 4,255-run corpus, writes a flight record with ranges. Fly: the cockpit in your browser, with a guide by Muse Spark and fixes by Muse Code verified by a re-run, exports a plan, patch, Slurm file and link.</desc>
+	<style>
+		text { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; }
+		.name { fill: #ffffff; font-size: 12px; font-weight: 600; }
+		.sub { fill: #94a3b8; font-size: 10px; }
+		.meta { fill: #f9a8d4; font-size: 10px; font-style: italic; }
+		.stage { fill: #cbd5e1; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+		.note { fill: #94a3b8; font-size: 9px; }
+		.title { fill: #ffffff; font-size: 15px; font-weight: 700; }
+		.legend { fill: #cbd5e1; font-size: 10px; }
+	</style>
+	<defs>
+		<marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+			<polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+		</marker>
+		<marker id="ahs" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+			<polygon points="10 0, 0 3.5, 10 7" fill="#64748b"/>
+		</marker>
+		<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+			<path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+		</pattern>
+	</defs>
+
+	<!-- background -->
+	<rect width="1000" height="530" rx="14" fill="#020617"/>
+	<rect width="1000" height="530" rx="14" fill="url(#grid)"/>
+
+	<text x="30" y="38" class="title">How Preflight works</text>
+	<text x="230" y="38" class="sub">GPU time goes only to step ①; everything after it runs in your browser</text>
+
+	<!-- stage boundaries -->
+	<rect x="20" y="62" width="310" height="392" rx="12" fill="rgba(251,191,36,0.04)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+	<text x="36" y="86" class="stage">① MEASURE · minutes, real GPU</text>
+	<rect x="350" y="62" width="290" height="392" rx="12" fill="rgba(52,211,153,0.04)" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
+	<text x="366" y="86" class="stage">② PREDICT</text>
+	<rect x="660" y="62" width="320" height="392" rx="12" fill="rgba(34,211,238,0.04)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+	<text x="676" y="86" class="stage">③ FLY · in your browser</text>
+
+	<!-- arrows first, so boxes sit on top -->
+	<g stroke="#64748b" stroke-width="1.5" fill="none">
+		<line x1="175" y1="152" x2="175" y2="186" marker-end="url(#ah)"/>
+		<line x1="175" y1="246" x2="175" y2="282" marker-end="url(#ah)"/>
+		<path d="M275 312 H338 V248 H398" marker-end="url(#ah)"/>
+		<line x1="490" y1="166" x2="490" y2="216" stroke-dasharray="5,4" marker-end="url(#ah)"/>
+		<line x1="490" y1="276" x2="490" y2="336" marker-end="url(#ah)"/>
+		<path d="M580 366 H646 V138 H686" marker-end="url(#ah)"/>
+		<line x1="820" y1="166" x2="820" y2="336" marker-end="url(#ah)"/>
+		<line x1="747" y1="168" x2="747" y2="206" marker-start="url(#ahs)" marker-end="url(#ah)" stroke-dasharray="5,4"/>
+		<line x1="897" y1="166" x2="897" y2="206" stroke-dasharray="5,4" marker-end="url(#ah)"/>
+		<line x1="175" y1="342" x2="175" y2="376" stroke-dasharray="5,4" marker-end="url(#ah)"/>
+		<path d="M275 408 H344 V376 H398" stroke-dasharray="5,4" marker-end="url(#ah)"/>
+	</g>
+	<text x="183" y="364" class="note">if one fails</text>
+	<text x="282" y="398" class="note">findings</text>
+
+	<!-- ① MEASURE -->
+	<rect x="75" y="106" width="200" height="46" rx="6" fill="#0f172a"/>
+	<rect x="75" y="106" width="200" height="46" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+	<text x="175" y="134" class="name" text-anchor="middle">Your code</text>
+
+	<rect x="75" y="188" width="200" height="58" rx="6" fill="#0f172a"/>
+	<rect x="75" y="188" width="200" height="58" rx="6" fill="rgba(131,24,67,0.45)" stroke="#f472b6" stroke-width="1.5"/>
+	<text x="175" y="212" class="name" text-anchor="middle">Script map</text>
+	<text x="175" y="230" class="meta" text-anchor="middle">Muse Spark</text>
+
+	<rect x="75" y="284" width="200" height="58" rx="6" fill="#0f172a"/>
+	<rect x="75" y="284" width="200" height="58" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+	<text x="175" y="308" class="name" text-anchor="middle">Probes</text>
+	<text x="175" y="326" class="sub" text-anchor="middle">a few real steps</text>
+
+	<rect x="75" y="378" width="200" height="58" rx="6" fill="#0f172a"/>
+	<rect x="75" y="378" width="200" height="58" rx="6" fill="rgba(131,24,67,0.45)" stroke="#f472b6" stroke-width="1.5"/>
+	<text x="175" y="402" class="name" text-anchor="middle">Triage</text>
+	<text x="175" y="420" class="meta" text-anchor="middle">Muse Spark Open · Glimmer</text>
+
+	<!-- ② PREDICT -->
+	<rect x="400" y="108" width="180" height="58" rx="6" fill="#0f172a"/>
+	<rect x="400" y="108" width="180" height="58" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+	<text x="490" y="132" class="name" text-anchor="middle">Corpus</text>
+	<text x="490" y="150" class="sub" text-anchor="middle">4,255 measured runs</text>
+
+	<rect x="400" y="218" width="180" height="58" rx="6" fill="#0f172a"/>
+	<rect x="400" y="218" width="180" height="58" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+	<text x="490" y="242" class="name" text-anchor="middle">Engine</text>
+	<text x="490" y="260" class="sub" text-anchor="middle">models + ranges</text>
+
+	<rect x="400" y="338" width="180" height="58" rx="6" fill="#0f172a"/>
+	<rect x="400" y="338" width="180" height="58" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+	<text x="490" y="362" class="name" text-anchor="middle">Flight record</text>
+	<text x="490" y="380" class="sub" text-anchor="middle">every number + its range</text>
+
+	<!-- ③ FLY -->
+	<rect x="690" y="108" width="270" height="58" rx="6" fill="#0f172a"/>
+	<rect x="690" y="108" width="270" height="58" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+	<text x="825" y="132" class="name" text-anchor="middle">Cockpit</text>
+	<text x="825" y="150" class="sub" text-anchor="middle">map · readouts · knobs · replay</text>
+
+	<rect x="690" y="208" width="115" height="58" rx="6" fill="#0f172a"/>
+	<rect x="690" y="208" width="115" height="58" rx="6" fill="rgba(131,24,67,0.45)" stroke="#f472b6" stroke-width="1.5"/>
+	<text x="747" y="232" class="name" text-anchor="middle">Guide</text>
+	<text x="747" y="250" class="meta" text-anchor="middle">Muse Spark</text>
+
+	<rect x="835" y="208" width="125" height="58" rx="6" fill="#0f172a"/>
+	<rect x="835" y="208" width="125" height="58" rx="6" fill="rgba(131,24,67,0.45)" stroke="#f472b6" stroke-width="1.5"/>
+	<text x="897" y="228" class="name" text-anchor="middle">Fixes</text>
+	<text x="897" y="244" class="meta" text-anchor="middle">Muse Code</text>
+	<text x="897" y="258" class="note" text-anchor="middle">verified by a re-run</text>
+
+	<rect x="690" y="338" width="270" height="58" rx="6" fill="#0f172a"/>
+	<rect x="690" y="338" width="270" height="58" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+	<text x="825" y="362" class="name" text-anchor="middle">Take it with you</text>
+	<text x="825" y="380" class="sub" text-anchor="middle">plan · patch · Slurm file · link</text>
+
+	<!-- legend, outside the boundaries -->
+	<g transform="translate(30,482)">
+		<rect x="0" y="0" width="16" height="10" rx="2" fill="rgba(131,24,67,0.45)" stroke="#f472b6"/>
+		<text x="24" y="9" class="legend">Meta model</text>
+		<rect x="130" y="0" width="16" height="10" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399"/>
+		<text x="154" y="9" class="legend">Preflight's own code</text>
+		<rect x="320" y="0" width="16" height="10" rx="2" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/>
+		<text x="344" y="9" class="legend">Data</text>
+		<rect x="410" y="0" width="16" height="10" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee"/>
+		<text x="434" y="9" class="legend">What you see</text>
+		<line x1="560" y1="5" x2="590" y2="5" stroke="#64748b" stroke-width="1.5"/>
+		<text x="598" y="9" class="legend">main path</text>
+		<line x1="690" y1="5" x2="720" y2="5" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,4"/>
+		<text x="728" y="9" class="legend">on demand</text>
+	</g>
+</svg>

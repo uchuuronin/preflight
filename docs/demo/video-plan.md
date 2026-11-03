@@ -35,7 +35,7 @@ Monday's table below); "Chiya's live test" means D can't reach the live site to 
 | 10 | 2:01 | PF331, the agent sample: the caching finding | Works (sample says Measured) | |
 | 11 | 2:13 | PF510, the GRPO sample: the RL band | Works (sample says Measured) | |
 | 12 | 2:22 | New flight with "Private triage"; a private record's "Found by Muse Glimmer" | Works (C's record 01M6EG0284PWZDRXGGQVVZYVND) | Ask C for its link |
-| 13 | 2:33 | Checks page, "Each check" | Works, but it still reads "1 of 2 runs measured · engine 006bc57 · 31 Oct" (B's checks weren't regenerated) | Keep only with the line below changed to what the page shows; else cut (its 9 s go to shot 14 and the end card) |
+| 13 | 2:33 | Checks page, "Each check" | **Keep** (Nov 3, 18:15): B's three strings are on `main` (`checks.title` "Checks against full runs", `checks.col.result` "Scored", `checks.method`), and the page reads B's final table | Film the page as it is; the voice-over and caption below match its words |
 | 14 | 2:42 | The share link opened in a new tab | Works: use the `/s/` link, now live, rather than the address bar | |
 | 15 | 2:50 | End card | Works | Repository public first |
 
@@ -65,7 +65,7 @@ Total 2:58.
 | 2:01 to 2:13 | 10 | "Not just training. A coding agent on Muse Spark ran 130 tasks through Preflight, and not one input token came from the cache." | 23 | "Agent eval on Muse Spark (Meta) · measured · 0 of 905,739 input tokens from cache, 130 tasks, two runs" |
 | 2:13 to 2:22 | 11 | "In this GRPO run, 15 of 20 prompts had no reward spread at all, so they teach nothing." | 18 | "GRPO on an L4 · measured · 15 of 20 prompts with no reward spread" |
 | 2:22 to 2:33 | 12 | "For code that mustn't leave, private mode triages on Muse Glimmer, Meta's open weights, on our own GPU." | 18 | "Muse Glimmer (Meta's open weights, on Preflight's own GPU)" |
-| 2:33 to 2:42 | 13 | "Predictions are checked against real runs, held out, misses included." | 10 | "Held-out checks on real runs" |
+| 2:33 to 2:42 | 13 | "Every prediction is checked against a real script's full run, misses included." | 12 | the page's own title, "Checks against full runs" |
 | 2:42 to 2:50 | 14 | "Every flight is a link anyone can open." | 8 | |
 | 2:50 to 2:58 | 15 | "Preflight. Built October 26 to November 4. Fly the run before you pay for it." | 15 | link · repository · "Built Oct 26 to Nov 4" |
 
@@ -105,20 +105,19 @@ sound off. About 2.5 words a second.
 | 0:04 to 0:08 | Title card: "Preflight" set in the app's serif, then the hook under it. A slow sky gradient behind (the app's colours, below), a thin flight-path line drawn left to right. Clearly a graphic, not a screen. | "Preflight. The cheapest place for your training run to crash." (10 words) | none: the card carries the words | n/a |
 | 0:08 to 0:16 | The live site, New flight: Repo link with `github.com/uchuuronin/preflight`, Entry point `zoo/finetune_lora_hf/train.py`, "Check in". Hard cut past the wait to Boarding ("Reading your script", "Checking the logs"), then the cockpit's map assembling. | "Point it at your repo. Muse Spark reads the script; real steps run on a real GPU." (17 words) | "Muse Spark (Meta) reads the script" over Boarding's first stage, then "Muse Spark Open (Meta's open model, on Baseten) reads each probe's log" over the second | Film a fresh check-in on Wed (one of Chiya's 3 jobs a day; about 5 to 11 minutes [measured: production's two LoRA check-ins], cut). Fallback: the Oct 28 record's share link, opened, with the check-in from shot 3's take |
 | 0:16 to 0:24 | The cockpit's run timeline ("The whole run, step by step"): drag the playhead from step 0 to step 200; the eval node goes red at the first eval, with whatever status word the app puts on a measured out-of-memory (film it as it is). | "Model the hours from minutes. At step 200, the first eval runs out of memory. Measured, not guessed." (18 words) | "Step 200: the first eval runs out of memory · measured on a real GPU" | The filmed record: its `p1-eval` probe ran out of memory, so the app marks it measured. If the fallback is used, the Oct 28 record (the same probe, the same message) |
-| 0:24 to 0:32 | The eval finding, "Fix it with Muse Code", the fixes writing side by side. Then the verify results the app shows for this record's patches: the single fix "Verify failed", the stacked fix "Verified". See the open question below. | "Muse Code writes the fixes. Preflight runs each one for real: one still crashes, rejected. The stacked fix passes." (19 words) | "Muse Code (Meta) · each fix re-run on a real A10 · single fix rejected · stacked fix passed, eval peak 10.4 GiB · race cost $0.39" | C's race, Nov 2 (GitHub run 41482457185, `docs/status/c.md` D8): round 1, `torch.no_grad()` alone, verify failed (record 01M6EHR42KZR8F3MWZJKAQBWNW); round 2, no_grad with eval batch 8, verify passed, eval peak 10.4 GiB (record 01M6EHYYCM3JRHXKJ9XM5EPJ41); US$0.39 for the race [measured]. Caption these numbers only over this race; another race gets only what it shows |
+| 0:24 to 0:32 | **On the LoRA sample, PF102 (`#/cockpit/lora-qwen`)** (C's screen, ws-c `6a7fcd66`; the verdicts are on this sample, not on the fresh check-in): the finding "Eval runs with gradients kept" (in the tour step, the Findings panel or the eval node's detail sheet), **Fix it with Muse Code**, **Write the fixes**: two lanes write side by side (cut the wait). When they finish, hold on the lanes: "Run evaluation without gradients" reads "An earlier patch for this fix, checked on 2 Nov on an A10: Rejected: the re-run still ran out of memory." in red; "Evaluation without gradients, in smaller batches · 8" reads "... Passed: eval peak 10.4 GiB, loss within 0.11%." in green. Each lane's own "Not verified: Preflight hasn't run this fix yet." stays in shot: it's true of the fresh patch. Film as it is, nothing drawn on top | "Muse Code writes the fixes. Preflight runs each one for real: one still crashes, rejected. The stacked fix passes." (19 words) | "Muse Code (Meta) · the LoRA sample · each fix re-run on a real A10 (2 Nov) · race cost $0.39" (the verdicts and the 10.4 GiB are on screen in the app's words, so the caption doesn't repeat them) | The verdicts: C's race, Nov 2 (GitHub run 41482457185, `docs/status/c.md` D8): round 1, `torch.no_grad()` alone, verify failed (record 01M6EHR42KZR8F3MWZJKAQBWNW); round 2, no_grad with eval batch 8, verify passed, eval peak 10.4 GiB, loss within 0.11% (record 01M6EHYYCM3JRHXKJ9XM5EPJ41); US$0.39 for that race [measured]. Writing the fixes on film costs up to about US$0.26 of Muse Code, paid by Preflight (C's lane cap); the verdicts shown are the Nov 2 checks, not of the patches written on film |
 | 0:32 to 0:39 | The same cockpit before and after: the readouts at the record's own setting ("Likely runs out of memory", the dials marked "If it didn't run out of memory"), then after applying the guide's combined move (eval batch 8 and no_grad): the ring back under the line, each dial with its range. One cut between the two, no split screen. | "Before and after. Every readout comes with its range." (9 words) | none, so the app's own labels and ranges are read as they are | The filmed record, on screen only (predicted ranges are the app's; nothing here is spoken) |
 | 0:39 to 0:45 | "Take this plan with you": the Plan (the settings as JSON), "Muse Code patches for this record", the "Slurm batch file", each opened for a beat. Cut to the end card: "Crash it here, not on your GPU bill." with the link and "Built Oct 26 to Nov 4 for the Meta hackathon". | "Take the config, patch and batch file. Crash it here, not on your GPU bill." (15 words) | end card: `preflight-cqn.pages.dev` · github.com/uchuuronin/preflight · "Built Oct 26 to Nov 4" | The exports panel on the filmed record (`c.exports`, on in production) |
 
 98 words in 45 s, about 2.2 a second; no line is faster than 2.5 a second.
 
-**Open, for C by Wed 10 AM (or the shot changes):** the live race lanes say "Not verified: Preflight
-hasn't run this fix yet" (`FixRace.tsx`), and verify results appear in the exports panel's "Muse
-Code patches for this record" as "Verified" or "Verify failed", once A's job store has run them.
-D hasn't seen C's Nov 2 race in the app. C: is there a record whose cockpit shows both patches
-with their verify results (the LoRA sample, or the two verify records above)? If yes, film 0:24 to
-0:32 there. If not, film the race lanes writing, then open the two verify records' cockpits (the
-failed one's eval out of memory, the passed one's eval peak), and let the caption carry
-"rejected" and "passed". Either way, no "REJECTED" or "PASSED" stamp drawn on the app.
+**Settled (C, Nov 3, 17:40):** before today no screen showed a race's verdicts (the site never
+runs verify on a race; the Nov 2 verdicts came from C's script). C's ws-c `6a7fcd66` now puts each
+lane's verdict under it, from Preflight's dated check of the same fix on the same sample, with the
+"earlier patch" wording because the patch written on film isn't the one verify checked. It is live
+after the PM's next merge and C's deploy: check it on the live site before filming. If it isn't
+live on Wednesday, cut 0:24 to 0:32 rather than draw the verdicts, and give its 8 s to 0:32 to
+0:39 and the end card.
 
 **Making the graphics** (the cold open, the title card, the end card; the skills from the team's
 Skills Audit doc, "Video" and "Animation and motion"):
@@ -311,8 +310,14 @@ From a clone of the repository:
 (on since the PM's 4:25 PM merge, Nov 2; live once C deploys); then Chiya's take. The GPU test is
 done (above), and the stopgap step is gone: `preflight run` fills predictions (B's fix, on `main`).
 
-## Before filming (Wed Nov 4)
+## Before filming (as soon as C posts the live deploy)
 
+Chiya, Nov 3, 18:12: no fixed time; film as soon as C posts the live deploy, with the product
+complete by then. Shot 9b on Chiya's RTX 4070 on native Windows (`docs/demo/shot-9b-laptop.md`);
+the clip's 0:24 to 0:32 on C's race lanes on the live LoRA sample. D re-runs the Windows check on
+`main` when C's deploy is posted.
+
+- [ ] C's deploy is posted, and the live site shows the race lanes' verdicts on PF102.
 - [ ] Each "needs" row above is ready, or cut as its row says.
 - [ ] Every number spoken or captioned is in the submission's numbers table.
 - [ ] Each Meta model named is labelled on screen while it works, and its record shows the call.

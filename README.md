@@ -6,7 +6,7 @@ run, or a whole campaign of runs, before you spend real GPU hours or API dollars
 
 Built for the Meta Global AI Developer Hackathon.
 
-**Live:** <https://preflight-cqn.pages.dev> · **The manual:** [every input and knob, explained](https://preflight-cqn.pages.dev/#/help)
+**Live:** <https://preflight-cqn.pages.dev> · **The manual:** [Technical Documentation](https://preflight-cqn.pages.dev/#/help)
 
 ## Contents
 
@@ -110,40 +110,7 @@ CPU, or the CUDA or ROCm wheel on a GPU box.
 GPU time goes only to a few minutes of probes. Everything you explore afterwards is computed in the
 browser from the flight record.
 
-```mermaid
-flowchart LR
-	subgraph S1["① Measure · minutes on a real GPU"]
-		direction TB
-		IN(["Your code"]) --> MAP["Script map<br/><i>Muse Spark</i>"]
-		MAP --> PRB["Probes<br/>a few real steps"]
-		PRB -.->|if one fails| TRI["Triage<br/><i>Muse Spark Open · Glimmer</i>"]
-	end
-	subgraph S2["② Predict"]
-		direction TB
-		CORP[("Corpus<br/>4,255 runs")] -.-> ENG["Engine<br/>models + ranges"]
-		ENG --> REC[("Flight record")]
-	end
-	subgraph S3["③ Fly · in your browser"]
-		direction TB
-		COCK["Cockpit<br/>map · readouts · knobs"] --> OUT(["Plan · patch ·<br/>Slurm · link"])
-		COCK <-.-> G["Guide<br/><i>Muse Spark</i>"]
-		COCK -.-> FIX["Fixes, verified by a re-run<br/><i>Muse Code</i>"]
-	end
-	PRB --> ENG
-	REC --> COCK
-
-	classDef meta fill:#ece6ff,stroke:#6b4fd8,color:#24185c
-	classDef data fill:#fff3dc,stroke:#c9861a,color:#4d3305
-	classDef step fill:#ffffff,stroke:#8a8a99,color:#1d1d29
-	class MAP,TRI,G,FIX meta
-	class REC,CORP data
-	class IN,PRB,ENG,COCK,OUT step
-	style S1 fill:#f5f6fa,stroke:#c9cad6
-	style S2 fill:#f5f6fa,stroke:#c9cad6
-	style S3 fill:#f5f6fa,stroke:#c9cad6
-```
-
-Purple nodes are Meta models; orange nodes are data.
+![How Preflight works: measure, predict, fly](docs/readme-assets/how-it-works.svg)
 
 ## Meta models and partner tools
 
@@ -176,26 +143,29 @@ Purple nodes are Meta models; orange nodes are data.
 
 ## Validation
 
-Every prediction below is checked against a real full run, hit or miss.
+Preflight was scored against real full runs it had never seen, with the engine frozen first. In short:
 
-**How these numbers were made:** the engine was frozen first, then scored against full runs it had
-never seen. Every hit count carries a Wilson 95% interval, so a small sample never reads better
-than it is; a "hit" needs at least 90% of runs inside the target.
+- **It catches the crash that costs the most.** It predicted 10 of 11 out-of-memory failures before the run, with no false alarms, and found 6 of 7 planted bugs.
+- **It's far closer than asking a model.** On the same scripts, Preflight's step time was off by 8% to 36%; Muse Spark reading the code alone was off by 1.6× to 18×. Peak memory within 10%: Preflight 2 of 4, Muse Spark 0 of 4.
+- **It's fast and cheap.** The knobs answer in 68 ms on the live site, and a check-in costs under $1.
+- **Where it's still short:** memory that keeps growing after the probes end, such as an allocator pool that grows for epochs or an evaluation after training. The per-script table says which scripts and why, and the ranges on screen are widened to match.
+
+Each count carries a Wilson 95% interval, so a small sample never reads better than it is.
 
 <!-- validation:start -->
-| Check | Target | Result | 95% interval | Hit | Notes |
-|---|---|---|---|---|---|
-| Out-of-memory prediction | No missed OOMs | 10 of 11 | 62% to 99% | miss | No false alarms. The one miss: a retrieval script that ran out with no probe to see it |
-| Planted problems caught | All of them | 6 of 7 | 48% to 98% | miss | Missed: a vision script's missing channels-last layout |
-| Agent run total cost | Inside the 90% range | 1 of 1 | 20% to 100% | hit, few runs | Predicted $5.90 to $13.71; the full run cost $6.66 |
-| Knob response | Under 400 ms | 120 of 120 | 96% to 100% | hit | 95th percentile 68 ms, live site |
-| Peak memory | Within 10% | 3 of 8 | 13% to 70% | miss | The misses are memory the probes never see (below) |
-| Step time, same GPU | Within 15% | 3 of 6 | 18% to 82% | miss | Causes below |
-| Step time, a GPU never probed | Within 20% | 57% of 6,694 | 55% to 59% | miss | Simulated on held-out GPUs; the range shown on screen is widened to match |
-| 90% ranges cover the truth | At least 88% | 10 of 18 | 33% to 76% | miss | Mostly the same memory misses |
-| Abstains outside what it measured | Always | checked in CI | | | `tests/test_engine_api.py` |
-| Cost of one check-in | Under $1 and 5 minutes | 1 of 2 | 9% to 91% | miss | Both under $1; one took 10 minutes |
-| RL rollout time · serving throughput | Within 20% · 15% | not yet scored | | | No full run yet |
+| Check | Target | Result | 95% interval | What's going on |
+|---|---|---|---|---|
+| Out-of-memory prediction | No missed OOMs | 10 of 11 | 62% to 99% | No false alarms. The one it missed is a retrieval script where no probe ran |
+| Planted problems caught | All of them | 6 of 7 | 48% to 98% | The one it missed is a vision script's missing channels-last layout, a speed setting rather than a crash |
+| Knob response | Under 400 ms | 120 of 120 | 96% to 100% | 95th percentile 68 ms on the live site |
+| Agent run total cost | Inside the 90% range | 1 of 1 | 20% to 100% | Predicted $5.90 to $13.71; the full run cost $6.66. One run so far |
+| Cost of one check-in | Under $1 and 5 minutes | 1 of 2 | 9% to 91% | Both cost under $1; one took 10 minutes |
+| Peak memory | Within 10% | 3 of 8 | 13% to 70% | Close when the peak happens during training; low when memory grows after the probes end (per script, below) |
+| Step time, same GPU | Within 15% | 3 of 6 | 18% to 82% | Off by 8% to 36% on the four bug-zoo scripts; causes per script below |
+| Step time, a GPU never probed | Within 20% | 57% of 6,694 | 55% to 59% | Simulated on held-out GPUs; the range on screen is widened to match |
+| 90% ranges cover the truth | At least 88% | 10 of 18 | 33% to 76% | Mostly the same memory that grows after the probes end |
+| Abstains outside what it measured | Always | checked in CI | | `tests/test_engine_api.py` |
+| RL rollout time · serving throughput | Within 20% · 15% | not yet scored | | No full run yet |
 <!-- validation:end -->
 
 **Predicted against the real run, per script** (the bug zoo, each run to the end):

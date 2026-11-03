@@ -1,7 +1,7 @@
 # Meta models and partner tools, and where each is used
 
-Draft by D, Sun Nov 1; updated Tue Nov 3 to the production flags at the freeze. `docs/readme-final.md` has a shorter table in the
-README's own words; the facts in the two must agree. "Off" means built on `main` behind a flag that is off in production.
+Draft by D, Sun Nov 1; updated Tue Nov 3 to the production flags at the freeze. `README.md` (final on `main`) has a shorter table in its
+own words; the facts in the two must agree. "Off" means built on `main` behind a flag that is off in production.
 
 | Tool | What it does in Preflight | Where in the code | Today |
 | --- | --- | --- | --- |

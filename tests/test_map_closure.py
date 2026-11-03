@@ -61,7 +61,7 @@ def test_a_repo_maps_from_what_the_entry_point_imports(closure):
 	assert after.loop.location.file == "examples/word/main.py" and after.loop.kind == "plain"
 	assert {k.id: k.location.file for k in after.knobs}.get("lr") == "examples/word/main.py"
 	assert all(k.location.file.startswith("examples/word/") for k in after.knobs)
-	assert "t5" not in json.dumps(after.model.model_dump(mode="json") if after.model else {})
+	assert after.model == before.model  # the model from the full read, as before (B's review, Nov 3)
 	assert before.loop.location.file != "examples/word/main.py"  # before: another example's Trainer
 
 
@@ -91,3 +91,17 @@ def test_a_docstring_that_mentions_an_api_call_changes_nothing(closure):
 	closure(True)
 	after = map_static(files, entrypoint="train.py")
 	assert after.framework == before.framework == "timm" and after.loop.kind == before.loop.kind
+
+
+def test_the_model_and_the_rl_inputs_come_from_the_full_read(closure):
+	"""B's review (Nov 3): LitGPT gained a model shape from a module it imports, and open-r1 lost vLLM and its group
+	size, which other files set; with the flag on, those still come from the whole source, as before."""
+	files = {"grpo.py": "from trl import GRPOTrainer, GRPOConfig\nfrom shapes import Cfg\n"
+		"t = GRPOTrainer(model='Qwen/Qwen2.5-0.5B', reward_funcs=[f], args=GRPOConfig(learning_rate=1e-6))\nt.train()\n",
+		"shapes.py": "class Cfg:\n    n_layer = 16\n",
+		"gen.py": "import vllm\nfrom trl import GRPOConfig\nc = GRPOConfig(num_generations=4, use_vllm=True)\n"}  # fmt: skip
+	closure(False)
+	before = map_static(files, entrypoint="grpo.py")
+	closure(True)
+	after = map_static(files, entrypoint="grpo.py")
+	assert after.model == before.model and after.rl == before.rl and after.lens == before.lens == "rl"

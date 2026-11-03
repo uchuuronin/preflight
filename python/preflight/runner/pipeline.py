@@ -228,6 +228,23 @@ def _emit(ctx, stage: str, rec: FlightRecord | None = None, rev: int | None = No
 # ---------------------------------------------------------------- stages
 
 
+def _refuse_inert_entry(fetched: Fetched) -> None:
+	"""runner.entry_runs_nothing (off; D's walkthrough, Nov 3): an uploaded or linked entry file that runs nothing is
+	refused before any GPU time, with C's error code entry.runs_nothing."""
+	if not _flag("runner.entry_runs_nothing"):
+		return
+	kind = getattr(fetched.source, "kind", None)
+	entry = fetched.entrypoint or ""
+	if kind not in ("repo", "upload") or not entry.endswith(".py") or entry.endswith("__main__.py"):
+		return
+	from .sources import runs_nothing
+
+	code = fetched.files.get(entry)
+	if isinstance(code, str) and runs_nothing(code):
+		raise InvalidSubmission(f"{entry} defines functions but runs nothing; name the script you'd run with python, or "
+			"use a supported command", code="entry.runs_nothing")  # fmt: skip
+
+
 NOTHING_MEASURED = "job.nothing_measured"
 
 
@@ -585,6 +602,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		from .patches import apply_patch
 
 		fixed = replace(fetched, files=apply_patch(fetched.files, req.patch))
+	_refuse_inert_entry(fixed or fetched)  # the code that would run: a fix may add the entry guard (review)
 
 	_emit(ctx, "mapping")
 	followup = req.mode != "plan"

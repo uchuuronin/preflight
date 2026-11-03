@@ -1262,18 +1262,31 @@ def _job_framework(f: Facts, reach: Facts, entrypoint: str) -> str:
 def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 	if entrypoint not in files:
 		raise ScriptParseError(f"entrypoint {entrypoint} is not among the submitted files")
-	files, _ = mapped_files(files, entrypoint)
+	whole = files
+	files, partial = mapped_files(files, entrypoint)
 	f = _parse(files)
 	_collect_knobs(f)
 	knobs = _knobs(f)
 	by_id = {k.id: k for k in knobs}
+	# harness.map_closure (B's review, Nov 3): the closure gives the job type, loop and knobs; the model's name and
+	# shape, the RL backend and the group size still come from the full read, as before (LitGPT gained a 3.4B shape
+	# from litgpt/lora.py, and open-r1 lost vLLM and its group size, which its YAML and command set)
+	full, full_by_id = f, by_id
+	if (
+		_map_closure() and partial is None and len(files) < len(whole)
+	):  # the closure by the flag, not for size
+		full = _parse(whole)
+		_collect_knobs(full)
+		full_by_id = {k.id: k for k in _knobs(full)}
 	# the job's own imports decide its framework and lens, not every file in the repo (B, Nov 2)
 	reach = Facts(**{**f.__dict__, "imports": entry_imports(f, entrypoint)})
 	framework = _job_framework(f, reach, entrypoint)
 	hf_id, pcall, ppath = _pretrained(f)
 	lens = _lens(reach, framework, hf_id)
 	lens = _lens_by_entry(lens, reach, f, entrypoint)
-	model = _model(f, hf_id, pcall, ppath)
+	if full is not f:
+		hf_id, pcall, ppath = _pretrained(full)
+	model = _model(full, hf_id, pcall, ppath)
 	data = _data(f, by_id)
 	loop = _loop(f, framework)
 	risks: list[str] = []
@@ -1370,12 +1383,20 @@ def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 		if short in RL_TRAINERS:
 			rf = _kwargs(call).get("reward_funcs")
 			names = [dotted(e) for e in rf.elts] if isinstance(rf, ast.List | ast.Tuple) else []
-			vllm = by_id.get("use_vllm")
-			backend = "vllm" if (vllm is not None and vllm.current is True) or _has(f, "vllm") else "hf"
+			vllm = full_by_id.get("use_vllm")
+			backend = "vllm" if (vllm is not None and vllm.current is True) or _has(full, "vllm") else "hf"
+			g = full_by_id.get("group_size")
 			rl = RLInfo(
 				algorithm=RL_TRAINERS[short],
-				group_size=num("group_size"),
-				max_completion_len=num("max_completion_len"),
+				group_size=g.current
+				if g is not None and isinstance(g.current, int | float) and not isinstance(g.current, bool)
+				else None,
+				max_completion_len=(
+					full_by_id["max_completion_len"].current
+					if "max_completion_len" in full_by_id
+					and isinstance(full_by_id["max_completion_len"].current, int | float)
+					else None
+				),
 				reward_functions=[n for n in names if n],
 				generation_backend=backend,
 			)

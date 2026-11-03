@@ -23,6 +23,14 @@ changed value now comes from the job's own file.
 `SpladeNaver` from a module its package imports; the real one is a string argument) and F1 (t5-base from another
 example, then `PositionalEncoding`, a class in its own model.py). lm-eval and torchtitan_debug have no loop either way.
 
+
+**Revised after B's review (Nov 3, 5:00 PM):** with the flag on, the closure now gives only the job type, the loop
+and the knobs. The model's name and shape, the RL generation backend and the group size come from the full read, as
+before. Rerun on all 23: the model and `rl` fields are identical to the flag off on every one, and the job type, loop
+and knobs are those of the closure in the table below (so LitGPT no longer gains `litgpt/lora.py`'s 3.4B shape, and
+open-r1 keeps vLLM and its group size of 4). The model column below is from the first version; after the revision
+it is the "before" value on every row.
+
 | Source | Map | Job type | Loop | Model | Knobs |
 | --- | --- | --- | --- | --- | --- |
 | zoo/agent_eval_spark | same | agent → agent | agent_loop at `run.py:154` → agent_loop at `run.py:154` | none → none | 6 → 6 |

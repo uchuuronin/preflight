@@ -76,6 +76,47 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 18:20 ET (filming as soon as C's deploy is posted; shot 13 kept)
+
+Chiya, 18:12: no Wednesday 7:30 time; the Windows check and the filming run as soon as C posts the
+live deploy. Deleted D's scheduled Wednesday check; a watch on C's status file starts the Windows
+check on `main` when the deploy row lands. Shot 13 kept: B's three checks-page strings are on
+`main`, so its voice-over now matches the page ("Checks against full runs"). Merged `main`.
+
+This push sends: `docs/demo/video-plan.md`, this file.
+
+## Tue Nov 3, 18:05 ET (the clip's fix-race shot, to C's screen)
+
+C answered (ws-c `6a7fcd66`): no screen showed a race's verdicts before today; each lane now shows
+its fix's dated Nov 2 verdict on the LoRA sample. The clip's 0:24 to 0:32 row films that screen
+(PF102), with its exact words, and is cut rather than drawn if it isn't live on Wednesday. Replied
+to C's ask about the plain line (D built it). Merged `main`.
+
+This push sends: `docs/demo/video-plan.md`, `docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 17:55 ET (two display-only lines: the beginner's line, the share page's money line)
+
+Chiya's call, by 8 PM. (1) At "New to this" only (`d.expertise`), one plain line above the
+cockpit's status line, restating the readouts and their ranges (`addons/expertise/plainWords.ts`,
+`PlainLine.tsx`): "Fits on A10 with 21.1 GiB to spare · about 7 min 48 s (6 min 58 s to 8 min 44 s)
+· about US$0.14"; an abstaining readout said plainly ("time: not measured here", "time: run length
+unknown"); a likely failure in the dials' words with time and cost "if it ran to the end"; an agent
+run's context window and runaway chance by their labels. No advice and no verdict (a test looks
+for advice words on three settings). Not a live region (the status line is), a hidden lead-in "The
+readouts in plain words:" for screen readers, body-text colour (11.8:1 at worst). Checked on all 8
+samples at 1366 and 390 px on a production build: before the status line in reading order, no
+sideways scroll, hidden at Practitioner and Expert. (2) On the share page (`workers/`), "At risk if
+run as is: US$0.08 (US$0.07 to US$0.08, predicted) · spent to find out: US$0.11" from B's
+`job_cost.at_risk_usd` and the record's `costs`, only when both exist and nothing is illustrative;
+in the page and its preview's description, not the image's alt text; sub-cent figures as "under
+US$0.01". Checked at both widths (no overflow; #FFF5D1 on #0E2634). The page redirects to the
+cockpit at once, so the preview's description is where most people will read it. Tests: 10 for the
+line, 6 for the share line; web 718 and workers 24 pass. A read-only review; its must-fix (the cost
+not qualified on a failing run) and its should-fixes are in.
+
+This push sends: `web/src/addons/expertise/` (the line, its strings, style and registration),
+`workers/functions/_card/` and its tests, this file.
+
 ## Tue Nov 3, 17:00 ET (the 45-second clip and X post, new concept; notes for C's Help page)
 
 The 45-second X clip rewritten for Chiya's pick, "The cheapest place for your training run to
