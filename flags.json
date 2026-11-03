@@ -36,6 +36,7 @@
 	"harness.map_closure": false,
 	"runner.nothing_measured": false,
 	"runner.made_by": false,
+	"runner.entry_runs_nothing": false,
 	"c.guide.live": false,
 	"c.provider.pyodide": false,
 	"c.hops": false,
