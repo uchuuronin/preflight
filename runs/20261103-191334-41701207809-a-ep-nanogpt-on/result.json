@@ -1,0 +1,11 @@
+{
+	"name": "20261103-191334-41701207809-a-ep-nanogpt-on",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41701207809",
+	"ref": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"sha": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --script pretrain_nanogpt --bare-steps 60 --recorder-steps 30 --budget-min 15 --first-gpu A10 --entry-path",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T19:18:28Z"
+}
