@@ -1,0 +1,11 @@
+{
+	"name": "20261103-191347-41701238253-a-fresh-F3-after",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41701238253",
+	"ref": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"sha": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/kuangliu/pytorch-cifar --commit 49b7aa97b0c12fe0d4054e670403a16b6b834ddd --entrypoint main.py --bare-steps 1000000 --recorder-steps 60 --budget-min 25 --first-gpu A10 --install-requirements --install-repo --dataset-cache --tty",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T19:27:50Z"
+}
