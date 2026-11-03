@@ -1,0 +1,11 @@
+{
+	"name": "20261103-144930-41657481934-c-campaign-cells",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41657481934",
+	"ref": "ws-c",
+	"sha": "7c7431a655f8466dffac993adb72fc590a516524",
+	"cmd": "modal run --env main api/campaign_cells_app.py::cells",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T14:50:19Z"
+}
