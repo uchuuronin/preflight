@@ -165,10 +165,6 @@ class Job:
 	error_code: str | None = None  # Probe.error_code's families, for the boarding screen's copy
 	events: list[dict] = field(default_factory=list)
 	next_seq: int = 0
-	import_stop: bool = (
-		False  # every probe stopped at an import (an import_stop event), or refused for a package
-	)
-	free_resend: bool = False  # runner.free_resend: not counted against the visitor's daily probe jobs
 
 
 class JobStore(Protocol):
@@ -213,6 +209,20 @@ def _waiting_for_gpu(job) -> dict | None:
 			break
 		since = ev.get("at")
 	return {"gpu": msg.removeprefix(GPU_WAIT_PREFIX).split(" ", 1)[0], "since": since}
+
+
+def source_key(request: dict) -> str | None:
+	"""Which code a request runs: its source's kind, repo or upload, commit, record or sample; not the entry
+	point, the scope or the extra packages, which a resend changes to get past an import (runner.free_resend)."""
+	src = request.get("source") if isinstance(request, dict) else None
+	if not isinstance(src, dict):
+		return None
+	keep = {k: src.get(k) for k in ("kind", "uri", "commit", "files_ref", "record_ref")}
+	if (
+		src.get("files") is not None and keep["files_ref"] is None
+	):  # inline files, before the store moves them
+		keep["files"] = body_hash(src["files"]) if isinstance(src["files"], dict) else None
+	return body_hash(keep)
 
 
 def body_hash(request: dict) -> str:
@@ -261,6 +271,7 @@ class InMemoryJobStore:
 		self.daily_cap_usd = daily_cap_usd
 		self.job_budget_usd = job_budget_usd
 		self.free_resend = free_resend  # None: runner.free_resend's flag, read at each submit
+		self._import_stops: set[str] = set()  # live jobs whose probes all stopped at an import (this attempt)
 		# per ET day: {"spent": reported GPU dollars, "jobs": {visitor: probe jobs submitted}}
 		self._daily: dict[str, dict] = {}
 		self._lock = threading.RLock()
@@ -355,8 +366,8 @@ class InMemoryJobStore:
 
 	def _emit(self, job: Job, stage: str, **fields) -> JobEvent:
 		ev = JobEvent(job_id=job.job_id, seq=job.next_seq, at=self._iso(), stage=stage, **fields)
-		if ev.import_stop:
-			job.import_stop = True
+		if ev.import_stop:  # held beside the job, not on it: a snapshot stays one an older build restores
+			self._import_stops.add(job.job_id)
 		if ev.share_token:  # the latest attempt's record: a retry writes a fresh one
 			job.share_token = ev.share_token
 		if ev.record_id:
@@ -382,6 +393,8 @@ class InMemoryJobStore:
 		"""Move a job out of the live set once it is terminal."""
 		self._jobs.pop(job.job_id, None)
 		self._done[job.job_id] = job
+		stopped = job.job_id in self._import_stops
+		self._import_stops.discard(job.job_id)
 		while len(self._done) > RECENT_DONE:
 			self._done.popitem(last=False)
 		self._index[job.job_id] = {
@@ -394,8 +407,10 @@ class InMemoryJobStore:
 			"error": job.error,
 			"retryable": job.retryable,
 			"error_code": job.error_code,
-			# a job refused for a package never reached a GPU probe either
-			"import_stop": job.import_stop or (job.error_code or "").startswith("missing_package"),
+			# runner.free_resend: every probe stopped at an import, or the job was refused for a package (it never
+			# reached a GPU probe either); and which code it ran, so a free resend is of the same code
+			"import_stop": stopped or (job.error_code or "").startswith("missing_package"),
+			"source_key": source_key(job.request),
 			"submitted_at": job.submitted_at,
 			"last_event": job.events[-1] if job.events else None,
 			"next_seq": job.next_seq,
@@ -413,6 +428,7 @@ class InMemoryJobStore:
 		if retryable and job.attempt < self.max_attempts:
 			job.status = "queued"
 			job.error = error
+			self._import_stops.discard(job.job_id)  # the next attempt may get past the import: its own marker
 			self._order.append(job.job_id)
 			self._emit(job, "queued", message=error, level="warn", queue_position=self._position(job.job_id))
 		else:
@@ -491,7 +507,6 @@ class InMemoryJobStore:
 				self._order.append(job.job_id)
 				t = self._today(day)
 				if free:
-					job.free_resend = True
 					t.setdefault("free", {})[visitor] = t.setdefault("free", {}).get(visitor, 0) + 1
 				else:
 					t["jobs"][visitor] = t["jobs"].get(visitor, 0) + 1
@@ -509,6 +524,8 @@ class InMemoryJobStore:
 		prev_id = request.get("resend_of") if isinstance(request, dict) else None
 		prev = self._index.get(prev_id) if isinstance(prev_id, str) else None
 		if not prev or prev.get("visitor") != visitor or not prev.get("import_stop"):
+			return False
+		if prev.get("source_key") != source_key(request):  # the same code sent again, not another script
 			return False
 		return today.get("free", {}).get(visitor, 0) < FREE_RESENDS_PER_DAY
 

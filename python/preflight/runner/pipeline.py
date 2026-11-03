@@ -616,7 +616,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		findings = [f for f in rec.findings if not any(e.probe_id in dropped for e in f.evidence)]
 		rec = rec.model_copy(update={"predictions": Predictions(), "models": [], "findings": findings})
 	# a probe that didn't finish names its step and the way past it by hand (item 43)
-	if probes and all(q.steps == 0 and (q.error_code or "").startswith("missing_package") for q in probes):
+	if (
+		_flag("runner.free_resend")
+		and probes
+		and all(q.steps == 0 and (q.error_code or "").startswith("missing_package") for q in probes)
+	):
 		# every probe stopped at an import: a resend with the packages is free today (runner.free_resend)
 		_emit(
 			ctx,
