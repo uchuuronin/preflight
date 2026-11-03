@@ -1,0 +1,20 @@
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ systemctl restart hosted-compute-agent.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+{"size": "laptop", "sample": "lora-qwen", "moves": 20, "timed": 20, "p50_ms": 53.4, "p95_ms": 93.6, "max_ms": 93.6}
+{"size": "laptop", "sample": "pretrain", "moves": 20, "timed": 20, "p50_ms": 34.3, "p95_ms": 102.2, "max_ms": 102.2}
+{"size": "laptop", "sample": "grpo", "moves": 20, "timed": 20, "p50_ms": 37, "p95_ms": 76.9, "max_ms": 76.9}
+{"size": "phone", "sample": "lora-qwen", "moves": 20, "timed": 20, "p50_ms": 30.2, "p95_ms": 51.5, "max_ms": 51.5}
+{"size": "phone", "sample": "pretrain", "moves": 20, "timed": 20, "p50_ms": 21.2, "p95_ms": 41.3, "max_ms": 41.3}
+{"size": "phone", "sample": "grpo", "moves": 20, "timed": 20, "p50_ms": 29.4, "p95_ms": 55.4, "max_ms": 55.4}
+{"all_p95_ms": 67.5, "n": 120}

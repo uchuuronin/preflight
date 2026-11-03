@@ -1,0 +1,11 @@
+{
+	"name": "20261103-143802-41655597938-c-knob-p95-live",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41655597938",
+	"ref": "main",
+	"sha": "74ce7814192cd294c514732c7d6f4be7dbc14591",
+	"cmd": "python scripts/knob_p95_live.py https://preflight-cqn.pages.dev",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T14:40:20Z"
+}
