@@ -71,3 +71,9 @@ def test_the_pipeline_refuses_it_only_with_the_flag(tmp_path, monkeypatch):
 		assert error_code(e) != "entry.runs_nothing"
 	except Exception:
 		pass
+
+
+@pytest.mark.parametrize("code", ["from experiments.run_cifar import *\n",
+	"import atexit\n@atexit.register\ndef main():\n    pass\n"])  # fmt: skip
+def test_a_star_import_or_a_decorated_definition_might_run(code):
+	assert not runs_nothing(code)  # review, Nov 3: never refuse a maybe

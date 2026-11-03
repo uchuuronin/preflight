@@ -596,13 +596,13 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 		if was and fetched.source.content_hash != was and older != was:
 			raise InvalidSubmission("this record's code has changed since it was measured; check it in again",
 				code="submission.code_changed")  # fmt: skip
-	_refuse_inert_entry(fetched)
 	ctx.check()
 	fixed = None
 	if req.patch is not None:  # applied before anything is stored: a refused patch leaves no record
 		from .patches import apply_patch
 
 		fixed = replace(fetched, files=apply_patch(fetched.files, req.patch))
+	_refuse_inert_entry(fixed or fetched)  # the code that would run: a fix may add the entry guard (review)
 
 	_emit(ctx, "mapping")
 	followup = req.mode != "plan"

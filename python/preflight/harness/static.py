@@ -1391,7 +1391,12 @@ def map_static(files: dict[str, str], *, entrypoint: str) -> ScriptMap:
 				group_size=g.current
 				if g is not None and isinstance(g.current, int | float) and not isinstance(g.current, bool)
 				else None,
-				max_completion_len=num("max_completion_len"),
+				max_completion_len=(
+					full_by_id["max_completion_len"].current
+					if "max_completion_len" in full_by_id
+					and isinstance(full_by_id["max_completion_len"].current, int | float)
+					else None
+				),
 				reward_functions=[n for n in names if n],
 				generation_backend=backend,
 			)

@@ -119,6 +119,19 @@ def _read_tree(root: Path) -> dict[str, str]:
 	return files
 
 
+# decorators that run or register the function they wrap (`@atexit.register`, `@app.command()`, `@hydra.main(...)`,
+# `@click.command()`); `@torch.no_grad()`, `@dataclass`, `@lru_cache` only wrap it (litgpt/pretrain.py has those)
+_RUNNING_DECORATORS = ("register", "main", "command", "entrypoint", "cli", "run", "group", "script")
+
+
+def _runs_at_definition(dec) -> bool:
+	import ast
+
+	node = dec.func if isinstance(dec, ast.Call) else dec
+	name = node.attr if isinstance(node, ast.Attribute) else node.id if isinstance(node, ast.Name) else ""
+	return name.lower().endswith(_RUNNING_DECORATORS)
+
+
 def runs_nothing(code: str) -> bool:
 	"""runner.entry_runs_nothing (off; D's walkthrough, Nov 3): the entry file only defines things when run with python:
 	no `if __name__ == "__main__":` and no top-level statement that calls or does anything (litgpt/pretrain.py, vLLM's
@@ -133,6 +146,12 @@ def runs_nothing(code: str) -> bool:
 
 	def inert(body) -> bool:
 		for st in body:
+			if isinstance(st, ast.ImportFrom) and any(a.name == "*" for a in st.names):
+				return False  # `from experiments.run import *`: that module may be what runs (review)
+			if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and any(
+				_runs_at_definition(d) for d in st.decorator_list
+			):
+				return False  # a decorator that runs or registers it (`@atexit.register`, a CLI's command): a maybe
 			if isinstance(
 				st,
 				(ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Pass),
