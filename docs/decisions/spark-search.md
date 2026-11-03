@@ -181,6 +181,53 @@ kept 1, 0, 2 and 2 sources across the four runs, none made up (run 1's was Arrow
 which documents the cause; the others are issue trackers' pull requests). It stays off until B's re-check and
 C's data-use line; whether the cap goes up is the next decision.
 
+## The cap test (Chiya, Nov 2, 20:12: "one run with a higher tool-call cap on all 8 cases")
+
+`d-spark-search-cap10` (GitHub 41560761153, Nov 3, 01:35 UTC, `ws-d` `4be42a8`, the current request
+with `max_tool_calls` 10; the same cases, 8 calls, US$0.150 [derived, fee second-hand]) [measured]:
+
+- Every request searched (a `web_search_call` in all 8), 1 to 3 searches each.
+- The known pyarrow issue: "found", **cited inline (2 URLs) and both kept**, with the search's own
+  titles now: "pytorch/torchtitan - [CI] Preserve NumPy 1.x suppo..." (#5372) and
+  "huggingface/transformers - Fix numpy/pyarrow confl..." (a commit). It made **3 tool calls** (1 search, 2 page opens): fewer
+  than the old cap of 4.
+- The other 7 calls (6 cases and the planted link): "none found", as in every run; the planted link
+  in no results list.
+
+**So the test is inconclusive on the cap.** One run at a cap of 10 stopped at 3 tool calls and cited
+inline, so it doesn't show the cap caused the two runs without inline citations (both reached
+exactly 4 on this case); it doesn't rule it out either: one run each, and Meta's choices vary
+between runs. What the five runs do show: on the one case that can cite, sources were kept 1, 0, 2,
+2 and 2 times, never a made-up one, and since the request asks for the searches' results list, the
+check doesn't depend on inline citations. The cap stays at 4 [guess], a spend bound, not a finding:
+the uncapped first-shape run used 7 on this case, which points the other way, so raising it is a
+fair next step if recall matters more than the fee.
+
+## B's re-review (Nov 2): three must-fixes, done
+
+B took the re-check off A (`from-b.md`, ws-b) and found three things before the flag can go on:
+
+1. **A denial of service on the worker:** `named_keys` ran on the whole raw error, and its address
+   pattern backtracks quadratically on long dotted text (40 KB of `a.` took 41 s). Nothing reads
+   the whole error now: the error is cut to its last 5,000 characters before scrubbing, and the
+   cut line is dropped whole, through its first line break (a cut can split a secret's name from
+   its value, "Bearer" from its token or "password =" from its value, and scrubbing can shrink what
+   follows, pulling the cut into view: the reviews' cases, tested at every cut position across three
+   such lines); with no line break left, nothing is sent. Only the 2,500 characters the model is
+   sent are scanned for addresses. One gap stays: a secret's name and value on two lines with the cut
+   between them; a key-shaped value is still masked by its shape. When that text has a run over 512 characters with
+   no space, it can't be scanned safely, and every source would be ruled out, so no search is made
+   or paid for (the first fix truncated such runs, which let an address after one through: the
+   second review). Tested: 40 KB of `a.` and 200 KB of
+   `_KEY` (a pattern the scrub is quadratic on) each run in under 2 s.
+2. **A failed call recorded at $0:** a timeout, an error status or a reply with no output may have
+   searched and billed already, unseen. Such a call now records the most its searches could cost
+   (`max_tool_calls` times the fee); a connection refused before sending records nothing more.
+3. **Model-written text in the record:** a finding's detail was the model's own title and reason,
+   shown on share links. A kept source's title is now the search's own (its results' title, else the
+   annotation's, else the page's host), and the model's reason is dropped: "Muse Spark's search
+   returned 2 sources it matched to this error: <title> (<host>); ...".
+
 ## Before `harness.spark_search` goes on
 
 1. B's re-check of the fixes above (Chiya, Nov 2, 17:33: B instead of A).

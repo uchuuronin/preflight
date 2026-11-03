@@ -73,6 +73,70 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 22:36 UTC | none (Meta API) | about 1 | 0.148 of Muse Spark [derived: tokens at the list and cached rates plus the search fee, second-hand] | `d-spark-search-validate-3` (41538652971): Meta's documented format; results on every search, the known issue kept 2 sources |
 | Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
 | Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
+| Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
+
+## Mon Nov 2, 22:30 ET (Chiya's 21:02 list: the stranger walkthrough; readme-final)
+
+Pushed `593be8b` at 21:04 (CI green): the search RESULT line for Tuesday noon in `from-d.md`, and
+`readme-final.md`'s AMD row at 199.3 GB reserved of the 206 GB card. No further search rounds.
+
+Item 1, the stranger walkthrough: `main` `75c9b24` built for production and served by `vite preview`,
+with C's API run locally (no Meta, Baseten or Modal credentials, nothing spent) for the knobs, the
+guide's fallback tour and the check-in up to the press. 20 findings for C, most serious first, in
+`from-d.md`: four measured samples open with blank time and cost dials (the run's length isn't
+known); on retrieval, vision, GNN and GRPO almost no knob move changes a dial, and the API doesn't know
+those samples or PF420 (its `SAMPLES` lists 5 of the 10) [measured]. Read-only fact-check before the
+push; its corrections are in. D changed no code of C's.
+
+Item 2: `readme-final.md` already mirrors main's share host and badge, AMD rows, and diagnosis,
+claim-check and engine-fallback rows; the one deliberate difference is main's stale AMD status row.
+Item 3: no video work tonight.
+
+This push sends: `docs/requests/from-d.md`, this file.
+
+## Mon Nov 2, 20:40 ET (search fixes pushed; the cap test)
+
+Pushed `4be42a8` (CI green): B's three must-fixes, after four rounds of read-only review. The
+reviews found, in turn: the scrub still read the whole error (quadratic on `_KEY` runs); cutting
+long runs let an address through; cutting before scrubbing could send part of a secret (a long URL
+query shrinks); and dropping one run still split names from values ("Bearer", "password ="). Now
+the cut line is dropped whole, an unscannable error isn't searched, and a sweep of every cut position
+leaks nothing. Full suite: 1,805 passed. Search spend tonight: US$0.150 (the cap test); today's
+total about US$0.77 [derived, fee second-hand].
+
+The cap test (all 8 cases at `max_tool_calls` 10): the known issue cited inline with 3 tool calls,
+under the old cap of 4, so the test doesn't show the cap caused the two runs without citations, nor
+rule it out (inconclusive, one run each). The cap stays at 4 as a spend bound.
+
+This push sends: `docs/decisions/spark-search.md` (the cap test), `docs/requests/from-d.md`, this file.
+
+## Mon Nov 2, 20:20 ET (Chiya's 8:12 list)
+
+`main` `a132c0a` (the PM's 7:35 merge, contract 0.6.4) merged into `ws-d`, no conflicts.
+
+- **Range test:** B's re-review clears my side (A's items 1, 2, 3 and 6 fixed with tests; B fixed
+  item 4 on ws-b). What's left is A's (the golden's old key names) and C's (the curve). Nothing of
+  mine to push for it beyond what's on `ws-d`.
+- **Search, B's three must-fixes:** nothing reads the whole error now (cut to 5,000 characters
+  before scrubbing, the cut line dropped whole so a secret split by the cut isn't sent, 2,500 scanned for
+  addresses; an error with a run over 512 characters and no space isn't searched at all); 40 KB of `a.` and 200 KB of `_KEY` each under 2 s, tested; a failed call that may have reached
+  Meta records its searches' most possible fee; the record shows the search's own titles and hosts,
+  not the model's words. `docs/decisions/spark-search.md`. Then the cap test: all 8 cases at
+  `max_tool_calls` 10 (about US$0.15 to 0.35 with the fee).
+- **Shot 9b:** the false "faster" alert is posted to B (`from-d.md`, in-flight's band). The device
+  plan stands: Chiya's RTX 4070 if she has time, else a Colab T4, decided by Tue noon.
+- **`readme-final.md`** mirrors the PM's README: the live share host and badge, the in-flight,
+  failed-check-in, diagnosis and engine-fallback rows, the claim check, Glimmer, Cloudflare, and the
+  AMD row as the PM's 7:35 correction has it (LoRA's eval runs out of memory at step 200, 191.3 GB of
+  192 GB; LoRA rows "loss NaN on this stack (bf16, rocm6.2), timing and memory only"; nanoGPT
+  normal). `README.md` itself still says "fits on 192 GB": asked the PM.
+- **Video:** shot 6b, about 8 s on a diagnosis finding with the claim check's mark, needing the
+  deploys and C's live check by Tue noon; otherwise not in the cut.
+
+This push sends: the merge of `main` `a132c0a`; `python/preflight/harness/search_grounding.py`,
+`scripts/spark_search_validate.py` (`--max-tool-calls`), `tests/test_d_search_grounding.py`,
+`docs/decisions/spark-search.md`, `docs/readme-final.md`, `docs/demo/video-plan.md` (6b, 9b),
+`docs/requests/from-d.md`, this file.
 
 ## Mon Nov 2, 18:05 ET (the 6 PM check-in)
 

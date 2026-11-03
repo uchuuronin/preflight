@@ -42,8 +42,10 @@ after the first failed.
 import json
 import logging
 import re
+import unicodedata
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
+import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from preflight.schema.record import Citation, Evidence, Finding
@@ -52,6 +54,9 @@ log = logging.getLogger(__name__)
 
 ERROR_CHARS = 2500  # guess: the end of the recorded error, the exception line and its last frames
 MAX_SOURCES = 3  # Chiya's spec (Nov 2): at most 3 sources
+NAMED_TOKEN = 512  # guess: the longest unbroken run an error's text is read for addresses in
+SCRUB_CHARS = 2 * ERROR_CHARS  # guess: the margin before the cut, so a key across it is still masked
+EVERYTHING = "*"  # named_keys' answer when it can't read the text safely: every source is ruled out
 # guess: searches and page opens a question may make (the validation's used 1 to 4); not in Meta's
 # docs, but taken without an error (d-spark-search-validate-2)
 MAX_TOOL_CALLS = 4
@@ -231,8 +236,17 @@ _ADDRESS = re.compile(
 
 def named_keys(text: str) -> set[str]:
 	"""What the addresses an error text names rule out (`_key`): with or without a scheme, defanged
-	(`hxxps://`, `[.]`) or not, punctuation after them dropped."""
-	text = (text or "").replace("[.]", ".").replace("(.)", ".").replace("{.}", ".")
+	(`hxxps://`, `[.]`) or not, punctuation after them dropped. Only the end the model is sent
+	(ERROR_CHARS) is read, and each run of text between spaces at most NAMED_TOKEN characters:
+	`_ADDRESS` backtracks quadratically on long dotted text (B's review, Nov 2: 41 s on 40 KB of
+	`a.`), and the visitor's process writes the error. An address the model never saw can't steer
+	it."""
+	text = (text or "")[-ERROR_CHARS:]
+	if any(len(w) > NAMED_TOKEN for w in text.split()):
+		# a run too long to scan safely could hide an address the model still sees: rule out every
+		# source rather than read part of it (B's review, Nov 2: a cut-off run let one through)
+		return {EVERYTHING}
+	text = text.replace("[.]", ".").replace("(.)", ".").replace("{.}", ".")
 	text = (
 		text.replace("\uff0e", ".").replace("\u3002", ".").replace("\uff61", ".")
 	)  # wide and ideographic dots
@@ -247,6 +261,8 @@ def named_keys(text: str) -> set[str]:
 
 def _is_named(url: str, named: set[str]) -> bool:
 	"""Does an error's `named_keys` rule this address out (a subdomain of a named host too)?"""
+	if EVERYTHING in named:
+		return True
 	host = _host(url)
 	if _public(host):
 		return _page(url) in named
@@ -288,6 +304,25 @@ def annotations(data: dict) -> dict[str, str]:
 				if isinstance(a, dict) and a.get("type") == "url_citation" and isinstance(a.get("url"), str):
 					got.setdefault(_exact(a["url"]), a["url"])
 	return got
+
+
+def search_titles(data: dict) -> dict[str, str]:
+	"""A title for each URL the search returned, from the search itself (its results' titles, then
+	the annotations'), never the model's answer: {as matched: title}."""
+	got: dict[str, str] = {}
+	for item in data.get("output") or []:
+		if not isinstance(item, dict):
+			continue
+		if str(item.get("type") or "").endswith("search_call"):
+			for r in item.get("results") or []:
+				if isinstance(r, dict) and isinstance(r.get("url"), str) and isinstance(r.get("title"), str):
+					got.setdefault(_exact(r["url"]), r["title"])
+		for part in item.get("content") or []:
+			for a in (part.get("annotations") or []) if isinstance(part, dict) else []:
+				if isinstance(a, dict) and isinstance(a.get("url"), str) and isinstance(a.get("title"), str):
+					got.setdefault(_exact(a["url"]), a["title"])
+	clean = {k: "".join(c for c in v if unicodedata.category(c) not in ("Cc", "Cf")) for k, v in got.items()}
+	return {k: " ".join(v.split())[:200] for k, v in clean.items() if v.strip()}
 
 
 def annotated_urls(data: dict) -> set[str]:
@@ -377,6 +412,7 @@ def kept_sources(answer: Answer, data: dict, error_text: str = "") -> tuple[list
 	# what the search returned: the model's inline citations, and the results Meta lists (an answer
 	# ending in a JSON object may cite nothing inline: the second validation run had no annotations)
 	got = {**returned(data), **annotations(data)}
+	titles = search_titles(data)
 	bad, named = failed_opens(data), named_keys(error_text)
 	if any(not _public(_host(u)) and _is_named(u, named) for u in opened(data)):
 		return [], list(answer.sources)  # a library's own page on a public host is a fair open
@@ -396,7 +432,15 @@ def kept_sources(answer: Answer, data: dict, error_text: str = "") -> tuple[list
 			and not _is_named(s.url, named)
 			and not _own(s.url)
 		)
-		(keep if ok else dropped).append(s.model_copy(update={"url": got[exact]}) if ok else s)
+		if ok and any(k.url == got[exact] for k in keep):
+			continue  # the same page named twice: one citation
+		if ok:
+			# what the record shows comes from the search, not the model (B's review, Nov 2): the
+			# search's title for the page, else its host; the model's own reason is dropped
+			title = titles.get(exact) or _host(got[exact])
+			keep.append(Source(url=got[exact], title=title, why=""))
+		else:
+			dropped.append(s)
 	return keep[:MAX_SOURCES], dropped
 
 
@@ -434,6 +478,7 @@ def ground_failure(
 	*,
 	skip_codes: tuple[str, ...] = SKIP_CODES,
 	shape: str = "current",
+	max_tool_calls: int = MAX_TOOL_CALLS,
 ) -> tuple[Finding | None, list]:
 	"""(a finding: a known issue with its sources, or "no known issue found"; the model calls made).
 
@@ -447,7 +492,24 @@ def ground_failure(
 		return None, []
 	libs = ", ".join(f"{k} {v}" for k, v in sorted((env or {}).items()) if v)
 	# the error can't close its data block early, however it spells the tag
-	error = re.sub(r"(?i)<\s*/\s*error\s*>", "< /error >", scrub(probe.error)[-ERROR_CHARS:])
+	# the end the model is sent, scrubbed once: cut first with a margin, so a key across the cut is
+	# still masked, and nothing reads the whole error (the visitor's process writes it, up to 5 MB;
+	# scrub's patterns are quadratic on some long runs: B's review, Nov 2)
+	window = probe.error[-SCRUB_CHARS:]
+	if len(probe.error) > SCRUB_CHARS:
+		# the cut may fall inside a secret's line, splitting its name from its value ("password = x",
+		# "Bearer x"), which scrubbing then can't recognise: drop the window through its first line
+		# break, and with none left there's nothing safe to send (third review, Nov 2). A name and
+		# value split across lines at the cut stays a gap; key-shaped values are masked by shape.
+		nl = window.find("\n")
+		window = window[nl + 1 :] if nl >= 0 else ""
+	sent = scrub(window)[-ERROR_CHARS:]
+	if not sent.strip() or named_keys(sent) == {EVERYTHING}:
+		# a run too long to scan (or one filling the whole window): every source would be ruled out,
+		# so the search isn't paid for
+		log.info("search %s: skipped, the error has a run over %d characters", probe.id, NAMED_TOKEN)
+		return None, []
+	error = re.sub(r"(?i)<\s*/\s*error\s*>", "< /error >", sent)
 	user = (
 		f"Lens: {lens or 'unknown'}. Libraries: {libs or 'unknown'}.\n"
 		f"Error code (Preflight's): {probe.error_code or 'none'}.\n"
@@ -460,20 +522,31 @@ def ground_failure(
 		# the results added to the input; the include lists what the search returned
 		"tools": [{"type": "web_search", "search_context_size": "low"}],
 		"include": ["web_search_call.results"],
-		"max_tool_calls": MAX_TOOL_CALLS,
+		"max_tool_calls": max_tool_calls,
 	}
 	if shape == "first":
 		first_user = (
 			f"Lens: {lens or 'unknown'}. Libraries: {libs or 'unknown'}.\n"
 			f"Error code (Preflight's): {probe.error_code or 'none'}.\n"
-			f"The probe's recorded error (its end):\n{scrub(probe.error)[-ERROR_CHARS:]}\n\n{ANSWER}"
+			f"The probe's recorded error (its end):\n{sent}\n\n{ANSWER}"
 		)
 		body = {"instructions": SYSTEM_FIRST, "input": first_user, "tools": [{"type": "web_search"}]}
 	before = len(client.calls)
 	try:
 		data, call = client.respond(body, purpose="search", reasoning_effort="low")
-	except Exception:
-		return None, client.calls[before:]  # a failed call stays in provenance; no finding
+	except Exception as exc:
+		# a failed call stays in provenance, no finding. One that may have reached Meta (a timeout, an
+		# error status, a reply with no output) may have searched and billed already, unseen: record
+		# the most it could have, max_tool_calls searches' fee (B's review, Nov 2); its tokens stay
+		# unknown. One refused before it was sent (a connection error) records nothing more.
+		reached = not isinstance(exc, httpx.ConnectError | httpx.ConnectTimeout)
+		for i in range(before, len(client.calls)):
+			c = client.calls[i]
+			if not c.ok and reached:
+				client.calls[i] = c.model_copy(
+					update={"cost_usd": round(c.cost_usd + max_tool_calls * SEARCH_USD_PER_QUERY, 6)}
+				)
+		return None, client.calls[before:]
 	fee = search_queries(data) * SEARCH_USD_PER_QUERY
 	if fee and client.calls and client.calls[-1] is call:  # the fee the usage doesn't carry
 		client.calls[-1] = call.model_copy(update={"cost_usd": round(call.cost_usd + fee, 6)})
@@ -484,7 +557,7 @@ def ground_failure(
 	if answer is None or not searched(data):
 		# no parseable answer, or no search at all: nothing can be cited, and it doesn't claim none
 		return None, calls
-	keep, dropped = kept_sources(answer, data, probe.error) if answer.status == "found" else ([], [])
+	keep, dropped = kept_sources(answer, data, sent) if answer.status == "found" else ([], [])
 	ev = [Evidence(metric="search", value=float(len(keep)), probe_id=probe.id)]
 	ev += [Evidence(metric=f"search.trace.{k}", value=float(v), probe_id=probe.id) for k, v in trace.items()]
 	if dropped:  # every source dropped, for any reason (the name predates the others; C reads it)
@@ -506,15 +579,17 @@ def ground_failure(
 			source="model",
 			evidence=ev,
 		), calls
-	lines = "; ".join(f"{s.title or s.url}: {s.why}".strip() for s in keep)
+	lines = "; ".join(f"{s.title} ({_host(s.url)})" if s.title != _host(s.url) else s.title for s in keep)
 	n = len(keep)
 	return Finding(
 		id=f"search.{probe.id}",
 		severity="info",
 		code="search.known_issue",
 		title=f"Known issue matching probe {probe.id}'s error",
-		detail=f"Muse Spark found {n} source{'s' if n != 1 else ''} describing this error: {lines}"[:600],
+		detail=f"Muse Spark's search returned {n} source{'s' if n != 1 else ''} it matched to this error: {lines}"[
+			:600
+		],
 		source="model",
 		evidence=ev,
-		citations=[Citation(title=(s.title or s.url)[:200], url=s.url) for s in keep],
+		citations=[Citation(title=s.title[:200], url=s.url) for s in keep],
 	), calls
