@@ -1,0 +1,11 @@
+{
+	"name": "20261103-152245-41663236531-a-fresh-live-ogb-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41663236531",
+	"ref": "28fc9b62f28ce0517f45369e506f433a627ed9e7",
+	"sha": "28fc9b62f28ce0517f45369e506f433a627ed9e7",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor fresh-live-ogb --gpus L4,A10 --max-minutes 40 --repo https://github.com/snap-stanford/ogb --commit 61e9784ca76edeaa6e259ba0f836099608ff0586 --entrypoint examples/nodeproppred/arxiv/gnn.py --args=--use_sage,--runs,1,--epochs,500",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T15:33:03Z"
+}
