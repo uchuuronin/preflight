@@ -325,3 +325,21 @@ def test_a_command_off_the_list_or_empty_is_refused_before_the_queue(monkeypatch
 	)
 	assert nul.status_code == 422
 	assert not store.jobs
+
+
+def test_a_repo_check_in_keeps_its_entry_point_and_arguments():
+	"""New flight's Repo link sends which script to run and its flags (contract source.entrypoint and
+	source.args; PM, Nov 3); the API passes them to the runner as sent."""
+	store = Store()
+	c = client(store)
+	src = {
+		"kind": "repo",
+		"uri": "https://github.com/karpathy/nanoGPT",
+		"entrypoint": "word_language_model/main.py",
+		"args": ["--accel", "--epochs", "6"],
+	}
+	r = c.post("/v1/jobs", json={**BODY, "source": src}, headers={"Idempotency-Key": "k-entry-000001"})
+	assert r.status_code == 202, r.text
+	sent = store.jobs[r.json()["job_id"]]["request"]["source"]
+	assert sent["entrypoint"] == "word_language_model/main.py"
+	assert sent["args"] == ["--accel", "--epochs", "6"]
