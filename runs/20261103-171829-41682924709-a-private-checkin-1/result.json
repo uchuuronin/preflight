@@ -1,0 +1,11 @@
+{
+	"name": "20261103-171829-41682924709-a-private-checkin-1",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41682924709",
+	"ref": "cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41",
+	"sha": "cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor private-check --gpus L4,A10 --max-minutes 45 --private",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T17:34:53Z"
+}
