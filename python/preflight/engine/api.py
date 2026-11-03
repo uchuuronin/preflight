@@ -896,10 +896,12 @@ _MARGIN_FAMILY = {
 	"finetune": "hf",
 	"rl": "hf",
 	"pretrain": "gpt",
-	"eval": "gpt",
 	"vision": "cnn",
 	"retrieval": "encoder",
 }
+# review, Nov 3: a training-step margin says nothing about inference: vLLM preallocates its pool, and an eval's batches
+# aren't training steps
+_MARGIN_SKIP = ("serving", "eval")
 _MARGIN_SIZES = ((1e7, "<10M"), (1e8, "<100M"), (1e9, "<1B"), (float("inf"), ">=1B"))
 
 
@@ -940,7 +942,12 @@ def _probe_pool_ratio(record: FlightRecord) -> float | None:
 def _with_reserved_margin(
 	record: FlightRecord, est: memory.MemoryEstimate, ctx: float, capacity: float, n_params: float | None
 ) -> memory.MemoryEstimate:
-	if not feature("memory_reserved") or est.status in ("abstain", "measured") or not est.point:
+	if (
+		not feature("memory_reserved")
+		or record.job.lens in _MARGIN_SKIP
+		or est.status in ("abstain", "measured")
+		or not est.point
+	):
 		return est
 	ratio = _probe_pool_ratio(record)
 	if ratio is None:
@@ -1827,13 +1834,17 @@ class _TimeResult:
 
 
 # Chiya, Nov 3: an eval by command (lm_eval's loglikelihood tasks) has no optimizer steps; A's eval probe (probes.eval_units)
-# times its scoring batches instead. Total = the probe's time before its first measured batch (load, tokenizing, two
-# warm-up batches) + scoring passes x the per-pass time, passes = the eval's requests / the rows a batch holds.
+# times its scoring batches instead. Total = the probe's time outside its scoring batches (load, tokenizing, lm_eval's
+# batch-size search; the warm-up batches count as passes) + scoring passes x the per-pass time, passes = the eval's
+# requests / the rows a batch holds. Only at the probe's own GPU and knobs: nothing here scales to another.
 EVAL_PASS_SIGMA = 0.30  # guess: log-space, as serving.SIGMA_UNCALIBRATED; no eval run has calibrated it
 MODEL_ID_EVAL = "eval-passes@0.1.0"
 
 
-def _eval_passes_total(record: FlightRecord) -> Estimate:
+def _eval_passes_total(record: FlightRecord, moved: bool = False) -> Estimate:
+	if moved:
+		why = "the eval's passes are timed at the probe's GPU and settings only; run a probe at these"
+		return _abstain("s", MODEL_ID_EVAL, why)
 	probe = next(
 		(p for p in record.probes if p.status in OK_PROBE and (p.extras or {}).get("eval_forward_batches")),
 		None,
@@ -1854,7 +1865,7 @@ def _eval_passes_total(record: FlightRecord) -> Estimate:
 	h = memory.Z90 * EVAL_PASS_SIGMA
 	why = (
 		f"{passes:,} scoring passes ({requests:,.0f} requests at {rows:.0f} a batch) x {per:.2f} s a pass (the probe's "
-		f"{n:.0f} batches, p50) + {fixed:.0f} s before the first pass; an eval that scores its longest requests first "
+		f"{n:.0f} batches, p50) + {fixed:.0f} s outside the scoring batches; an eval that scores its longest requests first "
 		"(lm_eval does) makes the probe's batches the slowest, so this leans long"
 	)
 	return _est(
@@ -2529,7 +2540,10 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 	mem = _memory(record, values, eval_off=eval_off)
 	tm = _time(record, values)
 	if feature("eval_passes") and record.job.lens == "eval" and tm.total.status == "abstain":
-		tm = replace(tm, total=_eval_passes_total(record))
+		moved = _target_gpu(record, values) != _env_gpu(record) or any(
+			values.get(k) != v for k, v in _current(record).items()
+		)
+		tm = replace(tm, total=_eval_passes_total(record, moved), sigma=EVAL_PASS_SIGMA)
 	out = {
 		"memory.peak": mem.peak,
 		"risk.oom": mem.oom,
