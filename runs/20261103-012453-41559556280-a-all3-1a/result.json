@@ -1,0 +1,11 @@
+{
+	"name": "20261103-012453-41559556280-a-all3-1a",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41559556280",
+	"ref": "0f1d49397b4db51991e17a69649824ae56e4c1f6",
+	"sha": "0f1d49397b4db51991e17a69649824ae56e4c1f6",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/pytorch/torchtune --commit bd2a0fc7c31430972728494fa01aaeeb0ebf1ba1 --entrypoint recipes/lora_finetune_single_device.py --args=--config,qwen2_5/1.5B_lora_single_device  --bare-steps 300 --budget-min 25 --first-gpu A10 --install-requirements --install-repo --uv --pyg",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T01:27:15Z"
+}

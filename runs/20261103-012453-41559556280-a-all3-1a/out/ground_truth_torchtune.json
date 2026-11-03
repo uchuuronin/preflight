@@ -1,0 +1,101 @@
+{
+  "script": "torchtune",
+  "entrypoint": "recipes/lora_finetune_single_device.py",
+  "args": [
+    "--config",
+    "qwen2_5/1.5B_lora_single_device"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "ImportError",
+    "error": "ImportError: cannot import name 'NF4Tensor' from 'torchao.quantization' (/tmp/gt-caches-o1kx3k_5/deps/lib/python3.11/site-packages/torchao/quantization/__init__.py)\n",
+    "seconds": 2.721265020999999,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 16.7
+  },
+  "recorder": {
+    "status": "error",
+    "error": "ImportError: cannot import name 'NF4Tensor' from 'torchao.quantization' (/tmp/pf-deps/3775987ef08366d0ef53a60c/lib/python3.11/site-packages/torchao/quantization/__init__.py). ImportError: cannot import name 'NF4Tensor' from 'torchao.quantization' (/tmp/pf-deps/3775987ef08366d0ef53a60c/lib/python3.11/site-packages/torchao/quantization/__init__.py) at torchtune/modules/common_utils.py:19, before the first optimizer step (stage: running script)",
+    "error_code": "user_error",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 93.135,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 6872338432.0
+    },
+    "step_log": [],
+    "log_tail": "ssion denied: '/pkg/sitecustomize.py'\n[preflight] requirements: the repo declares 15 dependencies (pyproject.toml, setup.cfg or setup.py)\n[preflight] requirements: the script imports torchao: installing torchao<0.8\n[preflight] requirements: kept the image's datasets 3.1.0 (asked for 'datasets')\n[preflight] requirements: kept the image's huggingface_hub 0.36.2 (asked for 'huggingface_hub[hf_transfer]')\n[preflight] requirements: kept the image's safetensors 0.4.5 (asked for 'safetensors')\n[preflight] requirements: kept the image's tokenizers 0.20.3 (asked for 'tokenizers')\n[preflight] requirements: kept the image's numpy 2.1.3 (asked for 'numpy')\n[preflight] requirements: kept the image's tqdm 4.70.1 (asked for 'tqdm')\n[preflight] requirements: kept the image's psutil 6.1.0 (asked for 'psutil')\n[preflight] requirements: kept the image's Pillow 13.0.0 (asked for 'Pillow>=9.4.0')\n[preflight] requirements: kept the image's pyarrow 26.0.0 (asked for 'pyarrow<21.0.0')\n[preflight] requirements: installing torchdata, kagglehub, sentencepiece, tiktoken, blobfile>=2, omegaconf, torchao<0.8\n/tmp/pf-2eebsjnz/work/torchtune/__init__.py:18: UserWarning: The 'torch' module has already been imported. Setting PYTORCH_CUDA_ALLOC_CONF may not have an effect.For best results, set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before importing 'torch'.\n  warnings.warn(\nError in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T01:25:37Z",
+      "duration_s": 93.135,
+      "error": "ImportError: cannot import name 'NF4Tensor' from 'torchao.quantization' (/tmp/pf-deps/3775987ef08366d0ef53a60c/lib/python3.11/site-packages/torchao/quantization/__init__.py). ImportError: cannot import name 'NF4Tensor' from 'torchao.quantization' (/tmp/pf-deps/3775987ef08366d0ef53a60c/lib/python3.11/site-packages/torchao/quantization/__init__.py) at torchtune/modules/common_utils.py:19, before the first optimizer step (stage: running script)",
+      "error_code": "user_error",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 9.783714285714284,
+        "max_w": 9.818,
+        "samples": 7
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 6872338432.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 93.135,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": null,
+  "image": "probe"
+}
