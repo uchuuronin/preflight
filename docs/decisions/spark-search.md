@@ -225,8 +225,26 @@ B took the re-check off A (`from-b.md`, ws-b) and found three things before the 
    (`max_tool_calls` times the fee); a connection refused before sending records nothing more.
 3. **Model-written text in the record:** a finding's detail was the model's own title and reason,
    shown on share links. A kept source's title is now the search's own (its results' title, else the
-   annotation's, else the page's host), and the model's reason is dropped: "Muse Spark's search
+   page's host), and the model's reason is dropped: "Muse Spark's search
    returned 2 sources it matched to this error: <title> (<host>); ...".
+
+## B's re-check (Nov 2): one fix left, done (Nov 3)
+
+B's re-check of `4be42a8` (`from-b.md`) passed the three fixes above and found one more: a page the
+model only opened, which no search returned, could still be kept as a source, because a
+`url_citation` annotation alone counted, and the opened page's title could replace the search's.
+B's case: the error says "see pytorch issue #777" (no address, so nothing rules the page out), the
+model opens `github.com/pytorch/pytorch/issues/777` itself and cites it inline. Now a source is kept
+only if a search's own `results` list it (`returned`), and its title comes only from those results,
+never a page open's or an annotation's. Every source kept in the runs with Meta's documented format
+was among the search's results (D checked the stored runs: the cap test's 2 and the third run's 2),
+so the one measured result for Tuesday stands. Tests: B's exact case is dropped and counted, a page
+the search returned is still kept with the search's title though an open and an annotation give it
+others, with no title in the result the host stands in, and an answer nested too deep to parse is no
+answer (`tests/test_d_search_grounding.py`; each fails on `4be42a8`). Results count only from a
+search action, never from an untyped item. One consequence: the first run's request
+(`shape="first"`, comparison runs only) asks for no search results, so it can keep no source now;
+runs 1 and 4 kept theirs through inline citations.
 
 ## Before `harness.spark_search` goes on
 

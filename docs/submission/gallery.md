@@ -1,6 +1,6 @@
 # Gallery blurb
 
-Draft by D, Sun Nov 1. Numbers from `README.md`'s table.
+Draft by D, Sun Nov 1; checked Tue Nov 3. Numbers from `README.md`'s table.
 
 ## One line (75 characters)
 
@@ -14,4 +14,4 @@ memory, time, cost and risk, each with a range and a word for how it was made. O
 fine-tune with a planted bug, it caught the out-of-memory at step 200 in 189 seconds of probing,
 for $0.042 of GPU at list price. Built during the hackathon with Muse Spark.
 
-TODO(PM): add Muse Code and Muse Spark Open only if they are on in the live app at submission.
+Muse Code and Muse Spark Open are both on in the live app (Nov 3), so the last line can read: "Built during the hackathon with Muse Spark, Muse Code and Muse Spark Open." Take a name out if its flag is off on Nov 4.
