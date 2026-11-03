@@ -1,0 +1,11 @@
+{
+	"name": "20261103-191341-41701223151-a-fresh-F1-after",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41701223151",
+	"ref": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"sha": "8529dcfb85a87c9eda0d8f4d0626eb3feecf8d45",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/pytorch/examples --commit acc295dc7b90714f1bf47f06004fc19a7fe235c4 --entrypoint word_language_model/main.py --args=--accel,--epochs,6 --bare-steps 1000000 --recorder-steps 60 --budget-min 25 --first-gpu A10 --install-requirements --install-repo --flags runner.read_closure --torch-hint",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T19:15:22Z"
+}

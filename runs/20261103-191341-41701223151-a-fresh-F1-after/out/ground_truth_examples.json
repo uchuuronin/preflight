@@ -1,0 +1,94 @@
+{
+  "script": "examples",
+  "entrypoint": "word_language_model/main.py",
+  "args": [
+    "--accel",
+    "--epochs",
+    "6"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "AttributeError",
+    "error": "AttributeError: module 'torch' has no attribute 'accelerator'\n",
+    "seconds": 0.42041088800000015,
+    "peak_allocated_bytes": 0,
+    "peak_reserved_bytes": 0,
+    "device": "NVIDIA A10G",
+    "timing": "cuda_events",
+    "wall_s": 4.2
+  },
+  "recorder": {
+    "status": "error",
+    "error": "This code needs a newer torch than it declares: torch.accelerator isn't in torch 2.5.1, Preflight's probe image. Declare the torch it needs in requirements.txt (torch>=2.6) and Preflight probes it on its torch 2.7.1 image. AttributeError: module 'torch' has no attribute 'accelerator' at word_language_model/main.py:59, before the first optimizer step (stage: running script)",
+    "error_code": "torch.too_old",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 3.339,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {},
+    "step_log": [],
+    "log_tail": "Error in sitecustomize; set PYTHONVERBOSE for traceback:\nPermissionError: [Errno 13] Permission denied: '/pkg/sitecustomize.py'\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "error",
+      "steps": 0,
+      "started_at": "2026-11-03T19:14:19Z",
+      "duration_s": 3.339,
+      "error": "This code needs a newer torch than it declares: torch.accelerator isn't in torch 2.5.1, Preflight's probe image. Declare the torch it needs in requirements.txt (torch>=2.6) and Preflight probes it on its torch 2.7.1 image. AttributeError: module 'torch' has no attribute 'accelerator' at word_language_model/main.py:59, before the first optimizer step (stage: running script)",
+      "error_code": "torch.too_old",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": null,
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {},
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 3.339,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "finetune",
+  "image": "probe"
+}
