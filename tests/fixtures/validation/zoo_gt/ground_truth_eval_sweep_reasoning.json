@@ -1,0 +1,143 @@
+{
+  "script": "eval_sweep_reasoning",
+  "entrypoint": "run.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "failed": "the bare run took longer than 900 s",
+    "tail": "m8k/.no_exist/740312add88f781978c0658806c59bc2815b9866/gsm8k.py'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ccv0pjbh/hf/hub/datasets--openai--gsm8k/.no_exist/740312add88f781978c0658806c59bc2815b9866/.huggingface.yaml'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ccv0pjbh/hf/hub/datasets--openai--gsm8k/.no_exist/740312add88f781978c0658806c59bc2815b9866/dataset_infos.json'\n\rGenerating train split:   0%|          | 0/7473 [00:00<?, ? examples/s]\rGenerating train split: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 7473/7473 [00:00<00:00, 360998.25 examples/s]\n\rGenerating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]\rGenerating test split: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 1319/1319 [00:00<00:00, 218909.74 examples/s]\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ccv0pjbh/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ccv0pjbh/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ccv0pjbh/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ccv0pjbh/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 30] Read-only file system: '/tmp/gt-caches-ccv0pjbh/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nFrom v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\n",
+    "wall_s": 900.6
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 173.735,
+    "by_phase": {},
+    "rl": {
+      "response_length": {
+        "mean": 1558.0625,
+        "p95": 2048.0,
+        "max": 2048.0,
+        "n": 16
+      },
+      "truncation_rate": 0.5,
+      "zero_spread_fraction": null,
+      "pass_rate_per_prompt": [],
+      "group_size": null,
+      "entropy": [],
+      "kl": [],
+      "clip_fraction": [],
+      "reward_mean": []
+    },
+    "generation": {
+      "calls": 2,
+      "seconds_total": 110.56420979699988,
+      "sequences": 16,
+      "new_tokens_mean": 1558.0625,
+      "new_tokens_p95": 2048.0,
+      "new_tokens_max": 2048.0,
+      "max_new_tokens": 2048,
+      "truncation_rate": 0.5,
+      "backend": "hf"
+    },
+    "extras": {
+      "host_rss_peak_bytes": 7421849600.0,
+      "generation_ending_known": 16.0
+    },
+    "step_log": [],
+    "log_tail": ":00, 339136.73 examples/s]\n\rGenerating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]\rGenerating test split: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 1319/1319 [00:00<00:00, 215708.93 examples/s]\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 13] Permission denied: '/tmp/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 13] Permission denied: '/tmp/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 13] Permission denied: '/tmp/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 13] Permission denied: '/tmp/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nCould not cache non-existence of file. Will ignore error and continue. Error: [Errno 13] Permission denied: '/tmp/hf/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-1.5B/.no_exist'\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\nFrom v4.47 onwards, when a model cache is to be returned, `generate` will return a `Cache` instance instead by default (as opposed to the legacy tuple of tuples format). If you want to keep returning the legacy format, please set `return_legacy_cache=True`.\nSetting `pad_token_id` to `eos_token_id`:None for open-end generation.\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "ok",
+      "steps": 0,
+      "started_at": "2026-11-02T22:58:09Z",
+      "duration_s": 173.735,
+      "error": null,
+      "error_code": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": {
+        "response_length": {
+          "mean": 1558.0625,
+          "p95": 2048.0,
+          "max": 2048.0,
+          "n": 16
+        },
+        "truncation_rate": 0.5,
+        "zero_spread_fraction": null,
+        "pass_rate_per_prompt": [],
+        "group_size": null,
+        "entropy": [],
+        "kl": [],
+        "clip_fraction": [],
+        "reward_mean": []
+      },
+      "power": {
+        "mean_w": 118.40797869101979,
+        "max_w": 155.897,
+        "samples": 657
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": {
+        "calls": 2,
+        "seconds_total": 110.56420979699988,
+        "sequences": 16,
+        "new_tokens_mean": 1558.0625,
+        "new_tokens_p95": 2048.0,
+        "new_tokens_max": 2048.0,
+        "max_new_tokens": 2048,
+        "truncation_rate": 0.5,
+        "backend": "hf"
+      },
+      "extras": {
+        "host_rss_peak_bytes": 7421849600.0,
+        "generation_ending_known": 16.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 173.735,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": {
+    "sync_overhead": null,
+    "hook_overhead": null,
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "eval",
+  "image": "probe"
+}

@@ -253,7 +253,10 @@ _LOG_QUOTE = re.compile(r'\s*\(log: ".*?"\)', re.S)
 PRIVATE = "private_job"
 
 
-def annotate_findings(record, *, client=None) -> tuple[list, list]:
+JOB_CAP_USD = 0.10  # guess: a claim check costs about $0.01 a call, so this is ten findings; past it, code only (A's review)
+
+
+def annotate_findings(record, *, client=None, cap_usd: float = JOB_CAP_USD) -> tuple[list, list]:
 	"""The record's findings with every model-written number checked: each number gets an Evidence line
 	(`claim_check.supported` naming its field, or `claim_check.unsupported`), and a finding with an unsupported number
 	says so at the end of its detail ("21.9 GB: unsupported: run a probe"). Returns the findings and the model calls.
@@ -273,12 +276,17 @@ def annotate_findings(record, *, client=None) -> tuple[list, list]:
 		# a private job's finding is code only on every later job too (A's review, Nov 2)
 		private = any(e.metric == PRIVATE for e in f.evidence)
 		who = None if f.source == "spark_diagnosis" or private else client
+		# a per-job spend cap (A's review, Nov 2): once this job's billed calls reach it, the rest are code only
+		if who is not None and sum(c.cost_usd or 0 for c in calls) >= cap_usd:
+			who = None
 		checks, cs = check_text(" ".join(x for x in (f.title, text) if x), record, client=who)
 		calls += cs
 		ev = [e for e in f.evidence if not e.metric.startswith("claim_check.")]
 		# checked, whatever it found (an all-ambiguous or number-free finding too), so no later job sends it again
+		# "Spark Open picked" only when a call was made and answered (review, Nov 2): no call, or a failed one, is code only
+		picked = bool(cs) and bool(cs[-1].ok)
 		ev.append(
-			Evidence(metric="claim_check.checked", value="code only" if who is None else "Spark Open picked")
+			Evidence(metric="claim_check.checked", value="Spark Open picked" if picked else "code only")
 		)
 		bad = []
 		for c in checks:

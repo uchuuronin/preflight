@@ -229,19 +229,42 @@ class Quantiles:
 	reason: str
 
 
+def per_x_means(pts: list[tuple[int, float]], last_step: int) -> list[tuple[float, float]]:
+	"""The seen losses as the prior's points: one (x, mean loss) per x = 1 to X_MAX, the steps that fall in it averaged
+	(Chiya's review, Nov 2: LC-PFN was trained on one value per epoch, and got raw per-step losses, six to an x on a
+	600-step run). x is the bin's own index, so a run's last step lands on x = X_MAX."""
+	bins: dict[int, list[float]] = {}
+	for s, v in pts:
+		b = min(X_MAX, max(1, math.ceil(s * X_MAX / last_step)))
+		bins.setdefault(b, []).append(v)
+	return [(float(b), sum(vs) / len(vs)) for b, vs in sorted(bins.items())]
+
+
 def forecast_loss(
-	model: LCPFN, losses: list[float | None], last_step: int, first_step: int = 1
+	model: LCPFN, losses: list[float | None], last_step: int, first_step: int = 1, bin_x: bool = True
 ) -> Quantiles | None:
 	"""The loss at `last_step` as LC-PFN's 5%, 50% and 95% quantiles, from a series starting at `first_step`. None
-	when there is nothing to condition on, or the seen steps already pass the last one."""
+	when there is nothing to condition on, or the seen steps already pass the last one. bin_x: per-x means (the
+	default since Nov 2); False gives the raw per-step losses, thinned to MAX_POINTS, as before."""
 	pts = [(first_step + i, float(v)) for i, v in enumerate(losses) if v is not None and math.isfinite(v)]
 	if len(pts) < 2 or last_step <= pts[-1][0] or min(v for _, v in pts) < 0:
 		return None  # a negative loss (some NLLs) has no place on the normaliser's [0, inf) range
-	if len(pts) > MAX_POINTS:
-		keep = sorted({round(k * (len(pts) - 1) / (MAX_POINTS - 1)) for k in range(MAX_POINTS)})
-		pts = [pts[k] for k in keep]
-	steps = torch.tensor([p[0] for p in pts], dtype=torch.float32)
-	ys = torch.tensor([p[1] for p in pts], dtype=torch.float32)
+	binned = per_x_means(pts, last_step) if bin_x else []
+	if bin_x and binned and binned[-1][0] >= X_MAX:
+		return None
+	bin_x = (
+		bin_x and len(binned) >= 2
+	)  # review, Nov 2: a long run seen only in its first x keeps the raw steps
+	if bin_x:
+		steps = torch.tensor([b for b, _ in binned], dtype=torch.float32) * last_step / X_MAX
+		ys = torch.tensor([v for _, v in binned], dtype=torch.float32)
+		pts = [(round(float(s)), float(v)) for s, v in zip(steps, ys, strict=True)]
+	else:
+		if len(pts) > MAX_POINTS:
+			keep = sorted({round(k * (len(pts) - 1) / (MAX_POINTS - 1)) for k in range(MAX_POINTS)})
+			pts = [pts[k] for k in keep]
+		steps = torch.tensor([p[0] for p in pts], dtype=torch.float32)
+		ys = torch.tensor([p[1] for p in pts], dtype=torch.float32)
 	# losses are non-negative; the soft range runs from below the best loss seen to the first one
 	best, first = float(ys.min()), float(ys[0])
 	soft_ub = max(first, best * 1.0001 + 1e-6)
@@ -255,7 +278,8 @@ def forecast_loss(
 	q = q.clamp(1e-6, 1 - 1e-6)
 	lo, mid, hi = (float(back(v)) for v in (q[2], q[1], q[0]))
 	why = (
-		f"LC-PFN posterior on {len(pts)} loss values (steps {pts[0][0]} to {pts[-1][0]}), scaled so step {last_step} "
+		f"LC-PFN posterior on {len(pts)} {'per-x mean losses' if bin_x else 'loss values'} (steps {pts[0][0]} to "
+		f"{pts[-1][0]}), scaled so step {last_step} "
 		"is the prior's last epoch"
 	)
 	return Quantiles(lo, mid, hi, why)

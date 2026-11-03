@@ -112,6 +112,14 @@ def ask_all(cases: list[dict], max_usd: float = MAX_USD) -> dict:
 				files = _narrow(src["uri"], src["commit"], src["entrypoint"], src.get("args") or [])
 				entry, args = src["entrypoint"], src.get("args") or []
 				how = f"narrowed: the runner refused the repo ({str(exc)[:120]})"
+			if src.get("kind") == "sample":
+				# review, Nov 2: a zoo sample's own measured outputs (record_*.json and the like) stay out, as the
+				# runner leaves them out with runner.hide_sample_outputs on; grpo_trl's answer read its own record
+				from preflight.runner.sources import _SAMPLE_OUTPUT
+
+				hidden = [k for k in files if _SAMPLE_OUTPUT.fullmatch(k)]
+				files = {k: v for k, v in files.items() if k not in hidden}
+				how += f", {len(hidden)} measured output files left out" if hidden else ""
 			row["files"] = {"how": how, "n": len(files)}
 			ans, _ = client.structured(
 				am.messages(files, entry, _command(entry, args), c["gpu"], c.get("steps")),

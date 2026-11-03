@@ -4,6 +4,20 @@
 
 | # | When (ET) | What | Why | Cost | How to undo |
 | --- | --- | --- | --- | --- | --- |
+| B5 | 15:40 | Watcher for the PM's afternoon "main is ready" stopped at its time limit with no 2:30 post (main's last is 1:15, `12058ca`); checked by hand since, the 4:15 one still to come | Its limit | none | none needed |
+| B6 | 15:45 | Took A's review of the range test (ws-a `from-a.md`) as "its review is back" (the 12:53 list's item 2) and fixed its items 1, 2, 3 and 6 on `ws-d`; 4 asked of B (the engine's `OK_PROBE` filters are B's), 5 of A (`scripts/make_golden.py` is A's) | Those are the owners; the flag stays off until A re-checks | none | Revert the commit |
+| B7 | 15:45 | "Checked" now needs the updates to grow with the ramp (slope of log update-to-weight on log rate at least 0.5 [guess]); with too few measured steps the rates are dropped as `unverified` rather than shown unchecked | A suggestion we can't show took effect shouldn't read as one; dropping it is the conservative side | none | Lower or drop `UPDATE_SLOPE`, keep rates on `unverified` |
+| B8 | 15:40 | Installed CPU torch, transformers and accelerate in my local environment to run the recorder tests (CI's torch job installs the same) | A's review listed tests that need torch | none | `uv sync` |
+| B9 | 16:25 | Merged `main` `8ec03bc` (the PM's 4:25 PM post) into `ws-d`; one conflict in `tests/test_pipeline.py` (A's import-knob test beside my range-test tests), kept both | The PM's "main is ready" | none | Revert the merge commit |
+| B10 | 16:25 | Re-ran the range test's GPU check (`d-lr-range-gpu-2`, the same app and scripts, A10 or L4) with the new "checked" | The 12:35 run's "checked" was the old test, which proved nothing; the new one should be seen on a GPU before A re-checks | about US$0.19 [guess: the 12:35 run's cost], inside item 3's US$2 | None needed (an ephemeral app) |
+| B11 | 16:30 | The PM's 4:25 list gives D "A's review items on search grounding": fixed (no retries on `/responses`, the search fee recorded, `max_tool_calls` 4, at most 2 searches a job and none started after 120 s, the error text marked as data and its own addresses and Preflight's host never cited, the exact annotated URL stored); flag still off | The PM's order; A's six items | none yet | Revert the commit |
+| B12 | 16:30 | The search fee is US$2.50 per 1,000 queries, cited from eesel.ai's summary of Meta's pricing page, not Meta's own page (my fetch can't reach it) | Recording $0 for a fee we know exists is worse than a cited figure; the tag says where it's from | none | Change `SEARCH_USD_PER_QUERY` |
+| B13 | 16:30 | Shot 9b's stopgap step (filling predictions by hand) replaced by a check that the record has bands, after B's CLI fix reached `main`; checked on a CPU (memory band yes, step-time band no) | The 12:53 list's "the in-flight steps once B's GPU test and the CLI predictions fix land": the fix landed; B's GPU test of the shot's own script hasn't | none | Restore the step from git |
+| B14 | 17:35 | The planted-rate run's container capped at 27 min (US$0.495 at the A10's list price); 100 held steps, not 50 | Chiya's US$0.50 cap; 100 steps show a gap 50 might not | US$0.14 spent | None needed |
+| B15 | 17:40 | Search's third try used Meta's documented format (`include` the searches' results, low context); a source counts when a search's `results` list it | Meta's search-grounding page documents it; annotations are only inline citations | US$0.148 | Drop `include` and the results check |
+| B16 | 17:45 | Shot 7b (the planted bad rate) added to the video plan, needing the flag on and C's curve by Tue noon | It caught the rate and suggested a sane one, Chiya's condition | none | Remove the row |
+| B17 | 17:45 | Ran shot 9b's own steps on an A10 myself (`watch_gpu_app.py`, an ephemeral app like the range test's) rather than wait for B | Chiya asked for a proposal by Tue noon; a checked proposal beats a guessed one; under US$0.33 | US$0.10 | None needed |
+| B18 | 17:50 | Shot 9b proposal: film on Chiya's laptop GPU if its record gets a step range, else Colab on a T4 with the record opened after, else cut | The A10 check shows a GPU record gets the bands and both alerts fire | none | Cut 9b |
 | B1 | 12:55 | Merged `main` `7ba177b` into `ws-d` (no conflicts) | The PM's "main is ready" (12:53) | none | Revert the merge commit |
 | B1b | 13:20 | Merged `main` `12058ca` into `ws-d`; one conflict in `runner/sources.py` (A's new `data` parameter for `probes.repo_install` against my `_git_read`/`_clone_read`), kept both | The PM's 1:15 "main is ready" | none | Revert the merge commit |
 | B2 | 13:00 | Big repositories (Chiya's new item 1) are read as the entry point plus its import closure only with a new flag, `runner.read_closure` (off); with it off, the refusals now say how big the source is and carry `submission.too_large`, not `syntax_error` | Her 11:15 rule: runner and harness changes behind new flags, off, for A's one redeploy. The message fix is a plain bug fix, so it isn't flagged | none | Leave the flag off, or revert the commit |
@@ -53,6 +67,135 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 2, 16:52 UTC | none (GitHub CPU runner) | about 3 | 0 | `d-watch-cpu-check` (41485598315): `preflight watch` on `zoo/notebook_tiny` on CPU works; no alert, as CLI records have no bands |
 | Nov 2, 17:20 UTC | A10 (both scripts) | about 11 (633 s of containers) | 0.19 [derived: container time at list price] | `d-lr-range-gpu` (41490183749): the range test on LoRA and nanoGPT, both train at the suggestion (`docs/decisions/lr-range.md`) |
 | Nov 2, 18:21 UTC | none (Meta API) | about 2 | 0.110 of Muse Spark [derived: tokens at list price] | `d-bigrepo-spark-map` (41499720563): Muse Spark's script map on the three big repositories, flag on |
+| Nov 2, 21:24 UTC | A10 (both scripts) | about 10 (596 s of containers) | 0.18 [derived: container time at list price] | `d-lr-range-gpu-2` (41528070349): the range test with the new "checked"; both scripts checked, the same suggestions (`docs/decisions/lr-range.md`) |
+| Nov 2, 21:37 UTC | none (Meta API) | about 1 | 0.142 of Muse Spark [derived: tokens at the list and cached rates plus 18 searches' fee, US$0.045, at US$2.50 per 1,000, second-hand] | `d-spark-search-validate-2` (41529989287): the fixed search on the same cases; Meta takes `max_tool_calls`; no annotations this time, so the known issue's three sources were dropped (`docs/decisions/spark-search.md`) |
+| Nov 2, 22:36 UTC | A10 | about 8 (469 s of container) | 0.14 [derived: container time at list price] | `d-lr-range-planted-1e-3` (41538650072): the LoRA script at 1e-3; caught past the curve's lowest point (`docs/decisions/lr-range.md`) |
+| Nov 2, 22:36 UTC | none (Meta API) | about 1 | 0.148 of Muse Spark [derived: tokens at the list and cached rates plus the search fee, second-hand] | `d-spark-search-validate-3` (41538652971): Meta's documented format; results on every search, the known issue kept 2 sources |
+| Nov 2, 22:43 UTC | none (Meta API) | about 1 | 0.169 of Muse Spark [derived: as above] | `d-spark-search-first-shape` (41539601183): the first run's request again; citations back on the known issue (2) |
+| Nov 2, 22:43 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b` (41539605466): shot 9b's own steps; a step range on the A10, both alerts fire with the change, one false "below" alert unchanged |
+
+## Mon Nov 2, 18:05 ET (the 6 PM check-in)
+
+`main` is still `8ec03bc` (the 4:25 PM merge), already in `ws-d`; nothing to merge.
+
+- (a) **Landed:** C's 12:45 deploy put share pages live (the Oct 28 record's `/s/` link, card and
+  badge pass `scripts/share_page_check.py`). Both X posts and shot 5 now use
+  `/s/ICDYrfHQ2nBNbv3mlRHHMg`; the TODOs are gone. Not opened in a browser yet (the live host
+  isn't reachable from here): before filming or posting.
+- (b) **Landed:** C's private check-in, record 01M6EG0284PWZDRXGGQVVZYVND, triaged by Glimmer, and
+  "Found by Muse Glimmer" shows on it live. Shot 12 marked works now (its link stays private; the "Private triage" box's two flags are on in
+  production).
+- (c) **Landed:** A's `a-triage-lora-prod-2` (record 01M6EGH5YMCXPFPNY5SHPNSYV5, share
+  `Q3s5qyHKTNf-fCng4dwn6g`, an A10) quotes the out-of-memory line. Checked in Chromium on A's
+  committed copy (`api/tests/fixtures/a-triage-lora-prod-2.record.json`, the app served locally in
+  production mode with the record answered from the copy; the live host isn't reachable from here):
+  the Eval loop node's sheet shows the quote and "Found by Muse Spark Open triage", desk and phone.
+  The token is in shot 6, storyboard 12b and E, fallback 11b; the portal's TODO(PM) has the re-run's
+  ID; a one-record draft for Chiya is in `video-plan.md` (not applied: that record ran on an A10 and
+  its memory ring abstains).
+- (d) **Not landed:** no regenerated validation table yet (B scored the first attempts; only BEIR
+  measured something). Shot 13 keeps its Tuesday condition.
+- (e) **Landed:** A confirmed the empty L4 eval runs (Modal couldn't schedule an L4); closed.
+
+One more check-in is scheduled for Tue Nov 3, 9 AM ET for (d).
+
+This push sends: `docs/demo/video-plan.md` (shots 5, 6, 12, 13, the one-record draft),
+`docs/demo/storyboard.md`, `docs/demo/fallback-cut.md`, `docs/submission/x-post.md`,
+`docs/submission/portal.md`, `docs/requests/from-d.md`, this file.
+
+## Mon Nov 2, 17:50 ET (Chiya's 17:33 and 17:39: a planted bad rate, search's citations, shot 9b)
+
+1. **Range test, a planted bad rate** (LoRA at 1e-3, ten times its author's; A10, US$0.14 of the
+   US$0.50 cap): caught. The script's rate sits past the curve's lowest point, 12.6 times the
+   suggestion (7.9e-5, 0.8 times the author's own). 100 held steps: no blow-up at 1e-3, but its
+   loss stayed above the suggested rate's in every 10-step block after the first, by 0.01 to 0.05.
+   Added to the video plan as shot 7b; it needs the flag on and C's curve by Tue noon.
+2. **Search grounding's citations.** Third try, Meta's documented format: results came back on
+   every search; still no inline citations; the known issue kept 2 sources from the results.
+   Chiya, 17:39: log per request whether a search happened, and re-run once with the first run's
+   request. Done: every request had a `web_search_call`; with the first run's request, inline
+   citations came back (2, both kept). The one case that can cite made exactly 4 tool calls,
+   the cap I'd added, in both runs without citations, and 5 and 7 in the two runs with them: the
+   cap is one of three changes that coincide with no inline citations (one case, so a hypothesis). Not "stays off for no citations": it works
+   on Meta's API; off until B's re-check and C's data-use line. Search spend today: about US$0.62
+   (the morning's probe and four validation runs) [derived, fee second-hand].
+3. **Shot 9b on a GPU** (A10, US$0.10): the record gets a step range there, and step 5's change
+   fires both alerts within about 1.3 s [derived from steps a second]; about 18,000 changed steps make a minute. One false
+   "below the band" alert on the unchanged control (told B). Proposal: Chiya's laptop GPU first
+   (by the code its record should get a step range), else Colab on a T4, else cut, by Tue noon.
+4. B re-checks my fixes instead of A: both requests moved to B.
+
+This push sends: `python/preflight/harness/search_grounding.py` (the documented format, the trace,
+the first shape), `scripts/spark_search_validate.py`, `python/preflight/runner/lr_range_app.py`
+(`--lr`, `--confirm-steps`), `python/preflight/runner/watch_gpu_app.py` (new),
+`tests/test_d_search_grounding.py`, `docs/decisions/spark-search.md`, `docs/decisions/lr-range.md`,
+`docs/demo/video-plan.md` (shots 7b and 9b), `docs/requests/from-d.md`, this file.
+
+## Mon Nov 2, 16:45 ET (both re-runs: the range test checked on a GPU; search's request checked on Meta's API)
+
+CI on `5dcf16a`: green, all seven jobs.
+
+- `d-lr-range-gpu-2` (A10, US$0.18 [derived]): both zoo scripts read **checked** under the new test,
+  with the same suggestions (LoRA 7.9e-5, nanoGPT 2.5e-4); details in `docs/decisions/lr-range.md`.
+  Item 3's spend: US$0.37 of its US$2.
+- `d-spark-search-validate-2` (Meta API, US$0.142 [derived, fee second-hand]): Meta takes
+  `max_tool_calls`, and its search actions are typed `search`. 6 of 7 "none found" as before; the
+  known pyarrow issue's three sources (GitHub pull requests the model said describe the exact
+  conflict) were all dropped because this response carried no citation annotations at all (the first run kept one).
+  So recall under the annotation rule is the open question for turning it on; told A. The
+  finding no longer says "found none" when it dropped sources that didn't pass the checks. The
+  request's shape is checked on Meta's API; the citation path wasn't exercised (nothing annotated).
+
+This push sends: `harness/search_grounding.py` (the dropped-sources wording),
+`tests/test_d_search_grounding.py`, `docs/decisions/spark-search.md`, `docs/decisions/lr-range.md`,
+`docs/requests/from-d.md`, this file.
+
+## Mon Nov 2, 16:35 ET (the PM's 4:25 list: A's search grounding review fixed; main merged; shot 9b)
+
+The PM's 4:25 PM "main is ready" (`8ec03bc`) merged into `ws-d` (one conflict, both sides' tests
+kept); 1,721 non-GPU tests passed on the merge (CPU torch). The PM's list for D: "fix A's review
+items on search grounding and the range test". The range test's went out at 16:20 (CI green,
+`7263013`). Search grounding's six items are fixed, still off: `docs/decisions/spark-search.md`,
+"A's review (Nov 2) and what changed". Two rounds of read-only review: the first found that an
+error could still get its own page cited (an address ending a sentence, without a scheme, another
+path on the same host) and that nothing had been checked against Meta's real API; the first is
+fixed, the second is the validation re-run after this push (about US$0.11 plus the search fee).
+The second round found nothing blocking for the merge, and one thing before the flag goes on (a
+library's error naming its own docs dropped those docs, e.g. NumPy's migration guide), fixed with
+library docs hosts read page by page, plus three small holes.
+
+Shot 9b: `preflight run` fills predictions now (B's fix, on `main`), so the video plan's stopgap
+step is replaced by a check the record has bands. On a CPU, `memory.peak` had a range (604 to 978
+MiB) and `time.step` abstained. B's GPU test of the shot's own script is still asked.
+
+This push sends: the merge of `main` `8ec03bc`; `python/preflight/harness/search_grounding.py`,
+`harness/spark.py` (`_post`'s `retries`, `respond` never retried), `runner/pipeline.py` (search
+cap), `tests/test_d_search_grounding.py`, `tests/test_pipeline.py`, `docs/decisions/spark-search.md`,
+`docs/demo/video-plan.md` (shot 9b), `docs/requests/from-d.md`, this file.
+
+## Mon Nov 2, 16:20 ET (12:53 item 2: the range test, A's review fixed; still off)
+
+A's review of the range test came back (ws-a `from-a.md`): ready to merge off, six fixes before
+the flag goes on. Items 1, 2, 3 and 6 fixed here; 4 asked of B and 5 of A (their files). What
+changed, and the CPU tests for each: `docs/decisions/lr-range.md`, "A's review (Nov 2) and what
+changed". The main one: "checked" now reads whether the updates grew with the ramp, not the rate
+the recorder had just written, so the GPU check's "the ramp checked" (12:35) doesn't count; the
+GPU check is re-run after A's re-check (US$0.19 last time, inside item 3's US$2).
+
+Three rounds of read-only review on the fixes. First: two blocking (zero-start weights such as
+LoRA's B made a ramp that took effect read as not set; the check app's single-rate runs came
+back empty), fixed. Second: one blocking (fp16 accumulation of 64 stopped before the first
+step), fixed by reading a stalled scaler from its scale's drops. Third: nothing blocking; its
+suggestion (each scaler tracked on its own) taken. Tests (CPU torch, transformers and accelerate, CI's
+non-GPU set): 1,692 passed before the review fixes, 1,699 after the first round; the range tests
+(32) after the last two.
+
+This push sends: `python/preflight/probes/lr_range.py` (`follows_rate`, `losses`),
+`recorder/runtime.py` (the range test's update sample, `initial_lr` ratios, other and rebuilt
+optimizers, the stall rule), `recorder/run.py` (four summary keys, range tests only),
+`probes/local.py` (`with_lr_range`'s reasons), `runner/pipeline.py` (the timeout cap, a cached
+`p1`), `runner/lr_range_app.py`, `tests/test_d_lr_range.py`, `tests/test_d_lr_range_probe.py`,
+`tests/test_pipeline.py`, `docs/decisions/lr-range.md`, `docs/requests/from-d.md`, this file.
 
 ## Mon Nov 2, 13:40 ET (item 1: Muse Spark's map on the three repositories)
 

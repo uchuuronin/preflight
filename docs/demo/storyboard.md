@@ -57,7 +57,7 @@ any hours or monthly savings, and any accuracy rate (one script gives no rate).
 | 10 | 1:25 | Cockpit, knob dock | Drag eval batch size down; dials and ring move together | "Move a setting and the whole run answers at once." | "Predicted" (the app's own label on the dials) |
 | 11 | 1:40 | Cockpit, live guide | The guide proposes one knob move; Accept | "Ask the guide, and Muse Spark moves the knobs that matter, one at a time." | "Muse Spark (Meta)" |
 | 12 | 1:55 | Fix loop | Two or three candidate fixes run side by side; the measured winner is kept | "Muse Code tries fixes in parallel, and Preflight's own probe picks the winner by measurement." | "Muse Code (Meta)" |
-| 12b | 2:10 | A's production triage run of the LoRA zoo script, the same script as the fine-tune story, from its share link (posted by Tue Nov 3, noon ET): the Eval loop node's detail sheet, where A's triage finding for the eval probe's out-of-memory sits (A's code puts it on node `eval`) | Click the Eval loop node; its detail sheet lists the rule checks' findings and, below them, the triage finding. Hold on it: its title, its sentence with the quoted log line, and the app's own "Found by Muse Spark Open triage" | "When a probe fails on the live site, Muse Spark Open reads the end of its log and quotes the line." | "Muse Spark Open (Meta, open weights, on Baseten) · triage of a failed probe's log · a real job on the live site" |
+| 12b | 2:10 | A's production triage run of the LoRA zoo script, the same script as the fine-tune story, from its share link, https://preflight-cqn.pages.dev/s/Q3s5qyHKTNf-fCng4dwn6g (A's `a-triage-lora-prod-2`, record 01M6EGH5YMCXPFPNY5SHPNSYV5, an A10; D checked A's committed copy in Chromium, Nov 2: the quote and "Found by Muse Spark Open triage" show on the Eval loop node, desk and phone): the Eval loop node's detail sheet, where A's triage finding for the eval probe's out-of-memory sits (A's code puts it on node `eval`) | Click the Eval loop node; its detail sheet lists the rule checks' findings and, below them, the triage finding. Hold on it: its title, its sentence with the quoted log line, and the app's own "Found by Muse Spark Open triage" | "When a probe fails on the live site, Muse Spark Open reads the end of its log and quotes the line." | "Muse Spark Open (Meta, open weights, on Baseten) · triage of a failed probe's log · a real job on the live site" |
 | 13 | 2:20 | Checks page | Scroll the "Each check" list: the caught OOM, and the step-time misses | "Every prediction is checked against real runs, misses included." | "Held-out checks on real runs" |
 | 14 | 2:33 | Cockpit, then a new tab | Copy the address from the address bar, paste it in a new tab; the same flight opens | "Every flight is a link anyone can open." | |
 | 15 | 2:43 | End card (about 10 s, ends near 2:55) | Public link and repo | "Preflight. Fly the run before you pay for it." | link · repo · "Built Oct 26 to Nov 4" |
@@ -124,9 +124,10 @@ by Tue Nov 3, noon ET), C runs 0:24 to 0:36 and D 0:36 to 0:45, as before.
 - [ ] Every number spoken or captioned is in the table above, with its source.
 - [ ] The Oct 28 record opens from its share link on the deployed app.
 - [ ] Each Meta model named in the video did that work in the record on screen (that record shows it).
-- [ ] Shot 12b (and E): A's production record, from its share link, shows a finding marked
-  "Found by Muse Spark Open triage" that quotes a log line; posted by Tue Nov 3, noon ET, or the
-  shot is dropped, not faked. Spark Open's work is shown in that record, not the Oct 28 one.
+- [x] Shot 12b (and E): A's production record, from its share link, shows a finding marked
+  "Found by Muse Spark Open triage" that quotes a log line (A's `a-triage-lora-prod-2`, share
+  `/s/Q3s5qyHKTNf-fCng4dwn6g`; D checked A's committed copy in Chromium, Nov 2; open the live link
+  once before filming). Spark Open's work is shown in that record, not the Oct 28 one.
 - [ ] No sample screens (they say "Illustrative").
 - [ ] Each shot's flag is on and checked on the deploy, or the fallback is used.
 - [ ] Captions on for every narration line.

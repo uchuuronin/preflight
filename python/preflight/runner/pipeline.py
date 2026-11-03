@@ -76,7 +76,7 @@ from preflight.schema.script_map import ScriptMap
 
 from . import record_jobs
 from .records import RecordReader, RecordWriter
-from .sources import Fetched, fetch
+from .sources import Fetched, extra_lines, fetch
 from .worker import JobContext, PermanentError
 
 log = logging.getLogger("preflight.pipeline")
@@ -149,6 +149,10 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		"seed_force": spec.seed_force,
 		"install_requirements": spec.install_requirements,
 		**({"install_repo": True} if spec.install_repo else {}),  # absent: keys stay as they were
+		**({"extra_packages": list(spec.extra_packages)} if spec.extra_packages else {}),
+		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
+		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
+		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		"gpu": gpu,
 		"image": image if spec.image == "probe" else f"{image}+{spec.image}",
 	}  # fmt: skip
@@ -303,6 +307,10 @@ def _spec(
 		seed_force=p.seed_force,
 		install_requirements=deps.install_requirements,
 		install_repo=deps.install_requirements and _repo_install_on(),
+		extra_packages=extra_lines(fetched.source) if deps.install_requirements else (),
+		install_uv=deps.install_requirements and _flag("probes.uv_install"),
+		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
+		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
@@ -319,6 +327,27 @@ def _import_knobs(knobs: dict) -> tuple:
 			if isinstance(v, bool) or not isinstance(v, int | float)
 		)
 	)
+
+
+def _command_sdists(fetched: Fetched) -> tuple[str, ...]:
+	"""A check-in by command's own source-only dependencies (sources.COMMANDS), else none."""
+	from .sources import COMMANDS
+
+	src = fetched.source
+	if src is None or src.kind != "command" or not src.args:
+		return ()
+	return tuple((COMMANDS.get(src.args[0]) or {}).get("sdists", ()))
+
+
+def _command_lens(sm: ScriptMap, fetched: Fetched) -> ScriptMap:
+	"""A check-in by command is its tool's lens (sources.COMMANDS): the map reads only the wrapper."""
+	return sm.model_copy(update={"lens": fetched.lens}) if fetched.lens else sm
+
+
+def _flag(name: str) -> bool:
+	from .flags import flag
+
+	return flag(name)
 
 
 def _repo_install_on() -> bool:
@@ -402,6 +431,10 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if source.get("kind") == "record":
 		origin = record_jobs.resolve(source, reader=deps.reader, blobs=deps.blobs)
 		source = origin.fetch_source
+	if req.extra_packages:  # 0.6.3: checked against the list by fetch, and kept on the record's source
+		# added to the record's own (a probe from a record that already installs some), in order, once each
+		had = source.get("extra_packages") or []
+		source = {**source, "extra_packages": list(dict.fromkeys([*had, *req.extra_packages]))}
 	_emit(ctx, "fetching")
 	fetched = fetch(source, blobs=deps.blobs)
 	if origin is not None and origin.parent is not None:
@@ -421,14 +454,21 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	if followup and origin.parent is not None:
 		# the parent's map and knobs carry over (no Muse Spark call): a new record, same script
 		rec = record_jobs.derive(origin.parent, ids)
+		if fetched.source.extra_packages != rec.job.source.extra_packages:  # this job added packages
+			src = rec.job.source.model_copy(update={"extra_packages": fetched.source.extra_packages})
+			rec = rec.model_copy(update={"job": rec.job.model_copy(update={"source": src})})
 		sm = rec.job.script_map or values_from_args(
-			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+			fetched.files,
+			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			fetched.args,
 		)
 		rev = deps.records.put(rec)
 		_emit(ctx, "skeleton", rec, rev, message=f"continuing from record {origin.parent.share_token}")
 	else:
 		sm = values_from_args(
-			fetched.files, map_static(fetched.files, entrypoint=fetched.entrypoint), fetched.args
+			fetched.files,
+			_command_lens(map_static(fetched.files, entrypoint=fetched.entrypoint), fetched),
+			fetched.args,
 		)
 		rec = _skeleton(fetched, sm, request)
 		update = {"parent_id": origin.parent_id} if origin is not None else {}
@@ -446,7 +486,7 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 			ctx.check()
 			spark_sm, calls = map_script(fetched.files, entrypoint=fetched.entrypoint, client=deps.spark)
 			if calls:
-				sm = values_from_args(fetched.files, spark_sm, fetched.args)
+				sm = values_from_args(fetched.files, _command_lens(spark_sm, fetched), fetched.args)
 				rec = _skeleton(fetched, sm, request, base=rec)
 				if origin is not None:
 					rec = rec.model_copy(update={"parent_id": origin.parent_id})
@@ -781,9 +821,9 @@ def _reading_findings(fetched: Fetched) -> list:
 			else ""
 		)
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
-			title="Read the entry point and what it imports, not the whole repository",
-			detail=(f"The repository has {p['repo_files']:,} text files ({_mb(p['repo_bytes'])}), more than Preflight "
-				f"reads whole, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
+			title="Read the entry point and what it imports, as asked" if p.get("asked")
+				else "Read the entry point and what it imports, not the whole repository",
+			detail=(f"{_why_partial(p)}, so it read {fetched.entrypoint} and {_n_files(p['imported'], 'Python file')} it imports "
 				f"({_mb(p['bytes'])} in all){left}. The map and the findings cover what was read, and the probes run "
 				"on it: a module left out, or loaded by name at run time, can stop a probe with an import error."),
 			evidence=[Evidence(metric="source.files_read", value=float(p["files"])),
@@ -800,6 +840,13 @@ def _reading_findings(fetched: Fetched) -> list:
 				f"it imports ({_mb(m['bytes'])}). Settings in other files aren't on the map."),
 			evidence=[Evidence(metric="map.files_read", value=float(m["files"]))]))  # fmt: skip
 	return out
+
+
+def _why_partial(p: dict) -> str:
+	size = f"{p['repo_files']:,} text files ({_mb(p['repo_bytes'])})"
+	if p.get("asked"):  # Source.scope "entrypoint"
+		return f"You asked Preflight to start from the entry point (the source has {size})"
+	return f"The repository has {size}, more than Preflight reads whole"
 
 
 def _triage_client(deps: Deps, private: bool):
@@ -854,19 +901,26 @@ def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
 	if not flag("probes.lr_range") or sm.lens not in LR_RANGE_LENSES or not plan or ctx.should_stop():
 		return None
 	first = next((q for q in probes if q.id == plan[0].probe_id), None)
-	if first is None or first.status != "ok" or not first.steps:
-		return None
+	if first is None or first.status not in ("ok", "cached") or not first.steps:
+		return None  # a p1 from the cache ran too (A's review, Nov 2)
 	# the point's time: its first probe's, scaled to the ramp's steps [guess: setup plus steps]
 	per_step = (first.step_time.mean_s if first.step_time else None) or 1.0
 	est_s = (first.duration_s or 60.0) + STEPS * per_step
-	if not budget.allows((_price(gpu) + deps.overhead_usd_per_h) * est_s / 3600, est_s):
+	usd_per_s = (_price(gpu) + deps.overhead_usd_per_h) / 3600
+	if not budget.allows(usd_per_s * est_s, est_s):
 		return None
+	# it may run past its estimate, never past what the job has left (A's review, Nov 2)
+	left_s = budget.left_s()
+	if usd_per_s > 0:
+		left_s = min(left_s, (budget.usd - budget.spent_usd) / usd_per_s)
 	p = replace(plan[0], probe_id=f"{plan[0].probe_id}-lr", warmup=STEPS, timed=0, profile=False)
 	try:
 		spec = _spec(fetched, sm, p, deps, eval_off=True)
 	except OverrideError:
 		return None
-	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS})
+	# a floor of 1 s [guess] so the timeout is never 0
+	spec = replace(spec, lr_range={"start": LR_START, "end": LR_END, "steps": STEPS},
+		timeout_s=max(1.0, min(spec.timeout_s, left_s)))  # fmt: skip
 	if spec.nproc > 1:
 		return None  # a guard (no plan runs ranks today): each rank would stop on its own loss
 	result, cached = _run_point(spec, gpu, deps, ctx)
@@ -879,6 +933,8 @@ def _lr_range_point(plan, probes, fetched, sm, deps, ctx, budget, *, gpu: str):
 	return result.probe
 
 
+SEARCH_MAX_QUESTIONS = 2  # guess: searches a job asks, in series, before the visitor gets the record
+SEARCH_JOB_S = 120.0  # guess: no new search starts after this long searching in one job
 SEARCH_LIBRARIES = ("torch", "transformers", "peft", "trl", "accelerate", "datasets", "bitsandbytes",
 	"vllm", "sentence-transformers", "torch_geometric", "torchvision", "timm", "numpy", "deepspeed")  # fmt: skip
 
@@ -891,7 +947,8 @@ def _search(
 	harness.spark_search is on and the Meta client is configured; never for a private job (its
 	error text would go to Meta and the web), nor a verify job (one question, as with the
 	diagnosis). One search per distinct error code in a job: several points that ran out of memory
-	the same way are one question. Every call is in the record's provenance."""
+	the same way are one question; at most SEARCH_MAX_QUESTIONS, none started past SEARCH_JOB_S
+	(A's review, Nov 2). Every call is in the record's provenance."""
 	from .flags import flag
 
 	if private or verify or deps.spark is None or not flag("harness.spark_search"):
@@ -899,6 +956,7 @@ def _search(
 	from preflight.harness.search_grounding import ground_failure, skipped
 
 	findings, calls, asked = [], [], set()
+	started = time.monotonic()
 	for r in results:
 		if not isinstance(r, ProbeResult) or skipped(r.probe):
 			continue
@@ -907,6 +965,8 @@ def _search(
 		key = r.probe.error_code or r.probe.error.splitlines()[0][:120]
 		if key in asked:
 			continue
+		if len(asked) >= SEARCH_MAX_QUESTIONS or (asked and time.monotonic() - started > SEARCH_JOB_S):
+			break
 		asked.add(key)
 		env = r.env or rec.env
 		libs = {k: v for k, v in (env.libraries if env is not None else {}).items() if k in SEARCH_LIBRARIES}
@@ -1078,7 +1138,8 @@ def _probe_points(
 			# an import that failed before the first step fails the same way at every point: skip the
 			# rest and their triage (unseen runs, Nov 2: three probes and three paid triage calls each)
 			probes.append(Probe(id=p.probe_id, knobs=p.knobs, status="error", steps=0,
-				error=f"skipped: the script couldn't import a package (see {gone.id})", error_code="missing_package"))  # fmt: skip
+				error=f"skipped: the script couldn't import a package (see {gone.id})", error_code="missing_package",
+				missing_module=gone.missing_module, missing_package=gone.missing_package))  # fmt: skip
 			continue
 		if any(q.error_code == "missing_package.install" for q in probes):
 			# the same requirements fail the same way at every point: don't pay for it again

@@ -309,7 +309,45 @@ def hf_configs(models: tuple[str, ...] = HF_MODELS, rank: int = 16) -> list[Corp
 	return out
 
 
-KINDS = ("kernels", "grouped", "hf", "divergence")
+def divergence_real_configs(n: int, seed: int = 0) -> list[CorpusConfig]:
+	"""Chiya's review (Nov 2): the Nov 1 sweep's 44 divergences all came at learning rates of 0.07 or more, none at
+	the rates people train at, so the classifier was judged on the wrong runs. This sweep keeps the learning rate where
+	people train (1e-4 to 3e-2, log-uniform) and turns on the usual triggers instead: no clipping, no warm-up, and fp16
+	without a loss scaler for half the runs; the same small GPT, data and 600 steps. Its rows are kind
+	"divergence_real", so they never mix into the Nov 1 sweep's fit."""
+	r = random.Random(seed)
+	out: list[CorpusConfig] = []
+	seen: set[str] = set()
+	while len(out) < n:
+		precision = r.choices(["fp16", "bf16", "fp32"], weights=[0.5, 0.3, 0.2])[0]
+		p = {
+			"n_layers": 4,
+			"d_model": 256,
+			"n_heads": 4,
+			"seq": 256,
+			"batch": 16,
+			"steps": 600,
+			"lr": round(10 ** r.uniform(math.log10(1e-4), math.log10(3e-2)), 6),
+			"warmup": 0,
+			"init_std": r.choice([0.02, 0.05, 0.1, 0.2]),
+			"precision": precision,
+			"scaler": False,  # fp16 with no GradScaler; bf16 and fp32 never use one
+			"qk_norm": r.random() < 0.4,
+			"z_loss": r.choice([0.0, 1e-4]),
+			"beta2": r.choice([0.95, 0.999]),
+			"weight_decay": 0.1,
+			"grad_clip": None,
+			"seed": r.randrange(1_000_000),
+		}
+		cfg = CorpusConfig("divergence_real", "gpt-small", p)
+		if cfg.key not in seen:
+			seen.add(cfg.key)
+			out.append(cfg)
+	return out
+
+
+DIVERGENCE_KINDS = ("divergence", "divergence_real")
+KINDS = ("kernels", "grouped", "hf", "divergence", "divergence_real")
 
 
 def configs_for(kind: str, n: int, seed: int = 0) -> list[CorpusConfig]:
@@ -322,6 +360,8 @@ def configs_for(kind: str, n: int, seed: int = 0) -> list[CorpusConfig]:
 		return hf_configs()
 	if kind == "divergence":
 		return divergence_configs(n, seed)
+	if kind == "divergence_real":
+		return divergence_real_configs(n, seed)
 	raise ValueError(f"unknown kind {kind!r}; one of {KINDS}")
 
 

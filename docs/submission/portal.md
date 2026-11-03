@@ -130,8 +130,10 @@ Baseten for $0.0184; the eval probe's call said "unclear", because the out-of-me
 probe's recorded error rather than its output. Triage now reads that error too, and on all 11
 failed probes in our test scripts' records Spark Open quoted a line every time
 (`a-triage-agreement`). Spark Open also labelled the corpus: it was sent all 2,339 rows,
-answered for 1,997, and the datasheet sets its labels against ours, misses included. TODO(PM): add the
-production re-run's ID once A posts it.
+answered for 1,997, and the datasheet sets its labels against ours, misses included. The
+production re-run (`a-triage-lora-prod-2`, GitHub run 41479039229, Nov 2, record
+01M6EGH5YMCXPFPNY5SHPNSYV5) quotes the line: "Ran out of GPU memory during the eval pass.
+OutOfMemoryError: CUDA out of memory. Tried to allocate 530.00 MiB.".
 
 **Muse Glimmer, Meta's open weights on our own GPU, for private mode.** With its flag on, a
 private job gets triage from Muse Glimmer (Apache 2.0) on an A100-40GB on Modal that Preflight

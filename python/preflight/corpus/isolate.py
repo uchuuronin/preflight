@@ -32,6 +32,7 @@ KILL_GRACE_S = 30.0  # guess: time for a killed child to exit before the parent 
 DEFAULT_TIMEOUT_S = {
 	"kernels": 600.0,
 	"divergence": 1500.0,
+	"divergence_real": 1500.0,
 	"hf": 900.0,  # guess: model download plus five points; replaced by measured p99 after the first hf wave
 }  # guess: per-config deadline; replaced by 3x the measured p99 config time after the first wave
 
