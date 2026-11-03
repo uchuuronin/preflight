@@ -731,7 +731,8 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	keep = [
 		f
 		for f in keep
-		if not f.id.startswith(afresh) and (f.id != "source.login_skipped" or not fetched.login_skipped)
+		if not f.id.startswith(afresh)
+		and f.id != "source.login_skipped"  # said afresh: every job fetches its source
 	]
 	read = [*_reading_findings(fetched), *_image_findings(sm, fetched)]
 	out = out.model_copy(update={"findings": [*keep, *hygiene_findings(out, code), *triaged, *read]})
@@ -939,7 +940,8 @@ def _reading_findings(fetched: Fetched) -> list:
 		n = fetched.login_skipped
 		out.append(Finding(id="source.login_skipped", severity="info", code="source.login_skipped", source="rule",
 			title="Preflight skipped your login cell",
-			detail=(f"Preflight skipped your login cell{'s' if n > 1 else ''} (notebook_login() or huggingface_hub.login()): "
+			detail=(f"Preflight skipped your login cell{'s' if n > 1 else ''} (notebook_login() or huggingface_hub.login(), "
+				"with no token; the imports stay): "
 				"it only runs inside a notebook or waits for a token, and public models need no login. A gated model "
 				"still needs access: log in with a token in the code."),
 			evidence=[Evidence(metric="source.login_cells", value=float(n))]))  # fmt: skip

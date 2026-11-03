@@ -393,6 +393,14 @@ def _probe_tty() -> tuple[int, int] | None:
 		return None
 	with contextlib.suppress(OSError):
 		fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", TTY_ROWS, TTY_COLS, 0, 0))
+	# every read of it returns at once with nothing (end-of-file), as /dev/null's does: non-canonical, VMIN=VTIME=0.
+	# Queued ^D bytes weren't enough: getpass (huggingface_hub.login() in a script, wandb.login()) flushes them with
+	# TCSAFLUSH and then waited for the probe's timeout (review, Nov 3)
+	with contextlib.suppress(OSError, termios.error):
+		attrs = termios.tcgetattr(slave)
+		attrs[3] &= ~termios.ICANON
+		attrs[6][termios.VMIN] = attrs[6][termios.VTIME] = 0
+		termios.tcsetattr(slave, termios.TCSANOW, attrs)
 	_TTYS.append(master)
 	return master, slave
 
@@ -1117,6 +1125,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	started = datetime.now(UTC).replace(microsecond=0)
 	t0 = time.monotonic()
 	_PROBE_LOCK.acquire()  # one probe at a time per process: the descendant sweep below must not touch another probe
+	term = None
 	try:
 		launch = [python, "-m", "preflight.recorder.run", str(spec_path)]
 		if spec.nproc > 1:
@@ -1139,11 +1148,11 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 		plog = _CappedLog(proc.stdout, root / f"{spec.probe_id}.log")
 		if term:
 			os.close(term[1])  # the probe holds the slave end now
-			with contextlib.suppress(
-				OSError
-			):  # a read of stdin gets end-of-file, as with /dev/null, not a hang
-				os.write(term[0], b"\x04" * 16)
+			term = (term[0], None)
 	except BaseException:
+		if term and term[1] is not None:  # Popen raised: the slave end is still ours
+			with contextlib.suppress(OSError):
+				os.close(term[1])
 		_PROBE_LOCK.release()
 		raise
 	timed_out = cancelled = False

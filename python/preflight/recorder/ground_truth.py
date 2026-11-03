@@ -101,8 +101,6 @@ def _stream(
 		stdin=term[1] if term else None, start_new_session=True)  # fmt: skip
 	if term:
 		os.close(term[1])
-		with contextlib.suppress(OSError):
-			os.write(term[0], b"\x04" * 16)
 	fd = proc.stdout.fileno()
 	exited_at = None
 	code: int | None = None

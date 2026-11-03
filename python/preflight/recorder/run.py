@@ -34,6 +34,40 @@ def _what_installed(spec: dict) -> str:
 	return what
 
 
+_TORCH_REMOVED = {
+	"symeig",
+	"eig",
+	"lstsq",
+	"solve",
+	"matrix_rank",
+	"ffi",
+	"trainer",
+	"legacy",
+}  # older code, not newer
+
+
+def _typo(exc: BaseException, missing: str) -> bool:
+	"""The missing name is close to one the module has (`torch.nn.Relu` for ReLU): the code's own typo, not a torch
+	version (review, Nov 3)."""
+	import difflib
+
+	parent, _, name = missing.rpartition(".")
+	obj = getattr(exc, "obj", None)
+	if obj is None:
+		try:
+			import importlib
+
+			obj = importlib.import_module(parent)
+		except Exception:
+			return False
+	try:
+		have = [n for n in dir(obj) if not n.startswith("_")]
+	except Exception:
+		return False
+	lower = {n.lower() for n in have}
+	return name.lower() in lower or bool(difflib.get_close_matches(name, have, n=1, cutoff=0.85))
+
+
 def _newer_torch(exc: BaseException) -> str | None:
 	"""probes.torch_hint: a torch attribute or module this torch doesn't have (`torch.accelerator` is 2.6's), said as
 	a torch older than the code needs, with the route to the 2.7.1 image; None for anything else."""
@@ -48,7 +82,9 @@ def _newer_torch(exc: BaseException) -> str | None:
 		and (getattr(exc, "name", "") or "").startswith("torch.")
 	):
 		missing = exc.name
-	if not missing:
+	if not missing or any(part.startswith("_") for part in missing.split(".")):
+		return None  # a private name (torch._six, torch._C._x) says nothing about the version the code needs
+	if missing.rsplit(".", 1)[-1] in _TORCH_REMOVED or _typo(exc, missing):
 		return None
 	try:
 		import torch
