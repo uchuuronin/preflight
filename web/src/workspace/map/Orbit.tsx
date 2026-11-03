@@ -282,15 +282,26 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 				}),
 				fit,
 				evalStalled: failing,
-				coreNumber: trusted(peak) ? fmt(peak.point, memT?.unit ?? "bytes") : t("readout.abstain_short"),
+				// The verdict leads when the peak itself isn't measured but the risk is (the LoRA sample: every
+				// probe's eval ran out of memory, so there is no peak to show, yet "Not measured here" over a
+				// "Fails" mark read as a contradiction). Then the caption says why the number is missing.
+				coreNumber: trusted(peak)
+					? fmt(peak.point, memT?.unit ?? "bytes")
+					: fit === "fails"
+						? t("map.core.oom")
+						: fit === "tight"
+							? t("map.core.tight")
+							: t("readout.abstain_short"),
 				coreValue: trusted(peak) ? peak.point : null,
 				coreUnit: memT?.unit ?? "bytes",
 				coreCaption:
 					memT && memT.unit !== "bytes"
 						? t(memT.label_key)
-						: cap
-							? t("map.core.of_capacity", { cap: fmt(cap, "bytes") })
-							: t("map.core.peak"),
+						: !trusted(peak) && (fit === "fails" || fit === "tight") && cap
+							? t("map.core.peak_unmeasured", { cap: fmt(cap, "bytes") })
+							: cap
+								? t("map.core.of_capacity", { cap: fmt(cap, "bytes") })
+								: t("map.core.peak"),
 				coreStatus:
 					fit === "fails" && trusted(peak) && cap && peak.point > cap && memT?.unit === "bytes"
 						? t("map.core.over_by", { over: fmt(peak.point - cap, "bytes") })

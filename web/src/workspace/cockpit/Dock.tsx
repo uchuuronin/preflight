@@ -4,11 +4,11 @@
  * model can answer, with fits / tight / fails / not measured here drawn on each tick, or a choice
  * row; plus pin and, for code knobs, what changing it involves.
  */
-import { memo, useId, useMemo, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { hasKey, t } from "../../lib/i18n";
 import { applyKnobViews, type KnobViewContext, useKnobDecorations, useKnobViews } from "../../registry";
 import { valueText } from "../../guide/GuidePanel";
-import { knobChoices, targetFor } from "../record/model";
+import { knobChoices } from "../record/model";
 import type { Knob, KnobValue } from "../record/types";
 import { guidedKnobs, useRanked, useWorkspace } from "../state";
 import { fitOf, type Fit } from "../status";
@@ -22,13 +22,13 @@ type ValueStatus = Fit | "abstain";
 function useValueStatuses(knob: Knob, values: KnobValue[]): ValueStatus[] {
 	const { record, provider, state } = useWorkspace();
 	return useMemo(() => {
-		const memT = targetFor(record, "memory");
+		// The fit first: a measured out-of-memory risk is a verdict even when the peak itself has no number
+		// (the LoRA sample at batch 4: the dial said 100%, the slider said "not predicted"; Chiya, Nov 2).
 		return values.map((v) => {
 			const knobs = { ...state.knobs, [knob.id]: v };
 			const p = provider.predict(record, knobs);
-			const head = memT ? p[memT.id] : undefined;
-			if (!head || head.status === "abstain") return "abstain";
-			return fitOf(record, p, knobs);
+			const f = fitOf(record, p, knobs);
+			return f === "unknown" ? "abstain" : f;
 		});
 	}, [record, provider, state.knobs, knob.id, values]);
 }
@@ -47,9 +47,18 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 	const status = statuses[index] ?? "unknown";
 	const proposed = state.proposal?.knobId === knob.id;
 	const numeric = knob.kind === "int" || knob.kind === "float";
+	// The editor opens above the rail, and on a laptop the rail sits at the fold: without this only its
+	// title showed (Chiya, Nov 2). Scrolled the least that brings it into view, once, when it opens.
+	const box = useRef<HTMLDivElement>(null);
+	const openedByGuide = useRef(proposed);
+	useEffect(() => {
+		if (openedByGuide.current) return; // the guide's own move: the page stays where the person is reading
+		const still = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+		box.current?.scrollIntoView?.({ block: "nearest", behavior: still ? "auto" : "smooth" });
+	}, []);
 
 	return (
-		<div className="glass pf-control" role="group" aria-labelledby={`${id}-title`}>
+		<div ref={box} className="glass pf-control" role="group" aria-labelledby={`${id}-title`}>
 			<div className="pf-control__head">
 				<b id={`${id}-title`}>{label}</b>
 				<span>
@@ -109,7 +118,8 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 							onClick={() => actions.setKnob(knob.id, v, "user")}
 						>
 							{valueText(knob, v)}
-							{statuses[i] === "fails" ? <FitMark fit="fails" label="" /> : null}
+							{/* The same marks as the slider's ticks: a dot fits, a triangle is tight, a cross fails; hatching means not predicted. */}
+							{statuses[i] === "fails" || statuses[i] === "tight" || statuses[i] === "fits" ? <FitMark fit={statuses[i] as Fit} label="" /> : null}
 						</button>
 					))}
 				</div>

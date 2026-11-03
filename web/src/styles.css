@@ -694,7 +694,8 @@ a {
 .pf-choice__opt--abstain {
 	background-image: repeating-linear-gradient(135deg, transparent 0 5px, var(--pf-track) 5px 7px);
 }
-.pf-choice__opt .pf-status { padding: 0; border: 0; background: transparent; }
+.pf-choice__opt .pf-status { padding: 0; border: 0; background: transparent; gap: 0; }
+.pf-choice__opt .pf-status > span:empty { display: none; }
 
 .pf-departures {
 	flex: 1 1 400px;
@@ -870,15 +871,17 @@ a {
 .pf-dial-wrap { width: 116px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .pf-dial {
 	position: relative;
-	width: 96px;
-	height: 96px;
+	width: 108px;
+	height: 108px;
 	display: grid;
 	place-items: center;
 	padding: 0;
 	border-radius: 50%;
 	color: var(--pf-fg);
 }
-.pf-dial svg { position: absolute; inset: 6px; width: 84px; height: 84px; overflow: visible; }
+/* The ring's clear inside is about 74 px (r 40 of 100 on 100 px, less the 10 px band): a value like
+   "1 h 34 min" at 12 px (about 63 px) sits inside it; at 84 px the ring ran over the number. */
+.pf-dial svg { position: absolute; inset: 4px; width: 100px; height: 100px; overflow: visible; }
 .pf-dial--button { cursor: pointer; transition: transform var(--pf-dur-press) var(--pf-ease), box-shadow 0.3s ease; }
 .pf-dial--button:active { transform: scale(0.96); }
 .pf-dial--button:hover { box-shadow: inset 0 1px 0 var(--pf-glass-hi), 0 0 0 1px var(--pf-stroke-strong), var(--pf-shadow); }
@@ -904,6 +907,7 @@ a {
 .pf-dial__text b { font-size: 18px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pf-dial__text b.is-long { font-size: 14px; }
 .pf-dial__text b.is-longer { font-size: 12px; }
+.pf-dial__text b.is-longest { font-size: 10.5px; }
 .pf-dial__text small { max-width: 68px; font-family: var(--pf-font-mono); font-size: 9.5px; line-height: 1.2; color: var(--pf-fg-dim); }
 .pf-dial__label { font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
 .pf-dial__note { max-width: 116px; font-family: var(--pf-font-mono); font-size: 10.5px; line-height: 1.3; text-align: center; color: var(--pf-fg-dim); }
@@ -1085,6 +1089,7 @@ a {
 	gap: 4px;
 	text-align: center;
 	pointer-events: none;
+	transition: opacity 0.4s ease;
 }
 .pf-core__num { font-family: var(--pf-font-serif); font-size: var(--pf-text-3xl); line-height: 1; font-variant-numeric: tabular-nums; }
 .pf-core__cap { font-size: 11.5px; line-height: 1.3; color: var(--pf-fg-dim); }
@@ -1126,11 +1131,12 @@ a {
 .pf-onode__inner b {
 	display: -webkit-box;
 	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
+	-webkit-line-clamp: 3;
 	overflow: hidden;
 	font-size: 11.5px;
 	font-weight: 600;
 	line-height: 1.15;
+	overflow-wrap: anywhere;
 }
 .pf-onode__inner small { font-family: var(--pf-font-mono); font-size: 9.5px; line-height: 1.2; color: var(--pf-fg-dim); }
 .pf-onode--circle { border-radius: 50%; }
@@ -1138,10 +1144,11 @@ a {
 .pf-onode--diamond:hover { transform: rotate(45deg) scale(0.86); }
 .pf-onode--diamond:active { transform: rotate(45deg) scale(0.78); }
 .pf-onode--diamond .pf-onode__inner { transform: rotate(-45deg) scale(1.25); }
-.pf-onode--hexagon { border: 0; background: var(--pf-glass-hi); clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
+/* A flatter hexagon: its top edge is 64% of its width (was 50%), so a three-line title's first line isn't cut by the slant. */
+.pf-onode--hexagon { border: 0; background: var(--pf-glass-hi); clip-path: polygon(18% 3%, 82% 3%, 100% 50%, 82% 97%, 18% 97%, 0 50%); }
 /* The hexagon narrows towards its top and bottom: keep the words inside its middle band. */
-.pf-onode--hexagon .pf-onode__inner { max-width: 78%; }
-.pf-onode--hexagon .pf-onode__inner b { font-size: 10.5px; }
+.pf-onode--hexagon .pf-onode__inner { max-width: 88%; }
+.pf-onode--hexagon .pf-onode__inner b { font-size: 10px; }
 .pf-onode.is-accent { border-color: var(--pf-accent); box-shadow: 0 0 0 5px var(--pf-accent-glow), 0 0 40px var(--pf-accent-glow); }
 .pf-onode--hexagon.is-accent { background: var(--pf-accent-glow); }
 .pf-onode.is-fails { border-color: var(--pf-fail); box-shadow: 0 0 0 4px var(--pf-fail-soft); }
@@ -1153,6 +1160,8 @@ a {
 /* Zoomed in, a node that would sit cut in half at the stage's edge isn't drawn; it shows again
    when keyboard focus reaches it, and when the zoom lets go. */
 .pf-orbit.is-zoomed .pf-onode.is-off { opacity: 0; pointer-events: none; }
+/* The core's big number is for the whole map; zoomed on a node it is cut by the stage's edge, so it fades. */
+.pf-orbit.is-zoomed .pf-core { opacity: 0; }
 .pf-orbit.is-zoomed .pf-onode.is-off:focus-visible { opacity: 1; }
 
 .pf-onode__chip {
@@ -1160,18 +1169,23 @@ a {
 	bottom: -12px;
 	left: 50%;
 	transform: translateX(-50%);
-	max-width: 160px;
+	width: max-content;
+	max-width: 150px;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
 	overflow: hidden;
-	text-overflow: ellipsis;
-	padding: 1px 8px;
-	border-radius: var(--pf-radius-pill);
+	padding: 2px 9px;
+	border-radius: 11px;
 	border: 1px solid currentColor;
 	/* Solid, not glass: a red-orange warning over a node's edge fell under 4.5:1 (review, Nov 1). */
 	background: var(--pf-glass-solid);
 	color: var(--pf-tight);
 	font-size: 10px;
 	font-weight: 600;
-	white-space: nowrap;
+	line-height: 1.2;
+	text-align: center;
+	white-space: normal;
 }
 .pf-onode__chip.is-fails { color: var(--pf-fail); }
 .pf-onode__chip.is-fails::before { content: "✕ "; }
@@ -1205,6 +1219,13 @@ a {
 
 /* Side column: node detail and the guide */
 .pf-side { grid-area: side; position: relative; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+/* An open node's sheet can be taller than the stage; it used to stretch the row, and the map and the
+   dials (centred in it) dropped by a few hundred pixels on each open (Chiya, Nov 2). The sheet now takes
+   the stage's height at most and scrolls inside, so the map holds still. */
+@media (min-width: 761px) {
+	.pf-deck.has-detail > .pf-side { max-height: clamp(540px, calc(100dvh - 400px), 1400px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
+	.pf-deck.has-detail > .pf-side > .pf-detail { flex: none; }
+}
 
 .pf-detail {
 	display: flex;
@@ -1341,11 +1362,15 @@ a {
 }
 .pf-guide__ask .pf-btn { align-self: flex-start; }
 
+.pf-trace-fold { border-top: 1px solid var(--pf-stroke); padding-top: 6px; }
+.pf-trace-fold > summary { cursor: pointer; font-size: 12px; color: var(--pf-fg-dim); list-style: none; display: flex; align-items: center; gap: 6px; }
+.pf-trace-fold > summary::-webkit-details-marker { display: none; }
+.pf-trace-fold > summary::before { content: "›"; display: inline-block; transition: transform var(--pf-dur-quick) var(--pf-ease); }
+.pf-trace-fold[open] > summary::before { transform: rotate(90deg); }
 .pf-trace {
 	list-style: none;
 	margin: 0;
 	padding: 8px 0 0;
-	border-top: 1px solid var(--pf-stroke);
 	display: flex;
 	flex-direction: column;
 	gap: 3px;
@@ -1813,7 +1838,7 @@ a {
 	.pf-cockpit__head h1 { font-size: 28px; }
 	.pf-deck { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "stage" "dials" "side"; gap: 20px; }
 	.pf-dials { flex-direction: row; flex-wrap: wrap; justify-content: center; }
-	.pf-dial-wrap { width: 106px; }
+	.pf-dial-wrap { width: 112px; }
 	/* No height to fill on a phone: the stage is the screen's width. */
 	.pf-stage-fill { height: auto; container-type: normal; display: block; }
 	.pf-stage-fill > .pf-orbit,
@@ -2300,7 +2325,7 @@ a {
 .pf-private__hint { display: flex; flex-direction: column; gap: 4px; padding-left: 24px; }
 /* "Not measured here" (PM, Nov 2) is longer than "Not trusted": it wraps inside the dial face and
    under the dial instead of running into the next readout. */
-.pf-dial__text b.is-abstain { max-width: 64px; font-size: 12px; line-height: 1.15; white-space: normal; }
+.pf-dial__text b.is-abstain { max-width: 70px; font-size: 12px; line-height: 1.15; white-space: normal; }
 .pf-dial__status .pf-prov--abstain { white-space: normal; text-align: center; max-width: 100%; }
 /* In-flight mode (c.inflight): the real run under the status line, and the logbook's chooser. */
 .pf-live { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: var(--pf-radius-md); border: 1px solid var(--pf-stroke); }

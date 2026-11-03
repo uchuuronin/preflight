@@ -47,6 +47,8 @@ export function Measured() {
 	const knobs = new Map(record.knobs.map((k) => [k.id, k]));
 	const total = record.probes.reduce((a, p) => a + (p.cost?.usd ?? 0), 0);
 	const failed = record.probes.filter((p) => PROBE_FIT[p.status] === "fails").length;
+	// "ran out" when every failure is memory (the usual case); "failed" when any probe errored or timed out.
+	const allOom = failed > 0 && record.probes.every((p) => PROBE_FIT[p.status] !== "fails" || p.status === "oom");
 	// One column order for every chip: the knobs any probe set, in the record's order; a probe
 	// holds a knob it didn't list at the record's current value.
 	const cols = record.knobs.filter((k) => record.probes.some((p) => p.knobs && k.id in p.knobs));
@@ -66,7 +68,7 @@ export function Measured() {
 				{illustrative
 					? t("measured.capsule_illustrative", { n: fmt(record.probes.length, "count") })
 					: t("measured.capsule", { n: fmt(record.probes.length, "count"), cost: fmt(total, "usd") })}
-				{failed ? <FitMark fit="fails" label={fmt(failed, "count")} /> : null}
+				{failed ? <FitMark fit="fails" label={t(allOom ? (failed === 1 ? "measured.oom_one" : "measured.oom_many") : failed === 1 ? "measured.failed_one" : "measured.failed_many", { n: fmt(failed, "count") })} /> : null}
 			</button>
 			<aside
 				id={id}

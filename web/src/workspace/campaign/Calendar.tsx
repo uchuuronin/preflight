@@ -6,7 +6,7 @@
  * their durations. The totals and the finish are B's estimates with their intervals, or B's reason
  * for not giving one. Behind `c.campaign_calendar`.
  */
-import { fmt, fmtRange } from "../../lib/fmt";
+import { fmt, fmtRange, fmtSpread } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { Info } from "../components/Info";
 import type { Estimate } from "../record/types";
@@ -16,7 +16,8 @@ import { type CampaignPlan, finishBand, hasSchedule, lanesOf, type PlanCell, slo
 function said(e: Estimate | null | undefined): string {
 	if (!e || !trusted(e)) return e?.reason ? t("campaign.abstain", { why: e.reason }) : t("value.none");
 	const unit = unitOf(e);
-	return `${fmt(e.point, unit)} (${fmtRange(e.lo ?? e.point, e.hi ?? e.point, unit)})`;
+	const spread = fmtSpread(e.lo ?? e.point, e.hi ?? e.point, unit);
+	return spread ? `${fmt(e.point, unit)} (${spread})` : fmt(e.point, unit);
 }
 
 function cellLabel(c: PlanCell): string {

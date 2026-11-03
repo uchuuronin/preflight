@@ -9,7 +9,7 @@
  *   the probe read the cap, otherwise "not measured" with B's estimate (`rl.truncation`) beside it.
  */
 import { wilson } from "../../addons/_stats/wilson";
-import { fmt, fmtRange } from "../../lib/fmt";
+import { fmt, fmtSpread } from "../../lib/fmt";
 import { t } from "../../lib/i18n";
 import { target } from "../record/model";
 import type { Estimate } from "../record/types";
@@ -20,7 +20,8 @@ import { abstainText } from "./abstain";
 
 function est(e: Estimate | undefined): string {
 	if (!e || !trusted(e)) return e?.reason ? abstainText(e.reason) : t("value.none");
-	return t("rl.estimate", { point: fmt(e.point, "probability"), range: fmtRange(e.lo ?? e.point, e.hi ?? e.point, "probability") });
+	const spread = fmtSpread(e.lo ?? e.point, e.hi ?? e.point, "probability");
+	return spread ? t("rl.estimate", { point: fmt(e.point, "probability"), range: spread }) : fmt(e.point, "probability");
 }
 
 export function RlBand() {
