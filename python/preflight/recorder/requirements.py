@@ -150,8 +150,8 @@ def torch_fits(asks: list[str], version: str) -> bool:
 
 
 def torch_too_old(asks: list[str], version: str) -> str | None:
-	"""The plain stop when the code's own torch requirement asks for a newer torch than the image's: "needs
-	torch>=2.7; Preflight's probe image has torch 2.5.1" (the PM, Nov 3), else None. Only an ask that rules
+	"""Said plainly when the code's own torch requirement asks for a newer torch than the image's: "asks for
+	torch>=2.7; Preflight's probe image has torch 2.5.1" (the PM, Nov 3), else None; a note, never a stop. Only an ask that rules
 	the image's version out from below (>=, >, ~=, or == a newer one): an older pin, a != or a < runs as it
 	did, with the image's torch (review, Nov 3)."""
 	try:

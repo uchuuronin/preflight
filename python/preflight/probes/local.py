@@ -225,7 +225,7 @@ class ProbeSpec:
 	# probes.repo_install_exec: a setup.py that builds its list in code is run, in the sandbox, to read it
 	install_exec: bool = False
 	torch_note: bool = (
-		False  # probes.torch_new: stop, saying so, when the code's torch is newer than the image's
+		False  # probes.torch_new: say plainly when the code asks for a newer torch than the image's
 	)
 	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
 	step_clock: bool = False  # probes.step_clock: the GPU's SM clock on each timed step
