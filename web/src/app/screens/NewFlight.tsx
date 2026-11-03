@@ -103,7 +103,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 		return fn;
 	};
 	const smooth = (): ScrollBehavior => (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
-	// From the hint to the box and, once it's ticked, back to Check in (two panels up on a phone).
+	// From the hint to the box and, once it's ticked, back to Check in (both in the last panel).
 	const fromHint = useRef(false);
 	const checkInBtn = useRef<HTMLButtonElement>(null);
 	const focusDataUse = () => {
@@ -431,9 +431,9 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						</div>
 						{/* Goal and GPU share a row where the desk is wide enough (Chiya, Nov 2: less scrolling). */}
 						<div className="pf-desk__pair">
-							{/* The aim and, under it, what you're trying to do: the left column beside the GPU choices (Chiya's mockup, Nov 3). */}
-							<div className="pf-desk__col">
-							<div className="pf-desk__row">
+							{/* The aim, the GPU choices beside it, and under the aim what you're trying to do (Chiya's mockup,
+							    Nov 3). In the page in reading and Tab order, aim, GPU, goal box; placed by the grid. */}
+							<div className="pf-desk__row pf-desk__aim">
 								<span className="pf-desk__label" id={`${ids.describe}-goal`}>
 									{t("newflight.goal")}
 								</span>
@@ -451,12 +451,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									))}
 								</div>
 							</div>
-							<div className="pf-field">
-								<label htmlFor={ids.describe}>{t("newflight.describe.label")}</label>
-								<textarea id={ids.describe} rows={2} placeholder={t("newflight.describe.placeholder")} value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
-							</div>
-							</div>
-							<div className="pf-desk__row">
+							<div className="pf-desk__row pf-desk__gpu">
 								<span className="pf-desk__label" id={`${ids.describe}-gpu`}>
 									{t("newflight.gpu")}
 								</span>
@@ -474,6 +469,10 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 									</button>
 								</div>
 								{gpu === DEFAULT_GPU ? <p className="pf-hint">{t("newflight.gpu.hint")}</p> : null}
+							</div>
+							<div className="pf-field pf-desk__goalbox">
+								<label htmlFor={ids.describe}>{t("newflight.describe.label")}</label>
+								<textarea id={ids.describe} rows={2} placeholder={t("newflight.describe.placeholder")} value={description} onChange={(e) => setDescription(e.currentTarget.value)} />
 							</div>
 						</div>
 						{privateOffered ? (
@@ -538,7 +537,9 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 					) : null}
 				</div>
 				{/* Where the code goes, "Got it" and Check in: one panel across both columns, last (Chiya's mockup). */}
-				<section className="glass pf-checkin__confirm" aria-label={t("datause.title")}>
+				{/* A plain box: the notice inside is its own region, named "Where your code goes" (review, Nov 3: two
+				    nested regions with one name). */}
+				<div className="glass pf-checkin__confirm">
 				{error ? (
 					<p className="pf-error" role="alert">
 						{error}
@@ -553,7 +554,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						// the sandbox's CPU and memory cost is read off the bill.
 						<span className="pf-hint">{t("newflight.cost_hint")}</span>
 					) : (
-						// On a phone the box is two panels down: the hint takes the visitor there.
+						// The box sits above, in the same panel: the hint takes the visitor there.
 						<button type="button" className="pf-link pf-hint" onClick={focusDataUse}>
 							{t("datause.needed")}
 						</button>
@@ -562,7 +563,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						{busy ? t("newflight.checking_in") : t("newflight.check_in")}
 					</button>
 				</div>
-				</section>
+				</div>
 				<p className="pf-notice">{t("newflight.notice")}</p>
 			</div>
 		</div>
