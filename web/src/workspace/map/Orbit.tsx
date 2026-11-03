@@ -36,6 +36,8 @@ interface NodeData extends Record<string, unknown> {
 	off: boolean;
 	fails: boolean;
 	finding: string | null;
+	/** The node sits in the ring's upper half: its chip hangs above it, outside the ring (D's walkthrough 15). */
+	chipAbove: boolean;
 }
 
 function phaseLabel(phase: string): string {
@@ -159,7 +161,7 @@ const OrbitBackground = memo(function OrbitBackground({ data }: NodeProps<Node<B
 });
 
 const OrbitNodeView = memo(function OrbitNodeView({ data }: NodeProps<Node<NodeData>>) {
-	const { node, title, meta, accent, dim, off, fails, finding } = data;
+	const { node, title, meta, accent, dim, off, fails, finding, chipAbove } = data;
 	const cls = [
 		"pf-onode",
 		`pf-onode--${node.shape}`,
@@ -183,7 +185,7 @@ const OrbitNodeView = memo(function OrbitNodeView({ data }: NodeProps<Node<NodeD
 					{node.repeat > 1 ? <small>{t("map.repeat", { n: node.repeat })}</small> : null}
 					<small>{meta}</small>
 				</span>
-				{finding ? <span className={`pf-onode__chip${fails ? " is-fails" : ""}`}>{finding}</span> : null}
+				{finding ? <span className={`pf-onode__chip${fails ? " is-fails" : ""}${chipAbove ? " is-above" : ""}`}>{finding}</span> : null}
 			</button>
 		</div>
 	);
@@ -363,6 +365,8 @@ function OrbitInner({ compact = false }: { compact?: boolean }) {
 					off: !!state.focus && offstage.has(n.id),
 					fails: n.phase === "eval" && failing,
 					finding: finding ? finding.title : null,
+					// Above for the upper nodes, so the chip falls outside the ring rather than over the nodes inside it.
+					chipAbove: n.shape !== "diamond" && n.y < FRAME.cy - n.size / 2, // a diamond places its own chip
 				},
 				draggable: false,
 				zIndex: 2,

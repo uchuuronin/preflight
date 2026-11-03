@@ -350,7 +350,8 @@ export class LiveTour {
 				const err = (await res.json().catch(() => null)) as { error?: { message?: string; fallback?: string; reason?: string; code?: string } } | null;
 				if (res.status === 409) this.state = null;
 				if (err?.error?.fallback === "rule_based") throw new GuideFallback(err.error.message ?? "", err.error.reason ?? "unknown");
-				throw new GuideFallback(err?.error?.message ?? `The guide request failed (${res.status}).`, err?.error?.code ?? "http_error");
+				// No body to show (the API unreachable, a proxy's 503): the panel's own words, not a bare code (D's walkthrough).
+				throw new GuideFallback(err?.error?.message ?? "", err?.error?.code ?? `http_${res.status}`);
 			}
 			const out = (await res.json()) as RoundOut;
 			this.state = out.state;

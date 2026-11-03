@@ -15,7 +15,7 @@ import {
 	type ReactNode,
 } from "react";
 import { type Limits, NO_LIMITS } from "../guide/limits";
-import { currentKnobs } from "./record/model";
+import { currentKnobs, isFixture } from "./record/model";
 import type { KnobValue, LoadedRecord, Objective, ObjectiveKind, Prediction } from "./record/types";
 import { askEngine, engineOn, engineVersion, needsEngine, subscribeEngine, withEngine } from "./provider/engineFallback";
 import type { PredictionProvider } from "./provider/PredictionProvider";
@@ -229,17 +229,21 @@ export function WorkspaceProvider({
 	// reaches every dollar at once.
 	// Where the grids hold no value, the engine's own prediction once it has answered (engineFallback.ts).
 	const engineV = useSyncExternalStore(subscribeEngine, engineVersion, engineVersion);
-	const engineBase = useMemo(() => withEngine(baseProvider, ref), [baseProvider, ref, engineV]); // eslint-disable-line react-hooks/exhaustive-deps
+	// Not on an illustrative sample: its numbers are examples, and the engine's real ones beside them
+	// made moves look like savings (D's walkthrough, Nov 2: four PF101 knobs gave the same, cheaper
+	// numbers, the engine's at the base being below the sample's own).
+	const engineRef = isFixture(record) ? null : ref;
+	const engineBase = useMemo(() => withEngine(baseProvider, engineRef), [baseProvider, engineRef, engineV]); // eslint-disable-line react-hooks/exhaustive-deps
 	const rated = useMemo(() => withRate(engineBase, state.rate), [engineBase, state.rate]);
 	const estimates = useMemo(() => rated.predict(record, state.knobs), [rated, record, state.knobs]);
 	const tableEstimates = useMemo(() => (state.rate ? engineBase.predict(record, state.knobs) : estimates), [state.rate, engineBase, record, state.knobs, estimates]);
 	// The setting the visitor lands on: ask the engine once the knobs settle, if the grids can't say.
 	// (`estimates` already holds the engine's answer once it has one, so this stops asking by itself.)
 	useEffect(() => {
-		if (!engineOn(ref) || !needsEngine(estimates)) return;
-		const id = setTimeout(() => void askEngine(ref, record, [state.knobs]), ENGINE_SETTLE_MS);
+		if (!engineOn(engineRef) || !needsEngine(estimates)) return;
+		const id = setTimeout(() => void askEngine(engineRef, record, [state.knobs]), ENGINE_SETTLE_MS);
 		return () => clearTimeout(id);
-	}, [ref, record, estimates, state.knobs]);
+	}, [engineRef, record, estimates, state.knobs]);
 
 	// Knob latency is measured to the frame after the new readouts commit, which is what the
 	// person sees; the contract's target is under 400 ms at p95.
