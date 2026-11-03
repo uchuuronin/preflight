@@ -76,7 +76,7 @@ from preflight.schema.script_map import ScriptMap
 
 from . import record_jobs
 from .records import RecordReader, RecordWriter
-from .sources import Fetched, extra_lines, fetch
+from .sources import Fetched, content_hash, extra_lines, fetch
 from .worker import JobContext, PermanentError
 
 log = logging.getLogger("preflight.pipeline")
@@ -503,7 +503,11 @@ def run_pipeline(request: dict, ctx, deps: Deps, *, ids: tuple[str, str] | None 
 	fetched = fetch(source, blobs=deps.blobs)
 	if origin is not None and origin.parent is not None:
 		was = origin.parent.job.source.content_hash
-		if was and fetched.source.content_hash != was:
+		# a record read before the closure read data files (B's must-fix 3, Nov 3) hashed its imports alone: the same
+		# code, read as it was then, still matches (review)
+		data = set((fetched.partial or {}).get("data_files") or ())
+		older = content_hash({k: v for k, v in fetched.files.items() if k not in data}) if data else None
+		if was and fetched.source.content_hash != was and older != was:
 			raise InvalidSubmission("this record's code has changed since it was measured; check it in again",
 				code="submission.code_changed")  # fmt: skip
 	ctx.check()
@@ -945,7 +949,10 @@ def _reading_findings(fetched: Fetched) -> list:
 		if p.get("data_read") or p.get("data_skipped"):
 			left += f"; it also read {_n_files(p.get('data_read', 0), 'file')} the code may open"
 			if p.get("data_skipped"):
-				left += f" and left out {p['data_skipped']:,} more for the size limit"
+				names = ", ".join(p.get("data_left_out") or [])
+				left += f" and left out {p['data_skipped']:,} more for the budget" + (
+					f" ({names}{', …' if p['data_skipped'] > 5 else ''})" if names else ""
+				)
 		out.append(Finding(id="source.partial.read", severity="info", code="source.partial", source="rule",
 			title="Read the entry point and what it imports, as asked" if p.get("asked")
 				else "Read the entry point and what it imports, not the whole repository",

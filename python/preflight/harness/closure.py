@@ -12,7 +12,8 @@ doesn't parse is kept but not followed. Resolution is the static, ordinary case:
 `from a.b import c` to `a/b.py` or `a/b/__init__.py` (and `a/b/c.py` for the `from` form), each
 package's `__init__.py` on the way, relative imports from the importing file's package, under the
 first of the roots Python would search that has the module: the entry point's own folder, the
-repository's top, `src/`. Imports under `if TYPE_CHECKING:` aren't followed. Imports made by string
+repository's top, `src/`. Imports under `if TYPE_CHECKING:` aren't followed, except in a package's `__init__.py`
+(a lazy package's real modules, B's must-fix 4). Imports made by string
 (importlib, registries, entry points in pyproject) aren't seen.
 
 The repository is untrusted: a dotted name, an import's names and a file's imports are capped, and
@@ -257,27 +258,34 @@ def import_closure(
 		for c in have
 		if not c.endswith((".py", *DOCS)) and (c.rsplit("/", 1)[0] if "/" in c else "") in folders
 	)
-	data_read, data_skipped, want = 0, 0, []
+	# counted before the data pass: an argument naming a .py file is read as data, not as an import (review)
+	imported = sum(1 for p in out if p.endswith(".py") and p != entry and p not in PROJECT_FILES)
+	data_files: list[str] = []
+	left_out: list[str] = []
+	want, known = [], {}
 	for c in dict.fromkeys([*named, *beside]):
 		if c in out:
 			continue
 		size = (sizes or {}).get(c)
 		if len(out) + len(want) >= max_files or (size is not None and total + size > max_bytes):
-			data_skipped += 1
+			left_out.append(c)
 			continue
 		want.append(c)
+		known[c] = size
 		total += size or 0
 	got = read(want) if want else {}
 	for c in want:
 		text = got.get(c)
-		n = len(text.encode("utf-8", "surrogatepass")) if text is not None else 0
-		if text is None or (sizes is None and total + n > max_bytes):
-			data_skipped += text is not None
+		if text is None:
 			continue
-		out[c] = text
-		data_read += 1
-		if sizes is None:
+		n = len(text.encode("utf-8", "surrogatepass"))
+		if known[c] is None:  # no size before the read: checked now, as the import walk does (review)
+			if total + n > max_bytes:
+				left_out.append(c)
+				continue
 			total += n
-	imported = sum(1 for p in out if p.endswith(".py") and p != entry and p not in PROJECT_FILES)
+		out[c] = text
+		data_files.append(c)
 	return out, {"files": len(out), "imported": imported, "bytes": total, "skipped": skipped,
-		"cut": cut, "repo_files": len(have), "data_read": data_read, "data_skipped": data_skipped}  # fmt: skip
+		"cut": cut, "repo_files": len(have), "data_read": len(data_files), "data_skipped": len(left_out),
+		"data_files": data_files, "data_left_out": left_out[:5]}  # fmt: skip

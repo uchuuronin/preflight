@@ -295,3 +295,23 @@ def test_a_lazy_package_s_type_checking_imports_are_followed():
 		repo, lambda ps: {p: repo[p] for p in ps}, "app.py", max_files=99, max_bytes=10**6
 	)
 	assert "heavy.py" not in got  # a module's own TYPE_CHECKING body still isn't followed
+
+
+def test_the_data_pass_keeps_the_budget_without_sizes_and_doesn_t_count_as_imports():
+	repo = {"train.py": "import util\n", "util.py": "", "big.json": "x" * 50, "b.json": "y"}
+	got, info = import_closure(repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99, max_bytes=30,
+		sizes={"train.py": 12, "util.py": 0}, args=["util.py"])  # fmt: skip
+	assert "big.json" not in got and info["bytes"] <= 30 and "big.json" in info["data_left_out"]
+	assert info["imported"] == 1  # util.py, imported; naming it in the arguments doesn't count it twice
+
+
+def test_a_follow_up_on_a_record_read_before_the_data_pass_still_matches_its_code():
+	from preflight.runner.sources import content_hash
+
+	repo = {"train.py": "import util\n", "util.py": "", "notes.txt": "x"}
+	got, info = import_closure(
+		repo, lambda ps: {p: repo[p] for p in ps}, "train.py", max_files=99, max_bytes=999
+	)
+	assert info["data_files"] == ["notes.txt"]
+	before = content_hash({k: v for k, v in got.items() if k not in info["data_files"]})
+	assert before == content_hash({"train.py": "import util\n", "util.py": ""})  # what the old read hashed
