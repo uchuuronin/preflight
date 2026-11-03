@@ -1383,6 +1383,9 @@ button.pf-prov:hover { color: var(--pf-fg); }
 .pf-fix__diff summary { cursor: pointer; }
 .pf-fix__diff pre { max-height: 260px; overflow: auto; margin: 6px 0 0; padding: 8px; border-radius: var(--pf-radius-sm); background: var(--pf-glass); font-family: var(--pf-font-mono); font-size: 11.5px; white-space: pre; }
 .pf-fix__unverified { font-size: 12px; color: var(--pf-tight); }
+.pf-fix__verdict { font-size: 12px; }
+.pf-fix__verdict.is-passed, .pf-fix__verdict .is-passed { color: var(--pf-ok); }
+.pf-fix__verdict.is-rejected, .pf-fix__verdict .is-rejected { color: var(--pf-fail); }
 .pf-fix__error { color: var(--pf-fail); }
 
 .pf-guide { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: var(--pf-radius-lg); }
@@ -2026,6 +2029,8 @@ button.pf-prov:hover { color: var(--pf-fg); }
 
 /* ---------- The cockpit as a dashboard: status line, info buttons, Map/Fit stage, drawer ---------- */
 
+/* The Meta models a record's calls show, under the title: a plain line in the header's small text. */
+.pf-cockpit__models { flex-basis: 100%; margin: 0; font-size: var(--pf-text-sm); color: var(--pf-fg-dim); }
 .pf-statusline {
 	flex-basis: 100%;
 	order: 6;
@@ -2251,6 +2256,12 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	min-width: 0;
 }
 .pf-checks__row:first-child { border-top: 0; }
+/* The same-code comparison (B, Nov 2): four columns in the summary's style. */
+.pf-checks__row--ask { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.pf-checks__ask { display: flex; flex-direction: column; gap: 10px; }
+.pf-checks__note { margin: 0; font-size: 13px; }
+.pf-checks__pair { display: flex; flex-direction: column; gap: 2px; }
+.pf-checks__caveats { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 .pf-checks__row--head { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-fg-dim); }
 .pf-checks__row > * { min-width: 0; overflow-wrap: anywhere; }
 .pf-checks__list .pf-chips { display: flex; flex-direction: column; gap: 8px; }

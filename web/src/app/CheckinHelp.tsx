@@ -18,7 +18,7 @@ function newKey(): string {
 }
 
 /** "a", "a and b", "a, b and c" */
-function listOf(names: readonly string[]): string {
+export function listOf(names: readonly string[]): string {
 	return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} ${t("checkin.and")} ${names[names.length - 1]}`;
 }
 

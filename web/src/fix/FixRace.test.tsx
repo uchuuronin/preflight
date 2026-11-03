@@ -72,6 +72,34 @@ describe("the fix race on screen", () => {
 		expect(screen.getByText(/Muse Code used US\$0\.09/)).toBeTruthy();
 	});
 
+	it("shows each lane's verdict where Preflight checked that fix on this sample (Nov 2)", async () => {
+		vi.useFakeTimers();
+		const lane = (id: string, template_id: string, value: unknown) => ({ id, template_id, value, status: "patched", diff: "--- a/train.py\n+++ b/train.py\n", files: ["train.py"], final: null, seconds: 22, problem: null, blocked: [] });
+		const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+			if (url.startsWith("/v1/guide/limits")) return new Response(JSON.stringify({ saved: true, limits: null }), { status: 200 });
+			if (url === "/v1/patches") return new Response(JSON.stringify({ patch_id: "fx_abcdefghijklmnopqr", status: "running", candidates: [], cap_usd: 0.26, candidates_asked: JSON.parse(init?.body as string).candidates }), { status: 202 });
+			return new Response(JSON.stringify({ patch_id: "fx_abcdefghijklmnopqr", status: "done", candidates: [lane("c1", "eval.wrap_no_grad", null), lane("c2", "eval.no_grad_and_batch", 8)], spent_usd: 0.17 }), { status: 200 });
+		});
+		vi.stubGlobal("fetch", fetch);
+		render(
+			<WorkspaceProvider record={dev} recordRef="lora-qwen" provider={new GridProvider()}>
+				<FixFinding finding={f2} />
+			</WorkspaceProvider>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: en["guide.fix_it"] }));
+		await act(async () => {
+			fireEvent.click(screen.getByRole("button", { name: /^Write the fix/ }));
+		});
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(2100);
+		});
+		expect(screen.getByText(/Rejected: the re-run still ran out of memory\./)).toBeTruthy();
+		expect(screen.getByText(/Passed: eval peak 10\.4 GiB, loss within 0\.11%\./)).toBeTruthy();
+		expect(screen.getAllByText(/An earlier patch for this fix, checked on 2 Nov on an A10:/).length).toBe(2);
+		// this race's patches are still not verified themselves
+		expect(screen.getAllByText(en["fix.not_verified"]).length).toBe(2);
+	});
+
 	it("stays away when the fix loop is off or the finding has no fix", () => {
 		render(
 			<WorkspaceProvider record={dev} recordRef="lora-7b" provider={new GridProvider()}>
