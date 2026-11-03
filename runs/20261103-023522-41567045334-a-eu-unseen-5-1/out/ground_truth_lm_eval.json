@@ -1,0 +1,131 @@
+{
+  "script": "lm_eval",
+  "entrypoint": "preflight_command.py",
+  "args": [
+    "lm_eval",
+    "--model",
+    "hf",
+    "--model_args",
+    "pretrained=HuggingFaceTB/SmolLM2-1.7B-Instruct,dtype=bfloat16",
+    "--tasks",
+    "arc_easy,hellaswag,piqa",
+    "--batch_size",
+    "auto"
+  ],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "finished",
+    "error": null,
+    "seconds": 340.338475286,
+    "peak_allocated_bytes": 9570034688,
+    "peak_reserved_bytes": 12490637312,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 363.4
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": 9570034688,
+    "seconds": 96.378,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "eval_forward_batches": 8.0,
+      "eval_forward_s_p50": 0.7756241214999875,
+      "eval_forward_s_total": 6.188731292999989,
+      "eval_forward_tokens_mean": 11880.0,
+      "eval_forward_rows_mean": 64.0,
+      "host_rss_peak_bytes": 6480707584.0
+    },
+    "step_log": [],
+    "log_tail": "g inputs:  91%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 | 48577/53345 [00:12<00:01, 3011.60it/s]\rTokenizing inputs:  92%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258f| 48885/53345 [00:12<00:01, 3031.08it/s]\rTokenizing inputs:  92%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258f| 49189/53345 [00:13<00:01, 3007.51it/s]\rTokenizing inputs:  93%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258e| 49492/53345 [00:13<00:01, 3013.34it/s]\rTokenizing inputs:  94%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258e| 49940/53345 [00:13<00:00, 3449.24it/s]\rTokenizing inputs:  95%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258d| 50564/53345 [00:13<00:00, 4281.37it/s]\rTokenizing inputs:  96%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258c| 51213/53345 [00:13<00:00, 4939.69it/s]\rTokenizing inputs:  97%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258b| 51829/53345 [00:13<00:00, 5303.85it/s]\rTokenizing inputs:  98%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a| 52474/53345 [00:13<00:00, 5645.80it/s]\rTokenizing inputs: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2589| 53107/53345 [00:13<00:00, 5850.57it/s]\rTokenizing inputs: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 53345/53345 [00:13<00:00, 3869.86it/s]\n\rRunning loglikelihood requests:   0%|          | 0/53345 [00:00<?, ?it/s]Passed argument batch_size = auto:1. Detecting largest batch size\nDetermined largest batch size: 64\n\rRunning loglikelihood requests:   0%|          | 1/53345 [00:07<111:47:38,  7.54s/it]\rRunning loglikelihood requests:   0%|          | 65/53345 [00:08<1:20:31, 11.03it/s] \rRunning loglikelihood requests:   0%|          | 129/53345 [00:08<38:11, 23.23it/s] \rRunning loglikelihood requests:   0%|          | 194/53345 [00:09<24:08, 36.68it/s]\rRunning loglikelihood requests:   0%|          | 258/53345 [00:09<17:45, 49.81it/s]\rRunning loglikelihood requests:   1%|          | 321/53345 [00:09<27:14, 32.43it/s]\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "ok",
+      "steps": 0,
+      "started_at": "2026-11-03T02:41:56Z",
+      "duration_s": 96.378,
+      "error": null,
+      "error_code": null,
+      "missing_module": null,
+      "missing_package": null,
+      "memory": {
+        "peak_allocated_bytes": 9570034688,
+        "peak_reserved_bytes": null,
+        "device_total_bytes": null,
+        "by_term": {
+          "activations": 9570034688
+        },
+        "peak_step": null,
+        "timeline": null
+      },
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 56.36262676056338,
+        "max_w": 157.355,
+        "samples": 284
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "eval_forward_batches": 8.0,
+        "eval_forward_s_p50": 0.7756241214999875,
+        "eval_forward_s_total": 6.188731292999989,
+        "eval_forward_tokens_mean": 11880.0,
+        "eval_forward_rows_mean": 64.0,
+        "host_rss_peak_bytes": 6480707584.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 96.378,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": {
+    "sync_overhead": null,
+    "hook_overhead": null,
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "eval",
+  "image": "probe"
+}
