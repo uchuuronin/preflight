@@ -3,7 +3,7 @@
  * knobs) or from a probe, and the sheet says which: "measured at batch 4" is not a prediction
  * for batch 8. Groups list what they hold; findings say what to do about them.
  */
-import { fmt, fmtRange } from "../../lib/fmt";
+import { fmt, fmtSpread } from "../../lib/fmt";
 import { hasKey, t } from "../../lib/i18n";
 import { usePanels } from "../../registry";
 import { valueText } from "../../guide/GuidePanel";
@@ -17,6 +17,13 @@ import { AddonBoundary } from "../../components/AddonBoundary";
 import { FixFinding } from "../../fix/FixFinding";
 import { FindingCitations, findingSourceKey } from "./findingSource";
 import { abstainText } from "./abstain";
+
+/** A metric path with no label of its own, as words: "probe.eval.peak_allocated_bytes" reads "Eval peak allocated". */
+function plainMetric(key: string): string {
+	const parts = key.split(".").filter((p) => p !== "probe");
+	const words = parts.join(" ").replace(/_/g, " ").replace(/\bbytes\b|\bfraction\b|\bmean\b|\bs\b/g, "").trim();
+	return words ? words[0]!.toUpperCase() + words.slice(1) : key;
+}
 
 export function DetailSheet() {
 	const { record, estimates, state, actions } = useWorkspace();
@@ -65,7 +72,7 @@ export function DetailSheet() {
 					{metricKeys.map((key) => {
 						const m = resolveMetric(record, state.knobs, estimates, key);
 						const tg = target(record, key);
-						const label = tg ? t(tg.label_key) : hasKey(`metric.${key}`) ? t(`metric.${key}`) : key;
+						const label = tg ? t(tg.label_key) : hasKey(`metric.${key}`) ? t(`metric.${key}`) : plainMetric(key);
 						const est = estimates[key];
 						return (
 							<div key={key}>
@@ -74,8 +81,8 @@ export function DetailSheet() {
 									{m ? (
 										<>
 											<strong>{fmt(m.value, m.unit)}</strong>
-											{trusted(est) && est.lo !== null && est.hi !== null ? (
-												<span className="pf-dim">{fmtRange(...bounds(est), est.unit)}</span>
+											{trusted(est) && est.lo !== null && est.hi !== null && fmtSpread(...bounds(est), est.unit) ? (
+												<span className="pf-dim">{fmtSpread(...bounds(est), est.unit)}</span>
 											) : null}
 											{m.kind === "prediction" && est ? <Provenance status={est.status} /> : null}
 											{m.kind === "measured_here" ? <Provenance status="measured" /> : null}
