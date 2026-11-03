@@ -23,6 +23,13 @@ import { KNOBS_ID, WakeStrip } from "./Dials";
 
 type ValueStatus = Fit | "abstain";
 
+/** Hover note for a GPU option whose specs aren't all from its datasheet (engine/gpus.py confidence). */
+function gpuNote(knobId: string, v: KnobValue): string | undefined {
+	if (!(GPU_KNOBS as readonly string[]).includes(knobId) || typeof v !== "string") return undefined;
+	const c = gpuSpec(v)?.confidence;
+	return c === "derived" ? t("gpu.derived") : c === "secondary" ? t("gpu.secondary") : undefined;
+}
+
 function useValueStatuses(knob: Knob, values: KnobValue[]): ValueStatus[] {
 	const { record, provider, state } = useWorkspace();
 	return useMemo(() => {
@@ -133,8 +140,8 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 							role="radio"
 							aria-checked={v === value}
 							className={`pf-choice__opt pf-choice__opt--${statuses[i]}`}
-							// A GPU whose specs in B's table are derived, not from its datasheet, says so on hover (Nov 3).
-							title={(GPU_KNOBS as readonly string[]).includes(knob.id) && typeof v === "string" && gpuSpec(v)?.confidence === "derived" ? t("gpu.derived") : undefined}
+							// A GPU whose specs in B's table aren't all quoted from its datasheet says so on hover (Nov 3).
+							title={gpuNote(knob.id, v)}
 							onClick={() => actions.setKnob(knob.id, v, "user")}
 						>
 							{valueText(knob, v)}

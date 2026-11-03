@@ -1231,5 +1231,6 @@
 	"sample.gnn_a10": "GraphSAGE on a 200,000-node graph, measured on an A10 (2 Nov)",
 	"sample.vision_a10": "ResNet-50 fine-tune on leaf photos, measured on an A10 (2 Nov)",
 	"fix.none.sample_script": "Muse Code fixes this sample's script only on a check-in of your own: check in the script and the fix appears here.",
-	"gpu.derived": "Specs derived: Preflight's figures for this card aren't from its datasheet."
+	"gpu.derived": "Specs partly derived: some of Preflight's figures for this card are computed from vendor specs, not quoted from its datasheet.",
+	"gpu.secondary": "Specs from a spec database, not the vendor's datasheet: predictions on this card have wider bands."
 }
