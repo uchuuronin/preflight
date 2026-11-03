@@ -733,6 +733,7 @@ def ground_truth(
 	torch_new: bool = False,
 	dataset_cache: bool = False,
 	flags: str = "",
+	notebook: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -775,7 +776,17 @@ def ground_truth(
 		entrypoint, args = "preflight_command.py", shlex.join(words)
 		install_requirements = True
 		print(f"[ground truth] by command: {cmd}", flush=True)
-	if sum(map(bool, (script, dir, repo, command_hex))) != 1:
+	if notebook:  # an .ipynb from this checkout, converted as a notebook check-in converts it (sources.fetch)
+		from preflight.runner.sources import fetch
+
+		nb = (root / notebook).resolve()
+		if nb.suffix != ".ipynb" or root not in nb.parents:
+			raise SystemExit(f"{notebook!r} isn't an .ipynb file in this checkout")
+		got = fetch({"kind": "notebook", "files": {nb.name: nb.read_text(encoding="utf-8")}})
+		files, entrypoint, install_requirements = got.files, got.entrypoint, True
+		src = Path(nb.stem)
+		print(f"[ground truth] notebook {notebook}: {entrypoint}, {sorted(files)}", flush=True)
+	if sum(map(bool, (script, dir, repo, command_hex, notebook))) != 1:
 		raise SystemExit(
 			"name one of a zoo script (--script), a directory in this checkout (--dir) or a repo (--repo)"
 		)
@@ -813,7 +824,7 @@ def ground_truth(
 			files = _apply_edits(files, edit_hex)
 		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
 		print(f"[ground truth] {repo} at {sha}: {len(files)} files", flush=True)
-	if not (repo or command_hex):
+	if not (repo or command_hex or notebook):
 		files = _read_tree(src)
 	try:
 		p = plan(files, entrypoint or None)
