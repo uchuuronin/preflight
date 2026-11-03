@@ -32,9 +32,8 @@ SOURCES = {
 		VAL / "cost" / "manifest_cost_nov2.json"],
 	"unseen_first": [VAL / "manifest_unseen_nov2.json"],
 }  # fmt: skip
-KNOB_MS = (
-	VAL / "knob_ms_nov2.json"
-)  # C's stranger test, the only knob timing C has posted (PM, Nov 3: use C's)
+# C's live-site timing (remote run 41655597938): 3 samples x 20 moves at 1366x768 and 390x844 (PM, Nov 3: use C's)
+KNOB_MS = VAL / "knob" / "knob_ms_live_nov3.json"
 # A's from-a.md (Nov 3, item 8): the nine rerun with every bring-your-own-script fix on, ops full runs on the A10, the
 # list's own arguments, no hand edits: 4 of 9 reach their first step (fixes designed on these nine)
 AFTER_REACHED = {"unseen-4", "unseen-7", "unseen-8", "unseen-9"}

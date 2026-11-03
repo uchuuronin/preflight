@@ -1,6 +1,6 @@
 {
  "$comment": "final table, every row but unseen",
- "knob_ms": "files/tests/fixtures/validation/knob_ms_nov2.json",
+ "knob_ms": "files/tests/fixtures/validation/knob/knob_ms_live_nov3.json",
  "runs": [
   {
    "script": "finetune_lora_hf",
