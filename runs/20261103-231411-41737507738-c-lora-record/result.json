@@ -1,0 +1,11 @@
+{
+	"name": "20261103-231411-41737507738-c-lora-record",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41737507738",
+	"ref": "ws-c",
+	"sha": "ecf2098cba66616872698ae8da510a370a62625f",
+	"cmd": "modal run --env main api/record_dump_app.py::dump --rid 01M6HT93WFJWV96WVAMS8FZS9G",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T23:14:41Z"
+}
