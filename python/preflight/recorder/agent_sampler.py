@@ -226,7 +226,7 @@ def run_sample(cmd: list[str] | None, *, cwd: Path | None, proxy, population: in
 			else (failed[:FAILED_WITH_NOTE] + "..." if len(failed) > FAILED_WITH_NOTE else failed)
 		)
 		parts.insert(
-			3 if (own or bad) else 2, f"script failed: {short}"
+			2 + bool(own) + bool(bad), f"script failed: {short}"
 		)  # a note is the cause: it goes first
 	if cut == "stalled" and waiting:
 		w = at_cut.get("peak_concurrent") or 1

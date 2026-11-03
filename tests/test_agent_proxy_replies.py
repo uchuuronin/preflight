@@ -227,3 +227,12 @@ def test_the_providers_note_fits_beside_a_long_error_line():
 		"provider answered 400 invalid_request_error (muse-spark-1.3) to keys messages,model,stop"
 		in s.selection
 	)
+	Proxy.own_replies = lambda self: [(429, "sample_complete", None, 1)]
+	both = run_sample(
+		None, cwd=None, proxy=Proxy(), population=None, env={}, launch=lambda env: Proc(), note_replies=True
+	)
+	sel = both.selection
+	assert len(sel) <= 180 and sel.index("provider answered") < sel.index("proxy answered")
+	assert "script failed" not in sel or sel.index("proxy answered") < sel.index(
+		"script failed"
+	)  # the cause first
