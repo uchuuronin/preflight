@@ -1,0 +1,11 @@
+{
+	"name": "20261103-163558-41675822166-c-stranger-final-flags",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41675822166",
+	"ref": "ws-c",
+	"sha": "ca5cf71f82632cecc6d78b5db9cf37f605ffcf76",
+	"cmd": "python scripts/stranger_live.py https://preflight-cqn.pages.dev serving,vLLM,diverg,range_test,learning-rate_range,suggested_rate,eval_passes,same_stack,memory_reserved",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T16:37:41Z"
+}
