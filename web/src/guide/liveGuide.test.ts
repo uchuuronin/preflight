@@ -133,7 +133,7 @@ describe("the live guide on the measured LoRA sample (PM, Nov 3)", () => {
 		const provider = new GridProvider();
 		const { actions } = fakeActions();
 		const base = { record: rec, provider, actions, knobs: currentKnobs(rec), pinned: new Set<string>(), objective: { kind: "min_cost" as const }, requestApproval: vi.fn() };
-		const call = { name: "sensitivity", call_id: "s1", arguments: { objective: "min_cost" } } as GuideCall;
+		const call = { name: "sensitivity", call_id: "s1", arguments: { objective: "min_cost" } } as unknown as GuideCall;
 		const out = runBrowserCall(call, base, false) as { combined?: { knobs: Record<string, KnobValue> }; ranked: Array<{ knob_id: string }> };
 		expect(out.combined).toBeTruthy();
 		expect(Object.keys(out.combined!.knobs)).not.toContain("gpu_type");
