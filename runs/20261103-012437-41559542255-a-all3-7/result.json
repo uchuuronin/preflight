@@ -1,0 +1,11 @@
+{
+	"name": "20261103-012437-41559542255-a-all3-7",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41559542255",
+	"ref": "0f1d49397b4db51991e17a69649824ae56e4c1f6",
+	"sha": "0f1d49397b4db51991e17a69649824ae56e4c1f6",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::ground_truth --repo https://github.com/beir-cellar/beir --commit ef83d29307061c65d04b035b4f4e7c18bd8374af --entrypoint examples/retrieval/evaluation/dense/evaluate_sbert.py   --bare-steps 100000 --budget-min 25 --first-gpu A10 --install-requirements --install-repo --uv --pyg",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T01:27:54Z"
+}

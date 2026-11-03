@@ -1,0 +1,99 @@
+{
+  "script": "beir",
+  "entrypoint": "examples/retrieval/evaluation/dense/evaluate_sbert.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "steps": 0,
+    "walls_s": [
+      null
+    ],
+    "ended": "oom",
+    "error": "CUDA out of memory. Tried to allocate 2.19 GiB. GPU 0 has a total capacity of 22.06 GiB of which 802.62 MiB is free. Process 1 has 21.27 GiB memory in use. Of the allocated memory 18.51 GiB is allocated by PyTorch, and 2.48 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-",
+    "seconds": 68.886667478,
+    "peak_allocated_bytes": 22093963264,
+    "peak_reserved_bytes": 23089643520,
+    "device": "NVIDIA A10",
+    "timing": "cuda_events",
+    "wall_s": 82.5
+  },
+  "recorder": {
+    "status": "oom",
+    "error": "Ran out of GPU memory before the first step. OutOfMemoryError: CUDA out of memory. Tried to allocate 2.19 GiB. GPU 0 has a total capacity of 22.06 GiB of which 802.62 MiB is free. Process 1 has 21.27 GiB memory in use. Of the allocated memory 18.51 GiB is allocated by PyTorch, and 2.48 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment- at beir/retrieval/models/sentence_bert.py:105, before the first optimizer step (stage: running script)",
+    "error_code": "oom",
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 82.292,
+    "by_phase": {},
+    "rl": null,
+    "generation": null,
+    "extras": {
+      "host_rss_peak_bytes": 10643546112.0
+    },
+    "step_log": [],
+    "log_tail": "-11-03 01:26:56 - No device provided, using cuda:0\n2026-11-03 01:26:56 - Loading SentenceTransformer model from NovaSearch/stella_en_1.5B_v5.\nA new version of the following files was downloaded from https://huggingface.co/NovaSearch/stella_en_1.5B_v5:\n- modeling_qwen.py\n. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.\nA new version of the following files was downloaded from https://huggingface.co/NovaSearch/stella_en_1.5B_v5:\n- tokenization_qwen.py\n. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.\n2026-11-03 01:27:30 - Loaded 2 prompts with these keys: ['s2p_query', 's2s_query']\n2026-11-03 01:27:30 - Query prompt: None, Passage prompt: None\n2026-11-03 01:27:30 - Query prompt name: s2p_query, Passage prompt name: None\n2026-11-03 01:27:30 - Encoding Queries...\n\rBatches:   0%|          | 0/1 [00:00<?, ?it/s]\rBatches: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 1/1 [00:00<00:00,  1.08it/s]\rBatches: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 1/1 [00:00<00:00,  1.08it/s]\n2026-11-03 01:27:31 - Sorting Corpus by document length (Longest first)...\n2026-11-03 01:27:31 - Encoding Corpus in batches... Warning: This might take a while!\n2026-11-03 01:27:31 - Scoring Function: Cosine Similarity (cos_sim)\n2026-11-03 01:27:31 - Encoding Batch 1/4...\n\rBatches:   0%|          | 0/391 [00:00<?, ?it/s]\rBatches:   0%|          | 0/391 [00:17<?, ?it/s]\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "oom",
+      "steps": 0,
+      "started_at": "2026-11-03T01:26:27Z",
+      "duration_s": 82.292,
+      "error": "Ran out of GPU memory before the first step. OutOfMemoryError: CUDA out of memory. Tried to allocate 2.19 GiB. GPU 0 has a total capacity of 22.06 GiB of which 802.62 MiB is free. Process 1 has 21.27 GiB memory in use. Of the allocated memory 18.51 GiB is allocated by PyTorch, and 2.48 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment- at beir/retrieval/models/sentence_bert.py:105, before the first optimizer step (stage: running script)",
+      "error_code": "oom",
+      "missing_module": null,
+      "missing_package": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": null,
+      "power": {
+        "mean_w": 45.81420363636364,
+        "max_w": 157.615,
+        "samples": 275
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": null,
+      "extras": {
+        "host_rss_peak_bytes": 10643546112.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 82.292,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "peft": "0.13.2",
+        "trl": "0.14.0",
+        "accelerate": "1.1.1",
+        "datasets": "3.1.0",
+        "sentence-transformers": "5.7.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": null,
+  "lens": "retrieval",
+  "image": "probe"
+}
