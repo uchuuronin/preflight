@@ -1,6 +1,7 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
 # Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts.
-# Runs only when this file changes on ws-d. Everything lives on D:, as the laptop's steps keep
+# Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with os.geteuid
+# stubbed, to list what else stops it on Windows. Everything lives on D:, as the laptop's steps keep
 # everything on E:. No secrets are used. The job fails if any checked step failed, after every
 # step has reported and the logs are uploaded.
 name: d-windows-watch
@@ -63,7 +64,12 @@ jobs:
         run: |
           D:\pf9b\venv\Scripts\preflight.exe run film\tiny_train.py *> D:\pf9b\run.log
           $code = $LASTEXITCODE
-          Get-Content D:\pf9b\run.log -Tail 80
+          Get-Content D:\pf9b\run.log -Tail 15
+          # the first Windows blocker is os.geteuid (cli/main.py); stub it to find the next ones
+          D:\pf9b\venv\Scripts\python.exe -c "import os, sys; os.geteuid = lambda: 1000; from preflight.cli.main import main; sys.exit(main(['run', 'film\\tiny_train.py']))" *> D:\pf9b\run-stubbed.log
+          $code = $LASTEXITCODE
+          "--- with os.geteuid stubbed:"
+          Get-Content D:\pf9b\run-stubbed.log -Tail 120
           $rec = Get-ChildItem D:\pf9b\records\*.json -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($rec) { "record=$($rec.FullName)" >> $env:GITHUB_OUTPUT }
           exit $code
