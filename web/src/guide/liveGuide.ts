@@ -111,6 +111,9 @@ export class GuideFallback extends Error {
 	}
 }
 
+/** The tour was stopped (the visitor took the quick read, or the panel closed): nothing more is shown or moved. */
+export class TourCancelled extends Error {}
+
 export type Poster = (body: unknown) => Promise<Response>;
 
 const defaultPost: Poster = (body) =>
@@ -321,8 +324,20 @@ export class LiveTour {
 		private readonly post: Poster = defaultPost,
 	) {}
 
+	private cancelled = false;
+
 	get current(): LiveView {
 		return this.view;
+	}
+
+	/** Stop: an answer still on its way is dropped, and no browser tool runs (no knob moves) after this. */
+	cancel(): void {
+		this.cancelled = true;
+	}
+
+	/** Open again after a cancel (a remount of the same panel). */
+	reopen(): void {
+		this.cancelled = false;
 	}
 
 	start(): Promise<LiveView> {
@@ -350,6 +365,7 @@ export class LiveTour {
 		const answered = new Set(((extra.approvals as Array<{ call_id: string }> | undefined) ?? []).map((x) => x.call_id));
 		for (let round = 0; round <= MAX_BROWSER_ROUNDS; round++) {
 			const c = this.ctx();
+			if (this.cancelled) throw new TourCancelled();
 			const res = await this.post({
 				record: this.recordRef,
 				setting: this.setting(c),
@@ -357,14 +373,17 @@ export class LiveTour {
 				...(c.language ? { language: c.language } : {}),
 				...body,
 			});
+			if (this.cancelled) throw new TourCancelled();
 			if (!res.ok) {
 				const err = (await res.json().catch(() => null)) as { error?: { message?: string; fallback?: string; reason?: string; code?: string } } | null;
+				if (this.cancelled) throw new TourCancelled();
 				if (res.status === 409) this.state = null;
 				if (err?.error?.fallback === "rule_based") throw new GuideFallback(err.error.message ?? "", err.error.reason ?? "unknown");
 				// No body to show (the API unreachable, a proxy's 503): the panel's own words, not a bare code (D's walkthrough).
 				throw new GuideFallback(err?.error?.message ?? "", err?.error?.code ?? `http_${res.status}`);
 			}
 			const out = (await res.json()) as RoundOut;
+			if (this.cancelled) throw new TourCancelled();
 			this.state = out.state;
 			if (out.reverts?.length) {
 				const { actions } = this.ctx();
@@ -384,6 +403,7 @@ export class LiveTour {
 			// The server judges a move by its saved copy of the limits: wait for the latest save, so
 			// a move it would refuse is refused here first, before anything moves on the map.
 			await limitsSaved(this.recordRef);
+			if (this.cancelled) throw new TourCancelled();
 			let moved = false;
 			const results: ToolOut[] = [];
 			for (const call of browser) {

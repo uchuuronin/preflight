@@ -285,6 +285,9 @@ def _invalid(values: dict) -> str | None:
 		v = values[kid]
 		if v is not None and not isinstance(v, bool) and isinstance(v, int | float) and v <= 0:
 			return f"{kid} must be at least 1"
+	e = values.get("epochs")
+	if e is not None and not isinstance(e, bool) and isinstance(e, int | float) and e <= 0:
+		return "epochs must be more than 0"  # 0 read as the map's epochs, a negative as a negative time (review, Nov 3)
 	for kid in _PRECISION_KNOBS:
 		v = values.get(kid)
 		if isinstance(v, str) and v not in ("mixed", "unknown") and _precision({kid: v}) is None:
@@ -1902,11 +1905,40 @@ _PACKING_MOVED = (
 )
 
 
+# frameworks whose max_steps is a cap the trainer enforces whatever the epochs (review, Nov 3): a map's step count
+# there is never rescaled, even when its knob wasn't kept
+_HARD_STEP_CAPS = frozenset({"hf_trainer", "trl", "lightning", "torchtitan", "sentence_transformers"})
+
+
 def _total_steps(record: FlightRecord, values: dict) -> tuple[float | None, str]:
 	sm = record.job.script_map
 	tr = sm.training if sm else None
 	data = sm.data if sm else None
 	steps = values.get("max_steps") or (tr.max_steps if tr else None)
+	cur_e = _current(record).get("epochs")
+	if (
+		steps
+		and "max_steps" not in values
+		and "epochs" in values
+		and tr
+		and tr.epochs
+		and cur_e is not None
+		and float(cur_e)
+		== float(tr.epochs)  # the knob and the map agree, so the record's own values are unchanged
+		and (sm.framework if sm else None) not in _HARD_STEP_CAPS
+	):
+		# the map's step count beside an epochs knob, with no max_steps in the code's knobs, counts the epochs
+		# (the GNN sample's 471 = 3 epochs of 157, read from a comment): it scales with epochs and the examples a
+		# step takes, so moving epochs or the batch moves the run (D's walkthrough, Nov 3: GNN epochs changed nothing)
+		cur = _current(record)
+
+		def per(v: dict) -> float:
+			return (
+				float(v.get("batch_size", 1) or 1) * float(v.get("grad_accum", 1) or 1) * _n_gpus(v, record)
+			)
+
+		ratio = float(values["epochs"]) / float(tr.epochs) * per(cur) / per(values)  # epochs 0: no steps
+		return float(math.ceil(float(steps) * ratio - 1e-9)), ""
 	if steps:
 		return float(steps), ""
 	epochs = values.get("epochs") or (tr.epochs if tr else None) or 1.0
