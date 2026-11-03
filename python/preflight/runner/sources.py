@@ -245,6 +245,7 @@ def _git_read(
 	data: bool = False,
 	entry: str | None = None,
 	only_entry: bool = False,
+	args: tuple = (),
 ) -> tuple[dict[str, str], dict | None]:
 	"""Text files of a tree, read from the object store without a checkout or a lazy fetch.
 	only_entry (Source.scope "entrypoint"): the entry point and what it imports, at any size.
@@ -310,7 +311,7 @@ def _git_read(
 	from preflight.harness.closure import import_closure
 
 	files, info = import_closure(oid_of, lambda paths: _cat(g, env, [(p, oid_of[p]) for p in paths]), entry,
-		max_files=CLOSURE_MAX_FILES, max_bytes=CLOSURE_MAX_BYTES, sizes={rel: n for rel, _, n in keep})  # fmt: skip
+		max_files=CLOSURE_MAX_FILES, max_bytes=CLOSURE_MAX_BYTES, sizes={rel: n for rel, _, n in keep}, args=args)  # fmt: skip
 	if entry not in files:  # it's in the tree, so it wasn't UTF-8 text
 		raise InvalidSubmission(f"the entrypoint {entry!r} isn't UTF-8 text")
 	info["repo_bytes"] = total
@@ -347,7 +348,7 @@ def _clone(uri, commit, *, data: bool = False) -> tuple[dict[str, str], str]:
 
 
 def _clone_read(
-	uri, commit, entry: str | None = None, *, data: bool = False, only_entry: bool = False
+	uri, commit, entry: str | None = None, *, data: bool = False, only_entry: bool = False, args: tuple = ()
 ) -> tuple[dict[str, str], str, dict | None]:
 	"""The text files of a public GitHub repo at its default branch or a full commit hash, and the
 	commit they were read at, so a later probe of the same record reads the same code. data: small
@@ -369,7 +370,7 @@ def _clone_read(
 			treeish = commit
 		sha = _git(base, "-C", str(dest), "rev-parse", f"{treeish}^{{commit}}", env=env).decode().strip()
 		files, partial = _git_read(dest, treeish, base=base, env=env, data=data, entry=entry,
-			only_entry=only_entry)  # fmt: skip
+			only_entry=only_entry, args=args)  # fmt: skip
 		return files, sha, partial
 	except subprocess.TimeoutExpired as exc:
 		raise InvalidSubmission("the repository took too long to clone") from exc
@@ -462,11 +463,11 @@ def fetch(source: dict, *, blobs=None) -> Fetched:
 		files, args, command_lens = _command(source)
 	elif kind == "repo":
 		files, commit, partial = _clone_read(uri, commit, want if isinstance(want, str) and want else None,
-			data=_repo_data(), only_entry=only_entry)  # fmt: skip
+			data=_repo_data(), only_entry=only_entry, args=_arg_words(source))  # fmt: skip
 	else:
 		raise InvalidSubmission(f"unknown source kind {kind!r}")
 	if only_entry and kind != "repo":  # files already in hand: the same walk over them
-		files, partial = _only_entry(files, want)
+		files, partial = _only_entry(files, want, _arg_words(source))
 	if kind == "command":
 		entry, uri = COMMAND_ENTRY, f"command://{args[0]}"
 	else:
@@ -591,7 +592,13 @@ def extra_lines(src: Source | None) -> tuple[str, ...]:
 	return tuple(extra_requirements(list(names)))
 
 
-def _only_entry(files: dict[str, str], entry) -> tuple[dict[str, str], dict]:
+def _arg_words(source: dict) -> tuple[str, ...]:
+	"""The job's arguments, as words the closure reads for repo paths (B, Nov 3: `--config configs/a.yaml`)."""
+	a = source.get("args") if isinstance(source, dict) else None
+	return tuple(w for w in a[:64] if isinstance(w, str))[:64] if isinstance(a, list) else ()
+
+
+def _only_entry(files: dict[str, str], entry, args: tuple = ()) -> tuple[dict[str, str], dict]:
 	"""An upload's or sample's files cut to the entry point and what it imports (Source.scope)."""
 	from preflight.harness.closure import import_closure
 
@@ -602,7 +609,7 @@ def _only_entry(files: dict[str, str], entry) -> tuple[dict[str, str], dict]:
 			f"can follow; {entry!r} isn't one, so name the Python script it runs", code="submission.invalid")  # fmt: skip
 	sizes = {p: len(t.encode("utf-8", "surrogatepass")) for p, t in files.items()}
 	got, info = import_closure(files, lambda paths: {p: files[p] for p in paths}, entry,
-		max_files=CLOSURE_MAX_FILES, max_bytes=CLOSURE_MAX_BYTES, sizes=sizes)  # fmt: skip
+		max_files=CLOSURE_MAX_FILES, max_bytes=CLOSURE_MAX_BYTES, sizes=sizes, args=args)  # fmt: skip
 	info["repo_bytes"] = sum(sizes.values())
 	info["asked"] = True
 	return got, info

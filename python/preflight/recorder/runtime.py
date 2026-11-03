@@ -507,6 +507,7 @@ class Recorder:
 		self._train_dataset = None
 		self._train_sampler = None
 		self.run_length: dict = {}
+		self.eval_requests: dict = {}  # probes.eval_units: lm-eval's request counts and scoring tokens
 		self._scalers: weakref.WeakSet = weakref.WeakSet()
 		self._attn_calls = 0
 		self._rss_peak = 0
@@ -806,6 +807,7 @@ class Recorder:
 		self._importer.on("transformers.generation.utils", self._hook_hf_generate)
 		if self.eval_units:
 			self._importer.on("transformers.modeling_utils", self._hook_hf_forward)
+			self._importer.on("lm_eval.models.huggingface", self._hook_lm_eval_requests)
 		self._importer.on("transformers.trainer", self._hook_trainer)
 		self._importer.on("trl.trainer.grpo_trainer", self._hook_grpo)
 		for name in ("lightning.pytorch.trainer.trainer", "pytorch_lightning.trainer.trainer"):
@@ -1303,12 +1305,51 @@ class Recorder:
 						"planned_steps": int(num_training_steps),
 						"epochs": float(self_.args.num_train_epochs) if self_.args.max_steps <= 0 else None,
 					}
+				with suppress(
+					Exception
+				):  # B, Nov 3: the dataset's rows, as the trainer holds it (TRL's GRPOTrainer
+					# draws it through its own RepeatSampler, which the loader's count doesn't read)
+					rec.run_length["trainer_dataset_len"] = float(len(self_.train_dataset))
 				return orig(self_, num_training_steps, *args, **kwargs)
 
 			return create
 
 		if hasattr(tr, "create_scheduler"):
 			self._patch(tr, "create_scheduler", plan_factory)
+
+	def _hook_lm_eval_requests(self, mod):
+		"""probes.eval_units (B, Nov 3): the eval's whole request count and its scoring tokens, as lm-eval's HF model is
+		handed them before the first batch, so the run's length is requests over rows a batch, not a guess."""
+		rec = self
+		lm = getattr(mod, "HFLM", None)
+		if lm is None:
+			return
+
+		def ll_factory(orig):
+			def tokens(self_, requests, *args, **kwargs):
+				with suppress(Exception):
+					rec.eval_requests["loglikelihood"] = rec.eval_requests.get("loglikelihood", 0) + len(
+						requests
+					)
+					rec.eval_requests["tokens"] = rec.eval_requests.get("tokens", 0) + sum(
+						len(r[1]) + len(r[2]) for r in requests
+					)
+				return orig(self_, requests, *args, **kwargs)
+
+			return tokens
+
+		def gen_factory(orig):
+			def gen(self_, requests, *args, **kwargs):
+				with suppress(Exception):
+					rec.eval_requests["generate"] = rec.eval_requests.get("generate", 0) + len(requests)
+				return orig(self_, requests, *args, **kwargs)
+
+			return gen
+
+		if hasattr(lm, "_loglikelihood_tokens"):
+			self._patch(lm, "_loglikelihood_tokens", ll_factory)
+		if hasattr(lm, "generate_until"):
+			self._patch(lm, "generate_until", gen_factory)
 
 	def _hook_lightning(self, mod):
 		"""Lightning's Trainer: the run's length, as HF's create_scheduler gives it (max_steps, or
@@ -1998,6 +2039,13 @@ class Recorder:
 						out["channels_last"] = float(all(p.is_contiguous(memory_format=torch.channels_last) for p in convs)
 							and any(not p.is_contiguous() for p in convs))  # fmt: skip
 		out.update({k: v for k, v in self.run_length.items() if v is not None})
+		if self.eval_requests:  # probes.eval_units
+			r = self.eval_requests
+			out["eval_requests"] = float(r.get("loglikelihood", 0) + r.get("generate", 0))
+			if r.get("loglikelihood"):
+				out["eval_request_tokens"] = float(r.get("tokens", 0))
+			if r.get("generate"):
+				out["eval_generate_requests"] = float(r["generate"])
 		out["host_rss_peak_bytes"] = self._rss_peak or None
 		out["train_peak_before_eval_bytes"] = self._train_peak_before_eval or None
 		if self._kernels is not None:

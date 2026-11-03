@@ -255,7 +255,7 @@ def _run_caches_when_root() -> Path | None:
 	fresh, empty set of caches it owns: nothing is shared with earlier runs (whose probes could
 	have planted links or poisoned files), and root never walks or chowns anything a probe wrote.
 	Returns the run's directory, which the caller removes when the run ends."""
-	if os.geteuid() != 0:
+	if getattr(os, "geteuid", lambda: -1)() != 0:  # no euid on Windows: never root there (D, Nov 3)
 		return None
 	from preflight.probes.local import uid_can_run_this_python
 

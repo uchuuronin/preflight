@@ -505,8 +505,8 @@ async def guide_turn(request: Request) -> dict:
 					)
 				elif refusal == "already_ranked":
 					out["hint"] = (
-						"This setting is already ranked above. If nothing there fits and improves the aim, "
-						"tell the person so in one sentence and stop."
+						"This setting is already ranked above. If it returned a combined setting, offer that; "
+						"if nothing there fits and improves the aim, tell the person so in one sentence and stop."
 					)
 				elif refusal == "already_done":
 					out["hint"] = (

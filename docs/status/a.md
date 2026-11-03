@@ -1,8 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 10:55 AM ET.
+Updated Tue Nov 3, 1:10 PM ET.
 
-**Production runner: fixes live, deployed from ws-a c146cf11** (= main d9e6b555, the main the PM posted at 10:45, plus OGB's and BEIR's dataset hosts in the probe egress; `a-deploy-main-29`, GitHub 41668262328, Nov 3 15:52 UTC / 10:52 AM ET), after three startup checks passed (`a-startup-check-29` 41667268503, `a-startup-check-serving-15` 41667695263, `a-startup-torch-new-3` 41668003979: the torch 2.7.1 image); the limit check passed after it (`a-limit-check-10`, 41668393969). **On in production:** `runner.read_closure`, `probes.repo_install_exec`, `runner.probe_without_map`, `harness.lens_by_entry`, `probes.torch_new`, `probes.dataset_cache`, with the morning's flags; the probe sees PyG's wheel index; the probe egress adds snap.stanford.edu and public.ukp.informatik.tu-darmstadt.de. Off: `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from 28fc9b62** (the 10:20 deploy), or ad12da7 for the morning's.
+**Production runner: deployed from ws-a 56e686de** (main b40012bb merged in, plus the PM's 11:23 list; `a-deploy-main-30`, GitHub 41690166435, Nov 3 18:05 UTC / 1:05 PM ET), after three startup checks passed (`a-startup-check-30` 41688982619, `a-startup-check-serving-16` 41689362694, `a-startup-torch-new-4` 41689764723); the limit check passed after it (`a-limit-check-11`, 41690460909). New in production with it: native Windows fixes (D's ten), B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map`, OGB's arxiv archive from the dataset volume (sha256-pinned), the retrieval, GNN and vision samples' Fix button, B's request-count logging under `probes.eval_units`, and `harness.spark_search` on (main's flags, Chiya's 11:25 yes). Off: `runner.entrypoint_path` (proposed on, for the PM), `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from c146cf11** (10:52 AM).
 
 ## Unseen validation runs (Nov 2): all nine posted
 
@@ -58,6 +58,19 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 2, LitGPT | install check on CPU, pip against uv (`probes.uv_install`) | **neither installs**: pip ran out at 420 s; uv's resolve overflowed its stack, then pip ran out (code fix since, not yet rerun when written: a 64 MiB stack, and "no solution" ends the install with uv's reason). The cause isn't the resolver: LitGPT at that commit asks for torch>=2.7 and lightning>=2.6.1, and the image has torch 2.5.1 | `a-trial-litgpt-install-pip` 41545743492, `-uv` 41545748477 |
 | 8, OGB arxiv | install check, uv and PyG's index (`probes.extra_hosts`) | **installs in 12.9 s**, every import the scan sees present; torch_sparse, which PyG imports at run time, wasn't among them (fixed: torch_geometric now brings torch-scatter and torch-sparse from PyG's index) | `a-trial-ogb-install-pyg` 41545754612 |
 
+## Fresh scripts (Nov 3): pinned before any probe
+
+The PM's second held-out list (`docs/validation/fresh-hash.txt`), read 12:00 ET: the file Chiya sent hashes to the
+committed SHA-256 (497b052d…94df3). Each pinned to its default branch's head at A's first clone (17:01 UTC), before
+any of them was probed, and run once through production (the runner deployed from ws-a c146cf11 at 10:52 AM), first
+attempt only, with no Preflight change in between:
+
+| # | Repo, entry | Commit | Command, as published |
+| --- | --- | --- | --- |
+| F1 | pytorch/examples, `word_language_model/main.py` | acc295dc7b90714f1bf47f06004fc19a7fe235c4 | `python main.py --cuda --epochs 6` |
+| F2 | huggingface/notebooks, `examples/text_classification.ipynb` (as a notebook) | c31b9837028eeb7b46b63b6a2758e66f2c758643 | as it ships (file sha256 6b7bb716…c7db33, in `validation/fresh/f2/` for the check-in) |
+| F3 | kuangliu/pytorch-cifar, `main.py` | 49b7aa97b0c12fe0d4054e670403a16b6b834ddd | `python main.py` |
+
 ## Decisions Nov 3 (the PM's 8:04 AM list; decide and log)
 
 | When (ET) | Decision | Why | Cost | How to undo |
@@ -79,6 +92,16 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 10:20 | **Fixes live:** redeployed the runner from ws-a 28fc9b62 (`a-deploy-main-28`), gated on three startup checks (the torch 2.7.1 image's included) and followed by the limit check; CI green on 28fc9b62 | the PM's item 8 | cents (CPU) [estimate] | `modal deploy --env main` from ad12da7 |
 | 10:40 | **OGB's and BEIR's dataset hosts added to the probe egress** (`probes.extra_hosts`, on): `snap.stanford.edu`, `public.ukp.informatik.tu-darmstadt.de`. The first production check-in after the deploy, OGB (`a-fresh-live-ogb-checkin` 41663236531, record 01M6H03PXECMDSN5PKYR3215TW, share n1kcEQOWt9jpYWSPxxuwuw), stopped all three probes at `ogb/utils/url.py:12` (connection timed out): the ops rig has no allowlist, so its runs didn't show it. Item 8's 4 of 9 is the rig's count; through production 8 needs its host, and 7's script downloads from its own the same way (read from its code, not run through production) | found by the live check | none | revert the egress commit and redeploy |
 | 10:52 | **Fixes live, redeployed from ws-a c146cf11** (the PM's 10:45 main d9e6b555 plus the egress fix), gated: three startup checks, the deploy, the limit check | the PM's 10:45 note | cents (CPU) [estimate] | `modal deploy --env main` from 28fc9b62 |
+| 11:45 | Native Windows (D's ten gaps) as guarded bug fixes, each with a test; ET by the US rule when there's no zone database (no `tzdata`, so the lock file doesn't move) | the PM's 11:23 item 1 (shot 9b on Chiya's Windows laptop) | none | revert a315c1f2 |
+| 11:55 | `runner.entrypoint_path` (off): the entry point's folder first on `sys.path`; `missing_module.local` for the repo's own top-level module | the PM's item 2 (C's big-repo check-in) | none | revert de60bc49 |
+| 11:58 | retrieval, gnn and vision in `SAMPLE_REFS` and the web's `FIXABLE_SAMPLES`; GRPO and agent-eval stay out | the PM's item 3 | none | revert cdb157a9 |
+| 12:00 | OGB's arxiv archive from the dataset volume, kept by URL and served only when its sha256 is the pinned one (pinned from the fill after the fresh runs); BEIR's host is HTTPS and on the allowlist since 10:52, checked by `a-fresh-live-beir-checkin` (result in from-a) | the PM's item 4 | the fill, CPU minutes | revert ba3a2952 |
+| 12:00 | B's logging: `trainer_dataset_len`; lm-eval's request count and tokens (`probes.eval_units`) | the PM's item 6 | none | revert 2f7ad78a |
+| 12:00 | Skipped in A's push gate only: `api/tests/test_predict.py::test_a_burst_is_bounded…` (timing-dependent here, fails on main's own code too); told C | the gate blocked a push on it | none | drop the deselect from the gate |
+| 12:40 | B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map` (files the code may open; lazy packages' TYPE_CHECKING imports; a follow-up keeps the map-skipped finding), with two review rounds: an older record's follow-up still matches its code when the data files were the only change; one whose repo has a lazy package (its `__init__.py`'s TYPE_CHECKING imports now followed) reads more modules and is refused as changed, so it needs a fresh check-in | the PM's 12:20 note (due 2:30) | none | revert cbd900b1, c2138654 |
+| 12:45 | OGB's archive pinned (sha256 49f85c80…) after `a-fill-datasets-ogb-1` put it in the volume | item 4 | about $0.01 CPU [estimate] | revert 4669aeda |
+| 12:50 | The private check-in on production (record 01M6H6QJ0DK3WX7XGAVD25XPJ9): triage on Glimmer, no diagnosis, the claim check code only; one Meta call, the script map, as the data-use line discloses; the gate is the PM's call | item 5 | $0.39 [measured] | nothing to undo |
+| 13:05 | Redeployed the runner from ws-a 56e686de, gated (three startup checks, then the limit check), after the fresh runs and the private check-in | the PM's 11:23 note: one gated redeploy after the fresh runs | cents (CPU) [estimate] | `modal deploy --env main` from c146cf11 |
 
 ## Decisions today (Chiya out until about 5 PM ET; her autonomy, Nov 2 11:16 AM ET)
 
