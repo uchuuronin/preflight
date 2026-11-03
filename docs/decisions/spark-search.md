@@ -188,19 +188,20 @@ with `max_tool_calls` 10; the same cases, 8 calls, US$0.150 [derived, fee second
 
 - Every request searched (a `web_search_call` in all 8), 1 to 3 searches each.
 - The known pyarrow issue: "found", **cited inline (2 URLs) and both kept**, with the search's own
-  titles now: pytorch/torchtitan #5372 ("[CI] Preserve NumPy 1.x support...") and a transformers
-  commit ("Fix numpy/pyarrow conflict..."). It made **3 tool calls** (1 search, 2 page opens): fewer
+  titles now: "pytorch/torchtitan - [CI] Preserve NumPy 1.x suppo..." (#5372) and
+  "huggingface/transformers - Fix numpy/pyarrow confl..." (a commit). It made **3 tool calls** (1 search, 2 page opens): fewer
   than the old cap of 4.
 - The other 7 calls (6 cases and the planted link): "none found", as in every run; the planted link
   in no results list.
 
-**So the cap idea isn't supported.** With the cap raised the model stopped at 3 tool calls and
-cited; the cap of 4 wasn't binding in this run, so the two runs without inline citations (both at
-exactly 4) aren't explained by it: one run each, and Meta's choices vary between runs. What the five
-runs do show: on the one case that can cite, sources were kept 1, 0, 2, 2 and 2 times, never a
-made-up one, and since the request asks for the searches' results list, the check doesn't depend on
-inline citations. The cap stays at 4 [guess]: it bounds a question's fee, and no call in five runs
-needed more than 7.
+**So the test is inconclusive on the cap.** One run at a cap of 10 stopped at 3 tool calls and cited
+inline, so it doesn't show the cap caused the two runs without inline citations (both reached
+exactly 4 on this case); it doesn't rule it out either: one run each, and Meta's choices vary
+between runs. What the five runs do show: on the one case that can cite, sources were kept 1, 0, 2,
+2 and 2 times, never a made-up one, and since the request asks for the searches' results list, the
+check doesn't depend on inline citations. The cap stays at 4 [guess], a spend bound, not a finding:
+the uncapped first-shape run used 7 on this case, which points the other way, so raising it is a
+fair next step if recall matters more than the fee.
 
 ## B's re-review (Nov 2): three must-fixes, done
 

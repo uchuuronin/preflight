@@ -86,7 +86,8 @@ leaks nothing. Full suite: 1,805 passed. Search spend tonight: US$0.150 (the cap
 total about US$0.77 [derived, fee second-hand].
 
 The cap test (all 8 cases at `max_tool_calls` 10): the known issue cited inline with 3 tool calls,
-under the old cap of 4, so the cap doesn't explain the two runs without citations. The cap stays at 4.
+under the old cap of 4, so the test doesn't show the cap caused the two runs without citations, nor
+rule it out (inconclusive, one run each). The cap stays at 4 as a spend bound.
 
 This push sends: `docs/decisions/spark-search.md` (the cap test), `docs/requests/from-d.md`, this file.
 
