@@ -272,9 +272,16 @@ class ModelClient:
 	# ------------------------------------------------------------- transport
 
 	def _post(
-		self, body: dict, purpose: str, deadline: float, path: str = "/chat/completions"
+		self,
+		body: dict,
+		purpose: str,
+		deadline: float,
+		path: str = "/chat/completions",
+		retries: int | None = None,
 	) -> httpx.Response:
-		"""POST with bounded retries inside an overall deadline. Every failed attempt goes to provenance."""
+		"""POST with bounded retries inside an overall deadline. Every failed attempt goes to provenance.
+		`retries`: this call's, in place of the client's (None)."""
+		retries = self.retries if retries is None else retries
 		attempt = 0
 		while True:
 			remaining = deadline - time.monotonic()
@@ -286,7 +293,7 @@ class ModelClient:
 				resp = self._http.post(path, json=body, timeout=min(self.timeout_s, remaining))
 			except RETRY_TRANSPORT:
 				self._record(purpose, None, started, False, None)
-				if attempt >= self.retries:
+				if attempt >= retries:
 					raise
 				wait = None
 			except (
@@ -299,7 +306,7 @@ class ModelClient:
 				if resp.status_code < 400:
 					return resp
 				self._record(purpose, _json_or_none(resp), started, False, resp.headers.get("x-request-id"))
-				if resp.status_code not in RETRY_STATUS or attempt >= self.retries:
+				if resp.status_code not in RETRY_STATUS or attempt >= retries:
 					resp.raise_for_status()
 				wait = resp.headers.get("retry-after")
 			attempt += 1
@@ -397,18 +404,20 @@ class ModelClient:
 		self, body: dict, *, purpose: str, reasoning_effort: str | None = None
 	) -> tuple[dict, ModelCall]:
 		"""One call to the Responses API (`/responses`; Meta's supports the `web_search` tool, D's
-		probe of Nov 2). The same timeout, retries and provenance as chat; its usage is recorded
-		under the chat names so it's priced the same way. Unlike chat it has no input-token check
-		and sends no extra_body: its one caller (search grounding) sends a bounded prompt, and the
-		search results the API adds aren't ours to count before the call. A timed-out call is
-		recorded with no tokens, though Meta may bill it."""
+		probe of Nov 2). The same timeout and provenance as chat; its usage is recorded under the
+		chat names so it's priced the same way. Never retried (A's review, Nov 2): an attempt that
+		failed after reaching Meta may have searched and billed already, unseen, and a retry would
+		search again. Unlike chat it has no input-token check and sends no extra_body: its one
+		caller (search grounding) sends a bounded prompt, and the search results the API adds aren't
+		ours to count before the call. A timed-out call is recorded with no tokens, though Meta may
+		bill it; the caller adds the search tool's fee, which the usage doesn't carry."""
 		body = {**body, "model": self.model, "max_output_tokens": self.max_output_tokens, "store": False}
 		if reasoning_effort and self.send_reasoning_effort:
 			body["reasoning"] = {"effort": reasoning_effort}
 		deadline = time.monotonic() + self.deadline_s
 		started = time.monotonic()
 		try:
-			resp = self._post(body, purpose, deadline, path="/responses")
+			resp = self._post(body, purpose, deadline, path="/responses", retries=0)
 		except Exception as exc:
 			self.last_error = _why(exc)
 			raise

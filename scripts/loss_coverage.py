@@ -82,7 +82,7 @@ def score(curves_path: Path, pfn_path: Path, jobs: int = 1) -> dict:
 	for seen in doc["seen_steps"]:
 		tally = {
 			m: {"covered": 0, "scored": 0, "abstained": 0, "log_err": []}
-			for m in ("power", "lcpfn", "ensemble")
+			for m in ("power", "lcpfn", "lcpfn_raw", "ensemble")
 		}
 		work = [(c["seen"][:seen], c["steps"]) for c in doc["curves"]]
 		if jobs > 1:  # about a second a curve (a 200-draw block bootstrap), so the pool is worth it
@@ -94,10 +94,13 @@ def score(curves_path: Path, pfn_path: Path, jobs: int = 1) -> dict:
 			truth = c["truth"]
 			q = pfn_by.get((c["key"], seen))
 			qs = None if q is None or q.get("q") is None else tuple(q["q"])
+			# Nov 2 review: q is LC-PFN on per-x means; q_raw the raw per-step input of the first run (absent there)
+			raw = None if q is None or q.get("q_raw") is None else tuple(q["q_raw"])
 			ens = lf.ensemble(power, qs, "LC-PFN posterior")
 			got = {
 				"power": None if power.point is None else (power.lo, power.point, power.hi),
 				"lcpfn": qs and (qs[0], qs[1], qs[2]),
+				"lcpfn_raw": raw and (raw[0], raw[1], raw[2]),
 				"ensemble": None if ens.point is None else (ens.lo, ens.point, ens.hi),
 			}
 			for m, v in got.items():

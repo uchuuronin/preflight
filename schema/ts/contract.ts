@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.6.3. Generated; do not edit.
+ * Preflight contract v0.6.4. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -1196,6 +1196,10 @@ export interface Grid {
 		[k: string]: (boolean | number | string) | undefined;
 	};
 	/**
+	 * 0.6.4: knobs this target doesn't depend on (the learning rate, say): the grid answers at any value of them, so a reader holds them nowhere
+	 */
+	independent_of?: string[] | null;
+	/**
 	 * Set when the grid is too large to inline
 	 */
 	sidecar?: string | null;
@@ -1742,4 +1746,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.6.3";
+export const SCHEMA_VERSION = "0.6.4";

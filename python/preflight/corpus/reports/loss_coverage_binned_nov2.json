@@ -1,0 +1,116 @@
+{
+ "curves": 676,
+ "tail": 10,
+ "by_seen": {
+  "60": {
+   "power": {
+    "covered": 111,
+    "scored": 465,
+    "abstained": 211,
+    "coverage": 0.23870967741935484,
+    "coverage_all_curves": 0.16420118343195267,
+    "wilson95": [
+     0.20220384240055542,
+     0.27949728400743573
+    ],
+    "median_abs_log_err": 0.17437145798423698,
+    "meets_90": false
+   },
+   "lcpfn": {
+    "covered": 618,
+    "scored": 676,
+    "abstained": 0,
+    "coverage": 0.9142011834319527,
+    "coverage_all_curves": 0.9142011834319527,
+    "wilson95": [
+     0.890678430940156,
+     0.9330430304891301
+    ],
+    "median_abs_log_err": 0.06751659573473133,
+    "meets_90": true
+   },
+   "lcpfn_raw": {
+    "covered": 627,
+    "scored": 676,
+    "abstained": 0,
+    "coverage": 0.9275147928994083,
+    "coverage_all_curves": 0.9275147928994083,
+    "wilson95": [
+     0.9054591951556257,
+     0.9447390275338874
+    ],
+    "median_abs_log_err": 0.06807950826879784,
+    "meets_90": true
+   },
+   "ensemble": {
+    "covered": 294,
+    "scored": 321,
+    "abstained": 355,
+    "coverage": 0.9158878504672897,
+    "coverage_all_curves": 0.4349112426035503,
+    "wilson95": [
+     0.880388610936965,
+     0.9415508082779283
+    ],
+    "median_abs_log_err": 0.08492640425550768,
+    "meets_90": true
+   }
+  },
+  "150": {
+   "power": {
+    "covered": 147,
+    "scored": 636,
+    "abstained": 40,
+    "coverage": 0.23113207547169812,
+    "coverage_all_curves": 0.21745562130177515,
+    "wilson95": [
+     0.20004254495869983,
+     0.2654500465492844
+    ],
+    "median_abs_log_err": 0.10193581551375068,
+    "meets_90": false
+   },
+   "lcpfn": {
+    "covered": 451,
+    "scored": 676,
+    "abstained": 0,
+    "coverage": 0.6671597633136095,
+    "coverage_all_curves": 0.6671597633136095,
+    "wilson95": [
+     0.6307803044123307,
+     0.7016501425216312
+    ],
+    "median_abs_log_err": 0.0351997662664137,
+    "meets_90": false
+   },
+   "lcpfn_raw": {
+    "covered": 499,
+    "scored": 676,
+    "abstained": 0,
+    "coverage": 0.7381656804733728,
+    "coverage_all_curves": 0.7381656804733728,
+    "wilson95": [
+     0.7037453447238929,
+     0.7698944955979466
+    ],
+    "median_abs_log_err": 0.036971891482067074,
+    "meets_90": false
+   },
+   "ensemble": {
+    "covered": 487,
+    "scored": 558,
+    "abstained": 118,
+    "coverage": 0.8727598566308243,
+    "coverage_all_curves": 0.7204142011834319,
+    "wilson95": [
+     0.8425385675177653,
+     0.897883830062478
+    ],
+    "median_abs_log_err": 0.04366537841117293,
+    "meets_90": false
+   }
+  }
+ },
+ "lcpfn_errors": 0,
+ "lcpfn_wired": false
+}

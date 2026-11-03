@@ -211,9 +211,16 @@ def coverage_quantiles(doc: dict) -> dict:
 		for c in doc["curves"]:
 			for seen in doc["seen_steps"]:
 				try:
+					# Nov 2 review: per-x means (q), beside the raw per-step input the first run used (q_raw)
 					q = lcpfn.forecast_loss(model, c["seen"][:seen], last_step=c["steps"])
+					r = lcpfn.forecast_loss(model, c["seen"][:seen], last_step=c["steps"], bin_x=False)
 					rows.append(
-						{"key": c["key"], "seen": seen, "q": None if q is None else [q.lo, q.mid, q.hi]}
+						{
+							"key": c["key"],
+							"seen": seen,
+							"q": None if q is None else [q.lo, q.mid, q.hi],
+							"q_raw": None if r is None else [r.lo, r.mid, r.hi],
+						}
 					)
 				except Exception as exc:  # one curve's failure is its own row, not the whole run's
 					rows.append(

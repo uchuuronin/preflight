@@ -59,7 +59,12 @@ def test_the_notice_and_the_runner_read_the_same_triage_flag():
 	# Round five (PM, Nov 1): A's Spark diagnosis also calls Spark Open (its claim check) under
 	# harness.spark_diagnosis. The rule is that production never sends a visitor's data under a flag
 	# the notice doesn't speak for: every gating flag has a notice line, or is off in production.
-	notice = set(re.findall(r'flag\("([a-z0-9_.]+)"\)\) lines\.push', src))
+	# Every flag named in a line's condition counts (`if (flag("a") || flag("b")) lines.push(...)`).
+	notice = {
+		f
+		for cond in re.findall(r"if \(([^\n]*?)\) lines\.push", src)
+		for f in re.findall(r'flag\("([a-z0-9_.]+)"\)', cond)
+	}
 	prod = json.loads((ROOT / "flags.production.json").read_text())
 	assert m.group(1) in gated, f"the triage notice reads {m.group(1)}, which no runner gate reads"
 	silent = {f for f in gated if f not in notice and prod.get(f) is True}

@@ -1,0 +1,143 @@
+{
+  "script": "serving_vllm",
+  "entrypoint": "serve.py",
+  "args": [],
+  "gpu": "A10",
+  "backend": "cuda",
+  "bare": {
+    "failed": "the bare run took longer than 900 s",
+    "tail": "t. speed input: 14.63 toks/s, output: 474.67 toks/s]\rProcessed prompts:   8%|\u258a         | 81/1024 [11:33<1:18:21,  4.99s/it, est. speed input: 14.62 toks/s, output: 478.36 toks/s]\rProcessed prompts:   8%|\u258a         | 82/1024 [11:37<1:11:11,  4.53s/it, est. speed input: 14.89 toks/s, output: 481.85 toks/s]\rProcessed prompts:   8%|\u258a         | 83/1024 [11:38<55:36,  3.55s/it, est. speed input: 14.91 toks/s, output: 486.86 toks/s]  \rProcessed prompts:   8%|\u258a         | 84/1024 [11:40<47:20,  3.02s/it, est. speed input: 14.98 toks/s, output: 491.46 toks/s]\rProcessed prompts:   8%|\u258a         | 85/1024 [11:43<50:43,  3.24s/it, est. speed input: 15.48 toks/s, output: 494.66 toks/s]\rProcessed prompts:   8%|\u258a         | 86/1024 [11:44<40:53,  2.62s/it, est. speed input: 15.51 toks/s, output: 499.66 toks/s]\rProcessed prompts:   8%|\u258a         | 87/1024 [11:46<36:16,  2.32s/it, est. speed input: 15.54 toks/s, output: 504.29 toks/s]\rProcessed prompts:   9%|\u258a         | 88/1024 [11:49<40:31,  2.60s/it, est. speed input: 15.53 toks/s, output: 507.76 toks/s]\rProcessed prompts:   9%|\u258a         | 89/1024 [11:51<33:40,  2.16s/it, est. speed input: 15.56 toks/s, output: 512.71 toks/s]\rProcessed prompts:   9%|\u2589         | 90/1024 [11:52<29:08,  1.87s/it, est. speed input: 15.69 toks/s, output: 517.60 toks/s]\rProcessed prompts:   9%|\u2589         | 91/1024 [11:54<31:22,  2.02s/it, est. speed input: 15.71 toks/s, output: 521.62 toks/s]\rProcessed prompts:   9%|\u2589         | 92/1024 [11:57<34:53,  2.25s/it, est. speed input: 15.74 toks/s, output: 525.31 toks/s]\rProcessed prompts:   9%|\u2589         | 93/1024 [12:02<48:35,  3.13s/it, est. speed input: 15.70 toks/s, output: 527.20 toks/s]WARNING 11-02 23:05:10 scheduler.py:1481] Sequence group 142 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=401\n\rProcessed prompts:   9%|\u2589         | 94/1024 [12:28<2:32:24,  9.83s/it, est. speed input: 15.24 toks/s, output: 514.72 toks/s]\rProcessed prompts:   9%|\u2589         | 95/1024 [12:49<3:26:23, 13.33s/it, est. speed input: 15.00 toks/s, output: 505.67 toks/s]\rProcessed prompts:   9%|\u2589         | 96/1024 [13:06<3:41:25, 14.32s/it, est. speed input: 14.72 toks/s, output: 500.19 toks/s]\rProcessed prompts:   9%|\u2589         | 97/1024 [13:22<3:51:03, 14.96s/it, est. speed input: 14.50 toks/s, output: 495.05 toks/s]\rProcessed prompts:  10%|\u2589         | 98/1024 [13:35<3:40:21, 14.28s/it, est. speed input: 14.55 toks/s, output: 492.36 toks/s]\rProcessed prompts:  10%|\u2589         | 99/1024 [13:44<3:18:55, 12.90s/it, est. speed input: 14.42 toks/s, output: 491.54 toks/s]\rProcessed prompts:  10%|\u2589         | 100/1024 [13:50<2:44:29, 10.68s/it, est. speed input: 14.37 toks/s, output: 493.22 toks/s]\rProcessed prompts:  10%|\u2589         | 101/1024 [13:53<2:10:55,  8.51s/it, est. speed input: 14.36 toks/s, output: 496.09 toks/s]",
+    "wall_s": 901.1
+  },
+  "recorder": {
+    "status": "ok",
+    "error": null,
+    "error_code": null,
+    "steps": 0,
+    "p50_s": null,
+    "peak_allocated_bytes": null,
+    "seconds": 107.375,
+    "by_phase": {},
+    "rl": {
+      "response_length": {
+        "mean": 1024.0,
+        "p95": 1024.0,
+        "max": 1024.0,
+        "n": 32
+      },
+      "truncation_rate": null,
+      "zero_spread_fraction": null,
+      "pass_rate_per_prompt": [],
+      "group_size": null,
+      "entropy": [],
+      "kl": [],
+      "clip_fraction": [],
+      "reward_mean": []
+    },
+    "generation": {
+      "calls": 1,
+      "seconds_total": 44.21056575800003,
+      "sequences": 32,
+      "new_tokens_mean": 1024.0,
+      "new_tokens_p95": 1024.0,
+      "new_tokens_max": 1024.0,
+      "max_new_tokens": 4096,
+      "truncation_rate": null,
+      "backend": "vllm"
+    },
+    "extras": {
+      "host_rss_peak_bytes": 13194248192.0,
+      "serving_probe_max_tokens": 1024.0,
+      "serving_probe_capped_fraction": 1.0
+    },
+    "step_log": [],
+    "log_tail": "2768 tokens per request: 2.17x\nINFO 11-02 23:07:32 model_runner.py:1400] Capturing cudagraphs for decoding. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI.\nINFO 11-02 23:07:32 model_runner.py:1404] If out-of-memory error occurs during cudagraph capture, consider decreasing `gpu_memory_utilization` or switching to eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.\nINFO 11-02 23:07:56 model_runner.py:1518] Graph capturing finished in 25 secs, took 0.18 GiB\n\rProcessed prompts:   0%|          | 0/32 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]\rProcessed prompts:   3%|\u258e         | 1/32 [00:44<22:49, 44.19s/it, est. speed input: 3.30 toks/s, output: 23.17 toks/s]\rProcessed prompts: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 32/32 [00:44<00:00,  1.38s/it, est. speed input: 107.74 toks/s, output: 741.55 toks/s]\n[rank0]:[W1102 23:08:42.896182354 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())\n",
+    "probe": {
+      "id": "gt",
+      "knobs": {},
+      "status": "ok",
+      "steps": 0,
+      "started_at": "2026-11-02T23:06:55Z",
+      "duration_s": 107.375,
+      "error": null,
+      "error_code": null,
+      "memory": null,
+      "step_time": null,
+      "throughput": null,
+      "stability": null,
+      "data": null,
+      "rl": {
+        "response_length": {
+          "mean": 1024.0,
+          "p95": 1024.0,
+          "max": 1024.0,
+          "n": 32
+        },
+        "truncation_rate": null,
+        "zero_spread_fraction": null,
+        "pass_rate_per_prompt": [],
+        "group_size": null,
+        "entropy": [],
+        "kl": [],
+        "clip_fraction": [],
+        "reward_mean": []
+      },
+      "power": {
+        "mean_w": 127.60330684931508,
+        "max_w": 236.386,
+        "samples": 365
+      },
+      "eval": null,
+      "checkpoint": null,
+      "generation": {
+        "calls": 1,
+        "seconds_total": 44.21056575800003,
+        "sequences": 32,
+        "new_tokens_mean": 1024.0,
+        "new_tokens_p95": 1024.0,
+        "new_tokens_max": 1024.0,
+        "max_new_tokens": 4096,
+        "truncation_rate": null,
+        "backend": "vllm"
+      },
+      "extras": {
+        "host_rss_peak_bytes": 13194248192.0,
+        "serving_probe_max_tokens": 1024.0,
+        "serving_probe_capped_fraction": 1.0
+      },
+      "step_log": [],
+      "cost": {
+        "gpu_seconds": 107.375,
+        "usd": 0.0
+      },
+      "cache_key": null,
+      "log": null
+    },
+    "env": {
+      "backend": "cuda",
+      "provider": "local",
+      "gpu": {
+        "name": "A10",
+        "count": 1,
+        "memory_bytes": 23684186112,
+        "vendor": "nvidia",
+        "compute_capability": "8.6"
+      },
+      "nodes": 1,
+      "libraries": {
+        "torch": "2.5.1",
+        "transformers": "4.46.3",
+        "vllm": "0.6.4.post1",
+        "datasets": "3.1.0"
+      },
+      "python": "3.11.12"
+    }
+  },
+  "overhead": {
+    "sync_overhead": null,
+    "hook_overhead": null,
+    "note": "ratio of step times; 1.03 means the recorder makes a step 3% slower"
+  },
+  "lens": "serving",
+  "image": "serving"
+}
