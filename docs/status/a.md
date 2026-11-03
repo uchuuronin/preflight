@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 2:20 PM ET.
+Updated Tue Nov 3, 2:30 PM ET.
 
 **Production runner: deployed from ws-a 56e686de** (main b40012bb merged in, plus the PM's 11:23 list; `a-deploy-main-30`, GitHub 41690166435, Nov 3 18:05 UTC / 1:05 PM ET), after three startup checks passed (`a-startup-check-30` 41688982619, `a-startup-check-serving-16` 41689362694, `a-startup-torch-new-4` 41689764723); the limit check passed after it (`a-limit-check-11`, 41690460909). New in production with it: native Windows fixes (D's ten), B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map`, OGB's arxiv archive from the dataset volume (sha256-pinned), the retrieval, GNN and vision samples' Fix button, B's request-count logging under `probes.eval_units`, and `harness.spark_search` on (main's flags, Chiya's 11:25 yes). Off: `runner.entrypoint_path` (proposed on, for the PM), `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from c146cf11** (10:52 AM).
 
@@ -13,6 +13,8 @@ Updated Tue Nov 3, 2:20 PM ET.
 | 2:00 PM | `notebook_only` label for the notebook-login ImportError, no flag | the PM named it a plain bug fix; `missing_package` told visitors to add a package | none | revert 43f4dfe4's errors.py and failures.py lines |
 | 2:00 PM | `probes.torch_hint` names the newer torch only for a missing `torch.*` attribute or module, no retry | the PM: no retry today; a user's own typo on a tensor isn't blamed on torch | none; off | flag off |
 | 2:15 PM | The rig's full run gets `--entry-path`, `--tty`, `--torch-hint` (recorder probe; `--tty` gives the bare run a terminal too) | production keeps the flags off, so a check-in can't try them; the PM flips production flags | none until run | revert d092a055 |
+| 2:10 PM | Two review rounds on the fixes; everything they found is fixed (getpass hang, login detector too broad, torch blame on typos, fd leaks, a stale finding, a shared-line call) | a flag the PM may flip must not hang a probe or drop code | none | revert 8529dcfb, c6465777 |
+| 2:30 PM | Proposed `runner.entrypoint_path` on (paired runs: same peak to the byte, step time within machine noise); `probes.tty`, `probes.skip_login_cells`, `probes.torch_hint` listed as ready, the PM's call | the PM flips production flags | none | the PM leaves them off |
 | 2:15 PM | Item 6 compares the flag on and off side by side in the rig (same GPU class, same day) for the LoRA and nanoGPT samples | both entry points are at the repo's top, so the flag should change nothing; a paired run shows that directly | about $0.4 of Modal [estimate: four A10 runs of under 15 min] | none needed |
 
 ## Unseen validation runs (Nov 2): all nine posted
