@@ -1,0 +1,11 @@
+{
+	"name": "20261103-233314-41740041859-a-lora-final-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41740041859",
+	"ref": "f30f86252b30ec8a6cbd95f81baf11b54dd3904b",
+	"sha": "f30f86252b30ec8a6cbd95f81baf11b54dd3904b",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --sample sample://zoo/finetune_lora_hf --visitor lora-final-2 --max-minutes 35",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T23:40:34Z"
+}
