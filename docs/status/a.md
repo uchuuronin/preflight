@@ -1,6 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 6:15 PM ET.
+Updated Tue Nov 3, 6:45 PM ET.
+
+**FINAL runner, as asked at 6:24 PM: deployed from main f30f86252b30ec8a6cbd95f81baf11b54dd3904b** (the C and D merges plus the PM's note; its runner code, flags, zoo and schema are identical to the freeze commit 4671c8b's), `a-deploy-main-33` GitHub 41739754868, Nov 3 23:31 UTC / 6:31 PM ET, after three startup checks passed (`a-startup-check-33` 41739033090, `a-startup-check-serving-19` 41739361686, `a-startup-torch-new-7` 41739549630); the limit check passed after it (`a-limit-check-14` 41739872169; its first dispatch failed on a GitHub API error and was sent again). **Rollback: `modal deploy --env main` from 4671c8b3af32ea44983c5cdb3dd5d31f1d2b28f3** (the freeze runner, live 5:58 to 6:31 PM; same code). No runner changes until after submission.
 
 **FINAL (freeze) runner: deployed from main 4671c8b3af32ea44983c5cdb3dd5d31f1d2b28f3** (the PM's freeze merge: `runner.made_by`, `harness.map_closure`, `runner.entry_runs_nothing` on), `a-deploy-main-32` GitHub 41735219144, Nov 3 22:58 UTC / 5:58 PM ET, after three startup checks passed (`a-startup-check-32` 41734520603, `a-startup-check-serving-18` 41734823043, `a-startup-torch-new-6` 41735024703); the limit check passed after it (`a-limit-check-13` 41735320177). **Rollback: `modal deploy --env main` from e8f0516c64af51a1e84eed9b8750313bbdbd2ae8** (the runner live before it, 4:55 PM). No runner changes until after submission.
 
