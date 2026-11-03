@@ -53,3 +53,19 @@ def test_a_fanout_move_is_carried_by_the_model_and_a_packing_move_is_said_once()
 		cl = api._current(vis)["channels_last"]
 		r = api.predict(vis, {"channels_last": not cl}).root["time.step"].reason or ""
 		assert "isn't modelled for time yet" in r and "channels_last is off the probed values" not in r
+
+
+def test_checkpointing_named_none_adds_no_recompute():
+	assert (
+		not api._checkpointing_on("none")
+		and not api._checkpointing_on(False)
+		and not api._checkpointing_on(None)
+	)
+	assert (
+		api._checkpointing_on("full") and api._checkpointing_on("selective") and api._checkpointing_on(True)
+	)
+	assert (
+		not api._checkpointing_on("NONE")
+		and not api._checkpointing_on(0)
+		and api._checkpointing_on("unsloth")
+	)

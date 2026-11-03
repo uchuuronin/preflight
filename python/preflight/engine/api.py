@@ -1568,6 +1568,14 @@ def _dtype_ratio(
 	return compute_share * ps / pt + (1 - compute_share) * bt / bs
 
 
+def _checkpointing_on(v) -> bool:
+	"""Whether a gradient_checkpointing value recomputes: True, "full", "selective" or another name; False, None and
+	"none" don't (the string "none" was truthy, so it added a recompute pass: found writing the knobs guide, Nov 3)."""
+	if isinstance(v, str):  # any other name ("unsloth", "full") is on, as before
+		return v.strip().lower() not in ("none", "false", "off", "no", "0", "")
+	return bool(v)
+
+
 def _step(record: FlightRecord, values: dict) -> _StepResult:
 	lens = record.job.lens
 	sprobes, current_probe = [], None
@@ -1596,8 +1604,11 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	cell = conformal.TABLE.lookup("time.step", _env_gpu(record), lens)
 	if cell is not None:  # held-out conformal half-width replaces the simulated same-GPU sigma
 		model = replace(model, sigma=cell.half_width / steptime.Z90)
-	probe_gc = {bool(_probe_values(record, p).get("gradient_checkpointing", False)) for p in record.probes}
-	recompute = bool(values.get("gradient_checkpointing")) and probe_gc == {False}
+	probe_gc = {
+		_checkpointing_on(_probe_values(record, p).get("gradient_checkpointing", False))
+		for p in record.probes
+	}
+	recompute = _checkpointing_on(values.get("gradient_checkpointing")) and probe_gc == {False}
 	match = _matching_probe(record, values)
 	src_gpu, tgt_gpu = _env_gpu(record), _target_gpu(record, values)
 	requested = _gpu_move(record, values)
