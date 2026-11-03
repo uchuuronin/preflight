@@ -76,7 +76,59 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 14:10 ET (second stranger walkthrough, for C)
+
+The walkthrough on a production build of `main` (`b40012bb`, re-checked on `6d40cd40`), posted for
+C in `from-d.md`, most serious first: 11 new items (the description box nothing reads; the Pretrain
+tour cutting batch and sequence before bf16; identical changes from unrelated knobs; GNN epochs;
+GRPO blanking; one-card GPU knobs; no-gain tour steps; and smaller ones) and Nov 2's 20 re-checked:
+9 fixed, 7 partly, 3 open, 1 not reproduced. A read-only check of every number against the logs;
+its two fixes are in. Not checked: the live guide (no model key locally), a real check-in, the
+live site.
+
+This push sends: `docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 13:55 ET (native Windows on main; the guide with B's facts)
+
+The Windows check against `main` at `6d40cd40` (A's fix merged), nothing stubbed: run measured,
+watch followed (GitHub run 41696495753) [measured]. Shot 9b is native Windows (Chiya, 13:42).
+`docs/guide/knobs.md` now ends each knob with what Preflight does with it today, from B's
+code-checked reference (now `docs/guide/knobs-reference.md` beside it), describes the description
+box wired to the guide (option 1, C's work before 3 PM; option 2's text kept aside), gives the
+check-in as about 5 to 11 minutes and drops MI300X from New flight. A second read-only fact-check
+against B's reference; its fixes are in. Merged `main` `6d40cd40`.
+
+This push sends: the guide, the workflow, `docs/demo/shot-9b-laptop.md`,
+`docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 12:55 ET (the guide to every input and knob)
+
+`docs/guide/knobs.md` written for someone who has never trained a model (Chiya, 12:18), its title
+matching C's new documentation card on New flight. B's file wasn't on any branch, so it's new. Its
+first section says what the description box does today (saved, not read by the guide) and where
+the guide does read words: its own ask box and **Your limits**. Reviewed read-only against
+`en.json`, `NewFlight.tsx`, the limits panel and the guide's code; the review's eight must-fixes
+(labels, the GPU names, the precision and IVF explanations, the fall-back to an L40S) are in.
+
+This push sends: `docs/guide/knobs.md`, `docs/requests/from-d.md`, this file.
+
+## Tue Nov 3, 12:40 ET (the Windows fixes: A's kept, D's withdrawn)
+
+A's own copy of the same ten fixes (ws-a `a315c1f2`, `77c56899`) had landed at 11:31, before the
+hand-over reached A. Both copies passed the Windows runner with nothing stubbed, side by side
+(GitHub run 41684996973: three probes ok, a live record of 2,000 steps, the changed watch 400
+steps, for each) [measured]. A's is kept (A's code, already reviewed, no lock change), as D told
+Chiya at 12:35; D's code commit `c618c8a1` is reverted on ws-d (its docs kept), so `python/`,
+`pyproject.toml`, both lock files and `docs/licences.md` match `main` again. The workflow now
+checks ws-a at `cf4945fb`. A is asked for one line D's review found missing from both copies
+(`PYTHONIOENCODING=utf-8` in the probe's Windows environment, which D's copy had and A's lacks). Shot 9b's steps name A's fix.
+
+This push sends: the revert, the workflow, `docs/demo/shot-9b-laptop.md`,
+`docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 12:25 ET (the Windows fixes, taken from A)
+
+*Superseded at 12:40: D's copy is withdrawn and reverted; A's is kept.*
 
 Chiya, 11:52: D takes the nine gaps and the tenth risk off A. Merged main `8f29b3b`. Each fix is
 guarded so Linux is unchanged (geteuid, tzdata on Windows only, `kill_tree`, `resource`, the

@@ -9,7 +9,6 @@ dependencies = [
 	"pydantic>=2.8,<3",
 	"numpy>=1.26",
 	"httpx>=0.27",
-	"tzdata>=2024.1; sys_platform == 'win32'",  # Windows has no time-zone database (runner/queue.py's ZoneInfo)
 ]
 
 [project.optional-dependencies]
@@ -46,6 +45,8 @@ default-groups = ["dev"]
 line-length = 110
 target-version = "py311"
 src = ["python", "tests"]
+# held-out third-party files kept exactly as published (the fresh list, docs/validation/fresh-hash.txt): never linted
+extend-exclude = ["validation/fresh"]
 
 [tool.ruff.format]
 indent-style = "tab"

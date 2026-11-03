@@ -566,6 +566,45 @@ SHAPE_DEPENDENT = {
 }
 
 
+# knobs.py marks these modelled for time, but the step-time model never reads them: it reads the work per step
+# (batch, sequence, accumulation, image size, a GNN's fan-outs: knobs.work_units), precision, checkpointing, the
+# GPU, GPUs and nodes. Moved off every probe, the step was "carried" by the model while its point stayed put (nanoGPT's n_layer 12 to 24: 0.955 s to
+# 0.939 s). So such a move is said as unmodelled: held at its probed effect, wider, extrapolated (B, Nov 3: a bug
+# fix found writing the knobs guide; memory is unchanged)
+STEP_TIME_UNREAD = frozenset(
+	{
+		"n_layer",
+		"d_model",
+		"n_head",
+		"hidden_channels",
+		"gnn_layers",
+		"lora_r",
+		"quantization",
+		"optimizer",
+		"attn",
+		"eval_no_grad",
+		"num_workers",
+		"prefetch_factor",
+		"tensor_parallel",
+		"pipeline_parallel",
+		"use_vllm",
+		"kv_cache_dtype",
+		"gpu_memory_utilization",
+		"fsdp_mode",
+		"deepspeed_config",
+		"index_m",
+		"index_nlist",
+		"rl_iterations",
+		"max_num_seqs",
+		"max_batched_tokens",
+		"request_rate",
+		"max_new_tokens",
+	}
+)  # memory reads use_vllm and the KV and parallel knobs; the
+# strategy comes from the script map; the serving knobs feed only the serving simulator; max_new_tokens sizes memory
+# only, off the work axis (knobs.work_units reads seq_len or max_model_len) (review, Nov 3)
+
+
 def _generic_shape(record: FlightRecord) -> bool:
 	try:
 		arch, _setup, _shape = knobs.setup_from(_script_map(record), _current(record))
@@ -582,7 +621,8 @@ def _unmodelled_moves(record: FlightRecord, values: dict, readout: str) -> list[
 		spec = knobs.knob_spec(kid)
 		if readout not in spec.affects or kid == "gpu_type":
 			continue
-		if readout in spec.modelled:
+		unread = readout == "time" and kid in STEP_TIME_UNREAD
+		if readout in spec.modelled and not unread:
 			if kid not in SHAPE_DEPENDENT.get(readout, ()):
 				continue
 			if generic is None:
@@ -1527,6 +1567,14 @@ def _dtype_ratio(
 	return compute_share * ps / pt + (1 - compute_share) * bt / bs
 
 
+def _checkpointing_on(v) -> bool:
+	"""Whether a gradient_checkpointing value recomputes: True, "full", "selective" or another name; False, None and
+	"none" don't (the string "none" was truthy, so it added a recompute pass: found writing the knobs guide, Nov 3)."""
+	if isinstance(v, str):  # any other name ("unsloth", "full") is on, as before
+		return v.strip().lower() not in ("none", "false", "off", "no", "0", "")
+	return bool(v)
+
+
 def _step(record: FlightRecord, values: dict) -> _StepResult:
 	lens = record.job.lens
 	sprobes, current_probe = [], None
@@ -1555,8 +1603,11 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 	cell = conformal.TABLE.lookup("time.step", _env_gpu(record), lens)
 	if cell is not None:  # held-out conformal half-width replaces the simulated same-GPU sigma
 		model = replace(model, sigma=cell.half_width / steptime.Z90)
-	probe_gc = {bool(_probe_values(record, p).get("gradient_checkpointing", False)) for p in record.probes}
-	recompute = bool(values.get("gradient_checkpointing")) and probe_gc == {False}
+	probe_gc = {
+		_checkpointing_on(_probe_values(record, p).get("gradient_checkpointing", False))
+		for p in record.probes
+	}
+	recompute = _checkpointing_on(values.get("gradient_checkpointing")) and probe_gc == {False}
 	match = _matching_probe(record, values)
 	src_gpu, tgt_gpu = _env_gpu(record), _target_gpu(record, values)
 	requested = _gpu_move(record, values)
@@ -1719,9 +1770,15 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
 		)
 
+	unmodelled_moves = _unmodelled_moves(record, values, "time")
+	unmodelled = set(unmodelled_moves)
 	off = [
-		k for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"})) if k not in _PRECISION_KNOBS
-	]
+		k
+		for k in _off_probe(
+			record, values, also_ok=frozenset({"grad_accum", "eval_batch_size"})
+		)  # eval batch: no step effect; passes timed as probed
+		if k not in _PRECISION_KNOBS and k not in STEP_TIME_UNREAD and k not in unmodelled
+	]  # an unmodelled knob is said below, as unmodelled for time, never as carried too (review)
 	if off and status in ("predicted", "measured"):
 		status = "extrapolated"
 		reasons.append(
@@ -1733,12 +1790,14 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		status = "extrapolated"
 		reasons.append(past)
 
-	moves = [m for m in _unmodelled_moves(record, values, "time") if m != "gpus"]
+	moves = [m for m in unmodelled_moves if m != "gpus"]
 	if moves:
 		sigma *= UNMODELLED_WIDEN
 		lt = replace(lt, intact=False) if lt is not None else None
 		status = "extrapolated" if status != "abstain" else status
-		reasons.append(f"{', '.join(moves)} isn't modelled for time yet; held at its probed effect")
+		reasons.append(
+			f"{', '.join(moves)} {'isn' if len(moves) == 1 else 'aren'}'t modelled for time yet; held at its probed effect"
+		)
 	h = memory.Z90 * sigma
 	if rough and h > memory.ABSTAIN_HALF_WIDTH:
 		# Chiya, Oct 31 (option b): the held-out cross-GPU band is shown past +-50%, labelled, beside the probe offer
@@ -2641,7 +2700,20 @@ def _predict_values(record: FlightRecord, values: dict, eval_off: bool = False) 
 		out["risk.divergence"] = _divergence(record, values)
 	if feature("serving") and record.job.lens == "serving" and not _QUIET.get():
 		out.update(_serving_targets(record, values))
+	note = _image_note(record)
+	if note:
+		out = {k: v if v.status == "abstain" else _with_note(v, note) for k, v in out.items()}
 	return Prediction(out)
+
+
+IMAGE_OVERRIDES = "probe.image_overrides"  # runner/pipeline.py's finding: probes.torch_new's overridden pins
+
+
+def _image_note(record: FlightRecord) -> str | None:
+	"""The overridden pins, as the runner's finding says them ("measured on transformers 4.52.3; your code pins
+	4.46.3"), for every estimate's reason (B's review of probes.torch_new, Nov 3: the PM's fix)."""
+	f = next((f for f in record.findings if f.id == IMAGE_OVERRIDES and f.source == "rule"), None)
+	return (f.title[0].lower() + f.title[1:]) if f is not None and f.title else None
 
 
 # the serving simulation takes tens of milliseconds; grids and rankings that don't read it skip it. A context

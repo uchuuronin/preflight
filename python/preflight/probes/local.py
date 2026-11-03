@@ -132,6 +132,11 @@ EXTRAS_KEYS = (
 	"train_loader_batches",
 	"epochs",
 	"planned_steps",
+	"trainer_dataset_len",  # rows of the dataset a HF or TRL trainer holds (B, Nov 3: GRPO's run length)
+	# probes.eval_units: lm-eval's whole request count, its scoring tokens, and its generate requests (B, Nov 3)
+	"eval_requests",
+	"eval_request_tokens",
+	"eval_generate_requests",
 	"train_dataset_len",  # rows the training loader draws per epoch (examples, pairs, images, input nodes)
 	# the training set's row lengths in tokens, as the script tokenised them (B, Oct 30), over
 	# dataset_rows_scanned rows (the first 200,000 of dataset_rows_total for very large sets)
@@ -228,6 +233,8 @@ class ProbeSpec:
 		False  # probes.torch_new: say plainly when the code asks for a newer torch than the image's
 	)
 	dataset_cache: bool = False  # probes.dataset_cache: torchvision's datasets from the read-only volume
+	# runner.entrypoint_path: the script's own folder first on its path, as `python dir/main.py` puts it
+	entry_path: bool = False
 	step_clock: bool = False  # probes.step_clock: the GPU's SM clock on each timed step
 	install_sdists: tuple[
 		str, ...
@@ -313,7 +320,8 @@ def _write_files(root: Path, files: dict[str, str]) -> None:
 		if not p.is_relative_to(base):
 			raise InvalidSubmission(f"refusing to write outside the workdir: {rel}")
 		p.parent.mkdir(parents=True, exist_ok=True)
-		p.write_text(text, encoding="utf-8")  # Windows' default is cp1252, which can't hold every script
+		# UTF-8, as the code was sent: Windows' default (cp1252) can't write every character (D, Nov 3)
+		p.write_text(text, encoding="utf-8", errors="surrogatepass")
 
 
 # ---------------------------------------------------------------- isolation
@@ -334,27 +342,43 @@ def scrubbed_env(home: Path, extra: dict[str, str] | None = None) -> dict[str, s
 			"DO_NOT_TRACK": "1",
 		}
 	)
-	if os.name == "nt":
-		env.update(windows_env(home))
+	if os.name == "nt":  # D, Nov 3: Windows needs these to start Python's sockets and find its own folders
+		env.update(_windows_env(home))
 	if extra:
 		env.update(extra)
 	return env
 
 
-# Windows only (D, Nov 3): without SYSTEMROOT a probe can't start Winsock, so `import torch` fails
-# ("WinError 10106"); USERNAME is what getpass reads with no pwd module; the user's own CUDA cache
-# and UTF-8 setting are kept. The user's folders are swapped for the probe's throwaway home, as
-# HOME is on Linux: Windows ignores HOME and TMPDIR, and the real APPDATA holds credential files.
-WINDOWS_ENV = ("SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "USERNAME", "PATHEXT", "COMSPEC", "NUMBER_OF_PROCESSORS",
-	"PROCESSOR_ARCHITECTURE", "CUDA_PATH", "CUDA_CACHE_PATH", "PYTHONUTF8")  # fmt: skip
+# Windows: kept from the parent (without SYSTEMROOT, "[WinError 10106] The requested service provider could not be
+# loaded": D's run 4), and the per-user folders pointed into the probe's home (Windows ignores HOME and TMPDIR, and the
+# real APPDATA would put the user's credential folders in reach)
+WINDOWS_KEEP = ("SYSTEMROOT", "WINDIR", "USERNAME", "PATHEXT", "COMSPEC")
 
 
-def windows_env(home: Path, environ: dict[str, str] | None = None) -> dict[str, str]:
-	src = os.environ if environ is None else environ
-	env = {k: v for k, v in src.items() if k in WINDOWS_ENV}
-	env.update({"PYTHONIOENCODING": "utf-8", "USERPROFILE": str(home), "APPDATA": str(home / "AppData" / "Roaming"),
-		"LOCALAPPDATA": str(home / "AppData" / "Local"), "TEMP": str(home / "tmp"), "TMP": str(home / "tmp")})  # fmt: skip
-	return env
+def _windows_env(home: Path) -> dict[str, str]:
+	out = {k: os.environ[k] for k in WINDOWS_KEEP if k in os.environ}
+	for k, sub in (("USERPROFILE", ""), ("APPDATA", "AppData/Roaming"), ("LOCALAPPDATA", "AppData/Local"),
+			("TEMP", "tmp"), ("TMP", "tmp")):  # fmt: skip
+		p = home / sub if sub else home
+		with contextlib.suppress(OSError):
+			p.mkdir(parents=True, exist_ok=True)
+		out[k] = str(p)
+	return out
+
+
+def kill_group(pid: int, *, exited: bool = False) -> None:
+	"""SIGKILL a process's group. Windows has neither killpg nor SIGKILL, so the guard never names them there
+	(D, Nov 3): `taskkill /F /T` ends the still-running process and its tree; after it has exited (exited=True)
+	there's no tree left to find, so nothing more (a Job Object would be the full equivalent)."""
+	if hasattr(os, "killpg"):
+		os.killpg(pid, signal.SIGKILL)
+	elif not exited:
+		with contextlib.suppress(
+			subprocess.TimeoutExpired, OSError
+		):  # a hung taskkill never ends the run (review)
+			subprocess.run(
+				["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, timeout=30, check=False
+			)
 
 
 def _no_dumps() -> None:
@@ -429,7 +453,7 @@ def _probe_uid() -> int | None:
 	"""A fresh unprivileged uid per probe when running as root. PREFLIGHT_PROBE_UID pins one uid for
 	every probe in this process: in a per-job sandbox the sandbox is the isolation boundary, and
 	one uid lets a job's probes share the Hugging Face cache (locks, downloads) between points."""
-	if not hasattr(os, "geteuid") or os.geteuid() != 0:  # Windows has no uids: probes run as the user
+	if getattr(os, "geteuid", lambda: -1)() != 0:  # no euid on Windows (D, Nov 3)
 		return None
 	pinned = os.environ.get("PREFLIGHT_PROBE_UID")
 	if pinned and pinned.isdigit() and int(pinned) >= 1000:
@@ -722,9 +746,15 @@ _NEEDS = re.compile(
 )
 
 
+_LOCAL = re.compile(r"The script imports ([A-Za-z_][A-Za-z0-9_.]{0,199}), the repo's own module")
+
+
 def _missing(code: str | None, error: str | None) -> dict:
 	"""Probe.missing_module and .missing_package (0.6.3) for a missing import: the module as Python named
 	it, and the PyPI name on Preflight's list that provides it (absent when it isn't on the list)."""
+	if code == "missing_module.local" and error:  # runner.entrypoint_path: the repo's own module, no package
+		m = _LOCAL.search(error)
+		return {"missing_module": m.group(1).rstrip(".")} if m else {}
 	if code != "missing_package" or not error:
 		return {}
 	from preflight.recorder.requirements import known_packages, package_for_module
@@ -911,33 +941,14 @@ def _extras(summary: dict) -> dict[str, float]:
 # ---------------------------------------------------------------- run
 
 
-def sandbox_default(name: str | None = None) -> str:
-	"""Where probe sandboxes go without PREFLIGHT_SANDBOX_DIR: /tmp, or on Windows (where "/tmp" is
-	a folder on the current drive that usually isn't there) the user's temp folder."""
-	return tempfile.gettempdir() if (name or os.name) == "nt" else "/tmp"
-
-
-def kill_tree(pid: int, *, alive: bool) -> None:
-	"""SIGKILL the probe's process group. Windows has no process groups or SIGKILL: while the probe
-	is alive (its handle is held, so its pid can't be reused), taskkill /T ends it and its children;
-	once it has exited, nothing is left to find by its pid, and a reused pid mustn't be hit. Known
-	gap: on Windows a process the probe left running after a normal exit survives (a Job Object
-	with KILL_ON_JOB_CLOSE would end it); Linux's group kill after exit catches it."""
-	if hasattr(os, "killpg"):
-		os.killpg(pid, signal.SIGKILL)
-	elif alive:
-		with contextlib.suppress(OSError):
-			subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdin=subprocess.DEVNULL,
-				stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)  # fmt: skip
-
-
 def _read_untrusted(path: Path, cap: int = 5_000_000) -> str:
 	"""A file the probe's uid could write: never through a link, only a regular file, at most cap
 	bytes (a planted link to /dev/zero or a FIFO can't stall or flood the parent)."""
-	nofollow = getattr(os, "O_NOFOLLOW", 0)  # Windows has neither flag, and opens text mode by default
-	if not nofollow and path.is_symlink():
-		raise OSError(f"{path.name} is a link")
-	fd = os.open(path, os.O_RDONLY | nofollow | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0))
+	# Windows has neither O_NOFOLLOW nor O_NONBLOCK, and os.open is text mode there without O_BINARY (D, Nov 3)
+	flags = (
+		os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+	)
+	fd = os.open(path, flags)
 	try:
 		if not stat.S_ISREG(os.fstat(fd).st_mode):
 			raise OSError(f"{path.name} is not a regular file")
@@ -1010,9 +1021,9 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 	for name in ("result.json", "progress.json", "trace.json", "log"):
 		(root / f"{spec.probe_id}.{name}").unlink(missing_ok=True)
 	# the child runs in a fresh sandbox dir every time, so nothing from an earlier attempt is in reach
-	sandbox = Path(
-		tempfile.mkdtemp(prefix="pf-", dir=os.environ.get("PREFLIGHT_SANDBOX_DIR", sandbox_default()))
-	)
+	# Windows has no /tmp (it would be \\tmp on the current drive): its temp folder there (D, Nov 3)
+	default = "/tmp" if os.name != "nt" else tempfile.gettempdir()
+	sandbox = Path(tempfile.mkdtemp(prefix="pf-", dir=os.environ.get("PREFLIGHT_SANDBOX_DIR", default)))
 	work = sandbox / "work"
 	box = sandbox / "io"  # the only other place the child may write
 	work.mkdir()
@@ -1049,6 +1060,7 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 				"install_exec": spec.install_exec,
 				"torch_note": spec.torch_note,
 				"dataset_cache": spec.dataset_cache,
+				"entry_path": spec.entry_path,
 				"step_clock": spec.step_clock,
 				"install_sdists": list(spec.install_sdists),
 				"eval_units": spec.eval_units,
@@ -1103,17 +1115,14 @@ def run_probe(spec: ProbeSpec, *, should_stop: Callable[[], bool] | None = None)
 			else:
 				continue
 			with contextlib.suppress(ProcessLookupError):
-				kill_tree(proc.pid, alive=True)
-			if not hasattr(os, "killpg"):
-				with contextlib.suppress(OSError):
-					proc.kill()  # if taskkill wasn't there: the probe itself, at least
+				kill_group(proc.pid)
 			proc.wait()
 			break
 	# nothing the probe started survives it: its process group, every descendant that detached
 	# (reparented to us as subreaper), then anything else running as its uid
 	try:
 		with contextlib.suppress(ProcessLookupError, PermissionError):
-			kill_tree(proc.pid, alive=False)
+			kill_group(proc.pid, exited=True)
 		if subreaper:
 			_kill_descendants(os.getpid(), keep=before)
 		if uid is not None:

@@ -265,26 +265,32 @@ def live_record(parent, summary: dict, *, status: str, error: str | None = None,
 	)
 
 
-ATOMIC_TRIES = 8  # guess: about 1.3 s of retries in all, past a browser's or antivirus's brief read
+REPLACE_TRIES = (
+	5  # guess: Windows refuses a replace while a reader has the file open (Chrome rereads it every 3 s)
+)
+REPLACE_WAIT_S = 0.05
 
 
-def _atomic(path: Path, text: str, *, final: bool = True) -> bool:
-	"""Write the record whole. On Windows, os.replace onto a file another process has open (a
-	browser following the live record, antivirus) raises PermissionError: retry a few times; a
-	running write that still can't land is skipped (the next one carries the same data), and only
-	the final write raises. Linux replaces regardless, so the first try lands there."""
+def _atomic(path: Path, text: str, *, tries: int = REPLACE_TRIES) -> bool:
+	"""Write the live record whole. On Windows os.replace raises PermissionError while another process has the
+	file open (the browser following the record, an antivirus scan): a few retries, then this write is skipped,
+	never the run stopped (D, Nov 3); any other write error (a full disk, a deleted folder) skips it too, since this
+	runs inside the visitor's optimizer step (review). UTF-8 always: Windows' default is cp1252. Whether it was
+	written."""
 	tmp = path.with_suffix(path.suffix + ".tmp")
-	tmp.write_text(text, encoding="utf-8")
-	for i in range(ATOMIC_TRIES):
-		try:
-			os.replace(tmp, path)
-			return True
-		except PermissionError:
-			if i == ATOMIC_TRIES - 1:
-				if final:
-					raise
-				return False
-			time.sleep(0.01 * 2**i)
+	try:
+		tmp.write_text(text, encoding="utf-8")
+		for i in range(tries):
+			try:
+				os.replace(tmp, path)
+				return True
+			except PermissionError:
+				if i + 1 < tries:
+					time.sleep(REPLACE_WAIT_S * min(i + 1, 5))
+	except OSError:
+		pass
+	with contextlib.suppress(OSError):
+		tmp.unlink()
 	return False
 
 
@@ -349,11 +355,7 @@ def main(argv: list[str] | None = None) -> int:
 		now = time.monotonic()
 		if now - last_write[0] >= WRITE_EVERY_S:
 			last_write[0] = now
-			_atomic(
-				rec_path,
-				live_record(parent, col.summary(), status="running", ids=ids).model_dump_json(),
-				final=False,
-			)
+			_atomic(rec_path, live_record(parent, col.summary(), status="running", ids=ids).model_dump_json())
 
 	def peak():
 		return torch.cuda.max_memory_allocated(), torch.cuda.max_memory_reserved()  # counters, no sync
@@ -425,9 +427,15 @@ def main(argv: list[str] | None = None) -> int:
 	finally:
 		handle.remove()
 		summary = col.finish()
-		_atomic(rec_path, live_record(parent, summary, status=status, error=error, ids=ids).model_dump_json())
+		# the last write is the run's result: retried for longer than a periodic one (about 9 s)
+		final = live_record(parent, summary, status=status, error=error, ids=ids).model_dump_json()
+		written = _atomic(rec_path, final, tries=40)
 		log.close()
-		say(f"{summary['steps']} steps, {len(summary['alerts'])} alerts; record {rec_path}")
+		if written:
+			say(f"{summary['steps']} steps, {len(summary['alerts'])} alerts; record {rec_path}")
+		else:  # review: never "record <path>" for a file that still reads "running"
+			say(f"{summary['steps']} steps, {len(summary['alerts'])} alerts; the final record couldn't be written to "
+				f"{rec_path} (another program held it open), so it still reads the last update")  # fmt: skip
 	return code
 
 

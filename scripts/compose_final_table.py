@@ -56,6 +56,11 @@ def compose(main_md: str, unseen: list[tuple[str, int, int, str, str]]) -> str:
 				r.rstrip(" |")
 				+ f"; NVIDIA to MI300X, scored apart on the MI300X corpus slice (295 configs, 1,147 pairs): {AMD}; its sigma-0.22 band covers 36%, so a move across vendors abstains |"
 			)
+		if r.startswith("| Knob response |"):
+			r = r.replace(
+				"; stranger test: base https://preflight-cqn.pages.dev,",
+				"; C's live-site run (remote run 41655597938, 3 samples x 20 moves at 1366x768 and 390x844; C's own p95, 67.5 ms, takes the floor(0.95 n) sample): base https://preflight-cqn.pages.dev,",
+			)
 		if r.startswith("| Peak memory error |"):
 			r = r.rstrip(" |") + (
 				"; causes: gnn_pyg (39% under; @L4 36% under): the allocator's reserved pool grows for three epochs past "
@@ -122,9 +127,11 @@ def main(argv: list[str] | None = None) -> int:
 			k2,
 			n2,
 			"measured",
-			"fixes designed on these nine (A's ops runs with the install flags, no hand edits): 4 (smolagents, its first "
-			"model call), 7 (BEIR, ran out of memory) and 8 (OGB arxiv, all 500 epochs) reach their first step; not a "
-			"validation, since the fixes were made for them",
+			"fixes designed on these nine (A's item-8 ops rerun on the A10 with every bring-your-own-script fix on, the "
+			"list's own arguments, no hand edits; Nov 3): 4 (smolagents, its first model call), 7 (BEIR, ran out of memory), "
+			"8 (OGB arxiv, all 500 epochs; its probe measures) and 9 (airbench, its probe measures) reach their first step; "
+			"through production 8 (OGB) still stops at its dataset download after A's 10:52 AM deploy (its host is plain HTTP, which A reads as the cause, the sandbox opening only HTTPS [A's reading, not checked]; `a-fresh-live-ogb-2-checkin` 41668696736) and 7 (BEIR) isn't re-checked there; not a validation, "
+			"since the fixes were made for them",
 		),
 	]
 	if a.fresh:

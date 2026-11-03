@@ -125,3 +125,21 @@ describe("the browser's set_knob guard", () => {
 		for (const r of Object.values(p.readouts)) expect(r.unit).toMatch(/^[A-Za-z/_%]{0,16}$/);
 	});
 });
+
+describe("the live guide on the measured LoRA sample (PM, Nov 3)", () => {
+	it("offers a combination on the L4 before any GPU change, and ranks no GPU change beside it", async () => {
+		const { SAMPLES } = await import("../workspace/record/load");
+		const rec = normaliseRecord((await SAMPLES.find((s) => s.id === "lora-qwen")!.load()) as FlightRecord);
+		const provider = new GridProvider();
+		const { actions } = fakeActions();
+		const base = { record: rec, provider, actions, knobs: currentKnobs(rec), pinned: new Set<string>(), objective: { kind: "min_cost" as const }, requestApproval: vi.fn() };
+		const call = { name: "sensitivity", call_id: "s1", arguments: { objective: "min_cost" } } as unknown as GuideCall;
+		const out = runBrowserCall(call, base, false) as { combined?: { knobs: Record<string, KnobValue> }; ranked: Array<{ knob_id: string }> };
+		expect(out.combined).toBeTruthy();
+		expect(Object.keys(out.combined!.knobs)).not.toContain("gpu_type");
+		expect(out.ranked.map((r) => r.knob_id)).not.toContain("gpu_type");
+		// After the person declines a combination, the GPU change is back.
+		const again = runBrowserCall(call, { ...base, combosDeclined: new Set(["combo:x"]) }, false) as { ranked: Array<{ knob_id: string }> };
+		expect(again.ranked.map((r) => r.knob_id)).toContain("gpu_type");
+	});
+});
