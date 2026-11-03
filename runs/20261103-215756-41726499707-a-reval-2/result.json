@@ -1,0 +1,11 @@
+{
+	"name": "20261103-215756-41726499707-a-reval-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41726499707",
+	"ref": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"sha": "515400f412f527a122f7e3a84ba0c46d12af3e77",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor reval-2 --max-minutes 35 --repo https://github.com/Lightning-AI/litgpt --commit 4738993a5e0190b851162a52173729827d3884e7 --entrypoint litgpt/pretrain.py --args=--config,config_hub/pretrain/debug.yaml",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T22:11:25Z"
+}
