@@ -46,13 +46,13 @@ export function RangeTestCurve({ test, value, choices, onPick }: { test: Test; v
 	const byRate = test.checked && test.points.length > 1 && test.points.every((p) => p.lr !== null);
 
 	if (test.points.length < 2) {
-		// Nothing to draw (the recorder couldn't read the loss): the words alone (review, Nov 2).
+		// Nothing to draw (no loss read, or a single point): the words alone (review, Nov 2).
 		return (
 			<figure className="pf-lrr" aria-labelledby={`${id}-cap`}>
 				<figcaption id={`${id}-cap`} className="pf-lrr__cap">
 					<b>{t("lrr.title")}</b>
 				</figcaption>
-				<p className="pf-lrr__said">{t("lrr.no_curve")}</p>
+				<p className="pf-lrr__said">{t(test.points.length === 0 ? "lrr.no_curve" : "lrr.too_few")}</p>
 			</figure>
 		);
 	}

@@ -114,12 +114,18 @@ const familyCache = new WeakMap<LoadedRecord, Map<string, ReadonlySet<string>>>(
 export function freeFor(record: LoadedRecord, targetId: string): ReadonlySet<string> {
 	let byFamily = familyCache.get(record);
 	if (!byFamily) {
-		byFamily = new Map();
+		// Free for the family: every grid of it either names the knob free or has it on an axis (B never
+		// lists an axis knob, so a grid over lr mustn't take lr out of the set), and at least one names it.
+		const grids = new Map<string, Grid[]>();
 		for (const g of record.predictions.grids) {
 			const fam = familyOf(g.target_id);
-			const mine = freeKnobs(g);
-			const had = byFamily.get(fam);
-			byFamily.set(fam, had ? new Set([...had].filter((k) => mine.has(k))) : mine);
+			grids.set(fam, [...(grids.get(fam) ?? []), g]);
+		}
+		byFamily = new Map();
+		for (const [fam, gs] of grids) {
+			const named = new Set(gs.flatMap((g) => g.independent_of ?? []));
+			const free = [...named].filter((k) => gs.every((g) => freeKnobs(g).has(k) || g.axes.some((a) => a.knob_id === k)));
+			byFamily.set(fam, new Set(free));
 		}
 		familyCache.set(record, byFamily);
 	}

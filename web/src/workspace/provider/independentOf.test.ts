@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import raw from "../fixtures/lora-live-nov1.record.json";
 import { currentKnobs } from "../record/model";
 import { type FlightRecord, type LoadedRecord, normaliseRecord } from "../record/types";
-import { freeKnobs, GridProvider } from "./GridProvider";
+import { freeFor, freeKnobs, GridProvider } from "./GridProvider";
 
 const base = normaliseRecord(raw as unknown as FlightRecord);
 const FREE = ["lr", "warmup_steps", "lora_alpha", "lora_dropout"];
@@ -62,6 +62,15 @@ describe("Grid.independent_of (0.6.4)", () => {
 		const moved = grid.predict(rec, at(rec, { lr: 0.0002 }));
 		expect(moved["time.step"]?.status).toBe("predicted");
 		expect(moved["memory.peak"]?.status).toBe("abstain");
+	});
+
+	it("a grid with the free knob on an axis doesn't take it out of the family's free set (review, Nov 2)", () => {
+		const rec = withFree(base, FREE);
+		// B never names an axis knob: on g.time.total.lr the list leaves lr out
+		const grids = rec.predictions.grids.map((g) => (g.axes.some((a) => a.knob_id === "lr") ? { ...g, independent_of: FREE.filter((k) => k !== "lr") } : g));
+		const r2 = { ...rec, predictions: { ...rec.predictions, grids } } as LoadedRecord;
+		expect([...freeFor(r2, "time.step")].sort()).toEqual([...FREE].sort());
+		expect(grid.predict(r2, at(r2, { lr: 0.0002 }))["time.step"]?.status).toBe("predicted");
 	});
 
 	it("reads an absent or null list as no free knobs", () => {

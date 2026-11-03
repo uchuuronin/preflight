@@ -98,7 +98,7 @@ def _check_command(source) -> None:
 		raise ApiError(
 			422,
 			"invalid_request",
-			f"A command here is up to {max_words} words of up to {max_word:,} characters each.",
+			f"A command here is up to {max_words} words, {max_word:,} characters a word and {max_chars:,} in all.",
 		)
 	if words[0] not in known:
 		raise ApiError(422, "invalid_request", f"Preflight runs these commands by name: {', '.join(known)}.")
