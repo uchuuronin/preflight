@@ -544,6 +544,12 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 	print(f"[ground truth] container up on the {_gpu_name()}; {len(files)} files of {script}", flush=True)
 	remote.link_weights()
 	remote.deps_dir()
+	if (install_opts or {}).get(
+		"dataset_cache"
+	):  # the bare run reads it from the environment (recorder/bare.py)
+		import os
+
+		os.environ["PREFLIGHT_DATASET_CACHE"] = DATASETS_DIR
 	# the probe image has no zoo (Oct 31: "has no train.py"): the files come from the checkout
 	return measure(Path("/tmp") / script, bare_steps=bare_steps, recorder_steps=recorder_steps, warmup=warmup,
 		budget_s=budget_s, files=files, entrypoint=entrypoint, args=tuple(args),
@@ -553,7 +559,8 @@ def _ground_truth(script: str, bare_steps: int, recorder_steps: int, warmup: int
 
 # weights read-only: an unseen third-party script runs as root in the bare run, and must not be
 # able to change the shared weights production probes read (review, Nov 1)
-_GT = {"image": None, "volumes": {WEIGHTS_DIR: _read_only(weights_vol)}, "timeout": GROUND_TRUTH_TIMEOUT_S}
+_GT = {"image": None, "volumes": {WEIGHTS_DIR: _read_only(weights_vol), DATASETS_DIR: _read_only(datasets_vol)},
+	"timeout": GROUND_TRUTH_TIMEOUT_S}  # fmt: skip
 
 
 @ops.function(**{**_GT, "image": probe_image}, gpu=GROUND_TRUTH_GPUS)
@@ -673,6 +680,8 @@ def ground_truth(
 	sdists: str = "",
 	build: bool = False,
 	torch_new: bool = False,
+	dataset_cache: bool = False,
+	flags: str = "",
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -690,6 +699,14 @@ def ground_truth(
 	Writes out/ground_truth_<name>.json."""
 	import json
 
+	if flags:  # flags on in this process only, comma-separated (the workflow takes no quotes): the reader's and mapper's
+		import os
+
+		from preflight.runner import flags as F
+
+		os.environ["PREFLIGHT_FLAGS"] = json.dumps(dict.fromkeys((n for n in flags.split(",") if n), True))
+		F.reload()
+		print(f"[ground truth] flags on here: {flags}", flush=True)
 	from preflight.harness.static import ScriptParseError
 	from preflight.recorder.ground_truth import ZOO_SCRIPTS, brief, plan
 	from preflight.runner.sources import _read_tree
@@ -724,9 +741,18 @@ def ground_truth(
 	if command_hex:
 		src = Path(words[0])
 	elif repo:
+		from preflight.runner.flags import flag
 		from preflight.runner.sources import _clone
 
-		files, sha = _clone(repo, commit or None, data=install_repo)
+		if (
+			flag("runner.read_closure") and entrypoint
+		):  # a repository too big to read whole, as the runner reads it
+			from preflight.runner.sources import _clone_read
+
+			files, sha, part = _clone_read(repo, commit or None, entrypoint, data=install_repo)
+			print(f"[ground truth] read the entry point's closure: {part}", flush=True)
+		else:
+			files, sha = _clone(repo, commit or None, data=install_repo)
 		if edit_hex:
 			files = _apply_edits(files, edit_hex)
 		src = Path(repo.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1])
@@ -747,6 +773,8 @@ def ground_truth(
 	opts = {
 		k: v for k, v in (("uv", uv), ("pyg", pyg), ("build", build)) if v
 	}  # build: probes.repo_install_exec
+	if dataset_cache:  # probes.dataset_cache: torchvision's datasets from the volume, in both runs
+		opts["dataset_cache"] = True
 	if sdists:  # names of source-only packages allowed to build (commas, as the workflow allows)
 		opts["sdists"] = tuple(n for n in sdists.split(",") if n)
 	if eval_units:  # probes.eval_units in this process only: the recorder probe's scoring batches
