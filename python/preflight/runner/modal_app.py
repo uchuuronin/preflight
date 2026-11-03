@@ -84,7 +84,7 @@ EGRESS = [
 	"codeload.github.com",
 	"*.githubusercontent.com",
 ]
-# probes.extra_hosts (off): PyG's wheel index (torch-sparse and the rest, which PyPI has only as source) and
+# probes.extra_hosts (on in production since Nov 3): PyG's wheel index (torch-sparse and the rest, which PyPI has only as source) and
 # torchvision's dataset host for CIFAR (Nov 2: unseen scripts 8 and 9 stopped there)
 # torchvision 0.20's CIFAR comes from cave.cs.toronto.edu (a-all3-9, Nov 2), not www.cs.toronto.edu
 # OGB's datasets (snap.stanford.edu) and BEIR's (public.ukp.informatik.tu-darmstadt.de): unseen 8 and 7 measured on the
