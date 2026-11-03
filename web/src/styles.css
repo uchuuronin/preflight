@@ -2257,9 +2257,11 @@ button.pf-prov:hover { color: var(--pf-fg); }
 }
 .pf-checks__row:first-child { border-top: 0; }
 /* The same-code comparison (B, Nov 2): four columns in the summary's style. */
-.pf-checks__row--ask { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr); }
+.pf-checks__row--ask { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
 .pf-checks__ask { display: flex; flex-direction: column; gap: 10px; }
 .pf-checks__note { margin: 0; font-size: 13px; }
+.pf-checks__pair { display: flex; flex-direction: column; gap: 2px; }
+.pf-checks__caveats { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 .pf-checks__row--head { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pf-fg-dim); }
 .pf-checks__row > * { min-width: 0; overflow-wrap: anywhere; }
 .pf-checks__list .pf-chips { display: flex; flex-direction: column; gap: 8px; }

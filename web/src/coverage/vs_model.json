@@ -1,0 +1,307 @@
+{
+	"generated_at": "2026-11-03T22:31Z",
+	"engine_commit": "064f1a6b",
+	"source": "docs/validation/preflight-vs-model.md; scripts/vs_model_from_final.py",
+	"muse_spark": {
+		"model": "muse-spark-1.3",
+		"prompt": "ask-model@1",
+		"prompt_hash": "211e2e084350",
+		"given": "the repo's files (as Preflight's script map gets them), the command and the GPU; nothing measured"
+	},
+	"ratio_means": "prediction over what the full run did: 1 is exact, above 1 too high, below 1 too low",
+	"summary": "Too few to rank formally. On step time, on the 4 full runs both sides could be scored on, Muse Spark from the code alone was off by 1.6x to 18x (every one too slow), Preflight by 8% to 36% (0.83x to 1.36x; two low, two high). On peak memory, Preflight was within 10% on 2 of 4 and Muse Spark on 0 of 4. On running out of memory, both caught the LoRA eval (Preflight because a probe ran out of memory there); Muse Spark missed BEIR (15%), and Preflight gave no answer for it (no probe ran).",
+	"caveats": [
+		"4 scripts for step time and memory, 6 for running out of memory; the hit counts' Wilson 95% intervals overlap (2 of 4: 15% to 85%; 0 of 4: 0% to 49%).",
+		"Muse Spark's 90% intervals covered slightly more often than Preflight's on these four (4 of 8 against 3 of 8, memory and step together), but they are much wider: 1.8 to 6 times from low end to high end, against Preflight's 1.1 to 1.5, and two of its four covers are near misses.",
+		"Two of the four full runs (vision, nanoGPT) got an A10G; on the LoRA script an A10G ran about 11% slower than the A10 both sides predicted for.",
+		"The memory comparison is of unlike quantities on Preflight's side: its point includes the CUDA context and the full run's reserved peak doesn't, so each Preflight memory error reads about 0.3 GB (0.25 GiB) high.",
+		"The zoo LoRA run calibrated Preflight's step band, so its Preflight step isn't scored; it and BEIR ran out of memory, so their full peaks were never seen.",
+		"The GRPO zoo script is left out: its sample folder held that run's own record, which Muse Spark read."
+	],
+	"rows": [
+		{
+			"script": "finetune_lora_hf",
+			"label": "LoRA fine-tune (zoo)",
+			"gpu": "L4",
+			"device": "NVIDIA L4",
+			"full_run": {
+				"step_s": 1.8691,
+				"peak_gib": null,
+				"ran_out_of_memory": true,
+				"reserved_when_it_ran_out_gib": 21.77,
+				"run": "remote-runs runs/20261031-205402-41241033277-a-gt-lora-l4-5"
+			},
+			"preflight": {
+				"step_s": null,
+				"step_why": "this run calibrated Preflight's step band, so it isn't a fair test",
+				"peak_gib": {
+					"status": "abstain",
+					"reason": "probe p1-eval ran out of memory at these settings"
+				},
+				"p_oom": 1.0
+			},
+			"muse_spark": {
+				"step_s": {
+					"point": 2.8,
+					"lo": 1.8,
+					"hi": 4.5
+				},
+				"peak_gib": {
+					"point": 48.0,
+					"lo": 32.0,
+					"hi": 90.0
+				},
+				"p_oom": 0.97
+			},
+			"ratio": {
+				"preflight_step": null,
+				"muse_step": 1.498,
+				"preflight_peak": null,
+				"muse_peak": null
+			},
+			"notes": [
+				"ran out of memory at its first eval (step 200), so its full peak was never seen; its step time was used to calibrate Preflight's step band, so Preflight's step isn't a fair test and is left out"
+			]
+		},
+		{
+			"script": "beir",
+			"label": "Retrieval (BEIR)",
+			"gpu": "A10",
+			"device": "NVIDIA A10",
+			"full_run": {
+				"step_s": null,
+				"peak_gib": null,
+				"ran_out_of_memory": true,
+				"reserved_when_it_ran_out_gib": 21.5,
+				"run": "A's after-freeze full run with probes.repo_install (a-after-7-gt, run 41491792689, A10): ran out of memory before its first step, 21.5 GiB reserved"
+			},
+			"preflight": {
+				"step_s": {
+					"status": "abstain",
+					"reason": "no probe timed a step yet"
+				},
+				"why": "no probe ran: no answer, not a miss",
+				"peak_gib": {
+					"status": "abstain",
+					"reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through"
+				},
+				"p_oom": null
+			},
+			"muse_spark": {
+				"step_s": null,
+				"peak_gib": {
+					"point": 14.0,
+					"lo": 10.0,
+					"hi": 19.0
+				},
+				"p_oom": 0.15,
+				"step_why": "it said the job has no training step (eval only)"
+			},
+			"ratio": {
+				"preflight_step": null,
+				"muse_step": null,
+				"preflight_peak": null,
+				"muse_peak": null
+			},
+			"notes": [
+				"ran out of memory on the A10 before its first step; Muse Spark was asked for the L4, a 24 GB card like the A10; Preflight had no probe of it (its only check-in got no GPU), so it gave no numbers"
+			]
+		},
+		{
+			"script": "gnn_pyg",
+			"label": "GNN (PyG GraphSAGE)",
+			"gpu": "A10",
+			"device": "NVIDIA A10",
+			"full_run": {
+				"step_s": 0.0612,
+				"peak_gib": 7.95,
+				"ran_out_of_memory": false,
+				"reserved_when_it_ran_out_gib": null,
+				"run": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 471 steps"
+			},
+			"preflight": {
+				"step_s": {
+					"point": 0.0561,
+					"lo": 0.0525,
+					"hi": 0.06,
+					"status": "measured"
+				},
+				"peak_gib": {
+					"point": 4.8721,
+					"lo": 4.2609,
+					"hi": 5.571,
+					"status": "extrapolated"
+				},
+				"p_oom": 0.001
+			},
+			"muse_spark": {
+				"step_s": {
+					"point": 1.1,
+					"lo": 0.5,
+					"hi": 2.2
+				},
+				"peak_gib": {
+					"point": 5.5,
+					"lo": 3.5,
+					"hi": 9.0
+				},
+				"p_oom": 0.03
+			},
+			"ratio": {
+				"preflight_step": 0.9161,
+				"muse_step": 17.9626,
+				"preflight_peak": 0.6128,
+				"muse_peak": 0.6917
+			},
+			"notes": []
+		},
+		{
+			"script": "retrieval_st",
+			"label": "Retrieval (sentence-transformers)",
+			"gpu": "A10",
+			"device": "NVIDIA A10",
+			"full_run": {
+				"step_s": 0.0312,
+				"peak_gib": 2.26,
+				"ran_out_of_memory": false,
+				"reserved_when_it_ran_out_gib": null,
+				"run": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 12279 steps"
+			},
+			"preflight": {
+				"step_s": {
+					"point": 0.038,
+					"lo": 0.0338,
+					"hi": 0.0428,
+					"status": "measured"
+				},
+				"peak_gib": {
+					"point": 0.9646,
+					"lo": 0.8482,
+					"hi": 1.0969,
+					"status": "extrapolated"
+				},
+				"p_oom": 0.007
+			},
+			"muse_spark": {
+				"step_s": {
+					"point": 0.06,
+					"lo": 0.025,
+					"hi": 0.15
+				},
+				"peak_gib": {
+					"point": 1.3,
+					"lo": 0.8,
+					"hi": 2.2
+				},
+				"p_oom": 0.001
+			},
+			"ratio": {
+				"preflight_step": 1.2175,
+				"muse_step": 1.9223,
+				"preflight_peak": 0.4269,
+				"muse_peak": 0.5753
+			},
+			"notes": []
+		},
+		{
+			"script": "vision_timm",
+			"label": "Vision (timm ResNet-50)",
+			"gpu": "A10",
+			"device": "NVIDIA A10G",
+			"full_run": {
+				"step_s": 0.1504,
+				"peak_gib": 3.35,
+				"ran_out_of_memory": false,
+				"reserved_when_it_ran_out_gib": null,
+				"run": "B's after-freeze full run (ops ground_truth), A10: bare ended finished, 80 steps"
+			},
+			"preflight": {
+				"step_s": {
+					"point": 0.1247,
+					"lo": 0.1007,
+					"hi": 0.1543,
+					"status": "measured"
+				},
+				"peak_gib": {
+					"point": 3.679,
+					"lo": 3.2186,
+					"hi": 4.2054,
+					"status": "extrapolated"
+				},
+				"p_oom": 0.004
+			},
+			"muse_spark": {
+				"step_s": {
+					"point": 0.85,
+					"lo": 0.5,
+					"hi": 1.5
+				},
+				"peak_gib": {
+					"point": 3.8,
+					"lo": 2.8,
+					"hi": 5.5
+				},
+				"p_oom": 0.005
+			},
+			"ratio": {
+				"preflight_step": 0.8293,
+				"muse_step": 5.6527,
+				"preflight_peak": 1.0996,
+				"muse_peak": 1.1358
+			},
+			"notes": [
+				"the full run got an A10G, which ran the LoRA script about 11% slower than the A10 both sides predicted for"
+			]
+		},
+		{
+			"script": "pretrain_nanogpt",
+			"label": "Pretrain (nanoGPT)",
+			"gpu": "A10",
+			"device": "NVIDIA A10G",
+			"full_run": {
+				"step_s": 0.7047,
+				"peak_gib": 18.86,
+				"ran_out_of_memory": false,
+				"reserved_when_it_ran_out_gib": null,
+				"run": "B's after-freeze full run (ops ground_truth), A10: bare ended steps, 300 steps"
+			},
+			"preflight": {
+				"step_s": {
+					"point": 0.9549,
+					"lo": 0.8434,
+					"hi": 1.0812,
+					"status": "measured"
+				},
+				"peak_gib": {
+					"point": 19.1701,
+					"lo": 17.2248,
+					"hi": 21.3351,
+					"status": "measured"
+				},
+				"p_oom": 0.093
+			},
+			"muse_spark": {
+				"step_s": {
+					"point": 1.15,
+					"lo": 0.7,
+					"hi": 1.8
+				},
+				"peak_gib": {
+					"point": 11.5,
+					"lo": 8.5,
+					"hi": 15.0
+				},
+				"p_oom": 0.04
+			},
+			"ratio": {
+				"preflight_step": 1.3551,
+				"muse_step": 1.6319,
+				"preflight_peak": 1.0163,
+				"muse_peak": 0.6097
+			},
+			"notes": [
+				"the full run got an A10G, which ran the LoRA script about 11% slower than the A10 both sides predicted for"
+			]
+		}
+	]
+}
