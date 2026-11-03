@@ -167,7 +167,8 @@ export function configText(input: ExportInput): string {
 		preflight: "plan",
 		...(plan.shareUrl ? { link: plan.shareUrl } : {}),
 		...(input.illustrative ? { note: "Sample record: the numbers are illustrative, not measured." } : {}),
-		job: { title: plan.title, lens: plan.lens, entrypoint: plan.source.entrypoint ?? null, command: commandText(input) },
+		// a command record's entry point is the runner's wrapper (preflight_command.py), not a file of the visitor's
+		job: { title: plan.title, lens: plan.lens, entrypoint: plan.source.kind === "command" ? null : (plan.source.entrypoint ?? null), command: commandText(input) },
 		gpu: { type: g.name, count: g.count },
 		settings: plan.config,
 		changed,

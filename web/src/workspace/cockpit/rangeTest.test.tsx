@@ -108,6 +108,23 @@ describe("the curve in the learning-rate editor", () => {
 		expect(screen.getByText(t("lrr.flat"))).toBeTruthy();
 	});
 
+	it("is read-only when the rate is pinned: no click to set, no button (review, Nov 2)", () => {
+		render(<RangeTestCurve test={readRangeTest(probe(lora.extras))} value={0.0004} choices={CHOICES} onPick={null} />);
+		expect(screen.queryByRole("button")).toBeNull();
+		expect(document.querySelector(".pf-lrr__plot.is-live")).toBeNull();
+	});
+
+	it("draws nothing, and says why, when no loss was read", () => {
+		render(<RangeTestCurve test={readRangeTest(probe({ lr_range: 1, "lr_range.flat": 1 }))} value={0.0001} choices={CHOICES} onPick={() => {}} />);
+		expect(document.querySelector("svg")).toBeNull();
+		expect(screen.getByText(t("lrr.no_curve"))).toBeTruthy();
+	});
+
+	it("asks for a rate rather than saying the test found no fall, when the run's rate isn't set", () => {
+		render(<RangeTestCurve test={readRangeTest(probe(lora.extras))} value={undefined} choices={CHOICES} onPick={() => {}} />);
+		expect(screen.getByText(t("lrr.no_rate"))).toBeTruthy();
+	});
+
 	it("draws nanoGPT's curve too, which ran to the end of the ramp", () => {
 		render(<RangeTestCurve test={readRangeTest(probe(real.pretrain_nanogpt.extras))} value={real.pretrain_nanogpt.own_lr} choices={[0.0001, 0.0003, 0.0006, 0.001]} onPick={() => {}} />);
 		expect(document.querySelector(".pf-lrr__line")?.getAttribute("d")?.split("L").length).toBe(97);

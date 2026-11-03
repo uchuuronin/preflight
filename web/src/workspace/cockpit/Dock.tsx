@@ -134,7 +134,7 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 					))}
 				</div>
 			)}
-			{rangeTest ? <RangeTestCurve test={rangeTest} value={value} choices={values} onPick={(v) => actions.setKnob(knob.id, v, "user")} /> : null}
+			{rangeTest ? <RangeTestCurve test={rangeTest} value={value} choices={values} onPick={pinned ? null : (v) => actions.setKnob(knob.id, v, "user")} /> : null}
 			<WakeStrip />
 			<div className="pf-control__foot">
 				{status === "abstain" ? <span>{t("knob.not_trusted_here")}</span> : null}

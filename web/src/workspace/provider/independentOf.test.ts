@@ -43,6 +43,27 @@ describe("Grid.independent_of (0.6.4)", () => {
 		expect(p["time.total"]?.status).toBe("abstain");
 	});
 
+	it("with only a free knob moved, a target with no grid of its own keeps B's estimate (review, Nov 2)", () => {
+		const rec = withFree(base, FREE);
+		const here = grid.predict(rec, currentKnobs(rec));
+		const moved = grid.predict(rec, at(rec, { lr: 0.0002 }));
+		// the LoRA record has no time.step grid: before, it went to "Not measured here" while time.total stayed
+		expect(rec.predictions.grids.some((g) => g.target_id === "time.step")).toBe(false);
+		expect(moved["time.step"]?.status).toBe("predicted");
+		expect(moved["time.step"]?.point).toBeCloseTo(here["time.step"]!.point!, 9);
+		expect(moved["time.total"]?.status).not.toBe("abstain");
+		// without independent_of the old behaviour stands
+		expect(grid.predict(base, at(base, { lr: 0.0002 }))["time.step"]?.status).toBe("abstain");
+	});
+
+	it("follows B's families: a knob free for time but not memory leaves memory's estimate", () => {
+		const grids = base.predictions.grids.map((g) => ({ ...g, independent_of: g.target_id.startsWith("memory") || g.target_id === "risk.oom" ? [] : ["lr"] }));
+		const rec = { ...base, predictions: { ...base.predictions, grids } } as LoadedRecord;
+		const moved = grid.predict(rec, at(rec, { lr: 0.0002 }));
+		expect(moved["time.step"]?.status).toBe("predicted");
+		expect(moved["memory.peak"]?.status).toBe("abstain");
+	});
+
 	it("reads an absent or null list as no free knobs", () => {
 		expect(freeKnobs({}).size).toBe(0);
 		expect(freeKnobs({ independent_of: null }).size).toBe(0);

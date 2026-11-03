@@ -430,5 +430,6 @@ describe("helpers", () => {
 		const cmd = { ...gold, job: { ...gold.job, source: { kind: "command", uri: "command://lm_eval", args: words, entrypoint: "preflight_command.py" } } } as unknown as LoadedRecord;
 		expect(commandText(input(cmd))).toBe("lm_eval --model hf --model_args pretrained=gpt2 --tasks gsm8k");
 		expect(recheckText(input(cmd))).toBeNull();
+		expect(JSON.parse(configText(input(cmd))).job.entrypoint).toBeNull();
 	});
 });

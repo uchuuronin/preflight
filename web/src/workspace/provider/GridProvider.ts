@@ -90,11 +90,6 @@ function same(a: KnobValue | undefined, b: KnobValue | undefined): boolean {
 }
 
 /**
- * A grid answers a setting when every knob it doesn't put on an axis sits where the grid
- * holds it: at its `fixed` value, or, for a knob the grid never mentions, at the record's
- * current value. A knob moved away from either means this grid can't answer.
- */
-/**
  * The knobs a grid's target doesn't depend on (contract 0.6.4 `Grid.independent_of`: the learning rate,
  * warm-up, weight decay, clipping, LoRA alpha, PPO clip ranges, seed), so the grid answers at any value
  * of them. B emits it only with `engine.carry_free_knobs` on; absent, every knob off the axes must match.
@@ -103,6 +98,39 @@ export function freeKnobs(grid: Pick<Grid, "independent_of">): ReadonlySet<strin
 	return new Set(grid.independent_of ?? []);
 }
 
+/** A target's family, as B's `independent_of` reads it: memory.*, time.*, cost.*; risk.oom follows memory. */
+function familyOf(targetId: string): string {
+	return targetId === "risk.oom" ? "memory" : targetId.split(".", 1)[0]!;
+}
+
+const familyCache = new WeakMap<LoadedRecord, Map<string, ReadonlySet<string>>>();
+
+/**
+ * The knobs free for a target, whether or not it has a grid of its own (time.step has B's estimate at the
+ * record's setting but no grid): the knobs every grid of its family names in `independent_of` (none when a
+ * grid of the family names none, or the family has no grid). B carries a target's value across these
+ * knobs, so the record's own estimate still answers when only they moved (review, Nov 2).
+ */
+export function freeFor(record: LoadedRecord, targetId: string): ReadonlySet<string> {
+	let byFamily = familyCache.get(record);
+	if (!byFamily) {
+		byFamily = new Map();
+		for (const g of record.predictions.grids) {
+			const fam = familyOf(g.target_id);
+			const mine = freeKnobs(g);
+			const had = byFamily.get(fam);
+			byFamily.set(fam, had ? new Set([...had].filter((k) => mine.has(k))) : mine);
+		}
+		familyCache.set(record, byFamily);
+	}
+	return byFamily.get(familyOf(targetId)) ?? new Set();
+}
+
+/**
+ * A grid answers a setting when every knob it doesn't put on an axis sits where the grid
+ * holds it: at its `fixed` value, or, for a knob the grid never mentions, at the record's
+ * current value. A knob moved away from either means this grid can't answer.
+ */
 function applies(grid: Grid, record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
 	const onAxis = new Set(grid.axes.map((a) => a.knob_id));
 	const free = freeKnobs(grid);
@@ -239,15 +267,15 @@ function failedAt(record: LoadedRecord, grid: Grid, knobs: Readonly<Record<strin
 
 /** Every knob moved off the record's setting is a number inside its probed range: the probes
  * bracket this setting, and only the precomputed values are missing (PM, Nov 2). */
-function movedWithinProbed(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
-	const moved = record.knobs.filter((k) => !same(knobs[k.id], k.current));
+function movedWithinProbed(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>, free: ReadonlySet<string> = new Set()): boolean {
+	const moved = record.knobs.filter((k) => !free.has(k.id) && !same(knobs[k.id], k.current));
 	if (!moved.length || !moved.every((k) => typeof knobs[k.id] === "number" && !!k.probed_range && inProbedRange(record, k, knobs[k.id]!))) return false;
 	// A probe that ran out of memory at these values measured them: not a gap.
 	return !record.probes.some((p) => p.status === "oom" && moved.every((k) => same(p.knobs[k.id], knobs[k.id])));
 }
 
-function atCurrent(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): boolean {
-	return record.knobs.every((k) => same(knobs[k.id], k.current));
+function atCurrent(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>, free: ReadonlySet<string> = new Set()): boolean {
+	return record.knobs.every((k) => free.has(k.id) || same(knobs[k.id], k.current));
 }
 
 export class GridProvider implements PredictionProvider {
@@ -259,7 +287,6 @@ export class GridProvider implements PredictionProvider {
 
 	predict(record: LoadedRecord, knobs: Readonly<Record<string, KnobValue>>): Prediction {
 		const full = { ...currentKnobs(record), ...knobs };
-		const here = atCurrent(record, full);
 		const out: Prediction = {};
 		const fail = failureTarget(record);
 		let deriveRisk = false;
@@ -271,7 +298,10 @@ export class GridProvider implements PredictionProvider {
 			// an exact model that sees more than any grid does, like the eval pass), except that
 			// a "measured" label needs an observing probe here too.
 			const atHere = record.predictions.estimates?.[target.id];
-			if (here && atHere) {
+			// "Here" passes over the knobs B carries this target across (0.6.4 independent_of): with only the
+			// learning rate moved, the step time is still B's estimate, labelled predicted (no probe ran there).
+			const free = freeFor(record, target.id);
+			if (atHere && atCurrent(record, full, free)) {
 				out[target.id] = atHere.status === "measured" && !seen ? { ...atHere, status: "predicted" } : atHere;
 				continue;
 			}
@@ -283,7 +313,7 @@ export class GridProvider implements PredictionProvider {
 				if (target.id === fail && !onGridPoints(grid, full)) deriveRisk = true;
 				continue;
 			}
-			out[target.id] = abstained(target, grids[0]?.model_id ?? atHere?.model_id ?? "none", movedWithinProbed(record, full) ? "between_measured" : "off_grid");
+			out[target.id] = abstained(target, grids[0]?.model_id ?? atHere?.model_id ?? "none", movedWithinProbed(record, full, free) ? "between_measured" : "off_grid");
 		}
 		// Between grid points, P(OOM) comes from interpolated memory, never from interpolating
 		// the probability itself (record/oom.ts).

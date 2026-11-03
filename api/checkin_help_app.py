@@ -93,7 +93,6 @@ def summary(rec: dict | None) -> dict:
 	src = (rec.get("job") or {}).get("source") or {}
 	return {
 		"source": {k: src.get(k) for k in ("kind", "entrypoint", "scope", "extra_packages")},
-		"files_read": len(src.get("files") or {}) if isinstance(src.get("files"), dict) else None,
 		"lens": (rec.get("job") or {}).get("lens"),
 		"probes": [
 			{

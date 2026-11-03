@@ -314,8 +314,14 @@ def test_a_command_off_the_list_or_empty_is_refused_before_the_queue(monkeypatch
 	assert empty.status_code == 422
 	long = c.post(
 		"/v1/jobs",
-		json={**BODY, "source": {"kind": "command", "args": ["lm_eval", *["--x"] * 300]}},
+		json={**BODY, "source": {"kind": "command", "args": ["lm_eval", *["--x"] * 64]}},
 		headers={"Idempotency-Key": "k" * 13},
 	)
 	assert long.status_code == 422
+	nul = c.post(
+		"/v1/jobs",
+		json={**BODY, "source": {"kind": "command", "args": ["lm_eval", "--tasks", "a\u0000b"]}},
+		headers={"Idempotency-Key": "k" * 14},
+	)
+	assert nul.status_code == 422
 	assert not store.jobs

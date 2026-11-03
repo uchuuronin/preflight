@@ -63,18 +63,18 @@ def _seconds(value: float | None, default: int = 60) -> int:
 
 # A check-in by command (contract 0.6.3, runner.command_checkin, A's ask Nov 2): the whole command line as
 # the source's args, e.g. ["lm_eval", "--model", "hf", ...]. The runner reads it (runner/sources.py
-# `_command`) and refuses a command off its list; this answers the visitor before anything is queued.
-MAX_COMMAND_WORDS = 256  # source: guess, an lm_eval line with every option is about 30 words
-MAX_COMMAND_CHARS = 8_192  # source: A's runner/sources.py MAX_COMMAND_CHARS
+# `_command`, then `_args`) and refuses what this lets through, after it has used one of the visitor's
+# daily jobs; so this checks the same limits first, read from the runner where it can be.
 
 
-def _commands() -> tuple[str, ...]:
-	"""The command names the runner runs (A's `preflight.runner.sources.COMMANDS`)."""
+def _command_rules() -> tuple[tuple[str, ...], int, int, int]:
+	"""The command names, and the runner's limits: words, characters a word, characters in all."""
 	try:
-		from preflight.runner.sources import COMMANDS
+		from preflight.runner.sources import COMMANDS, MAX_ARG_LEN, MAX_ARGS, MAX_COMMAND_CHARS
 	except Exception:
-		return ("lm_eval",)
-	return tuple(sorted(COMMANDS))
+		# source: A's runner/sources.py as of Nov 2, if the runner's module can't be read here
+		return ("lm_eval",), 64, 4096, 8192
+	return tuple(sorted(COMMANDS)), MAX_ARGS, MAX_ARG_LEN, MAX_COMMAND_CHARS
 
 
 def _check_command(source) -> None:
@@ -84,14 +84,22 @@ def _check_command(source) -> None:
 			"invalid_request",
 			"Checking in by command isn't open here yet; check in the repository or a script.",
 		)
+	known, max_words, max_word, max_chars = _command_rules()
 	words = list(source.args or [])
 	if not words or not words[0].strip():
 		raise ApiError(
 			422, "invalid_request", "Name the command to run, as its words: lm_eval --model hf ..."
 		)
-	if len(words) > MAX_COMMAND_WORDS or sum(len(w) for w in words) > MAX_COMMAND_CHARS:
-		raise ApiError(422, "invalid_request", "That command is longer than Preflight takes.")
-	known = _commands()
+	if (
+		len(words) > max_words
+		or sum(len(w) for w in words) > max_chars
+		or any(len(w) > max_word or "\0" in w for w in words)
+	):
+		raise ApiError(
+			422,
+			"invalid_request",
+			f"A command here is up to {max_words} words of up to {max_word:,} characters each.",
+		)
 	if words[0] not in known:
 		raise ApiError(422, "invalid_request", f"Preflight runs these commands by name: {', '.join(known)}.")
 

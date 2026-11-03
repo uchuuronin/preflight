@@ -39,12 +39,35 @@ function useWidth(): [(el: HTMLDivElement | null) => void, number] {
 	return [setEl, w];
 }
 
-export function RangeTestCurve({ test, value, choices, onPick }: { test: Test; value: KnobValue | undefined; choices: readonly KnobValue[]; onPick: (v: number) => void }) {
+export function RangeTestCurve({ test, value, choices, onPick }: { test: Test; value: KnobValue | undefined; choices: readonly KnobValue[]; onPick?: ((v: number) => void) | null }) {
 	const id = useId();
 	const [hover, setHover] = useState<number | null>(null);
 	const rate = typeof value === "number" && value > 0 ? value : null;
 	const byRate = test.checked && test.points.length > 1 && test.points.every((p) => p.lr !== null);
 
+	if (test.points.length < 2) {
+		// Nothing to draw (the recorder couldn't read the loss): the words alone (review, Nov 2).
+		return (
+			<figure className="pf-lrr" aria-labelledby={`${id}-cap`}>
+				<figcaption id={`${id}-cap`} className="pf-lrr__cap">
+					<b>{t("lrr.title")}</b>
+				</figcaption>
+				<p className="pf-lrr__said">{t("lrr.no_curve")}</p>
+			</figure>
+		);
+	}
+	return <Curve test={test} rate={rate} choices={choices} onPick={onPick ?? null} byRate={byRate} id={id} hover={hover} setHover={setHover} />;
+}
+
+/** The words under the curve: the flat curve, why no rate is read, or where the run's rate sits. */
+function said(test: Test, byRate: boolean, verdict: ReturnType<typeof rateVerdict>, rate: number | null): string {
+	if (test.flat) return t("lrr.flat");
+	if (!byRate) return test.checked ? t("lrr.too_few") : t(`lrr.unchecked.${test.reasons[0] ?? "unverified"}`);
+	if (verdict === "unknown") return rate === null ? t("lrr.no_rate") : t("lrr.verdict.unknown");
+	return t(`lrr.verdict.${verdict}`, { v: rate ? rateText(rate) : "" });
+}
+
+function Curve({ test, rate, choices, onPick, byRate, id, hover, setHover }: { test: Test; rate: number | null; choices: readonly KnobValue[]; onPick: ((v: number) => void) | null; byRate: boolean; id: string; hover: number | null; setHover: (v: number | null) => void }) {
 	const [plotRef, W] = useWidth();
 	const IW = W - PAD.l - PAD.r;
 	const smooth = useMemo(() => smoothed(test.points.map((p) => p.loss)), [test]);
@@ -108,13 +131,13 @@ export function RangeTestCurve({ test, value, choices, onPick }: { test: Test; v
 			</figcaption>
 			<div
 				ref={plotRef}
-				className={`pf-lrr__plot${byRate ? " is-live" : ""}`}
+				className={`pf-lrr__plot${byRate && onPick ? " is-live" : ""}`}
 				onPointerMove={(e) => setHover(pickAt(e.clientX, e.currentTarget.getBoundingClientRect()))}
 				onPointerLeave={() => setHover(null)}
 				onClick={(e) => {
 					const r = pickAt(e.clientX, e.currentTarget.getBoundingClientRect());
 					const v = r !== null ? nearestRate(choices, r) : null;
-					if (v !== null) onPick(v);
+					if (v !== null) onPick?.(v);
 				}}
 			>
 				<svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary}>
@@ -152,16 +175,16 @@ export function RangeTestCurve({ test, value, choices, onPick }: { test: Test; v
 						</g>
 					) : null}
 				</svg>
-				{byRate && hover !== null && hoverChoice !== null ? (
+				{byRate && onPick && hover !== null && hoverChoice !== null ? (
 					<span className="pf-lrr__tip" aria-hidden="true">
 						{t("lrr.click_to", { v: rateText(hoverChoice) })}
 					</span>
 				) : null}
 			</div>
 			<p className={`pf-lrr__said is-${verdict}`} aria-live="polite">
-				{test.flat ? t("lrr.flat") : !byRate ? t(`lrr.unchecked.${test.reasons[0] ?? "unverified"}`) : t(`lrr.verdict.${verdict}`, { v: rate ? rateText(rate) : "" })}
+				{said(test, byRate, verdict, rate)}
 			</p>
-			{byRate && nearSuggested !== null && nearSuggested !== rate ? (
+			{byRate && onPick && nearSuggested !== null && nearSuggested !== rate ? (
 				<button type="button" className="pf-link" onClick={() => onPick(nearSuggested)}>
 					{t("lrr.use", { v: rateText(nearSuggested) })}
 				</button>
