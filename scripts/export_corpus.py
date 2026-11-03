@@ -50,6 +50,7 @@ def export(store: str, divergence: str, out: Path, divergence_real: str | None =
 	out.mkdir(parents=True, exist_ok=True)
 	path = out / f"preflight-corpus-{VERSION}.jsonl.gz"
 	counts: collections.Counter = collections.Counter()
+	skipped: collections.Counter = collections.Counter()
 	seen = set()
 	# a fixed mtime keeps the gzip bytes, and so the checksum, the same for the same rows
 	with open(path, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as gz:
@@ -64,7 +65,7 @@ def export(store: str, divergence: str, out: Path, divergence_real: str | None =
 				if (
 					own and own != kind
 				):  # review, Nov 2: the realistic sweep's rows never go out labelled as the Nov 1 sweep
-					counts[("skipped: kind " + own, row.get("gpu"), row.get("status"), "none")] += 1
+					skipped[own] += 1  # reported apart, never counted as a published row
 					continue
 				ident = (kind, row.get("gpu"), row.get("key"))
 				if ident in seen:  # each config is written once per GPU; a repeat would double-count
@@ -81,6 +82,7 @@ def export(store: str, divergence: str, out: Path, divergence_real: str | None =
 		"bytes": path.stat().st_size,
 		"sha256": digest,
 		"rows": sum(counts.values()),
+		"skipped_by_kind": dict(skipped),
 		"by": [
 			{"kind": k, "gpu": g, "status": s, "split": sp, "rows": n}
 			for (k, g, s, sp), n in sorted(counts.items(), key=str)

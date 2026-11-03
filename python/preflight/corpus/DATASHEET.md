@@ -8,7 +8,7 @@ Following *Datasheets for Datasets* (Gebru et al.). Version: **corpus 0.4.0, fin
 
 **Why it exists.** Preflight predicts a training job's memory, step time and cost from a few minutes of probes, and every prediction carries an interval. Those intervals have to be checked on runs the models never saw. The corpus is that check. It was generated on purpose: each config is a probe-like job measured on real GPUs, so calibration data looks like what users send.
 
-**Who paid.** Modal credits on the team's account: about $10 for the Oct 28 to Nov 1 NVIDIA slices, about $16.54 for the Nov 1 top-up and about $3.78 for the Nov 2 realistic divergence sweep [ledger, `docs/status/b.md`]; the MI300X slice ran on a rented AMD Developer Cloud MI300X, $8.86 by the sweep's own uptime count [ledger]. Per run, see `docs/status/b.md`.
+**Who paid.** Modal credits on the team's account: about $9.60 for the Oct 28 to 31 timing slices (the ledger counts each config's GPU-seconds; Modal's bill, which also counts container start-up, is higher: `b-corpus-l4` alone was billed an estimated $4.50 to $6.40 against its $0.88 in the ledger), about $11.55 for the Nov 1 divergence sweep with its smoke runs, about $16.54 for the Nov 1 top-up and about $3.78 for the Nov 2 realistic divergence sweep [ledger, `docs/status/b.md`]; the MI300X slice ran on a rented AMD Developer Cloud MI300X, $8.86 by the sweep's own uptime count [ledger]. The Muse Spark Open labels below were Baseten credit: $0.70 and $8.79. Per run, see `docs/status/b.md`.
 
 ## Composition
 
@@ -95,11 +95,12 @@ The corpus was collected between Oct 28 and Nov 2, 2026: the NVIDIA rows on Moda
 
 ## Known biases and limits
 
-- **Small models.** Everything is sized for a single 24 GB card. Grouped models range from 0.9M to 667M parameters, with a median of 24M. The HF checkpoints range from 360M to 1.7B. Multi-GPU, FSDP, and models that need 80 GB aren't covered.
+- **Small models.** Everything is sized for a single 24 GB card. Grouped models range from 0.9M to 670M parameters, with a median of 24M. The HF checkpoints range from 360M to 1.7B. Multi-GPU, FSDP, and models that need 80 GB aren't covered.
 - **GPU mix.** A10 and L4 dominate, then L40S and H100, with T4 small and the A100 boards as a holdout. T4 has fp32 and fp16 groups only, because it has no bf16 path. **One AMD GPU, the MI300X** (Nov 2, a rented AMD Developer Cloud machine, ROCm 6.4.4 host): 295 configs of 59 groups, the same configs as the NVIDIA GPUs, on torch 2.5.1+rocm6.2 where the NVIDIA rows are torch 2.8.0, so a cross-vendor difference mixes the card with the software stack. They are a holdout: scored once for NVIDIA to MI300X step time and never calibrated on. No other AMD card, and no Intel or Apple GPU.
-- **Modal picks the A100 board.** A request for an A100-80GB landed on PCIe or SXM. Rows are filed under the board they ran on.
+- **Modal picks the board.** A request for an A100-80GB landed on PCIe or SXM, and rows are filed under the board they ran on. A request for an A10 sometimes lands on an A10G (about 11% slower on one LoRA script); those rows are filed as `A10` (70 of them: 16 timing rows, 12 HF jobs and 42 realistic divergence runs), and `env.device_name` says "NVIDIA A10G".
 - **Short windows.** Five timed steps after two warm-up steps. Long-run effects (thermal throttling, allocator fragmentation, data-loader stalls) aren't in it; the zoo's full runs show two of them matter (a loader that stalls only after its prefetch drains, an allocator pool that keeps growing for epochs).
 - **Op tables count device time three times.** The worker kept profiler ranges, aten ops and the CUDA kernels under them, each with its own self device time, and together they sum to about 2.6× the step. Use the `aten::` rows alone, which cover about 0.9 of the step (`scripts/fit_steptime_gbdt.py`). The next corpus version keeps one view.
+- **Version strings.** Every row's `config.versions.corpus` says `corpus@0.3.0`: that is the worker code's version, part of the key, and it didn't change; 0.4.0 is the published file's version.
 - **Repeated configs.** The sampler for "100 grouped configs" drew 95 distinct ones on the A100. Counts above are distinct rows.
 - **Synthetic inputs.** Random tokens give every row the same length, so padding and length variation aren't measured. Preflight's own probes measure them on the user's data.
 
