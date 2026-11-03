@@ -1,0 +1,3292 @@
+{
+	"schema_version": "0.6.2",
+	"record_id": "01M6F80EZW4WY7T2TBF6KZ053P",
+	"created_at": "2026-11-02T23:02:46Z",
+	"job": {
+		"lens": "gnn",
+		"source": {
+			"kind": "sample",
+			"uri": "sample://zoo/gnn_pyg",
+			"content_hash": "sha256:dff6aca9b3c103b7181d5b3d3f9d00829478950b6e82da34a6cd5240ec0555ec",
+			"entrypoint": "train.py",
+			"args": []
+		},
+		"framework": "pyg",
+		"script_map": {
+			"lens": "gnn",
+			"framework": "pyg",
+			"entrypoint": "train.py",
+			"launch": "python train.py",
+			"model": {
+				"name": "SAGEConv",
+				"family": "gnn",
+				"n_layers": 3,
+				"d_model": 256,
+				"shape_source": "modules"
+			},
+			"data": {
+				"dataset": "FakeDataset",
+				"batch_size": 1024,
+				"n_examples": 200000,
+				"languages": []
+			},
+			"training": {
+				"optimizer": "Adam",
+				"lr": 0.003,
+				"warmup_steps": 0,
+				"grad_accum": 1,
+				"precision": "fp32",
+				"max_steps": 471,
+				"epochs": 3.0,
+				"grad_checkpointing": false,
+				"distributed": "none"
+			},
+			"loop": {
+				"kind": "plain",
+				"location": {
+					"file": "train.py",
+					"line": 131,
+					"expr": "opt.step()"
+				},
+				"step_call": "opt.step()",
+				"model_var": "model",
+				"optimizer_var": "opt"
+			},
+			"knobs": [
+				{
+					"id": "batch_size",
+					"label": "Batch size",
+					"kind": "int",
+					"current": 1024,
+					"unit": "samples",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 43,
+						"expr": "BATCH_SIZE = 1024"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "epochs",
+					"label": "Epochs",
+					"kind": "int",
+					"current": 3,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 44,
+						"expr": "EPOCHS = 3"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "fanout.hop1",
+					"label": "Fanout hop1",
+					"kind": "int",
+					"current": 15,
+					"unit": "nodes",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 126,
+						"expr": "num_neighbors=[15, 25, 25]"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "fanout.hop2",
+					"label": "Fanout hop2",
+					"kind": "int",
+					"current": 25,
+					"unit": "nodes",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 126,
+						"expr": "num_neighbors=[15, 25, 25]"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "fanout.hop3",
+					"label": "Fanout hop3",
+					"kind": "int",
+					"current": 25,
+					"unit": "nodes",
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 126,
+						"expr": "num_neighbors=[15, 25, 25]"
+					},
+					"needs_code": false
+				},
+				{
+					"id": "lr",
+					"label": "Learning rate",
+					"kind": "float",
+					"current": 0.003,
+					"choices": [],
+					"location": {
+						"file": "train.py",
+						"line": 45,
+						"expr": "LR = 3e-3"
+					},
+					"needs_code": false
+				}
+			],
+			"blocks": [
+				{
+					"id": "sage",
+					"label": "SAGE",
+					"kind": "module",
+					"repeat": 1
+				},
+				{
+					"id": "sage_conv_0",
+					"label": "SAGEConv(128 -> 256)",
+					"kind": "module",
+					"parent": "sage",
+					"repeat": 1
+				},
+				{
+					"id": "sage_conv_1",
+					"label": "SAGEConv(256 -> 256)",
+					"kind": "module",
+					"parent": "sage",
+					"repeat": 1
+				},
+				{
+					"id": "sage_conv_2",
+					"label": "SAGEConv(256 -> 47)",
+					"kind": "module",
+					"parent": "sage",
+					"repeat": 1
+				}
+			],
+			"risks": [
+				"Trains for 3 epochs, so every document repeats 3 times; repeated low-quality data costs more than unique data (give per-document quality scores for the repetition view)",
+				"Outer-hop fan-out 15 x 25 x 25 samples up to 9375 neighbors per seed and dominates memory and time.",
+				"Entire graph, features and labels are moved to GPU with .cuda() and may exceed GPU memory.",
+				"Synthetic FakeDataset random edges carry no signal so accuracy cannot show sampling trade-off.",
+				"Custom CPU neighbor sampler uses torch.rand per hop and may be slow."
+			],
+			"produced_by": "muse_spark",
+			"confidence": 0.9
+		},
+		"objective": {
+			"kind": "min_time",
+			"weights": {}
+		},
+		"constraints": {
+			"gpu_types": [
+				"A10"
+			],
+			"preemption": {
+				"kind": "none"
+			}
+		}
+	},
+	"env": {
+		"backend": "cuda",
+		"provider": "local",
+		"gpu": {
+			"name": "A10",
+			"count": 1,
+			"memory_bytes": 23684186112,
+			"vendor": "nvidia",
+			"compute_capability": "8.6"
+		},
+		"nodes": 1,
+		"libraries": {
+			"torch": "2.5.1",
+			"transformers": "4.46.3",
+			"peft": "0.13.2",
+			"trl": "0.14.0",
+			"accelerate": "1.1.1",
+			"datasets": "3.1.0",
+			"torch-geometric": "2.6.1"
+		},
+		"python": "3.11.12"
+	},
+	"graph": {
+		"nodes": [
+			{
+				"id": "graph",
+				"label": "Graph store",
+				"kind": "store",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "sampler",
+				"label": "Neighbour sampler (CPU) · 15 × 25 × 25",
+				"kind": "phase",
+				"repeat": 1,
+				"metrics": [
+					"probe.data.loader_wait_fraction"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "gnn",
+				"label": "SAGEConv",
+				"kind": "group",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "layer",
+				"label": "Message-passing layer",
+				"kind": "module",
+				"parent": "gnn",
+				"repeat": 3,
+				"metrics": [],
+				"attrs": {}
+			},
+			{
+				"id": "loss",
+				"label": "Loss",
+				"kind": "loss",
+				"repeat": 1,
+				"metrics": [
+					"probe.stability.loss"
+				],
+				"attrs": {}
+			},
+			{
+				"id": "optimizer",
+				"label": "Optimizer",
+				"kind": "optimizer",
+				"repeat": 1,
+				"metrics": [],
+				"attrs": {}
+			}
+		],
+		"edges": [
+			{
+				"source": "graph",
+				"target": "sampler",
+				"kind": "data"
+			},
+			{
+				"source": "sampler",
+				"target": "layer",
+				"kind": "data",
+				"metric": "probe.throughput.samples_per_s"
+			},
+			{
+				"source": "layer",
+				"target": "loss",
+				"kind": "data"
+			},
+			{
+				"source": "loss",
+				"target": "optimizer",
+				"kind": "grad"
+			},
+			{
+				"source": "optimizer",
+				"target": "layer",
+				"kind": "weights"
+			}
+		],
+		"skeleton": true
+	},
+	"knobs": [
+		{
+			"id": "gpu_type",
+			"label_key": "knob.gpu_type",
+			"kind": "categorical",
+			"domain": {
+				"values": [
+					"A10"
+				],
+				"log": false
+			},
+			"current": "A10",
+			"gridded": false,
+			"needs_code": false,
+			"group": "cluster",
+			"affects": [
+				"gnn"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "epochs",
+			"label_key": "knob.epochs",
+			"kind": "int",
+			"domain": {
+				"min": 0.0,
+				"max": 30.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 3,
+			"probed_range": {
+				"min": 3.0,
+				"max": 3.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "data",
+			"affects": [
+				"sampler"
+			],
+			"changes_results": true
+		},
+		{
+			"id": "batch_size",
+			"label_key": "knob.batch_size",
+			"unit": "samples",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 16384.0,
+				"values": [],
+				"step": 1.0,
+				"log": true
+			},
+			"current": 1024,
+			"probed_range": {
+				"min": 256.0,
+				"max": 1024.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"sampler",
+				"gnn"
+			]
+		},
+		{
+			"id": "fanout.hop1",
+			"label_key": "knob.fanout.hop1",
+			"unit": "nodes",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 100.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 15,
+			"probed_range": {
+				"min": 15.0,
+				"max": 15.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"sampler"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "fanout.hop2",
+			"label_key": "knob.fanout.hop2",
+			"unit": "nodes",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 100.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 25,
+			"probed_range": {
+				"min": 25.0,
+				"max": 25.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"sampler"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "fanout.hop3",
+			"label_key": "knob.fanout.hop3",
+			"unit": "nodes",
+			"kind": "int",
+			"domain": {
+				"min": 1.0,
+				"max": 100.0,
+				"values": [],
+				"step": 1.0,
+				"log": false
+			},
+			"current": 25,
+			"probed_range": {
+				"min": 25.0,
+				"max": 25.0
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "memory",
+			"affects": [
+				"sampler"
+			],
+			"changes_results": false
+		},
+		{
+			"id": "lr",
+			"label_key": "knob.lr",
+			"kind": "float",
+			"domain": {
+				"min": 3e-05,
+				"max": 0.3,
+				"values": [],
+				"log": true
+			},
+			"current": 0.003,
+			"probed_range": {
+				"min": 0.003,
+				"max": 0.003
+			},
+			"gridded": false,
+			"needs_code": false,
+			"group": "model",
+			"affects": [
+				"optimizer"
+			],
+			"changes_results": true
+		}
+	],
+	"probes": [
+		{
+			"id": "p1",
+			"knobs": {
+				"batch_size": 1024
+			},
+			"status": "ok",
+			"steps": 14,
+			"started_at": "2026-11-02T23:03:24Z",
+			"duration_s": 16.943,
+			"memory": {
+				"peak_allocated_bytes": 2619811840,
+				"peak_reserved_bytes": 4737466368,
+				"by_term": {
+					"weights": 884924,
+					"gradients": 884924,
+					"optimizer": 1769884,
+					"activations": 2616272108
+				},
+				"peak_step": 2
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.05639270477294922,
+				"p50_s": 0.05612953567504883,
+				"p95_s": 0.05754265594482422,
+				"first_step_s": 7.718288764,
+				"by_phase": {
+					"data": 0.0,
+					"forward": 0.0,
+					"backward": 0.36428990284480023,
+					"optimizer": 0.006598071216953891,
+					"other": 0.6291120259382459
+				},
+				"unprofiled": true
+			},
+			"throughput": {},
+			"stability": {
+				"series": {
+					"loss": [
+						13.747398376464844,
+						18.645132064819336,
+						25.053064346313477,
+						25.21006965637207,
+						22.164779663085938,
+						20.36786460876465,
+						16.010644912719727,
+						14.754620552062988,
+						11.735079765319824,
+						9.247438430786133,
+						8.133476257324219,
+						6.784002780914307,
+						5.849491596221924,
+						4.679494857788086
+					],
+					"grad_norm": [
+						160.56082153320312,
+						221.13589477539062,
+						226.35255432128906,
+						325.1856689453125,
+						243.6376953125,
+						188.8019561767578,
+						124.4106674194336,
+						78.93224334716797,
+						67.95347595214844,
+						37.73667907714844,
+						28.307422637939453,
+						23.76791763305664,
+						18.27660369873047,
+						10.221489906311035
+					],
+					"grad_norm_ma": [
+						160.56082153320312,
+						190.84835815429688,
+						202.68309020996094,
+						233.30873489379883,
+						235.37452697753906,
+						227.61243184407553,
+						212.86932264055525,
+						196.12718772888184,
+						181.88566419813367,
+						167.47076568603515,
+						154.81955268166283,
+						143.89858309427896,
+						134.235353910006,
+						125.37722076688495
+					],
+					"update_to_weight": [
+						0.061784710735082626,
+						0.044239114969968796,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.0189548684284091,
+						0.01729042548686266,
+						0.015839187894016504,
+						0.014649545075371861,
+						0.013574220472946763,
+						0.012698202161118388,
+						0.011830155039206147
+					],
+					"output_logit_norm": [
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null
+					],
+					"lr": [
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"loader_wait_fraction": 0.0
+			},
+			"power": {
+				"mean_w": 31.162171428571426,
+				"max_w": 162.538,
+				"samples": 35
+			},
+			"extras": {
+				"params_total": 221231.0,
+				"params_trainable": 221231.0,
+				"tokens_per_step": 0.0,
+				"samples_per_step": 0.0,
+				"micro_steps_per_step": 1.0,
+				"host_rss_peak_bytes": 5369270272.0,
+				"gpu_wait_s": 2.6
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 7.718288764,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2593298432,
+					"peak_reserved_bytes": 2885681152,
+					"device_used_bytes": 3221422080,
+					"reserved_bytes": 2885681152
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.0559156440000006,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2619811840,
+					"peak_reserved_bytes": 4735369216,
+					"device_used_bytes": 5071110144,
+					"reserved_bytes": 4735369216
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.05754265594482422,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2611215872,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.05612953567504883,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2612839424,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.056384513854980466,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2613539840,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.05586739349365234,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2607588352,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.05603942489624023,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2610059264,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 8,
+					"kind": "phase",
+					"wall_s": 0.055553708999999785,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2616781824,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.05538795500000049,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2613640704,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 10,
+					"kind": "profiled",
+					"wall_s": 0.05544732700000132,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2605130240,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5073207296,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 11,
+					"kind": "profiled",
+					"wall_s": 0.07904767000000135,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2612948992,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 12,
+					"kind": "profiled",
+					"wall_s": 0.057473496000001845,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2602354688,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 13,
+					"kind": "profiled",
+					"wall_s": 0.057089000999999584,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2612195840,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4737466368
+				},
+				{
+					"index": 14,
+					"kind": "profiled",
+					"wall_s": 0.05746116599999773,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 2617082880,
+					"peak_reserved_bytes": 4737466368,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4737466368
+				}
+			],
+			"kernels": {
+				"rows": [
+					{
+						"name": "aten::mm",
+						"kernel_class": "gemm",
+						"calls": 13.0,
+						"device_s": 0.011223573333333325,
+						"flops": 194937910272.0,
+						"bytes": 4193873128.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::index_select",
+						"kernel_class": "index",
+						"calls": 3.0,
+						"device_s": 0.008726820666666666,
+						"bytes": 1042236386.6666666,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::addmm",
+						"kernel_class": "gemm",
+						"calls": 3.0,
+						"device_s": 0.005702031999999996,
+						"flops": 44243411968.0,
+						"bytes": 962012804.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::scatter_add_",
+						"kernel_class": "index",
+						"calls": 6.0,
+						"device_s": 0.00497267333333335,
+						"bytes": 7304602760.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::div",
+						"kernel_class": "elementwise",
+						"calls": 9.0,
+						"device_s": 0.0038223080000000134,
+						"bytes": 2771629056.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::add",
+						"kernel_class": "elementwise",
+						"calls": 9.0,
+						"device_s": 0.0029019603333333304,
+						"flops": 112391107.33333333,
+						"bytes": 1378217733.3333333,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_unique2",
+						"kernel_class": "index",
+						"calls": 4.0,
+						"device_s": 0.002678555666666707,
+						"bytes": 62836618.666666664,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::threshold_backward",
+						"kernel_class": "elementwise",
+						"calls": 2.0,
+						"device_s": 0.002527707666666657,
+						"bytes": 1231835136.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::add_",
+						"kernel_class": "elementwise",
+						"calls": 2.0,
+						"device_s": 0.0025266736666666643,
+						"bytes": 1231835136.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::index_add_",
+						"kernel_class": "index",
+						"calls": 2.0,
+						"device_s": 0.0021103610000000094,
+						"bytes": 1294828548.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::fill_",
+						"kernel_class": "memset",
+						"calls": 16.0,
+						"device_s": 0.001983649666666659,
+						"bytes": 1961353565.3333333,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::clamp_min",
+						"kernel_class": "elementwise",
+						"calls": 2.0,
+						"device_s": 0.001686144333333336,
+						"bytes": 821223424.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::index",
+						"kernel_class": "index",
+						"calls": 28.0,
+						"device_s": 0.0010939256666666862,
+						"bytes": 547487008.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::sum",
+						"kernel_class": "reduction",
+						"calls": 3.0,
+						"device_s": 0.0010158583333333422,
+						"bytes": 896609168.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::gather",
+						"kernel_class": "index",
+						"calls": 2.0,
+						"device_s": 0.0007779470000000002,
+						"bytes": 1293474474.6666667,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::cat",
+						"kernel_class": "copy",
+						"calls": 5.0,
+						"device_s": 0.0004036723333333151,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::copy_",
+						"kernel_class": "copy",
+						"calls": 10.0,
+						"device_s": 0.00018239933333334292,
+						"bytes": 96601936.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::nonzero",
+						"kernel_class": "index",
+						"calls": 9.0,
+						"device_s": 8.148333333333123e-05,
+						"bytes": 3779536.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::mul",
+						"kernel_class": "elementwise",
+						"calls": 4.0,
+						"device_s": 7.818766666666775e-05,
+						"flops": 3927800.6666666665,
+						"bytes": 32052328.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::linalg_vector_norm",
+						"kernel_class": "reduction",
+						"calls": 9.0,
+						"device_s": 5.8241333333324295e-05,
+						"bytes": 3145800.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::uniform_",
+						"kernel_class": "memset",
+						"calls": 3.0,
+						"device_s": 3.664033333334237e-05,
+						"bytes": 31414213.333333332,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_addcdiv_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 3.5158333333328e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_div_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 3.356799999999688e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_sqrt",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 2.2144000000002656e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_local_scalar_dense",
+						"kernel_class": "host",
+						"calls": 34.0,
+						"device_s": 2.06626666666957e-05,
+						"bytes": 32.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_index_put_impl_",
+						"kernel_class": "index",
+						"calls": 2.0,
+						"device_s": 1.915733333332658e-05,
+						"bytes": 77984184.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_lerp_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 1.7727999999995518e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_mul_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 1.6010666666666415e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::nll_loss_forward",
+						"kernel_class": "loss",
+						"calls": 1.0,
+						"device_s": 1.4058666666671344e-05,
+						"bytes": 389120.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::sub",
+						"kernel_class": "elementwise",
+						"calls": 7.0,
+						"device_s": 1.2192000000000575e-05,
+						"bytes": 4249064.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_addcmul_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 1.197866666666717e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::gt",
+						"kernel_class": "elementwise",
+						"calls": 7.0,
+						"device_s": 1.0794000000011788e-05,
+						"bytes": 1259845.3333333333,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_norm",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 1.0592333333329104e-05,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::nll_loss_backward",
+						"kernel_class": "loss",
+						"calls": 1.0,
+						"device_s": 9.557333333335313e-06,
+						"bytes": 389120.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_foreach_add_",
+						"kernel_class": "optimizer",
+						"calls": 1.0,
+						"device_s": 9.31200000000293e-06,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::max",
+						"kernel_class": "reduction",
+						"calls": 1.0,
+						"device_s": 8.896000000004278e-06,
+						"bytes": 1603952.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::clamp",
+						"kernel_class": "elementwise",
+						"calls": 3.0,
+						"device_s": 7.487666666652633e-06,
+						"bytes": 4811856.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::arange",
+						"kernel_class": "memset",
+						"calls": 2.0,
+						"device_s": 4.619000000008782e-06,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::remainder",
+						"kernel_class": "elementwise",
+						"calls": 1.0,
+						"device_s": 2.6453333333435388e-06,
+						"bytes": 8192.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_log_softmax_backward_data",
+						"kernel_class": "softmax",
+						"calls": 1.0,
+						"device_s": 1.930333333334905e-06,
+						"bytes": 577536.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::_log_softmax",
+						"kernel_class": "softmax",
+						"calls": 1.0,
+						"device_s": 1.87733333332532e-06,
+						"bytes": 385024.0,
+						"dtype": "fp32"
+					},
+					{
+						"name": "aten::div_",
+						"kernel_class": "elementwise",
+						"calls": 1.0,
+						"device_s": 1.79199999999643e-06,
+						"bytes": 8192.0,
+						"dtype": "fp32"
+					}
+				],
+				"steps": 3,
+				"backend": "cuda",
+				"allow_tf32": false,
+				"classified_by": "engine.steptime"
+			},
+			"cost": {
+				"gpu_seconds": 16.943,
+				"usd": 0.005177
+			},
+			"cache_key": "sha256:128b108b6f7c1e2be62c6a43003a096c18d83adcbb78b38ca728e18b45bf3dc7"
+		},
+		{
+			"id": "p2",
+			"knobs": {
+				"batch_size": 512
+			},
+			"status": "ok",
+			"steps": 9,
+			"started_at": "2026-11-02T23:03:41Z",
+			"duration_s": 10.295,
+			"memory": {
+				"peak_allocated_bytes": 1964204544,
+				"peak_reserved_bytes": 4750049280,
+				"by_term": {
+					"weights": 884924,
+					"gradients": 884924,
+					"optimizer": 1769884,
+					"activations": 1960664812
+				},
+				"peak_step": 5
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.04865351715087891,
+				"p50_s": 0.04841984176635742,
+				"p95_s": 0.04983910369873047,
+				"first_step_s": 6.120269293,
+				"by_phase": {
+					"data": 0.0,
+					"forward": 0.0,
+					"backward": 0.39458899840935274,
+					"optimizer": 0.009314784733053253,
+					"other": 0.5960962168575941
+				},
+				"unprofiled": true
+			},
+			"throughput": {},
+			"stability": {
+				"series": {
+					"loss": [
+						13.47824764251709,
+						19.81275177001953,
+						23.16114616394043,
+						22.82914161682129,
+						21.951601028442383,
+						17.68342399597168,
+						16.216787338256836,
+						12.03001880645752,
+						9.734379768371582
+					],
+					"grad_norm": [
+						171.63662719726562,
+						181.55165100097656,
+						254.6732177734375,
+						229.5994110107422,
+						213.4961700439453,
+						148.3414764404297,
+						164.15647888183594,
+						75.13619232177734,
+						53.58332061767578
+					],
+					"grad_norm_ma": [
+						171.63662719726562,
+						176.5941390991211,
+						202.62049865722656,
+						209.36522674560547,
+						210.19141540527343,
+						199.88309224446616,
+						194.77929033551897,
+						179.82390308380127,
+						165.7971716986762
+					],
+					"update_to_weight": [
+						0.061650073155760765,
+						0.04378338344395161,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.019014023710042238,
+						0.01746759843081236
+					],
+					"output_logit_norm": [
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null
+					],
+					"lr": [
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"loader_wait_fraction": 0.0
+			},
+			"power": {
+				"mean_w": 24.233240000000002,
+				"max_w": 87.565,
+				"samples": 25
+			},
+			"extras": {
+				"params_total": 221231.0,
+				"params_trainable": 221231.0,
+				"tokens_per_step": 0.0,
+				"samples_per_step": 0.0,
+				"micro_steps_per_step": 1.0,
+				"host_rss_peak_bytes": 5367263232.0
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 6.120269293,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1932736512,
+					"peak_reserved_bytes": 2306867200,
+					"device_used_bytes": 2642608128,
+					"reserved_bytes": 2306867200
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.04859692800000204,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1956659200,
+					"peak_reserved_bytes": 3527409664,
+					"device_used_bytes": 3863150592,
+					"reserved_bytes": 3527409664
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.04983910369873047,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1950766080,
+					"peak_reserved_bytes": 3527409664,
+					"device_used_bytes": 3863150592,
+					"reserved_bytes": 3527409664
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.04832153701782226,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1950623232,
+					"peak_reserved_bytes": 3527409664,
+					"device_used_bytes": 3863150592,
+					"reserved_bytes": 3527409664
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.04841984176635742,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1964204544,
+					"peak_reserved_bytes": 4750049280,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4750049280
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.04846284866333008,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1954904064,
+					"peak_reserved_bytes": 4750049280,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4750049280
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.0482242546081543,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1950672384,
+					"peak_reserved_bytes": 4750049280,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4750049280
+				},
+				{
+					"index": 8,
+					"kind": "phase",
+					"wall_s": 0.04755395299999421,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1951310336,
+					"peak_reserved_bytes": 4750049280,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4750049280
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.047774497999999,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1950234112,
+					"peak_reserved_bytes": 4750049280,
+					"device_used_bytes": 5085790208,
+					"reserved_bytes": 4750049280
+				}
+			],
+			"cost": {
+				"gpu_seconds": 10.295,
+				"usd": 0.003146
+			},
+			"cache_key": "sha256:520061ab11095e0b7680af0baac7b79acc93d644a5a9f8beab9947649edcb728"
+		},
+		{
+			"id": "p3",
+			"knobs": {
+				"batch_size": 256
+			},
+			"status": "ok",
+			"steps": 9,
+			"started_at": "2026-11-02T23:03:53Z",
+			"duration_s": 10.135,
+			"memory": {
+				"peak_allocated_bytes": 1880997888,
+				"peak_reserved_bytes": 3649044480,
+				"by_term": {
+					"weights": 884924,
+					"gradients": 884924,
+					"optimizer": 1769884,
+					"activations": 1877458156
+				},
+				"peak_step": 8
+			},
+			"step_time": {
+				"n_steps": 5,
+				"mean_s": 0.04304445495605469,
+				"p50_s": 0.04279808044433594,
+				"p95_s": 0.04416204833984375,
+				"first_step_s": 6.137689021000007,
+				"by_phase": {
+					"data": 0.0,
+					"forward": 0.0,
+					"backward": 0.42583766717205773,
+					"optimizer": 0.008364012080319255,
+					"other": 0.565798320747623
+				},
+				"unprofiled": true
+			},
+			"throughput": {},
+			"stability": {
+				"series": {
+					"loss": [
+						13.142813682556152,
+						19.444669723510742,
+						26.588655471801758,
+						20.39801025390625,
+						18.014699935913086,
+						16.262300491333008,
+						15.350517272949219,
+						11.203423500061035,
+						9.097079277038574
+					],
+					"grad_norm": [
+						173.98800659179688,
+						226.96444702148438,
+						178.83535766601562,
+						178.8917236328125,
+						143.3152313232422,
+						151.9993133544922,
+						80.11336517333984,
+						75.99506378173828,
+						52.96327590942383
+					],
+					"grad_norm_ma": [
+						173.98800659179688,
+						200.47622680664062,
+						193.26260375976562,
+						189.66988372802734,
+						180.39895324707032,
+						175.66567993164062,
+						162.01534925188338,
+						151.26281356811523,
+						140.34064271714954
+					],
+					"update_to_weight": [
+						0.061378175392746925,
+						0.044437408447265625,
+						null,
+						null,
+						null,
+						null,
+						null,
+						0.01926786219701171,
+						0.01758842123672366
+					],
+					"output_logit_norm": [
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null,
+						null
+					],
+					"lr": [
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003,
+						0.003
+					]
+				},
+				"nan_count": 0,
+				"inf_count": 0,
+				"loss_scale_events": 0
+			},
+			"data": {
+				"loader_wait_fraction": 0.0
+			},
+			"power": {
+				"mean_w": 42.96456,
+				"max_w": 72.925,
+				"samples": 25
+			},
+			"extras": {
+				"params_total": 221231.0,
+				"params_trainable": 221231.0,
+				"tokens_per_step": 0.0,
+				"samples_per_step": 0.0,
+				"micro_steps_per_step": 1.0,
+				"host_rss_peak_bytes": 5437087744.0
+			},
+			"step_log": [
+				{
+					"index": 1,
+					"kind": "warmup",
+					"wall_s": 6.137689021000007,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1878864896,
+					"peak_reserved_bytes": 2214592512,
+					"device_used_bytes": 2550333440,
+					"reserved_bytes": 2214592512
+				},
+				{
+					"index": 2,
+					"kind": "warmup",
+					"wall_s": 0.0429581369999994,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880283648,
+					"peak_reserved_bytes": 2216689664,
+					"device_used_bytes": 2552430592,
+					"reserved_bytes": 2216689664
+				},
+				{
+					"index": 3,
+					"kind": "timed",
+					"wall_s": 0.04416204833984375,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880709632,
+					"peak_reserved_bytes": 2929721344,
+					"device_used_bytes": 3265462272,
+					"reserved_bytes": 2929721344
+				},
+				{
+					"index": 4,
+					"kind": "timed",
+					"wall_s": 0.04282777786254883,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880564224,
+					"peak_reserved_bytes": 2929721344,
+					"device_used_bytes": 3265462272,
+					"reserved_bytes": 2929721344
+				},
+				{
+					"index": 5,
+					"kind": "timed",
+					"wall_s": 0.04279808044433594,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880814080,
+					"peak_reserved_bytes": 2929721344,
+					"device_used_bytes": 3265462272,
+					"reserved_bytes": 2929721344
+				},
+				{
+					"index": 6,
+					"kind": "timed",
+					"wall_s": 0.042759166717529294,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880945152,
+					"peak_reserved_bytes": 3646947328,
+					"device_used_bytes": 3982688256,
+					"reserved_bytes": 3646947328
+				},
+				{
+					"index": 7,
+					"kind": "timed",
+					"wall_s": 0.04267520141601563,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880943616,
+					"peak_reserved_bytes": 3646947328,
+					"device_used_bytes": 3982688256,
+					"reserved_bytes": 3646947328
+				},
+				{
+					"index": 8,
+					"kind": "phase",
+					"wall_s": 0.04201540100000045,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880997888,
+					"peak_reserved_bytes": 3646947328,
+					"device_used_bytes": 3982688256,
+					"reserved_bytes": 3646947328
+				},
+				{
+					"index": 9,
+					"kind": "phase",
+					"wall_s": 0.0423866769999961,
+					"micro_steps": 1,
+					"peak_allocated_bytes": 1880698880,
+					"peak_reserved_bytes": 3649044480,
+					"device_used_bytes": 3984785408,
+					"reserved_bytes": 3649044480
+				}
+			],
+			"cost": {
+				"gpu_seconds": 10.135,
+				"usd": 0.003097
+			},
+			"cache_key": "sha256:b6bb4d1b50446025c04efe0ca46c2b7cb48969eabae5cc5c40ce4e7977e62daf"
+		}
+	],
+	"predictions": {
+		"targets": [
+			{
+				"id": "memory.peak",
+				"label_key": "target.memory.peak",
+				"unit": "bytes",
+				"readout": "memory"
+			},
+			{
+				"id": "time.total",
+				"label_key": "target.time.total",
+				"unit": "s",
+				"readout": "time"
+			},
+			{
+				"id": "cost.total",
+				"label_key": "target.cost.total",
+				"unit": "usd",
+				"readout": "cost"
+			},
+			{
+				"id": "cost.gpu_hours",
+				"label_key": "target.cost.gpu_hours",
+				"unit": "gpu_hours",
+				"readout": "cost"
+			},
+			{
+				"id": "risk.oom",
+				"label_key": "target.risk.oom",
+				"unit": "probability",
+				"readout": "risk"
+			},
+			{
+				"id": "time.step",
+				"label_key": "target.time.step",
+				"unit": "s"
+			},
+			{
+				"id": "memory.weights",
+				"label_key": "target.memory.weights",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.master_weights",
+				"label_key": "target.memory.master_weights",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.frozen_models",
+				"label_key": "target.memory.frozen_models",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.context",
+				"label_key": "target.memory.context",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.gradients",
+				"label_key": "target.memory.gradients",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.optimizer",
+				"label_key": "target.memory.optimizer",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.comm_buffers",
+				"label_key": "target.memory.comm_buffers",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.activations",
+				"label_key": "target.memory.activations",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.logits",
+				"label_key": "target.memory.logits",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.kv_cache",
+				"label_key": "target.memory.kv_cache",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.generation_engine",
+				"label_key": "target.memory.generation_engine",
+				"unit": "bytes"
+			},
+			{
+				"id": "memory.eval_spike",
+				"label_key": "target.memory.eval_spike",
+				"unit": "bytes"
+			},
+			{
+				"id": "time.phase.backward",
+				"label_key": "target.time.phase.backward",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.optimizer",
+				"label_key": "target.time.phase.optimizer",
+				"unit": "s"
+			},
+			{
+				"id": "time.phase.other",
+				"label_key": "target.time.phase.other",
+				"unit": "s"
+			}
+		],
+		"estimates": {
+			"memory.peak": {
+				"point": 5231392475.428572,
+				"lo": 4575118034.062367,
+				"hi": 5981805721.342317,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "the peak comes at optimizer_step, which no probe ran; run a probe with optimizer_step in it; band from held-out runs: merged across GPUs and job types (n = 904)",
+				"level": 0.9
+			},
+			"time.total": {
+				"point": 34.099170531272954,
+				"lo": 32.39267134967061,
+				"hi": 35.92342463208281,
+				"unit": "s",
+				"status": "predicted",
+				"model_id": "time-total@0.1.0",
+				"source": "exact",
+				"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median",
+				"level": 0.9
+			},
+			"cost.total": {
+				"point": 0.010419190995666738,
+				"lo": 0.009897760690177131,
+				"hi": 0.010976601970914195,
+				"unit": "usd",
+				"status": "predicted",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "A10 at $1.10/h (modal, 2026-07)",
+				"level": 0.9,
+				"rate": {
+					"quantity": "cost.gpu_hours",
+					"usd_per_unit": 1.1,
+					"unit": "gpu_hours",
+					"price_row": "gpu/modal/A10/us/on_demand"
+				}
+			},
+			"cost.gpu_hours": {
+				"point": 0.009471991814242487,
+				"lo": 0.00899796426379739,
+				"hi": 0.009978729064467447,
+				"unit": "gpu_hours",
+				"status": "predicted",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"source": "exact",
+				"reason": "1 GPU for the run's time",
+				"level": 0.9
+			},
+			"risk.oom": {
+				"point": 0.0005524861878453039,
+				"lo": 0.0005524861878453039,
+				"hi": 0.0005524861878453039,
+				"unit": "probability",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "fits: P(OOM) 0.1% (from 904 held-out runs); the peak comes at optimizer_step, not during training steps",
+				"level": 0.9
+			},
+			"time.step": {
+				"point": 0.05612953567504883,
+				"lo": 0.052478743588031895,
+				"hi": 0.06003430264696879,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"reason": "batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median",
+				"level": 0.9
+			},
+			"memory.weights": {
+				"point": 884924.0,
+				"lo": 773910.9176363087,
+				"hi": 1011861.2723124875,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.master_weights": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.frozen_models": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.context": {
+				"point": 335740928.0,
+				"lo": 293622468.9086813,
+				"hi": 383901038.477265,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.gradients": {
+				"point": 884924.0,
+				"lo": 773910.9176363087,
+				"hi": 1011861.2723124875,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.optimizer": {
+				"point": 2654772.0,
+				"lo": 2321732.752908926,
+				"hi": 3035583.8169374624,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.comm_buffers": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.activations": {
+				"point": 4891226927.428572,
+				"lo": 4277626010.5655046,
+				"hi": 5592845376.5034895,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.logits": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.kv_cache": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.generation_engine": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"memory.eval_spike": {
+				"point": 0.0,
+				"lo": 0.0,
+				"hi": 0.0,
+				"unit": "bytes",
+				"status": "extrapolated",
+				"model_id": "memory-analytical@0.3.1",
+				"source": "exact",
+				"reason": "weights, gradients, optimizer and caches as the model sizes them; activations, logits and any eval spike share the rest of the calibrated peak",
+				"level": 0.9
+			},
+			"time.phase.backward": {
+				"point": 0.020447423097787288,
+				"lo": 0.019117476403101324,
+				"hi": 0.021869890278619596,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.optimizer": {
+				"point": 0.00037034667375852626,
+				"lo": 0.0003462584875700968,
+				"hi": 0.0003961106043248635,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			},
+			"time.phase.other": {
+				"point": 0.03531176590350302,
+				"lo": 0.03301500869736048,
+				"hi": 0.037768301764024334,
+				"unit": "s",
+				"status": "measured",
+				"model_id": "steptime-phases@0.2.0",
+				"source": "exact",
+				"level": 0.9
+			}
+		},
+		"grids": [
+			{
+				"id": "g.memory.peak.gpu_type",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "32Q=",
+				"lo": "Q2Q=",
+				"hi": "kmU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4194304.0,
+				"fixed": {
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.time.total.gpu_type",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "Q1A=",
+				"lo": "DVA=",
+				"hi": "flA=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.total.gpu_type",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "ViE=",
+				"lo": "ESE=",
+				"hi": "nyE=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.gpu_type",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "2mQ=",
+				"lo": "m2Q=",
+				"hi": "HGU=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 7.62939453125e-06,
+				"fixed": {
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.risk.oom.gpu_type",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "gpu_type",
+						"values": [
+							"A10"
+						],
+						"scale": "categorical"
+					}
+				],
+				"point": "h2Q=",
+				"lo": "h2Q=",
+				"hi": "h2Q=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.76837158203125e-07,
+				"fixed": {
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.memory.peak.epochs",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							3,
+							6,
+							12,
+							24
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "32TfZN9k32TfZN9k32Q=",
+				"lo": "Q2RDZENkQ2RDZENkQ2Q=",
+				"hi": "kmWSZZJlkmWSZZJlkmU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4194304.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.time.total.epochs",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							3,
+							6,
+							12,
+							24
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "Q1BDUENQQ1BDUENQQ1A=",
+				"lo": "DVANUA1QDVANUA1QDVA=",
+				"hi": "flB+UH5QflB+UH5QflA=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.total.epochs",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							3,
+							6,
+							12,
+							24
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "ViFWIVYhViFWIVYhViE=",
+				"lo": "ESERIREhESERIREhESE=",
+				"hi": "nyGfIZ8hnyGfIZ8hnyE=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.epochs",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							3,
+							6,
+							12,
+							24
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "2mTaZNpk2mTaZNpk2mQ=",
+				"lo": "m2SbZJtkm2SbZJtkm2Q=",
+				"hi": "HGUcZRxlHGUcZRxlHGU=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 7.62939453125e-06,
+				"fixed": {
+					"gpu_type": "A10",
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.risk.oom.epochs",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "epochs",
+						"values": [
+							0,
+							1,
+							2,
+							3,
+							6,
+							12,
+							24
+						],
+						"scale": "linear"
+					}
+				],
+				"point": "h2SHZIdkh2SHZIdkh2Q=",
+				"lo": "h2SHZIdkh2SHZIdkh2Q=",
+				"hi": "h2SHZIdkh2SHZIdkh2Q=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.76837158203125e-07,
+				"fixed": {
+					"gpu_type": "A10",
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.memory.peak.batch_size",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "uWMBZEtk32QHZgAAAAA=",
+				"lo": "iGICY4NjQ2RFZQAAAAA=",
+				"hi": "kWSVZOlkkmXkZgAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4194304.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.time.total.batch_size",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "i0/0Tp5PQ1AYUAAAAAA=",
+				"lo": "YU6hTj9PDVBpTwAAAAA=",
+				"hi": "gVBOTwJQflCJUAAAAAA=",
+				"abstain": "YA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.total.batch_size",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "uCBaIMQgViEfIQAAAAA=",
+				"lo": "+x8mIIkgESGjIAAAAAA=",
+				"hi": "oyGSIAQhnyGtIQAAAAA=",
+				"abstain": "YA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.batch_size",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "SiDqH1Ug2iCoIAAAAAA=",
+				"lo": "QR+KHx8gmyA3IAAAAAA=",
+				"hi": "ICEoII8gHCEpIQAAAAA=",
+				"abstain": "YA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.risk.oom.batch_size",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "batch_size",
+						"values": [
+							128,
+							256,
+							512,
+							1024,
+							2048,
+							4096,
+							8192
+						],
+						"scale": "log"
+					}
+				],
+				"point": "h2SHZIdkh2SHZAAAAAA=",
+				"lo": "h2SHZIdkh2SHZAAAAAA=",
+				"hi": "h2SHZIdkh2SHZAAAAAA=",
+				"abstain": "YA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.76837158203125e-07,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.memory.peak.fanout.hop1",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "fanout.hop1",
+						"values": [
+							2,
+							4,
+							8,
+							15,
+							30,
+							60
+						],
+						"scale": "log"
+					}
+				],
+				"point": "vmMGZFVk32QHZgAA",
+				"lo": "kWIKY5RjQ2RFZQAA",
+				"hi": "kGSaZPRkkmXkZgAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4194304.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.time.total.fanout.hop1",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "fanout.hop1",
+						"values": [
+							2,
+							4,
+							8,
+							15,
+							30,
+							60
+						],
+						"scale": "log"
+					}
+				],
+				"point": "i0+XT69PQ1AYUAAA",
+				"lo": "bE7jTvhODVBpTwAA",
+				"hi": "eVAyUD9QflCJUAAA",
+				"abstain": "IA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.total.fanout.hop1",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "fanout.hop1",
+						"values": [
+							2,
+							4,
+							8,
+							15,
+							30,
+							60
+						],
+						"scale": "log"
+					}
+				],
+				"point": "uSDAIM8gViEfIQAA",
+				"lo": "BSBPIFwgESGjIAAA",
+				"hi": "mSFAIVEhnyGtIQAA",
+				"abstain": "IA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.fanout.hop1",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "fanout.hop1",
+						"values": [
+							2,
+							4,
+							8,
+							15,
+							30,
+							60
+						],
+						"scale": "log"
+					}
+				],
+				"point": "SyBRIF8g2iCoIAAA",
+				"lo": "Th/WH+4fmyA3IAAA",
+				"hi": "FyHGINUgHCEpIQAA",
+				"abstain": "IA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.risk.oom.fanout.hop1",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "fanout.hop1",
+						"values": [
+							2,
+							4,
+							8,
+							15,
+							30,
+							60
+						],
+						"scale": "log"
+					}
+				],
+				"point": "h2SHZIdkh2SHZAAA",
+				"lo": "h2SHZIdkh2SHZAAA",
+				"hi": "h2SHZIdkh2SHZAAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.76837158203125e-07,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.memory.peak.fanout.hop2",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "fanout.hop2",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "tmP9Y0Vk32QHZgAA",
+				"lo": "gmL5YnljQ2RFZQAA",
+				"hi": "kWSUZOJkkmXkZgAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4194304.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.time.total.fanout.hop2",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "fanout.hop2",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "ik+VT6pPQ1AYUAAA",
+				"lo": "WU7aTvRODVBpTwAA",
+				"hi": "hlA2UD1QflCJUAAA",
+				"abstain": "IA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.total.fanout.hop2",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "fanout.hop2",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "uCC+IMwgViEfIQAA",
+				"lo": "8h9KIFogESGjIAAA",
+				"hi": "qiFFIU4hnyGtIQAA",
+				"abstain": "IA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.fanout.hop2",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "fanout.hop2",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "SiBQIFwg2iCoIAAA",
+				"lo": "OR/LH+kfmyA3IAAA",
+				"hi": "JiHKINIgHCEpIQAA",
+				"abstain": "IA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.risk.oom.fanout.hop2",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "fanout.hop2",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "h2SHZIdkh2SHZAAA",
+				"lo": "h2SHZIdkh2SHZAAA",
+				"hi": "h2SHZIdkh2SHZAAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.76837158203125e-07,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop3": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.memory.peak.fanout.hop3",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "fanout.hop3",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "tmP9Y0Vk32QHZgAA",
+				"lo": "gmL5YnljQ2RFZQAA",
+				"hi": "kWSUZOJkkmXkZgAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4194304.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.time.total.fanout.hop3",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "fanout.hop3",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "ik+VT6pPQ1AYUAAA",
+				"lo": "WU7aTvRODVBpTwAA",
+				"hi": "hlA2UD1QflCJUAAA",
+				"abstain": "IA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.total.fanout.hop3",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "fanout.hop3",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "uCC+IMwgViEfIQAA",
+				"lo": "8h9KIFogESGjIAAA",
+				"hi": "qiFFIU4hnyGtIQAA",
+				"abstain": "IA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.fanout.hop3",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "fanout.hop3",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "SiBQIFwg2iCoIAAA",
+				"lo": "OR/LH+kfmyA3IAAA",
+				"hi": "JiHKINIgHCEpIQAA",
+				"abstain": "IA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.risk.oom.fanout.hop3",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "fanout.hop3",
+						"values": [
+							3,
+							6,
+							12,
+							25,
+							50,
+							100
+						],
+						"scale": "log"
+					}
+				],
+				"point": "h2SHZIdkh2SHZAAA",
+				"lo": "h2SHZIdkh2SHZAAA",
+				"hi": "h2SHZIdkh2SHZAAA",
+				"abstain": "IA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.76837158203125e-07,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"lr": 0.003
+				}
+			},
+			{
+				"id": "g.memory.peak.lr",
+				"target_id": "memory.peak",
+				"unit": "bytes",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							0.000375,
+							0.00075,
+							0.0015,
+							0.003,
+							0.006,
+							0.012,
+							0.024
+						],
+						"scale": "log"
+					}
+				],
+				"point": "32TfZN9k32TfZN9k32Q=",
+				"lo": "Q2RDZENkQ2RDZENkQ2Q=",
+				"hi": "kmWSZZJlkmWSZZJlkmU=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4194304.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25
+				}
+			},
+			{
+				"id": "g.time.total.lr",
+				"target_id": "time.total",
+				"unit": "s",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							0.000375,
+							0.00075,
+							0.0015,
+							0.003,
+							0.006,
+							0.012,
+							0.024
+						],
+						"scale": "log"
+					}
+				],
+				"point": "Q1BDUENQQ1BDUENQQ1A=",
+				"lo": "DVANUA1QDVANUA1QDVA=",
+				"hi": "flB+UH5QflB+UH5QflA=",
+				"abstain": "AA==",
+				"model_id": "time-total@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25
+				}
+			},
+			{
+				"id": "g.cost.total.lr",
+				"target_id": "cost.total",
+				"unit": "usd",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							0.000375,
+							0.00075,
+							0.0015,
+							0.003,
+							0.006,
+							0.012,
+							0.024
+						],
+						"scale": "log"
+					}
+				],
+				"point": "ViFWIVYhViFWIVYhViE=",
+				"lo": "ESERIREhESERIREhESE=",
+				"hi": "nyGfIZ8hnyGfIZ8hnyE=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 1.0,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25
+				}
+			},
+			{
+				"id": "g.cost.gpu_hours.lr",
+				"target_id": "cost.gpu_hours",
+				"unit": "gpu_hours",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							0.000375,
+							0.00075,
+							0.0015,
+							0.003,
+							0.006,
+							0.012,
+							0.024
+						],
+						"scale": "log"
+					}
+				],
+				"point": "2mTaZNpk2mTaZNpk2mQ=",
+				"lo": "m2SbZJtkm2SbZJtkm2Q=",
+				"hi": "HGUcZRxlHGUcZRxlHGU=",
+				"abstain": "AA==",
+				"model_id": "cost-gpu-hours@0.1.0",
+				"scale": 7.62939453125e-06,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25
+				}
+			},
+			{
+				"id": "g.risk.oom.lr",
+				"target_id": "risk.oom",
+				"unit": "probability",
+				"axes": [
+					{
+						"knob_id": "lr",
+						"values": [
+							0.000375,
+							0.00075,
+							0.0015,
+							0.003,
+							0.006,
+							0.012,
+							0.024
+						],
+						"scale": "log"
+					}
+				],
+				"point": "h2SHZIdkh2SHZIdkh2Q=",
+				"lo": "h2SHZIdkh2SHZIdkh2Q=",
+				"hi": "h2SHZIdkh2SHZIdkh2Q=",
+				"abstain": "AA==",
+				"model_id": "memory-analytical@0.3.1",
+				"scale": 4.76837158203125e-07,
+				"fixed": {
+					"gpu_type": "A10",
+					"epochs": 3,
+					"batch_size": 1024,
+					"fanout.hop1": 15,
+					"fanout.hop2": 25,
+					"fanout.hop3": 25
+				}
+			}
+		]
+	},
+	"models": [
+		{
+			"id": "cost-gpu-hours@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. GPU-hours x the dated price in engine/prices",
+			"fixture": false
+		},
+		{
+			"id": "memory-analytical@0.3.1",
+			"kind": "analytical",
+			"version": "0.3.1",
+			"training_data": "remote-runs b-topup-export-2 (Nov 1): L4, A10, L40S, T4, H100 (the Nov 1 top-up's seed 0 and 1 rows included); A100 held out, scored once on Oct 31, not re-scored (8463 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 50ea0fb14a",
+			"heldout_error": {},
+			"coverage": 0.9048672566371682,
+			"per_gpu_coverage": {
+				"A100-PCIe-80GB": 0.6666666666666666,
+				"A100-SXM-80GB": 0.875
+			},
+			"notes": "calibration: held_out. Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d.  Own cells: H100-SXM-80GB, pretrain (n = 40); H100-SXM-80GB, retrieval (n = 40); H100-SXM-80GB, vision (n = 78); L40S, pretrain (n = 47); L40S, retrieval (n = 48); L40S, vision (n = 91); A10, finetune (n = 19); A10, pretrain (n = 69); A10, retrieval (n = 70); A10, vision (n = 130); L4, finetune (n = 19); L4, pretrain (n = 55); L4, retrieval (n = 53); L4, vision (n = 101); T4, pretrain (n = 11); T4, retrieval (n = 11); T4, vision (n = 22); merged across GPUs and job types (n = 904); finetune, merged across GPUs (n = 38); pretrain, merged across GPUs (n = 222); retrieval, merged across GPUs (n = 222); vision, merged across GPUs (n = 422). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs, then all runs. Leave-one-architecture-out coverage 818 of 904 (Wilson 95% 88% to 92%). Holdout, never tuned on: A100-PCIe-80GB 8 of 12 inside the band (Wilson 95% 39% to 86%). Holdout, never tuned on: A100-SXM-80GB 14 of 16 inside the band (Wilson 95% 64% to 97%)",
+			"fixture": false
+		},
+		{
+			"id": "run-cost@0.1.0",
+			"kind": "rule",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+			"fixture": false
+		},
+		{
+			"id": "steptime-phases@0.2.0",
+			"kind": "analytical",
+			"version": "0.2.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. per-phase linear fits on the probes; S4b below the smallest probe",
+			"fixture": false
+		},
+		{
+			"id": "time-total@0.1.0",
+			"kind": "analytical",
+			"version": "0.1.0",
+			"training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+			"heldout_error": {},
+			"per_gpu_coverage": {},
+			"notes": "calibration: simulated. steps x step time plus measured checkpoint and eval overheads",
+			"fixture": false
+		}
+	],
+	"findings": [
+		{
+			"id": "read.precision.fp32",
+			"severity": "warn",
+			"code": "precision.fp32",
+			"title": "Trains in fp32",
+			"evidence": [],
+			"source": "rule",
+			"fix_template": "precision.bf16_autocast",
+			"knob_id": "precision",
+			"citations": []
+		}
+	],
+	"patches": [],
+	"provenance": [
+		{
+			"provider": "meta",
+			"model": "muse-spark-1.3",
+			"purpose": "script_map",
+			"input_tokens": 5156,
+			"output_tokens": 3136,
+			"cached_input_tokens": 0,
+			"cost_usd": 0.019773,
+			"request_id": "675f0879-5135-47d3-ae16-e65f81c70d8f",
+			"at": "2026-11-02T23:03:18Z",
+			"latency_s": 30.215,
+			"ok": true
+		},
+		{
+			"provider": "baseten",
+			"model": "meta-models/muse-spark-open-1026",
+			"purpose": "triage",
+			"input_tokens": 442,
+			"output_tokens": 1416,
+			"cached_input_tokens": 128,
+			"cost_usd": 0.00643,
+			"request_id": "chatcmpl-0c1727f669fc4690abfe6621399b8a6e",
+			"at": "2026-11-02T23:04:07Z",
+			"latency_s": 4.928,
+			"ok": true
+		},
+		{
+			"provider": "baseten",
+			"model": "meta-models/muse-spark-open-1026",
+			"purpose": "triage",
+			"input_tokens": 361,
+			"output_tokens": 379,
+			"cached_input_tokens": 128,
+			"cost_usd": 0.001921,
+			"request_id": "chatcmpl-b2e814a2e23d479ba13e797bdfc73d46",
+			"at": "2026-11-02T23:04:09Z",
+			"latency_s": 1.44,
+			"ok": true
+		},
+		{
+			"provider": "baseten",
+			"model": "meta-models/muse-spark-open-1026",
+			"purpose": "triage",
+			"input_tokens": 361,
+			"output_tokens": 378,
+			"cached_input_tokens": 128,
+			"cost_usd": 0.001917,
+			"request_id": "chatcmpl-b28ceff7f659486faa0363303e02e7a1",
+			"at": "2026-11-02T23:04:10Z",
+			"latency_s": 1.571,
+			"ok": true
+		}
+	],
+	"costs": {
+		"gpu_usd": 0.011949,
+		"llm_usd": 0.030041,
+		"breakdown": {
+			"probes": 0.01142,
+			"sandbox_overhead": 0.000529,
+			"sandbox_cpu_memory_estimate": 0.009862,
+			"model_calls": 0.030041
+		}
+	},
+	"cost_basis": {
+		"price_table": "prices@2026-11-01",
+		"as_of": "2026-11-01",
+		"provider": "local",
+		"billing": "on_demand",
+		"currency": "USD",
+		"includes": [
+			"gpu",
+			"tokens"
+		]
+	},
+	"job_cost": {
+		"lines": [
+			{
+				"kind": "gpu",
+				"label_key": "cost.line.gpu",
+				"quantity": {
+					"point": 0.009471991814242487,
+					"lo": 0.00899796426379739,
+					"hi": 0.009978729064467447,
+					"unit": "gpu_hours",
+					"status": "predicted",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "1 x A10; batches vary in length (the probe's 5 timed steps), so a full run's median step can differ from the probe's 5-step median",
+					"level": 0.9
+				},
+				"rate_usd": 1.1,
+				"usd": {
+					"point": 0.010419190995666737,
+					"lo": 0.009897760690177131,
+					"hi": 0.010976601970914194,
+					"unit": "usd",
+					"status": "predicted",
+					"model_id": "run-cost@0.1.0",
+					"source": "exact",
+					"reason": "A10 at $1.10/h (modal, 2026-07); no local rate for A10; the cheapest listed on-demand rate (modal, us) is used",
+					"level": 0.9,
+					"rate": {
+						"quantity": "line.quantity",
+						"usd_per_unit": 1.1,
+						"unit": "gpu_hours",
+						"price_row": "gpu/modal/A10/us/on_demand"
+					}
+				},
+				"price_row": "gpu/modal/A10/us/on_demand"
+			}
+		],
+		"total_usd": {
+			"point": 0.010419190995666737,
+			"lo": 0.009897760690177131,
+			"hi": 0.010976601970914194,
+			"unit": "usd",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "A10 at $1.10/h (modal, 2026-07); no local rate for A10; the cheapest listed on-demand rate (modal, us) is used",
+			"level": 0.9,
+			"rate": {
+				"quantity": "job_cost.gpu_hours",
+				"usd_per_unit": 1.1,
+				"unit": "gpu_hours",
+				"price_row": "gpu/modal/A10/us/on_demand"
+			}
+		},
+		"gpu_hours": {
+			"point": 0.009471991814242487,
+			"lo": 0.00899796426379739,
+			"hi": 0.009978729064467447,
+			"unit": "gpu_hours",
+			"status": "predicted",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"level": 0.9
+		},
+		"at_risk_gpu_hours": {
+			"point": 1.1845133155310007e-06,
+			"lo": 0.0,
+			"hi": 0.00010725268793016557,
+			"unit": "gpu_hours",
+			"status": "extrapolated",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "fits: P(OOM) between 0% and 5% x the cost up to the first step; 1 x A10",
+			"level": 0.9
+		},
+		"at_risk_usd": {
+			"point": 1.3029646470841009e-06,
+			"lo": 0.0,
+			"hi": 0.00011797795672318213,
+			"unit": "usd",
+			"status": "extrapolated",
+			"model_id": "run-cost@0.1.0",
+			"source": "exact",
+			"reason": "fits: P(OOM) between 0% and 5% x the cost up to the first step; A10 at $1.10/h (modal, 2026-07); no local rate for A10; the cheapest listed on-demand rate (modal, us) is used",
+			"level": 0.9,
+			"rate": {
+				"quantity": "job_cost.at_risk_gpu_hours",
+				"usd_per_unit": 1.1,
+				"unit": "gpu_hours",
+				"price_row": "gpu/modal/A10/us/on_demand"
+			}
+		}
+	}
+}

@@ -56,6 +56,13 @@ describe("the rule-based tour keeps to its aim", () => {
 		}
 	}
 
+	it("offers the LoRA sample a fix on its own L4 before any GPU change (PM, Nov 3: not L4 → B300 first)", async () => {
+		const record = normaliseRecord(await SAMPLES.find((x) => x.id === "lora-qwen")!.load());
+		const step = nextStep({ record, provider, knobs: currentKnobs(record), objective: { kind: "min_cost" } as never, visited: new Set<string>(), pinned: new Set<string>() } as never);
+		expect(step.kind).toBe("combo");
+		expect(step.combo!.changes.some((c) => c.knobId === "gpu_type")).toBe(false);
+	});
+
 	it("meets the memory-ranked case on some sample, so the check above isn't empty", () => {
 		expect(byMemory).toBeGreaterThan(0);
 	});

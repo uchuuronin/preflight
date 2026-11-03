@@ -357,6 +357,23 @@ export function nextStep(ctx: TourContext): TourStep {
 			whyKey: "guide.rule.aim_unpredicted.why",
 		};
 	}
+	// A GPU change only when nothing on this GPU clears it (PM, Nov 3): a combination of moves on this
+	// GPU (the LoRA sample's eval without gradients, eval batch 8 and a 512-token sequence, B's pair grids)
+	// comes first, a tight one included, measured against the best single move on this GPU.
+	if (failing && top && isGpuMove(top)) {
+		const o = opts(ctx, ctx.pinned);
+		const noGpu = new Set([...(o.pinned ?? []), ...GPU_KNOBS]);
+		const onGpu = { ...o, pinned: noGpu };
+		const combo = bestCombo(ctx.record, ctx.provider, ctx.knobs, ctx.objective, { ...beat(bestSingleRisk(ctx.record, ctx.provider, ctx.objective, onGpu)), pinned: noGpu, ...(o.allow ? { allow: o.allow } : {}), visited: ctx.visited });
+		if (combo && !combo.changes.some((c) => GPU_KNOBS.has(c.knobId))) {
+			return {
+				kind: "combo",
+				combo,
+				nodes: [...new Set(combo.changes.flatMap((c) => nodesForKnob(ctx.record, c.knobId)))],
+				...comboKeys(combo),
+			};
+		}
+	}
 	if (top) {
 		const fixing = top.clearsFailure || failing;
 		// Knob-specific fix lines say the run would stop; they fit only when it likely would.

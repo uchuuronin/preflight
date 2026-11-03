@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import goldenRaw from "../../../schema/examples/finetune.json";
 import devRaw from "./fixtures/dev-finetune.record.json";
 import agentRaw from "./fixtures/agent-eval-oct31.record.json";
-import campaignRaw from "./fixtures/campaign-grid.record.json";
+import campaignRaw from "./fixtures/campaign-grid-golden.record.json";
 import { planFromRecord } from "./campaign/plan";
 import { exportPlan } from "./export/plan";
 import { GridProvider } from "./provider/GridProvider";

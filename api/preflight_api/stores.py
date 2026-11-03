@@ -142,19 +142,19 @@ class LocalRecordStore:
 #: Sample flights served from the repo, so every visitor can try the cockpit and the guide
 #: without running anything. Ids match web/src/workspace/record/load.ts SAMPLES.
 SAMPLES: dict[str, str] = {
+	# Every sample the web lists is a measured run (PM, Nov 3). The hand-made LoRA 7B and agent records
+	# left the web's list but stay here, so old links, logbook entries and the fix loop's tests still open.
 	"lora-7b": "web/src/workspace/fixtures/dev-finetune.record.json",
+	"agent": "schema/examples/agent.json",
 	# The live record of zoo/finetune_lora_hf on an L4, its share token removed (PF102, Nov 1).
 	"lora-qwen": "web/src/workspace/fixtures/lora-live-nov1.record.json",
-	"pretrain": "schema/examples/pretrain.json",
-	"agent": "schema/examples/agent.json",
+	"pretrain": "web/src/workspace/fixtures/pretrain_nanogpt-a10-nov2.record.json",
 	"agent-eval": "web/src/workspace/fixtures/agent-eval-oct31.record.json",
-	# The other five the web lists (D's walkthrough, Nov 2: /predict and the guide's limits answered
-	# 404 for them, so their knobs moved nothing).
 	"campaign-grid": "web/src/workspace/fixtures/campaign-grid.record.json",
 	"grpo": "web/src/workspace/fixtures/grpo-l4.record.json",
-	"retrieval": "web/src/workspace/fixtures/retrieval_st-nov1.record.json",
-	"gnn": "web/src/workspace/fixtures/gnn_pyg-nov1.record.json",
-	"vision": "web/src/workspace/fixtures/vision_timm-nov1.record.json",
+	"retrieval": "web/src/workspace/fixtures/retrieval_st-a10-nov2.record.json",
+	"gnn": "web/src/workspace/fixtures/gnn_pyg-a10-nov2.record.json",
+	"vision": "web/src/workspace/fixtures/vision_timm-a10-nov2.record.json",
 }
 
 

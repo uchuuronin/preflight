@@ -258,3 +258,21 @@ def look(which: str = "packages") -> None:
 		print(json.dumps({"which": which, "browser_failed": type(e).__name__}))
 		raise SystemExit(1) from None
 	print(json.dumps({"which": which, "shown": shown, "chip": chip[:200]}, indent=1))
+
+
+@app.local_entrypoint()
+def handoff(which: str = "packages") -> None:
+	"""D's shot 6b (PM, Nov 3): the einops resend's record, a finished one whose diagnosis shows with its
+	labels. Its share link goes into the Modal Dict `preflight-handoff` (key `d.shot6b`, environment main)
+	for D to read; nothing about it is printed, so the run's log holds no token."""
+	sys.path.insert(0, str(ROOT / "api"))
+	if which not in REQUESTS:
+		raise SystemExit(f"which: {', '.join(REQUESTS)}")
+	vol = modal.Volume.from_name("preflight-records", environment_name="main")
+	found = _own_record(vol, which)
+	if not found:
+		raise SystemExit(f"{which}: no record of this script's among the newest {NEWEST}")
+	token, _rec = found
+	box = modal.Dict.from_name("preflight-handoff", environment_name="main", create_if_missing=True)
+	box["d.shot6b"] = f"{SITE}/s/{token}"
+	print(json.dumps({"which": which, "stored": "preflight-handoff[d.shot6b]"}))
