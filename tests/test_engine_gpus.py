@@ -286,3 +286,30 @@ def test_predict_survives_an_impossible_mig_what_if():
 	p = api.predict(rec, {"gpu_type": "A100 MIG 1g.0gb"}).root
 	assert p["time.step"].status == "abstain" and "isn't a GPU the table knows" in p["time.step"].reason
 	api.run_cost(rec, {"gpu_type": "A100 MIG 1g.0gb"})
+
+
+@pytest.mark.parametrize(
+	"reported,mem_gib,name",
+	[
+		("NVIDIA GeForce RTX 4070 Laptop GPU", 7.6, "RTX-4070-Laptop"),
+		("NVIDIA GeForce RTX 4090 Laptop GPU", 15.6, "RTX-4090-Laptop"),  # was read as the 24 GB desktop card
+		("NVIDIA GeForce RTX 4090", 23.6, "RTX-4090"),
+		("NVIDIA GeForce RTX 4070 Ti SUPER", 15.6, "RTX-4070-Ti-Super"),
+		("NVIDIA GeForce RTX 4060 Ti", 15.6, "RTX-4060-Ti-16GB"),
+		("NVIDIA GeForce RTX 3090 Ti", 23.6, "RTX-3090-Ti"),  # was read as the RTX 3090
+		("NVIDIA GeForce RTX 3080", 9.8, "RTX-3080-10GB"),
+		("NVIDIA GeForce RTX 3080 Laptop GPU", 15.7, "RTX-3080-Laptop-16GB"),
+		("NVIDIA GeForce RTX 3060 Laptop GPU", 5.8, "RTX-3060-Laptop"),
+		("NVIDIA GeForce RTX 3060", 11.8, "RTX-3060"),
+	],
+)
+def test_geforce_30_and_40_desktop_and_laptop_cards_resolve(reported, mem_gib, name):
+	# D, Nov 3: a student's own card gets memory and P(OOM), not only step time
+	got = gpus.resolve(reported, int(mem_gib * 2**30))
+	assert got == name
+	spec = gpus.get_gpu(got)
+	assert (
+		spec.confidence == ("datasheet" if name == "RTX-4090" else "derived")
+		and spec.memory_gib >= mem_gib
+		and spec.bf16 == pytest.approx(2 * spec.fp32, abs=0.2)
+	)

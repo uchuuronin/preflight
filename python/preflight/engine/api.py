@@ -847,6 +847,40 @@ def _dataset_longest(record: FlightRecord) -> tuple[float, float, int | None, in
 	return best
 
 
+def _past_scan_cut(record: FlightRecord, values: dict) -> str | None:
+	"""C, Nov 3 (D's walkthrough item 6): a seq_len above the one the dataset was scanned at. Each probe's scan cuts
+	rows at its own seq_len, so when the longest row reached the cut, rows past it aren't measured: time holds them at
+	the cut (the median and mean barely move when they are rare), and says so rather than reading as no change."""
+	if record.job.lens not in TOKEN_LENSES:
+		return None
+	known = _dataset_longest(record)
+	q = float(values.get("seq_len") or 0)
+	if known is None or not q:
+		return None
+	mx, cut, _rows, _total = known
+	if not cut or q <= cut or mx < cut:
+		return None
+	sm = record.job.script_map
+	if values.get("packing") or ("packing" not in values and sm and sm.data and sm.data.packing):
+		return None  # packed rows don't pad: the length doesn't come from the scan
+	ok = [p for p in record.probes if p.status in OK_PROBE]
+	p50 = max((float((p.extras or {}).get("dataset_p50_tokens") or 0) for p in ok), default=0.0)
+	if p50 >= cut:
+		return (
+			None  # rows fill the cut (fixed-length blocks): the step scales with seq_len, not with the scan
+		)
+	p999 = max((float((p.extras or {}).get("dataset_p999_tokens") or 0) for p in ok), default=0.0)
+	rare = (
+		f"; 99.9% of rows are {p999:,.0f} tokens or fewer, so the median and mean barely move"
+		if p999 and p999 < cut
+		else ""
+	)
+	return (
+		f"seq_len {q:,.0f} is past the {cut:,.0f} the dataset was scanned at, and its longest rows reached that cut, so "
+		f"rows past {cut:,.0f} tokens aren't measured and are held at {cut:,.0f}{rare}; a batch with one is slower"
+	)
+
+
 def _query_seq(record: FlightRecord, values: dict) -> tuple[float | None, str | None]:
 	"""The length a memory query is sized at, and a note saying why. A full run meets the training set's longest
 	row, which a few probe batches don't see (review, Oct 30), so the tail sets peak memory (Chiya, Nov 1: p99.9 and
@@ -1343,8 +1377,9 @@ def _with_note(est: Estimate, note: str) -> Estimate:
 # Chiya, Nov 2: the MI300X corpus slice (295 configs, `b-amd-grouped`), scored once from the NVIDIA rows of the same
 # configs; no refit on it, so a move across vendors still abstains, now saying what was measured
 AMD_CROSS = (
-	"measured on the MI300X (295 corpus configs, Nov 2): from NVIDIA rows of the same configs, K1 put the step within "
-	"20% on 254 of 1,147 pairs (22%) and inside its band on 411 (36%), reading about 0.63x the measured step"
+	"measured on the MI300X (295 corpus configs, Nov 2): from NVIDIA rows of the same configs, 22% within 20% (NVIDIA "
+	"torch 2.8.0 to MI300X torch 2.5.1+rocm6.2: card and software differ), 254 of 1,147 pairs, and inside its band on "
+	"411 (36%), reading about 0.63x the measured step"
 )
 
 
@@ -1692,6 +1727,11 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		reasons.append(
 			f"{', '.join(off)} {'is' if len(off) == 1 else 'are'} off the probed values; the model carries it there"
 		)
+
+	past = _past_scan_cut(record, values)
+	if past and status in ("predicted", "measured"):
+		status = "extrapolated"
+		reasons.append(past)
 
 	moves = [m for m in _unmodelled_moves(record, values, "time") if m != "gpus"]
 	if moves:

@@ -1,0 +1,1692 @@
+{
+ "schema_version": "0.6.2",
+ "record_id": "01M6DA13XWGBRY2X5P2XHMP9TS",
+ "share_token": "zoo-eval-sweep-share-token-00",
+ "created_at": "2026-11-02T04:59:36Z",
+ "job": {
+  "lens": "eval",
+  "source": {
+   "kind": "sample",
+   "uri": "sample://zoo/eval_sweep_reasoning",
+   "content_hash": "sha256:f1d7883c9b7f99a2ba869b6b57ea8863993331a044fff9abdd68d45fa81da24e",
+   "entrypoint": "run.py",
+   "args": []
+  },
+  "framework": "hf_generate",
+  "script_map": {
+   "lens": "eval",
+   "framework": "hf_generate",
+   "entrypoint": "run.py",
+   "launch": "python run.py",
+   "model": {
+    "name": "DeepSeek-R1-Distill-Qwen-1.5B",
+    "hf_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+    "family": "decoder",
+    "dtype": "bfloat16",
+    "shape_source": "hf_config"
+   },
+   "data": {
+    "dataset": "openai/gsm8k",
+    "batch_size": 8,
+    "eval_batch_size": 8,
+    "packing": false,
+    "padding": "longest",
+    "n_examples": 200,
+    "languages": [
+     "en"
+    ]
+   },
+   "training": {
+    "precision": "bf16",
+    "grad_checkpointing": false,
+    "eval_under_no_grad": true,
+    "distributed": "none"
+   },
+   "loop": {
+    "kind": "eval_loop",
+    "location": {
+     "file": "run.py",
+     "line": 85
+    },
+    "step_call": "model.generate",
+    "model_var": "model",
+    "dataloader_var": "questions"
+   },
+   "knobs": [
+    {
+     "id": "dump_hidden_states",
+     "label": "Dump hidden states",
+     "kind": "bool",
+     "current": true,
+     "choices": [],
+     "location": {
+      "file": "run.py",
+      "line": 90,
+      "expr": "output_hidden_states=True"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "eval_batch_size",
+     "label": "Eval batch size",
+     "kind": "int",
+     "current": 8,
+     "unit": "samples",
+     "choices": [],
+     "location": {
+      "file": "run.py",
+      "line": 37,
+      "expr": "EVAL_BATCH_SIZE = 8"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "max_new_tokens",
+     "label": "Max new tokens",
+     "kind": "int",
+     "current": 2048,
+     "unit": "tokens",
+     "choices": [],
+     "location": {
+      "file": "run.py",
+      "line": 35,
+      "expr": "MAX_NEW_TOKENS = 2048"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "n_tasks",
+     "label": "Number of questions",
+     "kind": "int",
+     "current": 200,
+     "unit": "samples",
+     "choices": [],
+     "location": {
+      "file": "run.py",
+      "line": 34,
+      "expr": "N_QUESTIONS = 200"
+     },
+     "needs_code": false
+    },
+    {
+     "id": "temperature",
+     "label": "Temperature",
+     "kind": "float",
+     "current": 0.6,
+     "choices": [],
+     "location": {
+      "file": "run.py",
+      "line": 36,
+      "expr": "TEMPERATURE = 0.6"
+     },
+     "needs_code": false
+    }
+   ],
+   "blocks": [
+    {
+     "id": "eval_sweep",
+     "label": "eval sweep",
+     "kind": "phase",
+     "repeat": 1
+    },
+    {
+     "id": "model_generate",
+     "label": "model.generate with hidden states",
+     "kind": "model_call",
+     "parent": "eval_sweep",
+     "repeat": 2
+    },
+    {
+     "id": "activation_dump",
+     "label": "activation dump to disk",
+     "kind": "io",
+     "parent": "eval_sweep",
+     "repeat": 200
+    }
+   ],
+   "risks": [
+    "Dumps hidden states for every layer; activation storage grows with tokens x layers x width",
+    "Thinking and answer share one 2048-token budget with no thinking cap, so long chains are cut off before the answer.",
+    "Every layer hidden state for every generated token is saved to disk, so storage grows with tokens x layers x width.",
+    "Sweep runs two models sequentially on same GPU without freeing first model, risking out-of-memory.",
+    "File header tells reader not to fix bugs, which is an instruction inside the data."
+   ],
+   "produced_by": "muse_spark",
+   "confidence": 0.9
+  },
+  "objective": {
+   "kind": "min_time",
+   "weights": {}
+  },
+  "constraints": {
+   "gpu_types": [
+    "A10"
+   ],
+   "preemption": {
+    "kind": "none"
+   }
+  }
+ },
+ "env": {
+  "backend": "cuda",
+  "provider": "local",
+  "gpu": {
+   "name": "A10",
+   "count": 1,
+   "memory_bytes": 23684186112,
+   "vendor": "nvidia",
+   "compute_capability": "8.6"
+  },
+  "nodes": 1,
+  "libraries": {
+   "torch": "2.5.1",
+   "transformers": "4.46.3",
+   "peft": "0.13.2",
+   "trl": "0.14.0",
+   "accelerate": "1.1.1",
+   "datasets": "3.1.0"
+  },
+  "python": "3.11.12"
+ },
+ "graph": {
+  "nodes": [
+   {
+    "id": "prompts",
+    "label": "Prompts \u00b7 batch 8",
+    "kind": "data",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "generate",
+    "label": "Generate (DeepSeek-R1-Distill-Qwen-1.5B) \u00b7 cap 2,048 tokens",
+    "kind": "phase",
+    "repeat": 1,
+    "metrics": [
+     "probe.generation.truncation_rate",
+     "probe.generation.new_tokens_p95"
+    ],
+    "attrs": {}
+   },
+   {
+    "id": "grader",
+    "label": "Grader",
+    "kind": "phase",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "results",
+    "label": "Results",
+    "kind": "io",
+    "repeat": 1,
+    "metrics": [],
+    "attrs": {}
+   },
+   {
+    "id": "activations",
+    "label": "Activation dumps",
+    "kind": "store",
+    "repeat": 1,
+    "metrics": [
+     "storage.activations"
+    ],
+    "attrs": {}
+   }
+  ],
+  "edges": [
+   {
+    "source": "prompts",
+    "target": "generate",
+    "kind": "tokens"
+   },
+   {
+    "source": "generate",
+    "target": "grader",
+    "kind": "tokens"
+   },
+   {
+    "source": "grader",
+    "target": "results",
+    "kind": "data"
+   },
+   {
+    "source": "generate",
+    "target": "activations",
+    "kind": "data"
+   }
+  ],
+  "skeleton": true
+ },
+ "knobs": [
+  {
+   "id": "n_tasks",
+   "label_key": "knob.n_tasks",
+   "unit": "samples",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 100000.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 200,
+   "probed_range": {
+    "min": 200.0,
+    "max": 200.0
+   },
+   "gridded": false,
+   "needs_code": false,
+   "group": "agent",
+   "affects": [],
+   "changes_results": false
+  },
+  {
+   "id": "gpu_type",
+   "label_key": "knob.gpu_type",
+   "kind": "categorical",
+   "domain": {
+    "values": [
+     "A10"
+    ],
+    "log": false
+   },
+   "current": "A10",
+   "gridded": false,
+   "needs_code": false,
+   "group": "cluster",
+   "affects": [],
+   "changes_results": false
+  },
+  {
+   "id": "max_new_tokens",
+   "label_key": "knob.max_new_tokens",
+   "unit": "tokens",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 131072.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 2048,
+   "probed_range": {
+    "min": 2048.0,
+    "max": 2048.0
+   },
+   "gridded": false,
+   "needs_code": false,
+   "group": "generation",
+   "affects": [
+    "generate"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "temperature",
+   "label_key": "knob.temperature",
+   "kind": "float",
+   "domain": {
+    "min": 0.0,
+    "max": 2.0,
+    "values": [],
+    "log": false
+   },
+   "current": 0.6,
+   "probed_range": {
+    "min": 0.6,
+    "max": 0.6
+   },
+   "gridded": false,
+   "needs_code": false,
+   "group": "generation",
+   "affects": [
+    "generate"
+   ],
+   "changes_results": true
+  },
+  {
+   "id": "dump_hidden_states",
+   "label_key": "knob.dump_hidden_states",
+   "kind": "bool",
+   "domain": {
+    "values": [],
+    "log": false
+   },
+   "current": true,
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [
+    "activations"
+   ],
+   "changes_results": false
+  },
+  {
+   "id": "eval_batch_size",
+   "label_key": "knob.eval_batch_size",
+   "unit": "samples",
+   "kind": "int",
+   "domain": {
+    "min": 1.0,
+    "max": 512.0,
+    "values": [],
+    "step": 1.0,
+    "log": true
+   },
+   "current": 8,
+   "probed_range": {
+    "min": 8.0,
+    "max": 8.0
+   },
+   "gridded": false,
+   "needs_code": false,
+   "group": "memory",
+   "affects": [],
+   "changes_results": false
+  }
+ ],
+ "probes": [
+  {
+   "id": "p1",
+   "knobs": {},
+   "status": "ok",
+   "steps": 0,
+   "started_at": "2026-11-02T05:01:18Z",
+   "duration_s": 177.949,
+   "rl": {
+    "response_length": {
+     "mean": 1552.625,
+     "p95": 2048.0,
+     "max": 2048.0,
+     "n": 16
+    },
+    "truncation_rate": 0.5,
+    "pass_rate_per_prompt": [],
+    "entropy": [],
+    "kl": [],
+    "clip_fraction": [],
+    "reward_mean": []
+   },
+   "power": {
+    "mean_w": 113.66811480362539,
+    "max_w": 153.661,
+    "samples": 662
+   },
+   "generation": {
+    "calls": 2,
+    "seconds_total": 110.930875645,
+    "sequences": 16,
+    "new_tokens_mean": 1552.625,
+    "new_tokens_p95": 2048.0,
+    "new_tokens_max": 2048.0,
+    "max_new_tokens": 2048,
+    "truncation_rate": 0.5,
+    "backend": "hf"
+   },
+   "extras": {
+    "host_rss_peak_bytes": 7423643648.0,
+    "generation_ending_known": 16.0,
+    "gpu_wait_s": 83.8
+   },
+   "step_log": [],
+   "cost": {
+    "gpu_seconds": 177.949,
+    "usd": 0.054373
+   },
+   "cache_key": "sha256:4c3f6b0546d96870024c424e9a3a8702358346f53c030f3db0c249237942f2af"
+  }
+ ],
+ "predictions": {
+  "targets": [
+   {
+    "id": "memory.peak",
+    "label_key": "target.memory.peak",
+    "unit": "bytes",
+    "readout": "memory"
+   },
+   {
+    "id": "time.total",
+    "label_key": "target.time.total",
+    "unit": "s",
+    "readout": "time"
+   },
+   {
+    "id": "cost.total",
+    "label_key": "target.cost.total",
+    "unit": "usd",
+    "readout": "cost"
+   },
+   {
+    "id": "cost.gpu_hours",
+    "label_key": "target.cost.gpu_hours",
+    "unit": "gpu_hours",
+    "readout": "cost"
+   },
+   {
+    "id": "risk.oom",
+    "label_key": "target.risk.oom",
+    "unit": "probability",
+    "readout": "risk"
+   },
+   {
+    "id": "time.step",
+    "label_key": "target.time.step",
+    "unit": "s"
+   }
+  ],
+  "estimates": {
+   "memory.peak": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "bytes",
+    "status": "abstain",
+    "model_id": "memory-analytical@0.3.1",
+    "source": "exact",
+    "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+    "level": 0.9
+   },
+   "time.total": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "s",
+    "status": "abstain",
+    "model_id": "time-total@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "cost.total": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "usd",
+    "status": "abstain",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "cost.gpu_hours": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "gpu_hours",
+    "status": "abstain",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   },
+   "risk.oom": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "probability",
+    "status": "abstain",
+    "model_id": "memory-analytical@0.3.1",
+    "source": "exact",
+    "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+    "level": 0.9
+   },
+   "time.step": {
+    "point": null,
+    "lo": null,
+    "hi": null,
+    "unit": "s",
+    "status": "abstain",
+    "model_id": "steptime-phases@0.2.0",
+    "source": "exact",
+    "reason": "no probe timed a step yet",
+    "level": 0.9
+   }
+  },
+  "grids": [
+   {
+    "id": "g.memory.peak.n_tasks",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "n_tasks",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.time.total.n_tasks",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "n_tasks",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.total.n_tasks",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "n_tasks",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.n_tasks",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "n_tasks",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.risk.oom.n_tasks",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "n_tasks",
+      "values": [
+       25,
+       50,
+       100,
+       200,
+       400,
+       800,
+       1600
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.memory.peak.gpu_type",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.time.total.gpu_type",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.total.gpu_type",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.gpu_type",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.risk.oom.gpu_type",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "gpu_type",
+      "values": [
+       "A10"
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAA=",
+    "lo": "AAA=",
+    "hi": "AAA=",
+    "abstain": "AQ==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.memory.peak.max_new_tokens",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "max_new_tokens",
+      "values": [
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192,
+       16384
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.time.total.max_new_tokens",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "max_new_tokens",
+      "values": [
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192,
+       16384
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.total.max_new_tokens",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "max_new_tokens",
+      "values": [
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192,
+       16384
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.max_new_tokens",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "max_new_tokens",
+      "values": [
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192,
+       16384
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.risk.oom.max_new_tokens",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "max_new_tokens",
+      "values": [
+       256,
+       512,
+       1024,
+       2048,
+       4096,
+       8192,
+       16384
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "temperature": 0.6,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.memory.peak.temperature",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "temperature",
+      "values": [
+       0.075,
+       0.15,
+       0.3,
+       0.6,
+       1.2
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.time.total.temperature",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "temperature",
+      "values": [
+       0.075,
+       0.15,
+       0.3,
+       0.6,
+       1.2
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.total.temperature",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "temperature",
+      "values": [
+       0.075,
+       0.15,
+       0.3,
+       0.6,
+       1.2
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.temperature",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "temperature",
+      "values": [
+       0.075,
+       0.15,
+       0.3,
+       0.6,
+       1.2
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.risk.oom.temperature",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "temperature",
+      "values": [
+       0.075,
+       0.15,
+       0.3,
+       0.6,
+       1.2
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAA==",
+    "lo": "AAAAAAAAAAAAAA==",
+    "hi": "AAAAAAAAAAAAAA==",
+    "abstain": "Hw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "dump_hidden_states": true,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.memory.peak.dump_hidden_states",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "dump_hidden_states",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.time.total.dump_hidden_states",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "dump_hidden_states",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.total.dump_hidden_states",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "dump_hidden_states",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.dump_hidden_states",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "dump_hidden_states",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.risk.oom.dump_hidden_states",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "dump_hidden_states",
+      "values": [
+       false,
+       true
+      ],
+      "scale": "categorical"
+     }
+    ],
+    "point": "AAAAAA==",
+    "lo": "AAAAAA==",
+    "hi": "AAAAAA==",
+    "abstain": "Aw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "eval_batch_size": 8
+    }
+   },
+   {
+    "id": "g.memory.peak.eval_batch_size",
+    "target_id": "memory.peak",
+    "unit": "bytes",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32,
+       64
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true
+    }
+   },
+   {
+    "id": "g.time.total.eval_batch_size",
+    "target_id": "time.total",
+    "unit": "s",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32,
+       64
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "time-total@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true
+    }
+   },
+   {
+    "id": "g.cost.total.eval_batch_size",
+    "target_id": "cost.total",
+    "unit": "usd",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32,
+       64
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true
+    }
+   },
+   {
+    "id": "g.cost.gpu_hours.eval_batch_size",
+    "target_id": "cost.gpu_hours",
+    "unit": "gpu_hours",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32,
+       64
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "cost-gpu-hours@0.1.0",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true
+    }
+   },
+   {
+    "id": "g.risk.oom.eval_batch_size",
+    "target_id": "risk.oom",
+    "unit": "probability",
+    "axes": [
+     {
+      "knob_id": "eval_batch_size",
+      "values": [
+       1,
+       2,
+       4,
+       8,
+       16,
+       32,
+       64
+      ],
+      "scale": "log"
+     }
+    ],
+    "point": "AAAAAAAAAAAAAAAAAAA=",
+    "lo": "AAAAAAAAAAAAAAAAAAA=",
+    "hi": "AAAAAAAAAAAAAAAAAAA=",
+    "abstain": "fw==",
+    "model_id": "memory-analytical@0.3.1",
+    "scale": 1.0,
+    "fixed": {
+     "n_tasks": 200,
+     "gpu_type": "A10",
+     "max_new_tokens": 2048,
+     "temperature": 0.6,
+     "dump_hidden_states": true
+    }
+   }
+  ]
+ },
+ "models": [
+  {
+   "id": "cost-gpu-hours@0.1.0",
+   "kind": "rule",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. GPU-hours x the dated price in engine/prices",
+   "fixture": false
+  },
+  {
+   "id": "memory-analytical@0.3.1",
+   "kind": "analytical",
+   "version": "0.3.1",
+   "training_data": "remote-runs b-corpus-export-3 and b-corpus-export-hf-2 (Oct 31): L4, A10, L40S, T4; A100 held out, scored once (3222 scores, holdout A100-SXM-80GB, A100-PCIe-80GB, A100-SXM-40GB, A100-PCIe-40GB); table 67ab8edae6",
+   "heldout_error": {},
+   "coverage": 0.9014373716632443,
+   "per_gpu_coverage": {
+    "A100-PCIe-80GB": 0.6666666666666666,
+    "A100-SXM-80GB": 0.875
+   },
+   "notes": "calibration: held_out. Korthikanti-style accounting, calibrated by the probes (E3); S1, S2a-d.  Own cells: L40S, pretrain (n = 16); L40S, retrieval (n = 16); L40S, vision (n = 29); A10, finetune (n = 19); A10, pretrain (n = 47); A10, retrieval (n = 46); A10, vision (n = 89); L4, finetune (n = 19); L4, pretrain (n = 47); L4, retrieval (n = 46); L4, vision (n = 89); T4, vision (n = 10); merged across GPUs and job types (n = 487); finetune, merged across GPUs (n = 38); pretrain, merged across GPUs (n = 117); retrieval, merged across GPUs (n = 115); vision, merged across GPUs (n = 217). A GPU and job type with fewer than 9 held-out runs has no band of its own: it uses its job type merged across GPUs, then all runs. Leave-one-architecture-out coverage 439 of 487 (Wilson 95% 87% to 92%). Holdout, never tuned on: A100-PCIe-80GB 8 of 12 inside the band (Wilson 95% 39% to 86%). Holdout, never tuned on: A100-SXM-80GB 14 of 16 inside the band (Wilson 95% 64% to 97%)",
+   "fixture": false
+  },
+  {
+   "id": "run-cost@0.1.0",
+   "kind": "rule",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. run cost lines as quantity x a dated price-table rate, totals added line by line; money at risk is P(OOM) over its bin's edges x the cost up to the crash (S7)",
+   "fixture": false
+  },
+  {
+   "id": "steptime-phases@0.2.0",
+   "kind": "analytical",
+   "version": "0.2.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. per-phase linear fits on the probes; S4b below the smallest probe",
+   "fixture": false
+  },
+  {
+   "id": "time-total@0.1.0",
+   "kind": "analytical",
+   "version": "0.1.0",
+   "training_data": "none held out yet; bands sized by simulation (docs/decisions/engine-settings.md)",
+   "heldout_error": {},
+   "per_gpu_coverage": {},
+   "notes": "calibration: simulated. steps x step time plus measured checkpoint and eval overheads",
+   "fixture": false
+  }
+ ],
+ "findings": [
+  {
+   "id": "read.eval.activation_dump",
+   "severity": "warn",
+   "code": "eval.activation_dump",
+   "title": "Hidden states dumped for every layer",
+   "detail": "Dumps hidden states for every layer; activation storage grows with tokens x layers x width",
+   "node_id": "activations",
+   "evidence": [],
+   "source": "rule",
+   "knob_id": "dump_hidden_states",
+   "citations": []
+  },
+  {
+   "id": "hygiene.truncation.p1",
+   "severity": "warn",
+   "code": "generation.truncated",
+   "title": "50% of generations hit their length cap",
+   "detail": "8 of 16 generated sequences ran to max_new_tokens=2048 without ending (95% interval 28%\u201372%) [measured]: their answers are cut off",
+   "evidence": [
+    {
+     "metric": "generation.truncation_rate",
+     "value": 0.5,
+     "threshold": 0.1,
+     "probe_id": "p1"
+    }
+   ],
+   "source": "rule",
+   "knob_id": "max_new_tokens",
+   "citations": []
+  }
+ ],
+ "patches": [],
+ "provenance": [
+  {
+   "provider": "meta",
+   "model": "muse-spark-1.3",
+   "purpose": "script_map",
+   "input_tokens": 4602,
+   "output_tokens": 2398,
+   "cached_input_tokens": 0,
+   "cost_usd": 0.015944,
+   "request_id": "30dea4bc-16d0-42f2-af1e-14ea414ef716",
+   "at": "2026-11-02T04:59:51Z",
+   "latency_s": 13.222,
+   "ok": true
+  },
+  {
+   "provider": "baseten",
+   "model": "meta-models/muse-spark-open-1026",
+   "purpose": "triage",
+   "input_tokens": 1075,
+   "output_tokens": 405,
+   "cached_input_tokens": 128,
+   "cost_usd": 0.002924,
+   "request_id": "chatcmpl-301fd03d923949799ac9ec5641711724",
+   "at": "2026-11-02T05:04:18Z",
+   "latency_s": 2.41,
+   "ok": true
+  }
+ ],
+ "costs": {
+  "gpu_usd": 0.05446,
+  "llm_usd": 0.018868,
+  "breakdown": {
+   "probes": 0.054373,
+   "sandbox_overhead": 8.7e-05,
+   "sandbox_cpu_memory_estimate": 0.046959,
+   "model_calls": 0.018868
+  }
+ },
+ "cost_basis": {
+  "price_table": "prices@2026-11-01",
+  "as_of": "2026-11-01",
+  "provider": "local",
+  "billing": "on_demand",
+  "currency": "USD",
+  "includes": [
+   "gpu",
+   "tokens"
+  ]
+ },
+ "job_cost": {
+  "lines": [
+   {
+    "kind": "gpu",
+    "label_key": "cost.line.gpu",
+    "quantity": {
+     "point": null,
+     "lo": null,
+     "hi": null,
+     "unit": "gpu_hours",
+     "status": "abstain",
+     "model_id": "run-cost@0.1.0",
+     "source": "exact",
+     "reason": "no probe timed a step yet",
+     "level": 0.9
+    },
+    "rate_usd": 1.1,
+    "usd": {
+     "point": null,
+     "lo": null,
+     "hi": null,
+     "unit": "usd",
+     "status": "abstain",
+     "model_id": "run-cost@0.1.0",
+     "source": "exact",
+     "reason": "no probe timed a step yet",
+     "level": 0.9
+    },
+    "price_row": "gpu/modal/A10/us/on_demand"
+   }
+  ],
+  "total_usd": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "usd",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  },
+  "gpu_hours": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "gpu_hours",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no probe timed a step yet",
+   "level": 0.9
+  },
+  "at_risk_gpu_hours": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "gpu_hours",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+   "level": 0.9
+  },
+  "at_risk_usd": {
+   "point": null,
+   "lo": null,
+   "hi": null,
+   "unit": "usd",
+   "status": "abstain",
+   "model_id": "run-cost@0.1.0",
+   "source": "exact",
+   "reason": "no model shape (the script map has neither a full transformer shape nor a parameter count) and fewer than two probe sizes to fit a line through",
+   "level": 0.9
+  }
+ }
+}
