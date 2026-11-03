@@ -1,0 +1,350 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-3qdSYp4qJjLLEvtZd92i0d
+✓ Created objects.
+├── ✓ Uploaded 
+│   /home/runner/work/preflight/preflight/python/preflight/corpus/modal_app.py
+├── ✓ Uploaded PythonPackage:preflight
+├── ✓ Created Function Sweeper.*.
+├── ✓ Created Function billing.
+├── ✓ Created Function lease.
+├── ✓ Created Function ledger.
+├── ✓ Created Function read_rows.
+├── ✓ Created Function gpu_dirs.
+└── ✓ Created Function read_rows_gz.
+[A10] wave 0: $0.00 of $3.10 spent (container time, worst case for unsettled waves), 0 done, 300 to do, deadline 90 s, next wave 2 x 31
+[A10] wave 0 took 539 s on 2 containers: 1137 container-s ($0.38, worst case was $3.03) for 62 configs
+[A10] batch: 439.3 s in the container, reload 0.1 s, commits 10.2 s
+[A10] config ba9b4edbc7ff gpt-small  ok: 17.8 s
+[A10] config 4380f850ed3c gpt-small  ok: 14.8 s
+[A10] config cb4c893a09af gpt-small  ok: 12.4 s
+[A10] config 86248b54b37a gpt-small  ok: 12.7 s
+[A10] config 2f60789bdf7a gpt-small  ok: 16.8 s
+[A10] config 2f01c1d87002 gpt-small  ok: 12.3 s
+[A10] config cc4b73b21136 gpt-small  ok: 12.7 s
+[A10] config 9d5c7023c4f9 gpt-small  ok: 15.0 s
+[A10] config bfb4583ef182 gpt-small  ok: 12.4 s
+[A10] config 5169877b2e9b gpt-small  ok: 12.2 s
+[A10] config 8185acd4c1d6 gpt-small  ok: 12.2 s
+[A10] config bfb29d68d50c gpt-small  ok: 16.8 s
+[A10] config 9400b3471dcd gpt-small  ok: 12.0 s
+[A10] config 91d039761b9a gpt-small  ok: 16.9 s
+[A10] config 1e6361ea9bf2 gpt-small  ok: 9.9 s
+[A10] config 6eefee596dc0 gpt-small  ok: 14.7 s
+[A10] config dddcd6e960b0 gpt-small  ok: 14.7 s
+[A10] config e5eddd6f881f gpt-small  ok: 14.6 s
+[A10] config 88b34dfa2fd3 gpt-small  ok: 11.9 s
+[A10] config 8ae6360368b8 gpt-small  ok: 13.7 s
+[A10] config 36a319903bd1 gpt-small  ok: 12.0 s
+[A10] config 74fea49ae81e gpt-small  ok: 14.7 s
+[A10] config 752aadd80674 gpt-small  ok: 15.0 s
+[A10] config 6265659f0fd4 gpt-small  ok: 14.9 s
+[A10] config 52b1552f5711 gpt-small  ok: 12.1 s
+[A10] config 5eaa94a4168e gpt-small  ok: 14.7 s
+[A10] config 8bfdaf503a75 gpt-small  ok: 14.9 s
+[A10] config 680b03921a28 gpt-small  ok: 14.2 s
+[A10] config ef626620b16c gpt-small  ok: 12.2 s
+[A10] config 9837771e9575 gpt-small  ok: 14.8 s
+[A10] config e0a17a3a2cf2 gpt-small  ok: 12.5 s
+[A10] batch: 527.5 s in the container, reload 0.1 s, commits 11.9 s
+[A10] config 4300694df27f gpt-small  ok: 20.3 s
+[A10] config f60fabb38bf8 gpt-small  ok: 18.5 s
+[A10] config ea3c3f7091f9 gpt-small  ok: 15.5 s
+[A10] config a6ee68427948 gpt-small  ok: 19.2 s
+[A10] config 92864e72ada3 gpt-small  ok: 18.9 s
+[A10] config 1e2b3c936ba7 gpt-small  ok: 15.9 s
+[A10] config 70f66ba74be4 gpt-small  ok: 15.7 s
+[A10] config bfab518bfee7 gpt-small  ok: 18.6 s
+[A10] config 75f49b5c77a1 gpt-small  ok: 19.1 s
+[A10] config d3ffa9c6ccf3 gpt-small  ok: 15.5 s
+[A10] config d022a035b2e1 gpt-small  ok: 15.5 s
+[A10] config 1bc4e807f68f gpt-small  ok: 16.2 s
+[A10] config 949ace39d9e6 gpt-small  ok: 18.7 s
+[A10] config b87db1b07358 gpt-small  ok: 16.2 s
+[A10] config e893719a5631 gpt-small  ok: 15.4 s
+[A10] config 21500e877463 gpt-small  ok: 15.8 s
+[A10] config 655610da1b92 gpt-small  ok: 16.1 s
+[A10] config 0c4f491598cb gpt-small  ok: 18.7 s
+[A10] config 3fe7c1cc12a4 gpt-small  ok: 15.9 s
+[A10] config 2e5d8d108d3c gpt-small  ok: 18.4 s
+[A10] config 0ee97342f479 gpt-small  ok: 15.4 s
+[A10] config 67c8d001eda9 gpt-small  ok: 9.8 s
+[A10] config 9f6997d389e4 gpt-small  ok: 15.7 s
+[A10] config bef6f5836f4f gpt-small  ok: 18.6 s
+[A10] config f0395fddb034 gpt-small  ok: 12.3 s
+[A10] config 35a51aad577c gpt-small  ok: 15.4 s
+[A10] config 2e2a2a6a8650 gpt-small  ok: 18.8 s
+[A10] config 189d6220cd4f gpt-small  ok: 15.3 s
+[A10] config 092072d11010 gpt-small  ok: 15.3 s
+[A10] config a595998a8596 gpt-small  ok: 15.5 s
+[A10] config df074faf65e4 gpt-small  ok: 18.9 s
+[A10] wave 1: $0.38 of $3.10 spent (container time, worst case for unsettled waves), 62 done, 238 to do, deadline 90 s, next wave 2 x 27
+[A10] wave 1 took 395 s on 2 containers: 850 container-s ($0.29, worst case was $2.70) for 54 configs
+[A10] batch: 389.8 s in the container, reload 0.2 s, commits 21.9 s
+[A10] config 3033f1863773 gpt-small  ok: 12.9 s
+[A10] config 21799b908f17 gpt-small  ok: 12.5 s
+[A10] config a412cbf03abe gpt-small  ok: 16.9 s
+[A10] config eb4fb748a7ae gpt-small  ok: 12.4 s
+[A10] config 1d3a10d16adb gpt-small  ok: 12.3 s
+[A10] config ff54870e4147 gpt-small  ok: 12.5 s
+[A10] config 6c9f91ce8fe4 gpt-small  ok: 12.1 s
+[A10] config e73708447983 gpt-small  ok: 15.1 s
+[A10] config 167f1146ed2b gpt-small  ok: 15.0 s
+[A10] config ee4e22d149fd gpt-small  ok: 12.5 s
+[A10] config 35394a36fd94 gpt-small  ok: 14.8 s
+[A10] config a715e2a8d9f1 gpt-small  ok: 14.8 s
+[A10] config ef2572aa21b8 gpt-small  ok: 12.2 s
+[A10] config 96288dd9bf30 gpt-small  ok: 14.8 s
+[A10] config b007c0f0e40f gpt-small  ok: 12.2 s
+[A10] config f21fbf93fa84 gpt-small  ok: 17.3 s
+[A10] config de9bdbe45984 gpt-small  ok: 10.8 s
+[A10] config 09afaea8a73a gpt-small  ok: 14.9 s
+[A10] config 8c6c3b90ea9c gpt-small  ok: 14.9 s
+[A10] config 6e59cf6d7dc8 gpt-small  ok: 17.0 s
+[A10] config dbdc3c02690d gpt-small  ok: 12.0 s
+[A10] config a8925ad9a4e3 gpt-small  ok: 12.1 s
+[A10] config 435b988c9d6e gpt-small  ok: 12.1 s
+[A10] config 83e582c97f32 gpt-small  ok: 11.9 s
+[A10] config 008256373969 gpt-small  ok: 14.4 s
+[A10] config ad8544cb7652 gpt-small  ok: 12.2 s
+[A10] config 9623189f5a40 gpt-small  ok: 14.8 s
+[A10] batch: 369.0 s in the container, reload 0.2 s, commits 11.7 s
+[A10] config 62c1d4e9d172 gpt-small  ok: 12.5 s
+[A10] config add03909d23a gpt-small  ok: 12.3 s
+[A10] config 8ea38cd9e6bc gpt-small  ok: 12.1 s
+[A10] config 57905f7349a9 gpt-small  ok: 12.0 s
+[A10] config 12007c70f38e gpt-small  ok: 14.5 s
+[A10] config 69c0a69ee8c7 gpt-small  ok: 16.8 s
+[A10] config e4849e3cc5c1 gpt-small  ok: 12.0 s
+[A10] config c627af72838b gpt-small  ok: 12.0 s
+[A10] config 42beddd9cd09 gpt-small  ok: 14.4 s
+[A10] config 7879fd0ec16e gpt-small  ok: 13.1 s
+[A10] config 1ae09d0b70bb gpt-small  ok: 12.0 s
+[A10] config 79033d213cb4 gpt-small  ok: 16.9 s
+[A10] config 6abcc0e1ecc4 gpt-small  ok: 12.1 s
+[A10] config 4d4ac9f81798 gpt-small  ok: 11.8 s
+[A10] config 8511e5771884 gpt-small  ok: 11.8 s
+[A10] config eb30e2b7f22e gpt-small  ok: 10.4 s
+[A10] config 4d37f93812bc gpt-small  ok: 15.1 s
+[A10] config f2844341b212 gpt-small  ok: 12.2 s
+[A10] config 565696b3992d gpt-small  ok: 15.1 s
+[A10] config 92eb33d738de gpt-small  ok: 14.6 s
+[A10] config eeb4038e1b76 gpt-small  ok: 14.7 s
+[A10] config cb060c5b8093 gpt-small  ok: 12.2 s
+[A10] config dff836094391 gpt-small  ok: 12.2 s
+[A10] config b9a60bbc993c gpt-small  ok: 14.8 s
+[A10] config a07f9ea77483 gpt-small  ok: 14.8 s
+[A10] config 4ce9097597a1 gpt-small  ok: 12.9 s
+[A10] config 55f8d32717fb gpt-small  ok: 11.8 s
+[A10] wave 2: $0.67 of $3.10 spent (container time, worst case for unsettled waves), 116 done, 184 to do, deadline 90 s, next wave 2 x 23
+[A10] wave 2 took 325 s on 2 containers: 710 container-s ($0.24, worst case was $2.38) for 46 configs
+[A10] batch: 307.7 s in the container, reload 0.1 s, commits 5.8 s
+[A10] config 1b6c83ee4dee gpt-small  ok: 13.3 s
+[A10] config 7b01a7ff0e4d gpt-small  ok: 14.9 s
+[A10] config abdeb702f1e0 gpt-small  ok: 12.0 s
+[A10] config ac60423e4dfd gpt-small  ok: 12.2 s
+[A10] config 3263ed607598 gpt-small  ok: 12.0 s
+[A10] config cd087559a7ee gpt-small  ok: 12.1 s
+[A10] config fab3a117e30c gpt-small  ok: 14.5 s
+[A10] config d7b063e7a841 gpt-small  ok: 12.8 s
+[A10] config d0870b92ee6c gpt-small  ok: 12.2 s
+[A10] config c34296b6d029 gpt-small  ok: 14.5 s
+[A10] config bd67cae835b9 gpt-small  ok: 12.6 s
+[A10] config e598f100eb17 gpt-small  ok: 12.7 s
+[A10] config cff25dec8337 gpt-small  ok: 14.7 s
+[A10] config 63ea0d19c442 gpt-small  ok: 14.9 s
+[A10] config 9cddfdc8d7c1 gpt-small  ok: 12.4 s
+[A10] config 5d5b4048627c gpt-small  ok: 14.7 s
+[A10] config 8a786757669a gpt-small  ok: 11.9 s
+[A10] config 56212ef22b1f gpt-small  ok: 14.7 s
+[A10] config c68a33720abe gpt-small  ok: 12.1 s
+[A10] config 1b74b3c084e3 gpt-small  ok: 14.4 s
+[A10] config 0165b4650c30 gpt-small  ok: 12.0 s
+[A10] config 5294f2b1ee1d gpt-small  ok: 12.2 s
+[A10] config 889fde191b99 gpt-small  ok: 11.8 s
+[A10] batch: 320.1 s in the container, reload 0.2 s, commits 10.4 s
+[A10] config 6baa2d2f4cdd gpt-small  ok: 12.7 s
+[A10] config d7ba13e7fbf2 gpt-small  ok: 12.4 s
+[A10] config 5fc5c3dddcd5 gpt-small  ok: 12.0 s
+[A10] config c5c08c8d1519 gpt-small  ok: 12.0 s
+[A10] config a5075af80ed9 gpt-small  ok: 12.4 s
+[A10] config 156a8cea82ed gpt-small  ok: 17.2 s
+[A10] config b0e3ebb502c4 gpt-small  ok: 15.3 s
+[A10] config 936e4dd173ee gpt-small  ok: 12.6 s
+[A10] config e9d4880fe0ee gpt-small  ok: 14.9 s
+[A10] config c75687bbf3a5 gpt-small  ok: 12.5 s
+[A10] config 9bd4a5951836 gpt-small  ok: 15.0 s
+[A10] config e9578ee90d94 gpt-small  ok: 16.9 s
+[A10] config 1354769ace57 gpt-small  ok: 14.5 s
+[A10] config 8d267f44c89d gpt-small  ok: 15.0 s
+[A10] config 9e728cc454c6 gpt-small  ok: 12.2 s
+[A10] config 993bd39a44d1 gpt-small  ok: 12.1 s
+[A10] config ed6036bd0445 gpt-small  ok: 12.2 s
+[A10] config c6ba9ab14dbe gpt-small  ok: 12.3 s
+[A10] config 68111c6e0a4b gpt-small  ok: 12.5 s
+[A10] config 0e439c8f3c8f gpt-small  ok: 12.4 s
+[A10] config d0f54d7c7589 gpt-small  ok: 12.7 s
+[A10] config 8676f40d4b27 gpt-small  ok: 12.5 s
+[A10] config 5c1e6a3d561d gpt-small  ok: 15.0 s
+[A10] wave 3: $0.91 of $3.10 spent (container time, worst case for unsettled waves), 162 done, 138 to do, deadline 90 s, next wave 2 x 20
+[A10] wave 3 took 302 s on 2 containers: 664 container-s ($0.22, worst case was $2.14) for 40 configs
+[A10] batch: 297.2 s in the container, reload 0.2 s, commits 7.8 s
+[A10] config d55379ac260d gpt-small  ok: 12.8 s
+[A10] config 6470b2568e5a gpt-small  ok: 12.2 s
+[A10] config b259e89aa904 gpt-small  ok: 14.5 s
+[A10] config 6c58050971fb gpt-small  ok: 12.3 s
+[A10] config c1de2958e07b gpt-small  ok: 15.2 s
+[A10] config 8acf4f9c9929 gpt-small  ok: 17.4 s
+[A10] config 206418a4b93c gpt-small  ok: 15.4 s
+[A10] config 1e2c10bc551f gpt-small  ok: 15.8 s
+[A10] config 2b9307d79cc8 gpt-small  ok: 13.6 s
+[A10] config 4987b59c61e2 gpt-small  ok: 14.1 s
+[A10] config dbe823a33a38 gpt-small  ok: 15.9 s
+[A10] config 51e0479df784 gpt-small  ok: 16.2 s
+[A10] config 20887966c81f gpt-small  ok: 15.5 s
+[A10] config 5c852c174adc gpt-small  ok: 13.7 s
+[A10] config 1fa82e16d756 gpt-small  ok: 13.1 s
+[A10] config ab230708558a gpt-small  ok: 13.3 s
+[A10] config 4e195b7e345a gpt-small  ok: 13.1 s
+[A10] config 0cbf87c12686 gpt-small  ok: 16.0 s
+[A10] config 1699b56a37b5 gpt-small  ok: 15.4 s
+[A10] config 635541e1f3b9 gpt-small  ok: 13.5 s
+[A10] batch: 284.8 s in the container, reload 0.2 s, commits 8.5 s
+[A10] config b2acb4084228 gpt-small  ok: 15.2 s
+[A10] config 5ed1a7605e30 gpt-small  ok: 12.5 s
+[A10] config 1e93b3b0fdc0 gpt-small  ok: 15.2 s
+[A10] config 985546288eec gpt-small  ok: 12.2 s
+[A10] config 7b9481935552 gpt-small  ok: 14.7 s
+[A10] config 80f89d3c933d gpt-small  ok: 12.3 s
+[A10] config 1121ef0c2d1c gpt-small  ok: 11.8 s
+[A10] config 16ce7e43ec3b gpt-small  ok: 14.8 s
+[A10] config 578b7de70276 gpt-small  ok: 11.8 s
+[A10] config 2a382f2f7769 gpt-small  ok: 14.6 s
+[A10] config d2897f50a91a gpt-small  ok: 16.8 s
+[A10] config eb583c44afc5 gpt-small  ok: 12.2 s
+[A10] config d87f2dd25d00 gpt-small  ok: 14.8 s
+[A10] config 307121ebe8d4 gpt-small  ok: 14.6 s
+[A10] config 666b1f4533cc gpt-small  ok: 14.7 s
+[A10] config 3960022d3214 gpt-small  ok: 11.9 s
+[A10] config 89aae3e04eb2 gpt-small  ok: 16.8 s
+[A10] config 0a08ccf33f37 gpt-small  ok: 14.4 s
+[A10] config dcc1465e23f5 gpt-small  ok: 12.3 s
+[A10] config b2c28147eb05 gpt-small  ok: 12.5 s
+[A10] wave 4: $1.13 of $3.10 spent (container time, worst case for unsettled waves), 202 done, 98 to do, deadline 90 s, next wave 2 x 17
+[A10] wave 4 took 269 s on 2 containers: 598 container-s ($0.20, worst case was $1.90) for 34 configs
+[A10] batch: 241.5 s in the container, reload 0.1 s, commits 11.3 s
+[A10] config 90e548d7c93a gpt-small  ok: 15.2 s
+[A10] config 1c5bef2d53c0 gpt-small  ok: 12.3 s
+[A10] config f69a34e91dd1 gpt-small  ok: 12.6 s
+[A10] config df647a763bf6 gpt-small  ok: 12.5 s
+[A10] config 3c5664f38f26 gpt-small  ok: 12.3 s
+[A10] config e6af698a12f3 gpt-small  ok: 15.0 s
+[A10] config 05c144e5cd91 gpt-small  ok: 12.9 s
+[A10] config aa0cb8e3fb84 gpt-small  ok: 12.2 s
+[A10] config 2f0c82a187d0 gpt-small  ok: 14.6 s
+[A10] config 55ed1fb939a3 gpt-small  ok: 11.9 s
+[A10] config 6a51fb9bbef0 gpt-small  ok: 14.5 s
+[A10] config 1cc0514b80cf gpt-small  ok: 14.3 s
+[A10] config 6f6ac93df8f4 gpt-small  ok: 16.9 s
+[A10] config 671a63065533 gpt-small  ok: 14.5 s
+[A10] config a99b910488ae gpt-small  ok: 11.8 s
+[A10] config 58641c13b6ed gpt-small  ok: 14.5 s
+[A10] config 891784e805b9 gpt-small  ok: 12.1 s
+[A10] batch: 263.1 s in the container, reload 0.3 s, commits 4.9 s
+[A10] config 63e8c1f8fa7a gpt-small  ok: 15.2 s
+[A10] config cac2c11696d6 gpt-small  ok: 17.0 s
+[A10] config 908207b7d998 gpt-small  ok: 17.1 s
+[A10] config 67d34ede2d9c gpt-small  ok: 15.2 s
+[A10] config f6778d27c3e5 gpt-small  ok: 12.2 s
+[A10] config a63dc1ce2053 gpt-small  ok: 15.1 s
+[A10] config 98fee496f81f gpt-small  ok: 12.8 s
+[A10] config e801117d783d gpt-small  ok: 15.0 s
+[A10] config 964d9f55a018 gpt-small  ok: 17.1 s
+[A10] config b09310b7da3b gpt-small  ok: 15.8 s
+[A10] config ed81cecc1d00 gpt-small  ok: 12.6 s
+[A10] config ef8e7001319a gpt-small  ok: 15.8 s
+[A10] config 6a4217bbf18b gpt-small  ok: 15.0 s
+[A10] config 07ffedc183be gpt-small  ok: 14.0 s
+[A10] config fbc8de515f09 gpt-small  ok: 17.9 s
+[A10] config 32e6e6dbc1d0 gpt-small  ok: 14.7 s
+[A10] config 729bc2707f54 gpt-small  ok: 15.1 s
+[A10] wave 5: $1.33 of $3.10 spent (container time, worst case for unsettled waves), 236 done, 64 to do, deadline 90 s, next wave 2 x 15
+[A10] wave 5 took 415 s on 2 containers: 890 container-s ($0.30, worst case was $1.73) for 30 configs
+[A10] batch: 207.5 s in the container, reload 0.3 s, commits 3.7 s
+[A10] config 4c530c485d04 gpt-small  ok: 13.1 s
+[A10] config 37f2d30b5cf0 gpt-small  ok: 8.8 s
+[A10] config 05425db35d76 gpt-small  ok: 12.1 s
+[A10] config 11200b93a425 gpt-small  ok: 14.9 s
+[A10] config 963df11db7d0 gpt-small  ok: 14.9 s
+[A10] config f74ac359fba2 gpt-small  ok: 12.6 s
+[A10] config cddb626dcbef gpt-small  ok: 12.1 s
+[A10] config 23b43e945678 gpt-small  ok: 16.9 s
+[A10] config 3452b9c79f03 gpt-small  ok: 14.8 s
+[A10] config accf3485f3e9 gpt-small  ok: 14.8 s
+[A10] config 3af05b7d0d50 gpt-small  ok: 11.9 s
+[A10] config 55113c1d36bc gpt-small  ok: 12.3 s
+[A10] config b881530776ed gpt-small  ok: 12.3 s
+[A10] config b64bb402bb49 gpt-small  ok: 16.8 s
+[A10] config 4f860e4c72e8 gpt-small  ok: 14.8 s
+[A10] batch: 203.4 s in the container, reload 0.2 s, commits 4.0 s
+[A10] config cd4a6c02c4f5 gpt-small  ok: 12.3 s
+[A10] config 2a00f6934cab gpt-small  ok: 14.4 s
+[A10] config c3b7b0e4b395 gpt-small  ok: 11.9 s
+[A10] config e6c27030bddd gpt-small  ok: 11.9 s
+[A10] config bdb78c5ce6ad gpt-small  ok: 14.6 s
+[A10] config d16b5f02e82a gpt-small  ok: 12.0 s
+[A10] config f6df8003a511 gpt-small  ok: 14.6 s
+[A10] config 1d8c11cc1b2d gpt-small  ok: 11.7 s
+[A10] config e906915b097d gpt-small  ok: 16.8 s
+[A10] config 629f081ab14b gpt-small  ok: 11.7 s
+[A10] config ca3fbf58e4f4 gpt-small  ok: 14.1 s
+[A10] config 51b3fe51f947 gpt-small  ok: 11.7 s
+[A10] config 0fe3d0ccb722 gpt-small  ok: 12.3 s
+[A10] config fe3d3867ee02 gpt-small  ok: 11.9 s
+[A10] config d02dfe3d2b6f gpt-small  ok: 17.1 s
+[A10] wave 6: $1.63 of $3.10 spent (container time, worst case for unsettled waves), 266 done, 34 to do, deadline 90 s, next wave 2 x 11
+[A10] wave 6 took 216 s on 2 containers: 492 container-s ($0.17, worst case was $1.41) for 22 configs
+[A10] batch: 208.4 s in the container, reload 0.1 s, commits 3.4 s
+[A10] config ecc8d9c751fb gpt-small  ok: 18.3 s
+[A10] config aa920b1d6b42 gpt-small  ok: 17.6 s
+[A10] config be96498cefa6 gpt-small  ok: 20.7 s
+[A10] config eb6d890d6636 gpt-small  ok: 17.6 s
+[A10] config d6e95bb973cf gpt-small  ok: 17.0 s
+[A10] config 14a4aaf3a015 gpt-small  ok: 21.0 s
+[A10] config 6a3dd60f1bb6 gpt-small  ok: 20.5 s
+[A10] config 37e7bb194f3c gpt-small  ok: 17.3 s
+[A10] config 5be4944e4b09 gpt-small  ok: 16.8 s
+[A10] config ac8d16c3ad7c gpt-small  ok: 16.7 s
+[A10] config 7e3afa255f11 gpt-small  ok: 21.0 s
+[A10] batch: 173.8 s in the container, reload 0.2 s, commits 6.9 s
+[A10] config 86cd8464e43d gpt-small  ok: 15.5 s
+[A10] config 8884466c5aaf gpt-small  ok: 15.3 s
+[A10] config 57b58467817e gpt-small  ok: 15.1 s
+[A10] config 00853a5556d4 gpt-small  ok: 15.3 s
+[A10] config d6858faedcc9 gpt-small  ok: 15.3 s
+[A10] config 06e99918d160 gpt-small  ok: 15.6 s
+[A10] config 99aa855f07e6 gpt-small  ok: 12.5 s
+[A10] config f5c1c74353e0 gpt-small  ok: 15.6 s
+[A10] config ce047d0be034 gpt-small  ok: 15.5 s
+[A10] config 6166d7b40550 gpt-small  ok: 15.2 s
+[A10] config f9496eee68ce gpt-small  ok: 15.6 s
+[A10] wave 7: $1.80 of $3.10 spent (container time, worst case for unsettled waves), 288 done, 12 to do, deadline 90 s, next wave 2 x 9
+[A10] wave 7 took 136 s on 2 containers: 332 container-s ($0.11, worst case was $1.25) for 12 configs
+[A10] batch: 131.3 s in the container, reload 0.5 s, commits 2.9 s
+[A10] config 89167276e0e0 gpt-small  ok: 12.6 s
+[A10] config 5d7bce47e093 gpt-small  ok: 12.6 s
+[A10] config e6a1707c481e gpt-small  ok: 14.4 s
+[A10] config 949754e467e5 gpt-small  ok: 14.9 s
+[A10] config cfca1e20ac2c gpt-small  ok: 12.4 s
+[A10] config 33646e922f27 gpt-small  ok: 12.2 s
+[A10] config 14c5d9e6dbc1 gpt-small  ok: 17.3 s
+[A10] config d8ba11adb7df gpt-small  ok: 15.5 s
+[A10] config 6099226b3b92 gpt-small  ok: 15.7 s
+[A10] batch: 49.6 s in the container, reload 0.2 s, commits 1.8 s
+[A10] config 92696c38f04c gpt-small  ok: 15.4 s
+[A10] config afe6a346d136 gpt-small  ok: 15.2 s
+[A10] config ab876073f22a gpt-small  ok: 17.1 s
+[A10] wave 8: $1.91 of $3.10 spent (container time, worst case for unsettled waves), 300 done, 0 to do, deadline 90 s, next wave 0 x 0
+[A10] finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-3qdSYp4qJjLLEvtZd92i0d

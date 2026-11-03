@@ -1,0 +1,11 @@
+{
+	"name": "20261103-001841-41551917685-b-div-real-2",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41551917685",
+	"ref": "ws-b",
+	"sha": "b4af53a6285f2b32cb7b230d679c9c71ddb0b8ce",
+	"cmd": "modal run --env main python/preflight/corpus/modal_app.py::main --kind divergence_real --n 300 --seed 2 --budgets A10=3.1 --batch-size 32 --max-containers 3 --max-minutes 90 --deadline-s 90",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T01:07:53Z"
+}
