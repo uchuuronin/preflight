@@ -45,6 +45,18 @@ def classify(exc: BaseException, *, steps: int, in_eval: bool) -> Classified:
 			f"The script imports {pkg}, which is not installed in the probe image",
 			False,
 		)
+	if (isinstance(exc, ImportError) or name == "ImportError") and _has(
+		msg, "can only be used in a notebook"
+	):
+		# huggingface_hub's notebook_login() outside Jupyter (F2, Nov 3): its message says `pip install ipywidgets`, but
+		# no package fixes it; it was labelled missing_package
+		return Classified(
+			"notebook_only",
+			"error",
+			"The script calls a function that only works inside a notebook (Jupyter or Colab), such as "
+			"notebook_login(); a probe isn't one, and public models need no login",
+			False,
+		)
 	if isinstance(exc, ImportError) or name == "ImportError":
 		# libraries that check optional dependencies themselves, e.g. Trainer asking for accelerate
 		m = re.search(r"requires `?([A-Za-z0-9_.\-\[\]]+?)`?(?:[<>=!~][^\s`:]*)?`?[\s:,]", msg)
