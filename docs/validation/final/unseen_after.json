@@ -1,5 +1,5 @@
 {
- "$comment": "the nine after the freeze: A's ops runs, install flags on, no hand edits (from-a.md, Nov 3); reaching the first step counts",
+ "$comment": "the nine after the freeze: A's item-8 ops rerun, every fix on, no hand edits (from-a.md, Nov 3); reaching the first step counts",
  "runs": [
   {
    "script": "unseen-1",
@@ -20,7 +20,7 @@
    "script": "unseen-4",
    "set": "unseen",
    "harnessed_without_edits": true,
-   "$run": "a-after-4a-full-3 41499457976"
+   "$run": "a-all4-4a 41649825142"
   },
   {
    "script": "unseen-5",
@@ -36,18 +36,19 @@
    "script": "unseen-7",
    "set": "unseen",
    "harnessed_without_edits": true,
-   "$run": "a-all3-7 41559542255"
+   "$run": "a-all4-7 41647588867"
   },
   {
    "script": "unseen-8",
    "set": "unseen",
    "harnessed_without_edits": true,
-   "$run": "a-all3-8 41559534537"
+   "$run": "a-all4-8-r 41652843880"
   },
   {
    "script": "unseen-9",
    "set": "unseen",
-   "harnessed_without_edits": false
+   "harnessed_without_edits": true,
+   "$run": "a-all4-9 41653607701"
   }
  ]
 }

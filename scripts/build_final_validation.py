@@ -35,11 +35,11 @@ SOURCES = {
 KNOB_MS = (
 	VAL / "knob_ms_nov2.json"
 )  # C's stranger test, the only knob timing C has posted (PM, Nov 3: use C's)
-# A's from-a.md (Nov 3): with probes.repo_install, probes.uv_install and probes.extra_hosts, ops full runs, no hand
-# edits, 3 of 9 reach their first step: 4 (smolagents, its first model call), 7 (BEIR), 8 (OGB arxiv)
-AFTER_REACHED = {"unseen-4", "unseen-7", "unseen-8"}
-AFTER_RUNS = {"unseen-4": "a-after-4a-full-3 41499457976", "unseen-7": "a-all3-7 41559542255",
-	"unseen-8": "a-all3-8 41559534537"}  # fmt: skip
+# A's from-a.md (Nov 3, item 8): the nine rerun with every bring-your-own-script fix on, ops full runs on the A10, the
+# list's own arguments, no hand edits: 4 of 9 reach their first step (fixes designed on these nine)
+AFTER_REACHED = {"unseen-4", "unseen-7", "unseen-8", "unseen-9"}
+AFTER_RUNS = {"unseen-4": "a-all4-4a 41649825142", "unseen-7": "a-all4-7 41647588867",
+	"unseen-8": "a-all4-8-r 41652843880", "unseen-9": "a-all4-9 41653607701"}  # fmt: skip
 
 
 def _version(v: str) -> tuple[int, ...]:
@@ -93,8 +93,8 @@ def main(argv: list[str] | None = None) -> int:
 		indent=1) + "\n")  # fmt: skip
 	after = [{"script": r["script"], "set": "unseen", "harnessed_without_edits": r["script"] in AFTER_REACHED,
 		**({"$run": AFTER_RUNS[r["script"]]} if r["script"] in AFTER_RUNS else {})} for r in first]  # fmt: skip
-	(DEST / "unseen_after.json").write_text(json.dumps({"$comment": "the nine after the freeze: A's ops runs, "
-		"install flags on, no hand edits (from-a.md, Nov 3); reaching the first step counts", "runs": after},
+	(DEST / "unseen_after.json").write_text(json.dumps({"$comment": "the nine after the freeze: A's item-8 ops rerun, "
+		"every fix on, no hand edits (from-a.md, Nov 3); reaching the first step counts", "runs": after},
 		indent=1) + "\n")  # fmt: skip
 	if a.fresh:
 		fresh = gather([a.fresh], relabelled)
