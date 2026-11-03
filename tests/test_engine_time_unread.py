@@ -39,3 +39,17 @@ def test_a_gnn_s_fanout_is_on_the_work_axis_not_unread():
 	assert knobs.work_units("gnn", {"batch_size": 8, "fanout.hop1": 10}) != knobs.work_units(
 		"gnn", {"batch_size": 8, "fanout.hop1": 20}
 	)
+
+
+def test_a_fanout_move_is_carried_by_the_model_and_a_packing_move_is_said_once():
+	rec = _rec("gnn_pyg_a10.record.json")
+	cur = api._current(rec)
+	fan = next((k for k in cur if k.startswith("fanout.")), None)
+	if fan is not None:
+		t = api.predict(rec, {fan: cur[fan] * 2}).root["time.step"]
+		assert "isn't modelled for time" not in (t.reason or "")
+	vis = _rec("vision_timm_a10.record.json")
+	if "channels_last" in api._current(vis):
+		cl = api._current(vis)["channels_last"]
+		r = api.predict(vis, {"channels_last": not cl}).root["time.step"].reason or ""
+		assert "isn't modelled for time yet" in r and "channels_last is off the probed values" not in r

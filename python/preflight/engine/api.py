@@ -590,8 +590,20 @@ STEP_TIME_UNREAD = frozenset(
 		"use_vllm",
 		"kv_cache_dtype",
 		"gpu_memory_utilization",
+		"eval_batch_size",
+		"fsdp_mode",
+		"deepspeed_config",
+		"index_m",
+		"index_nlist",
+		"rl_iterations",
+		"max_num_seqs",
+		"max_batched_tokens",
+		"request_rate",
+		"max_new_tokens",
 	}
-)  # fmt: skip (the last three: the serving simulator's, off)
+)  # memory reads use_vllm and the KV and parallel knobs; eval passes are timed at the probe's eval batch; the
+# strategy comes from the script map; the serving knobs feed only the serving simulator; max_new_tokens sizes memory
+# only, off the work axis (knobs.work_units reads seq_len or max_model_len) (review, Nov 3)
 
 
 def _generic_shape(record: FlightRecord) -> bool:
@@ -1748,11 +1760,12 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 			multi.reason if nodes > 1 else f"{world} GPUs: the gradient all-reduce is estimated, not measured"
 		)
 
+	unmodelled = set(_unmodelled_moves(record, values, "time"))
 	off = [
 		k
 		for k in _off_probe(record, values, also_ok=frozenset({"grad_accum"}))
-		if k not in _PRECISION_KNOBS and k not in STEP_TIME_UNREAD
-	]  # an unread knob is said below, as unmodelled for time
+		if k not in _PRECISION_KNOBS and k not in STEP_TIME_UNREAD and k not in unmodelled
+	]  # an unmodelled knob is said below, as unmodelled for time, never as carried too (review)
 	if off and status in ("predicted", "measured"):
 		status = "extrapolated"
 		reasons.append(
