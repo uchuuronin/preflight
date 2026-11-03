@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fromFile, parsePackages, troubleFromFailure, troubleFromProbes, withPackages } from "./checkinTrouble";
+import { nothingMeasured } from "./checkinTrouble";
 
 describe("where a check-in stopped, from what the runner says today (unseen runs, Nov 2)", () => {
 	it("reads a repo over the read limit and code over the map's limit", () => {
@@ -52,5 +53,20 @@ describe("the ways past", () => {
 		const body = { source: { kind: "repo", uri: "https://github.com/a/b", commit: "c" }, gpu: "L4" } as never;
 		expect(withPackages(body, ["torchvision"])).toMatchObject({ gpu: "L4", extra_packages: ["torchvision"], source: { uri: "https://github.com/a/b" } });
 		expect(fromFile(body, "scripts/train.py")).toMatchObject({ source: { kind: "repo", entrypoint: "scripts/train.py", scope: "entrypoint" } });
+	});
+});
+
+describe("nothingMeasured", () => {
+	it("is the stop when no probe measured, with the code they share", () => {
+		expect(nothingMeasured([{ status: "error", error_code: "gpu.unavailable" }, { status: "error", error_code: "gpu.unavailable" }])).toEqual({ step: "measure", code: "gpu.unavailable" });
+		expect(nothingMeasured([{ status: "error", error_code: "notebook_only" }, { status: "timeout", error_code: "timeout" }])).toEqual({ step: "measure", code: null });
+	});
+	it("is nothing when any probe measured (or came from the cache), or there are no probes", () => {
+		expect(nothingMeasured([{ status: "ok" }, { status: "error", error_code: "oom" }])).toBeNull();
+		expect(nothingMeasured([{ status: "cached" }])).toBeNull();
+		expect(nothingMeasured([])).toBeNull();
+	});
+	it("takes the job's own stop code when the runner sends one", () => {
+		expect(nothingMeasured([{ status: "error", error_code: "a" }, { status: "error", error_code: "b" }], "gpu.unavailable")).toEqual({ step: "measure", code: "gpu.unavailable" });
 	});
 });

@@ -66,3 +66,30 @@ describe("check-in help on Boarding", () => {
 		expect(body.extra_packages).toEqual(["einops"]);
 	});
 });
+
+describe("a check-in that measured nothing (PM, Nov 3)", () => {
+	afterEach(() => {
+		cleanup();
+		on.clear();
+		vi.unstubAllGlobals();
+	});
+	it("says so plainly, with why and a way to try again that resends the same check-in", async () => {
+		const body = { source: { kind: "repo", uri: "https://github.com/karpathy/nanoGPT" } } as never;
+		rememberRequest("j9", body);
+		on.add("runner.free_resend");
+		const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ job_id: "j10" }), { status: 202 }));
+		vi.stubGlobal("fetch", fetch);
+		const { container, getByRole } = render(<CheckinHelp trouble={{ step: "measure", code: "gpu.unavailable" }} jobId="j9" />);
+		expect(container.textContent).toContain("Nothing was measured");
+		expect(container.textContent).toContain("No GPU was free in time");
+		await act(async () => {
+			fireEvent.click(getByRole("button", { name: "Try again" }));
+		});
+		expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({ source: { kind: "repo", uri: "https://github.com/karpathy/nanoGPT" }, resend_of: "j9" });
+	});
+	it("names the repo's own module, not requirements.txt", () => {
+		const { container } = render(<CheckinHelp trouble={{ step: "measure", code: "missing_module.local" }} jobId="jx" />);
+		expect(container.textContent).toContain("whole repository");
+		expect(container.textContent).toContain("Check in again from New flight.");
+	});
+});
