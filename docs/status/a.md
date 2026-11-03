@@ -1,6 +1,6 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 12:05 PM ET.
+Updated Tue Nov 3, 12:55 PM ET.
 
 **Production runner: fixes live, deployed from ws-a c146cf11** (= main d9e6b555, the main the PM posted at 10:45, plus OGB's and BEIR's dataset hosts in the probe egress; `a-deploy-main-29`, GitHub 41668262328, Nov 3 15:52 UTC / 10:52 AM ET), after three startup checks passed (`a-startup-check-29` 41667268503, `a-startup-check-serving-15` 41667695263, `a-startup-torch-new-3` 41668003979: the torch 2.7.1 image); the limit check passed after it (`a-limit-check-10`, 41668393969). **On in production:** `runner.read_closure`, `probes.repo_install_exec`, `runner.probe_without_map`, `harness.lens_by_entry`, `probes.torch_new`, `probes.dataset_cache`, with the morning's flags; the probe sees PyG's wheel index; the probe egress adds snap.stanford.edu and public.ukp.informatik.tu-darmstadt.de. Off: `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from 28fc9b62** (the 10:20 deploy), or ad12da7 for the morning's.
 
@@ -98,6 +98,9 @@ attempt only, with no Preflight change in between:
 | 12:00 | OGB's arxiv archive from the dataset volume, kept by URL and served only when its sha256 is the pinned one (pinned from the fill after the fresh runs); BEIR's host is HTTPS and on the allowlist since 10:52, checked by `a-fresh-live-beir-checkin` (result in from-a) | the PM's item 4 | the fill, CPU minutes | revert ba3a2952 |
 | 12:00 | B's logging: `trainer_dataset_len`; lm-eval's request count and tokens (`probes.eval_units`) | the PM's item 6 | none | revert 2f7ad78a |
 | 12:00 | Skipped in A's push gate only: `api/tests/test_predict.py::test_a_burst_is_bounded…` (timing-dependent here, fails on main's own code too); told C | the gate blocked a push on it | none | drop the deselect from the gate |
+| 12:40 | B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map` (files the code may open; lazy packages' TYPE_CHECKING imports; a follow-up keeps the map-skipped finding), with a review round: an older record's follow-up still matches its code | the PM's 12:20 note (due 2:30) | none | revert cbd900b1, c2138654 |
+| 12:45 | OGB's archive pinned (sha256 49f85c80…) after `a-fill-datasets-ogb-1` put it in the volume | item 4 | about $0.01 CPU [estimate] | revert 4669aeda |
+| 12:50 | The private check-in on production (record 01M6H6QJ0DK3WX7XGAVD25XPJ9): triage on Glimmer, no diagnosis, the claim check code only; one Meta call, the script map, as the data-use line discloses; the gate is the PM's call | item 5 | $0.39 [measured] | nothing to undo |
 
 ## Decisions today (Chiya out until about 5 PM ET; her autonomy, Nov 2 11:16 AM ET)
 
