@@ -1,0 +1,65 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-oRaotsbXTrX27pZX4LguBY
+✓ Created objects.
+packages: submitted
+{
+ "which": "packages",
+ "job_status": "done",
+ "error_code": null,
+ "error": "",
+ "minutes": 5.7,
+ "usd": 0.0596,
+ "record": {
+  "source": {
+   "kind": "upload",
+   "entrypoint": "train.py",
+   "scope": null,
+   "extra_packages": [
+    "einops"
+   ]
+  },
+  "lens": "pretrain",
+  "probes": [
+   {
+    "id": "p1",
+    "status": "ok",
+    "error_code": null,
+    "missing_module": null,
+    "steps": 14
+   },
+   {
+    "id": "p2",
+    "status": "ok",
+    "error_code": null,
+    "missing_module": null,
+    "steps": 9
+   },
+   {
+    "id": "p3",
+    "status": "ok",
+    "error_code": null,
+    "missing_module": null,
+    "steps": 9
+   }
+  ],
+  "findings": [
+   {
+    "source": "rule",
+    "code": "precision.fp32",
+    "severity": "warn",
+    "checked_by_spark_open": false,
+    "title": "Trains in fp32"
+   },
+   {
+    "source": "spark_diagnosis",
+    "code": "diagnosis.consistent",
+    "severity": "info",
+    "checked_by_spark_open": true,
+    "title": "Plots and numbers agree"
+   }
+  ]
+ }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-oRaotsbXTrX27pZX4LguBY

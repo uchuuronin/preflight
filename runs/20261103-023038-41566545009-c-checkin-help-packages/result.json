@@ -1,0 +1,11 @@
+{
+	"name": "20261103-023038-41566545009-c-checkin-help-packages",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41566545009",
+	"ref": "ws-c",
+	"sha": "51db37d2fe07fa8ca5462062bfaa5c76905e319c",
+	"cmd": "modal run --env main api/checkin_help_app.py::send --which packages --attempt a",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T02:36:39Z"
+}
