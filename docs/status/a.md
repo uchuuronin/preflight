@@ -1,8 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Mon Nov 2, 5:40 PM ET.
+Updated Mon Nov 2, 7:55 PM ET.
 
-**Production runner: deployed from main 8ec03bc** (`a-deploy-main-25`, GitHub 41538939175, Nov 2 22:38 UTC / 5:38 PM ET), after both startup checks passed (`a-startup-check-25` 41538153950, `a-startup-check-serving-11` 41538684027); the limit check passed after it (`a-limit-check-6`, 41539041885). It carries the afternoon merge: `runner.stop_on_import_error`, `probes.agent_error_line`, `runner.hide_sample_outputs`, `c.inflight`, `c.fix_loop` and `harness.glimmer_private` on; `probes.repo_install` off. The previous deploys were 7ba177b (17:57 UTC) and 14ae7be (17:34 UTC); rollback is `modal deploy --env main` from 7ba177b.
+**Production runner: deployed from main a132c0a** (`a-deploy-main-26`, GitHub 41554416912, Nov 3 00:40 UTC / Nov 2 7:40 PM ET), after both startup checks passed (`a-startup-check-26` 41553993474, `a-startup-check-serving-12` 41554253275); the limit check passed after it (`a-limit-check-7`, 41554506106). New in production with it: `harness.spark_diagnosis` and `harness.spark_claim_check` on (the PM's merge 2), check-in help's fields (contract 0.6.3/0.6.4), and the new probe image (torchvision 0.20.1, uv 0.5.11), so every probe is measured afresh. The previous deploy was 8ec03bc (22:38 UTC); rollback is `modal deploy --env main` from 8ec03bc.
 
 ## Unseen validation runs (Nov 2): all nine posted
 
@@ -48,6 +48,15 @@ The flag is on only in each ops run's own process (`ground_truth --install-repo`
 | 7 | yes (sentence-transformers, pytrec-eval-terrier, faiss-cpu, scipy) | **yes: the full run encodes trec-covid and OOMs on the A10** ("tried to allocate 2.19 GiB", 18.51 GiB allocated, 22.06 GiB card), the probe too | that OOM is its outcome: a ground truth B can score | `a-after-7-gt` 41491792689 |
 | 8 | yes (torch-geometric and its declared deps; ogb's master.csv now read) | no | `Tensor.to_symmetric`: torch_sparse, which has no wheels on PyPI (the probe's egress is PyPI and Hugging Face only) | `a-after-8-gt` 41491722160, `-2` 41493786662 |
 | 9 | yes (torchvision) | no: the script starts, then downloads CIFAR-10 from torchvision's own host at about 37 kB/s (28% in 22 min) | data from a host other than PyPI or Hugging Face: slow here, and blocked in a production probe (its egress is PyPI and Hugging Face only) | `a-after-9-gt` 41491655356 (45 min on the A10) |
+
+### Evening trials (Chiya's 5:39 PM items, flags on in each ops process only)
+
+| Script | What was tried | Result | Run |
+| --- | --- | --- | --- |
+| 5, lm-evaluation-harness | **check in by command** (`runner.command_checkin`): lm-eval installed from requirements.txt (uv on; its three source-only dependencies allowed to build) | **installs and runs to the end** on the A10: all 53,345 loglikelihood requests in 4 min 18 s, bare run 359 s wall, peak 9.57 GB allocated / 12.49 GB reserved [measured], no OOM. The recorder's probe kept nothing (`too_few_steps`): loglikelihood scoring makes no generate call, so the eval probe sees no unit of work. The wrapper's `sys.exit(None)` read as an exit (fixed) | `a-trial-lmeval-cmd-gt` 41545760648 |
+| 6, vLLM bench | by command | not tried: the serving image's vLLM 0.6.4 has no `bench` subcommand, so vllm is off the command list | n/a |
+| 2, LitGPT | install check on CPU, pip against uv (`probes.uv_install`) | **neither installs**: pip ran out at 420 s; uv's resolve overflowed its stack, then pip ran out (code fix since, not yet rerun when written: a 64 MiB stack, and "no solution" ends the install with uv's reason). The cause isn't the resolver: LitGPT at that commit asks for torch>=2.7 and lightning>=2.6.1, and the image has torch 2.5.1 | `a-trial-litgpt-install-pip` 41545743492, `-uv` 41545748477 |
+| 8, OGB arxiv | install check, uv and PyG's index (`probes.extra_hosts`) | **installs in 12.9 s**, every import the scan sees present; torch_sparse, which PyG imports at run time, wasn't among them (fixed: torch_geometric now brings torch-scatter and torch-sparse from PyG's index) | `a-trial-ogb-install-pyg` 41545754612 |
 
 ## Decisions today (Chiya out until about 5 PM ET; her autonomy, Nov 2 11:16 AM ET)
 

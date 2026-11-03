@@ -17,7 +17,7 @@ def pip(monkeypatch, tmp_path):
 	def fake_run(cmd, **kw):
 		seen.append(list(cmd))
 		code = state["answer"](cmd)
-		return subprocess.CompletedProcess(cmd, code, "", "" if code == 0 else "No solution found")
+		return subprocess.CompletedProcess(cmd, code, "", "" if code == 0 else "error: something failed")
 
 	monkeypatch.setattr(R.subprocess, "run", fake_run)
 	monkeypatch.setattr(R, "installed", lambda: {"torch": "2.5.1+cu124"})
@@ -96,3 +96,52 @@ def test_the_probe_spec_carries_them_and_each_changes_the_cache_key():
 		cache_key(ProbeSpec(**kw, **x), "L4", "i") for x in ({}, {"install_uv": True}, {"install_pyg": True})
 	}
 	assert len(keys) == 3  # another resolver can pick other versions, another index another build
+
+
+def test_with_pygs_index_torch_geometric_brings_its_run_time_extensions(tmp_path, monkeypatch):
+	import importlib.util
+
+	(tmp_path / "gnn.py").write_text("import torch_geometric.transforms as T\nT.ToSparseTensor()\n")
+	monkeypatch.setattr(
+		importlib.util, "find_spec", lambda name, *a, **k: None if name.startswith("torch_") else object()
+	)
+	_, imported = R.repo_requirement_sets(tmp_path, "gnn.py", log=lambda m: None, pyg=True)
+	assert imported == ["torch-geometric", "torch-scatter", "torch-sparse"]
+	assert R.repo_requirement_sets(tmp_path, "gnn.py", log=lambda m: None)[1] == ["torch-geometric"]
+
+
+def test_when_uv_finds_no_solution_pip_isnt_run_and_the_reason_is_said(pip, monkeypatch):
+	seen, _, work = pip
+	monkeypatch.setattr(R, "_uv", lambda: ["/usr/bin/uv"])
+	text = (
+		"  × No solution found when resolving dependencies:\n"
+		"  ╰─▶ Because litgpt depends on torch>=2.7 and you require torch==2.5.1, we can conclude that your "
+		"requirements are unsatisfiable.\n"
+	)
+
+	def run(cmd, **kw):
+		seen.append(list(cmd))
+		assert kw["env"]["UV_STACK_SIZE"] == str(R.UV_STACK_BYTES)
+		return subprocess.CompletedProcess(cmd, 1, "", text)
+
+	monkeypatch.setattr(R.subprocess, "run", run)
+	err, _ = R.install(work, work / "d", log=lambda m: None, uv=True)
+	assert err.startswith(R.NO_SOLUTION) and "torch>=2.7" in err and len(seen) == 1
+
+
+def test_a_failed_install_names_the_pins_the_code_asks_past(pip, monkeypatch):
+	_, state, work = pip
+	(work / "requirements.txt").write_text("torch>=2.7\nlitdata\ntqdm>4\n")
+	monkeypatch.setattr(R, "installed", lambda: {"torch": "2.5.1+cu124", "tqdm": "4.70.1"})
+	state["answer"] = lambda cmd: 1
+	err, _ = R.install(work, work / "d", log=lambda m: None)
+	assert err.startswith(
+		"the code asks for torch>=2.7 (the image has 2.5.1), which the probe image can't change."
+	)
+	assert "tqdm" not in err.split(".")[0]  # a line the image's copy satisfies isn't named
+
+
+def test_a_marker_or_a_local_label_is_never_called_a_conflict():
+	have = {"torch": "2.5.1+cu124", "numpy": "2.0.0"}
+	assert R.pin_conflicts('torch>=2.7; python_version<"3.9"\nnumpy==2.0.0+cu1\n', have) == []
+	assert R.pin_conflicts("torch>=2.7\n", have) == ["torch>=2.7 (the image has 2.5.1)"]
