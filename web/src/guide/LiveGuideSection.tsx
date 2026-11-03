@@ -8,11 +8,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../lib/i18n";
 import type { KnobValue } from "../workspace/record/types";
 import { useWorkspace } from "../workspace/state";
-import { beat, bestCombo, bestSingleRisk, comboKeys, comboVisit, comboWords, singleClears } from "./combos";
+import { comboKeys, comboVisit, comboWords } from "./combos";
 import { valueText } from "./GuidePanel";
-import { withinLimits, NO_LIMITS } from "./limits";
+import { NO_LIMITS } from "./limits";
 import { isFailing } from "./ruleTour";
-import { GuideFallback, LiveTour, TourCancelled, type LiveView, type TourContext } from "./liveGuide";
+import { GuideFallback, guideCombo, LiveTour, TourCancelled, type LiveView, type TourContext } from "./liveGuide";
 import { MoveChoices } from "./MoveChoices";
 
 export function LiveGuideSection({
@@ -127,10 +127,8 @@ export function LiveGuideSection({
 	const combo = useMemo(() => {
 		// Never beside a move of the guide's still waiting: applying would put that knob back.
 		if (!view || proposal || !isFailing({ record, provider, knobs: state.knobs })) return null;
-		const lim = withinLimits(record, provider, state.limits ?? NO_LIMITS, state.knobs, { pinned: state.pinned });
-		const objective = { kind: state.objective.kind ?? "min_time" } as const;
-		if (singleClears(record, provider, objective, lim)) return null;
-		return bestCombo(record, provider, state.knobs, objective, { ...beat(bestSingleRisk(record, provider, objective, lim)), pinned: lim.pinned ?? state.pinned, ...(lim.allow ? { allow: lim.allow } : {}), visited: turnedDown });
+		// The same rule as the guide's sensitivity tool, so the card is there whenever the guide names it.
+		return guideCombo(record, provider, state.knobs, state.objective.kind ?? "min_time", state.limits ?? NO_LIMITS, state.pinned, turnedDown);
 	}, [view, proposal, record, provider, state.knobs, state.limits, state.pinned, state.objective.kind, turnedDown]);
 	const words = combo ? comboWords(record, state.knobs, combo) : null;
 	const knob = proposal ? knobs.get(proposal.knobId) : undefined;

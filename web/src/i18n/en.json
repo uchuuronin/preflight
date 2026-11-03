@@ -655,6 +655,8 @@
 	"error.oom.eval.hint": "Lower the eval batch, or run eval without gradients (torch.no_grad).",
 	"error.oom.host": "Ran out of CPU memory on the machine, not the GPU.",
 	"error.oom.host.hint": "Use fewer data workers, stream the dataset instead of loading it whole, or load the model in lower precision.",
+	"error.missing_module.local": "The script imports one of the repository's own modules, and the run couldn't find it.",
+	"error.missing_module.local.hint": "Check in the whole repository, not a single file, so its own modules come with it. It isn't a package: adding it to requirements.txt won't help.",
 	"error.missing_package": "A package the script imports isn't installed.",
 	"error.missing_package.hint": "Add it to requirements.txt or the notebook's first cell, then check in again.",
 	"error.download_blocked": "A download the script needs was blocked.",
