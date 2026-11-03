@@ -1,0 +1,11 @@
+{
+	"name": "20261103-023039-41566547468-c-checkin-help-scope",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41566547468",
+	"ref": "ws-c",
+	"sha": "51db37d2fe07fa8ca5462062bfaa5c76905e319c",
+	"cmd": "modal run --env main api/checkin_help_app.py::send --which scope --attempt a",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T02:34:19Z"
+}

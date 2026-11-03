@@ -1,0 +1,77 @@
+✓ Initialized. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sHE4KCS2473W7zo2pCpyLl
+✓ Created objects.
+scope: submitted
+{
+ "which": "scope",
+ "job_status": "done",
+ "error_code": null,
+ "error": "",
+ "minutes": 3.4,
+ "usd": 0.0441,
+ "record": {
+  "source": {
+   "kind": "repo",
+   "entrypoint": "PyTorch/Classification/ConvNets/main.py",
+   "scope": "entrypoint",
+   "extra_packages": null
+  },
+  "lens": "vision",
+  "probes": [
+   {
+    "id": "p1",
+    "status": "error",
+    "error_code": "missing_package",
+    "missing_module": "image_classification",
+    "steps": 0
+   },
+   {
+    "id": "p2",
+    "status": "error",
+    "error_code": "missing_package",
+    "missing_module": "image_classification",
+    "steps": 0
+   },
+   {
+    "id": "p3",
+    "status": "error",
+    "error_code": "missing_package",
+    "missing_module": "image_classification",
+    "steps": 0
+   }
+  ],
+  "findings": [
+   {
+    "source": "rule",
+    "code": "precision.fp32",
+    "severity": "warn",
+    "checked_by_spark_open": false,
+    "title": "Trains in fp32"
+   },
+   {
+    "source": "rule",
+    "code": "vision.cpu_augment",
+    "severity": "warn",
+    "checked_by_spark_open": false,
+    "title": "Augmentation runs on the CPU"
+   },
+   {
+    "source": "spark_open_triage",
+    "code": "triage.missing_package",
+    "severity": "info",
+    "checked_by_spark_open": false,
+    "title": "Spark Open on probe p1: missing package"
+   },
+   {
+    "source": "rule",
+    "code": "source.partial",
+    "severity": "info",
+    "checked_by_spark_open": false,
+    "title": "Read the entry point and what it imports, as asked"
+   }
+  ]
+ }
+}
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/shuureiyashi99/main/ap-sHE4KCS2473W7zo2pCpyLl
