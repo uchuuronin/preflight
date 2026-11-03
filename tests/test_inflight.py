@@ -46,8 +46,10 @@ def test_a_slow_stretch_alerts_once_after_two_windows_and_again_after_recovery()
 	_run(col, clock, 2.0, 30)  # still slow: one alert, not three
 	assert len(said) == 1 and "above the predicted 1–1.5 s" in said[0]
 	_run(col, clock, 1.2, 10)  # back in band
-	_run(col, clock, 0.5, 20)  # fast now: a new alert
-	assert len(said) == 2 and "below" in said[1]
+	_run(
+		col, clock, 0.5, 20
+	)  # fast now: a note, not an alert (D, Nov 2: a tiny model steps faster than its probe)
+	assert len(said) == 1 and lines[-1].get("notes") and "faster than the predicted" in lines[-1]["notes"][0]
 	assert [w["step"] for w in lines][:3] == [11, 21, 31] and lines[0]["step_s"] == pytest.approx(1.2)
 	assert col.setup_s == pytest.approx(30.0)  # loading is not step time
 
@@ -159,3 +161,27 @@ def test_a_run_on_another_card_says_different_gpu_instead_of_alerting():
 		"A100-SXM-80GB", "NVIDIA A100-SXM4-80GB MIG 1g.10gb"
 	)  # a seventh of it
 	assert "different GPU" in card_change("RTX-4090", "NVIDIA GeForce RTX 4090 D")
+
+
+def test_a_faster_stretch_is_said_as_a_note_and_never_counted_as_an_alert():
+	clock, said, noted, lines = Clock(), [], [], []
+	col = Collector(Bands(step_s=(1.0, 1.5)), window=10, clock=clock, alert=said.append, note=noted.append,
+		write=lines.append)  # fmt: skip
+	_go(col, clock)
+	_run(col, clock, 0.5, 40)
+	col.finish()
+	assert said == [] and len(noted) == 1 and "faster than" in noted[0]
+	assert col.summary()["alerts"] == []
+
+
+def test_each_side_keeps_its_own_streak_so_a_note_never_blocks_or_hastens_an_alert():
+	"""Review, Nov 2: with one shared streak, a fast window counted toward a slow alert, and a note blocked the alert
+	that should follow it (a run that starts fast and then slows was never flagged)."""
+	clock, said, noted = Clock(), [], []
+	col = Collector(Bands(step_s=(1.0, 1.5)), window=10, clock=clock, alert=said.append, note=noted.append)
+	_go(col, clock)
+	_run(col, clock, 0.5, 20)  # two fast windows: one note
+	_run(col, clock, 2.0, 10)  # one slow window: not yet
+	assert len(noted) == 1 and said == []
+	_run(col, clock, 2.0, 10)  # the second slow one: the alert
+	assert len(said) == 1 and "above the predicted" in said[0]
