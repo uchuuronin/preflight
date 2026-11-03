@@ -350,6 +350,20 @@
 			"title": "Private",
 			"type": "boolean"
 		},
+		"resend_of": {
+			"anyOf": [
+				{
+					"pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "0.6.5: the job this one sends again (its job id), after it stopped at an import; with runner.free_resend on, once a day per visitor it doesn't count against the daily probe jobs",
+			"title": "Resend Of"
+		},
 		"extra_packages": {
 			"anyOf": [
 				{
@@ -376,5 +390,5 @@
 	"title": "JobRequest",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.4/JobRequest"
+	"$id": "https://preflight.dev/schema/0.6.5/JobRequest"
 }

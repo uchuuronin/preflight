@@ -15,7 +15,7 @@ from .ids import new_share_token, new_ulid
 from .prediction import Estimate, Objective, Predictions
 from .script_map import Framework, ScriptMap
 
-SCHEMA_VERSION = "0.6.4"
+SCHEMA_VERSION = "0.6.5"
 
 
 def _now() -> datetime:

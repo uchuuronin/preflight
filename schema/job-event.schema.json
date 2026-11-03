@@ -375,6 +375,32 @@
 			"default": null,
 			"description": "On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')",
 			"title": "Error Code"
+		},
+		"import_stop": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "0.6.5: every probe stopped at an import before its first step (or the job was refused for a package); with runner.free_resend on, one resend of this job today doesn't count against the visitor's daily probe jobs (JobRequest.resend_of names it)",
+			"title": "Import Stop"
+		},
+		"free_resend": {
+			"anyOf": [
+				{
+					"type": "boolean"
+				},
+				{
+					"type": "null"
+				}
+			],
+			"default": null,
+			"description": "0.6.5: on queued, this job is a free resend: it doesn't count against the visitor's daily probe jobs (the daily GPU dollar cap still holds)",
+			"title": "Free Resend"
 		}
 	},
 	"required": [
@@ -386,5 +412,5 @@
 	"title": "JobEvent",
 	"type": "object",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://preflight.dev/schema/0.6.4/JobEvent"
+	"$id": "https://preflight.dev/schema/0.6.5/JobEvent"
 }

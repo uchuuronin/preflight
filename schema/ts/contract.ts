@@ -1,7 +1,7 @@
 /* Generated from python/preflight/schema by `uv run python -m preflight.schema.generate`. Do not edit. */
 
 /**
- * Preflight contract v0.6.4. Generated; do not edit.
+ * Preflight contract v0.6.5. Generated; do not edit.
  */
 export interface PreflightContract {
 	FlightRecord?: FlightRecord;
@@ -1638,6 +1638,14 @@ export interface JobEvent {
 	 * On failed: a stable code in Probe.error_code's families; the UI shows t('error.<code>')
 	 */
 	error_code?: string | null;
+	/**
+	 * 0.6.5: every probe stopped at an import before its first step (or the job was refused for a package); with runner.free_resend on, one resend of this job today doesn't count against the visitor's daily probe jobs (JobRequest.resend_of names it)
+	 */
+	import_stop?: boolean | null;
+	/**
+	 * 0.6.5: on queued, this job is a free resend: it doesn't count against the visitor's daily probe jobs (the daily GPU dollar cap still holds)
+	 */
+	free_resend?: boolean | null;
 }
 /**
  * Body of POST /v1/jobs (validated by C, executed by A).
@@ -1695,6 +1703,10 @@ export interface JobRequest {
 	 */
 	private?: boolean;
 	/**
+	 * 0.6.5: the job this one sends again (its job id), after it stopped at an import; with runner.free_resend on, once a day per visitor it doesn't count against the daily probe jobs
+	 */
+	resend_of?: string | null;
+	/**
 	 * 0.6.3: PyPI names (no versions or URLs) the probe installs after the code's own requirements; only names on Preflight's list (recorder.requirements.known_packages), wheels only, the image's pinned stack wins. A name off the list fails the job with missing_package.not_allowed (.no_wheels for a package PyPI has no wheels for). Kept on the record's source, so later probes of it install them too
 	 */
 	extra_packages?:
@@ -1746,4 +1758,4 @@ export interface Costs1 {
 	};
 }
 
-export const SCHEMA_VERSION = "0.6.4";
+export const SCHEMA_VERSION = "0.6.5";

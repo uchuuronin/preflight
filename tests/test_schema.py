@@ -31,7 +31,7 @@ GOLDEN = ["finetune", "pretrain", "agent"]
 
 def test_schema_version_is_semver_0_x():
 	# 0.2.0 (Oct 27): run cost fields; 0.3.0 (Oct 28): at_risk_gpu_hours; 0.4.0 (Oct 28): A's job and knob fields; 0.5.0 (Oct 31): campaign intervals, JobRequest.patch; 0.6.0 (Nov 1): campaign calendar fields, Estimate.rate, agent run endings; 0.6.1 (Nov 1): StepSample.reserved_bytes, AgentSample.concurrency; 0.6.2 (Nov 1): JobRequest.private; 0.6.3 (Nov 2): extra packages, Source.scope, Probe.missing_module; 0.6.4 (Nov 2): Grid.independent_of. All additive over the 0.1.0 freeze
-	assert SCHEMA_VERSION == "0.6.4"
+	assert SCHEMA_VERSION == "0.6.5"
 
 
 def test_ulid_is_26_crockford_chars_and_sortable():
