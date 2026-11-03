@@ -14,11 +14,11 @@ describe("the checks page's same-code comparison (B's vs_model.json)", () => {
 		const rows = within(table).getAllByRole("row").slice(1);
 		expect(rows.length).toBe(vs.rows.length);
 		const gnn = rows.find((r) => r.textContent?.includes("GNN (PyG GraphSAGE)"))!;
-		expect(gnn.textContent).toContain("Preflight: 0.92×");
-		expect(gnn.textContent).toContain("Muse Spark: 18×");
+		expect(gnn.textContent).toContain("Preflight: 0.916×");
+		expect(gnn.textContent).toContain("Muse Spark: 18.0×");
 		// a run that ran out of memory says why it has no peak, not a gap
 		const lora = rows.find((r) => r.textContent?.includes("LoRA fine-tune"))!;
-		expect(lora.textContent).toContain("never seen");
+		expect(lora.textContent).toContain("Ran out of memory at 21.8 GiB reserved");
 		for (const c of vs.caveats) expect(screen.getByText(c)).toBeTruthy();
 	});
 });

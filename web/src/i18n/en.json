@@ -960,6 +960,8 @@
 	"checks.ask.preflight": "Preflight: {v}",
 	"checks.ask.muse": "Muse Spark: {v}",
 	"checks.ask.no_answer": "no answer",
+	"checks.ask.no_peak_at": "Ran out of memory at {gib} GiB reserved, so its full peak was never seen.",
+	"checks.ask.on_other": "predicted for {gpu}, ran on {ran}",
 	"checks.ask.no_peak": "Ran out of memory, so its full peak was never seen.",
 	"checks.ask.ran_out": "The full run ran out of memory.",
 	"checks.ask.did_not": "The full run didn't run out.",

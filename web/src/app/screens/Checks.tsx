@@ -6,6 +6,12 @@
  */
 import data from "../../coverage/coverage.json";
 import vsRaw from "../../coverage/vs_model.json";
+import { type MetricSummary, verdict, type Verdict } from "../../coverage/verdict";
+import { fmt, fmtRange } from "../../lib/fmt";
+import { t } from "../../lib/i18n";
+import { Info } from "../../workspace/components/Info";
+import { FitMark } from "../../workspace/components/StatusMark";
+import type { Fit } from "../../workspace/status";
 
 /** B's comparison (vs_model.json, from docs/validation/preflight-vs-model.md): the same code asked to Muse Spark without probes. */
 type Side = { step_s?: unknown; peak_gib?: unknown; p_oom?: number | null; why?: string; step_why?: string };
@@ -15,6 +21,7 @@ const vs = vsRaw as unknown as {
 	rows: Array<{
 		script: string;
 		label: string;
+		gpu: string;
 		device: string;
 		full_run: { ran_out_of_memory: boolean; reserved_when_it_ran_out_gib: number | null };
 		preflight: Side;
@@ -23,15 +30,17 @@ const vs = vsRaw as unknown as {
 	}>;
 };
 
-/** A prediction over what the full run did, "0.92×", "18×": two significant figures. */
+/** A prediction over what the full run did, "0.916×", "18.0×": three significant figures, so the table
+ * shows what B's summary says (1.36×, and 1.10× within 10% beside 1.14× outside it). */
 function ratio(x: number): string {
-	return `${new Intl.NumberFormat("en-GB", { minimumSignificantDigits: 2, maximumSignificantDigits: 2 }).format(x)}×`;
+	return `${new Intl.NumberFormat("en-GB", { minimumSignificantDigits: 3, maximumSignificantDigits: 3 }).format(x)}×`;
 }
 
 /** Preflight's and Muse Spark's ratio for one quantity, or why there is none (B's words). */
-function Pair({ pf, ms, pfWhy, msWhy, oom, peak }: { pf: number | null; ms: number | null; pfWhy?: string; msWhy?: string; oom: boolean; peak?: boolean }) {
+function Pair({ pf, ms, pfWhy, msWhy, oom, reserved, peak }: { pf: number | null; ms: number | null; pfWhy?: string; msWhy?: string; oom: boolean; reserved?: number | null; peak?: boolean }) {
 	// A run that ran out of memory never showed its full peak: nothing to compare against on either side.
-	if (peak && oom) return <small className="pf-dim">{t("checks.ask.no_peak")}</small>;
+	if (peak && oom)
+		return <small className="pf-dim">{reserved ? t("checks.ask.no_peak_at", { gib: new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 }).format(reserved) }) : t("checks.ask.no_peak")}</small>;
 	return (
 		<span className="pf-checks__pair">
 			<span>{t("checks.ask.preflight", { v: pf !== null ? ratio(pf) : (pfWhy ?? t("checks.ask.no_answer")) })}</span>
@@ -39,12 +48,6 @@ function Pair({ pf, ms, pfWhy, msWhy, oom, peak }: { pf: number | null; ms: numb
 		</span>
 	);
 }
-import { type MetricSummary, verdict, type Verdict } from "../../coverage/verdict";
-import { fmt, fmtRange } from "../../lib/fmt";
-import { t } from "../../lib/i18n";
-import { Info } from "../../workspace/components/Info";
-import { FitMark } from "../../workspace/components/StatusMark";
-import type { Fit } from "../../workspace/status";
 
 const METRICS = ["oom", "step_time", "peak_memory", "interval"] as const;
 const TONE: Record<Verdict, Fit> = { meets: "fits", no_misses: "unknown", unsettled: "unknown", unchecked: "unknown", below: "fails", missed: "fails" };
@@ -160,13 +163,16 @@ export function Checks() {
 							<div key={r.script} className="pf-checks__row pf-checks__row--ask" role="row">
 								<span role="rowheader">
 									<b>{r.label}</b>
-									<small className="pf-dim"> {t("checks.ask.on", { gpu: r.device.replace(/^NVIDIA /, "") })}</small>
+									<small className="pf-dim">
+										{" "}
+										{r.device.replace(/^NVIDIA /, "") === r.gpu ? t("checks.ask.on", { gpu: r.gpu }) : t("checks.ask.on_other", { gpu: r.gpu, ran: r.device.replace(/^NVIDIA /, "") })}
+									</small>
 								</span>
 								<span role="cell" data-label={t("checks.ask.col.step")}>
 									<Pair pf={r.ratio.preflight_step} ms={r.ratio.muse_step} pfWhy={r.preflight.step_why ?? r.preflight.why} msWhy={r.muse_spark.step_why} oom={r.full_run.ran_out_of_memory} />
 								</span>
 								<span role="cell" data-label={t("checks.ask.col.peak")}>
-									<Pair pf={r.ratio.preflight_peak} ms={r.ratio.muse_peak} pfWhy={r.preflight.why} oom={r.full_run.ran_out_of_memory} peak />
+									<Pair pf={r.ratio.preflight_peak} ms={r.ratio.muse_peak} pfWhy={r.preflight.why} oom={r.full_run.ran_out_of_memory} reserved={r.full_run.reserved_when_it_ran_out_gib} peak />
 								</span>
 								<span role="cell" data-label={t("checks.ask.col.oom")}>
 									<span className="pf-checks__pair">
