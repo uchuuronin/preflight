@@ -20,6 +20,18 @@ import { ACCEPT, ACCEPT_SCRIPTS, checkinBytes, MAX_TOTAL_BYTES, type PickedFile,
 /** A public GitHub repository link: A's runner fetches from GitHub only, at a pinned commit. */
 const GITHUB_REPO = /^(https?:\/\/)?(www\.)?github\.com\/[^/\s]+\/[^/\s]+/;
 
+/**
+ * The repo link as the API takes it: https, and a commit pin written `owner/repo@<sha>` (or a branch or
+ * tag after "@") turned into the link form the API reads, `/tree/<ref>` (D's 12-repo walkthrough, Nov 3:
+ * the form passed `repo@<sha>` and the server refused it).
+ */
+export function repoUri(text: string): string {
+	const t = text.trim();
+	const link = /^https?:\/\//.test(t) ? t : `https://${t}`;
+	const pin = /^(https?:\/\/(?:www\.)?github\.com\/[^/\s@]+\/[^/\s@]+?)(?:\.git)?@([A-Za-z0-9._-]+)\/?$/.exec(link);
+	return pin ? `${pin[1]}/tree/${pin[2]}` : link;
+}
+
 /** Source: guess, a typing pause long enough that a half-typed link isn't called wrong (UX convention: 0.5 to 1 s). */
 const REPO_PAUSE_MS = 800;
 
@@ -208,7 +220,7 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						? check.source
 						: (handedSource ?? {
 								kind: "repo",
-								uri: repo.trim().startsWith("http") ? repo.trim() : `https://${repo.trim()}`,
+								uri: repoUri(repo),
 								// Left empty: Preflight picks the script (train.py, main.py, ...) and runs it with no arguments.
 								...(repoEntryCheck.ok && repoEntryCheck.path ? { entrypoint: repoEntryCheck.path } : {}),
 								...(repoArgWords.ok && repoArgWords.words.length ? { args: repoArgWords.words } : {}),
@@ -604,14 +616,6 @@ export function NewFlight({ onSample }: { onSample: (id: string) => void }) {
 						))}
 						<p className="pf-departures__foot">{t("newflight.departures.foot")}</p>
 					</section>
-					{/* The documentation link's own card, under the samples (Chiya's mockup, Nov 3); with the Help page. */}
-					{flag("c.help") ? (
-						<section className="glass pf-checkin__doc" aria-label={t("newflight.help_card")}>
-							<a className="pf-link" href={href("help")}>
-								{t("newflight.help_link")}
-							</a>
-						</section>
-					) : null}
 				</div>
 				{/* Where the code goes, "Got it" and Check in: one panel across both columns, last (Chiya's mockup). */}
 				{/* A plain box: the notice inside is its own region, named "Where your code goes" (review, Nov 3: two

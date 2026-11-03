@@ -1,7 +1,7 @@
 /**
  * Help: docs/guide/knobs.md (B and D), as a plain technical document in the site's colours and fonts,
- * with a table of contents on the left (a menu at the top on a phone). Reached from one place only, the
- * documentation card on New flight (Chiya, Nov 3); behind `c.help`. Static content: it changes nothing.
+ * with a table of contents on the left (a menu at the top on a phone). Reached from one place only, a
+ * text link on Home (Chiya, Nov 3); behind `c.help`. Static content: it changes nothing.
  */
 import { useMemo } from "react";
 import { t } from "../../lib/i18n";

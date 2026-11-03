@@ -9,7 +9,7 @@ vi.mock("../../lib/flags", () => ({ flag: (name: string) => name === "runner.que
 import { type IntakePanelProps, registerAppPanel, unregister } from "../../registry";
 import en from "../../i18n/en.json";
 import { DATA_USE_OK_ID } from "../DataUse";
-import { NewFlight } from "./NewFlight";
+import { NewFlight, repoUri } from "./NewFlight";
 
 const SOURCE = { kind: "notebook", files: { "train.ipynb": '{"cells":[]}' } };
 
@@ -355,5 +355,15 @@ describe("the repo link's entry point and arguments (PM, Nov 3)", () => {
 	it("won't send arguments that need a shell", async () => {
 		expect(await send("main.py", "--epochs 6 | tee log")).toBeNull();
 		expect(screen.getByText(/“\|” needs a shell/)).toBeTruthy();
+	});
+});
+
+describe("a repo link with a commit pin (D's walkthrough, Nov 3)", () => {
+	it("turns owner/repo@<sha> into the /tree/<sha> link the API reads", () => {
+		const sha = "a".repeat(40);
+		expect(repoUri(`github.com/pytorch/examples@${sha}`)).toBe(`https://github.com/pytorch/examples/tree/${sha}`);
+		expect(repoUri(`https://github.com/karpathy/nanoGPT.git@v1`)).toBe("https://github.com/karpathy/nanoGPT/tree/v1");
+		expect(repoUri("github.com/karpathy/nanoGPT")).toBe("https://github.com/karpathy/nanoGPT");
+		expect(repoUri(`https://github.com/karpathy/nanoGPT/commit/${sha}`)).toBe(`https://github.com/karpathy/nanoGPT/commit/${sha}`);
 	});
 });

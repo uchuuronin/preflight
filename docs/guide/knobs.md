@@ -134,12 +134,26 @@ its word-level language model:
 
 - Repo link: `github.com/pytorch/examples`
 - Entry point: `word_language_model/main.py`
-- Arguments: `--accel --epochs 6`
+- Arguments: `--accel --epochs 6 --data word_language_model/data/wikitext-2`
 
 Preflight reads the repo (for a large one, the entry point and what it uses: the repo's modules it
 imports, its requirements and files named in the arguments), then probes the script with those
 flags. If the entry point isn't in the repo, the check-in stops before any GPU time, but it still
 uses one of the day's check-ins, so check the path first.
+
+Limits to know:
+
+- **Paths from the top folder.** The script runs from the repo's top folder, so give data paths from
+  there: `--data word_language_model/data/wikitext-2`, not `--data ./data/wikitext-2`.
+- **One script, run with `python`.** The entry point must do its work when run as
+  `python <entry point>`. A file that only defines functions, or a module meant to be imported, runs
+  nothing; Preflight stops and says so.
+- **No two-step flows.** "Download, then train" in two commands isn't supported: the script has to
+  fetch what it needs itself, or read it from Hugging Face.
+- **No tools launched by name,** such as `litgpt pretrain` or `tune run`. Only `lm_eval` runs by name,
+  on the **Run a command** tab.
+- **Notebooks in a repo** go through the **Notebook** tab (download the `.ipynb` and add it there).
+  That check-in isn't pinned to a commit.
 
 ### Extra packages
 

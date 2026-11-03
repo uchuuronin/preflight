@@ -428,6 +428,8 @@ a {
 .pf-link:hover { text-decoration-color: currentColor; }
 
 .pf-cta { display: flex; flex-wrap: wrap; gap: 12px; }
+/* A text link among the buttons (Home's manual link): its 44 px target with the text on the buttons' centre line. */
+.pf-cta > .pf-link { display: inline-flex; align-items: center; }
 
 /* Fit status: icon plus word, never colour alone */
 .pf-status {
@@ -609,16 +611,13 @@ button.pf-prov:hover { color: var(--pf-fg); }
 	.pf-checkin__grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(440px, 1fr); grid-template-rows: auto 1fr; gap: 20px; align-items: start; }
 	.pf-checkin__grid > .pf-desk { grid-column: 1; grid-row: 1 / span 2; }
 	.pf-checkin__grid > .pf-departures { grid-column: 2; grid-row: 1; }
-	.pf-checkin__grid > .pf-checkin__doc { grid-column: 2; grid-row: 2; }
 }
 @media (max-width: 1239.98px) {
 	/* One column until the samples' column holds 440 px (its fixed columns take 276): the titles need the rest
 	   (review, Nov 3). As specific as .pf-desk's and .pf-departures' own flex, which came later. */
 	.pf-checkin__grid > *, .pf-checkin__grid > .pf-desk, .pf-checkin__grid > .pf-departures { flex-basis: 100%; }
-	.pf-checkin__grid > .pf-checkin__doc { order: 1; }
 	.pf-checkin__grid > .pf-departures { order: 2; }
 }
-.pf-checkin__doc { padding: 16px 20px; border-radius: var(--pf-radius-lg); font-size: var(--pf-text-sm); }
 .pf-checkin__confirm { padding: 18px 20px; border-radius: var(--pf-radius-lg); display: flex; flex-direction: column; gap: 10px; }
 .pf-checkin__confirm .pf-datause { border-top: 0; padding-top: 0; }
 
