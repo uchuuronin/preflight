@@ -1,0 +1,123 @@
+{
+ "what": "NVIDIA to MI300X step time on the MI300X corpus slice, scored once (Chiya, Nov 2); no refit",
+ "run": "b-amd-grouped, GitHub 41554116831, ref a132c0a, remote-runs runs/20261103-003704-41554116831-amd-b-amd-grouped/out/corpus",
+ "nvidia_rows": "B's corpus store with the Nov 1 top-up (A10, H100-SXM-80GB, L4, L40S, T4; the A100 holdout isn't paired)",
+ "script": "scripts/score_amd_cross.py",
+ "amd_rows": 295,
+ "amd_status": {
+  "ok": 295
+ },
+ "cases": 1147,
+ "configs": 295,
+ "groups": 59,
+ "within_20": [
+  254,
+  1147,
+  [
+   0.1984,
+   0.2464
+  ]
+ ],
+ "within_20_group_bootstrap_95": [
+  0.1609,
+  0.2852
+ ],
+ "band_covers": [
+  411,
+  1147,
+  [
+   0.3311,
+   0.3865
+  ]
+ ],
+ "band_covers_group_bootstrap_95": [
+  0.2806,
+  0.437
+ ],
+ "band_sigma": 0.22,
+ "band_90_factor": 1.436,
+ "median_ratio_k1_over_actual": 0.629,
+ "q05_q95_ratio": [
+  0.202,
+  1.386
+ ],
+ "by_source": {
+  "A10": {
+   "within_20": 47,
+   "covered": 67,
+   "n": 291
+  },
+  "H100-SXM-80GB": {
+   "within_20": 54,
+   "covered": 97,
+   "n": 200
+  },
+  "L4": {
+   "within_20": 49,
+   "covered": 99,
+   "n": 291
+  },
+  "L40S": {
+   "within_20": 81,
+   "covered": 117,
+   "n": 294
+  },
+  "T4": {
+   "within_20": 23,
+   "covered": 31,
+   "n": 71
+  }
+ },
+ "by_family": {
+  "cnn": {
+   "within_20": 37,
+   "covered": 55,
+   "n": 225
+  },
+  "encoder": {
+   "within_20": 40,
+   "covered": 59,
+   "n": 239
+  },
+  "gpt": {
+   "within_20": 67,
+   "covered": 97,
+   "n": 236
+  },
+  "lora": {
+   "within_20": 44,
+   "covered": 80,
+   "n": 227
+  },
+  "mlp": {
+   "within_20": 66,
+   "covered": 120,
+   "n": 220
+  }
+ },
+ "by_dtype": {
+  "bf16": {
+   "within_20": 136,
+   "covered": 238,
+   "n": 805
+  },
+  "fp16": {
+   "within_20": 46,
+   "covered": 67,
+   "n": 142
+  },
+  "fp32": {
+   "within_20": 72,
+   "covered": 106,
+   "n": 200
+  }
+ },
+ "torch": {
+  "nvidia": [
+   "2.8.0"
+  ],
+  "mi300x": [
+   "2.5.1+rocm6.2"
+  ]
+ }
+}

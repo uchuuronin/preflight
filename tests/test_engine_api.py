@@ -631,13 +631,14 @@ def test_with_the_held_out_band_a_gpu_move_is_rough_with_a_probe_offer(ft, monke
 	assert math.log(e.hi / e.point) > math.log(1.5)  # past the usual +-50% abstention, on purpose
 	total = api.predict(ft, {"gpu_type": "A100-SXM-80GB"}).root["time.total"]
 	assert total.status != "abstain"
-	# abstains only where it did: no bf16 path on T4, and another vendor until corpus rows from it exist
+	# abstains only where it did: no bf16 path on T4, and another vendor (measured on the MI300X, not usable)
 	assert api.predict(ft, {"gpu_type": "T4"}).root["time.step"].status == "abstain"
 	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
 	assert (
 		amd.status == "abstain"
-		and amd.reason.startswith("no AMD measurements")
+		and amd.reason.startswith("not shown across vendors")
 		and "another vendor" in amd.reason
+		and "within 20% on 254 of 1,147 pairs" in amd.reason
 	)
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
 	assert "Rough, no probe on this GPU" in card.notes and "26 of 28" in card.notes
@@ -868,13 +869,14 @@ def test_dollars_are_gpu_hours_times_the_rate_so_the_browser_can_recompute(ft):
 	assert "cost.gpu_hours" in {t.id for t in api.targets_for(ft)}
 
 
-def test_no_amd_measurements_on_every_engine_surface(ft):
-	# Chiya, Nov 1: the account is on a verification hold and the AMD slice is a config list
-	assert api.calibration_summary()["amd"] == "no AMD measurements"
+def test_the_amd_measurement_on_every_engine_surface(ft):
+	# Chiya, Nov 1: on every surface; Nov 2: the MI300X slice measured the move (no refit), so it still abstains
+	assert api.calibration_summary()["amd"] == api.AMD_CROSS
+	assert "measured on the MI300X" in api.AMD_CROSS and "no AMD" not in api.AMD_CROSS
 	(card,) = api._cards({api.steptime.MODEL_ID_CROSS}, ft)
-	assert "No AMD measurements" in card.notes
+	assert api.AMD_CROSS in card.notes
 	amd = api.predict(ft, {"gpu_type": "MI300X"}).root["time.step"]
-	assert amd.status == "abstain" and amd.reason.startswith("no AMD measurements")
+	assert amd.status == "abstain" and api.AMD_CROSS in amd.reason
 
 
 def test_one_fit_uses_one_estimator():
