@@ -1,0 +1,11 @@
+{
+	"name": "20261103-170740-41681124867-a-fresh-F3-checkin",
+	"exit_code": 0,
+	"workflow": "remote-run",
+	"run_id": "41681124867",
+	"ref": "eaffabd747eb2b2076be1c639602c6b308780af0",
+	"sha": "eaffabd747eb2b2076be1c639602c6b308780af0",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::smoke --visitor fresh-f3 --gpus L4,A10 --max-minutes 45 --repo https://github.com/kuangliu/pytorch-cifar --commit 49b7aa97b0c12fe0d4054e670403a16b6b834ddd --entrypoint main.py",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T17:11:33Z"
+}
