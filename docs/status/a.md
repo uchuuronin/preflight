@@ -1,8 +1,8 @@
 # Status: A (probes, recorders, execution plane)
 
-Updated Tue Nov 3, 12:55 PM ET.
+Updated Tue Nov 3, 1:10 PM ET.
 
-**Production runner: fixes live, deployed from ws-a c146cf11** (= main d9e6b555, the main the PM posted at 10:45, plus OGB's and BEIR's dataset hosts in the probe egress; `a-deploy-main-29`, GitHub 41668262328, Nov 3 15:52 UTC / 10:52 AM ET), after three startup checks passed (`a-startup-check-29` 41667268503, `a-startup-check-serving-15` 41667695263, `a-startup-torch-new-3` 41668003979: the torch 2.7.1 image); the limit check passed after it (`a-limit-check-10`, 41668393969). **On in production:** `runner.read_closure`, `probes.repo_install_exec`, `runner.probe_without_map`, `harness.lens_by_entry`, `probes.torch_new`, `probes.dataset_cache`, with the morning's flags; the probe sees PyG's wheel index; the probe egress adds snap.stanford.edu and public.ukp.informatik.tu-darmstadt.de. Off: `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from 28fc9b62** (the 10:20 deploy), or ad12da7 for the morning's.
+**Production runner: deployed from ws-a 56e686de** (main b40012bb merged in, plus the PM's 11:23 list; `a-deploy-main-30`, GitHub 41690166435, Nov 3 18:05 UTC / 1:05 PM ET), after three startup checks passed (`a-startup-check-30` 41688982619, `a-startup-check-serving-16` 41689362694, `a-startup-torch-new-4` 41689764723); the limit check passed after it (`a-limit-check-11`, 41690460909). New in production with it: native Windows fixes (D's ten), B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map`, OGB's arxiv archive from the dataset volume (sha256-pinned), the retrieval, GNN and vision samples' Fix button, B's request-count logging under `probes.eval_units`, and `harness.spark_search` on (main's flags, Chiya's 11:25 yes). Off: `runner.entrypoint_path` (proposed on, for the PM), `probes.step_clock`, `probes.uv_install`, `probes.agent_single_task`. **Rollback: `modal deploy --env main` from c146cf11** (10:52 AM).
 
 ## Unseen validation runs (Nov 2): all nine posted
 
@@ -101,6 +101,7 @@ attempt only, with no Preflight change in between:
 | 12:40 | B's must-fixes 3 to 5 on `runner.read_closure` and `runner.probe_without_map` (files the code may open; lazy packages' TYPE_CHECKING imports; a follow-up keeps the map-skipped finding), with two review rounds: an older record's follow-up still matches its code when the data files were the only change; one whose repo has a lazy package (its `__init__.py`'s TYPE_CHECKING imports now followed) reads more modules and is refused as changed, so it needs a fresh check-in | the PM's 12:20 note (due 2:30) | none | revert cbd900b1, c2138654 |
 | 12:45 | OGB's archive pinned (sha256 49f85c80…) after `a-fill-datasets-ogb-1` put it in the volume | item 4 | about $0.01 CPU [estimate] | revert 4669aeda |
 | 12:50 | The private check-in on production (record 01M6H6QJ0DK3WX7XGAVD25XPJ9): triage on Glimmer, no diagnosis, the claim check code only; one Meta call, the script map, as the data-use line discloses; the gate is the PM's call | item 5 | $0.39 [measured] | nothing to undo |
+| 13:05 | Redeployed the runner from ws-a 56e686de, gated (three startup checks, then the limit check), after the fresh runs and the private check-in | the PM's 11:23 note: one gated redeploy after the fresh runs | cents (CPU) [estimate] | `modal deploy --env main` from c146cf11 |
 
 ## Decisions today (Chiya out until about 5 PM ET; her autonomy, Nov 2 11:16 AM ET)
 
