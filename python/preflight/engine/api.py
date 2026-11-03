@@ -860,16 +860,20 @@ def _past_scan_cut(record: FlightRecord, values: dict) -> str | None:
 	mx, cut, _rows, _total = known
 	if not cut or q <= cut or mx < cut:
 		return None
-	p999 = max(
-		(
-			float((p.extras or {}).get("dataset_p999_tokens") or 0)
-			for p in record.probes
-			if p.status in OK_PROBE
-		),
-		default=0.0,
-	)
+	sm = record.job.script_map
+	if values.get("packing") or ("packing" not in values and sm and sm.data and sm.data.packing):
+		return None  # packed rows don't pad: the length doesn't come from the scan
+	ok = [p for p in record.probes if p.status in OK_PROBE]
+	p50 = max((float((p.extras or {}).get("dataset_p50_tokens") or 0) for p in ok), default=0.0)
+	if p50 >= cut:
+		return (
+			None  # rows fill the cut (fixed-length blocks): the step scales with seq_len, not with the scan
+		)
+	p999 = max((float((p.extras or {}).get("dataset_p999_tokens") or 0) for p in ok), default=0.0)
 	rare = (
-		f"; 99.9% of rows are {p999:,.0f} tokens or fewer, so the median and mean barely move" if p999 else ""
+		f"; 99.9% of rows are {p999:,.0f} tokens or fewer, so the median and mean barely move"
+		if p999 and p999 < cut
+		else ""
 	)
 	return (
 		f"seq_len {q:,.0f} is past the {cut:,.0f} the dataset was scanned at, and its longest rows reached that cut, so "

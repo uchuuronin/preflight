@@ -211,6 +211,12 @@
 			"memory_bytes": 12884901888,
 			"confidence": "derived"
 		},
+		"RTX-3060-8GB": {
+			"vendor": "nvidia",
+			"arch": "ampere",
+			"memory_bytes": 8589934592,
+			"confidence": "derived"
+		},
 		"RTX-3060-Laptop": {
 			"vendor": "nvidia",
 			"arch": "ampere",
@@ -489,6 +495,7 @@
 		"geforce rtx 3050 laptop gpu": "RTX-3050-Laptop",
 		"geforce rtx 3050 ti laptop gpu": "RTX-3050-Ti-Laptop",
 		"geforce rtx 3060": "RTX-3060",
+		"geforce rtx 3060 8gb": "RTX-3060-8GB",
 		"geforce rtx 3060 laptop gpu": "RTX-3060-Laptop",
 		"geforce rtx 3060 ti": "RTX-3060-Ti",
 		"geforce rtx 3070": "RTX-3070",
@@ -497,8 +504,8 @@
 		"geforce rtx 3070 ti laptop gpu": "RTX-3070-Ti-Laptop",
 		"geforce rtx 3080": "RTX-3080-10GB",
 		"geforce rtx 3080 12gb": "RTX-3080-12GB",
-		"geforce rtx 3080 laptop gpu": "RTX-3080-Laptop-16GB",
-		"geforce rtx 3080 laptop gpu 8gb": "RTX-3080-Laptop-8GB",
+		"geforce rtx 3080 laptop gpu": "RTX-3080-Laptop-8GB",
+		"geforce rtx 3080 laptop gpu 16gb": "RTX-3080-Laptop-16GB",
 		"geforce rtx 3080 ti": "RTX-3080-Ti",
 		"geforce rtx 3080 ti laptop gpu": "RTX-3080-Ti-Laptop",
 		"geforce rtx 3090": "RTX-3090",
@@ -579,6 +586,7 @@
 		"rtx-3050-laptop": "RTX-3050-Laptop",
 		"rtx-3050-ti-laptop": "RTX-3050-Ti-Laptop",
 		"rtx-3060": "RTX-3060",
+		"rtx-3060-8gb": "RTX-3060-8GB",
 		"rtx-3060-laptop": "RTX-3060-Laptop",
 		"rtx-3060-ti": "RTX-3060-Ti",
 		"rtx-3070": "RTX-3070",
