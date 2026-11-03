@@ -76,8 +76,8 @@ types (A10, H100, L4, L40S, T4), step time on a GPU Preflight never measured lan
 57% of 6,694 held-out cases (rows from a Nov 1 top-up included, which the published corpus
 doesn't hold yet), under the 90% target, so it is shown with a wide band and labelled rough; and the divergence classifier, refitted on 720 runs, scores a held-out AUROC of 0.66 (0.56 to
 0.76) against a 0.85 target, so it is switched off. On an MI300X,
-step time from its own probe lands within 15% (2 of 2 runs), but from NVIDIA probes it lands within 20% on only
-22% of 1,147 corpus pairs, so a move across vendors isn't shown.
+step time from its own probe lands within 15% (2 of 2 runs), but from NVIDIA corpus rows it lands within 20% on only
+22% of 1,147 pairs, so a move across vendors isn't shown.
 
 **The corpus published with a datasheet.** The 2,339 rows of GPU measurements behind the learned
 models and the held-out checks are a dataset on Hugging Face, public with the repository from
@@ -163,5 +163,5 @@ measurement; it is built and switched off, as that gating isn't wired end to end
 
 ## What's next
 
-A cross-vendor step-time model fitted on the MI300X corpus slice (measured Nov 2, not yet used); the full-run
-validation table from Mon Nov 2; private mode with Muse Glimmer switched on for visitors.
+A cross-vendor step-time model that holds on the MI300X (its corpus slice, measured Nov 2, shows the roofline
+reading 0.63x); the full-run validation table from Mon Nov 2; private mode with Muse Glimmer switched on for visitors.

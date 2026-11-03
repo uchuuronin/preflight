@@ -1488,16 +1488,15 @@ def _step(record: FlightRecord, values: dict) -> _StepResult:
 		)
 		if feature("steptime_cross_gpu") and gpus.get_gpu(src_gpu).vendor != gpus.get_gpu(tgt_gpu).vendor:
 			# Chiya, Oct 31: abstain, labelled; Nov 2: the AMD slice measured the move and K1 misses it (AMD_CROSS)
-			vendor = gpus.get_gpu(tgt_gpu).vendor
-			if vendor == "amd":
+			if tgt_gpu == "MI300X":  # the one AMD card measured; another AMD card falls to "not measured"
 				why = (
 					f"not shown across vendors: {tgt_gpu} is another vendor, and the move was {AMD_CROSS}, so it "
 					"isn't a usable estimate; run a probe there"
 				)
 			else:
 				why = (
-					f"not shown across vendors: {tgt_gpu} is another vendor, and this direction isn't measured "
-					"(only NVIDIA to MI300X is); run a probe there"
+					f"not shown across vendors: {tgt_gpu} is another vendor, and this move isn't measured "
+					"(only NVIDIA to the MI300X is); run a probe there"
 				)
 			return _StepResult(_abstain("s", steptime.MODEL_ID_CROSS, why), sigma)
 		if cross is not None and cross.status != "abstain":
