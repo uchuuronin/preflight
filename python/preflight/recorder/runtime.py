@@ -97,22 +97,6 @@ TRL_KEYS = {
 }
 
 
-def _replace(tmp: str, dst: str, *, final: bool = True) -> bool:
-	"""os.replace, retried: on Windows it raises PermissionError while another process (antivirus,
-	the parent reading) has dst open. Linux replaces regardless, so the first try lands there."""
-	for i in range(8):
-		try:
-			os.replace(tmp, dst)
-			return True
-		except PermissionError:
-			if i == 7:
-				if final:
-					raise
-				return False
-			time.sleep(0.01 * 2**i)
-	return False
-
-
 def _step_has(field_name: str) -> bool:
 	try:
 		from preflight.schema.record import StepSample
@@ -592,9 +576,9 @@ class Recorder:
 			**extra,
 		}
 		tmp = self.progress_path + ".tmp"
-		with open(tmp, "w", encoding="utf-8") as f:
+		with open(tmp, "w") as f:
 			json.dump(data, f)
-		_replace(tmp, self.progress_path, final=False)  # progress only: a write that can't land is skipped
+		os.replace(tmp, self.progress_path)
 
 	def _reset_acc(self):
 		self.acc = {

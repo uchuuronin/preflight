@@ -1,6 +1,7 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
-# Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts. Since
-# D's Windows fixes (Nov 3) nothing is stubbed: `preflight run` has to measure (every probe ok) and
+# Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts. It runs
+# A's Windows fixes (ws-a at cf4945fb, the copy kept; D's own copy passed the same check and was
+# withdrawn, Nov 3) with nothing stubbed: `preflight run` has to measure (every probe ok) and
 # `preflight watch` has to follow its record (a live record with steps). Runs only when this file
 # changes on ws-d. Everything lives on D:, as the laptop's steps keep everything on E:, but the
 # sandbox and time zones use Preflight's own defaults. No secrets are used. The job fails if any
@@ -17,12 +18,7 @@ permissions:
 
 jobs:
   windows:
-    # windows-2022 has a D: drive; the laptop's E: plays its part. Two copies of the Windows fixes
-    # exist (D's on this branch, A's on ws-a), so both are checked the same way, side by side.
-    strategy:
-      fail-fast: false
-      matrix:
-        src: [ws-d, ws-a]
+    # windows-2022 has a D: drive; the laptop's E: plays its part
     runs-on: windows-2022
     timeout-minutes: 40
     steps:
@@ -33,8 +29,8 @@ jobs:
         with:
           path: src
           persist-credentials: false
-          # ws-a at cf4945fb (A's fixes a315c1f2 and 77c56899)
-          ref: ${{ matrix.src == 'ws-a' && 'cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41' || github.sha }}
+          # ws-a at cf4945fb (A's fixes a315c1f2 and 77c56899); main once A's fix is merged
+          ref: cf4945fbcbcb06e6f71db0674adc5ba4b6c87c41
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
@@ -122,7 +118,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: d-windows-watch-${{ matrix.src }}
+          name: d-windows-watch
           path: |
             D:\pf9b\*.log
             D:\pf9b\records

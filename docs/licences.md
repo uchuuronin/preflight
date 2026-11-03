@@ -21,13 +21,6 @@ No GPL, AGPL or SSPL anywhere. Everything is permissive except the rows under "F
 | Build and test tools only (not shipped) | 155 | 143 | 12 |
 | Modal torchtitan image (Nov 1; an ops check only, no visitor job uses it) | 90 | 75 | 15 |
 
-## Added Nov 3: `tzdata`, on Windows only
-
-`tzdata` (Apache-2.0, the IANA time-zone database packaged for Python) is a runtime dependency of
-the `preflight` package on Windows only (`sys_platform == 'win32'` in `pyproject.toml`): Windows
-has no system time-zone database, and `runner/queue.py` reads America/New_York. It is in `uv.lock`
-and `api/uv.lock` with that marker; on Linux nothing is installed. Permissive.
-
 ## Re-check after round four (Sun Nov 1, `main` `a52753f`)
 
 What changed since `006bc57`, and nothing else did: `uv.lock`, `api/uv.lock`, both

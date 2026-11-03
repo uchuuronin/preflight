@@ -76,7 +76,23 @@ Every run through `remote-run.yml` or `amd-run.yml`: date, GPU, minutes, dollars
 | Nov 3, 01:35 UTC | none (Meta API) | about 1 | 0.150 of Muse Spark [derived: tokens at list and cached rates plus the search fee, second-hand] | `d-spark-search-cap10` (41560761153): the current request at `max_tool_calls` 10; the known issue cited inline with 3 tool calls, so the cap of 4 wasn't the cause (`docs/decisions/spark-search.md`) |
 | Nov 3, 14:05 UTC | A10 | about 5 (315 s of container) | 0.10 [derived: container time at list price] | `d-watch-gpu-9b-2` (41650324681): shot 9b's steps on today's code; both alerts fire with the change, the unchanged run only notes it's faster |
 
+## Tue Nov 3, 13:10 ET (the Windows fixes: A's kept, D's withdrawn)
+
+A's own copy of the same ten fixes (ws-a `a315c1f2`, `77c56899`) had landed at 11:31, before the
+hand-over reached A. Both copies passed the Windows runner with nothing stubbed, side by side
+(GitHub run 41684996973: three probes ok, a live record of 2,000 steps, the changed watch 400
+steps, for each) [measured]. A's is kept (A's code, already reviewed, no lock change), as D told
+Chiya at 12:40; D's code commit `c618c8a1` is reverted on ws-d (its docs kept), so `python/`,
+`pyproject.toml`, both lock files and `docs/licences.md` match `main` again. The workflow now
+checks ws-a at `cf4945fb`. A is asked for one line D's review found missing from both copies
+(`PYTHONIOENCODING=utf-8` in the probe's Windows environment, which D's copy had and A's lacks). Shot 9b's steps name A's fix.
+
+This push sends: the revert, the workflow, `docs/demo/shot-9b-laptop.md`,
+`docs/requests/from-d.md`, this file.
+
 ## Tue Nov 3, 12:25 ET (the Windows fixes, taken from A)
+
+*Superseded at 13:10: D's copy is withdrawn and reverted; A's is kept.*
 
 Chiya, 11:52: D takes the nine gaps and the tenth risk off A. Merged main `8f29b3b`. Each fix is
 guarded so Linux is unchanged (geteuid, tzdata on Windows only, `kill_tree`, `resource`, the

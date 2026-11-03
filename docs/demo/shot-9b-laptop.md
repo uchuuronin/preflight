@@ -13,11 +13,12 @@ one after another, no `.ps1`, `.bat` or `.sh` scripts.
 On Tue Nov 3, `preflight run` **didn't work on native Windows**: D's checks on a GitHub Windows
 runner stopped at `os.geteuid`, then the time-zone database, then `os.killpg`; with those and four
 more stubbed, it finished but every probe failed with `WinError 10106`, because the probe's
-cleaned-up environment drops Windows' own variables. Nine gaps in all, A's to fix behind a guard
-before the 3 PM freeze (the list is in `docs/requests/from-d.md`). With all nine stubbed, a fifth
-run measured: three probes ok, a record with its memory range (a CPU gives no step-time range), and
-`preflight watch` following the script [measured]. So once A's fix is on `main`, these steps
-should work as written; CUDA on Windows is the part no one has run yet.
+cleaned-up environment drops Windows' own variables. Nine gaps in all (the list is in
+`docs/requests/from-d.md`). A fixed them behind guards on `ws-a` (`a315c1f2`, `77c56899`), and on
+the same runner, with nothing stubbed, A's fixes measured all three probes, wrote a record with
+its memory range (a CPU gives no step-time range), and `preflight watch` followed the script for
+2,000 steps (GitHub run 41684996973) [measured]. So once A's fix is on `main`, these steps should
+work as written; CUDA on Windows is the part no one has run yet.
 
 Step 4 installs whatever is on `main`. If A's fix isn't on `main` on Wednesday morning, step 9
 fails (see its failure cases); then use the WSL2 route at the end of this page, which keeps
@@ -29,7 +30,7 @@ everything on E: too.
 | --- | --- | --- |
 | An A10 GPU on Modal, Linux, Nov 3 (`d-watch-gpu-9b-2`, GitHub run 41650324681) | The same flow from `runner/watch_gpu_app.py`: `preflight run` on the unchanged script, then `preflight watch` on it unchanged and with step 11's change. Differences: 200,000 steps, not 60,000; the repository's `flags.json` (a pip install reads none, so every flag is off; the run and watch steps use none of them); each watch stopped after 150 s | With the change, both alerts fired: `step 201: peak memory 0.40 GiB, above the predicted 0.27–0.36 GiB`, then `step 401: 0.0033 s a step, above the predicted 0.00125–0.00275 s`. Unchanged, only a note ("faster than the predicted"), no alert. About 1,240 steps a second unchanged, 300 with the change [measured] |
 | A CPU, Linux, Nov 3 (D's sandbox) | Steps 2 to 13 from a fresh venv, with 18,000 steps, the changed run at 400 | Every step works; no alert, because a CPU record has no step-time range ("the probes ran without a known GPU") [measured] |
-| A GitHub Windows runner, CPU, Nov 3 (`d-windows-watch.yml`, five runs) | The same flow in PowerShell 7 (not 5.1) on drive D:, with CPU torch, the script copied from the checkout, 2,000 steps and 400 changed | `preflight run` failed as above until all nine gaps were stubbed; `preflight watch` ran [measured] |
+| A GitHub Windows runner, CPU, Nov 3 (`d-windows-watch.yml`, seven runs) | The same flow in PowerShell 7 (not 5.1) on drive D:, with CPU torch, the script copied from the checkout, 2,000 steps and 400 changed | `preflight run` failed as above until all nine gaps were stubbed; `preflight watch` ran. Then, with nothing stubbed, D's own copy of the fixes (since withdrawn; run 41683645239) and A's (run 41684996973, both copies side by side) each measured all three probes, and `preflight watch` followed 2,000 steps [measured] |
 | Your card | An RTX 4070 Laptop isn't in Preflight's GPU table | Step time still gets its range from the probes on that card (checked by relabelling an L4 record as it) [measured]; memory's range on it wasn't checked (that L4 record's eval ran out of memory, so its memory abstains anyway); moving the GPU knob to or from the card can't be predicted until B adds it to the table |
 
 Not checked anywhere: CUDA on Windows, and Chrome on Windows following a file as it changes.
@@ -126,7 +127,7 @@ E:\pf9b\venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch
 
 **You should see:** `Successfully installed ... preflight-0.1.0 ...` (pip leaves step 3's CUDA torch
 alone: "Requirement already satisfied: torch"), then the same `+cu128 True` as before. `tzdata`
-is the time-zone database Windows lacks; it's harmless once A's fix adds it.
+is the time-zone database Windows lacks; A's fix doesn't need it, and it's harmless.
 
 **If it fails:**
 - A 404: the repository isn't public yet. In the browser, signed in to GitHub, right-click
@@ -292,9 +293,9 @@ probe or the run exits, and it keeps the GPU's memory until it is.
 - It says "Read <new>.json once": the browser can't follow files (not Chrome or Edge); use Chrome
   or Edge, or choose the file again to refresh.
 - The run stops with `PermissionError: [WinError 5]` while the browser follows it: Windows
-  wouldn't let Preflight replace the file while the browser or antivirus was reading it. Since
-  D's fix (Nov 3) Preflight retries for about a second and skips a running write that still can't
-  land, so this should only happen on the last write; if it does, move `<new>.json` and
+  wouldn't let Preflight replace the file while the browser or antivirus was reading it. With A's
+  fix Preflight retries, skips a running write that still can't land, and retries the last write
+  for about 9 seconds before it says so; if it still fails, move `<new>.json` and
   `<new>.live.jsonl` out of `records` and redo step 13.
 - No alert in the terminal: check step 11's lines took, and that step 10 had a range.
 - The Logbook shows no "Watch a real run": tell C (`c.inflight` is on in production since Nov 2).

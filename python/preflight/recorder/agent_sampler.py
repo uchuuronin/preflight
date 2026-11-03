@@ -103,14 +103,7 @@ class _LocalProc:
 
 	def kill(self):
 		with _quiet():
-			if hasattr(os, "killpg"):
-				os.killpg(self.p.pid, signal.SIGKILL)  # the script, and anything it left running
-			else:  # Windows: no process groups; taskkill /T while it runs, else the process itself
-				from preflight.probes.local import kill_tree
-
-				kill_tree(self.p.pid, alive=self.p.poll() is None)
-				if self.p.poll() is None:
-					self.p.kill()
+			os.killpg(self.p.pid, signal.SIGKILL)  # the script, and anything it left running
 		self.wait(10)
 
 
