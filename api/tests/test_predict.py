@@ -40,8 +40,9 @@ def test_off_by_default(monkeypatch):
 
 
 def test_the_engine_predicts_where_the_grids_dont(monkeypatch):
-	"""Chiya, Nov 2: on the LoRA record the engine predicts lr 2e-4 (the same step as 1e-4) and the A10
-	(extrapolated across GPUs), where the web's grids abstained."""
+	"""Chiya, Nov 2: on the LoRA record the engine predicts lr 2e-4 (the same step as 1e-4) and another
+	GPU (extrapolated across GPUs), where the web's grids abstained. The sample is A's Nov 3 A10 record
+	(probes on the A10), so the other GPU is the L4."""
 	_env(monkeypatch, True)
 	with client() as c:
 		r = ask(
@@ -49,16 +50,16 @@ def test_the_engine_predicts_where_the_grids_dont(monkeypatch):
 			[
 				{"batch_size": 4, "lr": 0.0002},
 				{"batch_size": 4, "lr": 0.0001},
-				{"batch_size": 4, "gpu_type": "A10"},
+				{"batch_size": 4, "gpu_type": "L4"},
 			],
 		)
 	assert r.status_code == 200, r.text
 	a, b, gpu = r.json()["cells"]
 	assert a["time.step"]["status"] == "predicted"
 	assert a["time.step"]["point"] == pytest.approx(b["time.step"]["point"])
-	assert a["time.step"]["point"] == pytest.approx(1.709, abs=0.01)
+	assert a["time.step"]["point"] == pytest.approx(1.409, abs=0.01)
 	assert gpu["time.step"]["status"] == "extrapolated"
-	assert gpu["time.step"]["point"] == pytest.approx(1.236, abs=0.01)
+	assert gpu["time.step"]["point"] == pytest.approx(2.190, abs=0.01)
 
 
 def test_only_the_records_own_knobs(monkeypatch):

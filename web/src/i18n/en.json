@@ -113,7 +113,7 @@
 	"goal.min_time": "Finish soonest",
 	"goal.fit_memory": "Most headroom",
 	"sample.lora_7b": "LoRA fine-tune of a 7B model on support tickets",
-	"sample.lora_qwen": "LoRA fine-tune of Qwen2.5-1.5B on Alpaca, measured on an L4 (1 Nov)",
+	"sample.lora_qwen": "LoRA fine-tune of Qwen2.5-1.5B on Alpaca, measured on an A10 (3 Nov)",
 	"sample.pretrain": "Pretrain a small LM from scratch",
 	"sample.agent": "Agent eval on the Meta API",
 	"boarding.eyebrow": "Boarding",

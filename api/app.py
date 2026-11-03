@@ -37,6 +37,7 @@ SAMPLE_FILES = [
 	"schema/examples/agent.json",
 	"schema/examples/pretrain.json",
 	"web/src/workspace/fixtures/lora-live-nov1.record.json",
+	"web/src/workspace/fixtures/lora-live-nov3.record.json",
 	"web/src/workspace/fixtures/pretrain_nanogpt-a10-nov2.record.json",
 	"web/src/workspace/fixtures/agent-eval-oct31.record.json",
 	"web/src/workspace/fixtures/campaign-grid.record.json",
