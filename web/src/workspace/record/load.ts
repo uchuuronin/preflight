@@ -5,6 +5,7 @@
  */
 import { flag } from "../../lib/flags";
 import { t } from "../../lib/i18n";
+import { isStaleChunkError, reloadOnceForStaleChunk } from "../../lib/staleChunk";
 import { LIVE_REF, liveRecord } from "../live/liveFile";
 import type { FlightRecord, Lens, LoadedRecord } from "./types";
 import { normaliseRecord } from "./types";
@@ -137,7 +138,19 @@ export async function loadRecord(ref: string): Promise<LoadedRecord> {
 	const id = currentRef(ref);
 	// A sample listed only behind a flag opens only with it on.
 	const sample = SAMPLES.find((s) => s.id === id && (!s.flag || flag(s.flag)));
-	if (sample) return normaliseRecord(await sample.load());
+	if (sample) {
+		try {
+			const raw = await sample.load();
+			// Vite's preload helper resolves to nothing once the page has chosen to reload for a gone
+			// chunk (staleChunk.ts): stay loading until it does, rather than show an error.
+			if (!raw) return new Promise<LoadedRecord>(() => {});
+			return normaliseRecord(raw);
+		} catch (e) {
+			// a page from before a deploy asks for a chunk the new one doesn't have: reload once
+			if (isStaleChunkError(e) && reloadOnceForStaleChunk()) return new Promise<LoadedRecord>(() => {});
+			throw e;
+		}
+	}
 	// A live record from `preflight watch`, opened from a file on this machine (live/liveFile.ts)
 	if (ref === LIVE_REF && flag("c.inflight")) {
 		const rec = liveRecord();
