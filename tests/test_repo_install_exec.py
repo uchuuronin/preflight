@@ -90,3 +90,47 @@ def test_the_spec_carries_it_and_the_cache_key_changes_only_when_set():
 	from preflight.probes.local import ProbeSpec
 
 	assert ProbeSpec.__dataclass_fields__["install_exec"].default is False
+
+
+# ---------------------------------------------------------------- probes.torch_new (off; the PM, Nov 3)
+
+
+def test_code_that_asks_for_a_newer_torch_reads_its_ask():
+	lit = {
+		"pyproject.toml": '[project]\nname = "litgpt"\ndependencies = ["torch>=2.7", "torch<2.13; python_version>=\'3.10\'"]\n'
+	}
+	assert R.torch_asks(lit) == ["torch>=2.7"]  # the marker line may not hold here
+	assert not R.torch_fits(["torch>=2.7"], R.IMAGE_TORCH) and R.torch_fits(["torch>=2.7"], R.NEW_IMAGE_TORCH)
+	assert R.torch_asks({"requirements.txt": "torch\nnumpy\n"}) == []  # no version asked: the image's is fine
+	assert (
+		R.torch_too_old(["torch>=2.6"], "2.5.1")
+		== "needs torch>=2.6; Preflight's probe image has torch 2.5.1"
+	)
+	assert R.torch_too_old(["torch>=2.4"], "2.5.1") is None
+
+
+def test_the_image_is_picked_by_the_ask_only_with_the_flag(monkeypatch):
+	import preflight.runner.pipeline as P
+	from preflight.harness.static import map_static
+
+	files = {
+		"train.py": "import torch\nfor step in range(10):\n    pass\n",
+		"requirements.txt": "torch>=2.7\n",
+	}
+	sm = map_static(files, entrypoint="train.py")
+	monkeypatch.setattr(P, "_flag", lambda name: False)
+	assert P._image(sm, files) == "probe"
+	monkeypatch.setattr(P, "_flag", lambda name: name == "probes.torch_new")
+	assert P._image(sm, files) == "torch27"
+	assert (
+		P._image(sm, {**files, "requirements.txt": "torch>=2.8\n"}) == "probe"
+	)  # neither image fits: the stop says so
+	assert P._image(sm, {**files, "requirements.txt": "torch\n"}) == "probe"
+
+
+def test_a_torch_the_image_cant_give_stops_before_any_install(tmp_path, monkeypatch):
+	(tmp_path / "requirements.txt").write_text("torch>=2.8\neinops\n")
+	monkeypatch.setattr(R, "installed", lambda: {"torch": "2.5.1+cu124"})
+	monkeypatch.setattr(R, "_pip", lambda *a, **k: (_ for _ in ()).throw(AssertionError("installed")))
+	err, dirs = R.install(tmp_path, tmp_path / "deps", log=lambda m: None, torch_stop=True)
+	assert err == "needs torch>=2.8; Preflight's probe image has torch 2.5.1" and dirs == []

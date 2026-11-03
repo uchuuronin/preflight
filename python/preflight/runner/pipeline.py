@@ -153,6 +153,7 @@ def cache_key(spec: ProbeSpec, gpu: str, image: str) -> str:
 		**({"install_pyg": True} if spec.install_pyg else {}),  # another index can install another build
 		**({"install_uv": True} if spec.install_uv else {}),  # another resolver can pick other versions
 		**({"install_exec": True} if spec.install_exec else {}),  # a list read from the build installs more
+		**({"torch_stop": True} if spec.torch_stop else {}),  # a stop instead of a run
 		**({"install_sdists": list(spec.install_sdists)} if spec.install_sdists else {}),
 		**({"eval_units": spec.eval_units} if spec.eval_units else {}),
 		"gpu": gpu,
@@ -287,6 +288,21 @@ def _uses_vllm(sm: ScriptMap, files: dict[str, str]) -> bool:
 	return sm.lens == "eval" and any(_VLLM_IMPORT.search(t) for n, t in files.items() if n.endswith(".py"))
 
 
+def _image(sm: ScriptMap, files: dict[str, str]) -> str:
+	"""The sandbox image: "serving" for vLLM (its own image); with probes.torch_new, "torch27" when the code's
+	own torch requirement rules out the probe image's 2.5.1 and admits 2.7.1 (LitGPT's torch>=2.7, Nov 2);
+	else "probe"."""
+	if _uses_vllm(sm, files):
+		return "serving"
+	if _flag("probes.torch_new"):
+		from preflight.recorder.requirements import IMAGE_TORCH, NEW_IMAGE_TORCH, torch_asks, torch_fits
+
+		asks = torch_asks(files)
+		if asks and not torch_fits(asks, IMAGE_TORCH) and torch_fits(asks, NEW_IMAGE_TORCH):
+			return "torch27"
+	return "probe"
+
+
 def _spec(
 	fetched: Fetched, sm: ScriptMap, p: PlannedProbe, deps: Deps, *, eval_off: bool = False
 ) -> ProbeSpec:
@@ -316,9 +332,10 @@ def _spec(
 		install_uv=deps.install_requirements and _flag("probes.uv_install"),
 		install_pyg=deps.install_requirements and _flag("probes.extra_hosts"),
 		install_exec=deps.install_requirements and _repo_install_on() and _flag("probes.repo_install_exec"),
+		torch_stop=deps.install_requirements and _flag("probes.torch_new"),
 		install_sdists=_command_sdists(fetched) if deps.install_requirements else (),
 		eval_units=EVAL_FORWARD_UNITS if sm.lens == "eval" and _flag("probes.eval_units") else 0,
-		image="serving" if _uses_vllm(sm, fetched.files) else "probe",  # vLLM lives in its own image
+		image=_image(sm, fetched.files),
 		generate_sample=SERVING_PROBE_PROMPTS if sm.lens == "serving" else 0,
 		generate_calls=EVAL_PROBE_CALLS if sm.lens == "eval" else 0,
 	)

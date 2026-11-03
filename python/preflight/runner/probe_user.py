@@ -13,6 +13,7 @@ PROBE_USER_IMPORTS = {
 	"probe": ("+compile",),
 	"serving": ("+compile", "vllm", "datasets"),  # datasets: pyarrow against the image's numpy 1
 	"titan": ("+compile", "torchtitan.train"),
+	"torch27": ("+compile", "transformers", "trl"),  # probes.torch_new
 }
 
 

@@ -204,7 +204,43 @@ serving_image = (
 	.run_commands(PROBE_USER_CMD)
 	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
 )
-SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image}
+# probes.torch_new (off; the PM, Nov 3): code whose own requirements ask for torch 2.6 or later (LitGPT's
+# torch>=2.7, unseen 2) probes here; the stack moves with torch, and the image's name keys its probes' cache
+# (pipeline.cache_key), so the default image's cache stays as it is
+PROBE_NEW_PACKAGES = [
+	"torch==2.7.1",
+	"torchvision==0.22.1",  # torch 2.7.1's
+	"uv==0.5.11",
+	"transformers==4.52.3",
+	"accelerate==1.7.0",
+	"peft==0.15.2",
+	"trl==0.18.0",
+	"datasets==3.6.0",
+	"safetensors==0.5.3",
+	"psutil==6.1.0",
+	"nvidia-ml-py==12.560.30",
+	"pydantic>=2.8,<3",
+	"numpy>=1.26,<2.3",
+	"httpx>=0.27",
+]
+PYG_INDEX_NEW = "https://data.pyg.org/whl/torch-2.7.0+cu126.html"  # PyPI's torch 2.7.1 is built for CUDA 12.6
+probe_new_image = (
+	_base.apt_install("git")
+	.pip_install(*PROBE_NEW_PACKAGES)
+	.env(
+		{
+			"HF_HOME": HF_HOME,
+			"PREFLIGHT_WEIGHTS_HUB": f"{WEIGHTS_DIR}/hf/hub",
+			"PREFLIGHT_SANDBOX_DIR": "/tmp",
+			"PREFLIGHT_PROBE_UID": "61000",
+			"PREFLIGHT_PYG_INDEX": PYG_INDEX_NEW,
+		}
+	)
+	.apt_install(*COMPILER_PACKAGES)
+	.run_commands(PROBE_USER_CMD)
+	.add_local_dir(PKG, f"{REMOTE_PKG}/preflight", ignore=_NOT_SOURCE)
+)
+SANDBOX_IMAGES = {"probe": probe_image, "serving": serving_image, "torch27": probe_new_image}
 
 # the torchtitan adapter check only (zoo/torchtitan_debug, an ops run): torchtitan 0.1.0 targets
 # torch 2.7, which the probe image's 2.5.1 isn't, so its own pins; no visitor job uses this image

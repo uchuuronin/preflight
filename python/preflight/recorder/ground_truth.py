@@ -142,7 +142,9 @@ def _bare(
 		try:
 			repo_kw = {"repo": True, "entrypoint": entrypoint} if install_repo else {}
 			how = {
-				k: v for k, v in (install_opts or {}).items() if k in ("uv", "pyg", "sdists", "build")
+				k: v
+				for k, v in (install_opts or {}).items()
+				if k in ("uv", "pyg", "sdists", "build", "torch_stop")
 			}  # the installer's own
 			err, dirs = install(work, caches / "deps", log=lambda m: print(m, flush=True), **repo_kw, **how)  # fmt: skip
 		finally:

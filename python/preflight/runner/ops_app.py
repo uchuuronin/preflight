@@ -28,6 +28,7 @@ from preflight.runner.modal_app import (
 	_read_only,
 	image_tag,
 	probe_image,
+	probe_new_image,
 	records_vol,
 	serving_image,
 	titan_image,
@@ -187,6 +188,25 @@ def probe_user_check_serving_image() -> dict:
 	from preflight.probes.local import probe_user_check
 
 	return probe_user_check(PROBE_USER_IMPORTS["serving"])
+
+
+@ops.function(image=probe_new_image, timeout=600)  # CPU, as startup_check_probe: probes.torch_new's image
+def startup_check_probe_new() -> dict:
+	"""The torch 2.7.1 probe image (probes.torch_new): its pins import, and a tiny loop runs through run_probe."""
+	import importlib.metadata as md
+
+	r = startup_check_probe.local()
+	r["versions"] = {
+		n: md.version(n) for n in ("torch", "torchvision", "transformers", "trl", "accelerate", "peft")
+	}
+	return r
+
+
+@ops.function(image=probe_new_image, timeout=600)
+def probe_user_check_probe_new_image() -> dict:
+	from preflight.probes.local import probe_user_check
+
+	return probe_user_check(PROBE_USER_IMPORTS["torch27"])
 
 
 @ops.function(image=titan_image, timeout=600)
@@ -491,6 +511,16 @@ def ground_truth_serving_on_a10(*a, **kw) -> dict:
 	return _ground_truth(*a, **kw)
 
 
+@ops.function(**{**_GT, "image": probe_new_image}, gpu=GROUND_TRUTH_GPUS)  # probes.torch_new
+def ground_truth_torch27_on_l4(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
+@ops.function(**{**_GT, "image": probe_new_image}, gpu=GROUND_TRUTH_GPUS[::-1])
+def ground_truth_torch27_on_a10(*a, **kw) -> dict:
+	return _ground_truth(*a, **kw)
+
+
 @ops.function(**{**_GT, "image": titan_image}, gpu=GROUND_TRUTH_GPUS)  # torchtitan: torch 2.7
 def ground_truth_titan_on_l4(*a, **kw) -> dict:
 	return _ground_truth(*a, **kw)
@@ -518,6 +548,7 @@ GT_FUNCTIONS = {
 	("probe", "L4"): ground_truth_on_l4, ("probe", "A10"): ground_truth_on_a10,
 	("serving", "L4"): ground_truth_serving_on_l4, ("serving", "A10"): ground_truth_serving_on_a10,
 	("titan", "L4"): ground_truth_titan_on_l4, ("titan", "A10"): ground_truth_titan_on_a10,
+	("torch27", "L4"): ground_truth_torch27_on_l4, ("torch27", "A10"): ground_truth_torch27_on_a10,
 }  # fmt: skip
 
 
@@ -576,6 +607,7 @@ def ground_truth(
 	eval_units: bool = False,
 	sdists: str = "",
 	build: bool = False,
+	torch_new: bool = False,
 ):
 	"""A full run of any script, with the same budget and stop rules (Monday's cost table, B):
 
@@ -664,6 +696,19 @@ def ground_truth(
 
 		p = {**p, "lens": command_lens, "generate_calls": EVAL_PROBE_CALLS if command_lens == "eval" else 0,
 			"generate_sample": SERVING_PROBE_PROMPTS if command_lens == "serving" else 0}  # fmt: skip
+	if torch_new:  # probes.torch_new in this process only: the image pick and the plain stop
+		from preflight.recorder.requirements import IMAGE_TORCH, NEW_IMAGE_TORCH, torch_asks, torch_fits
+
+		asks = torch_asks(files)
+		if (
+			p["image"] == "probe"
+			and asks
+			and not torch_fits(asks, IMAGE_TORCH)
+			and torch_fits(asks, NEW_IMAGE_TORCH)
+		):
+			p = {**p, "image": "torch27"}
+		opts["torch_stop"] = True
+		print(f"[ground truth] torch asks {asks}: {p['image']} image", flush=True)
 	if p["lens"] == "agent":
 		raise SystemExit("an agent run has no GPU ground truth: its full run is ops_app.py::agent_sample")
 	entry, image, sample = p["entrypoint"], p["image"], p["generate_sample"]
@@ -1367,6 +1412,29 @@ def startup_check_serving_image() -> dict:
 	if p.returncode == 0:
 		out.update(json.loads(p.stdout.strip().splitlines()[-1]))
 	return out
+
+
+@ops.local_entrypoint()
+def startup_check_torch_new():
+	"""modal run --env main python/preflight/runner/ops_app.py::startup_check_torch_new
+	Writes out/startup_check_torch_new.json; exits non-zero unless the torch 2.7.1 probe image (probes.torch_new)
+	runs the check loop as the probe uid."""
+	import sys
+
+	res = startup_check_probe_new.remote()
+	res["probe_user"] = probe_user_check_probe_new_image.remote()
+	res["ok"] = (
+		res.get("status") == "ok"
+		and res.get("steps", 0) > 0
+		and bool(res.get("reachable_by_probe_uid"))
+		and str(res.get("versions", {}).get("torch", "")).startswith("2.7.1")
+		and _probe_user_ok(res["probe_user"], "torch27")
+	)
+	Path("out").mkdir(exist_ok=True)
+	Path("out/startup_check_torch_new.json").write_text(json.dumps(res, indent=2))
+	print(json.dumps(res, indent=2), flush=True)
+	if not res["ok"]:
+		sys.exit(1)
 
 
 @ops.local_entrypoint()

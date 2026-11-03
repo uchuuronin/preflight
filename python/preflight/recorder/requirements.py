@@ -103,6 +103,58 @@ def pin_conflicts(text: str, have: dict[str, str]) -> list[str]:
 	return out[:4]
 
 
+# ---------------------------------------------------------------- probes.torch_new (off)
+
+# the probe images' torch: the default image's, and the newer image's (runner/modal_app.py PROBE_NEW_PACKAGES)
+IMAGE_TORCH = "2.5.1"
+NEW_IMAGE_TORCH = "2.7.1"
+
+
+def torch_asks(files: dict[str, str]) -> list[str]:
+	"""The torch requirements the code's own files state (requirements.txt, pyproject.toml, setup.cfg, a
+	literal setup.py list), without a marker: "torch>=2.7" from LitGPT's pyproject.toml, Nov 2."""
+	import tempfile
+
+	lines = []
+	if "requirements.txt" in files:
+		lines += files["requirements.txt"].splitlines()
+	with tempfile.TemporaryDirectory() as tmp:
+		for name in ("pyproject.toml", "setup.cfg", "setup.py"):
+			if name in files:
+				(Path(tmp) / name).write_text(files[name], encoding="utf-8", errors="replace")
+		lines += declared(Path(tmp))
+	out = []
+	for raw in lines:
+		m = _LINE.fullmatch(raw.split(" #", 1)[0].strip())
+		if m and _norm(m["name"]) == "torch" and m["spec"] and not m["marker"]:
+			out.append(f"torch{m['spec'].replace(' ', '')}")
+	return out
+
+
+def torch_fits(asks: list[str], version: str) -> bool:
+	"""Whether every torch requirement admits this version (no asks: it does)."""
+	try:
+		from packaging.specifiers import InvalidSpecifier, SpecifierSet
+		from packaging.version import Version
+	except ImportError:
+		return True
+	for a in asks:
+		try:
+			if not SpecifierSet(a[len("torch") :]).contains(Version(version), prereleases=True):
+				return False
+		except InvalidSpecifier:
+			continue
+	return True
+
+
+def torch_too_old(asks: list[str], version: str) -> str | None:
+	"""The plain stop when the code's own torch requirement excludes the image's: "needs torch>=2.7;
+	Preflight's probe image has 2.5.1" (the PM, Nov 3), else None."""
+	if torch_fits(asks, version):
+		return None
+	return f"needs {', '.join(asks[:2])}; Preflight's probe image has torch {version}"
+
+
 # ---------------------------------------------------------------- probes.repo_install (off)
 
 # A module a script imports, and the PyPI distribution that provides it, for the imports the image
@@ -636,7 +688,7 @@ def _pip(keep: list[str], target: Path, constraints: Path, timeout_s: float, *, 
 
 def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entrypoint: str | None = None,
 	extra: list[str] | None = None, uv: bool = False, pyg: bool = False, sdists: tuple[str, ...] = (),
-	build: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
+	build: bool = False, torch_stop: bool = False) -> tuple[str | None, list[Path]]:  # fmt: skip
 	"""Install workdir/requirements.txt. Returns (pip's error tail or None, the dirs to import from).
 
 	target: this probe's own prefix; a shared one under PREFLIGHT_DEPS_DIR is used instead when set.
@@ -648,7 +700,9 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	rules (the image's stack wins, wheels only), with or without a requirements.txt.
 	uv (probes.uv_install): uv before pip. pyg (probes.extra_hosts): PyG's wheel index too, so torch-sparse
 	and the other NO_WHEELS packages install, and a repo's imports of them count as known. build
-	(probes.repo_install_exec): a setup.py that builds its list in code is run to read it (requires_from_build)."""
+	(probes.repo_install_exec): a setup.py that builds its list in code is run to read it (requires_from_build).
+	torch_stop (probes.torch_new): when what's installed asks for a torch the image's excludes, stop with that,
+	said plainly (torch_too_old), before any install."""
 	import time
 
 	req = workdir / "requirements.txt"
@@ -672,6 +726,12 @@ def install(workdir: Path, target: Path, *, log=print, repo: bool = False, entry
 	if extra:  # first, so the requirements' own cap (MAX_REQUIREMENTS) never drops them
 		text = "\n".join([*extra, text])
 	have = installed()
+	if torch_stop and "torch" in have:
+		asks = [f"torch{m['spec'].replace(' ', '')}" for raw in text.splitlines()
+			if (m := _LINE.fullmatch(raw.split(' #', 1)[0].strip())) and _norm(m['name']) == 'torch' and m['spec'] and not m['marker']]  # fmt: skip
+		stop = torch_too_old(asks, have["torch"].split("+", 1)[0])
+		if stop:
+			return stop, []
 	keep, notes = plan(text, have)
 	for n in notes:
 		log(f"[preflight] requirements: {n}")
