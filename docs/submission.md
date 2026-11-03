@@ -49,12 +49,12 @@ missing to this list.
 | <https://github.com/uchuuronin/preflight> | Form, X post | Once public |
 | <https://huggingface.co/datasets/chaoschia/preflight-corpus> | Form, README, datasheet | 0.4.0 uploaded (Chiya, Nov 3); once public |
 | The video link | Form, X post | Wed |
-| Every relative link in `docs/readme-final.md` | README | All resolve (D, Nov 3) |
+| Every relative link in `README.md` (final on `main`, `5bd09ed`) | README | To check once more before submitting |
 
 ## Before pressing submit
 
-- [ ] `docs/readme-final.md` copied over `README.md` on `main` (the PM's diff, `from-d.md`), and the
-      four open questions there settled.
+- [x] `README.md` final on `main` (Chiya's rewrite, `5bd09ed`, Nov 3); `docs/readme-final.md` is retired,
+      not swapped in.
 - [ ] Repository public; no secrets in its history (CI's gitleaks job passes on `main`).
 - [x] Corpus 0.4.0 on Hugging Face (Chiya, Nov 3).
 - [ ] Corpus public.
