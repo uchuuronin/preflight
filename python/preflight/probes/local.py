@@ -112,6 +112,7 @@ EXTRAS_KEYS = (
 	"sm_clock_mhz_min",
 	"sm_clock_mhz_max",
 	"sm_clock_timed_steps",
+	"sm_clock_readings",
 	# probes.eval_units: an eval probe's scoring batches (a forward under no_grad outside generate)
 	"eval_forward_batches",
 	"eval_forward_s_p50",

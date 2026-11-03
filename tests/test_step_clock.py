@@ -23,3 +23,24 @@ def test_the_spec_carries_it_and_its_extras_are_named():
 	assert {"sm_clock_mhz_p50", "sm_clock_mhz_min", "sm_clock_mhz_max", "sm_clock_timed_steps"} <= set(
 		EXTRAS_KEYS
 	)
+
+
+def test_the_sampler_keeps_the_clock_and_counts_its_readings(monkeypatch):
+	import threading
+	import time
+
+	import preflight.recorder.runtime as RT
+
+	monkeypatch.setattr(RT, "gpu_clock_reader", lambda: lambda: 1410.0)
+	monkeypatch.setattr(RT, "gpu_power_reader", lambda: None)
+	monkeypatch.setattr(RT, "SAMPLE_EVERY_S", 0.01)
+	rec = RT.Recorder(step_clock=True)
+	rec.cuda = True
+	t = threading.Thread(target=rec._sample_loop, daemon=True)
+	t.start()
+	time.sleep(0.1)
+	rec._sampler_stop.set()
+	t.join(1)
+	assert rec._clock_now == 1410.0 and rec._clock_seq >= 2
+	off = RT.Recorder()
+	assert off.step_clock is False and off._clock_seq == 0

@@ -413,6 +413,7 @@ class Recorder:
 		# probes.step_clock (off): the SM clock the sampler last read, kept on each step (no NVML call in the step)
 		self.step_clock = step_clock
 		self._clock_now: float | None = None
+		self._clock_seq = 0  # readings so far: steps faster than the sampler share one (review)
 		self._fwd: list[dict] = []
 		self._fwd_depth = 0
 		self.target = warmup + timed + (0 if alternate_sync else PHASE_STEPS)
@@ -1496,7 +1497,8 @@ class Recorder:
 			if read_clock is not None:
 				with suppress(Exception):
 					c = read_clock()
-					self._clock_now = c if math.isfinite(c) and 0 < c < 10_000 else self._clock_now
+					if math.isfinite(c) and 0 < c < 10_000:
+						self._clock_now, self._clock_seq = c, self._clock_seq + 1
 			if proc is not None:
 				with suppress(Exception):
 					rss = proc.memory_info().rss + sum(
@@ -1829,6 +1831,7 @@ class Recorder:
 		)
 		if self.step_clock:
 			self.steps[-1]["sm_clock_mhz"] = self._clock_now
+			self.steps[-1]["sm_clock_seq"] = self._clock_seq
 		self._reset_acc()
 		n = len(self.steps)
 		if kind == "timed" and n == self.warmup + self.timed and not self.alternate_sync:
@@ -2011,6 +2014,8 @@ class Recorder:
 			out["sm_clock_mhz_p50"] = statistics.median(clocks)
 			out["sm_clock_mhz_min"], out["sm_clock_mhz_max"] = min(clocks), max(clocks)
 			out["sm_clock_timed_steps"] = float(len(clocks))
+			# distinct sampler readings among them: with steps under 0.25 s, several steps share one
+			out["sm_clock_readings"] = float(len({s["sm_clock_seq"] for s in timed if s.get("sm_clock_mhz")}))
 		if self._power:
 			out["power"] = {
 				"mean_w": statistics.fmean(self._power),

@@ -82,7 +82,7 @@ def fill_dataset_cache(only: str = "") -> list[dict]:
 						time.monotonic() - started > FILL_DEADLINE_S
 					):  # a slow host: say how slow, before the container ends
 						raise TimeoutError(
-							f"{n / 1024 / (time.monotonic() - t0):.0f} kB/s, {n:,} bytes in {FILL_DEADLINE_S:.0f} s"
+							f"{n / 1024 / (time.monotonic() - t0):.0f} kB/s, {n:,} bytes before the container's {FILL_DEADLINE_S:.0f} s ran out"
 						)
 		except Exception as exc:  # one host down doesn't stop the rest
 			tmp.unlink(missing_ok=True)
