@@ -1,0 +1,11 @@
+{
+	"name": "20261103-003620-41554038583-a-after-4a-notes",
+	"exit_code": 1,
+	"workflow": "remote-run",
+	"run_id": "41554038583",
+	"ref": "234ea120b2d558eb689d9d70cb6350f11f515b66",
+	"sha": "234ea120b2d558eb689d9d70cb6350f11f515b66",
+	"cmd": "modal run --env main python/preflight/runner/ops_app.py::agent_sample --repo https://github.com/huggingface/smolagents --commit 96f33faaf028479119ec8d34507b47694cf14e34 --entrypoint examples/agent_from_any_llm.py --edit-hex  --install-repo --keep-error --notes",
+	"actor": "uchuuronin",
+	"finished_at": "2026-11-03T00:36:44Z"
+}
