@@ -1,7 +1,7 @@
 # D's check of shot 9b's laptop steps on Windows (docs/demo/shot-9b-laptop.md), on a GitHub
 # Windows runner: no GPU, so it checks the commands and the CLI on Windows, not the alerts.
 # Runs only when this file changes on ws-d. Step 5 also runs `preflight run` with os.geteuid
-# stubbed, to list what else stops it on Windows. Everything lives on D:, as the laptop's steps keep
+# stubbed (and tzdata installed, a sandbox folder set), to list what else stops it on Windows. Everything lives on D:, as the laptop's steps keep
 # everything on E:. No secrets are used. The job fails if any checked step failed, after every
 # step has reported and the logs are uploaded.
 name: d-windows-watch
@@ -44,7 +44,7 @@ jobs:
         shell: pwsh
         env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PIP_CACHE_DIR: 'D:\pf9b\pip-cache' }
         run: |
-          D:\pf9b\venv\Scripts\python.exe -m pip install "${{ github.workspace }}\src[probe]"
+          D:\pf9b\venv\Scripts\python.exe -m pip install "${{ github.workspace }}\src[probe]" tzdata
           D:\pf9b\venv\Scripts\python.exe -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
           D:\pf9b\venv\Scripts\preflight.exe --help
       - name: "4. The script, copied, with its steps raised"
@@ -60,8 +60,9 @@ jobs:
         timeout-minutes: 10
         shell: pwsh
         working-directory: D:\pf9b
-        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8 }
+        env: { TEMP: 'D:\pf9b\tmp', TMP: 'D:\pf9b\tmp', PYTHONIOENCODING: utf-8, PREFLIGHT_SANDBOX_DIR: 'D:\pf9b\sandbox' }
         run: |
+          New-Item -ItemType Directory -Force D:\pf9b\sandbox | Out-Null
           D:\pf9b\venv\Scripts\preflight.exe run film\tiny_train.py *> D:\pf9b\run.log
           $code = $LASTEXITCODE
           Get-Content D:\pf9b\run.log -Tail 15
