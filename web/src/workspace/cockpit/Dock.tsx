@@ -12,6 +12,7 @@ import { knobChoices } from "../record/model";
 import type { Knob, KnobValue } from "../record/types";
 import { guidedKnobs, useRanked, useWorkspace } from "../state";
 import { fitOf, type Fit } from "../status";
+import { GPU_KNOBS, gpuSpec } from "../record/terms";
 import { flag } from "../../lib/flags";
 import { rangeTestOf } from "./lrRange";
 import { RangeTestCurve } from "./RangeTest";
@@ -132,6 +133,8 @@ function Control({ knob, labelKey, ranked }: { knob: Knob; labelKey: string; ran
 							role="radio"
 							aria-checked={v === value}
 							className={`pf-choice__opt pf-choice__opt--${statuses[i]}`}
+							// A GPU whose specs in B's table are derived, not from its datasheet, says so on hover (Nov 3).
+							title={(GPU_KNOBS as readonly string[]).includes(knob.id) && typeof v === "string" && gpuSpec(v)?.confidence === "derived" ? t("gpu.derived") : undefined}
 							onClick={() => actions.setKnob(knob.id, v, "user")}
 						>
 							{valueText(knob, v)}
